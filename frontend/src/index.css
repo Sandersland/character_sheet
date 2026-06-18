@@ -1,1 +1,130 @@
 @import "tailwindcss";
+
+/* ---------------------------------------------------------------------
+ * Design tokens
+ *
+ * Direction: "fantasy-tactile" — a warm parchment surface, deep umber
+ * text, a garnet primary, and small accent hues borrowed from the
+ * spellcasting palette (arcane teal, resource yellow, vitality green).
+ * Grounded in the Design Reference Library:
+ *   - Neutrals = `warm-grey` family, Primary = `red-vivid` family,
+ *     accents = `green` / `yellow` / `teal` families, all pulled from
+ *     swatches.json (Refactoring UI palette source) per colors.md's
+ *     "greys don't have to be neutral" + shade-scale rules.
+ *   - Headings use a serif (Source Serif 4) for "elegant/classic"
+ *     personality per principles.md; body/UI text uses a neutral sans
+ *     (Source Sans 3) from typography.md's "Modern/neutral sans-serif"
+ *     pairing list, since dense stat blocks need the wider letter-
+ *     spacing / taller x-height of a body-tuned cut.
+ * ------------------------------------------------------------------- */
+
+@theme {
+  /* Typography */
+  --font-display: "Source Serif 4", "Iowan Old Style", Georgia, serif;
+  --font-sans:
+    "Source Sans 3", -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+
+  /* Neutrals — warm grey, parchment-to-umber (swatches.json: warm-grey-*) */
+  --color-parchment-50: #faf9f7;
+  --color-parchment-100: #e8e6e1;
+  --color-parchment-200: #d3cec4;
+  --color-parchment-300: #b8b2a7;
+  --color-parchment-400: #a39e93;
+  --color-parchment-500: #857f72;
+  --color-parchment-600: #625d52;
+  --color-parchment-700: #504a40;
+  --color-parchment-800: #423d33;
+  --color-parchment-900: #27241d;
+
+  /* Primary — garnet / blood red (swatches.json: red-vivid-*) */
+  --color-garnet-50: #ffe3e3;
+  --color-garnet-100: #ffbdbd;
+  --color-garnet-200: #ff9b9b;
+  --color-garnet-300: #f86a6a;
+  --color-garnet-400: #ef4e4e;
+  --color-garnet-500: #e12d39;
+  --color-garnet-600: #cf1124;
+  --color-garnet-700: #ab091e;
+  --color-garnet-800: #8a041a;
+  --color-garnet-900: #610316;
+
+  /* Accent — arcane teal, for magic/spell affordances (swatches.json: teal-*) */
+  --color-arcane-50: #effcf6;
+  --color-arcane-100: #c6f7e2;
+  --color-arcane-200: #8eedc7;
+  --color-arcane-300: #65d6ad;
+  --color-arcane-400: #3ebd93;
+  --color-arcane-500: #27ab83;
+  --color-arcane-600: #199473;
+  --color-arcane-700: #147d64;
+  --color-arcane-800: #0c6b58;
+  --color-arcane-900: #014d40;
+
+  /* Accent — resource gold, for HP/slots/limited-use meters (swatches.json: yellow-*) */
+  --color-gold-50: #fffaeb;
+  --color-gold-100: #fcefc7;
+  --color-gold-200: #f8e3a3;
+  --color-gold-300: #f9da8b;
+  --color-gold-400: #f7d070;
+  --color-gold-500: #e9b949;
+  --color-gold-600: #c99a2e;
+  --color-gold-700: #a27c1a;
+  --color-gold-800: #7c5e10;
+  --color-gold-900: #513c06;
+
+  /* Accent — vitality green, for healing/positive states (swatches.json: green-*) */
+  --color-vitality-50: #e3f9e5;
+  --color-vitality-100: #c1eac5;
+  --color-vitality-200: #a3d9a5;
+  --color-vitality-300: #7bc47f;
+  --color-vitality-400: #57ae5b;
+  --color-vitality-500: #3f9142;
+  --color-vitality-600: #2f8132;
+  --color-vitality-700: #207227;
+  --color-vitality-800: #0e5814;
+  --color-vitality-900: #05400a;
+
+  /* Spacing scale (base 16px, ~25%+ steps per principles.md) */
+  --spacing-xs: 0.5rem;
+  --spacing-sm: 0.75rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2.25rem;
+  --spacing-2xl: 3.5rem;
+
+  /* Radius — one convention, reused everywhere per components.md */
+  --radius-card: 0.625rem;
+  --radius-control: 0.375rem;
+
+  /* Shadows — small elevation system per principles.md (Creating Depth) */
+  --shadow-card:
+    0 1px 2px 0 rgb(39 36 29 / 0.06), 0 2px 8px -2px rgb(39 36 29 / 0.10);
+  --shadow-raised:
+    0 4px 6px -2px rgb(39 36 29 / 0.08), 0 12px 24px -8px rgb(39 36 29 / 0.16);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+  }
+
+  body {
+    background-color: var(--color-parchment-100);
+    color: var(--color-parchment-900);
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+  }
+
+  /* Visible, brand-colored focus ring for keyboard users (replaces the
+     default outline rather than removing it). */
+  :focus-visible {
+    outline: 2px solid var(--color-garnet-600);
+    outline-offset: 2px;
+    border-radius: var(--radius-control);
+  }
+}

@@ -1,0 +1,1 @@
+- [Design system](design_system.md) — fantasy-tactile parchment direction, color/font/component tokens, mock data layer conventions
