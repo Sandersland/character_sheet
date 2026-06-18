@@ -153,3 +153,54 @@ export interface CharacterSummary {
   level: number;
   portraitUrl?: string;
 }
+
+/**
+ * Baseline catalog entries served by `GET /api/reference`, used to populate
+ * the character-creation form. These are *suggestions* the backend can
+ * derive mechanics from — a created character's race/class/background name
+ * can still drift from (or omit) a catalog match; see backend's
+ * schema.prisma for the reasoning.
+ */
+export interface RaceOption {
+  id: string;
+  name: string;
+  speed: number;
+}
+
+export interface ClassOption {
+  id: string;
+  name: string;
+  hitDie: string;
+  savingThrows: AbilityName[];
+  skillChoiceCount: number;
+  skillChoices: SkillName[];
+  isSpellcaster: boolean;
+}
+
+export interface BackgroundOption {
+  id: string;
+  name: string;
+  skillProficiencies: SkillName[];
+}
+
+export interface ReferenceData {
+  races: RaceOption[];
+  classes: ClassOption[];
+  backgrounds: BackgroundOption[];
+  alignments: string[];
+}
+
+/** Body for `POST /api/characters`. The backend derives AC/HP/saves/skills
+ * from `race`/`classes[0]`/`abilityScores` — see backend's
+ * src/lib/srd.ts — rather than the client computing and sending them. */
+export interface CreateCharacterInput {
+  name: string;
+  alignment: string;
+  portraitUrl?: string | null;
+  experiencePoints?: number;
+  race: string;
+  background: string;
+  classes: [{ name: string; subclass?: string | null }];
+  abilityScores: AbilityScores;
+  skillProficiencies?: SkillName[];
+}

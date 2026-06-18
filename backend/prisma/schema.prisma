@@ -10,13 +10,17 @@ datasource db {
 // level and proficiencyBonus are intentionally NOT columns here — they're
 // always derived from experiencePoints at read time (see
 // src/lib/experience.ts). Don't add them back as persisted fields.
+//
+// race/class/background are NOT columns here either — they're modeled as
+// per-character selection rows (CharacterRace/CharacterClassEntry/
+// CharacterBackground below) that each link to a baseline catalog entry via
+// a nullable FK but carry their own display name. This lets a sheet's
+// race/class/background name drift from (or fully replace) the catalog
+// entry without breaking the link used for mechanical derivation, and lets
+// class be one-to-many for future multiclass support.
 model Character {
   id          String  @id @default(uuid())
   name        String
-  race        String
-  class       String
-  subclass    String?
-  background  String
   alignment   String
   portraitUrl String?
 
@@ -38,6 +42,83 @@ model Character {
   spellcasting Json?
   journal      Json
 
+  raceSelection       CharacterRace?
+  backgroundSelection CharacterBackground?
+  classEntries        CharacterClassEntry[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// --- Reference catalog -----------------------------------------------------
+// Baseline lists offered in the character-creation form. These are seeded
+// from a small SRD subset (see prisma/seed.ts) and are NOT referenced
+// directly by Character — only through the nullable FKs on the selection
+// models below, so deleting/renaming a catalog row never breaks an existing
+// character sheet.
+
+model Race {
+  id    String @id @default(uuid())
+  name  String @unique
+  speed Int
+
+  selections CharacterRace[]
+}
+
+model CharacterClass {
+  id               String   @id @default(uuid())
+  name             String   @unique
+  hitDie           String // e.g. "d8"
+  savingThrows     String[] // ability names, e.g. ["strength", "constitution"]
+  skillChoiceCount Int
+  skillChoices     String[] // eligible skill names to choose from
+  isSpellcaster    Boolean  @default(false)
+
+  entries CharacterClassEntry[]
+}
+
+model Background {
+  id                 String   @id @default(uuid())
+  name               String   @unique
+  skillProficiencies String[]
+
+  selections CharacterBackground[]
+}
+
+// --- Per-character selections -----------------------------------------------
+// Each links a Character to a catalog row (optionally — null means
+// homebrew, no baseline) and carries its own `name`, which defaults to the
+// catalog entry's name at creation but is free to drift independently.
+
+model CharacterRace {
+  id          String @id @default(uuid())
+  characterId String @unique
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  raceId      String?
+  race        Race?  @relation(fields: [raceId], references: [id], onDelete: SetNull)
+  name        String
+}
+
+model CharacterBackground {
+  id           String @id @default(uuid())
+  characterId  String @unique
+  character    Character   @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  backgroundId String?
+  background   Background? @relation(fields: [backgroundId], references: [id], onDelete: SetNull)
+  name         String
+}
+
+// One-to-many (not @unique on characterId): a character can hold several
+// class entries, which is what multiclassing needs. v1 always creates
+// exactly one entry per character (position 0).
+model CharacterClassEntry {
+  id          String @id @default(uuid())
+  characterId String
+  character   Character       @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  classId     String?
+  class       CharacterClass? @relation(fields: [classId], references: [id], onDelete: SetNull)
+  name        String
+  level       Int     @default(1)
+  subclass    String?
+  position    Int     @default(0)
 }

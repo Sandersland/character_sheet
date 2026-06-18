@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { checkHealth, fetchCharacter, fetchCharacters, updateCharacter } from "./client";
+import {
+  checkHealth,
+  createCharacter,
+  fetchCharacter,
+  fetchCharacters,
+  fetchReference,
+  updateCharacter,
+} from "./client";
+import type { CreateCharacterInput } from "../types/character";
 
 describe("checkHealth", () => {
   afterEach(() => {
@@ -94,5 +102,79 @@ describe("updateCharacter", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 400 }));
 
     await expect(updateCharacter("1", { experiencePoints: -1 })).rejects.toThrow();
+  });
+});
+
+describe("fetchReference", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns the parsed catalog on success", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          races: [{ id: "r1", name: "Human", speed: 30 }],
+          classes: [],
+          backgrounds: [],
+          alignments: ["Lawful Good"],
+        }),
+      })
+    );
+
+    await expect(fetchReference()).resolves.toMatchObject({
+      races: [{ name: "Human", speed: 30 }],
+    });
+  });
+
+  it("throws on a non-ok response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+
+    await expect(fetchReference()).rejects.toThrow();
+  });
+});
+
+describe("createCharacter", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const input: CreateCharacterInput = {
+    name: "New Hero",
+    alignment: "Lawful Good",
+    race: "Human",
+    background: "Soldier",
+    classes: [{ name: "Fighter" }],
+    abilityScores: {
+      strength: 15,
+      dexterity: 12,
+      constitution: 14,
+      intelligence: 8,
+      wisdom: 10,
+      charisma: 8,
+    },
+  };
+
+  it("sends a POST with a JSON body and returns the created character", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: "new-1", name: "New Hero" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createCharacter(input);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/characters"),
+      expect.objectContaining({ method: "POST", body: JSON.stringify(input) })
+    );
+  });
+
+  it("throws on a non-ok response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 400 }));
+
+    await expect(createCharacter(input)).rejects.toThrow();
   });
 });

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { fetchCharacters } from "../api/client";
 import BackendStatus from "../components/BackendStatus";
@@ -29,15 +30,10 @@ function useCharacterList() {
 
 function NewCharacterCard() {
   return (
-    <button
-      type="button"
+    <Link
+      to="/characters/new"
       className="flex flex-col items-center justify-center gap-2 rounded-[var(--radius-card)] border-2 border-dashed border-[var(--color-parchment-300)] bg-transparent p-4 text-[var(--color-parchment-500)] transition-colors hover:border-[var(--color-garnet-400)] hover:text-[var(--color-garnet-700)] focus-visible:border-[var(--color-garnet-400)] focus-visible:text-[var(--color-garnet-700)]"
       style={{ aspectRatio: "4 / 3" }}
-      onClick={() => {
-        // Will route to a character-creation flow once that exists; no
-        // backend model to create against yet (see CLAUDE.md).
-        window.alert("Character creation isn't available yet — coming in a later phase.");
-      }}
     >
       <span
         className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-current text-xl leading-none"
@@ -46,7 +42,7 @@ function NewCharacterCard() {
         +
       </span>
       <span className="font-sans text-sm font-semibold">New Character</span>
-    </button>
+    </Link>
   );
 }
 

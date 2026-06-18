@@ -5,6 +5,124 @@ import { PrismaClient } from "../src/generated/prisma/client.js";
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
+// --- Reference catalog -------------------------------------------------
+// A small SRD subset populating the character-creation form's baseline
+// lists (served via GET /api/reference, see src/routes/reference.ts).
+// Covers every race/class/background used by SEED_CHARACTERS below, plus a
+// handful of extra options so the form isn't a list of three.
+
+const RACES = [
+  { name: "Human", speed: 30 },
+  { name: "Half-Elf", speed: 30 },
+  { name: "Wood Elf", speed: 35 },
+  { name: "Dwarf", speed: 25 },
+  { name: "Halfling", speed: 25 },
+  { name: "Half-Orc", speed: 30 },
+  { name: "Gnome", speed: 25 },
+  { name: "Tiefling", speed: 30 },
+];
+
+const CLASSES = [
+  {
+    name: "Wizard",
+    hitDie: "d6",
+    savingThrows: ["intelligence", "wisdom"],
+    skillChoiceCount: 2,
+    skillChoices: ["arcana", "history", "insight", "investigation", "medicine", "religion"],
+    isSpellcaster: true,
+  },
+  {
+    name: "Fighter",
+    hitDie: "d10",
+    savingThrows: ["strength", "constitution"],
+    skillChoiceCount: 2,
+    skillChoices: [
+      "acrobatics",
+      "animalHandling",
+      "athletics",
+      "history",
+      "insight",
+      "intimidation",
+      "perception",
+      "survival",
+    ],
+    isSpellcaster: false,
+  },
+  {
+    name: "Rogue",
+    hitDie: "d8",
+    savingThrows: ["dexterity", "intelligence"],
+    skillChoiceCount: 4,
+    skillChoices: [
+      "acrobatics",
+      "athletics",
+      "deception",
+      "insight",
+      "intimidation",
+      "investigation",
+      "perception",
+      "performance",
+      "persuasion",
+      "sleightOfHand",
+      "stealth",
+    ],
+    isSpellcaster: false,
+  },
+  {
+    name: "Cleric",
+    hitDie: "d8",
+    savingThrows: ["wisdom", "charisma"],
+    skillChoiceCount: 2,
+    skillChoices: ["history", "insight", "medicine", "persuasion", "religion"],
+    isSpellcaster: true,
+  },
+  {
+    name: "Barbarian",
+    hitDie: "d12",
+    savingThrows: ["strength", "constitution"],
+    skillChoiceCount: 2,
+    skillChoices: ["animalHandling", "athletics", "intimidation", "nature", "perception", "survival"],
+    isSpellcaster: false,
+  },
+  {
+    name: "Bard",
+    hitDie: "d8",
+    savingThrows: ["dexterity", "charisma"],
+    skillChoiceCount: 3,
+    skillChoices: [
+      "acrobatics",
+      "animalHandling",
+      "arcana",
+      "athletics",
+      "deception",
+      "history",
+      "insight",
+      "intimidation",
+      "investigation",
+      "medicine",
+      "nature",
+      "perception",
+      "performance",
+      "persuasion",
+      "religion",
+      "sleightOfHand",
+      "stealth",
+      "survival",
+    ],
+    isSpellcaster: true,
+  },
+];
+
+const BACKGROUNDS = [
+  { name: "Sage", skillProficiencies: ["arcana", "history"] },
+  { name: "Soldier", skillProficiencies: ["athletics", "intimidation"] },
+  { name: "Charlatan", skillProficiencies: ["deception", "sleightOfHand"] },
+  { name: "Acolyte", skillProficiencies: ["insight", "religion"] },
+  { name: "Criminal", skillProficiencies: ["deception", "stealth"] },
+  { name: "Folk Hero", skillProficiencies: ["animalHandling", "survival"] },
+  { name: "Noble", skillProficiencies: ["history", "persuasion"] },
+];
+
 // Equivalent of frontend/src/mock/characters.ts's three fixtures, ported
 // here deliberately — backend and frontend are separate packages with no
 // shared workspace, and this is fixture/seed data, not shared business
@@ -12,6 +130,10 @@ const prisma = new PrismaClient({ adapter });
 // exact lower threshold (level 5 -> 6500, level 6 -> 14000, level 7 ->
 // 23000) so the seeded levels match what the frontend mock currently
 // hardcodes.
+//
+// race/class/subclass/background here are seed-only identifiers used below
+// to look up catalog rows and build each character's nested selections —
+// they are not Character columns (see schema.prisma).
 const SEED_CHARACTERS = [
   {
     id: "1",
@@ -323,11 +445,56 @@ const SEED_CHARACTERS = [
 ];
 
 async function main() {
-  for (const character of SEED_CHARACTERS) {
+  const raceIds = new Map<string, string>();
+  for (const race of RACES) {
+    const row = await prisma.race.upsert({ where: { name: race.name }, create: race, update: race });
+    raceIds.set(row.name, row.id);
+  }
+
+  const classIds = new Map<string, string>();
+  for (const cls of CLASSES) {
+    const row = await prisma.characterClass.upsert({ where: { name: cls.name }, create: cls, update: cls });
+    classIds.set(row.name, row.id);
+  }
+
+  const backgroundIds = new Map<string, string>();
+  for (const background of BACKGROUNDS) {
+    const row = await prisma.background.upsert({
+      where: { name: background.name },
+      create: background,
+      update: background,
+    });
+    backgroundIds.set(row.name, row.id);
+  }
+
+  for (const { race, class: className, subclass, background, ...character } of SEED_CHARACTERS) {
+    const raceId = raceIds.get(race);
+    const classId = classIds.get(className);
+    const backgroundId = backgroundIds.get(background);
+
     await prisma.character.upsert({
       where: { id: character.id },
-      create: character,
-      update: character,
+      create: {
+        ...character,
+        raceSelection: { create: { name: race, raceId } },
+        backgroundSelection: { create: { name: background, backgroundId } },
+        classEntries: { create: [{ name: className, subclass, classId, position: 0 }] },
+      },
+      update: {
+        ...character,
+        raceSelection: {
+          upsert: { create: { name: race, raceId }, update: { name: race, raceId } },
+        },
+        backgroundSelection: {
+          upsert: { create: { name: background, backgroundId }, update: { name: background, backgroundId } },
+        },
+        // Class entries have no natural unique key to upsert against, so
+        // re-seeding replaces them wholesale rather than risking duplicates.
+        classEntries: {
+          deleteMany: {},
+          create: [{ name: className, subclass, classId, position: 0 }],
+        },
+      },
     });
   }
 }
