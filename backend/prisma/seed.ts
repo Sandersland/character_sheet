@@ -1,27 +1,31 @@
-import type { Character, CharacterSummary } from "../types/character";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-/**
- * Placeholder data standing in for the future `GET /api/characters` and
- * `GET /api/characters/:id` endpoints (no backend data model exists yet —
- * see CLAUDE.md). Shaped to match `src/types/character.ts` so this module
- * is the only thing that should need to change once those routes exist.
- */
+import { PrismaClient } from "../src/generated/prisma/client.js";
 
-const FULL_CHARACTERS: Character[] = [
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+const prisma = new PrismaClient({ adapter });
+
+// Equivalent of frontend/src/mock/characters.ts's three fixtures, ported
+// here deliberately — backend and frontend are separate packages with no
+// shared workspace, and this is fixture/seed data, not shared business
+// logic. experiencePoints is chosen as each character's target level's
+// exact lower threshold (level 5 -> 6500, level 6 -> 14000, level 7 ->
+// 23000) so the seeded levels match what the frontend mock currently
+// hardcodes.
+const SEED_CHARACTERS = [
   {
     id: "1",
     name: "Brielle Stormwind",
     race: "Half-Elf",
     class: "Wizard",
     subclass: "School of Evocation",
-    level: 7,
     background: "Sage",
     alignment: "Neutral Good",
+    experiencePoints: 23000,
 
     armorClass: 13,
     initiativeBonus: 2,
     speed: 30,
-    proficiencyBonus: 3,
 
     hitPoints: { current: 38, max: 46, temp: 0 },
     hitDice: { total: 7, die: "d6" },
@@ -59,13 +63,7 @@ const FULL_CHARACTERS: Character[] = [
     inventory: [
       { id: "i1", name: "Quarterstaff", quantity: 1, weight: 4, equipped: true },
       { id: "i2", name: "Spellbook", quantity: 1, weight: 3 },
-      {
-        id: "i3",
-        name: "Component Pouch",
-        quantity: 1,
-        weight: 2,
-        equipped: true,
-      },
+      { id: "i3", name: "Component Pouch", quantity: 1, weight: 2, equipped: true },
       {
         id: "i4",
         name: "Ring of Protection",
@@ -181,14 +179,13 @@ const FULL_CHARACTERS: Character[] = [
     race: "Dwarf",
     class: "Fighter",
     subclass: "Battle Master",
-    level: 5,
     background: "Soldier",
     alignment: "Lawful Good",
+    experiencePoints: 6500,
 
     armorClass: 18,
     initiativeBonus: 0,
     speed: 25,
-    proficiencyBonus: 3,
 
     hitPoints: { current: 44, max: 51, temp: 5 },
     hitDice: { total: 5, die: "d10" },
@@ -232,6 +229,7 @@ const FULL_CHARACTERS: Character[] = [
     ],
     currency: { cp: 0, sp: 15, gp: 62, pp: 0 },
 
+    spellcasting: null,
     journal: [],
   },
   {
@@ -240,14 +238,13 @@ const FULL_CHARACTERS: Character[] = [
     race: "Wood Elf",
     class: "Rogue",
     subclass: "Arcane Trickster",
-    level: 6,
     background: "Charlatan",
     alignment: "Chaotic Neutral",
+    experiencePoints: 14000,
 
     armorClass: 15,
     initiativeBonus: 4,
     speed: 35,
-    proficiencyBonus: 3,
 
     hitPoints: { current: 28, max: 39, temp: 0 },
     hitDice: { total: 6, die: "d8" },
@@ -325,17 +322,20 @@ const FULL_CHARACTERS: Character[] = [
   },
 ];
 
-export const CHARACTER_SUMMARIES: CharacterSummary[] = FULL_CHARACTERS.map(
-  (character) => ({
-    id: character.id,
-    name: character.name,
-    race: character.race,
-    class: character.class,
-    level: character.level,
-    portraitUrl: character.portraitUrl,
-  })
-);
-
-export function getCharacterById(id: string): Character | undefined {
-  return FULL_CHARACTERS.find((character) => character.id === id);
+async function main() {
+  for (const character of SEED_CHARACTERS) {
+    await prisma.character.upsert({
+      where: { id: character.id },
+      create: character,
+      update: character,
+    });
+  }
 }
+
+main()
+  .then(() => prisma.$disconnect())
+  .catch(async (error) => {
+    console.error(error);
+    await prisma.$disconnect();
+    process.exit(1);
+  });

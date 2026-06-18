@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// level and proficiencyBonus are intentionally NOT columns here — they're
+// always derived from experiencePoints at read time (see
+// src/lib/experience.ts). Don't add them back as persisted fields.
+model Character {
+  id          String  @id @default(uuid())
+  name        String
+  race        String
+  class       String
+  subclass    String?
+  background  String
+  alignment   String
+  portraitUrl String?
+
+  experiencePoints Int @default(0)
+
+  armorClass      Int
+  initiativeBonus Int
+  speed           Int
+
+  hitPoints     Json
+  hitDice       Json
+  abilityScores Json
+
+  savingThrowProficiencies String[]
+  skills                   Json
+
+  inventory    Json
+  currency     Json
+  spellcasting Json?
+  journal      Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

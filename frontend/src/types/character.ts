@@ -1,9 +1,8 @@
 /**
- * Shape of character data as the future `Character`/`InventoryItem`/`Spell`
- * resource models (Phase 2+, per CLAUDE.md) are expected to look once a
- * real Postgres/Prisma schema and `/api/characters` routes exist. Mock
- * data in `src/mock` conforms to these types so swapping a `fetch` call
- * in for the mock import later should not require touching components.
+ * Shape of character data returned by `GET /api/characters` and
+ * `GET /api/characters/:id`. `level`/`proficiencyBonus`/threshold fields
+ * are derived server-side from `experiencePoints` (see backend's
+ * src/lib/experience.ts) and never set directly by the client.
  */
 
 export type AbilityName =
@@ -101,6 +100,9 @@ export interface Character {
   class: string;
   subclass?: string;
   level: number;
+  experiencePoints: number;
+  currentLevelThreshold: number;
+  nextLevelThreshold: number | null;
   background: string;
   alignment: string;
   portraitUrl?: string;

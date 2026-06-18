@@ -1,17 +1,30 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { fetchCharacters } from "../api/client";
 import BackendStatus from "../components/BackendStatus";
 import CharacterCard from "../components/CharacterCard";
-import { CHARACTER_SUMMARIES } from "../mock/characters";
+import type { CharacterSummary } from "../types/character";
 
-/**
- * Mock data stands in for the future `GET /api/characters` endpoint —
- * see CLAUDE.md (no Character model/routes exist yet). Swapping this for
- * a real fetch later is the only change this page should need.
- */
 function useCharacterList() {
-  const [characters] = useState(CHARACTER_SUMMARIES);
-  return characters;
+  const [characters, setCharacters] = useState<CharacterSummary[] | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    setError(false);
+    fetchCharacters()
+      .then((data) => {
+        if (mounted) setCharacters(data);
+      })
+      .catch(() => {
+        if (mounted) setError(true);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return { characters, error };
 }
 
 function NewCharacterCard() {
@@ -51,8 +64,22 @@ function EmptyState() {
   );
 }
 
+function ErrorState() {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-[var(--radius-card)] border border-dashed border-[var(--color-garnet-300)] px-6 py-16 text-center">
+      <span className="font-display text-2xl text-[var(--color-garnet-800)]">
+        Couldn't load characters
+      </span>
+      <p className="max-w-sm text-sm text-[var(--color-parchment-600)]">
+        The backend may be unreachable. Check that it's running and try
+        refreshing.
+      </p>
+    </div>
+  );
+}
+
 export default function CharacterListPage() {
-  const characters = useCharacterList();
+  const { characters, error } = useCharacterList();
 
   return (
     <div className="min-h-screen bg-[var(--color-parchment-100)]">
@@ -71,7 +98,11 @@ export default function CharacterListPage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-8">
-        {characters.length === 0 ? (
+        {error ? (
+          <ErrorState />
+        ) : characters === null ? (
+          <p className="text-sm text-[var(--color-parchment-600)]">Loading characters…</p>
+        ) : characters.length === 0 ? (
           <EmptyState />
         ) : (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

@@ -1,30 +1,77 @@
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { fetchCharacter } from "../api/client";
 import AbilityScoreBox from "../components/AbilityScoreBox";
 import BackendStatus from "../components/BackendStatus";
 import Badge from "../components/Badge";
 import Card from "../components/Card";
+import ExperienceTracker from "../components/ExperienceTracker";
 import InventoryList from "../components/InventoryList";
 import JournalSection from "../components/JournalSection";
 import SkillsTable from "../components/SkillsTable";
 import SpellsSection from "../components/SpellsSection";
 import VitalsStrip from "../components/VitalsStrip";
 import { ABILITY_LABELS } from "../lib/abilities";
-import { getCharacterById } from "../mock/characters";
+import type { Character } from "../types/character";
 
-/**
- * Mock data stands in for the future `GET /api/characters/:id` endpoint
- * (no Character model/routes exist yet — see CLAUDE.md).
- */
 function useCharacter(id: string | undefined) {
-  return id ? getCharacterById(id) : undefined;
+  const [character, setCharacter] = useState<Character | null | undefined>(undefined);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    let mounted = true;
+    setCharacter(undefined);
+    setError(false);
+    fetchCharacter(id)
+      .then((data) => {
+        if (mounted) setCharacter(data);
+      })
+      .catch(() => {
+        if (mounted) setError(true);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
+
+  return { character, error, setCharacter };
 }
 
 export default function CharacterSheetPage() {
   const { id } = useParams();
-  const character = useCharacter(id);
+  const { character, error, setCharacter } = useCharacter(id);
 
-  if (!character) {
+  if (error) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--color-parchment-100)] px-6 text-center">
+        <h1 className="font-display text-2xl font-semibold text-[var(--color-garnet-800)]">
+          Something went wrong
+        </h1>
+        <p className="text-sm text-[var(--color-parchment-600)]">
+          Couldn't load this character. Check that the backend is running and
+          try refreshing.
+        </p>
+        <Link
+          to="/"
+          className="rounded-[var(--radius-control)] bg-[var(--color-garnet-700)] px-4 py-2 text-sm font-semibold text-[var(--color-parchment-50)] transition-colors hover:bg-[var(--color-garnet-800)]"
+        >
+          Back to characters
+        </Link>
+      </div>
+    );
+  }
+
+  if (character === undefined) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--color-parchment-100)]">
+        <p className="text-sm text-[var(--color-parchment-600)]">Loading character…</p>
+      </div>
+    );
+  }
+
+  if (character === null) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--color-parchment-100)] px-6 text-center">
         <h1 className="font-display text-2xl font-semibold text-[var(--color-parchment-900)]">
@@ -79,6 +126,7 @@ export default function CharacterSheetPage() {
 
       <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
         <VitalsStrip character={character} />
+        <ExperienceTracker character={character} onUpdate={setCharacter} />
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_1fr] lg:items-start">
           {/* Ability scores rail — fixed intrinsic width per
