@@ -40,14 +40,18 @@ export function rollDie(faces: number): number {
   return 1 + Math.floor(Math.random() * faces);
 }
 
-/** Rolls a full `RollSpec`, dropping the lowest `dropLowest` dice from the total. */
-export function rollSpec(spec: RollSpec): RollResult {
-  const { count, faces, modifier = 0, dropLowest = 0 } = spec;
-  const values = Array.from({ length: count }, () => rollDie(faces));
+/**
+ * Turns already-rolled face values into a full `RollResult`: flags the
+ * lowest `spec.dropLowest` values as dropped (without disturbing roll
+ * order, so the UI can animate dice in the order they were rolled while
+ * still knowing which one(s) to dim) and sums the rest plus `spec.modifier`.
+ * Pulled out of `rollSpec` so any source of per-die values — `rollDie`
+ * here, or a physics roller reading values off settled dice — can share
+ * the same drop/sum logic and produce an identical `RollResult` shape.
+ */
+export function summarizeRoll(values: number[], spec: RollSpec): RollResult {
+  const { modifier = 0, dropLowest = 0 } = spec;
 
-  // Find the indices of the `dropLowest` lowest-valued dice without
-  // disturbing roll order, so the UI can animate dice in the order they
-  // were rolled while still knowing which one(s) to dim.
   const ascendingByValue = values
     .map((value, index) => ({ value, index }))
     .sort((a, b) => a.value - b.value);
@@ -61,6 +65,12 @@ export function rollSpec(spec: RollSpec): RollResult {
   const total = dice.reduce((sum, die) => sum + (die.dropped ? 0 : die.value), 0) + modifier;
 
   return { dice, modifier, total, spec };
+}
+
+/** Rolls a full `RollSpec`, dropping the lowest `dropLowest` dice from the total. */
+export function rollSpec(spec: RollSpec): RollResult {
+  const values = Array.from({ length: spec.count }, () => rollDie(spec.faces));
+  return summarizeRoll(values, spec);
 }
 
 /** Human-readable label for a roll spec, e.g. "4d6 drop lowest", "1d8 + 3". */

@@ -1,7 +1,9 @@
+import type { ComponentType } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import type { RollResult, RollSpec } from "../lib/dice";
 import DiceRoller from "./DiceRoller";
+import type { DiceRollerProps } from "./diceRollerTypes";
 
 // Beat between one set settling and the next tumble starting, so results
 // don't blur together. Long enough to register a total, short enough that a
@@ -17,6 +19,12 @@ interface DiceRollSequenceProps {
   triggerKey?: number | string;
   /** Called once all `count` steps have settled, with their results in order. */
   onComplete: (results: RollResult[]) => void;
+  /** Which roller component drives each step — `DiceRoller` (a predetermined
+   *  result animating into place) or `PhysicsDiceRoller` (a genuine physics
+   *  throw the result is read from). Defaults to `DiceRoller`. The two share
+   *  an identical prop contract (`diceRollerTypes.ts`), so this orchestrator
+   *  doesn't otherwise need to know or care which one it's driving. */
+  roller?: ComponentType<DiceRollerProps>;
   className?: string;
 }
 
@@ -24,16 +32,18 @@ interface DiceRollSequenceProps {
  * Rolls `count` repeats of the same `RollSpec` one at a time instead of all
  * at once — six simultaneous 4d6 sets (character creation's original take)
  * read as "a lot" in practice, and revealing each total in turn is calmer to
- * follow. Reuses `DiceRoller` as the only thing that actually rolls (it +
- * `lib/dice.ts` stay the sole source of randomness/results) — this is purely
- * an orchestrator: which step is live, what's been collected, and a one-click
- * "Skip" that resolves the current and all remaining steps instantly.
+ * follow. Reuses whichever `roller` component actually rolls (it + the
+ * dice-result logic it's built on stay the sole source of randomness/
+ * results) — this is purely an orchestrator: which step is live, what's been
+ * collected, and a one-click "Skip" that resolves the current and all
+ * remaining steps instantly.
  */
 export default function DiceRollSequence({
   spec,
   count,
   triggerKey,
   onComplete,
+  roller: Roller = DiceRoller,
   className = "",
 }: DiceRollSequenceProps) {
   // -1 = idle/not started, 0..count-1 = the live step, count = done.
@@ -109,7 +119,7 @@ export default function DiceRollSequence({
   }
 
   const inProgress = stepIndex >= 0 && stepIndex < count;
-  // Once done, keep showing the last step's DiceRoller frozen on its
+  // Once done, keep showing the last step's Roller frozen on its
   // settled result instead of unmounting it — same key as it had while
   // live, so React reuses that instance rather than remounting (and
   // re-rolling) it. This, plus reserving the Skip line below even when
@@ -123,9 +133,9 @@ export default function DiceRollSequence({
       {/* Fixed-size slots, all rendered from the first render — filling one
           in only swaps its content, so this row's size never changes as
           results arrive (no layout shift below it). aria-hidden because each
-          step's own DiceRoller already announces its result via its
-          aria-live region; six of those used to fire at once and race, one
-          per step in order is already an improvement on its own. */}
+          step's own Roller already announces its result via its aria-live
+          region; six of those used to fire at once and race, one per step in
+          order is already an improvement on its own. */}
       <div aria-hidden="true" className="flex flex-wrap gap-2">
         {Array.from({ length: count }, (_, index) => {
           const filled = Boolean(results[index]);
@@ -148,13 +158,13 @@ export default function DiceRollSequence({
       </div>
 
       {/* Reserve the die-stage slot even when idle so the panel's height
-          doesn't change as the sequence starts. A single DiceRoller instance is
+          doesn't change as the sequence starts. A single Roller instance is
           kept mounted across all steps (no per-step `key` remount) so the dice
           stay on screen and re-roll in place — `rollKey` changing per step is
           what triggers each fresh roll. */}
       <div className="h-44 w-full">
         {displayStepIndex >= 0 && (
-          <DiceRoller
+          <Roller
             spec={spec}
             rollKey={`${triggerKey}:${displayStepIndex}`}
             skip={skip}

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { formatRollSpec, rollDie, rollSpec } from "./dice";
+import { formatRollSpec, rollDie, rollSpec, summarizeRoll } from "./dice";
 
 describe("rollDie", () => {
   afterEach(() => {
@@ -86,6 +86,50 @@ describe("rollSpec", () => {
 
     expect(result.dice).toEqual([{ value: 4, dropped: false }]);
     expect(result.total).toBe(4);
+  });
+});
+
+describe("summarizeRoll", () => {
+  it("drops exactly the lowest value and excludes it from the total (4d6 drop lowest)", () => {
+    const result = summarizeRoll([2, 5, 6, 1], { count: 4, faces: 6, dropLowest: 1 });
+
+    expect(result.dice).toEqual([
+      { value: 2, dropped: false },
+      { value: 5, dropped: false },
+      { value: 6, dropped: false },
+      { value: 1, dropped: true },
+    ]);
+    expect(result.total).toBe(13);
+    expect(result.modifier).toBe(0);
+  });
+
+  it("adds the modifier to the total without affecting individual dice", () => {
+    const result = summarizeRoll([5], { count: 1, faces: 8, modifier: 3 });
+
+    expect(result.dice).toEqual([{ value: 5, dropped: false }]);
+    expect(result.modifier).toBe(3);
+    expect(result.total).toBe(8);
+  });
+
+  it("defaults modifier and dropLowest to 0 when omitted", () => {
+    const result = summarizeRoll([4], { count: 1, faces: 6 });
+
+    expect(result.dice).toEqual([{ value: 4, dropped: false }]);
+    expect(result.total).toBe(4);
+  });
+
+  it("agrees with rollSpec when given the same underlying values", () => {
+    const sequence = [(6 - 1) / 6, (1 - 1) / 6, (4 - 1) / 6, (2 - 1) / 6];
+    let call = 0;
+    vi.spyOn(Math, "random").mockImplementation(() => sequence[call++]);
+
+    const spec = { count: 4, faces: 6, dropLowest: 2 };
+    const fromEngine = rollSpec(spec);
+    const fromObservedValues = summarizeRoll([6, 1, 4, 2], spec);
+
+    expect(fromObservedValues).toEqual(fromEngine);
+
+    vi.restoreAllMocks();
   });
 });
 

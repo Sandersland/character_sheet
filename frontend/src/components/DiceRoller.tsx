@@ -1,11 +1,15 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { ContactShadows, Environment, Lightformer, Text } from "@react-three/drei";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 import { formatRollSpec, rollSpec } from "../lib/dice";
-import type { RollResult, RollSpec } from "../lib/dice";
+import type { RollResult } from "../lib/dice";
+import { DIE_GAP, UP_AXIS, quaternionForUpFace } from "../lib/dieFaces";
+import type { FaceGroup } from "../lib/dieFaces";
+import DiceScene from "./DiceScene";
+import type { DiceRollerProps } from "./diceRollerTypes";
+import DieMesh from "./DieMesh";
+import { useDieFaceData } from "./useDieFaceData";
 
 // How long a roll tumbles before settling on its result. Rotation is modeled
 // as a single decelerating spin that unwinds onto the landing pose (see
@@ -43,136 +47,11 @@ const DROP_HEIGHT_MAX = 2.0;
 // actually reads as the die having been thrown/rolled rather than just
 // bobbing in place. Deliberately z-only, not also sideways along x: dice sit
 // side by side along x at DIE_GAP apart with only ~0.35 of clearance over
-// their circumscribed-sphere diameter at rest (see the DIE_GAP comment
-// below), so any x-direction travel risks two neighbors visibly clipping
+// their circumscribed-sphere diameter at rest (see lib/dieFaces.ts's DIE_GAP
+// comment), so any x-direction travel risks two neighbors visibly clipping
 // through each other mid-roll. z has no such neighbor to clip into.
 const SKITTER_DISTANCE_MIN = 0.9;
 const SKITTER_DISTANCE_MAX = 1.6;
-
-// Bumped from the original 0.045 so the larger labels below clear the
-// rounded d6's slightly proud-rendered surface without z-fighting.
-const LABEL_SURFACE_OFFSET = 0.06;
-// The d6 box (side 1.3) has a circumscribed-sphere diameter of ~2.25
-// (1.3 * sqrt(3)) — the gap between die centers needs to clear that with
-// real margin or spinning corners visibly intersect the neighboring die.
-const DIE_GAP = 2.6;
-const NORMAL_GROUP_EPSILON = 1e-3;
-
-// Mirrors index.css's garnet/parchment tokens — R3F materials can't read
-// CSS custom properties, so the values are duplicated here by hand.
-const DIE_BODY_COLOR = "#cf1124"; // --color-garnet-600
-const DIE_BODY_COLOR_DROPPED = "#b8b2a7"; // --color-parchment-300
-const DIE_LABEL_COLOR = "#faf9f7"; // --color-parchment-50
-const DIE_LABEL_COLOR_DROPPED = "#857f72"; // --color-parchment-500
-// Darker garnet outline so the light numerals stay legible against the
-// glossy resin body's specular highlights.
-const DIE_LABEL_OUTLINE_COLOR = "#7a0c18";
-
-// Game-shop dice print their numbers large enough to nearly fill the face —
-// these are sized well past the old, more conservative values.
-const FACE_LABEL_FONT_SIZE: Readonly<Record<number, number>> = {
-  4: 0.42,
-  6: 0.55,
-  8: 0.4,
-  12: 0.3,
-  20: 0.26,
-};
-const DEFAULT_FACE_LABEL_FONT_SIZE = 0.36;
-const FACE_LABEL_OUTLINE_WIDTH = 0.015;
-
-const UP_AXIS = new THREE.Vector3(0, 1, 0);
-const Z_AXIS = new THREE.Vector3(0, 0, 1);
-
-interface FaceGroup {
-  normal: THREE.Vector3;
-  centroid: THREE.Vector3;
-  labelQuaternion: THREE.Quaternion;
-}
-
-// d6 rounded-box tuning: side length matches the old sharp BoxGeometry,
-// `segments` smooths the curvature, `radius` is how deep the bevel cuts in.
-const D6_SIZE = 1.3;
-const D6_ROUNDING_SEGMENTS = 4;
-const D6_ROUNDING_RADIUS = 0.12;
-
-/** Sharp three.js geometry for a given die type; SRD dice with no built-in
- * polyhedron (only d10/d100, the pentagonal trapezohedron) fall back to a
- * plain cube — it still tumbles, it just can't land on a matching face.
- * This is always the *logic* geometry (see `createVisualDieGeometry`): face
- * normals/centroids and result orientation are computed from this sharp
- * solid even on die types whose rendered mesh is rounded, since rounding
- * only affects geometry near edges/corners and leaves face centers (and so
- * "which face is up") unchanged. */
-function createDieGeometry(faces: number): THREE.BufferGeometry {
-  switch (faces) {
-    case 4:
-      return new THREE.TetrahedronGeometry(0.95);
-    case 8:
-      return new THREE.OctahedronGeometry(0.95);
-    case 12:
-      return new THREE.DodecahedronGeometry(0.9);
-    case 20:
-      return new THREE.IcosahedronGeometry(0.95);
-    case 6:
-    default:
-      return new THREE.BoxGeometry(D6_SIZE, D6_SIZE, D6_SIZE);
-  }
-}
-
-/** Rendered geometry for a given die type. The d6 — the only die type
- * actually rolled in the app today — gets a rounded box for the realistic
- * "resin die from a game shop" look; other die types aren't rounded yet
- * (see DiceRoller's module comment) and just reuse the sharp logic solid. */
-function createVisualDieGeometry(faces: number): THREE.BufferGeometry {
-  if (faces === 6) {
-    return new RoundedBoxGeometry(D6_SIZE, D6_SIZE, D6_SIZE, D6_ROUNDING_SEGMENTS, D6_ROUNDING_RADIUS);
-  }
-  return createDieGeometry(faces);
-}
-
-/**
- * Groups a polyhedron's triangles into faces by clustering on shared
- * (near-identical) outward normals, then averages each face's unique
- * vertices for its centroid. This works for any convex die geometry without
- * having to hardcode three.js's internal triangulation/index layout (e.g.
- * the dodecahedron's pentagons are built from 3 triangles each).
- */
-function computeFaceGroups(geometry: THREE.BufferGeometry): FaceGroup[] {
-  const nonIndexed = geometry.index ? geometry.toNonIndexed() : geometry;
-  const position = nonIndexed.getAttribute("position");
-  const triangleCount = position.count / 3;
-
-  const raw: { normal: THREE.Vector3; vertices: Map<string, THREE.Vector3> }[] = [];
-
-  for (let i = 0; i < triangleCount; i++) {
-    const a = new THREE.Vector3().fromBufferAttribute(position, i * 3);
-    const b = new THREE.Vector3().fromBufferAttribute(position, i * 3 + 1);
-    const c = new THREE.Vector3().fromBufferAttribute(position, i * 3 + 2);
-    const normal = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
-
-    let group = raw.find((candidate) => candidate.normal.dot(normal) > 1 - NORMAL_GROUP_EPSILON);
-    if (!group) {
-      group = { normal, vertices: new Map() };
-      raw.push(group);
-    }
-    for (const vertex of [a, b, c]) {
-      const key = `${vertex.x.toFixed(4)},${vertex.y.toFixed(4)},${vertex.z.toFixed(4)}`;
-      if (!group.vertices.has(key)) group.vertices.set(key, vertex.clone());
-    }
-  }
-
-  return raw.map(({ normal, vertices }) => {
-    const centroid = new THREE.Vector3();
-    for (const vertex of vertices.values()) centroid.add(vertex);
-    centroid.divideScalar(vertices.size);
-    return { normal, centroid, labelQuaternion: new THREE.Quaternion().setFromUnitVectors(Z_AXIS, normal) };
-  });
-}
-
-/** The rotation that brings a given local face normal to point straight up. */
-function quaternionForUpFace(normal: THREE.Vector3): THREE.Quaternion {
-  return new THREE.Quaternion().setFromUnitVectors(normal, UP_AXIS);
-}
 
 /** Decelerating ease-out: starts fast, eases smoothly to a stop at t=1. */
 function easeOutCubic(t: number): number {
@@ -204,37 +83,7 @@ function easeOutBounce(t: number): number {
   }
 }
 
-/**
- * Builds (and disposes) the geometry + per-face data for one die type.
- * Returns the sharp *logic* geometry's face groups (normals/centroids/label
- * orientation — used for both label placement and result targeting) plus a
- * separate *visual* geometry that's what actually gets rendered, which may
- * be rounded (currently just the d6) while the logic geometry never is.
- */
-function useDieFaceData(faces: number) {
-  const logicGeometry = useMemo(() => createDieGeometry(faces), [faces]);
-  const visualGeometry = useMemo(() => createVisualDieGeometry(faces), [faces]);
-  useEffect(
-    () => () => {
-      logicGeometry.dispose();
-      visualGeometry.dispose();
-    },
-    [logicGeometry, visualGeometry],
-  );
-
-  const groups = useMemo(() => {
-    const computed = computeFaceGroups(logicGeometry);
-    // Only trust the grouping if it found exactly one face per rolled value
-    // (true for the supported platonic dice; false for the box fallback).
-    return computed.length === faces ? computed : [];
-  }, [logicGeometry, faces]);
-
-  const rounded = faces === 6;
-
-  return { visualGeometry, groups, rounded };
-}
-
-interface DieProps {
+interface ScriptedDieProps {
   geometry: THREE.BufferGeometry;
   groups: FaceGroup[];
   rounded: boolean;
@@ -246,8 +95,20 @@ interface DieProps {
   position: readonly [number, number, number];
 }
 
-/** One 3D die: tumbles freely, then eases into the engine-decided face. */
-function Die({ geometry, groups, rounded, value, dropped, rolling, rollId, reducedMotion, position }: DieProps) {
+/** One 3D die: tumbles freely via a scripted tween, then eases into the
+ *  engine-decided face. Owns only the animation timeline — `DieMesh` (shared
+ *  with the physics roller) owns what it actually looks like. */
+function ScriptedDie({
+  geometry,
+  groups,
+  rounded,
+  value,
+  dropped,
+  rolling,
+  rollId,
+  reducedMotion,
+  position,
+}: ScriptedDieProps) {
   const groupRef = useRef<THREE.Group>(null);
   const spinAxisRef = useRef(new THREE.Vector3(1, 0, 0));
   const elapsedRef = useRef(0);
@@ -359,76 +220,18 @@ function Die({ geometry, groups, rounded, value, dropped, rolling, rollId, reduc
     }
   });
 
-  // Only reveal that a die was dropped once the whole set has actually
-  // stopped spinning — the result (and so `dropped`) is known from frame
-  // one so the engine can target an orientation, but showing it mid-tumble
-  // spoils which die "loses" before any of the four have settled.
-  const isResolvedDrop = dropped && !rolling;
-  const bodyColor = isResolvedDrop ? DIE_BODY_COLOR_DROPPED : DIE_BODY_COLOR;
-  const labelColor = isResolvedDrop ? DIE_LABEL_COLOR_DROPPED : DIE_LABEL_COLOR;
-  const showFaceLabels = groups.length > 0;
-  const fontSize = FACE_LABEL_FONT_SIZE[groups.length] ?? DEFAULT_FACE_LABEL_FONT_SIZE;
-
   return (
-    <group ref={groupRef} position={position}>
-      <mesh geometry={geometry}>
-        <meshPhysicalMaterial
-          color={bodyColor}
-          flatShading={!rounded}
-          roughness={0.35}
-          metalness={0}
-          clearcoat={1}
-          clearcoatRoughness={0.15}
-          transparent={isResolvedDrop}
-          opacity={isResolvedDrop ? 0.55 : 1}
-        />
-      </mesh>
-      {showFaceLabels &&
-        groups.map((group, index) => (
-          <Text
-            key={index}
-            position={group.centroid.clone().addScaledVector(group.normal, LABEL_SURFACE_OFFSET).toArray()}
-            quaternion={group.labelQuaternion}
-            fontSize={fontSize}
-            color={labelColor}
-            outlineWidth={FACE_LABEL_OUTLINE_WIDTH}
-            outlineColor={DIE_LABEL_OUTLINE_COLOR}
-            anchorX="center"
-            anchorY="middle"
-          >
-            {`${index + 1}`}
-          </Text>
-        ))}
-      {/* Fallback for die types with no matching geometry (e.g. d10): no
-          per-face mapping is possible, so just surface the settled value. */}
-      {!showFaceLabels && !rolling && value !== null && (
-        <Text position={[0, 1.1, 0]} fontSize={0.4} color={labelColor} anchorX="center" anchorY="middle">
-          {`${value}`}
-        </Text>
-      )}
-    </group>
+    <DieMesh
+      ref={groupRef}
+      geometry={geometry}
+      groups={groups}
+      rounded={rounded}
+      value={value}
+      dropped={dropped}
+      rolling={rolling}
+      position={position}
+    />
   );
-}
-
-interface DiceRollerProps {
-  /** What to roll, e.g. `{ count: 4, faces: 6, dropLowest: 1 }` for 4d6 drop lowest. */
-  spec: RollSpec;
-  /** Called once the roll settles, with the full per-die result. */
-  onResult?: (result: RollResult) => void;
-  /** Bump this (e.g. a counter) to trigger a fresh roll, including re-rolls. */
-  rollKey?: number | string;
-  /** Roll immediately on mount if no `rollKey` is driving this instance. */
-  autoRollOnMount?: boolean;
-  /** Optional caption shown above the dice (e.g. "Hit dice", "Attack roll"). */
-  label?: string;
-  /** When true, resolve immediately with no animation — interrupts an
-   *  in-flight tumble and makes any roll that starts while set settle instantly. */
-  skip?: boolean;
-  /** Show the settled total below the dice (e.g. "= 14"). Defaults to true for
-   *  standalone use; callers that surface the total elsewhere (e.g.
-   *  DiceRollSequence's chip row) pass false to avoid the redundant readout. */
-  showTotal?: boolean;
-  className?: string;
 }
 
 /**
@@ -436,9 +239,11 @@ interface DiceRollerProps {
  * Three Fiber) that tumble and settle on a real roll from `lib/dice.ts`,
  * dimming any dice `spec.dropLowest` excludes from the total (e.g. the
  * dropped die in 4d6-drop-lowest). Parents stay in control of *when* a roll
- * happens via `rollKey` — character creation rolls ability scores this way
- * today; the same component is meant to be dropped into hit-dice, attack,
- * and saving-throw rolls later without changes.
+ * happens via `rollKey` — character creation rolls ability scores via the
+ * physics-backed `PhysicsDiceRoller` instead, but this scripted animator
+ * stays available for rolls whose result is already known (e.g. animating a
+ * previously-computed hit-die roll) and is meant to be dropped in unchanged
+ * wherever that's the case.
  *
  * The engine (`lib/dice.ts`) always decides the result; the 3D dice tumble
  * freely and then orient to land on that result, so rolls stay deterministic
@@ -584,69 +389,27 @@ export default function DiceRoller({
       : formatRollSpec(spec);
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      aria-label={ariaLabel}
-      className={`flex flex-col items-center gap-1 ${className}`}
+    <DiceScene
+      ariaLabel={ariaLabel}
+      label={label}
+      showTotal={showTotal}
+      settledTotal={settled?.total ?? null}
+      className={className}
     >
-      {label && (
-        <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-parchment-500)]">
-          {label}
-        </span>
-      )}
-      <div aria-hidden="true" className="h-44 w-full">
-        <Canvas dpr={[1, 1.5]} gl={{ alpha: true, antialias: true }} camera={{ position: [0, 7, 3], fov: 32 }}>
-          {/* Dialed down from the pre-resin-material intensities (0.7/1.05) —
-              the inline-Lightformer Environment below now does most of the
-              work, via clearcoat specular highlights, so blowing out the
-              scene with strong ambient/directional light would wash that
-              out and flatten the glossy look. */}
-          <ambientLight intensity={0.3} />
-          <directionalLight position={[2.5, 4, 3]} intensity={0.7} />
-          <Suspense fallback={null}>
-            {Array.from({ length: spec.count }, (_, index) => (
-              <Die
-                key={index}
-                geometry={visualGeometry}
-                groups={groups}
-                rounded={rounded}
-                value={result?.dice[index]?.value ?? null}
-                dropped={result?.dice[index]?.dropped ?? false}
-                rolling={rolling}
-                rollId={rollId}
-                reducedMotion={reducedMotionRef.current}
-                position={[(index - (spec.count - 1) / 2) * DIE_GAP, 0, 0]}
-              />
-            ))}
-            {/* frames={Infinity} re-renders the shadow map every frame so it
-                tracks the dice as they bounce and skitter; frames={1} (the
-                previous setting) bakes a single static shadow that can't
-                follow motion and visibly snaps whenever the scene re-renders. */}
-            <ContactShadows position={[0, -1.1, 0]} opacity={0.35} blur={2.4} far={3} scale={10} frames={Infinity} />
-            {/* Lighting-only environment (no HDRI fetch, no background — the
-                canvas stays transparent via gl.alpha) so the glossy resin
-                clearcoat has something to reflect. resolution is kept tiny
-                since these dice render at ~176px tall. */}
-            <Environment resolution={64}>
-              <Lightformer form="rect" intensity={2} position={[0, 5, 2]} scale={[6, 6, 1]} color="#fff7ec" />
-              <Lightformer form="rect" intensity={1} position={[-4, 2, 3]} scale={[3, 3, 1]} color="#ffe3c2" />
-              <Lightformer form="rect" intensity={0.6} position={[4, 1, -3]} scale={[3, 3, 1]} color="#cfe0ff" />
-            </Environment>
-          </Suspense>
-        </Canvas>
-      </div>
-      {/* Always rendered (rather than conditionally mounted) so this
-          component's own height never changes between idle/rolling/settled
-          — letting any layout-shift fix at the parent actually hold. */}
-      {showTotal && (
-        <span
-          aria-hidden={!settled}
-          className={`font-display text-2xl font-semibold leading-none tabular-nums text-[var(--color-garnet-800)] ${settled ? "" : "invisible"}`}
-        >
-          = {settled ? settled.total : " "}
-        </span>
-      )}
-    </div>
+      {Array.from({ length: spec.count }, (_, index) => (
+        <ScriptedDie
+          key={index}
+          geometry={visualGeometry}
+          groups={groups}
+          rounded={rounded}
+          value={result?.dice[index]?.value ?? null}
+          dropped={result?.dice[index]?.dropped ?? false}
+          rolling={rolling}
+          rollId={rollId}
+          reducedMotion={reducedMotionRef.current}
+          position={[(index - (spec.count - 1) / 2) * DIE_GAP, 0, 0]}
+        />
+      ))}
+    </DiceScene>
   );
 }

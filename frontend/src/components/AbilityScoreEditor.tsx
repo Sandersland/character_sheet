@@ -10,6 +10,7 @@ import {
 import type { RollSpec } from "../lib/dice";
 import type { AbilityName, AbilityScores } from "../types/character";
 import DiceRollSequence from "./DiceRollSequence";
+import PhysicsDiceRoller from "./PhysicsDiceRoller";
 
 type Method = "manual" | "roll" | "standardArray" | "pointBuy";
 
@@ -180,6 +181,7 @@ export default function AbilityScoreEditor({
               spec={ROLL_SPEC}
               count={POOL_SIZE}
               triggerKey={rollNonce}
+              roller={PhysicsDiceRoller}
               onComplete={(results) => {
                 onPoolChange(results.map((r) => r.total));
                 onAssignmentsChange(EMPTY_ASSIGNMENTS, abilityScores);
