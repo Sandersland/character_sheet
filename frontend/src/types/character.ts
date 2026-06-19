@@ -49,13 +49,56 @@ export interface Skill {
   expertise?: boolean;
 }
 
-export interface InventoryItem {
+export interface Currency {
+  cp: number;
+  sp: number;
+  gp: number;
+  pp: number;
+}
+
+export type ItemCategory = "weapon" | "armor" | "consumable" | "gear";
+
+/**
+ * Baseline equipment catalog served by `GET /api/items` — the "pick a
+ * club, don't hand-author one" path for the inventory editor (Phase B).
+ * `InventoryItem` below snapshots these fields rather than referencing this
+ * type live; see backend's schema.prisma comment on Item/InventoryItem.
+ */
+export interface Item {
   id: string;
   name: string;
+  category: ItemCategory;
+  weight?: number;
+  cost?: Currency;
+  damageDice?: string; // e.g. "1d4" (weapons)
+  damageType?: string; // e.g. "bludgeoning" (weapons)
+  armorClass?: number; // base AC or shield bonus (armor)
+  properties: string[]; // e.g. ["light", "finesse", "thrown"]
+  description?: string;
+}
+
+/**
+ * A character's own copy of an item's stats, optionally traced back to a
+ * catalog `Item` via `itemId` (undefined means homebrew/no catalog match —
+ * same nullable-FK-plus-own-fields shape as race/background selections).
+ * Every field below is this row's own value, free to diverge from the
+ * catalog (e.g. renaming "Club" to "Club +1" after a magic bonus).
+ */
+export interface InventoryItem {
+  id: string;
+  itemId?: string;
+  name: string;
+  category: ItemCategory;
   quantity: number;
   weight?: number;
-  equipped?: boolean;
+  cost?: Currency;
+  damageDice?: string;
+  damageType?: string;
+  armorClass?: number;
+  properties: string[];
   description?: string;
+  equipped: boolean;
+  notes?: string;
 }
 
 export type SpellSchool =
@@ -127,12 +170,7 @@ export interface Character {
   skills: Skill[];
 
   inventory: InventoryItem[];
-  currency: {
-    cp: number;
-    sp: number;
-    gp: number;
-    pp: number;
-  };
+  currency: Currency;
 
   spellcasting?: {
     ability: AbilityName;

@@ -74,7 +74,6 @@ export interface DerivedCharacterFields {
   initiativeBonus: number;
   savingThrowProficiencies: string[];
   skills: { name: string; ability: string; proficient: boolean }[];
-  inventory: never[];
   currency: { cp: number; sp: number; gp: number; pp: number };
   spellcasting: null;
   journal: never[];
@@ -105,7 +104,6 @@ export function deriveCreatedCharacter(
       ability,
       proficient: input.skillProficiencies.includes(name),
     })),
-    inventory: [],
     currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
     spellcasting: null,
     journal: [],

@@ -2,6 +2,7 @@ import type {
   Character,
   CharacterSummary,
   CreateCharacterInput,
+  Item,
   ReferenceData,
 } from "../types/character";
 
@@ -54,6 +55,15 @@ export async function fetchReference(): Promise<ReferenceData> {
   const response = await fetch(`${API_URL}/reference`);
   if (!response.ok) {
     throw new Error(`Failed to fetch reference data (${response.status})`);
+  }
+  return response.json();
+}
+
+// Feeds the inventory editor's "add from catalog" picker (Phase B).
+export async function fetchItems(): Promise<Item[]> {
+  const response = await fetch(`${API_URL}/items`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch items (${response.status})`);
   }
   return response.json();
 }

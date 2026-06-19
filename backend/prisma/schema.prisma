@@ -18,6 +18,13 @@ datasource db {
 // race/class/background name drift from (or fully replace) the catalog
 // entry without breaking the link used for mechanical derivation, and lets
 // class be one-to-many for future multiclass support.
+//
+// inventory follows the same pattern via InventoryItem below (and is NOT a
+// Json column here) rather than the sparse-overlay shape race/class/
+// background use: each row *snapshots* a catalog Item's stats at add-time
+// instead of just a name, since equipment commonly needs every field edited
+// (Club -> "Club +1" with bonus damage) and a snapshot needs no merge logic
+// to read or write. itemId is kept only as a provenance pointer.
 model Character {
   id          String  @id @default(uuid())
   name        String
@@ -37,7 +44,6 @@ model Character {
   savingThrowProficiencies String[]
   skills                   Json
 
-  inventory    Json
   currency     Json
   spellcasting Json?
   journal      Json
@@ -45,6 +51,7 @@ model Character {
   raceSelection       CharacterRace?
   backgroundSelection CharacterBackground?
   classEntries        CharacterClassEntry[]
+  inventoryItems      InventoryItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -91,17 +98,17 @@ model Background {
 // catalog entry's name at creation but is free to drift independently.
 
 model CharacterRace {
-  id          String @id @default(uuid())
-  characterId String @unique
+  id          String    @id @default(uuid())
+  characterId String    @unique
   character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
   raceId      String?
-  race        Race?  @relation(fields: [raceId], references: [id], onDelete: SetNull)
+  race        Race?     @relation(fields: [raceId], references: [id], onDelete: SetNull)
   name        String
 }
 
 model CharacterBackground {
-  id           String @id @default(uuid())
-  characterId  String @unique
+  id           String      @id @default(uuid())
+  characterId  String      @unique
   character    Character   @relation(fields: [characterId], references: [id], onDelete: Cascade)
   backgroundId String?
   background   Background? @relation(fields: [backgroundId], references: [id], onDelete: SetNull)
@@ -112,13 +119,70 @@ model CharacterBackground {
 // class entries, which is what multiclassing needs. v1 always creates
 // exactly one entry per character (position 0).
 model CharacterClassEntry {
-  id          String @id @default(uuid())
+  id          String          @id @default(uuid())
   characterId String
   character   Character       @relation(fields: [characterId], references: [id], onDelete: Cascade)
   classId     String?
   class       CharacterClass? @relation(fields: [classId], references: [id], onDelete: SetNull)
   name        String
-  level       Int     @default(1)
+  level       Int             @default(1)
   subclass    String?
-  position    Int     @default(0)
+  position    Int             @default(0)
+}
+
+enum ItemCategory {
+  weapon
+  armor
+  consumable
+  gear
+}
+
+// Baseline equipment catalog, same role as Race/CharacterClass above: seeded
+// from a small SRD subset (prisma/seed.ts) and never referenced directly by
+// Character — only through InventoryItem.itemId, which is nullable, so
+// editing/removing a catalog row never breaks an existing character's
+// inventory.
+model Item {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  category    ItemCategory
+  weight      Float?
+  cost        Json? // {cp,sp,gp,pp} — sell/buy default, player can override
+  damageDice  String? // e.g. "1d4" (weapons)
+  damageType  String? // e.g. "bludgeoning" (weapons)
+  armorClass  Int? // base AC or shield bonus (armor)
+  properties  String[] // e.g. ["light", "finesse", "thrown"]
+  description String?
+
+  inventoryItems InventoryItem[]
+}
+
+// Per-character inventory row. Unlike CharacterRace/CharacterBackground
+// (which carry just a drifting `name`), this snapshots the full set of
+// mechanical fields from the catalog Item at add-time — see the comment on
+// Character above for why. itemId is nullable: null means homebrew (no
+// catalog row at all), set means "started from this catalog item," and
+// either way every field below is this row's own copy, free to diverge.
+model InventoryItem {
+  id          String       @id @default(uuid())
+  characterId String
+  character   Character    @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  itemId      String?
+  item        Item?        @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  name        String
+  category    ItemCategory
+  weight      Float?
+  cost        Json?
+  damageDice  String?
+  damageType  String?
+  armorClass  Int?
+  properties  String[]
+  description String?
+  quantity    Int          @default(1)
+  equipped    Boolean      @default(false)
+  notes       String?
+  position    Int          @default(0)
+
+  // InventoryTransaction ledger relation arrives in Phase B, alongside the
+  // transactions endpoint that writes it — see the plan doc.
 }

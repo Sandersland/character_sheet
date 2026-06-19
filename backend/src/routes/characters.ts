@@ -16,6 +16,7 @@ const characterInclude = {
   raceSelection: true,
   backgroundSelection: true,
   classEntries: { orderBy: { position: "asc" } },
+  inventoryItems: { orderBy: { position: "asc" } },
 } satisfies Prisma.CharacterInclude;
 
 type CharacterWithRelations = Prisma.CharacterGetPayload<{ include: typeof characterInclude }>;
@@ -41,11 +42,32 @@ function serializeCharacterSummary(row: {
   };
 }
 
-// Json columns (hitPoints, hitDice, abilityScores, skills, inventory,
-// currency, spellcasting, journal) are round-tripped as-is below — they
-// were written by our own seed/PATCH/POST path, not external input, so they
-// aren't re-validated against the frontend Character type's nested shapes
-// here.
+// Json columns (hitPoints, hitDice, abilityScores, skills, currency,
+// spellcasting, journal) are round-tripped as-is below — they were written
+// by our own seed/PATCH/POST path, not external input, so they aren't
+// re-validated against the frontend Character type's nested shapes here.
+// inventory is the exception: it's relational (InventoryItem rows, see
+// schema.prisma), mapped into the same JSON shape the frontend already
+// expects below.
+function serializeInventoryItem(row: CharacterWithRelations["inventoryItems"][number]) {
+  return {
+    id: row.id,
+    itemId: row.itemId ?? undefined,
+    name: row.name,
+    category: row.category,
+    quantity: row.quantity,
+    weight: row.weight ?? undefined,
+    cost: row.cost ?? undefined,
+    damageDice: row.damageDice ?? undefined,
+    damageType: row.damageType ?? undefined,
+    armorClass: row.armorClass ?? undefined,
+    properties: row.properties,
+    description: row.description ?? undefined,
+    equipped: row.equipped,
+    notes: row.notes ?? undefined,
+  };
+}
+
 function serializeCharacter(row: CharacterWithRelations) {
   const progress = experienceProgress(row.experiencePoints);
   const primaryClass = row.classEntries[0];
@@ -75,7 +97,7 @@ function serializeCharacter(row: CharacterWithRelations) {
     abilityScores: row.abilityScores,
     savingThrowProficiencies: row.savingThrowProficiencies,
     skills: row.skills,
-    inventory: row.inventory,
+    inventory: row.inventoryItems.map(serializeInventoryItem),
     currency: row.currency,
     spellcasting: row.spellcasting ?? undefined,
     journal: row.journal,
@@ -258,7 +280,10 @@ charactersRouter.post("/characters", async (req, res) => {
 // relation-backed selections, not Character columns (see schema.prisma).
 // level and proficiencyBonus are also absent — they're derived, never
 // persisted, so .strict() rejects a client trying to set them directly
-// instead of silently ignoring it.
+// instead of silently ignoring it. inventory is absent too, for a different
+// reason: it's now InventoryItem rows, not a Json column, so a blind
+// full-array PATCH can't express intent (acquired vs. consumed vs. sold) —
+// see POST /api/characters/:id/inventory/transactions (Phase B) instead.
 const updateCharacterSchema = z
   .object({
     name: z.string().min(1),
@@ -277,7 +302,6 @@ const updateCharacterSchema = z
     abilityScores: z.record(z.string(), z.number().int()),
     savingThrowProficiencies: z.array(z.string()),
     skills: z.array(z.unknown()),
-    inventory: z.array(z.unknown()),
     currency: z.object({
       cp: z.number().int(),
       sp: z.number().int(),

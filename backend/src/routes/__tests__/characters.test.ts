@@ -15,6 +15,15 @@ const TEST_CLASS = {
   isSpellcaster: false,
 };
 const TEST_BACKGROUND = { name: "Test Background", skillProficiencies: ["athletics"] };
+const TEST_ITEM = {
+  name: "Test Club",
+  category: "weapon" as const,
+  weight: 2,
+  cost: { cp: 0, sp: 1, gp: 0, pp: 0 },
+  damageDice: "1d4",
+  damageType: "bludgeoning",
+  properties: ["light"],
+};
 
 const FIXTURE = {
   id: "test-character-1",
@@ -37,7 +46,6 @@ const FIXTURE = {
   },
   savingThrowProficiencies: ["strength"],
   skills: [],
-  inventory: [],
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
   journal: [],
 };
@@ -66,6 +74,11 @@ describe("characters routes", () => {
       create: TEST_BACKGROUND,
       update: TEST_BACKGROUND,
     });
+    const item = await prisma.item.upsert({
+      where: { name: TEST_ITEM.name },
+      create: TEST_ITEM,
+      update: TEST_ITEM,
+    });
 
     await prisma.character.create({
       data: {
@@ -75,6 +88,31 @@ describe("characters routes", () => {
         backgroundSelection: { create: { name: background.name, backgroundId: background.id } },
         classEntries: {
           create: [{ name: characterClass.name, classId: characterClass.id, position: 0 }],
+        },
+        inventoryItems: {
+          create: [
+            {
+              itemId: item.id,
+              name: item.name,
+              category: item.category,
+              weight: item.weight,
+              cost: TEST_ITEM.cost,
+              damageDice: item.damageDice,
+              damageType: item.damageType,
+              properties: item.properties,
+              quantity: 1,
+              equipped: true,
+              position: 0,
+            },
+            {
+              itemId: null,
+              name: "Homebrew Amulet",
+              category: "gear",
+              description: "A custom magic item with no catalog entry.",
+              quantity: 1,
+              position: 1,
+            },
+          ],
         },
       },
     });
@@ -88,12 +126,13 @@ describe("characters routes", () => {
 
   // The catalog rows are upserted (not deleted) between tests so reruns
   // don't churn ids — but they shouldn't linger in a shared dev database
-  // as selectable "Test Race"/"Test Class"/"Test Background" options once
-  // the whole suite is done.
+  // as selectable "Test Race"/"Test Class"/"Test Background"/"Test Club"
+  // options once the whole suite is done.
   afterAll(async () => {
     await prisma.race.deleteMany({ where: { name: TEST_RACE.name } });
     await prisma.characterClass.deleteMany({ where: { name: TEST_CLASS.name } });
     await prisma.background.deleteMany({ where: { name: TEST_BACKGROUND.name } });
+    await prisma.item.deleteMany({ where: { name: TEST_ITEM.name } });
   });
 
   it("GET /api/characters returns summaries with derived level", async () => {
@@ -120,6 +159,27 @@ describe("characters routes", () => {
     expect(response.body.race).toBe(TEST_RACE.name);
     expect(response.body.class).toBe(TEST_CLASS.name);
     expect(response.body.background).toBe(TEST_BACKGROUND.name);
+
+    expect(response.body.inventory).toHaveLength(2);
+    const [catalogRow, homebrewRow] = response.body.inventory;
+    expect(catalogRow).toMatchObject({
+      name: TEST_ITEM.name,
+      category: "weapon",
+      damageDice: "1d4",
+      damageType: "bludgeoning",
+      properties: ["light"],
+      quantity: 1,
+      equipped: true,
+    });
+    expect(typeof catalogRow.itemId).toBe("string");
+    expect(homebrewRow).toMatchObject({
+      name: "Homebrew Amulet",
+      category: "gear",
+      description: "A custom magic item with no catalog entry.",
+      quantity: 1,
+      equipped: false,
+    });
+    expect(homebrewRow.itemId).toBeUndefined();
   });
 
   it("GET /api/characters/:id 404s for unknown id", async () => {

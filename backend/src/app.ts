@@ -3,6 +3,7 @@ import express from "express";
 
 import { charactersRouter } from "./routes/characters.js";
 import { healthRouter } from "./routes/health.js";
+import { itemsRouter } from "./routes/items.js";
 import { referenceRouter } from "./routes/reference.js";
 
 export function createApp() {
@@ -14,6 +15,7 @@ export function createApp() {
   app.use("/api", healthRouter);
   app.use("/api", charactersRouter);
   app.use("/api", referenceRouter);
+  app.use("/api", itemsRouter);
 
   return app;
 }

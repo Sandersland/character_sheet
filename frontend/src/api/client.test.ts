@@ -5,6 +5,7 @@ import {
   createCharacter,
   fetchCharacter,
   fetchCharacters,
+  fetchItems,
   fetchReference,
   updateCharacter,
 } from "./client";
@@ -133,6 +134,32 @@ describe("fetchReference", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
 
     await expect(fetchReference()).rejects.toThrow();
+  });
+});
+
+describe("fetchItems", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns the parsed item catalog on success", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [
+          { id: "i1", name: "Club", category: "weapon", damageDice: "1d4", properties: ["light"] },
+        ],
+      })
+    );
+
+    await expect(fetchItems()).resolves.toMatchObject([{ name: "Club", category: "weapon" }]);
+  });
+
+  it("throws on a non-ok response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+
+    await expect(fetchItems()).rejects.toThrow();
   });
 });
 

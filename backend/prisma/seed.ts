@@ -123,6 +123,73 @@ const BACKGROUNDS = [
   { name: "Noble", skillProficiencies: ["history", "persuasion"] },
 ];
 
+// A coin purse shorthand for an Item's `cost`/an InventoryItem's `cost` —
+// both are the same {cp,sp,gp,pp} shape as Character.currency.
+function coins(gp: number, sp = 0, cp = 0) {
+  return { cp, sp, gp, pp: 0 };
+}
+
+// Matches the Prisma schema's ItemCategory enum.
+type ItemCategoryName = "weapon" | "armor" | "consumable" | "gear";
+
+interface CatalogItem {
+  name: string;
+  category: ItemCategoryName;
+  weight?: number;
+  cost?: ReturnType<typeof coins>;
+  damageDice?: string;
+  damageType?: string;
+  armorClass?: number;
+  properties?: string[];
+  description?: string;
+}
+
+// --- Item catalog -------------------------------------------------------
+// Baseline equipment list (served via GET /api/items, see
+// src/routes/items.ts) covering all four ItemCategory values. Like
+// RACES/CLASSES/BACKGROUNDS above, this seeds the catalog rows that
+// InventoryItem rows below snapshot from — see schema.prisma's comment on
+// Item/InventoryItem for why a snapshot rather than a live reference.
+const ITEMS: CatalogItem[] = [
+  // weapon
+  { name: "Club", category: "weapon", weight: 2, cost: coins(0, 1), damageDice: "1d4", damageType: "bludgeoning", properties: ["light"] },
+  { name: "Dagger", category: "weapon", weight: 1, cost: coins(2), damageDice: "1d4", damageType: "piercing", properties: ["finesse", "light", "thrown (range 20/60)"] },
+  { name: "Quarterstaff", category: "weapon", weight: 4, cost: coins(0, 2), damageDice: "1d6", damageType: "bludgeoning", properties: ["versatile (1d8)"] },
+  { name: "Shortsword", category: "weapon", weight: 2, cost: coins(10), damageDice: "1d6", damageType: "piercing", properties: ["finesse", "light"] },
+  { name: "Longsword", category: "weapon", weight: 3, cost: coins(15), damageDice: "1d8", damageType: "slashing", properties: ["versatile (1d10)"] },
+  { name: "Warhammer", category: "weapon", weight: 2, cost: coins(15), damageDice: "1d8", damageType: "bludgeoning", properties: ["versatile (1d10)"] },
+  { name: "Handaxe", category: "weapon", weight: 2, cost: coins(5), damageDice: "1d6", damageType: "slashing", properties: ["light", "thrown (range 20/60)"] },
+  { name: "Shortbow", category: "weapon", weight: 2, cost: coins(25), damageDice: "1d6", damageType: "piercing", properties: ["ammunition (range 80/320)", "two-handed"] },
+  // armor
+  { name: "Leather Armor", category: "armor", weight: 10, cost: coins(10), armorClass: 11, properties: ["light"] },
+  { name: "Shield", category: "armor", weight: 6, cost: coins(10), armorClass: 2, description: "Worn on one arm; grants +2 AC while wielded." },
+  { name: "Plate Armor", category: "armor", weight: 65, cost: coins(1500), armorClass: 18, properties: ["heavy", "stealth disadvantage"] },
+  // consumable
+  { name: "Potion of Healing", category: "consumable", weight: 0.5, cost: coins(50), description: "Regain 2d4 + 2 hit points when you drink this potion." },
+  { name: "Caltrops", category: "consumable", weight: 2, cost: coins(1), description: "Covers a 5-ft square. A creature entering must succeed a DC 15 Dex save or take 1 piercing damage and stop moving for the rest of its turn." },
+  // gear
+  { name: "Spellbook", category: "gear", weight: 3, cost: coins(50) },
+  { name: "Component Pouch", category: "gear", weight: 2, cost: coins(25), description: "A small watertight pouch holding what a spellcaster needs to cast spells with material components." },
+  { name: "Scholar's Pack", category: "gear", weight: 11, cost: coins(40), description: "Includes a backpack, a book of lore, ink, an ink pen, parchment, a sand bag, and a small knife." },
+  { name: "Ink and Quill", category: "gear", cost: coins(10) },
+  { name: "Pearl (arcane focus)", category: "gear", weight: 0.1, cost: coins(100), description: "Used by a spellcaster as an arcane focus in place of components." },
+  { name: "Healer's Kit", category: "gear", weight: 3, cost: coins(5), description: "Has 10 uses. As an action, expend one use to stabilize a creature without a Wisdom (Medicine) check." },
+  { name: "Thieves' Tools", category: "gear", weight: 1, cost: coins(25), description: "Lockpicks, a small file, mirror, scissors, and tweezers." },
+];
+
+// Per-character inventory row, specified as shorthand below and resolved
+// against the catalog in main(): `catalogName` pulls the row's stats from
+// the matching Item (the common, "don't hand-author your inventory" case),
+// while an explicit `category` makes the row fully homebrew (itemId stays
+// null) — e.g. a unique magic item with no baseline catalog entry. Either
+// way `quantity`/`equipped`/`notes` are this row's own values, and a
+// catalog row's fields can still be overridden (e.g. a `name` override for
+// "Club +1") since InventoryItem only snapshots from the catalog, it
+// doesn't keep reading it live.
+type SeedInventoryRow =
+  | { catalogName: string; name?: string; quantity?: number; equipped?: boolean; notes?: string }
+  | (CatalogItem & { quantity?: number; equipped?: boolean; notes?: string });
+
 // Equivalent of frontend/src/mock/characters.ts's three fixtures, ported
 // here deliberately — backend and frontend are separate packages with no
 // shared workspace, and this is fixture/seed data, not shared business
@@ -183,21 +250,21 @@ const SEED_CHARACTERS = [
     ],
 
     inventory: [
-      { id: "i1", name: "Quarterstaff", quantity: 1, weight: 4, equipped: true },
-      { id: "i2", name: "Spellbook", quantity: 1, weight: 3 },
-      { id: "i3", name: "Component Pouch", quantity: 1, weight: 2, equipped: true },
+      { catalogName: "Quarterstaff", quantity: 1, equipped: true },
+      { catalogName: "Spellbook", quantity: 1 },
+      { catalogName: "Component Pouch", quantity: 1, equipped: true },
       {
-        id: "i4",
         name: "Ring of Protection",
+        category: "gear",
         quantity: 1,
         equipped: true,
         description: "+1 bonus to AC and saving throws.",
       },
-      { id: "i5", name: "Potion of Healing", quantity: 3, weight: 0.5 },
-      { id: "i6", name: "Scholar's Pack", quantity: 1, weight: 11 },
-      { id: "i7", name: "Ink and Quill", quantity: 1 },
-      { id: "i8", name: "Pearl (arcane focus)", quantity: 1, weight: 0.1 },
-    ],
+      { catalogName: "Potion of Healing", quantity: 3 },
+      { catalogName: "Scholar's Pack", quantity: 1 },
+      { catalogName: "Ink and Quill", quantity: 1 },
+      { catalogName: "Pearl (arcane focus)", quantity: 1 },
+    ] satisfies SeedInventoryRow[],
     currency: { cp: 12, sp: 30, gp: 145, pp: 2 },
 
     spellcasting: {
@@ -343,12 +410,17 @@ const SEED_CHARACTERS = [
     ],
 
     inventory: [
-      { id: "i1", name: "Warhammer", quantity: 1, weight: 2, equipped: true },
-      { id: "i2", name: "Shield", quantity: 1, weight: 6, equipped: true },
-      { id: "i3", name: "Plate Armor", quantity: 1, weight: 65, equipped: true },
-      { id: "i4", name: "Handaxe", quantity: 2, weight: 2 },
-      { id: "i5", name: "Healer's Kit", quantity: 1, weight: 3 },
-    ],
+      {
+        catalogName: "Warhammer",
+        quantity: 1,
+        equipped: true,
+        notes: "Family heirloom, passed down for three generations.",
+      },
+      { catalogName: "Shield", quantity: 1, equipped: true },
+      { catalogName: "Plate Armor", quantity: 1, equipped: true },
+      { catalogName: "Handaxe", quantity: 2 },
+      { catalogName: "Healer's Kit", quantity: 1 },
+    ] satisfies SeedInventoryRow[],
     currency: { cp: 0, sp: 15, gp: 62, pp: 0 },
 
     spellcasting: null,
@@ -402,11 +474,18 @@ const SEED_CHARACTERS = [
     ],
 
     inventory: [
-      { id: "i1", name: "Shortsword", quantity: 2, weight: 2, equipped: true },
-      { id: "i2", name: "Shortbow", quantity: 1, weight: 2, equipped: true },
-      { id: "i3", name: "Thieves' Tools", quantity: 1, weight: 1 },
-      { id: "i4", name: "Cloak of Elvenkind", quantity: 1, equipped: true },
-    ],
+      { catalogName: "Shortsword", quantity: 2, equipped: true },
+      { catalogName: "Shortbow", quantity: 1, equipped: true },
+      { catalogName: "Thieves' Tools", quantity: 1 },
+      {
+        name: "Cloak of Elvenkind",
+        category: "gear",
+        quantity: 1,
+        equipped: true,
+        description:
+          "Advantage on Stealth checks; creatures have disadvantage on checks to spot you.",
+      },
+    ] satisfies SeedInventoryRow[],
     currency: { cp: 40, sp: 8, gp: 210, pp: 1 },
 
     spellcasting: {
@@ -444,6 +523,55 @@ const SEED_CHARACTERS = [
   },
 ];
 
+// Resolves one SeedInventoryRow into an InventoryItem create payload —
+// either a snapshot of a catalog Item (`catalogName` branch) or a fully
+// homebrew row (itemId: null). See the SeedInventoryRow comment above.
+function resolveInventoryRow(
+  row: SeedInventoryRow,
+  position: number,
+  itemsByName: Map<string, Awaited<ReturnType<typeof prisma.item.upsert>>>
+) {
+  if ("catalogName" in row) {
+    const catalogItem = itemsByName.get(row.catalogName);
+    if (!catalogItem) {
+      throw new Error(`Unknown seed catalogName: ${row.catalogName}`);
+    }
+    return {
+      itemId: catalogItem.id,
+      name: row.name ?? catalogItem.name,
+      category: catalogItem.category,
+      weight: catalogItem.weight,
+      cost: catalogItem.cost,
+      damageDice: catalogItem.damageDice,
+      damageType: catalogItem.damageType,
+      armorClass: catalogItem.armorClass,
+      properties: catalogItem.properties,
+      description: catalogItem.description,
+      quantity: row.quantity ?? 1,
+      equipped: row.equipped ?? false,
+      notes: row.notes,
+      position,
+    };
+  }
+
+  return {
+    itemId: null,
+    name: row.name,
+    category: row.category,
+    weight: row.weight,
+    cost: row.cost,
+    damageDice: row.damageDice,
+    damageType: row.damageType,
+    armorClass: row.armorClass,
+    properties: row.properties ?? [],
+    description: row.description,
+    quantity: row.quantity ?? 1,
+    equipped: row.equipped ?? false,
+    notes: row.notes,
+    position,
+  };
+}
+
 async function main() {
   const raceIds = new Map<string, string>();
   for (const race of RACES) {
@@ -467,10 +595,17 @@ async function main() {
     backgroundIds.set(row.name, row.id);
   }
 
-  for (const { race, class: className, subclass, background, ...character } of SEED_CHARACTERS) {
+  const itemsByName = new Map<string, Awaited<ReturnType<typeof prisma.item.upsert>>>();
+  for (const item of ITEMS) {
+    const row = await prisma.item.upsert({ where: { name: item.name }, create: item, update: item });
+    itemsByName.set(row.name, row);
+  }
+
+  for (const { race, class: className, subclass, background, inventory, ...character } of SEED_CHARACTERS) {
     const raceId = raceIds.get(race);
     const classId = classIds.get(className);
     const backgroundId = backgroundIds.get(background);
+    const inventoryItems = inventory.map((row, position) => resolveInventoryRow(row, position, itemsByName));
 
     await prisma.character.upsert({
       where: { id: character.id },
@@ -479,6 +614,7 @@ async function main() {
         raceSelection: { create: { name: race, raceId } },
         backgroundSelection: { create: { name: background, backgroundId } },
         classEntries: { create: [{ name: className, subclass, classId, position: 0 }] },
+        inventoryItems: { create: inventoryItems },
       },
       update: {
         ...character,
@@ -488,11 +624,16 @@ async function main() {
         backgroundSelection: {
           upsert: { create: { name: background, backgroundId }, update: { name: background, backgroundId } },
         },
-        // Class entries have no natural unique key to upsert against, so
-        // re-seeding replaces them wholesale rather than risking duplicates.
+        // Class entries and inventory items both have no natural unique key
+        // to upsert against, so re-seeding replaces them wholesale rather
+        // than risking duplicates.
         classEntries: {
           deleteMany: {},
           create: [{ name: className, subclass, classId, position: 0 }],
+        },
+        inventoryItems: {
+          deleteMany: {},
+          create: inventoryItems,
         },
       },
     });
