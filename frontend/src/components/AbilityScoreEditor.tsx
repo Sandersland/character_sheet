@@ -1,12 +1,15 @@
+import { useState } from "react";
+
 import { abilityModifier, formatModifier, ABILITY_LABELS } from "../lib/abilities";
 import {
   POINT_BUY_BUDGET,
   STANDARD_ARRAY,
   pointBuyCost,
-  rollAbilityScoreSet,
   totalPointBuyCost,
 } from "../lib/abilityGen";
+import type { RollSpec } from "../lib/dice";
 import type { AbilityName, AbilityScores } from "../types/character";
+import DiceRollSequence from "./DiceRollSequence";
 
 type Method = "manual" | "roll" | "standardArray" | "pointBuy";
 
@@ -28,6 +31,9 @@ const ABILITY_ORDER: AbilityName[] = [
 
 const POINT_BUY_FLOOR = 8;
 const POINT_BUY_CEILING = 15;
+
+const POOL_SIZE = 6;
+const ROLL_SPEC: RollSpec = { count: 4, faces: 6, dropLowest: 1 };
 
 type Assignments = Record<AbilityName, number | null>;
 
@@ -73,6 +79,7 @@ export default function AbilityScoreEditor({
       onMethodChange(next, [...STANDARD_ARRAY], EMPTY_ASSIGNMENTS);
     } else if (next === "roll") {
       onMethodChange(next, null, EMPTY_ASSIGNMENTS);
+      setRollNonce(0);
     } else if (next === "pointBuy") {
       onMethodChange(next, null, EMPTY_ASSIGNMENTS);
       onScoresChange({
@@ -88,9 +95,14 @@ export default function AbilityScoreEditor({
     }
   }
 
+  // Bumping `rollNonce` is what tells DiceRollSequence below to (re-)roll —
+  // it animates the six 4d6-drop-lowest sets one at a time and reports the
+  // final totals back via onComplete, which flows into the controlled
+  // `pool`/`assignments` props exactly as the old instant roll did.
+  const [rollNonce, setRollNonce] = useState(0);
+
   function rollPool() {
-    onPoolChange(rollAbilityScoreSet());
-    onAssignmentsChange(EMPTY_ASSIGNMENTS, abilityScores);
+    setRollNonce((n) => n + 1);
   }
 
   function assignSlot(ability: AbilityName, slotIndex: number | null) {
@@ -148,18 +160,31 @@ export default function AbilityScoreEditor({
       </div>
 
       {method === "roll" && (
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={rollPool}
-            className="rounded-[var(--radius-control)] bg-[var(--color-garnet-700)] px-3 py-1.5 text-sm font-semibold text-[var(--color-parchment-50)] transition-colors hover:bg-[var(--color-garnet-800)]"
-          >
-            {pool ? "Re-roll" : "Roll scores"}
-          </button>
-          {pool && (
-            <span className="text-xs text-[var(--color-parchment-600)]">
-              Rolled: {pool.join(", ")} — assign each below.
-            </span>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={rollPool}
+              className="rounded-[var(--radius-control)] bg-[var(--color-garnet-700)] px-3 py-1.5 text-sm font-semibold text-[var(--color-parchment-50)] transition-colors hover:bg-[var(--color-garnet-800)]"
+            >
+              {pool ? "Re-roll" : "Roll scores"}
+            </button>
+            {pool && rollNonce === 0 && (
+              <span className="text-xs text-[var(--color-parchment-600)]">
+                Rolled: {pool.join(", ")} — assign each below.
+              </span>
+            )}
+          </div>
+          {rollNonce > 0 && (
+            <DiceRollSequence
+              spec={ROLL_SPEC}
+              count={POOL_SIZE}
+              triggerKey={rollNonce}
+              onComplete={(results) => {
+                onPoolChange(results.map((r) => r.total));
+                onAssignmentsChange(EMPTY_ASSIGNMENTS, abilityScores);
+              }}
+            />
           )}
         </div>
       )}
