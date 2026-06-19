@@ -34,8 +34,27 @@ export const FLOOR_RESTITUTION = 0.3;
 export const SLEEP_SPEED_LIMIT = 0.15;
 export const SLEEP_TIME_LIMIT = 0.2;
 // Secondary settle check (belt-and-suspenders alongside cannon's own sleep
-// state) for any body that's effectively stopped but hasn't formally slept yet.
+// state) for any body that's effectively stopped but hasn't formally slept
+// yet — e.g. dice resting close enough together that tiny mutual nudges keep
+// re-arming cannon's own sleep timer indefinitely. Deliberately the *same*
+// magnitude as SLEEP_SPEED_LIMIT above: this isn't a looser threshold, just
+// an alternate, ungated path to the same "basically stopped" conclusion —
+// see SETTLE_FALLBACK_GRACE_MS below for why it can't fire immediately.
 const SETTLE_VELOCITY_THRESHOLD = 0.15;
+// How long a die must have been awake since its last throw before the
+// instantaneous fallback above is even consulted. Without this gate, the
+// fallback — checking the *same* speed limit cannon's own sleepState uses,
+// but with no sustain requirement — can report "settled" on whichever
+// single tick a die's velocity happens to dip during one of its small
+// decaying bounces, well before it's actually finished rocking to a stop;
+// since the resolver waits for *every* die to settle before reading any of
+// them, that one premature read is enough to misread a die that was about
+// to land flat for real a few frames later. 900ms is comfortably longer
+// than a normal landing takes to reach true `SLEEPING` via cannon's own
+// sustained check, so in the common case this fallback never actually
+// fires — it only kicks in for the close-neighbors-jittering edge case
+// above, well before MAX_ROLL_MS's full safety-timeout would.
+const SETTLE_FALLBACK_GRACE_MS = 900;
 
 // Matches DiceScene's <ContactShadows position={[0, -1.1, 0]}> — the tray
 // floor sits exactly where the shadow is already painted.
@@ -78,14 +97,19 @@ const THROW_ANGULAR_VELOCITY = 8;
 // A flat-resting cube face points within a few degrees of straight up;
 // anything further off than this is treated as not a clean landing (an
 // edge/corner balance, or a die resting against a neighbor) and gets
-// re-thrown rather than read as-is.
-export const COCK_DOT_THRESHOLD = Math.cos((15 * Math.PI) / 180);
+// re-thrown rather than read as-is. 20 degrees leaves a wide margin below
+// anything that would actually indicate an edge/corner balance (tens of
+// degrees off) while tolerating the couple-degree residual tilt ordinary
+// contact softness/low friction leaves even on a die that's genuinely done
+// settling.
+export const COCK_DOT_THRESHOLD = Math.cos((20 * Math.PI) / 180);
 // A die resting flat on the floor has its center within this tolerance of
 // the expected single-layer rest height; anything higher is very likely
 // stacked on top of another die rather than cocked on an edge, which the
 // dot-product check alone wouldn't catch (a die lying flat on top of a
-// neighbor still has a face pointing straight up).
-const REST_HEIGHT_TOLERANCE = 0.25;
+// neighbor still has a face pointing straight up). Still well short of a
+// full die-height (~1.3) that true stacking would show.
+const REST_HEIGHT_TOLERANCE = 0.35;
 
 export const MAX_REROLL_ATTEMPTS = 5;
 // Safety cap so a roll can never hang if dice somehow never settle (e.g. a
@@ -204,13 +228,19 @@ export function throwDie(body: CANNON.Body, laneX: number): void {
 }
 
 /** Whether a body has come to rest, per cannon-es's own sleep bookkeeping
- *  (the primary signal) or a plain velocity-threshold fallback (in case a
- *  body is somehow still awake despite having effectively stopped). */
-export function isBodySettled(body: CANNON.Body): boolean {
+ *  (the primary signal, already correctly sustained) or — only once
+ *  `sinceThrowMs` clears SETTLE_FALLBACK_GRACE_MS — a plain instantaneous
+ *  velocity-threshold fallback, for a body that's somehow still awake
+ *  despite having effectively stopped. `sinceThrowMs` is the time since
+ *  *this* body was last (re)thrown, tracked by the caller (see
+ *  createRollResolver), not overall roll time — a retried die deserves its
+ *  own fresh grace period, not whatever's left over from the first throw's. */
+export function isBodySettled(body: CANNON.Body, sinceThrowMs: number): boolean {
+  if (body.sleepState === CANNON.Body.SLEEPING) return true;
+  if (sinceThrowMs < SETTLE_FALLBACK_GRACE_MS) return false;
   return (
-    body.sleepState === CANNON.Body.SLEEPING ||
-    (body.velocity.lengthSquared() < SETTLE_VELOCITY_THRESHOLD ** 2 &&
-      body.angularVelocity.lengthSquared() < SETTLE_VELOCITY_THRESHOLD ** 2)
+    body.velocity.lengthSquared() < SETTLE_VELOCITY_THRESHOLD ** 2 &&
+    body.angularVelocity.lengthSquared() < SETTLE_VELOCITY_THRESHOLD ** 2
   );
 }
 
@@ -278,26 +308,38 @@ export interface RollResolverTickResult {
 export function createRollResolver(world: CANNON.World, dice: readonly PhysicsDie[]) {
   let elapsedMs = 0;
   let attempts = 0;
+  // Time since each die was last (re)thrown — separate from `elapsedMs`
+  // (which tracks the whole roll, including retries) because a retried die
+  // deserves its own fresh SETTLE_FALLBACK_GRACE_MS window, not whatever's
+  // left over from the very first throw's budget. Reset to 0 alongside
+  // `elapsedMs`/`attempts` for the initial throw, and per-index whenever
+  // that die alone is re-thrown below.
+  const sinceThrowMs = dice.map(() => 0);
 
   function reset(): void {
     elapsedMs = 0;
     attempts = 0;
+    sinceThrowMs.fill(0);
   }
 
   function tick(dt: number): RollResolverTickResult {
     world.step(FIXED_DT, dt, MAX_SUB_STEPS);
     elapsedMs += dt * 1000;
+    for (let index = 0; index < sinceThrowMs.length; index++) sinceThrowMs[index] += dt * 1000;
     const timedOut = elapsedMs >= MAX_ROLL_MS;
 
-    const allSettled = dice.every((die) => isBodySettled(die.body));
+    const allSettled = dice.every((die, index) => isBodySettled(die.body, sinceThrowMs[index]));
     if (!allSettled && !timedOut) return { done: false };
 
     const readings = dice.map((die) => readUpFace(die.body, die.groups));
-    const cockedDice = dice.filter((_, index) => readings[index].cocked);
+    const cockedIndices = readings.map((reading, index) => (reading.cocked ? index : -1)).filter((index) => index >= 0);
 
-    if (cockedDice.length > 0 && attempts < MAX_REROLL_ATTEMPTS && !timedOut) {
+    if (cockedIndices.length > 0 && attempts < MAX_REROLL_ATTEMPTS && !timedOut) {
       attempts += 1;
-      for (const die of cockedDice) throwDie(die.body, die.laneX);
+      for (const index of cockedIndices) {
+        throwDie(dice[index].body, dice[index].laneX);
+        sinceThrowMs[index] = 0;
+      }
       return { done: false };
     }
 
