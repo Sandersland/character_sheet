@@ -252,6 +252,27 @@ export type InventoryOperation =
   | { type: "remove"; inventoryItemId: string }
   | { type: "sell"; inventoryItemId: string; quantity?: number; currencyDelta: Currency };
 
+export type LedgerEntryType = "acquired" | "consumed" | "sold" | "bought" | "removed";
+
+/**
+ * One row from `GET /api/characters/:id/inventory/transactions` — the
+ * read-only ledger written by the operations above. `itemName` is a
+ * snapshot, so an entry stays readable even after `inventoryItemId`'s row
+ * is gone (sold/consumed/removed) — that's why `inventoryItemId` is
+ * undefined for those: the durable record is `itemName`, not the FK.
+ */
+export interface LedgerEntry {
+  id: string;
+  type: LedgerEntryType;
+  quantityDelta: number;
+  currencyDelta?: Currency;
+  itemName: string;
+  inventoryItemId?: string;
+  note?: string;
+  batchId?: string;
+  createdAt: string;
+}
+
 export type SpellSchool =
   | "abjuration"
   | "conjuration"

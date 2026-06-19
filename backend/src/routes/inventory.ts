@@ -182,3 +182,41 @@ inventoryRouter.post("/characters/:id/inventory/transactions", async (req, res) 
   });
   res.json(serializeCharacter(updated!));
 });
+
+// Read-only history (Phase C) — newest first, optionally filtered to one
+// still-held row via ?inventoryItemId=. Filtering only ever covers
+// currently-held items (once a row is sold/consumed/removed there's nothing
+// left to filter by); the unfiltered list is the durable record for
+// fully-disposed items, readable via the snapshotted `itemName` below.
+inventoryRouter.get("/characters/:id/inventory/transactions", async (req, res) => {
+  const character = await prisma.character.findUnique({
+    where: { id: req.params.id },
+    select: { id: true },
+  });
+  if (!character) {
+    res.status(404).json({ error: "Character not found" });
+    return;
+  }
+
+  const inventoryItemId =
+    typeof req.query.inventoryItemId === "string" ? req.query.inventoryItemId : undefined;
+
+  const transactions = await prisma.inventoryTransaction.findMany({
+    where: { characterId: character.id, ...(inventoryItemId ? { inventoryItemId } : {}) },
+    orderBy: { createdAt: "desc" },
+  });
+
+  res.json(
+    transactions.map((row) => ({
+      id: row.id,
+      type: row.type,
+      quantityDelta: row.quantityDelta,
+      currencyDelta: row.currencyDelta ?? undefined,
+      itemName: row.itemName,
+      inventoryItemId: row.inventoryItemId ?? undefined,
+      note: row.note ?? undefined,
+      batchId: row.batchId ?? undefined,
+      createdAt: row.createdAt,
+    }))
+  );
+});

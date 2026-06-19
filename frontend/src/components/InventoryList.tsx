@@ -5,6 +5,11 @@ import type { Character, Currency, InventoryOperation, Item } from "../types/cha
 import AddItemPanel from "./AddItemPanel";
 import Card from "./Card";
 import InventoryRow from "./InventoryRow";
+import LedgerModal from "./LedgerModal";
+
+// undefined = closed, null = open unfiltered, {id,name} = open filtered to
+// one row — see LedgerModal's comment for why both views share one modal.
+type LedgerFilter = { id: string; name?: string } | null | undefined;
 
 interface InventoryListProps {
   character: Character;
@@ -79,6 +84,7 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
   const [addOpen, setAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sellingId, setSellingId] = useState<string | null>(null);
+  const [ledgerFilter, setLedgerFilter] = useState<LedgerFilter>(undefined);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -113,13 +119,23 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
     <Card
       title="Inventory"
       titleAccessory={
-        <button
-          type="button"
-          onClick={() => setAddOpen((open) => !open)}
-          className="text-xs font-semibold text-[var(--color-garnet-700)] hover:underline"
-        >
-          {addOpen ? "Cancel" : "+ Add item"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setLedgerFilter(null)}
+            className="text-xs font-semibold text-[var(--color-garnet-700)] hover:underline"
+          >
+            History
+          </button>
+          <span className="text-[var(--color-parchment-300)]">·</span>
+          <button
+            type="button"
+            onClick={() => setAddOpen((open) => !open)}
+            className="text-xs font-semibold text-[var(--color-garnet-700)] hover:underline"
+          >
+            {addOpen ? "Cancel" : "+ Add item"}
+          </button>
+        </div>
       }
       className="p-4"
     >
@@ -156,6 +172,7 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
                 setEditingId(null);
                 setSellingId(null);
               }}
+              onHistory={() => setLedgerFilter({ id: item.id, name: item.name })}
               onSubmit={submitOperations}
             />
           ))}
@@ -167,6 +184,15 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
 
         <CurrencyEditor character={character} onUpdate={onUpdate} />
       </div>
+
+      {ledgerFilter !== undefined && (
+        <LedgerModal
+          characterId={character.id}
+          inventoryItemId={ledgerFilter?.id}
+          itemName={ledgerFilter?.name}
+          onClose={() => setLedgerFilter(undefined)}
+        />
+      )}
     </Card>
   );
 }

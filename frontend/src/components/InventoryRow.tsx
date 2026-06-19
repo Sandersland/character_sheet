@@ -18,6 +18,7 @@ interface InventoryRowProps {
   onEdit: () => void;
   onSell: () => void;
   onCancel: () => void;
+  onHistory: () => void;
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
 }
 
@@ -79,12 +80,22 @@ function currencyTimesQuantity(cost: Currency | undefined, quantity: number): Cu
  * One inventory row, in one of three modes: read-only display (Phase A's
  * rendering, unchanged), an inline edit form (cosmetic fields + quantity +
  * the matching weapon/armor/consumable detail, if any — the "Club +1"
- * path), or an inline sell form. Edit/Sell/Remove are low-emphasis text
- * links rather than icon buttons, matching the existing "← All characters"
- * link style — no icon-button row exists elsewhere in this app to match
- * instead.
+ * path), or an inline sell form. Edit/Sell/History/Remove are low-emphasis
+ * text links rather than icon buttons, matching the existing "← All
+ * characters" link style — no icon-button row exists elsewhere in this app
+ * to match instead. History (Phase C) doesn't have its own mode here since
+ * it opens a modal owned by the parent `InventoryList`, not an inline form.
  */
-export default function InventoryRow({ item, mode, pending, onEdit, onSell, onCancel, onSubmit }: InventoryRowProps) {
+export default function InventoryRow({
+  item,
+  mode,
+  pending,
+  onEdit,
+  onSell,
+  onCancel,
+  onHistory,
+  onSubmit,
+}: InventoryRowProps) {
   const { weapon, armor, consumable } = item;
 
   const [name, setName] = useState(item.name);
@@ -470,6 +481,10 @@ export default function InventoryRow({ item, mode, pending, onEdit, onSell, onCa
         <span className="text-[var(--color-parchment-300)]">·</span>
         <button type="button" disabled={pending} onClick={onSell} className={linkButtonClass}>
           Sell
+        </button>
+        <span className="text-[var(--color-parchment-300)]">·</span>
+        <button type="button" disabled={pending} onClick={onHistory} className={linkButtonClass}>
+          History
         </button>
         <span className="text-[var(--color-parchment-300)]">·</span>
         <button

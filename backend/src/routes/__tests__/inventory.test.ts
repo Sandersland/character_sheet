@@ -184,3 +184,99 @@ describe("POST /api/characters/:id/inventory/transactions", () => {
     expect(sellResponse.body.currency).toEqual({ cp: 0, sp: 0, gp: 6, pp: 0 });
   });
 });
+
+describe("GET /api/characters/:id/inventory/transactions", () => {
+  let itemId: string;
+
+  afterAll(async () => {
+    await prisma.item.deleteMany({ where: { name: TEST_ITEM.name } });
+  });
+
+  beforeEach(async () => {
+    const item = await prisma.item.upsert({
+      where: { name: TEST_ITEM.name },
+      create: { ...TEST_ITEM, weaponDetail: { create: TEST_WEAPON_DETAIL } },
+      update: {
+        ...TEST_ITEM,
+        weaponDetail: { upsert: { create: TEST_WEAPON_DETAIL, update: TEST_WEAPON_DETAIL } },
+      },
+    });
+    itemId = item.id;
+
+    await prisma.character.create({ data: { ...FIXTURE, spellcasting: Prisma.JsonNull } });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: FIXTURE.id } });
+  });
+
+  it("404s for an unknown character", async () => {
+    const response = await supertest(createApp()).get(
+      "/api/characters/does-not-exist/inventory/transactions"
+    );
+    expect(response.status).toBe(404);
+  });
+
+  it("returns the empty ledger for a fresh character", async () => {
+    const response = await supertest(createApp()).get(
+      `/api/characters/${FIXTURE.id}/inventory/transactions`
+    );
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual([]);
+  });
+
+  it("returns newest-first, and a deleted item's entries stay readable via the snapshotted name", async () => {
+    const app = createApp();
+
+    // acquire (logged "acquired"), then sell the whole stack (logged "sold",
+    // deletes the InventoryItem row) — both still readable afterward.
+    const acquireResponse = await supertest(app)
+      .post(`/api/characters/${FIXTURE.id}/inventory/transactions`)
+      .send({ operations: [{ type: "acquire", itemId, quantity: 1 }] });
+    const inventoryItemId = acquireResponse.body.inventory[0].id;
+
+    await supertest(app)
+      .post(`/api/characters/${FIXTURE.id}/inventory/transactions`)
+      .send({
+        operations: [
+          { type: "sell", inventoryItemId, currencyDelta: { cp: 0, sp: 0, gp: 1, pp: 0 } },
+        ],
+      });
+
+    const response = await supertest(app).get(`/api/characters/${FIXTURE.id}/inventory/transactions`);
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveLength(2);
+    // newest first: the sell comes before the acquire
+    expect(response.body[0]).toMatchObject({
+      type: "sold",
+      itemName: TEST_ITEM.name,
+      quantityDelta: -1,
+    });
+    // omitted (undefined), not null, matching serializeInventoryItem's
+    // convention elsewhere — the row genuinely no longer exists.
+    expect(response.body[0].inventoryItemId).toBeUndefined();
+    expect(response.body[1]).toMatchObject({ type: "acquired", itemName: TEST_ITEM.name, quantityDelta: 1 });
+  });
+
+  it("filters to a single still-held item via ?inventoryItemId=", async () => {
+    const app = createApp();
+
+    const first = await supertest(app)
+      .post(`/api/characters/${FIXTURE.id}/inventory/transactions`)
+      .send({ operations: [{ type: "acquire", itemId, quantity: 1 }] });
+    const keptId = first.body.inventory[0].id;
+
+    const second = await supertest(app)
+      .post(`/api/characters/${FIXTURE.id}/inventory/transactions`)
+      .send({ operations: [{ type: "acquire", itemId, quantity: 1 }] });
+    const otherId = second.body.inventory.find((i: { id: string }) => i.id !== keptId).id;
+
+    const response = await supertest(app).get(
+      `/api/characters/${FIXTURE.id}/inventory/transactions?inventoryItemId=${keptId}`
+    );
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveLength(1);
+    expect(response.body[0].inventoryItemId).toBe(keptId);
+    expect(otherId).not.toBe(keptId);
+  });
+});
