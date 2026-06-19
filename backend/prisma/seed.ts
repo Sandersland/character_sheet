@@ -129,19 +129,87 @@ function coins(gp: number, sp = 0, cp = 0) {
   return { cp, sp, gp, pp: 0 };
 }
 
-// Matches the Prisma schema's ItemCategory enum.
+// Matches the Prisma schema's ItemCategory/ArmorCategory enums.
 type ItemCategoryName = "weapon" | "armor" | "consumable" | "gear";
+type ArmorCategoryName = "light" | "medium" | "heavy" | "shield";
+
+// Mirrors ItemWeaponDetail/ItemArmorDetail/ItemConsumableDetail's own
+// fields (minus id/itemId) — these objects are used directly as both an
+// Item's nested detail create AND, for catalog-derived inventory rows, the
+// InventoryItem's own detail snapshot (see resolveInventoryRow below), so
+// there's exactly one place each weapon/armor/consumable's stats are typed
+// in. Dice are count/faces/modifier (matching frontend/src/lib/dice.ts's
+// RollSpec), not a "1d6" string — see schema.prisma's comment on
+// ItemWeaponDetail for why.
+interface WeaponDetailInput {
+  damageDiceCount: number;
+  damageDiceFaces: number;
+  damageModifier?: number;
+  damageType: string;
+  versatileDiceCount?: number;
+  versatileDiceFaces?: number;
+  finesse?: boolean;
+  light?: boolean;
+  heavy?: boolean;
+  twoHanded?: boolean;
+  reach?: boolean;
+  thrown?: boolean;
+  ammunition?: boolean;
+  rangeNormal?: number;
+  rangeLong?: number;
+}
+
+interface ArmorDetailInput {
+  armorCategory: ArmorCategoryName;
+  baseArmorClass: number;
+  dexModifierApplies?: boolean;
+  dexModifierMax?: number;
+  stealthDisadvantage?: boolean;
+  strengthRequirement?: number;
+}
+
+interface ConsumableDetailInput {
+  effectDiceCount?: number;
+  effectDiceFaces?: number;
+  effectModifier?: number;
+  effectDescription?: string;
+}
 
 interface CatalogItem {
   name: string;
   category: ItemCategoryName;
   weight?: number;
   cost?: ReturnType<typeof coins>;
-  damageDice?: string;
-  damageType?: string;
-  armorClass?: number;
-  properties?: string[];
   description?: string;
+  weapon?: WeaponDetailInput;
+  armor?: ArmorDetailInput;
+  consumable?: ConsumableDetailInput;
+}
+
+// Nested-create fields for an Item's optional 1:1 detail relations.
+function itemDetailCreateFields(item: CatalogItem) {
+  return {
+    weaponDetail: item.weapon ? { create: item.weapon } : undefined,
+    armorDetail: item.armor ? { create: item.armor } : undefined,
+    consumableDetail: item.consumable ? { create: item.consumable } : undefined,
+  };
+}
+
+// Same, but for the `update` side of an upsert — a true 1:1 optional
+// relation can nested-upsert directly, unlike the 1:many class/inventory
+// relations elsewhere in this file that have to deleteMany+create instead.
+function itemDetailUpsertFields(item: CatalogItem) {
+  return {
+    weaponDetail: item.weapon
+      ? { upsert: { create: item.weapon, update: item.weapon } }
+      : undefined,
+    armorDetail: item.armor
+      ? { upsert: { create: item.armor, update: item.armor } }
+      : undefined,
+    consumableDetail: item.consumable
+      ? { upsert: { create: item.consumable, update: item.consumable } }
+      : undefined,
+  };
 }
 
 // --- Item catalog -------------------------------------------------------
@@ -152,21 +220,143 @@ interface CatalogItem {
 // Item/InventoryItem for why a snapshot rather than a live reference.
 const ITEMS: CatalogItem[] = [
   // weapon
-  { name: "Club", category: "weapon", weight: 2, cost: coins(0, 1), damageDice: "1d4", damageType: "bludgeoning", properties: ["light"] },
-  { name: "Dagger", category: "weapon", weight: 1, cost: coins(2), damageDice: "1d4", damageType: "piercing", properties: ["finesse", "light", "thrown (range 20/60)"] },
-  { name: "Quarterstaff", category: "weapon", weight: 4, cost: coins(0, 2), damageDice: "1d6", damageType: "bludgeoning", properties: ["versatile (1d8)"] },
-  { name: "Shortsword", category: "weapon", weight: 2, cost: coins(10), damageDice: "1d6", damageType: "piercing", properties: ["finesse", "light"] },
-  { name: "Longsword", category: "weapon", weight: 3, cost: coins(15), damageDice: "1d8", damageType: "slashing", properties: ["versatile (1d10)"] },
-  { name: "Warhammer", category: "weapon", weight: 2, cost: coins(15), damageDice: "1d8", damageType: "bludgeoning", properties: ["versatile (1d10)"] },
-  { name: "Handaxe", category: "weapon", weight: 2, cost: coins(5), damageDice: "1d6", damageType: "slashing", properties: ["light", "thrown (range 20/60)"] },
-  { name: "Shortbow", category: "weapon", weight: 2, cost: coins(25), damageDice: "1d6", damageType: "piercing", properties: ["ammunition (range 80/320)", "two-handed"] },
+  {
+    name: "Club",
+    category: "weapon",
+    weight: 2,
+    cost: coins(0, 1),
+    weapon: { damageDiceCount: 1, damageDiceFaces: 4, damageType: "bludgeoning", light: true },
+  },
+  {
+    name: "Dagger",
+    category: "weapon",
+    weight: 1,
+    cost: coins(2),
+    weapon: {
+      damageDiceCount: 1,
+      damageDiceFaces: 4,
+      damageType: "piercing",
+      finesse: true,
+      light: true,
+      thrown: true,
+      rangeNormal: 20,
+      rangeLong: 60,
+    },
+  },
+  {
+    name: "Quarterstaff",
+    category: "weapon",
+    weight: 4,
+    cost: coins(0, 2),
+    weapon: {
+      damageDiceCount: 1,
+      damageDiceFaces: 6,
+      damageType: "bludgeoning",
+      versatileDiceCount: 1,
+      versatileDiceFaces: 8,
+    },
+  },
+  {
+    name: "Shortsword",
+    category: "weapon",
+    weight: 2,
+    cost: coins(10),
+    weapon: { damageDiceCount: 1, damageDiceFaces: 6, damageType: "piercing", finesse: true, light: true },
+  },
+  {
+    name: "Longsword",
+    category: "weapon",
+    weight: 3,
+    cost: coins(15),
+    weapon: {
+      damageDiceCount: 1,
+      damageDiceFaces: 8,
+      damageType: "slashing",
+      versatileDiceCount: 1,
+      versatileDiceFaces: 10,
+    },
+  },
+  {
+    name: "Warhammer",
+    category: "weapon",
+    weight: 2,
+    cost: coins(15),
+    weapon: {
+      damageDiceCount: 1,
+      damageDiceFaces: 8,
+      damageType: "bludgeoning",
+      versatileDiceCount: 1,
+      versatileDiceFaces: 10,
+    },
+  },
+  {
+    name: "Handaxe",
+    category: "weapon",
+    weight: 2,
+    cost: coins(5),
+    weapon: {
+      damageDiceCount: 1,
+      damageDiceFaces: 6,
+      damageType: "slashing",
+      light: true,
+      thrown: true,
+      rangeNormal: 20,
+      rangeLong: 60,
+    },
+  },
+  {
+    name: "Shortbow",
+    category: "weapon",
+    weight: 2,
+    cost: coins(25),
+    weapon: {
+      damageDiceCount: 1,
+      damageDiceFaces: 6,
+      damageType: "piercing",
+      ammunition: true,
+      twoHanded: true,
+      rangeNormal: 80,
+      rangeLong: 320,
+    },
+  },
   // armor
-  { name: "Leather Armor", category: "armor", weight: 10, cost: coins(10), armorClass: 11, properties: ["light"] },
-  { name: "Shield", category: "armor", weight: 6, cost: coins(10), armorClass: 2, description: "Worn on one arm; grants +2 AC while wielded." },
-  { name: "Plate Armor", category: "armor", weight: 65, cost: coins(1500), armorClass: 18, properties: ["heavy", "stealth disadvantage"] },
+  {
+    name: "Leather Armor",
+    category: "armor",
+    weight: 10,
+    cost: coins(10),
+    armor: { armorCategory: "light", baseArmorClass: 11, dexModifierApplies: true },
+  },
+  {
+    name: "Shield",
+    category: "armor",
+    weight: 6,
+    cost: coins(10),
+    description: "Worn on one arm; grants +2 AC while wielded.",
+    armor: { armorCategory: "shield", baseArmorClass: 2 },
+  },
+  {
+    name: "Plate Armor",
+    category: "armor",
+    weight: 65,
+    cost: coins(1500),
+    armor: { armorCategory: "heavy", baseArmorClass: 18, stealthDisadvantage: true },
+  },
   // consumable
-  { name: "Potion of Healing", category: "consumable", weight: 0.5, cost: coins(50), description: "Regain 2d4 + 2 hit points when you drink this potion." },
-  { name: "Caltrops", category: "consumable", weight: 2, cost: coins(1), description: "Covers a 5-ft square. A creature entering must succeed a DC 15 Dex save or take 1 piercing damage and stop moving for the rest of its turn." },
+  {
+    name: "Potion of Healing",
+    category: "consumable",
+    weight: 0.5,
+    cost: coins(50),
+    consumable: { effectDiceCount: 2, effectDiceFaces: 4, effectModifier: 2, effectDescription: "Restores hit points" },
+  },
+  {
+    name: "Caltrops",
+    category: "consumable",
+    weight: 2,
+    cost: coins(1),
+    description: "Covers a 5-ft square. A creature entering must succeed a DC 15 Dex save or take 1 piercing damage and stop moving for the rest of its turn.",
+  },
   // gear
   { name: "Spellbook", category: "gear", weight: 3, cost: coins(50) },
   { name: "Component Pouch", category: "gear", weight: 2, cost: coins(25), description: "A small watertight pouch holding what a spellcaster needs to cast spells with material components." },
@@ -525,32 +715,34 @@ const SEED_CHARACTERS = [
 
 // Resolves one SeedInventoryRow into an InventoryItem create payload —
 // either a snapshot of a catalog Item (`catalogName` branch) or a fully
-// homebrew row (itemId: null). See the SeedInventoryRow comment above.
+// homebrew row (itemId: null). See the SeedInventoryRow comment above. The
+// detail sub-object (if any) is reused directly from the same CatalogItem
+// literal the Item catalog itself was seeded from — at seed time the
+// inventory row's detail is identical to the catalog's, no override applied.
 function resolveInventoryRow(
   row: SeedInventoryRow,
   position: number,
-  itemsByName: Map<string, Awaited<ReturnType<typeof prisma.item.upsert>>>
+  catalogByName: Map<string, CatalogItem>,
+  itemIdsByName: Map<string, string>
 ) {
   if ("catalogName" in row) {
-    const catalogItem = itemsByName.get(row.catalogName);
-    if (!catalogItem) {
+    const catalogItem = catalogByName.get(row.catalogName);
+    const itemId = itemIdsByName.get(row.catalogName);
+    if (!catalogItem || !itemId) {
       throw new Error(`Unknown seed catalogName: ${row.catalogName}`);
     }
     return {
-      itemId: catalogItem.id,
+      itemId,
       name: row.name ?? catalogItem.name,
       category: catalogItem.category,
       weight: catalogItem.weight,
       cost: catalogItem.cost,
-      damageDice: catalogItem.damageDice,
-      damageType: catalogItem.damageType,
-      armorClass: catalogItem.armorClass,
-      properties: catalogItem.properties,
       description: catalogItem.description,
       quantity: row.quantity ?? 1,
       equipped: row.equipped ?? false,
       notes: row.notes,
       position,
+      ...itemDetailCreateFields(catalogItem),
     };
   }
 
@@ -560,15 +752,12 @@ function resolveInventoryRow(
     category: row.category,
     weight: row.weight,
     cost: row.cost,
-    damageDice: row.damageDice,
-    damageType: row.damageType,
-    armorClass: row.armorClass,
-    properties: row.properties ?? [],
     description: row.description,
     quantity: row.quantity ?? 1,
     equipped: row.equipped ?? false,
     notes: row.notes,
     position,
+    ...itemDetailCreateFields(row),
   };
 }
 
@@ -595,17 +784,25 @@ async function main() {
     backgroundIds.set(row.name, row.id);
   }
 
-  const itemsByName = new Map<string, Awaited<ReturnType<typeof prisma.item.upsert>>>();
+  const catalogByName = new Map<string, CatalogItem>(ITEMS.map((item) => [item.name, item]));
+  const itemIdsByName = new Map<string, string>();
   for (const item of ITEMS) {
-    const row = await prisma.item.upsert({ where: { name: item.name }, create: item, update: item });
-    itemsByName.set(row.name, row);
+    const { name, category, weight, cost, description } = item;
+    const row = await prisma.item.upsert({
+      where: { name },
+      create: { name, category, weight, cost, description, ...itemDetailCreateFields(item) },
+      update: { name, category, weight, cost, description, ...itemDetailUpsertFields(item) },
+    });
+    itemIdsByName.set(row.name, row.id);
   }
 
   for (const { race, class: className, subclass, background, inventory, ...character } of SEED_CHARACTERS) {
     const raceId = raceIds.get(race);
     const classId = classIds.get(className);
     const backgroundId = backgroundIds.get(background);
-    const inventoryItems = inventory.map((row, position) => resolveInventoryRow(row, position, itemsByName));
+    const inventoryItems = inventory.map((row, position) =>
+      resolveInventoryRow(row, position, catalogByName, itemIdsByName)
+    );
 
     await prisma.character.upsert({
       where: { id: character.id },

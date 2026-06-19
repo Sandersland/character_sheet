@@ -57,12 +57,64 @@ export interface Currency {
 }
 
 export type ItemCategory = "weapon" | "armor" | "consumable" | "gear";
+export type ArmorCategory = "light" | "medium" | "heavy" | "shield";
+
+/**
+ * Weapon-specific mechanics, present (as `weapon`) only on a row whose
+ * category is "weapon". Dice are decomposed (count/faces/modifier) to match
+ * `lib/dice.ts`'s `RollSpec` shape rather than a "1d6" string, so a future
+ * damage-roll feature reads these directly — see backend's schema.prisma
+ * comment on ItemWeaponDetail.
+ */
+export interface WeaponDetail {
+  damageDiceCount: number;
+  damageDiceFaces: number;
+  damageModifier: number;
+  damageType: string; // e.g. "bludgeoning"
+  /** Two-handed grip's alt die; undefined on both means not versatile. */
+  versatileDiceCount?: number;
+  versatileDiceFaces?: number;
+  finesse: boolean;
+  light: boolean;
+  heavy: boolean;
+  twoHanded: boolean;
+  reach: boolean;
+  thrown: boolean;
+  ammunition: boolean;
+  rangeNormal?: number;
+  rangeLong?: number;
+}
+
+/** Armor-specific mechanics (shields included), present only on `category: "armor"`. */
+export interface ArmorDetail {
+  armorCategory: ArmorCategory;
+  /** Base AC for body armor, or the flat AC bonus for a shield. */
+  baseArmorClass: number;
+  dexModifierApplies: boolean;
+  /** Cap on the Dex modifier added to AC; undefined means uncapped (light armor). */
+  dexModifierMax?: number;
+  stealthDisadvantage: boolean;
+  strengthRequirement?: number;
+}
+
+/**
+ * A consumable's roll-based effect (e.g. a potion's "2d4 + 2" healing),
+ * present only on `category: "consumable"` items that actually have one —
+ * a torch wouldn't. Same RollSpec-shaped dice fields as WeaponDetail.
+ */
+export interface ConsumableDetail {
+  effectDiceCount?: number;
+  effectDiceFaces?: number;
+  effectModifier?: number;
+  effectDescription?: string; // e.g. "Restores hit points"
+}
 
 /**
  * Baseline equipment catalog served by `GET /api/items` — the "pick a
  * club, don't hand-author one" path for the inventory editor (Phase B).
- * `InventoryItem` below snapshots these fields rather than referencing this
- * type live; see backend's schema.prisma comment on Item/InventoryItem.
+ * `InventoryItem` below snapshots these fields (including `weapon`/`armor`/
+ * `consumable`) rather than referencing this type live; see backend's
+ * schema.prisma comment on Item/InventoryItem.
  */
 export interface Item {
   id: string;
@@ -70,19 +122,20 @@ export interface Item {
   category: ItemCategory;
   weight?: number;
   cost?: Currency;
-  damageDice?: string; // e.g. "1d4" (weapons)
-  damageType?: string; // e.g. "bludgeoning" (weapons)
-  armorClass?: number; // base AC or shield bonus (armor)
-  properties: string[]; // e.g. ["light", "finesse", "thrown"]
   description?: string;
+  weapon?: WeaponDetail;
+  armor?: ArmorDetail;
+  consumable?: ConsumableDetail;
 }
 
 /**
  * A character's own copy of an item's stats, optionally traced back to a
  * catalog `Item` via `itemId` (undefined means homebrew/no catalog match —
  * same nullable-FK-plus-own-fields shape as race/background selections).
- * Every field below is this row's own value, free to diverge from the
- * catalog (e.g. renaming "Club" to "Club +1" after a magic bonus).
+ * Every field below — including `weapon`/`armor`/`consumable`, at most one
+ * of which is present, matching `category` — is this row's own value, free
+ * to diverge from the catalog (e.g. renaming "Club" to "Club +1" and
+ * bumping its own `weapon.damageModifier` after a magic bonus).
  */
 export interface InventoryItem {
   id: string;
@@ -92,13 +145,12 @@ export interface InventoryItem {
   quantity: number;
   weight?: number;
   cost?: Currency;
-  damageDice?: string;
-  damageType?: string;
-  armorClass?: number;
-  properties: string[];
   description?: string;
   equipped: boolean;
   notes?: string;
+  weapon?: WeaponDetail;
+  armor?: ArmorDetail;
+  consumable?: ConsumableDetail;
 }
 
 export type SpellSchool =

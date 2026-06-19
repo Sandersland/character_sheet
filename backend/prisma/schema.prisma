@@ -137,24 +137,98 @@ enum ItemCategory {
   gear
 }
 
+enum ArmorCategory {
+  light
+  medium
+  heavy
+  shield
+}
+
 // Baseline equipment catalog, same role as Race/CharacterClass above: seeded
 // from a small SRD subset (prisma/seed.ts) and never referenced directly by
 // Character — only through InventoryItem.itemId, which is nullable, so
 // editing/removing a catalog row never breaks an existing character's
-// inventory.
+// inventory. Mechanical fields specific to one category (damage dice, AC,
+// an effect roll) live on the optional *Detail tables below rather than as
+// nullable columns here — see those models' comments for why.
 model Item {
   id          String       @id @default(uuid())
   name        String       @unique
   category    ItemCategory
   weight      Float?
   cost        Json? // {cp,sp,gp,pp} — sell/buy default, player can override
-  damageDice  String? // e.g. "1d4" (weapons)
-  damageType  String? // e.g. "bludgeoning" (weapons)
-  armorClass  Int? // base AC or shield bonus (armor)
-  properties  String[] // e.g. ["light", "finesse", "thrown"]
   description String?
 
+  weaponDetail     ItemWeaponDetail?
+  armorDetail      ItemArmorDetail?
+  consumableDetail ItemConsumableDetail?
+
   inventoryItems InventoryItem[]
+}
+
+// Optional 1:1 with Item, present only when category = weapon. The FK lives
+// here (joins up to Item) rather than Item holding a column that points at
+// this table — keeps Item itself free of per-category columns no matter how
+// many detail tables exist. Dice fields are decomposed (count/faces/
+// modifier) to match frontend/src/lib/dice.ts's RollSpec shape rather than
+// a "1d6" string, so a future damage-roll feature reads these directly
+// instead of parsing notation.
+model ItemWeaponDetail {
+  id     String @id @default(uuid())
+  itemId String @unique
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  damageDiceCount Int
+  damageDiceFaces Int
+  damageModifier  Int    @default(0)
+  damageType      String // e.g. "bludgeoning"
+
+  // Versatile weapons' two-handed grip rolls a different die; null on both
+  // means not versatile. Which grip is "currently" in use is deliberately
+  // not persisted anywhere — a future roll UI offers both dice at roll time.
+  versatileDiceCount Int?
+  versatileDiceFaces Int?
+
+  finesse     Boolean @default(false)
+  light       Boolean @default(false)
+  heavy       Boolean @default(false)
+  twoHanded   Boolean @default(false)
+  reach       Boolean @default(false)
+  thrown      Boolean @default(false)
+  ammunition  Boolean @default(false)
+  rangeNormal Int?
+  rangeLong   Int?
+}
+
+// Optional 1:1 with Item, present only when category = armor (shields
+// included — a shield's baseArmorClass is its flat AC bonus rather than a
+// base, same overload the 5e SRD itself uses).
+model ItemArmorDetail {
+  id     String @id @default(uuid())
+  itemId String @unique
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  armorCategory       ArmorCategory
+  baseArmorClass      Int
+  dexModifierApplies  Boolean       @default(false)
+  dexModifierMax      Int? // null = uncapped (light armor)
+  stealthDisadvantage Boolean       @default(false)
+  strengthRequirement Int?
+}
+
+// Optional 1:1 with Item, present only when category = consumable and the
+// consumable actually has a roll (e.g. a potion's "2d4+2" healing) — a torch
+// wouldn't have one. Same RollSpec-shaped dice fields as ItemWeaponDetail,
+// for the same reason (a future "use consumable, roll its effect" feature).
+model ItemConsumableDetail {
+  id     String @id @default(uuid())
+  itemId String @unique
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  effectDiceCount   Int?
+  effectDiceFaces   Int?
+  effectModifier    Int?
+  effectDescription String? // e.g. "Restores hit points"
 }
 
 // Per-character inventory row. Unlike CharacterRace/CharacterBackground
@@ -162,7 +236,9 @@ model Item {
 // mechanical fields from the catalog Item at add-time — see the comment on
 // Character above for why. itemId is nullable: null means homebrew (no
 // catalog row at all), set means "started from this catalog item," and
-// either way every field below is this row's own copy, free to diverge.
+// either way every field below (including the *Detail row, if any) is this
+// row's own copy, free to diverge — e.g. a "Club +1" bumping its own
+// InventoryWeaponDetail.damageModifier independent of the catalog Club.
 model InventoryItem {
   id          String       @id @default(uuid())
   characterId String
@@ -173,16 +249,67 @@ model InventoryItem {
   category    ItemCategory
   weight      Float?
   cost        Json?
-  damageDice  String?
-  damageType  String?
-  armorClass  Int?
-  properties  String[]
   description String?
   quantity    Int          @default(1)
   equipped    Boolean      @default(false)
   notes       String?
   position    Int          @default(0)
 
+  weaponDetail     InventoryWeaponDetail?
+  armorDetail      InventoryArmorDetail?
+  consumableDetail InventoryConsumableDetail?
+
   // InventoryTransaction ledger relation arrives in Phase B, alongside the
   // transactions endpoint that writes it — see the plan doc.
+}
+
+// Same shape as ItemWeaponDetail, owned by InventoryItem instead of Item.
+model InventoryWeaponDetail {
+  id              String        @id @default(uuid())
+  inventoryItemId String        @unique
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  damageDiceCount Int
+  damageDiceFaces Int
+  damageModifier  Int    @default(0)
+  damageType      String
+
+  versatileDiceCount Int?
+  versatileDiceFaces Int?
+
+  finesse     Boolean @default(false)
+  light       Boolean @default(false)
+  heavy       Boolean @default(false)
+  twoHanded   Boolean @default(false)
+  reach       Boolean @default(false)
+  thrown      Boolean @default(false)
+  ammunition  Boolean @default(false)
+  rangeNormal Int?
+  rangeLong   Int?
+}
+
+// Same shape as ItemArmorDetail, owned by InventoryItem instead of Item.
+model InventoryArmorDetail {
+  id              String        @id @default(uuid())
+  inventoryItemId String        @unique
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  armorCategory       ArmorCategory
+  baseArmorClass      Int
+  dexModifierApplies  Boolean       @default(false)
+  dexModifierMax      Int?
+  stealthDisadvantage Boolean       @default(false)
+  strengthRequirement Int?
+}
+
+// Same shape as ItemConsumableDetail, owned by InventoryItem instead of Item.
+model InventoryConsumableDetail {
+  id              String        @id @default(uuid())
+  inventoryItemId String        @unique
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  effectDiceCount   Int?
+  effectDiceFaces   Int?
+  effectModifier    Int?
+  effectDescription String?
 }

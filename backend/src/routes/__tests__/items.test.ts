@@ -9,9 +9,14 @@ const TEST_ITEM = {
   category: "weapon" as const,
   weight: 1,
   cost: { cp: 0, sp: 0, gp: 2, pp: 0 },
-  damageDice: "1d4",
+};
+const TEST_ITEM_WEAPON_DETAIL = {
+  damageDiceCount: 1,
+  damageDiceFaces: 4,
   damageType: "piercing",
-  properties: ["finesse", "light", "thrown"],
+  finesse: true,
+  light: true,
+  thrown: true,
 };
 
 describe("GET /api/items", () => {
@@ -22,8 +27,11 @@ describe("GET /api/items", () => {
   it("returns the equipment catalog used to drive the inventory editor", async () => {
     await prisma.item.upsert({
       where: { name: TEST_ITEM.name },
-      create: TEST_ITEM,
-      update: TEST_ITEM,
+      create: { ...TEST_ITEM, weaponDetail: { create: TEST_ITEM_WEAPON_DETAIL } },
+      update: {
+        ...TEST_ITEM,
+        weaponDetail: { upsert: { create: TEST_ITEM_WEAPON_DETAIL, update: TEST_ITEM_WEAPON_DETAIL } },
+      },
     });
 
     const response = await supertest(createApp()).get("/api/items");
@@ -34,9 +42,16 @@ describe("GET /api/items", () => {
     const item = response.body.find((row: { name: string }) => row.name === TEST_ITEM.name);
     expect(item).toMatchObject({
       category: "weapon",
-      damageDice: "1d4",
-      damageType: "piercing",
-      properties: ["finesse", "light", "thrown"],
+      weapon: {
+        damageDiceCount: 1,
+        damageDiceFaces: 4,
+        damageType: "piercing",
+        finesse: true,
+        light: true,
+        thrown: true,
+      },
     });
+    expect(item.armor).toBeUndefined();
+    expect(item.consumable).toBeUndefined();
   });
 });

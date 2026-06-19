@@ -20,9 +20,12 @@ const TEST_ITEM = {
   category: "weapon" as const,
   weight: 2,
   cost: { cp: 0, sp: 1, gp: 0, pp: 0 },
-  damageDice: "1d4",
+};
+const TEST_ITEM_WEAPON_DETAIL = {
+  damageDiceCount: 1,
+  damageDiceFaces: 4,
   damageType: "bludgeoning",
-  properties: ["light"],
+  light: true,
 };
 
 const FIXTURE = {
@@ -76,8 +79,11 @@ describe("characters routes", () => {
     });
     const item = await prisma.item.upsert({
       where: { name: TEST_ITEM.name },
-      create: TEST_ITEM,
-      update: TEST_ITEM,
+      create: { ...TEST_ITEM, weaponDetail: { create: TEST_ITEM_WEAPON_DETAIL } },
+      update: {
+        ...TEST_ITEM,
+        weaponDetail: { upsert: { create: TEST_ITEM_WEAPON_DETAIL, update: TEST_ITEM_WEAPON_DETAIL } },
+      },
     });
 
     await prisma.character.create({
@@ -97,12 +103,10 @@ describe("characters routes", () => {
               category: item.category,
               weight: item.weight,
               cost: TEST_ITEM.cost,
-              damageDice: item.damageDice,
-              damageType: item.damageType,
-              properties: item.properties,
               quantity: 1,
               equipped: true,
               position: 0,
+              weaponDetail: { create: TEST_ITEM_WEAPON_DETAIL },
             },
             {
               itemId: null,
@@ -165,12 +169,17 @@ describe("characters routes", () => {
     expect(catalogRow).toMatchObject({
       name: TEST_ITEM.name,
       category: "weapon",
-      damageDice: "1d4",
-      damageType: "bludgeoning",
-      properties: ["light"],
       quantity: 1,
       equipped: true,
+      weapon: {
+        damageDiceCount: 1,
+        damageDiceFaces: 4,
+        damageType: "bludgeoning",
+        light: true,
+      },
     });
+    expect(catalogRow.armor).toBeUndefined();
+    expect(catalogRow.consumable).toBeUndefined();
     expect(typeof catalogRow.itemId).toBe("string");
     expect(homebrewRow).toMatchObject({
       name: "Homebrew Amulet",

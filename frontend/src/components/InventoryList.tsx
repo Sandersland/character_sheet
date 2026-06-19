@@ -1,4 +1,5 @@
-import type { Currency, InventoryItem, ItemCategory } from "../types/character";
+import { formatRollSpec } from "../lib/dice";
+import type { Currency, InventoryItem, ItemCategory, WeaponDetail } from "../types/character";
 import Badge from "./Badge";
 
 interface InventoryListProps {
@@ -13,6 +14,39 @@ const CATEGORY_TONE: Record<ItemCategory, "garnet" | "arcane" | "gold" | "neutra
   gear: "neutral",
 };
 
+/** "1d6 bludgeoning", plus a "versatile: 1d8" fragment if the weapon has an alt grip die. */
+function weaponDamageParts(weapon: WeaponDetail): string[] {
+  const base = `${formatRollSpec({
+    count: weapon.damageDiceCount,
+    faces: weapon.damageDiceFaces,
+    modifier: weapon.damageModifier,
+  })} ${weapon.damageType}`;
+  const parts = [base];
+  if (weapon.versatileDiceCount && weapon.versatileDiceFaces) {
+    parts.push(
+      `versatile: ${formatRollSpec({ count: weapon.versatileDiceCount, faces: weapon.versatileDiceFaces })}`
+    );
+  }
+  return parts;
+}
+
+/** Weapon properties folded into natural language rather than separate badges. */
+function weaponPropertyTags(weapon: WeaponDetail): string[] {
+  const tags = [
+    weapon.finesse && "finesse",
+    weapon.light && "light",
+    weapon.heavy && "heavy",
+    weapon.twoHanded && "two-handed",
+    weapon.reach && "reach",
+    weapon.thrown && "thrown",
+    weapon.ammunition && "ammunition",
+  ].filter((tag): tag is string => Boolean(tag));
+  if (weapon.rangeNormal && weapon.rangeLong) {
+    tags.push(`range ${weapon.rangeNormal}/${weapon.rangeLong} ft`);
+  }
+  return tags;
+}
+
 /**
  * Multi-row cell pattern (components.md: "Multi-row cells avoid extra
  * columns for secondary metadata") — item name is the lead line, weight/
@@ -21,7 +55,12 @@ const CATEGORY_TONE: Record<ItemCategory, "garnet" | "arcane" | "gold" | "neutra
  * label:value pairs). `description` is the catalog item's own flavor
  * text/rules text; `notes` (italicized) is the player's own annotation on
  * this specific row — kept visually distinct since they answer different
- * questions ("what is this" vs. "what did I do with it").
+ * questions ("what is this" vs. "what did I do with it"). Weapon/armor/
+ * consumable mechanics come from the matching detail sub-object (at most
+ * one present, per `category`) rather than flat fields — see
+ * types/character.ts's WeaponDetail/ArmorDetail/ConsumableDetail. Dice
+ * render via `formatRollSpec` (lib/dice.ts) rather than new formatting
+ * code, since the detail fields are already RollSpec-shaped.
  */
 export default function InventoryList({ items, currency }: InventoryListProps) {
   const totalWeight = items.reduce(
@@ -33,14 +72,34 @@ export default function InventoryList({ items, currency }: InventoryListProps) {
     <div className="flex flex-col gap-3">
       <ul className="flex flex-col divide-y divide-[var(--color-parchment-200)]">
         {items.map((item) => {
+          const { weapon, armor, consumable } = item;
+
+          const effectRoll =
+            consumable?.effectDiceCount && consumable?.effectDiceFaces
+              ? formatRollSpec({
+                  count: consumable.effectDiceCount,
+                  faces: consumable.effectDiceFaces,
+                  modifier: consumable.effectModifier ?? 0,
+                })
+              : null;
+
           const details = [
             item.quantity > 1 ? `${item.quantity}x` : "1x",
             item.weight ? `${item.weight * item.quantity} lb` : null,
-            item.damageDice
-              ? `${item.damageDice}${item.damageType ? ` ${item.damageType}` : ""}`
+            ...(weapon ? weaponDamageParts(weapon) : []),
+            ...(weapon ? weaponPropertyTags(weapon) : []),
+            armor
+              ? `AC ${armor.baseArmorClass}${
+                  armor.dexModifierApplies
+                    ? armor.dexModifierMax != null
+                      ? ` + Dex (max ${armor.dexModifierMax})`
+                      : " + Dex"
+                    : ""
+                }`
               : null,
-            item.armorClass ? `AC ${item.armorClass}` : null,
-            item.properties.length > 0 ? item.properties.join(", ") : null,
+            armor?.strengthRequirement ? `Str ${armor.strengthRequirement}` : null,
+            armor?.stealthDisadvantage ? "stealth disadvantage" : null,
+            effectRoll,
           ].filter((part): part is string => part !== null);
 
           return (
@@ -63,6 +122,11 @@ export default function InventoryList({ items, currency }: InventoryListProps) {
                 {item.description && (
                   <p className="mt-1 text-xs text-[var(--color-parchment-600)]">
                     {item.description}
+                  </p>
+                )}
+                {consumable?.effectDescription && (
+                  <p className="mt-1 text-xs text-[var(--color-parchment-600)]">
+                    {consumable.effectDescription}
                   </p>
                 )}
                 {item.notes && (

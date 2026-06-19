@@ -3,6 +3,11 @@ import { z } from "zod";
 
 import { Prisma } from "../generated/prisma/client.js";
 import { experienceProgress, levelForExperience } from "../lib/experience.js";
+import {
+  serializeArmorDetail,
+  serializeConsumableDetail,
+  serializeWeaponDetail,
+} from "../lib/itemDetail.js";
 import { prisma } from "../lib/prisma.js";
 import { ALIGNMENTS, deriveCreatedCharacter } from "../lib/srd.js";
 
@@ -16,7 +21,10 @@ const characterInclude = {
   raceSelection: true,
   backgroundSelection: true,
   classEntries: { orderBy: { position: "asc" } },
-  inventoryItems: { orderBy: { position: "asc" } },
+  inventoryItems: {
+    orderBy: { position: "asc" },
+    include: { weaponDetail: true, armorDetail: true, consumableDetail: true },
+  },
 } satisfies Prisma.CharacterInclude;
 
 type CharacterWithRelations = Prisma.CharacterGetPayload<{ include: typeof characterInclude }>;
@@ -48,7 +56,11 @@ function serializeCharacterSummary(row: {
 // re-validated against the frontend Character type's nested shapes here.
 // inventory is the exception: it's relational (InventoryItem rows, see
 // schema.prisma), mapped into the same JSON shape the frontend already
-// expects below.
+// expects below. weaponDetail/armorDetail/consumableDetail (at most one
+// present, matching `category`) nest as nullable `weapon`/`armor`/
+// `consumable` sub-objects via the shared lib/itemDetail.js serializers
+// (also used by routes/items.ts for the catalog) rather than flattening
+// back out — `id`/the owning FK aren't meaningful to the client.
 function serializeInventoryItem(row: CharacterWithRelations["inventoryItems"][number]) {
   return {
     id: row.id,
@@ -58,13 +70,12 @@ function serializeInventoryItem(row: CharacterWithRelations["inventoryItems"][nu
     quantity: row.quantity,
     weight: row.weight ?? undefined,
     cost: row.cost ?? undefined,
-    damageDice: row.damageDice ?? undefined,
-    damageType: row.damageType ?? undefined,
-    armorClass: row.armorClass ?? undefined,
-    properties: row.properties,
     description: row.description ?? undefined,
     equipped: row.equipped,
     notes: row.notes ?? undefined,
+    weapon: row.weaponDetail ? serializeWeaponDetail(row.weaponDetail) : undefined,
+    armor: row.armorDetail ? serializeArmorDetail(row.armorDetail) : undefined,
+    consumable: row.consumableDetail ? serializeConsumableDetail(row.consumableDetail) : undefined,
   };
 }
 
