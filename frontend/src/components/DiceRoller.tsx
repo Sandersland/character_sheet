@@ -1,7 +1,8 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { ContactShadows, Text } from "@react-three/drei";
+import { ContactShadows, Environment, Lightformer, Text } from "@react-three/drei";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 import { formatRollSpec, rollSpec } from "../lib/dice";
 import type { RollResult, RollSpec } from "../lib/dice";
@@ -48,7 +49,9 @@ const DROP_HEIGHT_MAX = 2.0;
 const SKITTER_DISTANCE_MIN = 0.9;
 const SKITTER_DISTANCE_MAX = 1.6;
 
-const LABEL_SURFACE_OFFSET = 0.045;
+// Bumped from the original 0.045 so the larger labels below clear the
+// rounded d6's slightly proud-rendered surface without z-fighting.
+const LABEL_SURFACE_OFFSET = 0.06;
 // The d6 box (side 1.3) has a circumscribed-sphere diameter of ~2.25
 // (1.3 * sqrt(3)) — the gap between die centers needs to clear that with
 // real margin or spinning corners visibly intersect the neighboring die.
@@ -61,15 +64,21 @@ const DIE_BODY_COLOR = "#cf1124"; // --color-garnet-600
 const DIE_BODY_COLOR_DROPPED = "#b8b2a7"; // --color-parchment-300
 const DIE_LABEL_COLOR = "#faf9f7"; // --color-parchment-50
 const DIE_LABEL_COLOR_DROPPED = "#857f72"; // --color-parchment-500
+// Darker garnet outline so the light numerals stay legible against the
+// glossy resin body's specular highlights.
+const DIE_LABEL_OUTLINE_COLOR = "#7a0c18";
 
+// Game-shop dice print their numbers large enough to nearly fill the face —
+// these are sized well past the old, more conservative values.
 const FACE_LABEL_FONT_SIZE: Readonly<Record<number, number>> = {
-  4: 0.36,
-  6: 0.4,
-  8: 0.32,
-  12: 0.24,
-  20: 0.22,
+  4: 0.42,
+  6: 0.55,
+  8: 0.4,
+  12: 0.3,
+  20: 0.26,
 };
-const DEFAULT_FACE_LABEL_FONT_SIZE = 0.3;
+const DEFAULT_FACE_LABEL_FONT_SIZE = 0.36;
+const FACE_LABEL_OUTLINE_WIDTH = 0.015;
 
 const UP_AXIS = new THREE.Vector3(0, 1, 0);
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
@@ -80,9 +89,20 @@ interface FaceGroup {
   labelQuaternion: THREE.Quaternion;
 }
 
-/** Real three.js geometry for a given die type; SRD dice with no built-in
+// d6 rounded-box tuning: side length matches the old sharp BoxGeometry,
+// `segments` smooths the curvature, `radius` is how deep the bevel cuts in.
+const D6_SIZE = 1.3;
+const D6_ROUNDING_SEGMENTS = 4;
+const D6_ROUNDING_RADIUS = 0.12;
+
+/** Sharp three.js geometry for a given die type; SRD dice with no built-in
  * polyhedron (only d10/d100, the pentagonal trapezohedron) fall back to a
- * plain cube — it still tumbles, it just can't land on a matching face. */
+ * plain cube — it still tumbles, it just can't land on a matching face.
+ * This is always the *logic* geometry (see `createVisualDieGeometry`): face
+ * normals/centroids and result orientation are computed from this sharp
+ * solid even on die types whose rendered mesh is rounded, since rounding
+ * only affects geometry near edges/corners and leaves face centers (and so
+ * "which face is up") unchanged. */
 function createDieGeometry(faces: number): THREE.BufferGeometry {
   switch (faces) {
     case 4:
@@ -95,8 +115,19 @@ function createDieGeometry(faces: number): THREE.BufferGeometry {
       return new THREE.IcosahedronGeometry(0.95);
     case 6:
     default:
-      return new THREE.BoxGeometry(1.3, 1.3, 1.3);
+      return new THREE.BoxGeometry(D6_SIZE, D6_SIZE, D6_SIZE);
   }
+}
+
+/** Rendered geometry for a given die type. The d6 — the only die type
+ * actually rolled in the app today — gets a rounded box for the realistic
+ * "resin die from a game shop" look; other die types aren't rounded yet
+ * (see DiceRoller's module comment) and just reuse the sharp logic solid. */
+function createVisualDieGeometry(faces: number): THREE.BufferGeometry {
+  if (faces === 6) {
+    return new RoundedBoxGeometry(D6_SIZE, D6_SIZE, D6_SIZE, D6_ROUNDING_SEGMENTS, D6_ROUNDING_RADIUS);
+  }
+  return createDieGeometry(faces);
 }
 
 /**
@@ -173,24 +204,40 @@ function easeOutBounce(t: number): number {
   }
 }
 
-/** Builds (and disposes) the geometry + per-face data for one die type. */
+/**
+ * Builds (and disposes) the geometry + per-face data for one die type.
+ * Returns the sharp *logic* geometry's face groups (normals/centroids/label
+ * orientation — used for both label placement and result targeting) plus a
+ * separate *visual* geometry that's what actually gets rendered, which may
+ * be rounded (currently just the d6) while the logic geometry never is.
+ */
 function useDieFaceData(faces: number) {
-  const geometry = useMemo(() => createDieGeometry(faces), [faces]);
-  useEffect(() => () => geometry.dispose(), [geometry]);
+  const logicGeometry = useMemo(() => createDieGeometry(faces), [faces]);
+  const visualGeometry = useMemo(() => createVisualDieGeometry(faces), [faces]);
+  useEffect(
+    () => () => {
+      logicGeometry.dispose();
+      visualGeometry.dispose();
+    },
+    [logicGeometry, visualGeometry],
+  );
 
   const groups = useMemo(() => {
-    const computed = computeFaceGroups(geometry);
+    const computed = computeFaceGroups(logicGeometry);
     // Only trust the grouping if it found exactly one face per rolled value
     // (true for the supported platonic dice; false for the box fallback).
     return computed.length === faces ? computed : [];
-  }, [geometry, faces]);
+  }, [logicGeometry, faces]);
 
-  return { geometry, groups };
+  const rounded = faces === 6;
+
+  return { visualGeometry, groups, rounded };
 }
 
 interface DieProps {
   geometry: THREE.BufferGeometry;
   groups: FaceGroup[];
+  rounded: boolean;
   value: number | null;
   dropped: boolean;
   rolling: boolean;
@@ -200,7 +247,7 @@ interface DieProps {
 }
 
 /** One 3D die: tumbles freely, then eases into the engine-decided face. */
-function Die({ geometry, groups, value, dropped, rolling, rollId, reducedMotion, position }: DieProps) {
+function Die({ geometry, groups, rounded, value, dropped, rolling, rollId, reducedMotion, position }: DieProps) {
   const groupRef = useRef<THREE.Group>(null);
   const spinAxisRef = useRef(new THREE.Vector3(1, 0, 0));
   const elapsedRef = useRef(0);
@@ -325,11 +372,13 @@ function Die({ geometry, groups, value, dropped, rolling, rollId, reducedMotion,
   return (
     <group ref={groupRef} position={position}>
       <mesh geometry={geometry}>
-        <meshStandardMaterial
+        <meshPhysicalMaterial
           color={bodyColor}
-          flatShading
-          roughness={0.4}
-          metalness={0.05}
+          flatShading={!rounded}
+          roughness={0.35}
+          metalness={0}
+          clearcoat={1}
+          clearcoatRoughness={0.15}
           transparent={isResolvedDrop}
           opacity={isResolvedDrop ? 0.55 : 1}
         />
@@ -342,6 +391,8 @@ function Die({ geometry, groups, value, dropped, rolling, rollId, reducedMotion,
             quaternion={group.labelQuaternion}
             fontSize={fontSize}
             color={labelColor}
+            outlineWidth={FACE_LABEL_OUTLINE_WIDTH}
+            outlineColor={DIE_LABEL_OUTLINE_COLOR}
             anchorX="center"
             anchorY="middle"
           >
@@ -410,7 +461,7 @@ export default function DiceRoller({
   const [rolling, setRolling] = useState(false);
   const [rollId, setRollId] = useState(0);
 
-  const { geometry, groups } = useDieFaceData(spec.faces);
+  const { visualGeometry, groups, rounded } = useDieFaceData(spec.faces);
 
   const specRef = useRef(spec);
   specRef.current = spec;
@@ -546,14 +597,20 @@ export default function DiceRoller({
       )}
       <div aria-hidden="true" className="h-44 w-full">
         <Canvas dpr={[1, 1.5]} gl={{ alpha: true, antialias: true }} camera={{ position: [0, 7, 3], fov: 32 }}>
-          <ambientLight intensity={0.7} />
-          <directionalLight position={[2.5, 4, 3]} intensity={1.05} />
+          {/* Dialed down from the pre-resin-material intensities (0.7/1.05) —
+              the inline-Lightformer Environment below now does most of the
+              work, via clearcoat specular highlights, so blowing out the
+              scene with strong ambient/directional light would wash that
+              out and flatten the glossy look. */}
+          <ambientLight intensity={0.3} />
+          <directionalLight position={[2.5, 4, 3]} intensity={0.7} />
           <Suspense fallback={null}>
             {Array.from({ length: spec.count }, (_, index) => (
               <Die
                 key={index}
-                geometry={geometry}
+                geometry={visualGeometry}
                 groups={groups}
+                rounded={rounded}
                 value={result?.dice[index]?.value ?? null}
                 dropped={result?.dice[index]?.dropped ?? false}
                 rolling={rolling}
@@ -567,6 +624,15 @@ export default function DiceRoller({
                 previous setting) bakes a single static shadow that can't
                 follow motion and visibly snaps whenever the scene re-renders. */}
             <ContactShadows position={[0, -1.1, 0]} opacity={0.35} blur={2.4} far={3} scale={10} frames={Infinity} />
+            {/* Lighting-only environment (no HDRI fetch, no background — the
+                canvas stays transparent via gl.alpha) so the glossy resin
+                clearcoat has something to reflect. resolution is kept tiny
+                since these dice render at ~176px tall. */}
+            <Environment resolution={64}>
+              <Lightformer form="rect" intensity={2} position={[0, 5, 2]} scale={[6, 6, 1]} color="#fff7ec" />
+              <Lightformer form="rect" intensity={1} position={[-4, 2, 3]} scale={[3, 3, 1]} color="#ffe3c2" />
+              <Lightformer form="rect" intensity={0.6} position={[4, 1, -3]} scale={[3, 3, 1]} color="#cfe0ff" />
+            </Environment>
           </Suspense>
         </Canvas>
       </div>
