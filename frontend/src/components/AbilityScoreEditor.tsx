@@ -170,24 +170,23 @@ export default function AbilityScoreEditor({
             >
               {pool ? "Re-roll" : "Roll scores"}
             </button>
-            {pool && rollNonce === 0 && (
+            {pool && (
               <span className="text-xs text-[var(--color-parchment-600)]">
-                Rolled: {pool.join(", ")} — assign each below.
+                Assign each below.
               </span>
             )}
           </div>
-          {rollNonce > 0 && (
-            <DiceRollSequence
-              spec={ROLL_SPEC}
-              count={POOL_SIZE}
-              triggerKey={rollNonce}
-              roller={PhysicsDiceRoller}
-              onComplete={(results) => {
-                onPoolChange(results.map((r) => r.total));
-                onAssignmentsChange(EMPTY_ASSIGNMENTS, abilityScores);
-              }}
-            />
-          )}
+          <DiceRollSequence
+            spec={ROLL_SPEC}
+            count={POOL_SIZE}
+            triggerKey={rollNonce > 0 ? rollNonce : undefined}
+            restoredTotals={pool ?? undefined}
+            roller={PhysicsDiceRoller}
+            onComplete={(results) => {
+              onPoolChange(results.map((r) => r.total));
+              onAssignmentsChange(EMPTY_ASSIGNMENTS, abilityScores);
+            }}
+          />
         </div>
       )}
 

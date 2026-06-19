@@ -15,8 +15,13 @@ interface DiceRollSequenceProps {
   spec: RollSpec;
   /** How many times to roll `spec`, one step at a time. */
   count: number;
-  /** Bump this (e.g. a counter) to start a fresh sequence. */
+  /** Bump this (e.g. a counter) to start a fresh sequence. Leave undefined to
+   *  stay idle on mount — e.g. while only showing a previously-restored roll. */
   triggerKey?: number | string;
+  /** Totals to paint into the result boxes while idle (`stepIndex === -1`) —
+   *  e.g. a pool restored from a saved draft on page load. Ignored once a
+   *  real roll starts or has results of its own; never feeds `onComplete`. */
+  restoredTotals?: number[];
   /** Called once all `count` steps have settled, with their results in order. */
   onComplete: (results: RollResult[]) => void;
   /** Which roller component drives each step — `DiceRoller` (a predetermined
@@ -42,6 +47,7 @@ export default function DiceRollSequence({
   spec,
   count,
   triggerKey,
+  restoredTotals,
   onComplete,
   roller: Roller = DiceRoller,
   className = "",
@@ -138,10 +144,17 @@ export default function DiceRollSequence({
           order is already an improvement on its own. */}
       <div aria-hidden="true" className="flex flex-wrap gap-2">
         {Array.from({ length: count }, (_, index) => {
-          const filled = Boolean(results[index]);
+          // Idle with nothing rolled yet this mount: paint from a restored
+          // pool (e.g. the draft reloaded from localStorage) instead of "–",
+          // so the boxes read correctly before the player ever re-rolls.
+          const showRestored = stepIndex === -1 && results.length === 0 && restoredTotals;
+          const filled = showRestored ? index < restoredTotals.length : Boolean(results[index]);
+          const total = showRestored ? restoredTotals[index] : results[index]?.total;
           // The most-recently-settled total: each chip flips into this state
           // exactly once as its result lands, retriggering the pop animation.
-          const justAdded = filled && index === results.length - 1;
+          // Restored totals appear all at once on mount, not one at a time,
+          // so they never get the pop treatment.
+          const justAdded = !showRestored && filled && index === results.length - 1;
           return (
             <span
               key={index}
@@ -151,7 +164,7 @@ export default function DiceRollSequence({
                   : "border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] text-[var(--color-parchment-800)]"
               } ${justAdded ? "animate-[score-pop_0.45s_ease-out]" : ""}`}
             >
-              {filled ? results[index].total : "–"}
+              {filled ? total : "–"}
             </span>
           );
         })}
