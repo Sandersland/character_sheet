@@ -2,6 +2,7 @@ import type {
   Character,
   CharacterSummary,
   CreateCharacterInput,
+  InventoryOperation,
   Item,
   ReferenceData,
 } from "../types/character";
@@ -38,7 +39,7 @@ export async function fetchCharacter(id: string): Promise<Character | null> {
 
 export async function updateCharacter(
   id: string,
-  patch: Partial<Pick<Character, "experiencePoints">>
+  patch: Partial<Pick<Character, "experiencePoints" | "currency">>
 ): Promise<Character> {
   const response = await fetch(`${API_URL}/characters/${id}`, {
     method: "PATCH",
@@ -64,6 +65,25 @@ export async function fetchItems(): Promise<Item[]> {
   const response = await fetch(`${API_URL}/items`);
   if (!response.ok) {
     throw new Error(`Failed to fetch items (${response.status})`);
+  }
+  return response.json();
+}
+
+// One inline edit is a batch of one operation; a bulk action (e.g. selling
+// several stacks at once) is a batch of several — see backend's
+// lib/inventory.ts for the atomicity/ledger semantics.
+export async function applyInventoryTransactions(
+  characterId: string,
+  operations: InventoryOperation[]
+): Promise<Character> {
+  const response = await fetch(`${API_URL}/characters/${characterId}/inventory/transactions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ operations }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to apply inventory transactions (${response.status})`);
   }
   return response.json();
 }

@@ -153,6 +153,105 @@ export interface InventoryItem {
   consumable?: ConsumableDetail;
 }
 
+// Looser than WeaponDetail/ArmorDetail above (which describe what the API
+// always returns, every flag included) — these describe what a client only
+// has to *send*: just the fields the matching *Detail table's columns are
+// NOT NULL for, matching backend's lib/inventory.ts WeaponDetailInput/
+// ArmorDetailInput exactly. Everything else defaults server-side and is
+// refinable later via an `update` operation.
+export interface WeaponDetailInput {
+  damageDiceCount: number;
+  damageDiceFaces: number;
+  damageModifier?: number;
+  damageType: string;
+  versatileDiceCount?: number;
+  versatileDiceFaces?: number;
+  finesse?: boolean;
+  light?: boolean;
+  heavy?: boolean;
+  twoHanded?: boolean;
+  reach?: boolean;
+  thrown?: boolean;
+  ammunition?: boolean;
+  rangeNormal?: number;
+  rangeLong?: number;
+}
+
+export interface ArmorDetailInput {
+  armorCategory: ArmorCategory;
+  baseArmorClass: number;
+  dexModifierApplies?: boolean;
+  dexModifierMax?: number;
+  stealthDisadvantage?: boolean;
+  strengthRequirement?: number;
+}
+
+/**
+ * Body for a custom (homebrew) `acquire` operation — same shape as `Item`
+ * minus `id`, plus the category's required minimal detail block (backend's
+ * routes/inventory.ts rejects e.g. a "weapon" with no `weapon` block, since
+ * those columns are NOT NULL). Matches backend's lib/inventory.ts
+ * CustomItemInput.
+ */
+export type CustomItemInput =
+  | {
+      name: string;
+      category: "weapon";
+      weight?: number;
+      cost?: Currency;
+      description?: string;
+      weapon: WeaponDetailInput;
+    }
+  | {
+      name: string;
+      category: "armor";
+      weight?: number;
+      cost?: Currency;
+      description?: string;
+      armor: ArmorDetailInput;
+    }
+  | {
+      name: string;
+      category: "consumable";
+      weight?: number;
+      cost?: Currency;
+      description?: string;
+      consumable?: ConsumableDetail;
+    }
+  | { name: string; category: "gear"; weight?: number; cost?: Currency; description?: string };
+
+/**
+ * One operation in a `POST /api/characters/:id/inventory/transactions`
+ * batch — see backend's lib/inventory.ts for the full semantics (which ops
+ * get logged to the ledger, atomicity, etc). A request batches 1+ of these.
+ */
+export type InventoryOperation =
+  | {
+      type: "acquire";
+      itemId?: string;
+      custom?: CustomItemInput;
+      quantity?: number;
+      equipped?: boolean;
+      notes?: string;
+      currencyDelta?: Currency;
+    }
+  | { type: "adjustQuantity"; inventoryItemId: string; delta: number }
+  | {
+      type: "update";
+      inventoryItemId: string;
+      name?: string;
+      notes?: string | null;
+      equipped?: boolean;
+      weight?: number;
+      cost?: Currency;
+      description?: string;
+      weapon?: Partial<WeaponDetail>;
+      armor?: Partial<ArmorDetail>;
+      consumable?: Partial<ConsumableDetail>;
+    }
+  | { type: "remove"; inventoryItemId: string }
+  | { type: "sell"; inventoryItemId: string; quantity?: number; currencyDelta: Currency };
+
 export type SpellSchool =
   | "abjuration"
   | "conjuration"

@@ -16,8 +16,10 @@ export const charactersRouter = Router();
 // Shared `include` for fetching a full character with its race/background/
 // class selections. classEntries is ordered so index 0 is always the
 // primary class (v1 creates exactly one; multiclass support will append
-// more at increasing `position` values later).
-const characterInclude = {
+// more at increasing `position` values later). Exported for routes/
+// inventory.ts to reuse — every inventory-transaction op returns the full
+// serialized character, same shape as this file's own endpoints.
+export const characterInclude = {
   raceSelection: true,
   backgroundSelection: true,
   classEntries: { orderBy: { position: "asc" } },
@@ -79,7 +81,7 @@ function serializeInventoryItem(row: CharacterWithRelations["inventoryItems"][nu
   };
 }
 
-function serializeCharacter(row: CharacterWithRelations) {
+export function serializeCharacter(row: CharacterWithRelations) {
   const progress = experienceProgress(row.experiencePoints);
   const primaryClass = row.classEntries[0];
 

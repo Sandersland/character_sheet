@@ -163,12 +163,7 @@ export default function CharacterSheetPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <Card title="Inventory" className="p-4">
-            <InventoryList
-              items={character.inventory}
-              currency={character.currency}
-            />
-          </Card>
+          <InventoryList character={character} onUpdate={setCharacter} />
 
           {character.spellcasting ? (
             <Card title="Spells" className="p-4">

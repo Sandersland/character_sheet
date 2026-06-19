@@ -48,10 +48,11 @@ model Character {
   spellcasting Json?
   journal      Json
 
-  raceSelection       CharacterRace?
-  backgroundSelection CharacterBackground?
-  classEntries        CharacterClassEntry[]
-  inventoryItems      InventoryItem[]
+  raceSelection         CharacterRace?
+  backgroundSelection   CharacterBackground?
+  classEntries          CharacterClassEntry[]
+  inventoryItems        InventoryItem[]
+  inventoryTransactions InventoryTransaction[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -258,9 +259,7 @@ model InventoryItem {
   weaponDetail     InventoryWeaponDetail?
   armorDetail      InventoryArmorDetail?
   consumableDetail InventoryConsumableDetail?
-
-  // InventoryTransaction ledger relation arrives in Phase B, alongside the
-  // transactions endpoint that writes it — see the plan doc.
+  transactions     InventoryTransaction[]
 }
 
 // Same shape as ItemWeaponDetail, owned by InventoryItem instead of Item.
@@ -312,4 +311,35 @@ model InventoryConsumableDetail {
   effectDiceFaces   Int?
   effectModifier    Int?
   effectDescription String?
+}
+
+enum InventoryTxnType {
+  acquired
+  consumed
+  sold
+  bought
+  removed
+}
+
+// Ledger of economic/consumption events only — acquired/consumed/sold/
+// bought/removed — written by POST /api/characters/:id/inventory/
+// transactions (backend/src/lib/inventory.ts). Cosmetic edits (rename,
+// notes, equip-toggle, weapon/armor/consumable detail tweaks) are NOT
+// logged here; see the `update` operation's comment in lib/inventory.ts.
+// itemName is a snapshot so an entry stays readable after the
+// InventoryItem it references is deleted (inventoryItemId goes null via
+// SetNull, but the row and its currencyDelta remain).
+model InventoryTransaction {
+  id              String           @id @default(uuid())
+  characterId     String
+  character       Character        @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  inventoryItemId String?
+  inventoryItem   InventoryItem?   @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  itemName        String
+  type            InventoryTxnType
+  quantityDelta   Int
+  currencyDelta   Json? // signed {cp,sp,gp,pp}
+  note            String?
+  batchId         String? // groups the operations from one request together
+  createdAt       DateTime         @default(now())
 }
