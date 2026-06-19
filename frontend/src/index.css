@@ -128,3 +128,22 @@
     border-radius: var(--radius-control);
   }
 }
+
+/* One-shot pop for a freshly-settled dice total (DiceRollSequence chips). */
+@keyframes score-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[score-pop_0\.45s_ease-out\] {
+    animation: none;
+  }
+}

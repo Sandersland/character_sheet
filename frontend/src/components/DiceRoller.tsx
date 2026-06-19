@@ -8,11 +8,18 @@ import type { RollResult, RollSpec } from "../lib/dice";
 
 // How long a roll tumbles before settling on its result, and what fraction
 // of that window is free-spinning vs. easing into the final, face-up pose.
-const TUMBLE_DURATION_MS = 750;
+const TUMBLE_DURATION_MS = 1300;
 const TUMBLE_DURATION_SECONDS = TUMBLE_DURATION_MS / 1000;
 const SETTLE_FRACTION = 0.62;
 const SPIN_SPEED_MIN_RAD_PER_SEC = 9;
 const SPIN_SPEED_MAX_RAD_PER_SEC = 15;
+
+// How far a die lifts toward the (top-down) camera while tumbling. The camera
+// looks down at the dice, so rising in +y reads as the die growing/coming
+// toward the screen as it rolls, then settling back to the table to show its
+// face. Rest height is the die's own resting y (0); it rises during the free
+// spin and descends back to rest as it eases onto the result face.
+const LIFT_HEIGHT = 1.1;
 
 const LABEL_SURFACE_OFFSET = 0.045;
 // The d6 box (side 1.3) has a circumscribed-sphere diameter of ~2.25
@@ -143,6 +150,13 @@ function Die({ geometry, groups, value, dropped, rolling, rollId, reducedMotion,
   const elapsedRef = useRef(0);
   const phaseRef = useRef<"idle" | "spin" | "settle">("idle");
   const settleStartQuatRef = useRef(new THREE.Quaternion());
+  // The actual orientation the die settles into: the engine-decided face
+  // pointing up, plus a random spin about the vertical so the dice don't all
+  // land in lockstep at the same angle. Recomputed each roll.
+  const landingQuatRef = useRef(new THREE.Quaternion());
+  // Per-die lift multiplier so each die arcs to a slightly different height
+  // rather than rising and falling in perfect unison.
+  const liftScaleRef = useRef(1);
 
   const targetQuaternion = useMemo(() => {
     if (value === null || groups.length === 0) return null;
@@ -156,10 +170,18 @@ function Die({ geometry, groups, value, dropped, rolling, rollId, reducedMotion,
     spinAxisRef.current.set(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize();
     spinSpeedRef.current =
       SPIN_SPEED_MIN_RAD_PER_SEC + Math.random() * (SPIN_SPEED_MAX_RAD_PER_SEC - SPIN_SPEED_MIN_RAD_PER_SEC);
+    liftScaleRef.current = 0.8 + Math.random() * 0.4;
+
+    // Keep the result face up, but rotate the die a random amount about the
+    // vertical axis so its final resting angle varies from roll to roll.
+    if (targetQuaternion) {
+      const yaw = new THREE.Quaternion().setFromAxisAngle(UP_AXIS, Math.random() * Math.PI * 2);
+      landingQuatRef.current.copy(yaw).multiply(targetQuaternion);
+    }
 
     if (reducedMotion) {
       phaseRef.current = "idle";
-      if (groupRef.current && targetQuaternion) groupRef.current.quaternion.copy(targetQuaternion);
+      if (groupRef.current && targetQuaternion) groupRef.current.quaternion.copy(landingQuatRef.current);
     } else {
       phaseRef.current = "spin";
     }
@@ -174,6 +196,14 @@ function Die({ geometry, groups, value, dropped, rolling, rollId, reducedMotion,
     elapsedRef.current += delta;
     const t = Math.min(elapsedRef.current / TUMBLE_DURATION_SECONDS, 1);
 
+    // A single gravity-style arc over the whole roll: the parabola 4t(1-t)
+    // rises to its peak around the midpoint and accelerates back down to the
+    // table (0 at t=1), so the die falls under "gravity" and lands with an
+    // implied impact rather than descending at a constant, robotic speed. Per-
+    // die `liftScaleRef` keeps them from arcing in perfect unison.
+    const liftFraction = 4 * t * (1 - t);
+    group.position.y = position[1] + LIFT_HEIGHT * liftScaleRef.current * liftFraction;
+
     if (t < SETTLE_FRACTION || !targetQuaternion) {
       group.rotateOnAxis(spinAxisRef.current, delta * spinSpeedRef.current);
       if (t >= 1) phaseRef.current = "idle";
@@ -187,10 +217,10 @@ function Die({ geometry, groups, value, dropped, rolling, rollId, reducedMotion,
 
     const settleT = Math.min((t - SETTLE_FRACTION) / (1 - SETTLE_FRACTION), 1);
     const eased = 1 - Math.pow(1 - settleT, 3);
-    group.quaternion.slerpQuaternions(settleStartQuatRef.current, targetQuaternion, eased);
+    group.quaternion.slerpQuaternions(settleStartQuatRef.current, landingQuatRef.current, eased);
 
     if (t >= 1) {
-      group.quaternion.copy(targetQuaternion);
+      group.quaternion.copy(landingQuatRef.current);
       phaseRef.current = "idle";
     }
   });
@@ -256,6 +286,10 @@ interface DiceRollerProps {
   /** When true, resolve immediately with no animation — interrupts an
    *  in-flight tumble and makes any roll that starts while set settle instantly. */
   skip?: boolean;
+  /** Show the settled total below the dice (e.g. "= 14"). Defaults to true for
+   *  standalone use; callers that surface the total elsewhere (e.g.
+   *  DiceRollSequence's chip row) pass false to avoid the redundant readout. */
+  showTotal?: boolean;
   className?: string;
 }
 
@@ -282,6 +316,7 @@ export default function DiceRoller({
   autoRollOnMount = false,
   label,
   skip = false,
+  showTotal = true,
   className = "",
 }: DiceRollerProps) {
   const [result, setResult] = useState<RollResult | null>(null);
@@ -423,7 +458,7 @@ export default function DiceRoller({
         </span>
       )}
       <div aria-hidden="true" className="h-44 w-full">
-        <Canvas dpr={[1, 1.5]} gl={{ alpha: true, antialias: true }} camera={{ position: [0, 4, 7], fov: 30 }}>
+        <Canvas dpr={[1, 1.5]} gl={{ alpha: true, antialias: true }} camera={{ position: [0, 7, 3], fov: 32 }}>
           <ambientLight intensity={0.7} />
           <directionalLight position={[2.5, 4, 3]} intensity={1.05} />
           <Suspense fallback={null}>
@@ -447,12 +482,14 @@ export default function DiceRoller({
       {/* Always rendered (rather than conditionally mounted) so this
           component's own height never changes between idle/rolling/settled
           — letting any layout-shift fix at the parent actually hold. */}
-      <span
-        aria-hidden={!settled}
-        className={`font-display text-2xl font-semibold leading-none tabular-nums text-[var(--color-garnet-800)] ${settled ? "" : "invisible"}`}
-      >
-        = {settled ? settled.total : " "}
-      </span>
+      {showTotal && (
+        <span
+          aria-hidden={!settled}
+          className={`font-display text-2xl font-semibold leading-none tabular-nums text-[var(--color-garnet-800)] ${settled ? "" : "invisible"}`}
+        >
+          = {settled ? settled.total : " "}
+        </span>
+      )}
     </div>
   );
 }

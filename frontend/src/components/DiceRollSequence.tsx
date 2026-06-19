@@ -127,21 +127,40 @@ export default function DiceRollSequence({
           aria-live region; six of those used to fire at once and race, one
           per step in order is already an improvement on its own. */}
       <div aria-hidden="true" className="flex flex-wrap gap-2">
-        {Array.from({ length: count }, (_, index) => (
-          <span
-            key={index}
-            className="inline-flex h-8 w-10 items-center justify-center rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] font-display text-sm tabular-nums text-[var(--color-parchment-800)]"
-          >
-            {results[index] ? results[index].total : "–"}
-          </span>
-        ))}
+        {Array.from({ length: count }, (_, index) => {
+          const filled = Boolean(results[index]);
+          // The most-recently-settled total: each chip flips into this state
+          // exactly once as its result lands, retriggering the pop animation.
+          const justAdded = filled && index === results.length - 1;
+          return (
+            <span
+              key={index}
+              className={`inline-flex h-8 w-10 items-center justify-center rounded-[var(--radius-control)] border font-display text-sm tabular-nums ${
+                filled
+                  ? "border-[var(--color-arcane-400)] bg-[var(--color-arcane-50)] text-[var(--color-arcane-800)]"
+                  : "border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] text-[var(--color-parchment-800)]"
+              } ${justAdded ? "animate-[score-pop_0.45s_ease-out]" : ""}`}
+            >
+              {filled ? results[index].total : "–"}
+            </span>
+          );
+        })}
       </div>
 
       {/* Reserve the die-stage slot even when idle so the panel's height
-          doesn't change as the sequence starts. */}
+          doesn't change as the sequence starts. A single DiceRoller instance is
+          kept mounted across all steps (no per-step `key` remount) so the dice
+          stay on screen and re-roll in place — `rollKey` changing per step is
+          what triggers each fresh roll. */}
       <div className="h-44 w-full">
         {displayStepIndex >= 0 && (
-          <DiceRoller key={displayStepIndex} spec={spec} autoRollOnMount skip={skip} onResult={handleStepResult} />
+          <DiceRoller
+            spec={spec}
+            rollKey={`${triggerKey}:${displayStepIndex}`}
+            skip={skip}
+            showTotal={false}
+            onResult={handleStepResult}
+          />
         )}
       </div>
 
