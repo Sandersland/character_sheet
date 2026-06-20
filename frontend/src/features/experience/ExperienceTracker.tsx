@@ -1,9 +1,9 @@
 import { useState } from "react";
 
-import { applyExperienceOperations } from "../api/client";
-import type { Character } from "../types/character";
-import Card from "./Card";
-import MeterBar from "./MeterBar";
+import { applyExperienceOperations } from "@/api/client";
+import type { Character } from "@/types/character";
+import Card from "@/components/ui/Card";
+import MeterBar from "@/components/ui/MeterBar";
 
 interface ExperienceTrackerProps {
   character: Character;

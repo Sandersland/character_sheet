@@ -2,14 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
-import { formatRollSpec, rollSpec } from "../lib/dice";
-import type { RollResult } from "../lib/dice";
-import { DIE_GAP, UP_AXIS, quaternionForUpFace } from "../lib/dieFaces";
-import type { FaceGroup } from "../lib/dieFaces";
-import DiceScene from "./DiceScene";
-import type { DiceRollerProps } from "./diceRollerTypes";
-import DieMesh from "./DieMesh";
-import { useDieFaceData } from "./useDieFaceData";
+import { formatRollSpec, rollSpec } from "@/lib/dice";
+import type { RollResult } from "@/lib/dice";
+import { DIE_GAP, UP_AXIS, quaternionForUpFace } from "@/lib/dieFaces";
+import type { FaceGroup } from "@/lib/dieFaces";
+import DiceScene from "@/features/dice/DiceScene";
+import type { DiceRollerProps } from "@/features/dice/diceRollerTypes";
+import DieMesh from "@/features/dice/DieMesh";
+import { useDieFaceData } from "@/features/dice/useDieFaceData";
 
 // How long a roll tumbles before settling on its result. Rotation is modeled
 // as a single decelerating spin that unwinds onto the landing pose (see

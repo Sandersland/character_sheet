@@ -1,5 +1,5 @@
-import { SKILL_LABELS, abilityModifier, formatModifier, skillBonus } from "../lib/abilities";
-import type { AbilityScores, Skill } from "../types/character";
+import { SKILL_LABELS, abilityModifier, formatModifier, skillBonus } from "@/lib/abilities";
+import type { AbilityScores, Skill } from "@/types/character";
 
 interface SkillsTableProps {
   skills: Skill[];

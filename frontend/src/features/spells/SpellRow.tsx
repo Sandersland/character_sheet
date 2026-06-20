@@ -6,8 +6,8 @@
 
 import { useState } from "react";
 
-import type { Spell } from "../types/character";
-import Badge from "./Badge";
+import type { Spell } from "@/types/character";
+import Badge from "@/components/ui/Badge";
 
 const SCHOOL_TONE = {
   abjuration: "arcane",

@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 
-import { computeFaceGroups, createDieGeometry, createVisualDieGeometry } from "../lib/dieFaces";
+import { computeFaceGroups, createDieGeometry, createVisualDieGeometry } from "@/lib/dieFaces";
 
 /**
  * Builds (and disposes) the geometry + per-face data for one die type.

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { deleteCharacter } from "../api/client";
-import Modal from "./Modal";
+import { deleteCharacter } from "@/api/client";
+import Modal from "@/components/ui/Modal";
 
 interface DeleteCharacterModalProps {
   characterId: string;

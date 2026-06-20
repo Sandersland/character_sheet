@@ -6,8 +6,8 @@ import {
   isGoldValid,
   rollGold,
   type EquipmentDraft,
-} from "../lib/startingEquipment";
-import type { ClassStartingEquipment, EquipmentBundle, Item } from "../types/character";
+} from "@/lib/startingEquipment";
+import type { ClassStartingEquipment, EquipmentBundle, Item } from "@/types/character";
 
 interface StartingEquipmentEditorProps {
   /** The selected class's starting-equipment definition (null → skip rendering). */

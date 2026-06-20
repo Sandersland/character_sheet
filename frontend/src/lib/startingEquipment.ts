@@ -9,7 +9,7 @@ import type {
   ClassStartingEquipment,
   PackageSelection,
   StartingEquipmentInput,
-} from "../types/character";
+} from "@/types/character";
 
 // One set of selections for a "package" mode submission — parallel array to
 // the class's groups, one entry per group with the chosen optionIndex and

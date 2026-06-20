@@ -1,11 +1,11 @@
 import { useState } from "react";
 
-import { applyHitPointOperations } from "../api/client";
-import { rollDie } from "../lib/dice";
-import type { Character, HitPointOperation } from "../types/character";
-import Card from "./Card";
-import MeterBar from "./MeterBar";
-import Modal from "./Modal";
+import { applyHitPointOperations } from "@/api/client";
+import { rollDie } from "@/lib/dice";
+import type { Character, HitPointOperation } from "@/types/character";
+import Card from "@/components/ui/Card";
+import MeterBar from "@/components/ui/MeterBar";
+import Modal from "@/components/ui/Modal";
 
 interface HitPointTrackerProps {
   character: Character;

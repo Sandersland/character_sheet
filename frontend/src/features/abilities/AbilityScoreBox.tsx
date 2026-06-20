@@ -1,4 +1,4 @@
-import { abilityModifier, formatModifier } from "../lib/abilities";
+import { abilityModifier, formatModifier } from "@/lib/abilities";
 
 interface AbilityScoreBoxProps {
   label: string;

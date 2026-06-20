@@ -1,18 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { createCharacter, fetchItems, fetchReference } from "../api/client";
-import AbilityScoreEditor from "../components/AbilityScoreEditor";
-import BackendStatus from "../components/BackendStatus";
-import Card from "../components/Card";
-import StartingEquipmentEditor from "../components/StartingEquipmentEditor";
+import { createCharacter, fetchItems, fetchReference } from "@/api/client";
+import AbilityScoreEditor from "@/features/abilities/AbilityScoreEditor";
+import BackendStatus from "@/features/character-meta/BackendStatus";
+import Card from "@/components/ui/Card";
+import StartingEquipmentEditor from "@/features/inventory/StartingEquipmentEditor";
 import {
   draftToInput,
   emptyPackageState,
   type EquipmentDraft,
-} from "../lib/startingEquipment";
-import { abilityModifier, formatModifier } from "../lib/abilities";
-import type { AbilityName, AbilityScores, Item, ReferenceData, SkillName } from "../types/character";
+} from "@/lib/startingEquipment";
+import { abilityModifier, formatModifier } from "@/lib/abilities";
+import type { AbilityName, AbilityScores, Item, ReferenceData, SkillName } from "@/types/character";
 
 const DRAFT_STORAGE_KEY = "character-draft:new";
 

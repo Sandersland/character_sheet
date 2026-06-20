@@ -1,16 +1,16 @@
 import { useState } from "react";
 
-import { abilityModifier, formatModifier, ABILITY_LABELS } from "../lib/abilities";
+import { abilityModifier, formatModifier, ABILITY_LABELS } from "@/lib/abilities";
 import {
   POINT_BUY_BUDGET,
   STANDARD_ARRAY,
   pointBuyCost,
   totalPointBuyCost,
-} from "../lib/abilityGen";
-import type { RollSpec } from "../lib/dice";
-import type { AbilityName, AbilityScores } from "../types/character";
-import DiceRollSequence from "./DiceRollSequence";
-import PhysicsDiceRoller from "./PhysicsDiceRoller";
+} from "@/lib/abilityGen";
+import type { RollSpec } from "@/lib/dice";
+import type { AbilityName, AbilityScores } from "@/types/character";
+import DiceRollSequence from "@/features/dice/DiceRollSequence";
+import PhysicsDiceRoller from "@/features/dice/PhysicsDiceRoller";
 
 type Method = "manual" | "roll" | "standardArray" | "pointBuy";
 

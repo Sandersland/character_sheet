@@ -1,4 +1,4 @@
-import type { RollResult, RollSpec } from "../lib/dice";
+import type { RollResult, RollSpec } from "@/lib/dice";
 
 /**
  * Shared prop contract for every dice-roller component (`DiceRoller`,

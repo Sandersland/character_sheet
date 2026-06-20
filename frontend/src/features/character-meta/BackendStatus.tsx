@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { checkHealth } from "../api/client";
+import { checkHealth } from "@/api/client";
 
 /**
  * Keeps the backend connectivity proof-of-life visible (per CLAUDE.md,

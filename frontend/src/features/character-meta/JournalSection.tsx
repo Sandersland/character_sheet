@@ -1,4 +1,4 @@
-import type { JournalEntry } from "../types/character";
+import type { JournalEntry } from "@/types/character";
 
 interface JournalSectionProps {
   entries: JournalEntry[];

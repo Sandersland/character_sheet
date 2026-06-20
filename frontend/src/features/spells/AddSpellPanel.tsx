@@ -7,13 +7,13 @@
 
 import { useEffect, useState } from "react";
 
-import { fetchSpells } from "../api/client";
+import { fetchSpells } from "@/api/client";
 import type {
   CatalogSpell,
   CustomSpellInput,
   LearnSpellOperation,
   SpellSchool,
-} from "../types/character";
+} from "@/types/character";
 
 interface AddSpellPanelProps {
   /** Called with the op to send; parent batches and fires the API. */

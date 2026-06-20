@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 
-import { fetchLedger } from "../api/client";
-import { formatBatchDate, groupByBatch } from "../lib/timeline";
-import type { Currency, LedgerEntry, LedgerEntryType } from "../types/character";
-import Badge from "./Badge";
-import Modal from "./Modal";
+import { fetchLedger } from "@/api/client";
+import { formatBatchDate, groupByBatch } from "@/lib/timeline";
+import type { Currency, LedgerEntry, LedgerEntryType } from "@/types/character";
+import Badge from "@/components/ui/Badge";
+import Modal from "@/components/ui/Modal";
 
 interface LedgerModalProps {
   characterId: string;

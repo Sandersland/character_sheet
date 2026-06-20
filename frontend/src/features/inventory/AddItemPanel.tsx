@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import type { Currency, CustomItemInput, InventoryOperation, Item, ItemCategory } from "../types/character";
+import type { Currency, CustomItemInput, InventoryOperation, Item, ItemCategory } from "@/types/character";
 
 interface AddItemPanelProps {
   items: Item[];

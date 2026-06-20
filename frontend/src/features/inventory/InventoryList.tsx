@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 
-import { applyInventoryTransactions, fetchItems, updateCharacter } from "../api/client";
-import type { Character, Currency, InventoryOperation, Item } from "../types/character";
-import AddItemPanel from "./AddItemPanel";
-import Card from "./Card";
-import InventoryRow from "./InventoryRow";
-import LedgerModal from "./LedgerModal";
+import { applyInventoryTransactions, fetchItems, updateCharacter } from "@/api/client";
+import type { Character, Currency, InventoryOperation, Item } from "@/types/character";
+import AddItemPanel from "@/features/inventory/AddItemPanel";
+import Card from "@/components/ui/Card";
+import InventoryRow from "@/features/inventory/InventoryRow";
+import LedgerModal from "@/features/inventory/LedgerModal";
 
 // undefined = closed, null = open unfiltered, {id,name} = open filtered to
 // one row — see LedgerModal's comment for why both views share one modal.

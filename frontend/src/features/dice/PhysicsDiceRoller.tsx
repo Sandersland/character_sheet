@@ -3,22 +3,22 @@ import { useFrame } from "@react-three/fiber";
 import type * as CANNON from "cannon-es";
 import type * as THREE from "three";
 
-import { formatRollSpec, summarizeRoll } from "../lib/dice";
-import type { RollResult } from "../lib/dice";
-import { D6_SIZE, DIE_GAP } from "../lib/dieFaces";
-import type { FaceGroup } from "../lib/dieFaces";
+import { formatRollSpec, summarizeRoll } from "@/lib/dice";
+import type { RollResult } from "@/lib/dice";
+import { D6_SIZE, DIE_GAP } from "@/lib/dieFaces";
+import type { FaceGroup } from "@/lib/dieFaces";
 import {
   FLOOR_Y,
   createDiceWorld,
   createDieBody,
   createRollResolver,
   throwDie,
-} from "../lib/physicsDice";
-import type { PhysicsDie } from "../lib/physicsDice";
-import DiceScene from "./DiceScene";
-import type { DiceRollerProps } from "./diceRollerTypes";
-import DieMesh from "./DieMesh";
-import { useDieFaceData } from "./useDieFaceData";
+} from "@/lib/physicsDice";
+import type { PhysicsDie } from "@/lib/physicsDice";
+import DiceScene from "@/features/dice/DiceScene";
+import type { DiceRollerProps } from "@/features/dice/diceRollerTypes";
+import DieMesh from "@/features/dice/DieMesh";
+import { useDieFaceData } from "@/features/dice/useDieFaceData";
 
 // Fixed simulated-time step used to fast-forward a roll with no animation
 // (reduced-motion, or a mid-tumble Skip) — must match physicsDice.ts's

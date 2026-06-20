@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { fetchCharacters } from "../api/client";
-import BackendStatus from "../components/BackendStatus";
-import CharacterCard from "../components/CharacterCard";
-import type { CharacterSummary } from "../types/character";
+import { fetchCharacters } from "@/api/client";
+import BackendStatus from "@/features/character-meta/BackendStatus";
+import CharacterCard from "@/features/character-meta/CharacterCard";
+import type { CharacterSummary } from "@/types/character";
 
 function useCharacterList() {
   const [characters, setCharacters] = useState<CharacterSummary[] | null>(null);

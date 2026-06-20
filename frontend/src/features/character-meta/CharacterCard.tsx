@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 
-import type { CharacterSummary } from "../types/character";
-import Badge from "./Badge";
+import type { CharacterSummary } from "@/types/character";
+import Badge from "@/components/ui/Badge";
 
 interface CharacterCardProps {
   character: CharacterSummary;

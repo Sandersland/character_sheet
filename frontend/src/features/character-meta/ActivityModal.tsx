@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 
-import { fetchActivity, revertBatch } from "../api/client";
-import { formatBatchDate, groupByBatch } from "../lib/timeline";
-import type { Character, CharacterEvent, CharacterEventCategory, CharacterEventField } from "../types/character";
-import Badge from "./Badge";
-import Modal from "./Modal";
+import { fetchActivity, revertBatch } from "@/api/client";
+import { formatBatchDate, groupByBatch } from "@/lib/timeline";
+import type { Character, CharacterEvent, CharacterEventCategory, CharacterEventField } from "@/types/character";
+import Badge from "@/components/ui/Badge";
+import Modal from "@/components/ui/Modal";
 
 interface ActivityModalProps {
   characterId: string;

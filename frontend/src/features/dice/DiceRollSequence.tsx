@@ -1,9 +1,9 @@
 import type { ComponentType } from "react";
 import { useEffect, useRef, useState } from "react";
 
-import type { RollResult, RollSpec } from "../lib/dice";
-import DiceRoller from "./DiceRoller";
-import type { DiceRollerProps } from "./diceRollerTypes";
+import type { RollResult, RollSpec } from "@/lib/dice";
+import DiceRoller from "@/features/dice/DiceRoller";
+import type { DiceRollerProps } from "@/features/dice/diceRollerTypes";
 
 // Beat between one set settling and the next tumble starting, so results
 // don't blur together. Long enough to register a total, short enough that a

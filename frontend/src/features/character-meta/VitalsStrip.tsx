@@ -1,6 +1,6 @@
-import { formatModifier } from "../lib/abilities";
-import type { Character } from "../types/character";
-import MeterBar from "./MeterBar";
+import { formatModifier } from "@/lib/abilities";
+import type { Character } from "@/types/character";
+import MeterBar from "@/components/ui/MeterBar";
 
 interface VitalsStripProps {
   character: Character;

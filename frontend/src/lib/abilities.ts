@@ -1,4 +1,4 @@
-import type { AbilityName } from "../types/character";
+import type { AbilityName } from "@/types/character";
 
 export const ABILITY_LABELS: Record<AbilityName, string> = {
   strength: "Strength",

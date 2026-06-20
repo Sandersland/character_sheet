@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { formatRollSpec } from "../lib/dice";
+import { formatRollSpec } from "@/lib/dice";
 import type {
   ArmorCategory,
   Currency,
@@ -8,8 +8,8 @@ import type {
   InventoryOperation,
   ItemCategory,
   WeaponDetail,
-} from "../types/character";
-import Badge from "./Badge";
+} from "@/types/character";
+import Badge from "@/components/ui/Badge";
 
 interface InventoryRowProps {
   item: InventoryItem;

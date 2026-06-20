@@ -15,18 +15,18 @@
 
 import { useState } from "react";
 
-import { applySpellcastingTransactions } from "../api/client";
-import { abilityModifier, formatModifier } from "../lib/abilities";
-import { rollSpec } from "../lib/dice";
+import { applySpellcastingTransactions } from "@/api/client";
+import { abilityModifier, formatModifier } from "@/lib/abilities";
+import { rollSpec } from "@/lib/dice";
 import type {
   AbilityName,
   Character,
   LearnSpellOperation,
   Spell,
-} from "../types/character";
-import AddSpellPanel from "./AddSpellPanel";
-import MeterBar from "./MeterBar";
-import SpellRow from "./SpellRow";
+} from "@/types/character";
+import AddSpellPanel from "@/features/spells/AddSpellPanel";
+import MeterBar from "@/components/ui/MeterBar";
+import SpellRow from "@/features/spells/SpellRow";
 
 interface SpellsSectionProps {
   character: Character;

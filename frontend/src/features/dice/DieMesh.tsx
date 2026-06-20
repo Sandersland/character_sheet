@@ -13,7 +13,7 @@ import {
   FACE_LABEL_OUTLINE_WIDTH,
   LABEL_SURFACE_OFFSET,
   type FaceGroup,
-} from "../lib/dieFaces";
+} from "@/lib/dieFaces";
 
 interface DieMeshProps {
   geometry: THREE.BufferGeometry;
