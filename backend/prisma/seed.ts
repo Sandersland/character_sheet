@@ -117,6 +117,60 @@ const CLASSES = [
     isSpellcaster: true,
     subclassLevel: 3,
   },
+  {
+    name: "Druid",
+    hitDie: "d8",
+    savingThrows: ["intelligence", "wisdom"],
+    skillChoiceCount: 2,
+    skillChoices: ["arcana", "animalHandling", "insight", "medicine", "nature", "perception", "religion", "survival"],
+    isSpellcaster: true,
+    subclassLevel: 2,
+  },
+  {
+    name: "Monk",
+    hitDie: "d8",
+    savingThrows: ["strength", "dexterity"],
+    skillChoiceCount: 2,
+    skillChoices: ["acrobatics", "athletics", "history", "insight", "religion", "stealth"],
+    isSpellcaster: false,
+    subclassLevel: 3,
+  },
+  {
+    name: "Paladin",
+    hitDie: "d10",
+    savingThrows: ["wisdom", "charisma"],
+    skillChoiceCount: 2,
+    skillChoices: ["athletics", "insight", "intimidation", "medicine", "persuasion", "religion"],
+    isSpellcaster: true,
+    subclassLevel: 3,
+  },
+  {
+    name: "Ranger",
+    hitDie: "d10",
+    savingThrows: ["strength", "dexterity"],
+    skillChoiceCount: 3,
+    skillChoices: ["animalHandling", "athletics", "insight", "investigation", "nature", "perception", "stealth", "survival"],
+    isSpellcaster: true,
+    subclassLevel: 3,
+  },
+  {
+    name: "Sorcerer",
+    hitDie: "d6",
+    savingThrows: ["constitution", "charisma"],
+    skillChoiceCount: 2,
+    skillChoices: ["arcana", "deception", "insight", "intimidation", "persuasion", "religion"],
+    isSpellcaster: true,
+    subclassLevel: 1,
+  },
+  {
+    name: "Warlock",
+    hitDie: "d8",
+    savingThrows: ["wisdom", "charisma"],
+    skillChoiceCount: 2,
+    skillChoices: ["arcana", "deception", "history", "intimidation", "investigation", "nature", "religion"],
+    isSpellcaster: true,
+    subclassLevel: 1,
+  },
 ];
 
 // --- Subclass catalog -------------------------------------------------------
@@ -220,6 +274,96 @@ const SUBCLASSES: SubclassSeed[] = [
     name: "College of Valor",
     description:
       "A bard who fights as well as they inspire. You gain medium armor and shield proficiency, Combat Inspiration (allies add your Bardic Inspiration die to damage rolls), and Extra Attack at level 6.",
+  },
+  // ── Druid ─────────────────────────────────────────────────────────────────
+  {
+    className: "Druid",
+    name: "Circle of the Land",
+    description:
+      "You draw on the magic of the natural world, becoming a conduit for druidic power. You gain additional spells based on a chosen terrain type (arctic, coast, desert, forest, grassland, mountain, swamp, or Underdark), Natural Recovery to restore expended spell slots on a short rest, and spells always prepared from your circle.",
+  },
+  {
+    className: "Druid",
+    name: "Circle of the Moon",
+    description:
+      "You are at home in the wild, capable of transforming into more powerful beasts. Starting at level 2 you can Wild Shape into beasts with CR up to 1 (scaling to CR equal to a third of your druid level at level 6), and you can use Wild Shape as a bonus action. At higher levels you can transform into elementals.",
+  },
+  // ── Monk ─────────────────────────────────────────────────────────────────
+  {
+    className: "Monk",
+    name: "Way of the Open Hand",
+    description:
+      "You master techniques to push and trip opponents, cover yourself in a shroud of ki, and enter a trance state that heals your wounds. Open Hand Technique allows you to impose special effects on creatures hit by your Flurry of Blows — knocking them prone, pushing them 15 ft, or denying their reaction.",
+  },
+  {
+    className: "Monk",
+    name: "Way of Shadow",
+    description:
+      "You follow a tradition that values stealth and subtlety. You can cast certain spells by spending ki points, teleport between areas of shadow, and silence a zone around yourself. At higher levels you become one with the darkness, striking from the unseen.",
+  },
+  // ── Paladin ───────────────────────────────────────────────────────────────
+  {
+    className: "Paladin",
+    name: "Oath of Devotion",
+    description:
+      "The Oath of Devotion binds you to the loftiest ideals of justice and order. Channel Divinity options include Sacred Weapon (add Cha modifier to attack rolls) and Turn the Unholy. You gain spells such as Protection from Evil and Good and Guardian of Faith, and eventually radiate an aura of courage.",
+  },
+  {
+    className: "Paladin",
+    name: "Oath of the Ancients",
+    description:
+      "You swear to protect the light and the living world. Channel Divinity options are Nature's Wrath (restrain a creature) and Turn the Faithless. You gain spells such as Ensnaring Strike and Misty Step, and eventually gain resistance to spell damage from magical effects.",
+  },
+  {
+    className: "Paladin",
+    name: "Oath of Vengeance",
+    description:
+      "You pursue the worst of the worst with righteous fury. Vow of Enmity grants advantage on attack rolls against one creature; Abjure Enemy holds a foe in fear. You gain spells such as Bane and Hold Person, and eventually can teleport to strike your quarry wherever they flee.",
+  },
+  // ── Ranger ───────────────────────────────────────────────────────────────
+  {
+    className: "Ranger",
+    name: "Hunter",
+    description:
+      "You stalk prey with precision and power. Hunter's Prey options (Colossus Slayer, Giant Killer, Horde Breaker) let you customize your approach against different threats. Defensive Tactics at level 7 add further versatility, letting you shrug off opportunity attacks, gain multiattack defense, or escape being surrounded.",
+  },
+  {
+    className: "Ranger",
+    name: "Beast Master",
+    description:
+      "You forge an unbreakable bond with an animal companion that fights alongside you. Your companion acts on your turn and grows more powerful as you level — sharing your proficiency bonus, gaining additional attacks, and becoming harder to kill. The bond lets you communicate with it telepathically.",
+  },
+  // ── Sorcerer ─────────────────────────────────────────────────────────────
+  {
+    className: "Sorcerer",
+    name: "Draconic Bloodline",
+    description:
+      "Magic runs in your veins as the blood of a dragon ancestor. You gain natural armor (AC 13 + Dex modifier without armor), resistance to your dragon type's damage, bonus damage on spells of that type, and eventually sprout wings and radiate a draconic presence that can frighten or charm creatures around you.",
+  },
+  {
+    className: "Sorcerer",
+    name: "Wild Magic",
+    description:
+      "Your innate magic stems from an untamed, chaotic source. Every time you cast a 1st level or higher spell there is a chance of a Wild Magic Surge — a random magical effect. Tides of Chaos grants advantage on one attack roll, ability check, or saving throw. Controlled Chaos and Spell Bombardment appear at higher levels.",
+  },
+  // ── Warlock ───────────────────────────────────────────────────────────────
+  {
+    className: "Warlock",
+    name: "The Fiend",
+    description:
+      "You have made a pact with a powerful devil or demon of the Lower Planes. Dark One's Blessing grants temporary HP whenever you reduce a hostile creature to 0. You gain a bonus spell list including Burning Hands and Command, and eventually gain fire resistance, immunity to fire, and the ability to call up fiends to serve you.",
+  },
+  {
+    className: "Warlock",
+    name: "The Archfey",
+    description:
+      "Your patron is a lord or lady of the Feywild. Fey Presence (charm or frighten nearby creatures as an action) and Misty Escape (teleport and turn invisible as a reaction when hit) define your early power. At higher levels you become immune to charm, can beguile minds, and can blur the line between dream and reality.",
+  },
+  {
+    className: "Warlock",
+    name: "The Great Old One",
+    description:
+      "Your patron is an entity of unfathomable cosmic power. Awakened Mind lets you telepathically communicate with any creature you can see. You gain spells such as Dissonant Whispers and Detect Thoughts, and eventually can project your awareness across planes, speak into the minds of others, and create a lair in the Far Realm.",
   },
 ];
 
@@ -726,6 +870,38 @@ const ITEMS: CatalogItem[] = [
   { name: "Book of Lore", category: "gear", weight: 5, cost: coins(25), description: "A book containing knowledge in a particular field." },
   { name: "Parchment Sheet", category: "gear", weight: 0, cost: coins(0, 1, 0) },
   { name: "Knife", category: "gear", weight: 0.5, cost: coins(0, 2, 0) },
+  // ── New items for missing PHB classes ─────────────────────────────────────
+  {
+    name: "Scimitar",
+    category: "weapon",
+    weight: 3,
+    cost: coins(25),
+    weapon: { damageDiceCount: 1, damageDiceFaces: 6, damageType: "slashing", finesse: true, light: true, weaponClass: "martial", weaponRange: "melee" },
+  },
+  {
+    name: "Dart",
+    category: "weapon",
+    weight: 0.25,
+    cost: coins(0, 0, 5),
+    weapon: {
+      damageDiceCount: 1,
+      damageDiceFaces: 4,
+      damageType: "piercing",
+      finesse: true,
+      thrown: true,
+      rangeNormal: 20,
+      rangeLong: 60,
+      weaponClass: "simple",
+      weaponRange: "ranged",
+    },
+  },
+  {
+    name: "Druidic Focus",
+    category: "gear",
+    weight: 0,
+    cost: coins(1),
+    description: "A sprig of mistletoe, a totem, a staff, or a wooden rod used by druids as a spellcasting focus in place of material components.",
+  },
 ];
 
 // ── Spell catalog ─────────────────────────────────────────────────────────────

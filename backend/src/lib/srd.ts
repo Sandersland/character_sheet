@@ -735,6 +735,249 @@ export const STARTING_EQUIPMENT: Record<string, ClassStartingEquipment> = {
       },
     ],
   },
+
+  Druid: {
+    gold: { diceCount: 2, diceFaces: 4, multiplier: 10 },
+    groups: [
+      {
+        label: "(a) a wooden shield or (b) any simple weapon",
+        options: [
+          { label: "Wooden Shield", items: [{ catalogName: "Shield" }] },
+          {
+            label: "Any simple weapon",
+            openPicks: [{ label: "any simple weapon", filter: { weaponClass: "simple" } }],
+          },
+        ],
+      },
+      {
+        label: "(a) a scimitar or (b) any simple melee weapon",
+        options: [
+          { label: "Scimitar", items: [{ catalogName: "Scimitar" }] },
+          {
+            label: "Any simple melee weapon",
+            openPicks: [{ label: "any simple melee weapon", filter: { weaponClass: "simple", range: "melee" } }],
+          },
+        ],
+      },
+      {
+        // Auto-granted
+        label: "Leather armor, an explorer's pack, and a druidic focus",
+        options: [
+          {
+            label: "Leather Armor, Explorer's Pack, and Druidic Focus",
+            items: [
+              { catalogName: "Leather Armor" },
+              { catalogName: "Explorer's Pack" },
+              { catalogName: "Druidic Focus" },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+
+  Monk: {
+    gold: { diceCount: 5, diceFaces: 4, multiplier: 1 },
+    groups: [
+      {
+        label: "(a) a shortsword or (b) any simple weapon",
+        options: [
+          { label: "Shortsword", items: [{ catalogName: "Shortsword" }] },
+          {
+            label: "Any simple weapon",
+            openPicks: [{ label: "any simple weapon", filter: { weaponClass: "simple" } }],
+          },
+        ],
+      },
+      {
+        label: "(a) a dungeoneer's pack or (b) an explorer's pack",
+        options: [
+          { label: "Dungeoneer's Pack", items: [{ catalogName: "Dungeoneer's Pack" }] },
+          { label: "Explorer's Pack", items: [{ catalogName: "Explorer's Pack" }] },
+        ],
+      },
+      {
+        // Auto-granted
+        label: "10 darts",
+        options: [{ label: "10 Darts", items: [{ catalogName: "Dart", quantity: 10 }] }],
+      },
+    ],
+  },
+
+  Paladin: {
+    gold: { diceCount: 5, diceFaces: 4, multiplier: 10 },
+    groups: [
+      {
+        label: "(a) a martial weapon and a shield or (b) two martial weapons",
+        options: [
+          {
+            label: "A martial weapon and a shield",
+            items: [{ catalogName: "Shield" }],
+            openPicks: [{ label: "any martial weapon", filter: { weaponClass: "martial" } }],
+          },
+          {
+            label: "Two martial weapons",
+            openPicks: [
+              { label: "first martial weapon", filter: { weaponClass: "martial" } },
+              { label: "second martial weapon", filter: { weaponClass: "martial" } },
+            ],
+          },
+        ],
+      },
+      {
+        label: "(a) five javelins or (b) any simple melee weapon",
+        options: [
+          { label: "Five Javelins", items: [{ catalogName: "Javelin", quantity: 5 }] },
+          {
+            label: "Any simple melee weapon",
+            openPicks: [{ label: "any simple melee weapon", filter: { weaponClass: "simple", range: "melee" } }],
+          },
+        ],
+      },
+      {
+        label: "(a) a priest's pack or (b) an explorer's pack",
+        options: [
+          { label: "Priest's Pack", items: [{ catalogName: "Priest's Pack" }] },
+          { label: "Explorer's Pack", items: [{ catalogName: "Explorer's Pack" }] },
+        ],
+      },
+      {
+        // Auto-granted
+        label: "Chain mail and a holy symbol",
+        options: [
+          {
+            label: "Chain Mail and Holy Symbol",
+            items: [{ catalogName: "Chain Mail" }, { catalogName: "Holy Symbol" }],
+          },
+        ],
+      },
+    ],
+  },
+
+  Ranger: {
+    gold: { diceCount: 5, diceFaces: 4, multiplier: 10 },
+    groups: [
+      {
+        label: "(a) scale mail or (b) leather armor",
+        options: [
+          { label: "Scale Mail", items: [{ catalogName: "Scale Mail" }] },
+          { label: "Leather Armor", items: [{ catalogName: "Leather Armor" }] },
+        ],
+      },
+      {
+        label: "(a) two shortswords or (b) two simple melee weapons",
+        options: [
+          { label: "Two Shortswords", items: [{ catalogName: "Shortsword", quantity: 2 }] },
+          {
+            label: "Two simple melee weapons",
+            openPicks: [
+              { label: "first simple melee weapon", filter: { weaponClass: "simple", range: "melee" } },
+              { label: "second simple melee weapon", filter: { weaponClass: "simple", range: "melee" } },
+            ],
+          },
+        ],
+      },
+      {
+        label: "(a) a dungeoneer's pack or (b) an explorer's pack",
+        options: [
+          { label: "Dungeoneer's Pack", items: [{ catalogName: "Dungeoneer's Pack" }] },
+          { label: "Explorer's Pack", items: [{ catalogName: "Explorer's Pack" }] },
+        ],
+      },
+      {
+        // Auto-granted
+        label: "A longbow and 20 arrows",
+        options: [
+          {
+            label: "Longbow and 20 Arrows",
+            items: [{ catalogName: "Longbow" }, { catalogName: "Arrows", quantity: 20 }],
+          },
+        ],
+      },
+    ],
+  },
+
+  Sorcerer: {
+    gold: { diceCount: 3, diceFaces: 4, multiplier: 10 },
+    groups: [
+      {
+        label: "(a) a light crossbow and 20 bolts or (b) any simple weapon",
+        options: [
+          {
+            label: "Light Crossbow and 20 Bolts",
+            items: [{ catalogName: "Light Crossbow" }, { catalogName: "Crossbow Bolts", quantity: 20 }],
+          },
+          {
+            label: "Any simple weapon",
+            openPicks: [{ label: "any simple weapon", filter: { weaponClass: "simple" } }],
+          },
+        ],
+      },
+      {
+        label: "(a) a component pouch or (b) an arcane focus",
+        options: [
+          { label: "Component Pouch", items: [{ catalogName: "Component Pouch" }] },
+          { label: "Arcane Focus (Pearl)", items: [{ catalogName: "Pearl (arcane focus)" }] },
+        ],
+      },
+      {
+        label: "(a) a dungeoneer's pack or (b) an explorer's pack",
+        options: [
+          { label: "Dungeoneer's Pack", items: [{ catalogName: "Dungeoneer's Pack" }] },
+          { label: "Explorer's Pack", items: [{ catalogName: "Explorer's Pack" }] },
+        ],
+      },
+      {
+        // Auto-granted
+        label: "Two daggers",
+        options: [{ label: "Two Daggers", items: [{ catalogName: "Dagger", quantity: 2 }] }],
+      },
+    ],
+  },
+
+  Warlock: {
+    gold: { diceCount: 4, diceFaces: 4, multiplier: 10 },
+    groups: [
+      {
+        label: "(a) a light crossbow and 20 bolts or (b) any simple weapon",
+        options: [
+          {
+            label: "Light Crossbow and 20 Bolts",
+            items: [{ catalogName: "Light Crossbow" }, { catalogName: "Crossbow Bolts", quantity: 20 }],
+          },
+          {
+            label: "Any simple weapon",
+            openPicks: [{ label: "any simple weapon", filter: { weaponClass: "simple" } }],
+          },
+        ],
+      },
+      {
+        label: "(a) a component pouch or (b) an arcane focus",
+        options: [
+          { label: "Component Pouch", items: [{ catalogName: "Component Pouch" }] },
+          { label: "Arcane Focus (Pearl)", items: [{ catalogName: "Pearl (arcane focus)" }] },
+        ],
+      },
+      {
+        label: "(a) a scholar's pack or (b) a dungeoneer's pack",
+        options: [
+          { label: "Scholar's Pack", items: [{ catalogName: "Scholar's Pack" }] },
+          { label: "Dungeoneer's Pack", items: [{ catalogName: "Dungeoneer's Pack" }] },
+        ],
+      },
+      {
+        // Auto-granted — leather armor, a simple weapon of choice, and two daggers
+        label: "Leather armor, any simple weapon, and two daggers",
+        options: [
+          {
+            label: "Leather Armor, Any Simple Weapon, and Two Daggers",
+            items: [{ catalogName: "Leather Armor" }, { catalogName: "Dagger", quantity: 2 }],
+            openPicks: [{ label: "any simple weapon", filter: { weaponClass: "simple" } }],
+          },
+        ],
+      },
+    ],
+  },
 };
 
 /**
