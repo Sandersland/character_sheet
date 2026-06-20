@@ -6,6 +6,7 @@ import AbilityScoreBox from "../components/AbilityScoreBox";
 import BackendStatus from "../components/BackendStatus";
 import Badge from "../components/Badge";
 import Card from "../components/Card";
+import DeleteCharacterModal from "../components/DeleteCharacterModal";
 import ExperienceTracker from "../components/ExperienceTracker";
 import InventoryList from "../components/InventoryList";
 import JournalSection from "../components/JournalSection";
@@ -42,6 +43,7 @@ function useCharacter(id: string | undefined) {
 export default function CharacterSheetPage() {
   const { id } = useParams();
   const { character, error, setCharacter } = useCharacter(id);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   if (error) {
     return (
@@ -120,9 +122,26 @@ export default function CharacterSheetPage() {
               </span>
             </p>
           </div>
-          <BackendStatus />
+          <div className="flex flex-col items-end gap-2">
+            <BackendStatus />
+            <button
+              type="button"
+              onClick={() => setConfirmDeleteOpen(true)}
+              className="text-xs font-semibold text-[var(--color-garnet-700)] hover:underline"
+            >
+              Delete character
+            </button>
+          </div>
         </div>
       </header>
+
+      {confirmDeleteOpen && (
+        <DeleteCharacterModal
+          characterId={character.id}
+          characterName={character.name}
+          onClose={() => setConfirmDeleteOpen(false)}
+        />
+      )}
 
       <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
         <VitalsStrip character={character} />

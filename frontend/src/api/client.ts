@@ -102,6 +102,13 @@ export async function fetchLedger(characterId: string, inventoryItemId?: string)
   return response.json();
 }
 
+export async function deleteCharacter(id: string): Promise<void> {
+  const response = await fetch(`${API_URL}/characters/${id}`, { method: "DELETE" });
+  if (!response.ok) {
+    throw new Error(`Failed to delete character ${id} (${response.status})`);
+  }
+}
+
 export async function createCharacter(input: CreateCharacterInput): Promise<Character> {
   const response = await fetch(`${API_URL}/characters`, {
     method: "POST",

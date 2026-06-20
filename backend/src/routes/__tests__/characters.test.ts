@@ -660,4 +660,42 @@ describe("characters routes", () => {
       expect(response.body.currency).toEqual({ cp: 0, sp: 0, gp: 0, pp: 0 });
     });
   });
+
+  describe("DELETE /api/characters/:id", () => {
+    it("returns 204 and removes the character", async () => {
+      const response = await supertest(createApp()).delete(`/api/characters/${FIXTURE.id}`);
+
+      expect(response.status).toBe(204);
+      await expect(
+        prisma.character.findUnique({ where: { id: FIXTURE.id } })
+      ).resolves.toBeNull();
+
+      // The afterEach deleteMany is harmless on an already-gone id, but clean
+      // up bookkeeping the same way the cascade test does.
+      createdCharacterIds = createdCharacterIds.filter((id) => id !== FIXTURE.id);
+    });
+
+    it("cascades to inventory and selection rows", async () => {
+      await supertest(createApp()).delete(`/api/characters/${FIXTURE.id}`);
+
+      await expect(
+        prisma.inventoryItem.findMany({ where: { characterId: FIXTURE.id } })
+      ).resolves.toHaveLength(0);
+      await expect(
+        prisma.characterRace.findUnique({ where: { characterId: FIXTURE.id } })
+      ).resolves.toBeNull();
+      await expect(
+        prisma.characterClassEntry.findMany({ where: { characterId: FIXTURE.id } })
+      ).resolves.toHaveLength(0);
+
+      createdCharacterIds = createdCharacterIds.filter((id) => id !== FIXTURE.id);
+    });
+
+    it("returns 404 for a non-existent id", async () => {
+      const response = await supertest(createApp()).delete("/api/characters/does-not-exist");
+
+      expect(response.status).toBe(404);
+      expect(response.body).toMatchObject({ error: "Character not found" });
+    });
+  });
 });

@@ -551,3 +551,21 @@ charactersRouter.patch("/characters/:id", async (req, res) => {
 
   res.json(serializeCharacter(updated));
 });
+
+charactersRouter.delete("/characters/:id", async (req, res) => {
+  const existing = await prisma.character.findUnique({
+    where: { id: req.params.id },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    res.status(404).json({ error: "Character not found" });
+    return;
+  }
+
+  // All child relations (CharacterRace, CharacterBackground, CharacterClassEntry,
+  // InventoryItem, InventoryTransaction, and their detail grandchildren) are
+  // onDelete: Cascade in the schema, so a single delete is fully atomic.
+  await prisma.character.delete({ where: { id: req.params.id } });
+  res.status(204).end();
+});
