@@ -43,6 +43,23 @@ export interface ToolProfEntry {
 }
 
 /**
+ * A structured mechanical effect defined on a catalog or custom feat.
+ * Snapshot into AdvancementEntry.improvements at take-time so removal/derivation
+ * never depend on the catalog row being present.
+ *
+ * Supported targets (enforced in advancement route + deriveFeatBonuses in srd.ts):
+ *   "initiative" | "speed" | "armorClass" | "maxHp"
+ *
+ * `perLevel`: when true, the effective bonus = amount × character's applied level
+ * (hitDice.total). Used by Tough (+2 HP per level).
+ */
+export interface FeatImprovement {
+  target: string;
+  amount: number;
+  perLevel?: boolean;
+}
+
+/**
  * One taken Ability Score Improvement or feat.
  * Stores the deltas applied so reversal subtracts exactly what was added —
  * never recomputes from ability scores, which may have changed since.
@@ -63,6 +80,13 @@ export interface AdvancementEntry {
   featName?: string;
   /** Description snapshot taken at time of choice (for feats). */
   featDescription?: string;
+  /**
+   * Snapshot of the feat's structured mechanical effects at take-time.
+   * Applied as a derived modifier layer in serializeCharacter / effective-max
+   * computations — never persisted into separate columns.
+   * Empty for ASI entries.
+   */
+  improvements?: FeatImprovement[];
 }
 
 export interface ResourcesMutableState {

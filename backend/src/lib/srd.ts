@@ -6,6 +6,8 @@
 // ability mapping from its own existing frontend/src/lib/abilities.ts
 // SKILL_LABELS (display-only, no rules logic).
 
+import type { AdvancementEntry } from "./resources.js";
+
 export const ALIGNMENTS: readonly string[] = [
   "Lawful Good",
   "Neutral Good",
@@ -3323,4 +3325,54 @@ export function deriveCreatedCharacter(
     spellcasting: null,
     journal: [],
   };
+}
+
+// ── Feat improvement targets ──────────────────────────────────────────────────
+
+/**
+ * The set of stat targets that FeatImprovement.target may refer to and that
+ * deriveFeatBonuses knows how to sum. Adding a new target here + a new apply
+ * site in serializeCharacter (or the relevant derivation) is all that's needed
+ * to support it for both catalog and custom feats.
+ */
+export const FEAT_IMPROVEMENT_TARGETS = [
+  "initiative",
+  "speed",
+  "armorClass",
+  "maxHp",
+] as const;
+
+export type FeatImprovementTarget = (typeof FEAT_IMPROVEMENT_TARGETS)[number];
+
+/**
+ * Sums all feat improvement bonuses across a set of advancements.
+ * `appliedLevel` is hitDice.total (the number of explicit level-ups applied),
+ * used to scale perLevel bonuses (e.g. Tough = +2 per applied level).
+ *
+ * Callers pass the **already-clamped** (in-cap) advancements slice so
+ * over-cap feats are automatically excluded — no reversal logic needed.
+ *
+ * Unknown targets are silently ignored, keeping the function forward-compatible
+ * with future targets that haven't been wired into apply sites yet.
+ */
+export function deriveFeatBonuses(
+  advancements: AdvancementEntry[],
+  appliedLevel: number,
+): Record<FeatImprovementTarget, number> {
+  const totals: Record<FeatImprovementTarget, number> = {
+    initiative: 0,
+    speed: 0,
+    armorClass: 0,
+    maxHp: 0,
+  };
+
+  for (const entry of advancements) {
+    for (const imp of (entry.improvements ?? [])) {
+      const target = imp.target as FeatImprovementTarget;
+      if (!(target in totals)) continue; // unknown target — skip gracefully
+      totals[target] += imp.perLevel ? imp.amount * appliedLevel : imp.amount;
+    }
+  }
+
+  return totals;
 }

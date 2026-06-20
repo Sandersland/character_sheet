@@ -19,6 +19,7 @@ featsRouter.get("/feats", async (_req, res) => {
       prerequisite: row.prerequisite ?? undefined,
       abilityOptions: row.abilityOptions,
       abilityIncrease: row.abilityIncrease,
+      improvements: row.improvements,
     })),
   );
 });

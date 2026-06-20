@@ -456,6 +456,16 @@ export interface CatalogManeuver {
 }
 
 /**
+ * A structured mechanical effect defined on a catalog or custom feat.
+ * Snapshot into AdvancementEntry.improvements at take-time.
+ */
+export interface FeatImprovement {
+  target: string;    // e.g. "initiative", "speed", "armorClass", "maxHp"
+  amount: number;
+  perLevel?: boolean; // true → effective bonus = amount × hitDice.total (e.g. Tough)
+}
+
+/**
  * One taken Ability Score Improvement or feat on a character.
  * Mirrors backend/src/lib/resources.ts AdvancementEntry.
  */
@@ -472,6 +482,8 @@ export interface AdvancementEntry {
   featId?: string;
   featName?: string;
   featDescription?: string;
+  /** Snapshot of the feat's structured mechanical effects. Applied as a read-time bonus layer. */
+  improvements?: FeatImprovement[];
 }
 
 /** Slot count summary for advancement choices. */
@@ -490,6 +502,8 @@ export interface CatalogFeat {
   abilityOptions: string[];
   /** Usually 1 for half-feats; 0 for full feats. */
   abilityIncrease: number;
+  /** Structured static effects applied as a read-time bonus when this feat is active. */
+  improvements: FeatImprovement[];
 }
 
 /**

@@ -6,6 +6,7 @@ import {
   InvalidAdvancementOperationError,
 } from "../lib/advancement.js";
 import { prisma } from "../lib/prisma.js";
+import { FEAT_IMPROVEMENT_TARGETS } from "../lib/srd.js";
 import { characterInclude, serializeCharacter } from "./characters.js";
 
 export const advancementRouter = Router();
@@ -22,12 +23,22 @@ const takeAsiOpSchema = z.object({
   increases: z.array(increaseSchema).min(1).max(2),
 });
 
+const featImprovementSchema = z.object({
+  target: z.enum(FEAT_IMPROVEMENT_TARGETS),
+  amount: z.number().int(),
+  perLevel: z.boolean().optional(),
+});
+
 const takeFeatOpSchema = z
   .object({
     type: z.literal("takeFeat"),
     featId: z.string().optional(),
     custom: z
-      .object({ name: z.string().min(1), description: z.string() })
+      .object({
+        name: z.string().min(1),
+        description: z.string(),
+        improvements: z.array(featImprovementSchema).optional(),
+      })
       .optional(),
     abilityChoice: z.string().optional(),
   })

@@ -118,7 +118,7 @@ export interface TakeFeatOperation {
   /** Catalog Feat.id — omit for custom feats. */
   featId?: string;
   /** Custom feat payload when featId is absent. */
-  custom?: { name: string; description: string };
+  custom?: { name: string; description: string; improvements?: import("./resources.js").FeatImprovement[] };
   /** Required when the catalog feat is a half-feat (abilityOptions non-empty). */
   abilityChoice?: string;
 }
@@ -306,6 +306,7 @@ export async function applyAdvancementOperations(
           let featDescription: string;
           const abilityDeltas: Record<string, number> = {};
           let resolvedFeatId: string | undefined;
+          let featImprovements: import("./resources.js").FeatImprovement[] = [];
 
           if (op.featId) {
             const catalogFeat = await tx.feat.findUnique({ where: { id: op.featId } });
@@ -317,6 +318,9 @@ export async function applyAdvancementOperations(
             featName = catalogFeat.name;
             featDescription = catalogFeat.description;
             resolvedFeatId = catalogFeat.id;
+            // Snapshot the catalog's improvements so removal/derivation never
+            // depend on the catalog row being present or unchanged.
+            featImprovements = (catalogFeat.improvements as unknown as import("./resources.js").FeatImprovement[]) ?? [];
 
             // Half-feat ability bump.
             if (catalogFeat.abilityOptions.length > 0) {
@@ -345,6 +349,8 @@ export async function applyAdvancementOperations(
             }
             featName = c.name.trim();
             featDescription = c.description ?? "";
+            // Custom feats may supply structured improvements directly.
+            featImprovements = c.improvements ?? [];
           }
 
           const effect = computeAdvancementEffect(scores, hitDice.total, abilityDeltas);
@@ -369,6 +375,7 @@ export async function applyAdvancementOperations(
             featId: resolvedFeatId,
             featName,
             featDescription,
+            improvements: featImprovements,
           };
           state.advancements.push(entry);
 

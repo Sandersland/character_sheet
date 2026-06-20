@@ -486,12 +486,19 @@ const MANEUVERS: ManeuverSeed[] = [
 // Deeper per-feat mechanics (Lucky rerolls, Sentinel reactions, Mobile
 // speed/disengage) are surfaced as description text, not automated.
 
+interface FeatImprovement {
+  target: string;
+  amount: number;
+  perLevel?: boolean;
+}
+
 interface FeatSeed {
   name: string;
   description: string;
   prerequisite?: string;
   abilityOptions?: string[];
   abilityIncrease?: number;
+  improvements?: FeatImprovement[];
 }
 
 const FEATS: FeatSeed[] = [
@@ -500,6 +507,7 @@ const FEATS: FeatSeed[] = [
     name: "Alert",
     description:
       "Always on the lookout for danger. You gain +5 to initiative rolls, can't be surprised while conscious, and other creatures don't gain advantage on attack rolls against you as a result of being unseen by you.",
+    improvements: [{ target: "initiative", amount: 5 }],
   },
   {
     name: "Lucky",
@@ -510,6 +518,7 @@ const FEATS: FeatSeed[] = [
     name: "Mobile",
     description:
       "Your speed increases by 10 feet. When you take the Dash action, difficult terrain doesn't cost you extra movement for the rest of the turn. When you make a melee attack against a creature, you don't provoke opportunity attacks from that creature for the rest of the turn, whether or not you hit.",
+    improvements: [{ target: "speed", amount: 10 }],
   },
   {
     name: "Sentinel",
@@ -560,7 +569,8 @@ const FEATS: FeatSeed[] = [
   {
     name: "Tough",
     description:
-      "Your hit point maximum increases by an amount equal to twice your level when you gain this feat. Whenever you gain a level thereafter, your hit point maximum increases by an additional 2 HP. (Note: this app tracks the static HP — apply the 2 × current level increase to your max HP manually or via the HP card.)",
+      "Your hit point maximum increases by an amount equal to twice your level when you gain this feat. Whenever you gain a level thereafter, your hit point maximum increases by an additional 2 HP.",
+    improvements: [{ target: "maxHp", amount: 2, perLevel: true }],
   },
   // ── Half-feats (grant +1 to a chosen ability score) ───────────────────────
   {
@@ -1861,6 +1871,7 @@ async function main() {
         prerequisite: feat.prerequisite ?? null,
         abilityOptions: feat.abilityOptions ?? [],
         abilityIncrease: feat.abilityIncrease ?? 0,
+        improvements: feat.improvements ?? [],
       },
     });
   }

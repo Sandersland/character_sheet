@@ -239,6 +239,7 @@ model Feat {
   prerequisite    String?
   abilityOptions  String[] @default([]) // abilities the player may raise by abilityIncrease
   abilityIncrease Int      @default(0)  // usually 1 for half-feats
+  improvements    Json     @default("[]") // FeatImprovement[]: { target, amount, perLevel? }
 }
 
 // Baseline spell catalog — same catalog-table role as Item above. Seeded from

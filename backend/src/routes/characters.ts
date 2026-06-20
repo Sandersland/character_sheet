@@ -18,6 +18,7 @@ import {
   ALIGNMENTS,
   advancementSlotsForLevel,
   deriveCreatedCharacter,
+  deriveFeatBonuses,
   deriveResources,
   deriveSpellcasting,
   isKnownTool,
@@ -243,6 +244,14 @@ export function serializeCharacter(row: CharacterWithRelations) {
     effectiveInitBonus = reversed.initiativeBonus;
   }
 
+  // ── Feat improvement modifier layer ───────────────────────────────────────
+  // Sum structured feat improvements over the in-cap advancements. Because
+  // clampedAdvancements already excludes over-cap feats, level-down behavior
+  // is automatic — no separate reversal code needed.
+  // perLevel bonuses (e.g. Tough) scale with hitDice.total (applied level).
+  const featBonuses = deriveFeatBonuses(clampedAdvancements, hitDice.total);
+  const effectiveMaxHp = hitPoints.max + featBonuses.maxHp;
+
   return {
     id: row.id,
     name: row.name,
@@ -255,9 +264,9 @@ export function serializeCharacter(row: CharacterWithRelations) {
     alignment: row.alignment,
     portraitUrl: row.portraitUrl ?? undefined,
 
-    armorClass: row.armorClass,
-    initiativeBonus: effectiveInitBonus,
-    speed: row.speed,
+    armorClass: row.armorClass + featBonuses.armorClass,
+    initiativeBonus: effectiveInitBonus + featBonuses.initiative,
+    speed: row.speed + featBonuses.speed,
     proficiencyBonus: progress.proficiencyBonus,
 
     experiencePoints: row.experiencePoints,
@@ -268,7 +277,13 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // up" via the /hp endpoint). The UI shows a "Level up" button when > 0.
     pendingLevelUps: Math.max(0, progress.level - hitDice.total),
 
-    hitPoints,
+    hitPoints: {
+      ...hitPoints,
+      max: effectiveMaxHp,
+      // Don't let current exceed effective max (e.g. if Tough was removed
+      // and the character hasn't spent HP yet).
+      current: Math.min(hitPoints.current, effectiveMaxHp),
+    },
     hitDice,
     abilityScores: effectiveScores,
     savingThrowProficiencies: row.savingThrowProficiencies,
