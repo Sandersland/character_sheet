@@ -293,6 +293,13 @@ const BATTLE_MASTER_FEATURES: DerivedFeature[] = [
 // Add new subclasses here as resources and features are implemented.
 // Keys are lowercase subclass names (matching entry.subclass.toLowerCase()).
 
+// The class level at which each subclass first grants its trackable resources
+// (mirrors CharacterClass.subclassLevel in the DB; default 3 = schema default).
+// Keep in sync when adding new subclasses.
+const SUBCLASS_GRANT_LEVEL: Record<string, number> = {
+  "battle master": 3,
+};
+
 const SUBCLASS_RESOURCE_FN: Record<
   string,
   (level: number, abilityScores: Record<string, number>, profBonus: number) => DerivedResource[]
@@ -344,6 +351,12 @@ export function deriveResources(
   const featureList = SUBCLASS_FEATURE_LIST[subclassKey];
 
   if (!resourceFn && !featureList) return null;
+
+  // Guard: don't surface resources or features until the character has reached
+  // the level at which the subclass is granted (e.g. Battle Master = 3).
+  // This defends both serializeCharacter and the spend endpoint against stale
+  // subclass names left on the class entry below the granting level.
+  if (level < (SUBCLASS_GRANT_LEVEL[subclassKey] ?? 3)) return null;
 
   const resources = resourceFn ? resourceFn(level, abilityScores, profBonus) : [];
   // Only surface features that have been gained (level >= feature.level).

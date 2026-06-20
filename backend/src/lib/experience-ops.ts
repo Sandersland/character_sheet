@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "../generated/prisma/client.js";
 import { levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
+import { reconcileLevelGatedState } from "./level-reconciliation.js";
 import { prisma } from "./prisma.js";
 import { fixedAverageForDie, normalizeHitDice, normalizeHitPoints } from "./hitpoints.js";
 import { abilityModifier, hitDieFace } from "./srd.js";
@@ -113,7 +114,7 @@ async function revertLevelUps(
     summary: `Leveled down to ${hd.total} — HP adjusted`,
     before: { hitPoints: beforeHp, hitDice: beforeHd, classEntryLevel: beforeHd.total },
     after: { hitPoints: { ...hp }, hitDice: { ...hd }, classEntryLevel: hd.total },
-    data: { levelsReversed: levelsToReverse, newLevel: hd.total },
+    data: { levelsReversed: levelsToReverse, newLevel: hd.total, primaryEntryId: primaryEntry?.id },
     batchId,
   });
 }
@@ -194,6 +195,12 @@ export async function applyExperienceOperations(
       if (newDerivedLevel < hd.total) {
         await revertLevelUps(tx, characterId, hd.total, newDerivedLevel, batchId);
       }
+
+      // Reconcile all level-gated state (subclass choice, maneuvers known, …)
+      // in the registered order. Runs unconditionally so it catches characters
+      // who gained a subclass via XP alone (no HP level-ups applied yet) and
+      // self-heals those already in an invalid state on their next XP op.
+      await reconcileLevelGatedState({ tx, characterId, newDerivedLevel, batchId });
     }
   });
 }

@@ -496,11 +496,13 @@ enum CharacterEventType {
   unprepareSpell
   // class
   subclassChosen
+  subclassRemoved
   // resources
   spendResource
   restoreResource
   learnManeuver
   forgetManeuver
+  maneuversReconciled
   // meta
   revert
 }

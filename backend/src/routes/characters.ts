@@ -162,7 +162,12 @@ export function serializeCharacter(row: CharacterWithRelations) {
         used: Math.min(pool.total, stored.used[pool.key] ?? 0),
         remaining: pool.total - Math.min(pool.total, stored.used[pool.key] ?? 0),
       })),
-      maneuversKnown: stored.maneuversKnown,
+      // Clamp to the level-derived cap (defense-in-depth for characters who
+      // haven't had a reconciling XP op yet after their level dropped).
+      maneuversKnown:
+        derivedRes.maneuverChoiceCount !== undefined
+          ? stored.maneuversKnown.slice(0, derivedRes.maneuverChoiceCount)
+          : stored.maneuversKnown,
     };
   }
 

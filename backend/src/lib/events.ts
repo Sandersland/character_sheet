@@ -43,11 +43,13 @@ export type EventType =
   | "unprepareSpell"
   // class
   | "subclassChosen"
+  | "subclassRemoved"
   // resources
   | "spendResource"
   | "restoreResource"
   | "learnManeuver"
   | "forgetManeuver"
+  | "maneuversReconciled"
   // meta
   | "revert";
 
