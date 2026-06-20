@@ -5,7 +5,27 @@ on:
   push:
     branches: [main]
 
+# Cancel superseded runs on the same ref so redundant pushes don't queue up.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+
+      - run: npm run lint
+
   test:
     runs-on: ubuntu-latest
 
@@ -29,14 +49,14 @@ jobs:
       DATABASE_URL: postgresql://character_sheet:character_sheet@localhost:5432/character_sheet
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
 
-      - run: npm ci
+      - run: npm ci --no-audit --no-fund
 
       - name: Prisma generate / migrate / seed
         working-directory: backend
@@ -44,7 +64,5 @@ jobs:
           npx prisma generate
           npx prisma migrate deploy
           npx prisma db seed
-
-      - run: npm run lint
 
       - run: npm test
