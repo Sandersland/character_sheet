@@ -199,10 +199,11 @@ describe("characters routes", () => {
     expect(response.status).toBe(404);
   });
 
-  it("PATCH /api/characters/:id updates experiencePoints and recomputes level", async () => {
+  it("POST /api/characters/:id/experience sets XP and recomputes level", async () => {
+    // experiencePoints was removed from PATCH — use the dedicated XP endpoint
     const response = await supertest(createApp())
-      .patch(`/api/characters/${FIXTURE.id}`)
-      .send({ experiencePoints: 6500 });
+      .post(`/api/characters/${FIXTURE.id}/experience`)
+      .send({ operations: [{ type: "set", value: 6500 }] });
 
     expect(response.status).toBe(200);
     expect(response.body.experiencePoints).toBe(6500);
@@ -235,9 +236,10 @@ describe("characters routes", () => {
   });
 
   it("PATCH 404s for unknown id", async () => {
+    // experiencePoints was removed from PATCH — use currency which is still patchable
     const response = await supertest(createApp())
       .patch("/api/characters/does-not-exist")
-      .send({ experiencePoints: 100 });
+      .send({ currency: { cp: 0, sp: 0, gp: 1, pp: 0 } });
 
     expect(response.status).toBe(404);
   });

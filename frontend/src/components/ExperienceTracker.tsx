@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { updateCharacter } from "../api/client";
+import { applyExperienceOperations } from "../api/client";
 import type { Character } from "../types/character";
 import Card from "./Card";
 import MeterBar from "./MeterBar";
@@ -25,14 +25,32 @@ export default function ExperienceTracker({
   const span = isMaxed ? 1 : nextLevelThreshold - currentLevelThreshold;
   const progressIntoLevel = isMaxed ? 1 : experiencePoints - currentLevelThreshold;
 
-  async function submit(newTotal: number) {
+  async function submitSet(newTotal: number) {
     if (!Number.isInteger(newTotal) || newTotal < 0) return;
     setPending(true);
     setError(false);
     try {
-      const updated = await updateCharacter(character.id, {
-        experiencePoints: newTotal,
-      });
+      const updated = await applyExperienceOperations(character.id, [
+        { type: "set", value: newTotal },
+      ]);
+      onUpdate(updated);
+      setSetValue(String(updated.experiencePoints));
+      setAwardValue("");
+    } catch {
+      setError(true);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function submitAward(amount: number) {
+    if (!Number.isInteger(amount) || amount <= 0) return;
+    setPending(true);
+    setError(false);
+    try {
+      const updated = await applyExperienceOperations(character.id, [
+        { type: "award", amount },
+      ]);
       onUpdate(updated);
       setSetValue(String(updated.experiencePoints));
       setAwardValue("");
@@ -94,7 +112,7 @@ export default function ExperienceTracker({
           <button
             type="button"
             disabled={pending}
-            onClick={() => submit(Number(setValue))}
+            onClick={() => submitSet(Number(setValue))}
             className="rounded-[var(--radius-control)] bg-[var(--color-arcane-700)] px-3 py-1.5 text-sm font-semibold text-[var(--color-parchment-50)] transition-colors hover:bg-[var(--color-arcane-800)] disabled:opacity-50"
           >
             Set
@@ -115,7 +133,7 @@ export default function ExperienceTracker({
           <button
             type="button"
             disabled={pending || !awardValue}
-            onClick={() => submit(experiencePoints + Number(awardValue))}
+            onClick={() => submitAward(Number(awardValue))}
             className="rounded-[var(--radius-control)] bg-[var(--color-garnet-700)] px-3 py-1.5 text-sm font-semibold text-[var(--color-parchment-50)] transition-colors hover:bg-[var(--color-garnet-800)] disabled:opacity-50"
           >
             Add

@@ -183,11 +183,14 @@ inventoryRouter.post("/characters/:id/inventory/transactions", async (req, res) 
   res.json(serializeCharacter(updated!));
 });
 
-// Read-only history (Phase C) — newest first, optionally filtered to one
-// still-held row via ?inventoryItemId=. Filtering only ever covers
-// currently-held items (once a row is sold/consumed/removed there's nothing
-// left to filter by); the unfiltered list is the durable record for
-// fully-disposed items, readable via the snapshotted `itemName` below.
+// Read-only inventory history — newest first, optionally filtered to one
+// still-held item via ?inventoryItemId=. Reads CharacterEvent filtered to
+// category:"inventory", preserving the LedgerEntry response shape so the
+// existing LedgerModal frontend component keeps working.
+//
+// The per-item filter uses the polymorphic entityId column (same role as the
+// former inventoryItemId column on InventoryTransaction). The unfiltered list
+// remains the durable record for fully-disposed items via event.data.itemName.
 inventoryRouter.get("/characters/:id/inventory/transactions", async (req, res) => {
   const character = await prisma.character.findUnique({
     where: { id: req.params.id },
@@ -201,22 +204,29 @@ inventoryRouter.get("/characters/:id/inventory/transactions", async (req, res) =
   const inventoryItemId =
     typeof req.query.inventoryItemId === "string" ? req.query.inventoryItemId : undefined;
 
-  const transactions = await prisma.inventoryTransaction.findMany({
-    where: { characterId: character.id, ...(inventoryItemId ? { inventoryItemId } : {}) },
+  const events = await prisma.characterEvent.findMany({
+    where: {
+      characterId: character.id,
+      category: "inventory",
+      ...(inventoryItemId ? { entityId: inventoryItemId } : {}),
+    },
     orderBy: { createdAt: "desc" },
   });
 
-  res.json(
-    transactions.map((row) => ({
+  // Map to the LedgerEntry shape the frontend expects (unchanged from the
+  // former InventoryTransaction read endpoint).
+  res.json(events.map((row) => {
+    const data = (row.data ?? {}) as Record<string, unknown>;
+    return {
       id: row.id,
       type: row.type,
-      quantityDelta: row.quantityDelta,
-      currencyDelta: row.currencyDelta ?? undefined,
-      itemName: row.itemName,
-      inventoryItemId: row.inventoryItemId ?? undefined,
-      note: row.note ?? undefined,
+      quantityDelta: (data.quantityDelta ?? 0) as number,
+      currencyDelta: data.currencyDelta as object | undefined ?? undefined,
+      itemName: (data.itemName ?? row.summary) as string,
+      inventoryItemId: row.entityId ?? undefined,
+      note: undefined,
       batchId: row.batchId ?? undefined,
       createdAt: row.createdAt,
-    }))
-  );
+    };
+  }));
 });

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "../generated/prisma/client.js";
+import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
 
 // Same {cp,sp,gp,pp} shape as Character.currency and Item/InventoryItem.cost.
@@ -355,28 +356,17 @@ export function buildInventoryCreateFromCatalog(
   };
 }
 
-interface LogParams {
-  characterId: string;
-  inventoryItemId: string | null;
-  itemName: string;
-  type: "acquired" | "consumed" | "sold" | "bought" | "removed";
-  quantityDelta: number;
-  currencyDelta?: Currency | null;
-  batchId: string;
-}
-
-async function logTransaction(tx: Prisma.TransactionClient, params: LogParams) {
-  await tx.inventoryTransaction.create({
-    data: {
-      characterId: params.characterId,
-      inventoryItemId: params.inventoryItemId,
-      itemName: params.itemName,
-      type: params.type,
-      quantityDelta: params.quantityDelta,
-      currencyDelta: toJsonInput(params.currencyDelta ?? null),
-      batchId: params.batchId,
-    },
-  });
+/** Formats a currency delta as "+7 gp" / "−5 gp 2 sp" for event summaries. */
+function formatCurrencyForSummary(delta: Currency | null | undefined): string | null {
+  if (!delta) return null;
+  const parts: string[] = [];
+  const sign = (delta.pp > 0 || delta.gp > 0 || delta.sp > 0 || delta.cp > 0) ? "+" : "−";
+  if (delta.pp !== 0) parts.push(`${Math.abs(delta.pp)} pp`);
+  if (delta.gp !== 0) parts.push(`${Math.abs(delta.gp)} gp`);
+  if (delta.sp !== 0) parts.push(`${Math.abs(delta.sp)} sp`);
+  if (delta.cp !== 0) parts.push(`${Math.abs(delta.cp)} cp`);
+  if (parts.length === 0) return null;
+  return `${sign}${parts.join(" ")}`;
 }
 
 async function applyAcquire(
@@ -452,13 +442,22 @@ async function applyAcquire(
     await setCharacterCurrency(tx, characterId, currencyDebit(currency, currencyDelta));
   }
 
-  await logTransaction(tx, {
+  const eventType = currencyDelta ? "bought" : "acquired";
+  const storedDelta = currencyDelta ? negate(currencyDelta) : null;
+  const currencyText = formatCurrencyForSummary(storedDelta);
+  const summary = eventType === "bought"
+    ? `Bought ${created.name} ×${quantity}${currencyText ? ` (${currencyText})` : ""}`
+    : `Acquired ${created.name} ×${quantity}`;
+  await logEvent(tx, {
     characterId,
-    inventoryItemId: created.id,
-    itemName: created.name,
-    type: currencyDelta ? "bought" : "acquired",
-    quantityDelta: quantity,
-    currencyDelta: currencyDelta ? negate(currencyDelta) : null,
+    category: "inventory",
+    type: eventType,
+    summary,
+    entityType: "InventoryItem",
+    entityId: created.id,
+    before: null,
+    after: { id: created.id, name: created.name, quantity, category: created.category },
+    data: { itemName: created.name, quantityDelta: quantity, currencyDelta: storedDelta },
     batchId,
   });
 }
@@ -475,13 +474,19 @@ async function applyAdjustQuantity(
     throw new InvalidInventoryOperationError(`Cannot reduce ${item.name} below zero`);
   }
 
-  await logTransaction(tx, {
+  const adjType = op.delta > 0 ? "acquired" : "consumed";
+  await logEvent(tx, {
     characterId,
-    inventoryItemId: item.id,
-    itemName: item.name,
-    type: op.delta > 0 ? "acquired" : "consumed",
-    quantityDelta: op.delta,
-    currencyDelta: null,
+    category: "inventory",
+    type: adjType,
+    summary: adjType === "acquired"
+      ? `Acquired ${item.name} ×${op.delta}`
+      : `Consumed ${item.name} ×${Math.abs(op.delta)}`,
+    entityType: "InventoryItem",
+    entityId: item.id,
+    before: { quantity: item.quantity },
+    after: nextQuantity === 0 ? null : { quantity: nextQuantity },
+    data: { itemName: item.name, quantityDelta: op.delta },
     batchId,
   });
 
@@ -530,13 +535,16 @@ async function applyRemove(
 ) {
   const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
 
-  await logTransaction(tx, {
+  await logEvent(tx, {
     characterId,
-    inventoryItemId: item.id,
-    itemName: item.name,
+    category: "inventory",
     type: "removed",
-    quantityDelta: -item.quantity,
-    currencyDelta: null,
+    summary: `Removed ${item.name}`,
+    entityType: "InventoryItem",
+    entityId: item.id,
+    before: { name: item.name, quantity: item.quantity, category: item.category },
+    after: null,
+    data: { itemName: item.name, quantityDelta: -item.quantity },
     batchId,
   });
 
@@ -553,13 +561,18 @@ async function applySell(tx: Prisma.TransactionClient, characterId: string, op: 
   const currency = await getCharacterCurrency(tx, characterId);
   await setCharacterCurrency(tx, characterId, currencyCredit(currency, op.currencyDelta));
 
-  await logTransaction(tx, {
+  const sellCurrencyText = formatCurrencyForSummary(op.currencyDelta);
+  const remaining = item.quantity - quantitySold;
+  await logEvent(tx, {
     characterId,
-    inventoryItemId: item.id,
-    itemName: item.name,
+    category: "inventory",
     type: "sold",
-    quantityDelta: -quantitySold,
-    currencyDelta: op.currencyDelta,
+    summary: `Sold ${item.name} ×${quantitySold}${sellCurrencyText ? ` (${sellCurrencyText})` : ""}`,
+    entityType: "InventoryItem",
+    entityId: item.id,
+    before: { quantity: item.quantity },
+    after: remaining === 0 ? null : { quantity: remaining },
+    data: { itemName: item.name, quantityDelta: -quantitySold, currencyDelta: op.currencyDelta },
     batchId,
   });
 

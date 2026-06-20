@@ -48,11 +48,11 @@ model Character {
   spellcasting Json?
   journal      Json
 
-  raceSelection         CharacterRace?
-  backgroundSelection   CharacterBackground?
-  classEntries          CharacterClassEntry[]
-  inventoryItems        InventoryItem[]
-  inventoryTransactions InventoryTransaction[]
+  raceSelection       CharacterRace?
+  backgroundSelection CharacterBackground?
+  classEntries        CharacterClassEntry[]
+  inventoryItems      InventoryItem[]
+  events              CharacterEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -284,7 +284,6 @@ model InventoryItem {
   weaponDetail     InventoryWeaponDetail?
   armorDetail      InventoryArmorDetail?
   consumableDetail InventoryConsumableDetail?
-  transactions     InventoryTransaction[]
 }
 
 // Same shape as ItemWeaponDetail, owned by InventoryItem instead of Item.
@@ -343,33 +342,107 @@ model InventoryConsumableDetail {
   effectDescription String?
 }
 
-enum InventoryTxnType {
+// ── Unified character activity log ──────────────────────────────────────────
+//
+// All meaningful state changes (inventory, HP, XP, currency, and future
+// domains) are written here, in the same DB transaction as the state change
+// itself. This is an append-only audit log — NOT event sourcing. The
+// Character row stays the source of truth; these events sit beside it.
+//
+// Three patterns at work:
+//  1. Single-Table Inheritance (category + type discriminators) — one table,
+//     one ORDER BY createdAt query, no merging anywhere. Adding a new domain
+//     = adding enum values, not new tables.
+//  2. Polymorphic soft-reference (entityType + entityId, no FK) — points at
+//     whatever row the event concerns (InventoryItem, etc.) without a hard FK
+//     that breaks on deletion. Enables the per-item filter on the ledger view.
+//  3. before/after JSON snapshots — "old value / new value" for field-level
+//     audit; also the data needed for undo (Phase 4) without replaying
+//     anything. CharacterEventField rows are derived from the diff at write time.
+//
+// Historical InventoryTransaction rows were migrated in on first deploy;
+// the InventoryTransaction table and InventoryTxnType enum were dropped then.
+
+enum CharacterEventCategory {
+  inventory
+  hitPoints
+  experience
+  currency
+  // future: journal, spells, conditions
+}
+
+enum CharacterEventType {
+  // inventory (mirrors the former InventoryTxnType)
   acquired
   consumed
   sold
   bought
   removed
+  // hitPoints
+  damage
+  heal
+  setTemp
+  shortRest
+  longRest
+  levelUp
+  levelDown
+  deathSave
+  stabilize
+  // experience
+  xpAward
+  xpSet
+  // currency
+  currencyAdjust
+  // meta
+  revert
 }
 
-// Ledger of economic/consumption events only — acquired/consumed/sold/
-// bought/removed — written by POST /api/characters/:id/inventory/
-// transactions (backend/src/lib/inventory.ts). Cosmetic edits (rename,
-// notes, equip-toggle, weapon/armor/consumable detail tweaks) are NOT
-// logged here; see the `update` operation's comment in lib/inventory.ts.
-// itemName is a snapshot so an entry stays readable after the
-// InventoryItem it references is deleted (inventoryItemId goes null via
-// SetNull, but the row and its currencyDelta remain).
-model InventoryTransaction {
-  id              String           @id @default(uuid())
-  characterId     String
-  character       Character        @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  inventoryItemId String?
-  inventoryItem   InventoryItem?   @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
-  itemName        String
-  type            InventoryTxnType
-  quantityDelta   Int
-  currencyDelta   Json? // signed {cp,sp,gp,pp}
-  note            String?
-  batchId         String? // groups the operations from one request together
-  createdAt       DateTime         @default(now())
+model CharacterEvent {
+  id          String                 @id @default(uuid())
+  characterId String
+  character   Character              @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  category    CharacterEventCategory
+  type        CharacterEventType
+  // Human-readable snapshot of the action, e.g. "Leveled up to 7 (+9 HP)" or
+  // "Sold Shortsword ×1 (+7 gp)". Stored so the timeline renders correctly
+  // even if op semantics change in a future version.
+  summary     String
+  // Polymorphic soft-reference — no FK, so the event survives deletion of the
+  // referenced row. entityType = "InventoryItem", entityId = the row's id.
+  entityType  String?
+  entityId    String?
+  // Full snapshot of the affected sub-state before and after the op.
+  // Null for historical rows backfilled from InventoryTransaction (no data).
+  // For undo: restoring `before` reverses any event that carries it.
+  before      Json?
+  after       Json?
+  // Op-specific inputs that aren't derivable from before/after alone, e.g.
+  // method/roll/conMod for levelUp, itemName/currencyDelta for inventory.
+  data        Json?
+  // Future-proofs multi-user "who performed this action" — single-player
+  // today, so always "player".
+  actor       String                 @default("player")
+  // Set true when this event has been compensated via a `revert` meta-event.
+  // The reverted row is never deleted — history is append-only.
+  reverted    Boolean                @default(false)
+  batchId     String?
+  createdAt   DateTime               @default(now())
+
+  fields CharacterEventField[]
+
+  @@index([characterId, createdAt])
+  @@index([entityType, entityId])
+}
+
+// Per-field diff rows derived from before/after at write time — the
+// "field-level" layer of the "both layers" granularity choice. Each row
+// records one changed leaf path (e.g. "hitPoints.max"), its old value, and
+// its new value. Cascades with the parent event.
+model CharacterEventField {
+  id       String         @id @default(uuid())
+  eventId  String
+  event    CharacterEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  path     String         // e.g. "hitPoints.max", "currency.gp", "quantity"
+  oldValue Json?
+  newValue Json?
 }

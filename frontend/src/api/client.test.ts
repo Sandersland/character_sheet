@@ -90,11 +90,11 @@ describe("updateCharacter", () => {
   it("sends a PATCH with a JSON body and returns the updated character", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ id: "1", experiencePoints: 1300 }),
+      json: async () => ({ id: "1", currency: { cp: 0, sp: 0, gp: 50, pp: 0 } }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await updateCharacter("1", { experiencePoints: 1300 });
+    await updateCharacter("1", { currency: { cp: 0, sp: 0, gp: 50, pp: 0 } });
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/characters/1"),
@@ -105,7 +105,7 @@ describe("updateCharacter", () => {
   it("throws on a non-ok response", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 400 }));
 
-    await expect(updateCharacter("1", { experiencePoints: -1 })).rejects.toThrow();
+    await expect(updateCharacter("1", {})).rejects.toThrow();
   });
 });
 

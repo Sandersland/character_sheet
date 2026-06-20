@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { fetchCharacter } from "../api/client";
 import AbilityScoreBox from "../components/AbilityScoreBox";
+import ActivityModal from "../components/ActivityModal";
 import BackendStatus from "../components/BackendStatus";
 import Badge from "../components/Badge";
 import Card from "../components/Card";
@@ -45,6 +46,7 @@ export default function CharacterSheetPage() {
   const { id } = useParams();
   const { character, error, setCharacter } = useCharacter(id);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
 
   if (error) {
     return (
@@ -125,13 +127,22 @@ export default function CharacterSheetPage() {
           </div>
           <div className="flex flex-col items-end gap-2">
             <BackendStatus />
-            <button
-              type="button"
-              onClick={() => setConfirmDeleteOpen(true)}
-              className="text-xs font-semibold text-[var(--color-garnet-700)] hover:underline"
-            >
-              Delete character
-            </button>
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={() => setActivityOpen(true)}
+                className="text-xs font-semibold text-[var(--color-arcane-700)] hover:underline"
+              >
+                Activity
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteOpen(true)}
+                className="text-xs font-semibold text-[var(--color-garnet-700)] hover:underline"
+              >
+                Delete character
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -141,6 +152,14 @@ export default function CharacterSheetPage() {
           characterId={character.id}
           characterName={character.name}
           onClose={() => setConfirmDeleteOpen(false)}
+        />
+      )}
+
+      {activityOpen && (
+        <ActivityModal
+          characterId={character.id}
+          onClose={() => setActivityOpen(false)}
+          onUpdate={setCharacter}
         />
       )}
 

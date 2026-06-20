@@ -252,9 +252,10 @@ describe("GET /api/characters/:id/inventory/transactions", () => {
       itemName: TEST_ITEM.name,
       quantityDelta: -1,
     });
-    // omitted (undefined), not null, matching serializeInventoryItem's
-    // convention elsewhere — the row genuinely no longer exists.
-    expect(response.body[0].inventoryItemId).toBeUndefined();
+    // With soft-reference semantics, entityId (mapped → inventoryItemId in the
+    // response) is set at event-write time and is NOT nulled when the item row
+    // is later deleted. The ID is preserved for per-item history lookups.
+    expect(response.body[0].inventoryItemId).toBeDefined();
     expect(response.body[1]).toMatchObject({ type: "acquired", itemName: TEST_ITEM.name, quantityDelta: 1 });
   });
 

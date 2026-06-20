@@ -1,5 +1,8 @@
+import { randomUUID } from "node:crypto";
+
 import { Prisma } from "../generated/prisma/client.js";
 import { levelForExperience } from "./experience.js";
+import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
 import { abilityModifier, hitDieFace } from "./srd.js";
 
@@ -196,11 +199,17 @@ export type HitPointOperation =
  * Applies a batch of HP operations atomically in one Prisma transaction.
  * State is re-read from the DB per op so a batch of N levelUp ops applies
  * sequentially (each sees the updated total/max/current from the previous).
+ * Every meaningful op writes a CharacterEvent (with field-level diffs) in
+ * the same transaction so history and state are always consistent.
  */
 export async function applyHitPointOperations(
   characterId: string,
   operations: HitPointOperation[]
 ): Promise<void> {
+  // One batchId groups all ops in this request on the activity timeline,
+  // same as inventory uses (lib/inventory.ts → applyInventoryOperations).
+  const batchId = randomUUID();
+
   await prisma.$transaction(async (tx) => {
     for (const op of operations) {
       const row = await tx.character.findUnique({
@@ -227,6 +236,16 @@ export async function applyHitPointOperations(
       const conMod = abilityModifier(abilityScores.constitution ?? 10);
       const faces = hitDieFace(hd.die);
 
+      // Snapshot the full sub-state before this op so the event can show
+      // both before/after and the per-field diffs. For levelUp, include the
+      // class-entry level since the op mutates that too.
+      const primaryEntry = row.classEntries[0];
+      const beforeHp = { ...hp };
+      const beforeHd = { ...hd };
+      const beforeClassLevel = primaryEntry?.level ?? null;
+      let eventData: Record<string, unknown> = {};
+      let summary = "";
+
       switch (op.type) {
         case "damage": {
           if (op.amount <= 0) {
@@ -238,6 +257,8 @@ export async function applyHitPointOperations(
           hp.current = Math.max(0, hp.current - (op.amount - absorbed));
           // Note: massive-damage instant-death (remaining damage ≥ max at 0) is
           // intentionally out of scope for this phase.
+          eventData = { amount: op.amount };
+          summary = `Took ${op.amount} damage (${beforeHp.current} → ${hp.current} HP)`;
           break;
         }
 
@@ -251,6 +272,8 @@ export async function applyHitPointOperations(
             hp.deathSaves = { successes: 0, failures: 0 };
           }
           hp.current = Math.min(hp.max, hp.current + op.amount);
+          eventData = { amount: op.amount };
+          summary = `Healed ${op.amount} HP (${beforeHp.current} → ${hp.current} HP)`;
           break;
         }
 
@@ -260,6 +283,8 @@ export async function applyHitPointOperations(
           }
           // 5e: temp HP doesn't stack — take the higher value.
           hp.temp = Math.max(hp.temp, op.amount);
+          eventData = { amount: op.amount };
+          summary = `Set temporary HP to ${op.amount}`;
           break;
         }
 
@@ -279,16 +304,23 @@ export async function applyHitPointOperations(
           const totalGain = op.rolls.reduce((sum, roll) => sum + hitDieHeal(roll, conMod), 0);
           hp.current = Math.min(hp.max, hp.current + totalGain);
           hd.spent += spending;
+          eventData = { rolls: op.rolls, totalGain, conMod };
+          summary = `Short rest — spent ${spending} hit ${spending === 1 ? "die" : "dice"}: +${totalGain} HP`;
           break;
         }
 
         case "longRest": {
+          const prevCurrent = hp.current;
           hp.current = hp.max;
           hp.temp = 0;
           hp.deathSaves = { successes: 0, failures: 0 };
           // Recover hit dice equal to half your total (round down, min 1).
           const recovered = Math.max(1, Math.floor(hd.total / 2));
           hd.spent = Math.max(0, hd.spent - recovered);
+          eventData = { recovered, hpRestored: hp.max - prevCurrent };
+          summary = prevCurrent < hp.max
+            ? `Long rest — HP fully restored (+${hp.max - prevCurrent} HP)`
+            : `Long rest — HP already full`;
           break;
         }
 
@@ -314,13 +346,26 @@ export async function applyHitPointOperations(
           // Repair the position-0 class entry's `level` to match the newly-applied
           // total. The seed defaults all entries to level 1 even for level-7 chars;
           // this self-heals that on the first real level-up.
-          const primaryEntry = row.classEntries[0];
           if (primaryEntry) {
             await tx.characterClassEntry.update({
               where: { id: primaryEntry.id },
               data: { level: hd.total },
             });
           }
+
+          // Store enough data to exactly reverse this level-up later (Phase 4
+          // undo) or when XP is lowered (auto-reverse in experience-ops.ts).
+          eventData = {
+            method: op.method,
+            roll: op.roll ?? null,
+            conMod,
+            faces,
+            hpGain: gain,
+            primaryEntryId: primaryEntry?.id ?? null,
+            prevEntryLevel: beforeClassLevel,
+            newEntryLevel: hd.total,
+          };
+          summary = `Leveled up to ${hd.total} (+${gain} HP)`;
           break;
         }
 
@@ -338,6 +383,11 @@ export async function applyHitPointOperations(
           const result = applyDeathSaveRoll(hp.deathSaves, hp.current, op.roll);
           hp.deathSaves = result.deathSaves;
           hp.current = result.current;
+          eventData = { roll: op.roll };
+          const ds = hp.deathSaves;
+          summary = op.roll === 20
+            ? `Death save: natural 20 — regained consciousness`
+            : `Death save: rolled ${op.roll} (${ds.successes} success${ds.successes !== 1 ? "es" : ""}, ${ds.failures} failure${ds.failures !== 1 ? "s" : ""})`;
           break;
         }
 
@@ -348,6 +398,8 @@ export async function applyHitPointOperations(
             );
           }
           hp.deathSaves = { successes: 0, failures: 0 };
+          eventData = {};
+          summary = "Stabilized";
           break;
         }
       }
@@ -358,6 +410,26 @@ export async function applyHitPointOperations(
           hitPoints: hp as unknown as Prisma.InputJsonValue,
           hitDice: hd as unknown as Prisma.InputJsonValue,
         },
+      });
+
+      // Build the before/after sub-state snapshots. levelUp also captures the
+      // class-entry level because the op mutates that outside the JSON columns.
+      const beforeState: Record<string, unknown> = { hitPoints: beforeHp, hitDice: beforeHd };
+      const afterState: Record<string, unknown> = { hitPoints: { ...hp }, hitDice: { ...hd } };
+      if (op.type === "levelUp") {
+        beforeState.classEntryLevel = beforeClassLevel;
+        afterState.classEntryLevel = hd.total;
+      }
+
+      await logEvent(tx, {
+        characterId,
+        category: "hitPoints",
+        type: op.type,
+        summary,
+        before: beforeState,
+        after: afterState,
+        data: eventData,
+        batchId,
       });
     }
   });

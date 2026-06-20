@@ -262,10 +262,9 @@ export type LedgerEntryType = "acquired" | "consumed" | "sold" | "bought" | "rem
 
 /**
  * One row from `GET /api/characters/:id/inventory/transactions` — the
- * read-only ledger written by the operations above. `itemName` is a
- * snapshot, so an entry stays readable even after `inventoryItemId`'s row
- * is gone (sold/consumed/removed) — that's why `inventoryItemId` is
- * undefined for those: the durable record is `itemName`, not the FK.
+ * read-only inventory ledger. Shape is unchanged from before the unified
+ * CharacterEvent table migration; the backend maps CharacterEvent fields back
+ * to this shape so LedgerModal keeps working.
  */
 export interface LedgerEntry {
   id: string;
@@ -277,6 +276,49 @@ export interface LedgerEntry {
   note?: string;
   batchId?: string;
   createdAt: string;
+}
+
+// ── Unified activity timeline ─────────────────────────────────────────────────
+
+export type CharacterEventCategory = "inventory" | "hitPoints" | "experience" | "currency";
+
+export type CharacterEventType =
+  | "acquired" | "consumed" | "sold" | "bought" | "removed"  // inventory
+  | "damage" | "heal" | "setTemp" | "shortRest" | "longRest" // hitPoints
+  | "levelUp" | "levelDown" | "deathSave" | "stabilize"      // hitPoints (cont.)
+  | "xpAward" | "xpSet"                                       // experience
+  | "currencyAdjust"                                           // currency
+  | "revert";                                                  // meta
+
+export interface CharacterEventField {
+  id: string;
+  path: string;
+  oldValue?: unknown;
+  newValue?: unknown;
+}
+
+/**
+ * One row from `GET /api/characters/:id/activity` — the unified event log
+ * that covers all domains (inventory, HP, XP, currency) in a single
+ * chronological stream. `summary` is a human-readable snapshot rendered
+ * at write time. `before`/`after` carry the affected sub-state for field
+ * diffs and undo. `fields` is included only when `?includeFields=1`.
+ */
+export interface CharacterEvent {
+  id: string;
+  category: CharacterEventCategory;
+  type: CharacterEventType;
+  summary: string;
+  entityType?: string;
+  entityId?: string;
+  before?: unknown;
+  after?: unknown;
+  data?: unknown;
+  actor: string;
+  reverted: boolean;
+  batchId?: string;
+  createdAt: string;
+  fields?: CharacterEventField[];
 }
 
 export type SpellSchool =
@@ -481,6 +523,15 @@ export interface CreateCharacterInput {
   skillProficiencies?: SkillName[];
   startingEquipment?: StartingEquipmentInput;
 }
+
+// ── XP operation types (mirrors backend/src/lib/experience-ops.ts) ──────────
+// Sent as `{ operations: ExperienceOperation[] }` to POST /api/characters/:id/experience.
+
+/** Award or deduct XP by a signed delta. */
+export interface XpAwardOperation { type: "award"; amount: number }
+/** Set total XP to an exact value. */
+export interface XpSetOperation { type: "set"; value: number }
+export type ExperienceOperation = XpAwardOperation | XpSetOperation;
 
 // ── HP operation types (mirrors backend/src/lib/hitpoints.ts) ───────────────
 // Sent as `{ operations: HitPointOperation[] }` to POST /api/characters/:id/hp.

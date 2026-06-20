@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { fetchLedger } from "../api/client";
+import { formatBatchDate, groupByBatch } from "../lib/timeline";
 import type { Currency, LedgerEntry, LedgerEntryType } from "../types/character";
 import Badge from "./Badge";
 import Modal from "./Modal";
@@ -36,35 +37,7 @@ function formatCurrencyDelta(delta: Currency | undefined): string | null {
   return `${isCredit ? "+" : "−"}${parts.join(" ")}`;
 }
 
-function formatBatchDate(iso: string): string {
-  const date = new Date(iso);
-  if (date.toDateString() === new Date().toDateString()) return "Today";
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-interface Batch {
-  key: string;
-  createdAt: string;
-  rows: LedgerEntry[];
-}
-
-/** Entries arrive newest-first already; grouping by first occurrence of a
- * batchId preserves that order across groups. */
-function groupByBatch(entries: LedgerEntry[]): Batch[] {
-  const batches: Batch[] = [];
-  const indexByKey = new Map<string, number>();
-  for (const entry of entries) {
-    const key = entry.batchId ?? entry.id;
-    const existingIndex = indexByKey.get(key);
-    if (existingIndex !== undefined) {
-      batches[existingIndex].rows.push(entry);
-    } else {
-      indexByKey.set(key, batches.length);
-      batches.push({ key, createdAt: entry.createdAt, rows: [entry] });
-    }
-  }
-  return batches;
-}
+// formatBatchDate and groupByBatch are imported from ../lib/timeline
 
 /**
  * The read-only transaction ledger — one modal shared by both the

@@ -101,19 +101,21 @@ describe("applyInventoryOperations", () => {
     await prisma.character.deleteMany({ where: { id: { in: [characterAId, characterBId] } } });
   });
 
-  it("acquire (free) creates a row and logs an 'acquired' transaction", async () => {
+  it("acquire (free) creates a row and logs an 'acquired' event", async () => {
     await applyInventoryOperations(characterAId, [{ type: "acquire", itemId, quantity: 2 }]);
 
     const items = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({ name: "Lib Test Club", quantity: 2, itemId });
 
-    const transactions = await prisma.inventoryTransaction.findMany({ where: { characterId: characterAId } });
-    expect(transactions).toHaveLength(1);
-    expect(transactions[0]).toMatchObject({ type: "acquired", quantityDelta: 2, inventoryItemId: items[0].id });
+    const events = await prisma.characterEvent.findMany({ where: { characterId: characterAId, category: "inventory" } });
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe("acquired");
+    expect(events[0].entityId).toBe(items[0].id);
+    expect((events[0].data as Record<string, unknown>).quantityDelta).toBe(2);
   });
 
-  it("acquire with a currencyDelta debits currency and logs 'bought'", async () => {
+  it("acquire with a currencyDelta debits currency and logs 'bought' event", async () => {
     await applyInventoryOperations(characterAId, [
       { type: "acquire", itemId, quantity: 1, currencyDelta: { cp: 0, sp: 1, gp: 0, pp: 0 } },
     ]);
@@ -121,8 +123,9 @@ describe("applyInventoryOperations", () => {
     const character = await prisma.character.findUniqueOrThrow({ where: { id: characterAId } });
     expect(character.currency).toEqual({ cp: 0, sp: 4, gp: 10, pp: 0 });
 
-    const [transaction] = await prisma.inventoryTransaction.findMany({ where: { characterId: characterAId } });
-    expect(transaction).toMatchObject({ type: "bought", currencyDelta: { cp: 0, sp: -1, gp: 0, pp: 0 } });
+    const [event] = await prisma.characterEvent.findMany({ where: { characterId: characterAId, category: "inventory" } });
+    expect(event.type).toBe("bought");
+    expect((event.data as Record<string, unknown>).currencyDelta).toEqual({ cp: 0, sp: -1, gp: 0, pp: 0 });
   });
 
   it("rolls back the whole batch when a debit is unaffordable", async () => {
@@ -149,12 +152,16 @@ describe("applyInventoryOperations", () => {
     const items = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
     expect(items).toHaveLength(0);
 
-    const transactions = await prisma.inventoryTransaction.findMany({
-      where: { characterId: characterAId },
+    const events = await prisma.characterEvent.findMany({
+      where: { characterId: characterAId, category: "inventory" },
       orderBy: { createdAt: "asc" },
     });
-    expect(transactions).toHaveLength(2);
-    expect(transactions[1]).toMatchObject({ type: "consumed", quantityDelta: -1, inventoryItemId: null, itemName: "Lib Test Club" });
+    expect(events).toHaveLength(2);
+    // entityId is the item ID at event-write time (soft ref — no SetNull cascade)
+    expect(events[1].type).toBe("consumed");
+    expect(events[1].entityId).toBe(created.id);
+    expect((events[1].data as Record<string, unknown>).itemName).toBe("Lib Test Club");
+    expect((events[1].data as Record<string, unknown>).quantityDelta).toBe(-1);
   });
 
   it("update edits cosmetic fields and a weapon override without logging a transaction", async () => {
@@ -173,8 +180,8 @@ describe("applyInventoryOperations", () => {
     expect(updated.weaponDetail?.damageModifier).toBe(1);
     expect(updated.weaponDetail?.damageDiceFaces).toBe(4); // untouched fields survive a partial update
 
-    const transactions = await prisma.inventoryTransaction.findMany({ where: { characterId: characterAId } });
-    expect(transactions).toHaveLength(1); // just the original acquire — update is cosmetic, not logged
+    const events = await prisma.characterEvent.findMany({ where: { characterId: characterAId, category: "inventory" } });
+    expect(events).toHaveLength(1); // just the original acquire — update is cosmetic, not logged
   });
 
   it("remove deletes the row outright and logs 'removed'", async () => {
@@ -186,11 +193,12 @@ describe("applyInventoryOperations", () => {
     const items = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
     expect(items).toHaveLength(0);
 
-    const transactions = await prisma.inventoryTransaction.findMany({
-      where: { characterId: characterAId },
+    const events = await prisma.characterEvent.findMany({
+      where: { characterId: characterAId, category: "inventory" },
       orderBy: { createdAt: "asc" },
     });
-    expect(transactions[1]).toMatchObject({ type: "removed", quantityDelta: -3 });
+    expect(events[1].type).toBe("removed");
+    expect((events[1].data as Record<string, unknown>).quantityDelta).toBe(-3);
   });
 
   it("sell decrements a partial stack and credits currency, logging 'sold'", async () => {

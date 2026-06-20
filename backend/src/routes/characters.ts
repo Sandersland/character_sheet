@@ -1,8 +1,11 @@
+import { randomUUID } from "node:crypto";
+
 import { Router } from "express";
 import { z } from "zod";
 
 import { Prisma } from "../generated/prisma/client.js";
 import { experienceProgress, levelForExperience } from "../lib/experience.js";
+import { logEvent } from "../lib/events.js";
 import {
   serializeArmorDetail,
   serializeConsumableDetail,
@@ -499,13 +502,20 @@ charactersRouter.post("/characters", async (req, res) => {
 // instead of silently ignoring it. inventory is absent too, for a different
 // reason: it's now InventoryItem rows, not a Json column, so a blind
 // full-array PATCH can't express intent (acquired vs. consumed vs. sold) —
-// see POST /api/characters/:id/inventory/transactions (Phase B) instead.
+// see POST /api/characters/:id/inventory/transactions instead.
+//
+// experiencePoints is also absent here — XP changes must go through
+// POST /api/characters/:id/experience (routes/experience.ts) so they are
+// logged to the activity timeline and auto-reverse HP on level-down.
+//
+// currency IS still patchable here (a bare DM-handed-over amount isn't
+// economically categorised as a buy/sell/etc.); the handler writes a
+// currencyAdjust event in the same transaction.
 const updateCharacterSchema = z
   .object({
     name: z.string().min(1),
     alignment: z.string().min(1),
     portraitUrl: z.string().nullable(),
-    experiencePoints: z.number().int().nonnegative(),
     armorClass: z.number().int(),
     initiativeBonus: z.number().int(),
     speed: z.number().int().nonnegative(),
@@ -553,7 +563,7 @@ charactersRouter.patch("/characters/:id", async (req, res) => {
 
   const existing = await prisma.character.findUnique({
     where: { id: req.params.id },
-    select: { id: true },
+    select: { id: true, currency: true },
   });
 
   if (!existing) {
@@ -561,13 +571,48 @@ charactersRouter.patch("/characters/:id", async (req, res) => {
     return;
   }
 
-  const updated = await prisma.character.update({
-    where: { id: req.params.id },
-    data: parseResult.data as Prisma.CharacterUpdateInput,
-    include: characterInclude,
-  });
+  // If currency is changing, log a currencyAdjust event in the same
+  // transaction so the activity timeline records bare DM-handed-over amounts.
+  let updated: Awaited<ReturnType<typeof prisma.character.findUnique>> & object;
+  const patchData = parseResult.data as Prisma.CharacterUpdateInput;
 
-  res.json(serializeCharacter(updated));
+  if (parseResult.data.currency) {
+    const oldCurrency = existing.currency as Record<string, number>;
+    const newCurrency = parseResult.data.currency as Record<string, number>;
+    // Build a one-line delta summary, e.g. "+5 gp −2 sp"
+    const parts: string[] = [];
+    for (const denom of ["pp", "gp", "sp", "cp"] as const) {
+      const diff = (newCurrency[denom] ?? 0) - (oldCurrency[denom] ?? 0);
+      if (diff !== 0) parts.push(`${diff > 0 ? "+" : ""}${diff} ${denom}`);
+    }
+    const summary = parts.length > 0 ? `Currency adjusted (${parts.join(", ")})` : "Currency adjusted";
+
+    updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.character.update({
+        where: { id: req.params.id },
+        data: patchData,
+        include: characterInclude,
+      });
+      await logEvent(tx, {
+        characterId: req.params.id,
+        category: "currency",
+        type: "currencyAdjust",
+        summary,
+        before: { currency: oldCurrency },
+        after: { currency: newCurrency },
+        batchId: randomUUID(),
+      });
+      return result;
+    });
+  } else {
+    updated = await prisma.character.update({
+      where: { id: req.params.id },
+      data: patchData,
+      include: characterInclude,
+    }) as typeof updated;
+  }
+
+  res.json(serializeCharacter(updated as Parameters<typeof serializeCharacter>[0]));
 });
 
 charactersRouter.delete("/characters/:id", async (req, res) => {
@@ -582,8 +627,8 @@ charactersRouter.delete("/characters/:id", async (req, res) => {
   }
 
   // All child relations (CharacterRace, CharacterBackground, CharacterClassEntry,
-  // InventoryItem, InventoryTransaction, and their detail grandchildren) are
-  // onDelete: Cascade in the schema, so a single delete is fully atomic.
+  // InventoryItem, CharacterEvent/CharacterEventField, and their grandchildren)
+  // are onDelete: Cascade in the schema, so a single delete is fully atomic.
   await prisma.character.delete({ where: { id: req.params.id } });
   res.status(204).end();
 });
