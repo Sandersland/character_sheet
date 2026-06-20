@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # Keep this in sync with the image in docker-compose.yml
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: character_sheet
+          POSTGRES_PASSWORD: character_sheet
+          POSTGRES_DB: character_sheet
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U character_sheet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://character_sheet:character_sheet@localhost:5432/character_sheet
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Prisma generate / migrate / seed
+        working-directory: backend
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+          npx prisma db seed
+
+      - run: npm run lint
+
+      - run: npm test
