@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { fetchCharacter } from "@/api/client";
 import AbilityScoreBox from "@/features/abilities/AbilityScoreBox";
 import ActivityModal from "@/features/character-meta/ActivityModal";
 import BackendStatus from "@/features/character-meta/BackendStatus";
@@ -15,32 +14,8 @@ import JournalSection from "@/features/character-meta/JournalSection";
 import SkillsTable from "@/features/abilities/SkillsTable";
 import SpellsSection from "@/features/spells/SpellsSection";
 import VitalsStrip from "@/features/character-meta/VitalsStrip";
+import { useCharacter } from "@/hooks/useCharacter";
 import { ABILITY_LABELS } from "@/lib/abilities";
-import type { Character } from "@/types/character";
-
-function useCharacter(id: string | undefined) {
-  const [character, setCharacter] = useState<Character | null | undefined>(undefined);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    if (!id) return;
-    let mounted = true;
-    setCharacter(undefined);
-    setError(false);
-    fetchCharacter(id)
-      .then((data) => {
-        if (mounted) setCharacter(data);
-      })
-      .catch(() => {
-        if (mounted) setError(true);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [id]);
-
-  return { character, error, setCharacter };
-}
 
 export default function CharacterSheetPage() {
   const { id } = useParams();

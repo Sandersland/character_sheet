@@ -1,32 +1,8 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { fetchCharacters } from "@/api/client";
 import BackendStatus from "@/features/character-meta/BackendStatus";
 import CharacterCard from "@/features/character-meta/CharacterCard";
-import type { CharacterSummary } from "@/types/character";
-
-function useCharacterList() {
-  const [characters, setCharacters] = useState<CharacterSummary[] | null>(null);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    setError(false);
-    fetchCharacters()
-      .then((data) => {
-        if (mounted) setCharacters(data);
-      })
-      .catch(() => {
-        if (mounted) setError(true);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  return { characters, error };
-}
+import { useCharacterList } from "@/hooks/useCharacterList";
 
 function NewCharacterCard() {
   return (
