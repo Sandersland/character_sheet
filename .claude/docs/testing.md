@@ -4,20 +4,25 @@
 
 ```bash
 # All tests (both workspaces):
+docker compose up db -d
 npm run test
 
 # Backend only (needs Postgres running):
 docker compose up db -d
-cd backend && DATABASE_URL="postgresql://character_sheet:character_sheet@localhost:5432/character_sheet" npx vitest run
+npm run test -w backend
 
 # Single backend test file:
-cd backend && DATABASE_URL="postgresql://character_sheet:character_sheet@localhost:5432/character_sheet" npx vitest run src/routes/__tests__/spellcasting.test.ts
+cd backend && npx vitest run src/routes/__tests__/spellcasting.test.ts
 
 # Frontend (no DB needed):
 cd frontend && npx vitest run
 ```
 
-> **Critical**: `DATABASE_URL` must be set **in the same command** as `vitest`. A separate `cd` then `export DATABASE_URL` does not propagate correctly when the two commands are chained differently — use `cd backend && DATABASE_URL=… npx vitest` on one line.
+> **Local setup**: `backend/.env` must exist and contain `DATABASE_URL`. Copy it from
+> `.env.example` on a fresh clone: `cp .env.example backend/.env`. The vitest config
+> (`backend/vitest.config.ts`) reads this file automatically via Vite's `loadEnv`, so
+> no manual env-var export is needed. In CI, set `DATABASE_URL` as a real environment
+> variable and it will take precedence over the file.
 
 ## Backend test structure
 
