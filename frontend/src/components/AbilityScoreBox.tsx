@@ -21,19 +21,19 @@ export default function AbilityScoreBox({
   const modifier = abilityModifier(score);
 
   return (
-    <div className="flex flex-col items-center rounded-[var(--radius-card)] border border-[var(--color-parchment-200)] bg-[var(--color-parchment-50)] px-3 py-2.5 shadow-[var(--shadow-card)]">
-      <span className="font-sans text-[11px] font-semibold uppercase tracking-wide text-[var(--color-parchment-500)]">
+    <div className="flex flex-col items-center rounded-card border border-parchment-200 bg-parchment-50 px-3 py-2.5 shadow-card">
+      <span className="font-sans text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
         {label}
       </span>
-      <span className="mt-1 font-display text-2xl font-semibold leading-none text-[var(--color-garnet-800)]">
+      <span className="mt-1 font-display text-2xl font-semibold leading-none text-garnet-800">
         {formatModifier(modifier)}
       </span>
-      <span className="mt-1.5 rounded-full border border-[var(--color-parchment-300)] bg-[var(--color-parchment-100)] px-2 py-0.5 text-xs tabular-nums text-[var(--color-parchment-700)]">
+      <span className="mt-1.5 rounded-full border border-parchment-300 bg-parchment-100 px-2 py-0.5 text-xs tabular-nums text-parchment-700">
         {score}
       </span>
       {saveProficient && (
         <span
-          className="mt-1 h-1.5 w-1.5 rounded-full bg-[var(--color-arcane-500)]"
+          className="mt-1 h-1.5 w-1.5 rounded-full bg-arcane-500"
           title="Proficient saving throw"
           aria-label="Proficient saving throw"
         />

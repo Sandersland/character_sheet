@@ -80,16 +80,16 @@ export default function Modal({ title, onClose, children }: ModalProps) {
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="flex max-h-[80vh] w-full max-w-[36rem] flex-col rounded-[var(--radius-card)] border border-[var(--color-parchment-200)] bg-[var(--color-parchment-50)] shadow-[var(--shadow-raised)]"
+        className="flex max-h-[80vh] w-full max-w-[36rem] flex-col rounded-card border border-parchment-200 bg-parchment-50 shadow-raised"
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--color-parchment-200)] px-4 py-3">
-          <h2 id={titleId} className="font-display text-lg font-semibold text-[var(--color-parchment-900)]">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-parchment-200 px-4 py-3">
+          <h2 id={titleId} className="font-display text-lg font-semibold text-parchment-900">
             {title}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="text-xs font-semibold text-[var(--color-garnet-700)] hover:underline"
+            className="text-xs font-semibold text-garnet-700 hover:underline"
           >
             Close
           </button>

@@ -65,22 +65,22 @@ export default function ExperienceTracker({
     <Card
       title="Experience"
       titleAccessory={
-        <span className="text-xs font-semibold text-[var(--color-parchment-500)]">
+        <span className="text-xs font-semibold text-parchment-500">
           Level {level}
         </span>
       }
     >
       <div className="flex flex-col gap-3 p-4">
         <div className="flex items-baseline justify-between">
-          <p className="font-display text-xl font-semibold leading-none text-[var(--color-arcane-800)]">
+          <p className="font-display text-xl font-semibold leading-none text-arcane-800">
             {experiencePoints.toLocaleString()}
-            <span className="text-sm font-normal text-[var(--color-parchment-500)]">
+            <span className="text-sm font-normal text-parchment-500">
               {" "}
               XP{!isMaxed && ` / ${nextLevelThreshold.toLocaleString()}`}
             </span>
           </p>
           {isMaxed && (
-            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-gold-700)]">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gold-700">
               Max level
             </span>
           )}
@@ -98,7 +98,7 @@ export default function ExperienceTracker({
         />
 
         <div className="flex flex-wrap items-end gap-3 pt-1">
-          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-parchment-500)]">
+          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
             Set total XP
             <input
               type="number"
@@ -106,19 +106,19 @@ export default function ExperienceTracker({
               step={1}
               value={setValue}
               onChange={(e) => setSetValue(e.target.value)}
-              className="w-28 rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] px-2 py-1 text-sm tabular-nums text-[var(--color-parchment-900)]"
+              className="w-28 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm tabular-nums text-parchment-900"
             />
           </label>
           <button
             type="button"
             disabled={pending}
             onClick={() => submitSet(Number(setValue))}
-            className="rounded-[var(--radius-control)] bg-[var(--color-arcane-700)] px-3 py-1.5 text-sm font-semibold text-[var(--color-parchment-50)] transition-colors hover:bg-[var(--color-arcane-800)] disabled:opacity-50"
+            className="rounded-control bg-arcane-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-arcane-800 disabled:opacity-50"
           >
             Set
           </button>
 
-          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-parchment-500)]">
+          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
             Award XP
             <input
               type="number"
@@ -127,21 +127,21 @@ export default function ExperienceTracker({
               value={awardValue}
               onChange={(e) => setAwardValue(e.target.value)}
               placeholder="e.g. 450"
-              className="w-28 rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] px-2 py-1 text-sm tabular-nums text-[var(--color-parchment-900)]"
+              className="w-28 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm tabular-nums text-parchment-900"
             />
           </label>
           <button
             type="button"
             disabled={pending || !awardValue}
             onClick={() => submitAward(Number(awardValue))}
-            className="rounded-[var(--radius-control)] bg-[var(--color-garnet-700)] px-3 py-1.5 text-sm font-semibold text-[var(--color-parchment-50)] transition-colors hover:bg-[var(--color-garnet-800)] disabled:opacity-50"
+            className="rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
           >
             Add
           </button>
         </div>
 
         {error && (
-          <p className="text-xs font-semibold text-[var(--color-garnet-700)]">
+          <p className="text-xs font-semibold text-garnet-700">
             Couldn't save — try again.
           </p>
         )}

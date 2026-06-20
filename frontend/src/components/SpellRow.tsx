@@ -89,7 +89,7 @@ export default function SpellRow({
           <div className="flex flex-wrap items-baseline gap-2">
             <button
               type="button"
-              className="text-left text-sm font-medium text-[var(--color-parchment-900)] hover:underline"
+              className="text-left text-sm font-medium text-parchment-900 hover:underline"
               onClick={() => setExpanded((e) => !e)}
               aria-expanded={expanded}
             >
@@ -103,7 +103,7 @@ export default function SpellRow({
             </div>
           </div>
           {effect && (
-            <p className="text-xs text-[var(--color-parchment-500)]">{effect}</p>
+            <p className="text-xs text-parchment-500">{effect}</p>
           )}
         </div>
 
@@ -117,8 +117,8 @@ export default function SpellRow({
               onClick={() => onPrepare(spell)}
               className={`rounded px-2 py-0.5 text-xs font-semibold transition-colors disabled:opacity-40 ${
                 spell.prepared
-                  ? "bg-[var(--color-arcane-100)] text-[var(--color-arcane-800)] hover:bg-[var(--color-arcane-200)]"
-                  : "bg-[var(--color-parchment-100)] text-[var(--color-parchment-500)] hover:bg-[var(--color-parchment-200)]"
+                  ? "bg-arcane-100 text-arcane-800 hover:bg-arcane-200"
+                  : "bg-parchment-100 text-parchment-500 hover:bg-parchment-200"
               }`}
               title={spell.prepared ? "Mark as unprepared" : "Mark as prepared"}
             >
@@ -131,7 +131,7 @@ export default function SpellRow({
             type="button"
             disabled={busy}
             onClick={handleCastClick}
-            className="rounded bg-[var(--color-garnet-600)] px-2.5 py-0.5 text-xs font-semibold text-white hover:bg-[var(--color-garnet-700)] disabled:opacity-40"
+            className="rounded bg-garnet-600 px-2.5 py-0.5 text-xs font-semibold text-white hover:bg-garnet-700 disabled:opacity-40"
             title={isCantrip ? `Cast ${spell.name}` : `Cast ${spell.name} (choose slot)`}
           >
             Cast
@@ -142,7 +142,7 @@ export default function SpellRow({
             type="button"
             disabled={busy}
             onClick={() => onForget(spell)}
-            className="text-[var(--color-parchment-400)] hover:text-[var(--color-garnet-600)] disabled:opacity-40"
+            className="text-parchment-400 hover:text-garnet-600 disabled:opacity-40"
             title={`Remove ${spell.name} from spellbook`}
             aria-label={`Remove ${spell.name}`}
           >
@@ -154,7 +154,7 @@ export default function SpellRow({
       {/* Slot picker (for leveled spells with multiple available slot levels) */}
       {slotPickerOpen && !isCantrip && (
         <div className="mt-2 flex flex-wrap gap-2">
-          <span className="text-xs text-[var(--color-parchment-500)]">Cast with slot:</span>
+          <span className="text-xs text-parchment-500">Cast with slot:</span>
           {availableSlots.map((slotLevel) => (
             <button
               key={slotLevel}
@@ -164,7 +164,7 @@ export default function SpellRow({
                 setSlotPickerOpen(false);
                 onCast(spell, slotLevel);
               }}
-              className="rounded bg-[var(--color-arcane-100)] px-2 py-0.5 text-xs font-semibold text-[var(--color-arcane-800)] hover:bg-[var(--color-arcane-200)] disabled:opacity-40"
+              className="rounded bg-arcane-100 px-2 py-0.5 text-xs font-semibold text-arcane-800 hover:bg-arcane-200 disabled:opacity-40"
             >
               L{slotLevel}
             </button>
@@ -172,7 +172,7 @@ export default function SpellRow({
           <button
             type="button"
             onClick={() => setSlotPickerOpen(false)}
-            className="text-xs text-[var(--color-parchment-400)] hover:text-[var(--color-parchment-700)]"
+            className="text-xs text-parchment-400 hover:text-parchment-700"
           >
             cancel
           </button>
@@ -181,21 +181,21 @@ export default function SpellRow({
 
       {/* Expand: description + stats */}
       {expanded && (
-        <div className="mt-2 space-y-1 rounded-[var(--radius-control)] bg-[var(--color-parchment-50)] p-3">
-          <p className="text-xs text-[var(--color-parchment-500)]">
+        <div className="mt-2 space-y-1 rounded-control bg-parchment-50 p-3">
+          <p className="text-xs text-parchment-500">
             {spell.castingTime} · {spell.range} · {spell.duration}
           </p>
           {spell.attackType && (
-            <p className="text-xs text-[var(--color-parchment-500)]">
+            <p className="text-xs text-parchment-500">
               {spell.attackType === "attack" ? "Ranged/melee spell attack" : `${spell.saveAbility ?? "—"} saving throw`}
             </p>
           )}
           {spell.upcastDicePerLevel && (
-            <p className="text-xs text-[var(--color-arcane-700)]">
+            <p className="text-xs text-arcane-700">
               Upcast: +{spell.upcastDicePerLevel}d{spell.effectDiceFaces ?? "?"} per slot level above {spell.level}
             </p>
           )}
-          <p className="text-sm text-[var(--color-parchment-700)]">{spell.description}</p>
+          <p className="text-sm text-parchment-700">{spell.description}</p>
         </div>
       )}
     </li>

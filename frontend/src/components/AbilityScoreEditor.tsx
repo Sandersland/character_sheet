@@ -149,10 +149,10 @@ export default function AbilityScoreEditor({
             key={value}
             type="button"
             onClick={() => selectMethod(value)}
-            className={`rounded-[var(--radius-control)] border px-3 py-1.5 text-xs font-semibold transition-colors ${
+            className={`rounded-control border px-3 py-1.5 text-xs font-semibold transition-colors ${
               method === value
-                ? "border-[var(--color-arcane-500)] bg-[var(--color-arcane-50)] text-[var(--color-arcane-800)]"
-                : "border-[var(--color-parchment-300)] text-[var(--color-parchment-600)] hover:border-[var(--color-arcane-400)]"
+                ? "border-arcane-500 bg-arcane-50 text-arcane-800"
+                : "border-parchment-300 text-parchment-600 hover:border-arcane-400"
             }`}
           >
             {label}
@@ -166,12 +166,12 @@ export default function AbilityScoreEditor({
             <button
               type="button"
               onClick={rollPool}
-              className="rounded-[var(--radius-control)] bg-[var(--color-garnet-700)] px-3 py-1.5 text-sm font-semibold text-[var(--color-parchment-50)] transition-colors hover:bg-[var(--color-garnet-800)]"
+              className="rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800"
             >
               {pool ? "Re-roll" : "Roll scores"}
             </button>
             {pool && (
-              <span className="text-xs text-[var(--color-parchment-600)]">
+              <span className="text-xs text-parchment-600">
                 Assign each below.
               </span>
             )}
@@ -191,7 +191,7 @@ export default function AbilityScoreEditor({
       )}
 
       {method === "pointBuy" && (
-        <p className="text-xs font-semibold text-[var(--color-parchment-600)]">
+        <p className="text-xs font-semibold text-parchment-600">
           {remainingPoints} of {POINT_BUY_BUDGET} points remaining
         </p>
       )}
@@ -207,9 +207,9 @@ export default function AbilityScoreEditor({
           return (
             <div
               key={ability}
-              className="flex flex-col gap-1.5 rounded-[var(--radius-card)] border border-[var(--color-parchment-200)] bg-[var(--color-parchment-50)] p-3"
+              className="flex flex-col gap-1.5 rounded-card border border-parchment-200 bg-parchment-50 p-3"
             >
-              <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-parchment-500)]">
+              <span className="text-xs font-semibold uppercase tracking-wide text-parchment-500">
                 {ABILITY_LABELS[ability]}
               </span>
 
@@ -219,7 +219,7 @@ export default function AbilityScoreEditor({
                   onChange={(e) =>
                     assignSlot(ability, e.target.value === "" ? null : Number(e.target.value))
                   }
-                  className="rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] px-2 py-1 text-sm"
+                  className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm"
                 >
                   <option value="">—</option>
                   {pool.map(
@@ -237,7 +237,7 @@ export default function AbilityScoreEditor({
                     type="button"
                     onClick={() => adjustPointBuy(ability, -1)}
                     disabled={abilityScores[ability] <= POINT_BUY_FLOOR}
-                    className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-parchment-300)] text-sm leading-none disabled:opacity-40"
+                    className="flex h-6 w-6 items-center justify-center rounded-full border border-parchment-300 text-sm leading-none disabled:opacity-40"
                   >
                     −
                   </button>
@@ -252,7 +252,7 @@ export default function AbilityScoreEditor({
                       pointBuyCost(abilityScores[ability] + 1) - pointBuyCost(abilityScores[ability]) >
                         remainingPoints
                     }
-                    className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-parchment-300)] text-sm leading-none disabled:opacity-40"
+                    className="flex h-6 w-6 items-center justify-center rounded-full border border-parchment-300 text-sm leading-none disabled:opacity-40"
                   >
                     +
                   </button>
@@ -262,11 +262,11 @@ export default function AbilityScoreEditor({
                   type="number"
                   value={abilityScores[ability]}
                   onChange={(e) => setManualScore(ability, e.target.value)}
-                  className="w-20 rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] px-2 py-1 text-sm tabular-nums"
+                  className="w-20 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm tabular-nums"
                 />
               )}
 
-              <span className="text-xs text-[var(--color-parchment-500)]">
+              <span className="text-xs text-parchment-500">
                 Modifier {formatModifier(abilityModifier(abilityScores[ability]))}
               </span>
             </div>

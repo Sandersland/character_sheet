@@ -9,11 +9,11 @@ interface BadgeProps {
 }
 
 const TONE_CLASSES: Record<BadgeTone, string> = {
-  garnet: "bg-[var(--color-garnet-50)] text-[var(--color-garnet-800)]",
-  arcane: "bg-[var(--color-arcane-50)] text-[var(--color-arcane-800)]",
-  gold: "bg-[var(--color-gold-50)] text-[var(--color-gold-800)]",
-  vitality: "bg-[var(--color-vitality-50)] text-[var(--color-vitality-800)]",
-  neutral: "bg-[var(--color-parchment-100)] text-[var(--color-parchment-700)]",
+  garnet: "bg-garnet-50 text-garnet-800",
+  arcane: "bg-arcane-50 text-arcane-800",
+  gold: "bg-gold-50 text-gold-800",
+  vitality: "bg-vitality-50 text-vitality-800",
+  neutral: "bg-parchment-100 text-parchment-700",
 };
 
 /**

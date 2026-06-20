@@ -118,18 +118,18 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
     onLearn({ type: "learnSpell", custom: payload });
   }
 
-  const inputCls = "w-full rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-white px-2.5 py-1.5 text-sm text-[var(--color-parchment-900)] placeholder:text-[var(--color-parchment-400)] focus:border-[var(--color-arcane-500)] focus:outline-none";
-  const labelCls = "block text-xs font-semibold text-[var(--color-parchment-700)]";
+  const inputCls = "w-full rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-arcane-500 focus:outline-none";
+  const labelCls = "block text-xs font-semibold text-parchment-700";
 
   return (
-    <div className="mt-3 rounded-[var(--radius-card)] border border-[var(--color-arcane-200)] bg-[var(--color-arcane-50)] p-4">
+    <div className="mt-3 rounded-card border border-arcane-200 bg-arcane-50 p-4">
       {/* Panel header */}
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-[var(--color-arcane-900)]">Learn a Spell</h3>
+        <h3 className="text-sm font-semibold text-arcane-900">Learn a Spell</h3>
         <button
           type="button"
           onClick={onClose}
-          className="text-[var(--color-parchment-400)] hover:text-[var(--color-parchment-700)]"
+          className="text-parchment-400 hover:text-parchment-700"
           aria-label="Close add spell panel"
         >
           ✕
@@ -137,7 +137,7 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
       </div>
 
       {/* Tab switcher */}
-      <div className="mb-4 flex gap-2 border-b border-[var(--color-arcane-200)] pb-2">
+      <div className="mb-4 flex gap-2 border-b border-arcane-200 pb-2">
         {(["catalog", "custom"] as const).map((t) => (
           <button
             key={t}
@@ -145,8 +145,8 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
             onClick={() => setTab(t)}
             className={`px-3 py-1 text-xs font-semibold transition-colors ${
               tab === t
-                ? "border-b-2 border-[var(--color-arcane-600)] text-[var(--color-arcane-800)]"
-                : "text-[var(--color-parchment-500)] hover:text-[var(--color-parchment-800)]"
+                ? "border-b-2 border-arcane-600 text-arcane-800"
+                : "text-parchment-500 hover:text-parchment-800"
             }`}
           >
             {t === "catalog" ? "From catalog" : "Custom spell"}
@@ -177,13 +177,13 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
           </div>
 
           {catalogError && (
-            <p className="text-xs text-[var(--color-garnet-700)]">{catalogError}</p>
+            <p className="text-xs text-garnet-700">{catalogError}</p>
           )}
           {catalog === null && !catalogError && (
-            <p className="text-xs text-[var(--color-parchment-500)]">Loading…</p>
+            <p className="text-xs text-parchment-500">Loading…</p>
           )}
           {catalog !== null && filteredCatalog.length === 0 && (
-            <p className="py-2 text-center text-xs text-[var(--color-parchment-500)]">No spells match your filter.</p>
+            <p className="py-2 text-center text-xs text-parchment-500">No spells match your filter.</p>
           )}
 
           <ul className="max-h-[320px] overflow-y-auto">
@@ -192,19 +192,19 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
               return (
                 <li
                   key={spell.id}
-                  className="flex items-center justify-between gap-3 border-b border-[var(--color-arcane-100)] py-2 last:border-0"
+                  className="flex items-center justify-between gap-3 border-b border-arcane-100 py-2 last:border-0"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-[var(--color-parchment-900)]">
+                    <p className="truncate text-sm font-medium text-parchment-900">
                       {spell.name}
                     </p>
-                    <p className="text-xs text-[var(--color-parchment-500)]">
+                    <p className="text-xs text-parchment-500">
                       {spell.level === 0 ? "Cantrip" : `Level ${spell.level}`} · {spell.school}
                       {spell.concentration && " · conc"}
                       {spell.ritual && " · ritual"}
                     </p>
                     {spell.effectKind && (
-                      <p className="text-xs text-[var(--color-arcane-700)]">
+                      <p className="text-xs text-arcane-700">
                         {spell.effectKind === "heal" ? "Healing" : `${spell.damageType ?? ""} damage`}
                         {" — "}
                         {spell.effectDiceCount}d{spell.effectDiceFaces}
@@ -216,7 +216,7 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
                     type="button"
                     disabled={busy || alreadyKnown}
                     onClick={() => handleCatalogLearn(spell)}
-                    className="shrink-0 rounded bg-[var(--color-arcane-600)] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[var(--color-arcane-700)] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="shrink-0 rounded bg-arcane-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-arcane-700 disabled:cursor-not-allowed disabled:opacity-40"
                     title={alreadyKnown ? "Already in your spellbook" : `Learn ${spell.name}`}
                   >
                     {alreadyKnown ? "Known" : "Learn"}
@@ -303,7 +303,7 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
             </div>
 
             <div className="flex gap-4">
-              <label className="flex items-center gap-1.5 text-xs text-[var(--color-parchment-700)]">
+              <label className="flex items-center gap-1.5 text-xs text-parchment-700">
                 <input
                   type="checkbox"
                   checked={!!custom.concentration}
@@ -311,7 +311,7 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
                 />
                 Concentration
               </label>
-              <label className="flex items-center gap-1.5 text-xs text-[var(--color-parchment-700)]">
+              <label className="flex items-center gap-1.5 text-xs text-parchment-700">
                 <input
                   type="checkbox"
                   checked={!!custom.ritual}
@@ -335,8 +335,8 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
           </div>
 
           {/* Optional effect fields (enables auto-rolling on cast) */}
-          <div className="rounded-[var(--radius-control)] border border-[var(--color-arcane-200)] p-3">
-            <label className="mb-2 flex items-center gap-2 text-xs font-semibold text-[var(--color-arcane-800)]">
+          <div className="rounded-control border border-arcane-200 p-3">
+            <label className="mb-2 flex items-center gap-2 text-xs font-semibold text-arcane-800">
               <input
                 type="checkbox"
                 checked={hasEffect}
@@ -398,7 +398,7 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
                 </div>
                 {custom.level === 0 && (
                   <div className="flex items-center gap-2">
-                    <label className="flex items-center gap-1.5 text-xs text-[var(--color-parchment-700)]">
+                    <label className="flex items-center gap-1.5 text-xs text-parchment-700">
                       <input type="checkbox" checked={!!custom.cantripScaling} onChange={(e) => setCustom((p) => ({ ...p, cantripScaling: e.target.checked }))} />
                       Cantrip scaling
                     </label>
@@ -409,13 +409,13 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
           </div>
 
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold text-[var(--color-parchment-600)] hover:text-[var(--color-parchment-900)]">
+            <button type="button" onClick={onClose} className="rounded-control px-3 py-1.5 text-xs font-semibold text-parchment-600 hover:text-parchment-900">
               Cancel
             </button>
             <button
               type="submit"
               disabled={busy || !custom.name.trim()}
-              className="rounded-[var(--radius-control)] bg-[var(--color-arcane-600)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--color-arcane-700)] disabled:opacity-40"
+              className="rounded-control bg-arcane-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-arcane-700 disabled:opacity-40"
             >
               {busy ? "Saving…" : "Add custom spell"}
             </button>

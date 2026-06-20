@@ -70,7 +70,7 @@ export default function LedgerModal({ characterId, inventoryItemId, itemName, on
   return (
     <Modal title="Transaction History" onClose={onClose}>
       <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2 text-xs text-[var(--color-parchment-600)]">
+        <div className="flex items-center gap-2 text-xs text-parchment-600">
           <span>Showing:</span>
           {filter ? (
             <Badge tone="neutral">
@@ -79,7 +79,7 @@ export default function LedgerModal({ characterId, inventoryItemId, itemName, on
                 type="button"
                 onClick={() => setFilter(null)}
                 aria-label="Clear filter"
-                className="ml-1 text-[var(--color-parchment-600)] hover:text-[var(--color-garnet-700)]"
+                className="ml-1 text-parchment-600 hover:text-garnet-700"
               >
                 ×
               </button>
@@ -89,14 +89,14 @@ export default function LedgerModal({ characterId, inventoryItemId, itemName, on
           )}
         </div>
 
-        {error && <p className="text-xs font-semibold text-[var(--color-garnet-700)]">{error}</p>}
+        {error && <p className="text-xs font-semibold text-garnet-700">{error}</p>}
 
         {entries === null && !error && (
-          <p className="text-sm text-[var(--color-parchment-500)]">Loading…</p>
+          <p className="text-sm text-parchment-500">Loading…</p>
         )}
 
         {entries !== null && entries.length === 0 && (
-          <p className="py-6 text-center text-sm text-[var(--color-parchment-500)]">
+          <p className="py-6 text-center text-sm text-parchment-500">
             No transactions yet. Acquiring, selling, or using items will record history here.
           </p>
         )}
@@ -104,7 +104,7 @@ export default function LedgerModal({ characterId, inventoryItemId, itemName, on
         <ul className="flex flex-col gap-3">
           {batches.map((batch) => (
             <li key={batch.key}>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-parchment-500)]">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
                 {formatBatchDate(batch.createdAt)}
               </p>
               <ul className="flex flex-col gap-1">
@@ -114,7 +114,7 @@ export default function LedgerModal({ characterId, inventoryItemId, itemName, on
                     <li key={entry.id} className="flex items-center justify-between gap-3 text-sm">
                       <span className="flex items-center gap-2">
                         <Badge tone={TYPE_TONE[entry.type]}>{entry.type}</Badge>
-                        <span className="text-[var(--color-parchment-900)]">
+                        <span className="text-parchment-900">
                           {entry.itemName} ×{Math.abs(entry.quantityDelta)}
                         </span>
                       </span>
@@ -122,8 +122,8 @@ export default function LedgerModal({ characterId, inventoryItemId, itemName, on
                         <span
                           className={`tabular-nums font-semibold ${
                             currencyText.startsWith("+")
-                              ? "text-[var(--color-vitality-700)]"
-                              : "text-[var(--color-garnet-700)]"
+                              ? "text-vitality-700"
+                              : "text-garnet-700"
                           }`}
                         >
                           {currencyText}

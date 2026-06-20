@@ -175,32 +175,32 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
   return (
     <div className="flex flex-col gap-5">
       {/* ── Stat bar: Save DC / Attack / Ability ── */}
-      <div className="flex flex-wrap items-center gap-4 rounded-[var(--radius-control)] bg-[var(--color-arcane-50)] px-4 py-3">
+      <div className="flex flex-wrap items-center gap-4 rounded-control bg-arcane-50 px-4 py-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-arcane-700)]">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-arcane-700">
             Spell Save DC
           </p>
-          <p className="font-display text-xl font-semibold text-[var(--color-arcane-900)]">
+          <p className="font-display text-xl font-semibold text-arcane-900">
             {spellSaveDC}
           </p>
         </div>
-        <div className="h-8 w-px bg-[var(--color-arcane-200)]" aria-hidden="true" />
+        <div className="h-8 w-px bg-arcane-200" aria-hidden="true" />
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-arcane-700)]">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-arcane-700">
             Spell Attack
           </p>
-          <p className="font-display text-xl font-semibold text-[var(--color-arcane-900)]">
+          <p className="font-display text-xl font-semibold text-arcane-900">
             {formatModifier(spellAttackBonus)}
           </p>
         </div>
-        <div className="h-8 w-px bg-[var(--color-arcane-200)]" aria-hidden="true" />
+        <div className="h-8 w-px bg-arcane-200" aria-hidden="true" />
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-arcane-700)]">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-arcane-700">
             Ability
           </p>
-          <p className="font-display text-xl font-semibold capitalize text-[var(--color-arcane-900)]">
+          <p className="font-display text-xl font-semibold capitalize text-arcane-900">
             {ability?.slice(0, 3).toUpperCase() ?? "—"}
-            <span className="ml-1 text-sm font-normal text-[var(--color-arcane-600)]">
+            <span className="ml-1 text-sm font-normal text-arcane-600">
               ({formatModifier(abilityMod)})
             </span>
           </p>
@@ -210,7 +210,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
       {/* ── Spell slot meters ── */}
       {slots.length > 0 && (
         <div>
-          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-parchment-500)]">
+          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
             Spell Slots
           </h3>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -218,7 +218,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
               const remaining = slot.total - slot.used;
               return (
                 <div key={slot.level}>
-                  <div className="mb-1 flex items-baseline justify-between text-xs text-[var(--color-parchment-600)]">
+                  <div className="mb-1 flex items-baseline justify-between text-xs text-parchment-600">
                     <span className="font-medium">Level {slot.level}</span>
                     <span className="tabular-nums">{remaining}/{slot.total}</span>
                   </div>
@@ -234,7 +234,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
                       type="button"
                       disabled={busy || remaining === 0}
                       onClick={() => handleExpendSlot(slot.level)}
-                      className="flex-1 rounded bg-[var(--color-arcane-100)] py-0.5 text-[11px] font-semibold text-[var(--color-arcane-700)] hover:bg-[var(--color-arcane-200)] disabled:opacity-30"
+                      className="flex-1 rounded bg-arcane-100 py-0.5 text-[11px] font-semibold text-arcane-700 hover:bg-arcane-200 disabled:opacity-30"
                       title={`Expend a level ${slot.level} slot`}
                     >
                       − use
@@ -244,7 +244,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
                       type="button"
                       disabled={busy || slot.used === 0}
                       onClick={() => handleRestoreSlot(slot.level)}
-                      className="flex-1 rounded bg-[var(--color-arcane-100)] py-0.5 text-[11px] font-semibold text-[var(--color-arcane-700)] hover:bg-[var(--color-arcane-200)] disabled:opacity-30"
+                      className="flex-1 rounded bg-arcane-100 py-0.5 text-[11px] font-semibold text-arcane-700 hover:bg-arcane-200 disabled:opacity-30"
                       title={`Restore a level ${slot.level} slot`}
                     >
                       + restore
@@ -260,10 +260,10 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
       {/* ── Inline cast result banner ── */}
       {castResult && (
         <div
-          className={`flex items-center justify-between rounded-[var(--radius-control)] px-4 py-3 ${
+          className={`flex items-center justify-between rounded-control px-4 py-3 ${
             castResult.effectKind === "heal"
-              ? "bg-[var(--color-vitality-50)] text-[var(--color-vitality-800)]"
-              : "bg-[var(--color-garnet-50)] text-[var(--color-garnet-800)]"
+              ? "bg-vitality-50 text-vitality-800"
+              : "bg-garnet-50 text-garnet-800"
           }`}
         >
           <div>
@@ -292,7 +292,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
 
       {/* ── Error banner ── */}
       {error && (
-        <p className="rounded-[var(--radius-control)] bg-[var(--color-garnet-50)] px-3 py-2 text-xs font-semibold text-[var(--color-garnet-700)]">
+        <p className="rounded-control bg-garnet-50 px-3 py-2 text-xs font-semibold text-garnet-700">
           {error}
         </p>
       )}
@@ -300,20 +300,20 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
       {/* ── Spell list ── */}
       <div>
         <div className="mb-1 flex items-center justify-between">
-          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-parchment-500)]">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
             Spellbook ({spells.length})
           </h3>
           {busy && (
-            <span className="text-[10px] text-[var(--color-parchment-400)]">Saving…</span>
+            <span className="text-[10px] text-parchment-400">Saving…</span>
           )}
         </div>
 
         {spells.length === 0 ? (
-          <p className="py-4 text-center text-sm text-[var(--color-parchment-400)]">
+          <p className="py-4 text-center text-sm text-parchment-400">
             No spells yet — add one below.
           </p>
         ) : (
-          <ul className="divide-y divide-[var(--color-parchment-200)]">
+          <ul className="divide-y divide-parchment-200">
             {sortedSpells.map((spell) => (
               <SpellRow
                 key={spell.id}
@@ -342,7 +342,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
         <button
           type="button"
           onClick={() => setAddPanelOpen(true)}
-          className="self-start rounded-[var(--radius-control)] border border-dashed border-[var(--color-arcane-300)] px-3 py-1.5 text-xs font-semibold text-[var(--color-arcane-700)] hover:border-[var(--color-arcane-500)] hover:bg-[var(--color-arcane-50)]"
+          className="self-start rounded-control border border-dashed border-arcane-300 px-3 py-1.5 text-xs font-semibold text-arcane-700 hover:border-arcane-500 hover:bg-arcane-50"
         >
           + Learn a spell
         </button>

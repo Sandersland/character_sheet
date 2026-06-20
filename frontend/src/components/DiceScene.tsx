@@ -42,7 +42,7 @@ export default function DiceScene({
       className={`flex flex-col items-center gap-1 ${className}`}
     >
       {label && (
-        <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-parchment-500)]">
+        <span className="text-xs font-semibold uppercase tracking-wide text-parchment-500">
           {label}
         </span>
       )}
@@ -80,7 +80,7 @@ export default function DiceScene({
       {showTotal && (
         <span
           aria-hidden={settledTotal === null}
-          className={`font-display text-2xl font-semibold leading-none tabular-nums text-[var(--color-garnet-800)] ${
+          className={`font-display text-2xl font-semibold leading-none tabular-nums text-garnet-800 ${
             settledTotal === null ? "invisible" : ""
           }`}
         >

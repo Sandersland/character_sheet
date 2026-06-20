@@ -22,11 +22,11 @@ export default function Card({
 }: CardProps) {
   return (
     <section
-      className={`rounded-[var(--radius-card)] border border-[var(--color-parchment-200)] bg-[var(--color-parchment-50)] shadow-[var(--shadow-card)] ${className}`}
+      className={`rounded-card border border-parchment-200 bg-parchment-50 shadow-card ${className}`}
     >
       {title && (
-        <div className="flex items-center justify-between gap-2 border-b border-[var(--color-parchment-200)] px-4 py-2.5">
-          <h3 className="font-sans text-xs font-semibold uppercase tracking-wide text-[var(--color-parchment-600)]">
+        <div className="flex items-center justify-between gap-2 border-b border-parchment-200 px-4 py-2.5">
+          <h3 className="font-sans text-xs font-semibold uppercase tracking-wide text-parchment-600">
             {title}
           </h3>
           {titleAccessory}

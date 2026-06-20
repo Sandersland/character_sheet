@@ -158,10 +158,10 @@ export default function DiceRollSequence({
           return (
             <span
               key={index}
-              className={`inline-flex h-8 w-10 items-center justify-center rounded-[var(--radius-control)] border font-display text-sm tabular-nums ${
+              className={`inline-flex h-8 w-10 items-center justify-center rounded-control border font-display text-sm tabular-nums ${
                 filled
-                  ? "border-[var(--color-arcane-400)] bg-[var(--color-arcane-50)] text-[var(--color-arcane-800)]"
-                  : "border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] text-[var(--color-parchment-800)]"
+                  ? "border-arcane-400 bg-arcane-50 text-arcane-800"
+                  : "border-parchment-300 bg-parchment-50 text-parchment-800"
               } ${justAdded ? "animate-[score-pop_0.45s_ease-out]" : ""}`}
             >
               {filled ? total : "–"}
@@ -192,7 +192,7 @@ export default function DiceRollSequence({
         onClick={() => setSkip(true)}
         aria-hidden={!inProgress}
         disabled={!inProgress}
-        className={`self-start text-xs font-semibold text-[var(--color-garnet-700)] hover:underline ${
+        className={`self-start text-xs font-semibold text-garnet-700 hover:underline ${
           inProgress ? "" : "invisible"
         }`}
       >

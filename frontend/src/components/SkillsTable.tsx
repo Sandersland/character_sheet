@@ -36,7 +36,7 @@ export default function SkillsTable({
     <table className="w-full table-fixed border-collapse text-sm">
       <caption className="sr-only">Skills and their modifiers</caption>
       <thead>
-        <tr className="text-left text-[11px] uppercase tracking-wide text-[var(--color-parchment-500)]">
+        <tr className="text-left text-[11px] uppercase tracking-wide text-parchment-500">
           <th scope="col" className="w-6 py-1.5 pl-4">
             <span className="sr-only">Proficient</span>
           </th>
@@ -65,16 +65,16 @@ export default function SkillsTable({
           return (
             <tr
               key={skill.name}
-              className="border-t border-[var(--color-parchment-200)]"
+              className="border-t border-parchment-200"
             >
               <td className="py-1.5 pl-4">
                 <span
                   className={`block h-2 w-2 rounded-full ${
                     skill.expertise
-                      ? "bg-[var(--color-gold-500)]"
+                      ? "bg-gold-500"
                       : skill.proficient
-                        ? "bg-[var(--color-garnet-500)]"
-                        : "bg-[var(--color-parchment-200)]"
+                        ? "bg-garnet-500"
+                        : "bg-parchment-200"
                   }`}
                   aria-hidden="true"
                 />
@@ -82,24 +82,24 @@ export default function SkillsTable({
               <td
                 className={`py-1.5 ${
                   isEmphasized
-                    ? "font-medium text-[var(--color-parchment-900)]"
-                    : "text-[var(--color-parchment-600)]"
+                    ? "font-medium text-parchment-900"
+                    : "text-parchment-600"
                 }`}
               >
                 {SKILL_LABELS[skill.name]}
                 {skill.expertise && (
-                  <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-gold-700)]">
+                  <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-gold-700">
                     Expertise
                   </span>
                 )}
               </td>
-              <td className="py-1.5 text-xs text-[var(--color-parchment-400)]">
+              <td className="py-1.5 text-xs text-parchment-400">
                 {ABILITY_ABBR[skill.ability]}{" "}
                 <span className="tabular-nums">
                   ({formatModifier(abilityModifier(score))})
                 </span>
               </td>
-              <td className="py-1.5 pr-4 text-right tabular-nums font-semibold text-[var(--color-parchment-900)]">
+              <td className="py-1.5 pr-4 text-right tabular-nums font-semibold text-parchment-900">
                 {formatModifier(bonus)}
               </td>
             </tr>

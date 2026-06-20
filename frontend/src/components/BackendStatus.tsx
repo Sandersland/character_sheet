@@ -24,10 +24,10 @@ export default function BackendStatus() {
 
   const dotColor =
     status === "ok"
-      ? "bg-[var(--color-vitality-500)]"
+      ? "bg-vitality-500"
       : status === "down"
-        ? "bg-[var(--color-garnet-500)]"
-        : "bg-[var(--color-parchment-400)]";
+        ? "bg-garnet-500"
+        : "bg-parchment-400";
 
   const text =
     status === "ok"
@@ -37,7 +37,7 @@ export default function BackendStatus() {
         : "Checking backend…";
 
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-[var(--color-parchment-500)]">
+    <span className="inline-flex items-center gap-1.5 text-xs text-parchment-500">
       <span
         className={`h-1.5 w-1.5 rounded-full ${dotColor}`}
         aria-hidden="true"

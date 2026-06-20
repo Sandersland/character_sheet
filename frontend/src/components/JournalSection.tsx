@@ -7,25 +7,25 @@ interface JournalSectionProps {
 export default function JournalSection({ entries }: JournalSectionProps) {
   if (entries.length === 0) {
     return (
-      <p className="px-4 py-6 text-center text-sm text-[var(--color-parchment-500)]">
+      <p className="px-4 py-6 text-center text-sm text-parchment-500">
         No journal entries yet. Notes from your sessions will show up here.
       </p>
     );
   }
 
   return (
-    <ul className="flex flex-col divide-y divide-[var(--color-parchment-200)]">
+    <ul className="flex flex-col divide-y divide-parchment-200">
       {entries.map((entry) => (
         <li key={entry.id} className="py-3">
           <div className="flex items-baseline justify-between gap-2">
-            <p className="font-display text-base font-semibold text-[var(--color-parchment-900)]">
+            <p className="font-display text-base font-semibold text-parchment-900">
               {entry.title}
             </p>
-            <span className="whitespace-nowrap text-xs text-[var(--color-parchment-500)]">
+            <span className="whitespace-nowrap text-xs text-parchment-500">
               {entry.date}
             </span>
           </div>
-          <p className="mt-1 text-sm text-[var(--color-parchment-700)]">
+          <p className="mt-1 text-sm text-parchment-700">
             {entry.body}
           </p>
         </li>

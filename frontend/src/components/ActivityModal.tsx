@@ -54,17 +54,17 @@ const TYPE_LABEL: Partial<Record<string, string>> = {
 function FieldDiffs({ fields }: { fields: CharacterEventField[] }) {
   if (fields.length === 0) return null;
   return (
-    <ul className="mt-1 flex flex-col gap-0.5 pl-4 text-xs text-[var(--color-parchment-500)]">
+    <ul className="mt-1 flex flex-col gap-0.5 pl-4 text-xs text-parchment-500">
       {fields.map((f) => (
         <li key={f.id}>
           <span className="font-mono">{f.path}</span>{" "}
           {f.oldValue !== undefined && (
             <span>
-              <span className="text-[var(--color-garnet-600)]">{JSON.stringify(f.oldValue)}</span>
+              <span className="text-garnet-600">{JSON.stringify(f.oldValue)}</span>
               {" → "}
             </span>
           )}
-          <span className="text-[var(--color-vitality-700)]">{JSON.stringify(f.newValue)}</span>
+          <span className="text-vitality-700">{JSON.stringify(f.newValue)}</span>
         </li>
       ))}
     </ul>
@@ -122,20 +122,20 @@ export default function ActivityModal({ characterId, onClose, onUpdate }: Activi
   return (
     <Modal title="Character Activity" onClose={onClose}>
       <div className="flex flex-col gap-3">
-        {error && <p className="text-xs font-semibold text-[var(--color-garnet-700)]">{error}</p>}
+        {error && <p className="text-xs font-semibold text-garnet-700">{error}</p>}
 
         {events === null && !error && (
-          <p className="text-sm text-[var(--color-parchment-500)]">Loading…</p>
+          <p className="text-sm text-parchment-500">Loading…</p>
         )}
 
         {events !== null && events.length === 0 && (
-          <p className="py-6 text-center text-sm text-[var(--color-parchment-500)]">
+          <p className="py-6 text-center text-sm text-parchment-500">
             No activity yet. Actions like gaining XP, taking damage, buying items, and leveling up will appear here.
           </p>
         )}
 
         {undoError && (
-          <p className="text-xs font-semibold text-[var(--color-garnet-700)]">{undoError}</p>
+          <p className="text-xs font-semibold text-garnet-700">{undoError}</p>
         )}
 
         <ul className="flex flex-col gap-4">
@@ -145,7 +145,7 @@ export default function ActivityModal({ characterId, onClose, onUpdate }: Activi
             return (
               <li key={batch.key}>
                 <div className="mb-1 flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-parchment-500)]">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-parchment-500">
                     {formatBatchDate(batch.createdAt)}
                   </p>
                   {isUndoable && (
@@ -153,7 +153,7 @@ export default function ActivityModal({ characterId, onClose, onUpdate }: Activi
                       type="button"
                       disabled={undoing}
                       onClick={() => handleUndo(batch.key)}
-                      className="text-xs font-semibold text-[var(--color-garnet-700)] hover:underline disabled:opacity-50"
+                      className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-50"
                     >
                       {undoing ? "Undoing…" : "Undo"}
                     </button>
@@ -174,7 +174,7 @@ export default function ActivityModal({ characterId, onClose, onUpdate }: Activi
                         <div className="flex items-start justify-between gap-3">
                           <span className="flex flex-wrap items-center gap-2">
                             <Badge tone={tone}>{label}</Badge>
-                            <span className="text-[var(--color-parchment-900)]">
+                            <span className="text-parchment-900">
                               {event.summary}
                             </span>
                             {event.reverted && (
@@ -185,7 +185,7 @@ export default function ActivityModal({ characterId, onClose, onUpdate }: Activi
                             <button
                               type="button"
                               onClick={() => toggleFields(event.id)}
-                              className="shrink-0 text-xs text-[var(--color-parchment-400)] hover:text-[var(--color-parchment-700)]"
+                              className="shrink-0 text-xs text-parchment-400 hover:text-parchment-700"
                               aria-label={expandedFields.has(event.id) ? "Hide field changes" : "Show field changes"}
                             >
                               {expandedFields.has(event.id) ? "▲" : "▼"}

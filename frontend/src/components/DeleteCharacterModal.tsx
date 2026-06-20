@@ -40,16 +40,16 @@ export default function DeleteCharacterModal({
   return (
     <Modal title="Delete character?" onClose={onClose}>
       <div className="flex flex-col gap-5">
-        <p className="text-sm text-[var(--color-parchment-700)]">
+        <p className="text-sm text-parchment-700">
           Permanently delete{" "}
-          <span className="font-semibold text-[var(--color-parchment-900)]">{characterName}</span>?{" "}
-          <span className="font-semibold text-[var(--color-garnet-700)]">
+          <span className="font-semibold text-parchment-900">{characterName}</span>?{" "}
+          <span className="font-semibold text-garnet-700">
             This can't be undone.
           </span>
         </p>
 
         {error && (
-          <p className="text-xs font-semibold text-[var(--color-garnet-700)]">{error}</p>
+          <p className="text-xs font-semibold text-garnet-700">{error}</p>
         )}
 
         <div className="flex items-center gap-4">
@@ -57,7 +57,7 @@ export default function DeleteCharacterModal({
             type="button"
             onClick={handleConfirm}
             disabled={pending}
-            className="rounded-[var(--radius-control)] bg-[var(--color-garnet-700)] px-4 py-2 text-sm font-semibold text-[var(--color-parchment-50)] transition-colors hover:bg-[var(--color-garnet-800)] disabled:opacity-50"
+            className="rounded-control bg-garnet-700 px-4 py-2 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
           >
             {pending ? "Deleting…" : "Delete"}
           </button>
@@ -65,7 +65,7 @@ export default function DeleteCharacterModal({
             type="button"
             onClick={onClose}
             disabled={pending}
-            className="text-sm font-semibold text-[var(--color-garnet-700)] hover:underline disabled:opacity-50"
+            className="text-sm font-semibold text-garnet-700 hover:underline disabled:opacity-50"
           >
             Cancel
           </button>

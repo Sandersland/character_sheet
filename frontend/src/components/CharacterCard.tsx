@@ -26,9 +26,9 @@ export default function CharacterCard({ character }: CharacterCardProps) {
   return (
     <Link
       to={`/characters/${character.id}`}
-      className="group flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-parchment-200)] bg-[var(--color-parchment-50)] shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-raised)] focus-visible:shadow-[var(--shadow-raised)]"
+      className="group flex flex-col overflow-hidden rounded-card border border-parchment-200 bg-parchment-50 shadow-card transition-shadow hover:shadow-raised focus-visible:shadow-raised"
     >
-      <div className="flex aspect-[4/3] items-center justify-center bg-gradient-to-br from-[var(--color-garnet-100)] to-[var(--color-parchment-200)]">
+      <div className="flex aspect-[4/3] items-center justify-center bg-gradient-to-br from-garnet-100 to-parchment-200">
         {character.portraitUrl ? (
           <img
             src={character.portraitUrl}
@@ -36,16 +36,16 @@ export default function CharacterCard({ character }: CharacterCardProps) {
             className="h-full w-full object-cover"
           />
         ) : (
-          <span className="font-display text-3xl font-semibold text-[var(--color-garnet-700)]">
+          <span className="font-display text-3xl font-semibold text-garnet-700">
             {initials(character.name)}
           </span>
         )}
       </div>
       <div className="flex flex-1 flex-col gap-2 p-4">
-        <h3 className="font-display text-lg font-semibold leading-tight text-[var(--color-parchment-900)] group-hover:text-[var(--color-garnet-700)]">
+        <h3 className="font-display text-lg font-semibold leading-tight text-parchment-900 group-hover:text-garnet-700">
           {character.name}
         </h3>
-        <p className="text-sm text-[var(--color-parchment-600)]">
+        <p className="text-sm text-parchment-600">
           {character.race} {character.class}
         </p>
         <div className="mt-auto pt-1">

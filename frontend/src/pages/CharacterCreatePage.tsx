@@ -231,20 +231,20 @@ export default function CharacterCreatePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-parchment-100)]">
-      <header className="border-b border-[var(--color-parchment-200)] bg-[var(--color-parchment-50)]">
+    <div className="min-h-screen bg-parchment-100">
+      <header className="border-b border-parchment-200 bg-parchment-50">
         <div className="mx-auto flex max-w-4xl flex-wrap items-start justify-between gap-4 px-6 py-5">
           <div>
             <Link
               to="/"
-              className="text-xs font-semibold text-[var(--color-garnet-700)] hover:underline"
+              className="text-xs font-semibold text-garnet-700 hover:underline"
             >
               ← All characters
             </Link>
-            <h1 className="mt-1 font-display text-3xl font-semibold text-[var(--color-parchment-900)]">
+            <h1 className="mt-1 font-display text-3xl font-semibold text-parchment-900">
               New Character
             </h1>
-            <p className="mt-1 text-sm text-[var(--color-parchment-600)]">
+            <p className="mt-1 text-sm text-parchment-600">
               Fill in what you know now — your progress is saved on this device
               until you press Save.
             </p>
@@ -256,33 +256,33 @@ export default function CharacterCreatePage() {
       <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
         {referenceError ? (
           <Card className="p-4">
-            <p className="text-sm text-[var(--color-garnet-700)]">
+            <p className="text-sm text-garnet-700">
               Couldn't load races/classes/backgrounds. Check that the backend is
               running and try refreshing.
             </p>
           </Card>
         ) : !reference ? (
-          <p className="text-sm text-[var(--color-parchment-600)]">Loading options…</p>
+          <p className="text-sm text-parchment-600">Loading options…</p>
         ) : (
           <>
             <Card title="Identity">
               <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
-                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-parchment-500)]">
+                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
                   Name
                   <input
                     type="text"
                     value={draft.name}
                     onChange={(e) => update({ name: e.target.value })}
-                    className="rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] px-2 py-1.5 text-sm font-normal normal-case text-[var(--color-parchment-900)]"
+                    className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
                   />
                 </label>
 
-                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-parchment-500)]">
+                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
                   Alignment
                   <select
                     value={draft.alignment}
                     onChange={(e) => update({ alignment: e.target.value })}
-                    className="rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] px-2 py-1.5 text-sm font-normal normal-case text-[var(--color-parchment-900)]"
+                    className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
                   >
                     <option value="">Select alignment…</option>
                     {reference.alignments.map((alignment) => (
@@ -293,12 +293,12 @@ export default function CharacterCreatePage() {
                   </select>
                 </label>
 
-                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-parchment-500)]">
+                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
                   Race
                   <select
                     value={draft.race}
                     onChange={(e) => update({ race: e.target.value })}
-                    className="rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] px-2 py-1.5 text-sm font-normal normal-case text-[var(--color-parchment-900)]"
+                    className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
                   >
                     <option value="">Select race…</option>
                     {reference.races.map((race) => (
@@ -309,7 +309,7 @@ export default function CharacterCreatePage() {
                   </select>
                 </label>
 
-                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-parchment-500)]">
+                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
                   Class
                   <select
                     value={draft.className}
@@ -329,7 +329,7 @@ export default function CharacterCreatePage() {
                             : null,
                       });
                     }}
-                    className="rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] px-2 py-1.5 text-sm font-normal normal-case text-[var(--color-parchment-900)]"
+                    className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
                   >
                     <option value="">Select class…</option>
                     {reference.classes.map((characterClass) => (
@@ -340,18 +340,18 @@ export default function CharacterCreatePage() {
                   </select>
                 </label>
 
-                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-parchment-500)]">
+                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
                   Subclass (optional)
                   <input
                     type="text"
                     value={draft.subclass}
                     onChange={(e) => update({ subclass: e.target.value })}
                     placeholder="e.g. School of Evocation"
-                    className="rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] px-2 py-1.5 text-sm font-normal normal-case text-[var(--color-parchment-900)]"
+                    className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
                   />
                 </label>
 
-                <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-parchment-500)]">
+                <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
                   Background
                   {draft.useCustomBackground ? (
                     <div className="flex gap-2">
@@ -360,12 +360,12 @@ export default function CharacterCreatePage() {
                         value={draft.customBackground}
                         onChange={(e) => update({ customBackground: e.target.value })}
                         placeholder="Invent your own…"
-                        className="flex-1 rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] px-2 py-1.5 text-sm font-normal normal-case text-[var(--color-parchment-900)]"
+                        className="flex-1 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
                       />
                       <button
                         type="button"
                         onClick={() => update({ useCustomBackground: false, customBackground: "" })}
-                        className="rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] px-2 text-xs font-semibold normal-case text-[var(--color-parchment-600)]"
+                        className="rounded-control border border-parchment-300 px-2 text-xs font-semibold normal-case text-parchment-600"
                       >
                         Use list
                       </button>
@@ -375,7 +375,7 @@ export default function CharacterCreatePage() {
                       <select
                         value={draft.background}
                         onChange={(e) => update({ background: e.target.value, skillProficiencies: [] })}
-                        className="flex-1 rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] px-2 py-1.5 text-sm font-normal normal-case text-[var(--color-parchment-900)]"
+                        className="flex-1 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
                       >
                         <option value="">Select background…</option>
                         {reference.backgrounds.map((background) => (
@@ -389,7 +389,7 @@ export default function CharacterCreatePage() {
                         onClick={() =>
                           update({ useCustomBackground: true, background: "", skillProficiencies: [] })
                         }
-                        className="rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] px-2 text-xs font-semibold normal-case text-[var(--color-parchment-600)]"
+                        className="rounded-control border border-parchment-300 px-2 text-xs font-semibold normal-case text-parchment-600"
                       >
                         Custom…
                       </button>
@@ -397,14 +397,14 @@ export default function CharacterCreatePage() {
                   )}
                 </div>
 
-                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-parchment-500)] sm:col-span-2">
+                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500 sm:col-span-2">
                   Portrait URL (optional)
                   <input
                     type="text"
                     value={draft.portraitUrl}
                     onChange={(e) => update({ portraitUrl: e.target.value })}
                     placeholder="https://…"
-                    className="rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] px-2 py-1.5 text-sm font-normal normal-case text-[var(--color-parchment-900)]"
+                    className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
                   />
                 </label>
               </div>
@@ -432,24 +432,24 @@ export default function CharacterCreatePage() {
             <Card title="Skill Proficiencies">
               <div className="flex flex-col gap-3 p-4">
                 {!selectedClass ? (
-                  <p className="text-sm text-[var(--color-parchment-600)]">
+                  <p className="text-sm text-parchment-600">
                     Pick a class above to choose its skill proficiencies.
                   </p>
                 ) : (
                   <>
                     {grantedSkills.length > 0 && (
-                      <p className="text-xs text-[var(--color-parchment-600)]">
+                      <p className="text-xs text-parchment-600">
                         Granted by background: {grantedSkills.join(", ")}
                       </p>
                     )}
-                    <p className="text-xs font-semibold text-[var(--color-parchment-600)]">
+                    <p className="text-xs font-semibold text-parchment-600">
                       Choose {maxClassChoices} ({selectedClassChoices.length}/{maxClassChoices} selected)
                     </p>
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                       {classChoiceOptions.map((skill) => (
                         <label
                           key={skill}
-                          className="flex items-center gap-2 text-sm text-[var(--color-parchment-800)]"
+                          className="flex items-center gap-2 text-sm text-parchment-800"
                         >
                           <input
                             type="checkbox"
@@ -482,33 +482,33 @@ export default function CharacterCreatePage() {
               </Card>
             )}
 
-            <Card title="Preview" titleAccessory={<span className="text-xs text-[var(--color-parchment-500)]">Level 1</span>}>
+            <Card title="Preview" titleAccessory={<span className="text-xs text-parchment-500">Level 1</span>}>
               <div className="grid grid-cols-2 gap-4 p-4 text-sm sm:grid-cols-4">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-[var(--color-parchment-500)]">
+                  <p className="text-xs uppercase tracking-wide text-parchment-500">
                     Armor Class
                   </p>
-                  <p className="font-display text-xl text-[var(--color-garnet-800)]">{previewArmorClass}</p>
+                  <p className="font-display text-xl text-garnet-800">{previewArmorClass}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-[var(--color-parchment-500)]">
+                  <p className="text-xs uppercase tracking-wide text-parchment-500">
                     Initiative
                   </p>
-                  <p className="font-display text-xl text-[var(--color-garnet-800)]">
+                  <p className="font-display text-xl text-garnet-800">
                     {formatModifier(dexModifier)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-[var(--color-parchment-500)]">Speed</p>
-                  <p className="font-display text-xl text-[var(--color-garnet-800)]">
+                  <p className="text-xs uppercase tracking-wide text-parchment-500">Speed</p>
+                  <p className="font-display text-xl text-garnet-800">
                     {selectedRace ? `${selectedRace.speed} ft` : "—"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-[var(--color-parchment-500)]">
+                  <p className="text-xs uppercase tracking-wide text-parchment-500">
                     Hit Points
                   </p>
-                  <p className="font-display text-xl text-[var(--color-garnet-800)]">
+                  <p className="font-display text-xl text-garnet-800">
                     {previewMaxHp ?? "—"}
                   </p>
                 </div>
@@ -520,12 +520,12 @@ export default function CharacterCreatePage() {
                 type="button"
                 disabled={!isValid || submitting}
                 onClick={handleSave}
-                className="rounded-[var(--radius-control)] bg-[var(--color-garnet-700)] px-4 py-2 text-sm font-semibold text-[var(--color-parchment-50)] transition-colors hover:bg-[var(--color-garnet-800)] disabled:opacity-50"
+                className="rounded-control bg-garnet-700 px-4 py-2 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
               >
                 {submitting ? "Saving…" : "Save Character"}
               </button>
               {submitError && (
-                <p className="text-xs font-semibold text-[var(--color-garnet-700)]">
+                <p className="text-xs font-semibold text-garnet-700">
                   Couldn't save — check the form and try again.
                 </p>
               )}

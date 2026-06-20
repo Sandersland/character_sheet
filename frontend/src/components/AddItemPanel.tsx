@@ -22,8 +22,8 @@ function isNonzero(currency: Currency): boolean {
 }
 
 const inputClass =
-  "rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] px-2 py-1 text-sm";
-const labelClass = "flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-parchment-500)]";
+  "rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm";
+const labelClass = "flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500";
 
 /**
  * Inline panel (no modal/dialog component exists anywhere in this app —
@@ -118,17 +118,17 @@ export default function AddItemPanel({ items, pending, onSubmit, onClose }: AddI
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-[var(--radius-control)] border border-[var(--color-parchment-200)] bg-[var(--color-parchment-100)] p-3">
+    <div className="flex flex-col gap-3 rounded-control border border-parchment-200 bg-parchment-100 p-3">
       <div className="flex gap-2">
         {(["catalog", "custom"] as const).map((value) => (
           <button
             key={value}
             type="button"
             onClick={() => setTab(value)}
-            className={`rounded-[var(--radius-control)] border px-3 py-1 text-xs font-semibold transition-colors ${
+            className={`rounded-control border px-3 py-1 text-xs font-semibold transition-colors ${
               tab === value
-                ? "border-[var(--color-arcane-500)] bg-[var(--color-arcane-50)] text-[var(--color-arcane-800)]"
-                : "border-[var(--color-parchment-300)] text-[var(--color-parchment-600)]"
+                ? "border-arcane-500 bg-arcane-50 text-arcane-800"
+                : "border-parchment-300 text-parchment-600"
             }`}
           >
             {value === "catalog" ? "From catalog" : "Custom"}
@@ -235,7 +235,7 @@ export default function AddItemPanel({ items, pending, onSubmit, onClose }: AddI
               </label>
             </>
           )}
-          <p className="w-full text-xs text-[var(--color-parchment-500)]">
+          <p className="w-full text-xs text-parchment-500">
             Other weapon/armor/consumable details can be refined afterward via Edit.
           </p>
         </div>
@@ -252,7 +252,7 @@ export default function AddItemPanel({ items, pending, onSubmit, onClose }: AddI
             onChange={(e) => changeQuantity(e.target.value)}
           />
         </label>
-        <label className="flex items-center gap-1.5 text-xs text-[var(--color-parchment-700)]">
+        <label className="flex items-center gap-1.5 text-xs text-parchment-700">
           <input type="checkbox" checked={equipped} onChange={(e) => setEquipped(e.target.checked)} />
           Equipped
         </label>
@@ -283,7 +283,7 @@ export default function AddItemPanel({ items, pending, onSubmit, onClose }: AddI
           type="button"
           disabled={pending}
           onClick={submit}
-          className="rounded-[var(--radius-control)] bg-[var(--color-garnet-700)] px-3 py-1.5 text-sm font-semibold text-[var(--color-parchment-50)] transition-colors hover:bg-[var(--color-garnet-800)] disabled:opacity-50"
+          className="rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
         >
           Add
         </button>
@@ -291,7 +291,7 @@ export default function AddItemPanel({ items, pending, onSubmit, onClose }: AddI
           type="button"
           disabled={pending}
           onClick={onClose}
-          className="text-xs font-semibold text-[var(--color-garnet-700)] hover:underline disabled:opacity-40"
+          className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
         >
           Cancel
         </button>

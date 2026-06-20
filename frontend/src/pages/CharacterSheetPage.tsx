@@ -50,17 +50,17 @@ export default function CharacterSheetPage() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--color-parchment-100)] px-6 text-center">
-        <h1 className="font-display text-2xl font-semibold text-[var(--color-garnet-800)]">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-parchment-100 px-6 text-center">
+        <h1 className="font-display text-2xl font-semibold text-garnet-800">
           Something went wrong
         </h1>
-        <p className="text-sm text-[var(--color-parchment-600)]">
+        <p className="text-sm text-parchment-600">
           Couldn't load this character. Check that the backend is running and
           try refreshing.
         </p>
         <Link
           to="/"
-          className="rounded-[var(--radius-control)] bg-[var(--color-garnet-700)] px-4 py-2 text-sm font-semibold text-[var(--color-parchment-50)] transition-colors hover:bg-[var(--color-garnet-800)]"
+          className="rounded-control bg-garnet-700 px-4 py-2 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800"
         >
           Back to characters
         </Link>
@@ -70,24 +70,24 @@ export default function CharacterSheetPage() {
 
   if (character === undefined) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--color-parchment-100)]">
-        <p className="text-sm text-[var(--color-parchment-600)]">Loading character…</p>
+      <div className="flex min-h-screen items-center justify-center bg-parchment-100">
+        <p className="text-sm text-parchment-600">Loading character…</p>
       </div>
     );
   }
 
   if (character === null) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--color-parchment-100)] px-6 text-center">
-        <h1 className="font-display text-2xl font-semibold text-[var(--color-parchment-900)]">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-parchment-100 px-6 text-center">
+        <h1 className="font-display text-2xl font-semibold text-parchment-900">
           Character not found
         </h1>
-        <p className="text-sm text-[var(--color-parchment-600)]">
+        <p className="text-sm text-parchment-600">
           There's no character with id "{id}" in this campaign yet.
         </p>
         <Link
           to="/"
-          className="rounded-[var(--radius-control)] bg-[var(--color-garnet-700)] px-4 py-2 text-sm font-semibold text-[var(--color-parchment-50)] transition-colors hover:bg-[var(--color-garnet-800)]"
+          className="rounded-control bg-garnet-700 px-4 py-2 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800"
         >
           Back to characters
         </Link>
@@ -101,26 +101,26 @@ export default function CharacterSheetPage() {
   ][];
 
   return (
-    <div className="min-h-screen bg-[var(--color-parchment-100)]">
-      <header className="border-b border-[var(--color-parchment-200)] bg-[var(--color-parchment-50)]">
+    <div className="min-h-screen bg-parchment-100">
+      <header className="border-b border-parchment-200 bg-parchment-50">
         <div className="mx-auto flex max-w-6xl flex-wrap items-start justify-between gap-4 px-6 py-5">
           <div>
             <Link
               to="/"
-              className="text-xs font-semibold text-[var(--color-garnet-700)] hover:underline"
+              className="text-xs font-semibold text-garnet-700 hover:underline"
             >
               ← All characters
             </Link>
-            <h1 className="mt-1 font-display text-3xl font-semibold text-[var(--color-parchment-900)]">
+            <h1 className="mt-1 font-display text-3xl font-semibold text-parchment-900">
               {character.name}
             </h1>
-            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[var(--color-parchment-600)]">
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-parchment-600">
               <span>
                 {character.race} {character.class}
                 {character.subclass ? ` (${character.subclass})` : ""}
               </span>
               <Badge tone="garnet">Level {character.level}</Badge>
-              <span className="text-[var(--color-parchment-400)]">
+              <span className="text-parchment-400">
                 {character.background} · {character.alignment}
               </span>
             </p>
@@ -131,14 +131,14 @@ export default function CharacterSheetPage() {
               <button
                 type="button"
                 onClick={() => setActivityOpen(true)}
-                className="text-xs font-semibold text-[var(--color-arcane-700)] hover:underline"
+                className="text-xs font-semibold text-arcane-700 hover:underline"
               >
                 Activity
               </button>
               <button
                 type="button"
                 onClick={() => setConfirmDeleteOpen(true)}
-                className="text-xs font-semibold text-[var(--color-garnet-700)] hover:underline"
+                className="text-xs font-semibold text-garnet-700 hover:underline"
               >
                 Delete character
               </button>

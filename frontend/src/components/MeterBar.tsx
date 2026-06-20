@@ -8,9 +8,9 @@ interface MeterBarProps {
 }
 
 const TONE_FILL: Record<MeterTone, string> = {
-  garnet: "bg-[var(--color-garnet-600)]",
-  arcane: "bg-[var(--color-arcane-500)]",
-  gold: "bg-[var(--color-gold-500)]",
+  garnet: "bg-garnet-600",
+  arcane: "bg-arcane-500",
+  gold: "bg-gold-500",
 };
 
 /**
@@ -33,7 +33,7 @@ export default function MeterBar({
       aria-valuemin={0}
       aria-valuemax={max}
       aria-label={label ?? `${current} of ${max}`}
-      className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--color-parchment-200)]"
+      className="h-2.5 w-full overflow-hidden rounded-full bg-parchment-200"
     >
       <div
         className={`h-full rounded-full ${TONE_FILL[tone]} transition-[width]`}

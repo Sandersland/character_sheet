@@ -65,11 +65,11 @@ function weaponPropertyTags(weapon: WeaponDetail): string[] {
 }
 
 const inputClass =
-  "rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] px-2 py-1 text-sm";
-const labelClass = "flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-parchment-500)]";
-const checkboxLabelClass = "flex items-center gap-1.5 text-xs text-[var(--color-parchment-700)]";
+  "rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm";
+const labelClass = "flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500";
+const checkboxLabelClass = "flex items-center gap-1.5 text-xs text-parchment-700";
 const linkButtonClass =
-  "text-xs font-semibold text-[var(--color-garnet-700)] hover:underline disabled:opacity-40 disabled:no-underline";
+  "text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40 disabled:no-underline";
 
 function currencyTimesQuantity(cost: Currency | undefined, quantity: number): Currency {
   if (!cost) return { cp: 0, sp: 0, gp: 0, pp: 0 };
@@ -167,7 +167,7 @@ export default function InventoryRow({
         </label>
 
         {weaponEdit && (
-          <div className="flex flex-col gap-2 rounded-[var(--radius-control)] bg-[var(--color-parchment-100)] p-3">
+          <div className="flex flex-col gap-2 rounded-control bg-parchment-100 p-3">
             <div className="flex flex-wrap gap-3">
               <label className={labelClass}>
                 Damage
@@ -255,7 +255,7 @@ export default function InventoryRow({
         )}
 
         {armorEdit && (
-          <div className="flex flex-wrap gap-3 rounded-[var(--radius-control)] bg-[var(--color-parchment-100)] p-3">
+          <div className="flex flex-wrap gap-3 rounded-control bg-parchment-100 p-3">
             <label className={labelClass}>
               Armor type
               <select
@@ -301,7 +301,7 @@ export default function InventoryRow({
         )}
 
         {consumableEdit !== undefined && (
-          <div className="flex flex-wrap gap-3 rounded-[var(--radius-control)] bg-[var(--color-parchment-100)] p-3">
+          <div className="flex flex-wrap gap-3 rounded-control bg-parchment-100 p-3">
             <label className={labelClass}>
               Effect roll
               <span className="flex items-center gap-1">
@@ -363,7 +363,7 @@ export default function InventoryRow({
             type="button"
             disabled={pending}
             onClick={submitEdit}
-            className="rounded-[var(--radius-control)] bg-[var(--color-arcane-700)] px-3 py-1.5 text-sm font-semibold text-[var(--color-parchment-50)] transition-colors hover:bg-[var(--color-arcane-800)] disabled:opacity-50"
+            className="rounded-control bg-arcane-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-arcane-800 disabled:opacity-50"
           >
             Save
           </button>
@@ -378,7 +378,7 @@ export default function InventoryRow({
   if (mode === "sell") {
     return (
       <li className="flex flex-col gap-3 py-3">
-        <p className="text-sm font-medium text-[var(--color-parchment-900)]">Sell {item.name}</p>
+        <p className="text-sm font-medium text-parchment-900">Sell {item.name}</p>
         <div className="flex flex-wrap items-end gap-3">
           <label className={labelClass}>
             Quantity
@@ -411,7 +411,7 @@ export default function InventoryRow({
             type="button"
             disabled={pending}
             onClick={submitSell}
-            className="rounded-[var(--radius-control)] bg-[var(--color-garnet-700)] px-3 py-1.5 text-sm font-semibold text-[var(--color-parchment-50)] transition-colors hover:bg-[var(--color-garnet-800)] disabled:opacity-50"
+            className="rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
           >
             Sell
           </button>
@@ -454,7 +454,7 @@ export default function InventoryRow({
   return (
     <li className="flex items-start justify-between gap-3 py-2.5">
       <div>
-        <p className="text-sm font-medium text-[var(--color-parchment-900)]">
+        <p className="text-sm font-medium text-parchment-900">
           {item.name}
           <Badge tone={CATEGORY_TONE[item.category]} className="ml-2">
             {item.category}
@@ -465,28 +465,28 @@ export default function InventoryRow({
             </Badge>
           )}
         </p>
-        <p className="mt-0.5 text-xs text-[var(--color-parchment-500)]">{details.join(" · ")}</p>
+        <p className="mt-0.5 text-xs text-parchment-500">{details.join(" · ")}</p>
         {item.description && (
-          <p className="mt-1 text-xs text-[var(--color-parchment-600)]">{item.description}</p>
+          <p className="mt-1 text-xs text-parchment-600">{item.description}</p>
         )}
         {consumable?.effectDescription && (
-          <p className="mt-1 text-xs text-[var(--color-parchment-600)]">{consumable.effectDescription}</p>
+          <p className="mt-1 text-xs text-parchment-600">{consumable.effectDescription}</p>
         )}
-        {item.notes && <p className="mt-1 text-xs italic text-[var(--color-parchment-500)]">{item.notes}</p>}
+        {item.notes && <p className="mt-1 text-xs italic text-parchment-500">{item.notes}</p>}
       </div>
       <div className="flex shrink-0 items-center gap-2 pt-0.5">
         <button type="button" disabled={pending} onClick={onEdit} className={linkButtonClass}>
           Edit
         </button>
-        <span className="text-[var(--color-parchment-300)]">·</span>
+        <span className="text-parchment-300">·</span>
         <button type="button" disabled={pending} onClick={onSell} className={linkButtonClass}>
           Sell
         </button>
-        <span className="text-[var(--color-parchment-300)]">·</span>
+        <span className="text-parchment-300">·</span>
         <button type="button" disabled={pending} onClick={onHistory} className={linkButtonClass}>
           History
         </button>
-        <span className="text-[var(--color-parchment-300)]">·</span>
+        <span className="text-parchment-300">·</span>
         <button
           type="button"
           disabled={pending}

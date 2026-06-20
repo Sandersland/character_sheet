@@ -82,10 +82,10 @@ export default function StartingEquipmentEditor({
         <button
           type="button"
           onClick={() => setMode("package")}
-          className={`rounded-[var(--radius-control)] border px-3 py-1.5 text-xs font-semibold transition-colors ${
+          className={`rounded-control border px-3 py-1.5 text-xs font-semibold transition-colors ${
             isPackage
-              ? "border-[var(--color-arcane-500)] bg-[var(--color-arcane-50)] text-[var(--color-arcane-800)]"
-              : "border-[var(--color-parchment-300)] text-[var(--color-parchment-600)] hover:border-[var(--color-arcane-400)]"
+              ? "border-arcane-500 bg-arcane-50 text-arcane-800"
+              : "border-parchment-300 text-parchment-600 hover:border-arcane-400"
           }`}
         >
           Class equipment package
@@ -93,10 +93,10 @@ export default function StartingEquipmentEditor({
         <button
           type="button"
           onClick={() => setMode("gold")}
-          className={`rounded-[var(--radius-control)] border px-3 py-1.5 text-xs font-semibold transition-colors ${
+          className={`rounded-control border px-3 py-1.5 text-xs font-semibold transition-colors ${
             isGold
-              ? "border-[var(--color-arcane-500)] bg-[var(--color-arcane-50)] text-[var(--color-arcane-800)]"
-              : "border-[var(--color-parchment-300)] text-[var(--color-parchment-600)] hover:border-[var(--color-arcane-400)]"
+              ? "border-arcane-500 bg-arcane-50 text-arcane-800"
+              : "border-parchment-300 text-parchment-600 hover:border-arcane-400"
           }`}
         >
           Starting gold ({goldLabel(startingEquipment.gold)})
@@ -116,15 +116,15 @@ export default function StartingEquipmentEditor({
             return (
               <div key={groupIdx} className="flex flex-col gap-2">
                 {/* Group label */}
-                <p className="text-sm font-medium text-[var(--color-parchment-800)]">
+                <p className="text-sm font-medium text-parchment-800">
                   {group.label}
                 </p>
 
                 {isAutoGrant ? (
                   // Auto-granted — display only, no choice needed
-                  <div className="rounded-[var(--radius-control)] border border-[var(--color-parchment-200)] bg-[var(--color-parchment-100)] px-3 py-2 text-sm text-[var(--color-parchment-700)]">
+                  <div className="rounded-control border border-parchment-200 bg-parchment-100 px-3 py-2 text-sm text-parchment-700">
                     {bundleFixedSummary(group.options[0])}
-                    <span className="ml-2 text-xs text-[var(--color-parchment-400)]">
+                    <span className="ml-2 text-xs text-parchment-400">
                       (auto-granted)
                     </span>
                   </div>
@@ -136,10 +136,10 @@ export default function StartingEquipmentEditor({
                       return (
                         <label
                           key={optionIdx}
-                          className={`flex cursor-pointer flex-col gap-2 rounded-[var(--radius-control)] border px-3 py-2 transition-colors ${
+                          className={`flex cursor-pointer flex-col gap-2 rounded-control border px-3 py-2 transition-colors ${
                             isChosen
-                              ? "border-[var(--color-arcane-400)] bg-[var(--color-arcane-50)]"
-                              : "border-[var(--color-parchment-200)] hover:border-[var(--color-arcane-300)]"
+                              ? "border-arcane-400 bg-arcane-50"
+                              : "border-parchment-200 hover:border-arcane-300"
                           }`}
                         >
                           <div className="flex items-start gap-2">
@@ -148,9 +148,9 @@ export default function StartingEquipmentEditor({
                               name={`group-${groupIdx}`}
                               checked={isChosen}
                               onChange={() => setOptionIndex(groupIdx, optionIdx)}
-                              className="mt-0.5 accent-[var(--color-arcane-600)]"
+                              className="mt-0.5 accent-arcane-600"
                             />
-                            <span className="text-sm text-[var(--color-parchment-800)]">
+                            <span className="text-sm text-parchment-800">
                               {option.label}
                             </span>
                           </div>
@@ -171,7 +171,7 @@ export default function StartingEquipmentEditor({
                                 const currentPick = sel?.openPicks?.[pickIdx] ?? "";
                                 return (
                                   <div key={pickIdx} className="flex flex-col gap-1">
-                                    <span className="text-xs text-[var(--color-parchment-500)]">
+                                    <span className="text-xs text-parchment-500">
                                       {pick.label}
                                     </span>
                                     <select
@@ -179,7 +179,7 @@ export default function StartingEquipmentEditor({
                                       onChange={(e) =>
                                         setOpenPick(groupIdx, pickIdx, e.target.value)
                                       }
-                                      className="rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-white px-2 py-1.5 text-sm text-[var(--color-parchment-900)] focus:border-[var(--color-arcane-500)] focus:outline-none"
+                                      className="rounded-control border border-parchment-300 bg-white px-2 py-1.5 text-sm text-parchment-900 focus:border-arcane-500 focus:outline-none"
                                     >
                                       <option value="">— choose —</option>
                                       {matchingItems.map((item) => (
@@ -196,7 +196,7 @@ export default function StartingEquipmentEditor({
 
                           {/* Fixed item summary for the chosen option */}
                           {isChosen && (option.items?.length ?? 0) > 0 && (
-                            <p className="ml-5 text-xs text-[var(--color-parchment-500)]">
+                            <p className="ml-5 text-xs text-parchment-500">
                               {bundleFixedSummary(option)}
                             </p>
                           )}
@@ -223,13 +223,13 @@ export default function StartingEquipmentEditor({
                     const currentPick = sel?.openPicks?.[pickIdx] ?? "";
                     return (
                       <div key={pickIdx} className="flex flex-col gap-1">
-                        <span className="text-xs text-[var(--color-parchment-500)]">
+                        <span className="text-xs text-parchment-500">
                           {pick.label}
                         </span>
                         <select
                           value={currentPick}
                           onChange={(e) => setOpenPick(groupIdx, pickIdx, e.target.value)}
-                          className="rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-white px-2 py-1.5 text-sm text-[var(--color-parchment-900)] focus:border-[var(--color-arcane-500)] focus:outline-none"
+                          className="rounded-control border border-parchment-300 bg-white px-2 py-1.5 text-sm text-parchment-900 focus:border-arcane-500 focus:outline-none"
                         >
                           <option value="">— choose —</option>
                           {matchingItems.map((item) => (
@@ -250,7 +250,7 @@ export default function StartingEquipmentEditor({
       {/* ── Gold mode ──────────────────────────────────────────────────────── */}
       {isGold && value.mode === "gold" && (
         <div className="flex flex-col gap-3">
-          <p className="text-sm text-[var(--color-parchment-700)]">
+          <p className="text-sm text-parchment-700">
             Roll {goldLabel(startingEquipment.gold)} gp (
             {goldMin(startingEquipment.gold)}–{goldMax(startingEquipment.gold)} gp) and spend it on
             equipment from the shop after creation.
@@ -259,7 +259,7 @@ export default function StartingEquipmentEditor({
             <button
               type="button"
               onClick={() => setGold(rollGold(startingEquipment.gold))}
-              className="rounded-[var(--radius-control)] bg-[var(--color-garnet-700)] px-3 py-1.5 text-sm font-semibold text-[var(--color-parchment-50)] transition-colors hover:bg-[var(--color-garnet-800)]"
+              className="rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800"
             >
               Roll {goldLabel(startingEquipment.gold)}
             </button>
@@ -274,9 +274,9 @@ export default function StartingEquipmentEditor({
                   if (!isNaN(n)) setGold(n);
                 }}
                 placeholder={`${goldMin(startingEquipment.gold)}–${goldMax(startingEquipment.gold)}`}
-                className="w-24 rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-white px-2 py-1.5 text-center text-sm text-[var(--color-parchment-900)] focus:border-[var(--color-arcane-500)] focus:outline-none"
+                className="w-24 rounded-control border border-parchment-300 bg-white px-2 py-1.5 text-center text-sm text-parchment-900 focus:border-arcane-500 focus:outline-none"
               />
-              <span className="text-sm text-[var(--color-parchment-600)]">gp</span>
+              <span className="text-sm text-parchment-600">gp</span>
             </div>
           </div>
           {value.gold > 0 && !isGoldValid(startingEquipment, value.gold) && (

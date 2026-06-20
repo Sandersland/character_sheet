@@ -17,7 +17,7 @@ interface InventoryListProps {
 }
 
 const inputClass =
-  "rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] px-1.5 py-0.5 text-xs tabular-nums";
+  "rounded-control border border-parchment-300 bg-parchment-50 px-1.5 py-0.5 text-xs tabular-nums";
 
 /** Currency purse editor — reuses the existing PATCH /api/characters/:id (currency is untouched by the Phase B endpoint, exactly like experiencePoints), not the transactions endpoint, since a bare currency edit has no item and isn't ledgered. */
 function CurrencyEditor({ character, onUpdate }: InventoryListProps) {
@@ -43,8 +43,8 @@ function CurrencyEditor({ character, onUpdate }: InventoryListProps) {
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-parchment-200)] pt-3">
-      <div className="flex items-center gap-2 text-xs text-[var(--color-parchment-600)]">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-parchment-200 pt-3">
+      <div className="flex items-center gap-2 text-xs text-parchment-600">
         {(["pp", "gp", "sp", "cp"] as const).map((denomination) => (
           <label key={denomination} className="flex items-center gap-1">
             <input
@@ -61,11 +61,11 @@ function CurrencyEditor({ character, onUpdate }: InventoryListProps) {
           type="button"
           disabled={pending}
           onClick={save}
-          className="rounded-[var(--radius-control)] bg-[var(--color-arcane-700)] px-2.5 py-1 text-xs font-semibold text-[var(--color-parchment-50)] transition-colors hover:bg-[var(--color-arcane-800)] disabled:opacity-50"
+          className="rounded-control bg-arcane-700 px-2.5 py-1 text-xs font-semibold text-parchment-50 transition-colors hover:bg-arcane-800 disabled:opacity-50"
         >
           Save
         </button>
-        {error && <span className="text-[var(--color-garnet-700)]">Couldn't save.</span>}
+        {error && <span className="text-garnet-700">Couldn't save.</span>}
       </div>
     </div>
   );
@@ -123,15 +123,15 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
           <button
             type="button"
             onClick={() => setLedgerFilter(null)}
-            className="text-xs font-semibold text-[var(--color-garnet-700)] hover:underline"
+            className="text-xs font-semibold text-garnet-700 hover:underline"
           >
             History
           </button>
-          <span className="text-[var(--color-parchment-300)]">·</span>
+          <span className="text-parchment-300">·</span>
           <button
             type="button"
             onClick={() => setAddOpen((open) => !open)}
-            className="text-xs font-semibold text-[var(--color-garnet-700)] hover:underline"
+            className="text-xs font-semibold text-garnet-700 hover:underline"
           >
             {addOpen ? "Cancel" : "+ Add item"}
           </button>
@@ -150,10 +150,10 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
         )}
 
         {error && (
-          <p className="text-xs font-semibold text-[var(--color-garnet-700)]">{error}</p>
+          <p className="text-xs font-semibold text-garnet-700">{error}</p>
         )}
 
-        <ul className="flex flex-col divide-y divide-[var(--color-parchment-200)]">
+        <ul className="flex flex-col divide-y divide-parchment-200">
           {character.inventory.map((item) => (
             <InventoryRow
               key={item.id}
@@ -178,7 +178,7 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
           ))}
         </ul>
 
-        <div className="flex items-center justify-between text-xs text-[var(--color-parchment-600)]">
+        <div className="flex items-center justify-between text-xs text-parchment-600">
           <span>{totalWeight.toFixed(1)} lb carried</span>
         </div>
 
