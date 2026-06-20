@@ -22,6 +22,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
+      - run: npm install -g npm@11  # align with npm 11 that generated package-lock.json (npm/cli#4828)
+
       - run: npm ci --no-audit --no-fund
 
       - run: npm run lint
@@ -55,6 +57,8 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+
+      - run: npm install -g npm@11  # align with npm 11 that generated package-lock.json (npm/cli#4828)
 
       - run: npm ci --no-audit --no-fund
 
