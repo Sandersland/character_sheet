@@ -43,7 +43,18 @@ activityRouter.get("/characters/:id/activity", async (req, res) => {
   // comes from a query string and must be narrowed to the Prisma enum.
   const whereClause = {
     characterId: character.id,
-    ...(category ? { category: category as "inventory" | "hitPoints" | "experience" | "currency" | "spellcasting" } : {}),
+    ...(category
+      ? {
+          category: category as
+            | "inventory"
+            | "hitPoints"
+            | "experience"
+            | "currency"
+            | "spellcasting"
+            | "class"
+            | "resources",
+        }
+      : {}),
     ...(entityId ? { entityId } : {}),
     ...(revertedFilter !== undefined ? { reverted: revertedFilter } : {}),
   };
@@ -147,9 +158,10 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
         if (before.hitPoints !== undefined) updateData.hitPoints = before.hitPoints;
         if (before.hitDice !== undefined) updateData.hitDice = before.hitDice;
         if (before.experiencePoints !== undefined) updateData.experiencePoints = before.experiencePoints;
-        // Long rest also snapshots spellcasting — restore it so undoing a rest
-        // re-expends the slots that were cleared.
+        // Long/short rest also snapshot spellcasting + resources — restore them
+        // so undoing a rest re-expends the slots/dice that were cleared.
         if (before.spellcasting !== undefined) updateData.spellcasting = before.spellcasting;
+        if (before.resources !== undefined) updateData.resources = before.resources;
         if (Object.keys(updateData).length > 0) {
           await tx.character.update({
             where: { id: character.id },
@@ -180,6 +192,31 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
           await tx.character.update({
             where: { id: character.id },
             data: { spellcasting: beforeSpellcasting as Prisma.InputJsonValue },
+          });
+        }
+      } else if (category === "resources") {
+        // Restore the full resources JSON (used counts + maneuversKnown) from
+        // the before snapshot — identical pattern to spellcasting revert.
+        const beforeResources = before.resources as Record<string, unknown> | undefined;
+        if (beforeResources !== undefined) {
+          await tx.character.update({
+            where: { id: character.id },
+            data: { resources: beforeResources as Prisma.InputJsonValue },
+          });
+        }
+      } else if (category === "class") {
+        // Restore subclassId + subclass display name onto the class entry.
+        // The before snapshot carries the class entry's data (not the whole
+        // character row), so grab classEntryId from event.data.
+        const data = event.data as Record<string, unknown> | null;
+        const classEntryId = data?.classEntryId as string | undefined;
+        if (classEntryId) {
+          await tx.characterClassEntry.update({
+            where: { id: classEntryId },
+            data: {
+              subclassId: (before.subclassId as string | null) ?? null,
+              subclass: (before.subclass as string | null) ?? null,
+            },
           });
         }
       }

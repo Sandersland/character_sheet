@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "../generated/prisma/client.js";
-import { levelForExperience } from "./experience.js";
+import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
-import { abilityModifier, hitDieFace } from "./srd.js";
+import { abilityModifier, deriveResources, hitDieFace } from "./srd.js";
+import { normalizeResourcesMutable } from "./resources.js";
 import { normalizeSpellcastingMutable } from "./spellcasting.js";
 
 export class InvalidHitPointOperationError extends Error {}
@@ -221,10 +222,11 @@ export async function applyHitPointOperations(
           abilityScores: true,
           experiencePoints: true,
           spellcasting: true,
+          resources: true,
           classEntries: {
             orderBy: { position: "asc" as const },
             take: 1,
-            select: { id: true, level: true },
+            select: { id: true, level: true, name: true, subclass: true },
           },
         },
       });
@@ -306,8 +308,56 @@ export async function applyHitPointOperations(
           const totalGain = op.rolls.reduce((sum, roll) => sum + hitDieHeal(roll, conMod), 0);
           hp.current = Math.min(hp.max, hp.current + totalGain);
           hd.spent += spending;
-          eventData = { rolls: op.rolls, totalGain, conMod };
-          summary = `Short rest — spent ${spending} hit ${spending === 1 ? "die" : "dice"}: +${totalGain} HP`;
+
+          // Reset subclass resources that recharge on short or short-or-long rest
+          // (e.g. Battle Master superiority dice recharge on a short rest).
+          const srAbilityScores = row.abilityScores as Record<string, number>;
+          const srLevel = levelForExperience(row.experiencePoints);
+          const srProfBonus = proficiencyBonusForLevel(srLevel);
+          const srClassEntry = row.classEntries[0];
+          const srDerivedRes = deriveResources(
+            srClassEntry?.name ?? "",
+            srClassEntry?.subclass ?? undefined,
+            srLevel,
+            srAbilityScores,
+            srProfBonus,
+          );
+          const srResourceState = normalizeResourcesMutable(row.resources);
+          const beforeSrResourceState = {
+            used: { ...srResourceState.used },
+            maneuversKnown: srResourceState.maneuversKnown.map((m) => ({ ...m })),
+          };
+          let srResourcesRestored = 0;
+          if (srDerivedRes) {
+            for (const pool of srDerivedRes.resources) {
+              if (pool.recharge === "shortRest" || pool.recharge === "short-or-long") {
+                srResourcesRestored += srResourceState.used[pool.key] ?? 0;
+                srResourceState.used[pool.key] = 0;
+              }
+            }
+          }
+
+          eventData = {
+            rolls: op.rolls,
+            totalGain,
+            conMod,
+            resourcesRestored: srResourcesRestored,
+            beforeResourceState: beforeSrResourceState,
+          };
+          const restParts: string[] = [`+${totalGain} HP`];
+          if (srResourcesRestored > 0) restParts.push(`resources restored`);
+          summary = `Short rest — spent ${spending} hit ${spending === 1 ? "die" : "dice"}: ${restParts.join(", ")}`;
+
+          // Write the resource reset alongside HP in the character.update below.
+          await tx.character.update({
+            where: { id: characterId },
+            data: {
+              resources: {
+                used: srResourceState.used,
+                maneuversKnown: srResourceState.maneuversKnown,
+              } as unknown as Prisma.InputJsonValue,
+            },
+          });
           break;
         }
 
@@ -328,17 +378,43 @@ export async function applyHitPointOperations(
           const slotsRestored = Object.values(spellState.slotsUsed).reduce((s, n) => s + n, 0);
           spellState.slotsUsed = {};
 
+          // Reset subclass resources that recharge on a long rest or short-or-long rest.
+          const abilityScores = row.abilityScores as Record<string, number>;
+          const derivedLevel = levelForExperience(row.experiencePoints);
+          const profBonus = proficiencyBonusForLevel(derivedLevel);
+          const primaryClassEntry = row.classEntries[0];
+          const derivedRes = deriveResources(
+            primaryClassEntry?.name ?? "",
+            primaryClassEntry?.subclass ?? undefined,
+            derivedLevel,
+            abilityScores,
+            profBonus,
+          );
+          const resourceState = normalizeResourcesMutable(row.resources);
+          const beforeResourceState = {
+            used: { ...resourceState.used },
+            maneuversKnown: resourceState.maneuversKnown.map((m) => ({ ...m })),
+          };
+          let resourcesRestored = 0;
+          if (derivedRes) {
+            for (const pool of derivedRes.resources) {
+              if (pool.recharge === "longRest" || pool.recharge === "short-or-long") {
+                resourcesRestored += resourceState.used[pool.key] ?? 0;
+                resourceState.used[pool.key] = 0;
+              }
+            }
+          }
+
           const hpRestored = hp.max - prevCurrent;
-          eventData = { recovered, hpRestored, slotsRestored };
+          eventData = { recovered, hpRestored, slotsRestored, resourcesRestored };
           const parts: string[] = [];
           if (hpRestored > 0) parts.push(`+${hpRestored} HP`);
           else parts.push("HP already full");
           if (slotsRestored > 0) parts.push(`${slotsRestored} slot${slotsRestored !== 1 ? "s" : ""} restored`);
+          if (resourcesRestored > 0) parts.push(`resources restored`);
           summary = `Long rest — ${parts.join(", ")}`;
 
-          // Write spellcasting update in the same character.update below.
-          // The update is applied unconditionally (even if no slots were spent)
-          // to keep the stored format normalized to the compact shape.
+          // Write spellcasting + resources in the same character.update below.
           await tx.character.update({
             where: { id: characterId },
             data: {
@@ -346,11 +422,16 @@ export async function applyHitPointOperations(
                 slotsUsed: spellState.slotsUsed,
                 spells: spellState.spells,
               } as unknown as Prisma.InputJsonValue,
+              resources: {
+                used: resourceState.used,
+                maneuversKnown: resourceState.maneuversKnown,
+              } as unknown as Prisma.InputJsonValue,
             },
           });
 
-          // Include spellcasting in the before/after snapshot for undo.
+          // Include spellcasting + resources in the before/after snapshot for undo.
           (eventData as Record<string, unknown>).beforeSpellState = beforeSpellState;
+          (eventData as Record<string, unknown>).beforeResourceState = beforeResourceState;
           break;
         }
 
@@ -456,6 +537,18 @@ export async function applyHitPointOperations(
         beforeState.spellcasting = data.beforeSpellState;
         afterState.spellcasting = { slotsUsed: {} };
         delete data.beforeSpellState; // don't duplicate in eventData
+        if (data.beforeResourceState !== undefined) {
+          beforeState.resources = data.beforeResourceState;
+          afterState.resources = data.beforeResourceState; // populated by rest handler
+          delete data.beforeResourceState;
+        }
+      }
+      if (op.type === "shortRest") {
+        const data = eventData as Record<string, unknown>;
+        if (data.beforeResourceState !== undefined) {
+          beforeState.resources = data.beforeResourceState;
+          delete data.beforeResourceState;
+        }
       }
 
       await logEvent(tx, {

@@ -31,6 +31,8 @@ export interface CharacterDraft {
   race: string;
   className: string;
   subclass: string;
+  /** Catalog subclass id — empty string when none selected or class grants subclass post-L1. */
+  subclassId: string;
   portraitUrl: string;
   background: string;
   useCustomBackground: boolean;
@@ -49,6 +51,7 @@ const EMPTY_DRAFT: CharacterDraft = {
   race: "",
   className: "",
   subclass: "",
+  subclassId: "",
   portraitUrl: "",
   background: "",
   useCustomBackground: false,

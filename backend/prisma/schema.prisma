@@ -46,6 +46,10 @@ model Character {
 
   currency     Json
   spellcasting Json?
+  // Mutable resource state: { used: Record<key,count>, maneuversKnown: ManeuverEntry[] }.
+  // Only `used` counts and known lists persist; totals/die-size/recharge are
+  // derived at read time by deriveResources() in src/lib/srd.ts.
+  resources    Json?
   journal      Json
 
   raceSelection       CharacterRace?
@@ -81,8 +85,30 @@ model CharacterClass {
   skillChoiceCount Int
   skillChoices     String[] // eligible skill names to choose from
   isSpellcaster    Boolean  @default(false)
+  // Character level at which this class first grants a subclass choice.
+  // Cleric/Sorcerer/Warlock = 1, Wizard/Druid = 2, most others = 3.
+  subclassLevel    Int      @default(3)
 
-  entries CharacterClassEntry[]
+  entries    CharacterClassEntry[]
+  subclasses Subclass[]
+}
+
+// Subclass catalog — Pattern A (like Race/CharacterClass). Each row is a
+// named subclass belonging to one CharacterClass. The nullable FK on
+// CharacterClassEntry.subclassId points here; `onDelete: SetNull` keeps
+// existing entries intact if a catalog subclass is ever removed. Homebrew
+// subclasses are represented by a null subclassId with a drifting name string,
+// same as homebrew races/classes/backgrounds.
+model Subclass {
+  id          String         @id @default(uuid())
+  classId     String
+  class       CharacterClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  name        String
+  description String
+
+  selections CharacterClassEntry[]
+
+  @@unique([classId, name])
 }
 
 model Background {
@@ -127,7 +153,13 @@ model CharacterClassEntry {
   class       CharacterClass? @relation(fields: [classId], references: [id], onDelete: SetNull)
   name        String
   level       Int             @default(1)
+  // Drifting subclass display name — free to diverge from the catalog row's
+  // name (same pattern as the `name` field coexisting with `classId`). Set on
+  // creation or via POST …/class/transactions. Null = no subclass chosen yet.
   subclass    String?
+  // Nullable FK to the Subclass catalog. Null means homebrew or no subclass.
+  subclassId  String?
+  subclassRef Subclass?       @relation(fields: [subclassId], references: [id], onDelete: SetNull)
   position    Int             @default(0)
 }
 
@@ -174,6 +206,15 @@ enum SpellSchool {
   illusion
   necromancy
   transmutation
+}
+
+// Maneuver catalog — seeded from the 5e Basic Rules Battle Master maneuver
+// list. Provenance pointer in ResourcesMutableState.ManeuverEntry.maneuverId.
+// Nullable FK so homebrew/custom maneuvers have no catalog row.
+model Maneuver {
+  id          String @id @default(uuid())
+  name        String @unique
+  description String
 }
 
 // Baseline spell catalog — same catalog-table role as Item above. Seeded from
@@ -418,6 +459,8 @@ enum CharacterEventCategory {
   experience
   currency
   spellcasting
+  class     // subclass selection and future multiclass ops
+  resources // superiority dice, ki, rage, maneuvers, etc.
   // future: journal, conditions
 }
 
@@ -451,6 +494,13 @@ enum CharacterEventType {
   forgetSpell
   prepareSpell
   unprepareSpell
+  // class
+  subclassChosen
+  // resources
+  spendResource
+  restoreResource
+  learnManeuver
+  forgetManeuver
   // meta
   revert
 }

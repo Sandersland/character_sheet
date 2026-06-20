@@ -2,7 +2,14 @@ import { Prisma } from "../generated/prisma/client.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export type EventCategory = "inventory" | "hitPoints" | "experience" | "currency" | "spellcasting";
+export type EventCategory =
+  | "inventory"
+  | "hitPoints"
+  | "experience"
+  | "currency"
+  | "spellcasting"
+  | "class"
+  | "resources";
 
 export type EventType =
   // inventory
@@ -34,6 +41,13 @@ export type EventType =
   | "forgetSpell"
   | "prepareSpell"
   | "unprepareSpell"
+  // class
+  | "subclassChosen"
+  // resources
+  | "spendResource"
+  | "restoreResource"
+  | "learnManeuver"
+  | "forgetManeuver"
   // meta
   | "revert";
 

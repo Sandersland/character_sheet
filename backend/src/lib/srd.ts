@@ -101,6 +101,38 @@ export interface DerivedSpellcastingInfo {
   slotTotals: Array<{ level: number; total: number }>;
 }
 
+// Third-caster subclasses that grant spellcasting — Eldritch Knight and
+// Arcane Trickster. Both use Intelligence and follow the same slot table.
+// Keyed by lowercase subclass name.
+const THIRD_CASTER_SUBCLASSES: Readonly<Record<string, string>> = {
+  "eldritch knight": "intelligence",
+  "arcane trickster": "intelligence",
+};
+
+// Third-caster slot table (PHB Fighter/Rogue spell slot table).
+// Spellcasting starts at class level 3 (when the subclass is gained).
+// Outer key: character level; inner key: spell slot level.
+export const THIRD_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number>>>> = {
+   3: { 1: 2 },
+   4: { 1: 3 },
+   5: { 1: 3 },
+   6: { 1: 3 },
+   7: { 1: 4, 2: 2 },
+   8: { 1: 4, 2: 2 },
+   9: { 1: 4, 2: 2 },
+  10: { 1: 4, 2: 3 },
+  11: { 1: 4, 2: 3 },
+  12: { 1: 4, 2: 3 },
+  13: { 1: 4, 2: 3, 3: 2 },
+  14: { 1: 4, 2: 3, 3: 2 },
+  15: { 1: 4, 2: 3, 3: 2 },
+  16: { 1: 4, 2: 3, 3: 3 },
+  17: { 1: 4, 2: 3, 3: 3 },
+  18: { 1: 4, 2: 3, 3: 3 },
+  19: { 1: 4, 2: 3, 3: 3, 4: 1 },
+  20: { 1: 4, 2: 3, 3: 3, 4: 1 },
+};
+
 /**
  * Derives the mechanical spellcasting stats (ability, save DC, attack bonus,
  * slot totals) from a character's class, level, ability scores, and proficiency
@@ -109,15 +141,33 @@ export interface DerivedSpellcastingInfo {
  *
  * Pure function — no DB access, safe to call in serializeCharacter.
  *
- * TODO: add half-caster (Paladin/Ranger) and third-caster (Eldritch Knight/
- * Arcane Trickster) slot tables, and Warlock Pact Magic progression.
+ * @param subclass Optional subclass name — used to detect third-caster
+ *   subclasses (Eldritch Knight / Arcane Trickster) which grant their own
+ *   INT-based spellcasting.
  */
 export function deriveSpellcasting(
   className: string,
   characterLevel: number,
   abilityScores: Record<string, number>,
-  proficiencyBonus: number
+  proficiencyBonus: number,
+  subclass?: string,
 ): DerivedSpellcastingInfo | null {
+  // Check third-caster subclasses first — they grant spellcasting independent
+  // of the base class's caster status (Fighter/Rogue are not casters without them).
+  const subclassKey = (subclass ?? "").toLowerCase();
+  const thirdCasterAbility = THIRD_CASTER_SUBCLASSES[subclassKey];
+  if (thirdCasterAbility) {
+    if (characterLevel < 3) return null; // subclass (and its spellcasting) unlocked at level 3
+    const abilityMod = abilityModifier(abilityScores[thirdCasterAbility] ?? 10);
+    const spellSaveDC = 8 + proficiencyBonus + abilityMod;
+    const spellAttackBonus = proficiencyBonus + abilityMod;
+    const slotRow = THIRD_CASTER_SLOTS[Math.min(20, Math.max(3, characterLevel))] ?? {};
+    const slotTotals = Object.entries(slotRow)
+      .map(([lvl, total]) => ({ level: Number(lvl), total }))
+      .sort((a, b) => a.level - b.level);
+    return { ability: thirdCasterAbility, spellSaveDC, spellAttackBonus, slotTotals };
+  }
+
   const classKey = className.toLowerCase();
   const ability = SPELLCASTING_ABILITY[classKey];
   if (!ability) return null; // non-caster class
@@ -133,6 +183,182 @@ export function deriveSpellcasting(
     .sort((a, b) => a.level - b.level);
 
   return { ability, spellSaveDC, spellAttackBonus, slotTotals };
+}
+
+// ── Class features + trackable resources ──────────────────────────────────────
+//
+// `deriveResources` is the analog to `deriveSpellcasting` for non-slot resources:
+// superiority dice, ki points, rages, etc. Like deriveSpellcasting it is pure
+// (no DB) and called inside serializeCharacter. Only `used` counts and known
+// lists persist; totals/die/recharge are derived here every read.
+
+export type RechargeOn = "shortRest" | "longRest" | "short-or-long" | "none";
+
+export interface DerivedResource {
+  key: string;          // stable machine key, e.g. "superiorityDice"
+  label: string;        // display label, e.g. "Superiority Dice"
+  total: number;        // maximum count at this level
+  die?: string;         // die size string, e.g. "d8" — absent for simple counters
+  recharge: RechargeOn; // when the pool fully recharges
+  description?: string;
+}
+
+export interface DerivedFeature {
+  name: string;
+  level: number;        // character level at which this feature is gained
+  description: string;
+  source: "class" | "subclass";
+}
+
+export interface DerivedClassInfo {
+  resources: DerivedResource[];
+  features: DerivedFeature[];
+  /** Battle Master only: number of maneuvers the character may know at this level. */
+  maneuverChoiceCount?: number;
+  /** Battle Master only: save DC for maneuver effects (8 + prof + Str/Dex mod). */
+  maneuverSaveDC?: number;
+}
+
+// ── Battle Master rules data ──────────────────────────────────────────────────
+// All subclass-specific rules tables live in this file — same reasoning as
+// ALIGNMENTS, SKILLS, and FULL_CASTER_SLOTS: the only permitted home for 5e
+// rules data in the backend (see CLAUDE.md).
+
+/** Superiority dice count by Fighter level (Battle Master). */
+function battleMasterDiceCount(level: number): number {
+  if (level >= 15) return 6;
+  if (level >= 7) return 5;
+  return 4;
+}
+
+/** Superiority die size by Fighter level (Battle Master). */
+function battleMasterDieFace(level: number): string {
+  if (level >= 18) return "d12";
+  if (level >= 10) return "d10";
+  return "d8";
+}
+
+/** Maneuver choice count by Fighter level (Battle Master). */
+function battleMasterManeuverCount(level: number): number {
+  if (level >= 15) return 9;
+  if (level >= 10) return 7;
+  if (level >= 7) return 5;
+  return 3;
+}
+
+const BATTLE_MASTER_FEATURES: DerivedFeature[] = [
+  {
+    name: "Combat Superiority",
+    level: 3,
+    source: "subclass",
+    description:
+      "You learn maneuvers fueled by superiority dice (d8s). You have 4 dice and regain all expended dice on a short or long rest. Maneuvers can only be used once per attack unless otherwise stated.",
+  },
+  {
+    name: "Student of War",
+    level: 3,
+    source: "subclass",
+    description:
+      "You gain proficiency with one type of artisan's tools of your choice.",
+  },
+  {
+    name: "Know Your Enemy",
+    level: 7,
+    source: "subclass",
+    description:
+      "If you spend at least 1 minute observing or interacting with another creature outside combat, you can compare two of its ability scores, armor class, hit points, hit dice, or levels to your own.",
+  },
+  {
+    name: "Improved Combat Superiority (d10)",
+    level: 10,
+    source: "subclass",
+    description: "Your superiority dice turn into d10s.",
+  },
+  {
+    name: "Relentless",
+    level: 15,
+    source: "subclass",
+    description:
+      "When you roll initiative and have no superiority dice remaining, you regain 1 superiority die.",
+  },
+  {
+    name: "Improved Combat Superiority (d12)",
+    level: 18,
+    source: "subclass",
+    description: "Your superiority dice turn into d12s.",
+  },
+];
+
+// ── Subclass dispatch tables ──────────────────────────────────────────────────
+// Add new subclasses here as resources and features are implemented.
+// Keys are lowercase subclass names (matching entry.subclass.toLowerCase()).
+
+const SUBCLASS_RESOURCE_FN: Record<
+  string,
+  (level: number, abilityScores: Record<string, number>, profBonus: number) => DerivedResource[]
+> = {
+  "battle master": (level, abilityScores, profBonus) => {
+    const count = battleMasterDiceCount(level);
+    const die = battleMasterDieFace(level);
+    const strMod = abilityModifier(abilityScores.strength ?? 10);
+    const dexMod = abilityModifier(abilityScores.dexterity ?? 10);
+    const mightMod = Math.max(strMod, dexMod);
+    const saveDC = 8 + profBonus + mightMod;
+    return [
+      {
+        key: "superiorityDice",
+        label: "Superiority Dice",
+        total: count,
+        die,
+        recharge: "short-or-long",
+        description: `Spend to fuel maneuvers. Maneuver save DC ${saveDC}. Regain all on a short or long rest.`,
+      },
+    ];
+  },
+};
+
+const SUBCLASS_FEATURE_LIST: Record<string, DerivedFeature[]> = {
+  "battle master": BATTLE_MASTER_FEATURES,
+};
+
+/**
+ * Derives the trackable resources (pools with totals/die/recharge) and static
+ * feature descriptions for a character's subclass. Returns null when no rules
+ * exist for the given subclass — callers should render nothing.
+ *
+ * Pure function — no DB access, safe to call in serializeCharacter.
+ * Takes abilityScores and profBonus for forward-compat (maneuver save DCs,
+ * ki save DCs, etc.) even when the pool itself doesn't need them.
+ */
+export function deriveResources(
+  _className: string,
+  subclass: string | undefined,
+  level: number,
+  abilityScores: Record<string, number>,
+  profBonus: number,
+): DerivedClassInfo | null {
+  const subclassKey = (subclass ?? "").toLowerCase();
+  if (!subclassKey) return null;
+
+  const resourceFn = SUBCLASS_RESOURCE_FN[subclassKey];
+  const featureList = SUBCLASS_FEATURE_LIST[subclassKey];
+
+  if (!resourceFn && !featureList) return null;
+
+  const resources = resourceFn ? resourceFn(level, abilityScores, profBonus) : [];
+  // Only surface features that have been gained (level >= feature.level).
+  const features = (featureList ?? []).filter((f) => f.level <= level);
+
+  const result: DerivedClassInfo = { resources, features };
+
+  if (subclassKey === "battle master" && level >= 3) {
+    result.maneuverChoiceCount = battleMasterManeuverCount(level);
+    const strMod = abilityModifier(abilityScores.strength ?? 10);
+    const dexMod = abilityModifier(abilityScores.dexterity ?? 10);
+    result.maneuverSaveDC = 8 + profBonus + Math.max(strMod, dexMod);
+  }
+
+  return result;
 }
 
 /** Standard 5e modifier: floor((score - 10) / 2). */

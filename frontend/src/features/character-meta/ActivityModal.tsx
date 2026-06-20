@@ -20,6 +20,8 @@ const CATEGORY_TONE: Record<CharacterEventCategory, "vitality" | "gold" | "garne
   experience: "arcane",
   currency: "gold",
   spellcasting: "arcane",
+  class: "neutral",
+  resources: "gold",
 };
 
 // Label per event type for the badge.
