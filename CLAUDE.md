@@ -26,6 +26,8 @@ See `.claude/docs/development.md` for per-workspace commands, running outside Do
 
 **All backend calls go through `frontend/src/api/client.ts`.** Never call `fetch` directly from a component.
 
+**Frontend code is organized by domain.** Reusable, domain-agnostic primitives live in `frontend/src/components/ui/`; domain components in `frontend/src/features/<domain>/`; reusable React hooks in `frontend/src/hooks/`; pure logic (no JSX) in `lib/`. Use the `@/` alias (maps to `src/`) for all cross-file imports — never `../` relative paths. See `.claude/docs/frontend.md` for the full decision rule.
+
 **Tailwind v4 utilities work normally here.** Named size utilities (`max-w-xl`, `w-96`, etc.) and numeric spacing (`p-4`, `gap-2`) all resolve correctly. Custom `@theme` tokens also auto-generate idiomatic utilities — prefer `text-garnet-700` over `text-[var(--color-garnet-700)]`, `rounded-card` over `rounded-[var(--radius-card)]`, etc. One historical footgun to never reintroduce: bare `--spacing-{name}` custom tokens (e.g. `--spacing-sm`) collide with Tailwind's `--container-*` scale and break `max-w-sm/md/lg/xl/2xl`. If a named spacing rhythm is ever wanted, use a `--space-*` prefix instead.
 
 **Backend tests need Postgres.** Run `docker compose up db -d` first and export `DATABASE_URL` in the same shell command as `vitest` (not a prior `export`). See `.claude/docs/testing.md`.
@@ -39,5 +41,5 @@ Read these on demand — they are **not** auto-loaded:
 | `.claude/docs/architecture.md` | You need the router map, lib responsibilities, the data patterns (catalog+snapshot, JSON columns, audit log, transaction pattern), or the Docker Compose layout |
 | `.claude/docs/development.md` | You need full commands, Prisma workflow, or the step-by-step "how to add a new domain/feature" recipe |
 | `.claude/docs/testing.md` | You need to run tests, write a new test file, or understand the fixture-isolation rules |
-| `.claude/docs/frontend.md` | You're writing frontend code: Tailwind footgun, inline-panel-vs-Modal rule, primitives, dice engine, orchestrator pattern |
+| `.claude/docs/frontend.md` | You're writing frontend code: directory structure + where components/hooks/types belong, `@/` alias, Tailwind footgun, inline-panel-vs-Modal rule, primitives, dice engine, orchestrator pattern |
 | `.claude/agent-memory/frontend-design-architect/design_system.md` | You need exact color/type/radius/shadow token names and the design direction rationale |

@@ -90,12 +90,66 @@ it("batch is atomic", async () => {
 
 ## Frontend tests
 
-Located in colocated `*.test.ts` files (no `__tests__/` subdirectory):
-- `src/api/client.test.ts` — mocks `fetch`, tests all client functions
-- `src/lib/dice.test.ts` — pure unit tests for the dice engine
-- `src/lib/abilityGen.test.ts` — pure unit tests for score generation
-
 No DB needed. Run with `cd frontend && npx vitest run`.
+
+### Setup
+
+`vite.config.ts` carries the `test` block (`environment: "jsdom"`, `setupFiles: ["./src/test/setup.ts"]`, `globals: false`). Vitest inherits the `@/` alias from the same config. `src/test/setup.ts` registers jest-dom matchers and runs RTL `cleanup()` after each test. Test deps: `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, `@testing-library/dom`.
+
+### Two flavors — both colocated next to their source file (no `__tests__/` subdirectory)
+
+**Pure logic / fetch-mock → `*.test.ts`**
+
+```ts
+// src/lib/dice.test.ts — no DOM, no React
+import { describe, it, expect } from "vitest";
+import { rollSpec } from "@/lib/dice";
+```
+
+Examples: `src/api/client.test.ts` (mocks `fetch`, tests all client functions), `src/lib/dice.test.ts`, `src/lib/abilityGen.test.ts`.
+
+**Component render tests → `*.test.tsx`** (next to the component)
+
+```tsx
+// src/features/inventory/InventoryRow.test.tsx
+import { describe, it, expect, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import InventoryRow from "@/features/inventory/InventoryRow";
+```
+
+Examples: `src/components/ui/Modal.test.tsx` (portal, focus trap, Esc/backdrop/Close, body overflow, focus restore), `src/features/spells/SpellRow.test.tsx` (callback assertions + typed fixture).
+
+### Conventions
+
+**`globals: false`** — always import explicitly from `"vitest"`:
+```ts
+import { describe, it, expect, vi, beforeEach } from "vitest";
+```
+
+**Query by accessible role/name** where possible — it tests what the user actually sees:
+```ts
+screen.getByRole("button", { name: "Cast" })
+screen.getByRole("meter")
+screen.getByRole("dialog")
+```
+
+**Two gotchas from the existing suite:**
+- An `<img alt="">` has ARIA role `presentation`, not `img` — query it with `container.querySelector("img")` instead of `getByRole("img")`.
+- A button's accessible name comes from its text content, not its `title` attribute — use the text (e.g. `"Cast"`, not `"Cast Fireball"`).
+
+**Router-dependent components** — wrap in `MemoryRouter`:
+```tsx
+render(<MemoryRouter><CharacterCard character={base} /></MemoryRouter>);
+```
+
+**Domain component fixtures** — build a fully-typed fixture object at the top of the test file, then spread-override per test:
+```ts
+const base: InventoryItem = { id: "item-1", name: "Club", category: "weapon", quantity: 1, equipped: false };
+renderRow({ item: { ...base, equipped: true } });
+```
+
+**Interaction** — use `userEvent.setup()` for clicks, typing, and keyboard events that involve real browser-like sequencing; use `fireEvent` only for low-level event injection (e.g. `fireEvent.keyDown(document, { key: "Escape" })` in Modal tests).
 
 ## Lib-level unit tests
 
