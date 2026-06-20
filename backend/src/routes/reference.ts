@@ -1,16 +1,14 @@
 import { Router } from "express";
 
-import { ALIGNMENTS, STARTING_EQUIPMENT } from "../lib/srd.js";
+import { ALIGNMENTS, STARTING_EQUIPMENT, TOOLS, toolsByCategory } from "../lib/srd.js";
 import { prisma } from "../lib/prisma.js";
 
 export const referenceRouter = Router();
 
 // Feeds the character-creation form's baseline lists: catalog rows for
-// race/class/background plus the fixed alignment set and per-class starting-
-// equipment definitions. Alignments are a closed 9-value set served as a
-// code constant. Starting-equipment definitions live in srd.ts (the only
-// allowed home for 5e rules data) and are attached to each class row here so
-// the frontend never has to duplicate them.
+// race/class/background plus the fixed alignment set, per-class starting-
+// equipment definitions, and the TOOLS rules constant (grouped by category
+// for the creation form's tool-proficiency pickers).
 referenceRouter.get("/reference", async (_req, res) => {
   // Sequential rather than Promise.all — see the matching comment in
   // routes/characters.ts's POST handler.
@@ -30,9 +28,39 @@ referenceRouter.get("/reference", async (_req, res) => {
     skillChoices: c.skillChoices,
     isSpellcaster: c.isSpellcaster,
     subclassLevel: c.subclassLevel,
+    // Tool proficiency fields — parallel to skillChoices/skillChoiceCount.
+    toolProficiencies: c.toolProficiencies,
+    toolChoices: c.toolChoices,
+    toolChoiceCount: c.toolChoiceCount,
     subclasses: c.subclasses.map((s) => ({ id: s.id, name: s.name, description: s.description })),
     startingEquipment: STARTING_EQUIPMENT[c.name] ?? null,
   }));
 
-  res.json({ races, classes, backgrounds, alignments: ALIGNMENTS });
+  const racesWithTools = races.map((r) => ({
+    id: r.id,
+    name: r.name,
+    speed: r.speed,
+    toolProficiencies: r.toolProficiencies,
+  }));
+
+  const backgroundsWithTools = backgrounds.map((b) => ({
+    id: b.id,
+    name: b.name,
+    skillProficiencies: b.skillProficiencies,
+    toolProficiencies: b.toolProficiencies,
+  }));
+
+  // TOOLS rules data grouped by category for the creation form's pickers.
+  // Sending all 40+ tools is tiny; grouping here saves the frontend a filter.
+  const tools = {
+    all: TOOLS,
+    byCategory: {
+      artisan:          toolsByCategory("artisan"),
+      gamingSet:        toolsByCategory("gamingSet"),
+      musicalInstrument: toolsByCategory("musicalInstrument"),
+      other:            toolsByCategory("other"),
+    },
+  };
+
+  res.json({ races: racesWithTools, classes, backgrounds: backgroundsWithTools, alignments: ALIGNMENTS, tools });
 });

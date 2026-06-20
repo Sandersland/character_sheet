@@ -74,6 +74,7 @@ const FIXTURE_BASE = {
   },
   savingThrowProficiencies: ["intelligence", "wisdom"],
   skills: [],
+  toolProficiencies: [],
   currency: { cp: 0, sp: 0, gp: 10, pp: 0 },
   journal: [],
 };

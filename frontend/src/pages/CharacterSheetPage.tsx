@@ -14,6 +14,7 @@ import InventoryList from "@/features/inventory/InventoryList";
 import JournalSection from "@/features/character-meta/JournalSection";
 import SkillsTable from "@/features/abilities/SkillsTable";
 import SpellsSection from "@/features/spells/SpellsSection";
+import ToolProficienciesCard from "@/features/abilities/ToolProficienciesCard";
 import VitalsStrip from "@/features/character-meta/VitalsStrip";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useReferenceData } from "@/hooks/useReferenceData";
@@ -181,6 +182,20 @@ export default function CharacterSheetPage() {
             />
           </Card>
         </div>
+
+        {/* Tool proficiencies — rendered whenever the character has any
+            tool profs (background/class/race) or is eligible to choose one
+            (Student of War at level 3+). Hidden for characters with none. */}
+        {(character.toolProficiencies.length > 0 ||
+          (character.resources?.toolProfChoiceCount ?? 0) > 0) && (
+          <Card title="Tool Proficiencies" className="p-4">
+            <ToolProficienciesCard
+              character={character}
+              artisanTools={reference?.tools.byCategory.artisan ?? []}
+              onUpdate={setCharacter}
+            />
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <InventoryList character={character} onUpdate={setCharacter} />

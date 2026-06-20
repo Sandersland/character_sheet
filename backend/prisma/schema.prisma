@@ -43,6 +43,10 @@ model Character {
 
   savingThrowProficiencies String[]
   skills                   Json
+  // Array of { name, source } — tool proficiencies granted at character
+  // creation by background / class / race. Never trimmed on level-down.
+  // Level-gated choices (e.g. Student of War) live in resources Json instead.
+  toolProficiencies        Json
 
   currency     Json
   spellcasting Json?
@@ -70,9 +74,10 @@ model Character {
 // character sheet.
 
 model Race {
-  id    String @id @default(uuid())
-  name  String @unique
-  speed Int
+  id                String   @id @default(uuid())
+  name              String   @unique
+  speed             Int
+  toolProficiencies String[] @default([])
 
   selections CharacterRace[]
 }
@@ -88,6 +93,11 @@ model CharacterClass {
   // Character level at which this class first grants a subclass choice.
   // Cleric/Sorcerer/Warlock = 1, Wizard/Druid = 2, most others = 3.
   subclassLevel    Int      @default(3)
+  // Tool proficiency grants — fixed tools the class always grants.
+  toolProficiencies  String[] @default([])
+  // Tool proficiency choices — player picks toolChoiceCount from this list.
+  toolChoices        String[] @default([])
+  toolChoiceCount    Int      @default(0)
 
   entries    CharacterClassEntry[]
   subclasses Subclass[]
@@ -115,6 +125,7 @@ model Background {
   id                 String   @id @default(uuid())
   name               String   @unique
   skillProficiencies String[]
+  toolProficiencies  String[] @default([])
 
   selections CharacterBackground[]
 }
@@ -503,6 +514,9 @@ enum CharacterEventType {
   learnManeuver
   forgetManeuver
   maneuversReconciled
+  learnToolProficiency
+  forgetToolProficiency
+  toolProficienciesReconciled
   // meta
   revert
 }

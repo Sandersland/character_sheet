@@ -51,6 +51,7 @@ const BASE_CHARACTER = {
   abilityScores: BASE_ABILITY_SCORES,
   savingThrowProficiencies: [],
   skills: [],
+  toolProficiencies: [],
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
   journal: [],
 };

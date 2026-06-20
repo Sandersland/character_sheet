@@ -299,7 +299,8 @@ export type CharacterEventType =
   | "learnSpell" | "forgetSpell" | "prepareSpell" | "unprepareSpell" // spellcasting (cont.)
   | "subclassChosen"                                           // class
   | "spendResource" | "restoreResource"                       // resources
-  | "learnManeuver" | "forgetManeuver"                        // resources (cont.)
+  | "learnManeuver" | "forgetManeuver" | "maneuversReconciled" // resources (cont.)
+  | "learnToolProficiency" | "forgetToolProficiency" | "toolProficienciesReconciled" // resources
   | "revert";                                                  // meta
 
 export interface CharacterEventField {
@@ -454,13 +455,35 @@ export interface CatalogManeuver {
   description: string;
 }
 
+/**
+ * One merged tool proficiency entry on the character wire type.
+ * Creation-fixed profs (background/class/race) and level-gated subclass
+ * profs (Student of War) are merged by serializeCharacter before sending.
+ */
+export interface ToolProficiency {
+  name: string;
+  category: "artisan" | "gamingSet" | "musicalInstrument" | "other";
+  /** Where this proficiency came from. */
+  source: "background" | "class" | "race" | "subclass";
+}
+
+/** Level-gated tool proficiency entry within the resources JSON. */
+export interface ToolProfEntry {
+  id: string;   // per-character entry UUID
+  name: string; // matches a TOOLS entry name
+}
+
 /** Derived class/subclass resource data merged with stored mutable state. */
 export interface CharacterResources {
   features: ClassFeature[];
   maneuverChoiceCount?: number;
   maneuverSaveDC?: number;
+  /** Number of artisan's-tool proficiency choices from a subclass feature. */
+  toolProfChoiceCount?: number;
   pools: ResourcePool[];
   maneuversKnown: ManeuverEntry[];
+  /** Level-gated tool proficiency choices (e.g. Student of War). */
+  toolProficienciesKnown: ToolProfEntry[];
 }
 
 /** One entry in `Character.classes` — structured multiclass-aware view. */
@@ -517,6 +540,9 @@ export interface Character {
   abilityScores: AbilityScores;
   savingThrowProficiencies: AbilityName[];
   skills: Skill[];
+  /** Merged tool proficiencies — creation-fixed (background/class/race) and
+   *  level-gated subclass choices (e.g. Student of War), deduped by name. */
+  toolProficiencies: ToolProficiency[];
 
   inventory: InventoryItem[];
   currency: Currency;
@@ -556,6 +582,7 @@ export interface RaceOption {
   id: string;
   name: string;
   speed: number;
+  toolProficiencies: string[];
 }
 
 // ── Starting equipment types (mirrors backend/src/lib/srd.ts) ──────────────
@@ -616,12 +643,37 @@ export interface ClassOption {
   subclasses: SubclassOption[];
   /** Starting equipment definition, null if the class has no package defined. */
   startingEquipment: ClassStartingEquipment | null;
+  /** Fixed tool proficiencies always granted by this class. */
+  toolProficiencies: string[];
+  /** Tool names the player may choose from at creation. */
+  toolChoices: string[];
+  /** Number of tool choices the player may make. */
+  toolChoiceCount: number;
 }
 
 export interface BackgroundOption {
   id: string;
   name: string;
   skillProficiencies: SkillName[];
+  toolProficiencies: string[];
+}
+
+/** One tool from the SRD TOOLS constant, served by GET /api/reference. */
+export interface ToolOption {
+  name: string;
+  category: "artisan" | "gamingSet" | "musicalInstrument" | "other";
+  cost?: { gp?: number; sp?: number; cp?: number };
+  weight?: number;
+}
+
+export interface ReferenceTools {
+  all: ToolOption[];
+  byCategory: {
+    artisan: ToolOption[];
+    gamingSet: ToolOption[];
+    musicalInstrument: ToolOption[];
+    other: ToolOption[];
+  };
 }
 
 export interface ReferenceData {
@@ -629,6 +681,7 @@ export interface ReferenceData {
   classes: ClassOption[];
   backgrounds: BackgroundOption[];
   alignments: string[];
+  tools: ReferenceTools;
 }
 
 /** Body for `POST /api/characters`. The backend derives AC/HP/saves/skills
@@ -654,6 +707,8 @@ export interface CreateCharacterInput {
   classes: [{ name: string; subclass?: string | null; subclassId?: string }];
   abilityScores: AbilityScores;
   skillProficiencies?: SkillName[];
+  /** Tool names chosen by the player (from class toolChoices). */
+  toolChoices?: string[];
   startingEquipment?: StartingEquipmentInput;
 }
 
@@ -720,11 +775,17 @@ export interface SpendResourceOperation { type: "spendResource"; key: string; am
 export interface RestoreResourceOperation { type: "restoreResource"; key: string; amount?: number }
 export interface LearnManeuverOperation { type: "learnManeuver"; maneuverId?: string; custom?: { name: string; description: string } }
 export interface ForgetManeuverOperation { type: "forgetManeuver"; entryId: string }
+/** Choose an artisan's-tool proficiency from the Student of War feature. */
+export interface LearnToolProficiencyOperation { type: "learnToolProficiency"; name: string }
+/** Undo a subclass-granted tool proficiency choice. */
+export interface ForgetToolProficiencyOperation { type: "forgetToolProficiency"; entryId: string }
 export type ResourceOperation =
   | SpendResourceOperation
   | RestoreResourceOperation
   | LearnManeuverOperation
-  | ForgetManeuverOperation;
+  | ForgetManeuverOperation
+  | LearnToolProficiencyOperation
+  | ForgetToolProficiencyOperation;
 
 // ── XP operation types (mirrors backend/src/lib/experience-ops.ts) ──────────
 // Sent as `{ operations: ExperienceOperation[] }` to POST /api/characters/:id/experience.
