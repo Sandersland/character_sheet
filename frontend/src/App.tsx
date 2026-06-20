@@ -1,8 +1,8 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
-import CharacterCreatePage from "./pages/CharacterCreatePage";
-import CharacterListPage from "./pages/CharacterListPage";
-import CharacterSheetPage from "./pages/CharacterSheetPage";
+import CharacterCreatePage from "@/pages/CharacterCreatePage";
+import CharacterListPage from "@/pages/CharacterListPage";
+import CharacterSheetPage from "@/pages/CharacterSheetPage";
 
 export default function App() {
   return (

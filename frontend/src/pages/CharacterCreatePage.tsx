@@ -1,138 +1,16 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { createCharacter, fetchItems, fetchReference } from "../api/client";
-import AbilityScoreEditor from "../components/AbilityScoreEditor";
-import BackendStatus from "../components/BackendStatus";
-import Card from "../components/Card";
-import StartingEquipmentEditor from "../components/StartingEquipmentEditor";
-import {
-  draftToInput,
-  emptyPackageState,
-  type EquipmentDraft,
-} from "../lib/startingEquipment";
-import { abilityModifier, formatModifier } from "../lib/abilities";
-import type { AbilityName, AbilityScores, Item, ReferenceData, SkillName } from "../types/character";
-
-const DRAFT_STORAGE_KEY = "character-draft:new";
-
-type AbilityMethod = "manual" | "roll" | "standardArray" | "pointBuy";
-
-const DEFAULT_ABILITY_SCORES: AbilityScores = {
-  strength: 10,
-  dexterity: 10,
-  constitution: 10,
-  intelligence: 10,
-  wisdom: 10,
-  charisma: 10,
-};
-
-const EMPTY_ASSIGNMENTS: Record<AbilityName, number | null> = {
-  strength: null,
-  dexterity: null,
-  constitution: null,
-  intelligence: null,
-  wisdom: null,
-  charisma: null,
-};
-
-interface CharacterDraft {
-  name: string;
-  alignment: string;
-  race: string;
-  className: string;
-  subclass: string;
-  portraitUrl: string;
-  background: string;
-  useCustomBackground: boolean;
-  customBackground: string;
-  abilityMethod: AbilityMethod;
-  abilityPool: number[] | null;
-  abilityAssignments: Record<AbilityName, number | null>;
-  abilityScores: AbilityScores;
-  skillProficiencies: SkillName[];
-  equipmentDraft: EquipmentDraft | null;
-}
-
-const EMPTY_DRAFT: CharacterDraft = {
-  name: "",
-  alignment: "",
-  race: "",
-  className: "",
-  subclass: "",
-  portraitUrl: "",
-  background: "",
-  useCustomBackground: false,
-  customBackground: "",
-  abilityMethod: "manual",
-  abilityPool: null,
-  abilityAssignments: EMPTY_ASSIGNMENTS,
-  abilityScores: DEFAULT_ABILITY_SCORES,
-  skillProficiencies: [],
-  equipmentDraft: null,
-};
-
-/**
- * Stages the in-progress form in localStorage so a player can fill in what
- * they know now, navigate away, and come back to finish later — the form
- * only talks to the backend once, on the first Save (see handleSave below).
- */
-function useCharacterDraft() {
-  const [draft, setDraft] = useState<CharacterDraft>(() => {
-    try {
-      const stored = localStorage.getItem(DRAFT_STORAGE_KEY);
-      return stored ? { ...EMPTY_DRAFT, ...JSON.parse(stored) } : EMPTY_DRAFT;
-    } catch {
-      return EMPTY_DRAFT;
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-    } catch {
-      // localStorage may be unavailable (private browsing, quota, etc).
-      // Creation still works for the current session — it just won't
-      // survive a reload.
-    }
-  }, [draft]);
-
-  function update(patch: Partial<CharacterDraft>) {
-    setDraft((prev) => ({ ...prev, ...patch }));
-  }
-
-  function clear() {
-    try {
-      localStorage.removeItem(DRAFT_STORAGE_KEY);
-    } catch {
-      // ignore — nothing to clean up if storage was never available
-    }
-    setDraft(EMPTY_DRAFT);
-  }
-
-  return { draft, update, clear };
-}
-
-function useReferenceData() {
-  const [reference, setReference] = useState<ReferenceData | null>(null);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    fetchReference()
-      .then((data) => {
-        if (mounted) setReference(data);
-      })
-      .catch(() => {
-        if (mounted) setError(true);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  return { reference, error };
-}
+import { createCharacter, fetchItems } from "@/api/client";
+import AbilityScoreEditor from "@/features/abilities/AbilityScoreEditor";
+import BackendStatus from "@/features/character-meta/BackendStatus";
+import Card from "@/components/ui/Card";
+import StartingEquipmentEditor from "@/features/inventory/StartingEquipmentEditor";
+import { draftToInput, emptyPackageState } from "@/lib/startingEquipment";
+import { abilityModifier, formatModifier } from "@/lib/abilities";
+import type { Item, SkillName } from "@/types/character";
+import { useCharacterDraft } from "@/hooks/useCharacterDraft";
+import { useReferenceData } from "@/hooks/useReferenceData";
 
 function hitDieFace(hitDie: string): number {
   return Number(hitDie.replace(/^d/i, ""));

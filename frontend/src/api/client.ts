@@ -11,7 +11,7 @@ import type {
   LedgerEntry,
   ReferenceData,
   SpellcastingOperation,
-} from "../types/character";
+} from "@/types/character";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
 
