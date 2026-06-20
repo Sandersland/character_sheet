@@ -211,14 +211,11 @@ export default function CharacterSheetPage() {
           )}
         </div>
 
-        {/* Class features — shown whenever the character has a subclass with
-            derived resources or features (Battle Master superiority dice,
-            static features, maneuvers, etc.). Also renders when eligible for a
-            subclass selection (e.g. Fighter reaching level 3). */}
-        {(character.resources || (reference && (() => {
-          const classDef = reference.classes.find((c) => c.name === character.class);
-          return classDef && character.level >= classDef.subclassLevel && !character.subclassId && classDef.subclasses.length > 0;
-        })())) && (
+        {/* Class features — shown whenever the character has a primary class.
+            All 12 classes now return derived features/resources, so this card
+            is visible for every character. ClassFeaturesSection handles the
+            subclass-picker, pool spending, maneuvers, and feature list. */}
+        {character.class && (
           <Card title="Class Features" className="p-4">
             <ClassFeaturesSection
               character={character}

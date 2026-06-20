@@ -5,7 +5,7 @@ import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
 import { abilityModifier, deriveResources, hitDieFace } from "./srd.js";
-import { normalizeResourcesMutable } from "./resources.js";
+import { normalizeResourcesMutable, serializeResourcesState } from "./resources.js";
 import { normalizeSpellcastingMutable } from "./spellcasting.js";
 
 export class InvalidHitPointOperationError extends Error {}
@@ -349,13 +349,12 @@ export async function applyHitPointOperations(
           summary = `Short rest — spent ${spending} hit ${spending === 1 ? "die" : "dice"}: ${restParts.join(", ")}`;
 
           // Write the resource reset alongside HP in the character.update below.
+          // Route through serializeResourcesState so all keys (including
+          // toolProficienciesKnown) round-trip — prevents silent data loss on rest.
           await tx.character.update({
             where: { id: characterId },
             data: {
-              resources: {
-                used: srResourceState.used,
-                maneuversKnown: srResourceState.maneuversKnown,
-              } as unknown as Prisma.InputJsonValue,
+              resources: serializeResourcesState(srResourceState),
             },
           });
           break;
@@ -422,10 +421,7 @@ export async function applyHitPointOperations(
                 slotsUsed: spellState.slotsUsed,
                 spells: spellState.spells,
               } as unknown as Prisma.InputJsonValue,
-              resources: {
-                used: resourceState.used,
-                maneuversKnown: resourceState.maneuversKnown,
-              } as unknown as Prisma.InputJsonValue,
+              resources: serializeResourcesState(resourceState),
             },
           });
 
