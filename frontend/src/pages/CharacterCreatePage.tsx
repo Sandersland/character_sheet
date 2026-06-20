@@ -49,6 +49,33 @@ export default function CharacterCreatePage() {
     }
   }
 
+  // ── Tool proficiencies ────────────────────────────────────────────────────
+  // Granted = fixed from background/class/race (read-only display).
+  // Choices = player-selectable from class.toolChoices up to toolChoiceCount.
+
+  const grantedToolProfs = [
+    ...(draft.useCustomBackground ? [] : selectedBackground?.toolProficiencies ?? []),
+    ...(selectedClass?.toolProficiencies ?? []),
+    ...(selectedRace?.toolProficiencies ?? []),
+  ].filter((name, idx, arr) => arr.indexOf(name) === idx); // dedup
+
+  const toolChoiceOptions = (selectedClass?.toolChoices ?? []).filter(
+    (name) => !grantedToolProfs.includes(name)
+  );
+  const maxToolChoices = selectedClass?.toolChoiceCount ?? 0;
+  const selectedToolChoices = draft.toolChoices.filter((t) =>
+    toolChoiceOptions.includes(t)
+  );
+
+  function toggleToolChoice(name: string) {
+    const isSelected = selectedToolChoices.includes(name);
+    if (isSelected) {
+      update({ toolChoices: draft.toolChoices.filter((t) => t !== name) });
+    } else if (selectedToolChoices.length < maxToolChoices) {
+      update({ toolChoices: [...draft.toolChoices, name] });
+    }
+  }
+
   const backgroundNameForSubmit = draft.useCustomBackground
     ? draft.customBackground.trim()
     : draft.background;
@@ -98,6 +125,7 @@ export default function CharacterCreatePage() {
         }],
         abilityScores: draft.abilityScores,
         skillProficiencies: [...grantedSkills, ...selectedClassChoices],
+        toolChoices: selectedToolChoices.length > 0 ? selectedToolChoices : undefined,
         portraitUrl: draft.portraitUrl.trim() || null,
         startingEquipment: equipmentInput ?? undefined,
       });
@@ -206,6 +234,7 @@ export default function CharacterCreatePage() {
                         subclass: "",
                         subclassId: "",
                         skillProficiencies: [],
+                        toolChoices: [],
                         equipmentDraft:
                           newClassDef?.startingEquipment
                             ? { mode: "package", selections: emptyPackageState(newClassDef.startingEquipment) }
@@ -284,7 +313,7 @@ export default function CharacterCreatePage() {
                     <div className="flex gap-2">
                       <select
                         value={draft.background}
-                        onChange={(e) => update({ background: e.target.value, skillProficiencies: [] })}
+                        onChange={(e) => update({ background: e.target.value, skillProficiencies: [], toolChoices: [] })}
                         className="flex-1 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
                       >
                         <option value="">Select background…</option>
@@ -297,7 +326,7 @@ export default function CharacterCreatePage() {
                       <button
                         type="button"
                         onClick={() =>
-                          update({ useCustomBackground: true, background: "", skillProficiencies: [] })
+                          update({ useCustomBackground: true, background: "", skillProficiencies: [], toolChoices: [] })
                         }
                         className="rounded-control border border-parchment-300 px-2 text-xs font-semibold normal-case text-parchment-600"
                       >
@@ -378,6 +407,51 @@ export default function CharacterCreatePage() {
                 )}
               </div>
             </Card>
+
+            {/* Tool Proficiency Choices — only shown when the class grants a
+                choice (e.g. Bard → 3 instruments; Monk → 1 artisan or
+                instrument). Also shows any granted tool profs as read-only. */}
+            {(grantedToolProfs.length > 0 || toolChoiceOptions.length > 0) && (
+              <Card title="Tool Proficiencies">
+                <div className="flex flex-col gap-3 p-4">
+                  {grantedToolProfs.length > 0 && (
+                    <p className="text-xs text-parchment-600">
+                      Granted:{" "}
+                      <span className="font-medium text-parchment-800">
+                        {grantedToolProfs.join(", ")}
+                      </span>
+                    </p>
+                  )}
+                  {toolChoiceOptions.length > 0 && (
+                    <>
+                      <p className="text-xs font-semibold text-parchment-600">
+                        Choose {maxToolChoices} (
+                        {selectedToolChoices.length}/{maxToolChoices} selected)
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {toolChoiceOptions.map((name) => (
+                          <label
+                            key={name}
+                            className="flex items-center gap-2 text-sm text-parchment-800"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedToolChoices.includes(name)}
+                              onChange={() => toggleToolChoice(name)}
+                              disabled={
+                                !selectedToolChoices.includes(name) &&
+                                selectedToolChoices.length >= maxToolChoices
+                              }
+                            />
+                            {name}
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </Card>
+            )}
 
             {selectedClass?.startingEquipment && draft.equipmentDraft && (
               <Card title="Starting Equipment">

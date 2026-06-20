@@ -42,6 +42,8 @@ export interface CharacterDraft {
   abilityAssignments: Record<AbilityName, number | null>;
   abilityScores: AbilityScores;
   skillProficiencies: SkillName[];
+  /** Tool proficiency names chosen by the player at character creation. */
+  toolChoices: string[];
   equipmentDraft: EquipmentDraft | null;
 }
 
@@ -61,6 +63,7 @@ const EMPTY_DRAFT: CharacterDraft = {
   abilityAssignments: EMPTY_ASSIGNMENTS,
   abilityScores: DEFAULT_ABILITY_SCORES,
   skillProficiencies: [],
+  toolChoices: [],
   equipmentDraft: null,
 };
 

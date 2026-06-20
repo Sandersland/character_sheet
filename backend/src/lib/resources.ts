@@ -15,7 +15,7 @@ import { Prisma } from "../generated/prisma/client.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
-import { deriveResources } from "./srd.js";
+import { deriveResources, isKnownTool, toolsByCategory } from "./srd.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 
@@ -36,9 +36,17 @@ export interface ManeuverEntry {
   description: string;
 }
 
+/** A tool proficiency granted by a level-gated subclass feature (Student of War). */
+export interface ToolProfEntry {
+  id: string;   // per-character entry UUID (operation target)
+  name: string; // matches a TOOLS entry name
+}
+
 export interface ResourcesMutableState {
   used: Record<string, number>;
   maneuversKnown: ManeuverEntry[];
+  /** Level-gated tool proficiency choices (currently: Student of War). */
+  toolProficienciesKnown: ToolProfEntry[];
 }
 
 // ── Normalizer ────────────────────────────────────────────────────────────────
@@ -47,13 +55,27 @@ export interface ResourcesMutableState {
 
 export function normalizeResourcesMutable(json: Prisma.JsonValue): ResourcesMutableState {
   if (!json || typeof json !== "object" || Array.isArray(json)) {
-    return { used: {}, maneuversKnown: [] };
+    return { used: {}, maneuversKnown: [], toolProficienciesKnown: [] };
   }
   const obj = json as Record<string, unknown>;
   return {
     used: (obj.used as Record<string, number>) ?? {},
     maneuversKnown: (obj.maneuversKnown as ManeuverEntry[]) ?? [],
+    toolProficienciesKnown: (obj.toolProficienciesKnown as ToolProfEntry[]) ?? [],
   };
+}
+
+/**
+ * Serializes the full mutable resource state to the shape written to
+ * Character.resources. Route every update through this helper so all keys
+ * round-trip — required now that multiple level-gated lists share one column.
+ */
+export function serializeResourcesState(state: ResourcesMutableState): Prisma.InputJsonValue {
+  return {
+    used: state.used,
+    maneuversKnown: state.maneuversKnown,
+    toolProficienciesKnown: state.toolProficienciesKnown,
+  } as unknown as Prisma.InputJsonValue;
 }
 
 // ── Operation types ───────────────────────────────────────────────────────────
@@ -87,11 +109,28 @@ export interface ForgetManeuverOperation {
   entryId: string;
 }
 
+/**
+ * Learn an artisan's-tool proficiency from the Student of War feature.
+ * `name` must match a TOOLS entry with category "artisan".
+ */
+export interface LearnToolProficiencyOperation {
+  type: "learnToolProficiency";
+  name: string; // must match TOOLS[].name where category === "artisan"
+}
+
+/** Remove a subclass-granted tool proficiency by its per-character entry id. */
+export interface ForgetToolProficiencyOperation {
+  type: "forgetToolProficiency";
+  entryId: string;
+}
+
 export type ResourceOperation =
   | SpendResourceOperation
   | RestoreResourceOperation
   | LearnManeuverOperation
-  | ForgetManeuverOperation;
+  | ForgetManeuverOperation
+  | LearnToolProficiencyOperation
+  | ForgetToolProficiencyOperation;
 
 // ── Transaction handler ───────────────────────────────────────────────────────
 
@@ -144,6 +183,7 @@ export async function applyResourceOperations(
         resources: {
           used: { ...state.used },
           maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
+          toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
         },
       };
 
@@ -274,23 +314,71 @@ export async function applyResourceOperations(
           eventData = { entryId: op.entryId, maneuverName: forgotten.name };
           break;
         }
+
+        case "learnToolProficiency": {
+          // Validate the name is a known artisan's tool.
+          const artisanTools = toolsByCategory("artisan");
+          if (!artisanTools.some((t) => t.name === op.name)) {
+            throw new InvalidResourceOperationError(
+              `"${op.name}" is not a known artisan's tool. Student of War only grants proficiency with artisan's tools.`
+            );
+          }
+          if (!isKnownTool(op.name)) {
+            throw new InvalidResourceOperationError(`Unknown tool: ${op.name}`);
+          }
+
+          // Enforce choice count limit (Student of War = 1).
+          const toolChoiceCount = derivedInfo?.toolProfChoiceCount;
+          if (toolChoiceCount !== undefined && state.toolProficienciesKnown.length >= toolChoiceCount) {
+            throw new InvalidResourceOperationError(
+              `Cannot learn more tool proficiencies: already know ${state.toolProficienciesKnown.length}/${toolChoiceCount} via subclass`
+            );
+          }
+
+          // Dedup check.
+          if (state.toolProficienciesKnown.some((t) => t.name === op.name)) {
+            throw new InvalidResourceOperationError(
+              `Tool proficiency already known: ${op.name}`
+            );
+          }
+
+          const newToolEntry: ToolProfEntry = { id: randomUUID(), name: op.name };
+          state.toolProficienciesKnown.push(newToolEntry);
+          eventType = "learnToolProficiency";
+          summary = `Learned tool proficiency: ${op.name} (Student of War)`;
+          eventData = { entryId: newToolEntry.id, toolName: op.name };
+          break;
+        }
+
+        case "forgetToolProficiency": {
+          const toolIdx = state.toolProficienciesKnown.findIndex((t) => t.id === op.entryId);
+          if (toolIdx === -1) {
+            throw new InvalidResourceOperationError(
+              `Tool proficiency entry not found: ${op.entryId}`
+            );
+          }
+          const forgottenTool = state.toolProficienciesKnown[toolIdx];
+          state.toolProficienciesKnown.splice(toolIdx, 1);
+          eventType = "forgetToolProficiency";
+          summary = `Forgot tool proficiency: ${forgottenTool.name}`;
+          eventData = { entryId: op.entryId, toolName: forgottenTool.name };
+          break;
+        }
       }
 
-      // Write the updated state back.
+      // Write the updated state back — always via serializeResourcesState so
+      // all keys round-trip (prevents clobbering toolProficienciesKnown when
+      // updating maneuversKnown and vice-versa).
       await tx.character.update({
         where: { id: characterId },
-        data: {
-          resources: {
-            used: state.used,
-            maneuversKnown: state.maneuversKnown,
-          } as unknown as Prisma.InputJsonValue,
-        },
+        data: { resources: serializeResourcesState(state) },
       });
 
       const afterState = {
         resources: {
           used: { ...state.used },
           maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
+          toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
         },
       };
 

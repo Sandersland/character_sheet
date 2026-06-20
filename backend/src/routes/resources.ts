@@ -42,11 +42,23 @@ const forgetManeuverOpSchema = z.object({
   entryId: z.string().min(1),
 });
 
+const learnToolProficiencyOpSchema = z.object({
+  type: z.literal("learnToolProficiency"),
+  name: z.string().min(1),
+});
+
+const forgetToolProficiencyOpSchema = z.object({
+  type: z.literal("forgetToolProficiency"),
+  entryId: z.string().min(1),
+});
+
 const operationSchema = z.discriminatedUnion("type", [
   spendResourceOpSchema,
   restoreResourceOpSchema,
   learnManeuverOpSchema,
   forgetManeuverOpSchema,
+  learnToolProficiencyOpSchema,
+  forgetToolProficiencyOpSchema,
 ]);
 
 const transactionsRequestSchema = z.object({
@@ -57,10 +69,12 @@ const transactionsRequestSchema = z.object({
 //
 // Intent-bearing batch mutation for class/subclass resource state — mirrors
 // POST /api/characters/:id/spellcasting/transactions. Operations:
-//   spendResource   — spend one or more units of a pool (e.g. superiority die)
-//   restoreResource — restore spent units (undo mis-click or Relentless trigger)
-//   learnManeuver   — add a maneuver from catalog or custom payload
-//   forgetManeuver  — remove a known maneuver by entry id
+//   spendResource         — spend one or more units of a pool (e.g. superiority die)
+//   restoreResource       — restore spent units (undo mis-click or Relentless trigger)
+//   learnManeuver         — add a maneuver from catalog or custom payload
+//   forgetManeuver        — remove a known maneuver by entry id
+//   learnToolProficiency  — choose an artisan's tool (Student of War, level 3+)
+//   forgetToolProficiency — undo a tool proficiency choice by entry id
 //
 // Returns the full updated character on success.
 

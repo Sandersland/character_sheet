@@ -19,10 +19,13 @@ import {
   deriveCreatedCharacter,
   deriveResources,
   deriveSpellcasting,
+  isKnownTool,
   PACK_CONTENTS,
   STARTING_EQUIPMENT,
+  TOOLS,
+  type ToolProficiencyEntry,
 } from "../lib/srd.js";
-import { normalizeResourcesMutable } from "../lib/resources.js";
+import { normalizeResourcesMutable, type ToolProfEntry } from "../lib/resources.js";
 import { normalizeSpellcastingMutable } from "../lib/spellcasting.js";
 
 export const charactersRouter = Router();
@@ -95,6 +98,39 @@ function serializeInventoryItem(row: CharacterWithRelations["inventoryItems"][nu
   };
 }
 
+/**
+ * Merges creation-fixed tool profs (Character.toolProficiencies column) with
+ * level-gated subclass choices (toolProficienciesKnown from resources JSON)
+ * into the single wire-format array the API emits.
+ *
+ * Dedup rule: creation-fixed entries win — they survive level-down and
+ * the client should never show a duplicate proficiency row.
+ */
+function buildMergedToolProficiencies(
+  stored: Prisma.JsonValue,
+  subclassKnown: ToolProfEntry[],
+): Array<{ name: string; category: string; source: string }> {
+  const creationFixed = (Array.isArray(stored) ? stored : []) as unknown as ToolProficiencyEntry[];
+  const fixedNames = new Set(creationFixed.map((e) => e.name));
+
+  const merged = [
+    ...creationFixed.map((e) => ({
+      name: e.name,
+      category: TOOLS.find((t) => t.name === e.name)?.category ?? "other",
+      source: e.source,
+    })),
+    // Only add subclass entries that don't duplicate a creation-fixed grant.
+    ...subclassKnown
+      .filter((e) => !fixedNames.has(e.name))
+      .map((e) => ({
+        name: e.name,
+        category: TOOLS.find((t) => t.name === e.name)?.category ?? "other",
+        source: "subclass" as const,
+      })),
+  ];
+  return merged;
+}
+
 export function serializeCharacter(row: CharacterWithRelations) {
   const progress = experienceProgress(row.experiencePoints);
   const primaryClass = row.classEntries[0];
@@ -148,10 +184,21 @@ export function serializeCharacter(row: CharacterWithRelations) {
   let resources: object | undefined;
   if (derivedRes) {
     const stored = normalizeResourcesMutable(row.resources);
+    // Clamp level-gated lists to their derived cap (defense-in-depth for
+    // characters who haven't had a reconciling XP op since their level dropped).
+    const clampedManeuversKnown =
+      derivedRes.maneuverChoiceCount !== undefined
+        ? stored.maneuversKnown.slice(0, derivedRes.maneuverChoiceCount)
+        : stored.maneuversKnown;
+    const clampedToolProfsKnown =
+      derivedRes.toolProfChoiceCount !== undefined
+        ? stored.toolProficienciesKnown.slice(0, derivedRes.toolProfChoiceCount)
+        : stored.toolProficienciesKnown;
     resources = {
       features: derivedRes.features,
       maneuverChoiceCount: derivedRes.maneuverChoiceCount,
       maneuverSaveDC: derivedRes.maneuverSaveDC,
+      toolProfChoiceCount: derivedRes.toolProfChoiceCount,
       pools: derivedRes.resources.map((pool) => ({
         key: pool.key,
         label: pool.label,
@@ -162,12 +209,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
         used: Math.min(pool.total, stored.used[pool.key] ?? 0),
         remaining: pool.total - Math.min(pool.total, stored.used[pool.key] ?? 0),
       })),
-      // Clamp to the level-derived cap (defense-in-depth for characters who
-      // haven't had a reconciling XP op yet after their level dropped).
-      maneuversKnown:
-        derivedRes.maneuverChoiceCount !== undefined
-          ? stored.maneuversKnown.slice(0, derivedRes.maneuverChoiceCount)
-          : stored.maneuversKnown,
+      maneuversKnown: clampedManeuversKnown,
+      toolProficienciesKnown: clampedToolProfsKnown,
     };
   }
 
@@ -201,6 +244,16 @@ export function serializeCharacter(row: CharacterWithRelations) {
     abilityScores: row.abilityScores,
     savingThrowProficiencies: row.savingThrowProficiencies,
     skills: row.skills,
+    // Merged tool proficiency list — creation-fixed entries (stored in
+    // Character.toolProficiencies) + level-gated subclass choices (from
+    // resources.toolProficienciesKnown, already clamped above).
+    // Deduped by name: creation-fixed wins over subclass if both appear.
+    toolProficiencies: buildMergedToolProficiencies(
+      row.toolProficiencies,
+      resources && "toolProficienciesKnown" in resources
+        ? (resources as { toolProficienciesKnown: ToolProfEntry[] }).toolProficienciesKnown
+        : [],
+    ),
     inventory: row.inventoryItems.map(serializeInventoryItem),
     currency: row.currency,
     spellcasting,
@@ -301,6 +354,9 @@ const createCharacterSchema = z
     classes: z.array(classChoiceSchema).length(1),
     abilityScores: abilityScoresSchema,
     skillProficiencies: z.array(z.string()).optional(),
+    /** Tool names chosen by the player at creation (class choices only —
+     *  fixed grants from background/class/race are applied server-side). */
+    toolChoices: z.array(z.string()).optional(),
     startingEquipment: startingEquipmentSchema.optional(),
   })
   .strict();
@@ -439,6 +495,41 @@ charactersRouter.post("/characters", async (req, res) => {
     return;
   }
 
+  // ── Tool proficiency validation ─────────────────────────────────────────
+  // Fixed grants come from background/class/race — applied server-side.
+  // toolChoices in the request are the player's selections from the class
+  // toolChoices pool (e.g. 3 instruments for Bard).
+  const playerToolChoices = input.toolChoices ?? [];
+  if (playerToolChoices.length > 0) {
+    const allowedToolChoices = new Set(characterClass.toolChoices);
+    const invalidToolChoices = playerToolChoices.filter((t) => !allowedToolChoices.has(t));
+    if (invalidToolChoices.length > 0) {
+      res.status(400).json({
+        error: `Invalid tool choices: ${invalidToolChoices.join(", ")}. Must be from the class's toolChoices list.`,
+      });
+      return;
+    }
+    if (!playerToolChoices.every((t) => isKnownTool(t))) {
+      res.status(400).json({ error: "Unknown tool name in toolChoices" });
+      return;
+    }
+    if (playerToolChoices.length > characterClass.toolChoiceCount) {
+      res.status(400).json({
+        error: `Too many tool choices (max ${characterClass.toolChoiceCount})`,
+      });
+      return;
+    }
+  }
+
+  // Assemble creation-fixed tool proficiencies from all three fixed sources.
+  // toolChoices (player picks) count as a "class" source.
+  const creationToolProfs = [
+    ...(background?.toolProficiencies ?? []).map((name) => ({ name, source: "background" as const })),
+    ...(characterClass.toolProficiencies ?? []).map((name) => ({ name, source: "class" as const })),
+    ...(race?.toolProficiencies ?? []).map((name) => ({ name, source: "race" as const })),
+    ...playerToolChoices.map((name) => ({ name, source: "class" as const })),
+  ];
+
   // ── Resolve starting equipment ──────────────────────────────────────────
   // Starting equipment is optional (omitting it creates an empty-inventory
   // character, preserving the existing behaviour and all current tests).
@@ -570,7 +661,7 @@ charactersRouter.post("/characters", async (req, res) => {
   }
 
   const derived = deriveCreatedCharacter(
-    { abilityScores: input.abilityScores, skillProficiencies },
+    { abilityScores: input.abilityScores, skillProficiencies, toolProficiencies: creationToolProfs },
     { race, characterClass }
   );
 
@@ -582,6 +673,9 @@ charactersRouter.post("/characters", async (req, res) => {
       experiencePoints: input.experiencePoints ?? 0,
       abilityScores: input.abilityScores,
       ...derived,
+      // toolProficiencies is ToolProficiencyEntry[] from srd.ts; Prisma
+      // expects InputJsonValue for Json columns — safe to cast here.
+      toolProficiencies: derived.toolProficiencies as unknown as Prisma.InputJsonValue,
       // Override derived currency with starting gold if the gold path was chosen.
       ...(startingCurrency ? { currency: startingCurrency } : {}),
       // Prisma represents an explicit JSON null distinctly from "field
