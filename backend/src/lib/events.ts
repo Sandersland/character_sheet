@@ -9,7 +9,8 @@ export type EventCategory =
   | "currency"
   | "spellcasting"
   | "class"
-  | "resources";
+  | "resources"
+  | "advancement";
 
 export type EventType =
   // inventory
@@ -53,6 +54,11 @@ export type EventType =
   | "learnToolProficiency"
   | "forgetToolProficiency"
   | "toolProficienciesReconciled"
+  // advancement (ASI + feats)
+  | "abilityScoreImprovement"
+  | "featTaken"
+  | "advancementRemoved"
+  | "advancementsReconciled"
   // meta
   | "revert";
 

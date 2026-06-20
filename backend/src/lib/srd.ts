@@ -2572,6 +2572,27 @@ export function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
 }
 
+// ── Ability Score Improvement / Feat slot table ───────────────────────────────
+// Per 5e PHB: most classes get ASI slots at levels 4, 8, 12, 16, 19.
+// Fighter gets two extras (levels 6 and 14); Rogue gets one extra (level 10).
+// Returns the *total* number of slots the character has earned at `level`.
+
+const BASE_ASI_LEVELS = [4, 8, 12, 16, 19];
+const EXTRA_ASI_LEVELS: Record<string, number[]> = {
+  fighter: [6, 14],
+  rogue:   [10],
+};
+
+/**
+ * Returns the cumulative number of Ability Score Improvement / Feat slots
+ * the character has earned at `level`. Homebrew / unknown classes fall back
+ * to the base 5-slot schedule.
+ */
+export function advancementSlotsForLevel(className: string, level: number): number {
+  const extra = EXTRA_ASI_LEVELS[className.toLowerCase()] ?? [];
+  return [...BASE_ASI_LEVELS, ...extra].filter((l) => level >= l).length;
+}
+
 /** Parses a hit die string like "d8" into its face value (8). */
 export function hitDieFace(hitDie: string): number {
   return Number(hitDie.replace(/^d/i, ""));

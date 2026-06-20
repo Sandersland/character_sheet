@@ -42,11 +42,36 @@ export interface ToolProfEntry {
   name: string; // matches a TOOLS entry name
 }
 
+/**
+ * One taken Ability Score Improvement or feat.
+ * Stores the deltas applied so reversal subtracts exactly what was added —
+ * never recomputes from ability scores, which may have changed since.
+ */
+export interface AdvancementEntry {
+  id: string;                            // per-character entry UUID (operation target)
+  level: number;                         // character level when taken (informational)
+  kind: "asi" | "feat";
+  /** The raw score increases applied: e.g. { strength: 2 } or { dexterity: 1, constitution: 1 } */
+  abilityDeltas: Record<string, number>;
+  /** HP added to hitPoints.max/current (CON-mod change × hitDice.total). */
+  hpDelta: number;
+  /** Addend applied to initiativeBonus (DEX-mod change). */
+  initDelta: number;
+  /** Catalog Feat.id provenance — undefined for ASI or custom feat. */
+  featId?: string;
+  /** Display name snapshot taken at time of choice (for feats). */
+  featName?: string;
+  /** Description snapshot taken at time of choice (for feats). */
+  featDescription?: string;
+}
+
 export interface ResourcesMutableState {
   used: Record<string, number>;
   maneuversKnown: ManeuverEntry[];
   /** Level-gated tool proficiency choices (currently: Student of War). */
   toolProficienciesKnown: ToolProfEntry[];
+  /** Ability Score Improvements and feats taken, in the order chosen. */
+  advancements: AdvancementEntry[];
 }
 
 // ── Normalizer ────────────────────────────────────────────────────────────────
@@ -55,13 +80,14 @@ export interface ResourcesMutableState {
 
 export function normalizeResourcesMutable(json: Prisma.JsonValue): ResourcesMutableState {
   if (!json || typeof json !== "object" || Array.isArray(json)) {
-    return { used: {}, maneuversKnown: [], toolProficienciesKnown: [] };
+    return { used: {}, maneuversKnown: [], toolProficienciesKnown: [], advancements: [] };
   }
   const obj = json as Record<string, unknown>;
   return {
     used: (obj.used as Record<string, number>) ?? {},
     maneuversKnown: (obj.maneuversKnown as ManeuverEntry[]) ?? [],
     toolProficienciesKnown: (obj.toolProficienciesKnown as ToolProfEntry[]) ?? [],
+    advancements: (obj.advancements as AdvancementEntry[]) ?? [],
   };
 }
 
@@ -75,6 +101,7 @@ export function serializeResourcesState(state: ResourcesMutableState): Prisma.In
     used: state.used,
     maneuversKnown: state.maneuversKnown,
     toolProficienciesKnown: state.toolProficienciesKnown,
+    advancements: state.advancements,
   } as unknown as Prisma.InputJsonValue;
 }
 
@@ -184,6 +211,7 @@ export async function applyResourceOperations(
           used: { ...state.used },
           maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
           toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
+          advancements: state.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
         },
       };
 
@@ -379,6 +407,7 @@ export async function applyResourceOperations(
           used: { ...state.used },
           maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
           toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
+          advancements: state.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
         },
       };
 

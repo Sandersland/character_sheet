@@ -16,6 +16,7 @@ import { prisma } from "../lib/prisma.js";
 import { normalizeHitDice, normalizeHitPoints } from "../lib/hitpoints.js";
 import {
   ALIGNMENTS,
+  advancementSlotsForLevel,
   deriveCreatedCharacter,
   deriveResources,
   deriveSpellcasting,
@@ -26,6 +27,7 @@ import {
   type ToolProficiencyEntry,
 } from "../lib/srd.js";
 import { normalizeResourcesMutable, type ToolProfEntry } from "../lib/resources.js";
+import { reverseAdvancementEffects } from "../lib/advancement.js";
 import { normalizeSpellcastingMutable } from "../lib/spellcasting.js";
 
 export const charactersRouter = Router();
@@ -134,7 +136,7 @@ function buildMergedToolProficiencies(
 export function serializeCharacter(row: CharacterWithRelations) {
   const progress = experienceProgress(row.experiencePoints);
   const primaryClass = row.classEntries[0];
-  const hitPoints = normalizeHitPoints(row.hitPoints);
+  let hitPoints = normalizeHitPoints(row.hitPoints);
   const hitDice = normalizeHitDice(row.hitDice);
 
   // Derive spellcasting stats at read time (ability, DC, attack, slot totals)
@@ -214,6 +216,33 @@ export function serializeCharacter(row: CharacterWithRelations) {
     };
   }
 
+  // ── Advancement clamp-on-read ─────────────────────────────────────────────
+  // Mirrors the reconcile-on-write in level-reconciliation.ts: if the stored
+  // advancements array exceeds the level-derived slot count (e.g. the character
+  // hasn't had a reconciling XP op since leveling down), cap the displayed
+  // values and derive effective ability scores / HP / initiative from the
+  // clamped list. This ensures the sheet always reflects a valid state.
+  const storedForAdv = normalizeResourcesMutable(row.resources);
+  const advSlotTotal = advancementSlotsForLevel(primaryClass?.name ?? "", progress.level);
+  let effectiveScores = row.abilityScores as Record<string, number>;
+  let effectiveInitBonus = row.initiativeBonus;
+  const clampedAdvancements = storedForAdv.advancements.slice(0, advSlotTotal);
+
+  if (clampedAdvancements.length < storedForAdv.advancements.length) {
+    // Some advancements are beyond the cap — reverse the excess ones to compute
+    // effective display values (without writing; reconcile-on-write handles that).
+    const excess = storedForAdv.advancements.slice(advSlotTotal);
+    const reversed = reverseAdvancementEffects(
+      effectiveScores,
+      hitPoints,
+      effectiveInitBonus,
+      excess,
+    );
+    effectiveScores = reversed.scores;
+    hitPoints = reversed.hitPoints;
+    effectiveInitBonus = reversed.initiativeBonus;
+  }
+
   return {
     id: row.id,
     name: row.name,
@@ -227,7 +256,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     portraitUrl: row.portraitUrl ?? undefined,
 
     armorClass: row.armorClass,
-    initiativeBonus: row.initiativeBonus,
+    initiativeBonus: effectiveInitBonus,
     speed: row.speed,
     proficiencyBonus: progress.proficiencyBonus,
 
@@ -241,7 +270,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
 
     hitPoints,
     hitDice,
-    abilityScores: row.abilityScores,
+    abilityScores: effectiveScores,
     savingThrowProficiencies: row.savingThrowProficiencies,
     skills: row.skills,
     // Merged tool proficiency list — creation-fixed entries (stored in
@@ -258,6 +287,15 @@ export function serializeCharacter(row: CharacterWithRelations) {
     currency: row.currency,
     spellcasting,
     resources,
+
+    // Advancements (ASI + feats) — top-level so every class sees them,
+    // independent of whether deriveResources returns a non-null value.
+    advancements: clampedAdvancements,
+    advancementSlots: {
+      total: advSlotTotal,
+      used: clampedAdvancements.length,
+    },
+
     journal: row.journal,
 
     // Structured, multiclass-aware view alongside the flattened

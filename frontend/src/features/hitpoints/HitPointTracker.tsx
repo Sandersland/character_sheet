@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { applyHitPointOperations } from "@/api/client";
 import { rollDie } from "@/lib/dice";
@@ -127,6 +127,17 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
   const [levelUpOpen, setLevelUpOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [advancementCallout, setAdvancementCallout] = useState(false);
+
+  // Detect when a level-up unlocks a new advancement slot.
+  const prevAdvancementTotal = useRef(character.advancementSlots.total);
+  useEffect(() => {
+    const newTotal = character.advancementSlots.total;
+    if (newTotal > prevAdvancementTotal.current) {
+      setAdvancementCallout(true);
+    }
+    prevAdvancementTotal.current = newTotal;
+  }, [character.advancementSlots.total]);
 
   const isDying = hitPoints.current === 0;
 
@@ -193,6 +204,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
     const roll = method === "roll" ? rollDie(faces) : undefined;
     const ok = await submit([{ type: "levelUp", method, roll }]);
     if (ok) setLevelUpOpen(false);
+    // Advancement callout is triggered by the useEffect watching advancementSlots.total.
   }
 
   return (
@@ -408,6 +420,25 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
               className="rounded-control bg-gold-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-gold-800 disabled:opacity-50"
             >
               Level up
+            </button>
+          </div>
+        )}
+
+        {/* ── Advancement slot unlocked callout ── */}
+        {advancementCallout && (
+          <div className="flex items-center justify-between gap-3 rounded-card border border-arcane-300 bg-arcane-50 px-3 py-2">
+            <span className="text-sm font-semibold text-arcane-800">
+              New advancement slot! Choose an ASI or feat.
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setAdvancementCallout(false);
+                document.getElementById("advancement-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              className="rounded-control bg-arcane-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-arcane-800"
+            >
+              Go to Advancements
             </button>
           </div>
         )}
