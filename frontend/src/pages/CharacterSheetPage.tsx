@@ -6,6 +6,7 @@ import ActivityModal from "@/features/character-meta/ActivityModal";
 import BackendStatus from "@/features/character-meta/BackendStatus";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
+import ClassFeaturesSection from "@/features/class/ClassFeaturesSection";
 import DeleteCharacterModal from "@/features/character-meta/DeleteCharacterModal";
 import ExperienceTracker from "@/features/experience/ExperienceTracker";
 import HitPointTracker from "@/features/hitpoints/HitPointTracker";
@@ -15,11 +16,13 @@ import SkillsTable from "@/features/abilities/SkillsTable";
 import SpellsSection from "@/features/spells/SpellsSection";
 import VitalsStrip from "@/features/character-meta/VitalsStrip";
 import { useCharacter } from "@/hooks/useCharacter";
+import { useReferenceData } from "@/hooks/useReferenceData";
 import { ABILITY_LABELS } from "@/lib/abilities";
 
 export default function CharacterSheetPage() {
   const { id } = useParams();
   const { character, error, setCharacter } = useCharacter(id);
+  const { reference } = useReferenceData();
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
 
@@ -192,6 +195,23 @@ export default function CharacterSheetPage() {
             </Card>
           )}
         </div>
+
+        {/* Class features — shown whenever the character has a subclass with
+            derived resources or features (Battle Master superiority dice,
+            static features, maneuvers, etc.). Also renders when eligible for a
+            subclass selection (e.g. Fighter reaching level 3). */}
+        {(character.resources || (reference && (() => {
+          const classDef = reference.classes.find((c) => c.name === character.class);
+          return classDef && character.level >= classDef.subclassLevel && !character.subclassId && classDef.subclasses.length > 0;
+        })())) && (
+          <Card title="Class Features" className="p-4">
+            <ClassFeaturesSection
+              character={character}
+              referenceClasses={reference?.classes ?? []}
+              onUpdate={setCharacter}
+            />
+          </Card>
+        )}
 
         {character.spellcasting && (
           <Card title="Journal" className="p-4">

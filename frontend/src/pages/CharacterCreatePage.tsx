@@ -91,7 +91,11 @@ export default function CharacterCreatePage() {
         alignment: draft.alignment,
         race: draft.race,
         background: backgroundNameForSubmit,
-        classes: [{ name: draft.className, subclass: draft.subclass.trim() || null }],
+        classes: [{
+          name: draft.className,
+          subclass: draft.subclass.trim() || null,
+          subclassId: draft.subclassId || undefined,
+        }],
         abilityScores: draft.abilityScores,
         skillProficiencies: [...grantedSkills, ...selectedClassChoices],
         portraitUrl: draft.portraitUrl.trim() || null,
@@ -192,14 +196,15 @@ export default function CharacterCreatePage() {
                   <select
                     value={draft.className}
                     onChange={(e) => {
-                      // Changing class resets both skill choices and equipment
-                      // selection — the new class has different options.
+                      // Changing class resets skill choices, equipment, and subclass.
                       const newClassName = e.target.value;
                       const newClassDef = reference.classes.find(
                         (c) => c.name === newClassName
                       );
                       update({
                         className: newClassName,
+                        subclass: "",
+                        subclassId: "",
                         skillProficiencies: [],
                         equipmentDraft:
                           newClassDef?.startingEquipment
@@ -218,16 +223,43 @@ export default function CharacterCreatePage() {
                   </select>
                 </label>
 
-                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
-                  Subclass (optional)
-                  <input
-                    type="text"
-                    value={draft.subclass}
-                    onChange={(e) => update({ subclass: e.target.value })}
-                    placeholder="e.g. School of Evocation"
-                    className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
-                  />
-                </label>
+                {/* Subclass picker — a class-aware select for L1 subclasses (Cleric,
+                    Sorcerer, Warlock); disabled with explanatory text for classes that
+                    grant their subclass later (Fighter L3, Wizard L2, etc.). */}
+                {(() => {
+                  const classDef = reference.classes.find((c) => c.name === draft.className);
+                  if (!classDef || classDef.subclasses.length === 0) return null;
+                  const unlockedAtCreation = classDef.subclassLevel === 1;
+                  return (
+                    <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
+                      Subclass
+                      {unlockedAtCreation ? (
+                        <select
+                          value={draft.subclassId}
+                          onChange={(e) => {
+                            const selected = classDef.subclasses.find((s) => s.id === e.target.value);
+                            update({
+                              subclassId: e.target.value,
+                              subclass: selected?.name ?? "",
+                            });
+                          }}
+                          className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
+                        >
+                          <option value="">Select subclass…</option>
+                          {classDef.subclasses.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="rounded-control border border-parchment-200 bg-parchment-100 px-2 py-1.5 text-sm font-normal normal-case text-parchment-500">
+                          Chosen at level {classDef.subclassLevel}
+                        </div>
+                      )}
+                    </label>
+                  );
+                })()}
 
                 <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
                   Background

@@ -86,6 +86,8 @@ Additive changes (new model, new enum value via `ALTER TYPE ADD VALUE`) are safe
 ### 2. Rules data (if any)
 If the feature has 5e rules logic, add it to `backend/src/lib/srd.ts` (or `experience.ts` for XP math). Never inline rules in a route or duplicate them on the frontend.
 
+> **Level-gated feature?** If the feature's availability or count depends on character level (feats, ASI, subclass unlocks, etc.), follow the reconciliation pattern in `.claude/docs/leveling.md` in addition to this recipe. The transaction-handler checklist below still applies, but you also need a reconciler + read-clamp.
+
 ### 3. `lib/<domain>.ts` — operation handler
 - Define op types (discriminated union) and any domain errors (`class FooError extends Error {}`).
 - `export async function apply<Domain>Operations(characterId, ops)`: one `randomUUID()` batchId → `prisma.$transaction` → per-op: validate, mutate, `logEvent(tx, { category, type, summary, before, after, batchId })`.

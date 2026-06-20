@@ -17,10 +17,12 @@ import { normalizeHitDice, normalizeHitPoints } from "../lib/hitpoints.js";
 import {
   ALIGNMENTS,
   deriveCreatedCharacter,
+  deriveResources,
   deriveSpellcasting,
   PACK_CONTENTS,
   STARTING_EQUIPMENT,
 } from "../lib/srd.js";
+import { normalizeResourcesMutable } from "../lib/resources.js";
 import { normalizeSpellcastingMutable } from "../lib/spellcasting.js";
 
 export const charactersRouter = Router();
@@ -107,7 +109,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
     primaryClass?.name ?? "",
     progress.level,
     abilityScoresMap,
-    progress.proficiencyBonus
+    progress.proficiencyBonus,
+    primaryClass?.subclass ?? undefined,
   );
 
   let spellcasting: object | undefined;
@@ -129,8 +132,43 @@ export function serializeCharacter(row: CharacterWithRelations) {
   } else if (row.spellcasting !== null && row.spellcasting !== undefined) {
     // Fallback for unsupported caster classes (Warlock Pact Magic, half/third
     // casters): pass the stored blob as-is so the UI still renders.
-    // TODO: add half-caster / Pact Magic progressions and derive these too.
     spellcasting = row.spellcasting as object;
+  }
+
+  // Derive class/subclass resources at read time — same derive-don't-persist
+  // pattern as spellcasting. Only `used` counts and maneuversKnown persist.
+  const derivedRes = deriveResources(
+    primaryClass?.name ?? "",
+    primaryClass?.subclass ?? undefined,
+    progress.level,
+    abilityScoresMap,
+    progress.proficiencyBonus,
+  );
+
+  let resources: object | undefined;
+  if (derivedRes) {
+    const stored = normalizeResourcesMutable(row.resources);
+    resources = {
+      features: derivedRes.features,
+      maneuverChoiceCount: derivedRes.maneuverChoiceCount,
+      maneuverSaveDC: derivedRes.maneuverSaveDC,
+      pools: derivedRes.resources.map((pool) => ({
+        key: pool.key,
+        label: pool.label,
+        total: pool.total,
+        die: pool.die,
+        recharge: pool.recharge,
+        description: pool.description,
+        used: Math.min(pool.total, stored.used[pool.key] ?? 0),
+        remaining: pool.total - Math.min(pool.total, stored.used[pool.key] ?? 0),
+      })),
+      // Clamp to the level-derived cap (defense-in-depth for characters who
+      // haven't had a reconciling XP op yet after their level dropped).
+      maneuversKnown:
+        derivedRes.maneuverChoiceCount !== undefined
+          ? stored.maneuversKnown.slice(0, derivedRes.maneuverChoiceCount)
+          : stored.maneuversKnown,
+    };
   }
 
   return {
@@ -139,6 +177,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     race: row.raceSelection?.name ?? "",
     class: primaryClass?.name ?? "",
     subclass: primaryClass?.subclass ?? undefined,
+    subclassId: primaryClass?.subclassId ?? undefined,
     level: progress.level,
     background: row.backgroundSelection?.name ?? "",
     alignment: row.alignment,
@@ -165,6 +204,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     inventory: row.inventoryItems.map(serializeInventoryItem),
     currency: row.currency,
     spellcasting,
+    resources,
     journal: row.journal,
 
     // Structured, multiclass-aware view alongside the flattened
@@ -173,6 +213,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
       name: entry.name,
       level: entry.level,
       subclass: entry.subclass ?? undefined,
+      subclassId: entry.subclassId ?? undefined,
       classId: entry.classId ?? undefined,
     })),
   };
@@ -223,6 +264,10 @@ const abilityScoresSchema = z.object({
 const classChoiceSchema = z.object({
   name: z.string().min(1),
   subclass: z.string().nullable().optional(),
+  // Catalog subclass FK — required when the class grants its subclass at
+  // creation level (Cleric L1, Sorcerer L1, Warlock L1). Null/absent for
+  // classes whose subclass is chosen post-creation (Fighter L3, etc.).
+  subclassId: z.string().optional(),
 });
 
 // One entry per choice group sent by the frontend when mode:"package". Each
@@ -327,6 +372,37 @@ charactersRouter.post("/characters", async (req, res) => {
     where: { name: primaryClassChoice.name },
   });
   const background = await prisma.background.findUnique({ where: { name: input.background } });
+
+  // Validate subclass choice when provided: must belong to the chosen class
+  // and only classes that grant subclasses at level 1 can have one at creation.
+  let resolvedSubclassId: string | null = null;
+  let resolvedSubclassName: string | null = null;
+  if (primaryClassChoice.subclassId && characterClass) {
+    const subclass = await prisma.subclass.findUnique({
+      where: { id: primaryClassChoice.subclassId },
+    });
+    if (!subclass) {
+      res.status(400).json({ error: `Unknown subclass id: ${primaryClassChoice.subclassId}` });
+      return;
+    }
+    if (subclass.classId !== characterClass.id) {
+      res
+        .status(400)
+        .json({ error: `Subclass "${subclass.name}" does not belong to ${characterClass.name}` });
+      return;
+    }
+    if (characterClass.subclassLevel > 1) {
+      res.status(400).json({
+        error: `${characterClass.name} grants its subclass at level ${characterClass.subclassLevel}, not at creation (level 1)`,
+      });
+      return;
+    }
+    resolvedSubclassId = subclass.id;
+    resolvedSubclassName = subclass.name;
+  } else if (primaryClassChoice.subclass && !primaryClassChoice.subclassId) {
+    // Legacy: plain string subclass name with no id (homebrew / pre-catalog).
+    resolvedSubclassName = primaryClassChoice.subclass;
+  }
 
   // Mechanical derivation needs a catalog anchor for race + class. The
   // background only grants skill-proficiency choices (no mechanical
@@ -520,7 +596,8 @@ charactersRouter.post("/characters", async (req, res) => {
         create: [
           {
             name: primaryClassChoice.name,
-            subclass: primaryClassChoice.subclass ?? null,
+            subclass: resolvedSubclassName,
+            subclassId: resolvedSubclassId,
             classId: characterClass.id,
             position: 0,
           },

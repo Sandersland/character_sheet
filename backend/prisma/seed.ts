@@ -30,6 +30,7 @@ const CLASSES = [
     skillChoiceCount: 2,
     skillChoices: ["arcana", "history", "insight", "investigation", "medicine", "religion"],
     isSpellcaster: true,
+    subclassLevel: 2,
   },
   {
     name: "Fighter",
@@ -47,6 +48,7 @@ const CLASSES = [
       "survival",
     ],
     isSpellcaster: false,
+    subclassLevel: 3,
   },
   {
     name: "Rogue",
@@ -67,6 +69,7 @@ const CLASSES = [
       "stealth",
     ],
     isSpellcaster: false,
+    subclassLevel: 3,
   },
   {
     name: "Cleric",
@@ -75,6 +78,7 @@ const CLASSES = [
     skillChoiceCount: 2,
     skillChoices: ["history", "insight", "medicine", "persuasion", "religion"],
     isSpellcaster: true,
+    subclassLevel: 1,
   },
   {
     name: "Barbarian",
@@ -83,6 +87,7 @@ const CLASSES = [
     skillChoiceCount: 2,
     skillChoices: ["animalHandling", "athletics", "intimidation", "nature", "perception", "survival"],
     isSpellcaster: false,
+    subclassLevel: 3,
   },
   {
     name: "Bard",
@@ -110,6 +115,203 @@ const CLASSES = [
       "survival",
     ],
     isSpellcaster: true,
+    subclassLevel: 3,
+  },
+];
+
+// --- Subclass catalog -------------------------------------------------------
+// Class-keyed subclass catalog powering the character-creation dropdown and
+// post-creation setSubclass transaction. Only classes/subclasses currently
+// covered by SEED_CHARACTERS need full mechanics support in srd.ts — others
+// are included for creation UX completeness.
+interface SubclassSeed {
+  className: string;    // must match an entry in CLASSES
+  name: string;
+  description: string;
+}
+
+const SUBCLASSES: SubclassSeed[] = [
+  // ── Fighter ────────────────────────────────────────────────────────────────
+  {
+    className: "Fighter",
+    name: "Battle Master",
+    description:
+      "Masters of tactical martial combat. You learn special maneuvers fueled by superiority dice (d8s). You know 3 maneuvers at level 3, gaining more at higher levels. Superiority dice refresh on a short or long rest.",
+  },
+  {
+    className: "Fighter",
+    name: "Champion",
+    description:
+      "A paragon of physical might. Your critical hit range expands (19–20 at level 3, 18–20 at level 15), and you gain additional combat benefits including second wind improvements.",
+  },
+  {
+    className: "Fighter",
+    name: "Eldritch Knight",
+    description:
+      "A warrior who weaves abjuration and evocation magic into combat. You gain spellcasting using Intelligence, following the third-caster progression (slots start at level 3).",
+  },
+  // ── Wizard ────────────────────────────────────────────────────────────────
+  {
+    className: "Wizard",
+    name: "School of Evocation",
+    description:
+      "You focus your study on magic that creates powerful elemental effects. Sculpt Spells lets you protect allies from area-of-effect spells; Empowered Evocation adds your Intelligence modifier to evocation spell damage.",
+  },
+  {
+    className: "Wizard",
+    name: "School of Abjuration",
+    description:
+      "A specialist in protective and warding magic. You gain an Arcane Ward that absorbs damage, and can extend its protection to allies.",
+  },
+  {
+    className: "Wizard",
+    name: "School of Illusion",
+    description:
+      "You study magic that dazzles the senses and tricks the mind. Improved Minor Illusion and Malleable Illusions let you push the boundaries of what can appear real.",
+  },
+  // ── Rogue ─────────────────────────────────────────────────────────────────
+  {
+    className: "Rogue",
+    name: "Arcane Trickster",
+    description:
+      "You combine roguish skill with arcane magic, learning enchantment and illusion spells using Intelligence following the third-caster progression. Mage Hand becomes an extension of your cunning.",
+  },
+  {
+    className: "Rogue",
+    name: "Assassin",
+    description:
+      "Trained in the art of swift, lethal strikes. You gain proficiency with disguise and poisoner's kits, and deal massive damage to surprised targets with Assassinate.",
+  },
+  // ── Cleric ────────────────────────────────────────────────────────────────
+  {
+    className: "Cleric",
+    name: "Life Domain",
+    description:
+      "Devoted to the positive energy that sustains life. You gain heavy armor proficiency and powerful healing features including Disciple of Life (healing spells restore additional HP) and Blessed Healer.",
+  },
+  {
+    className: "Cleric",
+    name: "Trickery Domain",
+    description:
+      "A champion of deception and infiltration. You gain access to domain spells like Charm Person and Disguise Self, and can grant allies the ability to attack with advantage using your Blessing of the Trickster.",
+  },
+  // ── Barbarian ─────────────────────────────────────────────────────────────
+  {
+    className: "Barbarian",
+    name: "Totem Warrior",
+    description:
+      "You forge a connection to a spirit animal. Totem choices include Bear (resistance while raging), Eagle (disengage/dash as bonus action), and Wolf (allies have advantage on melee attacks vs. nearby targets).",
+  },
+  {
+    className: "Barbarian",
+    name: "Berserker",
+    description:
+      "You channel a battle frenzy beyond normal rage. Frenzied Rage lets you make a bonus attack each turn, and Mindless Rage makes you immune to the charmed and frightened conditions while raging.",
+  },
+  // ── Bard ─────────────────────────────────────────────────────────────────
+  {
+    className: "Bard",
+    name: "College of Lore",
+    description:
+      "Devoted to knowledge and cunning. You gain proficiency in three additional skills, Cutting Words to impose penalties on enemy rolls, and bonus spells from any class at level 6.",
+  },
+  {
+    className: "Bard",
+    name: "College of Valor",
+    description:
+      "A bard who fights as well as they inspire. You gain medium armor and shield proficiency, Combat Inspiration (allies add your Bardic Inspiration die to damage rolls), and Extra Attack at level 6.",
+  },
+];
+
+// --- Maneuver catalog -------------------------------------------------------
+// SRD Battle Master maneuvers. Seeded by name (unique); the known-maneuver
+// picker will fetch these from GET /api/maneuvers. Descriptions are concise
+// enough to render as inline tooltips without truncation.
+interface ManeuverSeed {
+  name: string;
+  description: string;
+}
+
+const MANEUVERS: ManeuverSeed[] = [
+  {
+    name: "Commander's Strike",
+    description:
+      "When you take the Attack action, forgo one of your attacks and use a bonus action to direct one ally to strike. Expend a superiority die; the ally uses their reaction to make one weapon attack and adds the die result to the damage roll.",
+  },
+  {
+    name: "Disarming Attack",
+    description:
+      "When you hit a creature with a weapon attack, expend a superiority die and add it to the damage roll. The target must make a Strength saving throw or drop one item of your choice. The item lands at its feet.",
+  },
+  {
+    name: "Distracting Strike",
+    description:
+      "When you hit a creature with a weapon attack, expend a superiority die and add it to the damage roll. The next attack roll against the target by someone other than you has advantage if made before the start of your next turn.",
+  },
+  {
+    name: "Evasive Footwork",
+    description:
+      "When you move, expend a superiority die and add it to your AC until you stop moving.",
+  },
+  {
+    name: "Feinting Attack",
+    description:
+      "As a bonus action, you can expend a superiority die and choose one creature within 5 feet. You have advantage on your next attack roll against that creature this turn. On a hit, add the die result to the damage roll.",
+  },
+  {
+    name: "Goading Attack",
+    description:
+      "When you hit a creature with a weapon attack, expend a superiority die and add it to the damage roll. The target must make a Wisdom saving throw or have disadvantage on all attack rolls against targets other than you until the end of your next turn.",
+  },
+  {
+    name: "Lunging Attack",
+    description:
+      "When you make a melee weapon attack, expend a superiority die to increase your reach by 5 feet. On a hit, add the die result to the damage roll.",
+  },
+  {
+    name: "Maneuvering Attack",
+    description:
+      "When you hit a creature with a weapon attack, expend a superiority die and add it to the damage roll. Choose one friendly creature. It can use its reaction to move up to half its speed without provoking opportunity attacks from the target.",
+  },
+  {
+    name: "Menacing Attack",
+    description:
+      "When you hit a creature with a weapon attack, expend a superiority die and add it to the damage roll. The target must make a Wisdom saving throw or be frightened of you until the end of your next turn.",
+  },
+  {
+    name: "Parry",
+    description:
+      "When you take damage from a melee attack, use your reaction to expend a superiority die and reduce the damage by the die result + your Dexterity modifier.",
+  },
+  {
+    name: "Precision Attack",
+    description:
+      "When you make a weapon attack roll, you can expend a superiority die and add the result to the roll. You can use this maneuver before or after making the attack roll, but before any effects of the attack are applied.",
+  },
+  {
+    name: "Pushing Attack",
+    description:
+      "When you hit a creature with a weapon attack, expend a superiority die and add it to the damage roll. If the target is Large or smaller, it must make a Strength saving throw or be pushed up to 15 feet away from you.",
+  },
+  {
+    name: "Rally",
+    description:
+      "As a bonus action, expend a superiority die to bolster one ally you can see within 60 feet. The ally gains temporary HP equal to the die result + your Charisma modifier.",
+  },
+  {
+    name: "Riposte",
+    description:
+      "When a creature misses you with a melee attack, use your reaction to expend a superiority die and make one melee weapon attack against that creature. On a hit, add the die result to the damage roll.",
+  },
+  {
+    name: "Sweeping Attack",
+    description:
+      "When you hit a creature with a melee weapon attack, expend a superiority die and attempt to hit a second creature within 5 feet of the first. If the original roll would have hit the second creature, it takes the die result in damage.",
+  },
+  {
+    name: "Trip Attack",
+    description:
+      "When you hit a creature with a weapon attack, expend a superiority die and add it to the damage roll. If the target is Large or smaller, it must make a Strength saving throw or be knocked prone.",
   },
 ];
 
@@ -1188,11 +1390,11 @@ const SEED_CHARACTERS = [
     ] satisfies SeedInventoryRow[],
     currency: { cp: 40, sp: 8, gp: 210, pp: 1 },
 
+    // Compact mutable-only format — slots/saveDC/attackBonus are now derived
+    // at read time via deriveSpellcasting (subclass "Arcane Trickster" triggers
+    // the third-caster progression). Level 6 → 1 level-1 slot used.
     spellcasting: {
-      ability: "intelligence",
-      spellSaveDC: 13,
-      spellAttackBonus: 5,
-      slots: [{ level: 1, total: 3, used: 1 }],
+      slotsUsed: { "1": 1 },
       spells: [
         {
           id: "s1",
@@ -1284,6 +1486,29 @@ async function main() {
     classIds.set(row.name, row.id);
   }
 
+  // Seed subclasses — upsert by (classId, name) unique constraint.
+  // Build a map keyed by "<ClassName>/<SubclassName>" for the SEED_CHARACTERS loop.
+  const subclassIdsByClassAndName = new Map<string, string>();
+  for (const sub of SUBCLASSES) {
+    const classId = classIds.get(sub.className);
+    if (!classId) throw new Error(`Seed error: unknown class "${sub.className}" in SUBCLASSES`);
+    const row = await prisma.subclass.upsert({
+      where: { classId_name: { classId, name: sub.name } },
+      create: { classId, name: sub.name, description: sub.description },
+      update: { description: sub.description },
+    });
+    subclassIdsByClassAndName.set(`${sub.className}/${sub.name}`, row.id);
+  }
+
+  // Seed maneuver catalog — upsert by unique name.
+  for (const maneuver of MANEUVERS) {
+    await prisma.maneuver.upsert({
+      where: { name: maneuver.name },
+      create: maneuver,
+      update: { description: maneuver.description },
+    });
+  }
+
   const backgroundIds = new Map<string, string>();
   for (const background of BACKGROUNDS) {
     const row = await prisma.background.upsert({
@@ -1319,6 +1544,10 @@ async function main() {
     const raceId = raceIds.get(race);
     const classId = classIds.get(className);
     const backgroundId = backgroundIds.get(background);
+    // Resolve catalog subclassId from the seed character's subclass name (if any).
+    const subclassId = subclass
+      ? (subclassIdsByClassAndName.get(`${className}/${subclass}`) ?? null)
+      : null;
     const inventoryItems = inventory.map((row, position) =>
       resolveInventoryRow(row, position, catalogByName, itemIdsByName)
     );
@@ -1329,7 +1558,7 @@ async function main() {
         ...character,
         raceSelection: { create: { name: race, raceId } },
         backgroundSelection: { create: { name: background, backgroundId } },
-        classEntries: { create: [{ name: className, subclass, classId, position: 0 }] },
+        classEntries: { create: [{ name: className, subclass, subclassId, classId, position: 0 }] },
         inventoryItems: { create: inventoryItems },
       },
       update: {
@@ -1345,7 +1574,7 @@ async function main() {
         // than risking duplicates.
         classEntries: {
           deleteMany: {},
-          create: [{ name: className, subclass, classId, position: 0 }],
+          create: [{ name: className, subclass, subclassId, classId, position: 0 }],
         },
         inventoryItems: {
           deleteMany: {},

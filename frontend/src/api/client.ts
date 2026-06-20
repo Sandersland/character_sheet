@@ -1,8 +1,10 @@
 import type {
+  CatalogManeuver,
   CatalogSpell,
   Character,
   CharacterEvent,
   CharacterSummary,
+  ClassOperation,
   CreateCharacterInput,
   ExperienceOperation,
   HitPointOperation,
@@ -10,6 +12,7 @@ import type {
   Item,
   LedgerEntry,
   ReferenceData,
+  ResourceOperation,
   SpellcastingOperation,
 } from "@/types/character";
 
@@ -211,6 +214,51 @@ export async function fetchActivity(
   const response = await fetch(`${API_URL}/characters/${characterId}/activity${query}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch activity (${response.status})`);
+  }
+  return response.json();
+}
+
+// Feeds the class-features section's "learn a maneuver" picker. Ordered
+// alphabetically server-side; no client-side re-sort needed.
+export async function fetchManeuvers(): Promise<CatalogManeuver[]> {
+  const response = await fetch(`${API_URL}/maneuvers`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch maneuver catalog (${response.status})`);
+  }
+  return response.json();
+}
+
+// Applies a batch of resource operations atomically (spend/restore resource
+// pools, learn/forget maneuvers). Full updated Character returned on success.
+export async function applyResourceTransactions(
+  characterId: string,
+  operations: ResourceOperation[]
+): Promise<Character> {
+  const response = await fetch(`${API_URL}/characters/${characterId}/resources/transactions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ operations }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to apply resource operations (${response.status})`);
+  }
+  return response.json();
+}
+
+// Applies class-level mutations (today: setSubclass). Returns the updated character.
+export async function applyClassTransactions(
+  characterId: string,
+  operations: ClassOperation[]
+): Promise<Character> {
+  const response = await fetch(`${API_URL}/characters/${characterId}/class/transactions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ operations }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to apply class operations (${response.status})`);
   }
   return response.json();
 }

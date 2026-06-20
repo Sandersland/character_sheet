@@ -280,7 +280,14 @@ export interface LedgerEntry {
 
 // ── Unified activity timeline ─────────────────────────────────────────────────
 
-export type CharacterEventCategory = "inventory" | "hitPoints" | "experience" | "currency" | "spellcasting";
+export type CharacterEventCategory =
+  | "inventory"
+  | "hitPoints"
+  | "experience"
+  | "currency"
+  | "spellcasting"
+  | "class"
+  | "resources";
 
 export type CharacterEventType =
   | "acquired" | "consumed" | "sold" | "bought" | "removed"  // inventory
@@ -290,6 +297,9 @@ export type CharacterEventType =
   | "currencyAdjust"                                           // currency
   | "castSpell" | "expendSlot" | "restoreSlot"                // spellcasting
   | "learnSpell" | "forgetSpell" | "prepareSpell" | "unprepareSpell" // spellcasting (cont.)
+  | "subclassChosen"                                           // class
+  | "spendResource" | "restoreResource"                       // resources
+  | "learnManeuver" | "forgetManeuver"                        // resources (cont.)
   | "revert";                                                  // meta
 
 export interface CharacterEventField {
@@ -407,12 +417,76 @@ export interface JournalEntry {
   body: string;
 }
 
+// ── Class feature types ───────────────────────────────────────────────────────
+
+export type RechargeOn = "shortRest" | "longRest" | "short-or-long" | "none";
+
+export interface ResourcePool {
+  key: string;
+  label: string;
+  total: number;
+  die?: string;        // e.g. "d8"
+  recharge: RechargeOn;
+  description?: string;
+  used: number;
+  remaining: number;
+}
+
+export interface ClassFeature {
+  name: string;
+  level: number;
+  description: string;
+  source: "class" | "subclass";
+}
+
+/** A known maneuver entry on a character — per-character entry with catalog provenance. */
+export interface ManeuverEntry {
+  id: string;
+  maneuverId?: string;   // catalog Maneuver.id provenance — undefined for custom
+  name: string;
+  description: string;
+}
+
+/** Catalog maneuver served by GET /api/maneuvers. */
+export interface CatalogManeuver {
+  id: string;
+  name: string;
+  description: string;
+}
+
+/** Derived class/subclass resource data merged with stored mutable state. */
+export interface CharacterResources {
+  features: ClassFeature[];
+  maneuverChoiceCount?: number;
+  maneuverSaveDC?: number;
+  pools: ResourcePool[];
+  maneuversKnown: ManeuverEntry[];
+}
+
+/** One entry in `Character.classes` — structured multiclass-aware view. */
+export interface ClassEntry {
+  name: string;
+  level: number;
+  subclass?: string;
+  subclassId?: string;
+  classId?: string;
+}
+
+// ── Subclass option (from GET /api/reference) ─────────────────────────────────
+
+export interface SubclassOption {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export interface Character {
   id: string;
   name: string;
   race: string;
   class: string;
   subclass?: string;
+  subclassId?: string;
   level: number;
   experiencePoints: number;
   currentLevelThreshold: number;
@@ -454,6 +528,10 @@ export interface Character {
     slots: SpellSlots[];
     spells: Spell[];
   };
+
+  resources?: CharacterResources;
+
+  classes?: ClassEntry[];
 
   journal: JournalEntry[];
 }
@@ -532,6 +610,10 @@ export interface ClassOption {
   skillChoiceCount: number;
   skillChoices: SkillName[];
   isSpellcaster: boolean;
+  /** Character level at which this class grants a subclass (1, 2, or 3). */
+  subclassLevel: number;
+  /** Available subclasses for this class, ordered alphabetically. */
+  subclasses: SubclassOption[];
   /** Starting equipment definition, null if the class has no package defined. */
   startingEquipment: ClassStartingEquipment | null;
 }
@@ -569,7 +651,7 @@ export interface CreateCharacterInput {
   experiencePoints?: number;
   race: string;
   background: string;
-  classes: [{ name: string; subclass?: string | null }];
+  classes: [{ name: string; subclass?: string | null; subclassId?: string }];
   abilityScores: AbilityScores;
   skillProficiencies?: SkillName[];
   startingEquipment?: StartingEquipmentInput;
@@ -624,6 +706,25 @@ export type SpellcastingOperation =
   | ForgetSpellOperation
   | PrepareSpellOperation
   | UnprepareSpellOperation;
+
+// ── Class operation types (mirrors backend/src/lib/class.ts) ─────────────────
+// Sent as `{ operations: ClassOperation[] }` to POST /api/characters/:id/class/transactions.
+
+export interface SetSubclassOperation { type: "setSubclass"; subclassId: string }
+export type ClassOperation = SetSubclassOperation;
+
+// ── Resource operation types (mirrors backend/src/lib/resources.ts) ──────────
+// Sent as `{ operations: ResourceOperation[] }` to POST /api/characters/:id/resources/transactions.
+
+export interface SpendResourceOperation { type: "spendResource"; key: string; amount?: number; roll?: number }
+export interface RestoreResourceOperation { type: "restoreResource"; key: string; amount?: number }
+export interface LearnManeuverOperation { type: "learnManeuver"; maneuverId?: string; custom?: { name: string; description: string } }
+export interface ForgetManeuverOperation { type: "forgetManeuver"; entryId: string }
+export type ResourceOperation =
+  | SpendResourceOperation
+  | RestoreResourceOperation
+  | LearnManeuverOperation
+  | ForgetManeuverOperation;
 
 // ── XP operation types (mirrors backend/src/lib/experience-ops.ts) ──────────
 // Sent as `{ operations: ExperienceOperation[] }` to POST /api/characters/:id/experience.
