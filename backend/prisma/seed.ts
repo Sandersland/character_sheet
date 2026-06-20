@@ -157,6 +157,8 @@ interface WeaponDetailInput {
   ammunition?: boolean;
   rangeNormal?: number;
   rangeLong?: number;
+  weaponClass?: "simple" | "martial";
+  weaponRange?: "melee" | "ranged";
 }
 
 interface ArmorDetailInput {
@@ -219,13 +221,13 @@ function itemDetailUpsertFields(item: CatalogItem) {
 // InventoryItem rows below snapshot from — see schema.prisma's comment on
 // Item/InventoryItem for why a snapshot rather than a live reference.
 const ITEMS: CatalogItem[] = [
-  // weapon
+  // ── Simple melee weapons ──────────────────────────────────────────────────
   {
     name: "Club",
     category: "weapon",
     weight: 2,
     cost: coins(0, 1),
-    weapon: { damageDiceCount: 1, damageDiceFaces: 4, damageType: "bludgeoning", light: true },
+    weapon: { damageDiceCount: 1, damageDiceFaces: 4, damageType: "bludgeoning", light: true, weaponClass: "simple", weaponRange: "melee" },
   },
   {
     name: "Dagger",
@@ -241,6 +243,8 @@ const ITEMS: CatalogItem[] = [
       thrown: true,
       rangeNormal: 20,
       rangeLong: 60,
+      weaponClass: "simple",
+      weaponRange: "melee",
     },
   },
   {
@@ -254,54 +258,49 @@ const ITEMS: CatalogItem[] = [
       damageType: "bludgeoning",
       versatileDiceCount: 1,
       versatileDiceFaces: 8,
+      weaponClass: "simple",
+      weaponRange: "melee",
     },
   },
   {
-    name: "Shortsword",
+    name: "Mace",
     category: "weapon",
-    weight: 2,
-    cost: coins(10),
-    weapon: { damageDiceCount: 1, damageDiceFaces: 6, damageType: "piercing", finesse: true, light: true },
-  },
-  {
-    name: "Longsword",
-    category: "weapon",
-    weight: 3,
-    cost: coins(15),
-    weapon: {
-      damageDiceCount: 1,
-      damageDiceFaces: 8,
-      damageType: "slashing",
-      versatileDiceCount: 1,
-      versatileDiceFaces: 10,
-    },
-  },
-  {
-    name: "Warhammer",
-    category: "weapon",
-    weight: 2,
-    cost: coins(15),
-    weapon: {
-      damageDiceCount: 1,
-      damageDiceFaces: 8,
-      damageType: "bludgeoning",
-      versatileDiceCount: 1,
-      versatileDiceFaces: 10,
-    },
-  },
-  {
-    name: "Handaxe",
-    category: "weapon",
-    weight: 2,
+    weight: 4,
     cost: coins(5),
+    weapon: { damageDiceCount: 1, damageDiceFaces: 6, damageType: "bludgeoning", weaponClass: "simple", weaponRange: "melee" },
+  },
+  {
+    name: "Javelin",
+    category: "weapon",
+    weight: 2,
+    cost: coins(0, 5),
     weapon: {
       damageDiceCount: 1,
       damageDiceFaces: 6,
-      damageType: "slashing",
-      light: true,
+      damageType: "piercing",
       thrown: true,
-      rangeNormal: 20,
-      rangeLong: 60,
+      rangeNormal: 30,
+      rangeLong: 120,
+      weaponClass: "simple",
+      weaponRange: "melee",
+    },
+  },
+  // ── Simple ranged weapons ─────────────────────────────────────────────────
+  {
+    name: "Light Crossbow",
+    category: "weapon",
+    weight: 5,
+    cost: coins(25),
+    weapon: {
+      damageDiceCount: 1,
+      damageDiceFaces: 8,
+      damageType: "piercing",
+      ammunition: true,
+      twoHanded: true,
+      rangeNormal: 80,
+      rangeLong: 320,
+      weaponClass: "simple",
+      weaponRange: "ranged",
     },
   },
   {
@@ -317,15 +316,127 @@ const ITEMS: CatalogItem[] = [
       twoHanded: true,
       rangeNormal: 80,
       rangeLong: 320,
+      weaponClass: "simple",
+      weaponRange: "ranged",
     },
   },
-  // armor
+  // ── Martial melee weapons ─────────────────────────────────────────────────
+  {
+    name: "Shortsword",
+    category: "weapon",
+    weight: 2,
+    cost: coins(10),
+    weapon: { damageDiceCount: 1, damageDiceFaces: 6, damageType: "piercing", finesse: true, light: true, weaponClass: "martial", weaponRange: "melee" },
+  },
+  {
+    name: "Longsword",
+    category: "weapon",
+    weight: 3,
+    cost: coins(15),
+    weapon: {
+      damageDiceCount: 1,
+      damageDiceFaces: 8,
+      damageType: "slashing",
+      versatileDiceCount: 1,
+      versatileDiceFaces: 10,
+      weaponClass: "martial",
+      weaponRange: "melee",
+    },
+  },
+  {
+    name: "Rapier",
+    category: "weapon",
+    weight: 2,
+    cost: coins(25),
+    weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageType: "piercing", finesse: true, weaponClass: "martial", weaponRange: "melee" },
+  },
+  {
+    name: "Warhammer",
+    category: "weapon",
+    weight: 2,
+    cost: coins(15),
+    weapon: {
+      damageDiceCount: 1,
+      damageDiceFaces: 8,
+      damageType: "bludgeoning",
+      versatileDiceCount: 1,
+      versatileDiceFaces: 10,
+      weaponClass: "martial",
+      weaponRange: "melee",
+    },
+  },
+  {
+    name: "Handaxe",
+    category: "weapon",
+    weight: 2,
+    cost: coins(5),
+    weapon: {
+      damageDiceCount: 1,
+      damageDiceFaces: 6,
+      damageType: "slashing",
+      light: true,
+      thrown: true,
+      rangeNormal: 20,
+      rangeLong: 60,
+      weaponClass: "martial",
+      weaponRange: "melee",
+    },
+  },
+  {
+    name: "Greataxe",
+    category: "weapon",
+    weight: 7,
+    cost: coins(30),
+    weapon: {
+      damageDiceCount: 1,
+      damageDiceFaces: 12,
+      damageType: "slashing",
+      heavy: true,
+      twoHanded: true,
+      weaponClass: "martial",
+      weaponRange: "melee",
+    },
+  },
+  // ── Martial ranged weapons ────────────────────────────────────────────────
+  {
+    name: "Longbow",
+    category: "weapon",
+    weight: 2,
+    cost: coins(50),
+    weapon: {
+      damageDiceCount: 1,
+      damageDiceFaces: 8,
+      damageType: "piercing",
+      ammunition: true,
+      heavy: true,
+      twoHanded: true,
+      rangeNormal: 150,
+      rangeLong: 600,
+      weaponClass: "martial",
+      weaponRange: "ranged",
+    },
+  },
+  // ── Armor ─────────────────────────────────────────────────────────────────
   {
     name: "Leather Armor",
     category: "armor",
     weight: 10,
     cost: coins(10),
     armor: { armorCategory: "light", baseArmorClass: 11, dexModifierApplies: true },
+  },
+  {
+    name: "Scale Mail",
+    category: "armor",
+    weight: 45,
+    cost: coins(50),
+    armor: { armorCategory: "medium", baseArmorClass: 14, dexModifierApplies: true, dexModifierMax: 2, stealthDisadvantage: true },
+  },
+  {
+    name: "Chain Mail",
+    category: "armor",
+    weight: 55,
+    cost: coins(75),
+    armor: { armorCategory: "heavy", baseArmorClass: 16, stealthDisadvantage: true, strengthRequirement: 13 },
   },
   {
     name: "Shield",
@@ -340,9 +451,9 @@ const ITEMS: CatalogItem[] = [
     category: "armor",
     weight: 65,
     cost: coins(1500),
-    armor: { armorCategory: "heavy", baseArmorClass: 18, stealthDisadvantage: true },
+    armor: { armorCategory: "heavy", baseArmorClass: 18, stealthDisadvantage: true, strengthRequirement: 15 },
   },
-  // consumable
+  // ── Consumables ───────────────────────────────────────────────────────────
   {
     name: "Potion of Healing",
     category: "consumable",
@@ -357,14 +468,62 @@ const ITEMS: CatalogItem[] = [
     cost: coins(1),
     description: "Covers a 5-ft square. A creature entering must succeed a DC 15 Dex save or take 1 piercing damage and stop moving for the rest of its turn.",
   },
-  // gear
+  // ── Ammunition ───────────────────────────────────────────────────────────
+  { name: "Arrows", category: "gear", weight: 0.05, cost: coins(0, 5, 0), description: "A quiver of 20 arrows. Price is per arrow." },
+  { name: "Crossbow Bolts", category: "gear", weight: 0.075, cost: coins(0, 5, 0), description: "A case of 20 bolts. Price is per bolt." },
+  // ── Spellcasting foci & tools ─────────────────────────────────────────────
   { name: "Spellbook", category: "gear", weight: 3, cost: coins(50) },
   { name: "Component Pouch", category: "gear", weight: 2, cost: coins(25), description: "A small watertight pouch holding what a spellcaster needs to cast spells with material components." },
-  { name: "Scholar's Pack", category: "gear", weight: 11, cost: coins(40), description: "Includes a backpack, a book of lore, ink, an ink pen, parchment, a sand bag, and a small knife." },
-  { name: "Ink and Quill", category: "gear", cost: coins(10) },
   { name: "Pearl (arcane focus)", category: "gear", weight: 0.1, cost: coins(100), description: "Used by a spellcaster as an arcane focus in place of components." },
-  { name: "Healer's Kit", category: "gear", weight: 3, cost: coins(5), description: "Has 10 uses. As an action, expend one use to stabilize a creature without a Wisdom (Medicine) check." },
+  { name: "Holy Symbol", category: "gear", weight: 1, cost: coins(5), description: "An amulet, reliquary, or other symbol of a deity. Clerics and paladins use this as a spellcasting focus." },
+  { name: "Lute", category: "gear", weight: 2, cost: coins(35), description: "A musical instrument; bards use it as a spellcasting focus." },
   { name: "Thieves' Tools", category: "gear", weight: 1, cost: coins(25), description: "Lockpicks, a small file, mirror, scissors, and tweezers." },
+  { name: "Ink and Quill", category: "gear", cost: coins(10) },
+  { name: "Healer's Kit", category: "gear", weight: 3, cost: coins(5), description: "Has 10 uses. As an action, expend one use to stabilize a creature without a Wisdom (Medicine) check." },
+  // ── Equipment packs (also available as single gear items for the shop) ────
+  { name: "Dungeoneer's Pack", category: "gear", weight: 61.5, cost: coins(12), description: "Includes a backpack, a crowbar, a hammer, 10 pitons, 10 torches, a tinderbox, 10 days of rations, a waterskin, and 50 ft of hempen rope." },
+  { name: "Explorer's Pack", category: "gear", weight: 59, cost: coins(10), description: "Includes a backpack, a bedroll, a mess kit, a tinderbox, 10 torches, 10 days of rations, a waterskin, and 50 ft of hempen rope." },
+  { name: "Burglar's Pack", category: "gear", weight: 44.5, cost: coins(16), description: "Includes a backpack, ball bearings (1000), 10 ft of string, a bell, 5 candles, a crowbar, a hammer, 10 pitons, a hooded lantern, 2 flasks of oil, 5 days of rations, a tinderbox, a waterskin, and 50 ft of hempen rope." },
+  { name: "Priest's Pack", category: "gear", weight: 24, cost: coins(19), description: "Includes a backpack, a blanket, 10 candles, a tinderbox, an alms box, 2 blocks of incense, a censer, vestments, 2 days of rations, and a waterskin." },
+  { name: "Diplomat's Pack", category: "gear", weight: 36, cost: coins(39), description: "Includes a chest, 2 cases for maps and scrolls, a set of fine clothes, a bottle of ink, an ink pen, a lamp, 2 flasks of oil, 5 sheets of paper, a vial of perfume, sealing wax, and soap." },
+  { name: "Entertainer's Pack", category: "gear", weight: 38, cost: coins(40), description: "Includes a backpack, a bedroll, 2 costumes, 5 candles, 5 days of rations, a waterskin, and a disguise kit." },
+  { name: "Scholar's Pack", category: "gear", weight: 11, cost: coins(40), description: "Includes a backpack, a book of lore, a bottle of ink, an ink pen, 10 sheets of parchment, a little bag of sand, and a small knife." },
+  // ── Pack expansion items (individual rows when a pack is chosen) ──────────
+  { name: "Backpack", category: "gear", weight: 5, cost: coins(2) },
+  { name: "Crowbar", category: "gear", weight: 5, cost: coins(2) },
+  { name: "Hammer", category: "gear", weight: 3, cost: coins(1) },
+  { name: "Piton", category: "gear", weight: 0.25, cost: coins(0, 5, 0) },
+  { name: "Torch", category: "gear", weight: 1, cost: coins(0, 1, 0), description: "Burns for 1 hour; bright light in 20 ft, dim 20 ft beyond. Can be used as an improvised weapon (1 fire damage)." },
+  { name: "Tinderbox", category: "gear", weight: 1, cost: coins(0, 5, 0), description: "Used to light fires; takes an action to light a torch or similar." },
+  { name: "Rations", category: "gear", weight: 2, cost: coins(0, 5, 0), description: "Dry foods suitable for extended travel." },
+  { name: "Waterskin", category: "gear", weight: 5, cost: coins(0, 2, 0), description: "Holds up to 4 pints of liquid. Weight includes 4 pints of water." },
+  { name: "Hempen Rope (50 ft)", category: "gear", weight: 10, cost: coins(1) },
+  { name: "Bedroll", category: "gear", weight: 7, cost: coins(1) },
+  { name: "Mess Kit", category: "gear", weight: 1, cost: coins(0, 2, 0), description: "Tin box with a cup and simple cutlery." },
+  { name: "Ball Bearings", category: "gear", weight: 2, cost: coins(1), description: "As an action, scatter up to 1000 ball bearings (included) from a pouch across a 10-ft square. Creatures moving through must succeed DC 10 Dex or fall prone." },
+  { name: "String (10 ft)", category: "gear", cost: coins(0, 0, 1) },
+  { name: "Bell", category: "gear", weight: 0.1, cost: coins(1) },
+  { name: "Candle", category: "gear", weight: 0.01, cost: coins(0, 0, 1), description: "Dim light in 5 ft for 1 hour." },
+  { name: "Hooded Lantern", category: "gear", weight: 2, cost: coins(5), description: "Bright light in 30 ft and dim light for 30 ft beyond, or dim light in a 5-ft cone (hood closed). Burns for 6 hours per flask of oil." },
+  { name: "Oil Flask", category: "consumable", weight: 1, cost: coins(0, 1, 0), description: "Fuels a lantern for 6 hours. Can be splashed on a surface or creature (DC 10 Dex, sets alight for 1d4 fire per round)." },
+  { name: "Blanket", category: "gear", weight: 3, cost: coins(0, 5, 0) },
+  { name: "Alms Box", category: "gear", weight: 1, cost: coins(0, 5, 0) },
+  { name: "Incense Block", category: "gear", weight: 0.1, cost: coins(0, 2, 0) },
+  { name: "Censer", category: "gear", weight: 2, cost: coins(5) },
+  { name: "Vestments", category: "gear", weight: 4, cost: coins(5) },
+  { name: "Chest", category: "gear", weight: 25, cost: coins(5), description: "Holds 300 lb / 12 cubic feet." },
+  { name: "Map Case", category: "gear", weight: 1, cost: coins(1), description: "Scroll or map case; holds 10 rolled documents." },
+  { name: "Fine Clothes", category: "gear", weight: 6, cost: coins(15) },
+  { name: "Lamp", category: "gear", weight: 1, cost: coins(0, 5, 0), description: "Bright light in 15 ft, dim light 30 ft beyond. Burns for 6 hours per flask of oil." },
+  { name: "Paper Sheet", category: "gear", weight: 0, cost: coins(0, 2, 0) },
+  { name: "Perfume Vial", category: "gear", weight: 0, cost: coins(5) },
+  { name: "Sealing Wax", category: "gear", weight: 0, cost: coins(0, 5, 0) },
+  { name: "Soap", category: "gear", weight: 0, cost: coins(0, 0, 2) },
+  { name: "Costume Clothes", category: "gear", weight: 4, cost: coins(5) },
+  { name: "Disguise Kit", category: "gear", weight: 3, cost: coins(25), description: "Cosmetics, hair dye, small props, and a few costumes for creating disguises." },
+  { name: "Book of Lore", category: "gear", weight: 5, cost: coins(25), description: "A book containing knowledge in a particular field." },
+  { name: "Parchment Sheet", category: "gear", weight: 0, cost: coins(0, 1, 0) },
+  { name: "Knife", category: "gear", weight: 0.5, cost: coins(0, 2, 0) },
 ];
 
 // Per-character inventory row, specified as shorthand below and resolved

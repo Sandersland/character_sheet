@@ -81,6 +81,8 @@ export interface WeaponDetailInput {
   ammunition?: boolean;
   rangeNormal?: number;
   rangeLong?: number;
+  weaponClass?: string;
+  weaponRange?: string;
 }
 
 export interface ArmorDetailInput {
@@ -185,13 +187,25 @@ async function setCharacterCurrency(tx: Prisma.TransactionClient, characterId: s
   await tx.character.update({ where: { id: characterId }, data: { currency } });
 }
 
-const inventoryItemDetailInclude = {
+export const inventoryItemDetailInclude = {
   weaponDetail: true,
   armorDetail: true,
   consumableDetail: true,
 } satisfies Prisma.InventoryItemInclude;
 
 type InventoryItemWithDetails = Prisma.InventoryItemGetPayload<{ include: typeof inventoryItemDetailInclude }>;
+
+// The Item catalog include used when fetching a catalog Item's detail rows
+// for snapshot — same shape as inventoryItemDetailInclude above but typed
+// against Item (not InventoryItem). Exported so routes/characters.ts can
+// build starting-equipment inventory rows at character creation time.
+export const catalogItemDetailInclude = {
+  weaponDetail: true,
+  armorDetail: true,
+  consumableDetail: true,
+} satisfies Prisma.ItemInclude;
+
+export type CatalogItemWithDetails = Prisma.ItemGetPayload<{ include: typeof catalogItemDetailInclude }>;
 
 // Every op past `acquire` operates on an existing row — this is the one
 // place ownership is checked, so a stray inventoryItemId can't touch
@@ -238,6 +252,8 @@ function normalizeWeaponDetail(input: WeaponDetailInput) {
     ammunition: input.ammunition ?? false,
     rangeNormal: input.rangeNormal ?? null,
     rangeLong: input.rangeLong ?? null,
+    weaponClass: (input.weaponClass ?? null) as "simple" | "martial" | null,
+    weaponRange: (input.weaponRange ?? null) as "melee" | "ranged" | null,
   };
 }
 
@@ -260,8 +276,6 @@ function normalizeConsumableDetail(input: ConsumableDetailInput) {
     effectDescription: input.effectDescription ?? null,
   };
 }
-
-type CatalogItemWithDetails = Prisma.ItemGetPayload<{ include: typeof inventoryItemDetailInclude }>;
 
 // Reads a catalog Item's (already-included) weapon/armor/consumable detail
 // rows and builds the nested-create payload for a new InventoryItem's own
@@ -287,6 +301,8 @@ function snapshotItemDetail(item: CatalogItemWithDetails) {
             ammunition: item.weaponDetail.ammunition,
             rangeNormal: item.weaponDetail.rangeNormal,
             rangeLong: item.weaponDetail.rangeLong,
+            weaponClass: item.weaponDetail.weaponClass,
+            weaponRange: item.weaponDetail.weaponRange,
           },
         }
       : undefined,
@@ -312,6 +328,30 @@ function snapshotItemDetail(item: CatalogItemWithDetails) {
           },
         }
       : undefined,
+  };
+}
+
+// Builds the nested-create payload for an InventoryItem from a catalog Item
+// that has already been fetched with catalogItemDetailInclude. Used by
+// routes/characters.ts to create starting-equipment rows atomically inside
+// prisma.character.create, without going through applyInventoryOperations
+// (which would write ledger rows — starting gear is a character's genesis
+// state, not an economic event; same reasoning as prisma/seed.ts).
+export function buildInventoryCreateFromCatalog(
+  item: CatalogItemWithDetails,
+  opts: { quantity: number; position: number }
+) {
+  return {
+    itemId: item.id,
+    name: item.name,
+    category: item.category,
+    weight: item.weight ?? undefined,
+    cost: toJsonInput(asCurrency(item.cost)),
+    description: item.description ?? undefined,
+    quantity: opts.quantity,
+    equipped: false,
+    position: opts.position,
+    ...snapshotItemDetail(item),
   };
 }
 
@@ -359,7 +399,7 @@ async function applyAcquire(
   if (op.itemId) {
     const catalogItem = await tx.item.findUnique({
       where: { id: op.itemId },
-      include: inventoryItemDetailInclude,
+      include: catalogItemDetailInclude,
     });
     if (!catalogItem) {
       throw new InvalidInventoryOperationError(`Unknown catalog item: ${op.itemId}`);
@@ -474,7 +514,8 @@ async function applyUpdate(tx: Prisma.TransactionClient, characterId: string, op
       weight: op.weight,
       cost: op.cost !== undefined ? toJsonInput(op.cost) : undefined,
       description: op.description,
-      weaponDetail: op.weapon ? { update: op.weapon } : undefined,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      weaponDetail: op.weapon ? { update: op.weapon as any } : undefined,
       armorDetail: op.armor ? { update: op.armor } : undefined,
       consumableDetail: op.consumable ? { update: op.consumable } : undefined,
     },

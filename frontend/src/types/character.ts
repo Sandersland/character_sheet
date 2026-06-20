@@ -58,6 +58,8 @@ export interface Currency {
 
 export type ItemCategory = "weapon" | "armor" | "consumable" | "gear";
 export type ArmorCategory = "light" | "medium" | "heavy" | "shield";
+export type WeaponClass = "simple" | "martial";
+export type WeaponRange = "melee" | "ranged";
 
 /**
  * Weapon-specific mechanics, present (as `weapon`) only on a row whose
@@ -83,6 +85,10 @@ export interface WeaponDetail {
   ammunition: boolean;
   rangeNormal?: number;
   rangeLong?: number;
+  /** Proficiency group; undefined for homebrew weapons that weren't classified. */
+  weaponClass?: WeaponClass;
+  /** Melee vs. ranged; undefined for unclassified homebrew weapons. */
+  weaponRange?: WeaponRange;
 }
 
 /** Armor-specific mechanics (shields included), present only on `category: "armor"`. */
@@ -377,6 +383,50 @@ export interface RaceOption {
   speed: number;
 }
 
+// ── Starting equipment types (mirrors backend/src/lib/srd.ts) ──────────────
+// The frontend receives these from GET /api/reference (attached to each
+// ClassOption) and never needs to hardcode them itself.
+
+export interface WeaponPoolFilter {
+  weaponClass?: WeaponClass;
+  range?: WeaponRange;
+}
+
+export interface FixedItemRef {
+  catalogName: string;
+  quantity?: number;
+}
+
+export interface OpenWeaponPick {
+  label: string;
+  filter: WeaponPoolFilter;
+  quantity?: number;
+}
+
+export interface EquipmentBundle {
+  label: string;
+  items?: FixedItemRef[];
+  openPicks?: OpenWeaponPick[];
+}
+
+export interface EquipmentChoiceGroup {
+  label: string;
+  options: EquipmentBundle[];
+}
+
+export interface StartingGold {
+  diceCount: number;
+  diceFaces: number;
+  multiplier: number;
+}
+
+export interface ClassStartingEquipment {
+  groups: EquipmentChoiceGroup[];
+  gold: StartingGold;
+}
+
+// ── Reference types ─────────────────────────────────────────────────────────
+
 export interface ClassOption {
   id: string;
   name: string;
@@ -385,6 +435,8 @@ export interface ClassOption {
   skillChoiceCount: number;
   skillChoices: SkillName[];
   isSpellcaster: boolean;
+  /** Starting equipment definition, null if the class has no package defined. */
+  startingEquipment: ClassStartingEquipment | null;
 }
 
 export interface BackgroundOption {
@@ -403,6 +455,16 @@ export interface ReferenceData {
 /** Body for `POST /api/characters`. The backend derives AC/HP/saves/skills
  * from `race`/`classes[0]`/`abilityScores` — see backend's
  * src/lib/srd.ts — rather than the client computing and sending them. */
+// One selection per equipment choice group when mode:"package".
+export interface PackageSelection {
+  optionIndex: number;
+  openPicks?: string[]; // catalog item names, in the bundle's openPick order
+}
+
+export type StartingEquipmentInput =
+  | { mode: "package"; selections: PackageSelection[] }
+  | { mode: "gold"; gold: number };
+
 export interface CreateCharacterInput {
   name: string;
   alignment: string;
@@ -413,4 +475,5 @@ export interface CreateCharacterInput {
   classes: [{ name: string; subclass?: string | null }];
   abilityScores: AbilityScores;
   skillProficiencies?: SkillName[];
+  startingEquipment?: StartingEquipmentInput;
 }

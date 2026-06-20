@@ -373,5 +373,291 @@ describe("characters routes", () => {
 
       expect(response.status).toBe(400);
     });
+
+    // ── Starting equipment tests ──────────────────────────────────────────
+    // These tests rely on the seeded catalog (Wizard/Fighter classes, Human
+    // race, Sage/Soldier backgrounds, and the weapon/armor/gear items) which
+    // is applied via `prisma db seed` before running the test suite.
+    describe("with startingEquipment (package mode)", () => {
+      // Simplest package path: Wizard with no open picks.
+      //   Group 0: Quarterstaff
+      //   Group 1: Component Pouch
+      //   Group 2: Scholar's Pack (expands via PACK_CONTENTS → 6 rows)
+      //   Group 3: Spellbook (auto-grant)
+      const wizardBody = {
+        name: "Merlin",
+        alignment: "Neutral Good",
+        race: "Human",
+        background: "Sage",
+        classes: [{ name: "Wizard" }],
+        abilityScores: {
+          strength: 8,
+          dexterity: 12,
+          constitution: 12,
+          intelligence: 16,
+          wisdom: 10,
+          charisma: 10,
+        },
+        skillProficiencies: ["arcana", "history"],
+        startingEquipment: {
+          mode: "package",
+          selections: [
+            { optionIndex: 0 },
+            { optionIndex: 0 },
+            { optionIndex: 0 },
+            { optionIndex: 0 },
+          ],
+        },
+      };
+
+      it("creates inventory rows from a package selection (no open picks)", async () => {
+        const response = await supertest(createApp())
+          .post("/api/characters")
+          .send(wizardBody);
+
+        expect(response.status).toBe(201);
+        createdCharacterIds.push(response.body.id);
+
+        // Scholar's Pack expands to 6 items, plus Quarterstaff, Component
+        // Pouch, Spellbook = 9 total inventory rows.
+        const names: string[] = response.body.inventory.map(
+          (i: { name: string }) => i.name
+        );
+        expect(names).toContain("Quarterstaff");
+        expect(names).toContain("Component Pouch");
+        expect(names).toContain("Spellbook");
+        // Scholar's Pack is expanded — its individual items appear, not the pack itself
+        expect(names).not.toContain("Scholar's Pack");
+        expect(names).toContain("Backpack");
+        // Starting gold should be zero for the package path
+        expect(response.body.currency).toEqual({ cp: 0, sp: 0, gp: 0, pp: 0 });
+      });
+
+      it("creates inventory rows with an open-pick weapon (Fighter martial weapon)", async () => {
+        // Fighter group 1, option 0: martial weapon + shield. Open pick: Longsword
+        const response = await supertest(createApp())
+          .post("/api/characters")
+          .send({
+            name: "Sir Gawain",
+            alignment: "Lawful Good",
+            race: "Human",
+            background: "Soldier",
+            classes: [{ name: "Fighter" }],
+            abilityScores: {
+              strength: 16,
+              dexterity: 12,
+              constitution: 14,
+              intelligence: 8,
+              wisdom: 10,
+              charisma: 8,
+            },
+            skillProficiencies: ["athletics", "intimidation"],
+            startingEquipment: {
+              mode: "package",
+              selections: [
+                { optionIndex: 0 },                          // Chain Mail
+                { optionIndex: 0, openPicks: ["Longsword"] }, // Martial weapon + Shield
+                { optionIndex: 1 },                          // Two Handaxes
+                { optionIndex: 0 },                          // Dungeoneer's Pack
+              ],
+            },
+          });
+
+        expect(response.status).toBe(201);
+        createdCharacterIds.push(response.body.id);
+
+        const names: string[] = response.body.inventory.map(
+          (i: { name: string }) => i.name
+        );
+        expect(names).toContain("Chain Mail");
+        expect(names).toContain("Longsword");
+        expect(names).toContain("Shield");
+        // Handaxe ×2 comes as quantity:2 on one row, or one row with qty 2
+        expect(names).toContain("Handaxe");
+        // Dungeoneer's Pack expanded
+        expect(names).not.toContain("Dungeoneer's Pack");
+        expect(names).toContain("Backpack");
+        expect(names).toContain("Torch");
+        // The Longsword row should have weaponClass:"martial" snapshotted
+        const longsword = response.body.inventory.find(
+          (i: { name: string }) => i.name === "Longsword"
+        );
+        expect(longsword?.weapon?.weaponClass).toBe("martial");
+      });
+
+      it("rejects optionIndex out of range with 400", async () => {
+        const response = await supertest(createApp())
+          .post("/api/characters")
+          .send({
+            ...wizardBody,
+            startingEquipment: {
+              mode: "package",
+              // Wizard has groups.length === 4; optionIndex 99 is out of range
+              selections: [
+                { optionIndex: 99 }, // invalid
+                { optionIndex: 0 },
+                { optionIndex: 0 },
+                { optionIndex: 0 },
+              ],
+            },
+          });
+
+        expect(response.status).toBe(400);
+      });
+
+      it("rejects wrong number of selections with 400", async () => {
+        const response = await supertest(createApp())
+          .post("/api/characters")
+          .send({
+            ...wizardBody,
+            startingEquipment: {
+              mode: "package",
+              // Wizard has 4 groups; only 2 provided
+              selections: [{ optionIndex: 0 }, { optionIndex: 0 }],
+            },
+          });
+
+        expect(response.status).toBe(400);
+      });
+
+      it("rejects an open pick that is not in the catalog with 400", async () => {
+        const response = await supertest(createApp())
+          .post("/api/characters")
+          .send({
+            name: "Bad Fighter",
+            alignment: "Chaotic Evil",
+            race: "Human",
+            background: "Soldier",
+            classes: [{ name: "Fighter" }],
+            abilityScores: {
+              strength: 16,
+              dexterity: 12,
+              constitution: 14,
+              intelligence: 8,
+              wisdom: 10,
+              charisma: 8,
+            },
+            skillProficiencies: ["athletics", "intimidation"],
+            startingEquipment: {
+              mode: "package",
+              selections: [
+                { optionIndex: 0 },
+                { optionIndex: 0, openPicks: ["Vorpal Sword of Doom"] }, // not in catalog
+                { optionIndex: 1 },
+                { optionIndex: 0 },
+              ],
+            },
+          });
+
+        expect(response.status).toBe(400);
+      });
+
+      it("rejects an open pick with wrong weapon class with 400", async () => {
+        const response = await supertest(createApp())
+          .post("/api/characters")
+          .send({
+            name: "Sneaky Fighter",
+            alignment: "Chaotic Neutral",
+            race: "Human",
+            background: "Soldier",
+            classes: [{ name: "Fighter" }],
+            abilityScores: {
+              strength: 16,
+              dexterity: 12,
+              constitution: 14,
+              intelligence: 8,
+              wisdom: 10,
+              charisma: 8,
+            },
+            skillProficiencies: ["athletics", "intimidation"],
+            startingEquipment: {
+              mode: "package",
+              selections: [
+                { optionIndex: 0 },
+                // Club is a simple weapon; Fighter group 1 requires "martial"
+                { optionIndex: 0, openPicks: ["Club"] },
+                { optionIndex: 1 },
+                { optionIndex: 0 },
+              ],
+            },
+          });
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toMatch(/weaponClass/);
+      });
+
+      it("rejects mode:package for a class with no package definition with 400", async () => {
+        // TEST_CLASS ("Test Class") is not in STARTING_EQUIPMENT
+        const response = await supertest(createApp())
+          .post("/api/characters")
+          .send({
+            ...createBody,
+            startingEquipment: { mode: "package", selections: [] },
+          });
+
+        expect(response.status).toBe(400);
+      });
+    });
+
+    describe("with startingEquipment (gold mode)", () => {
+      const baseBody = {
+        name: "Wealthy Adventurer",
+        alignment: "True Neutral",
+        race: "Human",
+        background: "Sage",
+        classes: [{ name: "Wizard" }],
+        abilityScores: {
+          strength: 8,
+          dexterity: 12,
+          constitution: 12,
+          intelligence: 16,
+          wisdom: 10,
+          charisma: 10,
+        },
+        skillProficiencies: ["arcana", "history"],
+      };
+
+      it("sets currency.gp and leaves inventory empty", async () => {
+        // Wizard gold: 4d4×10 → min 40, max 160
+        const response = await supertest(createApp())
+          .post("/api/characters")
+          .send({ ...baseBody, startingEquipment: { mode: "gold", gold: 100 } });
+
+        expect(response.status).toBe(201);
+        createdCharacterIds.push(response.body.id);
+
+        expect(response.body.currency).toEqual({ cp: 0, sp: 0, gp: 100, pp: 0 });
+        expect(response.body.inventory).toHaveLength(0);
+      });
+
+      it("rejects gold below the class minimum with 400", async () => {
+        // Wizard min = 4×10 = 40
+        const response = await supertest(createApp())
+          .post("/api/characters")
+          .send({ ...baseBody, startingEquipment: { mode: "gold", gold: 0 } });
+
+        expect(response.status).toBe(400);
+      });
+
+      it("rejects gold above the class maximum with 400", async () => {
+        // Wizard max = 4×4×10 = 160
+        const response = await supertest(createApp())
+          .post("/api/characters")
+          .send({ ...baseBody, startingEquipment: { mode: "gold", gold: 999 } });
+
+        expect(response.status).toBe(400);
+      });
+    });
+
+    it("omitting startingEquipment creates an empty-inventory character (regression)", async () => {
+      const response = await supertest(createApp())
+        .post("/api/characters")
+        .send(createBody); // createBody has no startingEquipment
+
+      expect(response.status).toBe(201);
+      createdCharacterIds.push(response.body.id);
+      expect(response.body.inventory).toHaveLength(0);
+      expect(response.body.currency).toEqual({ cp: 0, sp: 0, gp: 0, pp: 0 });
+    });
   });
 });

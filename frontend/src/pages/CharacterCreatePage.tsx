@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { createCharacter, fetchReference } from "../api/client";
+import { createCharacter, fetchItems, fetchReference } from "../api/client";
 import AbilityScoreEditor from "../components/AbilityScoreEditor";
 import BackendStatus from "../components/BackendStatus";
 import Card from "../components/Card";
+import StartingEquipmentEditor from "../components/StartingEquipmentEditor";
+import {
+  draftToInput,
+  emptyPackageState,
+  type EquipmentDraft,
+} from "../lib/startingEquipment";
 import { abilityModifier, formatModifier } from "../lib/abilities";
-import type { AbilityName, AbilityScores, ReferenceData, SkillName } from "../types/character";
+import type { AbilityName, AbilityScores, Item, ReferenceData, SkillName } from "../types/character";
 
 const DRAFT_STORAGE_KEY = "character-draft:new";
 
@@ -45,6 +51,7 @@ interface CharacterDraft {
   abilityAssignments: Record<AbilityName, number | null>;
   abilityScores: AbilityScores;
   skillProficiencies: SkillName[];
+  equipmentDraft: EquipmentDraft | null;
 }
 
 const EMPTY_DRAFT: CharacterDraft = {
@@ -62,6 +69,7 @@ const EMPTY_DRAFT: CharacterDraft = {
   abilityAssignments: EMPTY_ASSIGNMENTS,
   abilityScores: DEFAULT_ABILITY_SCORES,
   skillProficiencies: [],
+  equipmentDraft: null,
 };
 
 /**
@@ -136,6 +144,12 @@ export default function CharacterCreatePage() {
   const { reference, error: referenceError } = useReferenceData();
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(false);
+  const [catalog, setCatalog] = useState<Item[]>([]);
+
+  // Load the item catalog once for the equipment picker's open-pick dropdowns.
+  useEffect(() => {
+    fetchItems().then(setCatalog).catch(() => {});
+  }, []);
 
   const selectedRace = reference?.races.find((r) => r.name === draft.race);
   const selectedClass = reference?.classes.find((c) => c.name === draft.className);
@@ -161,12 +175,26 @@ export default function CharacterCreatePage() {
     ? draft.customBackground.trim()
     : draft.background;
 
+  // Equipment validation: if the class has a starting-equipment definition
+  // and the player has started filling it in, the selection must be complete.
+  // If the player hasn't touched it yet (null), we skip validation — the
+  // character will simply start with no inventory.
+  const equipmentInput =
+    draft.equipmentDraft && selectedClass?.startingEquipment
+      ? draftToInput(selectedClass.startingEquipment, draft.equipmentDraft)
+      : undefined;
+  const equipmentIsComplete =
+    !draft.equipmentDraft ||
+    !selectedClass?.startingEquipment ||
+    equipmentInput !== null;
+
   const isValid =
     draft.name.trim().length > 0 &&
     draft.alignment.length > 0 &&
     draft.race.length > 0 &&
     draft.className.length > 0 &&
-    backgroundNameForSubmit.length > 0;
+    backgroundNameForSubmit.length > 0 &&
+    equipmentIsComplete;
 
   const dexModifier = abilityModifier(draft.abilityScores.dexterity);
   const conModifier = abilityModifier(draft.abilityScores.constitution);
@@ -189,6 +217,7 @@ export default function CharacterCreatePage() {
         abilityScores: draft.abilityScores,
         skillProficiencies: [...grantedSkills, ...selectedClassChoices],
         portraitUrl: draft.portraitUrl.trim() || null,
+        startingEquipment: equipmentInput ?? undefined,
       });
       clear();
       // The URL gains the new character's id now that one exists; replace
@@ -284,9 +313,22 @@ export default function CharacterCreatePage() {
                   Class
                   <select
                     value={draft.className}
-                    onChange={(e) =>
-                      update({ className: e.target.value, skillProficiencies: [] })
-                    }
+                    onChange={(e) => {
+                      // Changing class resets both skill choices and equipment
+                      // selection — the new class has different options.
+                      const newClassName = e.target.value;
+                      const newClassDef = reference.classes.find(
+                        (c) => c.name === newClassName
+                      );
+                      update({
+                        className: newClassName,
+                        skillProficiencies: [],
+                        equipmentDraft:
+                          newClassDef?.startingEquipment
+                            ? { mode: "package", selections: emptyPackageState(newClassDef.startingEquipment) }
+                            : null,
+                      });
+                    }}
                     className="rounded-[var(--radius-control)] border border-[var(--color-parchment-300)] bg-[var(--color-parchment-50)] px-2 py-1.5 text-sm font-normal normal-case text-[var(--color-parchment-900)]"
                   >
                     <option value="">Select class…</option>
@@ -426,6 +468,19 @@ export default function CharacterCreatePage() {
                 )}
               </div>
             </Card>
+
+            {selectedClass?.startingEquipment && draft.equipmentDraft && (
+              <Card title="Starting Equipment">
+                <div className="p-4">
+                  <StartingEquipmentEditor
+                    startingEquipment={selectedClass.startingEquipment}
+                    catalog={catalog}
+                    value={draft.equipmentDraft}
+                    onChange={(eq) => update({ equipmentDraft: eq })}
+                  />
+                </div>
+              </Card>
+            )}
 
             <Card title="Preview" titleAccessory={<span className="text-xs text-[var(--color-parchment-500)]">Level 1</span>}>
               <div className="grid grid-cols-2 gap-4 p-4 text-sm sm:grid-cols-4">

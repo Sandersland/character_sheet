@@ -27,6 +27,8 @@ interface WeaponDetailFields {
   ammunition: boolean;
   rangeNormal: number | null;
   rangeLong: number | null;
+  weaponClass: string | null;
+  weaponRange: string | null;
 }
 
 interface ArmorDetailFields {
@@ -62,6 +64,8 @@ export function serializeWeaponDetail(detail: WeaponDetailFields) {
     ammunition: detail.ammunition,
     rangeNormal: detail.rangeNormal ?? undefined,
     rangeLong: detail.rangeLong ?? undefined,
+    weaponClass: detail.weaponClass ?? undefined,
+    weaponRange: detail.weaponRange ?? undefined,
   };
 }
 

@@ -145,6 +145,24 @@ enum ArmorCategory {
   shield
 }
 
+// Weapon proficiency group — used by the starting-equipment package resolver
+// to filter open picks like "any martial weapon". Nullable on both detail
+// tables: homebrew weapons (custom acquire) may omit classification without
+// breaking anything; open-pick validation simply skips weapons whose value
+// is null.
+enum WeaponClass {
+  simple
+  martial
+}
+
+// Whether a weapon is wielded in melee or at range — combined with
+// WeaponClass for finer open-pick filters like "any martial melee weapon"
+// (Barbarian). Nullable for the same reasons as WeaponClass above.
+enum WeaponRange {
+  melee
+  ranged
+}
+
 // Baseline equipment catalog, same role as Race/CharacterClass above: seeded
 // from a small SRD subset (prisma/seed.ts) and never referenced directly by
 // Character — only through InventoryItem.itemId, which is nullable, so
@@ -199,6 +217,13 @@ model ItemWeaponDetail {
   ammunition  Boolean @default(false)
   rangeNormal Int?
   rangeLong   Int?
+
+  // Proficiency group and melee/ranged classification — used by the
+  // starting-equipment resolver to filter open picks. Nullable so existing
+  // homebrew weapons and weapons added before this migration require no
+  // backfill.
+  weaponClass WeaponClass?
+  weaponRange WeaponRange?
 }
 
 // Optional 1:1 with Item, present only when category = armor (shields
@@ -285,6 +310,11 @@ model InventoryWeaponDetail {
   ammunition  Boolean @default(false)
   rangeNormal Int?
   rangeLong   Int?
+
+  // Snapshot of ItemWeaponDetail.weaponClass/weaponRange — same nullable
+  // reasoning as the catalog side.
+  weaponClass WeaponClass?
+  weaponRange WeaponRange?
 }
 
 // Same shape as ItemArmorDetail, owned by InventoryItem instead of Item.

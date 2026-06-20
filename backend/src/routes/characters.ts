@@ -8,8 +8,9 @@ import {
   serializeConsumableDetail,
   serializeWeaponDetail,
 } from "../lib/itemDetail.js";
+import { buildInventoryCreateFromCatalog, catalogItemDetailInclude } from "../lib/inventory.js";
 import { prisma } from "../lib/prisma.js";
-import { ALIGNMENTS, deriveCreatedCharacter } from "../lib/srd.js";
+import { ALIGNMENTS, deriveCreatedCharacter, PACK_CONTENTS, STARTING_EQUIPMENT } from "../lib/srd.js";
 
 export const charactersRouter = Router();
 
@@ -173,6 +174,26 @@ const classChoiceSchema = z.object({
   subclass: z.string().nullable().optional(),
 });
 
+// One entry per choice group sent by the frontend when mode:"package". Each
+// entry carries the chosen optionIndex within that group's options array and,
+// for any open weapon picks in the chosen bundle, the catalog item names the
+// player selected (in the same order as the bundle's openPicks array).
+const packageSelectionSchema = z.object({
+  optionIndex: z.number().int().nonnegative(),
+  openPicks: z.array(z.string()).optional(),
+});
+
+const startingEquipmentSchema = z.discriminatedUnion("mode", [
+  z.object({
+    mode: z.literal("package"),
+    selections: z.array(packageSelectionSchema),
+  }),
+  z.object({
+    mode: z.literal("gold"),
+    gold: z.number().int().nonnegative(),
+  }),
+]);
+
 const createCharacterSchema = z
   .object({
     name: z.string().min(1),
@@ -184,8 +205,48 @@ const createCharacterSchema = z
     classes: z.array(classChoiceSchema).length(1),
     abilityScores: abilityScoresSchema,
     skillProficiencies: z.array(z.string()).optional(),
+    startingEquipment: startingEquipmentSchema.optional(),
   })
   .strict();
+
+// Resolves a list of FixedItemRef-style catalog names + quantities into
+// InventoryItem nested-create payloads. Expands pack names via PACK_CONTENTS.
+// Fetches all required catalog Items in one query (by name) and throws an
+// object with a `message` string if any name is unknown, so the caller can
+// return a 400.
+async function resolveFixedItems(
+  refs: { catalogName: string; quantity?: number }[]
+): Promise<{ inventoryCreates: ReturnType<typeof buildInventoryCreateFromCatalog>[]; error?: string }> {
+  // Expand packs first
+  const expanded: { catalogName: string; quantity: number }[] = [];
+  for (const ref of refs) {
+    const packContents = PACK_CONTENTS[ref.catalogName];
+    if (packContents) {
+      for (const content of packContents) {
+        expanded.push({ catalogName: content.catalogName, quantity: (content.quantity ?? 1) * (ref.quantity ?? 1) });
+      }
+    } else {
+      expanded.push({ catalogName: ref.catalogName, quantity: ref.quantity ?? 1 });
+    }
+  }
+
+  const names = [...new Set(expanded.map((r) => r.catalogName))];
+  const items = await prisma.item.findMany({
+    where: { name: { in: names } },
+    include: catalogItemDetailInclude,
+  });
+  const itemByName = new Map(items.map((i) => [i.name, i]));
+
+  const missing = names.filter((n) => !itemByName.has(n));
+  if (missing.length > 0) {
+    return { inventoryCreates: [], error: `Unknown catalog items: ${missing.join(", ")}` };
+  }
+
+  const inventoryCreates = expanded.map((ref, idx) =>
+    buildInventoryCreateFromCatalog(itemByName.get(ref.catalogName)!, { quantity: ref.quantity, position: idx })
+  );
+  return { inventoryCreates };
+}
 
 charactersRouter.post("/characters", async (req, res) => {
   const parseResult = createCharacterSchema.safeParse(req.body);
@@ -251,6 +312,136 @@ charactersRouter.post("/characters", async (req, res) => {
     return;
   }
 
+  // ── Resolve starting equipment ──────────────────────────────────────────
+  // Starting equipment is optional (omitting it creates an empty-inventory
+  // character, preserving the existing behaviour and all current tests).
+  // When provided, the backend re-resolves authoritatively against the
+  // STARTING_EQUIPMENT rules — the frontend only sends choice indices and
+  // open-pick item names; it never sends the full item list itself.
+  //
+  // We use a nested `inventoryItems: { create: [...] }` on character.create
+  // rather than calling applyInventoryOperations: the character has no id
+  // yet, and starting gear is genesis state, not an economic event — it
+  // should not generate ledger rows (same reasoning prisma/seed.ts uses).
+  let inventoryItemCreates: ReturnType<typeof buildInventoryCreateFromCatalog>[] = [];
+  let startingCurrency: { cp: number; sp: number; gp: number; pp: number } | undefined;
+
+  if (input.startingEquipment) {
+    const se = input.startingEquipment;
+
+    if (se.mode === "gold") {
+      // Validate gold is within the class's dice range
+      const classDef = STARTING_EQUIPMENT[primaryClassChoice.name];
+      if (classDef) {
+        const { diceCount, diceFaces, multiplier } = classDef.gold;
+        const min = diceCount * multiplier;
+        const max = diceCount * diceFaces * multiplier;
+        if (se.gold < min || se.gold > max) {
+          res.status(400).json({
+            error: `Starting gold must be between ${min} and ${max} for ${primaryClassChoice.name}`,
+          });
+          return;
+        }
+      }
+      startingCurrency = { cp: 0, sp: 0, gp: se.gold, pp: 0 };
+    } else {
+      // mode === "package"
+      const classDef = STARTING_EQUIPMENT[primaryClassChoice.name];
+      if (!classDef) {
+        res.status(400).json({
+          error: `No starting equipment package defined for class: ${primaryClassChoice.name}`,
+        });
+        return;
+      }
+
+      if (se.selections.length !== classDef.groups.length) {
+        res.status(400).json({
+          error: `Expected ${classDef.groups.length} equipment selections, got ${se.selections.length}`,
+        });
+        return;
+      }
+
+      // Collect all fixed items and validate all open picks
+      const allFixedRefs: { catalogName: string; quantity: number }[] = [];
+
+      for (let groupIdx = 0; groupIdx < classDef.groups.length; groupIdx++) {
+        const group = classDef.groups[groupIdx];
+        const sel = se.selections[groupIdx];
+
+        if (sel.optionIndex < 0 || sel.optionIndex >= group.options.length) {
+          res.status(400).json({
+            error: `Equipment group ${groupIdx}: optionIndex ${sel.optionIndex} out of range (0–${group.options.length - 1})`,
+          });
+          return;
+        }
+
+        const bundle = group.options[sel.optionIndex];
+
+        // Fixed items in the chosen bundle
+        for (const ref of bundle.items ?? []) {
+          // Pack names are expanded later in resolveFixedItems
+          allFixedRefs.push({ catalogName: ref.catalogName, quantity: ref.quantity ?? 1 });
+        }
+
+        // Open picks — validate each against its filter
+        const openPicks = bundle.openPicks ?? [];
+        const providedPicks = sel.openPicks ?? [];
+        if (providedPicks.length !== openPicks.length) {
+          res.status(400).json({
+            error: `Equipment group ${groupIdx}, option ${sel.optionIndex}: expected ${openPicks.length} open picks, got ${providedPicks.length}`,
+          });
+          return;
+        }
+
+        for (let pickIdx = 0; pickIdx < openPicks.length; pickIdx++) {
+          const pickFilter = openPicks[pickIdx].filter;
+          const chosenName = providedPicks[pickIdx];
+
+          // Look up the item in the catalog and validate it matches the filter
+          const catalogItem = await prisma.item.findUnique({
+            where: { name: chosenName },
+            include: { weaponDetail: true },
+          });
+
+          if (!catalogItem || catalogItem.category !== "weapon") {
+            res.status(400).json({
+              error: `Open pick "${chosenName}" is not a known weapon in the catalog`,
+            });
+            return;
+          }
+          if (
+            pickFilter.weaponClass &&
+            catalogItem.weaponDetail?.weaponClass !== pickFilter.weaponClass
+          ) {
+            res.status(400).json({
+              error: `Open pick "${chosenName}" does not satisfy filter: weaponClass must be "${pickFilter.weaponClass}"`,
+            });
+            return;
+          }
+          if (
+            pickFilter.range &&
+            catalogItem.weaponDetail?.weaponRange !== pickFilter.range
+          ) {
+            res.status(400).json({
+              error: `Open pick "${chosenName}" does not satisfy filter: range must be "${pickFilter.range}"`,
+            });
+            return;
+          }
+
+          allFixedRefs.push({ catalogName: chosenName, quantity: openPicks[pickIdx].quantity ?? 1 });
+        }
+      }
+
+      // Resolve all items (expands packs) into InventoryItem create payloads
+      const { inventoryCreates, error } = await resolveFixedItems(allFixedRefs);
+      if (error) {
+        res.status(400).json({ error });
+        return;
+      }
+      inventoryItemCreates = inventoryCreates;
+    }
+  }
+
   const derived = deriveCreatedCharacter(
     { abilityScores: input.abilityScores, skillProficiencies },
     { race, characterClass }
@@ -264,6 +455,8 @@ charactersRouter.post("/characters", async (req, res) => {
       experiencePoints: input.experiencePoints ?? 0,
       abilityScores: input.abilityScores,
       ...derived,
+      // Override derived currency with starting gold if the gold path was chosen.
+      ...(startingCurrency ? { currency: startingCurrency } : {}),
       // Prisma represents an explicit JSON null distinctly from "field
       // omitted" — derived.spellcasting is the app-level `null`, swapped
       // here for the sentinel Prisma's Json column type expects.
@@ -282,6 +475,9 @@ charactersRouter.post("/characters", async (req, res) => {
           },
         ],
       },
+      ...(inventoryItemCreates.length > 0
+        ? { inventoryItems: { create: inventoryItemCreates } }
+        : {}),
     },
     include: characterInclude,
   });
