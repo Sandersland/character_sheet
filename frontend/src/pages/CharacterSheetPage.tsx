@@ -209,7 +209,7 @@ export default function CharacterSheetPage() {
 
           {character.spellcasting ? (
             <Card title="Spells" className="p-4">
-              <SpellsSection spellcasting={character.spellcasting} />
+              <SpellsSection character={character} onUpdate={setCharacter} />
             </Card>
           ) : (
             <Card title="Journal" className="p-4">

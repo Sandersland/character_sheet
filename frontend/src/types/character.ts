@@ -280,7 +280,7 @@ export interface LedgerEntry {
 
 // ── Unified activity timeline ─────────────────────────────────────────────────
 
-export type CharacterEventCategory = "inventory" | "hitPoints" | "experience" | "currency";
+export type CharacterEventCategory = "inventory" | "hitPoints" | "experience" | "currency" | "spellcasting";
 
 export type CharacterEventType =
   | "acquired" | "consumed" | "sold" | "bought" | "removed"  // inventory
@@ -288,6 +288,8 @@ export type CharacterEventType =
   | "levelUp" | "levelDown" | "deathSave" | "stabilize"      // hitPoints (cont.)
   | "xpAward" | "xpSet"                                       // experience
   | "currencyAdjust"                                           // currency
+  | "castSpell" | "expendSlot" | "restoreSlot"                // spellcasting
+  | "learnSpell" | "forgetSpell" | "prepareSpell" | "unprepareSpell" // spellcasting (cont.)
   | "revert";                                                  // meta
 
 export interface CharacterEventField {
@@ -331,8 +333,16 @@ export type SpellSchool =
   | "necromancy"
   | "transmutation";
 
+/**
+ * A spell entry in the character's spellcasting JSON (per-character mutable
+ * state). `id` is the per-character entry UUID (operation target); `spellId`
+ * is the optional catalog `Spell.id` provenance pointer (null for custom spells).
+ * Effect fields are snapshotted from the catalog at learn time so they can be
+ * used for auto-rolling without a live catalog join.
+ */
 export interface Spell {
   id: string;
+  spellId?: string;   // catalog Spell.id provenance — undefined for custom spells
   name: string;
   level: number; // 0 = cantrip
   school: SpellSchool;
@@ -341,6 +351,47 @@ export interface Spell {
   range: string;
   duration: string;
   description: string;
+  concentration?: boolean;
+  ritual?: boolean;
+  // Structured effect for auto-rolling at cast time (RollSpec-shaped):
+  effectKind?: "damage" | "heal" | null;
+  effectDiceCount?: number | null;
+  effectDiceFaces?: number | null;
+  effectModifier?: number | null;
+  damageType?: string | null;
+  attackType?: "attack" | "save" | null;
+  saveAbility?: string | null;
+  upcastDicePerLevel?: number | null;
+  cantripScaling?: boolean;
+}
+
+/**
+ * Baseline catalog entry served by `GET /api/spells` — the "pick a spell
+ * from the SRD" path for the spellbook editor. Mirrors the `Spell` interface
+ * but without per-character fields (id here is the catalog id, not an entry id;
+ * `prepared` is absent since preparation is a per-character state).
+ */
+export interface CatalogSpell {
+  id: string;       // catalog Spell.id (used as learnSpell.spellId)
+  name: string;
+  level: number;
+  school: SpellSchool;
+  castingTime: string;
+  range: string;
+  duration: string;
+  description: string;
+  concentration: boolean;
+  ritual: boolean;
+  classes: string[];
+  effectKind?: "damage" | "heal";
+  effectDiceCount?: number;
+  effectDiceFaces?: number;
+  effectModifier?: number;
+  damageType?: string;
+  attackType?: "attack" | "save";
+  saveAbility?: string;
+  upcastDicePerLevel?: number;
+  cantripScaling: boolean;
 }
 
 export interface SpellSlots {
@@ -523,6 +574,56 @@ export interface CreateCharacterInput {
   skillProficiencies?: SkillName[];
   startingEquipment?: StartingEquipmentInput;
 }
+
+// ── Spellcasting operation types (mirrors backend/src/lib/spellcasting.ts) ───
+// Sent as `{ operations: SpellcastingOperation[] }` to
+// POST /api/characters/:id/spellcasting/transactions.
+
+/** Custom spell input for learnSpell without a catalog entry. */
+export interface CustomSpellInput {
+  name: string;
+  level: number;
+  school: SpellSchool;
+  castingTime: string;
+  range: string;
+  duration: string;
+  description: string;
+  concentration?: boolean;
+  ritual?: boolean;
+  effectKind?: "damage" | "heal";
+  effectDiceCount?: number;
+  effectDiceFaces?: number;
+  effectModifier?: number;
+  damageType?: string;
+  attackType?: "attack" | "save";
+  saveAbility?: string;
+  upcastDicePerLevel?: number;
+  cantripScaling?: boolean;
+}
+
+/** Cast a spell: expend slot (if leveled), send client-computed roll total. */
+export interface CastSpellOperation { type: "castSpell"; entryId: string; slotLevel?: number; roll: number }
+/** Bare slot expenditure (no specific spell). */
+export interface ExpendSlotOperation { type: "expendSlot"; level: number }
+/** Restore one previously-expended slot (undo mis-click). */
+export interface RestoreSlotOperation { type: "restoreSlot"; level: number }
+/** Learn a spell from catalog (spellId) or custom payload. */
+export interface LearnSpellOperation { type: "learnSpell"; spellId?: string; custom?: CustomSpellInput }
+/** Remove a spell from the spellbook by its per-character entry id. */
+export interface ForgetSpellOperation { type: "forgetSpell"; entryId: string }
+/** Mark a non-cantrip as prepared. */
+export interface PrepareSpellOperation { type: "prepareSpell"; entryId: string }
+/** Mark a non-cantrip as unprepared. */
+export interface UnprepareSpellOperation { type: "unprepareSpell"; entryId: string }
+
+export type SpellcastingOperation =
+  | CastSpellOperation
+  | ExpendSlotOperation
+  | RestoreSlotOperation
+  | LearnSpellOperation
+  | ForgetSpellOperation
+  | PrepareSpellOperation
+  | UnprepareSpellOperation;
 
 // ── XP operation types (mirrors backend/src/lib/experience-ops.ts) ──────────
 // Sent as `{ operations: ExperienceOperation[] }` to POST /api/characters/:id/experience.

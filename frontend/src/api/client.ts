@@ -1,4 +1,5 @@
 import type {
+  CatalogSpell,
   Character,
   CharacterEvent,
   CharacterSummary,
@@ -9,6 +10,7 @@ import type {
   Item,
   LedgerEntry,
   ReferenceData,
+  SpellcastingOperation,
 } from "../types/character";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
@@ -71,6 +73,35 @@ export async function fetchItems(): Promise<Item[]> {
   const response = await fetch(`${API_URL}/items`);
   if (!response.ok) {
     throw new Error(`Failed to fetch items (${response.status})`);
+  }
+  return response.json();
+}
+
+// Feeds the spellcasting section's "learn from catalog" picker.
+// Ordered by level then name server-side; no client-side re-sort needed.
+export async function fetchSpells(): Promise<CatalogSpell[]> {
+  const response = await fetch(`${API_URL}/spells`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch spell catalog (${response.status})`);
+  }
+  return response.json();
+}
+
+// Applies a batch of spellcasting operations atomically: cast, expend/restore
+// slots, learn/forget spells, prepare/unprepare. Mirrors applyInventoryTransactions
+// — same intent-bearing batch pattern, full updated Character returned on success.
+export async function applySpellcastingTransactions(
+  characterId: string,
+  operations: SpellcastingOperation[]
+): Promise<Character> {
+  const response = await fetch(`${API_URL}/characters/${characterId}/spellcasting/transactions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ operations }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to apply spellcasting operations (${response.status})`);
   }
   return response.json();
 }

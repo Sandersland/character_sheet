@@ -43,7 +43,7 @@ activityRouter.get("/characters/:id/activity", async (req, res) => {
   // comes from a query string and must be narrowed to the Prisma enum.
   const whereClause = {
     characterId: character.id,
-    ...(category ? { category: category as "inventory" | "hitPoints" | "experience" | "currency" } : {}),
+    ...(category ? { category: category as "inventory" | "hitPoints" | "experience" | "currency" | "spellcasting" } : {}),
     ...(entityId ? { entityId } : {}),
     ...(revertedFilter !== undefined ? { reverted: revertedFilter } : {}),
   };
@@ -147,6 +147,9 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
         if (before.hitPoints !== undefined) updateData.hitPoints = before.hitPoints;
         if (before.hitDice !== undefined) updateData.hitDice = before.hitDice;
         if (before.experiencePoints !== undefined) updateData.experiencePoints = before.experiencePoints;
+        // Long rest also snapshots spellcasting — restore it so undoing a rest
+        // re-expends the slots that were cleared.
+        if (before.spellcasting !== undefined) updateData.spellcasting = before.spellcasting;
         if (Object.keys(updateData).length > 0) {
           await tx.character.update({
             where: { id: character.id },
@@ -168,6 +171,15 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
           await tx.character.update({
             where: { id: character.id },
             data: { currency: beforeCurrency as Prisma.InputJsonValue },
+          });
+        }
+      } else if (category === "spellcasting") {
+        // Restore the full spellcasting JSON from before snapshot.
+        const beforeSpellcasting = before.spellcasting as Record<string, unknown> | undefined;
+        if (beforeSpellcasting !== undefined) {
+          await tx.character.update({
+            where: { id: character.id },
+            data: { spellcasting: beforeSpellcasting as Prisma.InputJsonValue },
           });
         }
       }

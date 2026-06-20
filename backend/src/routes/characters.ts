@@ -14,7 +14,14 @@ import {
 import { buildInventoryCreateFromCatalog, catalogItemDetailInclude } from "../lib/inventory.js";
 import { prisma } from "../lib/prisma.js";
 import { normalizeHitDice, normalizeHitPoints } from "../lib/hitpoints.js";
-import { ALIGNMENTS, deriveCreatedCharacter, PACK_CONTENTS, STARTING_EQUIPMENT } from "../lib/srd.js";
+import {
+  ALIGNMENTS,
+  deriveCreatedCharacter,
+  deriveSpellcasting,
+  PACK_CONTENTS,
+  STARTING_EQUIPMENT,
+} from "../lib/srd.js";
+import { normalizeSpellcastingMutable } from "../lib/spellcasting.js";
 
 export const charactersRouter = Router();
 
@@ -92,6 +99,40 @@ export function serializeCharacter(row: CharacterWithRelations) {
   const hitPoints = normalizeHitPoints(row.hitPoints);
   const hitDice = normalizeHitDice(row.hitDice);
 
+  // Derive spellcasting stats at read time (ability, DC, attack, slot totals)
+  // rather than persisting them — same pattern as level/proficiencyBonus.
+  // The stored JSON only holds mutable state: slotsUsed + spells[].
+  const abilityScoresMap = row.abilityScores as Record<string, number>;
+  const derivedSpell = deriveSpellcasting(
+    primaryClass?.name ?? "",
+    progress.level,
+    abilityScoresMap,
+    progress.proficiencyBonus
+  );
+
+  let spellcasting: object | undefined;
+  if (derivedSpell) {
+    const stored = normalizeSpellcastingMutable(row.spellcasting);
+    spellcasting = {
+      ability: derivedSpell.ability,
+      spellSaveDC: derivedSpell.spellSaveDC,
+      spellAttackBonus: derivedSpell.spellAttackBonus,
+      slots: derivedSpell.slotTotals.map(({ level: slotLevel, total }) => ({
+        level: slotLevel,
+        total,
+        // Clamp used to total in case stored value is stale (e.g. after a
+        // class change or long rest that wasn't captured in the old blob).
+        used: Math.min(total, stored.slotsUsed[String(slotLevel)] ?? 0),
+      })),
+      spells: stored.spells,
+    };
+  } else if (row.spellcasting !== null && row.spellcasting !== undefined) {
+    // Fallback for unsupported caster classes (Warlock Pact Magic, half/third
+    // casters): pass the stored blob as-is so the UI still renders.
+    // TODO: add half-caster / Pact Magic progressions and derive these too.
+    spellcasting = row.spellcasting as object;
+  }
+
   return {
     id: row.id,
     name: row.name,
@@ -123,7 +164,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     skills: row.skills,
     inventory: row.inventoryItems.map(serializeInventoryItem),
     currency: row.currency,
-    spellcasting: row.spellcasting ?? undefined,
+    spellcasting,
     journal: row.journal,
 
     // Structured, multiclass-aware view alongside the flattened
@@ -545,7 +586,10 @@ const updateCharacterSchema = z
       gp: z.number().int(),
       pp: z.number().int(),
     }),
-    spellcasting: z.unknown().nullable(),
+    // spellcasting is intentionally absent: mutate via
+    // POST /characters/:id/spellcasting/transactions instead, so that slot
+    // expenditure and spell changes are logged as events (same reasoning as
+    // inventory being absent from PATCH).
     journal: z.array(z.unknown()),
   })
   .partial()

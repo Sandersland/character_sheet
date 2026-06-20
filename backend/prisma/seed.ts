@@ -526,6 +526,348 @@ const ITEMS: CatalogItem[] = [
   { name: "Knife", category: "gear", weight: 0.5, cost: coins(0, 2, 0) },
 ];
 
+// ── Spell catalog ─────────────────────────────────────────────────────────────
+// A curated SRD subset (cantrips–L3) seeded for the spell-catalog picker and
+// auto-rolling feature. Structured effect fields (effectKind/effectDiceCount
+// etc.) mirror ItemWeaponDetail / ItemConsumableDetail so the frontend can roll
+// damage/healing at cast time using the same dice.ts engine.
+type SpellSchoolSeed =
+  | "abjuration" | "conjuration" | "divination" | "enchantment"
+  | "evocation" | "illusion" | "necromancy" | "transmutation";
+
+interface CatalogSpell {
+  name: string;
+  level: number;
+  school: SpellSchoolSeed;
+  castingTime: string;
+  range: string;
+  duration: string;
+  description: string;
+  concentration?: boolean;
+  ritual?: boolean;
+  classes: string[];          // lowercase class names
+  effectKind?: "damage" | "heal";
+  effectDiceCount?: number;
+  effectDiceFaces?: number;
+  effectModifier?: number;    // flat bonus (e.g. +3 in "3d4+3" for Magic Missile)
+  damageType?: string;
+  attackType?: "attack" | "save";
+  saveAbility?: string;
+  upcastDicePerLevel?: number;
+  cantripScaling?: boolean;
+}
+
+const SPELLS: CatalogSpell[] = [
+  // ── Cantrips ──────────────────────────────────────────────────────────────
+  {
+    name: "Fire Bolt",
+    level: 0,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "120 ft",
+    duration: "Instantaneous",
+    description: "A mote of fire streaks toward a creature. Make a ranged spell attack. On a hit, deal 1d10 fire damage (scales to 2d10 at level 5, 3d10 at level 11, 4d10 at level 17).",
+    classes: ["wizard", "sorcerer"],
+    effectKind: "damage",
+    effectDiceCount: 1,
+    effectDiceFaces: 10,
+    damageType: "fire",
+    attackType: "attack",
+    cantripScaling: true,
+  },
+  {
+    name: "Sacred Flame",
+    level: 0,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "60 ft",
+    duration: "Instantaneous",
+    description: "Flame-like radiance descends on a creature. It must succeed on a Dexterity saving throw or take 1d8 radiant damage (scales to 2d8 at level 5, 3d8 at 11, 4d8 at 17). No cover bonus.",
+    classes: ["cleric"],
+    effectKind: "damage",
+    effectDiceCount: 1,
+    effectDiceFaces: 8,
+    damageType: "radiant",
+    attackType: "save",
+    saveAbility: "dexterity",
+    cantripScaling: true,
+  },
+  {
+    name: "Vicious Mockery",
+    level: 0,
+    school: "enchantment",
+    castingTime: "1 action",
+    range: "60 ft",
+    duration: "Instantaneous",
+    description: "Unleash a string of insults laden with magic. The target must succeed on a Wisdom save or take 1d4 psychic damage and have disadvantage on its next attack roll (scales to 2d4 at level 5, 3d4 at 11, 4d4 at 17).",
+    classes: ["bard"],
+    effectKind: "damage",
+    effectDiceCount: 1,
+    effectDiceFaces: 4,
+    damageType: "psychic",
+    attackType: "save",
+    saveAbility: "wisdom",
+    cantripScaling: true,
+  },
+  {
+    name: "Toll the Dead",
+    level: 0,
+    school: "necromancy",
+    castingTime: "1 action",
+    range: "60 ft",
+    duration: "Instantaneous",
+    description: "Point at a creature and the sound of a dolorous bell fills the air. It must succeed on a Constitution save or take 1d8 necrotic damage (1d12 if it's missing HP). Scales at level 5/11/17.",
+    classes: ["cleric", "wizard"],
+    effectKind: "damage",
+    effectDiceCount: 1,
+    effectDiceFaces: 8,
+    damageType: "necrotic",
+    attackType: "save",
+    saveAbility: "constitution",
+    cantripScaling: true,
+  },
+  {
+    name: "Mage Hand",
+    level: 0,
+    school: "conjuration",
+    castingTime: "1 action",
+    range: "30 ft",
+    duration: "1 minute",
+    description: "A spectral, floating hand appears at a point you choose within range. It can manipulate objects, open doors, or stow items, but can't attack or carry more than 10 pounds.",
+    classes: ["wizard", "sorcerer", "bard"],
+  },
+  {
+    name: "Prestidigitation",
+    level: 0,
+    school: "transmutation",
+    castingTime: "1 action",
+    range: "10 ft",
+    duration: "Up to 1 hour",
+    description: "Magical tricks: create a small sensory effect, light or snuff a flame, clean or soil an object, warm or chill food, create a mark, produce a trinket-like item, or activate/cancel a past prestidigitation effect.",
+    classes: ["wizard", "sorcerer", "bard"],
+  },
+  {
+    name: "Light",
+    level: 0,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "1 hour",
+    description: "Touch one object no larger than 10 feet in any dimension. Until the spell ends, it emits bright light in a 20-foot radius and dim light for an additional 20 feet.",
+    classes: ["cleric", "bard", "wizard", "sorcerer"],
+  },
+  // ── Level 1 ───────────────────────────────────────────────────────────────
+  {
+    name: "Magic Missile",
+    level: 1,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "120 ft",
+    duration: "Instantaneous",
+    description: "Three glowing darts of magical force hit automatically (1d4+1 each = 3d4+3 total). At higher levels: +1 dart per slot level above 1st.",
+    classes: ["wizard", "sorcerer"],
+    effectKind: "damage",
+    effectDiceCount: 3,
+    effectDiceFaces: 4,
+    effectModifier: 3,
+    damageType: "force",
+    upcastDicePerLevel: 1,   // +1 dart (1d4+1) per level; effectModifier also increases by 1
+  },
+  {
+    name: "Cure Wounds",
+    level: 1,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "Instantaneous",
+    description: "Touch a living creature and restore 1d8 + spellcasting modifier HP. At higher levels: +1d8 per slot level above 1st.",
+    classes: ["cleric", "bard", "druid"],
+    effectKind: "heal",
+    effectDiceCount: 1,
+    effectDiceFaces: 8,
+    upcastDicePerLevel: 1,
+  },
+  {
+    name: "Healing Word",
+    level: 1,
+    school: "evocation",
+    castingTime: "1 bonus action",
+    range: "60 ft",
+    duration: "Instantaneous",
+    description: "Call out words of restoration to restore 1d4 + spellcasting modifier HP to a visible creature within range. At higher levels: +1d4 per slot level above 1st.",
+    classes: ["cleric", "bard", "druid"],
+    effectKind: "heal",
+    effectDiceCount: 1,
+    effectDiceFaces: 4,
+    upcastDicePerLevel: 1,
+  },
+  {
+    name: "Mage Armor",
+    level: 1,
+    school: "abjuration",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "8 hours",
+    description: "Touch a willing creature not wearing armor. Until the spell ends, the target's base AC becomes 13 + its Dexterity modifier. The spell ends if the target dons armor.",
+    classes: ["wizard", "sorcerer"],
+  },
+  {
+    name: "Shield",
+    level: 1,
+    school: "abjuration",
+    castingTime: "1 reaction",
+    range: "Self",
+    duration: "1 round",
+    description: "Reaction to an attack hitting you: +5 AC until the start of your next turn (potentially turning the hit into a miss), plus immunity to Magic Missile.",
+    classes: ["wizard", "sorcerer"],
+  },
+  {
+    name: "Thunderwave",
+    level: 1,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "Self (15-ft cube)",
+    duration: "Instantaneous",
+    description: "A wave of thunderous force sweeps out. Each creature in a 15-ft cube must succeed on a Constitution save or take 2d8 thunder damage and be pushed 10 feet. At higher levels: +1d8 per slot level above 1st.",
+    classes: ["wizard", "druid", "bard", "sorcerer", "cleric"],
+    effectKind: "damage",
+    effectDiceCount: 2,
+    effectDiceFaces: 8,
+    damageType: "thunder",
+    attackType: "save",
+    saveAbility: "constitution",
+    upcastDicePerLevel: 1,
+  },
+  {
+    name: "Detect Magic",
+    level: 1,
+    school: "divination",
+    castingTime: "1 action",
+    range: "Self",
+    duration: "Concentration, up to 10 minutes",
+    description: "Sense the presence of magic within 30 feet. You can use your action to see a faint aura around visible magical creatures or objects and learn its school of magic, if any.",
+    classes: ["wizard", "cleric", "druid", "bard"],
+    concentration: true,
+    ritual: true,
+  },
+  // ── Level 2 ───────────────────────────────────────────────────────────────
+  {
+    name: "Scorching Ray",
+    level: 2,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "120 ft",
+    duration: "Instantaneous",
+    description: "Create three rays of fire; make a separate ranged spell attack for each. On a hit, each ray deals 2d6 fire damage (total 6d6 if all hit). At higher levels: +1 ray per slot level above 2nd.",
+    classes: ["wizard", "sorcerer"],
+    effectKind: "damage",
+    effectDiceCount: 6,
+    effectDiceFaces: 6,
+    damageType: "fire",
+    attackType: "attack",
+    upcastDicePerLevel: 2,   // +1 ray (+2d6) per slot level above 2nd
+  },
+  {
+    name: "Misty Step",
+    level: 2,
+    school: "conjuration",
+    castingTime: "1 bonus action",
+    range: "Self",
+    duration: "Instantaneous",
+    description: "Briefly surrounded by silvery mist, you teleport up to 30 feet to an unoccupied space you can see.",
+    classes: ["wizard", "sorcerer", "bard"],
+  },
+  {
+    name: "Shatter",
+    level: 2,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "60 ft",
+    duration: "Instantaneous",
+    description: "A sudden loud ringing noise causes creatures and objects in a 10-ft-radius sphere to take 3d8 thunder damage on a failed Constitution save, half on a success. Inorganic material has disadvantage. At higher levels: +1d8 per slot above 2nd.",
+    classes: ["bard", "sorcerer", "wizard", "cleric"],
+    effectKind: "damage",
+    effectDiceCount: 3,
+    effectDiceFaces: 8,
+    damageType: "thunder",
+    attackType: "save",
+    saveAbility: "constitution",
+    upcastDicePerLevel: 1,
+  },
+  {
+    name: "Hold Person",
+    level: 2,
+    school: "enchantment",
+    castingTime: "1 action",
+    range: "60 ft",
+    duration: "Concentration, up to 1 minute",
+    description: "Choose a humanoid within range. It must succeed on a Wisdom saving throw or be paralyzed for the duration. At the end of each of its turns, it can repeat the save.",
+    classes: ["bard", "cleric", "druid", "wizard"],
+    concentration: true,
+    attackType: "save",
+    saveAbility: "wisdom",
+  },
+  // ── Level 3 ───────────────────────────────────────────────────────────────
+  {
+    name: "Fireball",
+    level: 3,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "150 ft",
+    duration: "Instantaneous",
+    description: "A bright streak flashes to a point you choose, then blossoms into an explosion. Each creature in a 20-ft-radius sphere must make a Dexterity save. On failure, 8d6 fire damage; half on success. At higher levels: +1d6 per slot level above 3rd.",
+    classes: ["wizard", "sorcerer"],
+    effectKind: "damage",
+    effectDiceCount: 8,
+    effectDiceFaces: 6,
+    damageType: "fire",
+    attackType: "save",
+    saveAbility: "dexterity",
+    upcastDicePerLevel: 1,
+  },
+  {
+    name: "Lightning Bolt",
+    level: 3,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "Self (100-ft line)",
+    duration: "Instantaneous",
+    description: "A stroke of lightning blasts out in a 100-ft line. Each creature in the line makes a Dexterity save. On failure, 8d6 lightning damage; half on success. At higher levels: +1d6 per slot level above 3rd.",
+    classes: ["wizard", "sorcerer"],
+    effectKind: "damage",
+    effectDiceCount: 8,
+    effectDiceFaces: 6,
+    damageType: "lightning",
+    attackType: "save",
+    saveAbility: "dexterity",
+    upcastDicePerLevel: 1,
+  },
+  {
+    name: "Counterspell",
+    level: 3,
+    school: "abjuration",
+    castingTime: "1 reaction",
+    range: "60 ft",
+    duration: "Instantaneous",
+    description: "Attempt to interrupt a creature in the process of casting a spell. If the spell is 3rd level or lower, it fails automatically. If it's 4th level or higher, make an ability check (DC = 10 + spell's level).",
+    classes: ["wizard", "sorcerer", "bard", "cleric"],
+  },
+  {
+    name: "Mass Healing Word",
+    level: 3,
+    school: "evocation",
+    castingTime: "1 bonus action",
+    range: "60 ft",
+    duration: "Instantaneous",
+    description: "As you call out words of restoration, up to six creatures you choose within range each regain 1d4 + spellcasting modifier HP. At higher levels: +1d4 per slot level above 3rd.",
+    classes: ["cleric", "bard"],
+    effectKind: "heal",
+    effectDiceCount: 1,
+    effectDiceFaces: 4,
+    upcastDicePerLevel: 1,
+  },
+];
+
 // Per-character inventory row, specified as shorthand below and resolved
 // against the catalog in main(): `catalogName` pulls the row's stats from
 // the matching Item (the common, "don't hand-author your inventory" case),
@@ -616,16 +958,11 @@ const SEED_CHARACTERS = [
     ] satisfies SeedInventoryRow[],
     currency: { cp: 12, sp: 30, gp: 145, pp: 2 },
 
+    // New compact format: only mutable state (slotsUsed + spells) is stored.
+    // Slot totals, spellSaveDC, spellAttackBonus, and ability are derived at
+    // read time from class/level/abilityScores in serializeCharacter.
     spellcasting: {
-      ability: "intelligence",
-      spellSaveDC: 15,
-      spellAttackBonus: 6,
-      slots: [
-        { level: 1, total: 4, used: 1 },
-        { level: 2, total: 3, used: 0 },
-        { level: 3, total: 3, used: 2 },
-        { level: 4, total: 1, used: 0 },
-      ],
+      slotsUsed: { "1": 1, "3": 2 },
       spells: [
         {
           id: "s1",
@@ -636,18 +973,24 @@ const SEED_CHARACTERS = [
           castingTime: "1 action",
           range: "120 ft",
           duration: "Instantaneous",
-          description: "Ranged spell attack hurling a mote of fire, 2d10 fire damage.",
+          description: "A mote of fire streaks toward a creature. Make a ranged spell attack. On a hit, deal 1d10 fire damage (scales to 2d10 at level 5, 3d10 at level 11, 4d10 at level 17).",
+          effectKind: "damage",
+          effectDiceCount: 1,
+          effectDiceFaces: 10,
+          damageType: "fire",
+          attackType: "attack",
+          cantripScaling: true,
         },
         {
           id: "s2",
           name: "Mage Armor",
           level: 1,
-          school: "conjuration",
+          school: "abjuration",
           prepared: true,
           castingTime: "1 action",
           range: "Touch",
           duration: "8 hours",
-          description: "Target's base AC becomes 13 + Dex modifier.",
+          description: "Touch a willing creature not wearing armor. Until the spell ends, the target's base AC becomes 13 + its Dexterity modifier.",
         },
         {
           id: "s3",
@@ -658,7 +1001,7 @@ const SEED_CHARACTERS = [
           castingTime: "1 bonus action",
           range: "Self",
           duration: "Instantaneous",
-          description: "Teleport up to 30 feet to an unoccupied space you can see.",
+          description: "Briefly surrounded by silvery mist, you teleport up to 30 feet to an unoccupied space you can see.",
         },
         {
           id: "s4",
@@ -669,7 +1012,14 @@ const SEED_CHARACTERS = [
           castingTime: "1 action",
           range: "150 ft",
           duration: "Instantaneous",
-          description: "8d6 fire damage in a 20-ft radius sphere, Dex save for half.",
+          description: "A bright streak flashes to a point you choose, then blossoms into an explosion. Each creature in a 20-ft-radius sphere must make a Dexterity save. On failure, 8d6 fire damage; half on success.",
+          effectKind: "damage",
+          effectDiceCount: 8,
+          effectDiceFaces: 6,
+          damageType: "fire",
+          attackType: "save",
+          saveAbility: "dexterity",
+          upcastDicePerLevel: 1,
         },
         {
           id: "s5",
@@ -680,7 +1030,7 @@ const SEED_CHARACTERS = [
           castingTime: "1 reaction",
           range: "60 ft",
           duration: "Instantaneous",
-          description: "Interrupt a creature casting a spell.",
+          description: "Attempt to interrupt a creature in the process of casting a spell. If 3rd level or lower, it fails automatically. If higher, make an ability check (DC = 10 + spell's level).",
         },
         {
           id: "s6",
@@ -691,7 +1041,8 @@ const SEED_CHARACTERS = [
           castingTime: "1 action",
           range: "60 ft",
           duration: "Concentration, up to 1 hour",
-          description: "Transform a creature into a new form.",
+          description: "Transform a creature into a beast (you choose its form) with CR equal to or less than the target's CR (or level). The target's stats and capabilities are replaced by the beast's.",
+          concentration: true,
         },
       ],
     },
@@ -941,6 +1292,15 @@ async function main() {
       update: background,
     });
     backgroundIds.set(row.name, row.id);
+  }
+
+  // Seed spell catalog — upsert by unique name, same idempotent pattern as items.
+  for (const spell of SPELLS) {
+    await prisma.spell.upsert({
+      where: { name: spell.name },
+      create: spell,
+      update: spell,
+    });
   }
 
   const catalogByName = new Map<string, CatalogItem>(ITEMS.map((item) => [item.name, item]));

@@ -163,6 +163,55 @@ enum WeaponRange {
   ranged
 }
 
+// Spell schools per the 5e SRD. Mirrors frontend/src/types/character.ts
+// SpellSchool — the two must stay in sync.
+enum SpellSchool {
+  abjuration
+  conjuration
+  divination
+  enchantment
+  evocation
+  illusion
+  necromancy
+  transmutation
+}
+
+// Baseline spell catalog — same catalog-table role as Item above. Seeded from
+// a curated SRD subset (prisma/seed.ts). Never referenced by a direct FK on
+// Character; provenance lives in the per-character spellcasting JSON blob's
+// SpellEntry.spellId field, nullable so homebrew spells have no catalog row.
+// All per-spell mechanical data lives here rather than on a *Detail table —
+// spells are flat (school/level/effect/scaling) rather than category-
+// polymorphic like items, so no detail table split is needed.
+model Spell {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  level       Int         // 0 = cantrip
+  school      SpellSchool
+  castingTime String
+  range       String
+  duration    String
+  description String
+  concentration Boolean   @default(false)
+  ritual      Boolean     @default(false)
+  classes     String[]    // lowercase class names the spell appears on, e.g. ["wizard","sorcerer"]
+
+  // Structured effect data for auto-rolling at cast time (RollSpec-shaped,
+  // mirrors ItemWeaponDetail / ItemConsumableDetail). null = utility spell.
+  effectKind         String?  // "damage" | "heal" — null means utility (no roll)
+  effectDiceCount    Int?
+  effectDiceFaces    Int?
+  effectModifier     Int?     // flat bonus added after dice (e.g. +3 in "3d4+3")
+  damageType         String?  // "fire" / "radiant" / etc. — for damage spells
+  attackType         String?  // "attack" | "save" | null
+  saveAbility        String?  // ability the target saves with, e.g. "dexterity"
+  // Extra effect dice added per slot level cast above the base level (null =
+  // spell has no upcast scaling — Fireball adds 1d6 per upcast level).
+  upcastDicePerLevel Int?
+  // Cantrip damage scales with character level (5/11/17 thresholds) per 5e rules.
+  cantripScaling     Boolean  @default(false)
+}
+
 // Baseline equipment catalog, same role as Race/CharacterClass above: seeded
 // from a small SRD subset (prisma/seed.ts) and never referenced directly by
 // Character — only through InventoryItem.itemId, which is nullable, so
@@ -368,7 +417,8 @@ enum CharacterEventCategory {
   hitPoints
   experience
   currency
-  // future: journal, spells, conditions
+  spellcasting
+  // future: journal, conditions
 }
 
 enum CharacterEventType {
@@ -393,6 +443,14 @@ enum CharacterEventType {
   xpSet
   // currency
   currencyAdjust
+  // spellcasting
+  castSpell
+  expendSlot
+  restoreSlot
+  learnSpell
+  forgetSpell
+  prepareSpell
+  unprepareSpell
   // meta
   revert
 }

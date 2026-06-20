@@ -19,6 +19,7 @@ const CATEGORY_TONE: Record<CharacterEventCategory, "vitality" | "gold" | "garne
   hitPoints: "vitality",
   experience: "arcane",
   currency: "gold",
+  spellcasting: "arcane",
 };
 
 // Label per event type for the badge.
@@ -40,6 +41,13 @@ const TYPE_LABEL: Partial<Record<string, string>> = {
   xpAward: "XP",
   xpSet: "XP set",
   currencyAdjust: "currency",
+  castSpell: "cast",
+  expendSlot: "slot used",
+  restoreSlot: "slot restored",
+  learnSpell: "learned",
+  forgetSpell: "forgotten",
+  prepareSpell: "prepared",
+  unprepareSpell: "unprepared",
   revert: "undo",
 };
 

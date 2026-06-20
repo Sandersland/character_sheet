@@ -5,6 +5,7 @@ import { levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
 import { abilityModifier, hitDieFace } from "./srd.js";
+import { normalizeSpellcastingMutable } from "./spellcasting.js";
 
 export class InvalidHitPointOperationError extends Error {}
 
@@ -219,6 +220,7 @@ export async function applyHitPointOperations(
           hitDice: true,
           abilityScores: true,
           experiencePoints: true,
+          spellcasting: true,
           classEntries: {
             orderBy: { position: "asc" as const },
             take: 1,
@@ -317,10 +319,38 @@ export async function applyHitPointOperations(
           // Recover hit dice equal to half your total (round down, min 1).
           const recovered = Math.max(1, Math.floor(hd.total / 2));
           hd.spent = Math.max(0, hd.spent - recovered);
-          eventData = { recovered, hpRestored: hp.max - prevCurrent };
-          summary = prevCurrent < hp.max
-            ? `Long rest — HP fully restored (+${hp.max - prevCurrent} HP)`
-            : `Long rest — HP already full`;
+
+          // Reset all spell slot used-counts to 0 (full caster long-rest recovery).
+          // TODO: Warlock Pact Magic restores on short rest — handle once the
+          // half/Pact caster progressions are added.
+          const spellState = normalizeSpellcastingMutable(row.spellcasting);
+          const beforeSpellState = { slotsUsed: { ...spellState.slotsUsed } };
+          const slotsRestored = Object.values(spellState.slotsUsed).reduce((s, n) => s + n, 0);
+          spellState.slotsUsed = {};
+
+          const hpRestored = hp.max - prevCurrent;
+          eventData = { recovered, hpRestored, slotsRestored };
+          const parts: string[] = [];
+          if (hpRestored > 0) parts.push(`+${hpRestored} HP`);
+          else parts.push("HP already full");
+          if (slotsRestored > 0) parts.push(`${slotsRestored} slot${slotsRestored !== 1 ? "s" : ""} restored`);
+          summary = `Long rest — ${parts.join(", ")}`;
+
+          // Write spellcasting update in the same character.update below.
+          // The update is applied unconditionally (even if no slots were spent)
+          // to keep the stored format normalized to the compact shape.
+          await tx.character.update({
+            where: { id: characterId },
+            data: {
+              spellcasting: {
+                slotsUsed: spellState.slotsUsed,
+                spells: spellState.spells,
+              } as unknown as Prisma.InputJsonValue,
+            },
+          });
+
+          // Include spellcasting in the before/after snapshot for undo.
+          (eventData as Record<string, unknown>).beforeSpellState = beforeSpellState;
           break;
         }
 
@@ -414,11 +444,18 @@ export async function applyHitPointOperations(
 
       // Build the before/after sub-state snapshots. levelUp also captures the
       // class-entry level because the op mutates that outside the JSON columns.
+      // longRest captures spellcasting so undoing it re-expends the slots.
       const beforeState: Record<string, unknown> = { hitPoints: beforeHp, hitDice: beforeHd };
       const afterState: Record<string, unknown> = { hitPoints: { ...hp }, hitDice: { ...hd } };
       if (op.type === "levelUp") {
         beforeState.classEntryLevel = beforeClassLevel;
         afterState.classEntryLevel = hd.total;
+      }
+      if (op.type === "longRest") {
+        const data = eventData as Record<string, unknown>;
+        beforeState.spellcasting = data.beforeSpellState;
+        afterState.spellcasting = { slotsUsed: {} };
+        delete data.beforeSpellState; // don't duplicate in eventData
       }
 
       await logEvent(tx, {

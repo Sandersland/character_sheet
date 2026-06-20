@@ -9,6 +9,8 @@ import { hitPointsRouter } from "./routes/hitpoints.js";
 import { inventoryRouter } from "./routes/inventory.js";
 import { itemsRouter } from "./routes/items.js";
 import { referenceRouter } from "./routes/reference.js";
+import { spellsRouter } from "./routes/spells.js";
+import { spellcastingRouter } from "./routes/spellcasting.js";
 
 export function createApp() {
   const app = express();
@@ -24,6 +26,8 @@ export function createApp() {
   app.use("/api", inventoryRouter);
   app.use("/api", experienceRouter);
   app.use("/api", activityRouter);
+  app.use("/api", spellsRouter);
+  app.use("/api", spellcastingRouter);
 
   return app;
 }

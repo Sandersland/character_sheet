@@ -46,6 +46,95 @@ export const SKILLS: readonly SkillDefinition[] = [
   { name: "survival", ability: "wisdom" },
 ];
 
+// ── Spellcasting ability by class ────────────────────────────────────────────
+// Maps a class name (lowercase) to the ability that governs its spellcasting.
+// Used to derive spellSaveDC and spellAttackBonus at read time.
+// Warlock is listed here for ability lookup but uses Pact Magic (short-rest,
+// different slot counts) rather than the full-caster table — see
+// deriveSpellcasting below.
+export const SPELLCASTING_ABILITY: Readonly<Record<string, string>> = {
+  wizard: "intelligence",
+  sorcerer: "charisma",
+  cleric: "wisdom",
+  druid: "wisdom",
+  bard: "charisma",
+  warlock: "charisma",
+  paladin: "charisma",
+  ranger: "wisdom",
+};
+
+// Classes that use the standard full-caster progression below.
+// Half/third casters and Warlock (Pact Magic) use different tables — they
+// fall back to stored slot totals until a later phase adds their progressions.
+const FULL_CASTER_CLASSES = new Set(["wizard", "sorcerer", "cleric", "druid", "bard"]);
+
+// Standard 5e full-caster slot table (PHB p. 114 / Basic Rules spell table).
+// Outer key: character level 1–20.  Inner key: slot level 1–9.
+// Only non-zero slot counts are listed; missing slot levels have 0 slots.
+export const FULL_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number>>>> = {
+   1: { 1: 2 },
+   2: { 1: 3 },
+   3: { 1: 4, 2: 2 },
+   4: { 1: 4, 2: 3 },
+   5: { 1: 4, 2: 3, 3: 2 },
+   6: { 1: 4, 2: 3, 3: 3 },
+   7: { 1: 4, 2: 3, 3: 3, 4: 1 },
+   8: { 1: 4, 2: 3, 3: 3, 4: 2 },
+   9: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 1 },
+  10: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2 },
+  11: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1 },
+  12: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1 },
+  13: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1 },
+  14: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1 },
+  15: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1, 8: 1 },
+  16: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1, 8: 1 },
+  17: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2, 6: 1, 7: 1, 8: 1, 9: 1 },
+  18: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 1, 7: 1, 8: 1, 9: 1 },
+  19: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2, 7: 1, 8: 1, 9: 1 },
+  20: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1 },
+};
+
+export interface DerivedSpellcastingInfo {
+  ability: string;
+  spellSaveDC: number;
+  spellAttackBonus: number;
+  slotTotals: Array<{ level: number; total: number }>;
+}
+
+/**
+ * Derives the mechanical spellcasting stats (ability, save DC, attack bonus,
+ * slot totals) from a character's class, level, ability scores, and proficiency
+ * bonus. Returns null for non-casters or unsupported progressions (half/third
+ * casters, Warlock Pact Magic) — callers fall back to the stored blob.
+ *
+ * Pure function — no DB access, safe to call in serializeCharacter.
+ *
+ * TODO: add half-caster (Paladin/Ranger) and third-caster (Eldritch Knight/
+ * Arcane Trickster) slot tables, and Warlock Pact Magic progression.
+ */
+export function deriveSpellcasting(
+  className: string,
+  characterLevel: number,
+  abilityScores: Record<string, number>,
+  proficiencyBonus: number
+): DerivedSpellcastingInfo | null {
+  const classKey = className.toLowerCase();
+  const ability = SPELLCASTING_ABILITY[classKey];
+  if (!ability) return null; // non-caster class
+  if (!FULL_CASTER_CLASSES.has(classKey)) return null; // TODO: Pact Magic / half-casters
+
+  const abilityMod = abilityModifier(abilityScores[ability] ?? 10);
+  const spellSaveDC = 8 + proficiencyBonus + abilityMod;
+  const spellAttackBonus = proficiencyBonus + abilityMod;
+
+  const slotRow = FULL_CASTER_SLOTS[Math.min(20, Math.max(1, characterLevel))] ?? {};
+  const slotTotals = Object.entries(slotRow)
+    .map(([lvl, total]) => ({ level: Number(lvl), total }))
+    .sort((a, b) => a.level - b.level);
+
+  return { ability, spellSaveDC, spellAttackBonus, slotTotals };
+}
+
 /** Standard 5e modifier: floor((score - 10) / 2). */
 export function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
