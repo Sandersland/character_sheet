@@ -2,6 +2,7 @@ import type {
   Character,
   CharacterSummary,
   CreateCharacterInput,
+  HitPointOperation,
   InventoryOperation,
   Item,
   LedgerEntry,
@@ -98,6 +99,25 @@ export async function fetchLedger(characterId: string, inventoryItemId?: string)
   const response = await fetch(`${API_URL}/characters/${characterId}/inventory/transactions${query}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch ledger (${response.status})`);
+  }
+  return response.json();
+}
+
+// Applies a batch of HP operations atomically (damage, heal, rest, level-up,
+// death saves). Mirrors applyInventoryTransactions — same intent-bearing
+// batch pattern, full updated Character returned on success.
+export async function applyHitPointOperations(
+  characterId: string,
+  operations: HitPointOperation[]
+): Promise<Character> {
+  const response = await fetch(`${API_URL}/characters/${characterId}/hp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ operations }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to apply HP operations (${response.status})`);
   }
   return response.json();
 }

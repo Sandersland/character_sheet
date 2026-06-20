@@ -52,7 +52,7 @@ export function abilityModifier(score: number): number {
 }
 
 /** Parses a hit die string like "d8" into its face value (8). */
-function hitDieFace(hitDie: string): number {
+export function hitDieFace(hitDie: string): number {
   return Number(hitDie.replace(/^d/i, ""));
 }
 
@@ -68,8 +68,8 @@ export interface DeriveCharacterCatalog {
 
 export interface DerivedCharacterFields {
   speed: number;
-  hitDice: { total: number; die: string };
-  hitPoints: { current: number; max: number; temp: number };
+  hitDice: { total: number; die: string; spent: number };
+  hitPoints: { current: number; max: number; temp: number; deathSaves: { successes: number; failures: number } };
   armorClass: number;
   initiativeBonus: number;
   savingThrowProficiencies: string[];
@@ -511,8 +511,8 @@ export function deriveCreatedCharacter(
 
   return {
     speed: catalog.race.speed,
-    hitDice: { total: 1, die: catalog.characterClass.hitDie },
-    hitPoints: { current: maxHitPoints, max: maxHitPoints, temp: 0 },
+    hitDice: { total: 1, die: catalog.characterClass.hitDie, spent: 0 },
+    hitPoints: { current: maxHitPoints, max: maxHitPoints, temp: 0, deathSaves: { successes: 0, failures: 0 } },
     armorClass: 10 + dexterityModifier,
     initiativeBonus: dexterityModifier,
     savingThrowProficiencies: catalog.characterClass.savingThrows,

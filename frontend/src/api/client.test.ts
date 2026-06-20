@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  applyHitPointOperations,
   applyInventoryTransactions,
   checkHealth,
   createCharacter,
@@ -11,7 +12,7 @@ import {
   fetchReference,
   updateCharacter,
 } from "./client";
-import type { CreateCharacterInput, InventoryOperation } from "../types/character";
+import type { CreateCharacterInput, HitPointOperation, InventoryOperation } from "../types/character";
 
 describe("checkHealth", () => {
   afterEach(() => {
@@ -234,6 +235,43 @@ describe("fetchLedger", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
 
     await expect(fetchLedger("1")).rejects.toThrow();
+  });
+});
+
+describe("applyHitPointOperations", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("sends a POST with the operations batch and returns the updated character", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: "1", hitPoints: { current: 15, max: 22, temp: 0, deathSaves: { successes: 0, failures: 0 } } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const operations: HitPointOperation[] = [{ type: "damage", amount: 7 }];
+    await applyHitPointOperations("1", operations);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/characters/1/hp"),
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ operations }) })
+    );
+  });
+
+  it("throws the server's error message on a non-ok response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: "No pending level-up: already at level 2" }),
+      })
+    );
+
+    await expect(
+      applyHitPointOperations("1", [{ type: "levelUp", method: "average" }])
+    ).rejects.toThrow("No pending level-up: already at level 2");
   });
 });
 

@@ -8,6 +8,7 @@ import Badge from "../components/Badge";
 import Card from "../components/Card";
 import DeleteCharacterModal from "../components/DeleteCharacterModal";
 import ExperienceTracker from "../components/ExperienceTracker";
+import HitPointTracker from "../components/HitPointTracker";
 import InventoryList from "../components/InventoryList";
 import JournalSection from "../components/JournalSection";
 import SkillsTable from "../components/SkillsTable";
@@ -145,7 +146,10 @@ export default function CharacterSheetPage() {
 
       <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
         <VitalsStrip character={character} />
-        <ExperienceTracker character={character} onUpdate={setCharacter} />
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <HitPointTracker character={character} onUpdate={setCharacter} />
+          <ExperienceTracker character={character} onUpdate={setCharacter} />
+        </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_1fr] lg:items-start">
           {/* Ability scores rail — fixed intrinsic width per

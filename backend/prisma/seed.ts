@@ -565,8 +565,8 @@ const SEED_CHARACTERS = [
     initiativeBonus: 2,
     speed: 30,
 
-    hitPoints: { current: 38, max: 46, temp: 0 },
-    hitDice: { total: 7, die: "d6" },
+    hitPoints: { current: 38, max: 46, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+    hitDice: { total: 7, die: "d6", spent: 0 },
 
     abilityScores: {
       strength: 8,
@@ -725,8 +725,8 @@ const SEED_CHARACTERS = [
     initiativeBonus: 0,
     speed: 25,
 
-    hitPoints: { current: 44, max: 51, temp: 5 },
-    hitDice: { total: 5, die: "d10" },
+    hitPoints: { current: 44, max: 51, temp: 5, deathSaves: { successes: 0, failures: 0 } },
+    hitDice: { total: 5, die: "d10", spent: 0 },
 
     abilityScores: {
       strength: 17,
@@ -789,8 +789,8 @@ const SEED_CHARACTERS = [
     initiativeBonus: 4,
     speed: 35,
 
-    hitPoints: { current: 28, max: 39, temp: 0 },
-    hitDice: { total: 6, die: "d8" },
+    hitPoints: { current: 28, max: 39, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+    hitDice: { total: 6, die: "d8", spent: 0 },
 
     abilityScores: {
       strength: 10,

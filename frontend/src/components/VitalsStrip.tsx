@@ -46,7 +46,7 @@ export default function VitalsStrip({ character }: VitalsStripProps) {
             Hit Points
           </span>
           <span className="text-xs text-[var(--color-parchment-500)]">
-            {hitDice.total}{hitDice.die}
+            {hitDice.total - hitDice.spent}/{hitDice.total}{hitDice.die}
           </span>
         </div>
         <p className="font-display text-xl font-semibold leading-none text-[var(--color-garnet-800)]">

@@ -324,6 +324,8 @@ export interface Character {
   experiencePoints: number;
   currentLevelThreshold: number;
   nextLevelThreshold: number | null;
+  /** Number of level-ups pending (XP-derived level exceeds applied hitDice.total). */
+  pendingLevelUps: number;
   background: string;
   alignment: string;
   portraitUrl?: string;
@@ -337,10 +339,12 @@ export interface Character {
     current: number;
     max: number;
     temp: number;
+    deathSaves: { successes: number; failures: number };
   };
   hitDice: {
     total: number;
     die: string; // e.g. "d10"
+    spent: number;
   };
 
   abilityScores: AbilityScores;
@@ -477,3 +481,28 @@ export interface CreateCharacterInput {
   skillProficiencies?: SkillName[];
   startingEquipment?: StartingEquipmentInput;
 }
+
+// ── HP operation types (mirrors backend/src/lib/hitpoints.ts) ───────────────
+// Sent as `{ operations: HitPointOperation[] }` to POST /api/characters/:id/hp.
+
+export interface DamageOperation { type: "damage"; amount: number }
+export interface HealOperation { type: "heal"; amount: number }
+export interface SetTempOperation { type: "setTemp"; amount: number }
+/** `rolls`: one raw die value per hit die spent (rolled by the client via dice.ts). */
+export interface ShortRestOperation { type: "shortRest"; rolls: number[] }
+export interface LongRestOperation { type: "longRest" }
+/** For "roll": client rolls via dice.ts, sends the raw die face as `roll`. */
+export interface LevelUpOperation { type: "levelUp"; method: "average" | "roll"; roll?: number }
+/** Client rolls d20 via dice.ts, sends the raw value. Only valid at 0 HP. */
+export interface DeathSaveOperation { type: "deathSave"; roll: number }
+export interface StabilizeOperation { type: "stabilize" }
+
+export type HitPointOperation =
+  | DamageOperation
+  | HealOperation
+  | SetTempOperation
+  | ShortRestOperation
+  | LongRestOperation
+  | LevelUpOperation
+  | DeathSaveOperation
+  | StabilizeOperation;

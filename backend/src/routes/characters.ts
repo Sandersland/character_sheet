@@ -10,6 +10,7 @@ import {
 } from "../lib/itemDetail.js";
 import { buildInventoryCreateFromCatalog, catalogItemDetailInclude } from "../lib/inventory.js";
 import { prisma } from "../lib/prisma.js";
+import { normalizeHitDice, normalizeHitPoints } from "../lib/hitpoints.js";
 import { ALIGNMENTS, deriveCreatedCharacter, PACK_CONTENTS, STARTING_EQUIPMENT } from "../lib/srd.js";
 
 export const charactersRouter = Router();
@@ -85,6 +86,8 @@ function serializeInventoryItem(row: CharacterWithRelations["inventoryItems"][nu
 export function serializeCharacter(row: CharacterWithRelations) {
   const progress = experienceProgress(row.experiencePoints);
   const primaryClass = row.classEntries[0];
+  const hitPoints = normalizeHitPoints(row.hitPoints);
+  const hitDice = normalizeHitDice(row.hitDice);
 
   return {
     id: row.id,
@@ -105,9 +108,13 @@ export function serializeCharacter(row: CharacterWithRelations) {
     experiencePoints: row.experiencePoints,
     currentLevelThreshold: progress.currentLevelThreshold,
     nextLevelThreshold: progress.nextLevelThreshold,
+    // Pending level-ups: XP-derived level exceeds the number of HP levels
+    // applied so far (hitDice.total tracks how many levels have been "leveled
+    // up" via the /hp endpoint). The UI shows a "Level up" button when > 0.
+    pendingLevelUps: Math.max(0, progress.level - hitDice.total),
 
-    hitPoints: row.hitPoints,
-    hitDice: row.hitDice,
+    hitPoints,
+    hitDice,
     abilityScores: row.abilityScores,
     savingThrowProficiencies: row.savingThrowProficiencies,
     skills: row.skills,
@@ -506,8 +513,19 @@ const updateCharacterSchema = z
       current: z.number().int(),
       max: z.number().int(),
       temp: z.number().int(),
+      // Optional so callers that don't know about death saves can still PATCH
+      // without stripping the field; normalizeHitPoints handles the default.
+      deathSaves: z.object({
+        successes: z.number().int().min(0).max(3),
+        failures: z.number().int().min(0).max(3),
+      }).optional(),
     }),
-    hitDice: z.object({ total: z.number().int(), die: z.string() }),
+    hitDice: z.object({
+      total: z.number().int(),
+      die: z.string(),
+      // Optional for the same backward-compat reason as deathSaves above.
+      spent: z.number().int().min(0).optional(),
+    }),
     abilityScores: z.record(z.string(), z.number().int()),
     savingThrowProficiencies: z.array(z.string()),
     skills: z.array(z.unknown()),
