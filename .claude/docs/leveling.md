@@ -1,0 +1,148 @@
+# Leveling: XP, Level-Up, Level-Down, and Level-Gated State
+
+Read this when you are:
+- touching XP or the level-up/level-down flow
+- adding any feature whose **availability or count depends on character level** (subclass, maneuvers known, future feats, Ability Score Improvements)
+- trying to understand why `level` is not a column
+
+---
+
+## XP → level is derived, never persisted
+
+`experiencePoints` is the only stored authority for a character's level. `level` and `proficiencyBonus` are **never columns** — they are computed at read time:
+
+```
+backend/src/lib/experience.ts
+  levelForExperience(xp)         → number 1–20 (pure, no DB)
+  proficiencyBonusForLevel(lvl)  → number
+  experienceProgress(xp)         → { level, proficiencyBonus, currentLevelThreshold,
+                                      nextLevelThreshold, xpToNextLevel }
+```
+
+`serializeCharacter` (`backend/src/routes/characters.ts`) calls `experienceProgress(row.experiencePoints)` and spreads the result onto the wire shape. These values must never be added back as columns — add or modify the curve in `experience.ts` and every read automatically reflects it.
+
+---
+
+## Level-up (HP gain) is a separate, explicit action
+
+XP going up does **not** automatically raise HP. A character can have XP at level 7 while only having applied HP for 5 levels. The fields that track this are:
+
+| Field | What it represents |
+|---|---|
+| `experiencePoints` | XP-derived level authority |
+| `hitDice.total` | How many HP level-ups have actually been applied |
+| `classEntries[0].level` | Mirrors `hitDice.total` (repaired by `revertLevelUps`) |
+
+`pendingLevelUps = derivedLevel − hitDice.total` is computed in `serializeCharacter` and drives the "Level up" button in the UI. The level-up action hits `POST /characters/:id/hp` with a `levelUp` op.
+
+---
+
+## Level-down auto-reverses HP and dice
+
+When a new XP value drops the derived level below `hitDice.total`, `applyExperienceOperations` calls `revertLevelUps` inside the same transaction:
+
+```
+backend/src/lib/experience-ops.ts
+  revertLevelUps(tx, characterId, currentHdTotal, targetLevel, batchId)
+```
+
+It reads the most recent `levelUp` CharacterEvents newest-first to recover exact per-level HP gains (fixed-average fallback for levels without an event record), subtracts them from `hitPoints.max` / `hitPoints.current`, decrements `hitDice.total`, and repairs `classEntries[0].level` to match. Emits one `hitPoints/levelDown` event carrying `data.primaryEntryId` so the undo handler can restore the class-entry level.
+
+---
+
+## Level-gated reconciliation — the pattern
+
+Level-gated state is **persisted state whose legal maximum is determined by the character's level**. Examples: subclass choice (locked until `class.subclassLevel`), maneuvers known (`battleMasterManeuverCount(level)`), future feats (granted at fixed class levels), Ability Score Improvements (ditto).
+
+When level drops, this state must be reconciled. The system uses two complementary layers.
+
+### Layer 1 — Reconcile-on-write (destructive, audited, undoable)
+
+Runs inside the XP transaction immediately after `revertLevelUps`. The entry point is:
+
+```
+backend/src/lib/level-reconciliation.ts
+  reconcileLevelGatedState(ctx: ReconcileContext)
+```
+
+`ReconcileContext` carries `{ tx, characterId, newDerivedLevel, batchId }`. Internally it runs the `LEVEL_GATED_RECONCILERS` array **in order**:
+
+| Reconciler | What it does |
+|---|---|
+| `reconcileSubclass` | Clears `subclassId`/`subclass` on the primary class entry if `newDerivedLevel < class.subclassLevel`. Emits `class/subclassRemoved`. |
+| `reconcileManeuvers` | Runs after `reconcileSubclass` so it sees a cleared subclass. Calls `deriveResources(...)` for the new level; `allowed = maneuverChoiceCount ?? 0`. Trims `maneuversKnown` to the first `allowed` entries (oldest kept, LIFO). Emits `resources/maneuversReconciled`. |
+
+Order matters: later reconcilers observe earlier ones' writes (maneuvers must see the already-cleared subclass so that `deriveResources` returns `null → allowed = 0` for a full reset).
+
+Each reconciler is an async function with the same signature:
+```typescript
+type Reconciler = (ctx: ReconcileContext) => Promise<void>;
+```
+
+It runs unconditionally on every XP op (cheap — one indexed read). This means:
+- Characters who gained a subclass via XP alone (never clicked "Level Up") still get reconciled.
+- Characters already in an invalid state are self-healed the moment their next XP op runs.
+
+**Undo:** reconciliation events ride the same LIFO `batchId` as the XP event. Because they use standard `category/type` event shapes that already have undo branches in `backend/src/routes/activity.ts`, no new revert code is needed:
+- `class` category → restores `subclassId`/`subclass` from `before` via `data.classEntryId`
+- `resources` category → restores full `before.resources` JSON (used counts + `maneuversKnown`)
+
+### Layer 2 — Clamp-on-read (non-destructive, defense-in-depth)
+
+`serializeCharacter` caps displayed values to the derived limit so characters already in an invalid state render correctly before their next XP op:
+
+```typescript
+// backend/src/routes/characters.ts — inside the `resources` block
+maneuversKnown:
+  derivedRes.maneuverChoiceCount !== undefined
+    ? stored.maneuversKnown.slice(0, derivedRes.maneuverChoiceCount)
+    : stored.maneuversKnown,
+```
+
+This mirrors the adjacent `Math.min(pool.total, stored.used[pool.key] ?? 0)` clamps for resource pools and `Math.min(total, stored.slotsUsed[…])` for spell slots.
+
+---
+
+## Checklist: adding a new level-gated feature
+
+When you ship a feature whose count or availability depends on level (feats, ASI, Ki points unlocked at a certain level, etc.):
+
+### 1. Rules data → `srd.ts`
+Add the level table and derivation function to `backend/src/lib/srd.ts`. Example: a `featsGrantedAt(className, level)` helper returning how many feats the character is allowed. Never inline rules in a route or duplicate them on the frontend (see CLAUDE.md non-negotiables).
+
+### 2. Write a `Reconciler` and register it
+In `backend/src/lib/level-reconciliation.ts`:
+- Write `async function reconcile<Feature>(ctx: ReconcileContext): Promise<void>`.
+  - Re-read only the persisted fields you need (one indexed read).
+  - Call the relevant derivation from `srd.ts` to get the new cap.
+  - Early-return if current count ≤ cap (no action).
+  - Trim/clear excess, `tx.character.update(...)`.
+  - `logEvent(tx, { category, type, before, after, data, batchId })` — pick a category that has an existing undo branch in `activity.ts` if possible.
+- Add the new reconciler to `LEVEL_GATED_RECONCILERS` in dependency order.
+
+### 3. Clamp-on-read in `serializeCharacter`
+In `backend/src/routes/characters.ts`, add a `Math.min`/`slice` clamp in the serialization block for the new field, analogous to `maneuversKnown.slice(0, maneuverChoiceCount)`.
+
+### 4. New `EventType` (if needed)
+- Add the value to `CharacterEventType` enum in `backend/prisma/schema.prisma`.
+- Add it to the `EventType` union in `backend/src/lib/events.ts`.
+- Migrate + regenerate:
+  ```bash
+  cd backend
+  DATABASE_URL=postgresql://character_sheet:character_sheet@localhost:5432/character_sheet \
+    npx prisma migrate dev --name add_<name>_event_type
+  DATABASE_URL=postgresql://character_sheet:character_sheet@localhost:5432/character_sheet \
+    npx prisma generate
+  ```
+  Both steps are required — the generated client can be stale even after migration.
+
+### 5. Undo branch (if needed)
+If you had to introduce a new event category not already handled in `routes/activity.ts`, add a branch to the LIFO revert handler there. Reuse an existing branch where possible — the `resources` category already restores the full `before.resources` JSON, so any reconciler that writes into `Character.resources` gets undo for free.
+
+### 6. Tests
+Mirror the maneuver test block in `backend/src/routes/__tests__/experience.test.ts`:
+1. Partial trim: level drops to a cap > 0 → excess removed, oldest kept.
+2. Full clear: level drops below grant level → all entries removed.
+3. Event emitted: `resources/maneuversReconciled` (or your equivalent) appears in the activity log.
+4. Undo: reverting the XP-reset batch restores the full before-state.
+5. Read-clamp: a character with persisted excess at the wrong level serves the capped count on `GET` without any XP op.

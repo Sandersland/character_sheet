@@ -20,6 +20,8 @@ See `.claude/docs/development.md` for per-workspace commands, running outside Do
 
 **Derive, don't persist.** `level` and `proficiencyBonus` are computed from `experiencePoints` in `serializeCharacter`; spellcasting slot totals/save DC/attack bonus are computed from class+level+ability scores via `deriveSpellcasting()` in `srd.ts`. `race`/`class`/`background` are read from the selection relations. None of these are columns; don't add them back.
 
+**Level-gated state reconciles through one registry.** Any persisted state whose legal maximum depends on character level (subclass choice, maneuvers known, future feats, Ability Score Improvements) must add a reconciler to `LEVEL_GATED_RECONCILERS` in `backend/src/lib/level-reconciliation.ts` **and** a matching clamp-on-read in `serializeCharacter`. Never hand-roll level-down logic at a new call site. See `.claude/docs/leveling.md` for the full pattern and checklist.
+
 **5e rules data lives only in `lib/`.** `backend/src/lib/experience.ts` (XP curve) and `backend/src/lib/srd.ts` (everything else: alignments, skills, ability math, spellcasting ability, slot tables, starting equipment, `deriveCreatedCharacter`). Never duplicate rules on the frontend or inline them in a route.
 
 **State changes go through intent-bearing transaction endpoints.** `PATCH /api/characters/:id` is a thin field-patch for cosmetic/DM-assigned fields (`name`, `armorClass`, `currency`, etc.). Inventory, HP, XP, and spellcasting are mutated only through their dedicated `POST …/transactions` endpoints, which validate ops, apply them atomically, write audit events, and return the updated character. Do not add new mutable domains to PATCH.
@@ -41,5 +43,6 @@ Read these on demand — they are **not** auto-loaded:
 | `.claude/docs/architecture.md` | You need the router map, lib responsibilities, the data patterns (catalog+snapshot, JSON columns, audit log, transaction pattern), or the Docker Compose layout |
 | `.claude/docs/development.md` | You need full commands, Prisma workflow, or the step-by-step "how to add a new domain/feature" recipe |
 | `.claude/docs/testing.md` | You need to run tests, write a new test file, or understand the fixture-isolation rules |
+| `.claude/docs/leveling.md` | You're touching XP, level-up/level-down, or any feature whose availability/count is gated by character level (subclass, maneuvers, future feats/ASI) |
 | `.claude/docs/frontend.md` | You're writing frontend code: directory structure + where components/hooks/types belong, `@/` alias, Tailwind footgun, inline-panel-vs-Modal rule, primitives, dice engine, orchestrator pattern |
 | `.claude/agent-memory/frontend-design-architect/design_system.md` | You need exact color/type/radius/shadow token names and the design direction rationale |

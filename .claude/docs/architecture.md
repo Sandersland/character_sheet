@@ -27,7 +27,8 @@
 | `lib/events.ts` | `logEvent(tx, params)` — writes one `CharacterEvent` + per-field `CharacterEventField` diffs inside the caller's transaction. `EventCategory`/`EventType` type unions. |
 | `lib/srd.ts` | **All 5e rules data**: alignments, skills, ability-modifier math, `SPELLCASTING_ABILITY`, `FULL_CASTER_SLOTS`, `STARTING_EQUIPMENT`, `PACK_CONTENTS`, `deriveCreatedCharacter()`, `deriveSpellcasting()`. **This is the only permitted location for rules data.** |
 | `lib/experience.ts` | Pure XP-curve math (no DB): `XP_THRESHOLDS`, `levelForExperience`, `proficiencyBonusForLevel`, `experienceProgress`. |
-| `lib/experience-ops.ts` | `applyExperienceOperations()` — transactional XP handler. Also `revertLevelUps()` (auto-reverses HP/dice when XP drops derived level). |
+| `lib/experience-ops.ts` | `applyExperienceOperations()` — transactional XP handler. Also `revertLevelUps()` (auto-reverses HP/dice when XP drops derived level). Calls `reconcileLevelGatedState` after each op. |
+| `lib/level-reconciliation.ts` | Level-gated state registry. `reconcileLevelGatedState(ctx)` runs `LEVEL_GATED_RECONCILERS` in order (currently `reconcileSubclass` → `reconcileManeuvers`) inside the XP transaction. Add new reconcilers here when shipping level-gated features (feats, ASI, etc.). See `.claude/docs/leveling.md`. |
 | `lib/hitpoints.ts` | HP domain: shapes, normalizers, pure rules helpers, `applyHitPointOperations()`. LongRest also resets spell slots in the same transaction. |
 | `lib/spellcasting.ts` | `SpellEntry`/`SpellcastingMutableState` shapes, `normalizeSpellcastingMutable()` (handles compact + legacy JSON formats), `applySpellcastingOperations()`. |
 | `lib/inventory.ts` | Currency math, catalog→snapshot builders, `applyInventoryOperations()`. Reference implementation for the intent-bearing transaction pattern. |
