@@ -26,7 +26,7 @@ See `.claude/docs/development.md` for per-workspace commands, running outside Do
 
 **All backend calls go through `frontend/src/api/client.ts`.** Never call `fetch` directly from a component.
 
-**Tailwind v4 named size utilities don't work here.** `max-w-xl`, `w-96`, etc. resolve to undefined CSS variables → ~0. Use arbitrary values: `max-w-[36rem]`. Verify in the browser.
+**Tailwind v4 utilities work normally here.** Named size utilities (`max-w-xl`, `w-96`, etc.) and numeric spacing (`p-4`, `gap-2`) all resolve correctly. Custom `@theme` tokens also auto-generate idiomatic utilities — prefer `text-garnet-700` over `text-[var(--color-garnet-700)]`, `rounded-card` over `rounded-[var(--radius-card)]`, etc. One historical footgun to never reintroduce: bare `--spacing-{name}` custom tokens (e.g. `--spacing-sm`) collide with Tailwind's `--container-*` scale and break `max-w-sm/md/lg/xl/2xl`. If a named spacing rhythm is ever wanted, use a `--space-*` prefix instead.
 
 **Backend tests need Postgres.** Run `docker compose up db -d` first and export `DATABASE_URL` in the same shell command as `vitest` (not a prior `export`). See `.claude/docs/testing.md`.
 

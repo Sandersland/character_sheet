@@ -2,19 +2,23 @@
 
 ## Tailwind v4
 
-**Setup**: loaded via `@tailwindcss/vite` in `vite.config.ts`. No `tailwind.config.js` or `postcss.config.js`. The only Tailwind setup is `@import "tailwindcss";` in `frontend/src/index.css`.
+**Setup**: loaded via `@tailwindcss/vite` in `vite.config.ts`. No `tailwind.config.js` or `postcss.config.js` — this is correct v4 practice; do not add them. The only Tailwind setup is `@import "tailwindcss";` in `frontend/src/index.css`.
 
-**Critical footgun — named size utilities don't work here**: This project's `index.css` defines custom color/radius/shadow/font tokens in an `@theme` block, but does *not* include Tailwind's default spacing scale. Named utilities like `max-w-xl`, `max-w-lg`, `w-96`, `h-24` silently resolve to `var(--spacing-xl)` etc., which are undefined → effectively `0`. Use **explicit arbitrary values** instead:
+**Named utilities work normally.** Named size utilities (`max-w-xl`, `max-w-6xl`, `w-96`, `h-24`, etc.) and numeric spacing (`p-4`, `gap-2`, `w-14`) all resolve correctly in Tailwind 4.3.1.
+
+**Prefer idiomatic utilities over verbose arbitrary values.** Custom `@theme` tokens auto-generate idiomatic Tailwind classes — use these:
 
 ```tsx
-// ✗ Broken — resolves to ~0
-<div className="max-w-xl">
+// ✓ Idiomatic (preferred)
+<div className="text-garnet-700 bg-parchment-50 rounded-card shadow-card">
 
-// ✓ Correct
-<div className="max-w-[36rem]">
+// ✗ Verbose (legacy, avoid for new code)
+<div className="text-[var(--color-garnet-700)] bg-[var(--color-parchment-50)] rounded-[var(--radius-card)] shadow-[var(--shadow-card)]">
 ```
 
-Always verify the rendered size in the browser; don't trust named classes.
+Genuine non-token values still use arbitrary syntax: `text-[11px]`, `max-h-[80vh]`, `max-w-[36rem]`.
+
+**One footgun to never reintroduce:** bare `--spacing-{name}` custom tokens (e.g. `--spacing-sm`) collide with Tailwind's `--container-*` scale and silently break `max-w-sm/md/lg/xl/2xl`. Use a `--space-*` prefix if a named spacing rhythm is ever wanted.
 
 ## Design tokens
 
@@ -28,7 +32,7 @@ Summary of what's available:
 - Radius: `--radius-card` (0.625rem), `--radius-control` (0.375rem) — just two, used everywhere
 - Shadows: `--shadow-card`, `--shadow-raised`
 
-Use CSS variable references in className strings: `text-[var(--color-garnet-700)]`, `bg-[var(--color-arcane-50)]`.
+Use idiomatic utility classes — tokens auto-generate them in v4: `text-garnet-700`, `bg-arcane-50`, `rounded-card`, `shadow-raised`. Only fall back to `[var(...)]` syntax for non-token one-off values.
 
 ## UI pattern: inline panels vs Modal overlay
 

@@ -30,7 +30,7 @@ here: see `frontend/src/index.css` header comment block.
 - Fonts: `--font-display` = Source Serif 4 (headings only, h1-h3), `--font-sans`
   = Source Sans 3 (body/UI default). Loaded via Google Fonts `<link>` tags in
   `frontend/index.html` (no local font files, no extra build dep).
-- Spacing scale: `--spacing-{xs,sm,md,lg,xl,2xl}` = 0.5/0.75/1/1.5/2.25/3.5rem.
+- Spacing: Tailwind's built-in numeric scale (`p-4`, `gap-2`, `w-14`, `max-w-6xl`) works as normal. No custom named spacing tokens — they were removed because bare `--spacing-{name}` tokens collide with Tailwind's `--container-*` scale and break `max-w-sm/md/lg/xl`. If a named rhythm is ever needed, prefix as `--space-*`.
   Radius: `--radius-card` (0.625rem) and `--radius-control` (0.375rem) — only
   two radius values, reused everywhere per components.md's "pick one
   corner-radius convention."

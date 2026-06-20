@@ -32,7 +32,7 @@ function NewCharacterCard() {
   return (
     <Link
       to="/characters/new"
-      className="flex flex-col items-center justify-center gap-2 rounded-[var(--radius-card)] border-2 border-dashed border-[var(--color-parchment-300)] bg-transparent p-4 text-[var(--color-parchment-500)] transition-colors hover:border-[var(--color-garnet-400)] hover:text-[var(--color-garnet-700)] focus-visible:border-[var(--color-garnet-400)] focus-visible:text-[var(--color-garnet-700)]"
+      className="flex flex-col items-center justify-center gap-2 rounded-card border-2 border-dashed border-parchment-300 bg-transparent p-4 text-parchment-500 transition-colors hover:border-garnet-400 hover:text-garnet-700 focus-visible:border-garnet-400 focus-visible:text-garnet-700"
       style={{ aspectRatio: "4 / 3" }}
     >
       <span
@@ -48,11 +48,11 @@ function NewCharacterCard() {
 
 function EmptyState() {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-[var(--radius-card)] border border-dashed border-[var(--color-parchment-300)] px-6 py-16 text-center">
-      <span className="font-display text-2xl text-[var(--color-parchment-800)]">
+    <div className="flex flex-col items-center gap-3 rounded-card border border-dashed border-parchment-300 px-6 py-16 text-center">
+      <span className="font-display text-2xl text-parchment-800">
         No characters yet
       </span>
-      <p className="max-w-sm text-sm text-[var(--color-parchment-600)]">
+      <p className="max-w-sm text-sm text-parchment-600">
         Create your first adventurer to start tracking ability scores, HP,
         inventory, and spells in one place.
       </p>
@@ -62,11 +62,11 @@ function EmptyState() {
 
 function ErrorState() {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-[var(--radius-card)] border border-dashed border-[var(--color-garnet-300)] px-6 py-16 text-center">
-      <span className="font-display text-2xl text-[var(--color-garnet-800)]">
+    <div className="flex flex-col items-center gap-3 rounded-card border border-dashed border-garnet-300 px-6 py-16 text-center">
+      <span className="font-display text-2xl text-garnet-800">
         Couldn't load characters
       </span>
-      <p className="max-w-sm text-sm text-[var(--color-parchment-600)]">
+      <p className="max-w-sm text-sm text-parchment-600">
         The backend may be unreachable. Check that it's running and try
         refreshing.
       </p>
@@ -78,14 +78,14 @@ export default function CharacterListPage() {
   const { characters, error } = useCharacterList();
 
   return (
-    <div className="min-h-screen bg-[var(--color-parchment-100)]">
-      <header className="border-b border-[var(--color-parchment-200)] bg-[var(--color-parchment-50)]">
+    <div className="min-h-screen bg-parchment-100">
+      <header className="border-b border-parchment-200 bg-parchment-50">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-5">
           <div>
-            <p className="font-sans text-xs font-semibold uppercase tracking-wide text-[var(--color-garnet-700)]">
+            <p className="font-sans text-xs font-semibold uppercase tracking-wide text-garnet-700">
               Your Party
             </p>
-            <h1 className="font-display text-2xl font-semibold text-[var(--color-parchment-900)]">
+            <h1 className="font-display text-2xl font-semibold text-parchment-900">
               Characters
             </h1>
           </div>
@@ -97,7 +97,7 @@ export default function CharacterListPage() {
         {error ? (
           <ErrorState />
         ) : characters === null ? (
-          <p className="text-sm text-[var(--color-parchment-600)]">Loading characters…</p>
+          <p className="text-sm text-parchment-600">Loading characters…</p>
         ) : characters.length === 0 ? (
           <EmptyState />
         ) : (
