@@ -118,8 +118,19 @@ export interface TakeFeatOperation {
   /** Catalog Feat.id — omit for custom feats. */
   featId?: string;
   /** Custom feat payload when featId is absent. */
-  custom?: { name: string; description: string; improvements?: import("./resources.js").FeatImprovement[] };
-  /** Required when the catalog feat is a half-feat (abilityOptions non-empty). */
+  custom?: {
+    name: string;
+    description: string;
+    improvements?: import("./resources.js").FeatImprovement[];
+    /**
+     * Half-feat style: list of ability names the player may choose to bump.
+     * When provided (non-empty), `abilityChoice` must be set at the operation level.
+     */
+    abilityOptions?: string[];
+    /** Amount to increase the chosen ability (default 1). */
+    abilityIncrease?: number;
+  };
+  /** Required when taking a half-feat (catalog or custom) with abilityOptions. */
   abilityChoice?: string;
 }
 
@@ -351,6 +362,28 @@ export async function applyAdvancementOperations(
             featDescription = c.description ?? "";
             // Custom feats may supply structured improvements directly.
             featImprovements = c.improvements ?? [];
+
+            // Custom half-feat: optional ability bump, same rules as catalog half-feats.
+            if (c.abilityOptions && c.abilityOptions.length > 0) {
+              if (!op.abilityChoice) {
+                throw new InvalidAdvancementOperationError(
+                  `takeFeat: custom feat "${featName}" has abilityOptions — provide abilityChoice from: ${c.abilityOptions.join(", ")}`,
+                );
+              }
+              if (!c.abilityOptions.includes(op.abilityChoice)) {
+                throw new InvalidAdvancementOperationError(
+                  `takeFeat: "${op.abilityChoice}" is not a valid choice for "${featName}" (options: ${c.abilityOptions.join(", ")})`,
+                );
+              }
+              const increase = c.abilityIncrease ?? 1;
+              const current = scores[op.abilityChoice] ?? 10;
+              if (current + increase > ABILITY_CAP) {
+                throw new InvalidAdvancementOperationError(
+                  `takeFeat: ${op.abilityChoice} would exceed ${ABILITY_CAP} with +${increase}`,
+                );
+              }
+              abilityDeltas[op.abilityChoice] = increase;
+            }
           }
 
           const effect = computeAdvancementEffect(scores, hitDice.total, abilityDeltas);

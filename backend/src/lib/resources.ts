@@ -47,16 +47,24 @@ export interface ToolProfEntry {
  * Snapshot into AdvancementEntry.improvements at take-time so removal/derivation
  * never depend on the catalog row being present.
  *
- * Supported targets (enforced in advancement route + deriveFeatBonuses in srd.ts):
+ * Supported targets (enforced in advancement route, applied in serializeCharacter):
+ *
+ * Numeric (summed by deriveFeatBonuses, applied as additive bonuses):
  *   "initiative" | "speed" | "armorClass" | "maxHp"
  *
+ * Keyed proficiency (collected by deriveFeatProficiencies, OR'd with stored proficiencies):
+ *   "skillProficiency"       — imp.key = skill name e.g. "Athletics"
+ *   "savingThrowProficiency" — imp.key = ability name e.g. "strength"
+ *
  * `perLevel`: when true, the effective bonus = amount × character's applied level
- * (hitDice.total). Used by Tough (+2 HP per level).
+ * (hitDice.total). Only meaningful for numeric targets. Used by Tough (+2 HP per level).
  */
 export interface FeatImprovement {
   target: string;
   amount: number;
   perLevel?: boolean;
+  /** Required for keyed targets (skillProficiency, savingThrowProficiency). */
+  key?: string;
 }
 
 /**

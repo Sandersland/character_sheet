@@ -19,6 +19,7 @@ import {
   advancementSlotsForLevel,
   deriveCreatedCharacter,
   deriveFeatBonuses,
+  deriveFeatProficiencies,
   deriveResources,
   deriveSpellcasting,
   isKnownTool,
@@ -252,6 +253,10 @@ export function serializeCharacter(row: CharacterWithRelations) {
   const featBonuses = deriveFeatBonuses(clampedAdvancements, hitDice.total);
   const effectiveMaxHp = hitPoints.max + featBonuses.maxHp;
 
+  // Proficiency grants from feats (skills + saving throws). Merged with stored
+  // proficiencies below using OR — existing proficiency is never removed.
+  const featProficiencies = deriveFeatProficiencies(clampedAdvancements);
+
   return {
     id: row.id,
     name: row.name,
@@ -286,8 +291,19 @@ export function serializeCharacter(row: CharacterWithRelations) {
     },
     hitDice,
     abilityScores: effectiveScores,
-    savingThrowProficiencies: row.savingThrowProficiencies,
-    skills: row.skills,
+    // Merge feat-granted saving throw proficiencies (OR with class-fixed stored set;
+    // deduped via Set round-trip).
+    savingThrowProficiencies: featProficiencies.savingThrows.size > 0
+      ? [...new Set([...row.savingThrowProficiencies, ...featProficiencies.savingThrows])]
+      : row.savingThrowProficiencies,
+    // Merge feat-granted skill proficiencies: proficient stays true if already true;
+    // feat grants can only add proficiency, never remove it.
+    skills: featProficiencies.skills.size > 0
+      ? (row.skills as { name: string; ability: string; proficient: boolean }[]).map((s) => ({
+          ...s,
+          proficient: s.proficient || featProficiencies.skills.has(s.name),
+        }))
+      : row.skills,
     // Merged tool proficiency list — creation-fixed entries (stored in
     // Character.toolProficiencies) + level-gated subclass choices (from
     // resources.toolProficienciesKnown, already clamped above).

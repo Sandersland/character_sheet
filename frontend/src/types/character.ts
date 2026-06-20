@@ -460,9 +460,13 @@ export interface CatalogManeuver {
  * Snapshot into AdvancementEntry.improvements at take-time.
  */
 export interface FeatImprovement {
-  target: string;    // e.g. "initiative", "speed", "armorClass", "maxHp"
+  /** Numeric: "initiative" | "speed" | "armorClass" | "maxHp"
+   *  Keyed:   "skillProficiency" | "savingThrowProficiency" (require `key`) */
+  target: string;
   amount: number;
   perLevel?: boolean; // true → effective bonus = amount × hitDice.total (e.g. Tough)
+  /** Skill name for skillProficiency; ability name for savingThrowProficiency. */
+  key?: string;
 }
 
 /**
@@ -854,7 +858,16 @@ export interface TakeAsiOperation {
 export interface TakeFeatOperation {
   type: "takeFeat";
   featId?: string;
-  custom?: { name: string; description: string };
+  custom?: {
+    name: string;
+    description: string;
+    improvements?: FeatImprovement[];
+    /** Ability names the player may choose for a half-feat-style bump. */
+    abilityOptions?: string[];
+    /** Amount to apply to the chosen ability (default 1). */
+    abilityIncrease?: number;
+  };
+  /** Required when taking a half-feat (catalog or custom) with abilityOptions. */
   abilityChoice?: string;
 }
 export interface RemoveAdvancementOperation {

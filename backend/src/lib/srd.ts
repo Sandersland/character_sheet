@@ -3330,36 +3330,57 @@ export function deriveCreatedCharacter(
 // ── Feat improvement targets ──────────────────────────────────────────────────
 
 /**
- * The set of stat targets that FeatImprovement.target may refer to and that
- * deriveFeatBonuses knows how to sum. Adding a new target here + a new apply
- * site in serializeCharacter (or the relevant derivation) is all that's needed
- * to support it for both catalog and custom feats.
+ * Numeric stat targets: summed by deriveFeatBonuses and applied as additive
+ * bonuses in serializeCharacter. Adding a target here + a new apply site in
+ * serializeCharacter is all that's needed to support it for catalog and custom feats.
  */
-export const FEAT_IMPROVEMENT_TARGETS = [
+export const NUMERIC_FEAT_IMPROVEMENT_TARGETS = [
   "initiative",
   "speed",
   "armorClass",
   "maxHp",
 ] as const;
 
+export type NumericFeatImprovementTarget = (typeof NUMERIC_FEAT_IMPROVEMENT_TARGETS)[number];
+
+/**
+ * Proficiency targets: keyed improvements (imp.key = skill name or ability name).
+ * Applied by deriveFeatProficiencies rather than deriveFeatBonuses.
+ */
+export const PROFICIENCY_FEAT_IMPROVEMENT_TARGETS = [
+  "skillProficiency",
+  "savingThrowProficiency",
+] as const;
+
+export type ProficiencyFeatImprovementTarget = (typeof PROFICIENCY_FEAT_IMPROVEMENT_TARGETS)[number];
+
+/**
+ * All valid FeatImprovement.target values. Used for route-level Zod validation.
+ * Adding a new target here + wiring it in serializeCharacter is all that's needed.
+ */
+export const FEAT_IMPROVEMENT_TARGETS = [
+  ...NUMERIC_FEAT_IMPROVEMENT_TARGETS,
+  ...PROFICIENCY_FEAT_IMPROVEMENT_TARGETS,
+] as const;
+
 export type FeatImprovementTarget = (typeof FEAT_IMPROVEMENT_TARGETS)[number];
 
 /**
- * Sums all feat improvement bonuses across a set of advancements.
+ * Sums all numeric feat improvement bonuses across a set of advancements.
  * `appliedLevel` is hitDice.total (the number of explicit level-ups applied),
  * used to scale perLevel bonuses (e.g. Tough = +2 per applied level).
  *
  * Callers pass the **already-clamped** (in-cap) advancements slice so
  * over-cap feats are automatically excluded — no reversal logic needed.
  *
- * Unknown targets are silently ignored, keeping the function forward-compatible
- * with future targets that haven't been wired into apply sites yet.
+ * Proficiency targets (skillProficiency, savingThrowProficiency) fall through
+ * the `if (!(target in totals)) continue` guard — handled by deriveFeatProficiencies.
  */
 export function deriveFeatBonuses(
   advancements: AdvancementEntry[],
   appliedLevel: number,
-): Record<FeatImprovementTarget, number> {
-  const totals: Record<FeatImprovementTarget, number> = {
+): Record<NumericFeatImprovementTarget, number> {
+  const totals: Record<NumericFeatImprovementTarget, number> = {
     initiative: 0,
     speed: 0,
     armorClass: 0,
@@ -3368,11 +3389,36 @@ export function deriveFeatBonuses(
 
   for (const entry of advancements) {
     for (const imp of (entry.improvements ?? [])) {
-      const target = imp.target as FeatImprovementTarget;
-      if (!(target in totals)) continue; // unknown target — skip gracefully
+      const target = imp.target as NumericFeatImprovementTarget;
+      if (!(target in totals)) continue; // unknown / proficiency target — skip gracefully
       totals[target] += imp.perLevel ? imp.amount * appliedLevel : imp.amount;
     }
   }
 
   return totals;
+}
+
+/**
+ * Collects proficiency grants from feat improvements across a set of advancements.
+ * Returns two sets:
+ *   - `skills`:       skill names (e.g. "Athletics") where `target === "skillProficiency"`
+ *   - `savingThrows`: ability names (e.g. "strength") where `target === "savingThrowProficiency"`
+ *
+ * Callers pass the **already-clamped** slice so over-cap feats are excluded automatically.
+ */
+export function deriveFeatProficiencies(
+  advancements: AdvancementEntry[],
+): { skills: Set<string>; savingThrows: Set<string> } {
+  const skills = new Set<string>();
+  const savingThrows = new Set<string>();
+
+  for (const entry of advancements) {
+    for (const imp of (entry.improvements ?? [])) {
+      if (!imp.key) continue;
+      if (imp.target === "skillProficiency") skills.add(imp.key);
+      else if (imp.target === "savingThrowProficiency") savingThrows.add(imp.key);
+    }
+  }
+
+  return { skills, savingThrows };
 }

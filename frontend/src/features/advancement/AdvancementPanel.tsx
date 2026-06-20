@@ -6,6 +6,13 @@
  * Two modes (toggled by a tab bar inside the panel):
  *  - ASI   — steppers for each ability; exactly 2 points to distribute; cap 20.
  *  - Feat  — catalog search list (with optional custom entry form).
+ *
+ * The custom feat form supports all mechanical benefit types:
+ *  - Numeric stat bonuses (speed, maxHp, armorClass, initiative) with optional perLevel
+ *  - Skill proficiencies (one or more from character's skill list)
+ *  - Saving throw proficiencies (one or more abilities)
+ *  - Ability score increase (half-feat style: author picks eligible abilities, player
+ *    chooses one when taking the feat)
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -14,6 +21,7 @@ import { fetchFeats } from "@/api/client";
 import type {
   AdvancementOperation,
   CatalogFeat,
+  FeatImprovement,
   TakeAsiOperation,
 } from "@/types/character";
 
@@ -28,10 +36,26 @@ const ABILITIES: { key: string; label: string }[] = [
 
 const ABILITY_CAP = 20;
 
+const NUMERIC_TARGETS: { value: string; label: string }[] = [
+  { value: "speed", label: "Speed" },
+  { value: "maxHp", label: "Max HP" },
+  { value: "armorClass", label: "Armor Class" },
+  { value: "initiative", label: "Initiative" },
+];
+
+interface StatBonusRow {
+  id: number;
+  target: string;
+  amount: number;
+  perLevel: boolean;
+}
+
 interface Props {
   currentScores: Record<string, number>;
   slotsRemaining: number;
   busy: boolean;
+  /** Ordered list of skill names from the character (avoids duplicating SRD skill list). */
+  skillNames: string[];
   onSubmit: (op: AdvancementOperation) => void;
 }
 
@@ -39,6 +63,7 @@ export default function AdvancementPanel({
   currentScores,
   slotsRemaining,
   busy,
+  skillNames,
   onSubmit,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -54,9 +79,22 @@ export default function AdvancementPanel({
   const [selectedFeat, setSelectedFeat] = useState<CatalogFeat | null>(null);
   const [abilityChoice, setAbilityChoice] = useState("");
   const [customMode, setCustomMode] = useState(false);
+  const hasFetched = useRef(false);
+
+  // ── Custom feat form state ─────────────────────────────────────────────────
   const [customName, setCustomName] = useState("");
   const [customDesc, setCustomDesc] = useState("");
-  const hasFetched = useRef(false);
+  // Numeric stat bonus rows
+  const nextRowId = useRef(0);
+  const [statBonuses, setStatBonuses] = useState<StatBonusRow[]>([]);
+  // Skill proficiencies
+  const [grantedSkills, setGrantedSkills] = useState<Set<string>>(new Set());
+  // Saving throw proficiencies
+  const [grantedSaves, setGrantedSaves] = useState<Set<string>>(new Set());
+  // Ability increase (half-feat style)
+  const [abilityOptions, setAbilityOptions] = useState<Set<string>>(new Set());
+  const [abilityIncrease, setAbilityIncrease] = useState(1);
+  const [customAbilityChoice, setCustomAbilityChoice] = useState("");
 
   // Fetch catalog the first time the panel opens and the feat tab is viewed.
   useEffect(() => {
@@ -124,10 +162,86 @@ export default function AdvancementPanel({
     setSearch("");
   }
 
+  // ── Custom feat helpers ────────────────────────────────────────────────────
+
+  function addStatBonus() {
+    const id = nextRowId.current++;
+    setStatBonuses([...statBonuses, { id, target: "speed", amount: 0, perLevel: false }]);
+  }
+
+  function updateStatBonus(id: number, patch: Partial<StatBonusRow>) {
+    setStatBonuses(statBonuses.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  }
+
+  function removeStatBonus(id: number) {
+    setStatBonuses(statBonuses.filter((r) => r.id !== id));
+  }
+
+  function toggleSkill(name: string) {
+    const next = new Set(grantedSkills);
+    if (next.has(name)) next.delete(name); else next.add(name);
+    setGrantedSkills(next);
+  }
+
+  function toggleSave(ability: string) {
+    const next = new Set(grantedSaves);
+    if (next.has(ability)) next.delete(ability); else next.add(ability);
+    setGrantedSaves(next);
+  }
+
+  function toggleAbilityOption(key: string) {
+    const next = new Set(abilityOptions);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    setAbilityOptions(next);
+    // Clear choice if it's no longer a valid option
+    if (next.size <= 1) setCustomAbilityChoice("");
+  }
+
+  function resetCustomForm() {
+    setCustomName("");
+    setCustomDesc("");
+    setStatBonuses([]);
+    setGrantedSkills(new Set());
+    setGrantedSaves(new Set());
+    setAbilityOptions(new Set());
+    setAbilityIncrease(1);
+    setCustomAbilityChoice("");
+  }
+
   function handleFeatSubmit() {
     if (customMode) {
       if (!customName.trim()) return;
-      onSubmit({ type: "takeFeat", custom: { name: customName.trim(), description: customDesc } });
+
+      // Build improvements from stat bonuses, skill profs, saving throw profs
+      const improvements: FeatImprovement[] = [
+        ...statBonuses
+          .filter((r) => r.amount > 0)
+          .map((r): FeatImprovement => ({
+            target: r.target,
+            amount: r.amount,
+            ...(r.perLevel ? { perLevel: true } : {}),
+          })),
+        ...Array.from(grantedSkills).map((name): FeatImprovement => ({ target: "skillProficiency", amount: 1, key: name })),
+        ...Array.from(grantedSaves).map((ability): FeatImprovement => ({ target: "savingThrowProficiency", amount: 1, key: ability })),
+      ];
+
+      const abilityOptionsArr = Array.from(abilityOptions);
+      // If a half-feat ability bump is configured, determine the choice
+      const needsChoice = abilityOptionsArr.length > 1;
+      const chosenAbility = abilityOptionsArr.length === 1 ? abilityOptionsArr[0] : customAbilityChoice;
+      if (needsChoice && !chosenAbility) return; // guard: choice required
+
+      onSubmit({
+        type: "takeFeat",
+        custom: {
+          name: customName.trim(),
+          description: customDesc,
+          improvements: improvements.length > 0 ? improvements : undefined,
+          abilityOptions: abilityOptionsArr.length > 0 ? abilityOptionsArr : undefined,
+          abilityIncrease: abilityOptionsArr.length > 0 ? abilityIncrease : undefined,
+        },
+        abilityChoice: abilityOptionsArr.length > 0 ? chosenAbility : undefined,
+      });
     } else if (selectedFeat) {
       const needsChoice = selectedFeat.abilityOptions.length > 1;
       if (needsChoice && !abilityChoice) return;
@@ -140,10 +254,15 @@ export default function AdvancementPanel({
     setSelectedFeat(null);
     setAbilityChoice("");
     setCustomMode(false);
-    setCustomName("");
-    setCustomDesc("");
+    resetCustomForm();
     setOpen(false);
   }
+
+  // Disable custom feat submit: needs a name, and if ability increase configured with
+  // multiple options, a choice must be made. Stat bonuses with amount 0 are ignored.
+  const abilityOptionsArr = Array.from(abilityOptions);
+  const needsCustomAbilityChoice = abilityOptionsArr.length > 1 && !customAbilityChoice;
+  const customSubmitDisabled = !customName.trim() || needsCustomAbilityChoice || busy;
 
   if (!open || slotsRemaining <= 0) {
     return (
@@ -174,7 +293,7 @@ export default function AdvancementPanel({
         </h3>
         <button
           type="button"
-          onClick={() => { setOpen(false); setAsiIncreases({}); setSelectedFeat(null); setCustomMode(false); }}
+          onClick={() => { setOpen(false); setAsiIncreases({}); setSelectedFeat(null); setCustomMode(false); resetCustomForm(); }}
           className="text-parchment-400 hover:text-parchment-700"
           aria-label="Close advancement panel"
         >
@@ -324,11 +443,13 @@ export default function AdvancementPanel({
             <div>
               <button
                 type="button"
-                onClick={() => setCustomMode(false)}
+                onClick={() => { setCustomMode(false); resetCustomForm(); }}
                 className="mb-3 text-xs text-parchment-500 hover:text-parchment-800"
               >
                 ← Back to list
               </button>
+
+              {/* Name + description */}
               <div className="flex flex-col gap-2">
                 <input
                   type="text"
@@ -341,15 +462,175 @@ export default function AdvancementPanel({
                   placeholder="Description (optional)"
                   value={customDesc}
                   onChange={(e) => setCustomDesc(e.target.value)}
-                  rows={3}
+                  rows={2}
                   className="w-full rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
                 />
               </div>
+
+              {/* ── Stat bonuses ── */}
+              <div className="mt-4">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+                  Stat Bonuses
+                </p>
+                {statBonuses.length > 0 && (
+                  <div className="mb-2 flex flex-col gap-2">
+                    {statBonuses.map((row) => (
+                      <div key={row.id} className="flex items-center gap-2">
+                        <select
+                          value={row.target}
+                          onChange={(e) => updateStatBonus(row.id, { target: e.target.value })}
+                          className="rounded-control border border-parchment-300 bg-white px-2 py-1 text-xs text-parchment-900 focus:border-gold-500 focus:outline-none"
+                        >
+                          {NUMERIC_TARGETS.map((t) => (
+                            <option key={t.value} value={t.value}>{t.label}</option>
+                          ))}
+                        </select>
+                        <span className="text-xs text-parchment-500">+</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={99}
+                          value={row.amount || ""}
+                          onChange={(e) => updateStatBonus(row.id, { amount: Math.max(0, parseInt(e.target.value) || 0) })}
+                          className="w-16 rounded-control border border-parchment-300 bg-white px-2 py-1 text-xs text-parchment-900 focus:border-gold-500 focus:outline-none"
+                          placeholder="0"
+                        />
+                        <label className="flex items-center gap-1 text-[11px] text-parchment-600">
+                          <input
+                            type="checkbox"
+                            checked={row.perLevel}
+                            onChange={(e) => updateStatBonus(row.id, { perLevel: e.target.checked })}
+                            className="rounded-sm"
+                          />
+                          /level
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => removeStatBonus(row.id)}
+                          className="ml-auto text-[11px] text-parchment-400 hover:text-garnet-600"
+                          aria-label="Remove stat bonus"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={addStatBonus}
+                  className="text-xs text-gold-700 hover:text-gold-900"
+                >
+                  + Add stat bonus
+                </button>
+              </div>
+
+              {/* ── Skill proficiencies ── */}
+              <div className="mt-4">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+                  Skill Proficiencies
+                </p>
+                <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+                  {skillNames.map((name) => (
+                    <label key={name} className="flex items-center gap-1.5 text-xs text-parchment-700">
+                      <input
+                        type="checkbox"
+                        checked={grantedSkills.has(name)}
+                        onChange={() => toggleSkill(name)}
+                        className="rounded-sm"
+                      />
+                      {name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Saving throw proficiencies ── */}
+              <div className="mt-4">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+                  Saving Throw Proficiencies
+                </p>
+                <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+                  {ABILITIES.map(({ key, label }) => (
+                    <label key={key} className="flex items-center gap-1.5 text-xs text-parchment-700">
+                      <input
+                        type="checkbox"
+                        checked={grantedSaves.has(key)}
+                        onChange={() => toggleSave(key)}
+                        className="rounded-sm"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Ability score increase (half-feat style) ── */}
+              <div className="mt-4">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+                  Ability Score Increase
+                </p>
+                <p className="mb-2 text-[11px] text-parchment-500">
+                  Check abilities the player may choose from when taking this feat.
+                </p>
+                <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1.5">
+                  {ABILITIES.map(({ key, label }) => (
+                    <label key={key} className="flex items-center gap-1.5 text-xs text-parchment-700">
+                      <input
+                        type="checkbox"
+                        checked={abilityOptions.has(key)}
+                        onChange={() => toggleAbilityOption(key)}
+                        className="rounded-sm"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                {abilityOptionsArr.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-parchment-700">Amount:</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={abilityIncrease}
+                      onChange={(e) => setAbilityIncrease(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-16 rounded-control border border-parchment-300 bg-white px-2 py-1 text-xs text-parchment-900 focus:border-gold-500 focus:outline-none"
+                    />
+                  </div>
+                )}
+                {/* Player choice picker — only shown when taking the feat and >1 option */}
+                {abilityOptionsArr.length > 1 && (
+                  <div className="mt-2">
+                    <label className="mb-1 block text-xs font-semibold text-parchment-700">
+                      Choose +{abilityIncrease} to:
+                    </label>
+                    <select
+                      value={customAbilityChoice}
+                      onChange={(e) => setCustomAbilityChoice(e.target.value)}
+                      className="w-full max-w-xs rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 focus:border-gold-500 focus:outline-none"
+                    >
+                      <option value="" disabled>Choose an ability…</option>
+                      {abilityOptionsArr.map((a) => (
+                        <option key={a} value={a}>
+                          {a.charAt(0).toUpperCase() + a.slice(1)} (currently {currentScores[a] ?? 10})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {abilityOptionsArr.length === 1 && (
+                  <p className="mt-1.5 text-[11px] text-parchment-500">
+                    +{abilityIncrease} to {abilityOptionsArr[0]} will be applied automatically.
+                  </p>
+                )}
+              </div>
+
               <button
                 type="button"
-                disabled={!customName.trim() || busy}
+                disabled={customSubmitDisabled}
                 onClick={handleFeatSubmit}
-                className="mt-3 w-full rounded-control bg-gold-600 px-4 py-2 text-sm font-semibold text-white hover:bg-gold-700 disabled:cursor-not-allowed disabled:opacity-40"
+                className="mt-4 w-full rounded-control bg-gold-600 px-4 py-2 text-sm font-semibold text-white hover:bg-gold-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Add custom feat
               </button>

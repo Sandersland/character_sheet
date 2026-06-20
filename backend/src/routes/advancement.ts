@@ -23,11 +23,20 @@ const takeAsiOpSchema = z.object({
   increases: z.array(increaseSchema).min(1).max(2),
 });
 
-const featImprovementSchema = z.object({
-  target: z.enum(FEAT_IMPROVEMENT_TARGETS),
-  amount: z.number().int(),
-  perLevel: z.boolean().optional(),
-});
+const featImprovementSchema = z
+  .object({
+    target: z.enum(FEAT_IMPROVEMENT_TARGETS),
+    amount: z.number().int(),
+    perLevel: z.boolean().optional(),
+    key: z.string().optional(),
+  })
+  .refine(
+    (imp) => {
+      const keyedTargets: string[] = ["skillProficiency", "savingThrowProficiency"];
+      return keyedTargets.includes(imp.target) ? !!imp.key : true;
+    },
+    { message: "FeatImprovement: 'key' is required for skillProficiency and savingThrowProficiency targets" },
+  );
 
 const takeFeatOpSchema = z
   .object({
@@ -38,6 +47,10 @@ const takeFeatOpSchema = z
         name: z.string().min(1),
         description: z.string(),
         improvements: z.array(featImprovementSchema).optional(),
+        /** Ability names the player may choose for a half-feat-style bump. */
+        abilityOptions: z.array(z.string()).optional(),
+        /** Amount to apply to the chosen ability (default 1). */
+        abilityIncrease: z.number().int().min(1).optional(),
       })
       .optional(),
     abilityChoice: z.string().optional(),
