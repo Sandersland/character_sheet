@@ -50,6 +50,9 @@ export type EventType =
   | "learnManeuver"
   | "forgetManeuver"
   | "maneuversReconciled"
+  | "learnToolProficiency"
+  | "forgetToolProficiency"
+  | "toolProficienciesReconciled"
   // meta
   | "revert";
 

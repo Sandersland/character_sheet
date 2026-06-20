@@ -46,6 +46,73 @@ export const SKILLS: readonly SkillDefinition[] = [
   { name: "survival", ability: "wisdom" },
 ];
 
+// ── Tools ─────────────────────────────────────────────────────────────────────
+// Full SRD tool list. Used to validate tool-proficiency choices at creation,
+// for the Student of War artisan-tool picker, and in GET /api/reference.
+// Tool proficiency in 5e adds proficiency bonus to ability checks — the
+// governing ability is chosen per check by the DM, not fixed per tool.
+
+export type ToolCategory = "artisan" | "gamingSet" | "musicalInstrument" | "other";
+
+export interface ToolDefinition {
+  name: string;
+  category: ToolCategory;
+  cost?: { gp?: number; sp?: number; cp?: number };
+  weight?: number; // lbs
+}
+
+export const TOOLS: readonly ToolDefinition[] = [
+  // Artisan's tools (PHB p. 154)
+  { name: "Alchemist's Supplies",    category: "artisan",          cost: { gp: 50 },  weight: 8  },
+  { name: "Brewer's Supplies",       category: "artisan",          cost: { gp: 20 },  weight: 9  },
+  { name: "Calligrapher's Supplies", category: "artisan",          cost: { gp: 10 },  weight: 5  },
+  { name: "Carpenter's Tools",       category: "artisan",          cost: { gp: 8  },  weight: 6  },
+  { name: "Cartographer's Tools",    category: "artisan",          cost: { gp: 15 },  weight: 6  },
+  { name: "Cobbler's Tools",         category: "artisan",          cost: { gp: 5  },  weight: 5  },
+  { name: "Cook's Utensils",         category: "artisan",          cost: { gp: 1  },  weight: 8  },
+  { name: "Glassblower's Tools",     category: "artisan",          cost: { gp: 30 },  weight: 5  },
+  { name: "Jeweler's Tools",         category: "artisan",          cost: { gp: 25 },  weight: 2  },
+  { name: "Leatherworker's Tools",   category: "artisan",          cost: { gp: 5  },  weight: 5  },
+  { name: "Mason's Tools",           category: "artisan",          cost: { gp: 10 },  weight: 8  },
+  { name: "Painter's Supplies",      category: "artisan",          cost: { gp: 10 },  weight: 5  },
+  { name: "Potter's Tools",          category: "artisan",          cost: { gp: 10 },  weight: 3  },
+  { name: "Smith's Tools",           category: "artisan",          cost: { gp: 20 },  weight: 8  },
+  { name: "Tinker's Tools",          category: "artisan",          cost: { gp: 50 },  weight: 10 },
+  { name: "Weaver's Tools",          category: "artisan",          cost: { gp: 1  },  weight: 5  },
+  { name: "Woodcarver's Tools",      category: "artisan",          cost: { gp: 1  },  weight: 5  },
+  // Gaming sets
+  { name: "Dice Set",                category: "gamingSet",        cost: { sp: 1  },  weight: 0  },
+  { name: "Playing Card Set",        category: "gamingSet",        cost: { sp: 5  },  weight: 0  },
+  // Musical instruments (PHB p. 154)
+  { name: "Bagpipes",                category: "musicalInstrument", cost: { gp: 30 }, weight: 6  },
+  { name: "Drum",                    category: "musicalInstrument", cost: { gp: 6  }, weight: 3  },
+  { name: "Dulcimer",                category: "musicalInstrument", cost: { gp: 25 }, weight: 10 },
+  { name: "Flute",                   category: "musicalInstrument", cost: { gp: 2  }, weight: 1  },
+  { name: "Lute",                    category: "musicalInstrument", cost: { gp: 35 }, weight: 2  },
+  { name: "Lyre",                    category: "musicalInstrument", cost: { gp: 30 }, weight: 2  },
+  { name: "Horn",                    category: "musicalInstrument", cost: { gp: 3  }, weight: 2  },
+  { name: "Pan Flute",               category: "musicalInstrument", cost: { gp: 12 }, weight: 2  },
+  { name: "Shawm",                   category: "musicalInstrument", cost: { gp: 2  }, weight: 1  },
+  { name: "Viol",                    category: "musicalInstrument", cost: { gp: 30 }, weight: 1  },
+  // Other tools
+  { name: "Disguise Kit",            category: "other",            cost: { gp: 25 },  weight: 3  },
+  { name: "Forgery Kit",             category: "other",            cost: { gp: 15 },  weight: 5  },
+  { name: "Herbalism Kit",           category: "other",            cost: { gp: 5  },  weight: 3  },
+  { name: "Navigator's Tools",       category: "other",            cost: { gp: 25 },  weight: 2  },
+  { name: "Poisoner's Kit",          category: "other",            cost: { gp: 50 },  weight: 2  },
+  { name: "Thieves' Tools",          category: "other",            cost: { gp: 25 },  weight: 1  },
+];
+
+/** Returns tools filtered by category. */
+export function toolsByCategory(category: ToolCategory): readonly ToolDefinition[] {
+  return TOOLS.filter((t) => t.category === category);
+}
+
+/** Returns true if `name` is a known tool name (case-sensitive). */
+export function isKnownTool(name: string): boolean {
+  return TOOLS.some((t) => t.name === name);
+}
+
 // ── Spellcasting ability by class ────────────────────────────────────────────
 // Maps a class name (lowercase) to the ability that governs its spellcasting.
 // Used to derive spellSaveDC and spellAttackBonus at read time.
@@ -217,6 +284,12 @@ export interface DerivedClassInfo {
   maneuverChoiceCount?: number;
   /** Battle Master only: save DC for maneuver effects (8 + prof + Str/Dex mod). */
   maneuverSaveDC?: number;
+  /**
+   * Number of artisan's-tool proficiency choices available from a subclass
+   * feature (currently: Student of War = 1 at Battle Master level 3+).
+   * Undefined when no subclass feature grants a tool choice.
+   */
+  toolProfChoiceCount?: number;
 }
 
 // ── Battle Master rules data ──────────────────────────────────────────────────
@@ -236,6 +309,16 @@ function battleMasterDieFace(level: number): string {
   if (level >= 18) return "d12";
   if (level >= 10) return "d10";
   return "d8";
+}
+
+/**
+ * Number of artisan's-tool proficiency choices the Battle Master may make
+ * via Student of War. Returns 1 at/above level 3 (when the subclass is
+ * granted), 0 below. Modeled as a count (not a boolean) to stay parallel
+ * with battleMasterManeuverCount for the level-reconciliation registry.
+ */
+export function studentOfWarToolCount(level: number): number {
+  return level >= 3 ? 1 : 0;
 }
 
 /** Maneuver choice count by Fighter level (Battle Master). */
@@ -369,6 +452,7 @@ export function deriveResources(
     const strMod = abilityModifier(abilityScores.strength ?? 10);
     const dexMod = abilityModifier(abilityScores.dexterity ?? 10);
     result.maneuverSaveDC = 8 + profBonus + Math.max(strMod, dexMod);
+    result.toolProfChoiceCount = studentOfWarToolCount(level);
   }
 
   return result;
@@ -384,9 +468,18 @@ export function hitDieFace(hitDie: string): number {
   return Number(hitDie.replace(/^d/i, ""));
 }
 
+export interface ToolProficiencyEntry {
+  name: string;
+  /** Origin of the proficiency — used to distinguish creation-fixed entries
+   *  (never trimmed on level-down) from subclass-granted ones (reconciled). */
+  source: "background" | "class" | "race";
+}
+
 export interface DeriveCharacterInput {
   abilityScores: Record<string, number>;
   skillProficiencies: string[];
+  /** Tool proficiencies granted by background / class / race at creation. */
+  toolProficiencies?: ToolProficiencyEntry[];
 }
 
 export interface DeriveCharacterCatalog {
@@ -402,6 +495,9 @@ export interface DerivedCharacterFields {
   initiativeBonus: number;
   savingThrowProficiencies: string[];
   skills: { name: string; ability: string; proficient: boolean }[];
+  /** Creation-fixed tool proficiencies (background / class / race).
+   *  Stored in Character.toolProficiencies Json column; never reconciled on level-down. */
+  toolProficiencies: ToolProficiencyEntry[];
   currency: { cp: number; sp: number; gp: number; pp: number };
   spellcasting: null;
   journal: never[];
@@ -1092,6 +1188,7 @@ export function deriveCreatedCharacter(
       ability,
       proficient: input.skillProficiencies.includes(name),
     })),
+    toolProficiencies: input.toolProficiencies ?? [],
     currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
     spellcasting: null,
     journal: [],

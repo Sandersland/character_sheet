@@ -70,6 +70,7 @@ const CLASSES = [
     ],
     isSpellcaster: false,
     subclassLevel: 3,
+    toolProficiencies: ["Thieves' Tools"], // class always grants this
   },
   {
     name: "Cleric",
@@ -116,6 +117,12 @@ const CLASSES = [
     ],
     isSpellcaster: true,
     subclassLevel: 3,
+    // PHB: Three musical instruments of your choice.
+    toolChoiceCount: 3,
+    toolChoices: [
+      "Bagpipes", "Drum", "Dulcimer", "Flute", "Lute",
+      "Lyre", "Horn", "Pan Flute", "Shawm", "Viol",
+    ],
   },
   {
     name: "Druid",
@@ -134,6 +141,18 @@ const CLASSES = [
     skillChoices: ["acrobatics", "athletics", "history", "insight", "religion", "stealth"],
     isSpellcaster: false,
     subclassLevel: 3,
+    // PHB: One type of artisan's tools or one musical instrument of your choice.
+    toolChoiceCount: 1,
+    toolChoices: [
+      "Alchemist's Supplies", "Brewer's Supplies", "Calligrapher's Supplies",
+      "Carpenter's Tools", "Cartographer's Tools", "Cobbler's Tools",
+      "Cook's Utensils", "Glassblower's Tools", "Jeweler's Tools",
+      "Leatherworker's Tools", "Mason's Tools", "Painter's Supplies",
+      "Potter's Tools", "Smith's Tools", "Tinker's Tools",
+      "Weaver's Tools", "Woodcarver's Tools",
+      "Bagpipes", "Drum", "Dulcimer", "Flute", "Lute",
+      "Lyre", "Horn", "Pan Flute", "Shawm", "Viol",
+    ],
   },
   {
     name: "Paladin",
@@ -460,13 +479,16 @@ const MANEUVERS: ManeuverSeed[] = [
 ];
 
 const BACKGROUNDS = [
-  { name: "Sage", skillProficiencies: ["arcana", "history"] },
-  { name: "Soldier", skillProficiencies: ["athletics", "intimidation"] },
-  { name: "Charlatan", skillProficiencies: ["deception", "sleightOfHand"] },
-  { name: "Acolyte", skillProficiencies: ["insight", "religion"] },
-  { name: "Criminal", skillProficiencies: ["deception", "stealth"] },
+  { name: "Sage",      skillProficiencies: ["arcana", "history"] },
+  { name: "Soldier",   skillProficiencies: ["athletics", "intimidation"] },
+  { name: "Charlatan", skillProficiencies: ["deception", "sleightOfHand"],
+    toolProficiencies: ["Disguise Kit", "Forgery Kit"] },
+  { name: "Acolyte",   skillProficiencies: ["insight", "religion"] },
+  // Criminal: Thieves' Tools (fixed) + one gaming set (Dice Set by default).
+  { name: "Criminal",  skillProficiencies: ["deception", "stealth"],
+    toolProficiencies: ["Thieves' Tools", "Dice Set"] },
   { name: "Folk Hero", skillProficiencies: ["animalHandling", "survival"] },
-  { name: "Noble", skillProficiencies: ["history", "persuasion"] },
+  { name: "Noble",     skillProficiencies: ["history", "persuasion"] },
 ];
 
 // A coin purse shorthand for an Item's `cost`/an InventoryItem's `cost` —
@@ -1732,6 +1754,9 @@ async function main() {
       where: { id: character.id },
       create: {
         ...character,
+        // Seed characters have no creation-fixed tool profs — they exist to
+        // demonstrate features, not to be playable party members.
+        toolProficiencies: (character as Record<string, unknown>).toolProficiencies ?? [],
         raceSelection: { create: { name: race, raceId } },
         backgroundSelection: { create: { name: background, backgroundId } },
         classEntries: { create: [{ name: className, subclass, subclassId, classId, position: 0 }] },
@@ -1739,6 +1764,7 @@ async function main() {
       },
       update: {
         ...character,
+        toolProficiencies: (character as Record<string, unknown>).toolProficiencies ?? [],
         raceSelection: {
           upsert: { create: { name: race, raceId }, update: { name: race, raceId } },
         },
