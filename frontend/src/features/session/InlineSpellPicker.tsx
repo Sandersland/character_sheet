@@ -6,27 +6,31 @@
  * slot ≥ spell level), the player can:
  *
  *   1. (leveled spells only) Choose a slot level via a dropdown — shows a live
- *      effect preview using computeCastRoll so the player sees the upcast delta
+ *      effect preview using computeCastSpec so the player sees the upcast delta
  *      before committing.
  *   2. Choose a target: "self" (HP is automatically adjusted) or "other"
- *      (roll is displayed for the DM / GM to apply). Default: "other" for
- *      damage, "self" for heal. Locked to "self" when range is "Self".
+ *      (roll is displayed via the toast for the DM / GM to apply). Default:
+ *      "other" for damage, "self" for heal. Locked to "self" when range is "Self".
  *   3. For attack spells (attackType === "attack"): roll the spell attack via
- *      useRoll(), then cast with a separate Cast button.
- *      For save spells (attackType === "save"): display the save DC + ability;
- *      cast immediately with Cast (no to-hit roll).
- *      For utility spells (no attackType): cast directly.
- *   4. Cast → computeCastRoll for the effect total → applySpellcastingTransactions
- *      with optional apply:{target:"self",kind,amount} when targeting self →
- *      onUpdate(refreshed character). Panel stays open for multiple casts.
+ *      useRoll() (shows in global toast — re-rollable, free, consumes nothing).
+ *      For save spells (attackType === "save"): display the save DC + ability.
+ *   4. Cast → computeCastSpec for the dice spec → roll() via RollContext (toast)
+ *      → applySpellcastingTransactions → onCommitSlot() → onUpdate(refreshed char).
+ *      Panel stays open for multiple casts.
+ *
+ * Action economy: the action/bonus/reaction slot is consumed WHEN THE CAST
+ * SUCCEEDS (via onCommitSlot), never on opening the picker. This means the
+ * player can open the picker, browse spells, or roll the attack die freely
+ * without committing their action. Once a cast goes through, the slot is spent
+ * and slotAvailable becomes false — disabling further casts.
+ *
+ * 5e bonus-action spell restriction:
+ *   - Casting a leveled bonus-action spell → action picker shows cantrips only.
+ *   - Casting a leveled action spell → bonus-action spell picker is blocked.
+ *
+ * All roll results surface in the global RollResultToast (no inline banners).
  *
  * Explicit "Done" button closes the panel (never auto-closes).
- *
- * For bonus-action spells (castingTime starts with "1 bonus action") the
- * TurnHub already consumed the bonus-action slot via the castSpellBonus resolver
- * before opening this panel. For reaction spells (castSpellReaction resolver)
- * the reaction slot is already consumed. Filtering by casting time is therefore
- * already done at the resolver / turnRules layer.
  */
 
 import { useState } from "react";
@@ -34,7 +38,7 @@ import { useState } from "react";
 import { useRoll } from "@/features/dice/RollContext";
 import { formatModifier } from "@/lib/abilities";
 import { applySpellcastingTransactions } from "@/api/client";
-import { computeCastRoll } from "@/lib/spellCast";
+import { computeCastSpec } from "@/lib/spellCast";
 import {
   SCHOOL_TONE,
   levelLabel,
@@ -44,6 +48,7 @@ import {
 } from "@/lib/spellMeta";
 import Badge from "@/components/ui/Badge";
 import type { Character, Spell } from "@/types/character";
+import type { SpellCastKind } from "@/features/session/useTurnState";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -51,10 +56,22 @@ interface InlineSpellPickerProps {
   character: Character;
   onUpdate: (c: Character) => void;
   onClose: () => void;
+  /** Which economy slot this picker is managing. */
+  slot: "action" | "bonusAction" | "reaction";
+  /** True when the slot is still available to spend. */
+  slotAvailable: boolean;
+  /**
+   * Called with the spell's level when a cast succeeds, so TurnHub can commit
+   * the appropriate action/bonus/reaction slot (and record the spell kind for
+   * the 5e bonus-action restriction).
+   */
+  onCommitSlot: (spellLevel: number) => void;
+  /** From useTurnState — used to enforce the 5e bonus-action spell restriction. */
+  spellCastThisTurn: { action?: SpellCastKind; bonus?: SpellCastKind };
   /**
    * Optional filter on casting time. When provided, only spells whose
    * castingTime starts with this prefix are shown (e.g. "1 action",
-   * "1 bonus action", "1 reaction"). Omit to show all castable spells.
+   * "1 bonus action", "1 reaction"). Applied to ALL spells including cantrips.
    */
   castingTimeFilter?: string;
 }
@@ -62,11 +79,8 @@ interface InlineSpellPickerProps {
 type Target = "self" | "other";
 
 interface SpellRowState {
-  slotLevel: number | undefined;   // chosen slot level (undefined = not picked yet)
+  slotLevel: number | undefined;  // chosen slot level (undefined = not picked yet)
   target: Target;
-  attackRolled: boolean;           // true after the attack-roll button is used
-  attackTotal: number | null;      // the d20+bonus result
-  castResult: { total: number; diceStr: string } | null;
   casting: boolean;
   error: string | null;
 }
@@ -91,6 +105,10 @@ export default function InlineSpellPicker({
   character,
   onUpdate,
   onClose,
+  slot,
+  slotAvailable,
+  onCommitSlot,
+  spellCastThisTurn,
   castingTimeFilter,
 }: InlineSpellPickerProps) {
   const { roll } = useRoll();
@@ -104,9 +122,6 @@ export default function InlineSpellPicker({
     return rowStates[spellId] ?? {
       slotLevel: resolvedSlot,
       target: defaultTarget(spell),
-      attackRolled: false,
-      attackTotal: null,
-      castResult: null,
       casting: false,
       error: null,
     };
@@ -125,18 +140,33 @@ export default function InlineSpellPicker({
     .map((s) => s.level)
     .sort((a, b) => a - b);
 
-  // Castable spells: prepared (or cantrips), and — for leveled spells — there
-  // must be at least one slot level ≥ spell.level remaining.
+  // 5e bonus-action restriction helpers.
+  // Cast leveled spell as action → bonus-action spell picker is fully blocked.
+  const bonusActionBlockedByActionSpell =
+    slot === "bonusAction" && spellCastThisTurn.action === "leveled";
+  // Cast leveled spell as bonus action → only cantrips allowed with the action.
+  const actionLimitedToCantrips =
+    slot === "action" && spellCastThisTurn.bonus === "leveled";
+
+  // Castable spells: prepared (or cantrips), slot available, casting-time matches,
+  // and not blocked by the 5e bonus-action restriction.
   const castableSpells = spells.filter((spell) => {
     if (!spell.prepared && spell.level > 0) return false;
-    if (spell.level === 0) return true; // cantrips always available
-    const hasSlotsAvailable = availableSlotLevels.some((l) => l >= spell.level);
-    if (!hasSlotsAvailable) return false;
-    // Filter by casting time if requested.
+
+    // Casting-time filter applies to ALL spells including cantrips.
     if (castingTimeFilter) {
-      return spell.castingTime?.toLowerCase().startsWith(castingTimeFilter.toLowerCase());
+      if (!spell.castingTime?.toLowerCase().startsWith(castingTimeFilter.toLowerCase())) return false;
     }
-    return true;
+
+    // 5e restriction: bonus-action spell picker blocked entirely by leveled action spell.
+    if (bonusActionBlockedByActionSpell) return false;
+
+    // 5e restriction: action picker limited to cantrips when a bonus-action leveled spell was cast.
+    if (actionLimitedToCantrips && spell.level > 0) return false;
+
+    if (spell.level === 0) return true; // cantrip — no slot needed
+    const hasSlotsAvailable = availableSlotLevels.some((l) => l >= spell.level);
+    return hasSlotsAvailable;
   });
 
   // Sort: cantrips first, then ascending level, then alphabetically.
@@ -156,43 +186,48 @@ export default function InlineSpellPicker({
   function resolvedSlot(spell: Spell, row: SpellRowState): number | undefined {
     if (spell.level === 0) return undefined;
     if (row.slotLevel !== undefined) return row.slotLevel;
-    const slots = availableSlotsForSpell(spell);
-    return slots[0];
+    const s = availableSlotsForSpell(spell);
+    return s[0];
   }
 
   // ── Cast handler ─────────────────────────────────────────────────────────────
 
   async function handleCast(spell: Spell) {
-    const row = rowStates[spell.id] ?? { ...getRow(spell.id, spell, undefined), slotLevel: availableSlotsForSpell(spell)[0] };
-    const slot = resolvedSlot(spell, row);
     const isCantrip = spell.level === 0;
+    const row = rowStates[spell.id] ?? {
+      ...getRow(spell.id, spell, undefined),
+      slotLevel: availableSlotsForSpell(spell)[0],
+    };
+    const spellSlot = resolvedSlot(spell, row);
 
-    patchRow(spell.id, { casting: true, error: null, castResult: null });
+    patchRow(spell.id, { casting: true, error: null });
 
-    // Compute the effect roll (pure, client-side).
-    const castRoll = computeCastRoll(spell, character, slot ?? spell.level);
-    const rollTotal = castRoll?.total ?? 0;
-    const diceStr = castRoll ? `${castRoll.spec.count}d${castRoll.spec.faces}` : "";
+    // Roll damage/heal via RollContext — result surfaces in the global toast.
+    const castSpec = computeCastSpec(spell, character, spellSlot ?? spell.level);
+    let rollTotal = 0;
+    if (castSpec) {
+      const kindLabel = spell.effectKind === "heal" ? "healing" : "damage";
+      const targetNote = row.target === "self" ? " → your HP" : "";
+      const result = roll(castSpec, `${spell.name} — ${kindLabel}${targetNote}`);
+      rollTotal = result.total;
+    }
 
-    // Build the op.
+    // Self-targeted effect: pass to the backend so HP is adjusted in the same transaction.
     const applyPayload =
-      row.target === "self" && castRoll && spell.effectKind
+      row.target === "self" && castSpec && spell.effectKind
         ? { target: "self" as const, kind: spell.effectKind as "heal" | "damage", amount: rollTotal }
         : undefined;
 
     const op = isCantrip
       ? { type: "castSpell" as const, entryId: spell.id, roll: rollTotal, apply: applyPayload }
-      : { type: "castSpell" as const, entryId: spell.id, slotLevel: slot!, roll: rollTotal, apply: applyPayload };
+      : { type: "castSpell" as const, entryId: spell.id, slotLevel: spellSlot!, roll: rollTotal, apply: applyPayload };
 
     try {
       const updated = await applySpellcastingTransactions(character.id, [op]);
+      // Commit the economy slot AFTER a successful cast (never on open, never on Attack roll).
+      onCommitSlot(spell.level);
       onUpdate(updated);
-      patchRow(spell.id, {
-        casting: false,
-        attackRolled: false,
-        attackTotal: null,
-        castResult: castRoll ? { total: rollTotal, diceStr } : null,
-      });
+      patchRow(spell.id, { casting: false });
     } catch (err) {
       patchRow(spell.id, {
         casting: false,
@@ -203,7 +238,14 @@ export default function InlineSpellPicker({
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
-  if (castableSpells.length === 0) {
+  // Economy hint shown when no further casts are possible.
+  const slotUsedHint = bonusActionBlockedByActionSpell
+      ? "Leveled spell cast this turn — bonus-action spell casting is not allowed (5e)."
+      : actionLimitedToCantrips
+        ? "Bonus-action spell cast this turn — only cantrips may be cast with the action (5e)."
+        : null;
+
+  if (castableSpells.length === 0 && !slotUsedHint) {
     return (
       <div className="flex flex-col gap-3">
         <p className="text-sm text-parchment-500">
@@ -223,24 +265,33 @@ export default function InlineSpellPicker({
   }
 
   return (
-    <div className="flex flex-col divide-y divide-parchment-200">
+    <div className="flex flex-col gap-0">
+      {/* Economy / 5e restriction hint */}
+      {slotUsedHint && (
+        <p className="mb-2 rounded bg-parchment-100 px-3 py-2 text-[11px] font-semibold text-parchment-500">
+          {slotUsedHint}
+        </p>
+      )}
+
       {sortedSpells.map((spell) => {
         const isCantrip = spell.level === 0;
         const schoolTone = SCHOOL_TONE[spell.school as keyof typeof SCHOOL_TONE] ?? "neutral";
         const availableSlots = availableSlotsForSpell(spell);
         const initRow = getRow(spell.id, spell, availableSlots[0]);
         const row = rowStates[spell.id] ?? initRow;
-        const slot = resolvedSlot(spell, row);
+        const spellSlot = resolvedSlot(spell, row);
         const locked = targetLocked(spell);
-        const preview = effectPreviewWithMod(spell, character, slot);
+        const preview = effectPreviewWithMod(spell, character, spellSlot);
         const compStr = componentsLabel(spell);
         const isAttack = spell.attackType === "attack";
         const isSave = spell.attackType === "save";
         const dcLabel = isSave ? saveDcLabel(spell, spellSaveDC ?? 0) : null;
-        const canCast = isAttack ? row.attackRolled : true;
+
+        // Cast is gated only by economy + slot availability — never by attack-roll status.
+        const castDisabled = row.casting || !slotAvailable;
 
         return (
-          <div key={spell.id} className="flex flex-col gap-1.5 py-3">
+          <div key={spell.id} className="flex flex-col gap-1.5 py-3 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-parchment-200">
             {/* ── Row header: name + badges ── */}
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="flex min-w-0 flex-col gap-0.5">
@@ -264,9 +315,9 @@ export default function InlineSpellPicker({
                 )}
               </div>
 
-              {/* ── Right: target toggle + cast buttons ── */}
+              {/* ── Right: target toggle + slot picker + cast buttons ── */}
               <div className="flex shrink-0 flex-col items-end gap-1.5">
-                {/* Slot / upcast selector (leveled only) */}
+                {/* Slot / upcast selector (leveled only, multiple options) */}
                 {!isCantrip && availableSlots.length > 1 && (
                   <div className="flex items-center gap-1.5">
                     <span className="text-[11px] text-parchment-500">Slot:</span>
@@ -274,9 +325,9 @@ export default function InlineSpellPicker({
                       <button
                         key={lvl}
                         type="button"
-                        onClick={() => patchRow(spell.id, { slotLevel: lvl, castResult: null, attackRolled: false, attackTotal: null })}
+                        onClick={() => patchRow(spell.id, { slotLevel: lvl })}
                         className={`rounded px-1.5 py-0.5 text-[11px] font-semibold transition-colors ${
-                          slot === lvl
+                          spellSlot === lvl
                             ? "bg-arcane-600 text-white"
                             : "bg-arcane-100 text-arcane-800 hover:bg-arcane-200"
                         }`}
@@ -286,6 +337,13 @@ export default function InlineSpellPicker({
                       </button>
                     ))}
                   </div>
+                )}
+
+                {/* Slot display when only one option */}
+                {!isCantrip && availableSlots.length === 1 && (
+                  <span className="text-[11px] text-parchment-500">
+                    Slot: L{availableSlots[0]}
+                  </span>
                 )}
 
                 {/* Target toggle */}
@@ -333,17 +391,16 @@ export default function InlineSpellPicker({
                     <span className="text-[11px] text-parchment-400">½ on save</span>
                   )}
 
-                  {/* Attack roll button (attack spells) */}
-                  {isAttack && !row.attackRolled && (
+                  {/* Attack roll button (attack spells) — re-rollable, free, shows in toast */}
+                  {isAttack && (
                     <button
                       type="button"
-                      disabled={row.casting}
+                      disabled={row.casting || !slotAvailable}
                       onClick={() => {
-                        const result = roll(
+                        roll(
                           { count: 1, faces: 20, modifier: spellAttackBonus ?? 0 },
                           `${spell.name} spell attack`,
                         );
-                        patchRow(spell.id, { attackRolled: true, attackTotal: result.total, castResult: null });
                       }}
                       className="rounded-control border border-garnet-200 bg-garnet-50 px-2.5 py-1 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-100 disabled:cursor-not-allowed disabled:opacity-40"
                     >
@@ -351,56 +408,18 @@ export default function InlineSpellPicker({
                     </button>
                   )}
 
-                  {/* Attack total after roll */}
-                  {isAttack && row.attackRolled && row.attackTotal !== null && (
-                    <span className="text-xs font-semibold text-garnet-700">
-                      Attack: {row.attackTotal}
-                    </span>
-                  )}
-
-                  {/* Cast button */}
+                  {/* Cast button — gated only by economy + slot availability */}
                   <button
                     type="button"
-                    disabled={row.casting || !canCast}
+                    disabled={castDisabled}
                     onClick={() => handleCast(spell)}
-                    title={isAttack && !row.attackRolled ? "Roll the attack first" : undefined}
                     className="rounded-control bg-arcane-600 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-arcane-700 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {row.casting ? "Casting…" : isCantrip ? "Cast" : `Cast (L${slot ?? spell.level})`}
+                    {row.casting ? "Casting…" : isCantrip ? "Cast" : `Cast (L${spellSlot ?? spell.level})`}
                   </button>
                 </div>
               </div>
             </div>
-
-            {/* ── Cast result banner ── */}
-            {row.castResult && spell.effectKind && (
-              <div
-                className={`flex items-center justify-between rounded-control px-3 py-2 ${
-                  spell.effectKind === "heal"
-                    ? "bg-vitality-50 text-vitality-800"
-                    : "bg-garnet-50 text-garnet-800"
-                }`}
-              >
-                <span className="text-xs font-semibold">
-                  {spell.effectKind === "heal" ? "Healed" : "Damage"}:{" "}
-                  <span className="font-display text-base">{row.castResult.total}</span>
-                  <span className="ml-1 opacity-60">({row.castResult.diceStr})</span>
-                  {row.target === "self" ? (
-                    <span className="ml-1 text-[11px] opacity-70">→ applied to your HP</span>
-                  ) : (
-                    <span className="ml-1 text-[11px] opacity-70">→ tell your DM</span>
-                  )}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => patchRow(spell.id, { castResult: null })}
-                  className="ml-2 opacity-50 hover:opacity-100"
-                  aria-label="Dismiss"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
 
             {/* ── Error ── */}
             {row.error && (
@@ -409,6 +428,11 @@ export default function InlineSpellPicker({
           </div>
         );
       })}
+
+      {/* Empty state when 5e rule blocks everything */}
+      {castableSpells.length === 0 && slotUsedHint && (
+        <p className="py-2 text-sm text-parchment-500">No spells available.</p>
+      )}
 
       {/* ── Done button ── */}
       <div className="pt-3">

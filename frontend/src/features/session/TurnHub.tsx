@@ -324,6 +324,7 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
     attack,
     bonusAttack,
     twfAvailable,
+    spellCastThisTurn,
     startTurn,
     endTurn,
     consumeAction,
@@ -332,6 +333,9 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
     enterTwfMode,
     consumeReaction,
     grantExtraAction,
+    commitActionSpell,
+    commitBonusActionSpell,
+    commitReactionSpell,
   } = turnState;
 
   const { activeResolution, openResolution, closeResolution } = useActiveResolution();
@@ -447,9 +451,8 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
         break;
 
       case "spell-picker":
-        if (cost === "action") consumeAction();
-        else if (cost === "bonusAction") consumeBonusAction();
-        else if (cost === "reaction") consumeReaction();
+        // Do NOT consume the slot here — it's committed by InlineSpellPicker
+        // on successful cast (so opening the picker without casting wastes nothing).
         openResolution(key);
         break;
 
@@ -810,29 +813,45 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
           />
         )}
 
-        {activeResolution?.resolver.kind === "spell-picker" && character.spellcasting && (
-          <div className="rounded-card border border-arcane-200 bg-arcane-50 p-3">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-arcane-600">
-              {activeResolution.resolver.slot === "bonusAction"
-                ? "Bonus-Action Spell"
-                : activeResolution.resolver.slot === "reaction"
-                  ? "Reaction Spell"
-                  : "Cast a Spell"}
-            </p>
-            <InlineSpellPicker
-              character={character}
-              onUpdate={onUpdate}
-              onClose={closeResolution}
-              castingTimeFilter={
-                activeResolution.resolver.slot === "bonusAction"
-                  ? "1 bonus action"
-                  : activeResolution.resolver.slot === "reaction"
-                    ? "1 reaction"
-                    : "1 action"
-              }
-            />
-          </div>
-        )}
+        {activeResolution?.resolver.kind === "spell-picker" && character.spellcasting && (() => {
+          const spellSlot = activeResolution.resolver.slot as "action" | "bonusAction" | "reaction";
+          const slotAvailable =
+            spellSlot === "action" ? actionsRemaining > 0
+            : spellSlot === "bonusAction" ? !bonusActionUsed
+            : !reactionUsed;
+          const onCommitSlot = (spellLevel: number) => {
+            if (spellSlot === "action") commitActionSpell(spellLevel);
+            else if (spellSlot === "bonusAction") commitBonusActionSpell(spellLevel);
+            else commitReactionSpell();
+          };
+          return (
+            <div className="rounded-card border border-arcane-200 bg-arcane-50 p-3">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-arcane-600">
+                {spellSlot === "bonusAction"
+                  ? "Bonus-Action Spell"
+                  : spellSlot === "reaction"
+                    ? "Reaction Spell"
+                    : "Cast a Spell"}
+              </p>
+              <InlineSpellPicker
+                character={character}
+                onUpdate={onUpdate}
+                onClose={closeResolution}
+                slot={spellSlot}
+                slotAvailable={slotAvailable}
+                onCommitSlot={onCommitSlot}
+                spellCastThisTurn={spellCastThisTurn}
+                castingTimeFilter={
+                  spellSlot === "bonusAction"
+                    ? "1 bonus action"
+                    : spellSlot === "reaction"
+                      ? "1 reaction"
+                      : "1 action"
+                }
+              />
+            </div>
+          );
+        })()}
 
         {/* ── Effect maneuvers (no slot consumed) — e.g. Evasive Footwork ─────── */}
         {effectManeuvers.length > 0 && superiorityRemaining > 0 && (

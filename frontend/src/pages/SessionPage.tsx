@@ -30,6 +30,7 @@ import Tabs from "@/components/ui/Tabs";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useReferenceData } from "@/hooks/useReferenceData";
 import { useTurnState } from "@/features/session/useTurnState";
+import SessionLog from "@/features/session/SessionLog";
 import { endSession, fetchActiveSession } from "@/api/client";
 import type { Session } from "@/types/character";
 
@@ -203,6 +204,7 @@ function SessionPageInner() {
               : []),
             ...(hasClass ? [{ id: "class", label: "Class" }] : []),
             { id: "rest", label: "Rest & HP" },
+            { id: "log", label: "Log" },
           ];
 
           // If the currently active tab was gated away (e.g. spells tab
@@ -237,6 +239,16 @@ function SessionPageInner() {
 
               {effectiveTab === "rest" && (
                 <HitPointTracker character={character} onUpdate={setCharacter} />
+              )}
+
+              {effectiveTab === "log" && session && (
+                <Card title="Session Log" className="p-4">
+                  <SessionLog
+                    characterId={character.id}
+                    sessionId={session.id}
+                    refreshKey={character}
+                  />
+                </Card>
               )}
             </div>
           );

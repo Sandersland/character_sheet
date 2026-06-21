@@ -315,7 +315,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
                       </span>
                     )}
                   </div>
-                  <ul className="divide-y divide-parchment-200">
+                  <ul className="flex flex-col">
                     {levelSpells.map((spell) => (
                       <SpellRow
                         key={spell.id}
