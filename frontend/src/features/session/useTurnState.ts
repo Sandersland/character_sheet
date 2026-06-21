@@ -133,11 +133,10 @@ export function useTurnState(character: Character): TurnState & TurnStateActions
   const recordAttack = useCallback(() => {
     setState((s) => {
       if (!s.attack) return s;
-      const used = s.attack.used + 1;
-      // When all attacks are used, close attack mode automatically.
-      const attack: AttackState | null =
-        used >= s.attack.total ? null : { ...s.attack, used };
-      return { ...s, attack };
+      // Clamp at total — keep attack non-null so the picker stays open for damage rolls.
+      // The picker is closed explicitly by the player via the "Done" button.
+      const used = Math.min(s.attack.used + 1, s.attack.total);
+      return { ...s, attack: { ...s.attack, used } };
     });
   }, []);
 

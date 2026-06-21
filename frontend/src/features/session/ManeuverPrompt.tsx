@@ -2,26 +2,23 @@
  * ManeuverPrompt — inline Battle Master maneuver die spend, rendered inside
  * each weapon row of InlineAttackPicker.
  *
- * Only visible when the character has a superiorityDice pool with remaining > 0
- * and at least one maneuver known. Presents three sections:
+ * Only shows maneuvers whose placement is "attackRoll" or "damageRoll" (i.e.
+ * those that genuinely augment *this* weapon's attack or damage roll). Maneuvers
+ * routed to "attackOption" (Commander's Strike), "reaction" (Parry/Riposte), or
+ * "effect" (Evasive Footwork) are handled at the TurnHub / InlineAttackPicker
+ * level and do NOT appear here.
  *
+ * Two sections:
  *   1. Add to Attack (Precision Attack) — shown after an attack roll is made.
  *   2. Add to Damage — shown after a damage roll; lists applicable maneuvers.
- *   3. Apply Effect  — save-based / special maneuvers; spends the die and
- *      shows a DM narration reminder (no roll augment).
- *
- * On spend: rolls 1dX from pool.die via rollSpec, calls applyResourceTransactions,
- * then invokes onUpdate with the refreshed character and onRollsUpdated with the
- * new auto-summed total.
  *
  * Styling: compact gold-tinted strip — gold = resources in the design system.
  */
 
 import { useState } from "react";
 
-import { rollSpec } from "@/lib/dice";
-import { mechanicsFor } from "@/lib/maneuvers";
-import { applyResourceTransactions } from "@/api/client";
+import { maneuverPlacement } from "@/lib/maneuvers";
+import { useManeuverDie } from "@/features/session/useManeuverDie";
 import type { Character } from "@/types/character";
 import type { RollResult } from "@/lib/dice";
 
@@ -48,14 +45,12 @@ export default function ManeuverPrompt({
 }: ManeuverPromptProps) {
   // ── All hooks at the top — no hooks after early returns ───────────────────
 
-  const [busy, setBusy] = useState(false);
+  const { pool, dieLabel, busy, spend } = useManeuverDie(character, onUpdate);
   const [spentFor, setSpentFor] = useState<string | null>(null);
-  const [effectMessage, setEffectMessage] = useState<string | null>(null);
   const [selectedDamageManeuver, setSelectedDamageManeuver] = useState("");
 
-  // ── Derive pool and maneuver list ─────────────────────────────────────────
+  // ── Derive maneuver lists ─────────────────────────────────────────────────
 
-  const pool = character.resources?.pools?.find((p) => p.key === "superiorityDice");
   const maneuversKnown = character.resources?.maneuversKnown ?? [];
 
   // Guard: only render when the character is a Battle Master with dice left.
@@ -63,70 +58,42 @@ export default function ManeuverPrompt({
     return null;
   }
 
-  const diceFaces = pool.die ? parseInt(pool.die.replace("d", ""), 10) : 8;
-  const dieLabel = pool.die ?? "d8";
-
-  // Partition known maneuvers by mechanic class.
-  const addToAttackManeuvers = maneuversKnown.filter(
-    (m) => mechanicsFor(m.name).mechanic === "addToAttack",
+  // Show only maneuvers that belong in the weapon row.
+  const attackRollManeuvers = maneuversKnown.filter(
+    (m) => maneuverPlacement(m.name) === "attackRoll",
   );
-  const addToDamageManeuvers = maneuversKnown.filter(
-    (m) => mechanicsFor(m.name).mechanic === "addToDamage",
+  const damageRollManeuvers = maneuversKnown.filter(
+    (m) => maneuverPlacement(m.name) === "damageRoll",
   );
-  const effectManeuvers = maneuversKnown.filter((m) => {
-    const mech = mechanicsFor(m.name).mechanic;
-    return mech === "saveBased" || mech === "special";
-  });
-
-  // Resolved current damage maneuver selection — fall back to first if state is stale.
-  const activeDamageManeuver =
-    addToDamageManeuvers.some((m) => m.name === selectedDamageManeuver)
-      ? selectedDamageManeuver
-      : (addToDamageManeuvers[0]?.name ?? "");
 
   // Show sections only when the relevant roll has been made.
-  const showAttackSection = lastAttackRoll !== null && addToAttackManeuvers.length > 0;
-  const showDamageSection = lastDamageRoll !== null && addToDamageManeuvers.length > 0;
-  const showEffectSection = effectManeuvers.length > 0;
+  const showAttackSection = lastAttackRoll !== null && attackRollManeuvers.length > 0;
+  const showDamageSection = lastDamageRoll !== null && damageRollManeuvers.length > 0;
 
-  // Nothing to show if no sections apply.
-  if (!showAttackSection && !showDamageSection && !showEffectSection) {
+  if (!showAttackSection && !showDamageSection) {
     return null;
   }
 
-  // ── Spend helper ──────────────────────────────────────────────────────────
+  // Resolved current damage maneuver selection — fall back to first if state is stale.
+  const activeDamageManeuver =
+    damageRollManeuvers.some((m) => m.name === selectedDamageManeuver)
+      ? selectedDamageManeuver
+      : (damageRollManeuvers[0]?.name ?? "");
 
-  async function spend(maneuverName: string): Promise<number> {
-    const dieResult = rollSpec({ count: 1, faces: diceFaces }).total;
-    setBusy(true);
-    try {
-      const updated = await applyResourceTransactions(character.id, [
-        { type: "spendResource", key: "superiorityDice", amount: 1, roll: dieResult },
-      ]);
-      onUpdate(updated);
-      setSpentFor(maneuverName);
-    } finally {
-      setBusy(false);
-    }
-    return dieResult;
-  }
+  // ── Spend handlers ────────────────────────────────────────────────────────
 
-  async function handlePrecision() {
+  async function handlePrecision(maneuverName: string) {
     if (busy || !lastAttackRoll) return;
-    const dieResult = await spend("Precision Attack");
+    const dieResult = await spend();
+    setSpentFor(maneuverName);
     onRollsUpdated(lastAttackRoll.total + dieResult, null);
   }
 
   async function handleDamage(maneuverName: string) {
     if (busy || !lastDamageRoll) return;
-    const dieResult = await spend(maneuverName);
+    const dieResult = await spend();
+    setSpentFor(maneuverName);
     onRollsUpdated(null, lastDamageRoll.total + dieResult);
-  }
-
-  async function handleEffect(maneuverName: string) {
-    if (busy) return;
-    const dieResult = await spend(maneuverName);
-    setEffectMessage(`Tell your DM: ${maneuverName} — rolled ${dieResult} on ${dieLabel}`);
   }
 
   return (
@@ -139,12 +106,12 @@ export default function ManeuverPrompt({
       {showAttackSection && (
         <div className="flex items-center gap-2">
           <span className="text-xs text-gold-800">Add to Attack:</span>
-          {addToAttackManeuvers.map((m) => (
+          {attackRollManeuvers.map((m) => (
             <button
               key={m.id}
               type="button"
               disabled={busy || spentFor === m.name}
-              onClick={handlePrecision}
+              onClick={() => handlePrecision(m.name)}
               className="rounded-control border border-gold-300 bg-gold-100 px-2 py-0.5 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-200 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {m.name} +{dieLabel}
@@ -157,14 +124,14 @@ export default function ManeuverPrompt({
       {showDamageSection && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-gold-800">Add to Damage:</span>
-          {addToDamageManeuvers.length === 1 ? (
+          {damageRollManeuvers.length === 1 ? (
             <button
               type="button"
-              disabled={busy || spentFor === addToDamageManeuvers[0].name}
-              onClick={() => handleDamage(addToDamageManeuvers[0].name)}
+              disabled={busy || spentFor === damageRollManeuvers[0].name}
+              onClick={() => handleDamage(damageRollManeuvers[0].name)}
               className="rounded-control border border-gold-300 bg-gold-100 px-2 py-0.5 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-200 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {addToDamageManeuvers[0].name} +{dieLabel}
+              {damageRollManeuvers[0].name} +{dieLabel}
             </button>
           ) : (
             <>
@@ -175,7 +142,7 @@ export default function ManeuverPrompt({
                 className="rounded-control border border-gold-300 bg-white px-1.5 py-0.5 text-xs text-parchment-800 focus:outline-none focus:ring-1 focus:ring-gold-400"
                 aria-label="Select maneuver to add to damage"
               >
-                {addToDamageManeuvers.map((m) => (
+                {damageRollManeuvers.map((m) => (
                   <option key={m.id} value={m.name}>
                     {m.name}
                   </option>
@@ -192,29 +159,6 @@ export default function ManeuverPrompt({
             </>
           )}
         </div>
-      )}
-
-      {/* ── Apply Effect (save-based / special) ────────────────────────── */}
-      {showEffectSection && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-gold-800">Apply Effect:</span>
-          {effectManeuvers.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              disabled={busy || spentFor === m.name}
-              onClick={() => handleEffect(m.name)}
-              className="rounded-control border border-gold-300 bg-gold-100 px-2 py-0.5 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-200 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {m.name} ({dieLabel})
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* ── DM narration reminder ───────────────────────────────────────── */}
-      {effectMessage && (
-        <p className="text-xs italic text-gold-700">{effectMessage}</p>
       )}
     </div>
   );

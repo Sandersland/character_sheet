@@ -57,3 +57,32 @@ export const MANEUVER_MECHANICS: Record<string, ManeuverMechanics> = {
 export function mechanicsFor(name: string): ManeuverMechanics {
   return MANEUVER_MECHANICS[name] ?? { mechanic: "addToDamage" };
 }
+
+/**
+ * Where a maneuver's UI lives — the single routing table.
+ *
+ *   "attackOption" — standalone row in the Select-Attack picker (forfeits one
+ *                    attack, costs the appropriate slot). e.g. Commander's Strike.
+ *   "reaction"     — appears in the Reaction slot menus. e.g. Parry, Riposte.
+ *   "attackRoll"   — inline under the weapon row, after an attack roll is made.
+ *                    e.g. Precision Attack.
+ *   "damageRoll"   — inline under the weapon row, after a damage roll is made.
+ *                    e.g. Trip Attack, Disarming Attack.
+ *   "effect"       — standalone gold strip; no slot consumed; DM narration only.
+ *                    e.g. Evasive Footwork.
+ */
+export type ManeuverPlacement =
+  | "attackOption"
+  | "reaction"
+  | "attackRoll"
+  | "damageRoll"
+  | "effect";
+
+export function maneuverPlacement(name: string): ManeuverPlacement {
+  const m = mechanicsFor(name);
+  if (m.consumesAttack) return "attackOption";   // Commander's Strike
+  if (m.slot === "reaction") return "reaction";  // Parry, Riposte
+  if (m.mechanic === "addToAttack") return "attackRoll";
+  if (m.mechanic === "addToDamage") return "damageRoll";
+  return "effect";                               // saveBased w/o slot — Evasive Footwork
+}

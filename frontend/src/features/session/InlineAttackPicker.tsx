@@ -1,11 +1,18 @@
 /**
  * InlineAttackPicker — inline weapon list for the TurnHub's attack resolution.
  *
- * Renders equipped weapons, Unarmed Strike, and Improvised Weapon. Each row
- * has Attack and Damage roll buttons. Clicking Attack rolls the d20+bonus,
- * then calls turnState.recordAttack() to decrement the Extra Attack counter.
- * When the counter reaches zero (attack becomes null), onClose() fires so
- * the TurnHub clears the active resolution.
+ * Renders equipped weapons, Unarmed Strike, Improvised Weapon, and any
+ * "attackOption" maneuvers (e.g. Commander's Strike) that consume one of the
+ * Attack action's attacks. Each weapon row has Attack and Damage roll buttons.
+ *
+ * The panel no longer auto-closes when the last attack is recorded. Instead,
+ * Attack buttons disable at 0 remaining so the player can still roll damage and
+ * spend superiority dice. An explicit "Done" button closes the panel.
+ *
+ * Maneuvers whose placement is "attackRoll" or "damageRoll" are shown inline
+ * beneath their weapon row (ManeuverPrompt). "attackOption" maneuvers are shown
+ * as their own rows at the bottom of the list. "reaction" and "effect" maneuvers
+ * are handled in TurnHub (Reaction menu and standalone Maneuvers strip).
  *
  * Retains the last attack and damage RollResult per weapon row in local state
  * so ManeuverPrompt can receive them as props. Auto-summed maneuver totals
@@ -15,11 +22,13 @@
  * garnet attack buttons, parchment damage buttons.
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useRoll } from "@/features/dice/RollContext";
 import { formatRollSpec } from "@/lib/dice";
+import { maneuverPlacement, mechanicsFor } from "@/lib/maneuvers";
+import { useManeuverDie } from "@/features/session/useManeuverDie";
 import ManeuverPrompt from "@/features/session/ManeuverPrompt";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
@@ -33,7 +42,7 @@ interface InlineAttackPickerProps {
   onUpdate: (c: Character) => void;
 }
 
-// Gate: only show ManeuverPrompt when the character has a Battle Master die pool.
+// Gate: only show maneuver affordances when the character has a Battle Master die pool.
 function hasSuperiorityDice(character: Character): boolean {
   return (
     character.resources?.pools?.some(
@@ -49,6 +58,7 @@ export default function InlineAttackPicker({
   onUpdate,
 }: InlineAttackPickerProps) {
   const { roll } = useRoll();
+  const { pool, dieLabel, busy: dieBusy, spend } = useManeuverDie(character, onUpdate);
 
   // Per-weapon last roll results (keyed by item.id, "unarmed", or "improvised").
   const [lastAttackRolls, setLastAttackRolls] = useState<Record<string, RollResult | null>>({});
@@ -59,22 +69,8 @@ export default function InlineAttackPicker({
   const [attackTotals, setAttackTotals] = useState<Record<string, number | null>>({});
   const [damageTotals, setDamageTotals] = useState<Record<string, number | null>>({});
 
-  // Guard so the initial null state of turnState.attack doesn't fire onClose
-  // before the player even takes their first attack.
-  const mountedRef = useRef(false);
-  useEffect(() => {
-    mountedRef.current = true;
-  }, []);
-
-  // When the attack counter is exhausted (transitions non-null → null), close.
-  useEffect(() => {
-    if (!mountedRef.current) return;
-    if (turnState.attack === null) {
-      onClose();
-    }
-    // onClose is stable — intentionally omitted from deps to avoid re-runs
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [turnState.attack]);
+  // Per-maneuver reminder messages (keyed by maneuver name).
+  const [maneuverMessages, setManeuverMessages] = useState<Record<string, string>>({});
 
   const equippedWeapons = character.inventory.filter(
     (item) => item.category === "weapon" && item.equipped && item.weapon,
@@ -82,6 +78,17 @@ export default function InlineAttackPicker({
 
   const { unarmedStrike, improvisedWeapon } = character;
   const showManeuvers = hasSuperiorityDice(character);
+
+  // Attacks are exhausted when the counter has reached total (used >= total).
+  // When attack is null (Flurry/Opportunity context), there is no counter → always allow.
+  const attacksExhausted = turnState.attack !== null && turnState.attack.used >= turnState.attack.total;
+
+  // "attackOption" maneuvers (Commander's Strike, etc.) — shown when in attack context.
+  const attackOptionManeuvers = showManeuvers && turnState.attack !== null
+    ? (character.resources?.maneuversKnown ?? []).filter(
+        (m) => maneuverPlacement(m.name) === "attackOption",
+      )
+    : [];
 
   // Unarmed damage display — flat value when faces === 1 (baseline), or die notation.
   const unarmedDamageSpec = {
@@ -112,9 +119,43 @@ export default function InlineAttackPicker({
     };
   }
 
+  // Handler for "attackOption" maneuver rows (e.g. Commander's Strike).
+  async function handleAttackOption(maneuverName: string) {
+    if (dieBusy || attacksExhausted || !pool || pool.remaining === 0) return;
+    const mech = mechanicsFor(maneuverName);
+    const dieResult = await spend();
+    // Consume the slot specified by the maneuver (Commander's Strike → bonus action).
+    if (mech.slot === "bonusAction" && !turnState.bonusActionUsed) {
+      turnState.consumeBonusAction();
+    } else if (mech.slot === "reaction" && !turnState.reactionUsed) {
+      turnState.consumeReaction();
+    }
+    // Forfeit one of the Attack action's attacks.
+    turnState.recordAttack();
+    setManeuverMessages((prev) => ({
+      ...prev,
+      [maneuverName]: `${maneuverName} — tell an ally to use their reaction to make an attack, adding +${dieResult} (${dieLabel}) to the damage roll.`,
+    }));
+  }
+
+  // Determine whether a given attackOption row's "Use" button is enabled.
+  function attackOptionEnabled(maneuverName: string): { enabled: boolean; reason?: string } {
+    if (!pool || pool.remaining === 0) {
+      return { enabled: false, reason: "No superiority dice remaining." };
+    }
+    if (attacksExhausted) {
+      return { enabled: false, reason: "No attacks remaining to forfeit." };
+    }
+    const mech = mechanicsFor(maneuverName);
+    if (mech.slot === "bonusAction" && turnState.bonusActionUsed) {
+      return { enabled: false, reason: "Bonus action already used." };
+    }
+    return { enabled: true };
+  }
+
   return (
     <div className="flex flex-col divide-y divide-parchment-200">
-      {equippedWeapons.length === 0 && (
+      {equippedWeapons.length === 0 && attackOptionManeuvers.length === 0 && (
         <p className="pb-3 text-sm text-parchment-500">
           No weapons equipped. Go to your{" "}
           <Link
@@ -164,6 +205,7 @@ export default function InlineAttackPicker({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  disabled={attacksExhausted}
                   onClick={() => {
                     const result = roll(
                       { count: 1, faces: 20, modifier: w.attackBonus ?? 0 },
@@ -174,7 +216,8 @@ export default function InlineAttackPicker({
                     setAttackTotals((prev) => ({ ...prev, [item.id]: null }));
                     turnState.recordAttack();
                   }}
-                  className="rounded-control border border-garnet-200 bg-garnet-50 px-2.5 py-1 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-100"
+                  title={attacksExhausted ? "No attacks remaining" : undefined}
+                  className="rounded-control border border-garnet-200 bg-garnet-50 px-2.5 py-1 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Attack
                 </button>
@@ -230,6 +273,7 @@ export default function InlineAttackPicker({
           <div className="flex items-center gap-2">
             <button
               type="button"
+              disabled={attacksExhausted}
               onClick={() => {
                 const result = roll(
                   { count: 1, faces: 20, modifier: unarmedStrike.attackBonus },
@@ -239,7 +283,8 @@ export default function InlineAttackPicker({
                 setAttackTotals((prev) => ({ ...prev, unarmed: null }));
                 turnState.recordAttack();
               }}
-              className="rounded-control border border-garnet-200 bg-garnet-50 px-2.5 py-1 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-100"
+              title={attacksExhausted ? "No attacks remaining" : undefined}
+              className="rounded-control border border-garnet-200 bg-garnet-50 px-2.5 py-1 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-100 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Attack
             </button>
@@ -294,6 +339,7 @@ export default function InlineAttackPicker({
           <div className="flex items-center gap-2">
             <button
               type="button"
+              disabled={attacksExhausted}
               onClick={() => {
                 const result = roll(
                   { count: 1, faces: 20, modifier: improvisedWeapon.attackBonus },
@@ -303,7 +349,8 @@ export default function InlineAttackPicker({
                 setAttackTotals((prev) => ({ ...prev, improvised: null }));
                 turnState.recordAttack();
               }}
-              className="rounded-control border border-garnet-200 bg-garnet-50 px-2.5 py-1 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-100"
+              title={attacksExhausted ? "No attacks remaining" : undefined}
+              className="rounded-control border border-garnet-200 bg-garnet-50 px-2.5 py-1 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-100 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Attack
             </button>
@@ -332,6 +379,47 @@ export default function InlineAttackPicker({
             onUpdate={onUpdate}
           />
         )}
+      </div>
+
+      {/* ── Attack-option maneuvers (e.g. Commander's Strike) ────────────────── */}
+      {attackOptionManeuvers.map((m) => {
+        const { enabled, reason } = attackOptionEnabled(m.name);
+        const message = maneuverMessages[m.name];
+        return (
+          <div key={m.id} className="flex flex-col gap-1.5 py-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-parchment-900">{m.name}</p>
+                <p className="text-xs text-parchment-500">
+                  Forfeit 1 attack · Costs bonus action · Spend {dieLabel}
+                </p>
+                {message && (
+                  <p className="mt-1 text-xs italic text-gold-700">{message}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                disabled={!enabled || dieBusy}
+                onClick={() => handleAttackOption(m.name)}
+                title={reason}
+                className="rounded-control border border-gold-300 bg-gold-50 px-2.5 py-1 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Use
+              </button>
+            </div>
+          </div>
+        );
+      })}
+
+      {/* ── Done button ───────────────────────────────────────────────────────── */}
+      <div className="pt-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
+        >
+          Done
+        </button>
       </div>
     </div>
   );

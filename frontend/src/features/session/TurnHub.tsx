@@ -23,10 +23,11 @@
 import { useState } from "react";
 
 import Card from "@/components/ui/Card";
-import { applyActionTransactions, applyResourceTransactions } from "@/api/client";
+import { applyActionTransactions } from "@/api/client";
 import { UNIVERSAL_ACTIONS } from "@/lib/turnRules";
 import { rollSpec } from "@/lib/dice";
-import { mechanicsFor } from "@/lib/maneuvers";
+import { maneuverPlacement } from "@/lib/maneuvers";
+import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { resolverFor } from "@/features/session/actionResolvers";
 import { useActiveResolution } from "@/features/session/useActiveResolution";
 import InlineAttackPicker from "@/features/session/InlineAttackPicker";
@@ -209,6 +210,10 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
   const [showBonusMenu, setShowBonusMenu] = useState(false);
   const [showReactionMenu, setShowReactionMenu] = useState(false);
 
+  // Superiority die spend helper — used by reaction and effect maneuvers.
+  const { pool: superiorityPool, dieLabel, busy: dieBusy, spend: spendDie } =
+    useManeuverDie(character, onUpdate);
+
   // Derive available class actions from character data.
   const availableActions: AvailableAction[] = character.availableActions ?? [];
   const classActions = availableActions.filter((a) => a.cost === "action");
@@ -219,17 +224,15 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
   const actionSurgePool = character.resources?.pools?.find((p) => p.key === "actionSurge");
   const actionSurgeAvailable = (actionSurgePool?.remaining ?? 0) > 0;
 
-  // Commander's Strike — Battle Master bonus action.
-  const superiorityPool = character.resources?.pools?.find((p) => p.key === "superiorityDice");
-  const commandersStrikeKnown =
-    character.resources?.maneuversKnown?.some(
-      (m) => mechanicsFor(m.name).slot === "bonusAction" && m.name === "Commander's Strike",
-    ) ?? false;
-  const commandersStrikeAvailable =
-    commandersStrikeKnown &&
-    (superiorityPool?.remaining ?? 0) > 0 &&
-    !bonusActionUsed &&
-    (attack !== null || actionsRemaining < 1);
+  // Partition known maneuvers by placement for the Reaction slot and effect strip.
+  const maneuversKnown = character.resources?.maneuversKnown ?? [];
+  const reactionManeuvers = maneuversKnown.filter(
+    (m) => maneuverPlacement(m.name) === "reaction",
+  );
+  const effectManeuvers = maneuversKnown.filter(
+    (m) => maneuverPlacement(m.name) === "effect",
+  );
+  const superiorityRemaining = superiorityPool?.remaining ?? 0;
 
   // ── send() helper — fires applyActionTransactions then calls onUpdate ─────
 
@@ -359,32 +362,49 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
     }
   }
 
-  // Commander's Strike — forefits one attack, costs the bonus action, spends a die.
-  async function handleCommandersStrike() {
-    if (!commandersStrikeAvailable || busy) return;
-    setBusy(true);
-    setError(null);
-    setInfoMessage(null);
+  // ── Reaction maneuver handler ──────────────────────────────────────────────
+
+  async function handleReactionManeuver(maneuverName: string) {
+    if (dieBusy || superiorityRemaining === 0) return;
     try {
-      const diceFaces = superiorityPool?.die
-        ? parseInt(superiorityPool.die.replace("d", ""), 10)
-        : 8;
-      const dieResult = rollSpec({ count: 1, faces: diceFaces }).total;
-      const updated = await applyResourceTransactions(character.id, [
-        { type: "spendResource", key: "superiorityDice", amount: 1, roll: dieResult },
-      ]);
-      onUpdate(updated);
-      // Consume the bonus action slot and forfeit one of the Attack action's attacks.
-      consumeBonusAction();
-      if (attack !== null) turnState.recordAttack();
-      setShowBonusMenu(false);
-      setInfoMessage(
-        `Commander's Strike — tell ally to attack and add +${dieResult} to damage.`,
-      );
+      const dieResult = await spendDie();
+      consumeReaction();
+      setShowReactionMenu(false);
+      if (maneuverName === "Parry") {
+        setInfoMessage(
+          `Parry — reduce incoming damage by ${dieResult} + DEX modifier (${dieLabel} rolled ${dieResult}).`,
+        );
+      } else if (maneuverName === "Riposte") {
+        setInfoMessage(
+          `Riposte — make one melee attack against the creature; add +${dieResult} to the damage roll (${dieLabel} rolled ${dieResult}).`,
+        );
+      } else {
+        setInfoMessage(
+          `${maneuverName} — tell your DM: rolled ${dieResult} on ${dieLabel}.`,
+        );
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Commander's Strike failed.");
-    } finally {
-      setBusy(false);
+      setError(e instanceof Error ? e.message : `${maneuverName} failed.`);
+    }
+  }
+
+  // ── Effect maneuver handler (no slot consumed) ─────────────────────────────
+
+  async function handleEffectManeuver(maneuverName: string) {
+    if (dieBusy || superiorityRemaining === 0) return;
+    try {
+      const dieResult = await spendDie();
+      if (maneuverName === "Evasive Footwork") {
+        setInfoMessage(
+          `Evasive Footwork — add +${dieResult} to your AC until the end of your turn (${dieLabel} rolled ${dieResult}).`,
+        );
+      } else {
+        setInfoMessage(
+          `${maneuverName} — tell your DM: rolled ${dieResult} on ${dieLabel}.`,
+        );
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `${maneuverName} failed.`);
     }
   }
 
@@ -456,6 +476,22 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
                     title={u.description}
                   >
                     {u.label}
+                  </QuickBtn>
+                ))}
+                {/* Battle Master reaction maneuvers (Parry, Riposte) */}
+                {reactionManeuvers.map((m) => (
+                  <QuickBtn
+                    key={m.id}
+                    tone={superiorityRemaining > 0 ? "gold" : "neutral"}
+                    disabled={superiorityRemaining === 0 || dieBusy}
+                    onClick={() => handleReactionManeuver(m.name)}
+                    title={
+                      superiorityRemaining === 0
+                        ? "No superiority dice remaining."
+                        : `Spend ${dieLabel} — ${m.name}`
+                    }
+                  >
+                    {m.name} ({dieLabel})
                   </QuickBtn>
                 ))}
               </div>
@@ -586,16 +622,6 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
                   Off-hand Attack (TWF)
                 </QuickBtn>
               )}
-              {commandersStrikeAvailable && (
-                <QuickBtn
-                  tone="gold"
-                  disabled={busy}
-                  onClick={handleCommandersStrike}
-                  title="Forfeit one attack; an ally uses their reaction to strike, adding the superiority die to damage."
-                >
-                  Commander's Strike
-                </QuickBtn>
-              )}
               {classBonusActions.map((a) => (
                 <QuickBtn
                   key={a.key}
@@ -668,6 +694,22 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
                   {u.label}
                 </QuickBtn>
               ))}
+              {/* Battle Master reaction maneuvers (Parry, Riposte) */}
+              {reactionManeuvers.map((m) => (
+                <QuickBtn
+                  key={m.id}
+                  tone={superiorityRemaining > 0 ? "gold" : "neutral"}
+                  disabled={superiorityRemaining === 0 || dieBusy}
+                  onClick={() => handleReactionManeuver(m.name)}
+                  title={
+                    superiorityRemaining === 0
+                      ? "No superiority dice remaining."
+                      : `Spend ${dieLabel} — ${m.name}`
+                  }
+                >
+                  {m.name} ({dieLabel})
+                </QuickBtn>
+              ))}
             </div>
           )}
         </div>
@@ -729,12 +771,34 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
           <InlineSpellPicker character={character} onUpdate={onUpdate} onClose={closeResolution} />
         )} */}
 
+        {/* ── Effect maneuvers (no slot consumed) — e.g. Evasive Footwork ─────── */}
+        {effectManeuvers.length > 0 && superiorityRemaining > 0 && (
+          <div className="rounded-card border border-gold-200 bg-gold-50 p-3">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-gold-700">
+              Maneuvers ({dieLabel}, {superiorityRemaining} left)
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {effectManeuvers.map((m) => (
+                <QuickBtn
+                  key={m.id}
+                  tone="gold"
+                  disabled={dieBusy}
+                  onClick={() => handleEffectManeuver(m.name)}
+                  title={`Spend ${dieLabel} — ${m.name}`}
+                >
+                  {m.name} ({dieLabel})
+                </QuickBtn>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Error display */}
         {error && (
           <p className="text-xs font-semibold text-garnet-700">{error}</p>
         )}
 
-        {/* Commander's Strike info message */}
+        {/* Info message (maneuver reminders, Commander's Strike, etc.) */}
         {infoMessage && (
           <p className="rounded-control border border-gold-200 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800">
             {infoMessage}
