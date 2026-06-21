@@ -26,6 +26,7 @@ const CATEGORY_TONE: Record<CharacterEventCategory, "vitality" | "gold" | "garne
   spellcasting: "arcane",
   class: "neutral",
   resources: "gold",
+  combat: "garnet",
 };
 
 const TYPE_LABEL: Partial<Record<string, string>> = {
@@ -57,6 +58,9 @@ const TYPE_LABEL: Partial<Record<string, string>> = {
   unprepareSpell: "unprepared",
   spendResource: "resource used",
   restoreResource: "resource restored",
+  combatStarted: "combat",
+  combatEnded: "combat end",
+  combatRoundAdvanced: "round",
   revert: "undo",
 };
 
@@ -82,8 +86,6 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
     fetchSession(characterId, sessionId)
       .then((data) => setEvents(data.events as CharacterEvent[]))
       .catch(() => setError("Couldn't load session log — try again."));
-  // refreshKey is intentionally included to trigger re-fetches on character updates.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [characterId, sessionId, refreshKey]);
 
   if (error) {

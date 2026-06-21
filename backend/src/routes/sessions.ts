@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import { prisma } from "../lib/prisma.js";
-import { startSession, endSession, getActiveSession, SessionError } from "../lib/sessions.js";
+import { startSession, endSession, getActiveSession, logCombatEvent, SessionError, CombatError } from "../lib/sessions.js";
 import { serializeCharacter, characterInclude } from "./characters.js";
 
 export const sessionsRouter = Router();
@@ -161,4 +161,76 @@ sessionsRouter.get("/characters/:id/sessions/:sessionId", async (req, res) => {
       createdAt: row.createdAt,
     })),
   });
+});
+
+// ── Combat lifecycle event routes ─────────────────────────────────────────────
+//
+// These routes only write audit log events — they do not mutate character state.
+// POST /…/combat/start   — logs "combatStarted"
+// POST /…/combat/end     — logs "combatEnded"
+// POST /…/combat/round   — logs "combatRoundAdvanced" (body: { round: number })
+
+async function resolveCombatCharacter(id: string, res: Parameters<Parameters<typeof sessionsRouter.post>[1]>[1]) {
+  const character = await prisma.character.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!character) {
+    res.status(404).json({ error: "Character not found" });
+    return null;
+  }
+  return character;
+}
+
+sessionsRouter.post("/characters/:id/sessions/:sessionId/combat/start", async (req, res) => {
+  const character = await resolveCombatCharacter(req.params.id, res);
+  if (!character) return;
+  try {
+    await logCombatEvent(character.id, req.params.sessionId, "combatStarted");
+    res.status(201).json({ ok: true });
+  } catch (err) {
+    if (err instanceof CombatError) {
+      const status = err.message.includes("not found") ? 404 : 409;
+      res.status(status).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
+});
+
+sessionsRouter.post("/characters/:id/sessions/:sessionId/combat/end", async (req, res) => {
+  const character = await resolveCombatCharacter(req.params.id, res);
+  if (!character) return;
+  try {
+    await logCombatEvent(character.id, req.params.sessionId, "combatEnded");
+    res.status(201).json({ ok: true });
+  } catch (err) {
+    if (err instanceof CombatError) {
+      const status = err.message.includes("not found") ? 404 : 409;
+      res.status(status).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
+});
+
+sessionsRouter.post("/characters/:id/sessions/:sessionId/combat/round", async (req, res) => {
+  const character = await resolveCombatCharacter(req.params.id, res);
+  if (!character) return;
+  const { round } = req.body as { round?: number };
+  if (typeof round !== "number" || round < 1) {
+    res.status(400).json({ error: "round must be a positive integer" });
+    return;
+  }
+  try {
+    await logCombatEvent(character.id, req.params.sessionId, "combatRoundAdvanced", { round });
+    res.status(201).json({ ok: true });
+  } catch (err) {
+    if (err instanceof CombatError) {
+      const status = err.message.includes("not found") ? 404 : 409;
+      res.status(status).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
 });

@@ -38,6 +38,11 @@ interface InlineAttackPickerProps {
   character: Character;
   turnState: TurnState & TurnStateActions;
   onClose: () => void;
+  /**
+   * Called when the player cancels before rolling any attacks — refunds the
+   * action and returns to the action menu.
+   */
+  onCancel: () => void;
   /** Required for ManeuverPrompt to push resource spend results back up to the page. */
   onUpdate: (c: Character) => void;
 }
@@ -55,6 +60,7 @@ export default function InlineAttackPicker({
   character,
   turnState,
   onClose,
+  onCancel,
   onUpdate,
 }: InlineAttackPickerProps) {
   const { roll } = useRoll();
@@ -411,15 +417,31 @@ export default function InlineAttackPicker({
         );
       })}
 
-      {/* ── Done button ───────────────────────────────────────────────────────── */}
+      {/* ── Back / Done footer ────────────────────────────────────────────────── */}
+      {/*
+        Back is shown when no attack has been rolled yet — pressing it refunds
+        the action so the player can choose a different one.
+        Done is shown once at least one attack roll has been recorded — at that
+        point the action is committed and cannot be returned.
+      */}
       <div className="pt-3">
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-full rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
-        >
-          Done
-        </button>
+        {turnState.attack !== null && turnState.attack.used === 0 ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="w-full rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
+          >
+            ← Back
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
+          >
+            Done
+          </button>
+        )}
       </div>
     </div>
   );

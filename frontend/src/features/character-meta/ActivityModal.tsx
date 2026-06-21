@@ -22,6 +22,7 @@ const CATEGORY_TONE: Record<CharacterEventCategory, "vitality" | "gold" | "garne
   spellcasting: "arcane",
   class: "neutral",
   resources: "gold",
+  combat: "garnet",
 };
 
 // Label per event type for the badge.

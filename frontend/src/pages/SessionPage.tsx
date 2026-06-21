@@ -30,9 +30,10 @@ import Tabs from "@/components/ui/Tabs";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useReferenceData } from "@/hooks/useReferenceData";
 import { useTurnState } from "@/features/session/useTurnState";
+import { clearTurnState } from "@/features/session/turnStatePersistence";
 import SessionLog from "@/features/session/SessionLog";
 import { endSession, fetchActiveSession } from "@/api/client";
-import type { Session } from "@/types/character";
+import type { Character, Session, ReferenceData } from "@/types/character";
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -51,24 +52,6 @@ function SessionPageInner() {
   const { character, error, setCharacter } = useCharacter(id);
   const { reference } = useReferenceData();
   const [session, setSession] = useState<Session | null>(null);
-  const [endPending, setEndPending] = useState(false);
-  const [activeTab, setActiveTab] = useState("inventory");
-
-  // Ephemeral turn-economy state — never persisted, resets on Start/End Turn.
-  // Requires a character, so we instantiate the hook after loading. We pass a
-  // stable fallback object so hooks are never conditionally called.
-  const turnState = useTurnState(character ?? {
-    id: "", name: "", race: "", class: "", level: 1, experiencePoints: 0,
-    currentLevelThreshold: 0, nextLevelThreshold: null, pendingLevelUps: 0,
-    background: "", alignment: "", armorClass: 10, initiativeBonus: 0,
-    speed: 30, proficiencyBonus: 2, hitPoints: { current: 0, max: 1, temp: 0, deathSaves: { successes: 0, failures: 0 } },
-    hitDice: { total: 1, die: "d8", spent: 0 }, abilityScores: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },
-    savingThrowProficiencies: [], skills: [], toolProficiencies: [], armorProficiencies: [], weaponProficiencies: [],
-    inventory: [], currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
-    unarmedStrike: { attackBonus: 0, damage: { count: 1, faces: 1, modifier: 0, damageType: "bludgeoning" } },
-    improvisedWeapon: { attackBonus: 0, proficient: false, damage: { count: 1, faces: 4, modifier: 0, damageType: "bludgeoning" } },
-    advancements: [], advancementSlots: { total: 0, used: 0 }, journal: [],
-  });
 
   // Resolve the active session on mount. If none found, bounce back to the sheet.
   useEffect(() => {
@@ -81,17 +64,6 @@ function SessionPageInner() {
       }
     });
   }, [id, navigate]);
-
-  async function handleEndSession() {
-    if (!id || !session) return;
-    setEndPending(true);
-    try {
-      await endSession(id, session.id);
-      navigate(`/characters/${id}`);
-    } finally {
-      setEndPending(false);
-    }
-  }
 
   if (error) {
     return (
@@ -124,13 +96,66 @@ function SessionPageInner() {
   }
 
   return (
+    <SessionContent
+      character={character}
+      session={session}
+      reference={reference}
+      setCharacter={setCharacter}
+      navigate={navigate}
+    />
+  );
+}
+
+// ── SessionContent ─────────────────────────────────────────────────────────────
+//
+// Extracted into its own component so useTurnState is called with a guaranteed
+// non-null character and real sessionId — which means the lazy localStorage
+// initializer works correctly and the fallback character object is not needed.
+
+interface SessionContentProps {
+  character: Character;
+  session: Session;
+  reference: ReferenceData | null;
+  setCharacter: (c: Character) => void;
+  navigate: ReturnType<typeof useNavigate>;
+}
+
+function SessionContent({ character, session, reference, setCharacter, navigate }: SessionContentProps) {
+  const [activeTab, setActiveTab] = useState("inventory");
+  const [endPending, setEndPending] = useState(false);
+  // logRefresh bumps whenever character state or a combat log event changes,
+  // so the Log tab refreshes on both.
+  const [logRefresh, setLogRefresh] = useState(0);
+
+  // Turn/combat state — persisted to localStorage keyed by session.id.
+  const turnState = useTurnState(character, session.id);
+
+  function handleCharacterUpdate(updated: Character) {
+    setCharacter(updated);
+    setLogRefresh((n) => n + 1);
+  }
+
+  async function handleEndSession() {
+    if (!session) return;
+    setEndPending(true);
+    try {
+      // Clear persisted turn state before navigating away.
+      clearTurnState(session.id);
+      await endSession(character.id, session.id);
+      navigate(`/characters/${character.id}`);
+    } finally {
+      setEndPending(false);
+    }
+  }
+
+  return (
     <div className="min-h-screen bg-parchment-100">
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <header className="border-b border-parchment-200 bg-parchment-50">
         <div className="mx-auto flex max-w-4xl flex-wrap items-start justify-between gap-4 px-6 py-4">
           <div>
             <Link
-              to={`/characters/${id}`}
+              to={`/characters/${character.id}`}
               className="text-xs font-semibold text-garnet-700 hover:underline"
             >
               ← Character sheet
@@ -170,8 +195,10 @@ function SessionPageInner() {
         {/* ── Turn hub — primary surface; inline attack/item pickers live here ── */}
         <TurnHub
           character={character}
+          sessionId={session.id}
           turnState={turnState}
-          onUpdate={setCharacter}
+          onUpdate={handleCharacterUpdate}
+          onLogChanged={() => setLogRefresh((n) => n + 1)}
         />
 
         {/* ── Reference tabs — secondary content ───────────────────────── */}
@@ -218,12 +245,12 @@ function SessionPageInner() {
               <Tabs tabs={tabs} active={effectiveTab} onChange={setActiveTab} />
 
               {effectiveTab === "inventory" && (
-                <InventoryList character={character} onUpdate={setCharacter} />
+                <InventoryList character={character} onUpdate={handleCharacterUpdate} />
               )}
 
               {effectiveTab === "spells" && isCaster && (
                 <Card title="Spells" className="p-4">
-                  <SpellsSection character={character} onUpdate={setCharacter} />
+                  <SpellsSection character={character} onUpdate={handleCharacterUpdate} />
                 </Card>
               )}
 
@@ -232,21 +259,21 @@ function SessionPageInner() {
                   <ClassFeaturesSection
                     character={character}
                     referenceClasses={reference?.classes ?? []}
-                    onUpdate={setCharacter}
+                    onUpdate={handleCharacterUpdate}
                   />
                 </Card>
               )}
 
               {effectiveTab === "rest" && (
-                <HitPointTracker character={character} onUpdate={setCharacter} />
+                <HitPointTracker character={character} onUpdate={handleCharacterUpdate} />
               )}
 
-              {effectiveTab === "log" && session && (
+              {effectiveTab === "log" && (
                 <Card title="Session Log" className="p-4">
                   <SessionLog
                     characterId={character.id}
                     sessionId={session.id}
-                    refreshKey={character}
+                    refreshKey={logRefresh}
                   />
                 </Card>
               )}

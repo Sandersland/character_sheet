@@ -23,7 +23,7 @@
 import { useState } from "react";
 
 import Card from "@/components/ui/Card";
-import { applyActionTransactions } from "@/api/client";
+import { applyActionTransactions, startCombat, endCombat, advanceCombatRound } from "@/api/client";
 import { UNIVERSAL_ACTIONS } from "@/lib/turnRules";
 import { rollSpec } from "@/lib/dice";
 import { maneuverPlacement } from "@/lib/maneuvers";
@@ -311,12 +311,17 @@ function LayOnHandsInput({
 
 interface TurnHubProps {
   character: Character;
+  sessionId: string;
   turnState: TurnState & TurnStateActions;
   onUpdate: (c: Character) => void;
+  /** Called after a combat log event so the Log tab refreshes. */
+  onLogChanged: () => void;
 }
 
-export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps) {
+export default function TurnHub({ character, sessionId, turnState, onUpdate, onLogChanged }: TurnHubProps) {
   const {
+    inCombat,
+    round,
     phase,
     actionsRemaining,
     bonusActionUsed,
@@ -325,10 +330,14 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
     bonusAttack,
     twfAvailable,
     spellCastThisTurn,
+    startCombat: startCombatState,
+    endCombat: endCombatState,
     startTurn,
     endTurn,
     consumeAction,
     enterAttackMode,
+    cancelAttack,
+    finishAttack,
     consumeBonusAction,
     enterTwfMode,
     consumeReaction,
@@ -502,6 +511,33 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
     }
   }
 
+  // ── Combat lifecycle handlers ─────────────────────────────────────────────
+
+  async function handleStartCombat() {
+    startCombatState();
+    // Best-effort: log the event to the audit log, but don't block local state.
+    try {
+      await startCombat(character.id, sessionId);
+      onLogChanged();
+    } catch {
+      // Silently swallow — local state is already updated.
+    }
+  }
+
+  async function handleEndCombat() {
+    endCombatState();
+    closeResolution();
+    setReactionMessage(null);
+    setEffectMessage(null);
+    setError(null);
+    try {
+      await endCombat(character.id, sessionId);
+      onLogChanged();
+    } catch {
+      // Silently swallow — local state is already updated.
+    }
+  }
+
   // ── Reaction maneuver handler ──────────────────────────────────────────────
 
   async function handleReactionManeuver(maneuverName: string) {
@@ -550,28 +586,63 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
 
   // ── Idle state ─────────────────────────────────────────────────────────────
   if (phase === "idle") {
+    // Not in combat — show only the Start Combat gate.
+    if (!inCombat) {
+      return (
+        <Card className="p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-parchment-800">Not in Combat</p>
+              <p className="mt-0.5 text-xs text-parchment-500">
+                When a combat encounter begins, start it here to track your turn.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleStartCombat}
+              className="shrink-0 rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-garnet-800"
+            >
+              Start Combat
+            </button>
+          </div>
+        </Card>
+      );
+    }
+
+    // In combat but between turns — show round indicator, Start Turn, End Combat, Reaction.
     return (
       <Card className="p-4">
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold text-parchment-800">Your Turn</p>
+              <p className="text-sm font-semibold text-parchment-800">
+                Combat — Round {round}
+              </p>
               <p className="mt-0.5 text-xs text-parchment-500">
                 When the DM calls your turn, start tracking your action economy.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setReactionMessage(null);
-                setEffectMessage(null);
-                setError(null);
-                startTurn();
-              }}
-              className="shrink-0 rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-garnet-800"
-            >
-              Start Turn
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={handleEndCombat}
+                className="rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-600 transition-colors hover:bg-parchment-100"
+              >
+                End Combat
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setReactionMessage(null);
+                  setEffectMessage(null);
+                  setError(null);
+                  startTurn();
+                }}
+                className="rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-garnet-800"
+              >
+                Start Turn
+              </button>
+            </div>
           </div>
 
           {/* Reaction is available between turns — render it in idle mode. */}
@@ -601,15 +672,31 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
     <Card className="p-4">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
-        <p className="font-semibold text-parchment-800">Your Turn</p>
+        <div>
+          <p className="font-semibold text-parchment-800">Your Turn</p>
+          {inCombat && (
+            <p className="mt-0.5 text-xs text-parchment-500">Round {round}</p>
+          )}
+        </div>
         <button
           type="button"
-          onClick={() => {
+          onClick={async () => {
             setReactionMessage(null);
             setEffectMessage(null);
             setError(null);
+            // endTurn() increments round when inCombat — capture the new round number.
+            const nextRound = inCombat ? round + 1 : undefined;
             endTurn();
             closeResolution();
+            // Log the new round beginning (round 1 is logged by combatStarted).
+            if (inCombat && nextRound !== undefined && nextRound >= 2) {
+              try {
+                await advanceCombatRound(character.id, sessionId, nextRound);
+                onLogChanged();
+              } catch {
+                // Silently swallow — turn already ended locally.
+              }
+            }
           }}
           className="rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1 text-xs font-semibold text-parchment-600 transition-colors hover:bg-parchment-100"
         >
@@ -786,7 +873,15 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
             <InlineAttackPicker
               character={character}
               turnState={turnState}
-              onClose={closeResolution}
+              onClose={() => {
+                finishAttack();
+                closeResolution();
+              }}
+              onCancel={() => {
+                cancelAttack();
+                closeResolution();
+                setShowActionMenu(true);
+              }}
               onUpdate={onUpdate}
             />
           </div>

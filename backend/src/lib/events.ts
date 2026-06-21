@@ -11,7 +11,8 @@ export type EventCategory =
   | "class"
   | "resources"
   | "advancement"
-  | "session";
+  | "session"
+  | "combat";
 
 export type EventType =
   // inventory
@@ -66,6 +67,10 @@ export type EventType =
   // session lifecycle
   | "sessionStarted"
   | "sessionEnded"
+  // combat lifecycle
+  | "combatStarted"
+  | "combatEnded"
+  | "combatRoundAdvanced"
   // meta
   | "revert";
 
