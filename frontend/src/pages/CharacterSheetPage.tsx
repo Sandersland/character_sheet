@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import AbilityScoreBox from "@/features/abilities/AbilityScoreBox";
 import ActivityModal from "@/features/character-meta/ActivityModal";
+import AdvancementSection from "@/features/advancement/AdvancementSection";
 import BackendStatus from "@/features/character-meta/BackendStatus";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
@@ -18,7 +19,7 @@ import ToolProficienciesCard from "@/features/abilities/ToolProficienciesCard";
 import VitalsStrip from "@/features/character-meta/VitalsStrip";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useReferenceData } from "@/hooks/useReferenceData";
-import { ABILITY_LABELS } from "@/lib/abilities";
+import { abilityAbbr } from "@/lib/abilities";
 
 export default function CharacterSheetPage() {
   const { id } = useParams();
@@ -165,7 +166,7 @@ export default function CharacterSheetPage() {
             {abilityEntries.map(([key, score]) => (
               <AbilityScoreBox
                 key={key}
-                label={ABILITY_LABELS[key].slice(0, 3).toUpperCase()}
+                label={abilityAbbr(key)}
                 score={score}
                 saveProficient={character.savingThrowProficiencies.includes(
                   key
@@ -223,6 +224,21 @@ export default function CharacterSheetPage() {
               onUpdate={setCharacter}
             />
           </Card>
+        )}
+
+        {/* Advancements (ASI + Feats) — shown whenever the character has earned
+            at least one slot (level 4+) or has already taken an advancement.
+            Class-level-gated: Fighter/Rogue earn extra slots. The id allows
+            the level-up callout in HitPointTracker to scroll here. */}
+        {(character.advancementSlots.total > 0 || character.advancements.length > 0) && (
+          <div id="advancement-card">
+            <Card title="Advancements" className="p-4">
+              <AdvancementSection
+                character={character}
+                onUpdate={setCharacter}
+              />
+            </Card>
+          </div>
         )}
 
         {character.spellcasting && (

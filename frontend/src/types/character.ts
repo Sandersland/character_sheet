@@ -456,6 +456,61 @@ export interface CatalogManeuver {
 }
 
 /**
+ * A structured mechanical effect defined on a catalog or custom feat.
+ * Snapshot into AdvancementEntry.improvements at take-time.
+ */
+export interface FeatImprovement {
+  /** Numeric: "initiative" | "speed" | "armorClass" | "maxHp"
+   *  Keyed:   "skillProficiency" | "savingThrowProficiency" (require `key`) */
+  target: string;
+  amount: number;
+  perLevel?: boolean; // true → effective bonus = amount × hitDice.total (e.g. Tough)
+  /** Skill name for skillProficiency; ability name for savingThrowProficiency. */
+  key?: string;
+}
+
+/**
+ * One taken Ability Score Improvement or feat on a character.
+ * Mirrors backend/src/lib/resources.ts AdvancementEntry.
+ */
+export interface AdvancementEntry {
+  id: string;
+  level: number;
+  kind: "asi" | "feat";
+  /** Score bumps applied: e.g. { strength: 2 } or { dexterity: 1, constitution: 1 } */
+  abilityDeltas: Record<string, number>;
+  /** HP delta added to max/current at time of choice. */
+  hpDelta: number;
+  /** Initiative delta added at time of choice. */
+  initDelta: number;
+  featId?: string;
+  featName?: string;
+  featDescription?: string;
+  /** Snapshot of the feat's structured mechanical effects. Applied as a read-time bonus layer. */
+  improvements?: FeatImprovement[];
+}
+
+/** Slot count summary for advancement choices. */
+export interface AdvancementSlots {
+  total: number;
+  used: number;
+}
+
+/** Catalog feat served by GET /api/feats. */
+export interface CatalogFeat {
+  id: string;
+  name: string;
+  description: string;
+  prerequisite?: string;
+  /** Ability names the player may choose to bump by abilityIncrease. Empty = not a half-feat. */
+  abilityOptions: string[];
+  /** Usually 1 for half-feats; 0 for full feats. */
+  abilityIncrease: number;
+  /** Structured static effects applied as a read-time bonus when this feat is active. */
+  improvements: FeatImprovement[];
+}
+
+/**
  * One merged tool proficiency entry on the character wire type.
  * Creation-fixed profs (background/class/race) and level-gated subclass
  * profs (Student of War) are merged by serializeCharacter before sending.
@@ -556,6 +611,11 @@ export interface Character {
   };
 
   resources?: CharacterResources;
+
+  /** Taken ASI / feat entries, in the order chosen (clamped to advancementSlots.total). */
+  advancements: AdvancementEntry[];
+  /** How many advancement slots this character has earned at their level. */
+  advancementSlots: AdvancementSlots;
 
   classes?: ClassEntry[];
 
@@ -786,6 +846,38 @@ export type ResourceOperation =
   | ForgetManeuverOperation
   | LearnToolProficiencyOperation
   | ForgetToolProficiencyOperation;
+
+// ── Advancement operation types (mirrors backend/src/lib/advancement.ts) ─────
+// Sent as `{ operations: AdvancementOperation[] }` to
+// POST /api/characters/:id/advancement/transactions.
+
+export interface TakeAsiOperation {
+  type: "takeAsi";
+  increases: { ability: string; amount: 1 | 2 }[];
+}
+export interface TakeFeatOperation {
+  type: "takeFeat";
+  featId?: string;
+  custom?: {
+    name: string;
+    description: string;
+    improvements?: FeatImprovement[];
+    /** Ability names the player may choose for a half-feat-style bump. */
+    abilityOptions?: string[];
+    /** Amount to apply to the chosen ability (default 1). */
+    abilityIncrease?: number;
+  };
+  /** Required when taking a half-feat (catalog or custom) with abilityOptions. */
+  abilityChoice?: string;
+}
+export interface RemoveAdvancementOperation {
+  type: "removeAdvancement";
+  entryId: string;
+}
+export type AdvancementOperation =
+  | TakeAsiOperation
+  | TakeFeatOperation
+  | RemoveAdvancementOperation;
 
 // ── XP operation types (mirrors backend/src/lib/experience-ops.ts) ──────────
 // Sent as `{ operations: ExperienceOperation[] }` to POST /api/characters/:id/experience.

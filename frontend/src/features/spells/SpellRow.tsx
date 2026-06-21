@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 
+import { abilityLabel } from "@/lib/abilities";
 import type { Spell } from "@/types/character";
 import Badge from "@/components/ui/Badge";
 
@@ -187,7 +188,7 @@ export default function SpellRow({
           </p>
           {spell.attackType && (
             <p className="text-xs text-parchment-500">
-              {spell.attackType === "attack" ? "Ranged/melee spell attack" : `${spell.saveAbility ?? "—"} saving throw`}
+              {spell.attackType === "attack" ? "Ranged/melee spell attack" : `${spell.saveAbility ? abilityLabel(spell.saveAbility) : "—"} saving throw`}
             </p>
           )}
           {spell.upcastDicePerLevel && (

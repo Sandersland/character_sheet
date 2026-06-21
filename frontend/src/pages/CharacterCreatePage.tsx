@@ -7,7 +7,7 @@ import BackendStatus from "@/features/character-meta/BackendStatus";
 import Card from "@/components/ui/Card";
 import StartingEquipmentEditor from "@/features/inventory/StartingEquipmentEditor";
 import { draftToInput, emptyPackageState } from "@/lib/startingEquipment";
-import { abilityModifier, formatModifier, SKILL_LABELS } from "@/lib/abilities";
+import { abilityModifier, formatModifier, skillLabel } from "@/lib/abilities";
 import type { Item, SkillName } from "@/types/character";
 import { useCharacterDraft } from "@/hooks/useCharacterDraft";
 import { useReferenceData } from "@/hooks/useReferenceData";
@@ -378,7 +378,7 @@ export default function CharacterCreatePage() {
                   <>
                     {grantedSkills.length > 0 && (
                       <p className="text-xs text-parchment-600">
-                        Granted by background: {grantedSkills.map((s) => SKILL_LABELS[s]).join(", ")}
+                        Granted by background: {grantedSkills.map((s) => skillLabel(s)).join(", ")}
                       </p>
                     )}
                     <p className="text-xs font-semibold text-parchment-600">
@@ -399,7 +399,7 @@ export default function CharacterCreatePage() {
                               selectedClassChoices.length >= maxClassChoices
                             }
                           />
-                          {SKILL_LABELS[skill]}
+                          {skillLabel(skill)}
                         </label>
                       ))}
                     </div>

@@ -52,7 +52,8 @@ activityRouter.get("/characters/:id/activity", async (req, res) => {
             | "currency"
             | "spellcasting"
             | "class"
-            | "resources",
+            | "resources"
+            | "advancement",
         }
       : {}),
     ...(entityId ? { entityId } : {}),
@@ -217,6 +218,20 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
               subclassId: (before.subclassId as string | null) ?? null,
               subclass: (before.subclass as string | null) ?? null,
             },
+          });
+        }
+      } else if (category === "advancement") {
+        // Restore ability scores, hit points, initiative, and resources from
+        // before snapshot — all four columns that advancement ops mutate.
+        const updateData: Record<string, unknown> = {};
+        if (before.abilityScores !== undefined) updateData.abilityScores = before.abilityScores;
+        if (before.hitPoints !== undefined) updateData.hitPoints = before.hitPoints;
+        if (before.initiativeBonus !== undefined) updateData.initiativeBonus = before.initiativeBonus;
+        if (before.resources !== undefined) updateData.resources = before.resources;
+        if (Object.keys(updateData).length > 0) {
+          await tx.character.update({
+            where: { id: character.id },
+            data: updateData as Prisma.CharacterUpdateInput,
           });
         }
       }

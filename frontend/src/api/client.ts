@@ -1,4 +1,6 @@
 import type {
+  AdvancementOperation,
+  CatalogFeat,
   CatalogManeuver,
   CatalogSpell,
   Character,
@@ -259,6 +261,34 @@ export async function applyClassTransactions(
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     throw new Error(body?.error ?? `Failed to apply class operations (${response.status})`);
+  }
+  return response.json();
+}
+
+// Feeds the advancement section's feat picker — same role as fetchManeuvers.
+// Ordered alphabetically server-side.
+export async function fetchFeats(): Promise<CatalogFeat[]> {
+  const response = await fetch(`${API_URL}/feats`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch feat catalog (${response.status})`);
+  }
+  return response.json();
+}
+
+// Applies advancement operations (takeAsi / takeFeat / removeAdvancement).
+// Returns the full updated Character on success.
+export async function applyAdvancementTransactions(
+  characterId: string,
+  operations: AdvancementOperation[]
+): Promise<Character> {
+  const response = await fetch(`${API_URL}/characters/${characterId}/advancement/transactions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ operations }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to apply advancement operations (${response.status})`);
   }
   return response.json();
 }

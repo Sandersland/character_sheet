@@ -4,7 +4,7 @@ import { Prisma } from "../generated/prisma/client.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
-import { abilityModifier, deriveResources, hitDieFace } from "./srd.js";
+import { abilityModifier, advancementSlotsForLevel, deriveFeatBonuses, deriveResources, hitDieFace } from "./srd.js";
 import { normalizeResourcesMutable, serializeResourcesState } from "./resources.js";
 import { normalizeSpellcastingMutable } from "./spellcasting.js";
 
@@ -240,10 +240,25 @@ export async function applyHitPointOperations(
       const conMod = abilityModifier(abilityScores.constitution ?? 10);
       const faces = hitDieFace(hd.die);
 
+      const primaryEntry = row.classEntries[0];
+
+      // Compute the effective HP maximum including feat improvements (e.g. Tough).
+      // This is a read-time overlay — hp.max itself stays the feat-free base so
+      // the value written back to the DB never includes the feat bonus.
+      // Use the in-cap advancements slice so over-cap feats are automatically excluded.
+      const advStateForFeat = normalizeResourcesMutable(row.resources);
+      const featSlotCap = advancementSlotsForLevel(
+        primaryEntry?.name ?? "",
+        levelForExperience(row.experiencePoints),
+      );
+      const featBonus = deriveFeatBonuses(advStateForFeat.advancements.slice(0, featSlotCap), hd.total);
+      // effMax is used for all clamp/ceiling operations instead of hp.max.
+      // hp.max is the stored (feat-free) base and is what gets persisted.
+      const effMax = hp.max + featBonus.maxHp;
+
       // Snapshot the full sub-state before this op so the event can show
       // both before/after and the per-field diffs. For levelUp, include the
       // class-entry level since the op mutates that too.
-      const primaryEntry = row.classEntries[0];
       const beforeHp = { ...hp };
       const beforeHd = { ...hd };
       const beforeClassLevel = primaryEntry?.level ?? null;
@@ -275,7 +290,7 @@ export async function applyHitPointOperations(
           if (hp.current === 0) {
             hp.deathSaves = { successes: 0, failures: 0 };
           }
-          hp.current = Math.min(hp.max, hp.current + op.amount);
+          hp.current = Math.min(effMax, hp.current + op.amount);
           eventData = { amount: op.amount };
           summary = `Healed ${op.amount} HP (${beforeHp.current} → ${hp.current} HP)`;
           break;
@@ -306,7 +321,7 @@ export async function applyHitPointOperations(
             );
           }
           const totalGain = op.rolls.reduce((sum, roll) => sum + hitDieHeal(roll, conMod), 0);
-          hp.current = Math.min(hp.max, hp.current + totalGain);
+          hp.current = Math.min(effMax, hp.current + totalGain);
           hd.spent += spending;
 
           // Reset subclass resources that recharge on short or short-or-long rest
@@ -362,7 +377,7 @@ export async function applyHitPointOperations(
 
         case "longRest": {
           const prevCurrent = hp.current;
-          hp.current = hp.max;
+          hp.current = effMax;
           hp.temp = 0;
           hp.deathSaves = { successes: 0, failures: 0 };
           // Recover hit dice equal to half your total (round down, min 1).
@@ -404,7 +419,7 @@ export async function applyHitPointOperations(
             }
           }
 
-          const hpRestored = hp.max - prevCurrent;
+          const hpRestored = effMax - prevCurrent;
           eventData = { recovered, hpRestored, slotsRestored, resourcesRestored };
           const parts: string[] = [];
           if (hpRestored > 0) parts.push(`+${hpRestored} HP`);

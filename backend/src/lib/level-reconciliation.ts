@@ -33,10 +33,13 @@ import { logEvent } from "./events.js";
 import {
   normalizeResourcesMutable,
   serializeResourcesState,
+  type AdvancementEntry,
   type ManeuverEntry,
   type ToolProfEntry,
 } from "./resources.js";
-import { deriveResources } from "./srd.js";
+import { advancementSlotsForLevel, deriveResources } from "./srd.js";
+import { reverseAdvancementEffects } from "./advancement.js";
+import { normalizeHitPoints } from "./hitpoints.js";
 
 // ── Reconcile context ─────────────────────────────────────────────────────────
 
@@ -275,6 +278,130 @@ async function reconcileToolProficiencies(ctx: ReconcileContext): Promise<void> 
   });
 }
 
+// ── reconcileAdvancements ─────────────────────────────────────────────────────
+// Reverses the tail of advancements[] when the XP-derived level has fallen
+// below the level required for those slots (i.e. character leveled down past
+// an ASI level). Uses LIFO: the most-recently-taken advancements are removed
+// first. Reversal subtracts the stored deltas from abilityScores, hitPoints,
+// and initiativeBonus rather than recomputing — ensuring exactness even if
+// other ops have changed these columns since.
+//
+// Order-independent of reconcileSubclass/Maneuvers — ASI slots are class-level-
+// gated, not subclass-gated, so they can safely run last.
+//
+// Uses `advancement` category events so the undo branch in activity.ts restores
+// abilityScores + hitPoints + initiativeBonus + resources in one shot.
+
+async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
+  const { tx, characterId, newDerivedLevel, batchId } = ctx;
+
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: {
+      resources: true,
+      abilityScores: true,
+      hitPoints: true,
+      hitDice: true,
+      initiativeBonus: true,
+      classEntries: {
+        orderBy: { position: "asc" as const },
+        take: 1,
+        select: { name: true },
+      },
+    },
+  });
+  if (!row) return;
+
+  const state = normalizeResourcesMutable(row.resources);
+  if (state.advancements.length === 0) return; // nothing to trim
+
+  const className = row.classEntries[0]?.name ?? "";
+  const allowed = advancementSlotsForLevel(className, newDerivedLevel);
+
+  if (state.advancements.length <= allowed) return; // within cap
+
+  const scores = row.abilityScores as Record<string, number>;
+  const hp = normalizeHitPoints(row.hitPoints);
+  const initBonus = row.initiativeBonus;
+
+  // Snapshot before (for undo).
+  const before = {
+    abilityScores: { ...scores },
+    hitPoints: { ...hp, deathSaves: { ...hp.deathSaves } },
+    initiativeBonus: initBonus,
+    resources: {
+      used: { ...state.used },
+      maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+      toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
+      advancements: state.advancements.map((a: AdvancementEntry) => ({
+        ...a,
+        abilityDeltas: { ...a.abilityDeltas },
+      })),
+    },
+  };
+
+  // LIFO: reverse the tail entries (those beyond the new cap).
+  const toRemove = state.advancements.slice(allowed);
+  const removedCount = toRemove.length;
+
+  const reversed = reverseAdvancementEffects(scores, hp, initBonus, toRemove);
+  state.advancements = state.advancements.slice(0, allowed);
+
+  const newHp = {
+    ...reversed.hitPoints,
+    current: Math.min(reversed.hitPoints.current, reversed.hitPoints.max),
+  };
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: {
+      abilityScores: reversed.scores as Prisma.InputJsonValue,
+      hitPoints: newHp as Prisma.InputJsonValue,
+      initiativeBonus: reversed.initiativeBonus,
+      resources: serializeResourcesState(state),
+    },
+  });
+
+  const after = {
+    abilityScores: { ...reversed.scores },
+    hitPoints: { ...newHp, deathSaves: { ...newHp.deathSaves } },
+    initiativeBonus: reversed.initiativeBonus,
+    resources: {
+      used: { ...state.used },
+      maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+      toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
+      advancements: state.advancements.map((a: AdvancementEntry) => ({
+        ...a,
+        abilityDeltas: { ...a.abilityDeltas },
+      })),
+    },
+  };
+
+  const removedLabels = toRemove
+    .map((a) =>
+      a.kind === "feat"
+        ? (a.featName ?? "Custom feat")
+        : Object.entries(a.abilityDeltas)
+            .map(([ab, d]) => `${ab} +${d}`)
+            .join(", "),
+    )
+    .join("; ");
+
+  await logEvent(tx, {
+    characterId,
+    category: "advancement",
+    type: "advancementsReconciled",
+    summary:
+      allowed === 0
+        ? `${removedCount} advancement${removedCount > 1 ? "s" : ""} removed — level dropped below first ASI level`
+        : `${removedCount} advancement${removedCount > 1 ? "s" : ""} removed — level cap reduced to ${allowed} (removed: ${removedLabels})`,
+    before,
+    after,
+    data: { removedCount, allowed },
+    batchId,
+  });
+}
+
 // ── Registry + orchestrator ───────────────────────────────────────────────────
 
 /**
@@ -285,6 +412,7 @@ const LEVEL_GATED_RECONCILERS: Reconciler[] = [
   reconcileSubclass,
   reconcileManeuvers,
   reconcileToolProficiencies,
+  reconcileAdvancements,
 ];
 
 /**

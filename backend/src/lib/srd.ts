@@ -6,6 +6,8 @@
 // ability mapping from its own existing frontend/src/lib/abilities.ts
 // SKILL_LABELS (display-only, no rules logic).
 
+import type { AdvancementEntry } from "./resources.js";
+
 export const ALIGNMENTS: readonly string[] = [
   "Lawful Good",
   "Neutral Good",
@@ -2572,6 +2574,27 @@ export function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
 }
 
+// ── Ability Score Improvement / Feat slot table ───────────────────────────────
+// Per 5e PHB: most classes get ASI slots at levels 4, 8, 12, 16, 19.
+// Fighter gets two extras (levels 6 and 14); Rogue gets one extra (level 10).
+// Returns the *total* number of slots the character has earned at `level`.
+
+const BASE_ASI_LEVELS = [4, 8, 12, 16, 19];
+const EXTRA_ASI_LEVELS: Record<string, number[]> = {
+  fighter: [6, 14],
+  rogue:   [10],
+};
+
+/**
+ * Returns the cumulative number of Ability Score Improvement / Feat slots
+ * the character has earned at `level`. Homebrew / unknown classes fall back
+ * to the base 5-slot schedule.
+ */
+export function advancementSlotsForLevel(className: string, level: number): number {
+  const extra = EXTRA_ASI_LEVELS[className.toLowerCase()] ?? [];
+  return [...BASE_ASI_LEVELS, ...extra].filter((l) => level >= l).length;
+}
+
 /** Parses a hit die string like "d8" into its face value (8). */
 export function hitDieFace(hitDie: string): number {
   return Number(hitDie.replace(/^d/i, ""));
@@ -3302,4 +3325,100 @@ export function deriveCreatedCharacter(
     spellcasting: null,
     journal: [],
   };
+}
+
+// ── Feat improvement targets ──────────────────────────────────────────────────
+
+/**
+ * Numeric stat targets: summed by deriveFeatBonuses and applied as additive
+ * bonuses in serializeCharacter. Adding a target here + a new apply site in
+ * serializeCharacter is all that's needed to support it for catalog and custom feats.
+ */
+export const NUMERIC_FEAT_IMPROVEMENT_TARGETS = [
+  "initiative",
+  "speed",
+  "armorClass",
+  "maxHp",
+] as const;
+
+export type NumericFeatImprovementTarget = (typeof NUMERIC_FEAT_IMPROVEMENT_TARGETS)[number];
+
+/**
+ * Proficiency targets: keyed improvements (imp.key = skill name or ability name).
+ * Applied by deriveFeatProficiencies rather than deriveFeatBonuses.
+ */
+export const PROFICIENCY_FEAT_IMPROVEMENT_TARGETS = [
+  "skillProficiency",
+  "savingThrowProficiency",
+] as const;
+
+export type ProficiencyFeatImprovementTarget = (typeof PROFICIENCY_FEAT_IMPROVEMENT_TARGETS)[number];
+
+/**
+ * All valid FeatImprovement.target values. Used for route-level Zod validation.
+ * Adding a new target here + wiring it in serializeCharacter is all that's needed.
+ */
+export const FEAT_IMPROVEMENT_TARGETS = [
+  ...NUMERIC_FEAT_IMPROVEMENT_TARGETS,
+  ...PROFICIENCY_FEAT_IMPROVEMENT_TARGETS,
+] as const;
+
+export type FeatImprovementTarget = (typeof FEAT_IMPROVEMENT_TARGETS)[number];
+
+/**
+ * Sums all numeric feat improvement bonuses across a set of advancements.
+ * `appliedLevel` is hitDice.total (the number of explicit level-ups applied),
+ * used to scale perLevel bonuses (e.g. Tough = +2 per applied level).
+ *
+ * Callers pass the **already-clamped** (in-cap) advancements slice so
+ * over-cap feats are automatically excluded — no reversal logic needed.
+ *
+ * Proficiency targets (skillProficiency, savingThrowProficiency) fall through
+ * the `if (!(target in totals)) continue` guard — handled by deriveFeatProficiencies.
+ */
+export function deriveFeatBonuses(
+  advancements: AdvancementEntry[],
+  appliedLevel: number,
+): Record<NumericFeatImprovementTarget, number> {
+  const totals: Record<NumericFeatImprovementTarget, number> = {
+    initiative: 0,
+    speed: 0,
+    armorClass: 0,
+    maxHp: 0,
+  };
+
+  for (const entry of advancements) {
+    for (const imp of (entry.improvements ?? [])) {
+      const target = imp.target as NumericFeatImprovementTarget;
+      if (!(target in totals)) continue; // unknown / proficiency target — skip gracefully
+      totals[target] += imp.perLevel ? imp.amount * appliedLevel : imp.amount;
+    }
+  }
+
+  return totals;
+}
+
+/**
+ * Collects proficiency grants from feat improvements across a set of advancements.
+ * Returns two sets:
+ *   - `skills`:       camelCase skill keys (e.g. "athletics", "animalHandling") where `target === "skillProficiency"`
+ *   - `savingThrows`: ability names (e.g. "strength") where `target === "savingThrowProficiency"`
+ *
+ * Callers pass the **already-clamped** slice so over-cap feats are excluded automatically.
+ */
+export function deriveFeatProficiencies(
+  advancements: AdvancementEntry[],
+): { skills: Set<string>; savingThrows: Set<string> } {
+  const skills = new Set<string>();
+  const savingThrows = new Set<string>();
+
+  for (const entry of advancements) {
+    for (const imp of (entry.improvements ?? [])) {
+      if (!imp.key) continue;
+      if (imp.target === "skillProficiency") skills.add(imp.key);
+      else if (imp.target === "savingThrowProficiency") savingThrows.add(imp.key);
+    }
+  }
+
+  return { skills, savingThrows };
 }

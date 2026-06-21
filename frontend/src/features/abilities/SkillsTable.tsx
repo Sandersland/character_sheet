@@ -1,4 +1,4 @@
-import { SKILL_LABELS, abilityModifier, formatModifier, skillBonus } from "@/lib/abilities";
+import { abilityAbbr, abilityModifier, formatModifier, skillBonus, skillLabel } from "@/lib/abilities";
 import type { AbilityScores, Skill } from "@/types/character";
 
 interface SkillsTableProps {
@@ -6,15 +6,6 @@ interface SkillsTableProps {
   abilityScores: AbilityScores;
   proficiencyBonus: number;
 }
-
-const ABILITY_ABBR: Record<string, string> = {
-  strength: "STR",
-  dexterity: "DEX",
-  constitution: "CON",
-  intelligence: "INT",
-  wisdom: "WIS",
-  charisma: "CHA",
-};
 
 /**
  * Skills as a condensed table (components.md: "Condensed trades comfort
@@ -29,7 +20,7 @@ export default function SkillsTable({
   proficiencyBonus,
 }: SkillsTableProps) {
   const sorted = [...skills].sort((a, b) =>
-    SKILL_LABELS[a.name].localeCompare(SKILL_LABELS[b.name])
+    skillLabel(a.name).localeCompare(skillLabel(b.name))
   );
 
   return (
@@ -86,7 +77,7 @@ export default function SkillsTable({
                     : "text-parchment-600"
                 }`}
               >
-                {SKILL_LABELS[skill.name]}
+                {skillLabel(skill.name)}
                 {skill.expertise && (
                   <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-gold-700">
                     Expertise
@@ -94,7 +85,7 @@ export default function SkillsTable({
                 )}
               </td>
               <td className="py-1.5 text-xs text-parchment-400">
-                {ABILITY_ABBR[skill.ability]}{" "}
+                {abilityAbbr(skill.ability)}{" "}
                 <span className="tabular-nums">
                   ({formatModifier(abilityModifier(score))})
                 </span>

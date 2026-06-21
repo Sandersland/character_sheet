@@ -35,6 +35,8 @@ const mockCharacter: Character = {
   toolProficiencies: [],
   inventory: [],
   currency: { cp: 0, sp: 0, gp: 25, pp: 0 },
+  advancements: [],
+  advancementSlots: { total: 1, used: 0 },
   journal: [],
 };
 

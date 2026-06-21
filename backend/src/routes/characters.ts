@@ -16,7 +16,10 @@ import { prisma } from "../lib/prisma.js";
 import { normalizeHitDice, normalizeHitPoints } from "../lib/hitpoints.js";
 import {
   ALIGNMENTS,
+  advancementSlotsForLevel,
   deriveCreatedCharacter,
+  deriveFeatBonuses,
+  deriveFeatProficiencies,
   deriveResources,
   deriveSpellcasting,
   isKnownTool,
@@ -26,6 +29,7 @@ import {
   type ToolProficiencyEntry,
 } from "../lib/srd.js";
 import { normalizeResourcesMutable, type ToolProfEntry } from "../lib/resources.js";
+import { reverseAdvancementEffects } from "../lib/advancement.js";
 import { normalizeSpellcastingMutable } from "../lib/spellcasting.js";
 
 export const charactersRouter = Router();
@@ -134,7 +138,7 @@ function buildMergedToolProficiencies(
 export function serializeCharacter(row: CharacterWithRelations) {
   const progress = experienceProgress(row.experiencePoints);
   const primaryClass = row.classEntries[0];
-  const hitPoints = normalizeHitPoints(row.hitPoints);
+  let hitPoints = normalizeHitPoints(row.hitPoints);
   const hitDice = normalizeHitDice(row.hitDice);
 
   // Derive spellcasting stats at read time (ability, DC, attack, slot totals)
@@ -214,6 +218,45 @@ export function serializeCharacter(row: CharacterWithRelations) {
     };
   }
 
+  // ── Advancement clamp-on-read ─────────────────────────────────────────────
+  // Mirrors the reconcile-on-write in level-reconciliation.ts: if the stored
+  // advancements array exceeds the level-derived slot count (e.g. the character
+  // hasn't had a reconciling XP op since leveling down), cap the displayed
+  // values and derive effective ability scores / HP / initiative from the
+  // clamped list. This ensures the sheet always reflects a valid state.
+  const storedForAdv = normalizeResourcesMutable(row.resources);
+  const advSlotTotal = advancementSlotsForLevel(primaryClass?.name ?? "", progress.level);
+  let effectiveScores = row.abilityScores as Record<string, number>;
+  let effectiveInitBonus = row.initiativeBonus;
+  const clampedAdvancements = storedForAdv.advancements.slice(0, advSlotTotal);
+
+  if (clampedAdvancements.length < storedForAdv.advancements.length) {
+    // Some advancements are beyond the cap — reverse the excess ones to compute
+    // effective display values (without writing; reconcile-on-write handles that).
+    const excess = storedForAdv.advancements.slice(advSlotTotal);
+    const reversed = reverseAdvancementEffects(
+      effectiveScores,
+      hitPoints,
+      effectiveInitBonus,
+      excess,
+    );
+    effectiveScores = reversed.scores;
+    hitPoints = reversed.hitPoints;
+    effectiveInitBonus = reversed.initiativeBonus;
+  }
+
+  // ── Feat improvement modifier layer ───────────────────────────────────────
+  // Sum structured feat improvements over the in-cap advancements. Because
+  // clampedAdvancements already excludes over-cap feats, level-down behavior
+  // is automatic — no separate reversal code needed.
+  // perLevel bonuses (e.g. Tough) scale with hitDice.total (applied level).
+  const featBonuses = deriveFeatBonuses(clampedAdvancements, hitDice.total);
+  const effectiveMaxHp = hitPoints.max + featBonuses.maxHp;
+
+  // Proficiency grants from feats (skills + saving throws). Merged with stored
+  // proficiencies below using OR — existing proficiency is never removed.
+  const featProficiencies = deriveFeatProficiencies(clampedAdvancements);
+
   return {
     id: row.id,
     name: row.name,
@@ -226,9 +269,9 @@ export function serializeCharacter(row: CharacterWithRelations) {
     alignment: row.alignment,
     portraitUrl: row.portraitUrl ?? undefined,
 
-    armorClass: row.armorClass,
-    initiativeBonus: row.initiativeBonus,
-    speed: row.speed,
+    armorClass: row.armorClass + featBonuses.armorClass,
+    initiativeBonus: effectiveInitBonus + featBonuses.initiative,
+    speed: row.speed + featBonuses.speed,
     proficiencyBonus: progress.proficiencyBonus,
 
     experiencePoints: row.experiencePoints,
@@ -239,11 +282,28 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // up" via the /hp endpoint). The UI shows a "Level up" button when > 0.
     pendingLevelUps: Math.max(0, progress.level - hitDice.total),
 
-    hitPoints,
+    hitPoints: {
+      ...hitPoints,
+      max: effectiveMaxHp,
+      // Don't let current exceed effective max (e.g. if Tough was removed
+      // and the character hasn't spent HP yet).
+      current: Math.min(hitPoints.current, effectiveMaxHp),
+    },
     hitDice,
-    abilityScores: row.abilityScores,
-    savingThrowProficiencies: row.savingThrowProficiencies,
-    skills: row.skills,
+    abilityScores: effectiveScores,
+    // Merge feat-granted saving throw proficiencies (OR with class-fixed stored set;
+    // deduped via Set round-trip).
+    savingThrowProficiencies: featProficiencies.savingThrows.size > 0
+      ? [...new Set([...row.savingThrowProficiencies, ...featProficiencies.savingThrows])]
+      : row.savingThrowProficiencies,
+    // Merge feat-granted skill proficiencies: proficient stays true if already true;
+    // feat grants can only add proficiency, never remove it.
+    skills: featProficiencies.skills.size > 0
+      ? (row.skills as { name: string; ability: string; proficient: boolean }[]).map((s) => ({
+          ...s,
+          proficient: s.proficient || featProficiencies.skills.has(s.name),
+        }))
+      : row.skills,
     // Merged tool proficiency list — creation-fixed entries (stored in
     // Character.toolProficiencies) + level-gated subclass choices (from
     // resources.toolProficienciesKnown, already clamped above).
@@ -258,6 +318,15 @@ export function serializeCharacter(row: CharacterWithRelations) {
     currency: row.currency,
     spellcasting,
     resources,
+
+    // Advancements (ASI + feats) — top-level so every class sees them,
+    // independent of whether deriveResources returns a non-null value.
+    advancements: clampedAdvancements,
+    advancementSlots: {
+      total: advSlotTotal,
+      used: clampedAdvancements.length,
+    },
+
     journal: row.journal,
 
     // Structured, multiclass-aware view alongside the flattened

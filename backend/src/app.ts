@@ -2,9 +2,11 @@ import cors from "cors";
 import express from "express";
 
 import { activityRouter } from "./routes/activity.js";
+import { advancementRouter } from "./routes/advancement.js";
 import { classRouter } from "./routes/class.js";
 import { charactersRouter } from "./routes/characters.js";
 import { experienceRouter } from "./routes/experience.js";
+import { featsRouter } from "./routes/feats.js";
 import { healthRouter } from "./routes/health.js";
 import { hitPointsRouter } from "./routes/hitpoints.js";
 import { inventoryRouter } from "./routes/inventory.js";
@@ -34,6 +36,8 @@ export function createApp() {
   app.use("/api", resourcesRouter);
   app.use("/api", classRouter);
   app.use("/api", maneuversRouter);
+  app.use("/api", featsRouter);
+  app.use("/api", advancementRouter);
 
   return app;
 }
