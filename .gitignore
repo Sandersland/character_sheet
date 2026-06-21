@@ -5,3 +5,10 @@ build/
 *.log
 .DS_Store
 backend/src/generated/
+
+# Playwright / verify-tool artifacts
+.playwright-mcp/
+page-*.png
+test-results/
+playwright-report/
+driver.mjs
