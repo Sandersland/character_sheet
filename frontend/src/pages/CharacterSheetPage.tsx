@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import AbilityScoreBox from "@/features/abilities/AbilityScoreBox";
+import RollResultToast from "@/features/dice/RollResultToast";
+import { RollProvider } from "@/features/dice/RollContext";
 import ActivityModal from "@/features/character-meta/ActivityModal";
 import AdvancementSection from "@/features/advancement/AdvancementSection";
 import BackendStatus from "@/features/character-meta/BackendStatus";
@@ -81,6 +83,7 @@ export default function CharacterSheetPage() {
   ][];
 
   return (
+    <RollProvider>
     <div className="min-h-screen bg-parchment-100">
       <header className="border-b border-parchment-200 bg-parchment-50">
         <div className="mx-auto flex max-w-6xl flex-wrap items-start justify-between gap-4 px-6 py-5">
@@ -171,6 +174,7 @@ export default function CharacterSheetPage() {
                 saveProficient={character.savingThrowProficiencies.includes(
                   key
                 )}
+                proficiencyBonus={character.proficiencyBonus}
               />
             ))}
           </div>
@@ -250,6 +254,8 @@ export default function CharacterSheetPage() {
           </Card>
         )}
       </main>
+      <RollResultToast />
     </div>
+    </RollProvider>
   );
 }

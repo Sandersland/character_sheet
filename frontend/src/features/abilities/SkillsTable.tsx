@@ -1,4 +1,5 @@
 import { abilityAbbr, abilityModifier, formatModifier, skillBonus, skillLabel } from "@/lib/abilities";
+import RollButton from "@/features/dice/RollButton";
 import type { AbilityScores, Skill } from "@/types/character";
 
 interface SkillsTableProps {
@@ -91,7 +92,13 @@ export default function SkillsTable({
                 </span>
               </td>
               <td className="py-1.5 pr-4 text-right tabular-nums font-semibold text-parchment-900">
-                {formatModifier(bonus)}
+                <RollButton
+                  spec={{ count: 1, faces: 20, modifier: bonus }}
+                  label={`${skillLabel(skill.name)} check`}
+                  className="-m-0.5 inline-flex p-0.5"
+                >
+                  {formatModifier(bonus)}
+                </RollButton>
               </td>
             </tr>
           );

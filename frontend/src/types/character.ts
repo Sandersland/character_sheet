@@ -89,6 +89,12 @@ export interface WeaponDetail {
   weaponClass?: WeaponClass;
   /** Melee vs. ranged; undefined for unclassified homebrew weapons. */
   weaponRange?: WeaponRange;
+  /**
+   * Attack bonus = ability modifier (STR/DEX/finesse-best) + proficiency bonus
+   * if proficient. Derived server-side in `serializeCharacter` — never persisted.
+   * Present on `InventoryItem.weapon`; absent on catalog `Item.weapon`.
+   */
+  attackBonus?: number;
 }
 
 /** Armor-specific mechanics (shields included), present only on `category: "armor"`. */

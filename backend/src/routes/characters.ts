@@ -22,6 +22,7 @@ import {
   deriveFeatBonuses,
   deriveFeatProficiencies,
   deriveSpellcasting,
+  deriveWeaponAttackBonus,
   isKnownTool,
   RACE_PROFICIENCY_GRANTS,
   TOOLS,
@@ -86,7 +87,38 @@ function serializeCharacterSummary(row: {
 // `consumable` sub-objects via the shared lib/itemDetail.js serializers
 // (also used by routes/items.ts for the catalog) rather than flattening
 // back out — `id`/the owning FK aren't meaningful to the client.
-function serializeInventoryItem(row: CharacterWithRelations["inventoryItems"][number]) {
+
+interface InventoryItemContext {
+  /** The character's effective ability scores (post-advancement-clamp). */
+  effectiveScores: Record<string, number>;
+  /** The character's proficiency bonus (derived from level). */
+  proficiencyBonus: number;
+  /** The character's merged weapon proficiency grants (class + race + feat). */
+  weaponGrants: ReadonlyArray<{ name: string }>;
+}
+
+function serializeInventoryItem(
+  row: CharacterWithRelations["inventoryItems"][number],
+  context: InventoryItemContext,
+) {
+  let weapon: (ReturnType<typeof serializeWeaponDetail> & { attackBonus: number }) | undefined;
+  if (row.weaponDetail) {
+    weapon = {
+      ...serializeWeaponDetail(row.weaponDetail),
+      attackBonus: deriveWeaponAttackBonus(
+        {
+          name: row.name,
+          finesse: row.weaponDetail.finesse,
+          weaponClass: row.weaponDetail.weaponClass,
+          weaponRange: row.weaponDetail.weaponRange,
+        },
+        context.effectiveScores,
+        context.proficiencyBonus,
+        context.weaponGrants,
+      ),
+    };
+  }
+
   return {
     id: row.id,
     itemId: row.itemId ?? undefined,
@@ -98,7 +130,7 @@ function serializeInventoryItem(row: CharacterWithRelations["inventoryItems"][nu
     description: row.description ?? undefined,
     equipped: row.equipped,
     notes: row.notes ?? undefined,
-    weapon: row.weaponDetail ? serializeWeaponDetail(row.weaponDetail) : undefined,
+    weapon,
     armor: row.armorDetail ? serializeArmorDetail(row.armorDetail) : undefined,
     consumable: row.consumableDetail ? serializeConsumableDetail(row.consumableDetail) : undefined,
   };
@@ -326,6 +358,20 @@ export function serializeCharacter(row: CharacterWithRelations) {
   // proficiencies below using OR — existing proficiency is never removed.
   const featProficiencies = deriveFeatProficiencies(clampedAdvancements);
 
+  // Pre-compute weapon proficiency grants so they can be reused both in the
+  // inventory serialisation (attack-bonus derivation) and the wire response.
+  const weaponGrants = buildMergedWeaponProficiencies(
+    row.classEntries,
+    row.raceSelection?.name,
+    featProficiencies.weapons,
+  );
+
+  const inventoryContext: InventoryItemContext = {
+    effectiveScores,
+    proficiencyBonus: progress.proficiencyBonus,
+    weaponGrants,
+  };
+
   return {
     id: row.id,
     name: row.name,
@@ -393,12 +439,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
       row.raceSelection?.name,
       featProficiencies.armor,
     ),
-    weaponProficiencies: buildMergedWeaponProficiencies(
-      row.classEntries,
-      row.raceSelection?.name,
-      featProficiencies.weapons,
-    ),
-    inventory: row.inventoryItems.map(serializeInventoryItem),
+    weaponProficiencies: weaponGrants,
+    inventory: row.inventoryItems.map((item) => serializeInventoryItem(item, inventoryContext)),
     currency: row.currency,
     spellcasting,
     resources,
