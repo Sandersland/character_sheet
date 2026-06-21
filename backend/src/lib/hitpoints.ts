@@ -654,3 +654,58 @@ export async function applyHealInTx(
     sessionId,
   });
 }
+
+/**
+ * Apply damage to a character's HP inside an existing transaction, mirroring
+ * the `case "damage"` branch of applyHitPointOperations.
+ *
+ * Exported so the spellcasting orchestrator (lib/spellcasting.ts) can compose a
+ * "cast self-targeted damage spell + take damage" pair into one atomic
+ * $transaction without nesting. Keep the damage logic in sync with the
+ * `case "damage"` branch above (temp-HP absorption, floor at 0).
+ */
+export async function applyDamageInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  amount: number,
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  if (amount <= 0) {
+    throw new InvalidHitPointOperationError("damage amount must be positive");
+  }
+
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: { hitPoints: true, hitDice: true },
+  });
+  if (!row) {
+    throw new InvalidHitPointOperationError(`Character not found: ${characterId}`);
+  }
+
+  const hp = normalizeHitPoints(row.hitPoints);
+  const hd = normalizeHitDice(row.hitDice);
+  const beforeHp = { ...hp };
+
+  // Temp HP absorbs first, then current. Both floor at 0.
+  const absorbed = Math.min(hp.temp, amount);
+  hp.temp -= absorbed;
+  hp.current = Math.max(0, hp.current - (amount - absorbed));
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: { hitPoints: hp as unknown as Prisma.InputJsonValue },
+  });
+
+  await logEvent(tx, {
+    characterId,
+    category: "hitPoints",
+    type: "damage",
+    summary: `Took ${amount} damage (${beforeHp.current} → ${hp.current} HP)`,
+    before: { hitPoints: beforeHp, hitDice: { ...hd } },
+    after: { hitPoints: { ...hp }, hitDice: { ...hd } },
+    data: { amount },
+    batchId,
+    sessionId,
+  });
+}

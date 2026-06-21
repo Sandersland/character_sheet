@@ -365,6 +365,14 @@ export type SpellSchool =
   | "necromancy"
   | "transmutation";
 
+/** Spell verbal/somatic/material component flags + optional material text. */
+export interface SpellComponents {
+  verbal: boolean;
+  somatic: boolean;
+  material: boolean;
+  materialDescription?: string;
+}
+
 /**
  * A spell entry in the character's spellcasting JSON (per-character mutable
  * state). `id` is the per-character entry UUID (operation target); `spellId`
@@ -385,6 +393,8 @@ export interface Spell {
   description: string;
   concentration?: boolean;
   ritual?: boolean;
+  components?: SpellComponents | null;
+  saveEffect?: "half" | "none" | null;
   // Structured effect for auto-rolling at cast time (RollSpec-shaped):
   effectKind?: "damage" | "heal" | null;
   effectDiceCount?: number | null;
@@ -415,6 +425,8 @@ export interface CatalogSpell {
   concentration: boolean;
   ritual: boolean;
   classes: string[];
+  components?: SpellComponents | null;
+  saveEffect?: "half" | "none" | null;
   effectKind?: "damage" | "heal";
   effectDiceCount?: number;
   effectDiceFaces?: number;
@@ -914,6 +926,8 @@ export interface CustomSpellInput {
   description: string;
   concentration?: boolean;
   ritual?: boolean;
+  components?: SpellComponents;
+  saveEffect?: "half" | "none";
   effectKind?: "damage" | "heal";
   effectDiceCount?: number;
   effectDiceFaces?: number;
@@ -925,8 +939,19 @@ export interface CustomSpellInput {
   cantripScaling?: boolean;
 }
 
-/** Cast a spell: expend slot (if leveled), send client-computed roll total. */
-export interface CastSpellOperation { type: "castSpell"; entryId: string; slotLevel?: number; roll: number }
+/**
+ * Cast a spell: expend slot (if leveled), send client-computed roll total.
+ * `apply` optionally applies the rolled effect to the caster's own HP in the
+ * same atomic batch — used when the player targets themselves (heal or, rarely,
+ * self-damage). Omitted when targeting others (no enemy entities exist).
+ */
+export interface CastSpellOperation {
+  type: "castSpell";
+  entryId: string;
+  slotLevel?: number;
+  roll: number;
+  apply?: { target: "self"; kind: "heal" | "damage"; amount: number };
+}
 /** Bare slot expenditure (no specific spell). */
 export interface ExpendSlotOperation { type: "expendSlot"; level: number }
 /** Restore one previously-expended slot (undo mis-click). */

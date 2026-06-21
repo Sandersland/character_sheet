@@ -98,10 +98,6 @@ export interface TurnActionOption {
  * NO server call and write NOTHING to the activity log.
  *
  * Reference: PHB "Actions in Combat" (Roll20 SRD equivalent).
- *
- * ⚑ Casting a Spell is listed here as a placeholder; spell-action-economy
- * integration (consuming the correct action/bonus/reaction slot automatically
- * based on castingTime) is Phase D.
  */
 export const UNIVERSAL_ACTIONS: TurnActionOption[] = [
   {
@@ -116,7 +112,14 @@ export const UNIVERSAL_ACTIONS: TurnActionOption[] = [
     label: "Cast a Spell",
     cost: "action",
     description:
-      "Cast a spell with a casting time of 1 action. ⚑ Bonus-action and reaction spells are not yet tracked automatically — mark the correct slot manually.",
+      "Cast a spell with a casting time of 1 action. Opens the spell picker to choose a spell, upcast slot, and target.",
+  },
+  {
+    key: "castSpellBonus",
+    label: "Cast a Spell (Bonus Action)",
+    cost: "bonusAction",
+    description:
+      "Cast a spell with a casting time of 1 bonus action (e.g. Healing Word, Misty Step, Mass Healing Word). Opens the spell picker filtered to bonus-action spells.",
   },
   {
     key: "dodge",
@@ -191,7 +194,7 @@ export const UNIVERSAL_ACTIONS: TurnActionOption[] = [
     label: "Cast Spell (Reaction)",
     cost: "reaction",
     description:
-      "Cast a spell with a casting time of 1 reaction (e.g. Shield, Counterspell, Hellish Rebuke). ⚑ Automatic slot detection coming in Phase D.",
+      "Cast a spell with a casting time of 1 reaction (e.g. Shield, Counterspell, Hellish Rebuke). Opens the spell picker filtered to reaction spells.",
   },
 ];
 

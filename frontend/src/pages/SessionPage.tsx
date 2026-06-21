@@ -180,9 +180,27 @@ function SessionPageInner() {
 
           // Build the tab list dynamically; conditionally include Spells and
           // Class tabs so we never render components for classless/non-caster chars.
+          // Remaining spell slots badge: total remaining across all levels.
+          const remainingSlots = isCaster
+            ? (character.spellcasting?.slots ?? []).reduce(
+                (sum, s) => sum + Math.max(0, s.total - s.used),
+                0,
+              )
+            : 0;
+
           const tabs = [
             { id: "inventory", label: "Inventory" },
-            ...(isCaster ? [{ id: "spells", label: "Spells" }] : []),
+            ...(isCaster
+              ? [{
+                  id: "spells",
+                  label: "Spells",
+                  badge: remainingSlots > 0 ? (
+                    <span className="ml-1 rounded-full bg-arcane-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      {remainingSlots}
+                    </span>
+                  ) : undefined,
+                }]
+              : []),
             ...(hasClass ? [{ id: "class", label: "Class" }] : []),
             { id: "rest", label: "Rest & HP" },
           ];

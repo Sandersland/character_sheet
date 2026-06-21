@@ -415,6 +415,71 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     expect(slot1.used).toBe(0); // rolled back
   });
 
+  // ── castSpell self-apply (target: self) ───────────────────────────────────
+
+  it("castSpell with apply:{self,damage} subtracts HP and expends the slot in one batch", async () => {
+    const res = await supertest(createApp())
+      .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
+      .send({
+        operations: [{
+          type: "castSpell",
+          entryId: "fixture-spell-1",
+          slotLevel: 1,
+          roll: 4,
+          apply: { target: "self", kind: "damage", amount: 4 },
+        }],
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.hitPoints.current).toBe(4); // 8 → 4
+    const slot1 = res.body.spellcasting.slots.find((s: { level: number }) => s.level === 1);
+    expect(slot1.used).toBe(1);
+  });
+
+  it("castSpell with apply:{self,heal} restores HP (after taking damage)", async () => {
+    const app = createApp();
+    const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
+
+    // Take 5 self-damage first (8 → 3).
+    await supertest(app).post(url).send({
+      operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 5, apply: { target: "self", kind: "damage", amount: 5 } }],
+    });
+
+    // Heal 3 (3 → 6).
+    const heal = await supertest(app).post(url).send({
+      operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 3, apply: { target: "self", kind: "heal", amount: 3 } }],
+    });
+    expect(heal.status).toBe(200);
+    expect(heal.body.hitPoints.current).toBe(6);
+  });
+
+  it("self-damage clamps at 0 HP", async () => {
+    const res = await supertest(createApp())
+      .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
+      .send({
+        operations: [{ type: "castSpell", entryId: "fixture-cantrip-1", roll: 100, apply: { target: "self", kind: "damage", amount: 100 } }],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.hitPoints.current).toBe(0);
+  });
+
+  it("a failing later op rolls back BOTH the slot spend and the self-HP change", async () => {
+    const res = await supertest(createApp())
+      .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
+      .send({
+        operations: [
+          { type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 4, apply: { target: "self", kind: "damage", amount: 4 } },
+          { type: "forgetSpell", entryId: "not-a-real-entry" }, // invalid — rolls back the cast + HP
+        ],
+      });
+    expect(res.status).toBe(400);
+
+    const char = await supertest(createApp()).get(`/api/characters/${FIXTURE_ID}`);
+    expect(char.body.hitPoints.current).toBe(8); // HP unchanged
+    const slot1 = char.body.spellcasting.slots.find((s: { level: number }) => s.level === 1);
+    expect(slot1.used).toBe(0); // slot unchanged
+  });
+
   // ── Derived stats ─────────────────────────────────────────────────────────
 
   it("returns correct derived spellSaveDC and spellAttackBonus for a L1 INT-16 Wizard", async () => {

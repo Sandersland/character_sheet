@@ -61,8 +61,11 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
   // Which catalog spell ids are already in the spellbook (to disable duplicates in AddSpellPanel).
   const learnedSpellIds = new Set(spells.flatMap((s) => s.spellId ? [s.spellId] : []));
 
-  // Sorted spell list: cantrips first, then ascending level.
+  // Group spells by level (0 = Cantrips, then 1–9).
   const sortedSpells = [...spells].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+
+  // Unique spell levels present, in ascending order.
+  const spellLevels = [...new Set(sortedSpells.map((s) => s.level))].sort((a, b) => a - b);
 
   // The spellcasting ability modifier (for healing bonus).
   const abilityScore = character.abilityScores[ability as AbilityName] ?? 10;
@@ -279,9 +282,9 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
         </p>
       )}
 
-      {/* ── Spell list ── */}
+      {/* ── Spell list (grouped by level) ── */}
       <div>
-        <div className="mb-1 flex items-center justify-between">
+        <div className="mb-2 flex items-center justify-between">
           <h3 className="text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
             Spellbook ({spells.length})
           </h3>
@@ -295,20 +298,41 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
             No spells yet — add one below.
           </p>
         ) : (
-          <ul className="divide-y divide-parchment-200">
-            {sortedSpells.map((spell) => (
-              <SpellRow
-                key={spell.id}
-                spell={spell}
-                characterLevel={character.level}
-                busy={busy}
-                onCast={handleCast}
-                onPrepare={handlePrepare}
-                onForget={handleForget}
-                availableSlots={availableSlotsForSpell(spell)}
-              />
-            ))}
-          </ul>
+          <div className="flex flex-col gap-4">
+            {spellLevels.map((lvl) => {
+              const levelSpells = sortedSpells.filter((s) => s.level === lvl);
+              const slotInfo = lvl === 0 ? null : slots.find((s) => s.level === lvl);
+              return (
+                <div key={lvl}>
+                  {/* Level header — cantrips get a simple label; leveled groups show a slot meter */}
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <h4 className="text-[11px] font-semibold uppercase tracking-wide text-arcane-700">
+                      {lvl === 0 ? "Cantrips" : `Level ${lvl}`}
+                    </h4>
+                    {slotInfo && (
+                      <span className="text-[11px] tabular-nums text-arcane-600">
+                        {slotInfo.total - slotInfo.used}/{slotInfo.total} slots
+                      </span>
+                    )}
+                  </div>
+                  <ul className="divide-y divide-parchment-200">
+                    {levelSpells.map((spell) => (
+                      <SpellRow
+                        key={spell.id}
+                        spell={spell}
+                        characterLevel={character.level}
+                        busy={busy}
+                        onCast={handleCast}
+                        onPrepare={handlePrepare}
+                        onForget={handleForget}
+                        availableSlots={availableSlotsForSpell(spell)}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 

@@ -25,6 +25,15 @@ const customSpellSchema = z.object({
   description: z.string().min(1),
   concentration: z.boolean().optional(),
   ritual: z.boolean().optional(),
+  components: z
+    .object({
+      verbal: z.boolean(),
+      somatic: z.boolean(),
+      material: z.boolean(),
+      materialDescription: z.string().optional(),
+    })
+    .optional(),
+  saveEffect: z.enum(["half", "none"]).optional(),
   effectKind: z.enum(["damage", "heal"]).optional(),
   effectDiceCount: z.number().int().positive().optional(),
   effectDiceFaces: z.number().int().positive().optional(),
@@ -41,6 +50,13 @@ const castSpellOpSchema = z.object({
   entryId: z.string().min(1),
   slotLevel: z.number().int().min(1).max(9).optional(),
   roll: z.number().int().min(0),
+  apply: z
+    .object({
+      target: z.literal("self"),
+      kind: z.enum(["heal", "damage"]),
+      amount: z.number().int().positive(),
+    })
+    .optional(),
 });
 
 const expendSlotOpSchema = z.object({

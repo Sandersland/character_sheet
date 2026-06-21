@@ -32,6 +32,7 @@ import { resolverFor } from "@/features/session/actionResolvers";
 import { useActiveResolution } from "@/features/session/useActiveResolution";
 import InlineAttackPicker from "@/features/session/InlineAttackPicker";
 import InlineItemPicker from "@/features/session/InlineItemPicker";
+import InlineSpellPicker from "@/features/session/InlineSpellPicker";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character, AvailableAction } from "@/types/character";
 
@@ -809,10 +810,29 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
           />
         )}
 
-        {/* spell-picker: PR4 will add InlineSpellPicker here. */}
-        {/* {activeResolution?.resolver.kind === "spell-picker" && (
-          <InlineSpellPicker character={character} onUpdate={onUpdate} onClose={closeResolution} />
-        )} */}
+        {activeResolution?.resolver.kind === "spell-picker" && character.spellcasting && (
+          <div className="rounded-card border border-arcane-200 bg-arcane-50 p-3">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-arcane-600">
+              {activeResolution.resolver.slot === "bonusAction"
+                ? "Bonus-Action Spell"
+                : activeResolution.resolver.slot === "reaction"
+                  ? "Reaction Spell"
+                  : "Cast a Spell"}
+            </p>
+            <InlineSpellPicker
+              character={character}
+              onUpdate={onUpdate}
+              onClose={closeResolution}
+              castingTimeFilter={
+                activeResolution.resolver.slot === "bonusAction"
+                  ? "1 bonus action"
+                  : activeResolution.resolver.slot === "reaction"
+                    ? "1 reaction"
+                    : "1 action"
+              }
+            />
+          </div>
+        )}
 
         {/* ── Effect maneuvers (no slot consumed) — e.g. Evasive Footwork ─────── */}
         {effectManeuvers.length > 0 && superiorityRemaining > 0 && (

@@ -6,24 +6,16 @@
 
 import { useState } from "react";
 
-import { abilityLabel } from "@/lib/abilities";
 import type { Spell } from "@/types/character";
 import Badge from "@/components/ui/Badge";
-
-const SCHOOL_TONE = {
-  abjuration: "arcane",
-  conjuration: "arcane",
-  divination: "gold",
-  enchantment: "garnet",
-  evocation: "garnet",
-  illusion: "arcane",
-  necromancy: "neutral",
-  transmutation: "gold",
-} as const;
-
-function levelLabel(level: number): string {
-  return level === 0 ? "Cantrip" : `Level ${level}`;
-}
+import {
+  SCHOOL_TONE,
+  levelLabel,
+  effectPreview,
+  componentsLabel,
+  attackTypeLabel,
+  upcastHint,
+} from "@/lib/spellMeta";
 
 interface SpellRowProps {
   spell: Spell;
@@ -52,19 +44,8 @@ export default function SpellRow({
   const isCantrip = spell.level === 0;
   const schoolTone = SCHOOL_TONE[spell.school as keyof typeof SCHOOL_TONE] ?? "neutral";
 
-  // For cantrips with scaling, show the correct dice count at current character level.
-  function effectLabel(): string | null {
-    if (!spell.effectKind || !spell.effectDiceCount || !spell.effectDiceFaces) return null;
-    let count = spell.effectDiceCount;
-    if (spell.cantripScaling && isCantrip) {
-      if (characterLevel >= 17) count *= 4;
-      else if (characterLevel >= 11) count *= 3;
-      else if (characterLevel >= 5) count *= 2;
-    }
-    const mod = spell.effectModifier ? (spell.effectModifier > 0 ? ` + ${spell.effectModifier}` : ` − ${Math.abs(spell.effectModifier)}`) : "";
-    const kind = spell.effectKind === "heal" ? "healing" : (spell.damageType ?? "damage");
-    return `${count}d${spell.effectDiceFaces}${mod} ${kind}`;
-  }
+  // Castability: leveled spells with no remaining slots are shown but dimmed.
+  const noBudget = !isCantrip && availableSlots.length === 0;
 
   function handleCastClick() {
     if (isCantrip) {
@@ -80,10 +61,11 @@ export default function SpellRow({
     }
   }
 
-  const effect = effectLabel();
+  const effect = effectPreview(spell, characterLevel);
+  const compStr = componentsLabel(spell);
 
   return (
-    <li className="py-3">
+    <li className={`py-3 ${noBudget ? "opacity-50" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         {/* Left: name + badges */}
         <div className="flex min-w-0 flex-col gap-1">
@@ -101,10 +83,14 @@ export default function SpellRow({
               <Badge tone={schoolTone}>{spell.school}</Badge>
               {spell.concentration && <Badge tone="arcane">conc</Badge>}
               {spell.ritual && <Badge tone="gold">ritual</Badge>}
+              {noBudget && <Badge tone="neutral">no slots</Badge>}
             </div>
           </div>
           {effect && (
             <p className="text-xs text-parchment-500">{effect}</p>
+          )}
+          {compStr && (
+            <p className="text-[11px] text-parchment-400">{compStr}</p>
           )}
         </div>
 
@@ -186,15 +172,16 @@ export default function SpellRow({
           <p className="text-xs text-parchment-500">
             {spell.castingTime} · {spell.range} · {spell.duration}
           </p>
-          {spell.attackType && (
-            <p className="text-xs text-parchment-500">
-              {spell.attackType === "attack" ? "Ranged/melee spell attack" : `${spell.saveAbility ? abilityLabel(spell.saveAbility) : "—"} saving throw`}
+          {attackTypeLabel(spell) && (
+            <p className="text-xs text-parchment-500">{attackTypeLabel(spell)}</p>
+          )}
+          {spell.components?.material && spell.components.materialDescription && (
+            <p className="text-xs text-parchment-400 italic">
+              Material: {spell.components.materialDescription}
             </p>
           )}
-          {spell.upcastDicePerLevel && (
-            <p className="text-xs text-arcane-700">
-              Upcast: +{spell.upcastDicePerLevel}d{spell.effectDiceFaces ?? "?"} per slot level above {spell.level}
-            </p>
+          {upcastHint(spell) && (
+            <p className="text-xs text-arcane-700">{upcastHint(spell)}</p>
           )}
           <p className="text-sm text-parchment-700">{spell.description}</p>
         </div>
