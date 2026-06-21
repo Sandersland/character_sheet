@@ -5,6 +5,7 @@ import { activityRouter } from "./routes/activity.js";
 import { advancementRouter } from "./routes/advancement.js";
 import { classRouter } from "./routes/class.js";
 import { charactersRouter } from "./routes/characters.js";
+import { sessionsRouter } from "./routes/sessions.js";
 import { experienceRouter } from "./routes/experience.js";
 import { featsRouter } from "./routes/feats.js";
 import { healthRouter } from "./routes/health.js";
@@ -38,6 +39,7 @@ export function createApp() {
   app.use("/api", maneuversRouter);
   app.use("/api", featsRouter);
   app.use("/api", advancementRouter);
+  app.use("/api", sessionsRouter);
 
   return app;
 }

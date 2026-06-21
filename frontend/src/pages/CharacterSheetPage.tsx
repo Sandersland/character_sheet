@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 import AbilityScoreBox from "@/features/abilities/AbilityScoreBox";
 import RollResultToast from "@/features/dice/RollResultToast";
@@ -22,13 +22,25 @@ import VitalsStrip from "@/features/character-meta/VitalsStrip";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useReferenceData } from "@/hooks/useReferenceData";
 import { abilityAbbr } from "@/lib/abilities";
+import { fetchActiveSession, startSession } from "@/api/client";
+import type { Session } from "@/types/character";
 
 export default function CharacterSheetPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { character, error, setCharacter } = useCharacter(id);
   const { reference } = useReferenceData();
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [activeSession, setActiveSession] = useState<Session | null | undefined>(undefined);
+  const [sessionPending, setSessionPending] = useState(false);
+
+  // Resolve active session on mount so the header button can say
+  // "Start Session" or "Resume Session" correctly.
+  useEffect(() => {
+    if (!id) return;
+    fetchActiveSession(id).then(setActiveSession).catch(() => setActiveSession(null));
+  }, [id]);
 
   if (error) {
     return (
@@ -110,7 +122,30 @@ export default function CharacterSheetPage() {
           </div>
           <div className="flex flex-col items-end gap-2">
             <BackendStatus />
-            <div className="flex gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Start / Resume Session — the primary live-play entry point */}
+              <button
+                type="button"
+                disabled={sessionPending || activeSession === undefined}
+                onClick={async () => {
+                  if (!id) return;
+                  setSessionPending(true);
+                  try {
+                    if (activeSession) {
+                      navigate(`/characters/${id}/session`);
+                    } else {
+                      const { session } = await startSession(id);
+                      setActiveSession(session);
+                      navigate(`/characters/${id}/session`);
+                    }
+                  } finally {
+                    setSessionPending(false);
+                  }
+                }}
+                className="rounded-control bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
+              >
+                {activeSession ? "Resume Session" : "Start Session"}
+              </button>
               <button
                 type="button"
                 onClick={() => setActivityOpen(true)}
@@ -123,7 +158,7 @@ export default function CharacterSheetPage() {
                 onClick={() => setConfirmDeleteOpen(true)}
                 className="text-xs font-semibold text-garnet-700 hover:underline"
               >
-                Delete character
+                Delete
               </button>
             </div>
           </div>
@@ -147,12 +182,17 @@ export default function CharacterSheetPage() {
       )}
 
       <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+
+        {/* ── Combat vitals at a glance ───────────────────────────────── */}
         <VitalsStrip character={character} />
+
+        {/* ── Hit points · Experience ────────────────────────────────── */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <HitPointTracker character={character} onUpdate={setCharacter} />
           <ExperienceTracker character={character} onUpdate={setCharacter} />
         </div>
 
+        {/* ── Ability scores · Saves · Skills ────────────────────────── */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_1fr] lg:items-start">
           {/* Ability scores rail — fixed intrinsic width per
               principles.md ("don't over-rely on grid systems" for
@@ -171,9 +211,7 @@ export default function CharacterSheetPage() {
                 key={key}
                 label={abilityAbbr(key)}
                 score={score}
-                saveProficient={character.savingThrowProficiencies.includes(
-                  key
-                )}
+                saveProficient={character.savingThrowProficiencies.includes(key)}
                 proficiencyBonus={character.proficiencyBonus}
               />
             ))}
@@ -188,10 +226,10 @@ export default function CharacterSheetPage() {
           </Card>
         </div>
 
-        {/* Proficiencies — weapons, armor (derived from class/race/feats), and
-            tools (creation-fixed + subclass choices) all in one card with
-            sub-section headers. Hidden only when the character has nothing
-            to display and no pending tool choice (e.g. test fixtures). */}
+        {/* ── Proficiencies & Languages ───────────────────────────────── */}
+        {/* Weapons, armor (derived from class/race/feats), and tools
+            (creation-fixed + subclass choices). Hidden only when the character
+            has nothing to display and no pending tool choice (e.g. test fixtures). */}
         {(character.toolProficiencies.length > 0 ||
           (character.resources?.toolProfChoiceCount ?? 0) > 0 ||
           (character.armorProficiencies?.length ?? 0) > 0 ||
@@ -205,6 +243,34 @@ export default function CharacterSheetPage() {
           </Card>
         )}
 
+        {/* ── Features & Traits ──────────────────────────────────────── */}
+        {/* Class features + Advancements grouped together, as they would be
+            on a printed sheet (your class abilities, feats, and ASI sit
+            alongside each other rather than scattered). ClassFeaturesSection
+            handles the subclass picker, resource pools, maneuvers, and feature
+            list. AdvancementSection handles ASI + feats (level 4+ only). */}
+        {character.class && (
+          <Card title="Class Features" className="p-4">
+            <ClassFeaturesSection
+              character={character}
+              referenceClasses={reference?.classes ?? []}
+              onUpdate={setCharacter}
+            />
+          </Card>
+        )}
+
+        {(character.advancementSlots.total > 0 || character.advancements.length > 0) && (
+          <div id="advancement-card">
+            <Card title="Advancements" className="p-4">
+              <AdvancementSection
+                character={character}
+                onUpdate={setCharacter}
+              />
+            </Card>
+          </div>
+        )}
+
+        {/* ── Equipment · Spells ─────────────────────────────────────── */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <InventoryList character={character} onUpdate={setCharacter} />
 
@@ -219,35 +285,8 @@ export default function CharacterSheetPage() {
           )}
         </div>
 
-        {/* Class features — shown whenever the character has a primary class.
-            All 12 classes now return derived features/resources, so this card
-            is visible for every character. ClassFeaturesSection handles the
-            subclass-picker, pool spending, maneuvers, and feature list. */}
-        {character.class && (
-          <Card title="Class Features" className="p-4">
-            <ClassFeaturesSection
-              character={character}
-              referenceClasses={reference?.classes ?? []}
-              onUpdate={setCharacter}
-            />
-          </Card>
-        )}
-
-        {/* Advancements (ASI + Feats) — shown whenever the character has earned
-            at least one slot (level 4+) or has already taken an advancement.
-            Class-level-gated: Fighter/Rogue earn extra slots. The id allows
-            the level-up callout in HitPointTracker to scroll here. */}
-        {(character.advancementSlots.total > 0 || character.advancements.length > 0) && (
-          <div id="advancement-card">
-            <Card title="Advancements" className="p-4">
-              <AdvancementSection
-                character={character}
-                onUpdate={setCharacter}
-              />
-            </Card>
-          </div>
-        )}
-
+        {/* ── Campaign Journal (spellcasters only — the 2-col row above
+            uses the right column for Spells, so Journal gets its own row) */}
         {character.spellcasting && (
           <Card title="Journal" className="p-4">
             <JournalSection entries={character.journal} />

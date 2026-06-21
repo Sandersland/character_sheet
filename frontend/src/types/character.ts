@@ -95,6 +95,19 @@ export interface WeaponDetail {
    * Present on `InventoryItem.weapon`; absent on catalog `Item.weapon`.
    */
   attackBonus?: number;
+  /**
+   * Derived damage roll spec — grip-resolved at read time by `deriveWeaponDamage`
+   * in `srd.ts`. Encodes the correct die for versatile weapons based on what else
+   * is equipped (1d10 when off-hand is free; 1d8 when a shield or second weapon
+   * is equipped). Present on `InventoryItem.weapon`; absent on catalog `Item.weapon`.
+   */
+  damage?: {
+    damageDiceCount: number;
+    damageDiceFaces: number;
+    damageModifier: number;
+    damageType: string;
+    grip: "one-handed" | "two-handed" | "versatile-two-handed";
+  };
 }
 
 /** Armor-specific mechanics (shields included), present only on `category: "armor"`. */
@@ -262,7 +275,9 @@ export type InventoryOperation =
       consumable?: Partial<ConsumableDetail>;
     }
   | { type: "remove"; inventoryItemId: string }
-  | { type: "sell"; inventoryItemId: string; quantity?: number; currencyDelta: Currency };
+  | { type: "sell"; inventoryItemId: string; quantity?: number; currencyDelta: Currency }
+  /** Equips or unequips an item. Unlike `update`, this IS logged on the timeline. */
+  | { type: "setEquipped"; inventoryItemId: string; equipped: boolean };
 
 export type LedgerEntryType = "acquired" | "consumed" | "sold" | "bought" | "removed";
 
@@ -946,3 +961,17 @@ export type HitPointOperation =
   | LevelUpOperation
   | DeathSaveOperation
   | StabilizeOperation;
+
+// ── Session ───────────────────────────────────────────────────────────────────
+
+export type SessionStatus = "active" | "ended";
+
+export interface Session {
+  id: string;
+  characterId: string;
+  status: SessionStatus;
+  startedAt: string; // ISO 8601
+  endedAt?: string;
+  title?: string;
+  summary?: unknown;
+}

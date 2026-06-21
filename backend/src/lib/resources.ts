@@ -15,6 +15,7 @@ import { Prisma } from "../generated/prisma/client.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
+import { getActiveSessionId } from "./sessions.js";
 import { deriveResources } from "./class-features.js";
 import { isKnownTool, toolsByCategory } from "./srd.js";
 
@@ -208,6 +209,7 @@ export async function applyResourceOperations(
   operations: ResourceOperation[]
 ): Promise<void> {
   const batchId = randomUUID();
+  const sessionId = await getActiveSessionId(characterId);
 
   await prisma.$transaction(async (tx) => {
     for (const op of operations) {
@@ -453,6 +455,7 @@ export async function applyResourceOperations(
         after: afterState,
         data: eventData,
         batchId,
+        sessionId,
       });
     }
   });

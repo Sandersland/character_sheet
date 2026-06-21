@@ -16,10 +16,12 @@
 
 import { randomUUID } from "node:crypto";
 
+
 import { Prisma } from "../generated/prisma/client.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
+import { getActiveSessionId } from "./sessions.js";
 import { deriveSpellcasting } from "./srd.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
@@ -196,6 +198,7 @@ export async function applySpellcastingOperations(
   operations: SpellcastingOperation[]
 ): Promise<void> {
   const batchId = randomUUID();
+  const sessionId = await getActiveSessionId(characterId);
 
   await prisma.$transaction(async (tx) => {
     for (const op of operations) {
@@ -454,6 +457,7 @@ export async function applySpellcastingOperations(
         after: afterState,
         data: eventData,
         batchId,
+        sessionId,
       });
     }
   });

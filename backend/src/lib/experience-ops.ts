@@ -7,6 +7,7 @@ import { reconcileLevelGatedState } from "./level-reconciliation.js";
 import { prisma } from "./prisma.js";
 import { fixedAverageForDie, normalizeHitDice, normalizeHitPoints } from "./hitpoints.js";
 import { abilityModifier, hitDieFace } from "./srd.js";
+import { getActiveSessionId } from "./sessions.js";
 
 export class InvalidExperienceOperationError extends Error {}
 
@@ -43,7 +44,8 @@ async function revertLevelUps(
   characterId: string,
   currentHdTotal: number,
   targetLevel: number,
-  batchId: string
+  batchId: string,
+  sessionId: string | null,
 ): Promise<void> {
   const levelsToReverse = currentHdTotal - targetLevel;
   if (levelsToReverse <= 0) return;
@@ -116,6 +118,7 @@ async function revertLevelUps(
     after: { hitPoints: { ...hp }, hitDice: { ...hd }, classEntryLevel: hd.total },
     data: { levelsReversed: levelsToReverse, newLevel: hd.total, primaryEntryId: primaryEntry?.id },
     batchId,
+    sessionId,
   });
 }
 
@@ -133,6 +136,7 @@ export async function applyExperienceOperations(
   operations: ExperienceOperation[]
 ): Promise<void> {
   const batchId = randomUUID();
+  const sessionId = await getActiveSessionId(characterId);
 
   await prisma.$transaction(async (tx) => {
     for (const op of operations) {
@@ -187,13 +191,14 @@ export async function applyExperienceOperations(
         after: { experiencePoints: newXp },
         data: op.type === "award" ? { amount: op.amount } : { value: op.value },
         batchId,
+        sessionId,
       });
 
       // Auto-reverse HP if the new XP drops derived level below applied level.
       // This fixes the stranded-HP bug: lowering XP now rolls HP/hit-dice back.
       const newDerivedLevel = levelForExperience(newXp);
       if (newDerivedLevel < hd.total) {
-        await revertLevelUps(tx, characterId, hd.total, newDerivedLevel, batchId);
+        await revertLevelUps(tx, characterId, hd.total, newDerivedLevel, batchId, sessionId);
       }
 
       // Reconcile all level-gated state (subclass choice, maneuvers known, …)

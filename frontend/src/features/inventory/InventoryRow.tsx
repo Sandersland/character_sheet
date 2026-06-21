@@ -1,7 +1,6 @@
 import { useState } from "react";
 
 import { formatRollSpec } from "@/lib/dice";
-import { useRoll } from "@/features/dice/RollContext";
 import type {
   ArmorCategory,
   Currency,
@@ -97,7 +96,6 @@ export default function InventoryRow({
   onHistory,
   onSubmit,
 }: InventoryRowProps) {
-  const { roll } = useRoll();
   const { weapon, armor, consumable } = item;
 
   const [name, setName] = useState(item.name);
@@ -477,42 +475,17 @@ export default function InventoryRow({
         {item.notes && <p className="mt-1 text-xs italic text-parchment-500">{item.notes}</p>}
       </div>
       <div className="flex shrink-0 items-center gap-2 pt-0.5">
-        {weapon && (
-          <>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() =>
-                roll(
-                  { count: 1, faces: 20, modifier: weapon.attackBonus ?? 0 },
-                  `${item.name} attack`,
-                )
-              }
-              className={linkButtonClass}
-            >
-              Attack
-            </button>
-            <span className="text-parchment-300">·</span>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() =>
-                roll(
-                  {
-                    count: weapon.damageDiceCount,
-                    faces: weapon.damageDiceFaces,
-                    modifier: weapon.damageModifier,
-                  },
-                  `${item.name} damage (${weapon.damageType})`,
-                )
-              }
-              className={linkButtonClass}
-            >
-              Damage
-            </button>
-            <span className="text-parchment-300">·</span>
-          </>
-        )}
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() =>
+            onSubmit([{ type: "setEquipped", inventoryItemId: item.id, equipped: !item.equipped }])
+          }
+          className={linkButtonClass}
+        >
+          {item.equipped ? "Unequip" : "Equip"}
+        </button>
+        <span className="text-parchment-300">·</span>
         <button type="button" disabled={pending} onClick={onEdit} className={linkButtonClass}>
           Edit
         </button>

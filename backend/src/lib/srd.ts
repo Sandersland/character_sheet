@@ -380,6 +380,18 @@ export function isProficientWithWeapon(
  * Proficiency bonus is added only if the character is proficient with the
  * weapon (category-level or name-level match from `isProficientWithWeapon`).
  */
+/** Shared helper — same ability-selection rule used for both attack and damage. */
+function weaponAbilityMod(
+  weapon: { finesse: boolean; weaponRange?: string | null },
+  effectiveScores: Record<string, number>,
+): number {
+  const strMod = abilityModifier(effectiveScores.strength ?? 10);
+  const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
+  if (weapon.weaponRange === "ranged") return dexMod;
+  if (weapon.finesse) return Math.max(strMod, dexMod);
+  return strMod;
+}
+
 export function deriveWeaponAttackBonus(
   weapon: {
     name: string;
@@ -391,20 +403,70 @@ export function deriveWeaponAttackBonus(
   proficiencyBonus: number,
   weaponGrants: ReadonlyArray<{ name: string }>,
 ): number {
-  const strMod = abilityModifier(effectiveScores.strength ?? 10);
-  const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
-
-  let abilityMod: number;
-  if (weapon.weaponRange === "ranged") {
-    abilityMod = dexMod;
-  } else if (weapon.finesse) {
-    abilityMod = Math.max(strMod, dexMod);
-  } else {
-    abilityMod = strMod;
-  }
-
+  const abilityMod = weaponAbilityMod(weapon, effectiveScores);
   const proficient = isProficientWithWeapon(weapon, weaponGrants);
   return abilityMod + (proficient ? proficiencyBonus : 0);
+}
+
+export type WeaponGrip = "one-handed" | "two-handed" | "versatile-two-handed";
+
+/**
+ * Derives the damage roll spec for a weapon, choosing the correct die for
+ * versatile weapons based on what else is equipped.
+ *
+ * Grip rule (5e PHB):
+ *   - `twoHanded` weapons always use their base dice (no off-hand applies).
+ *   - Versatile weapons use their **two-handed die** when the off-hand is free
+ *     (no equipped shield and no other equipped weapon). Otherwise one-handed.
+ *   - All other weapons use their base dice.
+ *
+ * Damage modifier follows the same ability-selection rule as attackBonus
+ * (ranged → DEX, finesse → max(STR, DEX), else STR) so attack and damage stay
+ * consistent and we never duplicate that rule.
+ */
+export function deriveWeaponDamage(
+  weapon: {
+    name: string;
+    finesse: boolean;
+    weaponRange?: string | null;
+    damageDiceCount: number;
+    damageDiceFaces: number;
+    damageType: string;
+    versatileDiceCount?: number | null;
+    versatileDiceFaces?: number | null;
+    twoHanded: boolean;
+  },
+  /** True if any other equipped item occupies the off-hand (shield or weapon). */
+  offHandOccupied: boolean,
+  effectiveScores: Record<string, number>,
+): {
+  damageDiceCount: number;
+  damageDiceFaces: number;
+  damageModifier: number;
+  damageType: string;
+  grip: WeaponGrip;
+} {
+  const damageModifier = weaponAbilityMod(weapon, effectiveScores);
+
+  // Resolve grip and choose dice.
+  const isVersatile =
+    weapon.versatileDiceCount != null && weapon.versatileDiceFaces != null;
+  const useTwoHandedDie = isVersatile && !offHandOccupied && !weapon.twoHanded;
+
+  const damageDiceCount = useTwoHandedDie
+    ? weapon.versatileDiceCount!
+    : weapon.damageDiceCount;
+  const damageDiceFaces = useTwoHandedDie
+    ? weapon.versatileDiceFaces!
+    : weapon.damageDiceFaces;
+
+  const grip: WeaponGrip = weapon.twoHanded
+    ? "two-handed"
+    : useTwoHandedDie
+      ? "versatile-two-handed"
+      : "one-handed";
+
+  return { damageDiceCount, damageDiceFaces, damageModifier, damageType: weapon.damageType, grip };
 }
 
 export interface ToolProficiencyEntry {

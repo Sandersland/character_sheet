@@ -10,7 +10,8 @@ export type EventCategory =
   | "spellcasting"
   | "class"
   | "resources"
-  | "advancement";
+  | "advancement"
+  | "session";
 
 export type EventType =
   // inventory
@@ -59,6 +60,12 @@ export type EventType =
   | "featTaken"
   | "advancementRemoved"
   | "advancementsReconciled"
+  // inventory (equip/unequip logged for timeline + undo)
+  | "equipped"
+  | "unequipped"
+  // session lifecycle
+  | "sessionStarted"
+  | "sessionEnded"
   // meta
   | "revert";
 
@@ -80,6 +87,9 @@ export interface LogEventParams {
   data?: Record<string, unknown> | null;
   batchId?: string;
   actor?: string;
+  /** FK to the play session during which this event occurred. Null for
+   *  out-of-session events (shopping, level-ups on the reference sheet). */
+  sessionId?: string | null;
 }
 
 // ── diffToFields ─────────────────────────────────────────────────────────────
@@ -171,6 +181,7 @@ export async function logEvent(
       data: (params.data ?? null) as Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput,
       actor: params.actor ?? "player",
       batchId: params.batchId ?? null,
+      sessionId: params.sessionId ?? null,
       fields: {
         create: fieldDiffs.map((f) => ({
           path: f.path,

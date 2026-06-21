@@ -23,6 +23,7 @@ import {
   deriveFeatProficiencies,
   deriveSpellcasting,
   deriveWeaponAttackBonus,
+  deriveWeaponDamage,
   isKnownTool,
   RACE_PROFICIENCY_GRANTS,
   TOOLS,
@@ -95,13 +96,24 @@ interface InventoryItemContext {
   proficiencyBonus: number;
   /** The character's merged weapon proficiency grants (class + race + feat). */
   weaponGrants: ReadonlyArray<{ name: string }>;
+  /**
+   * True when any equipped item occupies the off-hand: either an equipped
+   * shield or ≥ 2 equipped weapons. Used by `deriveWeaponDamage` to resolve
+   * the correct die for versatile weapons (2H die when off-hand is free).
+   */
+  offHandBusy: boolean;
 }
 
 function serializeInventoryItem(
   row: CharacterWithRelations["inventoryItems"][number],
   context: InventoryItemContext,
 ) {
-  let weapon: (ReturnType<typeof serializeWeaponDetail> & { attackBonus: number }) | undefined;
+  let weapon:
+    | (ReturnType<typeof serializeWeaponDetail> & {
+        attackBonus: number;
+        damage: ReturnType<typeof deriveWeaponDamage>;
+      })
+    | undefined;
   if (row.weaponDetail) {
     weapon = {
       ...serializeWeaponDetail(row.weaponDetail),
@@ -115,6 +127,21 @@ function serializeInventoryItem(
         context.effectiveScores,
         context.proficiencyBonus,
         context.weaponGrants,
+      ),
+      damage: deriveWeaponDamage(
+        {
+          name: row.name,
+          finesse: row.weaponDetail.finesse,
+          weaponRange: row.weaponDetail.weaponRange,
+          damageDiceCount: row.weaponDetail.damageDiceCount,
+          damageDiceFaces: row.weaponDetail.damageDiceFaces,
+          damageType: row.weaponDetail.damageType,
+          versatileDiceCount: row.weaponDetail.versatileDiceCount,
+          versatileDiceFaces: row.weaponDetail.versatileDiceFaces,
+          twoHanded: row.weaponDetail.twoHanded,
+        },
+        context.offHandBusy,
+        context.effectiveScores,
       ),
     };
   }
@@ -366,10 +393,23 @@ export function serializeCharacter(row: CharacterWithRelations) {
     featProficiencies.weapons,
   );
 
+  // Compute off-hand state once for the whole inventory so versatile weapons
+  // know whether to use their two-handed die. Off-hand is "busy" when any
+  // equipped item is a shield OR when 2+ weapons are equipped (two-weapon
+  // fighting). This is the lightweight approach that avoids a full
+  // main-hand/off-hand slot model.
+  const equippedItems = row.inventoryItems.filter((i) => i.equipped);
+  const equippedShieldPresent = equippedItems.some(
+    (i) => i.armorDetail?.armorCategory === "shield",
+  );
+  const equippedWeaponCount = equippedItems.filter((i) => i.category === "weapon").length;
+  const offHandBusy = equippedShieldPresent || equippedWeaponCount >= 2;
+
   const inventoryContext: InventoryItemContext = {
     effectiveScores,
     proficiencyBonus: progress.proficiencyBonus,
     weaponGrants,
+    offHandBusy,
   };
 
   return {

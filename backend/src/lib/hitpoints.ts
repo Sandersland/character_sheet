@@ -4,6 +4,7 @@ import { Prisma } from "../generated/prisma/client.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
+import { getActiveSessionId } from "./sessions.js";
 import { abilityModifier, advancementSlotsForLevel, deriveFeatBonuses, hitDieFace } from "./srd.js";
 import { deriveResources } from "./class-features.js";
 import { normalizeResourcesMutable, serializeResourcesState } from "./resources.js";
@@ -212,6 +213,7 @@ export async function applyHitPointOperations(
   // One batchId groups all ops in this request on the activity timeline,
   // same as inventory uses (lib/inventory.ts → applyInventoryOperations).
   const batchId = randomUUID();
+  const sessionId = await getActiveSessionId(characterId);
 
   await prisma.$transaction(async (tx) => {
     for (const op of operations) {
@@ -572,6 +574,7 @@ export async function applyHitPointOperations(
         after: afterState,
         data: eventData,
         batchId,
+        sessionId,
       });
     }
   });
