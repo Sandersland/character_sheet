@@ -1,4 +1,4 @@
-import type { AbilityName, SkillName } from "@/types/character";
+import type { AbilityName, ArmorProficiencyCategory, SkillName } from "@/types/character";
 
 export const ABILITY_LABELS: Record<AbilityName, string> = {
   strength: "Strength",
@@ -90,6 +90,32 @@ export function skillLabel(key: string): string {
 export function abilityLabel(key: string): string {
   return ABILITY_LABELS[key as AbilityName] ?? key;
 }
+
+/** Display labels for armor proficiency categories. */
+export const ARMOR_CATEGORY_LABELS: Record<ArmorProficiencyCategory, string> = {
+  light:  "Light Armor",
+  medium: "Medium Armor",
+  heavy:  "Heavy Armor",
+  shield: "Shields",
+};
+
+/** Canonical display order for armor categories (light → medium → heavy → shields). */
+export const ARMOR_CATEGORY_ORDER: readonly ArmorProficiencyCategory[] = [
+  "light", "medium", "heavy", "shield",
+];
+
+/** Union of all proficiency grant sources used across weapons, armor, and tools. */
+export type ProficiencySource = "class" | "race" | "feat" | "background" | "subclass";
+
+/** Human-readable labels for every proficiency source. Used by ProficienciesCard
+ *  across all three sub-sections so weapons, armor, and tools share one map. */
+export const SOURCE_LABELS: Record<ProficiencySource, string> = {
+  class:      "Class",
+  race:       "Race",
+  feat:       "Feat",
+  background: "Background",
+  subclass:   "Battle Master",
+};
 
 /** Three-letter uppercase ability abbreviation (e.g. "strength" → "STR"). */
 export function abilityAbbr(key: string): string {

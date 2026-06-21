@@ -15,7 +15,7 @@ import InventoryList from "@/features/inventory/InventoryList";
 import JournalSection from "@/features/character-meta/JournalSection";
 import SkillsTable from "@/features/abilities/SkillsTable";
 import SpellsSection from "@/features/spells/SpellsSection";
-import ToolProficienciesCard from "@/features/abilities/ToolProficienciesCard";
+import ProficienciesCard from "@/features/abilities/ProficienciesCard";
 import VitalsStrip from "@/features/character-meta/VitalsStrip";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useReferenceData } from "@/hooks/useReferenceData";
@@ -184,13 +184,16 @@ export default function CharacterSheetPage() {
           </Card>
         </div>
 
-        {/* Tool proficiencies — rendered whenever the character has any
-            tool profs (background/class/race) or is eligible to choose one
-            (Student of War at level 3+). Hidden for characters with none. */}
+        {/* Proficiencies — weapons, armor (derived from class/race/feats), and
+            tools (creation-fixed + subclass choices) all in one card with
+            sub-section headers. Hidden only when the character has nothing
+            to display and no pending tool choice (e.g. test fixtures). */}
         {(character.toolProficiencies.length > 0 ||
-          (character.resources?.toolProfChoiceCount ?? 0) > 0) && (
-          <Card title="Tool Proficiencies" className="p-4">
-            <ToolProficienciesCard
+          (character.resources?.toolProfChoiceCount ?? 0) > 0 ||
+          (character.armorProficiencies?.length ?? 0) > 0 ||
+          (character.weaponProficiencies?.length ?? 0) > 0) && (
+          <Card title="Proficiencies" className="p-4">
+            <ProficienciesCard
               character={character}
               artisanTools={reference?.tools.byCategory.artisan ?? []}
               onUpdate={setCharacter}
