@@ -16,6 +16,8 @@ Capture the full output (pass/fail count, any failing test names and assertions)
 
 **Browser verification** — invoke the `/verify` skill concurrently. It will launch the app and drive the changed UI at the browser surface.
 
+> **Screenshot paths:** when calling `browser_take_screenshot`, always use an absolute path under `/tmp/` (e.g. `/tmp/verify-<feature>.png`). Never use a relative filename — it resolves to the project root and pollutes the working tree.
+
 ### 2. Wait for both to complete
 
 Do not report until you have results from both. If the unit tests finish first, hold the result. If `/verify` finishes first, hold the result. Report only when both are in hand.

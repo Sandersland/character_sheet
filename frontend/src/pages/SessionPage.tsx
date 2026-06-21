@@ -41,20 +41,36 @@ function AttacksPanel({ character }: { character: Character }) {
     (item) => item.category === "weapon" && item.equipped && item.weapon,
   );
 
-  if (equippedWeapons.length === 0) {
-    return (
-      <p className="text-sm text-parchment-500">
-        No weapons equipped. Go to your{" "}
-        <Link to={`/characters/${character.id}`} className="text-garnet-700 hover:underline">
-          character sheet
-        </Link>{" "}
-        and use the Equip button on a weapon.
-      </p>
-    );
-  }
+  // Unarmed strike and improvised weapon are derived server-side so Tavern
+  // Brawler's modifiers (d4 unarmed, improvised proficiency) are reflected
+  // automatically without any client-side feat-inspection logic.
+  const { unarmedStrike, improvisedWeapon } = character;
+  const unarmedDamageSpec = {
+    count: unarmedStrike.damage.count,
+    faces: unarmedStrike.damage.faces,
+    modifier: unarmedStrike.damage.modifier,
+  };
+  const unarmedDamageDisplay =
+    unarmedStrike.damage.faces === 1
+      ? Math.max(1, 1 + unarmedStrike.damage.modifier)  // flat 1 + STR mod, min 1
+      : `1d${unarmedStrike.damage.faces}${unarmedStrike.damage.modifier !== 0 ? ` + ${unarmedStrike.damage.modifier}` : ""}`;
+  const improvisedDamageSpec = {
+    count: improvisedWeapon.damage.count,
+    faces: improvisedWeapon.damage.faces,
+    modifier: improvisedWeapon.damage.modifier,
+  };
 
   return (
     <div className="flex flex-col divide-y divide-parchment-200">
+      {equippedWeapons.length === 0 && (
+        <p className="pb-3 text-sm text-parchment-500">
+          No weapons equipped. Go to your{" "}
+          <Link to={`/characters/${character.id}`} className="text-garnet-700 hover:underline">
+            character sheet
+          </Link>{" "}
+          and use the Equip button on a weapon.
+        </p>
+      )}
       {equippedWeapons.map((item) => {
         const w = item.weapon!;
         // Use the server-derived damage spec for correct versatile die; fall
@@ -107,6 +123,76 @@ function AttacksPanel({ character }: { character: Character }) {
           </div>
         );
       })}
+      {/* Unarmed strike — always available in 5e, always proficient, uses STR.
+          Damage die is server-derived: d1 baseline (1 + STR mod, min 1) raised to
+          d4 by Tavern Brawler. */}
+      <div className="flex items-center justify-between py-3">
+        <div>
+          <p className="text-sm font-medium text-parchment-900">Unarmed Strike</p>
+          <p className="text-xs text-parchment-500">
+            Attack: +{unarmedStrike.attackBonus} · Damage: {unarmedDamageDisplay} bludgeoning
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              roll(
+                { count: 1, faces: 20, modifier: unarmedStrike.attackBonus },
+                "Unarmed strike attack",
+              )
+            }
+            className="rounded-control border border-garnet-200 bg-garnet-50 px-2.5 py-1 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-100"
+          >
+            Attack
+          </button>
+          <button
+            type="button"
+            onClick={() => roll(unarmedDamageSpec, "Unarmed strike damage (bludgeoning)")}
+            className="rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
+          >
+            Damage
+          </button>
+        </div>
+      </div>
+      {/* Improvised weapon — anyone can pick up an object and swing it (1d4 + STR).
+          Attack bonus includes proficiency only with Tavern Brawler. */}
+      <div className="flex items-center justify-between py-3">
+        <div>
+          <p className="text-sm font-medium text-parchment-900">Improvised Weapon</p>
+          <p className="text-xs text-parchment-500">
+            Attack: {improvisedWeapon.attackBonus >= 0 ? "+" : ""}
+            {improvisedWeapon.attackBonus} · Damage:{" "}
+            {formatRollSpec(improvisedDamageSpec)} bludgeoning
+            {!improvisedWeapon.proficient && (
+              <span className="ml-1 italic text-parchment-400">(no proficiency)</span>
+            )}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              roll(
+                { count: 1, faces: 20, modifier: improvisedWeapon.attackBonus },
+                "Improvised weapon attack",
+              )
+            }
+            className="rounded-control border border-garnet-200 bg-garnet-50 px-2.5 py-1 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-100"
+          >
+            Attack
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              roll(improvisedDamageSpec, "Improvised weapon damage (bludgeoning)")
+            }
+            className="rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
+          >
+            Damage
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

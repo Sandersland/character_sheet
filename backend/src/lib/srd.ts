@@ -469,6 +469,76 @@ export function deriveWeaponDamage(
   return { damageDiceCount, damageDiceFaces, damageModifier, damageType: weapon.damageType, grip };
 }
 
+// ── Unarmed strike + improvised weapon derivation ─────────────────────────────
+
+/**
+ * Returns the unarmed-strike damage die face count for the given advancements.
+ * Default is 1 (1 + STR mod, minimum 1 per 5e PHB). Tavern Brawler raises it to
+ * d4 via a `{ target: "unarmedDamageDie", amount: 4 }` improvement. When multiple
+ * feats would affect this (future-proofing), the max wins — you never "downgrade"
+ * a damage die.
+ */
+export function deriveUnarmedDamageDie(advancements: AdvancementEntry[]): number {
+  let best = 1; // default: "1" (flat 1 + STR mod, minimum 1)
+  for (const entry of advancements) {
+    for (const imp of entry.improvements ?? []) {
+      if (imp.target === "unarmedDamageDie") {
+        best = Math.max(best, imp.amount);
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Derives the unarmed-strike attack bonus and damage spec for a character.
+ * Unarmed strikes are always proficient (5e PHB) and always use STR.
+ * `unarmedDamageDie` is 1 by default (flat 1 + STR mod) and is raised to 4
+ * by Tavern Brawler.
+ */
+export function deriveUnarmedStrike(
+  effectiveScores: Record<string, number>,
+  proficiencyBonus: number,
+  unarmedDamageDie: number,
+): {
+  attackBonus: number;
+  damage: { count: number; faces: number; modifier: number; damageType: string };
+} {
+  const strMod = abilityModifier(effectiveScores.strength ?? 10);
+  return {
+    attackBonus: strMod + proficiencyBonus,
+    damage: {
+      count: 1,
+      faces: unarmedDamageDie,
+      modifier: Math.max(0, strMod), // d1 baseline guarantees at least 1 total
+      damageType: "bludgeoning",
+    },
+  };
+}
+
+/**
+ * Derives the improvised-weapon attack bonus and damage spec for a character.
+ * Per 5e PHB: improvised weapons deal 1d4 bludgeoning and use STR. A character
+ * is normally **not** proficient with improvised weapons unless they have Tavern
+ * Brawler (which grants a `weaponProficiency` for "Improvised Weapons").
+ */
+export function deriveImprovisedAttack(
+  effectiveScores: Record<string, number>,
+  proficiencyBonus: number,
+  proficient: boolean,
+): {
+  attackBonus: number;
+  proficient: boolean;
+  damage: { count: number; faces: number; modifier: number; damageType: string };
+} {
+  const strMod = abilityModifier(effectiveScores.strength ?? 10);
+  return {
+    attackBonus: strMod + (proficient ? proficiencyBonus : 0),
+    proficient,
+    damage: { count: 1, faces: 4, modifier: strMod, damageType: "bludgeoning" },
+  };
+}
+
 export interface ToolProficiencyEntry {
   name: string;
   /** Origin of the proficiency — used to distinguish creation-fixed entries
@@ -567,12 +637,25 @@ export const PROFICIENCY_FEAT_IMPROVEMENT_TARGETS = [
 export type ProficiencyFeatImprovementTarget = (typeof PROFICIENCY_FEAT_IMPROVEMENT_TARGETS)[number];
 
 /**
+ * Combat-modifier targets: not summed as flat bonuses but used to derive
+ * per-attack properties at read time (e.g. raising the unarmed-strike damage die).
+ * `unarmedDamageDie` stores the die face count (e.g. 4 → d4); derivation takes
+ * the max across all active advancements rather than summing them.
+ */
+export const COMBAT_FEAT_IMPROVEMENT_TARGETS = [
+  "unarmedDamageDie", // amount = die face count (e.g. 4 for d4); max across feats
+] as const;
+
+export type CombatFeatImprovementTarget = (typeof COMBAT_FEAT_IMPROVEMENT_TARGETS)[number];
+
+/**
  * All valid FeatImprovement.target values. Used for route-level Zod validation.
  * Adding a new target here + wiring it in serializeCharacter is all that's needed.
  */
 export const FEAT_IMPROVEMENT_TARGETS = [
   ...NUMERIC_FEAT_IMPROVEMENT_TARGETS,
   ...PROFICIENCY_FEAT_IMPROVEMENT_TARGETS,
+  ...COMBAT_FEAT_IMPROVEMENT_TARGETS,
 ] as const;
 
 export type FeatImprovementTarget = (typeof FEAT_IMPROVEMENT_TARGETS)[number];

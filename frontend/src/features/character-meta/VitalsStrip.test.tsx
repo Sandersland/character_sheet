@@ -42,6 +42,15 @@ const mockCharacter: Character = {
   weaponProficiencies: [],
   inventory: [],
   currency: { cp: 0, sp: 0, gp: 25, pp: 0 },
+  unarmedStrike: {
+    attackBonus: 3,
+    damage: { count: 1, faces: 1, modifier: 1, damageType: "bludgeoning" },
+  },
+  improvisedWeapon: {
+    attackBonus: 1,
+    proficient: false,
+    damage: { count: 1, faces: 4, modifier: 1, damageType: "bludgeoning" },
+  },
   advancements: [],
   advancementSlots: { total: 1, used: 0 },
   journal: [],
