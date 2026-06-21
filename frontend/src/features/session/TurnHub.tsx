@@ -23,9 +23,10 @@
 import { useState } from "react";
 
 import Card from "@/components/ui/Card";
-import { applyActionTransactions } from "@/api/client";
+import { applyActionTransactions, applyResourceTransactions } from "@/api/client";
 import { UNIVERSAL_ACTIONS } from "@/lib/turnRules";
 import { rollSpec } from "@/lib/dice";
+import { mechanicsFor } from "@/lib/maneuvers";
 import { resolverFor } from "@/features/session/actionResolvers";
 import { useActiveResolution } from "@/features/session/useActiveResolution";
 import InlineAttackPicker from "@/features/session/InlineAttackPicker";
@@ -202,6 +203,7 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [showBonusMenu, setShowBonusMenu] = useState(false);
@@ -216,6 +218,18 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
   // Action Surge pool — Fighter-only resource.
   const actionSurgePool = character.resources?.pools?.find((p) => p.key === "actionSurge");
   const actionSurgeAvailable = (actionSurgePool?.remaining ?? 0) > 0;
+
+  // Commander's Strike — Battle Master bonus action.
+  const superiorityPool = character.resources?.pools?.find((p) => p.key === "superiorityDice");
+  const commandersStrikeKnown =
+    character.resources?.maneuversKnown?.some(
+      (m) => mechanicsFor(m.name).slot === "bonusAction" && m.name === "Commander's Strike",
+    ) ?? false;
+  const commandersStrikeAvailable =
+    commandersStrikeKnown &&
+    (superiorityPool?.remaining ?? 0) > 0 &&
+    !bonusActionUsed &&
+    (attack !== null || actionsRemaining < 1);
 
   // ── send() helper — fires applyActionTransactions then calls onUpdate ─────
 
@@ -340,6 +354,35 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
       grantExtraAction();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action Surge failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Commander's Strike — forefits one attack, costs the bonus action, spends a die.
+  async function handleCommandersStrike() {
+    if (!commandersStrikeAvailable || busy) return;
+    setBusy(true);
+    setError(null);
+    setInfoMessage(null);
+    try {
+      const diceFaces = superiorityPool?.die
+        ? parseInt(superiorityPool.die.replace("d", ""), 10)
+        : 8;
+      const dieResult = rollSpec({ count: 1, faces: diceFaces }).total;
+      const updated = await applyResourceTransactions(character.id, [
+        { type: "spendResource", key: "superiorityDice", amount: 1, roll: dieResult },
+      ]);
+      onUpdate(updated);
+      // Consume the bonus action slot and forfeit one of the Attack action's attacks.
+      consumeBonusAction();
+      if (attack !== null) turnState.recordAttack();
+      setShowBonusMenu(false);
+      setInfoMessage(
+        `Commander's Strike — tell ally to attack and add +${dieResult} to damage.`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Commander's Strike failed.");
     } finally {
       setBusy(false);
     }
@@ -543,6 +586,16 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
                   Off-hand Attack (TWF)
                 </QuickBtn>
               )}
+              {commandersStrikeAvailable && (
+                <QuickBtn
+                  tone="gold"
+                  disabled={busy}
+                  onClick={handleCommandersStrike}
+                  title="Forfeit one attack; an ally uses their reaction to strike, adding the superiority die to damage."
+                >
+                  Commander's Strike
+                </QuickBtn>
+              )}
               {classBonusActions.map((a) => (
                 <QuickBtn
                   key={a.key}
@@ -645,6 +698,7 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
               character={character}
               turnState={turnState}
               onClose={closeResolution}
+              onUpdate={onUpdate}
             />
           </div>
         )}
@@ -678,6 +732,13 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
         {/* Error display */}
         {error && (
           <p className="text-xs font-semibold text-garnet-700">{error}</p>
+        )}
+
+        {/* Commander's Strike info message */}
+        {infoMessage && (
+          <p className="rounded-control border border-gold-200 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800">
+            {infoMessage}
+          </p>
         )}
 
         {/* Note about movement */}
