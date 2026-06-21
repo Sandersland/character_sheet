@@ -20,14 +20,13 @@ import {
   deriveCreatedCharacter,
   deriveFeatBonuses,
   deriveFeatProficiencies,
-  deriveResources,
   deriveSpellcasting,
   isKnownTool,
-  PACK_CONTENTS,
-  STARTING_EQUIPMENT,
   TOOLS,
   type ToolProficiencyEntry,
 } from "../lib/srd.js";
+import { deriveResources } from "../lib/class-features.js";
+import { STARTING_EQUIPMENT } from "../lib/starting-equipment.js";
 import { normalizeResourcesMutable, type ToolProfEntry } from "../lib/resources.js";
 import { reverseAdvancementEffects } from "../lib/advancement.js";
 import { normalizeSpellcastingMutable } from "../lib/spellcasting.js";
@@ -438,13 +437,20 @@ const createCharacterSchema = z
 async function resolveFixedItems(
   refs: { catalogName: string; quantity?: number }[]
 ): Promise<{ inventoryCreates: ReturnType<typeof buildInventoryCreateFromCatalog>[]; error?: string }> {
-  // Expand packs first
+  // Expand packs via DB — fetch all Pack rows whose name matches a ref.
+  const refNames = [...new Set(refs.map((r) => r.catalogName))];
+  const packs = await prisma.pack.findMany({
+    where: { name: { in: refNames } },
+    include: { contents: { include: { item: { select: { name: true } } } } },
+  });
+  const packByName = new Map(packs.map((p) => [p.name, p]));
+
   const expanded: { catalogName: string; quantity: number }[] = [];
   for (const ref of refs) {
-    const packContents = PACK_CONTENTS[ref.catalogName];
-    if (packContents) {
-      for (const content of packContents) {
-        expanded.push({ catalogName: content.catalogName, quantity: (content.quantity ?? 1) * (ref.quantity ?? 1) });
+    const pack = packByName.get(ref.catalogName);
+    if (pack) {
+      for (const content of pack.contents) {
+        expanded.push({ catalogName: content.item.name, quantity: content.quantity * (ref.quantity ?? 1) });
       }
     } else {
       expanded.push({ catalogName: ref.catalogName, quantity: ref.quantity ?? 1 });

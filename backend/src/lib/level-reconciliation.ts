@@ -37,7 +37,8 @@ import {
   type ManeuverEntry,
   type ToolProfEntry,
 } from "./resources.js";
-import { advancementSlotsForLevel, deriveResources } from "./srd.js";
+import { advancementSlotsForLevel } from "./srd.js";
+import { deriveResources } from "./class-features.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeHitPoints } from "./hitpoints.js";
 

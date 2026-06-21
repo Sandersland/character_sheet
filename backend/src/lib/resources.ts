@@ -6,7 +6,7 @@
  * What is persisted: `used` counts per resource key and the `maneuversKnown`
  * snapshot array. What is derived at read time (in routes/characters.ts
  * serializeCharacter): pool totals, die size, recharge timing, maneuver
- * choice count — all via deriveResources() in src/lib/srd.ts.
+ * choice count — all via deriveResources() in src/lib/class-features.ts.
  */
 
 import { randomUUID } from "node:crypto";
@@ -15,7 +15,8 @@ import { Prisma } from "../generated/prisma/client.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
-import { deriveResources, isKnownTool, toolsByCategory } from "./srd.js";
+import { deriveResources } from "./class-features.js";
+import { isKnownTool, toolsByCategory } from "./srd.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 

@@ -4,7 +4,8 @@ import { Prisma } from "../generated/prisma/client.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
-import { abilityModifier, advancementSlotsForLevel, deriveFeatBonuses, deriveResources, hitDieFace } from "./srd.js";
+import { abilityModifier, advancementSlotsForLevel, deriveFeatBonuses, hitDieFace } from "./srd.js";
+import { deriveResources } from "./class-features.js";
 import { normalizeResourcesMutable, serializeResourcesState } from "./resources.js";
 import { normalizeSpellcastingMutable } from "./spellcasting.js";
 

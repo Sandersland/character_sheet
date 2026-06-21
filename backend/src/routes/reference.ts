@@ -1,6 +1,7 @@
 import { Router } from "express";
 
-import { ALIGNMENTS, STARTING_EQUIPMENT, TOOLS, toolsByCategory } from "../lib/srd.js";
+import { ALIGNMENTS, TOOLS, toolsByCategory } from "../lib/srd.js";
+import { STARTING_EQUIPMENT } from "../lib/starting-equipment.js";
 import { prisma } from "../lib/prisma.js";
 
 export const referenceRouter = Router();
