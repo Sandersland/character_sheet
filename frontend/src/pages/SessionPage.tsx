@@ -17,11 +17,13 @@ import RollResultToast from "@/features/dice/RollResultToast";
 import HitPointTracker from "@/features/hitpoints/HitPointTracker";
 import InventoryList from "@/features/inventory/InventoryList";
 import ClassFeaturesSection from "@/features/class/ClassFeaturesSection";
+import TurnTracker from "@/features/session/TurnTracker";
 import BackendStatus from "@/features/character-meta/BackendStatus";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useReferenceData } from "@/hooks/useReferenceData";
+import { useTurnState } from "@/features/session/useTurnState";
 import { endSession, fetchActiveSession } from "@/api/client";
 import { formatRollSpec } from "@/lib/dice";
 import type { Character, Session } from "@/types/character";
@@ -34,7 +36,14 @@ import type { Character, Session } from "@/types/character";
  * is always correct for the current loadout (shield present = 1d8, free
  * off-hand = 1d10, etc.).
  */
-function AttacksPanel({ character }: { character: Character }) {
+function AttacksPanel({
+  character,
+  onAttackRolled,
+}: {
+  character: Character;
+  /** Called when an attack roll button is clicked — auto-decrements turn-tracker counter. */
+  onAttackRolled?: () => void;
+}) {
   const { roll } = useRoll();
 
   const equippedWeapons = character.inventory.filter(
@@ -97,12 +106,13 @@ function AttacksPanel({ character }: { character: Character }) {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
                   roll(
                     { count: 1, faces: 20, modifier: w.attackBonus ?? 0 },
                     `${item.name} attack`,
-                  )
-                }
+                  );
+                  onAttackRolled?.();
+                }}
                 className="rounded-control border border-garnet-200 bg-garnet-50 px-2.5 py-1 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-100"
               >
                 Attack
@@ -136,12 +146,13 @@ function AttacksPanel({ character }: { character: Character }) {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() =>
+            onClick={() => {
               roll(
                 { count: 1, faces: 20, modifier: unarmedStrike.attackBonus },
                 "Unarmed strike attack",
-              )
-            }
+              );
+              onAttackRolled?.();
+            }}
             className="rounded-control border border-garnet-200 bg-garnet-50 px-2.5 py-1 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-100"
           >
             Attack
@@ -172,12 +183,13 @@ function AttacksPanel({ character }: { character: Character }) {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() =>
+            onClick={() => {
               roll(
                 { count: 1, faces: 20, modifier: improvisedWeapon.attackBonus },
                 "Improvised weapon attack",
-              )
-            }
+              );
+              onAttackRolled?.();
+            }}
             className="rounded-control border border-garnet-200 bg-garnet-50 px-2.5 py-1 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-100"
           >
             Attack
@@ -215,6 +227,22 @@ function SessionPageInner() {
   const { reference } = useReferenceData();
   const [session, setSession] = useState<Session | null>(null);
   const [endPending, setEndPending] = useState(false);
+
+  // Ephemeral turn-economy state — never persisted, resets on Start/End Turn.
+  // Requires a character, so we instantiate the hook after loading. We pass a
+  // stable fallback object so hooks are never conditionally called.
+  const turnState = useTurnState(character ?? {
+    id: "", name: "", race: "", class: "", level: 1, experiencePoints: 0,
+    currentLevelThreshold: 0, nextLevelThreshold: null, pendingLevelUps: 0,
+    background: "", alignment: "", armorClass: 10, initiativeBonus: 0,
+    speed: 30, proficiencyBonus: 2, hitPoints: { current: 0, max: 1, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+    hitDice: { total: 1, die: "d8", spent: 0 }, abilityScores: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },
+    savingThrowProficiencies: [], skills: [], toolProficiencies: [], armorProficiencies: [], weaponProficiencies: [],
+    inventory: [], currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+    unarmedStrike: { attackBonus: 0, damage: { count: 1, faces: 1, modifier: 0, damageType: "bludgeoning" } },
+    improvisedWeapon: { attackBonus: 0, proficient: false, damage: { count: 1, faces: 4, modifier: 0, damageType: "bludgeoning" } },
+    advancements: [], advancementSlots: { total: 0, used: 0 }, journal: [],
+  });
 
   // Resolve the active session on mount. If none found, bounce back to the sheet.
   useEffect(() => {
@@ -313,9 +341,25 @@ function SessionPageInner() {
         {/* ── Hit points ──────────────────────────────────────────────── */}
         <HitPointTracker character={character} onUpdate={setCharacter} />
 
+        {/* ── Turn tracker ─────────────────────────────────────────────── */}
+        <TurnTracker
+          character={character}
+          turnState={turnState}
+          onUpdate={setCharacter}
+        />
+
         {/* ── Attacks ─────────────────────────────────────────────────── */}
         <Card title="Attacks" className="p-4">
-          <AttacksPanel character={character} />
+          <AttacksPanel
+            character={character}
+            onAttackRolled={
+              // Only wire the callback when a turn is active and Attack mode is open
+              // so the counter is never decremented by out-of-turn roll-button clicks.
+              turnState.phase === "active" && turnState.attack !== null
+                ? turnState.recordAttack
+                : undefined
+            }
+          />
         </Card>
 
         {/* ── Resources (class pools) ──────────────────────────────────── */}

@@ -615,6 +615,47 @@ export interface ClassEntry {
   classId?: string;
 }
 
+// ── Action catalog types (Phase B) ───────────────────────────────────────────
+
+/**
+ * Action-economy cost — which slot an action consumes on the character's turn.
+ * Mirrors the `ActionCost` enum on the backend Action model.
+ */
+export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "special";
+
+/**
+ * A lean "available action" entry attached to the serialized character.
+ * Derived at read time by `deriveActions` in `backend/src/lib/actions.ts`.
+ * Display copy (name/description) is joined from the `Action` catalog.
+ * `enabled` cross-references remaining resource-pool counts so the frontend
+ * can grey out abilities the character can't afford.
+ */
+export interface AvailableAction {
+  /** Stable machine key matching `Action.key` in the catalog. */
+  key: string;
+  name: string;
+  cost: ActionCost;
+  /** False when the character can't currently use this action (e.g. no ki). */
+  enabled: boolean;
+  /** Human-readable reason why `enabled` is false; absent when enabled. */
+  disabledReason?: string;
+}
+
+/** Full catalog entry served by `GET /api/actions`. */
+export interface CatalogAction {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  cost: ActionCost;
+  universal: boolean;
+  grantClass?: string;
+  grantSubclass?: string;
+  grantLevel?: number;
+  resourceKey?: string;
+  resourceAmount?: number;
+}
+
 // ── Subclass option (from GET /api/reference) ─────────────────────────────────
 
 export interface SubclassOption {
@@ -681,6 +722,13 @@ export interface Character {
   };
 
   resources?: CharacterResources;
+
+  /**
+   * Derived available actions for the current turn — filtered by class/level/
+   * resource availability. Lean display objects; see `AvailableAction`.
+   * Undefined for characters without a class (shouldn't occur in practice).
+   */
+  availableActions?: AvailableAction[];
 
   /** Derived unarmed-strike stats — attack bonus and damage always available
    *  since everyone is proficient with unarmed strikes in 5e. Damage faces
@@ -991,6 +1039,33 @@ export type HitPointOperation =
   | LevelUpOperation
   | DeathSaveOperation
   | StabilizeOperation;
+
+// ── Action operation types (mirrors backend/src/lib/actions.ts) ─────────────
+// Sent as `{ operations: ActionOperation[] }` to
+// POST /api/characters/:id/actions/transactions.
+
+/**
+ * Execute a named action from the Action catalog. The server looks up
+ * ACTION_EFFECT_FN[key], emits the appropriate domain ops (spendResource,
+ * adjustQuantity, heal, etc.) within a single atomic transaction, and returns
+ * the updated character. Client-rolled values (potion heal, die roll totals)
+ * are passed via `roll`.
+ */
+export interface ExecuteActionOperation {
+  type: "executeAction";
+  /** Matches `Action.key` in the catalog (e.g. "drinkPotion", "rage"). */
+  actionKey: string;
+  /** Target inventory item id for item-consuming actions (e.g. drinkPotion). */
+  inventoryItemId?: string;
+  /**
+   * Client-rolled total for actions whose effects involve dice (e.g. a potion
+   * heal). The server validates and records this; it does NOT re-roll.
+   * Absent for actions with no die roll.
+   */
+  roll?: number;
+}
+
+export type ActionOperation = ExecuteActionOperation;
 
 // ── Session ───────────────────────────────────────────────────────────────────
 

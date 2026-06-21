@@ -34,6 +34,7 @@ import {
   type ToolProficiencyEntry,
 } from "../lib/srd.js";
 import { deriveResources } from "../lib/class-features.js";
+import { deriveActions, type AvailableAction } from "../lib/actions.js";
 import { STARTING_EQUIPMENT } from "../lib/starting-equipment.js";
 import { normalizeResourcesMutable, type ToolProfEntry } from "../lib/resources.js";
 import { reverseAdvancementEffects } from "../lib/advancement.js";
@@ -300,9 +301,18 @@ export function serializeCharacter(row: CharacterWithRelations) {
       })),
       spells: stored.spells,
     };
-  } else if (row.spellcasting !== null && row.spellcasting !== undefined) {
-    // Fallback for unsupported caster classes (Warlock Pact Magic, half/third
-    // casters): pass the stored blob as-is so the UI still renders.
+  } else if (
+    row.spellcasting !== null &&
+    row.spellcasting !== undefined &&
+    Array.isArray((row.spellcasting as { slots?: unknown }).slots)
+  ) {
+    // Fallback only for an already well-formed serialized blob (has `slots`).
+    // The compact mutable format ({ slotsUsed, spells }) that a non-caster or
+    // partial caster may have persisted is NOT renderable — leave spellcasting
+    // undefined so SpellsSection is skipped (Journal card renders instead of
+    // crashing with slots.filter on undefined).
+    // This branch is currently inert for real data (no Warlock/Paladin/Ranger
+    // serialized blobs exist), but guards future half/third-caster additions.
     spellcasting = row.spellcasting as object;
   }
 
@@ -507,6 +517,23 @@ export function serializeCharacter(row: CharacterWithRelations) {
       total: advSlotTotal,
       used: clampedAdvancements.length,
     },
+
+    // Class-specific available actions for the turn tracker — derived from
+    // class/subclass/level + current resource pools. Universal actions are
+    // rendered client-side from UNIVERSAL_ACTIONS in lib/turnRules.ts;
+    // only class-specific ones live here to avoid double-rendering.
+    availableActions: ((): AvailableAction[] => {
+      const pools =
+        resources && "pools" in resources
+          ? (resources as { pools: { key: string; remaining: number }[] }).pools
+          : [];
+      return deriveActions(
+        primaryClass?.name ?? "",
+        primaryClass?.subclass ?? undefined,
+        progress.level,
+        pools,
+      );
+    })(),
 
     // ── Combat attack rows ─────────────────────────────────────────────────
     // Derived at read time; the frontend renders these directly in AttacksPanel

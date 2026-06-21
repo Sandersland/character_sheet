@@ -460,3 +460,101 @@ export async function applyResourceOperations(
     }
   });
 }
+
+/**
+ * Applies a single spendResource op inside a caller-supplied Prisma transaction.
+ *
+ * Exported so the actions orchestrator (routes/actions.ts) can include a
+ * resource spend alongside an inventory adjust or HP heal in one atomic
+ * $transaction. Keep in sync with the `case "spendResource"` branch above.
+ */
+export async function applySpendResourceInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: SpendResourceOperation,
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: {
+      resources: true,
+      experiencePoints: true,
+      abilityScores: true,
+      classEntries: {
+        orderBy: { position: "asc" as const },
+        take: 1,
+        select: { name: true, subclass: true },
+      },
+    },
+  });
+  if (!row) throw new InvalidResourceOperationError(`Character not found: ${characterId}`);
+
+  const level = levelForExperience(row.experiencePoints);
+  const profBonus = proficiencyBonusForLevel(level);
+  const primaryEntry = row.classEntries[0];
+  const className = primaryEntry?.name ?? "";
+  const subclass = primaryEntry?.subclass ?? undefined;
+  const abilityScores = row.abilityScores as Record<string, number>;
+  const derivedInfo = deriveResources(className, subclass, level, abilityScores, profBonus);
+
+  const state = normalizeResourcesMutable(row.resources);
+  const beforeState = {
+    resources: {
+      used: { ...state.used },
+      maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
+      toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
+      advancements: state.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
+    },
+  };
+
+  const amount = op.amount ?? 1;
+  if (amount <= 0) throw new InvalidResourceOperationError("spendResource: amount must be positive");
+
+  const pool = derivedInfo?.resources.find((r) => r.key === op.key);
+  if (!pool) {
+    throw new InvalidResourceOperationError(
+      `Resource "${op.key}" not available for this character's subclass`
+    );
+  }
+
+  const used = state.used[op.key] ?? 0;
+  if (used + amount > pool.total) {
+    throw new InvalidResourceOperationError(
+      `Cannot spend ${amount} ${pool.label}: only ${pool.total - used} remaining`
+    );
+  }
+
+  state.used[op.key] = used + amount;
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: { resources: serializeResourcesState(state) },
+  });
+
+  const remaining = pool.total - state.used[op.key];
+  const summary = op.roll !== undefined
+    ? `Spent ${amount} ${pool.label} (rolled ${pool.die}: ${op.roll}) — ${remaining}/${pool.total} remaining`
+    : `Spent ${amount} ${pool.label} — ${remaining}/${pool.total} remaining`;
+
+  const afterState = {
+    resources: {
+      used: { ...state.used },
+      maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
+      toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
+      advancements: state.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
+    },
+  };
+
+  await logEvent(tx, {
+    characterId,
+    category: "resources",
+    type: "spendResource",
+    summary,
+    before: beforeState,
+    after: afterState,
+    data: { key: op.key, amount, roll: op.roll ?? null, remaining },
+    batchId,
+    sessionId,
+  });
+}

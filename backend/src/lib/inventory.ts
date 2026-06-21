@@ -474,7 +474,12 @@ async function applyAcquire(
   });
 }
 
-async function applyAdjustQuantity(
+/**
+ * Exported so the actions orchestrator (routes/actions.ts) can include
+ * an adjustQuantity op inside a shared $transaction without re-opening one.
+ * Keep in sync with the inline version — one code path, two callers.
+ */
+export async function applyAdjustQuantity(
   tx: Prisma.TransactionClient,
   characterId: string,
   op: AdjustQuantityOperation,

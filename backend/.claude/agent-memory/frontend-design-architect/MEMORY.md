@@ -1,2 +1,0 @@
-- [Design system tokens](design_system_tokens.md) — parchment/garnet/arcane/gold/vitality palette, Source Serif 4 + Source Sans 3 fonts, rounded-card/rounded-control radii
-- [Class features section](class_features_section.md) — ResourcePoolRow, ManeuverRow, AddManeuverPanel, ClassFeaturesSection shipped in features/class/

@@ -1,5 +1,7 @@
 import type {
+  ActionOperation,
   AdvancementOperation,
+  CatalogAction,
   CatalogFeat,
   CatalogManeuver,
   CatalogSpell,
@@ -308,6 +310,38 @@ export async function revertBatch(
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     throw new Error(body?.error ?? `Failed to revert batch (${response.status})`);
+  }
+  return response.json();
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+
+// Feeds the TurnTracker's action catalog picker. Ordered by cost then name.
+export async function fetchActions(): Promise<CatalogAction[]> {
+  const response = await fetch(`${API_URL}/actions`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch action catalog (${response.status})`);
+  }
+  return response.json();
+}
+
+// Applies a batch of action operations atomically via the Phase-C orchestrator:
+// each action's effect function (spend resource, consume item, heal, etc.) runs
+// in a single Prisma transaction with a shared batchId, so "drink potion" is
+// atomic and LIFO-undoable. Rolls (e.g. a potion's healing) are client-computed
+// and passed as `op.roll`; the server validates and records but does not re-roll.
+export async function applyActionTransactions(
+  characterId: string,
+  operations: ActionOperation[]
+): Promise<Character> {
+  const response = await fetch(`${API_URL}/characters/${characterId}/actions/transactions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ operations }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to apply action operations (${response.status})`);
   }
   return response.json();
 }

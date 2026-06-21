@@ -45,7 +45,7 @@ interface CastResult {
 
 export default function SpellsSection({ character, onUpdate }: SpellsSectionProps) {
   const spellcasting = character.spellcasting!;
-  const { spellSaveDC, spellAttackBonus, slots, spells, ability } = spellcasting;
+  const { spellSaveDC, spellAttackBonus, slots = [], spells = [], ability } = spellcasting;
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

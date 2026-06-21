@@ -579,3 +579,78 @@ export async function applyHitPointOperations(
     }
   });
 }
+
+/**
+ * Applies a single heal op inside a caller-supplied Prisma transaction.
+ *
+ * Exported so the actions orchestrator (routes/actions.ts) can compose a
+ * "consume potion + heal" pair into one atomic $transaction without opening a
+ * nested transaction. Keep the heal logic in sync with the `case "heal"` branch
+ * inside applyHitPointOperations above.
+ */
+export async function applyHealInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  amount: number,
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  if (amount <= 0) {
+    throw new InvalidHitPointOperationError("heal amount must be positive");
+  }
+
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: {
+      hitPoints: true,
+      hitDice: true,
+      abilityScores: true,
+      experiencePoints: true,
+      resources: true,
+      classEntries: {
+        orderBy: { position: "asc" as const },
+        take: 1,
+        select: { id: true, level: true, name: true, subclass: true },
+      },
+    },
+  });
+  if (!row) {
+    throw new InvalidHitPointOperationError(`Character not found: ${characterId}`);
+  }
+
+  const hp = normalizeHitPoints(row.hitPoints);
+  const hd = normalizeHitDice(row.hitDice);
+
+  const advState = normalizeResourcesMutable(row.resources);
+  const featSlotCap = advancementSlotsForLevel(
+    row.classEntries[0]?.name ?? "",
+    levelForExperience(row.experiencePoints),
+  );
+  const featBonus = deriveFeatBonuses(advState.advancements.slice(0, featSlotCap), hd.total);
+  const effMax = hp.max + featBonus.maxHp;
+
+  const beforeHp = { ...hp };
+
+  // Regaining HP while at 0 wakes the character and clears death saves.
+  if (hp.current === 0) {
+    hp.deathSaves = { successes: 0, failures: 0 };
+  }
+  hp.current = Math.min(effMax, hp.current + amount);
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: { hitPoints: hp as unknown as Prisma.InputJsonValue },
+  });
+
+  await logEvent(tx, {
+    characterId,
+    category: "hitPoints",
+    type: "heal",
+    summary: `Healed ${amount} HP (${beforeHp.current} → ${hp.current} HP)`,
+    before: { hitPoints: beforeHp, hitDice: { ...hd } },
+    after: { hitPoints: { ...hp }, hitDice: { ...hd } },
+    data: { amount },
+    batchId,
+    sessionId,
+  });
+}
