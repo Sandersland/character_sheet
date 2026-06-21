@@ -227,6 +227,44 @@ enum SpellSchool {
   transmutation
 }
 
+// Action catalog — seeded with universal 5e combat actions (Dodge, Dash, etc.)
+// and class-specific abilities (Rage, Second Wind, Flurry of Blows, etc.).
+// Holds DISPLAY + GATING data only. Executable mechanics are hardcoded in
+// backend/src/lib/actions.ts (ACTION_EFFECT_FN keyed by `key`) — the same
+// split as CLASS_RESOURCE_FN vs. the DerivedResource descriptions here.
+// Adding a new action = append a row to seed.ts + add the effect fn in
+// actions.ts. No migration needed for new actions; only new columns need one.
+model Action {
+  id          String     @id @default(uuid())
+  key         String     @unique  // stable machine key, e.g. "rage" | "dodge"
+  name        String               // display label
+  description String
+
+  // Which economy slot this action consumes on the character's turn.
+  cost        ActionCost
+
+  // Gating — universal actions are available to everyone; class/subclass/level
+  // actions are gated by the character's class entry.
+  universal   Boolean    @default(false)
+  grantClass  String?    // lowercase class name, e.g. "fighter"
+  grantSubclass String?  // lowercase subclass name (optional, for subclass-only abilities)
+  grantLevel  Int?       // minimum character level for this action to appear
+
+  // Optional scalar resource-spend hint — used by deriveActions to determine
+  // `enabled` (e.g. Rage costs 1 "rage"; Flurry costs 2 "ki"). No program,
+  // just two columns that let deriveActions check remaining > amount.
+  resourceKey    String? // matches DerivedResource.key, e.g. "rage"
+  resourceAmount Int?    // units required; null means no resource check needed
+}
+
+enum ActionCost {
+  action
+  bonusAction
+  reaction
+  free
+  special
+}
+
 // Maneuver catalog — seeded from the 5e Basic Rules Battle Master maneuver
 // list. Provenance pointer in ResourcesMutableState.ManeuverEntry.maneuverId.
 // Nullable FK so homebrew/custom maneuvers have no catalog row.

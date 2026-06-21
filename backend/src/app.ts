@@ -1,6 +1,7 @@
 import cors from "cors";
 import express from "express";
 
+import { actionsRouter } from "./routes/actions.js";
 import { activityRouter } from "./routes/activity.js";
 import { advancementRouter } from "./routes/advancement.js";
 import { classRouter } from "./routes/class.js";
@@ -40,6 +41,7 @@ export function createApp() {
   app.use("/api", featsRouter);
   app.use("/api", advancementRouter);
   app.use("/api", sessionsRouter);
+  app.use("/api", actionsRouter);
 
   return app;
 }
