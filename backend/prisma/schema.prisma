@@ -308,6 +308,10 @@ model Spell {
   ritual      Boolean     @default(false)
   classes     String[]    // lowercase class names the spell appears on, e.g. ["wizard","sorcerer"]
 
+  // Spell components for spellbook display + future component checks.
+  // { verbal: bool, somatic: bool, material: bool, materialDescription?: string }
+  components  Json?
+
   // Structured effect data for auto-rolling at cast time (RollSpec-shaped,
   // mirrors ItemWeaponDetail / ItemConsumableDetail). null = utility spell.
   effectKind         String?  // "damage" | "heal" — null means utility (no roll)
@@ -317,6 +321,9 @@ model Spell {
   damageType         String?  // "fire" / "radiant" / etc. — for damage spells
   attackType         String?  // "attack" | "save" | null
   saveAbility        String?  // ability the target saves with, e.g. "dexterity"
+  // For save-based damage spells: "half" = half damage on a successful save
+  // (Fireball), "none" = no damage on save. null for attack spells / utility.
+  saveEffect         String?
   // Extra effect dice added per slot level cast above the base level (null =
   // spell has no upcast scaling — Fireball adds 1d6 per upcast level).
   upcastDicePerLevel Int?

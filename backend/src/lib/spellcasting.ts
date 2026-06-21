@@ -20,6 +20,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "../generated/prisma/client.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
+import { applyHealInTx, applyDamageInTx } from "./hitpoints.js";
 import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
 import { deriveSpellcasting } from "./srd.js";
@@ -48,6 +49,10 @@ export interface SpellEntry {
   description: string;
   concentration?: boolean;
   ritual?: boolean;
+  // Spell components ({ verbal, somatic, material, materialDescription? }) and
+  // save-on-damage behavior, snapshotted from the catalog at learn time.
+  components?: SpellComponents | null;
+  saveEffect?: string | null;    // "half" | "none" | null
   // Structured roll effect (snapshotted from catalog at learn time):
   effectKind?: string | null;    // "damage" | "heal" | null (utility)
   effectDiceCount?: number | null;
@@ -58,6 +63,14 @@ export interface SpellEntry {
   saveAbility?: string | null;
   upcastDicePerLevel?: number | null;
   cantripScaling?: boolean;
+}
+
+/** Spell verbal/somatic/material component flags + optional material text. */
+export interface SpellComponents {
+  verbal: boolean;
+  somatic: boolean;
+  material: boolean;
+  materialDescription?: string;
 }
 
 export interface SpellcastingMutableState {
@@ -109,6 +122,8 @@ export interface CustomSpellInput {
   description: string;
   concentration?: boolean;
   ritual?: boolean;
+  components?: SpellComponents;
+  saveEffect?: string;
   effectKind?: string;
   effectDiceCount?: number;
   effectDiceFaces?: number;
@@ -133,6 +148,12 @@ export interface CastSpellOperation {
   entryId: string;
   slotLevel?: number; // required for leveled spells, omit/ignore for cantrips
   roll: number;       // client-rolled total (0 for utility)
+  /**
+   * Optionally apply the rolled effect to the caster's own HP in the same atomic
+   * batch — used when the player targets themselves. Omitted when targeting
+   * others (no enemy entities exist; the player relays damage to the DM).
+   */
+  apply?: { target: "self"; kind: "heal" | "damage"; amount: number };
 }
 
 /** Expend one slot of a given level without associating it with a specific spell. */
@@ -288,6 +309,16 @@ export async function applySpellcastingOperations(
             }
             eventData = { entryId: op.entryId, spellName: entry.name, roll: op.roll, slotLevel };
           }
+
+          // Self-targeted effect: apply to the caster's own HP in this same batch
+          // so the slot-spend and HP-change revert together as one undo step.
+          if (op.apply && op.apply.target === "self" && op.apply.amount > 0) {
+            if (op.apply.kind === "heal") {
+              await applyHealInTx(tx, characterId, op.apply.amount, batchId, sessionId);
+            } else {
+              await applyDamageInTx(tx, characterId, op.apply.amount, batchId, sessionId);
+            }
+          }
           break;
         }
 
@@ -354,6 +385,8 @@ export async function applySpellcastingOperations(
               description: catalogSpell.description,
               concentration: catalogSpell.concentration,
               ritual: catalogSpell.ritual,
+              components: (catalogSpell.components as SpellComponents | null) ?? undefined,
+              saveEffect: catalogSpell.saveEffect ?? undefined,
               effectKind: catalogSpell.effectKind ?? undefined,
               effectDiceCount: catalogSpell.effectDiceCount ?? undefined,
               effectDiceFaces: catalogSpell.effectDiceFaces ?? undefined,
@@ -379,6 +412,8 @@ export async function applySpellcastingOperations(
               description: custom.description,
               concentration: custom.concentration,
               ritual: custom.ritual,
+              components: custom.components,
+              saveEffect: custom.saveEffect,
               effectKind: custom.effectKind,
               effectDiceCount: custom.effectDiceCount,
               effectDiceFaces: custom.effectDiceFaces,

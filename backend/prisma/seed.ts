@@ -1600,6 +1600,13 @@ interface CatalogSpell {
   concentration?: boolean;
   ritual?: boolean;
   classes: string[];          // lowercase class names
+  components?: {
+    verbal: boolean;
+    somatic: boolean;
+    material: boolean;
+    materialDescription?: string;
+  };
+  saveEffect?: "half" | "none"; // for save-based damage spells
   effectKind?: "damage" | "heal";
   effectDiceCount?: number;
   effectDiceFaces?: number;
@@ -1622,6 +1629,7 @@ const SPELLS: CatalogSpell[] = [
     duration: "Instantaneous",
     description: "A mote of fire streaks toward a creature. Make a ranged spell attack. On a hit, deal 1d10 fire damage (scales to 2d10 at level 5, 3d10 at level 11, 4d10 at level 17).",
     classes: ["wizard", "sorcerer"],
+    components: { verbal: true, somatic: true, material: false },
     effectKind: "damage",
     effectDiceCount: 1,
     effectDiceFaces: 10,
@@ -1638,12 +1646,14 @@ const SPELLS: CatalogSpell[] = [
     duration: "Instantaneous",
     description: "Flame-like radiance descends on a creature. It must succeed on a Dexterity saving throw or take 1d8 radiant damage (scales to 2d8 at level 5, 3d8 at 11, 4d8 at 17). No cover bonus.",
     classes: ["cleric"],
+    components: { verbal: true, somatic: true, material: false },
     effectKind: "damage",
     effectDiceCount: 1,
     effectDiceFaces: 8,
     damageType: "radiant",
     attackType: "save",
     saveAbility: "dexterity",
+    saveEffect: "none",
     cantripScaling: true,
   },
   {
@@ -1655,12 +1665,14 @@ const SPELLS: CatalogSpell[] = [
     duration: "Instantaneous",
     description: "Unleash a string of insults laden with magic. The target must succeed on a Wisdom save or take 1d4 psychic damage and have disadvantage on its next attack roll (scales to 2d4 at level 5, 3d4 at 11, 4d4 at 17).",
     classes: ["bard"],
+    components: { verbal: true, somatic: false, material: false },
     effectKind: "damage",
     effectDiceCount: 1,
     effectDiceFaces: 4,
     damageType: "psychic",
     attackType: "save",
     saveAbility: "wisdom",
+    saveEffect: "none",
     cantripScaling: true,
   },
   {
@@ -1672,12 +1684,14 @@ const SPELLS: CatalogSpell[] = [
     duration: "Instantaneous",
     description: "Point at a creature and the sound of a dolorous bell fills the air. It must succeed on a Constitution save or take 1d8 necrotic damage (1d12 if it's missing HP). Scales at level 5/11/17.",
     classes: ["cleric", "wizard"],
+    components: { verbal: true, somatic: true, material: false },
     effectKind: "damage",
     effectDiceCount: 1,
     effectDiceFaces: 8,
     damageType: "necrotic",
     attackType: "save",
     saveAbility: "constitution",
+    saveEffect: "none",
     cantripScaling: true,
   },
   {
@@ -1689,6 +1703,7 @@ const SPELLS: CatalogSpell[] = [
     duration: "1 minute",
     description: "A spectral, floating hand appears at a point you choose within range. It can manipulate objects, open doors, or stow items, but can't attack or carry more than 10 pounds.",
     classes: ["wizard", "sorcerer", "bard"],
+    components: { verbal: true, somatic: true, material: false },
   },
   {
     name: "Prestidigitation",
@@ -1699,6 +1714,7 @@ const SPELLS: CatalogSpell[] = [
     duration: "Up to 1 hour",
     description: "Magical tricks: create a small sensory effect, light or snuff a flame, clean or soil an object, warm or chill food, create a mark, produce a trinket-like item, or activate/cancel a past prestidigitation effect.",
     classes: ["wizard", "sorcerer", "bard"],
+    components: { verbal: true, somatic: true, material: false },
   },
   {
     name: "Light",
@@ -1709,6 +1725,7 @@ const SPELLS: CatalogSpell[] = [
     duration: "1 hour",
     description: "Touch one object no larger than 10 feet in any dimension. Until the spell ends, it emits bright light in a 20-foot radius and dim light for an additional 20 feet.",
     classes: ["cleric", "bard", "wizard", "sorcerer"],
+    components: { verbal: true, somatic: false, material: true, materialDescription: "a firefly or phosphorescent moss" },
   },
   // ── Level 1 ───────────────────────────────────────────────────────────────
   {
@@ -1720,6 +1737,7 @@ const SPELLS: CatalogSpell[] = [
     duration: "Instantaneous",
     description: "Three glowing darts of magical force hit automatically (1d4+1 each = 3d4+3 total). At higher levels: +1 dart per slot level above 1st.",
     classes: ["wizard", "sorcerer"],
+    components: { verbal: true, somatic: true, material: false },
     effectKind: "damage",
     effectDiceCount: 3,
     effectDiceFaces: 4,
@@ -1736,6 +1754,7 @@ const SPELLS: CatalogSpell[] = [
     duration: "Instantaneous",
     description: "Touch a living creature and restore 1d8 + spellcasting modifier HP. At higher levels: +1d8 per slot level above 1st.",
     classes: ["cleric", "bard", "druid"],
+    components: { verbal: true, somatic: true, material: false },
     effectKind: "heal",
     effectDiceCount: 1,
     effectDiceFaces: 8,
@@ -1750,6 +1769,7 @@ const SPELLS: CatalogSpell[] = [
     duration: "Instantaneous",
     description: "Call out words of restoration to restore 1d4 + spellcasting modifier HP to a visible creature within range. At higher levels: +1d4 per slot level above 1st.",
     classes: ["cleric", "bard", "druid"],
+    components: { verbal: true, somatic: false, material: false },
     effectKind: "heal",
     effectDiceCount: 1,
     effectDiceFaces: 4,
@@ -1764,6 +1784,7 @@ const SPELLS: CatalogSpell[] = [
     duration: "8 hours",
     description: "Touch a willing creature not wearing armor. Until the spell ends, the target's base AC becomes 13 + its Dexterity modifier. The spell ends if the target dons armor.",
     classes: ["wizard", "sorcerer"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a piece of cured leather" },
   },
   {
     name: "Shield",
@@ -1774,6 +1795,7 @@ const SPELLS: CatalogSpell[] = [
     duration: "1 round",
     description: "Reaction to an attack hitting you: +5 AC until the start of your next turn (potentially turning the hit into a miss), plus immunity to Magic Missile.",
     classes: ["wizard", "sorcerer"],
+    components: { verbal: true, somatic: true, material: false },
   },
   {
     name: "Thunderwave",
@@ -1784,12 +1806,14 @@ const SPELLS: CatalogSpell[] = [
     duration: "Instantaneous",
     description: "A wave of thunderous force sweeps out. Each creature in a 15-ft cube must succeed on a Constitution save or take 2d8 thunder damage and be pushed 10 feet. At higher levels: +1d8 per slot level above 1st.",
     classes: ["wizard", "druid", "bard", "sorcerer", "cleric"],
+    components: { verbal: true, somatic: true, material: false },
     effectKind: "damage",
     effectDiceCount: 2,
     effectDiceFaces: 8,
     damageType: "thunder",
     attackType: "save",
     saveAbility: "constitution",
+    saveEffect: "none",
     upcastDicePerLevel: 1,
   },
   {
@@ -1801,6 +1825,7 @@ const SPELLS: CatalogSpell[] = [
     duration: "Concentration, up to 10 minutes",
     description: "Sense the presence of magic within 30 feet. You can use your action to see a faint aura around visible magical creatures or objects and learn its school of magic, if any.",
     classes: ["wizard", "cleric", "druid", "bard"],
+    components: { verbal: true, somatic: true, material: false },
     concentration: true,
     ritual: true,
   },
@@ -1814,6 +1839,7 @@ const SPELLS: CatalogSpell[] = [
     duration: "Instantaneous",
     description: "Create three rays of fire; make a separate ranged spell attack for each. On a hit, each ray deals 2d6 fire damage (total 6d6 if all hit). At higher levels: +1 ray per slot level above 2nd.",
     classes: ["wizard", "sorcerer"],
+    components: { verbal: true, somatic: true, material: false },
     effectKind: "damage",
     effectDiceCount: 6,
     effectDiceFaces: 6,
@@ -1830,6 +1856,7 @@ const SPELLS: CatalogSpell[] = [
     duration: "Instantaneous",
     description: "Briefly surrounded by silvery mist, you teleport up to 30 feet to an unoccupied space you can see.",
     classes: ["wizard", "sorcerer", "bard"],
+    components: { verbal: true, somatic: false, material: false },
   },
   {
     name: "Shatter",
@@ -1840,12 +1867,14 @@ const SPELLS: CatalogSpell[] = [
     duration: "Instantaneous",
     description: "A sudden loud ringing noise causes creatures and objects in a 10-ft-radius sphere to take 3d8 thunder damage on a failed Constitution save, half on a success. Inorganic material has disadvantage. At higher levels: +1d8 per slot above 2nd.",
     classes: ["bard", "sorcerer", "wizard", "cleric"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a chip of mica" },
     effectKind: "damage",
     effectDiceCount: 3,
     effectDiceFaces: 8,
     damageType: "thunder",
     attackType: "save",
     saveAbility: "constitution",
+    saveEffect: "half",
     upcastDicePerLevel: 1,
   },
   {
@@ -1857,6 +1886,7 @@ const SPELLS: CatalogSpell[] = [
     duration: "Concentration, up to 1 minute",
     description: "Choose a humanoid within range. It must succeed on a Wisdom saving throw or be paralyzed for the duration. At the end of each of its turns, it can repeat the save.",
     classes: ["bard", "cleric", "druid", "wizard"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a small straight piece of iron" },
     concentration: true,
     attackType: "save",
     saveAbility: "wisdom",
@@ -1871,12 +1901,14 @@ const SPELLS: CatalogSpell[] = [
     duration: "Instantaneous",
     description: "A bright streak flashes to a point you choose, then blossoms into an explosion. Each creature in a 20-ft-radius sphere must make a Dexterity save. On failure, 8d6 fire damage; half on success. At higher levels: +1d6 per slot level above 3rd.",
     classes: ["wizard", "sorcerer"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a tiny ball of bat guano and sulfur" },
     effectKind: "damage",
     effectDiceCount: 8,
     effectDiceFaces: 6,
     damageType: "fire",
     attackType: "save",
     saveAbility: "dexterity",
+    saveEffect: "half",
     upcastDicePerLevel: 1,
   },
   {
@@ -1888,12 +1920,14 @@ const SPELLS: CatalogSpell[] = [
     duration: "Instantaneous",
     description: "A stroke of lightning blasts out in a 100-ft line. Each creature in the line makes a Dexterity save. On failure, 8d6 lightning damage; half on success. At higher levels: +1d6 per slot level above 3rd.",
     classes: ["wizard", "sorcerer"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a bit of fur and a rod of amber, crystal, or glass" },
     effectKind: "damage",
     effectDiceCount: 8,
     effectDiceFaces: 6,
     damageType: "lightning",
     attackType: "save",
     saveAbility: "dexterity",
+    saveEffect: "half",
     upcastDicePerLevel: 1,
   },
   {
@@ -1905,6 +1939,7 @@ const SPELLS: CatalogSpell[] = [
     duration: "Instantaneous",
     description: "Attempt to interrupt a creature in the process of casting a spell. If the spell is 3rd level or lower, it fails automatically. If it's 4th level or higher, make an ability check (DC = 10 + spell's level).",
     classes: ["wizard", "sorcerer", "bard", "cleric"],
+    components: { verbal: false, somatic: true, material: false },
   },
   {
     name: "Mass Healing Word",
@@ -1915,6 +1950,7 @@ const SPELLS: CatalogSpell[] = [
     duration: "Instantaneous",
     description: "As you call out words of restoration, up to six creatures you choose within range each regain 1d4 + spellcasting modifier HP. At higher levels: +1d4 per slot level above 3rd.",
     classes: ["cleric", "bard"],
+    components: { verbal: true, somatic: false, material: false },
     effectKind: "heal",
     effectDiceCount: 1,
     effectDiceFaces: 4,

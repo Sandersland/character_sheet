@@ -31,6 +31,9 @@ export interface AttackState {
   used: number;
 }
 
+/** Which kind of spell was cast from a given slot this turn — for 5e bonus-action restriction. */
+export type SpellCastKind = "cantrip" | "leveled";
+
 export interface TurnState {
   phase: TurnPhase;
   /** How many actions remain this turn (normally 1; +1 after Action Surge). */
@@ -45,6 +48,13 @@ export interface TurnState {
   bonusAttack: AttackState | null;
   /** Whether TWF is available for the bonus action (gates the affordance). */
   twfAvailable: boolean;
+  /**
+   * Tracks what was cast from each slot this turn (set when InlineSpellPicker
+   * commits a cast). Used to enforce the 5e bonus-action spell restriction:
+   * casting a leveled spell as a bonus action → only cantrips allowed as
+   * actions; casting a leveled spell as an action → no bonus-action spells.
+   */
+  spellCastThisTurn: { action?: SpellCastKind; bonus?: SpellCastKind };
 }
 
 export interface TurnStateActions {
@@ -71,6 +81,19 @@ export interface TurnStateActions {
    * by the caller (via applyResourceTransactions); this just bumps the UI counter.
    */
   grantExtraAction: () => void;
+  /**
+   * Commit the action slot for a spell cast (consumes the action and records the
+   * spell kind for the 5e bonus-action restriction). Call on successful cast.
+   */
+  commitActionSpell: (spellLevel: number) => void;
+  /**
+   * Commit the bonus-action slot for a spell cast. Call on successful cast.
+   */
+  commitBonusActionSpell: (spellLevel: number) => void;
+  /**
+   * Commit the reaction slot for a spell cast. Call on successful cast.
+   */
+  commitReactionSpell: () => void;
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -84,6 +107,7 @@ function initialState(): TurnState {
     attack: null,
     bonusAttack: null,
     twfAvailable: false,
+    spellCastThisTurn: {},
   };
 }
 
@@ -105,6 +129,7 @@ export function useTurnState(character: Character): TurnState & TurnStateActions
       attack: null,
       bonusAttack: null,
       twfAvailable: canTwoWeaponFight(character.inventory),
+      spellCastThisTurn: {},
     });
   }, [character.inventory]);
 
@@ -167,6 +192,30 @@ export function useTurnState(character: Character): TurnState & TurnStateActions
     setState((s) => ({ ...s, actionsRemaining: s.actionsRemaining + 1 }));
   }, []);
 
+  const commitActionSpell = useCallback((spellLevel: number) => {
+    const kind: SpellCastKind = spellLevel === 0 ? "cantrip" : "leveled";
+    setState((s) => ({
+      ...s,
+      actionsRemaining: Math.max(0, s.actionsRemaining - 1),
+      attack: null,
+      spellCastThisTurn: { ...s.spellCastThisTurn, action: kind },
+    }));
+  }, []);
+
+  const commitBonusActionSpell = useCallback((spellLevel: number) => {
+    const kind: SpellCastKind = spellLevel === 0 ? "cantrip" : "leveled";
+    setState((s) => ({
+      ...s,
+      bonusActionUsed: true,
+      bonusAttack: null,
+      spellCastThisTurn: { ...s.spellCastThisTurn, bonus: kind },
+    }));
+  }, []);
+
+  const commitReactionSpell = useCallback(() => {
+    setState((s) => ({ ...s, reactionUsed: true }));
+  }, []);
+
   return {
     ...state,
     startTurn,
@@ -179,5 +228,8 @@ export function useTurnState(character: Character): TurnState & TurnStateActions
     recordTwfAttack,
     consumeReaction,
     grantExtraAction,
+    commitActionSpell,
+    commitBonusActionSpell,
+    commitReactionSpell,
   };
 }

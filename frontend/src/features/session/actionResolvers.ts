@@ -67,6 +67,7 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   // ── Universal no-op actions (ephemeral slot only) ──────────────────────────
   attack:            { key: "attack",            kind: "attack-picker",  slot: "action",      serverEffect: false },
   castSpell:         { key: "castSpell",         kind: "spell-picker",   slot: "action",      serverEffect: false },
+  castSpellBonus:    { key: "castSpellBonus",    kind: "spell-picker",   slot: "bonusAction", serverEffect: false },
   castSpellReaction: { key: "castSpellReaction", kind: "spell-picker",   slot: "reaction",    serverEffect: false },
   useObject:         { key: "useObject",         kind: "item-picker",    slot: "action",      serverEffect: true  },
   dodge:             { key: "dodge",             kind: "simple-confirm", slot: "action",      serverEffect: false },

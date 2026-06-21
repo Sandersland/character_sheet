@@ -65,7 +65,8 @@ describe("actionResolvers", () => {
   it("secondWind healRoll produces correct spec at level 5", () => {
     const resolver = resolverFor("secondWind");
     expect(resolver).toBeDefined();
-    const spec = resolver!.healRoll!({ level: 5 } as Parameters<typeof resolver.healRoll>[0]);
+    const healRoll = resolver!.healRoll!;
+    const spec = healRoll({ level: 5 } as Parameters<typeof healRoll>[0]);
     expect(spec).toEqual({ count: 1, faces: 10, modifier: 5 });
   });
 
