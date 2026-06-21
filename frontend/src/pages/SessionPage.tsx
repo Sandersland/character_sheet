@@ -6,6 +6,9 @@
  * attack and damage (with correct versatile die), spend resources, use inventory,
  * and end the session when you're done.
  *
+ * Layout: persistent compact HP strip → TurnTracker (turn focus) →
+ * Attacks Card → tabbed reference area (Inventory / Spells / Class / Rest).
+ *
  * The character sheet (/characters/:id) is the static reference view.
  */
 
@@ -14,13 +17,16 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { RollProvider, useRoll } from "@/features/dice/RollContext";
 import RollResultToast from "@/features/dice/RollResultToast";
+import CompactHpBar from "@/features/hitpoints/CompactHpBar";
 import HitPointTracker from "@/features/hitpoints/HitPointTracker";
 import InventoryList from "@/features/inventory/InventoryList";
 import ClassFeaturesSection from "@/features/class/ClassFeaturesSection";
+import SpellsSection from "@/features/spells/SpellsSection";
 import TurnTracker from "@/features/session/TurnTracker";
 import BackendStatus from "@/features/character-meta/BackendStatus";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
+import Tabs from "@/components/ui/Tabs";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useReferenceData } from "@/hooks/useReferenceData";
 import { useTurnState } from "@/features/session/useTurnState";
@@ -227,6 +233,7 @@ function SessionPageInner() {
   const { reference } = useReferenceData();
   const [session, setSession] = useState<Session | null>(null);
   const [endPending, setEndPending] = useState(false);
+  const [activeTab, setActiveTab] = useState("inventory");
 
   // Ephemeral turn-economy state — never persisted, resets on Start/End Turn.
   // Requires a character, so we instantiate the hook after loading. We pass a
@@ -336,19 +343,19 @@ function SessionPageInner() {
       </header>
 
       {/* ── Main ──────────────────────────────────────────────────────────── */}
-      <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-6">
+      <main className="mx-auto flex max-w-4xl flex-col gap-4 px-6 py-6">
 
-        {/* ── Hit points ──────────────────────────────────────────────── */}
-        <HitPointTracker character={character} onUpdate={setCharacter} />
+        {/* ── Compact HP strip — always visible, slim ──────────────────── */}
+        <CompactHpBar character={character} />
 
-        {/* ── Turn tracker ─────────────────────────────────────────────── */}
+        {/* ── Turn tracker — primary surface ───────────────────────────── */}
         <TurnTracker
           character={character}
           turnState={turnState}
           onUpdate={setCharacter}
         />
 
-        {/* ── Attacks ─────────────────────────────────────────────────── */}
+        {/* ── Attacks — adjacent to the tracker for fast attack→roll flow ─ */}
         <Card title="Attacks" className="p-4">
           <AttacksPanel
             character={character}
@@ -362,19 +369,56 @@ function SessionPageInner() {
           />
         </Card>
 
-        {/* ── Resources (class pools) ──────────────────────────────────── */}
-        {character.class && (
-          <Card title="Class Features" className="p-4">
-            <ClassFeaturesSection
-              character={character}
-              referenceClasses={reference?.classes ?? []}
-              onUpdate={setCharacter}
-            />
-          </Card>
-        )}
+        {/* ── Reference tabs — secondary content ───────────────────────── */}
+        {(() => {
+          const isCaster = Boolean(character.spellcasting);
+          const hasClass = Boolean(character.class);
 
-        {/* ── Inventory (equip / use items) ────────────────────────────── */}
-        <InventoryList character={character} onUpdate={setCharacter} />
+          // Build the tab list dynamically; conditionally include Spells and
+          // Class tabs so we never render components for classless/non-caster chars.
+          const tabs = [
+            { id: "inventory", label: "Inventory" },
+            ...(isCaster ? [{ id: "spells", label: "Spells" }] : []),
+            ...(hasClass ? [{ id: "class", label: "Class" }] : []),
+            { id: "rest", label: "Rest & HP" },
+          ];
+
+          // If the currently active tab was gated away (e.g. spells tab
+          // selected, then character loses spellcasting), fall back.
+          const effectiveTab = tabs.some((t) => t.id === activeTab)
+            ? activeTab
+            : "inventory";
+
+          return (
+            <div className="flex flex-col gap-3">
+              <Tabs tabs={tabs} active={effectiveTab} onChange={setActiveTab} />
+
+              {effectiveTab === "inventory" && (
+                <InventoryList character={character} onUpdate={setCharacter} />
+              )}
+
+              {effectiveTab === "spells" && isCaster && (
+                <Card title="Spells" className="p-4">
+                  <SpellsSection character={character} onUpdate={setCharacter} />
+                </Card>
+              )}
+
+              {effectiveTab === "class" && hasClass && (
+                <Card title="Class Features" className="p-4">
+                  <ClassFeaturesSection
+                    character={character}
+                    referenceClasses={reference?.classes ?? []}
+                    onUpdate={setCharacter}
+                  />
+                </Card>
+              )}
+
+              {effectiveTab === "rest" && (
+                <HitPointTracker character={character} onUpdate={setCharacter} />
+              )}
+            </div>
+          );
+        })()}
 
       </main>
     </div>
