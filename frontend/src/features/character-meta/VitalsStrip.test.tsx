@@ -2,7 +2,12 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 import VitalsStrip from "@/features/character-meta/VitalsStrip";
+import { RollProvider } from "@/features/dice/RollContext";
 import type { Character } from "@/types/character";
+
+function renderWithRoll(ui: React.ReactElement) {
+  return render(<RollProvider>{ui}</RollProvider>);
+}
 
 const mockCharacter: Character = {
   id: "char-1",
@@ -44,36 +49,36 @@ const mockCharacter: Character = {
 
 describe("VitalsStrip", () => {
   it("renders armor class", () => {
-    render(<VitalsStrip character={mockCharacter} />);
+    renderWithRoll(<VitalsStrip character={mockCharacter} />);
     expect(screen.getByText("14")).toBeInTheDocument();
   });
 
   it("renders initiative as a formatted modifier", () => {
-    render(<VitalsStrip character={mockCharacter} />);
+    renderWithRoll(<VitalsStrip character={mockCharacter} />);
     // initiativeBonus=3 → formatModifier(3) = "+3"
     expect(screen.getByText("+3")).toBeInTheDocument();
   });
 
   it("renders speed with ft suffix", () => {
-    render(<VitalsStrip character={mockCharacter} />);
+    renderWithRoll(<VitalsStrip character={mockCharacter} />);
     expect(screen.getByText("35 ft")).toBeInTheDocument();
   });
 
   it("renders proficiency bonus as a formatted modifier", () => {
-    render(<VitalsStrip character={mockCharacter} />);
+    renderWithRoll(<VitalsStrip character={mockCharacter} />);
     // proficiencyBonus=2 → "+2"
     // (initiativeBonus is also +3, but proficiency is +2 — both use formatModifier)
     expect(screen.getByText("+2")).toBeInTheDocument();
   });
 
   it("renders current and max HP", () => {
-    render(<VitalsStrip character={mockCharacter} />);
+    renderWithRoll(<VitalsStrip character={mockCharacter} />);
     expect(screen.getByText(/28/)).toBeInTheDocument();
     expect(screen.getByText(/36/)).toBeInTheDocument();
   });
 
   it("renders an HP MeterBar", () => {
-    render(<VitalsStrip character={mockCharacter} />);
+    renderWithRoll(<VitalsStrip character={mockCharacter} />);
     const meter = screen.getByRole("meter");
     expect(meter).toHaveAttribute("aria-valuenow", "28");
     expect(meter).toHaveAttribute("aria-valuemax", "36");
