@@ -41,20 +41,24 @@ function AttacksPanel({ character }: { character: Character }) {
     (item) => item.category === "weapon" && item.equipped && item.weapon,
   );
 
-  if (equippedWeapons.length === 0) {
-    return (
-      <p className="text-sm text-parchment-500">
-        No weapons equipped. Go to your{" "}
-        <Link to={`/characters/${character.id}`} className="text-garnet-700 hover:underline">
-          character sheet
-        </Link>{" "}
-        and use the Equip button on a weapon.
-      </p>
-    );
-  }
+  const strMod = Math.floor((character.abilityScores.strength - 10) / 2);
+  const unarmedAttackBonus = strMod + character.proficiencyBonus;
+  // Unarmed damage = 1 + STR mod (minimum 1). Use max(0, strMod) as modifier
+  // so the d1 baseline guarantees a total of at least 1.
+  const unarmedDamageSpec = { count: 1, faces: 1, modifier: Math.max(0, strMod) };
+  const unarmedDamageDisplay = Math.max(1, 1 + strMod);
 
   return (
     <div className="flex flex-col divide-y divide-parchment-200">
+      {equippedWeapons.length === 0 && (
+        <p className="pb-3 text-sm text-parchment-500">
+          No weapons equipped. Go to your{" "}
+          <Link to={`/characters/${character.id}`} className="text-garnet-700 hover:underline">
+            character sheet
+          </Link>{" "}
+          and use the Equip button on a weapon.
+        </p>
+      )}
       {equippedWeapons.map((item) => {
         const w = item.weapon!;
         // Use the server-derived damage spec for correct versatile die; fall
@@ -107,6 +111,35 @@ function AttacksPanel({ character }: { character: Character }) {
           </div>
         );
       })}
+      {/* Unarmed strike — always available in 5e, always proficient, uses STR */}
+      <div className="flex items-center justify-between py-3">
+        <div>
+          <p className="text-sm font-medium text-parchment-900">Unarmed Strike</p>
+          <p className="text-xs text-parchment-500">
+            Attack: +{unarmedAttackBonus} · Damage: {unarmedDamageDisplay} bludgeoning
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              roll({ count: 1, faces: 20, modifier: unarmedAttackBonus }, "Unarmed strike attack")
+            }
+            className="rounded-control border border-garnet-200 bg-garnet-50 px-2.5 py-1 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-100"
+          >
+            Attack
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              roll(unarmedDamageSpec, "Unarmed strike damage (bludgeoning)")
+            }
+            className="rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
+          >
+            Damage
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
