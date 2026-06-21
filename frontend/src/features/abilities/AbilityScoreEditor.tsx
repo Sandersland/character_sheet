@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { abilityModifier, formatModifier, ABILITY_LABELS } from "@/lib/abilities";
+import { abilityModifier, formatModifier, ABILITY_LABELS, ABILITY_ORDER } from "@/lib/abilities";
 import {
   POINT_BUY_BUDGET,
   STANDARD_ARRAY,
@@ -19,15 +19,6 @@ const METHOD_LABELS: [Method, string][] = [
   ["roll", "Roll 4d6"],
   ["standardArray", "Standard array"],
   ["pointBuy", "Point buy"],
-];
-
-const ABILITY_ORDER: AbilityName[] = [
-  "strength",
-  "dexterity",
-  "constitution",
-  "intelligence",
-  "wisdom",
-  "charisma",
 ];
 
 const POINT_BUY_FLOOR = 8;

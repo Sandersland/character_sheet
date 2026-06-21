@@ -53,7 +53,7 @@ export interface ToolProfEntry {
  *   "initiative" | "speed" | "armorClass" | "maxHp"
  *
  * Keyed proficiency (collected by deriveFeatProficiencies, OR'd with stored proficiencies):
- *   "skillProficiency"       — imp.key = skill name e.g. "Athletics"
+ *   "skillProficiency"       — imp.key = camelCase skill key e.g. "athletics" / "animalHandling"
  *   "savingThrowProficiency" — imp.key = ability name e.g. "strength"
  *
  * `perLevel`: when true, the effective bonus = amount × character's applied level

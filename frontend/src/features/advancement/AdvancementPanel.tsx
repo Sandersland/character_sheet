@@ -18,21 +18,13 @@
 import { useEffect, useRef, useState } from "react";
 
 import { fetchFeats } from "@/api/client";
+import { ABILITY_OPTIONS, abilityLabel, skillLabel } from "@/lib/abilities";
 import type {
   AdvancementOperation,
   CatalogFeat,
   FeatImprovement,
   TakeAsiOperation,
 } from "@/types/character";
-
-const ABILITIES: { key: string; label: string }[] = [
-  { key: "strength", label: "Strength" },
-  { key: "dexterity", label: "Dexterity" },
-  { key: "constitution", label: "Constitution" },
-  { key: "intelligence", label: "Intelligence" },
-  { key: "wisdom", label: "Wisdom" },
-  { key: "charisma", label: "Charisma" },
-];
 
 const ABILITY_CAP = 20;
 
@@ -326,7 +318,7 @@ export default function AdvancementPanel({
             Distribute <span className="font-semibold">{pointsLeft} point{pointsLeft !== 1 ? "s" : ""}</span> remaining across any abilities (max 20 per score).
           </p>
           <div className="flex flex-col gap-2">
-            {ABILITIES.map(({ key, label }) => {
+            {ABILITY_OPTIONS.map(({ key, label }) => {
               const current = currentScores[key] ?? 10;
               const bonus = asiIncreases[key] ?? 0;
               const newVal = current + bonus;
@@ -415,7 +407,7 @@ export default function AdvancementPanel({
                     <option value="" disabled>Choose an ability…</option>
                     {selectedFeat.abilityOptions.map((a) => (
                       <option key={a} value={a}>
-                        {a.charAt(0).toUpperCase() + a.slice(1)} (currently {currentScores[a] ?? 10})
+                        {abilityLabel(a)} (currently {currentScores[a] ?? 10})
                       </option>
                     ))}
                   </select>
@@ -423,7 +415,7 @@ export default function AdvancementPanel({
               )}
               {selectedFeat.abilityOptions.length === 1 && (
                 <p className="mt-2 text-xs text-parchment-600">
-                  +{selectedFeat.abilityIncrease} to {selectedFeat.abilityOptions[0]} will be applied.
+                  +{selectedFeat.abilityIncrease} to {abilityLabel(selectedFeat.abilityOptions[0])} will be applied.
                 </p>
               )}
 
@@ -539,7 +531,7 @@ export default function AdvancementPanel({
                         onChange={() => toggleSkill(name)}
                         className="rounded-sm"
                       />
-                      {name}
+                      {skillLabel(name)}
                     </label>
                   ))}
                 </div>
@@ -551,7 +543,7 @@ export default function AdvancementPanel({
                   Saving Throw Proficiencies
                 </p>
                 <div className="flex flex-wrap gap-x-3 gap-y-1.5">
-                  {ABILITIES.map(({ key, label }) => (
+                  {ABILITY_OPTIONS.map(({ key, label }) => (
                     <label key={key} className="flex items-center gap-1.5 text-xs text-parchment-700">
                       <input
                         type="checkbox"
@@ -574,7 +566,7 @@ export default function AdvancementPanel({
                   Check abilities the player may choose from when taking this feat.
                 </p>
                 <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1.5">
-                  {ABILITIES.map(({ key, label }) => (
+                  {ABILITY_OPTIONS.map(({ key, label }) => (
                     <label key={key} className="flex items-center gap-1.5 text-xs text-parchment-700">
                       <input
                         type="checkbox"
@@ -613,7 +605,7 @@ export default function AdvancementPanel({
                       <option value="" disabled>Choose an ability…</option>
                       {abilityOptionsArr.map((a) => (
                         <option key={a} value={a}>
-                          {a.charAt(0).toUpperCase() + a.slice(1)} (currently {currentScores[a] ?? 10})
+                          {abilityLabel(a)} (currently {currentScores[a] ?? 10})
                         </option>
                       ))}
                     </select>
@@ -621,7 +613,7 @@ export default function AdvancementPanel({
                 )}
                 {abilityOptionsArr.length === 1 && (
                   <p className="mt-1.5 text-[11px] text-parchment-500">
-                    +{abilityIncrease} to {abilityOptionsArr[0]} will be applied automatically.
+                    +{abilityIncrease} to {abilityLabel(abilityOptionsArr[0])} will be applied automatically.
                   </p>
                 )}
               </div>

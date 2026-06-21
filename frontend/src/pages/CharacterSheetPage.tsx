@@ -19,7 +19,7 @@ import ToolProficienciesCard from "@/features/abilities/ToolProficienciesCard";
 import VitalsStrip from "@/features/character-meta/VitalsStrip";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useReferenceData } from "@/hooks/useReferenceData";
-import { ABILITY_LABELS } from "@/lib/abilities";
+import { abilityAbbr } from "@/lib/abilities";
 
 export default function CharacterSheetPage() {
   const { id } = useParams();
@@ -166,7 +166,7 @@ export default function CharacterSheetPage() {
             {abilityEntries.map(([key, score]) => (
               <AbilityScoreBox
                 key={key}
-                label={ABILITY_LABELS[key].slice(0, 3).toUpperCase()}
+                label={abilityAbbr(key)}
                 score={score}
                 saveProficient={character.savingThrowProficiencies.includes(
                   key

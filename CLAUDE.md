@@ -32,6 +32,8 @@ See `.claude/docs/development.md` for per-workspace commands, running outside Do
 
 **Tailwind v4 utilities work normally here.** Named size utilities (`max-w-xl`, `w-96`, etc.) and numeric spacing (`p-4`, `gap-2`) all resolve correctly. Custom `@theme` tokens also auto-generate idiomatic utilities — prefer `text-garnet-700` over `text-[var(--color-garnet-700)]`, `rounded-card` over `rounded-[var(--radius-card)]`, etc. One historical footgun to never reintroduce: bare `--spacing-{name}` custom tokens (e.g. `--spacing-sm`) collide with Tailwind's `--container-*` scale and break `max-w-sm/md/lg/xl/2xl`. If a named spacing rhythm is ever wanted, use a `--space-*` prefix instead.
 
+**Never render a skill/ability/save key directly in the UI.** Skills are stored as camelCase keys (`animalHandling`, `sleightOfHand`); abilities and saving throws as lowercase words (`strength`). Resolve all display text through `skillLabel` / `abilityLabel` / `abilityAbbr`, or iterate the ready-made `SKILL_OPTIONS` / `ABILITY_OPTIONS` lists — all from `frontend/src/lib/abilities.ts`. Never hand-roll a `{ key, label }` array or capitalize keys ad-hoc (`key.charAt(0).toUpperCase() + …`); that hack only "works" for single-word abilities and silently breaks camelCase skill keys (this footgun has shipped twice). `SKILL_LABELS`/`ABILITY_LABELS` are typed `Record<SkillName/AbilityName, string>`, so a missing or renamed key is a compile error.
+
 **Backend tests need Postgres.** Run `docker compose up db -d` first and export `DATABASE_URL` in the same shell command as `vitest` (not a prior `export`). See `.claude/docs/testing.md`.
 
 ## Doc map

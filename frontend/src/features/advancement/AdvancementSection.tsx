@@ -13,6 +13,7 @@
 import { useState } from "react";
 
 import { applyAdvancementTransactions } from "@/api/client";
+import { abilityAbbr, abilityLabel, skillLabel } from "@/lib/abilities";
 import type { AdvancementEntry, AdvancementOperation, Character } from "@/types/character";
 import AdvancementPanel from "@/features/advancement/AdvancementPanel";
 
@@ -28,7 +29,7 @@ function entryLabel(entry: AdvancementEntry): string {
   }
   // ASI — e.g. "STR +2" or "DEX +1, CON +1"
   return Object.entries(entry.abilityDeltas)
-    .map(([ab, d]) => `${ab.slice(0, 3).toUpperCase()} +${d}`)
+    .map(([ab, d]) => `${abilityAbbr(ab)} +${d}`)
     .join(", ");
 }
 
@@ -46,7 +47,7 @@ function entryDetail(entry: AdvancementEntry): string | undefined {
     // Ability score bump (from abilityDeltas, same cascade as ASI)
     const abParts = Object.entries(entry.abilityDeltas)
       .filter(([, d]) => d !== 0)
-      .map(([ab, d]) => `+${d} ${ab.charAt(0).toUpperCase() + ab.slice(1)}`);
+      .map(([ab, d]) => `+${d} ${abilityLabel(ab)}`);
     if (abParts.length) parts.push(...abParts);
 
     // Numeric stat bonuses from improvements
@@ -59,13 +60,13 @@ function entryDetail(entry: AdvancementEntry): string | undefined {
     // Skill proficiencies
     const skills = (entry.improvements ?? [])
       .filter((imp) => imp.target === "skillProficiency" && imp.key)
-      .map((imp) => imp.key as string);
+      .map((imp) => skillLabel(imp.key as string));
     if (skills.length) parts.push(`Prof: ${skills.join(", ")}`);
 
     // Saving throw proficiencies
     const saves = (entry.improvements ?? [])
       .filter((imp) => imp.target === "savingThrowProficiency" && imp.key)
-      .map((imp) => (imp.key as string).charAt(0).toUpperCase() + (imp.key as string).slice(1));
+      .map((imp) => abilityLabel(imp.key as string));
     if (saves.length) parts.push(`Save prof: ${saves.join(", ")}`);
 
     if (parts.length) return parts.join(" · ");

@@ -16,7 +16,7 @@
 import { useState } from "react";
 
 import { applySpellcastingTransactions } from "@/api/client";
-import { abilityModifier, formatModifier } from "@/lib/abilities";
+import { abilityAbbr, abilityModifier, formatModifier } from "@/lib/abilities";
 import { rollSpec } from "@/lib/dice";
 import type {
   AbilityName,
@@ -198,8 +198,8 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
           <p className="text-[11px] font-semibold uppercase tracking-wide text-arcane-700">
             Ability
           </p>
-          <p className="font-display text-xl font-semibold capitalize text-arcane-900">
-            {ability?.slice(0, 3).toUpperCase() ?? "—"}
+          <p className="font-display text-xl font-semibold text-arcane-900">
+            {ability ? abilityAbbr(ability) : "—"}
             <span className="ml-1 text-sm font-normal text-arcane-600">
               ({formatModifier(abilityMod)})
             </span>

@@ -3401,7 +3401,7 @@ export function deriveFeatBonuses(
 /**
  * Collects proficiency grants from feat improvements across a set of advancements.
  * Returns two sets:
- *   - `skills`:       skill names (e.g. "Athletics") where `target === "skillProficiency"`
+ *   - `skills`:       camelCase skill keys (e.g. "athletics", "animalHandling") where `target === "skillProficiency"`
  *   - `savingThrows`: ability names (e.g. "strength") where `target === "savingThrowProficiency"`
  *
  * Callers pass the **already-clamped** slice so over-cap feats are excluded automatically.
