@@ -477,11 +477,32 @@ export interface CatalogManeuver {
 }
 
 /**
+ * A derived attack row — unarmed strike or improvised weapon — computed
+ * server-side and surfaced on the character so `AttacksPanel` can render them
+ * without reproducing combat rules on the client.
+ */
+export interface DerivedAttack {
+  attackBonus: number;
+  damage: {
+    count: number;
+    faces: number;
+    modifier: number;
+    damageType: string;
+  };
+}
+
+/** DerivedAttack extended with a proficiency flag (for improvised weapons). */
+export interface DerivedImprovisedAttack extends DerivedAttack {
+  proficient: boolean;
+}
+
+/**
  * A structured mechanical effect defined on a catalog or custom feat.
  * Snapshot into AdvancementEntry.improvements at take-time.
  */
 export interface FeatImprovement {
   /** Numeric: "initiative" | "speed" | "armorClass" | "maxHp"
+   *  Combat:  "unarmedDamageDie" (amount = die faces, e.g. 4 → d4; max across feats)
    *  Keyed:   "skillProficiency" | "savingThrowProficiency" (require `key`) */
   target: string;
   amount: number;
@@ -660,6 +681,15 @@ export interface Character {
   };
 
   resources?: CharacterResources;
+
+  /** Derived unarmed-strike stats — attack bonus and damage always available
+   *  since everyone is proficient with unarmed strikes in 5e. Damage faces
+   *  start at 1 (flat 1 + STR mod) and are raised to d4 by Tavern Brawler. */
+  unarmedStrike: DerivedAttack;
+  /** Derived improvised-weapon stats — 1d4 + STR, always shown. `proficient`
+   *  is true only when "Improvised Weapons" appears in weaponProficiencies
+   *  (e.g. via Tavern Brawler), which adds proficiency bonus to attackBonus. */
+  improvisedWeapon: DerivedImprovisedAttack;
 
   /** Taken ASI / feat entries, in the order chosen (clamped to advancementSlots.total). */
   advancements: AdvancementEntry[];

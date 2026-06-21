@@ -22,6 +22,9 @@ import {
   deriveFeatBonuses,
   deriveFeatProficiencies,
   deriveSpellcasting,
+  deriveImprovisedAttack,
+  deriveUnarmedDamageDie,
+  deriveUnarmedStrike,
   deriveWeaponAttackBonus,
   deriveWeaponDamage,
   isKnownTool,
@@ -393,6 +396,18 @@ export function serializeCharacter(row: CharacterWithRelations) {
     featProficiencies.weapons,
   );
 
+  // ── Unarmed strike + improvised weapon derivation ────────────────────────
+  // Derived from the same clamped advancements slice so Tavern Brawler's
+  // upgrades are automatically excluded when the character is over-cap.
+  const unarmedDie = deriveUnarmedDamageDie(clampedAdvancements);
+  const unarmedStrike = deriveUnarmedStrike(effectiveScores, progress.proficiencyBonus, unarmedDie);
+  const improvisedProficient = weaponGrants.some((g) => g.name === "Improvised Weapons");
+  const improvisedWeapon = deriveImprovisedAttack(
+    effectiveScores,
+    progress.proficiencyBonus,
+    improvisedProficient,
+  );
+
   // Compute off-hand state once for the whole inventory so versatile weapons
   // know whether to use their two-handed die. Off-hand is "busy" when any
   // equipped item is a shield OR when 2+ weapons are equipped (two-weapon
@@ -492,6 +507,12 @@ export function serializeCharacter(row: CharacterWithRelations) {
       total: advSlotTotal,
       used: clampedAdvancements.length,
     },
+
+    // ── Combat attack rows ─────────────────────────────────────────────────
+    // Derived at read time; the frontend renders these directly in AttacksPanel
+    // rather than recomputing attack math on the client.
+    unarmedStrike,
+    improvisedWeapon,
 
     journal: row.journal,
 

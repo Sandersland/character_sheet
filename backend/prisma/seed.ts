@@ -679,6 +679,20 @@ const FEATS: FeatSeed[] = [
       { target: "weaponProficiency", amount: 1, key: "Greatswords" },
     ],
   },
+  {
+    name: "Tavern Brawler",
+    description:
+      "+1 to Strength or Constitution. You are proficient with improvised weapons and your " +
+      "unarmed strikes deal 1d4 bludgeoning damage. When you hit a creature with an unarmed " +
+      "strike or an improvised weapon on your turn, you can use a bonus action to attempt " +
+      "to grapple the target.",
+    abilityOptions: ["strength", "constitution"],
+    abilityIncrease: 1,
+    improvements: [
+      { target: "weaponProficiency", amount: 1, key: "Improvised Weapons" },
+      { target: "unarmedDamageDie", amount: 4 },
+    ],
+  },
 ];
 
 const BACKGROUNDS = [
