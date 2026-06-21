@@ -136,12 +136,19 @@ const sellOpSchema = z.object({
   currencyDelta: currencySchema,
 });
 
+const setEquippedOpSchema = z.object({
+  type: z.literal("setEquipped"),
+  inventoryItemId: z.string().min(1),
+  equipped: z.boolean(),
+});
+
 const operationSchema = z.discriminatedUnion("type", [
   acquireOpSchema,
   adjustQuantityOpSchema,
   updateOpSchema,
   removeOpSchema,
   sellOpSchema,
+  setEquippedOpSchema,
 ]);
 
 const transactionsRequestSchema = z.object({

@@ -22,6 +22,8 @@ import {
   deriveFeatBonuses,
   deriveFeatProficiencies,
   deriveSpellcasting,
+  deriveWeaponAttackBonus,
+  deriveWeaponDamage,
   isKnownTool,
   RACE_PROFICIENCY_GRANTS,
   TOOLS,
@@ -86,7 +88,64 @@ function serializeCharacterSummary(row: {
 // `consumable` sub-objects via the shared lib/itemDetail.js serializers
 // (also used by routes/items.ts for the catalog) rather than flattening
 // back out — `id`/the owning FK aren't meaningful to the client.
-function serializeInventoryItem(row: CharacterWithRelations["inventoryItems"][number]) {
+
+interface InventoryItemContext {
+  /** The character's effective ability scores (post-advancement-clamp). */
+  effectiveScores: Record<string, number>;
+  /** The character's proficiency bonus (derived from level). */
+  proficiencyBonus: number;
+  /** The character's merged weapon proficiency grants (class + race + feat). */
+  weaponGrants: ReadonlyArray<{ name: string }>;
+  /**
+   * True when any equipped item occupies the off-hand: either an equipped
+   * shield or ≥ 2 equipped weapons. Used by `deriveWeaponDamage` to resolve
+   * the correct die for versatile weapons (2H die when off-hand is free).
+   */
+  offHandBusy: boolean;
+}
+
+function serializeInventoryItem(
+  row: CharacterWithRelations["inventoryItems"][number],
+  context: InventoryItemContext,
+) {
+  let weapon:
+    | (ReturnType<typeof serializeWeaponDetail> & {
+        attackBonus: number;
+        damage: ReturnType<typeof deriveWeaponDamage>;
+      })
+    | undefined;
+  if (row.weaponDetail) {
+    weapon = {
+      ...serializeWeaponDetail(row.weaponDetail),
+      attackBonus: deriveWeaponAttackBonus(
+        {
+          name: row.name,
+          finesse: row.weaponDetail.finesse,
+          weaponClass: row.weaponDetail.weaponClass,
+          weaponRange: row.weaponDetail.weaponRange,
+        },
+        context.effectiveScores,
+        context.proficiencyBonus,
+        context.weaponGrants,
+      ),
+      damage: deriveWeaponDamage(
+        {
+          name: row.name,
+          finesse: row.weaponDetail.finesse,
+          weaponRange: row.weaponDetail.weaponRange,
+          damageDiceCount: row.weaponDetail.damageDiceCount,
+          damageDiceFaces: row.weaponDetail.damageDiceFaces,
+          damageType: row.weaponDetail.damageType,
+          versatileDiceCount: row.weaponDetail.versatileDiceCount,
+          versatileDiceFaces: row.weaponDetail.versatileDiceFaces,
+          twoHanded: row.weaponDetail.twoHanded,
+        },
+        context.offHandBusy,
+        context.effectiveScores,
+      ),
+    };
+  }
+
   return {
     id: row.id,
     itemId: row.itemId ?? undefined,
@@ -98,7 +157,7 @@ function serializeInventoryItem(row: CharacterWithRelations["inventoryItems"][nu
     description: row.description ?? undefined,
     equipped: row.equipped,
     notes: row.notes ?? undefined,
-    weapon: row.weaponDetail ? serializeWeaponDetail(row.weaponDetail) : undefined,
+    weapon,
     armor: row.armorDetail ? serializeArmorDetail(row.armorDetail) : undefined,
     consumable: row.consumableDetail ? serializeConsumableDetail(row.consumableDetail) : undefined,
   };
@@ -326,6 +385,33 @@ export function serializeCharacter(row: CharacterWithRelations) {
   // proficiencies below using OR — existing proficiency is never removed.
   const featProficiencies = deriveFeatProficiencies(clampedAdvancements);
 
+  // Pre-compute weapon proficiency grants so they can be reused both in the
+  // inventory serialisation (attack-bonus derivation) and the wire response.
+  const weaponGrants = buildMergedWeaponProficiencies(
+    row.classEntries,
+    row.raceSelection?.name,
+    featProficiencies.weapons,
+  );
+
+  // Compute off-hand state once for the whole inventory so versatile weapons
+  // know whether to use their two-handed die. Off-hand is "busy" when any
+  // equipped item is a shield OR when 2+ weapons are equipped (two-weapon
+  // fighting). This is the lightweight approach that avoids a full
+  // main-hand/off-hand slot model.
+  const equippedItems = row.inventoryItems.filter((i) => i.equipped);
+  const equippedShieldPresent = equippedItems.some(
+    (i) => i.armorDetail?.armorCategory === "shield",
+  );
+  const equippedWeaponCount = equippedItems.filter((i) => i.category === "weapon").length;
+  const offHandBusy = equippedShieldPresent || equippedWeaponCount >= 2;
+
+  const inventoryContext: InventoryItemContext = {
+    effectiveScores,
+    proficiencyBonus: progress.proficiencyBonus,
+    weaponGrants,
+    offHandBusy,
+  };
+
   return {
     id: row.id,
     name: row.name,
@@ -393,12 +479,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
       row.raceSelection?.name,
       featProficiencies.armor,
     ),
-    weaponProficiencies: buildMergedWeaponProficiencies(
-      row.classEntries,
-      row.raceSelection?.name,
-      featProficiencies.weapons,
-    ),
-    inventory: row.inventoryItems.map(serializeInventoryItem),
+    weaponProficiencies: weaponGrants,
+    inventory: row.inventoryItems.map((item) => serializeInventoryItem(item, inventoryContext)),
     currency: row.currency,
     spellcasting,
     resources,

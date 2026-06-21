@@ -16,6 +16,7 @@
 | `routes/activity.ts` | `GET /characters/:id/activity`, `POST /characters/:id/events/:batchId/revert` |
 | `routes/spells.ts` | `GET /spells` — spell catalog |
 | `routes/spellcasting.ts` | `POST /characters/:id/spellcasting/transactions` — batch spell ops |
+| `routes/sessions.ts` | `POST /characters/:id/sessions` (start), `POST /characters/:id/sessions/:sessionId/end`, `GET /characters/:id/sessions`, `GET /characters/:id/sessions/active`, `GET /characters/:id/sessions/:sessionId` |
 
 `characters.ts` exports `characterInclude` and `serializeCharacter`; every other mutation router imports and calls them to return the same full-character wire shape after applying changes.
 
@@ -25,14 +26,15 @@
 |---|---|
 | `lib/prisma.ts` | Singleton `PrismaClient` with `@prisma/adapter-pg` (required for Prisma 7). Reads `DATABASE_URL`. |
 | `lib/events.ts` | `logEvent(tx, params)` — writes one `CharacterEvent` + per-field `CharacterEventField` diffs inside the caller's transaction. `EventCategory`/`EventType` type unions. |
-| `lib/srd.ts` | **All 5e rules data**: alignments, skills, ability-modifier math, `SPELLCASTING_ABILITY`, `FULL_CASTER_SLOTS`, `STARTING_EQUIPMENT`, `PACK_CONTENTS`, `deriveCreatedCharacter()`, `deriveSpellcasting()`. **This is the only permitted location for rules data.** |
+| `lib/srd.ts` | **All 5e rules data**: alignments, skills, ability-modifier math, `SPELLCASTING_ABILITY`, `FULL_CASTER_SLOTS`, `STARTING_EQUIPMENT`, `PACK_CONTENTS`, `deriveCreatedCharacter()`, `deriveSpellcasting()`, `deriveWeaponAttackBonus()`, `deriveWeaponDamage()` (grip-aware: versatile die when off-hand is free). **This is the only permitted location for rules data.** |
 | `lib/experience.ts` | Pure XP-curve math (no DB): `XP_THRESHOLDS`, `levelForExperience`, `proficiencyBonusForLevel`, `experienceProgress`. |
 | `lib/experience-ops.ts` | `applyExperienceOperations()` — transactional XP handler. Also `revertLevelUps()` (auto-reverses HP/dice when XP drops derived level). Calls `reconcileLevelGatedState` after each op. |
 | `lib/level-reconciliation.ts` | Level-gated state registry. `reconcileLevelGatedState(ctx)` runs `LEVEL_GATED_RECONCILERS` in order (currently `reconcileSubclass` → `reconcileManeuvers`) inside the XP transaction. Add new reconcilers here when shipping level-gated features (feats, ASI, etc.). See `.claude/docs/leveling.md`. |
 | `lib/hitpoints.ts` | HP domain: shapes, normalizers, pure rules helpers, `applyHitPointOperations()`. LongRest also resets spell slots in the same transaction. |
 | `lib/spellcasting.ts` | `SpellEntry`/`SpellcastingMutableState` shapes, `normalizeSpellcastingMutable()` (handles compact + legacy JSON formats), `applySpellcastingOperations()`. |
-| `lib/inventory.ts` | Currency math, catalog→snapshot builders, `applyInventoryOperations()`. Reference implementation for the intent-bearing transaction pattern. |
+| `lib/inventory.ts` | Currency math, catalog→snapshot builders, `applyInventoryOperations()`. Reference implementation for the intent-bearing transaction pattern. Includes the `setEquipped` op (logged as `equipped`/`unequipped` events). |
 | `lib/itemDetail.ts` | `serializeWeaponDetail`/`serializeArmorDetail`/`serializeConsumableDetail` — shared by both `routes/items.ts` (catalog) and `routes/characters.ts` (inventory rows). |
+| `lib/sessions.ts` | `startSession`, `endSession`, `getActiveSessionId`. Enforces single-active-session per character. Called by session routes and by `getActiveSessionId()` which is threaded into every `apply*Operations()` lib function to tag events. |
 
 Prisma client is generated into `src/generated/prisma` (gitignored). Run `npx prisma generate` from `backend/` after a fresh clone or any schema change.
 
@@ -46,19 +48,24 @@ Prisma client is generated into `src/generated/prisma` (gitignored). Run `npx pr
 |---|---|---|
 | `/` | `CharacterListPage` | Grid of `CharacterCard`s + "new" card |
 | `/characters/new` | `CharacterCreatePage` | Staged in `localStorage` until save; registered before `:id` so it isn't swallowed |
-| `/characters/:id` | `CharacterSheetPage` | Main sheet; composes all section components |
+| `/characters/:id` | `CharacterSheetPage` | Reference sheet — what you'd print. No roll buttons. |
+| `/characters/:id/session` | `SessionPage` | Live-play mode. Requires an active `Session`; auto-bounces to the sheet if none found. |
 
-**`CharacterSheetPage` layout (top to bottom):**
-Header → `VitalsStrip` → `HitPointTracker` + `ExperienceTracker` (2-col) → ability rail + `SkillsTable` (2-col) → `InventoryList` + Spells Card / Journal Card (2-col) → Journal Card if spellcaster (full-width).
+**`CharacterSheetPage` layout (printed-sheet order, top to bottom):**
+Header (+ "Start Session" / "Resume Session" button) → `VitalsStrip` → `HitPointTracker` + `ExperienceTracker` (2-col) → ability rail + `SkillsTable` (auto/1fr) → `ProficienciesCard` → `ClassFeaturesSection` → `AdvancementSection` → `InventoryList` + Spells / Journal (2-col) → Journal (if spellcaster, full-width).
+
+**`SessionPage` layout (action-first, top to bottom):**
+Header (character identity + "End Session" button) → `HitPointTracker` → Attacks card (equipped weapons only, Attack + Damage roll buttons with correct versatile die) → `ClassFeaturesSection` (resource pools) → `InventoryList`.
 
 ### `api/client.ts`
 
 The only permitted backend-call site. Every exported function maps to one endpoint. Key ones:
 
-- `applyHitPointOperations`, `applyExperienceOperations`, `applyInventoryTransactions`, `applySpellcastingTransactions` — intent-bearing batch endpoints
+- `applyHitPointOperations`, `applyExperienceOperations`, `applyInventoryTransactions`, `applySpellcastingTransactions` — intent-bearing batch endpoints (inventory includes `setEquipped` op)
 - `fetchActivity`, `revertBatch` — unified audit log
 - `fetchReference`, `fetchItems`, `fetchSpells` — catalog reads
 - `updateCharacter` — thin PATCH, `currency` only
+- `startSession`, `endSession`, `fetchActiveSession`, `fetchSessions`, `fetchSession` — session lifecycle
 
 ### `lib/`
 
@@ -99,14 +106,15 @@ See `schema.prisma` model comments for the detailed snapshot-vs-overlay reasonin
 
 `CharacterEvent` + `CharacterEventField` in `schema.prisma`:
 
-- **Single-Table Inheritance**: `category` (inventory/hitPoints/experience/currency/spellcasting) + `type` discriminators.
+- **Single-Table Inheritance**: `category` (inventory/hitPoints/experience/currency/spellcasting/session) + `type` discriminators.
 - **Polymorphic soft-reference**: `entityType`/`entityId` (no FK — the entity may be deleted).
 - **before/after JSON snapshots**: the state before and after the operation, used by the revert handler to restore.
 - **Append-only**: events are flagged `reverted:true`, never deleted. A `revert` meta-event is appended on undo.
+- **Session tagging**: `sessionId String?` — events fired while a session is active get its id. Between-session events (shopping, leveling between adventures) get `null`. `getActiveSessionId(characterId)` is called at the top of every `apply*Operations()` function.
 
 `logEvent(tx, params)` in `lib/events.ts` writes the event + computes `CharacterEventField` diffs (via `diffToFields`) inside the caller's `$transaction`. All ops in a single request share a `randomUUID()` `batchId`.
 
-Undo: `POST /characters/:id/events/:batchId/revert` in `routes/activity.ts`. LIFO-only (returns 409 if not the most-recent non-reverted batch). Restores `before` snapshots in a transaction; inventory undo is intentionally deferred.
+Undo: `POST /characters/:id/events/:batchId/revert` in `routes/activity.ts`. LIFO-only (returns 409 if not the most-recent non-reverted batch). Restores `before` snapshots in a transaction; inventory undo is intentionally deferred. **The LIFO guard skips events from ended sessions** (`OR: [{ sessionId: null }, { session: { status: "active" } }]`) — a closed session's history is frozen and cannot be undone.
 
 ### Intent-bearing transaction pattern
 

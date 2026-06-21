@@ -23,6 +23,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "../generated/prisma/client.js";
 import { levelForExperience, proficiencyBonusForLevel } from "./experience.js";
 import { logEvent } from "./events.js";
+import { getActiveSessionId } from "./sessions.js";
 import { prisma } from "./prisma.js";
 import { normalizeResourcesMutable, serializeResourcesState, type AdvancementEntry } from "./resources.js";
 import { advancementSlotsForLevel, abilityModifier } from "./srd.js";
@@ -159,6 +160,7 @@ export async function applyAdvancementOperations(
   operations: AdvancementOperation[],
 ): Promise<void> {
   const batchId = randomUUID();
+  const sessionId = await getActiveSessionId(characterId);
 
   await prisma.$transaction(async (tx) => {
     for (const op of operations) {
@@ -494,6 +496,7 @@ export async function applyAdvancementOperations(
         after,
         data: eventData,
         batchId,
+        sessionId,
       });
     }
   });

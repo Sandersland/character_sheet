@@ -1,9 +1,11 @@
 import { abilityModifier, formatModifier } from "@/lib/abilities";
+import RollButton from "@/features/dice/RollButton";
 
 interface AbilityScoreBoxProps {
   label: string;
   score: number;
   saveProficient?: boolean;
+  proficiencyBonus: number;
 }
 
 /**
@@ -12,32 +14,54 @@ interface AbilityScoreBoxProps {
  * into a small pill below it — per principles.md's "avoid naked
  * label:value pairs," the modifier *is* the number players read at the
  * table, so it gets the visual weight, not the label.
+ *
+ * The modifier and "Save" link are clickable roll affordances that emit
+ * to `RollResultToast` via `RollContext`.
  */
 export default function AbilityScoreBox({
   label,
   score,
   saveProficient,
+  proficiencyBonus,
 }: AbilityScoreBoxProps) {
   const modifier = abilityModifier(score);
+  const saveBonus = modifier + (saveProficient ? proficiencyBonus : 0);
+
+  const checkSpec = { count: 1, faces: 20, modifier } as const;
+  const saveSpec = { count: 1, faces: 20, modifier: saveBonus } as const;
 
   return (
     <div className="flex flex-col items-center rounded-card border border-parchment-200 bg-parchment-50 px-3 py-2.5 shadow-card">
       <span className="font-sans text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
         {label}
       </span>
-      <span className="mt-1 font-display text-2xl font-semibold leading-none text-garnet-800">
-        {formatModifier(modifier)}
-      </span>
+      <RollButton
+        spec={checkSpec}
+        label={`${label} check`}
+        className="-mx-1 mt-1 px-1"
+      >
+        <span className="font-display text-2xl font-semibold leading-none text-garnet-800">
+          {formatModifier(modifier)}
+        </span>
+      </RollButton>
       <span className="mt-1.5 rounded-full border border-parchment-300 bg-parchment-100 px-2 py-0.5 text-xs tabular-nums text-parchment-700">
         {score}
       </span>
-      {saveProficient && (
-        <span
-          className="mt-1 h-1.5 w-1.5 rounded-full bg-arcane-500"
-          title="Proficient saving throw"
-          aria-label="Proficient saving throw"
-        />
-      )}
+      <div className="mt-1.5 flex items-center gap-1">
+        {saveProficient && (
+          <span
+            className="h-1.5 w-1.5 rounded-full bg-arcane-500"
+            aria-hidden="true"
+          />
+        )}
+        <RollButton
+          spec={saveSpec}
+          label={`${label} save`}
+          className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-parchment-400 hover:text-garnet-700"
+        >
+          Save
+        </RollButton>
+      </div>
     </div>
   );
 }

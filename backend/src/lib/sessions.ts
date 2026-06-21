@@ -1,0 +1,109 @@
+import { randomUUID } from "node:crypto";
+
+import { logEvent } from "./events.js";
+import { prisma } from "./prisma.js";
+
+export class SessionError extends Error {}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Returns the id of the currently-active session for a character, or null if
+ * none is active. Used by domain libs to tag logEvent calls.
+ */
+export async function getActiveSessionId(
+  characterId: string,
+): Promise<string | null> {
+  const session = await prisma.session.findFirst({
+    where: { characterId, status: "active" },
+    select: { id: true },
+  });
+  return session?.id ?? null;
+}
+
+/**
+ * Returns the full active session row, or null.
+ */
+export async function getActiveSession(characterId: string) {
+  return prisma.session.findFirst({
+    where: { characterId, status: "active" },
+  });
+}
+
+// ── Lifecycle ─────────────────────────────────────────────────────────────────
+
+/**
+ * Starts a new play session for a character. Rejects if one is already active
+ * (at most one active session per character). Returns the new session row.
+ */
+export async function startSession(
+  characterId: string,
+  title?: string,
+) {
+  const existing = await getActiveSession(characterId);
+  if (existing) {
+    throw new SessionError(
+      `A session is already active (id: ${existing.id}). End it before starting a new one.`,
+    );
+  }
+
+  const batchId = randomUUID();
+
+  return prisma.$transaction(async (tx) => {
+    const session = await tx.session.create({
+      data: { characterId, title: title ?? null },
+    });
+
+    await logEvent(tx, {
+      characterId,
+      category: "session",
+      type: "sessionStarted",
+      summary: title ? `Session started: ${title}` : "Session started",
+      batchId,
+      sessionId: session.id,
+    });
+
+    return session;
+  });
+}
+
+/**
+ * Ends the given session, setting status → ended and endedAt. Logs a
+ * sessionEnded event. Throws if the session doesn't exist or isn't active.
+ */
+export async function endSession(
+  characterId: string,
+  sessionId: string,
+) {
+  const session = await prisma.session.findUnique({
+    where: { id: sessionId },
+    select: { id: true, characterId: true, status: true },
+  });
+
+  if (!session || session.characterId !== characterId) {
+    throw new SessionError(`Session not found: ${sessionId}`);
+  }
+  if (session.status !== "active") {
+    throw new SessionError(`Session ${sessionId} is already ended`);
+  }
+
+  const batchId = randomUUID();
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.session.update({
+      where: { id: sessionId },
+      data: { status: "ended", endedAt: new Date() },
+    });
+
+    await logEvent(tx, {
+      characterId,
+      category: "session",
+      type: "sessionEnded",
+      summary: "Session ended",
+      batchId,
+      sessionId,
+    });
+
+    return updated;
+  });
+}

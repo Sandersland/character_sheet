@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "../generated/prisma/client.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
+import { getActiveSessionId } from "./sessions.js";
 
 // Same {cp,sp,gp,pp} shape as Character.currency and Item/InventoryItem.cost.
 // The index signature is just to satisfy Prisma's InputJsonObject structural
@@ -169,12 +170,21 @@ export interface SellOperation {
   currencyDelta: Currency;
 }
 
+// Equips or unequips a single item. Unlike `update`, this IS logged so
+// it appears on the activity timeline and is undoable.
+export interface SetEquippedOperation {
+  type: "setEquipped";
+  inventoryItemId: string;
+  equipped: boolean;
+}
+
 export type InventoryOperation =
   | AcquireOperation
   | AdjustQuantityOperation
   | UpdateOperation
   | RemoveOperation
-  | SellOperation;
+  | SellOperation
+  | SetEquippedOperation;
 
 async function getCharacterCurrency(tx: Prisma.TransactionClient, characterId: string): Promise<Currency> {
   const character = await tx.character.findUnique({ where: { id: characterId }, select: { currency: true } });
@@ -373,7 +383,8 @@ async function applyAcquire(
   tx: Prisma.TransactionClient,
   characterId: string,
   op: AcquireOperation,
-  batchId: string
+  batchId: string,
+  sessionId: string | null,
 ) {
   const quantity = op.quantity ?? 1;
   const position = await nextPosition(tx, characterId);
@@ -459,6 +470,7 @@ async function applyAcquire(
     after: { id: created.id, name: created.name, quantity, category: created.category },
     data: { itemName: created.name, quantityDelta: quantity, currencyDelta: storedDelta },
     batchId,
+    sessionId,
   });
 }
 
@@ -466,7 +478,8 @@ async function applyAdjustQuantity(
   tx: Prisma.TransactionClient,
   characterId: string,
   op: AdjustQuantityOperation,
-  batchId: string
+  batchId: string,
+  sessionId: string | null,
 ) {
   const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
   const nextQuantity = item.quantity + op.delta;
@@ -488,6 +501,7 @@ async function applyAdjustQuantity(
     after: nextQuantity === 0 ? null : { quantity: nextQuantity },
     data: { itemName: item.name, quantityDelta: op.delta },
     batchId,
+    sessionId,
   });
 
   if (nextQuantity === 0) {
@@ -527,11 +541,40 @@ async function applyUpdate(tx: Prisma.TransactionClient, characterId: string, op
   });
 }
 
+async function applySetEquipped(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: SetEquippedOperation,
+  batchId: string,
+  sessionId: string | null,
+) {
+  const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
+
+  await tx.inventoryItem.update({
+    where: { id: item.id },
+    data: { equipped: op.equipped },
+  });
+
+  await logEvent(tx, {
+    characterId,
+    category: "inventory",
+    type: op.equipped ? "equipped" : "unequipped",
+    summary: op.equipped ? `Equipped ${item.name}` : `Unequipped ${item.name}`,
+    entityType: "InventoryItem",
+    entityId: item.id,
+    before: { equipped: item.equipped },
+    after: { equipped: op.equipped },
+    batchId,
+    sessionId,
+  });
+}
+
 async function applyRemove(
   tx: Prisma.TransactionClient,
   characterId: string,
   op: RemoveOperation,
-  batchId: string
+  batchId: string,
+  sessionId: string | null,
 ) {
   const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
 
@@ -546,12 +589,13 @@ async function applyRemove(
     after: null,
     data: { itemName: item.name, quantityDelta: -item.quantity },
     batchId,
+    sessionId,
   });
 
   await tx.inventoryItem.delete({ where: { id: item.id } });
 }
 
-async function applySell(tx: Prisma.TransactionClient, characterId: string, op: SellOperation, batchId: string) {
+async function applySell(tx: Prisma.TransactionClient, characterId: string, op: SellOperation, batchId: string, sessionId: string | null) {
   const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
   const quantitySold = op.quantity ?? item.quantity;
   if (quantitySold <= 0 || quantitySold > item.quantity) {
@@ -574,6 +618,7 @@ async function applySell(tx: Prisma.TransactionClient, characterId: string, op: 
     after: remaining === 0 ? null : { quantity: remaining },
     data: { itemName: item.name, quantityDelta: -quantitySold, currencyDelta: op.currencyDelta },
     batchId,
+    sessionId,
   });
 
   if (quantitySold === item.quantity) {
@@ -592,23 +637,27 @@ export async function applyInventoryOperations(
   operations: InventoryOperation[]
 ): Promise<void> {
   const batchId = randomUUID();
+  const sessionId = await getActiveSessionId(characterId);
   await prisma.$transaction(async (tx) => {
     for (const op of operations) {
       switch (op.type) {
         case "acquire":
-          await applyAcquire(tx, characterId, op, batchId);
+          await applyAcquire(tx, characterId, op, batchId, sessionId);
           break;
         case "adjustQuantity":
-          await applyAdjustQuantity(tx, characterId, op, batchId);
+          await applyAdjustQuantity(tx, characterId, op, batchId, sessionId);
           break;
         case "update":
           await applyUpdate(tx, characterId, op);
           break;
         case "remove":
-          await applyRemove(tx, characterId, op, batchId);
+          await applyRemove(tx, characterId, op, batchId, sessionId);
           break;
         case "sell":
-          await applySell(tx, characterId, op, batchId);
+          await applySell(tx, characterId, op, batchId, sessionId);
+          break;
+        case "setEquipped":
+          await applySetEquipped(tx, characterId, op, batchId, sessionId);
           break;
       }
     }

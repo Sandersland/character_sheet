@@ -336,6 +336,139 @@ export const RACE_PROFICIENCY_GRANTS: Record<string, ProficiencyGrant> = {
   Dwarf:      { armor: [], weapons: ["Battleaxes", "Handaxes", "Light Hammers", "Warhammers"] },
 };
 
+// ── Weapon proficiency matching ──────────────────────────────────────────────
+
+/**
+ * Returns true if the character is proficient with the given weapon based on
+ * their merged weapon proficiency grants.
+ *
+ * Grant entries mix two forms:
+ *   - Category labels: "Simple Weapons" / "Martial Weapons" — matched by
+ *     `weapon.weaponClass` enum value ("simple" / "martial").
+ *   - Pluralised specific weapon names: "Longswords", "Hand Crossbows" —
+ *     matched by stripping the trailing "s" and comparing case-insensitively
+ *     to the weapon's display name (catalog names are singular).
+ *
+ * Tolerates `null`/`undefined` weaponClass (no category match; falls back to
+ * name matching only).
+ */
+export function isProficientWithWeapon(
+  weapon: { name: string; weaponClass?: string | null },
+  grants: ReadonlyArray<{ name: string }>,
+): boolean {
+  const lcName = weapon.name.toLowerCase();
+  for (const grant of grants) {
+    if (grant.name === "Simple Weapons" && weapon.weaponClass === "simple") return true;
+    if (grant.name === "Martial Weapons" && weapon.weaponClass === "martial") return true;
+    // Specific weapon: grants are plural ("Longswords"), catalog names are singular.
+    const grantSingular = grant.name.toLowerCase().replace(/s$/, "");
+    if (grantSingular === lcName) return true;
+  }
+  return false;
+}
+
+/**
+ * Derives the melee/ranged attack bonus for a single weapon. Mirrors the
+ * derive-don't-persist pattern of `deriveSpellcasting`: computed at read time
+ * from character ability scores, proficiency bonus, and the weapon's metadata.
+ *
+ * Ability selection per 5e PHB rules:
+ *   - Ranged weapons (`weaponRange === "ranged"`) → DEX modifier.
+ *   - Finesse weapons → higher of STR or DEX modifier.
+ *   - All other melee weapons → STR modifier.
+ *
+ * Proficiency bonus is added only if the character is proficient with the
+ * weapon (category-level or name-level match from `isProficientWithWeapon`).
+ */
+/** Shared helper — same ability-selection rule used for both attack and damage. */
+function weaponAbilityMod(
+  weapon: { finesse: boolean; weaponRange?: string | null },
+  effectiveScores: Record<string, number>,
+): number {
+  const strMod = abilityModifier(effectiveScores.strength ?? 10);
+  const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
+  if (weapon.weaponRange === "ranged") return dexMod;
+  if (weapon.finesse) return Math.max(strMod, dexMod);
+  return strMod;
+}
+
+export function deriveWeaponAttackBonus(
+  weapon: {
+    name: string;
+    finesse: boolean;
+    weaponClass?: string | null;
+    weaponRange?: string | null;
+  },
+  effectiveScores: Record<string, number>,
+  proficiencyBonus: number,
+  weaponGrants: ReadonlyArray<{ name: string }>,
+): number {
+  const abilityMod = weaponAbilityMod(weapon, effectiveScores);
+  const proficient = isProficientWithWeapon(weapon, weaponGrants);
+  return abilityMod + (proficient ? proficiencyBonus : 0);
+}
+
+export type WeaponGrip = "one-handed" | "two-handed" | "versatile-two-handed";
+
+/**
+ * Derives the damage roll spec for a weapon, choosing the correct die for
+ * versatile weapons based on what else is equipped.
+ *
+ * Grip rule (5e PHB):
+ *   - `twoHanded` weapons always use their base dice (no off-hand applies).
+ *   - Versatile weapons use their **two-handed die** when the off-hand is free
+ *     (no equipped shield and no other equipped weapon). Otherwise one-handed.
+ *   - All other weapons use their base dice.
+ *
+ * Damage modifier follows the same ability-selection rule as attackBonus
+ * (ranged → DEX, finesse → max(STR, DEX), else STR) so attack and damage stay
+ * consistent and we never duplicate that rule.
+ */
+export function deriveWeaponDamage(
+  weapon: {
+    name: string;
+    finesse: boolean;
+    weaponRange?: string | null;
+    damageDiceCount: number;
+    damageDiceFaces: number;
+    damageType: string;
+    versatileDiceCount?: number | null;
+    versatileDiceFaces?: number | null;
+    twoHanded: boolean;
+  },
+  /** True if any other equipped item occupies the off-hand (shield or weapon). */
+  offHandOccupied: boolean,
+  effectiveScores: Record<string, number>,
+): {
+  damageDiceCount: number;
+  damageDiceFaces: number;
+  damageModifier: number;
+  damageType: string;
+  grip: WeaponGrip;
+} {
+  const damageModifier = weaponAbilityMod(weapon, effectiveScores);
+
+  // Resolve grip and choose dice.
+  const isVersatile =
+    weapon.versatileDiceCount != null && weapon.versatileDiceFaces != null;
+  const useTwoHandedDie = isVersatile && !offHandOccupied && !weapon.twoHanded;
+
+  const damageDiceCount = useTwoHandedDie
+    ? weapon.versatileDiceCount!
+    : weapon.damageDiceCount;
+  const damageDiceFaces = useTwoHandedDie
+    ? weapon.versatileDiceFaces!
+    : weapon.damageDiceFaces;
+
+  const grip: WeaponGrip = weapon.twoHanded
+    ? "two-handed"
+    : useTwoHandedDie
+      ? "versatile-two-handed"
+      : "one-handed";
+
+  return { damageDiceCount, damageDiceFaces, damageModifier, damageType: weapon.damageType, grip };
+}
+
 export interface ToolProficiencyEntry {
   name: string;
   /** Origin of the proficiency — used to distinguish creation-fixed entries

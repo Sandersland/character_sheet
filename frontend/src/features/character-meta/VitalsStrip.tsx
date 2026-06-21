@@ -1,20 +1,48 @@
 import { formatModifier } from "@/lib/abilities";
+import RollButton from "@/features/dice/RollButton";
 import type { Character } from "@/types/character";
 import MeterBar from "@/components/ui/MeterBar";
+import type { RollSpec } from "@/lib/dice";
 
 interface VitalsStripProps {
   character: Character;
 }
 
-function VitalStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-card border border-parchment-200 bg-parchment-50 px-3 py-3 shadow-card">
+function VitalStat({
+  label,
+  value,
+  rollSpec,
+}: {
+  label: string;
+  value: string;
+  rollSpec?: RollSpec;
+}) {
+  const content = (
+    <>
       <span className="font-display text-2xl font-semibold leading-none text-parchment-900">
         {value}
       </span>
       <span className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
         {label}
       </span>
+    </>
+  );
+
+  if (rollSpec) {
+    return (
+      <RollButton
+        spec={rollSpec}
+        label={label}
+        className="flex flex-col items-center justify-center rounded-card border border-parchment-200 bg-parchment-50 px-3 py-3 shadow-card"
+      >
+        {content}
+      </RollButton>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center rounded-card border border-parchment-200 bg-parchment-50 px-3 py-3 shadow-card">
+      {content}
     </div>
   );
 }
@@ -33,6 +61,7 @@ export default function VitalsStrip({ character }: VitalsStripProps) {
       <VitalStat
         label="Initiative"
         value={formatModifier(character.initiativeBonus)}
+        rollSpec={{ count: 1, faces: 20, modifier: character.initiativeBonus }}
       />
       <VitalStat label="Speed" value={`${character.speed} ft`} />
       <VitalStat

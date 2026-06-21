@@ -15,6 +15,7 @@ import { randomUUID } from "node:crypto";
 import { levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
+import { getActiveSessionId } from "./sessions.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 
@@ -37,6 +38,7 @@ export async function applyClassOperations(
   operations: ClassOperation[]
 ): Promise<void> {
   const batchId = randomUUID();
+  const sessionId = await getActiveSessionId(characterId);
 
   await prisma.$transaction(async (tx) => {
     for (const op of operations) {
@@ -118,6 +120,7 @@ export async function applyClassOperations(
             after: { ...afterData },
             data: { classEntryId: primaryEntry.id, subclassId: subclass.id, subclassName: subclass.name },
             batchId,
+            sessionId,
           });
           break;
         }

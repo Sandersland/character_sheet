@@ -132,8 +132,19 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
   }
 
   // LIFO guard: find the most-recent non-reverted batch and ensure it matches.
+  // Also exclude events belonging to an already-ended session — those are frozen
+  // so the summary/XP that was awarded at session-end stays coherent.
   const latestEvent = await prisma.characterEvent.findFirst({
-    where: { characterId: character.id, reverted: false, type: { not: "revert" } },
+    where: {
+      characterId: character.id,
+      reverted: false,
+      type: { not: "revert" },
+      // Don't look through events whose session has been ended.
+      OR: [
+        { sessionId: null },
+        { session: { status: "active" } },
+      ],
+    },
     orderBy: { createdAt: "desc" },
   });
   if (!latestEvent || latestEvent.batchId !== batchId) {
@@ -141,6 +152,18 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
       error: "Only the most recent action can be undone",
     });
     return;
+  }
+
+  // Also block if the batch itself belongs to an ended session.
+  if (batchEvents[0]?.sessionId) {
+    const session = await prisma.session.findUnique({
+      where: { id: batchEvents[0].sessionId },
+      select: { status: true },
+    });
+    if (session?.status === "ended") {
+      res.status(409).json({ error: "Cannot undo actions from a completed session" });
+      return;
+    }
   }
 
   // Apply reversals in reverse order (latest op in the batch first).
