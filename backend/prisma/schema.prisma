@@ -298,6 +298,7 @@ model Item {
   consumableDetail ItemConsumableDetail?
 
   inventoryItems InventoryItem[]
+  packContents   PackContent[]
 }
 
 // Optional 1:1 with Item, present only when category = weapon. The FK lives
@@ -370,6 +371,31 @@ model ItemConsumableDetail {
   effectDiceFaces   Int?
   effectModifier    Int?
   effectDescription String? // e.g. "Restores hit points"
+}
+
+// Equipment packs — a named collection of items awarded as a bundle at
+// character creation. The pack itself also exists as a regular catalog Item
+// (category = gear) so it surfaces correctly in StartingEquipmentEditor;
+// this table adds the expansion data (which items + how many).
+// Seeded from the 5e Basic Rules baseline; custom packs can be added later.
+model Pack {
+  id          String        @id @default(uuid())
+  name        String        @unique // matches the bundle catalogName, e.g. "Scholar's Pack"
+  description String?
+  contents    PackContent[]
+}
+
+// Join between Pack and the catalog Items it contains.
+// quantity is the number of that item included in the pack.
+model PackContent {
+  id       String @id @default(uuid())
+  packId   String
+  pack     Pack   @relation(fields: [packId], references: [id], onDelete: Cascade)
+  itemId   String
+  item     Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  quantity Int    @default(1)
+
+  @@unique([packId, itemId])
 }
 
 // Per-character inventory row. Unlike CharacterRace/CharacterBackground

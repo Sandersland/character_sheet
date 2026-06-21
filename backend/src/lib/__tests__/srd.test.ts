@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { deriveResources } from "../srd.js";
+import { deriveResources } from "../class-features.js";
 
 const ABILITY_SCORES = {
   strength: 16, dexterity: 10, constitution: 14,
