@@ -15,6 +15,7 @@ import InventoryList from "@/features/inventory/InventoryList";
 import JournalSection from "@/features/character-meta/JournalSection";
 import SkillsTable from "@/features/abilities/SkillsTable";
 import SpellsSection from "@/features/spells/SpellsSection";
+import ProficienciesCard from "@/features/abilities/ProficienciesCard";
 import ToolProficienciesCard from "@/features/abilities/ToolProficienciesCard";
 import VitalsStrip from "@/features/character-meta/VitalsStrip";
 import { useCharacter } from "@/hooks/useCharacter";
@@ -195,6 +196,16 @@ export default function CharacterSheetPage() {
               artisanTools={reference?.tools.byCategory.artisan ?? []}
               onUpdate={setCharacter}
             />
+          </Card>
+        )}
+
+        {/* Weapon & Armor proficiencies — derived at read time from class, race,
+            and feats. Hidden for characters with no entries (e.g. a test
+            fixture with an unknown class). */}
+        {((character.armorProficiencies?.length ?? 0) > 0 ||
+          (character.weaponProficiencies?.length ?? 0) > 0) && (
+          <Card title="Weapon & Armor Proficiencies" className="p-4">
+            <ProficienciesCard character={character} />
           </Card>
         )}
 

@@ -1,4 +1,4 @@
-import type { AbilityName, SkillName } from "@/types/character";
+import type { AbilityName, ArmorProficiencyCategory, SkillName } from "@/types/character";
 
 export const ABILITY_LABELS: Record<AbilityName, string> = {
   strength: "Strength",
@@ -90,6 +90,19 @@ export function skillLabel(key: string): string {
 export function abilityLabel(key: string): string {
   return ABILITY_LABELS[key as AbilityName] ?? key;
 }
+
+/** Display labels for armor proficiency categories. */
+export const ARMOR_CATEGORY_LABELS: Record<ArmorProficiencyCategory, string> = {
+  light:  "Light Armor",
+  medium: "Medium Armor",
+  heavy:  "Heavy Armor",
+  shield: "Shields",
+};
+
+/** Canonical display order for armor categories (light → medium → heavy → shields). */
+export const ARMOR_CATEGORY_ORDER: readonly ArmorProficiencyCategory[] = [
+  "light", "medium", "heavy", "shield",
+];
 
 /** Three-letter uppercase ability abbreviation (e.g. "strength" → "STR"). */
 export function abilityAbbr(key: string): string {

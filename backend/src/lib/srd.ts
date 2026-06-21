@@ -285,6 +285,57 @@ export function hitDieFace(hitDie: string): number {
   return Number(hitDie.replace(/^d/i, ""));
 }
 
+// ── Armor & weapon proficiency grants ────────────────────────────────────────
+
+/** Armor categories that a character can be proficient with. */
+export type ArmorProficiencyCategory = "light" | "medium" | "heavy" | "shield";
+
+/** Static armor/weapon proficiency grants from a class or race. */
+export interface ProficiencyGrant {
+  armor: ArmorProficiencyCategory[];
+  /** May contain category labels ("Simple Weapons", "Martial Weapons") and/or
+   *  specific weapon names ("Longswords"). Mixed — display renders them verbatim. */
+  weapons: string[];
+}
+
+/**
+ * Fixed weapon/armor proficiencies granted by each class at creation (PHB).
+ * Keyed by class display name, matching CharacterClassEntry.name from the seed.
+ * Unknown class names are treated as granting nothing — no crash, no spurious grants.
+ */
+export const CLASS_PROFICIENCY_GRANTS: Record<string, ProficiencyGrant> = {
+  Barbarian: { armor: ["light", "medium", "shield"], weapons: ["Simple Weapons", "Martial Weapons"] },
+  Bard:      { armor: ["light"],                     weapons: ["Simple Weapons", "Hand Crossbows", "Longswords", "Rapiers", "Shortswords"] },
+  Cleric:    { armor: ["light", "medium", "shield"], weapons: ["Simple Weapons"] },
+  Druid:     { armor: ["light", "medium", "shield"], weapons: ["Clubs", "Daggers", "Darts", "Javelins", "Maces", "Quarterstaffs", "Scimitars", "Sickles", "Slings", "Spears"] },
+  Fighter:   { armor: ["light", "medium", "heavy", "shield"], weapons: ["Simple Weapons", "Martial Weapons"] },
+  Monk:      { armor: [],                            weapons: ["Simple Weapons", "Shortswords"] },
+  Paladin:   { armor: ["light", "medium", "heavy", "shield"], weapons: ["Simple Weapons", "Martial Weapons"] },
+  Ranger:    { armor: ["light", "medium", "shield"], weapons: ["Simple Weapons", "Martial Weapons"] },
+  Rogue:     { armor: ["light"],                     weapons: ["Simple Weapons", "Hand Crossbows", "Longswords", "Rapiers", "Shortswords"] },
+  Sorcerer:  { armor: [],                            weapons: ["Daggers", "Darts", "Slings", "Quarterstaffs", "Light Crossbows"] },
+  Warlock:   { armor: ["light"],                     weapons: ["Simple Weapons"] },
+  Wizard:    { armor: [],                            weapons: ["Daggers", "Darts", "Slings", "Quarterstaffs", "Light Crossbows"] },
+};
+
+/**
+ * Fixed weapon/armor proficiencies granted by race (PHB).
+ * Keyed by race display name, matching raceSelection.name from the seed.
+ * Races not listed (Human, Halfling, Gnome, Tiefling, etc.) grant nothing — omitted.
+ */
+export const RACE_PROFICIENCY_GRANTS: Record<string, ProficiencyGrant> = {
+  // Dwarven weapon training; Mountain Dwarf additionally gets light + medium armor.
+  "Hill Dwarf":     { armor: [],                  weapons: ["Battleaxes", "Handaxes", "Light Hammers", "Warhammers"] },
+  "Mountain Dwarf": { armor: ["light", "medium"], weapons: ["Battleaxes", "Handaxes", "Light Hammers", "Warhammers"] },
+  // Elf weapon training varies by subrace.
+  "High Elf": { armor: [], weapons: ["Longswords", "Shortswords", "Shortbows", "Longbows"] },
+  "Wood Elf": { armor: [], weapons: ["Longswords", "Shortswords", "Shortbows", "Longbows"] },
+  Drow:       { armor: [], weapons: ["Rapiers", "Shortswords", "Hand Crossbows"] },
+  // Legacy generic key: back-compat for any character created before the race list
+  // was expanded to named subraces (Hill/Mountain/High/Wood/Drow).
+  Dwarf:      { armor: [], weapons: ["Battleaxes", "Handaxes", "Light Hammers", "Warhammers"] },
+};
+
 export interface ToolProficiencyEntry {
   name: string;
   /** Origin of the proficiency — used to distinguish creation-fixed entries
@@ -369,12 +420,15 @@ export const NUMERIC_FEAT_IMPROVEMENT_TARGETS = [
 export type NumericFeatImprovementTarget = (typeof NUMERIC_FEAT_IMPROVEMENT_TARGETS)[number];
 
 /**
- * Proficiency targets: keyed improvements (imp.key = skill name or ability name).
+ * Proficiency targets: keyed improvements (imp.key identifies the specific
+ * skill, ability, armor category, or weapon name/category being granted).
  * Applied by deriveFeatProficiencies rather than deriveFeatBonuses.
  */
 export const PROFICIENCY_FEAT_IMPROVEMENT_TARGETS = [
   "skillProficiency",
   "savingThrowProficiency",
+  "armorProficiency",   // key = ArmorProficiencyCategory ("light" | "medium" | "heavy" | "shield")
+  "weaponProficiency",  // key = weapon category ("Simple Weapons") or specific name ("Longswords")
 ] as const;
 
 export type ProficiencyFeatImprovementTarget = (typeof PROFICIENCY_FEAT_IMPROVEMENT_TARGETS)[number];
@@ -425,25 +479,31 @@ export function deriveFeatBonuses(
 
 /**
  * Collects proficiency grants from feat improvements across a set of advancements.
- * Returns two sets:
- *   - `skills`:       camelCase skill keys (e.g. "athletics", "animalHandling") where `target === "skillProficiency"`
+ * Returns four sets:
+ *   - `skills`:       camelCase skill keys (e.g. "athletics") where `target === "skillProficiency"`
  *   - `savingThrows`: ability names (e.g. "strength") where `target === "savingThrowProficiency"`
+ *   - `armor`:        ArmorProficiencyCategory values (e.g. "light") where `target === "armorProficiency"`
+ *   - `weapons`:      weapon category/name strings (e.g. "Longswords") where `target === "weaponProficiency"`
  *
  * Callers pass the **already-clamped** slice so over-cap feats are excluded automatically.
  */
 export function deriveFeatProficiencies(
   advancements: AdvancementEntry[],
-): { skills: Set<string>; savingThrows: Set<string> } {
+): { skills: Set<string>; savingThrows: Set<string>; armor: Set<string>; weapons: Set<string> } {
   const skills = new Set<string>();
   const savingThrows = new Set<string>();
+  const armor = new Set<string>();
+  const weapons = new Set<string>();
 
   for (const entry of advancements) {
     for (const imp of (entry.improvements ?? [])) {
       if (!imp.key) continue;
       if (imp.target === "skillProficiency") skills.add(imp.key);
       else if (imp.target === "savingThrowProficiency") savingThrows.add(imp.key);
+      else if (imp.target === "armorProficiency") armor.add(imp.key);
+      else if (imp.target === "weaponProficiency") weapons.add(imp.key);
     }
   }
 
-  return { skills, savingThrows };
+  return { skills, savingThrows, armor, weapons };
 }

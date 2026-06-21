@@ -17,12 +17,15 @@ import { normalizeHitDice, normalizeHitPoints } from "../lib/hitpoints.js";
 import {
   ALIGNMENTS,
   advancementSlotsForLevel,
+  CLASS_PROFICIENCY_GRANTS,
   deriveCreatedCharacter,
   deriveFeatBonuses,
   deriveFeatProficiencies,
   deriveSpellcasting,
   isKnownTool,
+  RACE_PROFICIENCY_GRANTS,
   TOOLS,
+  type ArmorProficiencyCategory,
   type ToolProficiencyEntry,
 } from "../lib/srd.js";
 import { deriveResources } from "../lib/class-features.js";
@@ -132,6 +135,73 @@ function buildMergedToolProficiencies(
       })),
   ];
   return merged;
+}
+
+/**
+ * Merges armor proficiency grants from class(es), race, and feats into a
+ * deduplicated list tagged with the highest-priority source (class > race > feat).
+ *
+ * Multiclass: iterates all classEntries and takes the full union of their grants.
+ * This is a deliberate simplification of 5e's restricted multiclass-proficiency
+ * rules (which restrict certain armor/weapon grants on secondary class pickup);
+ * correct for the current single-class setup and conservatively permissive for
+ * any future multiclass character.
+ */
+function buildMergedArmorProficiencies(
+  classEntries: { name: string }[],
+  raceName: string | undefined,
+  featArmor: Set<string>,
+): Array<{ category: ArmorProficiencyCategory; source: "class" | "race" | "feat" }> {
+  const seen = new Set<string>();
+  const out: Array<{ category: ArmorProficiencyCategory; source: "class" | "race" | "feat" }> = [];
+
+  const push = (cat: string, source: "class" | "race" | "feat") => {
+    if (seen.has(cat)) return;
+    seen.add(cat);
+    out.push({ category: cat as ArmorProficiencyCategory, source });
+  };
+
+  for (const entry of classEntries) {
+    for (const cat of CLASS_PROFICIENCY_GRANTS[entry.name]?.armor ?? []) push(cat, "class");
+  }
+  if (raceName) {
+    for (const cat of RACE_PROFICIENCY_GRANTS[raceName]?.armor ?? []) push(cat, "race");
+  }
+  for (const cat of featArmor) push(cat, "feat");
+
+  return out;
+}
+
+/**
+ * Merges weapon proficiency grants from class(es), race, and feats into a
+ * deduplicated list tagged with the highest-priority source (class > race > feat).
+ * Entries may be category-level ("Simple Weapons") or specific names ("Longswords").
+ *
+ * See buildMergedArmorProficiencies for the multiclass simplification note.
+ */
+function buildMergedWeaponProficiencies(
+  classEntries: { name: string }[],
+  raceName: string | undefined,
+  featWeapons: Set<string>,
+): Array<{ name: string; source: "class" | "race" | "feat" }> {
+  const seen = new Set<string>();
+  const out: Array<{ name: string; source: "class" | "race" | "feat" }> = [];
+
+  const push = (name: string, source: "class" | "race" | "feat") => {
+    if (seen.has(name)) return;
+    seen.add(name);
+    out.push({ name, source });
+  };
+
+  for (const entry of classEntries) {
+    for (const w of CLASS_PROFICIENCY_GRANTS[entry.name]?.weapons ?? []) push(w, "class");
+  }
+  if (raceName) {
+    for (const w of RACE_PROFICIENCY_GRANTS[raceName]?.weapons ?? []) push(w, "race");
+  }
+  for (const w of featWeapons) push(w, "feat");
+
+  return out;
 }
 
 export function serializeCharacter(row: CharacterWithRelations) {
@@ -312,6 +382,21 @@ export function serializeCharacter(row: CharacterWithRelations) {
       resources && "toolProficienciesKnown" in resources
         ? (resources as { toolProficienciesKnown: ToolProfEntry[] }).toolProficienciesKnown
         : [],
+    ),
+    // Armor/weapon proficiencies — derived fully at read time from class, race,
+    // and feat grants. No persistence needed: these are fixed by class/race and
+    // any feat-granted additions are already tracked in advancements. Deduped
+    // with precedence class > race > feat so a feat re-granting an existing
+    // class proficiency renders as a single class-sourced entry.
+    armorProficiencies: buildMergedArmorProficiencies(
+      row.classEntries,
+      row.raceSelection?.name,
+      featProficiencies.armor,
+    ),
+    weaponProficiencies: buildMergedWeaponProficiencies(
+      row.classEntries,
+      row.raceSelection?.name,
+      featProficiencies.weapons,
     ),
     inventory: row.inventoryItems.map(serializeInventoryItem),
     currency: row.currency,

@@ -13,15 +13,37 @@ const prisma = new PrismaClient({ adapter });
 // Covers every race/class/background used by SEED_CHARACTERS below, plus a
 // handful of extra options so the form isn't a list of three.
 
+// Full PHB race/subrace list. Expanded to named subraces so racial proficiency
+// grants (armor for Mountain Dwarf, weapons for Elves, etc.) resolve correctly.
+// Legacy generic entries (plain "Dwarf", "Elf") are kept for back-compat with
+// any existing characters created before this expansion.
 const RACES = [
-  { name: "Human", speed: 30 },
-  { name: "Half-Elf", speed: 30 },
-  { name: "Wood Elf", speed: 35 },
-  { name: "Dwarf", speed: 25 },
-  { name: "Halfling", speed: 25 },
-  { name: "Half-Orc", speed: 30 },
-  { name: "Gnome", speed: 25 },
-  { name: "Tiefling", speed: 30 },
+  // Dwarf subraces
+  { name: "Hill Dwarf",     speed: 25 },
+  { name: "Mountain Dwarf", speed: 25 },
+  // Elf subraces
+  { name: "High Elf",       speed: 30 },
+  { name: "Wood Elf",       speed: 35 },
+  { name: "Drow",           speed: 30 },
+  // Halfling subraces
+  { name: "Lightfoot Halfling", speed: 25 },
+  { name: "Stout Halfling",     speed: 25 },
+  // Human (no subrace split)
+  { name: "Human",         speed: 30 },
+  // Dragonborn (no subrace split in PHB)
+  { name: "Dragonborn",    speed: 30 },
+  // Gnome subraces
+  { name: "Forest Gnome",  speed: 25 },
+  { name: "Rock Gnome",    speed: 25 },
+  // Half-races and Tiefling
+  { name: "Half-Elf",      speed: 30 },
+  { name: "Half-Orc",      speed: 30 },
+  { name: "Tiefling",      speed: 30 },
+  // Legacy generic entries — kept for back-compat with characters created
+  // before this list was expanded to named subraces.
+  { name: "Dwarf",         speed: 25 },
+  { name: "Halfling",      speed: 25 },
+  { name: "Gnome",         speed: 25 },
 ];
 
 const CLASSES = [
@@ -621,6 +643,7 @@ const FEATS: FeatSeed[] = [
       "+1 to Strength or Dexterity. You gain proficiency with light armor.",
     abilityOptions: ["strength", "dexterity"],
     abilityIncrease: 1,
+    improvements: [{ target: "armorProficiency", amount: 1, key: "light" }],
   },
   {
     name: "Moderately Armored",
@@ -629,6 +652,32 @@ const FEATS: FeatSeed[] = [
     prerequisite: "Proficiency with light armor",
     abilityOptions: ["strength", "dexterity"],
     abilityIncrease: 1,
+    improvements: [
+      { target: "armorProficiency", amount: 1, key: "medium" },
+      { target: "armorProficiency", amount: 1, key: "shield" },
+    ],
+  },
+  {
+    name: "Heavily Armored",
+    description:
+      "+1 to Strength. You gain proficiency with heavy armor.",
+    prerequisite: "Proficiency with medium armor",
+    abilityOptions: ["strength"],
+    abilityIncrease: 1,
+    improvements: [{ target: "armorProficiency", amount: 1, key: "heavy" }],
+  },
+  {
+    name: "Weapon Master",
+    description:
+      "+1 to Strength or Dexterity. You gain proficiency with four weapons of your choice.",
+    abilityOptions: ["strength", "dexterity"],
+    abilityIncrease: 1,
+    improvements: [
+      { target: "weaponProficiency", amount: 1, key: "Longswords" },
+      { target: "weaponProficiency", amount: 1, key: "Battleaxes" },
+      { target: "weaponProficiency", amount: 1, key: "Warhammers" },
+      { target: "weaponProficiency", amount: 1, key: "Greatswords" },
+    ],
   },
 ];
 
@@ -1742,7 +1791,7 @@ const SEED_CHARACTERS = [
   {
     id: "2",
     name: "Tordek Ironfist",
-    race: "Dwarf",
+    race: "Mountain Dwarf",
     class: "Fighter",
     subclass: "Battle Master",
     background: "Soldier",

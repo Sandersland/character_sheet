@@ -32,10 +32,15 @@ const featImprovementSchema = z
   })
   .refine(
     (imp) => {
-      const keyedTargets: string[] = ["skillProficiency", "savingThrowProficiency"];
+      const keyedTargets: string[] = [
+        "skillProficiency",
+        "savingThrowProficiency",
+        "armorProficiency",
+        "weaponProficiency",
+      ];
       return keyedTargets.includes(imp.target) ? !!imp.key : true;
     },
-    { message: "FeatImprovement: 'key' is required for skillProficiency and savingThrowProficiency targets" },
+    { message: "FeatImprovement: 'key' is required for proficiency targets (skill, savingThrow, armor, weapon)" },
   );
 
 const takeFeatOpSchema = z

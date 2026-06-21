@@ -33,6 +33,8 @@ const mockCharacter: Character = {
   savingThrowProficiencies: ["strength", "dexterity"],
   skills: [],
   toolProficiencies: [],
+  armorProficiencies: [],
+  weaponProficiencies: [],
   inventory: [],
   currency: { cp: 0, sp: 0, gp: 25, pp: 0 },
   advancements: [],

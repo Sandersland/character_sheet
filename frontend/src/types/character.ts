@@ -522,6 +522,29 @@ export interface ToolProficiency {
   source: "background" | "class" | "race" | "subclass";
 }
 
+/** Armor category that a character is proficient with. */
+export type ArmorProficiencyCategory = "light" | "medium" | "heavy" | "shield";
+
+/**
+ * One armor proficiency entry — derived at read time from class + race + feats.
+ * `category` identifies the armor type; `source` is the highest-priority origin
+ * (class wins over race over feat when multiple sources would grant the same category).
+ */
+export interface ArmorProficiency {
+  category: ArmorProficiencyCategory;
+  source: "class" | "race" | "feat";
+}
+
+/**
+ * One weapon proficiency entry — derived at read time from class + race + feats.
+ * `name` may be a category ("Simple Weapons", "Martial Weapons") or a specific
+ * weapon ("Longswords"). `source` is the highest-priority origin.
+ */
+export interface WeaponProficiency {
+  name: string;
+  source: "class" | "race" | "feat";
+}
+
 /** Level-gated tool proficiency entry within the resources JSON. */
 export interface ToolProfEntry {
   id: string;   // per-character entry UUID
@@ -598,6 +621,11 @@ export interface Character {
   /** Merged tool proficiencies — creation-fixed (background/class/race) and
    *  level-gated subclass choices (e.g. Student of War), deduped by name. */
   toolProficiencies: ToolProficiency[];
+  /** Armor proficiencies derived at read time from class, race, and feats. */
+  armorProficiencies: ArmorProficiency[];
+  /** Weapon proficiencies derived at read time from class, race, and feats.
+   *  Entries are either category-level ("Simple Weapons") or specific ("Longswords"). */
+  weaponProficiencies: WeaponProficiency[];
 
   inventory: InventoryItem[];
   currency: Currency;
