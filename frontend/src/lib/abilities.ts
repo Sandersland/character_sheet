@@ -104,6 +104,19 @@ export const ARMOR_CATEGORY_ORDER: readonly ArmorProficiencyCategory[] = [
   "light", "medium", "heavy", "shield",
 ];
 
+/** Union of all proficiency grant sources used across weapons, armor, and tools. */
+export type ProficiencySource = "class" | "race" | "feat" | "background" | "subclass";
+
+/** Human-readable labels for every proficiency source. Used by ProficienciesCard
+ *  across all three sub-sections so weapons, armor, and tools share one map. */
+export const SOURCE_LABELS: Record<ProficiencySource, string> = {
+  class:      "Class",
+  race:       "Race",
+  feat:       "Feat",
+  background: "Background",
+  subclass:   "Battle Master",
+};
+
 /** Three-letter uppercase ability abbreviation (e.g. "strength" → "STR"). */
 export function abilityAbbr(key: string): string {
   return abilityLabel(key).slice(0, 3).toUpperCase();
