@@ -17,7 +17,7 @@ import { useState } from "react";
 
 import { applySpellcastingTransactions } from "@/api/client";
 import { abilityAbbr, abilityModifier, formatModifier } from "@/lib/abilities";
-import { rollSpec } from "@/lib/dice";
+import { computeCastRoll } from "@/lib/spellCast";
 import type {
   AbilityName,
   Character,
@@ -87,52 +87,34 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
 
   function handleCast(spell: Spell, slotLevel?: number) {
     const isCantrip = spell.level === 0;
+    const resolvedSlotLevel = slotLevel ?? spell.level;
 
-    // If no effect, just expend the slot (no roll).
-    if (!spell.effectKind || !spell.effectDiceCount || !spell.effectDiceFaces) {
-      if (!isCantrip && slotLevel) {
-        // Still expend the slot; no roll to show.
-        send([{ type: "castSpell", entryId: spell.id, slotLevel, roll: 0 }]);
-      } else if (!isCantrip) {
-        send([{ type: "castSpell", entryId: spell.id, slotLevel: spell.level, roll: 0 }]);
+    // Compute roll via shared pure helper — null means no effect dice.
+    const castRoll = computeCastRoll(spell, character, resolvedSlotLevel);
+
+    if (!castRoll) {
+      // No effect dice — just expend the slot (no roll to show).
+      if (!isCantrip) {
+        send([{ type: "castSpell", entryId: spell.id, slotLevel: resolvedSlotLevel, roll: 0 }]);
       }
       return;
     }
 
-    // Compute dice count with cantrip scaling + upcast.
-    let diceCount = spell.effectDiceCount;
-    if (spell.cantripScaling && isCantrip) {
-      if (character.level >= 17) diceCount *= 4;
-      else if (character.level >= 11) diceCount *= 3;
-      else if (character.level >= 5) diceCount *= 2;
-    }
-    if (!isCantrip && slotLevel && spell.upcastDicePerLevel) {
-      const extraLevels = Math.max(0, slotLevel - spell.level);
-      diceCount += extraLevels * spell.upcastDicePerLevel;
-    }
-
-    // Flat modifier: heal spells add the spellcasting ability modifier.
-    let modifier = spell.effectModifier ?? 0;
-    if (spell.effectKind === "heal") {
-      modifier += abilityMod;
-    }
-
-    const result = rollSpec({ count: diceCount, faces: spell.effectDiceFaces, modifier });
-    const diceStr = `${diceCount}d${spell.effectDiceFaces}`;
+    const diceStr = `${castRoll.spec.count}d${castRoll.spec.faces}`;
 
     setCastResult({
       spellName: spell.name,
-      total: result.total,
+      total: castRoll.total,
       diceStr,
-      effectKind: spell.effectKind,
+      effectKind: spell.effectKind!,
       damageType: spell.damageType,
       slotLevel: isCantrip ? undefined : slotLevel,
     });
 
     const ops: Parameters<typeof applySpellcastingTransactions>[1] = [
       isCantrip
-        ? { type: "castSpell", entryId: spell.id, roll: result.total }
-        : { type: "castSpell", entryId: spell.id, slotLevel: slotLevel ?? spell.level, roll: result.total },
+        ? { type: "castSpell", entryId: spell.id, roll: castRoll.total }
+        : { type: "castSpell", entryId: spell.id, slotLevel: resolvedSlotLevel, roll: castRoll.total },
     ];
     send(ops);
   }
