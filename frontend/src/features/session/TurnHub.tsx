@@ -114,6 +114,139 @@ function AttackCounter({
   );
 }
 
+/** Inline outcome strip shown in the Reaction slot after the reaction is spent. */
+function ReactionResult({
+  message,
+  tone = "gold",
+}: {
+  message: string | null;
+  tone?: "gold" | "garnet";
+}) {
+  if (!message) return null;
+  const wrapperCls =
+    tone === "garnet"
+      ? "border-garnet-200 bg-garnet-50 text-garnet-700"
+      : "border-gold-200 bg-gold-50 text-gold-800";
+  const labelCls = tone === "garnet" ? "text-garnet-600" : "text-gold-700";
+  return (
+    <div className={`mt-2 rounded-control border px-3 py-2 ${wrapperCls}`}>
+      <p className={`mb-0.5 text-[10px] font-semibold uppercase tracking-wide ${labelCls}`}>
+        Reaction used
+      </p>
+      <p className="text-xs font-semibold leading-snug">{message}</p>
+    </div>
+  );
+}
+
+/**
+ * The Reaction economy slot — shared between idle and active render branches
+ * so both always show the same state and the same result strip.
+ */
+function ReactionSlot({
+  reactionUsed,
+  showReactionMenu,
+  setShowReactionMenu,
+  classReactions,
+  reactionManeuvers,
+  superiorityRemaining,
+  dieLabel,
+  dieBusy,
+  busy,
+  reactionMessage,
+  error,
+  handleActionClick,
+  handleReactionManeuver,
+}: {
+  reactionUsed: boolean;
+  showReactionMenu: boolean;
+  setShowReactionMenu: React.Dispatch<React.SetStateAction<boolean>>;
+  classReactions: AvailableAction[];
+  reactionManeuvers: Array<{ id: string; name: string }>;
+  superiorityRemaining: number;
+  dieLabel: string;
+  dieBusy: boolean;
+  busy: boolean;
+  reactionMessage: string | null;
+  error: string | null;
+  handleActionClick: (key: string, cost: "action" | "bonusAction" | "reaction") => void;
+  handleReactionManeuver: (name: string) => Promise<void>;
+}) {
+  return (
+    <div className="rounded-card border border-parchment-200 bg-parchment-50 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <SlotPip filled={!reactionUsed} />
+          <span className="text-sm font-semibold text-parchment-800">Reaction</span>
+          {reactionUsed ? (
+            <span className="text-xs text-parchment-400 italic">used</span>
+          ) : (
+            <span className="text-xs text-parchment-500">available</span>
+          )}
+        </div>
+        {!reactionUsed && (
+          <button
+            type="button"
+            onClick={() => setShowReactionMenu((v) => !v)}
+            className="text-xs font-medium text-garnet-700 hover:underline"
+          >
+            {showReactionMenu ? "Hide" : "Use Reaction ▾"}
+          </button>
+        )}
+      </div>
+
+      {showReactionMenu && !reactionUsed && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {classReactions.map((a) => (
+            <QuickBtn
+              key={a.key}
+              tone={a.enabled ? "arcane" : "neutral"}
+              disabled={!a.enabled || busy}
+              onClick={() => handleActionClick(a.key, "reaction")}
+              title={a.disabledReason}
+            >
+              {a.name}
+            </QuickBtn>
+          ))}
+          {UNIVERSAL_ACTIONS.filter(
+            (u) =>
+              u.cost === "reaction" &&
+              !classReactions.some((c) => c.key === u.key),
+          ).map((u) => (
+            <QuickBtn
+              key={u.key}
+              onClick={() => handleActionClick(u.key, "reaction")}
+              title={u.description}
+            >
+              {u.label}
+            </QuickBtn>
+          ))}
+          {/* Battle Master reaction maneuvers (Parry, Riposte) */}
+          {reactionManeuvers.map((m) => (
+            <QuickBtn
+              key={m.id}
+              tone={superiorityRemaining > 0 ? "gold" : "neutral"}
+              disabled={superiorityRemaining === 0 || dieBusy}
+              onClick={() => handleReactionManeuver(m.name)}
+              title={
+                superiorityRemaining === 0
+                  ? "No superiority dice remaining."
+                  : `Spend ${dieLabel} — ${m.name}`
+              }
+            >
+              {m.name} ({dieLabel})
+            </QuickBtn>
+          ))}
+        </div>
+      )}
+
+      {/* Error: show when something went wrong (e.g. die spend failed before reaction was consumed). */}
+      {!reactionUsed && error && <ReactionResult message={error} tone="garnet" />}
+      {/* Result: show after the reaction is spent. */}
+      {reactionUsed && <ReactionResult message={reactionMessage} />}
+    </div>
+  );
+}
+
 // ── Lay on Hands inline input ─────────────────────────────────────────────────
 
 function LayOnHandsInput({
@@ -204,7 +337,10 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  // reactionMessage: result of the last reaction used (shown in ReactionSlot).
+  // effectMessage:   result of effect maneuvers like Evasive Footwork (shown in active info strip).
+  const [reactionMessage, setReactionMessage] = useState<string | null>(null);
+  const [effectMessage, setEffectMessage] = useState<string | null>(null);
 
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [showBonusMenu, setShowBonusMenu] = useState(false);
@@ -371,15 +507,15 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
       consumeReaction();
       setShowReactionMenu(false);
       if (maneuverName === "Parry") {
-        setInfoMessage(
+        setReactionMessage(
           `Parry — reduce incoming damage by ${dieResult} + DEX modifier (${dieLabel} rolled ${dieResult}).`,
         );
       } else if (maneuverName === "Riposte") {
-        setInfoMessage(
+        setReactionMessage(
           `Riposte — make one melee attack against the creature; add +${dieResult} to the damage roll (${dieLabel} rolled ${dieResult}).`,
         );
       } else {
-        setInfoMessage(
+        setReactionMessage(
           `${maneuverName} — tell your DM: rolled ${dieResult} on ${dieLabel}.`,
         );
       }
@@ -395,11 +531,11 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
     try {
       const dieResult = await spendDie();
       if (maneuverName === "Evasive Footwork") {
-        setInfoMessage(
+        setEffectMessage(
           `Evasive Footwork — add +${dieResult} to your AC until the end of your turn (${dieLabel} rolled ${dieResult}).`,
         );
       } else {
-        setInfoMessage(
+        setEffectMessage(
           `${maneuverName} — tell your DM: rolled ${dieResult} on ${dieLabel}.`,
         );
       }
@@ -422,7 +558,12 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
             </div>
             <button
               type="button"
-              onClick={startTurn}
+              onClick={() => {
+                setReactionMessage(null);
+                setEffectMessage(null);
+                setError(null);
+                startTurn();
+              }}
               className="shrink-0 rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-garnet-800"
             >
               Start Turn
@@ -430,73 +571,21 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
           </div>
 
           {/* Reaction is available between turns — render it in idle mode. */}
-          <div className="rounded-card border border-parchment-200 bg-parchment-50 p-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <SlotPip filled={!reactionUsed} />
-                <span className="text-sm font-semibold text-parchment-800">Reaction</span>
-                {reactionUsed ? (
-                  <span className="text-xs text-parchment-400 italic">used</span>
-                ) : (
-                  <span className="text-xs text-parchment-500">available</span>
-                )}
-              </div>
-              {!reactionUsed && (
-                <button
-                  type="button"
-                  onClick={() => setShowReactionMenu((v) => !v)}
-                  className="text-xs font-medium text-garnet-700 hover:underline"
-                >
-                  {showReactionMenu ? "Hide" : "Use Reaction ▾"}
-                </button>
-              )}
-            </div>
-
-            {showReactionMenu && !reactionUsed && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {classReactions.map((a) => (
-                  <QuickBtn
-                    key={a.key}
-                    tone={a.enabled ? "arcane" : "neutral"}
-                    disabled={!a.enabled || busy}
-                    onClick={() => handleActionClick(a.key, "reaction")}
-                    title={a.disabledReason}
-                  >
-                    {a.name}
-                  </QuickBtn>
-                ))}
-                {UNIVERSAL_ACTIONS.filter(
-                  (u) =>
-                    u.cost === "reaction" &&
-                    !classReactions.some((c) => c.key === u.key),
-                ).map((u) => (
-                  <QuickBtn
-                    key={u.key}
-                    onClick={() => handleActionClick(u.key, "reaction")}
-                    title={u.description}
-                  >
-                    {u.label}
-                  </QuickBtn>
-                ))}
-                {/* Battle Master reaction maneuvers (Parry, Riposte) */}
-                {reactionManeuvers.map((m) => (
-                  <QuickBtn
-                    key={m.id}
-                    tone={superiorityRemaining > 0 ? "gold" : "neutral"}
-                    disabled={superiorityRemaining === 0 || dieBusy}
-                    onClick={() => handleReactionManeuver(m.name)}
-                    title={
-                      superiorityRemaining === 0
-                        ? "No superiority dice remaining."
-                        : `Spend ${dieLabel} — ${m.name}`
-                    }
-                  >
-                    {m.name} ({dieLabel})
-                  </QuickBtn>
-                ))}
-              </div>
-            )}
-          </div>
+          <ReactionSlot
+            reactionUsed={reactionUsed}
+            showReactionMenu={showReactionMenu}
+            setShowReactionMenu={setShowReactionMenu}
+            classReactions={classReactions}
+            reactionManeuvers={reactionManeuvers}
+            superiorityRemaining={superiorityRemaining}
+            dieLabel={dieLabel}
+            dieBusy={dieBusy}
+            busy={busy}
+            reactionMessage={reactionMessage}
+            error={error}
+            handleActionClick={handleActionClick}
+            handleReactionManeuver={handleReactionManeuver}
+          />
         </div>
       </Card>
     );
@@ -511,7 +600,13 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
         <p className="font-semibold text-parchment-800">Your Turn</p>
         <button
           type="button"
-          onClick={() => { endTurn(); closeResolution(); }}
+          onClick={() => {
+            setReactionMessage(null);
+            setEffectMessage(null);
+            setError(null);
+            endTurn();
+            closeResolution();
+          }}
           className="rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1 text-xs font-semibold text-parchment-600 transition-colors hover:bg-parchment-100"
         >
           End Turn
@@ -646,73 +741,21 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
         </div>
 
         {/* ── Reaction ─────────────────────────────────────────────────────── */}
-        <div className="rounded-card border border-parchment-200 bg-parchment-50 p-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <SlotPip filled={!reactionUsed} />
-              <span className="text-sm font-semibold text-parchment-800">Reaction</span>
-              {reactionUsed ? (
-                <span className="text-xs text-parchment-400 italic">used</span>
-              ) : (
-                <span className="text-xs text-parchment-500">available</span>
-              )}
-            </div>
-            {!reactionUsed && (
-              <button
-                type="button"
-                onClick={() => setShowReactionMenu((v) => !v)}
-                className="text-xs font-medium text-garnet-700 hover:underline"
-              >
-                {showReactionMenu ? "Hide" : "Use Reaction ▾"}
-              </button>
-            )}
-          </div>
-
-          {showReactionMenu && !reactionUsed && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {classReactions.map((a) => (
-                <QuickBtn
-                  key={a.key}
-                  tone={a.enabled ? "arcane" : "neutral"}
-                  disabled={!a.enabled || busy}
-                  onClick={() => handleActionClick(a.key, "reaction")}
-                  title={a.disabledReason}
-                >
-                  {a.name}
-                </QuickBtn>
-              ))}
-              {UNIVERSAL_ACTIONS.filter(
-                (u) =>
-                  u.cost === "reaction" &&
-                  !classReactions.some((c) => c.key === u.key),
-              ).map((u) => (
-                <QuickBtn
-                  key={u.key}
-                  onClick={() => handleActionClick(u.key, "reaction")}
-                  title={u.description}
-                >
-                  {u.label}
-                </QuickBtn>
-              ))}
-              {/* Battle Master reaction maneuvers (Parry, Riposte) */}
-              {reactionManeuvers.map((m) => (
-                <QuickBtn
-                  key={m.id}
-                  tone={superiorityRemaining > 0 ? "gold" : "neutral"}
-                  disabled={superiorityRemaining === 0 || dieBusy}
-                  onClick={() => handleReactionManeuver(m.name)}
-                  title={
-                    superiorityRemaining === 0
-                      ? "No superiority dice remaining."
-                      : `Spend ${dieLabel} — ${m.name}`
-                  }
-                >
-                  {m.name} ({dieLabel})
-                </QuickBtn>
-              ))}
-            </div>
-          )}
-        </div>
+        <ReactionSlot
+          reactionUsed={reactionUsed}
+          showReactionMenu={showReactionMenu}
+          setShowReactionMenu={setShowReactionMenu}
+          classReactions={classReactions}
+          reactionManeuvers={reactionManeuvers}
+          superiorityRemaining={superiorityRemaining}
+          dieLabel={dieLabel}
+          dieBusy={dieBusy}
+          busy={busy}
+          reactionMessage={reactionMessage}
+          error={error}
+          handleActionClick={handleActionClick}
+          handleReactionManeuver={handleReactionManeuver}
+        />
 
         {/* ── Action Surge (Fighter) ─────────────────────────────────────── */}
         {actionSurgeAvailable && (
@@ -793,15 +836,15 @@ export default function TurnHub({ character, turnState, onUpdate }: TurnHubProps
           </div>
         )}
 
-        {/* Error display */}
+        {/* General error display (covers send() failures: Action Surge, Second Wind, etc.) */}
         {error && (
           <p className="text-xs font-semibold text-garnet-700">{error}</p>
         )}
 
-        {/* Info message (maneuver reminders, Commander's Strike, etc.) */}
-        {infoMessage && (
+        {/* Info strip for effect maneuvers (turn-scoped: Evasive Footwork, etc.) */}
+        {effectMessage && (
           <p className="rounded-control border border-gold-200 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800">
-            {infoMessage}
+            {effectMessage}
           </p>
         )}
 
