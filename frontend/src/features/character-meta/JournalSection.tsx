@@ -27,11 +27,17 @@ interface JournalSectionProps {
   onUpdate: (character: Character) => void;
 }
 
-/** Format an ISO date string for display, e.g. "Jun 22, 2026". */
+/**
+ * Format an ISO date string for display, e.g. "Jun 22, 2026". Journal dates are
+ * calendar dates with no meaningful time-of-day: the backend stores the picked
+ * day at UTC midnight, so we MUST format in UTC. Formatting in local time would
+ * shift the day backwards for timezones behind UTC (e.g. "Jun 22" → "Jun 21").
+ */
 function formatDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString(undefined, {
+    timeZone: "UTC",
     year: "numeric",
     month: "short",
     day: "numeric",

@@ -24,9 +24,17 @@ interface JournalEntryPanelProps {
   onClose: () => void;
 }
 
-/** Today's date as a yyyy-mm-dd string for the add-form default. */
+/**
+ * Today's date as a yyyy-mm-dd string for the add-form default, built from the
+ * user's LOCAL calendar components. Using toISOString() here would default to
+ * the UTC day, which can be tomorrow during the evening in timezones behind UTC.
+ */
 function todayInputValue(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 /** Coerce an API ISO date string to the yyyy-mm-dd a date input expects. */
