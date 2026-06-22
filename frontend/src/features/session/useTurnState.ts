@@ -7,6 +7,14 @@
  * Only the economy bookkeeping (have I used my action? how many attacks remain?)
  * lives here.
  *
+ * The state is persisted to localStorage (keyed by sessionId) so it survives
+ * page refreshes and brief disconnects. It is cleared on session end.
+ *
+ * Combat gating:
+ *   - `inCombat` must be true before `startTurn()` can be called (the UI gates
+ *     the Start Turn button). This is enforced by the caller in TurnHub.
+ *   - `round` starts at 1 when combat begins; it increments when a turn ends.
+ *
  * Reaction lifecycle note (5e rules):
  *   - A reaction is consumed DURING another creature's turn (opportunity attack,
  *     Shield spell, etc.) or sometimes on your own turn (readied action).
@@ -15,8 +23,9 @@
  *   - `consumeReaction()` can be called at any time (during your turn or between turns).
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { deriveAttacksPerAction, canTwoWeaponFight } from "@/lib/turnRules";
+import { loadTurnState, saveTurnState } from "@/features/session/turnStatePersistence";
 import type { Character } from "@/types/character";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -35,6 +44,10 @@ export interface AttackState {
 export type SpellCastKind = "cantrip" | "leveled";
 
 export interface TurnState {
+  /** Whether the character is currently in a combat encounter. Gates turn-taking. */
+  inCombat: boolean;
+  /** Current combat round (1-indexed). 0 when not in combat. */
+  round: number;
   phase: TurnPhase;
   /** How many actions remain this turn (normally 1; +1 after Action Surge). */
   actionsRemaining: number;
@@ -58,9 +71,16 @@ export interface TurnState {
 }
 
 export interface TurnStateActions {
+  /** Enter combat: sets inCombat=true, round=1, resets turn economy. */
+  startCombat: () => void;
+  /** Exit combat: resets all state to idle/out-of-combat. */
+  endCombat: () => void;
   /** Begin the turn — resets action+bonus+reaction, derives TWF from loadout. */
   startTurn: () => void;
-  /** End the turn — returns to idle. */
+  /**
+   * End the turn — returns to idle within combat and increments the round
+   * counter. If not in combat, resets to full initialState.
+   */
   endTurn: () => void;
   /** Consume one action without entering Attack mode (Dodge, Cast a Spell, etc.). */
   consumeAction: () => void;
@@ -68,6 +88,16 @@ export interface TurnStateActions {
   enterAttackMode: () => void;
   /** Record one attack roll during Attack mode (auto-decrements counter). */
   recordAttack: () => void;
+  /**
+   * Cancel the Attack action if no attacks have been rolled yet — refunds the
+   * action so the player can choose a different action.
+   */
+  cancelAttack: () => void;
+  /**
+   * Finalize the Attack action after at least one attack was rolled — clears
+   * the attack counter (marking the action as fully spent) without refunding.
+   */
+  finishAttack: () => void;
   /** Consume the bonus action slot without entering TWF mode. */
   consumeBonusAction: () => void;
   /** Enter TWF bonus-attack mode: consume the bonus action and open the TWF counter. */
@@ -100,6 +130,8 @@ export interface TurnStateActions {
 
 function initialState(): TurnState {
   return {
+    inCombat: false,
+    round: 0,
     phase: "idle",
     actionsRemaining: 0,
     bonusActionUsed: false,
@@ -111,8 +143,11 @@ function initialState(): TurnState {
   };
 }
 
-export function useTurnState(character: Character): TurnState & TurnStateActions {
-  const [state, setState] = useState<TurnState>(initialState);
+export function useTurnState(character: Character, sessionId: string): TurnState & TurnStateActions {
+  const [state, setState] = useState<TurnState>(() => {
+    // Lazily hydrate from localStorage on first mount.
+    return loadTurnState(sessionId) ?? initialState();
+  });
 
   const attacksPerAction = deriveAttacksPerAction(
     character.class,
@@ -120,8 +155,33 @@ export function useTurnState(character: Character): TurnState & TurnStateActions
     character.level,
   );
 
-  const startTurn = useCallback(() => {
+  // Persist state to localStorage whenever it changes.
+  useEffect(() => {
+    saveTurnState(sessionId, state);
+  }, [sessionId, state]);
+
+  const startCombat = useCallback(() => {
     setState({
+      inCombat: true,
+      round: 1,
+      phase: "idle",
+      actionsRemaining: 0,
+      bonusActionUsed: false,
+      reactionUsed: false,
+      attack: null,
+      bonusAttack: null,
+      twfAvailable: false,
+      spellCastThisTurn: {},
+    });
+  }, []);
+
+  const endCombat = useCallback(() => {
+    setState(initialState());
+  }, []);
+
+  const startTurn = useCallback(() => {
+    setState((s) => ({
+      ...s,
       phase: "active",
       actionsRemaining: 1,
       bonusActionUsed: false,
@@ -130,11 +190,28 @@ export function useTurnState(character: Character): TurnState & TurnStateActions
       bonusAttack: null,
       twfAvailable: canTwoWeaponFight(character.inventory),
       spellCastThisTurn: {},
-    });
+    }));
   }, [character.inventory]);
 
   const endTurn = useCallback(() => {
-    setState(initialState());
+    setState((s) => {
+      if (s.inCombat) {
+        // Stay in combat — return to idle within the same encounter,
+        // advancing the round counter. The round log event is fired by TurnHub.
+        return {
+          ...s,
+          phase: "idle",
+          actionsRemaining: 0,
+          bonusActionUsed: false,
+          attack: null,
+          bonusAttack: null,
+          spellCastThisTurn: {},
+          round: s.round + 1,
+        };
+      }
+      // Out-of-combat (shouldn't normally happen now, but safe fallback).
+      return initialState();
+    });
   }, []);
 
   const consumeAction = useCallback(() => {
@@ -162,6 +239,24 @@ export function useTurnState(character: Character): TurnState & TurnStateActions
       // The picker is closed explicitly by the player via the "Done" button.
       const used = Math.min(s.attack.used + 1, s.attack.total);
       return { ...s, attack: { ...s.attack, used } };
+    });
+  }, []);
+
+  const cancelAttack = useCallback(() => {
+    // Only refund if no attacks have been rolled yet — once rolled, the action
+    // is committed per 5e rules.
+    setState((s) => {
+      if (!s.attack || s.attack.used > 0) return s;
+      return { ...s, actionsRemaining: s.actionsRemaining + 1, attack: null };
+    });
+  }, []);
+
+  const finishAttack = useCallback(() => {
+    // Clear the attack counter (action stays spent). No-op when attack is null
+    // (class pickers like Flurry that don't use the enterAttackMode path).
+    setState((s) => {
+      if (!s.attack) return s;
+      return { ...s, attack: null };
     });
   }, []);
 
@@ -218,11 +313,15 @@ export function useTurnState(character: Character): TurnState & TurnStateActions
 
   return {
     ...state,
+    startCombat,
+    endCombat,
     startTurn,
     endTurn,
     consumeAction,
     enterAttackMode,
     recordAttack,
+    cancelAttack,
+    finishAttack,
     consumeBonusAction,
     enterTwfMode,
     recordTwfAttack,

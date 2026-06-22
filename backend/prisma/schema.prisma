@@ -567,6 +567,7 @@ enum CharacterEventCategory {
   resources    // superiority dice, ki, rage, maneuvers, etc.
   advancement  // ability score improvements and feats
   session      // session lifecycle: started / ended
+  combat       // combat lifecycle: started / ended / round advanced
   // future: journal, roll, conditions
 }
 
@@ -623,6 +624,13 @@ enum CharacterEventType {
   // session lifecycle
   sessionStarted
   sessionEnded
+  // combat lifecycle
+  combatStarted
+  combatEnded
+  combatRoundAdvanced
+  // roll events (attack/damage logged from session UI)
+  attackRoll
+  damageRoll
   // meta
   revert
 }

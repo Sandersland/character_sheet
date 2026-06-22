@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import { logEvent } from "./events.js";
+import { logEvent, type EventType } from "./events.js";
 import { prisma } from "./prisma.js";
 
 export class SessionError extends Error {}
+export class CombatError extends Error {}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -105,5 +106,104 @@ export async function endSession(
     });
 
     return updated;
+  });
+}
+
+// ── Combat event logging ───────────────────────────────────────────────────────
+
+type CombatEventType = "combatStarted" | "combatEnded" | "combatRoundAdvanced";
+
+const COMBAT_SUMMARIES: Record<CombatEventType, (round?: number) => string> = {
+  combatStarted: () => "Combat started",
+  combatEnded: () => "Combat ended",
+  combatRoundAdvanced: (round) => `Round ${round ?? 2} began`,
+};
+
+/**
+ * Logs a single attack or damage roll from the session UI against the given
+ * session. The client computes the dice total and spec label; the backend
+ * formats the human-readable summary and persists the event. Does not mutate
+ * any character state — it's a pure log entry.
+ */
+export async function logRollEvent(
+  characterId: string,
+  sessionId: string,
+  params: {
+    kind: "attack" | "damage";
+    source: string;
+    total: number;
+    specLabel?: string;
+    damageType?: string;
+  },
+) {
+  const session = await prisma.session.findUnique({
+    where: { id: sessionId },
+    select: { id: true, characterId: true, status: true },
+  });
+
+  if (!session || session.characterId !== characterId) {
+    throw new CombatError(`Session not found: ${sessionId}`);
+  }
+  if (session.status !== "active") {
+    throw new CombatError(`Session ${sessionId} is not active`);
+  }
+
+  const { kind, source, total, specLabel, damageType } = params;
+  const batchId = randomUUID();
+
+  const summary =
+    kind === "attack"
+      ? `${source}: ${total}${specLabel ? ` (${specLabel})` : ""}`
+      : `${source}: ${total}${damageType ? ` ${damageType}` : ""}${specLabel ? ` (${specLabel})` : ""}`;
+
+  return prisma.$transaction(async (tx) => {
+    await logEvent(tx, {
+      characterId,
+      category: "combat",
+      type: kind === "attack" ? "attackRoll" : "damageRoll",
+      summary,
+      batchId,
+      sessionId,
+      data: { kind, source, total, specLabel: specLabel ?? null, damageType: damageType ?? null },
+    });
+  });
+}
+
+/**
+ * Logs a combat lifecycle event (started / ended / round advanced) against the
+ * given session. Validates that the character and session exist. Does not mutate
+ * any character state — it's a pure log entry.
+ */
+export async function logCombatEvent(
+  characterId: string,
+  sessionId: string,
+  type: CombatEventType,
+  opts?: { round?: number },
+) {
+  const session = await prisma.session.findUnique({
+    where: { id: sessionId },
+    select: { id: true, characterId: true, status: true },
+  });
+
+  if (!session || session.characterId !== characterId) {
+    throw new CombatError(`Session not found: ${sessionId}`);
+  }
+  if (session.status !== "active") {
+    throw new CombatError(`Session ${sessionId} is not active`);
+  }
+
+  const batchId = randomUUID();
+  const summary = COMBAT_SUMMARIES[type](opts?.round);
+
+  return prisma.$transaction(async (tx) => {
+    await logEvent(tx, {
+      characterId,
+      category: "combat",
+      type: type as EventType,
+      summary,
+      batchId,
+      sessionId,
+      data: opts?.round !== undefined ? { round: opts.round } : null,
+    });
   });
 }

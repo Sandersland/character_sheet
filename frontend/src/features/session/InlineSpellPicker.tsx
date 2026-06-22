@@ -11,18 +11,19 @@
  *   2. Choose a target: "self" (HP is automatically adjusted) or "other"
  *      (roll is displayed via the toast for the DM / GM to apply). Default:
  *      "other" for damage, "self" for heal. Locked to "self" when range is "Self".
- *   3. For attack spells (attackType === "attack"): roll the spell attack via
- *      useRoll() (shows in global toast — re-rollable, free, consumes nothing).
- *      For save spells (attackType === "save"): display the save DC + ability.
+ *   3. For attack spells (attackType === "attack"): pressing **Attack** rolls the
+ *      d20 via useRoll() AND consumes the economy slot (onCommitSlot). Cast is
+ *      then enabled to roll damage. For save spells: display the save DC + ability.
  *   4. Cast → computeCastSpec for the dice spec → roll() via RollContext (toast)
- *      → applySpellcastingTransactions → onCommitSlot() → onUpdate(refreshed char).
+ *      → applySpellcastingTransactions → (non-attack: onCommitSlot) → onUpdate.
  *      Panel stays open for multiple casts.
  *
- * Action economy: the action/bonus/reaction slot is consumed WHEN THE CAST
- * SUCCEEDS (via onCommitSlot), never on opening the picker. This means the
- * player can open the picker, browse spells, or roll the attack die freely
- * without committing their action. Once a cast goes through, the slot is spent
- * and slotAvailable becomes false — disabling further casts.
+ * Action economy:
+ *   - Non-attack spells (save/heal/utility): slot consumed on CAST (via onCommitSlot).
+ *   - Attack spells: slot consumed on the ATTACK ROLL button press. Cast then
+ *     becomes enabled (gated by attackRolled, not slotAvailable). This means a miss
+ *     where Cast is never pressed still spends the action — matching 5e rules.
+ *     With a second action (Action Surge), the player may Attack again then Cast.
  *
  * 5e bonus-action spell restriction:
  *   - Casting a leveled bonus-action spell → action picker shows cantrips only.
@@ -37,8 +38,9 @@ import { useState } from "react";
 
 import { useRoll } from "@/features/dice/RollContext";
 import { formatModifier } from "@/lib/abilities";
-import { applySpellcastingTransactions } from "@/api/client";
+import { applySpellcastingTransactions, logRoll } from "@/api/client";
 import { computeCastSpec } from "@/lib/spellCast";
+import { formatRollSpec } from "@/lib/dice";
 import {
   SCHOOL_TONE,
   levelLabel,
@@ -54,8 +56,12 @@ import type { SpellCastKind } from "@/features/session/useTurnState";
 
 interface InlineSpellPickerProps {
   character: Character;
+  /** Active session id — spell attack rolls are logged against it. */
+  sessionId: string;
   onUpdate: (c: Character) => void;
   onClose: () => void;
+  /** Called after a roll is logged so the Session Log can refresh. */
+  onLogChanged: () => void;
   /** Which economy slot this picker is managing. */
   slot: "action" | "bonusAction" | "reaction";
   /** True when the slot is still available to spend. */
@@ -82,6 +88,7 @@ interface SpellRowState {
   slotLevel: number | undefined;  // chosen slot level (undefined = not picked yet)
   target: Target;
   casting: boolean;
+  attackRolled: boolean;  // true once Attack was pressed (attack spells only); gates Cast
   error: string | null;
 }
 
@@ -103,8 +110,10 @@ function targetLocked(spell: Spell): boolean {
 
 export default function InlineSpellPicker({
   character,
+  sessionId,
   onUpdate,
   onClose,
+  onLogChanged,
   slot,
   slotAvailable,
   onCommitSlot,
@@ -123,6 +132,7 @@ export default function InlineSpellPicker({
       slotLevel: resolvedSlot,
       target: defaultTarget(spell),
       casting: false,
+      attackRolled: false,
       error: null,
     };
   }
@@ -224,10 +234,13 @@ export default function InlineSpellPicker({
 
     try {
       const updated = await applySpellcastingTransactions(character.id, [op]);
-      // Commit the economy slot AFTER a successful cast (never on open, never on Attack roll).
-      onCommitSlot(spell.level);
+      // Attack spells: slot was already committed on the Attack roll button press.
+      // Non-attack spells (save/heal/utility): commit the economy slot now on cast.
+      if (spell.attackType !== "attack") {
+        onCommitSlot(spell.level);
+      }
       onUpdate(updated);
-      patchRow(spell.id, { casting: false });
+      patchRow(spell.id, { casting: false, attackRolled: false });
     } catch (err) {
       patchRow(spell.id, {
         casting: false,
@@ -287,8 +300,9 @@ export default function InlineSpellPicker({
         const isSave = spell.attackType === "save";
         const dcLabel = isSave ? saveDcLabel(spell, spellSaveDC ?? 0) : null;
 
-        // Cast is gated only by economy + slot availability — never by attack-roll status.
-        const castDisabled = row.casting || !slotAvailable;
+        // Attack spells: Cast is gated by attackRolled (slot already spent on Attack).
+        // Non-attack spells: Cast is gated by economy slot availability.
+        const castDisabled = row.casting || (isAttack ? !row.attackRolled : !slotAvailable);
 
         return (
           <div key={spell.id} className="flex flex-col gap-1.5 py-3 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-parchment-200">
@@ -391,16 +405,28 @@ export default function InlineSpellPicker({
                     <span className="text-[11px] text-parchment-400">½ on save</span>
                   )}
 
-                  {/* Attack roll button (attack spells) — re-rollable, free, shows in toast */}
+                  {/* Attack roll button (attack spells) — consumes the economy slot and
+                      enables Cast. Disabled once the slot is spent (no second attack
+                      unless Action Surge refills actionsRemaining → slotAvailable). */}
                   {isAttack && (
                     <button
                       type="button"
                       disabled={row.casting || !slotAvailable}
                       onClick={() => {
-                        roll(
-                          { count: 1, faces: 20, modifier: spellAttackBonus ?? 0 },
-                          `${spell.name} spell attack`,
-                        );
+                        // Commit the economy slot first (action is spent on the attack declaration).
+                        onCommitSlot(spell.level);
+                        const attackSpec = { count: 1, faces: 20, modifier: spellAttackBonus ?? 0 };
+                        const result = roll(attackSpec, `${spell.name} spell attack`);
+                        // Log the spell attack roll (best-effort — never blocks play).
+                        logRoll(character.id, sessionId, {
+                          kind: "attack",
+                          source: spell.name,
+                          total: result.total,
+                          specLabel: formatRollSpec(attackSpec),
+                        })
+                          .then(onLogChanged)
+                          .catch((e) => console.error("roll log failed", e));
+                        patchRow(spell.id, { attackRolled: true });
                       }}
                       className="rounded-control border border-garnet-200 bg-garnet-50 px-2.5 py-1 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-100 disabled:cursor-not-allowed disabled:opacity-40"
                     >

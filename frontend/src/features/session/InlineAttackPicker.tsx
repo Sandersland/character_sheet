@@ -26,6 +26,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useRoll } from "@/features/dice/RollContext";
+import { logRoll } from "@/api/client";
 import { formatRollSpec } from "@/lib/dice";
 import { maneuverPlacement, mechanicsFor } from "@/lib/maneuvers";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
@@ -37,9 +38,18 @@ import type { RollResult } from "@/lib/dice";
 interface InlineAttackPickerProps {
   character: Character;
   turnState: TurnState & TurnStateActions;
+  /** Active session id — attack/damage rolls are logged against it. */
+  sessionId: string;
   onClose: () => void;
+  /**
+   * Called when the player cancels before rolling any attacks — refunds the
+   * action and returns to the action menu.
+   */
+  onCancel: () => void;
   /** Required for ManeuverPrompt to push resource spend results back up to the page. */
   onUpdate: (c: Character) => void;
+  /** Called after a roll is logged so the Session Log can refresh. */
+  onLogChanged: () => void;
 }
 
 // Gate: only show maneuver affordances when the character has a Battle Master die pool.
@@ -54,10 +64,33 @@ function hasSuperiorityDice(character: Character): boolean {
 export default function InlineAttackPicker({
   character,
   turnState,
+  sessionId,
   onClose,
+  onCancel,
   onUpdate,
+  onLogChanged,
 }: InlineAttackPickerProps) {
   const { roll } = useRoll();
+
+  // Persist a roll to the Session Log (best-effort — never blocks play).
+  function logRollSafe(
+    kind: "attack" | "damage",
+    source: string,
+    result: RollResult,
+    spec: { count: number; faces: number; modifier: number },
+    damageType?: string,
+  ) {
+    logRoll(character.id, sessionId, {
+      kind,
+      source,
+      total: result.total,
+      specLabel: formatRollSpec(spec),
+      damageType,
+    })
+      .then(onLogChanged)
+      .catch((e) => console.error("roll log failed", e));
+  }
+
   const { pool, dieLabel, busy: dieBusy, spend } = useManeuverDie(character, onUpdate);
 
   // Per-weapon last roll results (keyed by item.id, "unarmed", or "improvised").
@@ -207,10 +240,9 @@ export default function InlineAttackPicker({
                   type="button"
                   disabled={attacksExhausted}
                   onClick={() => {
-                    const result = roll(
-                      { count: 1, faces: 20, modifier: w.attackBonus ?? 0 },
-                      `${item.name} attack`,
-                    );
+                    const spec = { count: 1, faces: 20, modifier: w.attackBonus ?? 0 };
+                    const result = roll(spec, `${item.name} attack`);
+                    logRollSafe("attack", item.name, result, spec);
                     setLastAttackRolls((prev) => ({ ...prev, [item.id]: result }));
                     // Clear any previous override when re-rolling
                     setAttackTotals((prev) => ({ ...prev, [item.id]: null }));
@@ -224,10 +256,9 @@ export default function InlineAttackPicker({
                 <button
                   type="button"
                   onClick={() => {
-                    const result = roll(
-                      damageSpec,
-                      `${item.name} damage (${w.damage?.damageType ?? w.damageType})`,
-                    );
+                    const dmgType = w.damage?.damageType ?? w.damageType;
+                    const result = roll(damageSpec, `${item.name} damage (${dmgType})`);
+                    logRollSafe("damage", item.name, result, damageSpec, dmgType);
                     setLastDamageRolls((prev) => ({ ...prev, [item.id]: result }));
                     // Clear any previous override when re-rolling
                     setDamageTotals((prev) => ({ ...prev, [item.id]: null }));
@@ -275,10 +306,9 @@ export default function InlineAttackPicker({
               type="button"
               disabled={attacksExhausted}
               onClick={() => {
-                const result = roll(
-                  { count: 1, faces: 20, modifier: unarmedStrike.attackBonus },
-                  "Unarmed strike attack",
-                );
+                const spec = { count: 1, faces: 20, modifier: unarmedStrike.attackBonus };
+                const result = roll(spec, "Unarmed strike attack");
+                logRollSafe("attack", "Unarmed Strike", result, spec);
                 setLastAttackRolls((prev) => ({ ...prev, unarmed: result }));
                 setAttackTotals((prev) => ({ ...prev, unarmed: null }));
                 turnState.recordAttack();
@@ -292,6 +322,7 @@ export default function InlineAttackPicker({
               type="button"
               onClick={() => {
                 const result = roll(unarmedDamageSpec, "Unarmed strike damage (bludgeoning)");
+                logRollSafe("damage", "Unarmed Strike", result, unarmedDamageSpec, "bludgeoning");
                 setLastDamageRolls((prev) => ({ ...prev, unarmed: result }));
                 setDamageTotals((prev) => ({ ...prev, unarmed: null }));
               }}
@@ -341,10 +372,9 @@ export default function InlineAttackPicker({
               type="button"
               disabled={attacksExhausted}
               onClick={() => {
-                const result = roll(
-                  { count: 1, faces: 20, modifier: improvisedWeapon.attackBonus },
-                  "Improvised weapon attack",
-                );
+                const spec = { count: 1, faces: 20, modifier: improvisedWeapon.attackBonus };
+                const result = roll(spec, "Improvised weapon attack");
+                logRollSafe("attack", "Improvised Weapon", result, spec);
                 setLastAttackRolls((prev) => ({ ...prev, improvised: result }));
                 setAttackTotals((prev) => ({ ...prev, improvised: null }));
                 turnState.recordAttack();
@@ -357,10 +387,8 @@ export default function InlineAttackPicker({
             <button
               type="button"
               onClick={() => {
-                const result = roll(
-                  improvisedDamageSpec,
-                  "Improvised weapon damage (bludgeoning)",
-                );
+                const result = roll(improvisedDamageSpec, "Improvised weapon damage (bludgeoning)");
+                logRollSafe("damage", "Improvised Weapon", result, improvisedDamageSpec, "bludgeoning");
                 setLastDamageRolls((prev) => ({ ...prev, improvised: result }));
                 setDamageTotals((prev) => ({ ...prev, improvised: null }));
               }}
@@ -411,15 +439,31 @@ export default function InlineAttackPicker({
         );
       })}
 
-      {/* ── Done button ───────────────────────────────────────────────────────── */}
+      {/* ── Back / Done footer ────────────────────────────────────────────────── */}
+      {/*
+        Back is shown when no attack has been rolled yet — pressing it refunds
+        the action so the player can choose a different one.
+        Done is shown once at least one attack roll has been recorded — at that
+        point the action is committed and cannot be returned.
+      */}
       <div className="pt-3">
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-full rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
-        >
-          Done
-        </button>
+        {turnState.attack !== null && turnState.attack.used === 0 ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="w-full rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
+          >
+            ← Back
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
+          >
+            Done
+          </button>
+        )}
       </div>
     </div>
   );

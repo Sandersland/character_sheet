@@ -26,6 +26,7 @@ const CATEGORY_TONE: Record<CharacterEventCategory, "vitality" | "gold" | "garne
   spellcasting: "arcane",
   class: "neutral",
   resources: "gold",
+  combat: "garnet",
 };
 
 const TYPE_LABEL: Partial<Record<string, string>> = {
@@ -57,6 +58,10 @@ const TYPE_LABEL: Partial<Record<string, string>> = {
   unprepareSpell: "unprepared",
   spendResource: "resource used",
   restoreResource: "resource restored",
+  combatStarted: "combat",
+  combatEnded: "combat end",
+  attackRoll: "attack",
+  damageRoll: "damage",
   revert: "undo",
 };
 
@@ -82,8 +87,6 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
     fetchSession(characterId, sessionId)
       .then((data) => setEvents(data.events as CharacterEvent[]))
       .catch(() => setError("Couldn't load session log — try again."));
-  // refreshKey is intentionally included to trigger re-fetches on character updates.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [characterId, sessionId, refreshKey]);
 
   if (error) {
@@ -105,16 +108,42 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
     );
   }
 
+  // Build a round-per-event map by walking events oldest-first (list arrives newest-first).
+  // Combat markers (combatStarted/combatRoundAdvanced/combatEnded) anchor the round counter;
+  // all other events that fall inside a combat block get tagged with the current round.
+  const roundById = new Map<string, number>();
+  let currentRound: number | null = null;
+  for (const e of [...activeEvents].reverse()) {
+    if (e.type === "combatStarted") {
+      currentRound = 1;
+    } else if (e.type === "combatRoundAdvanced") {
+      const dataRound = (e.data as { round?: number } | undefined)?.round;
+      currentRound = dataRound ?? (currentRound !== null ? currentRound + 1 : 2);
+    } else if (e.type === "combatEnded") {
+      currentRound = null;
+    } else if (currentRound !== null) {
+      roundById.set(e.id, currentRound);
+    }
+  }
+
+  // combatRoundAdvanced markers drive the R{n} chip walk above but are too noisy to
+  // show as their own rows — every other entry already carries its round chip.
+  const displayEvents = activeEvents.filter((e) => e.type !== "combatRoundAdvanced");
+
   return (
     <ul className="flex flex-col gap-2">
-      {activeEvents.map((event) => {
+      {displayEvents.map((event) => {
         const tone = CATEGORY_TONE[event.category] ?? "neutral";
         const label = TYPE_LABEL[event.type] ?? event.type;
+        const round = roundById.get(event.id);
         return (
           <li
             key={event.id}
             className="flex flex-wrap items-center gap-2 py-1 text-sm"
           >
+            {round !== undefined && (
+              <Badge tone="neutral">R{round}</Badge>
+            )}
             <Badge tone={tone}>{label}</Badge>
             <span className="text-parchment-800">{event.summary}</span>
           </li>

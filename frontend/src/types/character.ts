@@ -308,7 +308,8 @@ export type CharacterEventCategory =
   | "currency"
   | "spellcasting"
   | "class"
-  | "resources";
+  | "resources"
+  | "combat";
 
 export type CharacterEventType =
   | "acquired" | "consumed" | "sold" | "bought" | "removed"  // inventory
@@ -322,6 +323,8 @@ export type CharacterEventType =
   | "spendResource" | "restoreResource"                       // resources
   | "learnManeuver" | "forgetManeuver" | "maneuversReconciled" // resources (cont.)
   | "learnToolProficiency" | "forgetToolProficiency" | "toolProficienciesReconciled" // resources
+  | "combatStarted" | "combatEnded" | "combatRoundAdvanced"   // combat lifecycle
+  | "attackRoll" | "damageRoll"                               // combat rolls
   | "revert";                                                  // meta
 
 export interface CharacterEventField {
