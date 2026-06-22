@@ -391,9 +391,8 @@ export async function fetchSessions(characterId: string): Promise<Session[]> {
 /** Get the currently-active session, or null if none is active. */
 export async function fetchActiveSession(characterId: string): Promise<Session | null> {
   const response = await fetch(`${API_URL}/characters/${characterId}/sessions/active`);
-  if (response.status === 404) return null;
   if (!response.ok) throw new Error(`Failed to fetch active session (${response.status})`);
-  return response.json();
+  return response.json(); // 200 with null body when no session is active
 }
 
 /** Get one session with its events. */

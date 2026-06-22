@@ -94,7 +94,8 @@ sessionsRouter.get("/characters/:id/sessions", async (req, res) => {
 
 // ── GET /api/characters/:id/sessions/active ───────────────────────────────────
 //
-// Returns the currently-active session, or 404 if none is active.
+// Returns the currently-active session, or null (200) if none is active.
+// 404 is reserved for an unknown character id.
 
 sessionsRouter.get("/characters/:id/sessions/active", async (req, res) => {
   const character = await prisma.character.findUnique({
@@ -107,12 +108,7 @@ sessionsRouter.get("/characters/:id/sessions/active", async (req, res) => {
   }
 
   const session = await getActiveSession(character.id);
-  if (!session) {
-    res.status(404).json({ error: "No active session" });
-    return;
-  }
-
-  res.json(session);
+  res.json(session ?? null);
 });
 
 // ── GET /api/characters/:id/sessions/:sessionId ───────────────────────────────

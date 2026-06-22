@@ -152,10 +152,18 @@ describe("GET /api/characters/:id/sessions/active", () => {
     expect(res.body.status).toBe("active");
   });
 
-  it("404s with 'No active session' when none is active", async () => {
+  it("returns 200 with a null body when none is active", async () => {
     const res = await supertest(app).get(sessionsUrl("/active"));
+    expect(res.status).toBe(200);
+    expect(res.body).toBeNull();
+  });
+
+  it("404s for an unknown character id", async () => {
+    const res = await supertest(app).get(
+      "/api/characters/00000000-0000-0000-0000-000000000000/sessions/active",
+    );
     expect(res.status).toBe(404);
-    expect(res.body.error).toBe("No active session");
+    expect(res.body.error).toBe("Character not found");
   });
 });
 
