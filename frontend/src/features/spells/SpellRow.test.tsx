@@ -27,6 +27,19 @@ const mockCantrip: Spell = {
   school: "evocation",
 };
 
+// Fireball with structured damage + upcast scaling (8d6 base, +1d6 per level above 3rd).
+const mockUpcastSpell: Spell = {
+  ...mockSpell,
+  id: "spell-3",
+  name: "Fireball",
+  level: 3,
+  effectKind: "damage",
+  effectDiceCount: 8,
+  effectDiceFaces: 6,
+  damageType: "fire",
+  upcastDicePerLevel: 1,
+};
+
 function defaultProps(spell: Spell, overrides = {}) {
   return {
     spell,
@@ -104,5 +117,64 @@ describe("SpellRow", () => {
     render(<ul><SpellRow {...defaultProps(mockSpell, { busy: true })} /></ul>);
     expect(screen.getByRole("button", { name: "Cast" })).toBeDisabled();
     expect(screen.getByRole("button", { name: /prepared|unprepared/i })).toBeDisabled();
+  });
+
+  describe("upcast slot picker", () => {
+    it("opens a slot button for each available level when multiple slots exist", async () => {
+      const user = userEvent.setup();
+      render(
+        <ul>
+          <SpellRow {...defaultProps(mockUpcastSpell, { availableSlots: [3, 4, 5] })} />
+        </ul>,
+      );
+      // Multiple slots → Cast opens the picker rather than casting immediately.
+      await user.click(screen.getByRole("button", { name: "Cast" }));
+      expect(screen.getByRole("button", { name: /L3/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /L4/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /L5/ })).toBeInTheDocument();
+    });
+
+    it("marks upcast slots (above the spell's base level) with an ↑ indicator", async () => {
+      const user = userEvent.setup();
+      render(
+        <ul>
+          <SpellRow {...defaultProps(mockUpcastSpell, { availableSlots: [3, 4, 5] })} />
+        </ul>,
+      );
+      await user.click(screen.getByRole("button", { name: "Cast" }));
+      // Base level (3) is not an upcast → no ↑.
+      expect(screen.getByRole("button", { name: /L3/ })).not.toHaveTextContent("↑");
+      // Higher slots are upcasts → ↑.
+      expect(screen.getByRole("button", { name: /L4/ })).toHaveTextContent("↑");
+      expect(screen.getByRole("button", { name: /L5/ })).toHaveTextContent("↑");
+    });
+
+    it("shows the scaled effect preview on upcast buttons", async () => {
+      const user = userEvent.setup();
+      render(
+        <ul>
+          <SpellRow {...defaultProps(mockUpcastSpell, { availableSlots: [3, 4, 5] })} />
+        </ul>,
+      );
+      await user.click(screen.getByRole("button", { name: "Cast" }));
+      // effectPreview renders "<count>d<faces> <damageType>" (the damage type stands in for "damage").
+      // 8d6 base + 2 levels above 3rd × 1d6 = 10d6 at L5.
+      expect(screen.getByRole("button", { name: /L5/ })).toHaveTextContent("10d6 fire");
+      // L4 → 9d6.
+      expect(screen.getByRole("button", { name: /L4/ })).toHaveTextContent("9d6 fire");
+    });
+
+    it("calls onCast with the chosen upcast slot level", async () => {
+      const user = userEvent.setup();
+      const onCast = vi.fn();
+      render(
+        <ul>
+          <SpellRow {...defaultProps(mockUpcastSpell, { onCast, availableSlots: [3, 4, 5] })} />
+        </ul>,
+      );
+      await user.click(screen.getByRole("button", { name: "Cast" }));
+      await user.click(screen.getByRole("button", { name: /L5/ }));
+      expect(onCast).toHaveBeenCalledWith(mockUpcastSpell, 5);
+    });
   });
 });
