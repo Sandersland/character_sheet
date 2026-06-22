@@ -299,6 +299,13 @@ export function serializeCharacter(row: CharacterWithRelations) {
         // class change or long rest that wasn't captured in the old blob).
         used: Math.min(total, stored.slotsUsed[String(slotLevel)] ?? 0),
       })),
+      // Warlock Mystic Arcanum charges (empty for every other caster). Same
+      // clamp-on-read as slots.
+      arcana: derivedSpell.arcana.map(({ level: arcanumLevel, total }) => ({
+        level: arcanumLevel,
+        total,
+        used: Math.min(total, stored.arcanumUsed[String(arcanumLevel)] ?? 0),
+      })),
       spells: stored.spells,
     };
   } else if (

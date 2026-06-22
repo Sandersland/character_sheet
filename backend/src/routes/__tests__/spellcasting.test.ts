@@ -495,3 +495,141 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     expect(res.body.spellcasting.ability).toBe("intelligence");
   });
 });
+
+// ── Warlock Pact Magic + Mystic Arcanum ───────────────────────────────────────
+// Level-11 Warlock: 3 Pact slots at level 5, plus a 6th-level Mystic Arcanum
+// charge (1/long rest). Exercises arcanum cast routing and rest recharge.
+
+const WARLOCK_ID = "test-warlock-character-1";
+
+const WARLOCK_BASE = {
+  id: WARLOCK_ID,
+  name: "Mystic Arcanum Test Warlock",
+  alignment: "Chaotic Neutral",
+  experiencePoints: 85000, // level 11
+  armorClass: 12,
+  initiativeBonus: 1,
+  speed: 30,
+  hitPoints: { current: 60, max: 60, temp: 0 },
+  hitDice: { total: 11, die: "d8" },
+  abilityScores: {
+    strength: 10, dexterity: 12, constitution: 14,
+    intelligence: 10, wisdom: 10, charisma: 18, // CHA +4
+  },
+  savingThrowProficiencies: ["wisdom", "charisma"],
+  skills: [],
+  toolProficiencies: [],
+  currency: { cp: 0, sp: 0, gp: 10, pp: 0 },
+  journal: [],
+};
+
+// A 5th-level Pact spell and a 6th-level Mystic Arcanum spell in the spellbook.
+const WARLOCK_SPELLCASTING_JSON = {
+  slotsUsed: {},
+  arcanumUsed: {},
+  spells: [
+    {
+      id: "pact-spell-5", name: "Fixture Synaptic Static", level: 5, school: "enchantment",
+      prepared: true, castingTime: "1 action", range: "120 ft", duration: "Instantaneous",
+      description: "8d6 psychic.", effectKind: "damage", effectDiceCount: 8, effectDiceFaces: 6,
+      damageType: "psychic", attackType: "save", saveAbility: "intelligence",
+    },
+    {
+      id: "arcanum-spell-6", name: "Fixture Eyebite", level: 6, school: "necromancy",
+      prepared: true, castingTime: "1 action", range: "60 ft", duration: "1 minute",
+      description: "A creature is frightened/sickened/asleep.",
+    },
+  ],
+};
+
+describe("Warlock Pact Magic + Mystic Arcanum", () => {
+  const WARLOCK_CATALOG_NAME = "Spellcasting Route Test Warlock";
+
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: WARLOCK_CATALOG_NAME } });
+  });
+
+  beforeEach(async () => {
+    const cls = await prisma.characterClass.upsert({
+      where: { name: WARLOCK_CATALOG_NAME },
+      create: {
+        name: WARLOCK_CATALOG_NAME, hitDie: "d8",
+        savingThrows: ["wisdom", "charisma"], skillChoiceCount: 2,
+        skillChoices: ["arcana", "deception"], isSpellcaster: true,
+      },
+      update: {},
+    });
+    await prisma.character.create({
+      data: {
+        ...WARLOCK_BASE,
+        spellcasting: WARLOCK_SPELLCASTING_JSON as Prisma.InputJsonValue,
+        classEntries: { create: [{ name: "warlock", classId: cls.id, position: 0 }] },
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: WARLOCK_ID } });
+  });
+
+  const castUrl = `/api/characters/${WARLOCK_ID}/spellcasting/transactions`;
+  const hpUrl = `/api/characters/${WARLOCK_ID}/hp`;
+
+  it("derives 3 Pact slots at level 5 and a 6th-level Mystic Arcanum charge", async () => {
+    const res = await supertest(createApp()).get(`/api/characters/${WARLOCK_ID}`);
+    expect(res.status).toBe(200);
+    const slots = res.body.spellcasting.slots as Array<{ level: number; total: number }>;
+    expect(slots).toEqual([{ level: 5, total: 3, used: 0 }]);
+    expect(res.body.spellcasting.arcana).toEqual([{ level: 6, total: 1, used: 0 }]);
+    // CHA +4, L11 prof +4 → DC = 8+4+4 = 16.
+    expect(res.body.spellcasting.spellSaveDC).toBe(16);
+    expect(res.body.spellcasting.ability).toBe("charisma");
+  });
+
+  it("casts a 6th-level spell via the Mystic Arcanum charge, not a Pact slot", async () => {
+    const res = await supertest(createApp())
+      .post(castUrl)
+      .send({ operations: [{ type: "castSpell", entryId: "arcanum-spell-6", slotLevel: 6, roll: 0 }] });
+    expect(res.status).toBe(200);
+    const arcanum6 = res.body.spellcasting.arcana.find((a: { level: number }) => a.level === 6);
+    expect(arcanum6.used).toBe(1);
+    const pact = res.body.spellcasting.slots.find((s: { level: number }) => s.level === 5);
+    expect(pact.used).toBe(0); // no Pact slot consumed
+  });
+
+  it("rejects a second arcanum cast of the same level until a long rest", async () => {
+    const app = createApp();
+    await supertest(app).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "arcanum-spell-6", slotLevel: 6, roll: 0 }] });
+    const res = await supertest(app).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "arcanum-spell-6", slotLevel: 6, roll: 0 }] });
+    expect(res.status).toBe(400);
+  });
+
+  it("recharges Pact slots on a short rest but NOT Mystic Arcanum", async () => {
+    const app = createApp();
+    // Spend a Pact slot (5th) and the 6th-level arcanum.
+    await supertest(app).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "pact-spell-5", slotLevel: 5, roll: 12 }] });
+    await supertest(app).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "arcanum-spell-6", slotLevel: 6, roll: 0 }] });
+
+    const rest = await supertest(app).post(hpUrl).send({ operations: [{ type: "shortRest", rolls: [5] }] });
+    expect(rest.status).toBe(200);
+    const pact = rest.body.spellcasting.slots.find((s: { level: number }) => s.level === 5);
+    expect(pact.used).toBe(0); // Pact slot recharged
+    const arcanum6 = rest.body.spellcasting.arcana.find((a: { level: number }) => a.level === 6);
+    expect(arcanum6.used).toBe(1); // arcanum still spent
+  });
+
+  it("recharges both Pact slots and Mystic Arcanum on a long rest", async () => {
+    const app = createApp();
+    await supertest(app).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "pact-spell-5", slotLevel: 5, roll: 12 }] });
+    await supertest(app).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "arcanum-spell-6", slotLevel: 6, roll: 0 }] });
+
+    const rest = await supertest(app).post(hpUrl).send({ operations: [{ type: "longRest" }] });
+    expect(rest.status).toBe(200);
+    const pact = rest.body.spellcasting.slots.find((s: { level: number }) => s.level === 5);
+    expect(pact.used).toBe(0);
+    const arcanum6 = rest.body.spellcasting.arcana.find((a: { level: number }) => a.level === 6);
+    expect(arcanum6.used).toBe(0);
+    // The known-spell list survives the long rest (regression guard).
+    expect(rest.body.spellcasting.spells).toHaveLength(2);
+  });
+});

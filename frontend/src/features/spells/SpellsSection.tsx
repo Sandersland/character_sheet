@@ -45,7 +45,11 @@ interface CastResult {
 
 export default function SpellsSection({ character, onUpdate }: SpellsSectionProps) {
   const spellcasting = character.spellcasting!;
-  const { spellSaveDC, spellAttackBonus, slots = [], spells = [], ability } = spellcasting;
+  const { spellSaveDC, spellAttackBonus, slots = [], arcana = [], spells = [], ability } = spellcasting;
+
+  // Warlocks use Pact Magic (single-level slots that recharge on a short rest)
+  // and gain Mystic Arcanum charges at higher levels — label/render accordingly.
+  const isWarlock = (character.classes?.[0]?.name ?? "").toLowerCase() === "warlock";
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +61,11 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
     .filter((s) => s.used < s.total)
     .map((s) => s.level)
     .sort((a, b) => a - b);
+
+  // Mystic Arcanum spell levels with a charge remaining (Warlock 6th–9th).
+  const availableArcanaLevels = arcana
+    .filter((a) => a.used < a.total)
+    .map((a) => a.level);
 
   // Which catalog spell ids are already in the spellbook (to disable duplicates in AddSpellPanel).
   const learnedSpellIds = new Set(spells.flatMap((s) => s.spellId ? [s.spellId] : []));
@@ -149,10 +158,17 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
   }
 
   // ── Available slots per spell (for the slot picker in SpellRow) ─────────────
-  // Only levels >= spell.level with remaining slots are valid choices.
+  // Only levels >= spell.level with remaining slots are valid choices. A 6th–9th
+  // level spell with a matching Mystic Arcanum charge is also castable (the
+  // backend routes a same-level cast to the arcanum charge since Pact slots cap
+  // at level 5).
   function availableSlotsForSpell(spell: Spell): number[] {
     if (spell.level === 0) return [];
-    return availableSlotLevels.filter((l) => l >= spell.level);
+    const levels = availableSlotLevels.filter((l) => l >= spell.level);
+    if (availableArcanaLevels.includes(spell.level) && !levels.includes(spell.level)) {
+      levels.push(spell.level);
+    }
+    return levels.sort((a, b) => a - b);
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -196,7 +212,16 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
       {slots.length > 0 && (
         <div>
           <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
-            Spell Slots
+            {isWarlock ? (
+              <>
+                Pact Magic{" "}
+                <span className="font-normal normal-case tracking-normal text-parchment-400">
+                  — recharges on a short rest
+                </span>
+              </>
+            ) : (
+              "Spell Slots"
+            )}
           </h3>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {slots.map((slot) => {
@@ -231,6 +256,49 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
                       onClick={() => handleRestoreSlot(slot.level)}
                       className="flex-1 rounded bg-arcane-100 py-0.5 text-[11px] font-semibold text-arcane-700 hover:bg-arcane-200 disabled:opacity-30"
                       title={`Restore a level ${slot.level} slot`}
+                    >
+                      + restore
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Mystic Arcanum (Warlock 6th–9th) ── */}
+      {arcana.length > 0 && (
+        <div>
+          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+            Mystic Arcanum{" "}
+            <span className="font-normal normal-case tracking-normal text-parchment-400">
+              — one cast each per long rest
+            </span>
+          </h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {arcana.map((charge) => {
+              const remaining = charge.total - charge.used;
+              return (
+                <div key={charge.level}>
+                  <div className="mb-1 flex items-baseline justify-between text-xs text-parchment-600">
+                    <span className="font-medium">Level {charge.level}</span>
+                    <span className="tabular-nums">{remaining}/{charge.total}</span>
+                  </div>
+                  <MeterBar
+                    current={remaining}
+                    max={charge.total}
+                    tone="gold"
+                    label={`Level ${charge.level} Mystic Arcanum`}
+                  />
+                  <div className="mt-1.5 flex gap-1">
+                    {/* Restore a spent arcanum (undo a mis-cast) */}
+                    <button
+                      type="button"
+                      disabled={busy || charge.used === 0}
+                      onClick={() => handleRestoreSlot(charge.level)}
+                      className="flex-1 rounded bg-arcane-100 py-0.5 text-[11px] font-semibold text-arcane-700 hover:bg-arcane-200 disabled:opacity-30"
+                      title={`Restore the level ${charge.level} Mystic Arcanum`}
                     >
                       + restore
                     </button>

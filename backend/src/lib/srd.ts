@@ -118,9 +118,8 @@ export function isKnownTool(name: string): boolean {
 // ── Spellcasting ability by class ────────────────────────────────────────────
 // Maps a class name (lowercase) to the ability that governs its spellcasting.
 // Used to derive spellSaveDC and spellAttackBonus at read time.
-// Warlock is listed here for ability lookup but uses Pact Magic (short-rest,
-// different slot counts) rather than the full-caster table — see
-// deriveSpellcasting below.
+// Warlock uses Pact Magic (single-level slots, short-rest recharge) and Paladin/
+// Ranger use the half-caster table — all handled by deriveSpellcasting below.
 export const SPELLCASTING_ABILITY: Readonly<Record<string, string>> = {
   wizard: "intelligence",
   sorcerer: "charisma",
@@ -133,9 +132,11 @@ export const SPELLCASTING_ABILITY: Readonly<Record<string, string>> = {
 };
 
 // Classes that use the standard full-caster progression below.
-// Half/third casters and Warlock (Pact Magic) use different tables — they
-// fall back to stored slot totals until a later phase adds their progressions.
 const FULL_CASTER_CLASSES = new Set(["wizard", "sorcerer", "cleric", "druid", "bard"]);
+
+// Half-casters (Paladin, Ranger) — gain spellcasting at class level 2 and use
+// the half-caster slot table below (equivalent to the full table at ceil(level/2)).
+const HALF_CASTER_CLASSES = new Set(["paladin", "ranger"]);
 
 // Standard 5e full-caster slot table (PHB p. 114 / Basic Rules spell table).
 // Outer key: character level 1–20.  Inner key: slot level 1–9.
@@ -168,6 +169,75 @@ export interface DerivedSpellcastingInfo {
   spellSaveDC: number;
   spellAttackBonus: number;
   slotTotals: Array<{ level: number; total: number }>;
+  /**
+   * Warlock Mystic Arcanum — one free cast per long rest of a spell at each
+   * listed level (6th–9th). Empty for every non-Warlock caster. Each entry has
+   * `total: 1`; used counts are tracked separately in the stored blob.
+   */
+  arcana: Array<{ level: number; total: number }>;
+}
+
+// Half-caster slot table (Paladin / Ranger). No spellcasting at level 1; slots
+// at level N match the full-caster table at ceil(N/2). PHB p. 84 / 91.
+// Outer key: character level 2–20.  Inner key: spell slot level.
+export const HALF_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number>>>> = {
+   2: { 1: 2 },
+   3: { 1: 3 },
+   4: { 1: 3 },
+   5: { 1: 4, 2: 2 },
+   6: { 1: 4, 2: 2 },
+   7: { 1: 4, 2: 3 },
+   8: { 1: 4, 2: 3 },
+   9: { 1: 4, 2: 3, 3: 2 },
+  10: { 1: 4, 2: 3, 3: 2 },
+  11: { 1: 4, 2: 3, 3: 3 },
+  12: { 1: 4, 2: 3, 3: 3 },
+  13: { 1: 4, 2: 3, 3: 3, 4: 1 },
+  14: { 1: 4, 2: 3, 3: 3, 4: 1 },
+  15: { 1: 4, 2: 3, 3: 3, 4: 2 },
+  16: { 1: 4, 2: 3, 3: 3, 4: 2 },
+  17: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 1 },
+  18: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 1 },
+  19: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2 },
+  20: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 2 },
+};
+
+// Warlock Pact Magic (PHB p. 106). Unlike other casters, every Pact slot is the
+// same (highest) level, and they recharge on a SHORT rest. Maps warlock level to
+// the single slot level and the number of slots at that level.
+export const PACT_MAGIC_SLOTS: Readonly<Record<number, { slotLevel: number; count: number }>> = {
+   1: { slotLevel: 1, count: 1 },
+   2: { slotLevel: 1, count: 2 },
+   3: { slotLevel: 2, count: 2 },
+   4: { slotLevel: 2, count: 2 },
+   5: { slotLevel: 3, count: 2 },
+   6: { slotLevel: 3, count: 2 },
+   7: { slotLevel: 4, count: 2 },
+   8: { slotLevel: 4, count: 2 },
+   9: { slotLevel: 5, count: 2 },
+  10: { slotLevel: 5, count: 2 },
+  11: { slotLevel: 5, count: 3 },
+  12: { slotLevel: 5, count: 3 },
+  13: { slotLevel: 5, count: 3 },
+  14: { slotLevel: 5, count: 3 },
+  15: { slotLevel: 5, count: 3 },
+  16: { slotLevel: 5, count: 3 },
+  17: { slotLevel: 5, count: 4 },
+  18: { slotLevel: 5, count: 4 },
+  19: { slotLevel: 5, count: 4 },
+  20: { slotLevel: 5, count: 4 },
+};
+
+// Warlock Mystic Arcanum (PHB p. 108). At levels 11/13/15/17 the warlock learns
+// one spell of level 6/7/8/9 respectively, castable once per long rest without a
+// Pact slot. Returns the arcanum spell levels available at a given warlock level.
+export function mysticArcanumLevels(warlockLevel: number): number[] {
+  const levels: number[] = [];
+  if (warlockLevel >= 11) levels.push(6);
+  if (warlockLevel >= 13) levels.push(7);
+  if (warlockLevel >= 15) levels.push(8);
+  if (warlockLevel >= 17) levels.push(9);
+  return levels;
 }
 
 // Third-caster subclasses that grant spellcasting — Eldritch Knight and
@@ -204,9 +274,12 @@ export const THIRD_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number,
 
 /**
  * Derives the mechanical spellcasting stats (ability, save DC, attack bonus,
- * slot totals) from a character's class, level, ability scores, and proficiency
- * bonus. Returns null for non-casters or unsupported progressions (half/third
- * casters, Warlock Pact Magic) — callers fall back to the stored blob.
+ * slot totals, Mystic Arcanum charges) from a character's class, level, ability
+ * scores, and proficiency bonus. Returns null for non-casters — callers fall
+ * back to the stored blob.
+ *
+ * Covers full casters, half-casters (Paladin/Ranger), Warlock Pact Magic, and
+ * the third-caster subclasses (Eldritch Knight / Arcane Trickster).
  *
  * Pure function — no DB access, safe to call in serializeCharacter.
  *
@@ -221,37 +294,59 @@ export function deriveSpellcasting(
   proficiencyBonus: number,
   subclass?: string,
 ): DerivedSpellcastingInfo | null {
+  // Builds the standard save-DC / attack-bonus pair plus a sorted slotTotals
+  // array from a per-level slot row, for a given governing ability.
+  const fromSlotRow = (
+    ability: string,
+    slotRow: Readonly<Record<number, number>>,
+    arcana: Array<{ level: number; total: number }> = [],
+  ): DerivedSpellcastingInfo => {
+    const abilityMod = abilityModifier(abilityScores[ability] ?? 10);
+    const slotTotals = Object.entries(slotRow)
+      .map(([lvl, total]) => ({ level: Number(lvl), total }))
+      .sort((a, b) => a.level - b.level);
+    return {
+      ability,
+      spellSaveDC: 8 + proficiencyBonus + abilityMod,
+      spellAttackBonus: proficiencyBonus + abilityMod,
+      slotTotals,
+      arcana,
+    };
+  };
+
   // Check third-caster subclasses first — they grant spellcasting independent
   // of the base class's caster status (Fighter/Rogue are not casters without them).
   const subclassKey = (subclass ?? "").toLowerCase();
   const thirdCasterAbility = THIRD_CASTER_SUBCLASSES[subclassKey];
   if (thirdCasterAbility) {
     if (characterLevel < 3) return null; // subclass (and its spellcasting) unlocked at level 3
-    const abilityMod = abilityModifier(abilityScores[thirdCasterAbility] ?? 10);
-    const spellSaveDC = 8 + proficiencyBonus + abilityMod;
-    const spellAttackBonus = proficiencyBonus + abilityMod;
-    const slotRow = THIRD_CASTER_SLOTS[Math.min(20, Math.max(3, characterLevel))] ?? {};
-    const slotTotals = Object.entries(slotRow)
-      .map(([lvl, total]) => ({ level: Number(lvl), total }))
-      .sort((a, b) => a.level - b.level);
-    return { ability: thirdCasterAbility, spellSaveDC, spellAttackBonus, slotTotals };
+    return fromSlotRow(
+      thirdCasterAbility,
+      THIRD_CASTER_SLOTS[Math.min(20, Math.max(3, characterLevel))] ?? {},
+    );
   }
 
   const classKey = className.toLowerCase();
   const ability = SPELLCASTING_ABILITY[classKey];
   if (!ability) return null; // non-caster class
-  if (!FULL_CASTER_CLASSES.has(classKey)) return null; // TODO: Pact Magic / half-casters
 
-  const abilityMod = abilityModifier(abilityScores[ability] ?? 10);
-  const spellSaveDC = 8 + proficiencyBonus + abilityMod;
-  const spellAttackBonus = proficiencyBonus + abilityMod;
+  if (FULL_CASTER_CLASSES.has(classKey)) {
+    return fromSlotRow(ability, FULL_CASTER_SLOTS[Math.min(20, Math.max(1, characterLevel))] ?? {});
+  }
 
-  const slotRow = FULL_CASTER_SLOTS[Math.min(20, Math.max(1, characterLevel))] ?? {};
-  const slotTotals = Object.entries(slotRow)
-    .map(([lvl, total]) => ({ level: Number(lvl), total }))
-    .sort((a, b) => a.level - b.level);
+  if (HALF_CASTER_CLASSES.has(classKey)) {
+    if (characterLevel < 2) return null; // half-casters gain spellcasting at level 2
+    return fromSlotRow(ability, HALF_CASTER_SLOTS[Math.min(20, characterLevel)] ?? {});
+  }
 
-  return { ability, spellSaveDC, spellAttackBonus, slotTotals };
+  if (classKey === "warlock") {
+    const pact = PACT_MAGIC_SLOTS[Math.min(20, Math.max(1, characterLevel))];
+    if (!pact) return null;
+    const arcana = mysticArcanumLevels(characterLevel).map((level) => ({ level, total: 1 }));
+    return fromSlotRow(ability, { [pact.slotLevel]: pact.count }, arcana);
+  }
+
+  return null;
 }
 
 /** Standard 5e modifier: floor((score - 10) / 2). */

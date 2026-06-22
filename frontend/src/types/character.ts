@@ -733,6 +733,11 @@ export interface Character {
     spellSaveDC: number;
     spellAttackBonus: number;
     slots: SpellSlots[];
+    /**
+     * Warlock Mystic Arcanum — one free cast per long rest of a spell at each
+     * listed level (6th–9th). Empty/absent for every other caster.
+     */
+    arcana?: SpellSlots[];
     spells: Spell[];
   };
 

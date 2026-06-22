@@ -122,7 +122,7 @@ export default function InlineSpellPicker({
 }: InlineSpellPickerProps) {
   const { roll } = useRoll();
   const spellcasting = character.spellcasting!;
-  const { slots = [], spells = [], spellSaveDC, spellAttackBonus } = spellcasting;
+  const { slots = [], arcana = [], spells = [], spellSaveDC, spellAttackBonus } = spellcasting;
 
   // Per-spell row state keyed by spell.id.
   const [rowStates, setRowStates] = useState<Record<string, SpellRowState>>({});
@@ -150,6 +150,18 @@ export default function InlineSpellPicker({
     .map((s) => s.level)
     .sort((a, b) => a - b);
 
+  // Warlock Mystic Arcanum levels (6th–9th) with a charge remaining. These are
+  // cast at their natural level; the backend routes the cast to the arcanum
+  // charge since Pact slots never reach level 6+.
+  const availableArcanaLevels = arcana
+    .filter((a) => a.used < a.total)
+    .map((a) => a.level);
+
+  /** True when a cast at this level draws from a Mystic Arcanum charge, not a slot. */
+  function isArcanumLevel(level: number | undefined): boolean {
+    return level !== undefined && availableArcanaLevels.includes(level);
+  }
+
   // 5e bonus-action restriction helpers.
   // Cast leveled spell as action → bonus-action spell picker is fully blocked.
   const bonusActionBlockedByActionSpell =
@@ -176,7 +188,7 @@ export default function InlineSpellPicker({
 
     if (spell.level === 0) return true; // cantrip — no slot needed
     const hasSlotsAvailable = availableSlotLevels.some((l) => l >= spell.level);
-    return hasSlotsAvailable;
+    return hasSlotsAvailable || isArcanumLevel(spell.level);
   });
 
   // Sort: cantrips first, then ascending level, then alphabetically.
@@ -186,10 +198,14 @@ export default function InlineSpellPicker({
 
   // ── Slot picker helpers ──────────────────────────────────────────────────────
 
-  /** Available slot levels for a given leveled spell. */
+  /** Available slot levels for a given leveled spell (incl. a Mystic Arcanum charge). */
   function availableSlotsForSpell(spell: Spell): number[] {
     if (spell.level === 0) return [];
-    return availableSlotLevels.filter((l) => l >= spell.level);
+    const levels = availableSlotLevels.filter((l) => l >= spell.level);
+    if (isArcanumLevel(spell.level) && !levels.includes(spell.level)) {
+      levels.push(spell.level);
+    }
+    return levels.sort((a, b) => a - b);
   }
 
   /** Resolved slot level for a spell: the row's chosen level, or the lowest available. */
@@ -293,6 +309,7 @@ export default function InlineSpellPicker({
         const initRow = getRow(spell.id, spell, availableSlots[0]);
         const row = rowStates[spell.id] ?? initRow;
         const spellSlot = resolvedSlot(spell, row);
+        const usesArcanum = !isCantrip && isArcanumLevel(spellSlot ?? spell.level);
         const locked = targetLocked(spell);
         const preview = effectPreviewWithMod(spell, character, spellSlot);
         const compStr = componentsLabel(spell);
@@ -316,6 +333,7 @@ export default function InlineSpellPicker({
                     <Badge tone={schoolTone}>{spell.school}</Badge>
                     {spell.concentration && <Badge tone="arcane">conc</Badge>}
                     {spell.ritual && <Badge tone="gold">ritual</Badge>}
+                    {usesArcanum && <Badge tone="gold">arcanum</Badge>}
                   </div>
                 </div>
                 <p className="text-xs text-parchment-500">
@@ -356,7 +374,7 @@ export default function InlineSpellPicker({
                 {/* Slot display when only one option */}
                 {!isCantrip && availableSlots.length === 1 && (
                   <span className="text-[11px] text-parchment-500">
-                    Slot: L{availableSlots[0]}
+                    {usesArcanum ? "Mystic Arcanum" : `Slot: L${availableSlots[0]}`}
                   </span>
                 )}
 
@@ -441,7 +459,7 @@ export default function InlineSpellPicker({
                     onClick={() => handleCast(spell)}
                     className="rounded-control bg-arcane-600 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-arcane-700 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {row.casting ? "Casting…" : isCantrip ? "Cast" : `Cast (L${spellSlot ?? spell.level})`}
+                    {row.casting ? "Casting…" : isCantrip ? "Cast" : usesArcanum ? "Cast (Arcanum)" : `Cast (L${spellSlot ?? spell.level})`}
                   </button>
                 </div>
               </div>
