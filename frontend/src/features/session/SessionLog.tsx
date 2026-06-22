@@ -60,7 +60,6 @@ const TYPE_LABEL: Partial<Record<string, string>> = {
   restoreResource: "resource restored",
   combatStarted: "combat",
   combatEnded: "combat end",
-  combatRoundAdvanced: "round",
   attackRoll: "attack",
   damageRoll: "damage",
   revert: "undo",
@@ -127,9 +126,13 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
     }
   }
 
+  // combatRoundAdvanced markers drive the R{n} chip walk above but are too noisy to
+  // show as their own rows — every other entry already carries its round chip.
+  const displayEvents = activeEvents.filter((e) => e.type !== "combatRoundAdvanced");
+
   return (
     <ul className="flex flex-col gap-2">
-      {activeEvents.map((event) => {
+      {displayEvents.map((event) => {
         const tone = CATEGORY_TONE[event.category] ?? "neutral";
         const label = TYPE_LABEL[event.type] ?? event.type;
         const round = roundById.get(event.id);
