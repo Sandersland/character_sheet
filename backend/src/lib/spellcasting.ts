@@ -76,6 +76,9 @@ export interface SpellComponents {
 export interface SpellcastingMutableState {
   // JSON object keys must be strings; slot level is stored as e.g. "1", "2".
   slotsUsed: Record<string, number>;
+  // Warlock Mystic Arcanum charges spent this long rest, keyed by spell level
+  // (e.g. "6"). Each level has exactly one charge; 0/absent means available.
+  arcanumUsed: Record<string, number>;
   spells: SpellEntry[];
 }
 
@@ -87,14 +90,15 @@ export interface SpellcastingMutableState {
 
 export function normalizeSpellcastingMutable(json: Prisma.JsonValue): SpellcastingMutableState {
   if (!json || typeof json !== "object" || Array.isArray(json)) {
-    return { slotsUsed: {}, spells: [] };
+    return { slotsUsed: {}, arcanumUsed: {}, spells: [] };
   }
   const obj = json as Record<string, unknown>;
 
-  // New compact format: { slotsUsed: {...}, spells: [...] }
+  // New compact format: { slotsUsed: {...}, arcanumUsed: {...}, spells: [...] }
   if ("slotsUsed" in obj) {
     return {
       slotsUsed: (obj.slotsUsed as Record<string, number>) ?? {},
+      arcanumUsed: (obj.arcanumUsed as Record<string, number>) ?? {},
       spells: (obj.spells as SpellEntry[]) ?? [],
     };
   }
@@ -107,6 +111,7 @@ export function normalizeSpellcastingMutable(json: Prisma.JsonValue): Spellcasti
   }
   return {
     slotsUsed,
+    arcanumUsed: {},
     spells: (obj.spells as SpellEntry[]) ?? [],
   };
 }
@@ -250,8 +255,11 @@ export async function applySpellcastingOperations(
 
       // Slot totals map: level → total (0 if no entry).
       const slotTotals: Record<number, number> = {};
+      // Mystic Arcanum totals map: spell level → charges (Warlock only).
+      const arcanaTotals: Record<number, number> = {};
       if (derived) {
         for (const s of derived.slotTotals) slotTotals[s.level] = s.total;
+        for (const a of derived.arcana) arcanaTotals[a.level] = a.total;
       } else if (row.spellcasting && typeof row.spellcasting === "object" && !Array.isArray(row.spellcasting)) {
         // Fallback for unsupported caster classes: read stored totals if present.
         const stored = row.spellcasting as Record<string, unknown>;
@@ -260,7 +268,14 @@ export async function applySpellcastingOperations(
       }
 
       const state = normalizeSpellcastingMutable(row.spellcasting);
-      const beforeState = { spellcasting: { ...state, slotsUsed: { ...state.slotsUsed }, spells: [...state.spells] } };
+      const beforeState = {
+        spellcasting: {
+          ...state,
+          slotsUsed: { ...state.slotsUsed },
+          arcanumUsed: { ...state.arcanumUsed },
+          spells: [...state.spells],
+        },
+      };
 
       let summary = "";
       let eventData: Record<string, unknown> = {};
@@ -284,24 +299,45 @@ export async function applySpellcastingOperations(
             }
             eventData = { entryId: op.entryId, spellName: entry.name, roll: op.roll, slotLevel: null };
           } else {
-            // Leveled spell — expend a slot.
+            // Leveled spell — expend a slot, or a Mystic Arcanum charge.
             const slotLevel = op.slotLevel ?? entry.level;
             if (slotLevel < entry.level) {
               throw new InvalidSpellcastingOperationError(
                 `Cannot cast ${entry.name} (L${entry.level}) in a level-${slotLevel} slot`
               );
             }
-            const total = slotTotals[slotLevel] ?? 0;
-            const used = state.slotsUsed[String(slotLevel)] ?? 0;
-            if (used >= total) {
+            const slotTotal = slotTotals[slotLevel] ?? 0;
+            const arcanumTotal = arcanaTotals[slotLevel] ?? 0;
+            eventType = "castSpell";
+            const upcasting = slotLevel > entry.level;
+
+            // Real slots take priority; Mystic Arcanum (Warlock 6th–9th) has no
+            // overlapping slot level, so the two paths are mutually exclusive.
+            let slotLabel: string;
+            if (slotTotal > 0) {
+              const used = state.slotsUsed[String(slotLevel)] ?? 0;
+              if (used >= slotTotal) {
+                throw new InvalidSpellcastingOperationError(
+                  `No level-${slotLevel} spell slots remaining`
+                );
+              }
+              state.slotsUsed[String(slotLevel)] = used + 1;
+              slotLabel = `L${slotLevel} slot${upcasting ? ` (upcast from L${entry.level})` : ""}`;
+            } else if (arcanumTotal > 0) {
+              const used = state.arcanumUsed[String(slotLevel)] ?? 0;
+              if (used >= arcanumTotal) {
+                throw new InvalidSpellcastingOperationError(
+                  `Mystic Arcanum (level ${slotLevel}) already used — recharges on a long rest`
+                );
+              }
+              state.arcanumUsed[String(slotLevel)] = used + 1;
+              slotLabel = `L${slotLevel} Mystic Arcanum`;
+            } else {
               throw new InvalidSpellcastingOperationError(
                 `No level-${slotLevel} spell slots remaining`
               );
             }
-            state.slotsUsed[String(slotLevel)] = used + 1;
-            eventType = "castSpell";
-            const upcasting = slotLevel > entry.level;
-            const slotLabel = `L${slotLevel} slot${upcasting ? ` (upcast from L${entry.level})` : ""}`;
+
             if (entry.effectKind && op.roll > 0) {
               summary = `Cast ${entry.name} (${slotLabel}): ${op.roll}${entry.damageType ? " " + entry.damageType : ""} ${entry.effectKind === "heal" ? "healing" : "damage"}`;
             } else {
@@ -339,15 +375,22 @@ export async function applySpellcastingOperations(
         }
 
         case "restoreSlot": {
-          const used = state.slotsUsed[String(op.level)] ?? 0;
-          if (used <= 0) {
+          const slotUsed = state.slotsUsed[String(op.level)] ?? 0;
+          const arcanumUsed = state.arcanumUsed[String(op.level)] ?? 0;
+          if (slotUsed > 0) {
+            state.slotsUsed[String(op.level)] = slotUsed - 1;
+            summary = `Restored 1 level-${op.level} spell slot`;
+          } else if (arcanumUsed > 0) {
+            // No expended slot at this level, but a Mystic Arcanum charge was
+            // spent — undo that instead.
+            state.arcanumUsed[String(op.level)] = arcanumUsed - 1;
+            summary = `Restored level-${op.level} Mystic Arcanum`;
+          } else {
             throw new InvalidSpellcastingOperationError(
               `No expended level-${op.level} slots to restore`
             );
           }
-          state.slotsUsed[String(op.level)] = used - 1;
           eventType = "restoreSlot";
-          summary = `Restored 1 level-${op.level} spell slot`;
           eventData = { level: op.level };
           break;
         }
@@ -476,12 +519,19 @@ export async function applySpellcastingOperations(
         data: {
           spellcasting: {
             slotsUsed: state.slotsUsed,
+            arcanumUsed: state.arcanumUsed,
             spells: state.spells,
           } as unknown as Prisma.InputJsonValue,
         },
       });
 
-      const afterState = { spellcasting: { slotsUsed: { ...state.slotsUsed }, spells: [...state.spells] } };
+      const afterState = {
+        spellcasting: {
+          slotsUsed: { ...state.slotsUsed },
+          arcanumUsed: { ...state.arcanumUsed },
+          spells: [...state.spells],
+        },
+      };
 
       await logEvent(tx, {
         characterId,

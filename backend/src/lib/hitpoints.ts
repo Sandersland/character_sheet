@@ -355,25 +355,52 @@ export async function applyHitPointOperations(
             }
           }
 
+          // Warlock Pact Magic slots recharge on a short rest. A pure Warlock's
+          // only spell slots are Pact slots, so clearing slotsUsed is safe here.
+          // (Mystic Arcanum is long-rest only — leave arcanumUsed untouched.)
+          const srIsWarlock = (srClassEntry?.name ?? "").toLowerCase() === "warlock";
+          const srSpellUpdate: Record<string, unknown> = {
+            resources: serializeResourcesState(srResourceState),
+          };
+          let srSlotsRestored = 0;
+          let beforeSrSpellState: Record<string, unknown> | undefined;
+          if (srIsWarlock) {
+            const srSpellState = normalizeSpellcastingMutable(row.spellcasting);
+            beforeSrSpellState = {
+              slotsUsed: { ...srSpellState.slotsUsed },
+              arcanumUsed: { ...srSpellState.arcanumUsed },
+              spells: srSpellState.spells.map((s) => ({ ...s })),
+            };
+            srSlotsRestored = Object.values(srSpellState.slotsUsed).reduce((s, n) => s + n, 0);
+            srSpellState.slotsUsed = {};
+            srSpellUpdate.spellcasting = {
+              slotsUsed: srSpellState.slotsUsed,
+              arcanumUsed: srSpellState.arcanumUsed,
+              spells: srSpellState.spells,
+            } as unknown as Prisma.InputJsonValue;
+          }
+
           eventData = {
             rolls: op.rolls,
             totalGain,
             conMod,
             resourcesRestored: srResourcesRestored,
+            slotsRestored: srSlotsRestored,
             beforeResourceState: beforeSrResourceState,
+            ...(beforeSrSpellState ? { beforeSpellState: beforeSrSpellState } : {}),
           };
           const restParts: string[] = [`+${totalGain} HP`];
+          if (srSlotsRestored > 0) restParts.push(`${srSlotsRestored} Pact slot${srSlotsRestored !== 1 ? "s" : ""} restored`);
           if (srResourcesRestored > 0) restParts.push(`resources restored`);
           summary = `Short rest — spent ${spending} hit ${spending === 1 ? "die" : "dice"}: ${restParts.join(", ")}`;
 
-          // Write the resource reset alongside HP in the character.update below.
-          // Route through serializeResourcesState so all keys (including
-          // toolProficienciesKnown) round-trip — prevents silent data loss on rest.
+          // Write the resource reset (and any Pact slot restore) alongside HP in
+          // the character.update below. Route resources through
+          // serializeResourcesState so all keys (including toolProficienciesKnown)
+          // round-trip — prevents silent data loss on rest.
           await tx.character.update({
             where: { id: characterId },
-            data: {
-              resources: serializeResourcesState(srResourceState),
-            },
+            data: srSpellUpdate as Prisma.CharacterUpdateInput,
           });
           break;
         }
@@ -387,13 +414,21 @@ export async function applyHitPointOperations(
           const recovered = Math.max(1, Math.floor(hd.total / 2));
           hd.spent = Math.max(0, hd.spent - recovered);
 
-          // Reset all spell slot used-counts to 0 (full caster long-rest recovery).
-          // TODO: Warlock Pact Magic restores on short rest — handle once the
-          // half/Pact caster progressions are added.
+          // Reset all spell slot used-counts to 0 (long-rest recovery for every
+          // caster, including Warlock Pact slots) and clear Warlock Mystic Arcanum
+          // charges. Snapshot the full blob (incl. spells) so undo restores it
+          // faithfully rather than wiping the known-spell list.
           const spellState = normalizeSpellcastingMutable(row.spellcasting);
-          const beforeSpellState = { slotsUsed: { ...spellState.slotsUsed } };
-          const slotsRestored = Object.values(spellState.slotsUsed).reduce((s, n) => s + n, 0);
+          const beforeSpellState = {
+            slotsUsed: { ...spellState.slotsUsed },
+            arcanumUsed: { ...spellState.arcanumUsed },
+            spells: spellState.spells.map((s) => ({ ...s })),
+          };
+          const slotsRestored =
+            Object.values(spellState.slotsUsed).reduce((s, n) => s + n, 0) +
+            Object.values(spellState.arcanumUsed).reduce((s, n) => s + n, 0);
           spellState.slotsUsed = {};
+          spellState.arcanumUsed = {};
 
           // Reset subclass resources that recharge on a long rest or short-or-long rest.
           const abilityScores = row.abilityScores as Record<string, number>;
@@ -437,6 +472,7 @@ export async function applyHitPointOperations(
             data: {
               spellcasting: {
                 slotsUsed: spellState.slotsUsed,
+                arcanumUsed: spellState.arcanumUsed,
                 spells: spellState.spells,
               } as unknown as Prisma.InputJsonValue,
               resources: serializeResourcesState(resourceState),
@@ -548,8 +584,10 @@ export async function applyHitPointOperations(
       }
       if (op.type === "longRest") {
         const data = eventData as Record<string, unknown>;
-        beforeState.spellcasting = data.beforeSpellState;
-        afterState.spellcasting = { slotsUsed: {} };
+        const beforeSpell = data.beforeSpellState as Record<string, unknown>;
+        beforeState.spellcasting = beforeSpell;
+        // Reflect the cleared state, preserving the known-spell list + arcanum keys.
+        afterState.spellcasting = { slotsUsed: {}, arcanumUsed: {}, spells: beforeSpell?.spells ?? [] };
         delete data.beforeSpellState; // don't duplicate in eventData
         if (data.beforeResourceState !== undefined) {
           beforeState.resources = data.beforeResourceState;
@@ -562,6 +600,17 @@ export async function applyHitPointOperations(
         if (data.beforeResourceState !== undefined) {
           beforeState.resources = data.beforeResourceState;
           delete data.beforeResourceState;
+        }
+        // Warlock Pact slot restore (present only when the rester is a Warlock).
+        if (data.beforeSpellState !== undefined) {
+          const beforeSpell = data.beforeSpellState as Record<string, unknown>;
+          beforeState.spellcasting = beforeSpell;
+          afterState.spellcasting = {
+            slotsUsed: {},
+            arcanumUsed: beforeSpell?.arcanumUsed ?? {},
+            spells: beforeSpell?.spells ?? [],
+          };
+          delete data.beforeSpellState;
         }
       }
 
