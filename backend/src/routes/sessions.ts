@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import { prisma } from "../lib/prisma.js";
-import { startSession, endSession, getActiveSession, logCombatEvent, SessionError, CombatError } from "../lib/sessions.js";
+import { startSession, endSession, getActiveSession, logCombatEvent, logRollEvent, SessionError, CombatError } from "../lib/sessions.js";
 import { serializeCharacter, characterInclude } from "./characters.js";
 
 export const sessionsRouter = Router();
@@ -224,6 +224,56 @@ sessionsRouter.post("/characters/:id/sessions/:sessionId/combat/round", async (r
   }
   try {
     await logCombatEvent(character.id, req.params.sessionId, "combatRoundAdvanced", { round });
+    res.status(201).json({ ok: true });
+  } catch (err) {
+    if (err instanceof CombatError) {
+      const status = err.message.includes("not found") ? 404 : 409;
+      res.status(status).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
+});
+
+// ── Roll event route ─────────────────────────────────────────────────────────
+//
+// POST /…/sessions/:sessionId/roll — log a single attack or damage roll from
+// the session UI. The client computes the dice total; the backend formats the
+// summary and persists the event tagged with the active session.
+
+sessionsRouter.post("/characters/:id/sessions/:sessionId/roll", async (req, res) => {
+  const character = await resolveCombatCharacter(req.params.id, res);
+  if (!character) return;
+
+  const { kind, source, total, specLabel, damageType } = req.body as {
+    kind?: unknown;
+    source?: unknown;
+    total?: unknown;
+    specLabel?: unknown;
+    damageType?: unknown;
+  };
+
+  if (kind !== "attack" && kind !== "damage") {
+    res.status(400).json({ error: "kind must be 'attack' or 'damage'" });
+    return;
+  }
+  if (typeof source !== "string" || source.trim() === "") {
+    res.status(400).json({ error: "source must be a non-empty string" });
+    return;
+  }
+  if (typeof total !== "number") {
+    res.status(400).json({ error: "total must be a number" });
+    return;
+  }
+
+  try {
+    await logRollEvent(character.id, req.params.sessionId, {
+      kind,
+      source,
+      total,
+      specLabel: typeof specLabel === "string" ? specLabel : undefined,
+      damageType: typeof damageType === "string" ? damageType : undefined,
+    });
     res.status(201).json({ ok: true });
   } catch (err) {
     if (err instanceof CombatError) {

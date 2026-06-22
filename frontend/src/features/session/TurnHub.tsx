@@ -519,8 +519,8 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     try {
       await startCombat(character.id, sessionId);
       onLogChanged();
-    } catch {
-      // Silently swallow — local state is already updated.
+    } catch (e) {
+      console.error("combat log failed (startCombat)", e);
     }
   }
 
@@ -533,8 +533,8 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     try {
       await endCombat(character.id, sessionId);
       onLogChanged();
-    } catch {
-      // Silently swallow — local state is already updated.
+    } catch (e) {
+      console.error("combat log failed (endCombat)", e);
     }
   }
 
@@ -693,8 +693,8 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
               try {
                 await advanceCombatRound(character.id, sessionId, nextRound);
                 onLogChanged();
-              } catch {
-                // Silently swallow — turn already ended locally.
+              } catch (e) {
+                console.error("combat log failed (advanceCombatRound)", e);
               }
             }
           }}
@@ -873,6 +873,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
             <InlineAttackPicker
               character={character}
               turnState={turnState}
+              sessionId={sessionId}
               onClose={() => {
                 finishAttack();
                 closeResolution();
@@ -883,6 +884,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
                 setShowActionMenu(true);
               }}
               onUpdate={onUpdate}
+              onLogChanged={onLogChanged}
             />
           </div>
         )}
@@ -930,8 +932,10 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
               </p>
               <InlineSpellPicker
                 character={character}
+                sessionId={sessionId}
                 onUpdate={onUpdate}
                 onClose={closeResolution}
+                onLogChanged={onLogChanged}
                 slot={spellSlot}
                 slotAvailable={slotAvailable}
                 onCommitSlot={onCommitSlot}

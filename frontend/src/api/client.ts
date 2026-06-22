@@ -455,3 +455,29 @@ export async function advanceCombatRound(
     throw new Error(body?.error ?? `Failed to advance combat round (${response.status})`);
   }
 }
+
+/** Log a single attack or damage roll from the session UI. Best-effort — callers catch and console.error. */
+export async function logRoll(
+  characterId: string,
+  sessionId: string,
+  payload: {
+    kind: "attack" | "damage";
+    source: string;
+    total: number;
+    specLabel?: string;
+    damageType?: string;
+  },
+): Promise<void> {
+  const response = await fetch(
+    `${API_URL}/characters/${characterId}/sessions/${sessionId}/roll`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to log roll (${response.status})`);
+  }
+}

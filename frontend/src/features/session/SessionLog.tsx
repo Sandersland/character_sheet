@@ -61,6 +61,8 @@ const TYPE_LABEL: Partial<Record<string, string>> = {
   combatStarted: "combat",
   combatEnded: "combat end",
   combatRoundAdvanced: "round",
+  attackRoll: "attack",
+  damageRoll: "damage",
   revert: "undo",
 };
 
@@ -107,16 +109,38 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
     );
   }
 
+  // Build a round-per-event map by walking events oldest-first (list arrives newest-first).
+  // Combat markers (combatStarted/combatRoundAdvanced/combatEnded) anchor the round counter;
+  // all other events that fall inside a combat block get tagged with the current round.
+  const roundById = new Map<string, number>();
+  let currentRound: number | null = null;
+  for (const e of [...activeEvents].reverse()) {
+    if (e.type === "combatStarted") {
+      currentRound = 1;
+    } else if (e.type === "combatRoundAdvanced") {
+      const dataRound = (e.data as { round?: number } | undefined)?.round;
+      currentRound = dataRound ?? (currentRound !== null ? currentRound + 1 : 2);
+    } else if (e.type === "combatEnded") {
+      currentRound = null;
+    } else if (currentRound !== null) {
+      roundById.set(e.id, currentRound);
+    }
+  }
+
   return (
     <ul className="flex flex-col gap-2">
       {activeEvents.map((event) => {
         const tone = CATEGORY_TONE[event.category] ?? "neutral";
         const label = TYPE_LABEL[event.type] ?? event.type;
+        const round = roundById.get(event.id);
         return (
           <li
             key={event.id}
             className="flex flex-wrap items-center gap-2 py-1 text-sm"
           >
+            {round !== undefined && (
+              <Badge tone="neutral">R{round}</Badge>
+            )}
             <Badge tone={tone}>{label}</Badge>
             <span className="text-parchment-800">{event.summary}</span>
           </li>

@@ -324,6 +324,7 @@ export type CharacterEventType =
   | "learnManeuver" | "forgetManeuver" | "maneuversReconciled" // resources (cont.)
   | "learnToolProficiency" | "forgetToolProficiency" | "toolProficienciesReconciled" // resources
   | "combatStarted" | "combatEnded" | "combatRoundAdvanced"   // combat lifecycle
+  | "attackRoll" | "damageRoll"                               // combat rolls
   | "revert";                                                  // meta
 
 export interface CharacterEventField {

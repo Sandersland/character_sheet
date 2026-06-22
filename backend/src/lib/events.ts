@@ -71,6 +71,9 @@ export type EventType =
   | "combatStarted"
   | "combatEnded"
   | "combatRoundAdvanced"
+  // roll events (attack/damage logged from session UI)
+  | "attackRoll"
+  | "damageRoll"
   // meta
   | "revert";
 
