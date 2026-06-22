@@ -56,6 +56,7 @@ export const characterInclude = {
     orderBy: { position: "asc" },
     include: { weaponDetail: true, armorDetail: true, consumableDetail: true },
   },
+  journalEntries: { orderBy: { createdAt: "desc" } },
 } satisfies Prisma.CharacterInclude;
 
 type CharacterWithRelations = Prisma.CharacterGetPayload<{ include: typeof characterInclude }>;
@@ -82,9 +83,11 @@ function serializeCharacterSummary(row: {
 }
 
 // Json columns (hitPoints, hitDice, abilityScores, skills, currency,
-// spellcasting, journal) are round-tripped as-is below — they were written
+// spellcasting) are round-tripped as-is below — they were written
 // by our own seed/PATCH/POST path, not external input, so they aren't
 // re-validated against the frontend Character type's nested shapes here.
+// (journal is no longer a Json column — it's the relational JournalEntry
+// table, mutated only via routes/journal.ts and mapped to the wire shape below.)
 // inventory is the exception: it's relational (InventoryItem rows, see
 // schema.prisma), mapped into the same JSON shape the frontend already
 // expects below. weaponDetail/armorDetail/consumableDetail (at most one
@@ -548,7 +551,16 @@ export function serializeCharacter(row: CharacterWithRelations) {
     unarmedStrike,
     improvisedWeapon,
 
-    journal: row.journal,
+    // Journal entries — relational JournalEntry rows (no longer a Json column),
+    // already ordered newest-first by the include. `date` is a real DateTime,
+    // emitted as an ISO string; sessionId is optional provenance.
+    journal: row.journalEntries.map((e) => ({
+      id: e.id,
+      title: e.title,
+      date: e.date.toISOString(),
+      body: e.body,
+      sessionId: e.sessionId ?? undefined,
+    })),
 
     // Structured, multiclass-aware view alongside the flattened
     // class/subclass above — today always a single entry.
@@ -1058,7 +1070,9 @@ const updateCharacterSchema = z
     // POST /characters/:id/spellcasting/transactions instead, so that slot
     // expenditure and spell changes are logged as events (same reasoning as
     // inventory being absent from PATCH).
-    journal: z.array(z.unknown()),
+    //
+    // journal is also absent: it's now the relational JournalEntry table,
+    // mutated via the plain-REST routes/journal.ts CRUD endpoints, not PATCH.
   })
   .partial()
   .strict();

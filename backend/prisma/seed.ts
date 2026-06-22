@@ -2492,7 +2492,7 @@ async function main() {
     });
   }
 
-  for (const { race, class: className, subclass, background, inventory, ...character } of SEED_CHARACTERS) {
+  for (const { race, class: className, subclass, background, inventory, journal, ...character } of SEED_CHARACTERS) {
     const raceId = raceIds.get(race);
     const classId = classIds.get(className);
     const backgroundId = backgroundIds.get(background);
@@ -2502,6 +2502,18 @@ async function main() {
       : null;
     const inventoryItems = inventory.map((row, position) =>
       resolveInventoryRow(row, position, catalogByName, itemIdsByName)
+    );
+
+    // Journal is now a relational JournalEntry table (no longer a Json column).
+    // The seed's old `date` values were in-world calendar strings ("Hammer 12");
+    // `date` is a real DateTime now, so derive a deterministic real date per
+    // entry (a few days apart) and keep the in-world flavor text in the body.
+    const journalEntries = ((journal ?? []) as { title: string; date: string; body: string }[]).map(
+      (entry, idx) => ({
+        title: entry.title,
+        date: new Date(Date.UTC(2024, 0, 1 + idx)),
+        body: entry.date ? `${entry.body}\n\n(In-world date: ${entry.date})` : entry.body,
+      }),
     );
 
     await prisma.character.upsert({
@@ -2515,6 +2527,7 @@ async function main() {
         backgroundSelection: { create: { name: background, backgroundId } },
         classEntries: { create: [{ name: className, subclass, subclassId, classId, position: 0 }] },
         inventoryItems: { create: inventoryItems },
+        ...(journalEntries.length > 0 ? { journalEntries: { create: journalEntries } } : {}),
       },
       update: {
         ...character,
@@ -2535,6 +2548,11 @@ async function main() {
         inventoryItems: {
           deleteMany: {},
           create: inventoryItems,
+        },
+        // Journal entries have no natural unique key either — replace wholesale.
+        journalEntries: {
+          deleteMany: {},
+          create: journalEntries,
         },
       },
     });

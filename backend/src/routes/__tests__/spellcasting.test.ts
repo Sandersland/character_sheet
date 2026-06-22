@@ -76,7 +76,6 @@ const FIXTURE_BASE = {
   skills: [],
   toolProficiencies: [],
   currency: { cp: 0, sp: 0, gp: 10, pp: 0 },
-  journal: [],
 };
 
 // Pre-seeded spells in the character's spellbook (compact format).
@@ -520,7 +519,6 @@ const WARLOCK_BASE = {
   skills: [],
   toolProficiencies: [],
   currency: { cp: 0, sp: 0, gp: 10, pp: 0 },
-  journal: [],
 };
 
 // A 5th-level Pact spell and a 6th-level Mystic Arcanum spell in the spellbook.
