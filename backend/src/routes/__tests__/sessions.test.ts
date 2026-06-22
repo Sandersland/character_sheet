@@ -1,0 +1,430 @@
+/**
+ * Session lifecycle + combat + roll-logging route integration tests.
+ * Mirrors spellcasting.test.ts: real Postgres in beforeEach, supertest against
+ * createApp(). Sessions and CharacterEvents cascade-delete with the character,
+ * so afterEach only needs to delete the character row.
+ *
+ * No catalog class is needed — the session routes don't gate on class/level and
+ * serializeCharacter handles missing classEntries gracefully (class: "").
+ */
+
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import supertest from "supertest";
+
+import { createApp } from "../../app.js";
+import { Prisma } from "../../generated/prisma/client.js";
+import { prisma } from "../../lib/prisma.js";
+
+// ── Character fixture ─────────────────────────────────────────────────────────
+
+const FIXTURE_ID = "test-sessions-character-1";
+
+const FIXTURE = {
+  id: FIXTURE_ID,
+  name: "Sessions Test Fighter",
+  alignment: "True Neutral",
+  experiencePoints: 900, // level 3
+  armorClass: 16,
+  initiativeBonus: 2,
+  speed: 30,
+  hitPoints: { current: 28, max: 28, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+  hitDice: { total: 3, die: "d10", spent: 0 },
+  abilityScores: {
+    strength: 16,
+    dexterity: 14,
+    constitution: 14,
+    intelligence: 10,
+    wisdom: 10,
+    charisma: 8,
+  },
+  savingThrowProficiencies: ["strength", "constitution"],
+  skills: [],
+  toolProficiencies: [],
+  currency: { cp: 0, sp: 0, gp: 50, pp: 0 },
+  journal: [],
+};
+
+const app = createApp();
+
+function sessionsUrl(suffix = "") {
+  return `/api/characters/${FIXTURE_ID}/sessions${suffix}`;
+}
+
+beforeEach(async () => {
+  await prisma.character.create({ data: { ...FIXTURE, spellcasting: Prisma.JsonNull } });
+});
+
+afterEach(async () => {
+  // Sessions and CharacterEvents cascade-delete via their characterId FK.
+  await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
+});
+
+// ── Session lifecycle ─────────────────────────────────────────────────────────
+
+describe("POST /api/characters/:id/sessions — start session", () => {
+  it("creates an active session and returns { session, character }", async () => {
+    const res = await supertest(app).post(sessionsUrl()).send({ title: "Battle at Phandalin" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.session.status).toBe("active");
+    expect(res.body.session.title).toBe("Battle at Phandalin");
+    expect(res.body.character).toBeDefined();
+    expect(res.body.character.id).toBe(FIXTURE_ID);
+  });
+
+  it("logs a sessionStarted event", async () => {
+    const res = await supertest(app).post(sessionsUrl()).send({});
+    expect(res.status).toBe(201);
+
+    const event = await prisma.characterEvent.findFirst({
+      where: { characterId: FIXTURE_ID, type: "sessionStarted" },
+    });
+    expect(event).not.toBeNull();
+    expect(event?.category).toBe("session");
+    expect(event?.sessionId).toBe(res.body.session.id);
+  });
+
+  it("409s when a session is already active", async () => {
+    await supertest(app).post(sessionsUrl()).send({});
+    const res = await supertest(app).post(sessionsUrl()).send({});
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/already active/i);
+  });
+
+  it("404s for an unknown character", async () => {
+    const res = await supertest(app)
+      .post("/api/characters/does-not-exist/sessions")
+      .send({});
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe("Character not found");
+  });
+});
+
+describe("POST /api/characters/:id/sessions/:sessionId/end — end session", () => {
+  it("ends the session: status=ended, endedAt set, sessionEnded event logged", async () => {
+    const startRes = await supertest(app).post(sessionsUrl()).send({});
+    const sessionId = startRes.body.session.id as string;
+
+    const endRes = await supertest(app).post(sessionsUrl(`/${sessionId}/end`)).send({});
+
+    expect(endRes.status).toBe(200);
+    expect(endRes.body.session.status).toBe("ended");
+    expect(endRes.body.session.endedAt).not.toBeNull();
+
+    const event = await prisma.characterEvent.findFirst({
+      where: { characterId: FIXTURE_ID, type: "sessionEnded" },
+    });
+    expect(event).not.toBeNull();
+    expect(event?.sessionId).toBe(sessionId);
+  });
+
+  it("409s when ending an already-ended session", async () => {
+    const startRes = await supertest(app).post(sessionsUrl()).send({});
+    const sessionId = startRes.body.session.id as string;
+    await supertest(app).post(sessionsUrl(`/${sessionId}/end`)).send({});
+
+    const res = await supertest(app).post(sessionsUrl(`/${sessionId}/end`)).send({});
+    expect(res.status).toBe(409);
+  });
+
+  it("404s for an unknown sessionId", async () => {
+    const res = await supertest(app)
+      .post(sessionsUrl("/00000000-0000-0000-0000-000000000000/end"))
+      .send({});
+    expect(res.status).toBe(404);
+    expect(res.body.error).toMatch(/not found/i);
+  });
+});
+
+// ── Active-session contract ───────────────────────────────────────────────────
+// Documents the GET /sessions/active behavior that the frontend polls on
+// every character sheet load (see sessions-active-404-console-noise memory).
+
+describe("GET /api/characters/:id/sessions/active", () => {
+  it("returns the active session when one exists", async () => {
+    const startRes = await supertest(app).post(sessionsUrl()).send({ title: "Active" });
+    const sessionId = startRes.body.session.id as string;
+
+    const res = await supertest(app).get(sessionsUrl("/active"));
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(sessionId);
+    expect(res.body.status).toBe("active");
+  });
+
+  it("404s with 'No active session' when none is active", async () => {
+    const res = await supertest(app).get(sessionsUrl("/active"));
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe("No active session");
+  });
+});
+
+// ── Session detail + events ───────────────────────────────────────────────────
+
+describe("GET /api/characters/:id/sessions/:sessionId", () => {
+  it("returns session fields plus events array", async () => {
+    const startRes = await supertest(app).post(sessionsUrl()).send({ title: "Detail Test" });
+    const sessionId = startRes.body.session.id as string;
+
+    const res = await supertest(app).get(sessionsUrl(`/${sessionId}`));
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(sessionId);
+    expect(res.body.status).toBe("active");
+    expect(Array.isArray(res.body.events)).toBe(true);
+    // The sessionStarted event was logged.
+    expect(res.body.events.some((e: { type: string }) => e.type === "sessionStarted")).toBe(true);
+  });
+
+  it("404s for an unknown sessionId", async () => {
+    const res = await supertest(app).get(sessionsUrl("/00000000-0000-0000-0000-000000000000"));
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe("Session not found");
+  });
+});
+
+// ── Combat lifecycle ──────────────────────────────────────────────────────────
+
+describe("combat lifecycle routes", () => {
+  // Helper: start a session and return its ID.
+  async function startSession(): Promise<string> {
+    const res = await supertest(app).post(sessionsUrl()).send({});
+    expect(res.status).toBe(201);
+    return res.body.session.id as string;
+  }
+
+  it("combat/start logs a combatStarted event", async () => {
+    const sessionId = await startSession();
+
+    const res = await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/combat/start`))
+      .send({});
+    expect(res.status).toBe(201);
+    expect(res.body.ok).toBe(true);
+
+    const event = await prisma.characterEvent.findFirst({
+      where: { characterId: FIXTURE_ID, type: "combatStarted" },
+    });
+    expect(event).not.toBeNull();
+    expect(event?.category).toBe("combat");
+    expect(event?.sessionId).toBe(sessionId);
+  });
+
+  it("combat/round logs a combatRoundAdvanced event with correct round data", async () => {
+    const sessionId = await startSession();
+
+    const res = await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/combat/round`))
+      .send({ round: 2 });
+    expect(res.status).toBe(201);
+
+    const event = await prisma.characterEvent.findFirst({
+      where: { characterId: FIXTURE_ID, type: "combatRoundAdvanced" },
+    });
+    expect(event).not.toBeNull();
+    expect((event?.data as { round: number } | null)?.round).toBe(2);
+  });
+
+  it("combat/round increments: second advance carries new round number", async () => {
+    const sessionId = await startSession();
+
+    await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/combat/round`))
+      .send({ round: 2 });
+    await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/combat/round`))
+      .send({ round: 3 });
+
+    const events = await prisma.characterEvent.findMany({
+      where: { characterId: FIXTURE_ID, type: "combatRoundAdvanced" },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(events).toHaveLength(2);
+    expect((events[0].data as { round: number })?.round).toBe(2);
+    expect((events[1].data as { round: number })?.round).toBe(3);
+  });
+
+  it("combat/round 400s on invalid round (0)", async () => {
+    const sessionId = await startSession();
+    const res = await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/combat/round`))
+      .send({ round: 0 });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("round must be a positive integer");
+  });
+
+  it("combat/round 400s when round is not a number", async () => {
+    const sessionId = await startSession();
+    const res = await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/combat/round`))
+      .send({ round: "two" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("round must be a positive integer");
+  });
+
+  it("combat/round does not mutate character state", async () => {
+    const sessionId = await startSession();
+
+    const before = await prisma.character.findUniqueOrThrow({
+      where: { id: FIXTURE_ID },
+      select: { hitPoints: true, experiencePoints: true },
+    });
+
+    await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/combat/round`))
+      .send({ round: 2 });
+
+    const after = await prisma.character.findUniqueOrThrow({
+      where: { id: FIXTURE_ID },
+      select: { hitPoints: true, experiencePoints: true },
+    });
+
+    expect(after.hitPoints).toEqual(before.hitPoints);
+    expect(after.experiencePoints).toBe(before.experiencePoints);
+  });
+
+  it("combat/end logs a combatEnded event", async () => {
+    const sessionId = await startSession();
+    await supertest(app).post(sessionsUrl(`/${sessionId}/combat/start`)).send({});
+
+    const res = await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/combat/end`))
+      .send({});
+    expect(res.status).toBe(201);
+
+    const event = await prisma.characterEvent.findFirst({
+      where: { characterId: FIXTURE_ID, type: "combatEnded" },
+    });
+    expect(event).not.toBeNull();
+  });
+
+  // ── Error contract for combat routes ───────────────────────────────────────
+  // Note the asymmetry: a truly missing session → 404;
+  // an ended (inactive) session → 409 (message "is not active", no "not found").
+
+  it("combat/start 404s for a missing sessionId", async () => {
+    const res = await supertest(app)
+      .post(sessionsUrl("/00000000-0000-0000-0000-000000000000/combat/start"))
+      .send({});
+    expect(res.status).toBe(404);
+  });
+
+  it("combat/start 409s for an ended session (not 404)", async () => {
+    const sessionId = await startSession();
+    await supertest(app).post(sessionsUrl(`/${sessionId}/end`)).send({});
+
+    const res = await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/combat/start`))
+      .send({});
+    // Session exists but is not active → CombatError("is not active") → 409.
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/not active/i);
+  });
+});
+
+// ── Roll logging ──────────────────────────────────────────────────────────────
+
+describe("POST /…/sessions/:sessionId/roll", () => {
+  async function startSession(): Promise<string> {
+    const res = await supertest(app).post(sessionsUrl()).send({});
+    return res.body.session.id as string;
+  }
+
+  it("logs an attackRoll event with correct data", async () => {
+    const sessionId = await startSession();
+
+    const res = await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/roll`))
+      .send({ kind: "attack", source: "Longsword", total: 17, specLabel: "1d20+5" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.ok).toBe(true);
+
+    const event = await prisma.characterEvent.findFirst({
+      where: { characterId: FIXTURE_ID, type: "attackRoll" },
+    });
+    expect(event).not.toBeNull();
+    expect(event?.category).toBe("combat");
+    expect(event?.sessionId).toBe(sessionId);
+    expect((event?.data as { total: number; kind: string } | null)?.total).toBe(17);
+    expect((event?.data as { total: number; kind: string } | null)?.kind).toBe("attack");
+  });
+
+  it("logs a damageRoll event with damageType", async () => {
+    const sessionId = await startSession();
+
+    await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/roll`))
+      .send({ kind: "damage", source: "Longsword", total: 9, damageType: "slashing" });
+
+    const event = await prisma.characterEvent.findFirst({
+      where: { characterId: FIXTURE_ID, type: "damageRoll" },
+    });
+    expect(event).not.toBeNull();
+    const data = event?.data as { damageType: string } | null;
+    expect(data?.damageType).toBe("slashing");
+  });
+
+  it("400s for an invalid kind", async () => {
+    const sessionId = await startSession();
+    const res = await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/roll`))
+      .send({ kind: "crit", source: "Axe", total: 10 });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/kind/);
+  });
+
+  it("400s for an empty source", async () => {
+    const sessionId = await startSession();
+    const res = await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/roll`))
+      .send({ kind: "attack", source: "  ", total: 12 });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/source/);
+  });
+
+  it("400s when total is not a number", async () => {
+    const sessionId = await startSession();
+    const res = await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/roll`))
+      .send({ kind: "damage", source: "Sword", total: "high" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/total/);
+  });
+});
+
+// ── sessionId threading ───────────────────────────────────────────────────────
+// A mutation made while a session is active should tag its CharacterEvent
+// with the active sessionId.
+
+describe("sessionId threading", () => {
+  it("HP damage event carries the active sessionId", async () => {
+    const startRes = await supertest(app).post(sessionsUrl()).send({});
+    const sessionId = startRes.body.session.id as string;
+
+    // Perform an HP mutation via the hitpoints domain endpoint.
+    const hpRes = await supertest(app)
+      .post(`/api/characters/${FIXTURE_ID}/hp`)
+      .send({ operations: [{ type: "damage", amount: 5 }] });
+    expect(hpRes.status).toBe(200);
+
+    // The damage CharacterEvent should be tagged with the active sessionId.
+    const event = await prisma.characterEvent.findFirst({
+      where: { characterId: FIXTURE_ID, type: "damage" },
+    });
+    expect(event).not.toBeNull();
+    expect(event?.sessionId).toBe(sessionId);
+  });
+
+  it("HP damage event has no sessionId when no session is active", async () => {
+    const hpRes = await supertest(app)
+      .post(`/api/characters/${FIXTURE_ID}/hp`)
+      .send({ operations: [{ type: "damage", amount: 5 }] });
+    expect(hpRes.status).toBe(200);
+
+    const event = await prisma.characterEvent.findFirst({
+      where: { characterId: FIXTURE_ID, type: "damage" },
+    });
+    expect(event).not.toBeNull();
+    expect(event?.sessionId).toBeNull();
+  });
+});
