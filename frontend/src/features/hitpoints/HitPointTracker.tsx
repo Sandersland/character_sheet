@@ -264,7 +264,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
                   type="button"
                   disabled={pending}
                   onClick={handleDeathSaveRoll}
-                  className="rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
+                  className="rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:cursor-not-allowed disabled:bg-parchment-200 disabled:text-parchment-400 disabled:hover:bg-parchment-200"
                 >
                   Roll death save (d20)
                 </button>
@@ -302,7 +302,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
                 type="button"
                 disabled={pending || !damageValue}
                 onClick={handleDamage}
-                className="rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
+                className="rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:cursor-not-allowed disabled:bg-parchment-200 disabled:text-parchment-400 disabled:hover:bg-parchment-200"
               >
                 Apply
               </button>
@@ -328,7 +328,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
                 type="button"
                 disabled={pending || !healValue}
                 onClick={handleHeal}
-                className="rounded-control bg-arcane-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-arcane-800 disabled:opacity-50"
+                className="rounded-control bg-arcane-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-arcane-800 disabled:cursor-not-allowed disabled:bg-parchment-200 disabled:text-parchment-400 disabled:hover:bg-parchment-200"
               >
                 Heal
               </button>
@@ -354,7 +354,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
                 type="button"
                 disabled={pending || !tempValue}
                 onClick={handleSetTemp}
-                className="rounded-control bg-gold-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-gold-800 disabled:opacity-50"
+                className="rounded-control bg-gold-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-gold-800 disabled:cursor-not-allowed disabled:bg-parchment-200 disabled:text-parchment-400 disabled:hover:bg-parchment-200"
               >
                 Set
               </button>
@@ -417,7 +417,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
               type="button"
               disabled={pending}
               onClick={() => setLevelUpOpen(true)}
-              className="rounded-control bg-gold-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-gold-800 disabled:opacity-50"
+              className="rounded-control bg-gold-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-gold-800 disabled:cursor-not-allowed disabled:bg-parchment-200 disabled:text-parchment-400 disabled:hover:bg-parchment-200"
             >
               Level up
             </button>
