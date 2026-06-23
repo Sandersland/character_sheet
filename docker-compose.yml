@@ -12,6 +12,7 @@ services:
 
   pgadmin:
     image: dpage/pgadmin4:latest
+    profiles: ["tools"]          # opt-in: `docker compose --profile tools up pgadmin`
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}

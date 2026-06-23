@@ -8,9 +8,11 @@ docker compose up --build
 
 # Services:
 #   Postgres      localhost:5432
-#   pgAdmin       localhost:5050
 #   Backend API   localhost:4000/api
 #   Frontend      localhost:5173
+
+# pgAdmin is opt-in (behind the `tools` profile):
+docker compose --profile tools up pgadmin   # localhost:5050
 ```
 
 On every container start, the backend runs `prisma generate && prisma migrate deploy && prisma db seed` before starting `tsx watch`. All three are idempotent (migrate deploy no-ops if already applied; seed uses upserts). Three sample characters (a Fighter, a Cleric, and a Wizard) land automatically.
@@ -70,6 +72,33 @@ npx prisma db seed
 ```
 
 `schema.prisma` lives at `backend/prisma/schema.prisma`. The `prisma.config.ts` at the backend root tells the CLI where to find it.
+
+## Parallel worktrees (build several features at once)
+
+`scripts/worktree.sh` runs an **isolated, fully-dockerized stack per git worktree** so multiple branches can run and be tested at the same time. Each worktree gets a port "slot" (1–9; slot 0 = this main checkout on default ports). Everything is derived from the slot:
+
+| Var (slot N) | Formula | Slot 1 |
+|---|---|---|
+| `COMPOSE_PROJECT_NAME` | `cs-<sanitized-branch>` | `cs-spell-upcasting` |
+| `BACKEND_PORT` | `4000 + N*10` | `4010` |
+| `FRONTEND_PORT` | `5173 + N*10` | `5183` |
+| `POSTGRES_PORT` | `5432 + N*10` | `5442` |
+| `VITE_API_URL` | `http://localhost:${BACKEND_PORT}/api` | `…:4010/api` |
+
+A distinct `COMPOSE_PROJECT_NAME` gives each worktree its **own** `postgres_data`/`node_modules` volumes — so a migration in one worktree is invisible to the others. The slot↔branch map persists in `.claude/worktrees/registry.json` (gitignored); the per-worktree `.env` is generated, never committed.
+
+```bash
+./scripts/worktree.sh create <branch> --up   # worktree under .claude/worktrees/<branch>, assign slot, build & start
+./scripts/worktree.sh ls                      # table: branch | slot | URLs | running status
+./scripts/worktree.sh up|down <branch>        # start / stop (down keeps the DB volume)
+./scripts/worktree.sh rm <branch>             # down -v + remove worktree + free the slot
+docker compose ls                             # all running stacks across worktrees, built-in
+docker compose -p cs-<branch> logs -f         # tail one worktree's stack
+```
+
+To work inside a worktree, `cd .claude/worktrees/<branch>` (a normal checkout on its own branch + ports) and run commands there, or open a separate `claude` session in that directory. There is also a `worktree` skill that wraps this.
+
+> **pgAdmin is opt-in.** It now sits behind the `tools` Compose profile, so neither the main stack nor worktrees start it by default. To inspect a DB visually: `docker compose --profile tools up pgadmin` (main checkout → port 5050; a worktree → `5050 + slot*10`).
 
 ## How to add a new domain / feature
 
