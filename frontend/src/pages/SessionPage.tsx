@@ -33,7 +33,8 @@ import { useTurnState } from "@/features/session/useTurnState";
 import { clearTurnState } from "@/features/session/turnStatePersistence";
 import SessionLog from "@/features/session/SessionLog";
 import SessionSummaryModal from "@/features/session/SessionSummaryModal";
-import { endSession, fetchActiveSession } from "@/api/client";
+import EndSessionPrompt from "@/features/session/EndSessionPrompt";
+import { applyExperienceOperations, endSession, fetchActiveSession } from "@/api/client";
 import type { Character, Session, ReferenceData } from "@/types/character";
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -124,6 +125,8 @@ interface SessionContentProps {
 function SessionContent({ character, session, reference, setCharacter, navigate }: SessionContentProps) {
   const [activeTab, setActiveTab] = useState("inventory");
   const [endPending, setEndPending] = useState(false);
+  // Whether the End Session confirm prompt (with optional XP input) is open.
+  const [endPromptOpen, setEndPromptOpen] = useState(false);
   // After ending, hold the ended session (with its computed summary) so we can
   // show the recap modal before navigating back to the sheet.
   const [endedSession, setEndedSession] = useState<Session | null>(null);
@@ -139,14 +142,21 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
     setLogRefresh((n) => n + 1);
   }
 
-  async function handleEndSession() {
+  // Confirm handler from the End Session prompt. KEY ORDERING: XP must be
+  // awarded while the session is still active (so it's auto-tagged with this
+  // sessionId and flows into the recap's xpGained) BEFORE we end the session.
+  async function handleConfirmEnd(xpAmount: number) {
     if (!session) return;
     setEndPending(true);
     try {
+      if (xpAmount > 0) {
+        await applyExperienceOperations(character.id, [{ type: "award", amount: xpAmount }]);
+      }
       // Clear persisted turn state — the session is over either way.
       clearTurnState(session.id);
       const { session: ended } = await endSession(character.id, session.id);
       // Show the recap modal; navigation happens when the modal is dismissed.
+      setEndPromptOpen(false);
       setEndedSession(ended);
     } finally {
       setEndPending(false);
@@ -182,7 +192,7 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
             <button
               type="button"
               disabled={endPending}
-              onClick={handleEndSession}
+              onClick={() => setEndPromptOpen(true)}
               className="rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100 disabled:opacity-50"
             >
               End Session
@@ -288,8 +298,17 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
 
       </main>
 
+      {endPromptOpen && !endedSession && (
+        <EndSessionPrompt
+          busy={endPending}
+          onConfirm={handleConfirmEnd}
+          onCancel={() => setEndPromptOpen(false)}
+        />
+      )}
+
       {endedSession && (
         <SessionSummaryModal
+          characterId={character.id}
           session={endedSession}
           onClose={() => navigate(`/characters/${character.id}`)}
         />

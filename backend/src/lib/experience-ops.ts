@@ -7,6 +7,7 @@ import { reconcileLevelGatedState } from "./level-reconciliation.js";
 import { prisma } from "./prisma.js";
 import { fixedAverageForDie, normalizeHitDice, normalizeHitPoints } from "./hitpoints.js";
 import { abilityModifier, hitDieFace } from "./srd.js";
+import { computeSessionSummary } from "./session-summary.js";
 import { getActiveSessionId } from "./sessions.js";
 
 export class InvalidExperienceOperationError extends Error {}
@@ -130,13 +131,38 @@ async function revertLevelUps(
  * derived level below the number of HP level-ups already applied
  * (hitDice.total), auto-reverses those HP gains in the same transaction —
  * fixing the stranded-HP bug described in the plan.
+ *
+ * `explicitSessionId` (optional) tags the resulting events to a SPECIFIC
+ * session instead of the currently-active one. This powers the retroactive
+ * "add XP to a past (ended) session" flow: when supplied, the targeted
+ * session's stored `Session.summary` is recomputed + re-persisted in the same
+ * transaction so its `xpGained` reflects the new award immediately. The session
+ * must belong to the character (validated before any mutation).
  */
 export async function applyExperienceOperations(
   characterId: string,
-  operations: ExperienceOperation[]
+  operations: ExperienceOperation[],
+  explicitSessionId?: string,
 ): Promise<void> {
   const batchId = randomUUID();
-  const sessionId = await getActiveSessionId(characterId);
+
+  // When an explicit session is targeted, validate ownership and use it for
+  // event tagging; otherwise fall back to the auto-detected active session.
+  let sessionId: string | null;
+  if (explicitSessionId) {
+    const target = await prisma.session.findUnique({
+      where: { id: explicitSessionId },
+      select: { id: true, characterId: true },
+    });
+    if (!target || target.characterId !== characterId) {
+      throw new InvalidExperienceOperationError(
+        `Session not found: ${explicitSessionId}`,
+      );
+    }
+    sessionId = explicitSessionId;
+  } else {
+    sessionId = await getActiveSessionId(characterId);
+  }
 
   await prisma.$transaction(async (tx) => {
     for (const op of operations) {
@@ -206,6 +232,33 @@ export async function applyExperienceOperations(
       // who gained a subclass via XP alone (no HP level-ups applied yet) and
       // self-heals those already in an invalid state on their next XP op.
       await reconcileLevelGatedState({ tx, characterId, newDerivedLevel, batchId });
+    }
+
+    // Retroactive path: when XP was tagged to a SPECIFIC (already-ended) session
+    // via an explicit override, recompute + re-persist that session's stored
+    // summary so its `xpGained` reflects the new award. Mirrors endSession's
+    // compute-and-persist (sessions.ts). Skipped for the active-session/default
+    // path — the active session's summary is computed once at endSession.
+    if (explicitSessionId) {
+      const session = await tx.session.findUnique({
+        where: { id: explicitSessionId },
+        select: { startedAt: true, endedAt: true },
+      });
+      if (session) {
+        const events = await tx.characterEvent.findMany({
+          where: { sessionId: explicitSessionId, type: { not: "sessionEnded" } },
+          select: { type: true, reverted: true, before: true, after: true, data: true },
+          orderBy: { createdAt: "asc" },
+        });
+        const summary = computeSessionSummary(events, {
+          startedAt: session.startedAt,
+          endedAt: session.endedAt ?? new Date(),
+        });
+        await tx.session.update({
+          where: { id: explicitSessionId },
+          data: { summary: summary as unknown as Prisma.InputJsonValue },
+        });
+      }
     }
   });
 }

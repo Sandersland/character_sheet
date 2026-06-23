@@ -106,8 +106,16 @@ export async function endSession(
     endedAt,
   });
 
-  return prisma.$transaction(async (tx) => {
-    const updated = await tx.session.update({
+  // The session's journal entries (linked by JournalEntry.sessionId), surfaced
+  // in the end-of-session recap. Read outside the transaction — they aren't
+  // mutated here, only attached to the returned payload.
+  const journalEntries = await prisma.journalEntry.findMany({
+    where: { sessionId: session.id },
+    orderBy: { date: "desc" },
+  });
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const row = await tx.session.update({
       where: { id: sessionId },
       data: {
         status: "ended",
@@ -125,8 +133,10 @@ export async function endSession(
       sessionId,
     });
 
-    return updated;
+    return row;
   });
+
+  return { ...updated, journalEntries };
 }
 
 // ── Combat event logging ───────────────────────────────────────────────────────

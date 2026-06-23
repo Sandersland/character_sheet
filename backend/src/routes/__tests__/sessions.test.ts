@@ -474,3 +474,156 @@ describe("sessionId threading", () => {
     expect(event?.sessionId).toBeNull();
   });
 });
+
+// ── Session journals in the recap (issue #45 part C) ──────────────────────────
+
+describe("session journals returned with the ended session", () => {
+  it("end response and GET include journalEntries linked by sessionId", async () => {
+    const startRes = await supertest(app).post(sessionsUrl()).send({});
+    const sessionId = startRes.body.session.id as string;
+
+    // Write a journal entry tagged to this session (and one that isn't).
+    const tagged = await prisma.journalEntry.create({
+      data: {
+        characterId: FIXTURE_ID,
+        sessionId,
+        title: "The Sunken Library",
+        date: new Date("2026-06-22T00:00:00.000Z"),
+        body: "We found a hidden door.",
+      },
+    });
+    await prisma.journalEntry.create({
+      data: {
+        characterId: FIXTURE_ID,
+        sessionId: null,
+        title: "Unrelated note",
+        date: new Date("2026-06-21T00:00:00.000Z"),
+        body: "Not part of any session.",
+      },
+    });
+
+    const endRes = await supertest(app).post(sessionsUrl(`/${sessionId}/end`)).send({});
+    expect(endRes.status).toBe(200);
+    expect(Array.isArray(endRes.body.session.journalEntries)).toBe(true);
+    expect(endRes.body.session.journalEntries).toHaveLength(1);
+    expect(endRes.body.session.journalEntries[0].id).toBe(tagged.id);
+    expect(endRes.body.session.journalEntries[0].title).toBe("The Sunken Library");
+
+    // GET the session detail — also carries journalEntries.
+    const getRes = await supertest(app).get(sessionsUrl(`/${sessionId}`));
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.journalEntries).toHaveLength(1);
+    expect(getRes.body.journalEntries[0].id).toBe(tagged.id);
+  });
+});
+
+// ── XP at end + retroactive XP to a past session (issue #45 parts A & B) ──────
+
+describe("XP awarded during a session shows in summary.xpGained", () => {
+  it("award before end flows into the recap", async () => {
+    const startRes = await supertest(app).post(sessionsUrl()).send({});
+    const sessionId = startRes.body.session.id as string;
+
+    // Award while active → auto-tagged with this sessionId.
+    await supertest(app)
+      .post(`/api/characters/${FIXTURE_ID}/experience`)
+      .send({ operations: [{ type: "award", amount: 300 }] });
+
+    const endRes = await supertest(app).post(sessionsUrl(`/${sessionId}/end`)).send({});
+    expect(endRes.status).toBe(200);
+    expect(endRes.body.session.summary.xpGained).toBe(300);
+  });
+});
+
+describe("retroactive XP to a past (ended) session", () => {
+  it("tags the award to the explicit sessionId, recomputes that session's summary, and is audited", async () => {
+    // Start and immediately end a session — no XP yet.
+    const startRes = await supertest(app).post(sessionsUrl()).send({});
+    const sessionId = startRes.body.session.id as string;
+    const endRes = await supertest(app).post(sessionsUrl(`/${sessionId}/end`)).send({});
+    expect(endRes.body.session.summary.xpGained).toBe(0);
+
+    // Retroactively award XP to the now-ended session via the explicit override.
+    const awardRes = await supertest(app)
+      .post(`/api/characters/${FIXTURE_ID}/experience`)
+      .send({ operations: [{ type: "award", amount: 750 }], sessionId });
+    expect(awardRes.status).toBe(200);
+    // The serialized character reflects the new total XP.
+    expect(awardRes.body.experiencePoints).toBe(FIXTURE.experiencePoints + 750);
+
+    // The xpAward event is tagged with the past session and audited (before/after).
+    const event = await prisma.characterEvent.findFirst({
+      where: { characterId: FIXTURE_ID, type: "xpAward" },
+    });
+    expect(event?.sessionId).toBe(sessionId);
+    expect((event?.before as { experiencePoints: number }).experiencePoints).toBe(
+      FIXTURE.experiencePoints,
+    );
+    expect((event?.after as { experiencePoints: number }).experiencePoints).toBe(
+      FIXTURE.experiencePoints + 750,
+    );
+
+    // That session's persisted summary now reflects the award.
+    const getRes = await supertest(app).get(sessionsUrl(`/${sessionId}`));
+    expect(getRes.body.summary.xpGained).toBe(750);
+
+    // Events tagged to a COMPLETED session are intentionally frozen — the undo
+    // path (LIFO) excludes them so the recap stays coherent. The retroactive
+    // award is audited but not undoable; mid-session awards (still active) are.
+    const batchId = event?.batchId as string;
+    const undoRes = await supertest(app)
+      .post(`/api/characters/${FIXTURE_ID}/events/${batchId}/revert`)
+      .send({});
+    expect(undoRes.status).toBe(409);
+  });
+
+  it("a mid-session XP award is undoable before the session ends", async () => {
+    const startRes = await supertest(app).post(sessionsUrl()).send({});
+    const sessionId = startRes.body.session.id as string;
+
+    const awardRes = await supertest(app)
+      .post(`/api/characters/${FIXTURE_ID}/experience`)
+      .send({ operations: [{ type: "award", amount: 200 }] });
+    expect(awardRes.status).toBe(200);
+
+    const event = await prisma.characterEvent.findFirst({
+      where: { characterId: FIXTURE_ID, type: "xpAward" },
+    });
+    expect(event?.sessionId).toBe(sessionId);
+    const batchId = event?.batchId as string;
+
+    // Still active → undoable.
+    const undoRes = await supertest(app)
+      .post(`/api/characters/${FIXTURE_ID}/events/${batchId}/revert`)
+      .send({});
+    expect(undoRes.status).toBe(200);
+
+    const character = await prisma.character.findUniqueOrThrow({
+      where: { id: FIXTURE_ID },
+      select: { experiencePoints: true },
+    });
+    expect(character.experiencePoints).toBe(FIXTURE.experiencePoints);
+  });
+
+  it("400s when the sessionId belongs to a different character", async () => {
+    // Create a throwaway character + session it owns.
+    const otherId = "test-sessions-character-other";
+    await prisma.character.create({
+      data: { ...FIXTURE, id: otherId, name: "Other", spellcasting: Prisma.JsonNull },
+    });
+    try {
+      const startRes = await supertest(app)
+        .post(`/api/characters/${otherId}/sessions`)
+        .send({});
+      const otherSessionId = startRes.body.session.id as string;
+
+      const res = await supertest(app)
+        .post(`/api/characters/${FIXTURE_ID}/experience`)
+        .send({ operations: [{ type: "award", amount: 100 }], sessionId: otherSessionId });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/session not found/i);
+    } finally {
+      await prisma.character.deleteMany({ where: { id: otherId } });
+    }
+  });
+});
