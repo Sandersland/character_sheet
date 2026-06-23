@@ -93,9 +93,67 @@ describe("computeSessionSummary", () => {
     const s = summarize([
       { type: "expendSlot", data: { level: 2 } },
       { type: "expendSlot", data: { level: 2 } },
-      { type: "restoreSlot", data: { level: 2 } },
+      // A real slot restore: slotsUsed drops from 2 → 1 in the snapshot.
+      {
+        type: "restoreSlot",
+        data: { level: 2 },
+        before: { spellcasting: { slotsUsed: { "2": 2 }, arcanumUsed: {} } },
+        after: { spellcasting: { slotsUsed: { "2": 1 }, arcanumUsed: {} } },
+      },
     ]);
     expect(s.slotsSpent).toEqual({ "2": 1 });
+  });
+
+  it("does not let a Mystic Arcanum restore decrement slotsSpent", () => {
+    // Warlock 11+: a level-6 Arcanum charge is spent (logged as castSpell at
+    // slotLevel 6), then restored. The restore touches arcanumUsed, not
+    // slotsUsed, so it must NOT net against the slot-spent tally.
+    const s = summarize([
+      { type: "castSpell", data: { spellName: "Eyebite", roll: 18, slotLevel: 6 } },
+      {
+        type: "restoreSlot",
+        data: { level: 6 },
+        before: { spellcasting: { slotsUsed: {}, arcanumUsed: { "6": 1 } } },
+        after: { spellcasting: { slotsUsed: {}, arcanumUsed: { "6": 0 } } },
+      },
+    ]);
+    expect(s.slotsSpent).toEqual({ "6": 1 });
+  });
+
+  it("does not push slotsSpent below zero for an unmatched cross-session restore", () => {
+    // The matching expendSlot happened in a prior session, so there is nothing
+    // to net against in this window. The restore is floored at 0 deliberately
+    // rather than producing a negative/wrong count.
+    const s = summarize([
+      {
+        type: "restoreSlot",
+        data: { level: 1 },
+        before: { spellcasting: { slotsUsed: { "1": 1 }, arcanumUsed: {} } },
+        after: { spellcasting: { slotsUsed: { "1": 0 }, arcanumUsed: {} } },
+      },
+    ]);
+    expect(s.slotsSpent).toEqual({});
+  });
+
+  it("an unmatched restore cancels at most the in-session expends, flooring at 0", () => {
+    const s = summarize([
+      { type: "expendSlot", data: { level: 1 } }, // one spent this session
+      // Two restores: first cancels the in-session expend, second is a
+      // cross-session restore with no in-window match → floored, not negative.
+      {
+        type: "restoreSlot",
+        data: { level: 1 },
+        before: { spellcasting: { slotsUsed: { "1": 2 }, arcanumUsed: {} } },
+        after: { spellcasting: { slotsUsed: { "1": 1 }, arcanumUsed: {} } },
+      },
+      {
+        type: "restoreSlot",
+        data: { level: 1 },
+        before: { spellcasting: { slotsUsed: { "1": 1 }, arcanumUsed: {} } },
+        after: { spellcasting: { slotsUsed: { "1": 0 }, arcanumUsed: {} } },
+      },
+    ]);
+    expect(s.slotsSpent).toEqual({});
   });
 
   it("takes the max combat round and counts attack/damage rolls", () => {
