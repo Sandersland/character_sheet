@@ -752,6 +752,12 @@ export interface Character {
   resources?: CharacterResources;
 
   /**
+   * Active status conditions + exhaustion level. Always present (normalized on
+   * read server-side). Mutate via applyConditionTransactions, never PATCH.
+   */
+  conditions: ConditionsState;
+
+  /**
    * Derived available actions for the current turn — filtered by class/level/
    * resource availability. Lean display objects; see `AvailableAction`.
    * Undefined for characters without a class (shouldn't occur in practice).
@@ -1017,6 +1023,48 @@ export type ResourceOperation =
   | ForgetManeuverOperation
   | LearnToolProficiencyOperation
   | ForgetToolProficiencyOperation;
+
+// ── Conditions state + operation types (mirrors backend/src/lib/conditions.ts)
+// Sent as `{ operations: ConditionOperation[] }` to
+// POST /api/characters/:id/conditions/transactions.
+
+/** The 14 standard 5e status condition keys (mirror of srd.ts ConditionKey). */
+export type ConditionKey =
+  | "blinded"
+  | "charmed"
+  | "deafened"
+  | "frightened"
+  | "grappled"
+  | "incapacitated"
+  | "invisible"
+  | "paralyzed"
+  | "petrified"
+  | "poisoned"
+  | "prone"
+  | "restrained"
+  | "stunned"
+  | "unconscious";
+
+export interface ConditionEntry {
+  key: ConditionKey;
+  /** Optional provenance, e.g. "Hold Person". Null when not supplied. */
+  source?: string | null;
+  appliedAt: string;
+}
+
+export interface ConditionsState {
+  active: ConditionEntry[];
+  /** Exhaustion level, 0–6 (6 = death). Special case, not part of `active`. */
+  exhaustion: number;
+}
+
+export interface ApplyConditionOperation { type: "applyCondition"; key: ConditionKey; source?: string }
+export interface RemoveConditionOperation { type: "removeCondition"; key: ConditionKey }
+export interface SetExhaustionOperation { type: "setExhaustion"; level: number }
+export type ConditionOperation =
+  | ApplyConditionOperation
+  | RemoveConditionOperation
+  | SetExhaustionOperation;
 
 // ── Advancement operation types (mirrors backend/src/lib/advancement.ts) ─────
 // Sent as `{ operations: AdvancementOperation[] }` to

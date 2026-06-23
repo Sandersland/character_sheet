@@ -238,6 +238,16 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
             data: { resources: beforeResources as Prisma.InputJsonValue },
           });
         }
+      } else if (category === "conditions") {
+        // Restore the full conditions JSON (active list + exhaustion level)
+        // from the before snapshot — identical pattern to resources revert.
+        const beforeConditions = before.conditions as Record<string, unknown> | undefined;
+        if (beforeConditions !== undefined) {
+          await tx.character.update({
+            where: { id: character.id },
+            data: { conditions: beforeConditions as Prisma.InputJsonValue },
+          });
+        }
       } else if (category === "class") {
         // Restore subclassId + subclass display name onto the class entry.
         // The before snapshot carries the class entry's data (not the whole

@@ -54,6 +54,11 @@ model Character {
   // Only `used` counts and known lists persist; totals/die-size/recharge are
   // derived at read time by deriveResources() in src/lib/srd.ts.
   resources    Json?
+  // Mutable conditions state: { active: ConditionEntry[], exhaustion: number }.
+  // `active` holds the standard 5e status conditions (prone, poisoned, etc.) by
+  // boolean presence; `exhaustion` is a single 0–6 level (special case). The
+  // canonical condition rules data lives in src/lib/srd.ts (CONDITIONS).
+  conditions   Json?
 
   raceSelection       CharacterRace?
   backgroundSelection CharacterBackground?
@@ -568,7 +573,8 @@ enum CharacterEventCategory {
   advancement  // ability score improvements and feats
   session      // session lifecycle: started / ended
   combat       // combat lifecycle: started / ended / round advanced
-  // future: journal, roll, conditions
+  conditions   // status conditions (prone, poisoned, etc.) + exhaustion level
+  // future: journal, roll
 }
 
 enum CharacterEventType {
@@ -629,6 +635,10 @@ enum CharacterEventType {
   combatStarted
   combatEnded
   combatRoundAdvanced
+  // conditions
+  conditionApplied
+  conditionRemoved
+  exhaustionSet
   // roll events (attack/damage logged from session UI)
   attackRoll
   damageRoll

@@ -37,6 +37,7 @@ import { deriveResources } from "../lib/class-features.js";
 import { deriveActions, type AvailableAction } from "../lib/actions.js";
 import { STARTING_EQUIPMENT } from "../lib/starting-equipment.js";
 import { normalizeResourcesMutable, type ToolProfEntry } from "../lib/resources.js";
+import { normalizeConditionsMutable } from "../lib/conditions.js";
 import { reverseAdvancementEffects } from "../lib/advancement.js";
 import { normalizeSpellcastingMutable } from "../lib/spellcasting.js";
 
@@ -528,6 +529,10 @@ export function serializeCharacter(row: CharacterWithRelations) {
     currency: row.currency,
     spellcasting,
     resources,
+    // Active status conditions + exhaustion level. Normalized on read (unknown
+    // keys dropped, deduped by key, exhaustion clamped 0–6) — mutate via
+    // POST /characters/:id/conditions/transactions, never PATCH.
+    conditions: normalizeConditionsMutable(row.conditions),
 
     // Advancements (ASI + feats) — top-level so every class sees them,
     // independent of whether deriveResources returns a non-null value.
