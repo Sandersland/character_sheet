@@ -6,6 +6,7 @@ import AddItemPanel from "@/features/inventory/AddItemPanel";
 import Card from "@/components/ui/Card";
 import InventoryRow from "@/features/inventory/InventoryRow";
 import LedgerModal from "@/features/inventory/LedgerModal";
+import { carryingCapacity } from "@/lib/encumbrance";
 
 // undefined = closed, null = open unfiltered, {id,name} = open filtered to
 // one row — see LedgerModal's comment for why both views share one modal.
@@ -98,6 +99,9 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
     (sum, item) => sum + (item.weight ?? 0) * item.quantity,
     0
   );
+  // 5e carrying capacity = STR × 15, derive-on-read so it tracks STR changes.
+  const capacity = carryingCapacity(character.abilityScores.strength);
+  const overCapacity = totalWeight > capacity;
 
   async function submitOperations(operations: InventoryOperation[]) {
     setPending(true);
@@ -179,7 +183,14 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
         </ul>
 
         <div className="flex items-center justify-between text-xs text-parchment-600">
-          <span>{totalWeight.toFixed(1)} lb carried</span>
+          <span className={overCapacity ? "font-semibold text-garnet-700" : undefined}>
+            {totalWeight.toFixed(1)} / {capacity} lb
+            {overCapacity && (
+              <span className="ml-2 rounded-control bg-garnet-700 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-parchment-50">
+                Over capacity
+              </span>
+            )}
+          </span>
         </div>
 
         <CurrencyEditor character={character} onUpdate={onUpdate} />
