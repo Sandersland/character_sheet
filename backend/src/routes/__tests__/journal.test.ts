@@ -97,6 +97,21 @@ describe("POST /api/characters/:id/journal — create entry", () => {
     expect(res.status).toBe(404);
     expect(res.body.error).toBe("Character not found");
   });
+
+  it("400s on a tz-offset datetime (only yyyy-mm-dd calendar dates allowed)", async () => {
+    const res = await supertest(app)
+      .post(journalUrl())
+      .send({ title: "Off by one?", date: "2026-06-22T23:00:00-05:00", body: "x" });
+    expect(res.status).toBe(400);
+  });
+
+  it("pins a yyyy-mm-dd date to UTC midnight", async () => {
+    const res = await supertest(app)
+      .post(journalUrl())
+      .send({ title: "Midnight", date: "2026-06-22", body: "x" });
+    expect(res.status).toBe(201);
+    expect(res.body.journal[0].date).toBe("2026-06-22T00:00:00.000Z");
+  });
 });
 
 // ── Update ─────────────────────────────────────────────────────────────────
@@ -179,7 +194,7 @@ describe("DELETE /api/characters/:id/journal/:entryId — delete entry", () => {
 // ── Ordering ─────────────────────────────────────────────────────────────────
 
 describe("journal ordering", () => {
-  it("returns entries newest-first by createdAt", async () => {
+  it("returns entries newest-first by the user-entered date", async () => {
     await supertest(app)
       .post(journalUrl())
       .send({ title: "First", date: "2026-06-20", body: "a" });
@@ -190,5 +205,20 @@ describe("journal ordering", () => {
     const res = await supertest(app).get(`/api/characters/${FIXTURE_ID}`);
     expect(res.status).toBe(200);
     expect(res.body.journal.map((e: { title: string }) => e.title)).toEqual(["Second", "First"]);
+  });
+
+  it("orders by the entered date, not creation order (a back-dated entry sorts by its date)", async () => {
+    // Created first, but with the LATEST date → must sort to the top.
+    await supertest(app)
+      .post(journalUrl())
+      .send({ title: "Future", date: "2026-07-01", body: "written first, dated latest" });
+    // Created second, but back-dated → must sort to the bottom.
+    await supertest(app)
+      .post(journalUrl())
+      .send({ title: "Past", date: "2026-01-01", body: "written second, dated earliest" });
+
+    const res = await supertest(app).get(`/api/characters/${FIXTURE_ID}`);
+    expect(res.status).toBe(200);
+    expect(res.body.journal.map((e: { title: string }) => e.title)).toEqual(["Future", "Past"]);
   });
 });

@@ -53,8 +53,9 @@ export default function JournalSection({ character, onUpdate }: JournalSectionPr
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Render newest-first. The API already orders by createdAt desc, but sort
-  // again defensively so an optimistic re-order can't surprise the view.
+  // Render newest-first by the user-entered date. The API already orders by
+  // date desc, but sort again defensively so an optimistic re-order can't
+  // surprise the view.
   const sortedEntries = [...entries].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   );

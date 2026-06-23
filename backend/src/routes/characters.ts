@@ -56,7 +56,9 @@ export const characterInclude = {
     orderBy: { position: "asc" },
     include: { weaponDetail: true, armorDetail: true, consumableDetail: true },
   },
-  journalEntries: { orderBy: { createdAt: "desc" } },
+  // Newest-first by the user-entered calendar `date`; `createdAt desc` is a
+  // stable tiebreaker so same-date entries stay newest-written-first.
+  journalEntries: { orderBy: [{ date: "desc" }, { createdAt: "desc" }] },
 } satisfies Prisma.CharacterInclude;
 
 type CharacterWithRelations = Prisma.CharacterGetPayload<{ include: typeof characterInclude }>;
@@ -552,8 +554,9 @@ export function serializeCharacter(row: CharacterWithRelations) {
     improvisedWeapon,
 
     // Journal entries — relational JournalEntry rows (no longer a Json column),
-    // already ordered newest-first by the include. `date` is a real DateTime,
-    // emitted as an ISO string; sessionId is optional provenance.
+    // already ordered newest-first by the user-entered `date` via the include.
+    // `date` is a real DateTime, emitted as an ISO string; sessionId is optional
+    // provenance.
     journal: row.journalEntries.map((e) => ({
       id: e.id,
       title: e.title,

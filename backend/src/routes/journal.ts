@@ -14,9 +14,15 @@ import { serializeCharacter, characterInclude } from "./characters.js";
 
 export const journalRouter = Router();
 
-// `date` is a real DateTime — accept an ISO-8601 / date string the client's
-// <input type="date"> produces (e.g. "2026-06-22") and coerce to a Date.
-const dateSchema = z.coerce.date();
+// `date` is a calendar date with no meaningful time-of-day. Accept ONLY the
+// yyyy-mm-dd string the client's <input type="date"> produces and pin it to UTC
+// midnight, so the stored value can never drift a day from what the user picked.
+// (A bare z.coerce.date() would accept tz-offset datetimes like
+// "2026-06-22T23:00:00-05:00" → stored 2026-06-23, displayed a day off.)
+const dateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a YYYY-MM-DD calendar date")
+  .transform((s) => new Date(`${s}T00:00:00.000Z`));
 
 const createJournalSchema = z
   .object({
