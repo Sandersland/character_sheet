@@ -44,6 +44,7 @@ export type EventType =
   | "forgetSpell"
   | "prepareSpell"
   | "unprepareSpell"
+  | "concentrationDropped"
   // class
   | "subclassChosen"
   | "subclassRemoved"

@@ -370,13 +370,16 @@ export async function applyHitPointOperations(
               slotsUsed: { ...srSpellState.slotsUsed },
               arcanumUsed: { ...srSpellState.arcanumUsed },
               spells: srSpellState.spells.map((s) => ({ ...s })),
+              concentratingOn: srSpellState.concentratingOn ? { ...srSpellState.concentratingOn } : null,
             };
             srSlotsRestored = Object.values(srSpellState.slotsUsed).reduce((s, n) => s + n, 0);
             srSpellState.slotsUsed = {};
+            // A short rest does NOT end concentration — preserve it.
             srSpellUpdate.spellcasting = {
               slotsUsed: srSpellState.slotsUsed,
               arcanumUsed: srSpellState.arcanumUsed,
               spells: srSpellState.spells,
+              concentratingOn: srSpellState.concentratingOn,
             } as unknown as Prisma.InputJsonValue;
           }
 
@@ -423,12 +426,15 @@ export async function applyHitPointOperations(
             slotsUsed: { ...spellState.slotsUsed },
             arcanumUsed: { ...spellState.arcanumUsed },
             spells: spellState.spells.map((s) => ({ ...s })),
+            concentratingOn: spellState.concentratingOn ? { ...spellState.concentratingOn } : null,
           };
           const slotsRestored =
             Object.values(spellState.slotsUsed).reduce((s, n) => s + n, 0) +
             Object.values(spellState.arcanumUsed).reduce((s, n) => s + n, 0);
           spellState.slotsUsed = {};
           spellState.arcanumUsed = {};
+          // A long rest ends any active concentration.
+          spellState.concentratingOn = null;
 
           // Reset subclass resources that recharge on a long rest or short-or-long rest.
           const abilityScores = row.abilityScores as Record<string, number>;
@@ -474,6 +480,7 @@ export async function applyHitPointOperations(
                 slotsUsed: spellState.slotsUsed,
                 arcanumUsed: spellState.arcanumUsed,
                 spells: spellState.spells,
+                concentratingOn: null,
               } as unknown as Prisma.InputJsonValue,
               resources: serializeResourcesState(resourceState),
             },
@@ -587,7 +594,7 @@ export async function applyHitPointOperations(
         const beforeSpell = data.beforeSpellState as Record<string, unknown>;
         beforeState.spellcasting = beforeSpell;
         // Reflect the cleared state, preserving the known-spell list + arcanum keys.
-        afterState.spellcasting = { slotsUsed: {}, arcanumUsed: {}, spells: beforeSpell?.spells ?? [] };
+        afterState.spellcasting = { slotsUsed: {}, arcanumUsed: {}, spells: beforeSpell?.spells ?? [], concentratingOn: null };
         delete data.beforeSpellState; // don't duplicate in eventData
         if (data.beforeResourceState !== undefined) {
           beforeState.resources = data.beforeResourceState;
@@ -609,6 +616,7 @@ export async function applyHitPointOperations(
             slotsUsed: {},
             arcanumUsed: beforeSpell?.arcanumUsed ?? {},
             spells: beforeSpell?.spells ?? [],
+            concentratingOn: beforeSpell?.concentratingOn ?? null,
           };
           delete data.beforeSpellState;
         }

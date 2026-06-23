@@ -601,6 +601,7 @@ enum CharacterEventType {
   forgetSpell
   prepareSpell
   unprepareSpell
+  concentrationDropped
   // class
   subclassChosen
   subclassRemoved
