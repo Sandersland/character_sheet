@@ -7,6 +7,7 @@ import BackendStatus from "@/features/character-meta/BackendStatus";
 import Card from "@/components/ui/Card";
 import StartingEquipmentEditor from "@/features/inventory/StartingEquipmentEditor";
 import { draftToInput, emptyPackageState } from "@/lib/startingEquipment";
+import { missingRequirements } from "@/lib/characterCreationValidation";
 import { abilityModifier, formatModifier, skillLabel } from "@/lib/abilities";
 import type { Item, SkillName } from "@/types/character";
 import { useCharacterDraft } from "@/hooks/useCharacterDraft";
@@ -14,6 +15,16 @@ import { useReferenceData } from "@/hooks/useReferenceData";
 
 function hitDieFace(hitDie: string): number {
   return Number(hitDie.replace(/^d/i, ""));
+}
+
+/** Inline marker for required form fields. */
+function RequiredMark() {
+  return (
+    <span className="text-garnet-700" aria-hidden="true" title="Required">
+      {" "}
+      *
+    </span>
+  );
 }
 
 export default function CharacterCreatePage() {
@@ -88,18 +99,20 @@ export default function CharacterCreatePage() {
     draft.equipmentDraft && selectedClass?.startingEquipment
       ? draftToInput(selectedClass.startingEquipment, draft.equipmentDraft)
       : undefined;
-  const equipmentIsComplete =
-    !draft.equipmentDraft ||
-    !selectedClass?.startingEquipment ||
-    equipmentInput !== null;
 
-  const isValid =
-    draft.name.trim().length > 0 &&
-    draft.alignment.length > 0 &&
-    draft.race.length > 0 &&
-    draft.className.length > 0 &&
-    backgroundNameForSubmit.length > 0 &&
-    equipmentIsComplete;
+  // A single source of truth for "why is Save disabled?": a human-readable
+  // list of the requirements still unmet (including nested equipment picks).
+  // `isValid` is simply "nothing is missing".
+  const missing = missingRequirements({
+    name: draft.name,
+    alignment: draft.alignment,
+    race: draft.race,
+    className: draft.className,
+    backgroundName: backgroundNameForSubmit,
+    startingEquipment: selectedClass?.startingEquipment ?? null,
+    equipmentDraft: draft.equipmentDraft,
+  });
+  const isValid = missing.length === 0;
 
   const dexModifier = abilityModifier(draft.abilityScores.dexterity);
   const conModifier = abilityModifier(draft.abilityScores.constitution);
@@ -175,10 +188,20 @@ export default function CharacterCreatePage() {
           <p className="text-sm text-parchment-600">Loading options…</p>
         ) : (
           <>
-            <Card title="Identity">
+            <Card
+              title="Identity"
+              titleAccessory={
+                <span className="text-xs font-normal normal-case text-parchment-500">
+                  <span className="text-garnet-700">*</span> required
+                </span>
+              }
+            >
               <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
                 <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
-                  Name
+                  <span>
+                    Name
+                    <RequiredMark />
+                  </span>
                   <input
                     type="text"
                     value={draft.name}
@@ -188,7 +211,10 @@ export default function CharacterCreatePage() {
                 </label>
 
                 <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
-                  Alignment
+                  <span>
+                    Alignment
+                    <RequiredMark />
+                  </span>
                   <select
                     value={draft.alignment}
                     onChange={(e) => update({ alignment: e.target.value })}
@@ -204,7 +230,10 @@ export default function CharacterCreatePage() {
                 </label>
 
                 <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
-                  Race
+                  <span>
+                    Race
+                    <RequiredMark />
+                  </span>
                   <select
                     value={draft.race}
                     onChange={(e) => update({ race: e.target.value })}
@@ -220,7 +249,10 @@ export default function CharacterCreatePage() {
                 </label>
 
                 <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
-                  Class
+                  <span>
+                    Class
+                    <RequiredMark />
+                  </span>
                   <select
                     value={draft.className}
                     onChange={(e) => {
@@ -291,7 +323,10 @@ export default function CharacterCreatePage() {
                 })()}
 
                 <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
-                  Background
+                  <span>
+                    Background
+                    <RequiredMark />
+                  </span>
                   {draft.useCustomBackground ? (
                     <div className="flex gap-2">
                       <input
@@ -454,7 +489,14 @@ export default function CharacterCreatePage() {
             )}
 
             {selectedClass?.startingEquipment && draft.equipmentDraft && (
-              <Card title="Starting Equipment">
+              <Card
+                title="Starting Equipment"
+                titleAccessory={
+                  <span className="text-xs font-normal normal-case text-parchment-500">
+                    All choices required
+                  </span>
+                }
+              >
                 <div className="p-4">
                   <StartingEquipmentEditor
                     startingEquipment={selectedClass.startingEquipment}
@@ -499,19 +541,59 @@ export default function CharacterCreatePage() {
               </div>
             </Card>
 
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                disabled={!isValid || submitting}
-                onClick={handleSave}
-                className="rounded-control bg-garnet-700 px-4 py-2 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
-              >
-                {submitting ? "Saving…" : "Save Character"}
-              </button>
-              {submitError && (
-                <p className="text-xs font-semibold text-garnet-700">
-                  Couldn't save — check the form and try again.
-                </p>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  disabled={!isValid || submitting}
+                  onClick={handleSave}
+                  title={
+                    isValid
+                      ? undefined
+                      : `Still needed before you can save: ${missing.join(", ")}`
+                  }
+                  className="rounded-control bg-garnet-700 px-4 py-2 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
+                >
+                  {submitting ? "Saving…" : "Save Character"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Start over? This clears the draft saved on this device."
+                      )
+                    ) {
+                      clear();
+                    }
+                  }}
+                  className="rounded-control border border-parchment-300 px-3 py-2 text-sm font-semibold text-parchment-600 transition-colors hover:border-garnet-400 hover:text-garnet-700"
+                >
+                  Start over
+                </button>
+                {submitError && (
+                  <p className="text-xs font-semibold text-garnet-700">
+                    Couldn't save — check the form and try again.
+                  </p>
+                )}
+              </div>
+
+              {/* Live explanation of why Save is disabled — lists exactly which
+                  requirements (incl. nested equipment picks) remain unmet. */}
+              {!isValid && (
+                <div
+                  role="status"
+                  className="rounded-control border border-parchment-300 bg-parchment-50 px-3 py-2 text-sm text-parchment-700"
+                >
+                  <p className="font-semibold text-parchment-800">
+                    Still needed before you can save:
+                  </p>
+                  <ul className="mt-1 list-disc pl-5">
+                    {missing.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           </>
