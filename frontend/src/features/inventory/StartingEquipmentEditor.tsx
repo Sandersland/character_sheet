@@ -169,17 +169,28 @@ export default function StartingEquipmentEditor({
                                       item.weapon.weaponRange === pick.filter.range)
                                 );
                                 const currentPick = sel?.openPicks?.[pickIdx] ?? "";
+                                const unfilled = !currentPick;
                                 return (
                                   <div key={pickIdx} className="flex flex-col gap-1">
                                     <span className="text-xs text-parchment-500">
                                       {pick.label}
+                                      {unfilled && (
+                                        <span className="ml-1 font-semibold text-red-600">
+                                          (required)
+                                        </span>
+                                      )}
                                     </span>
                                     <select
                                       value={currentPick}
+                                      aria-invalid={unfilled}
                                       onChange={(e) =>
                                         setOpenPick(groupIdx, pickIdx, e.target.value)
                                       }
-                                      className="rounded-control border border-parchment-300 bg-white px-2 py-1.5 text-sm text-parchment-900 focus:border-arcane-500 focus:outline-none"
+                                      className={`rounded-control border bg-white px-2 py-1.5 text-sm text-parchment-900 focus:outline-none ${
+                                        unfilled
+                                          ? "border-red-400 focus:border-red-500"
+                                          : "border-parchment-300 focus:border-arcane-500"
+                                      }`}
                                     >
                                       <option value="">— choose —</option>
                                       {matchingItems.map((item) => (
@@ -221,15 +232,26 @@ export default function StartingEquipmentEditor({
                           item.weapon.weaponRange === pick.filter.range)
                     );
                     const currentPick = sel?.openPicks?.[pickIdx] ?? "";
+                    const unfilled = !currentPick;
                     return (
                       <div key={pickIdx} className="flex flex-col gap-1">
                         <span className="text-xs text-parchment-500">
                           {pick.label}
+                          {unfilled && (
+                            <span className="ml-1 font-semibold text-red-600">
+                              (required)
+                            </span>
+                          )}
                         </span>
                         <select
                           value={currentPick}
+                          aria-invalid={unfilled}
                           onChange={(e) => setOpenPick(groupIdx, pickIdx, e.target.value)}
-                          className="rounded-control border border-parchment-300 bg-white px-2 py-1.5 text-sm text-parchment-900 focus:border-arcane-500 focus:outline-none"
+                          className={`rounded-control border bg-white px-2 py-1.5 text-sm text-parchment-900 focus:outline-none ${
+                            unfilled
+                              ? "border-red-400 focus:border-red-500"
+                              : "border-parchment-300 focus:border-arcane-500"
+                          }`}
                         >
                           <option value="">— choose —</option>
                           {matchingItems.map((item) => (

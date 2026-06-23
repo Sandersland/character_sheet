@@ -18,10 +18,22 @@ describe("formatBatchDate", () => {
     expect(formatBatchDate("2026-06-22T08:30:00Z")).toBe("Today");
   });
 
-  it("labels other days with month + day", () => {
+  it("labels other days in the current year with month + day (no year)", () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     expect(formatBatchDate("2026-06-21T08:30:00Z")).toBe("Jun 21");
+  });
+
+  it("adds the year for a prior-year date so it isn't confused with this year", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    expect(formatBatchDate("2025-06-21T08:30:00Z")).toBe("Jun 21, 2025");
+  });
+
+  it("adds the year for a future-year date too", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    expect(formatBatchDate("2027-01-03T08:30:00Z")).toBe("Jan 3, 2027");
   });
 });
 

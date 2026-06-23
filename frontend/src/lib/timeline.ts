@@ -3,11 +3,20 @@
  * ActivityModal (unified character event timeline).
  */
 
-/** Human-readable date header — "Today" or "Jun 19". */
+/** Human-readable date header — "Today", "Jun 19", or "Jun 19, 2024" when the
+ *  date falls in a prior (or future) year, so last year's "Jun 19" isn't
+ *  confused with this year's. The year is added only when it differs from the
+ *  current year. */
 export function formatBatchDate(iso: string): string {
   const date = new Date(iso);
-  if (date.toDateString() === new Date().toDateString()) return "Today";
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) return "Today";
+  const includeYear = date.getFullYear() !== now.getFullYear();
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    ...(includeYear ? { year: "numeric" } : {}),
+  });
 }
 
 /** Groups entries by batchId (falling back to id), preserving newest-first

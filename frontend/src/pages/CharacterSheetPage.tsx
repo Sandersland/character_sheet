@@ -22,7 +22,7 @@ import ProficienciesCard from "@/features/abilities/ProficienciesCard";
 import VitalsStrip from "@/features/character-meta/VitalsStrip";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useReferenceData } from "@/hooks/useReferenceData";
-import { abilityAbbr } from "@/lib/abilities";
+import { abilityAbbr, orderedAbilityEntries } from "@/lib/abilities";
 import { fetchActiveSession, startSession } from "@/api/client";
 import type { Session } from "@/types/character";
 
@@ -91,10 +91,10 @@ export default function CharacterSheetPage() {
     );
   }
 
-  const abilityEntries = Object.entries(character.abilityScores) as [
-    keyof typeof character.abilityScores,
-    number
-  ][];
+  // Render abilities in canonical 5e order (STR-DEX-CON-INT-WIS-CHA) via the
+  // shared helper rather than raw object key order, which is arbitrary and
+  // surprised D&D players (it read WIS-CHA-STR-DEX-CON-INT).
+  const abilityEntries = orderedAbilityEntries(character.abilityScores);
 
   return (
     <RollProvider>

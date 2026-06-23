@@ -155,6 +155,16 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
   }
 
   // Also block if the batch itself belongs to an ended session.
+  //
+  // NOTE: in practice this guard is a redundant second line of defense. The
+  // LIFO scan above excludes events whose session has been ended (the OR on
+  // `session.status === "active"`), so a batch from an ended session can never
+  // be the "most recent non-reverted batch" and the request already 409s with
+  // the "Only the most recent action can be undone" message before reaching
+  // here. We keep this explicit guard intentionally: it documents the
+  // ended-session-is-frozen invariant at the point it matters and stays correct
+  // even if the LIFO query above is ever refactored to stop filtering on
+  // session status.
   if (batchEvents[0]?.sessionId) {
     const session = await prisma.session.findUnique({
       where: { id: batchEvents[0].sessionId },

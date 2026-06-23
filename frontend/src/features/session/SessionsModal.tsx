@@ -19,20 +19,44 @@ function formatDate(iso: string): string {
   });
 }
 
+// Module-level cache for stale-while-revalidate: reopening the modal renders the
+// last-known sessions list instantly while a fresh fetch confirms it in the
+// background. The cache never short-circuits the network — every open refetches,
+// so a just-ended session can't linger as "active". Keyed by characterId.
+const sessionsCache = new Map<string, { sessions: Session[] }>();
+
 /**
  * Lists a character's play sessions (newest first). Clicking an ended session
  * opens its read-only recap (SessionSummaryModal). This is the entry point for
  * reviewing a past session's summary from the character sheet.
  */
 export default function SessionsModal({ characterId, onClose }: SessionsModalProps) {
-  const [sessions, setSessions] = useState<Session[] | null>(null);
+  // Seed from cache so a recently-loaded list renders instantly on reopen.
+  const [sessions, setSessions] = useState<Session[] | null>(
+    () => sessionsCache.get(characterId)?.sessions ?? null
+  );
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Session | null>(null);
 
   useEffect(() => {
+    const cached = sessionsCache.get(characterId);
+    setSessions(cached?.sessions ?? null);
+    setError(null);
+
+    // Always refetch on open so a just-ended session can't render as stale; the
+    // cached list above is only a placeholder until the network confirms.
+    let cancelled = false;
     fetchSessions(characterId)
-      .then(setSessions)
-      .catch(() => setError("Couldn't load sessions — try again."));
+      .then((fetched) => {
+        sessionsCache.set(characterId, { sessions: fetched });
+        if (!cancelled) setSessions(fetched);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Couldn't load sessions — try again.");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [characterId]);
 
   // While a past session's recap is open, render it on top of the list.
