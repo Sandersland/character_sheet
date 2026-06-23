@@ -51,7 +51,6 @@ const MINIMAL_CHARACTER = {
   savingThrowProficiencies: [],
   skills: [],
   toolProficiencies: [],
-  journal: [],
 };
 
 const TEST_ITEM = {

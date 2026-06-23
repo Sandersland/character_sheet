@@ -53,7 +53,6 @@ const BASE_CHARACTER = {
   skills: [],
   toolProficiencies: [],
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
-  journal: [],
 };
 
 // ── Suite ─────────────────────────────────────────────────────────────────────

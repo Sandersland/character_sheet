@@ -34,7 +34,6 @@ const FIXTURE = {
   skills: [],
   toolProficiencies: [],
   currency: { cp: 0, sp: 0, gp: 5, pp: 0 },
-  journal: [],
 };
 
 describe("POST /api/characters/:id/inventory/transactions", () => {

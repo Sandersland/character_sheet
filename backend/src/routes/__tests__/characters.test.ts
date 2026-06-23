@@ -51,7 +51,6 @@ const FIXTURE = {
   skills: [],
   toolProficiencies: [],
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
-  journal: [],
 };
 
 describe("characters routes", () => {
