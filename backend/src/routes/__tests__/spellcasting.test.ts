@@ -117,6 +117,30 @@ const FIXTURE_SPELLCASTING_JSON = {
       damageType: "force",
       upcastDicePerLevel: 1,
     },
+    {
+      id: "fixture-conc-1",
+      name: "Fixture Bless",
+      level: 1,
+      school: "enchantment",
+      prepared: true,
+      castingTime: "1 action",
+      range: "30 ft",
+      duration: "Concentration, up to 1 minute",
+      description: "Bless up to three creatures.",
+      concentration: true,
+    },
+    {
+      id: "fixture-conc-2",
+      name: "Fixture Shield of Faith",
+      level: 1,
+      school: "abjuration",
+      prepared: true,
+      castingTime: "1 bonus action",
+      range: "60 ft",
+      duration: "Concentration, up to 10 minutes",
+      description: "+2 AC to one creature.",
+      concentration: true,
+    },
   ],
 };
 
@@ -492,6 +516,154 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     expect(res.body.spellcasting.spellSaveDC).toBe(13);
     expect(res.body.spellcasting.spellAttackBonus).toBe(5);
     expect(res.body.spellcasting.ability).toBe("intelligence");
+  });
+
+  // ── Concentration enforcement ──────────────────────────────────────────────
+  // Reuses the L1 Wizard fixture above (which now also knows two concentration
+  // spells: fixture-conc-1 "Fixture Bless" and fixture-conc-2 "Fixture Shield of
+  // Faith", both L1 so they fit in the wizard's two L1 slots).
+
+  describe("concentration", () => {
+    const hpUrl = `/api/characters/${FIXTURE_ID}/hp`;
+
+    it("casting a concentration spell sets active concentration", async () => {
+      const res = await supertest(createApp())
+        .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
+        .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-1", slotLevel: 1, roll: 0 }] });
+
+      expect(res.status).toBe(200);
+      expect(res.body.spellcasting.concentratingOn).toEqual({
+        entryId: "fixture-conc-1",
+        spellName: "Fixture Bless",
+      });
+    });
+
+    it("casting a non-concentration spell does not start concentration", async () => {
+      const res = await supertest(createApp())
+        .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
+        .send({ operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 9 }] });
+
+      expect(res.status).toBe(200);
+      expect(res.body.spellcasting.concentratingOn ?? null).toBeNull();
+    });
+
+    it("casting a second concentration spell drops the first and logs it", async () => {
+      const app = createApp();
+      const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
+      await supertest(app)
+        .post(url)
+        .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-1", slotLevel: 1, roll: 0 }] });
+
+      const res = await supertest(app)
+        .post(url)
+        .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-2", slotLevel: 1, roll: 0 }] });
+
+      expect(res.status).toBe(200);
+      expect(res.body.spellcasting.concentratingOn).toEqual({
+        entryId: "fixture-conc-2",
+        spellName: "Fixture Shield of Faith",
+      });
+
+      const activity = await supertest(app).get(`/api/characters/${FIXTURE_ID}/activity`);
+      const dropEvents = (activity.body as Array<{ type: string; summary: string }>).filter(
+        (e) => e.type === "concentrationDropped",
+      );
+      expect(dropEvents.length).toBe(1);
+      expect(dropEvents[0].summary).toContain("Fixture Bless");
+    });
+
+    it("re-casting the same concentration spell keeps it concentrated (no spurious drop)", async () => {
+      const app = createApp();
+      const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
+      await supertest(app)
+        .post(url)
+        .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-1", slotLevel: 1, roll: 0 }] });
+      const res = await supertest(app)
+        .post(url)
+        .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-1", slotLevel: 1, roll: 0 }] });
+
+      expect(res.status).toBe(200);
+      expect(res.body.spellcasting.concentratingOn).toEqual({
+        entryId: "fixture-conc-1",
+        spellName: "Fixture Bless",
+      });
+      const activity = await supertest(app).get(`/api/characters/${FIXTURE_ID}/activity`);
+      const dropEvents = (activity.body as Array<{ type: string }>).filter(
+        (e) => e.type === "concentrationDropped",
+      );
+      expect(dropEvents.length).toBe(0);
+    });
+
+    it("dropConcentration op clears active concentration", async () => {
+      const app = createApp();
+      const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
+      await supertest(app)
+        .post(url)
+        .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-1", slotLevel: 1, roll: 0 }] });
+
+      const res = await supertest(app).post(url).send({ operations: [{ type: "dropConcentration" }] });
+      expect(res.status).toBe(200);
+      expect(res.body.spellcasting.concentratingOn ?? null).toBeNull();
+    });
+
+    it("dropConcentration with nothing concentrated is a no-op", async () => {
+      const res = await supertest(createApp())
+        .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
+        .send({ operations: [{ type: "dropConcentration" }] });
+      expect(res.status).toBe(200);
+      expect(res.body.spellcasting.concentratingOn ?? null).toBeNull();
+    });
+
+    it("forgetting the concentrated spell clears concentration", async () => {
+      const app = createApp();
+      const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
+      await supertest(app)
+        .post(url)
+        .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-1", slotLevel: 1, roll: 0 }] });
+
+      const res = await supertest(app)
+        .post(url)
+        .send({ operations: [{ type: "forgetSpell", entryId: "fixture-conc-1" }] });
+      expect(res.status).toBe(200);
+      expect(res.body.spellcasting.concentratingOn ?? null).toBeNull();
+    });
+
+    it("a long rest clears active concentration", async () => {
+      const app = createApp();
+      await supertest(app)
+        .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
+        .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-1", slotLevel: 1, roll: 0 }] });
+
+      const rest = await supertest(app).post(hpUrl).send({ operations: [{ type: "longRest" }] });
+      expect(rest.status).toBe(200);
+      expect(rest.body.spellcasting.concentratingOn ?? null).toBeNull();
+    });
+
+    it("undo restores concentration dropped by casting a second spell", async () => {
+      const app = createApp();
+      const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
+      await supertest(app)
+        .post(url)
+        .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-1", slotLevel: 1, roll: 0 }] });
+      // Casting the second spell drops the first (this batch holds two events:
+      // concentrationDropped + castSpell).
+      await supertest(app)
+        .post(url)
+        .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-2", slotLevel: 1, roll: 0 }] });
+
+      // Undo the most recent batch (the second cast). Revert is LIFO + keyed by
+      // batchId; the full spellcasting JSON is restored from the before-snapshot.
+      const activity = await supertest(app).get(`/api/characters/${FIXTURE_ID}/activity`);
+      const events = activity.body as Array<{ type: string; reverted: boolean; batchId?: string }>;
+      const latestCast = events.find((e) => e.type === "castSpell" && !e.reverted)!;
+      const undo = await supertest(app)
+        .post(`/api/characters/${FIXTURE_ID}/events/${latestCast.batchId}/revert`);
+      expect(undo.status).toBe(200);
+      expect(undo.body.spellcasting.concentratingOn).toEqual({
+        entryId: "fixture-conc-1",
+        spellName: "Fixture Bless",
+      });
+    });
   });
 });
 

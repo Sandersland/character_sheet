@@ -119,6 +119,34 @@ describe("SpellRow", () => {
     expect(screen.getByRole("button", { name: /prepared|unprepared/i })).toBeDisabled();
   });
 
+  describe("concentration badge", () => {
+    const concSpell: Spell = {
+      ...mockSpell,
+      id: "spell-conc",
+      name: "Bless",
+      level: 1,
+      concentration: true,
+    };
+
+    it("shows a static 'conc' badge when not actively concentrating", () => {
+      render(<ul><SpellRow {...defaultProps(concSpell, { isConcentrating: false })} /></ul>);
+      expect(screen.getByText("conc")).toBeInTheDocument();
+      expect(screen.queryByText("concentrating")).not.toBeInTheDocument();
+    });
+
+    it("shows an active 'concentrating' badge when this spell is the active concentration", () => {
+      render(<ul><SpellRow {...defaultProps(concSpell, { isConcentrating: true })} /></ul>);
+      expect(screen.getByText("concentrating")).toBeInTheDocument();
+      expect(screen.queryByText("conc")).not.toBeInTheDocument();
+    });
+
+    it("shows no concentration badge for a non-concentration spell", () => {
+      render(<ul><SpellRow {...defaultProps(mockSpell, { isConcentrating: false })} /></ul>);
+      expect(screen.queryByText("conc")).not.toBeInTheDocument();
+      expect(screen.queryByText("concentrating")).not.toBeInTheDocument();
+    });
+  });
+
   describe("upcast slot picker", () => {
     it("opens a slot button for each available level when multiple slots exist", async () => {
       const user = userEvent.setup();

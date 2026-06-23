@@ -73,6 +73,17 @@ export interface SpellComponents {
   materialDescription?: string;
 }
 
+/**
+ * The single concentration spell a character is currently maintaining, or null.
+ * 5e: a character can concentrate on only one spell at a time — casting a new
+ * concentration spell drops any prior one (see castSpell). `entryId` is the
+ * per-character SpellEntry id; `spellName` is denormalized for display/log text.
+ */
+export interface ConcentrationState {
+  entryId: string;
+  spellName: string;
+}
+
 export interface SpellcastingMutableState {
   // JSON object keys must be strings; slot level is stored as e.g. "1", "2".
   slotsUsed: Record<string, number>;
@@ -80,6 +91,8 @@ export interface SpellcastingMutableState {
   // (e.g. "6"). Each level has exactly one charge; 0/absent means available.
   arcanumUsed: Record<string, number>;
   spells: SpellEntry[];
+  // The active concentration spell, or null when not concentrating.
+  concentratingOn: ConcentrationState | null;
 }
 
 // ── Normalizer ────────────────────────────────────────────────────────────────
@@ -90,7 +103,7 @@ export interface SpellcastingMutableState {
 
 export function normalizeSpellcastingMutable(json: Prisma.JsonValue): SpellcastingMutableState {
   if (!json || typeof json !== "object" || Array.isArray(json)) {
-    return { slotsUsed: {}, arcanumUsed: {}, spells: [] };
+    return { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null };
   }
   const obj = json as Record<string, unknown>;
 
@@ -100,6 +113,7 @@ export function normalizeSpellcastingMutable(json: Prisma.JsonValue): Spellcasti
       slotsUsed: (obj.slotsUsed as Record<string, number>) ?? {},
       arcanumUsed: (obj.arcanumUsed as Record<string, number>) ?? {},
       spells: (obj.spells as SpellEntry[]) ?? [],
+      concentratingOn: normalizeConcentration(obj.concentratingOn),
     };
   }
 
@@ -113,7 +127,16 @@ export function normalizeSpellcastingMutable(json: Prisma.JsonValue): Spellcasti
     slotsUsed,
     arcanumUsed: {},
     spells: (obj.spells as SpellEntry[]) ?? [],
+    concentratingOn: normalizeConcentration(obj.concentratingOn),
   };
+}
+
+/** Coerce a stored concentration value into a valid ConcentrationState or null. */
+function normalizeConcentration(value: unknown): ConcentrationState | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const c = value as Record<string, unknown>;
+  if (typeof c.entryId !== "string" || c.entryId.length === 0) return null;
+  return { entryId: c.entryId, spellName: typeof c.spellName === "string" ? c.spellName : "" };
 }
 
 // ── Custom spell input shape ──────────────────────────────────────────────────
@@ -198,6 +221,11 @@ export interface UnprepareSpellOperation {
   entryId: string;
 }
 
+/** End the active concentration spell manually (player ends it / it was countered). */
+export interface DropConcentrationOperation {
+  type: "dropConcentration";
+}
+
 export type SpellcastingOperation =
   | CastSpellOperation
   | ExpendSlotOperation
@@ -205,7 +233,8 @@ export type SpellcastingOperation =
   | LearnSpellOperation
   | ForgetSpellOperation
   | PrepareSpellOperation
-  | UnprepareSpellOperation;
+  | UnprepareSpellOperation
+  | DropConcentrationOperation;
 
 // ── Transaction handler ───────────────────────────────────────────────────────
 
@@ -274,6 +303,7 @@ export async function applySpellcastingOperations(
           slotsUsed: { ...state.slotsUsed },
           arcanumUsed: { ...state.arcanumUsed },
           spells: [...state.spells],
+          concentratingOn: state.concentratingOn ? { ...state.concentratingOn } : null,
         },
       };
 
@@ -344,6 +374,54 @@ export async function applySpellcastingOperations(
               summary = `Cast ${entry.name} (${slotLabel})`;
             }
             eventData = { entryId: op.entryId, spellName: entry.name, roll: op.roll, slotLevel };
+          }
+
+          // Concentration: a character maintains at most one concentration spell.
+          // Casting a new one auto-drops the prior (logged separately so it shows
+          // on the timeline and is undoable). Re-casting the same spell refreshes.
+          if (entry.concentration) {
+            const prior = state.concentratingOn;
+            if (prior && prior.entryId !== entry.id) {
+              const dropBefore = {
+                spellcasting: {
+                  slotsUsed: { ...state.slotsUsed },
+                  arcanumUsed: { ...state.arcanumUsed },
+                  spells: [...state.spells],
+                  concentratingOn: { ...prior },
+                },
+              };
+              state.concentratingOn = null;
+              await tx.character.update({
+                where: { id: characterId },
+                data: {
+                  spellcasting: {
+                    slotsUsed: state.slotsUsed,
+                    arcanumUsed: state.arcanumUsed,
+                    spells: state.spells,
+                    concentratingOn: null,
+                  } as unknown as Prisma.InputJsonValue,
+                },
+              });
+              await logEvent(tx, {
+                characterId,
+                category: "spellcasting",
+                type: "concentrationDropped",
+                summary: `Concentration on ${prior.spellName} dropped (cast ${entry.name})`,
+                before: dropBefore,
+                after: {
+                  spellcasting: {
+                    slotsUsed: { ...state.slotsUsed },
+                    arcanumUsed: { ...state.arcanumUsed },
+                    spells: [...state.spells],
+                    concentratingOn: null,
+                  },
+                },
+                data: { droppedEntryId: prior.entryId, droppedSpellName: prior.spellName, reason: "newCast", castEntryId: entry.id },
+                batchId,
+                sessionId,
+              });
+            }
+            state.concentratingOn = { entryId: entry.id, spellName: entry.name };
           }
 
           // Self-targeted effect: apply to the caster's own HP in this same batch
@@ -483,6 +561,10 @@ export async function applySpellcastingOperations(
           }
           const forgotten = state.spells[idx];
           state.spells.splice(idx, 1);
+          // Forgetting the spell you're concentrating on ends that concentration.
+          if (state.concentratingOn?.entryId === op.entryId) {
+            state.concentratingOn = null;
+          }
           eventType = "forgetSpell";
           summary = `Removed ${forgotten.name} from spellbook`;
           eventData = { entryId: op.entryId, spellName: forgotten.name };
@@ -511,6 +593,19 @@ export async function applySpellcastingOperations(
           eventData = { entryId: op.entryId, spellName: entry.name, prepared: preparing };
           break;
         }
+
+        case "dropConcentration": {
+          const prior = state.concentratingOn;
+          if (!prior) {
+            // Nothing to drop — no-op (don't throw; idempotent), skip logging.
+            continue;
+          }
+          state.concentratingOn = null;
+          eventType = "concentrationDropped";
+          summary = `Stopped concentrating on ${prior.spellName}`;
+          eventData = { droppedEntryId: prior.entryId, droppedSpellName: prior.spellName, reason: "manual" };
+          break;
+        }
       }
 
       // Write the updated state back as a compact object.
@@ -521,6 +616,7 @@ export async function applySpellcastingOperations(
             slotsUsed: state.slotsUsed,
             arcanumUsed: state.arcanumUsed,
             spells: state.spells,
+            concentratingOn: state.concentratingOn,
           } as unknown as Prisma.InputJsonValue,
         },
       });
@@ -530,6 +626,7 @@ export async function applySpellcastingOperations(
           slotsUsed: { ...state.slotsUsed },
           arcanumUsed: { ...state.arcanumUsed },
           spells: [...state.spells],
+          concentratingOn: state.concentratingOn ? { ...state.concentratingOn } : null,
         },
       };
 

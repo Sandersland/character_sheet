@@ -312,6 +312,13 @@ export function serializeCharacter(row: CharacterWithRelations) {
         used: Math.min(total, stored.arcanumUsed[String(arcanumLevel)] ?? 0),
       })),
       spells: stored.spells,
+      // Active concentration spell, or null. Clamp-on-read: if the concentrated
+      // entry is no longer in the spellbook, treat it as not concentrating.
+      concentratingOn:
+        stored.concentratingOn &&
+        stored.spells.some((s) => s.id === stored.concentratingOn!.entryId)
+          ? stored.concentratingOn
+          : null,
     };
   } else if (
     row.spellcasting !== null &&

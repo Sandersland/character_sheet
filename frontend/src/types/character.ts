@@ -742,6 +742,11 @@ export interface Character {
      */
     arcana?: SpellSlots[];
     spells: Spell[];
+    /**
+     * The spell the character is currently concentrating on (5e: only one at a
+     * time), or null. `entryId` matches a `Spell.id` in `spells`.
+     */
+    concentratingOn?: { entryId: string; spellName: string } | null;
   };
 
   resources?: CharacterResources;
@@ -975,6 +980,8 @@ export interface ForgetSpellOperation { type: "forgetSpell"; entryId: string }
 export interface PrepareSpellOperation { type: "prepareSpell"; entryId: string }
 /** Mark a non-cantrip as unprepared. */
 export interface UnprepareSpellOperation { type: "unprepareSpell"; entryId: string }
+/** End the active concentration spell manually. */
+export interface DropConcentrationOperation { type: "dropConcentration" }
 
 export type SpellcastingOperation =
   | CastSpellOperation
@@ -983,7 +990,8 @@ export type SpellcastingOperation =
   | LearnSpellOperation
   | ForgetSpellOperation
   | PrepareSpellOperation
-  | UnprepareSpellOperation;
+  | UnprepareSpellOperation
+  | DropConcentrationOperation;
 
 // ── Class operation types (mirrors backend/src/lib/class.ts) ─────────────────
 // Sent as `{ operations: ClassOperation[] }` to POST /api/characters/:id/class/transactions.

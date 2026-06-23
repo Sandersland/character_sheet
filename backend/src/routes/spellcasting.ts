@@ -94,6 +94,10 @@ const unprepareSpellOpSchema = z.object({
   entryId: z.string().min(1),
 });
 
+const dropConcentrationOpSchema = z.object({
+  type: z.literal("dropConcentration"),
+});
+
 const operationSchema = z.discriminatedUnion("type", [
   castSpellOpSchema,
   expendSlotOpSchema,
@@ -102,6 +106,7 @@ const operationSchema = z.discriminatedUnion("type", [
   forgetSpellOpSchema,
   prepareSpellOpSchema,
   unprepareSpellOpSchema,
+  dropConcentrationOpSchema,
 ]);
 
 const transactionsRequestSchema = z.object({

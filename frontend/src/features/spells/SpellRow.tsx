@@ -27,6 +27,8 @@ interface SpellRowProps {
   onForget: (spell: Spell) => void;
   /** Available slot levels for the "cast with slot" picker (leveled spells only). */
   availableSlots: number[]; // levels that have remaining slots
+  /** True when this spell is the character's active concentration spell. */
+  isConcentrating?: boolean;
 }
 
 export default function SpellRow({
@@ -37,6 +39,7 @@ export default function SpellRow({
   onPrepare,
   onForget,
   availableSlots,
+  isConcentrating = false,
 }: SpellRowProps) {
   const [expanded, setExpanded] = useState(false);
   const [slotPickerOpen, setSlotPickerOpen] = useState(false);
@@ -81,7 +84,14 @@ export default function SpellRow({
             <div className="flex items-center gap-1">
               <Badge tone="neutral">{levelLabel(spell.level)}</Badge>
               <Badge tone={schoolTone}>{spell.school}</Badge>
-              {spell.concentration && <Badge tone="arcane">conc</Badge>}
+              {spell.concentration &&
+                (isConcentrating ? (
+                  <Badge tone="arcane" className="bg-arcane-600 text-white">
+                    concentrating
+                  </Badge>
+                ) : (
+                  <Badge tone="arcane">conc</Badge>
+                ))}
               {spell.ritual && <Badge tone="gold">ritual</Badge>}
               {noBudget && <Badge tone="neutral">no slots</Badge>}
             </div>
