@@ -30,3 +30,25 @@ export function groupByBatch<T extends { id: string; batchId?: string; createdAt
   }
   return batches;
 }
+
+/** Groups already-ordered items into per-date sections so a single date
+ *  header can be rendered per day instead of repeating the date for every
+ *  item that shares it. Consecutive items with the same `formatBatchDate`
+ *  label fall under one section; newest-first input order is preserved both
+ *  across sections and within each section. Works for any item that has a
+ *  `createdAt` (e.g. raw events or batches from `groupByBatch`). */
+export function groupByDate<T extends { createdAt: string }>(
+  items: T[]
+): Array<{ label: string; createdAt: string; items: T[] }> {
+  const sections: Array<{ label: string; createdAt: string; items: T[] }> = [];
+  for (const item of items) {
+    const label = formatBatchDate(item.createdAt);
+    const current = sections[sections.length - 1];
+    if (current && current.label === label) {
+      current.items.push(item);
+    } else {
+      sections.push({ label, createdAt: item.createdAt, items: [item] });
+    }
+  }
+  return sections;
+}
