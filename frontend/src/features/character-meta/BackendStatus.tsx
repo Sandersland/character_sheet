@@ -29,20 +29,30 @@ export default function BackendStatus() {
         ? "bg-garnet-500"
         : "bg-parchment-400";
 
-  const text =
+  const label =
     status === "ok"
       ? "Backend connected"
       : status === "down"
         ? "Backend unreachable"
         : "Checking backend…";
 
+  // The healthy state stays a quiet dot-only proof-of-life (the label is
+  // preserved for screen readers / hover via aria-label + title); only the
+  // problem states get visible prose so they actually draw the eye.
+  const showText = status !== "ok";
+
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-parchment-500">
+    <span
+      className="inline-flex items-center gap-1.5 text-xs text-parchment-500"
+      role="status"
+      aria-label={label}
+      title={label}
+    >
       <span
         className={`h-1.5 w-1.5 rounded-full ${dotColor}`}
         aria-hidden="true"
       />
-      {text}
+      {showText && label}
     </span>
   );
 }
