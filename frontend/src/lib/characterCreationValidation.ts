@@ -10,7 +10,7 @@
  * `missingRequirements(...).length === 0`.
  */
 
-import { isPackageComplete } from "@/lib/startingEquipment";
+import { isPackageComplete, isGoldValid } from "@/lib/startingEquipment";
 import type { ClassStartingEquipment } from "@/types/character";
 import type { EquipmentDraft } from "@/lib/startingEquipment";
 
@@ -54,12 +54,7 @@ export function missingRequirements(input: CreationValidationInput): string[] {
     } else {
       // Gold mode: the dedicated editor surfaces its own range error, so we
       // only flag it here as a blocking requirement.
-      const min = input.startingEquipment.gold.diceCount * input.startingEquipment.gold.multiplier;
-      const max =
-        input.startingEquipment.gold.diceCount *
-        input.startingEquipment.gold.diceFaces *
-        input.startingEquipment.gold.multiplier;
-      if (draft.gold < min || draft.gold > max) {
+      if (!isGoldValid(input.startingEquipment, draft.gold)) {
         missing.push("Starting gold amount");
       }
     }
