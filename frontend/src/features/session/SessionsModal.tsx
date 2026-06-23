@@ -19,20 +19,44 @@ function formatDate(iso: string): string {
   });
 }
 
+// Module-level cache so reopening the modal doesn't refetch the (rarely-
+// changing) sessions list every time. Entries go stale after SESSIONS_TTL_MS,
+// after which the next open refetches in the background. Keyed by characterId.
+const SESSIONS_TTL_MS = 60_000;
+const sessionsCache = new Map<string, { sessions: Session[]; fetchedAt: number }>();
+
 /**
  * Lists a character's play sessions (newest first). Clicking an ended session
  * opens its read-only recap (SessionSummaryModal). This is the entry point for
  * reviewing a past session's summary from the character sheet.
  */
 export default function SessionsModal({ characterId, onClose }: SessionsModalProps) {
-  const [sessions, setSessions] = useState<Session[] | null>(null);
+  // Seed from cache so a recently-loaded list renders instantly on reopen.
+  const [sessions, setSessions] = useState<Session[] | null>(
+    () => sessionsCache.get(characterId)?.sessions ?? null
+  );
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Session | null>(null);
 
   useEffect(() => {
+    const cached = sessionsCache.get(characterId);
+    setSessions(cached?.sessions ?? null);
+    // Only hit the network when there's no cached list or it's gone stale.
+    const isFresh = cached && Date.now() - cached.fetchedAt < SESSIONS_TTL_MS;
+    if (isFresh) return;
+
+    let cancelled = false;
     fetchSessions(characterId)
-      .then(setSessions)
-      .catch(() => setError("Couldn't load sessions — try again."));
+      .then((fetched) => {
+        sessionsCache.set(characterId, { sessions: fetched, fetchedAt: Date.now() });
+        if (!cancelled) setSessions(fetched);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Couldn't load sessions — try again.");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [characterId]);
 
   // While a past session's recap is open, render it on top of the list.

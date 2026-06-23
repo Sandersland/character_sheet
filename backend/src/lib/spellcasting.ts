@@ -390,18 +390,12 @@ export async function applySpellcastingOperations(
                   concentratingOn: { ...prior },
                 },
               };
+              // No intermediate DB write here: the common write-back below
+              // persists the final state (with the newly-cast concentration
+              // spell), so writing `concentratingOn: null` first would just be
+              // overwritten. Clearing the in-memory flag is enough for this
+              // drop event's `before`/`after` payloads.
               state.concentratingOn = null;
-              await tx.character.update({
-                where: { id: characterId },
-                data: {
-                  spellcasting: {
-                    slotsUsed: state.slotsUsed,
-                    arcanumUsed: state.arcanumUsed,
-                    spells: state.spells,
-                    concentratingOn: null,
-                  } as unknown as Prisma.InputJsonValue,
-                },
-              });
               await logEvent(tx, {
                 characterId,
                 category: "spellcasting",
