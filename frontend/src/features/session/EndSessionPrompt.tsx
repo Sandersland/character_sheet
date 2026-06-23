@@ -14,12 +14,19 @@ import Modal from "@/components/ui/Modal";
 
 interface EndSessionPromptProps {
   busy: boolean;
+  /** Error from the last attempt, if any (e.g. endSession failed). */
+  error?: string | null;
   /** Confirm with the parsed XP amount (0 = skip / no award). */
   onConfirm: (xpAmount: number) => void;
   onCancel: () => void;
 }
 
-export default function EndSessionPrompt({ busy, onConfirm, onCancel }: EndSessionPromptProps) {
+export default function EndSessionPrompt({
+  busy,
+  error,
+  onConfirm,
+  onCancel,
+}: EndSessionPromptProps) {
   const [xp, setXp] = useState("");
 
   // Empty input → 0 (skip). Only non-negative integers are awardable here.
@@ -64,6 +71,12 @@ export default function EndSessionPrompt({ busy, onConfirm, onCancel }: EndSessi
             </p>
           )}
         </div>
+
+        {error && (
+          <p className="text-xs font-semibold text-garnet-700" role="alert">
+            {error}
+          </p>
+        )}
 
         <div className="flex justify-end gap-2">
           <button

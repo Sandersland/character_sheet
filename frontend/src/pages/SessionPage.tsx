@@ -12,7 +12,7 @@
  * The character sheet (/characters/:id) is the static reference view.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { RollProvider } from "@/features/dice/RollContext";
@@ -125,6 +125,11 @@ interface SessionContentProps {
 function SessionContent({ character, session, reference, setCharacter, navigate }: SessionContentProps) {
   const [activeTab, setActiveTab] = useState("inventory");
   const [endPending, setEndPending] = useState(false);
+  // Error from the most recent end-session attempt (shown in the prompt).
+  const [endError, setEndError] = useState<string | null>(null);
+  // Tracks whether the XP award already landed for the current prompt, so a
+  // retry after an endSession failure doesn't award XP twice.
+  const awardedRef = useRef(false);
   // Whether the End Session confirm prompt (with optional XP input) is open.
   const [endPromptOpen, setEndPromptOpen] = useState(false);
   // After ending, hold the ended session (with its computed summary) so we can
@@ -145,12 +150,19 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
   // Confirm handler from the End Session prompt. KEY ORDERING: XP must be
   // awarded while the session is still active (so it's auto-tagged with this
   // sessionId and flows into the recap's xpGained) BEFORE we end the session.
+  //
+  // The award and the end are two calls; if the award succeeds but endSession
+  // throws, we must NOT re-award on retry (that would double-count the XP).
+  // `awardedRef` remembers a landed award for the duration of this prompt and
+  // is reset whenever the prompt is (re)opened.
   async function handleConfirmEnd(xpAmount: number) {
     if (!session) return;
     setEndPending(true);
+    setEndError(null);
     try {
-      if (xpAmount > 0) {
+      if (xpAmount > 0 && !awardedRef.current) {
         await applyExperienceOperations(character.id, [{ type: "award", amount: xpAmount }]);
+        awardedRef.current = true;
       }
       // Clear persisted turn state — the session is over either way.
       clearTurnState(session.id);
@@ -158,6 +170,12 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
       // Show the recap modal; navigation happens when the modal is dismissed.
       setEndPromptOpen(false);
       setEndedSession(ended);
+    } catch (err) {
+      // Surface the failure and keep the prompt open. A retry re-attempts
+      // endSession only — the award is guarded by awardedRef above.
+      setEndError(
+        err instanceof Error ? err.message : "Failed to end the session. Please try again."
+      );
     } finally {
       setEndPending(false);
     }
@@ -192,7 +210,11 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
             <button
               type="button"
               disabled={endPending}
-              onClick={() => setEndPromptOpen(true)}
+              onClick={() => {
+                awardedRef.current = false;
+                setEndError(null);
+                setEndPromptOpen(true);
+              }}
               className="rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100 disabled:opacity-50"
             >
               End Session
@@ -301,8 +323,12 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
       {endPromptOpen && !endedSession && (
         <EndSessionPrompt
           busy={endPending}
+          error={endError}
           onConfirm={handleConfirmEnd}
-          onCancel={() => setEndPromptOpen(false)}
+          onCancel={() => {
+            setEndError(null);
+            setEndPromptOpen(false);
+          }}
         />
       )}
 
