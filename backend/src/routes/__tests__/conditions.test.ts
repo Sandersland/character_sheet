@@ -113,7 +113,11 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
       .send({ operations: [{ type: "applyCondition", key: "poisoned", source: "Giant Spider" }] });
 
     expect(res.status).toBe(200);
-    const active = res.body.conditions.active as Array<{ key: string; source?: string }>;
+    const active = res.body.conditions.active as Array<{
+      key: string;
+      source?: string;
+      appliedAt: string;
+    }>;
     expect(active).toHaveLength(1);
     expect(active[0].key).toBe("poisoned");
     expect(active[0].source).toBe("Giant Spider");
