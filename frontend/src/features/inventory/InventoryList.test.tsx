@@ -65,4 +65,17 @@ describe("InventoryList carrying capacity", () => {
     expect(screen.getByText(/130\.0 \/ 120 lb/)).toBeInTheDocument();
     expect(screen.getByText(/over capacity/i)).toBeInTheDocument();
   });
+
+  it("does not flag when carried weight exactly equals capacity", () => {
+    // STR 8 → capacity 120; a single 120 lb item = exactly at the limit.
+    // 5e lets you carry UP TO STR × 15, so the boundary must use `>`, not `>=`.
+    render(
+      <InventoryList
+        character={makeCharacter(8, [makeItem({ weight: 120 })])}
+        onUpdate={vi.fn()}
+      />
+    );
+    expect(screen.getByText(/120\.0 \/ 120 lb/)).toBeInTheDocument();
+    expect(screen.queryByText(/over capacity/i)).not.toBeInTheDocument();
+  });
 });
