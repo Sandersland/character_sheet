@@ -140,26 +140,38 @@ export default function SpellRow({
 
       {/* Slot picker (for leveled spells with multiple available slot levels) */}
       {slotPickerOpen && !isCantrip && (
-        <div className="mt-2 flex flex-wrap gap-2">
-          <span className="text-xs text-parchment-500">Cast with slot:</span>
-          {availableSlots.map((slotLevel) => (
-            <button
-              key={slotLevel}
-              type="button"
-              disabled={busy}
-              onClick={() => {
-                setSlotPickerOpen(false);
-                onCast(spell, slotLevel);
-              }}
-              className="rounded bg-arcane-100 px-2 py-0.5 text-xs font-semibold text-arcane-800 hover:bg-arcane-200 disabled:opacity-40"
-            >
-              L{slotLevel}
-            </button>
-          ))}
+        <div className="mt-2 flex flex-wrap items-start gap-2">
+          <span className="py-0.5 text-xs text-parchment-500">Cast with slot:</span>
+          {availableSlots.map((slotLevel) => {
+            const isUpcast = slotLevel > spell.level;
+            // Scaled effect at this slot level (e.g. "10d6 fire damage"); null for utility spells.
+            const slotEffect = effectPreview(spell, characterLevel, slotLevel);
+            return (
+              <button
+                key={slotLevel}
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setSlotPickerOpen(false);
+                  onCast(spell, slotLevel);
+                }}
+                className="flex flex-col items-center rounded bg-arcane-100 px-2 py-0.5 text-xs font-semibold text-arcane-800 hover:bg-arcane-200 disabled:opacity-40"
+                title={isUpcast ? `Upcast ${spell.name} with a level ${slotLevel} slot` : `Cast ${spell.name} with a level ${slotLevel} slot`}
+              >
+                <span>
+                  L{slotLevel}
+                  {isUpcast && <span aria-hidden="true"> ↑</span>}
+                </span>
+                {isUpcast && slotEffect && (
+                  <span className="font-normal text-[10px] text-arcane-600">{slotEffect}</span>
+                )}
+              </button>
+            );
+          })}
           <button
             type="button"
             onClick={() => setSlotPickerOpen(false)}
-            className="text-xs text-parchment-400 hover:text-parchment-700"
+            className="py-0.5 text-xs text-parchment-400 hover:text-parchment-700"
           >
             cancel
           </button>
