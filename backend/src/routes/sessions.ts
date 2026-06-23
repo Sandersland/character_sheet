@@ -139,8 +139,14 @@ sessionsRouter.get("/characters/:id/sessions/:sessionId", async (req, res) => {
     orderBy: { createdAt: "desc" },
   });
 
+  const journalEntries = await prisma.journalEntry.findMany({
+    where: { sessionId: session.id },
+    orderBy: { date: "desc" },
+  });
+
   res.json({
     ...session,
+    journalEntries,
     events: events.map((row) => ({
       id: row.id,
       category: row.category,

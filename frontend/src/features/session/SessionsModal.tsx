@@ -61,7 +61,13 @@ export default function SessionsModal({ characterId, onClose }: SessionsModalPro
 
   // While a past session's recap is open, render it on top of the list.
   if (selected) {
-    return <SessionSummaryModal session={selected} onClose={() => setSelected(null)} />;
+    return (
+      <SessionSummaryModal
+        characterId={characterId}
+        session={selected}
+        onClose={() => setSelected(null)}
+      />
+    );
   }
 
   return (

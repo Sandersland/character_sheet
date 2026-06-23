@@ -1203,4 +1203,10 @@ export interface Session {
   endedAt?: string;
   title?: string;
   summary?: SessionSummary | null;
+  /**
+   * Journal entries written during this session (linked by
+   * JournalEntry.sessionId). Present on the end-session response and the
+   * single-session GET; surfaced read-only in the recap.
+   */
+  journalEntries?: JournalEntry[];
 }

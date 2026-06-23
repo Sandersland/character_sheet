@@ -239,14 +239,20 @@ export async function createCharacter(input: CreateCharacterInput): Promise<Char
 
 // Applies a batch of XP operations (award/set) via the intent-bearing
 // endpoint that logs events and auto-reverses HP on level-down.
+//
+// `sessionId` (optional) tags the resulting events to a SPECIFIC session
+// instead of the active one — used to retroactively award XP to a past,
+// already-ended session, which also recomputes that session's stored summary
+// server-side.
 export async function applyExperienceOperations(
   characterId: string,
-  operations: ExperienceOperation[]
+  operations: ExperienceOperation[],
+  sessionId?: string,
 ): Promise<Character> {
   const response = await fetch(`${API_URL}/characters/${characterId}/experience`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ operations }),
+    body: JSON.stringify(sessionId ? { operations, sessionId } : { operations }),
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
