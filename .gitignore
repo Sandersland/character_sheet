@@ -9,6 +9,16 @@ backend/src/generated/
 # Git worktrees used for parallel feature branches
 .claude/worktrees/
 
+# design-sync: staged scripts, build output, machine state, generated CSS.
+# Durable inputs under .design-sync/ (config.json, NOTES.md, conventions.md,
+# docs/, previews/, tailwind-input.css) ARE committed.
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+frontend/.ds-compiled.css
+
 # Playwright / verify-tool artifacts
 .playwright-mcp/
 page-*.png

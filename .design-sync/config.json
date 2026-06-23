@@ -1,0 +1,35 @@
+{
+  "projectId": "2de785d4-1811-432f-ba8f-84efb92b4108",
+  "shape": "package",
+  "pkg": "character-sheet-ds",
+  "globalName": "CharacterSheetDS",
+  "srcDir": "src/components/ui",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": ".ds-compiled.css",
+  "readmeHeader": ".design-sync/conventions.md",
+  "overrides": {
+    "Modal": { "cardMode": "single", "viewport": "760x560", "primaryStory": "LedgerReview" },
+    "Tabs": { "cardMode": "column" }
+  },
+  "componentSrcMap": {
+    "Badge": "src/components/ui/Badge.tsx",
+    "Card": "src/components/ui/Card.tsx",
+    "MeterBar": "src/components/ui/MeterBar.tsx",
+    "Modal": "src/components/ui/Modal.tsx",
+    "Tabs": "src/components/ui/Tabs.tsx"
+  },
+  "docsMap": {
+    "Badge": "../.design-sync/docs/Badge.md",
+    "Card": "../.design-sync/docs/Card.md",
+    "MeterBar": "../.design-sync/docs/MeterBar.md",
+    "Modal": "../.design-sync/docs/Modal.md",
+    "Tabs": "../.design-sync/docs/Tabs.md"
+  },
+  "dtsPropsFor": {
+    "Badge": "  /** Badge contents — short status or category text. */\n  children: React.ReactNode;\n  /** Color tone; maps to a soft-background pairing. Default \"neutral\". */\n  tone?: \"garnet\" | \"arcane\" | \"gold\" | \"vitality\" | \"neutral\";\n  /** Extra classes merged onto the badge span. */\n  className?: string;",
+    "Card": "  /** Card body content. */\n  children: React.ReactNode;\n  /** Extra classes merged onto the card surface. */\n  className?: string;\n  /** Renders a small uppercase caption heading above the content. */\n  title?: string;\n  /** Element rendered at the right edge of the title row (e.g. a Badge). */\n  titleAccessory?: React.ReactNode;",
+    "MeterBar": "  /** Current value — drives the filled portion. */\n  current: number;\n  /** Maximum value. */\n  max: number;\n  /** Fill color. Default \"garnet\". */\n  tone?: \"garnet\" | \"arcane\" | \"gold\";\n  /** Accessible label; defaults to \"{current} of {max}\". */\n  label?: string;",
+    "Modal": "  /** Heading shown in the modal title bar. */\n  title: string;\n  /** Called when the user dismisses (Close, Escape, or backdrop click). */\n  onClose: () => void;\n  /** Modal body content. */\n  children: React.ReactNode;",
+    "Tabs": "  /** Tab items, in display order. */\n  tabs: { id: string; label: string; badge?: React.ReactNode }[];\n  /** id of the currently active tab (controlled). */\n  active: string;\n  /** Called with the id of the tab the user selects. */\n  onChange: (id: string) => void;\n  /** Extra classes merged onto the tablist track. */\n  className?: string;"
+  }
+}
