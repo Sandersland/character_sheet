@@ -51,6 +51,7 @@ const TYPE_LABEL: Partial<Record<string, string>> = {
   forgetSpell: "forgotten",
   prepareSpell: "prepared",
   unprepareSpell: "unprepared",
+  concentrationDropped: "concentration dropped",
   revert: "undo",
 };
 
