@@ -80,6 +80,38 @@ function numField(value: unknown, key: string): number | undefined {
   return typeof v === "number" ? v : undefined;
 }
 
+/**
+ * Reads a per-level counter map out of an event's `spellcasting` snapshot
+ * (`before`/`after`). The snapshot shape is `{ spellcasting: { slotsUsed,
+ * arcanumUsed, … } }` (see `spellcasting.ts`). Returns the numeric count for
+ * `level` within the named counter, defaulting to 0 when absent.
+ */
+function spellcastingCount(snapshot: unknown, counter: string, level: number): number {
+  const spellcasting = asRecord(asRecord(snapshot).spellcasting);
+  const map = asRecord(spellcasting[counter]);
+  const v = map[String(level)];
+  return typeof v === "number" ? v : 0;
+}
+
+/**
+ * Distinguishes a true spell-slot restore from a Warlock Mystic Arcanum charge
+ * restore. Both are logged as `restoreSlot` with identical `data` ({ level }),
+ * so the only reliable signal is which counter changed in the event's
+ * before→after snapshot: a real slot restore decrements `slotsUsed`, while an
+ * Arcanum restore decrements `arcanumUsed` (and leaves `slotsUsed` untouched).
+ * See `spellcasting.ts`'s `restoreSlot` op, which prefers slots over Arcanum.
+ */
+function isArcanumRestore(event: SummaryEventInput, level: number): boolean {
+  const slotsBefore = spellcastingCount(event.before, "slotsUsed", level);
+  const slotsAfter = spellcastingCount(event.after, "slotsUsed", level);
+  // A real spell-slot restore drops slotsUsed by one. If slotsUsed did not
+  // change but arcanumUsed dropped, this restore returned an Arcanum charge.
+  if (slotsAfter < slotsBefore) return false;
+  const arcanumBefore = spellcastingCount(event.before, "arcanumUsed", level);
+  const arcanumAfter = spellcastingCount(event.after, "arcanumUsed", level);
+  return arcanumAfter < arcanumBefore;
+}
+
 // ── Aggregation ──────────────────────────────────────────────────────────────
 
 /**
@@ -152,7 +184,20 @@ export function computeSessionSummary(
       case "restoreSlot": {
         const level = numField(event.data, "level");
         if (typeof level === "number") {
+          // Mystic Arcanum (Warlock 11+) charge restores share the `restoreSlot`
+          // event type but must NOT net against spell slots spent — they're a
+          // separate resource. Skip those; only real slot restores reduce the
+          // slot-spent tally.
+          if (isArcanumRestore(event, level)) break;
+
           const key = String(level);
+          // Floor at 0 deliberately: a restoreSlot whose matching expendSlot
+          // happened in a PRIOR session (cross-session restore) has nothing to
+          // net against here. Rather than letting it drive slotsSpent negative —
+          // which would misreport this session as having "un-spent" slots it
+          // never expended — we clamp at 0. The summary reports slots SPENT in
+          // this session; an out-of-window restore can at most cancel an
+          // in-window expend, never push the count below zero.
           const next = (slotsSpent[key] ?? 0) - 1;
           if (next > 0) slotsSpent[key] = next;
           else delete slotsSpent[key];
