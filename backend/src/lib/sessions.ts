@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { logEvent, type EventType } from "./events.js";
 import { prisma } from "./prisma.js";
+import { computeSessionSummary } from "./session-summary.js";
+import type { Prisma } from "../generated/prisma/client.js";
 
 export class SessionError extends Error {}
 export class CombatError extends Error {}
@@ -78,7 +80,7 @@ export async function endSession(
 ) {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
-    select: { id: true, characterId: true, status: true },
+    select: { id: true, characterId: true, status: true, startedAt: true },
   });
 
   if (!session || session.characterId !== characterId) {
@@ -89,11 +91,29 @@ export async function endSession(
   }
 
   const batchId = randomUUID();
+  const endedAt = new Date();
+
+  // Aggregate the session's event log into a typed summary. Read the events
+  // BEFORE logging `sessionEnded` so that meta-event isn't part of the window.
+  const events = await prisma.characterEvent.findMany({
+    where: { sessionId: session.id },
+    select: { type: true, reverted: true, before: true, after: true, data: true },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const summary = computeSessionSummary(events, {
+    startedAt: session.startedAt,
+    endedAt,
+  });
 
   return prisma.$transaction(async (tx) => {
     const updated = await tx.session.update({
       where: { id: sessionId },
-      data: { status: "ended", endedAt: new Date() },
+      data: {
+        status: "ended",
+        endedAt,
+        summary: summary as unknown as Prisma.InputJsonValue,
+      },
     });
 
     await logEvent(tx, {

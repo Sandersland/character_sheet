@@ -32,6 +32,7 @@ import { useReferenceData } from "@/hooks/useReferenceData";
 import { useTurnState } from "@/features/session/useTurnState";
 import { clearTurnState } from "@/features/session/turnStatePersistence";
 import SessionLog from "@/features/session/SessionLog";
+import SessionSummaryModal from "@/features/session/SessionSummaryModal";
 import { endSession, fetchActiveSession } from "@/api/client";
 import type { Character, Session, ReferenceData } from "@/types/character";
 
@@ -123,6 +124,9 @@ interface SessionContentProps {
 function SessionContent({ character, session, reference, setCharacter, navigate }: SessionContentProps) {
   const [activeTab, setActiveTab] = useState("inventory");
   const [endPending, setEndPending] = useState(false);
+  // After ending, hold the ended session (with its computed summary) so we can
+  // show the recap modal before navigating back to the sheet.
+  const [endedSession, setEndedSession] = useState<Session | null>(null);
   // logRefresh bumps whenever character state or a combat log event changes,
   // so the Log tab refreshes on both.
   const [logRefresh, setLogRefresh] = useState(0);
@@ -139,10 +143,11 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
     if (!session) return;
     setEndPending(true);
     try {
-      // Clear persisted turn state before navigating away.
+      // Clear persisted turn state — the session is over either way.
       clearTurnState(session.id);
-      await endSession(character.id, session.id);
-      navigate(`/characters/${character.id}`);
+      const { session: ended } = await endSession(character.id, session.id);
+      // Show the recap modal; navigation happens when the modal is dismissed.
+      setEndedSession(ended);
     } finally {
       setEndPending(false);
     }
@@ -282,6 +287,13 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
         })()}
 
       </main>
+
+      {endedSession && (
+        <SessionSummaryModal
+          session={endedSession}
+          onClose={() => navigate(`/characters/${character.id}`)}
+        />
+      )}
     </div>
   );
 }

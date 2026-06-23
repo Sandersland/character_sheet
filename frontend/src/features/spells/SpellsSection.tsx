@@ -46,6 +46,7 @@ interface CastResult {
 export default function SpellsSection({ character, onUpdate }: SpellsSectionProps) {
   const spellcasting = character.spellcasting!;
   const { spellSaveDC, spellAttackBonus, slots = [], arcana = [], spells = [], ability } = spellcasting;
+  const concentratingOn = spellcasting.concentratingOn ?? null;
 
   // Warlocks use Pact Magic (single-level slots that recharge on a short rest)
   // and gain Mystic Arcanum charges at higher levels — label/render accordingly.
@@ -157,6 +158,10 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
     // Keep panel open so multiple spells can be learned in one session.
   }
 
+  function handleDropConcentration() {
+    send([{ type: "dropConcentration" }]);
+  }
+
   // ── Available slots per spell (for the slot picker in SpellRow) ─────────────
   // Only levels >= spell.level with remaining slots are valid choices. A 6th–9th
   // level spell with a matching Mystic Arcanum charge is also castable (the
@@ -207,6 +212,28 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
           </p>
         </div>
       </div>
+
+      {/* ── Active concentration banner ── */}
+      {concentratingOn && (
+        <div
+          className="flex items-center justify-between gap-3 rounded-control border border-arcane-300 bg-arcane-50 px-4 py-2.5"
+          role="status"
+        >
+          <p className="text-sm text-arcane-800">
+            Concentrating on{" "}
+            <span className="font-semibold">{concentratingOn.spellName}</span>
+          </p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={handleDropConcentration}
+            className="shrink-0 rounded bg-arcane-200 px-2.5 py-0.5 text-xs font-semibold text-arcane-800 hover:bg-arcane-300 disabled:opacity-40"
+            title={`Stop concentrating on ${concentratingOn.spellName}`}
+          >
+            Drop concentration
+          </button>
+        </div>
+      )}
 
       {/* ── Spell slot meters ── */}
       {slots.length > 0 && (
@@ -394,6 +421,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
                         onPrepare={handlePrepare}
                         onForget={handleForget}
                         availableSlots={availableSlotsForSpell(spell)}
+                        isConcentrating={concentratingOn?.entryId === spell.id}
                       />
                     ))}
                   </ul>

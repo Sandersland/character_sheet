@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { fetchActivity, revertBatch } from "@/api/client";
-import { formatBatchDate, groupByBatch } from "@/lib/timeline";
+import { groupByBatch, groupByDate } from "@/lib/timeline";
 import type { Character, CharacterEvent, CharacterEventCategory, CharacterEventField } from "@/types/character";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
@@ -51,6 +51,7 @@ const TYPE_LABEL: Partial<Record<string, string>> = {
   forgetSpell: "forgotten",
   prepareSpell: "prepared",
   unprepareSpell: "unprepared",
+  concentrationDropped: "concentration dropped",
   revert: "undo",
 };
 
@@ -118,6 +119,9 @@ export default function ActivityModal({ characterId, onClose, onUpdate }: Activi
   // Non-reverted, non-meta events in newest-first order.
   const activeEvents = (events ?? []).filter((e) => e.type !== "revert");
   const batches = groupByBatch(activeEvents);
+  // Collapse batches that share a calendar date under one date header so the
+  // label (TODAY, JUN 21, …) isn't repeated per batch.
+  const dateGroups = groupByDate(batches);
 
   // The most-recent non-reverted batch is the only one eligible for undo.
   const undoableBatchId = batches.find((b) => b.rows.every((r) => !r.reverted))?.key ?? null;
@@ -142,69 +146,75 @@ export default function ActivityModal({ characterId, onClose, onUpdate }: Activi
         )}
 
         <ul className="flex flex-col gap-4">
-          {batches.map((batch) => {
-            const isUndoable = batch.key === undoableBatchId;
-            const allReverted = batch.rows.every((r) => r.reverted);
-            return (
-              <li key={batch.key}>
-                <div className="mb-1 flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-parchment-500">
-                    {formatBatchDate(batch.createdAt)}
-                  </p>
-                  {isUndoable && (
-                    <button
-                      type="button"
-                      disabled={undoing}
-                      onClick={() => handleUndo(batch.key)}
-                      className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-50"
-                    >
-                      {undoing ? "Undoing…" : "Undo"}
-                    </button>
-                  )}
-                </div>
-                <ul className="flex flex-col gap-1.5">
-                  {batch.rows.map((event) => {
-                    const hasFields = (event.fields?.length ?? 0) > 0;
-                    const tone = CATEGORY_TONE[event.category] ?? "neutral";
-                    const label = TYPE_LABEL[event.type] ?? event.type;
-                    return (
-                      <li
-                        key={event.id}
-                        className={`flex flex-col text-sm transition-opacity ${
-                          allReverted ? "opacity-40" : ""
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <span className="flex flex-wrap items-center gap-2">
-                            <Badge tone={tone}>{label}</Badge>
-                            <span className="text-parchment-900">
-                              {event.summary}
-                            </span>
-                            {event.reverted && (
-                              <Badge tone="neutral">reverted</Badge>
-                            )}
-                          </span>
-                          {hasFields && (
-                            <button
-                              type="button"
-                              onClick={() => toggleFields(event.id)}
-                              className="shrink-0 text-xs text-parchment-400 hover:text-parchment-700"
-                              aria-label={expandedFields.has(event.id) ? "Hide field changes" : "Show field changes"}
-                            >
-                              {expandedFields.has(event.id) ? "▲" : "▼"}
-                            </button>
-                          )}
+          {dateGroups.map((group) => (
+            <li key={group.label} className="flex flex-col gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-parchment-500">
+                {group.label}
+              </p>
+              <ul className="flex flex-col gap-3">
+                {group.items.map((batch) => {
+                  const isUndoable = batch.key === undoableBatchId;
+                  const allReverted = batch.rows.every((r) => r.reverted);
+                  return (
+                    <li key={batch.key}>
+                      {isUndoable && (
+                        <div className="mb-1 flex justify-end">
+                          <button
+                            type="button"
+                            disabled={undoing}
+                            onClick={() => handleUndo(batch.key)}
+                            className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-50"
+                          >
+                            {undoing ? "Undoing…" : "Undo"}
+                          </button>
                         </div>
-                        {hasFields && expandedFields.has(event.id) && (
-                          <FieldDiffs fields={event.fields!} />
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </li>
-            );
-          })}
+                      )}
+                      <ul className="flex flex-col gap-1.5">
+                        {batch.rows.map((event) => {
+                          const hasFields = (event.fields?.length ?? 0) > 0;
+                          const tone = CATEGORY_TONE[event.category] ?? "neutral";
+                          const label = TYPE_LABEL[event.type] ?? event.type;
+                          return (
+                            <li
+                              key={event.id}
+                              className={`flex flex-col text-sm transition-opacity ${
+                                allReverted ? "opacity-40" : ""
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <span className="flex flex-wrap items-center gap-2">
+                                  <Badge tone={tone}>{label}</Badge>
+                                  <span className="text-parchment-900">
+                                    {event.summary}
+                                  </span>
+                                  {event.reverted && (
+                                    <Badge tone="neutral">reverted</Badge>
+                                  )}
+                                </span>
+                                {hasFields && (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleFields(event.id)}
+                                    className="shrink-0 text-xs text-parchment-400 hover:text-parchment-700"
+                                    aria-label={expandedFields.has(event.id) ? "Hide field changes" : "Show field changes"}
+                                  >
+                                    {expandedFields.has(event.id) ? "▲" : "▼"}
+                                  </button>
+                                )}
+                              </div>
+                              {hasFields && expandedFields.has(event.id) && (
+                                <FieldDiffs fields={event.fields!} />
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </li>
+                  );
+                })}
+              </ul>
+            </li>
+          ))}
         </ul>
       </div>
     </Modal>

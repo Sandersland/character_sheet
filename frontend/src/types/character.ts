@@ -742,6 +742,11 @@ export interface Character {
      */
     arcana?: SpellSlots[];
     spells: Spell[];
+    /**
+     * The spell the character is currently concentrating on (5e: only one at a
+     * time), or null. `entryId` matches a `Spell.id` in `spells`.
+     */
+    concentratingOn?: { entryId: string; spellName: string } | null;
   };
 
   resources?: CharacterResources;
@@ -975,6 +980,8 @@ export interface ForgetSpellOperation { type: "forgetSpell"; entryId: string }
 export interface PrepareSpellOperation { type: "prepareSpell"; entryId: string }
 /** Mark a non-cantrip as unprepared. */
 export interface UnprepareSpellOperation { type: "unprepareSpell"; entryId: string }
+/** End the active concentration spell manually. */
+export interface DropConcentrationOperation { type: "dropConcentration" }
 
 export type SpellcastingOperation =
   | CastSpellOperation
@@ -983,7 +990,8 @@ export type SpellcastingOperation =
   | LearnSpellOperation
   | ForgetSpellOperation
   | PrepareSpellOperation
-  | UnprepareSpellOperation;
+  | UnprepareSpellOperation
+  | DropConcentrationOperation;
 
 // ── Class operation types (mirrors backend/src/lib/class.ts) ─────────────────
 // Sent as `{ operations: ClassOperation[] }` to POST /api/characters/:id/class/transactions.
@@ -1107,6 +1115,38 @@ export type ActionOperation = ExecuteActionOperation;
 
 export type SessionStatus = "active" | "ended";
 
+/** One acquired-item line in a session summary. */
+export interface SessionSummaryItem {
+  name: string;
+  qty: number;
+}
+
+/** A level-up, ASI, or feat surfaced in a session summary. */
+export interface SessionSummaryAdvancement {
+  type: string;
+  label: string;
+}
+
+/**
+ * Computed end-of-session summary (Session Phase 3). Mirrors the backend
+ * `SessionSummary` shape produced by `computeSessionSummary`. Null while the
+ * session is still active.
+ */
+export interface SessionSummary {
+  startedAt: string; // ISO 8601
+  endedAt: string; // ISO 8601
+  durationMs: number;
+  xpGained: number;
+  levelsGained: number;
+  itemsAcquired: SessionSummaryItem[];
+  slotsSpent: Record<string, number>;
+  spellsCast: number;
+  combatRounds: number;
+  attackRolls: number;
+  damageRolls: number;
+  featsOrAsis: SessionSummaryAdvancement[];
+}
+
 export interface Session {
   id: string;
   characterId: string;
@@ -1114,5 +1154,5 @@ export interface Session {
   startedAt: string; // ISO 8601
   endedAt?: string;
   title?: string;
-  summary?: unknown;
+  summary?: SessionSummary | null;
 }
