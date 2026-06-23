@@ -636,3 +636,158 @@ describe("POST /:id/events/:batchId/revert — inventory deferral", () => {
     expect(events.every((e) => e.reverted)).toBe(true);
   });
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// Level-up / level-down: the ONLY revert sub-branch that writes a class-entry
+// level. The restore path (activity.ts) uses `event.data.primaryEntryId` +
+// `before.classEntryLevel` to write CharacterClassEntry.level back. These
+// scenarios exercise that branch end-to-end against persisted relational state.
+//
+// Fixture: a d10 Fighter sitting at exactly 900 XP (XP level 3) but with only
+// ONE HP level-up applied (hitDice.total = 1, classEntry.level = 1). That
+// pending-level gap lets us click a real `levelUp` op, then undo it.
+// ════════════════════════════════════════════════════════════════════════════
+
+const LVL_ID = "test-activity-leveling-1";
+const LVL_CATALOG_NAME = "Activity Revert Test Leveler";
+
+// 5e XP thresholds used below (levelForExperience): L2 = 300, L3 = 900.
+const XP_LEVEL_3 = 900;
+const XP_LEVEL_2 = 300;
+
+const LVL_BASE = {
+  id: LVL_ID,
+  name: "Activity Test Leveler",
+  alignment: "True Neutral",
+  experiencePoints: XP_LEVEL_3, // derived level 3, but only 1 HP level-up applied
+  armorClass: 16,
+  initiativeBonus: 1,
+  speed: 30,
+  hitPoints: { current: 12, max: 12, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+  hitDice: { total: 1, die: "d10", spent: 0 }, // only level 1 applied → 2 pending
+  abilityScores: {
+    strength: 14,
+    dexterity: 12,
+    constitution: 14, // +2 mod → no impact on +0-mod scenarios; chosen for clean HP math
+    intelligence: 10,
+    wisdom: 10,
+    charisma: 8,
+  },
+  savingThrowProficiencies: ["strength", "constitution"],
+  skills: [],
+  toolProficiencies: [],
+  currency: { cp: 0, sp: 0, gp: 10, pp: 0 },
+};
+
+describe("POST /:id/events/:batchId/revert — level-up / level-down class-entry level", () => {
+  let levelClassId: string;
+
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: LVL_CATALOG_NAME } });
+  });
+
+  beforeEach(async () => {
+    const cls = await prisma.characterClass.upsert({
+      where: { name: LVL_CATALOG_NAME },
+      create: {
+        name: LVL_CATALOG_NAME,
+        hitDie: "d10",
+        savingThrows: ["strength", "constitution"],
+        skillChoiceCount: 2,
+        skillChoices: ["athletics", "intimidation"],
+        isSpellcaster: false,
+      },
+      update: {},
+    });
+    levelClassId = cls.id;
+
+    await prisma.character.create({
+      data: {
+        ...LVL_BASE,
+        // class entry starts at level 1 (snapshot name drives nothing level-relevant here)
+        classEntries: { create: [{ name: "fighter", classId: levelClassId, position: 0, level: 1 }] },
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: LVL_ID } });
+  });
+
+  // Reads the persisted CharacterClassEntry.level directly (the column the
+  // revert branch writes) so the assertion is on real relational state, not a
+  // derived/serialized value.
+  async function persistedClassEntryLevel(): Promise<number> {
+    const entry = await prisma.characterClassEntry.findFirst({
+      where: { characterId: LVL_ID, position: 0 },
+      select: { level: true },
+    });
+    if (!entry) throw new Error("class entry not found");
+    return entry.level;
+  }
+
+  // ── levelUp: revert restores classEntry.level via primaryEntryId branch ────
+
+  it("reverts a level-up, restoring the persisted CharacterClassEntry.level", async () => {
+    // Sanity: fixture starts at class-entry level 1.
+    expect(await persistedClassEntryLevel()).toBe(1);
+
+    // Click a real level-up. XP already derives level 3 > hitDice.total 1, so
+    // the op is valid; it bumps hitDice.total → 2 and classEntry.level → 2 and
+    // writes a `levelUp` event carrying data.primaryEntryId + before.classEntryLevel.
+    const levelUp = await supertest(app())
+      .post(`/api/characters/${LVL_ID}/hp`)
+      .send({ operations: [{ type: "levelUp", method: "average" }] });
+    expect(levelUp.status).toBe(200);
+    expect(levelUp.body.classes[0].level).toBe(2);
+    expect(await persistedClassEntryLevel()).toBe(2);
+
+    // Undo it. This is the ONLY revert code path that writes a class-entry
+    // level — it reads data.primaryEntryId + before.classEntryLevel.
+    const batchId = await latestBatchId(LVL_ID);
+    const res = await revert(LVL_ID, batchId);
+    expect(res.status).toBe(200);
+    expect(res.body.classes[0].level).toBe(1); // serialized view restored
+    expect(await persistedClassEntryLevel()).toBe(1); // persisted column restored
+  });
+
+  // ── levelDown: XP set that lowers level emits a levelDown event whose revert
+  //    branch also restores classEntry.level via the same primaryEntryId path. ─
+
+  it("reverts an XP-driven level-down, restoring the lowered CharacterClassEntry.level", async () => {
+    // First, apply two real level-ups so hitDice.total = 3 and classEntry.level = 3.
+    const up1 = await supertest(app())
+      .post(`/api/characters/${LVL_ID}/hp`)
+      .send({ operations: [{ type: "levelUp", method: "average" }] });
+    expect(up1.status).toBe(200);
+    const up2 = await supertest(app())
+      .post(`/api/characters/${LVL_ID}/hp`)
+      .send({ operations: [{ type: "levelUp", method: "average" }] });
+    expect(up2.status).toBe(200);
+    expect(up2.body.classes[0].level).toBe(3);
+    expect(await persistedClassEntryLevel()).toBe(3);
+
+    // Now SET XP down to level 2. The experience handler auto-reverses the HP
+    // level-ups (revertLevelUps) in the SAME batch, emitting a `levelDown`
+    // event that snapshots before.classEntryLevel = 3 and data.primaryEntryId,
+    // and writes classEntry.level down to 2.
+    const down = await supertest(app())
+      .post(`/api/characters/${LVL_ID}/experience`)
+      .send({ operations: [{ type: "set", value: XP_LEVEL_2 }] });
+    expect(down.status).toBe(200);
+    expect(down.body.level).toBe(2);
+    expect(down.body.classes[0].level).toBe(2);
+    expect(await persistedClassEntryLevel()).toBe(2);
+
+    // Undo the XP-set batch. The batch contains BOTH the experience event
+    // (restores XP) and the levelDown event (restores classEntry.level via the
+    // primaryEntryId branch). After undo, the entry level returns to 3.
+    const batchId = await latestBatchId(LVL_ID);
+    const res = await revert(LVL_ID, batchId);
+    expect(res.status).toBe(200);
+    expect(res.body.experiencePoints).toBe(XP_LEVEL_3); // XP restored
+    expect(res.body.level).toBe(3); // derived level restored
+    expect(res.body.classes[0].level).toBe(3); // serialized class-entry level restored
+    expect(await persistedClassEntryLevel()).toBe(3); // persisted column restored
+  });
+});
