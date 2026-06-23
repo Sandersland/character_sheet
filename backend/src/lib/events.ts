@@ -12,7 +12,8 @@ export type EventCategory =
   | "resources"
   | "advancement"
   | "session"
-  | "combat";
+  | "combat"
+  | "conditions";
 
 export type EventType =
   // inventory
@@ -72,6 +73,10 @@ export type EventType =
   | "combatStarted"
   | "combatEnded"
   | "combatRoundAdvanced"
+  // conditions
+  | "conditionApplied"
+  | "conditionRemoved"
+  | "exhaustionSet"
   // roll events (attack/damage logged from session UI)
   | "attackRoll"
   | "damageRoll"

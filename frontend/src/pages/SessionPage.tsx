@@ -18,6 +18,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { RollProvider } from "@/features/dice/RollContext";
 import RollResultToast from "@/features/dice/RollResultToast";
 import CompactHpBar from "@/features/hitpoints/CompactHpBar";
+import ConditionsStrip from "@/features/conditions/ConditionsStrip";
 import HitPointTracker from "@/features/hitpoints/HitPointTracker";
 import InventoryList from "@/features/inventory/InventoryList";
 import ClassFeaturesSection from "@/features/class/ClassFeaturesSection";
@@ -196,6 +197,9 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
 
         {/* ── Compact HP strip — always visible, slim ──────────────────── */}
         <CompactHpBar character={character} />
+
+        {/* ── Active conditions + exhaustion ──────────────────────────── */}
+        <ConditionsStrip character={character} onUpdate={handleCharacterUpdate} />
 
         {/* ── Turn hub — primary surface; inline attack/item pickers live here ── */}
         <TurnHub

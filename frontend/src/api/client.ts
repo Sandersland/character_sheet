@@ -9,6 +9,7 @@ import type {
   CharacterEvent,
   CharacterSummary,
   ClassOperation,
+  ConditionOperation,
   CreateCharacterInput,
   ExperienceOperation,
   HitPointOperation,
@@ -299,6 +300,24 @@ export async function applyResourceTransactions(
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     throw new Error(body?.error ?? `Failed to apply resource operations (${response.status})`);
+  }
+  return response.json();
+}
+
+// Applies a batch of condition operations atomically (apply/remove a status
+// condition, set exhaustion level). Full updated Character returned on success.
+export async function applyConditionTransactions(
+  characterId: string,
+  operations: ConditionOperation[]
+): Promise<Character> {
+  const response = await fetch(`${API_URL}/characters/${characterId}/conditions/transactions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ operations }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to apply condition operations (${response.status})`);
   }
   return response.json();
 }

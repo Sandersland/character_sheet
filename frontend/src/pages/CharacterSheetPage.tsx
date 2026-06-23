@@ -20,6 +20,7 @@ import SkillsTable from "@/features/abilities/SkillsTable";
 import SpellsSection from "@/features/spells/SpellsSection";
 import ProficienciesCard from "@/features/abilities/ProficienciesCard";
 import VitalsStrip from "@/features/character-meta/VitalsStrip";
+import ConditionsStrip from "@/features/conditions/ConditionsStrip";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useReferenceData } from "@/hooks/useReferenceData";
 import { abilityAbbr, orderedAbilityEntries } from "@/lib/abilities";
@@ -201,6 +202,9 @@ export default function CharacterSheetPage() {
 
         {/* ── Combat vitals at a glance ───────────────────────────────── */}
         <VitalsStrip character={character} />
+
+        {/* ── Active conditions + exhaustion ──────────────────────────── */}
+        <ConditionsStrip character={character} onUpdate={setCharacter} />
 
         {/* ── Hit points · Experience ────────────────────────────────── */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
