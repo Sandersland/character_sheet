@@ -15,6 +15,7 @@ import ExperienceTracker from "@/features/experience/ExperienceTracker";
 import HitPointTracker from "@/features/hitpoints/HitPointTracker";
 import InventoryList from "@/features/inventory/InventoryList";
 import JournalSection from "@/features/character-meta/JournalSection";
+import SessionsModal from "@/features/session/SessionsModal";
 import SkillsTable from "@/features/abilities/SkillsTable";
 import SpellsSection from "@/features/spells/SpellsSection";
 import ProficienciesCard from "@/features/abilities/ProficienciesCard";
@@ -32,6 +33,7 @@ export default function CharacterSheetPage() {
   const { reference } = useReferenceData();
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
   const [activeSession, setActiveSession] = useState<Session | null | undefined>(undefined);
   const [sessionPending, setSessionPending] = useState(false);
 
@@ -148,6 +150,13 @@ export default function CharacterSheetPage() {
               </button>
               <button
                 type="button"
+                onClick={() => setSessionsOpen(true)}
+                className="text-xs font-semibold text-arcane-700 hover:underline"
+              >
+                Sessions
+              </button>
+              <button
+                type="button"
                 onClick={() => setActivityOpen(true)}
                 className="text-xs font-semibold text-arcane-700 hover:underline"
               >
@@ -178,6 +187,13 @@ export default function CharacterSheetPage() {
           characterId={character.id}
           onClose={() => setActivityOpen(false)}
           onUpdate={setCharacter}
+        />
+      )}
+
+      {sessionsOpen && (
+        <SessionsModal
+          characterId={character.id}
+          onClose={() => setSessionsOpen(false)}
         />
       )}
 

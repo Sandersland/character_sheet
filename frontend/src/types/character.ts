@@ -1107,6 +1107,38 @@ export type ActionOperation = ExecuteActionOperation;
 
 export type SessionStatus = "active" | "ended";
 
+/** One acquired-item line in a session summary. */
+export interface SessionSummaryItem {
+  name: string;
+  qty: number;
+}
+
+/** A level-up, ASI, or feat surfaced in a session summary. */
+export interface SessionSummaryAdvancement {
+  type: string;
+  label: string;
+}
+
+/**
+ * Computed end-of-session summary (Session Phase 3). Mirrors the backend
+ * `SessionSummary` shape produced by `computeSessionSummary`. Null while the
+ * session is still active.
+ */
+export interface SessionSummary {
+  startedAt: string; // ISO 8601
+  endedAt: string; // ISO 8601
+  durationMs: number;
+  xpGained: number;
+  levelsGained: number;
+  itemsAcquired: SessionSummaryItem[];
+  slotsSpent: Record<string, number>;
+  spellsCast: number;
+  combatRounds: number;
+  attackRolls: number;
+  damageRolls: number;
+  featsOrAsis: SessionSummaryAdvancement[];
+}
+
 export interface Session {
   id: string;
   characterId: string;
@@ -1114,5 +1146,5 @@ export interface Session {
   startedAt: string; // ISO 8601
   endedAt?: string;
   title?: string;
-  summary?: unknown;
+  summary?: SessionSummary | null;
 }

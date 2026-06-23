@@ -134,6 +134,45 @@ describe("POST /api/characters/:id/sessions/:sessionId/end — end session", () 
     expect(res.status).toBe(404);
     expect(res.body.error).toMatch(/not found/i);
   });
+
+  it("computes and persists a typed summary from the session's events", async () => {
+    const startRes = await supertest(app).post(sessionsUrl()).send({});
+    const sessionId = startRes.body.session.id as string;
+
+    // Generate a spread of summarizable events within the session.
+    await supertest(app)
+      .post(`/api/characters/${FIXTURE_ID}/experience`)
+      .send({ operations: [{ type: "award", amount: 450 }] });
+    await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/combat/round`))
+      .send({ round: 3 });
+    await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/roll`))
+      .send({ kind: "attack", source: "Longsword", total: 17 });
+    await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/roll`))
+      .send({ kind: "damage", source: "Longsword", total: 9, damageType: "slashing" });
+
+    const endRes = await supertest(app).post(sessionsUrl(`/${sessionId}/end`)).send({});
+    expect(endRes.status).toBe(200);
+
+    // Summary is returned by the end response …
+    const summary = endRes.body.session.summary;
+    expect(summary).toBeDefined();
+    expect(summary.xpGained).toBe(450);
+    expect(summary.combatRounds).toBe(3);
+    expect(summary.attackRolls).toBe(1);
+    expect(summary.damageRolls).toBe(1);
+    expect(typeof summary.durationMs).toBe("number");
+    expect(summary.startedAt).toBeDefined();
+    expect(summary.endedAt).toBeDefined();
+
+    // … and persisted on the row (visible via GET).
+    const getRes = await supertest(app).get(sessionsUrl(`/${sessionId}`));
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.summary.xpGained).toBe(450);
+    expect(getRes.body.summary.attackRolls).toBe(1);
+  });
 });
 
 // ── Active-session contract ───────────────────────────────────────────────────
