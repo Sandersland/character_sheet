@@ -29,7 +29,6 @@ const FIXTURE = {
   skills: [],
   toolProficiencies: [],
   currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
-  journal: [],
 };
 
 // A second fixture for "negative Con" edge cases — Con 6 → conMod -2.

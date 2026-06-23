@@ -172,6 +172,58 @@ export async function deleteCharacter(id: string): Promise<void> {
   }
 }
 
+// ── Journal CRUD ─────────────────────────────────────────────────────────────
+// Plain REST (no transaction/op batching) — journal entries carry no mechanical
+// effect, so they aren't routed through the audit log. Each call returns the
+// full updated Character so the caller can swap its state in one assignment.
+
+export async function createJournalEntry(
+  characterId: string,
+  entry: { title: string; date: string; body: string; sessionId?: string }
+): Promise<Character> {
+  const response = await fetch(`${API_URL}/characters/${characterId}/journal`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(entry),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to create journal entry (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function updateJournalEntry(
+  characterId: string,
+  entryId: string,
+  patch: { title?: string; date?: string; body?: string }
+): Promise<Character> {
+  const response = await fetch(`${API_URL}/characters/${characterId}/journal/${entryId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to update journal entry (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function deleteJournalEntry(
+  characterId: string,
+  entryId: string
+): Promise<Character> {
+  const response = await fetch(`${API_URL}/characters/${characterId}/journal/${entryId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to delete journal entry (${response.status})`);
+  }
+  return response.json();
+}
+
 export async function createCharacter(input: CreateCharacterInput): Promise<Character> {
   const response = await fetch(`${API_URL}/characters`, {
     method: "POST",

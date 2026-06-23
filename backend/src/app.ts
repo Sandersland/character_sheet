@@ -13,6 +13,7 @@ import { healthRouter } from "./routes/health.js";
 import { hitPointsRouter } from "./routes/hitpoints.js";
 import { inventoryRouter } from "./routes/inventory.js";
 import { itemsRouter } from "./routes/items.js";
+import { journalRouter } from "./routes/journal.js";
 import { maneuversRouter } from "./routes/maneuvers.js";
 import { referenceRouter } from "./routes/reference.js";
 import { resourcesRouter } from "./routes/resources.js";
@@ -42,6 +43,7 @@ export function createApp() {
   app.use("/api", advancementRouter);
   app.use("/api", sessionsRouter);
   app.use("/api", actionsRouter);
+  app.use("/api", journalRouter);
 
   return app;
 }

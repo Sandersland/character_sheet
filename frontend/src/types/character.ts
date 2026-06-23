@@ -450,8 +450,11 @@ export interface SpellSlots {
 export interface JournalEntry {
   id: string;
   title: string;
+  /** ISO-8601 date string from the API (the JournalEntry.date DateTime). */
   date: string;
   body: string;
+  /** Provenance: the session this entry was written during, if any. */
+  sessionId?: string;
 }
 
 // ── Class feature types ───────────────────────────────────────────────────────

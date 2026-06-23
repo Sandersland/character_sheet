@@ -666,7 +666,6 @@ export interface DerivedCharacterFields {
   toolProficiencies: ToolProficiencyEntry[];
   currency: { cp: number; sp: number; gp: number; pp: number };
   spellcasting: null;
-  journal: never[];
 }
 
 /**
@@ -697,7 +696,6 @@ export function deriveCreatedCharacter(
     toolProficiencies: input.toolProficiencies ?? [],
     currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
     spellcasting: null,
-    journal: [],
   };
 }
 
