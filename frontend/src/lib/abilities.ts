@@ -47,6 +47,17 @@ export const ABILITY_ORDER: readonly AbilityName[] = [
 export const ABILITY_OPTIONS: readonly { key: AbilityName; label: string }[] =
   ABILITY_ORDER.map((key) => ({ key, label: ABILITY_LABELS[key] }));
 
+/** Ability scores in canonical 5e rail order (STR-DEX-CON-INT-WIS-CHA),
+ *  regardless of the input object's key order. Single source of ability-rail
+ *  ordering shared by the page and its regression test. */
+export function orderedAbilityEntries(
+  scores: Record<AbilityName, number>
+): [AbilityName, number][] {
+  return ABILITY_OPTIONS.map(
+    ({ key }) => [key, scores[key]] as [AbilityName, number]
+  );
+}
+
 // Each skill's governing ability — display/selection metadata mirroring the
 // backend srd.ts SKILLS order (rules logic stays on the backend).
 const SKILL_ABILITY: Record<SkillName, AbilityName> = {
