@@ -6,6 +6,9 @@ build/
 .DS_Store
 backend/src/generated/
 
+# Git worktrees used for parallel feature branches
+.claude/worktrees/
+
 # Playwright / verify-tool artifacts
 .playwright-mcp/
 page-*.png
