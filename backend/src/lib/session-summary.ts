@@ -112,6 +112,24 @@ function isArcanumRestore(event: SummaryEventInput, level: number): boolean {
   return arcanumAfter < arcanumBefore;
 }
 
+/**
+ * Cast-side counterpart to {@link isArcanumRestore}. A Warlock Mystic Arcanum
+ * cast goes through the normal `castSpell` op and emits a non-null `slotLevel`,
+ * but it spends an Arcanum charge (`arcanumUsed`), not a spell slot
+ * (`slotsUsed`). Inspect the before→after snapshot: it's an Arcanum cast when
+ * `arcanumUsed[level]` increased while `slotsUsed[level]` did NOT — so its slot
+ * accounting must be skipped (the cast itself still counts toward `spellsCast`).
+ */
+function isArcanumCast(event: SummaryEventInput, level: number): boolean {
+  const slotsBefore = spellcastingCount(event.before, "slotsUsed", level);
+  const slotsAfter = spellcastingCount(event.after, "slotsUsed", level);
+  // A real slot cast bumps slotsUsed by one; if it did, this is not Arcanum.
+  if (slotsAfter > slotsBefore) return false;
+  const arcanumBefore = spellcastingCount(event.before, "arcanumUsed", level);
+  const arcanumAfter = spellcastingCount(event.after, "arcanumUsed", level);
+  return arcanumAfter > arcanumBefore;
+}
+
 // ── Aggregation ──────────────────────────────────────────────────────────────
 
 /**
@@ -175,6 +193,10 @@ export function computeSessionSummary(
         const data = asRecord(event.data);
         const level = numField(event.data, "level") ?? numField(event.data, "slotLevel");
         if (typeof level === "number" && data.slotLevel !== null) {
+          // A Mystic Arcanum cast emits a non-null slotLevel but spends an
+          // Arcanum charge, not a slot — disambiguate via the snapshot and skip
+          // the slot tally (spellsCast above still counts the cast itself).
+          if (isArcanumCast(event, level)) break;
           const key = String(level);
           slotsSpent[key] = (slotsSpent[key] ?? 0) + 1;
         }
