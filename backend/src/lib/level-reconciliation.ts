@@ -37,7 +37,7 @@ import {
   type ManeuverEntry,
   type ToolProfEntry,
 } from "./resources.js";
-import { advancementSlotsForLevel } from "./srd.js";
+import { advancementSlotsForLevel, fightingStyleChoiceCount, FIGHTING_STYLES } from "./srd.js";
 import { deriveResources } from "./class-features.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeHitPoints } from "./hitpoints.js";
@@ -279,6 +279,78 @@ async function reconcileToolProficiencies(ctx: ReconcileContext): Promise<void> 
   });
 }
 
+// ── reconcileFightingStyle ────────────────────────────────────────────────────
+// Clears the persisted fighting style when the character is no longer entitled
+// to one at the new level (e.g. a class change away from Fighter via the data —
+// fightingStyleChoiceCount drops to 0). Fighter keeps its choice at every level
+// >= 1, so for a pure single-class Fighter this only fires on a class change.
+//
+// Uses a `resources`-category event so the undo branch in activity.ts restores
+// before.resources wholesale (incl. fightingStyle) — no new undo code. The
+// clamp-on-read mirror lives in serializeCharacter.
+
+async function reconcileFightingStyle(ctx: ReconcileContext): Promise<void> {
+  const { tx, characterId, newDerivedLevel, batchId } = ctx;
+
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: {
+      resources: true,
+      classEntries: {
+        orderBy: { position: "asc" as const },
+        take: 1,
+        select: { name: true },
+      },
+    },
+  });
+  if (!row) return;
+
+  const state = normalizeResourcesMutable(row.resources);
+  if (state.fightingStyle === null) return; // nothing chosen
+
+  const className = row.classEntries[0]?.name ?? "";
+  const allowed = fightingStyleChoiceCount(className, newDerivedLevel);
+  if (allowed > 0) return; // still entitled — keep the choice
+
+  const before = {
+    resources: {
+      used: { ...state.used },
+      maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+      toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
+      fightingStyle: state.fightingStyle,
+    },
+  };
+
+  const removedKey = state.fightingStyle;
+  const removedLabel = FIGHTING_STYLES.find((s) => s.key === removedKey)?.label ?? removedKey;
+  state.fightingStyle = null;
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: { resources: serializeResourcesState(state) },
+  });
+
+  const after = {
+    resources: {
+      used: { ...state.used },
+      maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+      toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
+      fightingStyle: null,
+    },
+  };
+
+  await logEvent(tx, {
+    characterId,
+    category: "resources",
+    type: "fightingStyleRemoved",
+    summary: `Fighting style "${removedLabel}" removed — no longer available`,
+    before,
+    after,
+    data: { fightingStyle: removedKey },
+    batchId,
+  });
+}
+
 // ── reconcileAdvancements ─────────────────────────────────────────────────────
 // Reverses the tail of advancements[] when the XP-derived level has fallen
 // below the level required for those slots (i.e. character leveled down past
@@ -413,6 +485,7 @@ const LEVEL_GATED_RECONCILERS: Reconciler[] = [
   reconcileSubclass,
   reconcileManeuvers,
   reconcileToolProficiencies,
+  reconcileFightingStyle,
   reconcileAdvancements,
 ];
 

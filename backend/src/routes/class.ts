@@ -17,7 +17,22 @@ const setSubclassOpSchema = z.object({
   subclassId: z.string().min(1),
 });
 
-const operationSchema = z.discriminatedUnion("type", [setSubclassOpSchema]);
+const setFightingStyleOpSchema = z.object({
+  type: z.literal("setFightingStyle"),
+  key: z.enum([
+    "archery",
+    "defense",
+    "dueling",
+    "greatWeaponFighting",
+    "protection",
+    "twoWeaponFighting",
+  ]),
+});
+
+const operationSchema = z.discriminatedUnion("type", [
+  setSubclassOpSchema,
+  setFightingStyleOpSchema,
+]);
 
 const transactionsRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),

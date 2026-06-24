@@ -611,6 +611,18 @@ export interface ToolProfEntry {
   name: string; // matches a TOOLS entry name
 }
 
+/**
+ * The 6 core Fighting Style keys (mirror of srd.ts FightingStyleKey). Persisted
+ * choice is just this key; the mechanical effect is derived on the backend.
+ */
+export type FightingStyleKey =
+  | "archery"
+  | "defense"
+  | "dueling"
+  | "greatWeaponFighting"
+  | "protection"
+  | "twoWeaponFighting";
+
 /** Derived class/subclass resource data merged with stored mutable state. */
 export interface CharacterResources {
   features: ClassFeature[];
@@ -622,6 +634,10 @@ export interface CharacterResources {
   maneuversKnown: ManeuverEntry[];
   /** Level-gated tool proficiency choices (e.g. Student of War). */
   toolProficienciesKnown: ToolProfEntry[];
+  /** Number of Fighting Style choices the character is entitled to (Fighter L1 -> 1). */
+  fightingStyleChoiceCount?: number;
+  /** The chosen Fighting Style key, or null if unchosen / not entitled. */
+  fightingStyle?: FightingStyleKey | null;
 }
 
 /** One entry in `Character.classes` — structured multiclass-aware view. */
@@ -1003,7 +1019,8 @@ export type SpellcastingOperation =
 // Sent as `{ operations: ClassOperation[] }` to POST /api/characters/:id/class/transactions.
 
 export interface SetSubclassOperation { type: "setSubclass"; subclassId: string }
-export type ClassOperation = SetSubclassOperation;
+export interface SetFightingStyleOperation { type: "setFightingStyle"; key: FightingStyleKey }
+export type ClassOperation = SetSubclassOperation | SetFightingStyleOperation;
 
 // ── Resource operation types (mirrors backend/src/lib/resources.ts) ──────────
 // Sent as `{ operations: ResourceOperation[] }` to POST /api/characters/:id/resources/transactions.
