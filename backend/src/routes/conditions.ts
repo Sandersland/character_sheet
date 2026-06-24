@@ -6,7 +6,7 @@ import {
   InvalidConditionOperationError,
 } from "../lib/conditions.js";
 import { prisma } from "../lib/prisma.js";
-import { CONDITIONS, EXHAUSTION_MAX } from "../lib/srd.js";
+import { CONDITIONS, EXHAUSTION_MAX, type ConditionKey } from "../lib/srd.js";
 import { characterInclude, serializeCharacter } from "./characters.js";
 
 export const conditionsRouter = Router();
@@ -14,7 +14,7 @@ export const conditionsRouter = Router();
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 
 const conditionKeySchema = z.enum(
-  CONDITIONS.map((c) => c.key) as [string, ...string[]],
+  CONDITIONS.map((c) => c.key) as [ConditionKey, ...ConditionKey[]],
 );
 
 const applyConditionOpSchema = z.object({
@@ -70,10 +70,7 @@ conditionsRouter.post("/characters/:id/conditions/transactions", async (req, res
   }
 
   try {
-    await applyConditionsOperations(
-      character.id,
-      parseResult.data.operations as Parameters<typeof applyConditionsOperations>[1],
-    );
+    await applyConditionsOperations(character.id, parseResult.data.operations);
   } catch (error) {
     if (error instanceof InvalidConditionOperationError) {
       res.status(400).json({ error: error.message });
