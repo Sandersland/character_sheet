@@ -485,6 +485,77 @@ describe("characters routes", () => {
           (i: { name: string }) => i.name === "Longsword"
         );
         expect(longsword?.weapon?.weaponClass).toBe("martial");
+
+        // issue #51: a freshly created martial character must have its primary
+        // weapon + body armor + shield auto-equipped (one-handed weapon, so the
+        // shield is allowed), but NOT a second weapon (the thrown Handaxes).
+        expect(longsword?.equipped).toBe(true);
+        const chainMail = response.body.inventory.find(
+          (i: { name: string }) => i.name === "Chain Mail"
+        );
+        expect(chainMail?.equipped).toBe(true);
+        const shield = response.body.inventory.find(
+          (i: { name: string }) => i.name === "Shield"
+        );
+        expect(shield?.equipped).toBe(true);
+        const handaxe = response.body.inventory.find(
+          (i: { name: string }) => i.name === "Handaxe"
+        );
+        expect(handaxe?.equipped).toBe(false);
+      });
+
+      it("auto-equips a two-handed weapon alone — no second weapon (issue #51)", async () => {
+        // Fighter group 1, option 1: two martial weapons. The first pick is a
+        // Greataxe (two-handed); the rules preclude equipping the second weapon.
+        const response = await supertest(createApp())
+          .post("/api/characters")
+          .send({
+            name: "Hrothgar",
+            alignment: "Chaotic Good",
+            race: "Human",
+            background: "Soldier",
+            classes: [{ name: "Fighter" }],
+            abilityScores: {
+              strength: 16,
+              dexterity: 12,
+              constitution: 14,
+              intelligence: 8,
+              wisdom: 10,
+              charisma: 8,
+            },
+            skillProficiencies: ["athletics", "intimidation"],
+            startingEquipment: {
+              mode: "package",
+              selections: [
+                { optionIndex: 0 },                                       // Chain Mail
+                { optionIndex: 1, openPicks: ["Greataxe", "Longsword"] }, // Two martial weapons
+                { optionIndex: 1 },                                       // Two Handaxes
+                { optionIndex: 0 },                                       // Dungeoneer's Pack
+              ],
+            },
+          });
+
+        expect(response.status).toBe(201);
+        createdCharacterIds.push(response.body.id);
+
+        const greataxe = response.body.inventory.find(
+          (i: { name: string }) => i.name === "Greataxe"
+        );
+        // Confirm the fixture actually gave us a two-handed weapon.
+        expect(greataxe?.weapon?.twoHanded).toBe(true);
+        expect(greataxe?.equipped).toBe(true);
+
+        // Two-handed weapon consumes the off-hand: the second weapon stays
+        // unequipped. Body armor — which never contends for the off-hand — still
+        // equips.
+        const chainMail = response.body.inventory.find(
+          (i: { name: string }) => i.name === "Chain Mail"
+        );
+        expect(chainMail?.equipped).toBe(true);
+        const longsword = response.body.inventory.find(
+          (i: { name: string }) => i.name === "Longsword"
+        );
+        expect(longsword?.equipped).toBe(false);
       });
 
       it("rejects optionIndex out of range with 400", async () => {
