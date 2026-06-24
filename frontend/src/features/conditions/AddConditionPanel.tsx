@@ -20,6 +20,16 @@ interface Props {
 export default function AddConditionPanel({ activeKeys, busy, onApply }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [source, setSource] = useState("");
+
+  function handleApply(key: ConditionKey) {
+    const trimmed = source.trim();
+    onApply({
+      type: "applyCondition",
+      key,
+      ...(trimmed ? { source: trimmed } : {}),
+    });
+  }
 
   const activeSet = new Set(activeKeys);
   const available = CONDITION_OPTIONS.filter((c) => {
@@ -66,6 +76,17 @@ export default function AddConditionPanel({ activeKeys, busy, onApply }: Props) 
         className="mb-3 w-full rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
       />
 
+      <label className="mb-3 block">
+        <span className="mb-1 block text-xs font-semibold text-gold-900">Source</span>
+        <input
+          type="text"
+          placeholder="Giant Spider"
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
+          className="w-full rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
+        />
+      </label>
+
       {available.length === 0 ? (
         <p className="py-2 text-center text-xs text-parchment-500">
           {search ? "No conditions match your search." : "All conditions already applied."}
@@ -86,7 +107,7 @@ export default function AddConditionPanel({ activeKeys, busy, onApply }: Props) 
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => onApply({ type: "applyCondition", key: condition.key })}
+                onClick={() => handleApply(condition.key)}
                 className="shrink-0 rounded bg-gold-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-gold-700 disabled:cursor-not-allowed disabled:opacity-40"
                 title={`Apply ${condition.label}`}
               >
