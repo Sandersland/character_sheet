@@ -27,10 +27,13 @@ import {
   deriveUnarmedStrike,
   deriveWeaponAttackBonus,
   deriveWeaponDamage,
+  deriveFightingStyleBonuses,
+  fightingStyleChoiceCount,
   isKnownTool,
   RACE_PROFICIENCY_GRANTS,
   TOOLS,
   type ArmorProficiencyCategory,
+  type FightingStyleKey,
   type ToolProficiencyEntry,
 } from "../lib/srd.js";
 import { deriveResources } from "../lib/class-features.js";
@@ -112,6 +115,12 @@ interface InventoryItemContext {
    * the correct die for versatile weapons (2H die when off-hand is free).
    */
   offHandBusy: boolean;
+  /**
+   * The character's chosen Fighting Style (already clamped to null when the
+   * character isn't entitled). Threaded into deriveWeaponAttackBonus so Archery
+   * adds +2 to ranged weapon attacks.
+   */
+  fightingStyle: FightingStyleKey | null;
 }
 
 function serializeInventoryItem(
@@ -137,6 +146,7 @@ function serializeInventoryItem(
         context.effectiveScores,
         context.proficiencyBonus,
         context.weaponGrants,
+        context.fightingStyle,
       ),
       damage: deriveWeaponDamage(
         {
@@ -346,6 +356,18 @@ export function serializeCharacter(row: CharacterWithRelations) {
     progress.proficiencyBonus,
   );
 
+  // ── Fighting Style clamp-on-read ──────────────────────────────────────────
+  // The chosen style key is persisted in resources.fightingStyle. Clamp it to
+  // null when the character is no longer entitled (e.g. class change / level
+  // drop) — defense-in-depth mirroring reconcileFightingStyle on the write side.
+  const fightingStyleChoices = fightingStyleChoiceCount(
+    primaryClass?.name ?? "",
+    progress.level,
+  );
+  const storedFightingStyle = normalizeResourcesMutable(row.resources).fightingStyle;
+  const fightingStyle: FightingStyleKey | null =
+    fightingStyleChoices > 0 ? storedFightingStyle : null;
+
   let resources: object | undefined;
   if (derivedRes) {
     const stored = normalizeResourcesMutable(row.resources);
@@ -376,6 +398,11 @@ export function serializeCharacter(row: CharacterWithRelations) {
       })),
       maneuversKnown: clampedManeuversKnown,
       toolProficienciesKnown: clampedToolProfsKnown,
+      // Fighting Style choice surface for the frontend picker. Choice count is
+      // level-gated (Fighter L1 -> 1); fightingStyle is already clamped to null
+      // when the character isn't entitled.
+      fightingStyleChoiceCount: fightingStyleChoices,
+      fightingStyle,
     };
   }
 
@@ -455,6 +482,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     proficiencyBonus: progress.proficiencyBonus,
     weaponGrants,
     offHandBusy,
+    fightingStyle,
   };
 
   return {
@@ -469,7 +497,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
     alignment: row.alignment,
     portraitUrl: row.portraitUrl ?? undefined,
 
-    armorClass: row.armorClass + featBonuses.armorClass,
+    armorClass:
+      row.armorClass + featBonuses.armorClass + deriveFightingStyleBonuses(fightingStyle).armorClass,
     initiativeBonus: effectiveInitBonus + featBonuses.initiative,
     speed: row.speed + featBonuses.speed,
     proficiencyBonus: progress.proficiencyBonus,

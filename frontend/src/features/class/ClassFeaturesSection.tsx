@@ -14,10 +14,13 @@ import type {
   Character,
   ClassOperation,
   ClassOption,
+  FightingStyleKey,
   LearnManeuverOperation,
   ResourceOperation,
 } from "@/types/character";
+import { fightingStyleLabel, FIGHTING_STYLE_DESCRIPTIONS } from "@/lib/fightingStyles";
 import AddManeuverPanel from "@/features/class/AddManeuverPanel";
+import FightingStylePanel from "@/features/class/FightingStylePanel";
 import ManeuverRow from "@/features/class/ManeuverRow";
 import ResourcePoolRow from "@/features/class/ResourcePoolRow";
 
@@ -98,11 +101,19 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
     sendResource([{ type: "forgetManeuver", entryId }]);
   }
 
+  // ── Fighting style handler ─────────────────────────────────────────────────────
+
+  function handleChooseFightingStyle(key: FightingStyleKey) {
+    sendClass([{ type: "setFightingStyle", key }]);
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   const hasPools = resources && resources.pools.length > 0;
   const hasManeuvers = resources?.maneuverChoiceCount !== undefined;
   const hasFeatures = resources && resources.features.length > 0;
+  const hasFightingStyle = (resources?.fightingStyleChoiceCount ?? 0) > 0;
+  const fightingStyle = resources?.fightingStyle ?? null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -219,6 +230,39 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
         </div>
       )}
 
+      {/* ── Fighting Style (selectable L1 Fighter feature) ── */}
+      {hasFightingStyle && (
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+              Fighting Style
+            </h3>
+            {busy && <span className="text-[10px] text-parchment-400">Saving…</span>}
+          </div>
+
+          {fightingStyle ? (
+            <div className="mb-3">
+              <p className="text-sm font-semibold text-parchment-900">
+                {fightingStyleLabel(fightingStyle)}
+              </p>
+              <p className="mt-0.5 text-xs leading-relaxed text-parchment-600">
+                {FIGHTING_STYLE_DESCRIPTIONS[fightingStyle]}
+              </p>
+            </div>
+          ) : (
+            <p className="mb-3 text-xs text-parchment-600">
+              Choose a fighting style specialty.
+            </p>
+          )}
+
+          <FightingStylePanel
+            current={fightingStyle}
+            busy={busy}
+            onChoose={handleChooseFightingStyle}
+          />
+        </div>
+      )}
+
       {/* ── Class features (static) ── */}
       {hasFeatures && (
         <div>
@@ -246,7 +290,7 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
       )}
 
       {/* Empty state — no class resource data at all */}
-      {!hasPools && !hasManeuvers && !hasFeatures && !character.subclass && !needsSubclass && (
+      {!hasPools && !hasManeuvers && !hasFeatures && !hasFightingStyle && !character.subclass && !needsSubclass && (
         <p className="py-4 text-center text-sm text-parchment-400">
           No class features available at this level.
         </p>
