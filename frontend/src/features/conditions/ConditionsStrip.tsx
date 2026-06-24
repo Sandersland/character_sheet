@@ -29,8 +29,7 @@ export default function ConditionsStrip({ character, onUpdate }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const conditions = character.conditions ?? { active: [], exhaustion: 0 };
-  const { active, exhaustion } = conditions;
+  const { active, exhaustion } = character.conditions;
   const activeKeys = active.map((c) => c.key);
 
   async function send(ops: ConditionOperation[]) {

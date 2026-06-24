@@ -69,6 +69,45 @@ describe("ConditionsStrip", () => {
     expect(onUpdate).toHaveBeenCalled();
   });
 
+  it("includes a typed source in the applyCondition op", async () => {
+    const user = userEvent.setup();
+    const mockApply = vi.mocked(client.applyConditionTransactions);
+    mockApply.mockResolvedValue(makeCharacter({ active: [], exhaustion: 0 }));
+
+    render(
+      <ConditionsStrip character={makeCharacter({ active: [], exhaustion: 0 })} onUpdate={vi.fn()} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /add condition/i }));
+    await user.type(screen.getByPlaceholderText("Giant Spider"), "  Giant Spider  ");
+    const proneRow = screen.getByText("Prone").closest("li")!;
+    await user.click(within(proneRow).getByRole("button", { name: "Apply" }));
+
+    // Source is trimmed and passed through.
+    expect(mockApply).toHaveBeenCalledWith("char-1", [
+      { type: "applyCondition", key: "prone", source: "Giant Spider" },
+    ]);
+  });
+
+  it("omits source from the op when the field is blank or whitespace", async () => {
+    const user = userEvent.setup();
+    const mockApply = vi.mocked(client.applyConditionTransactions);
+    mockApply.mockResolvedValue(makeCharacter({ active: [], exhaustion: 0 }));
+
+    render(
+      <ConditionsStrip character={makeCharacter({ active: [], exhaustion: 0 })} onUpdate={vi.fn()} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /add condition/i }));
+    await user.type(screen.getByPlaceholderText("Giant Spider"), "   ");
+    const proneRow = screen.getByText("Prone").closest("li")!;
+    await user.click(within(proneRow).getByRole("button", { name: "Apply" }));
+
+    expect(mockApply).toHaveBeenCalledWith("char-1", [
+      { type: "applyCondition", key: "prone" },
+    ]);
+  });
+
   it("fires a removeCondition op when the chip remove control is clicked", async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
