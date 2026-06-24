@@ -131,6 +131,21 @@ describe("SessionSummaryModal", () => {
     expect(await screen.findByText("950")).toBeInTheDocument();
   });
 
+  it("hides the retroactive-XP affordance when the session is still active", () => {
+    const session: Session = { ...baseSession, status: "active" };
+    render(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />);
+    expect(
+      screen.queryByRole("button", { name: /add xp to this session/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the retroactive-XP affordance when the session is ended", () => {
+    render(<SessionSummaryModal characterId="c1" session={baseSession} onClose={() => {}} />);
+    expect(
+      screen.getByRole("button", { name: /add xp to this session/i }),
+    ).toBeInTheDocument();
+  });
+
   it("calls onClose when the Close control is used", async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();

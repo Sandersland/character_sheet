@@ -322,11 +322,14 @@ export default function SessionSummaryModal({ characterId, session, onClose }: S
         </div>
 
         {/* ── Retroactive XP ───────────────────────────────────────────────── */}
-        <AddXpForm
-          characterId={characterId}
-          sessionId={session.id}
-          onAwarded={(s) => setSummary(s)}
-        />
+        {/* Retroactive awards only apply to a closed session — gate defensively. */}
+        {session.status === "ended" && (
+          <AddXpForm
+            characterId={characterId}
+            sessionId={session.id}
+            onAwarded={(s) => setSummary(s)}
+          />
+        )}
       </div>
     </Modal>
   );
