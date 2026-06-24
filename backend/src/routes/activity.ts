@@ -1,7 +1,17 @@
 import { Router } from "express";
 
-import { Prisma } from "../generated/prisma/client.js";
+import { CharacterEventCategory, Prisma } from "../generated/prisma/client.js";
 import { prisma } from "../lib/prisma.js";
+
+// Runtime-checkable set of every valid CharacterEventCategory, derived from the
+// Prisma-generated enum so it can never drift from the schema.
+const CATEGORY_VALUES = new Set<string>(Object.values(CharacterEventCategory));
+
+function asCategory(value: string | undefined): CharacterEventCategory | undefined {
+  return value !== undefined && CATEGORY_VALUES.has(value)
+    ? (value as CharacterEventCategory)
+    : undefined;
+}
 
 export const activityRouter = Router();
 
@@ -13,7 +23,9 @@ export const activityRouter = Router();
 // so the frontend can render the full campaign story.
 //
 // Optional query params:
-//   ?category=inventory|hitPoints|experience|currency  — filter to one domain
+//   ?category=<CharacterEventCategory>  — filter to one domain (e.g. inventory,
+//                     hitPoints, experience, currency, conditions, combat,
+//                     session, …); unknown values are ignored (no filter)
 //   ?entityId=<id>    — filter to events for one entity (e.g. one InventoryItem)
 //   ?includeFields=1  — include the per-field diff rows alongside each event
 //   ?reverted=0|1     — include (1) or exclude (0) reverted events (default: include all)
@@ -28,8 +40,11 @@ activityRouter.get("/characters/:id/activity", async (req, res) => {
     return;
   }
 
-  const category =
-    typeof req.query.category === "string" ? req.query.category : undefined;
+  // Only apply the category filter when the query value is a real enum member;
+  // an unknown value is silently ignored (unfiltered), matching prior behavior.
+  const category = asCategory(
+    typeof req.query.category === "string" ? req.query.category : undefined,
+  );
   const entityId =
     typeof req.query.entityId === "string" ? req.query.entityId : undefined;
   const includeFields = req.query.includeFields === "1";
@@ -39,23 +54,11 @@ activityRouter.get("/characters/:id/activity", async (req, res) => {
     ? true
     : undefined; // undefined = no filter (include all)
 
-  // Build where clause — category uses a type assertion since the value
-  // comes from a query string and must be narrowed to the Prisma enum.
+  // Build where clause. `category` is already validated/narrowed to a real
+  // CharacterEventCategory by asCategory(), so no hand-maintained cast is needed.
   const whereClause = {
     characterId: character.id,
-    ...(category
-      ? {
-          category: category as
-            | "inventory"
-            | "hitPoints"
-            | "experience"
-            | "currency"
-            | "spellcasting"
-            | "class"
-            | "resources"
-            | "advancement",
-        }
-      : {}),
+    ...(category ? { category } : {}),
     ...(entityId ? { entityId } : {}),
     ...(revertedFilter !== undefined ? { reverted: revertedFilter } : {}),
   };

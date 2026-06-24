@@ -791,3 +791,97 @@ describe("POST /:id/events/:batchId/revert — level-up / level-down class-entry
     expect(await persistedClassEntryLevel()).toBe(3); // persisted column restored
   });
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// GET /:id/activity — ?category= filter (issue #69)
+//
+// The filter is derived from the Prisma-generated CharacterEventCategory enum.
+// Two behaviors are pinned here:
+//   - a previously-missing-from-the-old-cast value (`conditions`) actually
+//     filters (regression guard for the drifted union)
+//   - an unknown category value is ignored (unfiltered), not a 400
+// ════════════════════════════════════════════════════════════════════════════
+
+const FILTER_ID = "test-activity-filter-1";
+const FILTER_CATALOG_NAME = "Activity Filter Test Fighter";
+
+describe("GET /:id/activity — ?category= filter", () => {
+  let classId: string;
+
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: FILTER_CATALOG_NAME } });
+  });
+
+  beforeEach(async () => {
+    const cls = await prisma.characterClass.upsert({
+      where: { name: FILTER_CATALOG_NAME },
+      create: {
+        name: FILTER_CATALOG_NAME,
+        hitDie: "d10",
+        savingThrows: ["strength", "constitution"],
+        skillChoiceCount: 2,
+        skillChoices: ["athletics", "intimidation"],
+        isSpellcaster: false,
+      },
+      update: {},
+    });
+    classId = cls.id;
+
+    await prisma.character.create({
+      data: {
+        id: FILTER_ID,
+        name: "Activity Filter Test Fighter",
+        alignment: "Neutral Good",
+        experiencePoints: 0,
+        armorClass: 16,
+        initiativeBonus: 1,
+        speed: 30,
+        hitPoints: { current: 12, max: 12, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 1, die: "d10", spent: 0 },
+        abilityScores: {
+          strength: 16, dexterity: 12, constitution: 14,
+          intelligence: 10, wisdom: 10, charisma: 10,
+        },
+        savingThrowProficiencies: ["strength", "constitution"],
+        skills: [],
+        toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 10, pp: 0 },
+        classEntries: { create: [{ name: "fighter", classId, position: 0 }] },
+      },
+    });
+
+    // Seed events in two different categories so a filter is observable:
+    //   - one `conditions` event (the value missing from the old drifted cast)
+    //   - one `hitPoints` event (damage)
+    await supertest(app())
+      .post(`/api/characters/${FILTER_ID}/conditions/transactions`)
+      .send({ operations: [{ type: "applyCondition", key: "poisoned" }] });
+    await supertest(app())
+      .post(`/api/characters/${FILTER_ID}/hp`)
+      .send({ operations: [{ type: "damage", amount: 3 }] });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: FILTER_ID } });
+  });
+
+  it("?category=conditions returns ONLY conditions events (regression: was missing from the cast)", async () => {
+    const res = await supertest(app()).get(`/api/characters/${FILTER_ID}/activity?category=conditions`);
+    expect(res.status).toBe(200);
+    const events = res.body as Array<{ category: string }>;
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.every((e) => e.category === "conditions")).toBe(true);
+    // The hitPoints damage event must be filtered out.
+    expect(events.some((e) => e.category === "hitPoints")).toBe(false);
+  });
+
+  it("an unknown ?category value is ignored (returns unfiltered, no 400)", async () => {
+    const res = await supertest(app()).get(`/api/characters/${FILTER_ID}/activity?category=not-a-real-category`);
+    expect(res.status).toBe(200);
+    const events = res.body as Array<{ category: string }>;
+    // Unfiltered: both seeded domains are present.
+    const categories = new Set(events.map((e) => e.category));
+    expect(categories.has("conditions")).toBe(true);
+    expect(categories.has("hitPoints")).toBe(true);
+  });
+});
