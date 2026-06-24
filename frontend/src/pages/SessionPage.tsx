@@ -341,6 +341,7 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
           characterId={character.id}
           session={endedSession}
           onClose={() => navigate(`/characters/${character.id}`)}
+          onCharacterUpdate={handleCharacterUpdate}
         />
       )}
     </div>
