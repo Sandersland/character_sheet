@@ -11,7 +11,7 @@ import {
   serializeConsumableDetail,
   serializeWeaponDetail,
 } from "../lib/itemDetail.js";
-import { buildInventoryCreateFromCatalog, catalogItemDetailInclude } from "../lib/inventory.js";
+import { buildInventoryCreateFromCatalog, catalogItemDetailInclude, selectAutoEquip } from "../lib/inventory.js";
 import { prisma } from "../lib/prisma.js";
 import { normalizeHitDice, normalizeHitPoints } from "../lib/hitpoints.js";
 import {
@@ -982,6 +982,14 @@ charactersRouter.post("/characters", async (req, res) => {
       }
       inventoryItemCreates = inventoryCreates;
     }
+  }
+
+  // Auto-equip a new character's starting weapon/armor so the in-session
+  // Attack picker isn't empty on a freshly created sheet (issue #51). The 5e
+  // selection rule lives in lib/ (selectAutoEquip); the route just applies its
+  // decision by flipping `equipped` on the chosen create payloads.
+  for (const idx of selectAutoEquip(inventoryItemCreates)) {
+    inventoryItemCreates[idx].equipped = true;
   }
 
   const derived = deriveCreatedCharacter(
