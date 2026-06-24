@@ -8,6 +8,10 @@ import {
   deriveWeaponAttackBonus,
   type FightingStyleKey,
 } from "../srd.js";
+import {
+  normalizeResourcesMutable,
+  serializeResourcesState,
+} from "../resources.js";
 
 describe("FIGHTING_STYLES data block", () => {
   it("defines the 6 core fighting styles with key/label/description", () => {
@@ -96,5 +100,38 @@ describe("deriveWeaponAttackBonus with archery fighting style", () => {
     const without = deriveWeaponAttackBonus(rangedWeapon, scores, 2, noGrants);
     const withDefense = deriveWeaponAttackBonus(rangedWeapon, scores, 2, noGrants, "defense");
     expect(withDefense).toBe(without);
+  });
+});
+
+describe("resources normalize/serialize round-trip for fightingStyle", () => {
+  it("defaults fightingStyle to null when absent", () => {
+    expect(normalizeResourcesMutable(null).fightingStyle).toBeNull();
+    expect(normalizeResourcesMutable({ used: {} }).fightingStyle).toBeNull();
+  });
+
+  it("round-trips a known fighting style", () => {
+    const state = normalizeResourcesMutable({ fightingStyle: "archery" });
+    expect(state.fightingStyle).toBe("archery");
+    const serialized = serializeResourcesState(state) as Record<string, unknown>;
+    expect(serialized.fightingStyle).toBe("archery");
+    // Re-normalize the serialized form to confirm a full round-trip.
+    expect(normalizeResourcesMutable(serialized as never).fightingStyle).toBe("archery");
+  });
+
+  it("drops an unknown persisted fighting style key", () => {
+    expect(normalizeResourcesMutable({ fightingStyle: "notAStyle" }).fightingStyle).toBeNull();
+    expect(normalizeResourcesMutable({ fightingStyle: 42 }).fightingStyle).toBeNull();
+  });
+
+  it("preserves other resource lists alongside fightingStyle", () => {
+    const state = normalizeResourcesMutable({
+      used: { superiorityDice: 2 },
+      maneuversKnown: [{ id: "m1", name: "Trip", description: "x" }],
+      fightingStyle: "defense",
+    });
+    const serialized = serializeResourcesState(state) as Record<string, unknown>;
+    expect(serialized.used).toEqual({ superiorityDice: 2 });
+    expect((serialized.maneuversKnown as unknown[]).length).toBe(1);
+    expect(serialized.fightingStyle).toBe("defense");
   });
 });

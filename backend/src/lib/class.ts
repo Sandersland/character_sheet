@@ -16,6 +16,19 @@ import { levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
+import {
+  fightingStyleChoiceCount,
+  isKnownFightingStyle,
+  FIGHTING_STYLES,
+  type FightingStyleKey,
+} from "./srd.js";
+import {
+  normalizeResourcesMutable,
+  serializeResourcesState,
+  type ManeuverEntry,
+  type ToolProfEntry,
+  type AdvancementEntry,
+} from "./resources.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 
@@ -29,7 +42,13 @@ export interface SetSubclassOperation {
   subclassId: string;
 }
 
-export type ClassOperation = SetSubclassOperation;
+/** Choose the character's Fighting Style (Fighter L1 feature). */
+export interface SetFightingStyleOperation {
+  type: "setFightingStyle";
+  key: FightingStyleKey;
+}
+
+export type ClassOperation = SetSubclassOperation | SetFightingStyleOperation;
 
 // ── Transaction handler ───────────────────────────────────────────────────────
 
@@ -119,6 +138,82 @@ export async function applyClassOperations(
             before: { ...beforeData },
             after: { ...afterData },
             data: { classEntryId: primaryEntry.id, subclassId: subclass.id, subclassName: subclass.name },
+            batchId,
+            sessionId,
+          });
+          break;
+        }
+
+        case "setFightingStyle": {
+          // Re-read per-op so a batch sees each previous op's result.
+          const character = await tx.character.findUnique({
+            where: { id: characterId },
+            select: {
+              experiencePoints: true,
+              resources: true,
+              classEntries: {
+                orderBy: { position: "asc" as const },
+                take: 1,
+                select: { name: true },
+              },
+            },
+          });
+          if (!character) {
+            throw new InvalidClassOperationError(`Character not found: ${characterId}`);
+          }
+
+          // Validate the requested key is a known fighting style.
+          if (!isKnownFightingStyle(op.key)) {
+            throw new InvalidClassOperationError(`Unknown fighting style: ${op.key}`);
+          }
+
+          // Validate the character is entitled to a fighting style at this level.
+          const className = character.classEntries[0]?.name ?? "";
+          const level = levelForExperience(character.experiencePoints);
+          if (fightingStyleChoiceCount(className, level) === 0) {
+            throw new InvalidClassOperationError(
+              `Character (${className || "no class"}, level ${level}) cannot choose a Fighting Style`,
+            );
+          }
+
+          const state = normalizeResourcesMutable(character.resources);
+          // Deep-copy the full resources state for before/after snapshots so the
+          // `resources` undo branch in activity.ts restores everything wholesale.
+          const snapshot = (s: typeof state) => ({
+            resources: {
+              used: { ...s.used },
+              maneuversKnown: s.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+              toolProficienciesKnown: s.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
+              advancements: s.advancements.map((a: AdvancementEntry) => ({
+                ...a,
+                abilityDeltas: { ...a.abilityDeltas },
+              })),
+              fightingStyle: s.fightingStyle,
+            },
+          });
+
+          const beforeFs = snapshot(state);
+          state.fightingStyle = op.key;
+          await tx.character.update({
+            where: { id: characterId },
+            data: { resources: serializeResourcesState(state) },
+          });
+          const afterFs = snapshot(state);
+
+          const styleLabel =
+            FIGHTING_STYLES.find((s) => s.key === op.key)?.label ?? op.key;
+
+          await logEvent(tx, {
+            characterId,
+            // `resources` category so the existing resources revert branch in
+            // routes/activity.ts restores before.resources (incl. fightingStyle)
+            // with zero new undo code.
+            category: "resources",
+            type: "fightingStyleChosen",
+            summary: `Chose fighting style: ${styleLabel}`,
+            before: beforeFs,
+            after: afterFs,
+            data: { fightingStyle: op.key },
             batchId,
             sessionId,
           });

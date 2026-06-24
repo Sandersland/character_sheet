@@ -17,7 +17,13 @@ import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
 import { deriveResources } from "./class-features.js";
-import { isKnownTool, toolsByCategory } from "./srd.js";
+import {
+  isKnownTool,
+  toolsByCategory,
+  isKnownFightingStyle,
+  fightingStyleChoiceCount,
+  type FightingStyleKey,
+} from "./srd.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 
@@ -106,6 +112,14 @@ export interface ResourcesMutableState {
   toolProficienciesKnown: ToolProfEntry[];
   /** Ability Score Improvements and feats taken, in the order chosen. */
   advancements: AdvancementEntry[];
+  /**
+   * The chosen Fighting Style key (Fighter L1 feature), or null if unchosen /
+   * not entitled. Only the key is persisted — the mechanical effect (Defense
+   * +1 AC, Archery +2 ranged attack) is derived at read time in
+   * serializeCharacter. Level-gated: reconciled to null on level-down via
+   * reconcileFightingStyle when the character can no longer choose a style.
+   */
+  fightingStyle: FightingStyleKey | null;
 }
 
 // ── Normalizer ────────────────────────────────────────────────────────────────
@@ -114,14 +128,25 @@ export interface ResourcesMutableState {
 
 export function normalizeResourcesMutable(json: Prisma.JsonValue): ResourcesMutableState {
   if (!json || typeof json !== "object" || Array.isArray(json)) {
-    return { used: {}, maneuversKnown: [], toolProficienciesKnown: [], advancements: [] };
+    return {
+      used: {},
+      maneuversKnown: [],
+      toolProficienciesKnown: [],
+      advancements: [],
+      fightingStyle: null,
+    };
   }
   const obj = json as Record<string, unknown>;
+  // Tolerate null/unknown: drop a persisted fighting style that isn't a known key.
+  const rawStyle = obj.fightingStyle;
+  const fightingStyle: FightingStyleKey | null =
+    typeof rawStyle === "string" && isKnownFightingStyle(rawStyle) ? rawStyle : null;
   return {
     used: (obj.used as Record<string, number>) ?? {},
     maneuversKnown: (obj.maneuversKnown as ManeuverEntry[]) ?? [],
     toolProficienciesKnown: (obj.toolProficienciesKnown as ToolProfEntry[]) ?? [],
     advancements: (obj.advancements as AdvancementEntry[]) ?? [],
+    fightingStyle,
   };
 }
 
@@ -136,6 +161,7 @@ export function serializeResourcesState(state: ResourcesMutableState): Prisma.In
     maneuversKnown: state.maneuversKnown,
     toolProficienciesKnown: state.toolProficienciesKnown,
     advancements: state.advancements,
+    fightingStyle: state.fightingStyle,
   } as unknown as Prisma.InputJsonValue;
 }
 

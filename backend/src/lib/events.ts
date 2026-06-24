@@ -49,6 +49,8 @@ export type EventType =
   // class
   | "subclassChosen"
   | "subclassRemoved"
+  | "fightingStyleChosen"
+  | "fightingStyleRemoved"
   // resources
   | "spendResource"
   | "restoreResource"
