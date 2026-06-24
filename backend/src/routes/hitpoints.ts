@@ -87,8 +87,14 @@ hitPointsRouter.post("/characters/:id/hp", async (req, res) => {
     return;
   }
 
+  let concentrationChecks: Awaited<
+    ReturnType<typeof applyHitPointOperations>
+  >["concentrationChecks"] = [];
   try {
-    await applyHitPointOperations(character.id, parseResult.data.operations);
+    ({ concentrationChecks } = await applyHitPointOperations(
+      character.id,
+      parseResult.data.operations,
+    ));
   } catch (error) {
     if (error instanceof InvalidHitPointOperationError) {
       res.status(400).json({ error: error.message });
@@ -101,5 +107,7 @@ hitPointsRouter.post("/characters/:id/hp", async (req, res) => {
     where: { id: character.id },
     include: characterInclude,
   });
-  res.json(serializeCharacter(updated!));
+  // Response = serialized character plus any concentration check(s) triggered by
+  // damage ops (issue #41) so the client can toast the auto-rolled CON save.
+  res.json({ ...serializeCharacter(updated!), concentrationChecks });
 });
