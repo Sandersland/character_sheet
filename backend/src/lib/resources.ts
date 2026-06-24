@@ -21,7 +21,6 @@ import {
   isKnownTool,
   toolsByCategory,
   isKnownFightingStyle,
-  fightingStyleChoiceCount,
   type FightingStyleKey,
 } from "./srd.js";
 
