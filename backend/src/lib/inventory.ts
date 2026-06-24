@@ -366,6 +366,68 @@ export function buildInventoryCreateFromCatalog(
   };
 }
 
+// Minimal shape selectAutoEquip needs to decide what to equip — a subset of
+// what buildInventoryCreateFromCatalog returns. Kept structural (not tied to
+// that function's exact return type) so the rule stays unit-testable from a
+// hand-written literal with no DB.
+export interface AutoEquipCandidate {
+  category: ItemCategoryName;
+  position: number;
+  weaponDetail?: { create: { twoHanded?: boolean | null } } | undefined;
+  armorDetail?: { create: { armorCategory: ArmorCategoryName } } | undefined;
+}
+
+// 5e starting-equipment auto-equip rule, kept here in lib/ so it stays out of
+// the creation route body. Given the InventoryItem create payloads for a new
+// character's starting gear, returns the indices that should be marked
+// `equipped: true`. Mirrors the same off-hand/two-handed constraints the read
+// path derives (characters.ts): at most 2 weapons and 1 shield equipped; a
+// two-handed weapon precludes a shield and a second weapon.
+//
+// Choices:
+//   - Primary weapon = first weapon by position. Always equipped.
+//   - If primary weapon is two-handed: no shield, no second weapon.
+//   - Otherwise: also equip a shield (first armor with armorCategory "shield"),
+//     at most one.
+//   - Body armor (first non-shield armor) is equipped regardless of weapon grip.
+export function selectAutoEquip(items: AutoEquipCandidate[]): number[] {
+  const byPosition = (a: number, b: number) => items[a].position - items[b].position;
+
+  const weaponIdx = items
+    .map((_, i) => i)
+    .filter((i) => items[i].category === "weapon" && Boolean(items[i].weaponDetail))
+    .sort(byPosition);
+  const shieldIdx = items
+    .map((_, i) => i)
+    .filter((i) => items[i].category === "armor" && items[i].armorDetail?.create.armorCategory === "shield")
+    .sort(byPosition);
+  const bodyArmorIdx = items
+    .map((_, i) => i)
+    .filter((i) => items[i].category === "armor" && items[i].armorDetail?.create.armorCategory !== "shield")
+    .sort(byPosition);
+
+  const selected: number[] = [];
+
+  const primaryWeapon = weaponIdx[0];
+  const primaryTwoHanded =
+    primaryWeapon !== undefined && Boolean(items[primaryWeapon].weaponDetail?.create.twoHanded);
+  if (primaryWeapon !== undefined) {
+    selected.push(primaryWeapon);
+  }
+
+  // Body armor is always safe to equip — it never contends for the off-hand.
+  if (bodyArmorIdx[0] !== undefined) {
+    selected.push(bodyArmorIdx[0]);
+  }
+
+  // A two-handed primary weapon consumes the off-hand: no shield, no 2nd weapon.
+  if (!primaryTwoHanded && shieldIdx[0] !== undefined) {
+    selected.push(shieldIdx[0]);
+  }
+
+  return selected;
+}
+
 /** Formats a currency delta as "+7 gp" / "−5 gp 2 sp" for event summaries. */
 function formatCurrencyForSummary(delta: Currency | null | undefined): string | null {
   if (!delta) return null;
