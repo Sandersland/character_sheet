@@ -104,12 +104,70 @@ describe("computeSessionSummary", () => {
     expect(s.slotsSpent).toEqual({ "2": 1 });
   });
 
+  it("does not count a Mystic Arcanum cast toward slotsSpent (charge, not slot)", () => {
+    // Warlock 11+: a level-6 Arcanum cast goes through castSpell with a non-null
+    // slotLevel, but it bumps arcanumUsed — not slotsUsed — in the snapshot. The
+    // spell still counts as cast, but no 6th-level slot was spent.
+    const s = summarize([
+      {
+        type: "castSpell",
+        data: { spellName: "Eyebite", roll: 18, slotLevel: 6 },
+        before: { spellcasting: { slotsUsed: {}, arcanumUsed: { "6": 0 } } },
+        after: { spellcasting: { slotsUsed: {}, arcanumUsed: { "6": 1 } } },
+      },
+    ]);
+    expect(s.slotsSpent).toEqual({});
+    expect(s.spellsCast).toBe(1);
+  });
+
+  it("counts a real 6th-level slot cast toward slotsSpent", () => {
+    // A genuine 6th-level slot cast bumps slotsUsed in the snapshot, so it is
+    // NOT mistaken for an Arcanum charge and tallies a slot.
+    const s = summarize([
+      {
+        type: "castSpell",
+        data: { spellName: "Chain Lightning", roll: 21, slotLevel: 6 },
+        before: { spellcasting: { slotsUsed: { "6": 0 }, arcanumUsed: {} } },
+        after: { spellcasting: { slotsUsed: { "6": 1 }, arcanumUsed: {} } },
+      },
+    ]);
+    expect(s.slotsSpent).toEqual({ "6": 1 });
+    expect(s.spellsCast).toBe(1);
+  });
+
+  it("tallies only the real slot cast when mixed with an Arcanum cast at another level", () => {
+    const s = summarize([
+      // Real 3rd-level slot cast: slotsUsed bumps.
+      {
+        type: "castSpell",
+        data: { spellName: "Fireball", roll: 24, slotLevel: 3 },
+        before: { spellcasting: { slotsUsed: { "3": 0 }, arcanumUsed: {} } },
+        after: { spellcasting: { slotsUsed: { "3": 1 }, arcanumUsed: {} } },
+      },
+      // 6th-level Arcanum cast: arcanumUsed bumps, slotsUsed unchanged.
+      {
+        type: "castSpell",
+        data: { spellName: "Eyebite", roll: 18, slotLevel: 6 },
+        before: { spellcasting: { slotsUsed: { "3": 1 }, arcanumUsed: { "6": 0 } } },
+        after: { spellcasting: { slotsUsed: { "3": 1 }, arcanumUsed: { "6": 1 } } },
+      },
+    ]);
+    expect(s.slotsSpent).toEqual({ "3": 1 });
+    expect(s.spellsCast).toBe(2);
+  });
+
   it("does not let a Mystic Arcanum restore decrement slotsSpent", () => {
     // Warlock 11+: a level-6 Arcanum charge is spent (logged as castSpell at
     // slotLevel 6), then restored. The restore touches arcanumUsed, not
-    // slotsUsed, so it must NOT net against the slot-spent tally.
+    // slotsUsed, so it must NOT net against the slot-spent tally — which here is
+    // already empty because the Arcanum cast itself spends no slot.
     const s = summarize([
-      { type: "castSpell", data: { spellName: "Eyebite", roll: 18, slotLevel: 6 } },
+      {
+        type: "castSpell",
+        data: { spellName: "Eyebite", roll: 18, slotLevel: 6 },
+        before: { spellcasting: { slotsUsed: {}, arcanumUsed: { "6": 0 } } },
+        after: { spellcasting: { slotsUsed: {}, arcanumUsed: { "6": 1 } } },
+      },
       {
         type: "restoreSlot",
         data: { level: 6 },
@@ -117,7 +175,7 @@ describe("computeSessionSummary", () => {
         after: { spellcasting: { slotsUsed: {}, arcanumUsed: { "6": 0 } } },
       },
     ]);
-    expect(s.slotsSpent).toEqual({ "6": 1 });
+    expect(s.slotsSpent).toEqual({});
   });
 
   it("does not push slotsSpent below zero for an unmatched cross-session restore", () => {

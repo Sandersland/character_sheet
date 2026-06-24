@@ -6,6 +6,7 @@ import { activityRouter } from "./routes/activity.js";
 import { advancementRouter } from "./routes/advancement.js";
 import { classRouter } from "./routes/class.js";
 import { charactersRouter } from "./routes/characters.js";
+import { conditionsRouter } from "./routes/conditions.js";
 import { sessionsRouter } from "./routes/sessions.js";
 import { experienceRouter } from "./routes/experience.js";
 import { featsRouter } from "./routes/feats.js";
@@ -37,6 +38,7 @@ export function createApp() {
   app.use("/api", spellsRouter);
   app.use("/api", spellcastingRouter);
   app.use("/api", resourcesRouter);
+  app.use("/api", conditionsRouter);
   app.use("/api", classRouter);
   app.use("/api", maneuversRouter);
   app.use("/api", featsRouter);

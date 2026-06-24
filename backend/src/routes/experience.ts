@@ -24,6 +24,11 @@ const operationSchema = z.discriminatedUnion("type", [awardOpSchema, setOpSchema
 
 const experienceRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),
+  // Optional: tag the resulting xpAward/xpSet events to a SPECIFIC session
+  // (used by the retroactive "add XP to a past session" flow) instead of the
+  // currently-active one. When supplied, that session's stored summary is
+  // recomputed server-side. Must belong to the character (400 otherwise).
+  sessionId: z.string().uuid().optional(),
 });
 
 // ── Route ────────────────────────────────────────────────────────────────────
@@ -56,7 +61,11 @@ experienceRouter.post("/characters/:id/experience", async (req, res) => {
   }
 
   try {
-    await applyExperienceOperations(character.id, parseResult.data.operations);
+    await applyExperienceOperations(
+      character.id,
+      parseResult.data.operations,
+      parseResult.data.sessionId,
+    );
   } catch (error) {
     if (error instanceof InvalidExperienceOperationError) {
       res.status(400).json({ error: error.message });

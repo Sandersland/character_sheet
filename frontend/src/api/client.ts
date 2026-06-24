@@ -9,6 +9,7 @@ import type {
   CharacterEvent,
   CharacterSummary,
   ClassOperation,
+  ConditionOperation,
   CreateCharacterInput,
   ExperienceOperation,
   HitPointOperation,
@@ -238,14 +239,20 @@ export async function createCharacter(input: CreateCharacterInput): Promise<Char
 
 // Applies a batch of XP operations (award/set) via the intent-bearing
 // endpoint that logs events and auto-reverses HP on level-down.
+//
+// `sessionId` (optional) tags the resulting events to a SPECIFIC session
+// instead of the active one — used to retroactively award XP to a past,
+// already-ended session, which also recomputes that session's stored summary
+// server-side.
 export async function applyExperienceOperations(
   characterId: string,
-  operations: ExperienceOperation[]
+  operations: ExperienceOperation[],
+  sessionId?: string,
 ): Promise<Character> {
   const response = await fetch(`${API_URL}/characters/${characterId}/experience`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ operations }),
+    body: JSON.stringify(sessionId ? { operations, sessionId } : { operations }),
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
@@ -299,6 +306,24 @@ export async function applyResourceTransactions(
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     throw new Error(body?.error ?? `Failed to apply resource operations (${response.status})`);
+  }
+  return response.json();
+}
+
+// Applies a batch of condition operations atomically (apply/remove a status
+// condition, set exhaustion level). Full updated Character returned on success.
+export async function applyConditionTransactions(
+  characterId: string,
+  operations: ConditionOperation[]
+): Promise<Character> {
+  const response = await fetch(`${API_URL}/characters/${characterId}/conditions/transactions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ operations }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to apply condition operations (${response.status})`);
   }
   return response.json();
 }
