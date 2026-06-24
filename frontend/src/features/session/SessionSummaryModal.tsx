@@ -173,6 +173,9 @@ function AddXpForm({
           Cancel
         </button>
       </div>
+      <p className="text-xs text-parchment-500">
+        This session is closed, so the award is permanent — it can't be undone.
+      </p>
       {error && <p className="text-xs font-semibold text-garnet-700">{error}</p>}
     </div>
   );
