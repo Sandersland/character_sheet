@@ -28,6 +28,17 @@ jobs:
         with:
           fetch-depth: 1
 
+      # Full Sonnet review for PRs merging into main; a lighter, tightly-scoped
+      # Haiku review for feature-branch PRs targeting a non-main branch.
+      - name: Select review depth by base branch
+        id: cfg
+        run: |
+          if [ "${{ github.event.pull_request.base.ref }}" = "main" ]; then
+            echo 'claude_args=--model claude-sonnet-4-6' >> "$GITHUB_OUTPUT"
+          else
+            echo 'claude_args=--model claude-haiku-4-5-20251001 --append-system-prompt "This is a feature-branch PR targeting a non-main branch. Keep the review tightly scoped: report only correctness bugs and clear logic errors in the changed lines. Skip style, naming, and minor nitpicks. Be concise."' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
@@ -36,4 +47,4 @@ jobs:
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
           prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
-          claude_args: '--model claude-sonnet-4-6'
+          claude_args: ${{ steps.cfg.outputs.claude_args }}
