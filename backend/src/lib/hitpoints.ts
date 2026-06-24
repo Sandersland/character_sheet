@@ -5,7 +5,15 @@ import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
-import { abilityModifier, advancementSlotsForLevel, deriveFeatBonuses, hitDieFace } from "./srd.js";
+import {
+  abilityModifier,
+  advancementSlotsForLevel,
+  concentrationSaveDC,
+  deriveFeatBonuses,
+  deriveFeatProficiencies,
+  hitDieFace,
+} from "./srd.js";
+import { rollDie } from "./dice.js";
 import { deriveResources } from "./class-features.js";
 import { normalizeResourcesMutable, serializeResourcesState } from "./resources.js";
 import { normalizeSpellcastingMutable } from "./spellcasting.js";
@@ -197,6 +205,195 @@ export type HitPointOperation =
   | DeathSaveOperation
   | StabilizeOperation;
 
+// ---- Concentration-on-damage (issue #41) ----
+
+/**
+ * Outcome of a concentration check triggered by a damage instance. Returned
+ * (when non-null) so the route can surface the auto-rolled save to the player.
+ * `held: false` with `reason: "death"` means concentration was dropped without
+ * a save because the character hit 0 HP (or died).
+ */
+export interface ConcentrationCheckResult {
+  spellName: string;
+  reason: "damage" | "death";
+  held: boolean;
+  /** Present only for an actual save (reason "damage"); null on the 0-HP path. */
+  roll: number | null;
+  saveBonus: number | null;
+  total: number | null;
+  dc: number | null;
+  damage: number;
+}
+
+/**
+ * If the character is concentrating, resolve the 5e "concentration on damage"
+ * rule for one instance of damage and, on a drop, clear `concentratingOn` and
+ * log a `concentrationDropped` event.
+ *
+ * - At 0 HP (or already dead): concentration ends UNCONDITIONALLY, no save —
+ *   reason "death". The 0-HP path wins if it also would have triggered a save.
+ * - Otherwise: roll a Constitution saving throw server-side. Save bonus =
+ *   CON modifier + proficiency bonus IF proficient in CON saves (class grant or
+ *   feat grant). DC = max(10, floor(damage / 2)). On a failed save (total < DC)
+ *   concentration ends — reason "damage". On a success, nothing is logged.
+ *
+ * NOTE (deferred, issue #41 follow-up): concentration should ALSO end when the
+ * incapacitated / stunned / paralyzed / unconscious CONDITIONS are applied. That
+ * lives in the conditions feature (lib + conditions transaction path) and is
+ * intentionally out of scope here. The 0-HP path below covers the common case
+ * (dropping to 0 HP makes a character unconscious), but a directly-applied
+ * condition with the character still above 0 HP will not yet drop concentration.
+ *
+ * The event is logged under category "spellcasting" (not "hitPoints") so the
+ * activity revert handler restores the full spellcasting JSON from `before` —
+ * sharing the batchId with the damage event means LIFO undo reverses both.
+ *
+ * Returns the check result for the route to surface, or null when the character
+ * was not concentrating.
+ */
+export async function applyConcentrationCheckInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  damage: number,
+  newCurrentHp: number,
+  batchId: string,
+  sessionId: string | null,
+): Promise<ConcentrationCheckResult | null> {
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: {
+      spellcasting: true,
+      abilityScores: true,
+      experiencePoints: true,
+      savingThrowProficiencies: true,
+      resources: true,
+      classEntries: {
+        orderBy: { position: "asc" as const },
+        take: 1,
+        select: { name: true },
+      },
+    },
+  });
+  if (!row) return null;
+
+  const state = normalizeSpellcastingMutable(row.spellcasting);
+  const prior = state.concentratingOn;
+  if (!prior) return null;
+
+  const beforeSpellcasting = {
+    slotsUsed: { ...state.slotsUsed },
+    arcanumUsed: { ...state.arcanumUsed },
+    spells: state.spells.map((s) => ({ ...s })),
+    concentratingOn: { ...prior },
+  };
+
+  // Decide whether the save is even rolled.
+  const droppedByDeath = newCurrentHp <= 0;
+  let result: ConcentrationCheckResult;
+
+  if (droppedByDeath) {
+    result = {
+      spellName: prior.spellName,
+      reason: "death",
+      held: false,
+      roll: null,
+      saveBonus: null,
+      total: null,
+      dc: null,
+      damage,
+    };
+  } else {
+    // CON save bonus = CON modifier + proficiency bonus IF proficient in CON
+    // saves. Proficiency comes from the class grant (savingThrowProficiencies
+    // column) or a feat grant (deriveFeatProficiencies), mirroring how
+    // serializeCharacter resolves saving-throw proficiency.
+    const abilityScores = row.abilityScores as Record<string, number>;
+    const conMod = abilityModifier(abilityScores.constitution ?? 10);
+    const level = levelForExperience(row.experiencePoints);
+    const profBonus = proficiencyBonusForLevel(level);
+    const advState = normalizeResourcesMutable(row.resources);
+    const featSlotCap = advancementSlotsForLevel(
+      row.classEntries[0]?.name ?? "",
+      level,
+    );
+    const featProf = deriveFeatProficiencies(advState.advancements.slice(0, featSlotCap));
+    const proficientInCon =
+      row.savingThrowProficiencies.includes("constitution") ||
+      featProf.savingThrows.has("constitution");
+    const saveBonus = conMod + (proficientInCon ? profBonus : 0);
+
+    const dc = concentrationSaveDC(damage);
+    const roll = rollDie(20);
+    const total = roll + saveBonus;
+    const held = total >= dc;
+
+    result = {
+      spellName: prior.spellName,
+      reason: "damage",
+      held,
+      roll,
+      saveBonus,
+      total,
+      dc,
+      damage,
+    };
+
+    if (held) {
+      // Successful save — concentration holds, nothing to persist or log.
+      return result;
+    }
+  }
+
+  // Drop concentration (failed save, or 0-HP/death path).
+  state.concentratingOn = null;
+  await tx.character.update({
+    where: { id: characterId },
+    data: {
+      spellcasting: {
+        slotsUsed: state.slotsUsed,
+        arcanumUsed: state.arcanumUsed,
+        spells: state.spells,
+        concentratingOn: null,
+      } as unknown as Prisma.InputJsonValue,
+    },
+  });
+
+  const afterSpellcasting = {
+    slotsUsed: { ...state.slotsUsed },
+    arcanumUsed: { ...state.arcanumUsed },
+    spells: state.spells.map((s) => ({ ...s })),
+    concentratingOn: null,
+  };
+
+  const summary = droppedByDeath
+    ? `Concentration on ${prior.spellName} dropped (dropped to 0 HP)`
+    : `Concentration on ${prior.spellName} lost (CON save ${String(result.total)} vs DC ${String(result.dc)})`;
+
+  await logEvent(tx, {
+    characterId,
+    category: "spellcasting",
+    type: "concentrationDropped",
+    summary,
+    before: { spellcasting: beforeSpellcasting },
+    after: { spellcasting: afterSpellcasting },
+    data: {
+      droppedEntryId: prior.entryId,
+      droppedSpellName: prior.spellName,
+      reason: result.reason,
+      roll: result.roll,
+      saveBonus: result.saveBonus,
+      total: result.total,
+      dc: result.dc,
+      damage: result.damage,
+      held: result.held,
+    },
+    batchId,
+    sessionId,
+  });
+
+  return result;
+}
+
 // ---- Transaction handler ----
 
 /**
@@ -209,11 +406,15 @@ export type HitPointOperation =
 export async function applyHitPointOperations(
   characterId: string,
   operations: HitPointOperation[]
-): Promise<void> {
+): Promise<{ concentrationChecks: ConcentrationCheckResult[] }> {
   // One batchId groups all ops in this request on the activity timeline,
   // same as inventory uses (lib/inventory.ts → applyInventoryOperations).
   const batchId = randomUUID();
   const sessionId = await getActiveSessionId(characterId);
+
+  // Collect any concentration checks triggered by damage ops so the route can
+  // surface the auto-rolled CON save(s) to the player.
+  const concentrationChecks: ConcentrationCheckResult[] = [];
 
   await prisma.$transaction(async (tx) => {
     for (const op of operations) {
@@ -267,6 +468,9 @@ export async function applyHitPointOperations(
       const beforeClassLevel = primaryEntry?.level ?? null;
       let eventData: Record<string, unknown> = {};
       let summary = "";
+      // For a damage op, remember that a concentration check should run after the
+      // common HP write-back below (needs the post-damage current HP).
+      let damageForConcentration: number | null = null;
 
       switch (op.type) {
         case "damage": {
@@ -281,6 +485,9 @@ export async function applyHitPointOperations(
           // intentionally out of scope for this phase.
           eventData = { amount: op.amount };
           summary = `Took ${op.amount} damage (${beforeHp.current} → ${hp.current} HP)`;
+          // The 5e concentration save uses the full damage of the instance,
+          // including any absorbed by temp HP.
+          damageForConcentration = op.amount;
           break;
         }
 
@@ -633,8 +840,26 @@ export async function applyHitPointOperations(
         batchId,
         sessionId,
       });
+
+      // After the damage event is logged, resolve concentration (issue #41).
+      // Logged as a separate "spellcasting" event sharing this batchId so the
+      // CON save shows on the timeline and LIFO undo reverses HP + concentration
+      // together. `hp.current` here is the post-damage current HP.
+      if (damageForConcentration !== null) {
+        const check = await applyConcentrationCheckInTx(
+          tx,
+          characterId,
+          damageForConcentration,
+          hp.current,
+          batchId,
+          sessionId,
+        );
+        if (check) concentrationChecks.push(check);
+      }
     }
   });
+
+  return { concentrationChecks };
 }
 
 /**
@@ -727,7 +952,7 @@ export async function applyDamageInTx(
   amount: number,
   batchId: string,
   sessionId: string | null,
-): Promise<void> {
+): Promise<ConcentrationCheckResult | null> {
   if (amount <= 0) {
     throw new InvalidHitPointOperationError("damage amount must be positive");
   }
@@ -765,4 +990,8 @@ export async function applyDamageInTx(
     batchId,
     sessionId,
   });
+
+  // Resolve concentration on this damage instance (issue #41), mirroring the
+  // `case "damage"` branch of applyHitPointOperations.
+  return applyConcentrationCheckInTx(tx, characterId, amount, hp.current, batchId, sessionId);
 }

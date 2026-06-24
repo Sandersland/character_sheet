@@ -7,6 +7,7 @@ import type {
   CatalogSpell,
   Character,
   CharacterEvent,
+  ConcentrationCheck,
   CharacterSummary,
   ClassOperation,
   ConditionOperation,
@@ -150,10 +151,16 @@ export async function fetchLedger(characterId: string, inventoryItemId?: string)
 // Applies a batch of HP operations atomically (damage, heal, rest, level-up,
 // death saves). Mirrors applyInventoryTransactions — same intent-bearing
 // batch pattern, full updated Character returned on success.
+//
+// The response is the serialized character plus `concentrationChecks` — the
+// auto-rolled CON save(s) made when a concentrating character takes damage
+// (issue #41). We split them apart so callers get a clean Character to store and
+// the check list to surface (toast). `concentrationChecks` defaults to [] for
+// older servers / non-damage ops.
 export async function applyHitPointOperations(
   characterId: string,
   operations: HitPointOperation[]
-): Promise<Character> {
+): Promise<{ character: Character; concentrationChecks: ConcentrationCheck[] }> {
   const response = await fetch(`${API_URL}/characters/${characterId}/hp`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -163,7 +170,10 @@ export async function applyHitPointOperations(
     const body = await response.json().catch(() => null);
     throw new Error(body?.error ?? `Failed to apply HP operations (${response.status})`);
   }
-  return response.json();
+  const { concentrationChecks = [], ...character } = (await response.json()) as Character & {
+    concentrationChecks?: ConcentrationCheck[];
+  };
+  return { character: character as Character, concentrationChecks };
 }
 
 export async function deleteCharacter(id: string): Promise<void> {

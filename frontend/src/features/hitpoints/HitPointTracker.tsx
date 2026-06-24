@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { applyHitPointOperations } from "@/api/client";
 import { rollDie } from "@/lib/dice";
-import type { Character, HitPointOperation } from "@/types/character";
+import type { Character, ConcentrationCheck, HitPointOperation } from "@/types/character";
 import Card from "@/components/ui/Card";
 import MeterBar from "@/components/ui/MeterBar";
 import Modal from "@/components/ui/Modal";
@@ -128,6 +128,11 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [advancementCallout, setAdvancementCallout] = useState(false);
+  // Transient banner for the server's auto-rolled concentration save (issue #41).
+  const [concentrationNote, setConcentrationNote] = useState<{
+    text: string;
+    held: boolean;
+  } | null>(null);
 
   // Detect when a level-up unlocks a new advancement slot.
   const prevAdvancementTotal = useRef(character.advancementSlots.total);
@@ -141,13 +146,31 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
 
   const isDying = hitPoints.current === 0;
 
+  /** Build the player-facing text for a concentration check (issue #41). */
+  function concentrationMessage(check: ConcentrationCheck): { text: string; held: boolean } {
+    if (check.reason === "death") {
+      return { text: `Lost concentration on ${check.spellName} (dropped to 0 HP)`, held: false };
+    }
+    const roll = `${check.total} vs DC ${check.dc}`;
+    return check.held
+      ? { text: `Concentration save: ${roll} — held ${check.spellName}`, held: true }
+      : { text: `Concentration save: ${roll} — lost ${check.spellName}`, held: false };
+  }
+
   /** Submit a batch of operations, returns true on success. */
   async function submit(ops: HitPointOperation[]): Promise<boolean> {
     setPending(true);
     setError(null);
     try {
-      const updated = await applyHitPointOperations(character.id, ops);
+      const { character: updated, concentrationChecks } = await applyHitPointOperations(
+        character.id,
+        ops,
+      );
       onUpdate(updated);
+      // Surface the most recent concentration check (single damage op per submit
+      // in practice; if a batch produced several, show the last).
+      const last = concentrationChecks.at(-1);
+      setConcentrationNote(last ? concentrationMessage(last) : null);
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong — try again");
@@ -440,6 +463,21 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
             >
               Go to Advancements
             </button>
+          </div>
+        )}
+
+        {/* Concentration save result (issue #41) */}
+        {concentrationNote && (
+          <div
+            role="status"
+            aria-live="polite"
+            className={`rounded-card border px-3 py-2 text-sm font-semibold ${
+              concentrationNote.held
+                ? "border-arcane-300 bg-arcane-50 text-arcane-800"
+                : "border-garnet-300 bg-garnet-50 text-garnet-800"
+            }`}
+          >
+            {concentrationNote.text}
           </div>
         )}
 

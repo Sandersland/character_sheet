@@ -131,6 +131,49 @@ describe("SessionSummaryModal", () => {
     expect(await screen.findByText("950")).toBeInTheDocument();
   });
 
+  it("hides the retroactive-XP affordance when the session is still active", () => {
+    const session: Session = { ...baseSession, status: "active" };
+    render(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />);
+    expect(
+      screen.queryByRole("button", { name: /add xp to this session/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the retroactive-XP affordance when the session is ended", () => {
+    render(<SessionSummaryModal characterId="c1" session={baseSession} onClose={() => {}} />);
+    expect(
+      screen.getByRole("button", { name: /add xp to this session/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("calls onCharacterUpdate with the updated character after a successful award", async () => {
+    const user = userEvent.setup();
+    const updatedCharacter = { id: "c1", experiencePoints: 950 } as Character;
+    const onCharacterUpdate = vi.fn();
+    mockApplyXp.mockResolvedValue(updatedCharacter);
+    mockFetchSession.mockResolvedValue({
+      ...baseSession,
+      summary: { ...summary, xpGained: 950 },
+      events: [],
+    });
+
+    render(
+      <SessionSummaryModal
+        characterId="c1"
+        session={baseSession}
+        onClose={() => {}}
+        onCharacterUpdate={onCharacterUpdate}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /add xp to this session/i }));
+    await user.type(screen.getByLabelText(/^award xp$/i), "500");
+    await user.click(screen.getByRole("button", { name: /^award$/i }));
+
+    expect(await screen.findByText("950")).toBeInTheDocument();
+    expect(onCharacterUpdate).toHaveBeenCalledWith(updatedCharacter);
+  });
+
   it("calls onClose when the Close control is used", async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();

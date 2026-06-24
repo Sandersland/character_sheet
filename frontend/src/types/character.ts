@@ -1132,6 +1132,24 @@ export type HitPointOperation =
   | DeathSaveOperation
   | StabilizeOperation;
 
+/**
+ * Result of the auto-rolled concentration check the server makes when a
+ * concentrating character takes damage (issue #41). Returned by the HP
+ * endpoint alongside the updated character so the client can toast it.
+ * `reason: "death"` means concentration ended unconditionally (dropped to 0 HP)
+ * with no save — `roll`/`saveBonus`/`total`/`dc` are then null.
+ */
+export interface ConcentrationCheck {
+  spellName: string;
+  reason: "damage" | "death";
+  held: boolean;
+  roll: number | null;
+  saveBonus: number | null;
+  total: number | null;
+  dc: number | null;
+  damage: number;
+}
+
 // ── Action operation types (mirrors backend/src/lib/actions.ts) ─────────────
 // Sent as `{ operations: ActionOperation[] }` to
 // POST /api/characters/:id/actions/transactions.

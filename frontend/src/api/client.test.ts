@@ -251,12 +251,46 @@ describe("applyHitPointOperations", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const operations: HitPointOperation[] = [{ type: "damage", amount: 7 }];
-    await applyHitPointOperations("1", operations);
+    const result = await applyHitPointOperations("1", operations);
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/characters/1/hp"),
       expect.objectContaining({ method: "POST", body: JSON.stringify({ operations }) })
     );
+    // Returns the character split apart from concentrationChecks (defaulting to []).
+    expect(result.character.id).toBe("1");
+    expect(result.concentrationChecks).toEqual([]);
+  });
+
+  it("splits out concentrationChecks from the response", async () => {
+    const check = {
+      spellName: "Bless",
+      reason: "damage",
+      held: false,
+      roll: 4,
+      saveBonus: 2,
+      total: 6,
+      dc: 12,
+      damage: 24,
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          id: "1",
+          hitPoints: { current: 0, max: 22, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+          concentrationChecks: [check],
+        }),
+      })
+    );
+
+    const result = await applyHitPointOperations("1", [{ type: "damage", amount: 24 }]);
+    expect(result.character.id).toBe("1");
+    expect(
+      (result.character as unknown as { concentrationChecks?: unknown }).concentrationChecks
+    ).toBeUndefined();
+    expect(result.concentrationChecks).toEqual([check]);
   });
 
   it("throws the server's error message on a non-ok response", async () => {
