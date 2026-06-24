@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { applyExperienceOperations, fetchSession } from "@/api/client";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
-import type { JournalEntry, Session, SessionSummary } from "@/types/character";
+import { formatJournalDate } from "@/lib/formatJournalDate";
+import type { Character, JournalEntry, Session, SessionSummary } from "@/types/character";
 
 interface SessionSummaryModalProps {
   /** Owning character — needed to retroactively award XP to this session. */
@@ -11,6 +12,11 @@ interface SessionSummaryModalProps {
   /** The ended session whose `summary` is displayed. */
   session: Session;
   onClose: () => void;
+  /**
+   * Called with the updated character after a retroactive XP award lands, so the
+   * parent sheet's XP can refresh live (otherwise it only updates on reload).
+   */
+  onCharacterUpdate?: (character: Character) => void;
 }
 
 // ── Formatting helpers ────────────────────────────────────────────────────────
@@ -22,22 +28,6 @@ function formatDuration(ms: number): string {
   if (hours === 0) return `${minutes} min`;
   if (minutes === 0) return `${hours} hr`;
   return `${hours} hr ${minutes} min`;
-}
-
-/**
- * Format a journal entry's date for display. Mirrors JournalSection.formatDate:
- * journal dates are calendar dates stored at UTC midnight, so format in UTC to
- * avoid shifting the day backwards in timezones behind UTC.
- */
-function formatJournalDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, {
-    timeZone: "UTC",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
 }
 
 function formatTimeRange(startedAt: string, endedAt: string): string {
@@ -102,10 +92,12 @@ function AddXpForm({
   characterId,
   sessionId,
   onAwarded,
+  onCharacterUpdate,
 }: {
   characterId: string;
   sessionId: string;
   onAwarded: (summary: SessionSummary) => void;
+  onCharacterUpdate?: (character: Character) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [xp, setXp] = useState("");
@@ -120,7 +112,12 @@ function AddXpForm({
     setBusy(true);
     setError(null);
     try {
-      await applyExperienceOperations(characterId, [{ type: "award", amount: parsed }], sessionId);
+      const updated = await applyExperienceOperations(
+        characterId,
+        [{ type: "award", amount: parsed }],
+        sessionId,
+      );
+      onCharacterUpdate?.(updated);
       // Re-fetch the session to pick up its freshly recomputed summary.
       const refreshed = await fetchSession(characterId, sessionId);
       if (refreshed.summary) onAwarded(refreshed.summary as SessionSummary);
@@ -188,6 +185,9 @@ function AddXpForm({
           Cancel
         </button>
       </div>
+      <p className="text-xs text-parchment-500">
+        This session is closed, so the award is permanent — it can't be undone.
+      </p>
       {error && <p className="text-xs font-semibold text-garnet-700">{error}</p>}
     </div>
   );
@@ -201,7 +201,12 @@ function AddXpForm({
  * ActivityModal's styling. Renders the persisted `Session.summary`, the
  * session's journal entries, and a retroactive "add XP" affordance.
  */
-export default function SessionSummaryModal({ characterId, session, onClose }: SessionSummaryModalProps) {
+export default function SessionSummaryModal({
+  characterId,
+  session,
+  onClose,
+  onCharacterUpdate,
+}: SessionSummaryModalProps) {
   const [summary, setSummary] = useState<SessionSummary | null | undefined>(
     session.summary as SessionSummary | null | undefined,
   );
@@ -334,11 +339,15 @@ export default function SessionSummaryModal({ characterId, session, onClose }: S
         </div>
 
         {/* ── Retroactive XP ───────────────────────────────────────────────── */}
-        <AddXpForm
-          characterId={characterId}
-          sessionId={session.id}
-          onAwarded={(s) => setSummary(s)}
-        />
+        {/* Retroactive awards only apply to a closed session — gate defensively. */}
+        {session.status === "ended" && (
+          <AddXpForm
+            characterId={characterId}
+            sessionId={session.id}
+            onAwarded={(s) => setSummary(s)}
+            onCharacterUpdate={onCharacterUpdate}
+          />
+        )}
       </div>
     </Modal>
   );
