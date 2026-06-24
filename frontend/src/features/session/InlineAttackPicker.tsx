@@ -23,10 +23,9 @@
  */
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
 
 import { useRoll } from "@/features/dice/RollContext";
-import { logRoll } from "@/api/client";
+import { applyInventoryTransactions, logRoll } from "@/api/client";
 import { formatRollSpec } from "@/lib/dice";
 import { maneuverPlacement, mechanicsFor } from "@/lib/maneuvers";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
@@ -109,6 +108,35 @@ export default function InlineAttackPicker({
     (item) => item.category === "weapon" && item.equipped && item.weapon,
   );
 
+  // Weapons the player owns but hasn't equipped — surfaced inline so a freshly
+  // created (or just-unequipped) character can arm up without leaving the
+  // attack flow for the Inventory tab.
+  const unequippedWeapons = character.inventory.filter(
+    (item) => item.category === "weapon" && !item.equipped && item.weapon,
+  );
+
+  // Tracks the inventoryItemId currently being equipped (disables its button).
+  const [equipping, setEquipping] = useState<string | null>(null);
+
+  // Equip a weapon through the same audited setEquipped op the Inventory tab
+  // uses; the returned character refreshes the picker so the weapon appears
+  // in the equipped list immediately.
+  async function handleEquip(inventoryItemId: string) {
+    if (equipping) return;
+    setEquipping(inventoryItemId);
+    try {
+      const updated = await applyInventoryTransactions(character.id, [
+        { type: "setEquipped", inventoryItemId, equipped: true },
+      ]);
+      onUpdate(updated);
+      onLogChanged();
+    } catch (e) {
+      console.error("equip failed", e);
+    } finally {
+      setEquipping(null);
+    }
+  }
+
   const { unarmedStrike, improvisedWeapon } = character;
   const showManeuvers = hasSuperiorityDice(character);
 
@@ -190,15 +218,32 @@ export default function InlineAttackPicker({
     <div className="flex flex-col divide-y divide-parchment-200">
       {equippedWeapons.length === 0 && attackOptionManeuvers.length === 0 && (
         <p className="pb-3 text-sm text-parchment-500">
-          No weapons equipped. Go to your{" "}
-          <Link
-            to={`/characters/${character.id}`}
-            className="text-garnet-700 hover:underline"
-          >
-            character sheet
-          </Link>{" "}
-          and use the Equip button on a weapon.
+          {unequippedWeapons.length > 0
+            ? "No weapons equipped. Equip one below, or use the Inventory tab."
+            : "No weapons equipped. Add a weapon from the Inventory tab, then equip it here."}
         </p>
+      )}
+
+      {/* ── Equip an owned-but-unequipped weapon, inline ─────────────────────── */}
+      {unequippedWeapons.length > 0 && (
+        <div className="flex flex-col gap-1.5 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+            Equip a weapon
+          </p>
+          {unequippedWeapons.map((item) => (
+            <div key={item.id} className="flex items-center justify-between">
+              <p className="text-sm text-parchment-700">{item.name}</p>
+              <button
+                type="button"
+                disabled={equipping !== null}
+                onClick={() => handleEquip(item.id)}
+                className="rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {equipping === item.id ? "Equipping…" : "Equip"}
+              </button>
+            </div>
+          ))}
+        </div>
       )}
 
       {equippedWeapons.map((item) => {
