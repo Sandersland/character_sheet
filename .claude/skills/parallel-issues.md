@@ -60,26 +60,42 @@ This assigns a slot (1–9), writes a gitignored `.env` with the slot's ports + 
 - backend  `http://localhost:$((4000 + slot*10))/api`
 - postgres `localhost:$((5432 + slot*10))`
 
-First boot builds images and runs `prisma migrate deploy && prisma db seed` against the private DB — give it a moment.
+First boot builds images and runs `prisma migrate deploy && prisma db seed` against the private DB. Before handing off to a build agent, wait until the backend is healthy — poll `http://localhost:$((4000 + slot*10))/api/characters` until it returns `200`.
 
 ### 5. Build each issue in parallel (one background agent per worktree)
 
 Launch one background subagent per issue (`run_in_background: true`), so they build concurrently. Give each agent: its worktree path (`.claude/worktrees/feat/issue-<#>-<slug>`), its slot + ports, the approved plan, the issue number, and the integration branch name. Each agent follows this loop:
 
+> **Run all tooling _inside the containers_, not on the host.** A worktree's `node_modules` are empty Docker-volume mountpoints — host-run `npx vitest`/`prisma` will fail. Each container bind-mounts its workspace at `/app` (`./backend:/app`, `./frontend:/app`) with deps in a named volume, and the backend container already has `DATABASE_URL` preset to the internal `db:5432`. Because source is bind-mounted, your host file edits are live in-container immediately, and any migration files / generated Prisma client land back in the worktree (so they get committed). (`.claude/docs/testing.md` describes the host-run flow — that is for the **main** checkout, which has real `node_modules`; the worktree diverges.) Run everything below from the worktree dir.
+
 **Per chunk — test first:**
 1. Write the unit tests from the plan **first** (they should fail).
 2. Implement until they pass.
-   - **Backend tests need Postgres on the worktree's port.** Set `DATABASE_URL` in the *same command* as vitest (per `.claude/docs/testing.md` — never a prior `export`), using the worktree's postgres port:
+   - **Backend tests** (DB already wired via container env — no `DATABASE_URL` needed):
      ```bash
-     DATABASE_URL=postgresql://character_sheet:character_sheet@localhost:<5432+slot*10>/character_sheet \
-       npx vitest run <test-file>
+     docker compose exec -T backend sh -c 'cd /app && npx vitest run <test-file>'
      ```
-     Schema changes use `prisma migrate dev --name <change>` against that same `DATABASE_URL`.
-   - **Frontend tests** need no DB: `npm run test --workspace=frontend`.
-3. Commit each green chunk with a conventional message: `feat(<domain>): <summary> (#<#>)`.
+   - **Schema changes** — migrate **and regenerate the client in the same step** (a stale client after `migrate dev` causes confusing runtime errors like `Invalid value for argument 'type'. Expected <Enum>` even though the migration succeeded):
+     ```bash
+     docker compose exec -T backend sh -c 'cd /app && npx prisma migrate dev --name <change> && npx prisma generate'
+     ```
+     Then `docker compose restart backend` so the running server picks up the regenerated client; wait for `/api/characters` → `200` again.
+   - **Frontend tests** need no DB:
+     ```bash
+     docker compose exec -T frontend sh -c 'cd /app && npx vitest run <test-file>'
+     ```
+3. **Lint before committing** — `ci.yml` runs lint, so a missed lint error fails CI even when tests pass:
+   ```bash
+   docker compose exec -T backend  sh -c 'cd /app && npm run lint'
+   docker compose exec -T frontend sh -c 'cd /app && npm run lint'
+   ```
+   Both must be clean.
+4. Commit each green chunk with a conventional message: `feat(<domain>): <summary> (#<#>)`.
 
 **After the last chunk — UI gate (if the issue has a UI surface):**
 Run the **verify-frontend** skill, adapted to this worktree — run the frontend unit tests as usual, but point the browser verification at the **worktree's** frontend URL (`http://localhost:<5173+slot*10>`), not the hardcoded 5173. Screenshots go under `/tmp/` only — never the project tree.
+
+> **Playwright MCP gotcha:** `target` refs reset across snapshots and page reloads, so a ref captured earlier goes stale and `browser_snapshot`/click calls error. Re-`browser_snapshot` to get fresh refs, or fall back to `browser_evaluate` with DOM queries to read/assert state reliably. Button accessible names come from their **text content**, not `title` — scope an ambiguous click via its containing row.
 
 **On all-green — open the PR:**
 ```bash
