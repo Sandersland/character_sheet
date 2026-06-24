@@ -497,6 +497,19 @@ export function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
 }
 
+/**
+ * The DC of the Constitution saving throw to maintain concentration after
+ * taking damage (5e PHB): 10, or half the damage taken (rounded down),
+ * whichever is higher. The save is made once per instance of damage.
+ *
+ *   e.g. 9 damage  → max(10, 4)  = 10
+ *        10 damage → max(10, 5)  = 10
+ *        22 damage → max(10, 11) = 11
+ */
+export function concentrationSaveDC(damage: number): number {
+  return Math.max(10, Math.floor(damage / 2));
+}
+
 // ── Ability Score Improvement / Feat slot table ───────────────────────────────
 // Per 5e PHB: most classes get ASI slots at levels 4, 8, 12, 16, 19.
 // Fighter gets two extras (levels 6 and 14); Rogue gets one extra (level 10).
