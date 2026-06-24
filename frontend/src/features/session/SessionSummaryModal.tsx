@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { applyExperienceOperations, fetchSession } from "@/api/client";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
+import { formatJournalDate } from "@/lib/formatJournalDate";
 import type { JournalEntry, Session, SessionSummary } from "@/types/character";
 
 interface SessionSummaryModalProps {
@@ -22,22 +23,6 @@ function formatDuration(ms: number): string {
   if (hours === 0) return `${minutes} min`;
   if (minutes === 0) return `${hours} hr`;
   return `${hours} hr ${minutes} min`;
-}
-
-/**
- * Format a journal entry's date for display. Mirrors JournalSection.formatDate:
- * journal dates are calendar dates stored at UTC midnight, so format in UTC to
- * avoid shifting the day backwards in timezones behind UTC.
- */
-function formatJournalDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, {
-    timeZone: "UTC",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
 }
 
 function formatTimeRange(startedAt: string, endedAt: string): string {
