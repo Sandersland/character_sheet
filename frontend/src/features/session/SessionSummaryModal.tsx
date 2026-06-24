@@ -4,7 +4,7 @@ import { applyExperienceOperations, fetchSession } from "@/api/client";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import { formatJournalDate } from "@/lib/formatJournalDate";
-import type { JournalEntry, Session, SessionSummary } from "@/types/character";
+import type { Character, JournalEntry, Session, SessionSummary } from "@/types/character";
 
 interface SessionSummaryModalProps {
   /** Owning character — needed to retroactively award XP to this session. */
@@ -12,6 +12,11 @@ interface SessionSummaryModalProps {
   /** The ended session whose `summary` is displayed. */
   session: Session;
   onClose: () => void;
+  /**
+   * Called with the updated character after a retroactive XP award lands, so the
+   * parent sheet's XP can refresh live (otherwise it only updates on reload).
+   */
+  onCharacterUpdate?: (character: Character) => void;
 }
 
 // ── Formatting helpers ────────────────────────────────────────────────────────
@@ -87,10 +92,12 @@ function AddXpForm({
   characterId,
   sessionId,
   onAwarded,
+  onCharacterUpdate,
 }: {
   characterId: string;
   sessionId: string;
   onAwarded: (summary: SessionSummary) => void;
+  onCharacterUpdate?: (character: Character) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [xp, setXp] = useState("");
@@ -105,7 +112,12 @@ function AddXpForm({
     setBusy(true);
     setError(null);
     try {
-      await applyExperienceOperations(characterId, [{ type: "award", amount: parsed }], sessionId);
+      const updated = await applyExperienceOperations(
+        characterId,
+        [{ type: "award", amount: parsed }],
+        sessionId,
+      );
+      onCharacterUpdate?.(updated);
       // Re-fetch the session to pick up its freshly recomputed summary.
       const refreshed = await fetchSession(characterId, sessionId);
       if (refreshed.summary) onAwarded(refreshed.summary as SessionSummary);
@@ -189,7 +201,12 @@ function AddXpForm({
  * ActivityModal's styling. Renders the persisted `Session.summary`, the
  * session's journal entries, and a retroactive "add XP" affordance.
  */
-export default function SessionSummaryModal({ characterId, session, onClose }: SessionSummaryModalProps) {
+export default function SessionSummaryModal({
+  characterId,
+  session,
+  onClose,
+  onCharacterUpdate,
+}: SessionSummaryModalProps) {
   const [summary, setSummary] = useState<SessionSummary | null | undefined>(
     session.summary as SessionSummary | null | undefined,
   );
@@ -328,6 +345,7 @@ export default function SessionSummaryModal({ characterId, session, onClose }: S
             characterId={characterId}
             sessionId={session.id}
             onAwarded={(s) => setSummary(s)}
+            onCharacterUpdate={onCharacterUpdate}
           />
         )}
       </div>
