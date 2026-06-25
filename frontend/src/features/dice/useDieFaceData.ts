@@ -32,7 +32,10 @@ export function useDieFaceData(faces: number) {
     return computed.length === faces ? computed : [];
   }, [logicGeometry, faces]);
 
-  const rounded = faces === 6;
+  // Smooth-shade every recognized polyhedral die (those with a clean per-face
+  // grouping) so edges read as soft resin rather than hard CG facets — matching
+  // the d6's look. The d10/d100 box fallback (no face groups) stays flat-shaded.
+  const rounded = groups.length > 0;
 
   return { visualGeometry, groups, rounded };
 }

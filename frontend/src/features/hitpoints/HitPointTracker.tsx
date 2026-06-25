@@ -6,6 +6,9 @@ import type { Character, ConcentrationCheck, HitPointOperation } from "@/types/c
 import Card from "@/components/ui/Card";
 import MeterBar from "@/components/ui/MeterBar";
 import Modal from "@/components/ui/Modal";
+import ConcentrationSaveModal from "@/features/hitpoints/ConcentrationSaveModal";
+import type { PendingConcentrationSave } from "@/features/hitpoints/ConcentrationSaveModal";
+import { useAutoRollConcentrationPref } from "@/features/hitpoints/concentrationPreference";
 
 interface HitPointTrackerProps {
   character: Character;
@@ -128,11 +131,20 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [advancementCallout, setAdvancementCallout] = useState(false);
-  // Transient banner for the server's auto-rolled concentration save (issue #41).
+  // Transient banner for a resolved concentration save (issue #41).
   const [concentrationNote, setConcentrationNote] = useState<{
     text: string;
     held: boolean;
   } | null>(null);
+  // A deferred manual concentration save awaiting the player's roll (issue #76),
+  // surfaced in a modal. Only one is tracked at a time — a fresh qualifying
+  // damage overwrites it.
+  const [pendingSave, setPendingSave] = useState<PendingConcentrationSave | null>(null);
+
+  // "Auto-roll concentration saves" preference (issue #76). Only spellcasters
+  // can concentrate, so the toggle is only shown for them.
+  const isSpellcaster = character.spellcasting !== undefined;
+  const [autoRollConcentration, setAutoRollConcentration] = useAutoRollConcentrationPref();
 
   // Detect when a level-up unlocks a new advancement slot.
   const prevAdvancementTotal = useRef(character.advancementSlots.total);
@@ -157,8 +169,15 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
       : { text: `Concentration save: ${roll} — lost ${check.spellName}`, held: false };
   }
 
-  /** Submit a batch of operations, returns true on success. */
-  async function submit(ops: HitPointOperation[]): Promise<boolean> {
+  /**
+   * Submit a batch of operations, returns true on success.
+   * `silentConcentration` skips the inline banner/modal handling — used when the
+   * concentration-save modal is already showing the result itself (issue #76).
+   */
+  async function submit(
+    ops: HitPointOperation[],
+    opts: { silentConcentration?: boolean } = {},
+  ): Promise<boolean> {
     setPending(true);
     setError(null);
     try {
@@ -167,10 +186,25 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
         ops,
       );
       onUpdate(updated);
-      // Surface the most recent concentration check (single damage op per submit
-      // in practice; if a batch produced several, show the last).
-      const last = concentrationChecks.at(-1);
-      setConcentrationNote(last ? concentrationMessage(last) : null);
+      if (!opts.silentConcentration) {
+        // Surface the most recent concentration check (single damage op per
+        // submit in practice; if a batch produced several, show the last).
+        const last = concentrationChecks.at(-1);
+        if (last?.status === "pending") {
+          // Manual path (issue #76): a save is deferred — open the roll modal.
+          setPendingSave({
+            entryId: last.entryId,
+            spellName: last.spellName,
+            dc: last.dc ?? 0,
+            saveBonus: last.saveBonus ?? 0,
+            damage: last.damage,
+          });
+          setConcentrationNote(null);
+        } else {
+          setConcentrationNote(last ? concentrationMessage(last) : null);
+          setPendingSave(null);
+        }
+      }
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong — try again");
@@ -183,8 +217,29 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
   async function handleDamage() {
     const amount = parseInt(damageValue, 10);
     if (!amount || amount <= 0) return;
-    const ok = await submit([{ type: "damage", amount }]);
+    // When auto-roll is off (issue #76), the server defers the concentration
+    // save and returns a pending check; the player rolls it via the 3D die.
+    const ok = await submit([{ type: "damage", amount, autoRollConcentration }]);
     if (ok) setDamageValue("");
+  }
+
+  /**
+   * The save die settled in the modal — persist it with the natural d20 (issue
+   * #76). Silent: the modal shows the result, so no inline banner is set.
+   */
+  async function resolveConcentrationSave(roll: number) {
+    if (!pendingSave) return;
+    await submit(
+      [
+        {
+          type: "concentrationSave",
+          entryId: pendingSave.entryId,
+          roll,
+          damage: pendingSave.damage,
+        },
+      ],
+      { silentConcentration: true },
+    );
   }
 
   async function handleHeal() {
@@ -385,6 +440,20 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
           </label>
         </div>
 
+        {/* ── Concentration save preference (spellcasters only, issue #76) ── */}
+        {isSpellcaster && (
+          <label className="flex items-center gap-2 text-xs text-parchment-600">
+            <input
+              type="checkbox"
+              checked={autoRollConcentration}
+              onChange={(e) => setAutoRollConcentration(e.target.checked)}
+              disabled={pending}
+              className="h-3.5 w-3.5 rounded border-parchment-400 text-arcane-700 focus:ring-arcane-600"
+            />
+            Auto-roll concentration saves
+          </label>
+        )}
+
         {/* ── Rest controls ── */}
         <div className="flex flex-wrap items-end gap-3 border-t border-parchment-200 pt-3">
           {/* Short rest */}
@@ -466,7 +535,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
           </div>
         )}
 
-        {/* Concentration save result (issue #41) */}
+        {/* Concentration save result (issue #41, auto-roll path) */}
         {concentrationNote && (
           <div
             role="status"
@@ -495,6 +564,15 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
           pending={pending}
           onConfirm={handleLevelUp}
           onClose={() => setLevelUpOpen(false)}
+        />
+      )}
+
+      {/* Manual concentration-save modal (issue #76) */}
+      {pendingSave && (
+        <ConcentrationSaveModal
+          save={pendingSave}
+          onResolve={resolveConcentrationSave}
+          onClose={() => setPendingSave(null)}
         />
       )}
     </Card>

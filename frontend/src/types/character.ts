@@ -1127,7 +1127,12 @@ export type ExperienceOperation = XpAwardOperation | XpSetOperation;
 // ── HP operation types (mirrors backend/src/lib/hitpoints.ts) ───────────────
 // Sent as `{ operations: HitPointOperation[] }` to POST /api/characters/:id/hp.
 
-export interface DamageOperation { type: "damage"; amount: number }
+/**
+ * `autoRollConcentration: false` (issue #76) defers a triggered concentration
+ * save to the client — the response carries a `status: "pending"` check and the
+ * client follows up with a `ConcentrationSaveOperation`. Omitted = auto-roll.
+ */
+export interface DamageOperation { type: "damage"; amount: number; autoRollConcentration?: boolean }
 export interface HealOperation { type: "heal"; amount: number }
 export interface SetTempOperation { type: "setTemp"; amount: number }
 /** `rolls`: one raw die value per hit die spent (rolled by the client via dice.ts). */
@@ -1138,6 +1143,11 @@ export interface LevelUpOperation { type: "levelUp"; method: "average" | "roll";
 /** Client rolls d20 via dice.ts, sends the raw value. Only valid at 0 HP. */
 export interface DeathSaveOperation { type: "deathSave"; roll: number }
 export interface StabilizeOperation { type: "stabilize" }
+/**
+ * Resolve a deferred concentration save with a client-rolled d20 (issue #76).
+ * `damage` lets the server recompute the DC; `roll` is the raw d20 face.
+ */
+export interface ConcentrationSaveOperation { type: "concentrationSave"; entryId: string; roll: number; damage: number }
 
 export type HitPointOperation =
   | DamageOperation
@@ -1147,19 +1157,26 @@ export type HitPointOperation =
   | LongRestOperation
   | LevelUpOperation
   | DeathSaveOperation
-  | StabilizeOperation;
+  | StabilizeOperation
+  | ConcentrationSaveOperation;
 
 /**
- * Result of the auto-rolled concentration check the server makes when a
- * concentrating character takes damage (issue #41). Returned by the HP
- * endpoint alongside the updated character so the client can toast it.
- * `reason: "death"` means concentration ended unconditionally (dropped to 0 HP)
- * with no save — `roll`/`saveBonus`/`total`/`dc` are then null.
+ * Result of the concentration check the server makes when a concentrating
+ * character takes damage (issue #41). Returned by the HP endpoint alongside the
+ * updated character.
+ * - `status: "resolved"` — the save was rolled or skipped; `held` is final.
+ *   `reason: "death"` means concentration ended unconditionally (dropped to 0
+ *   HP) with no save — `roll`/`saveBonus`/`total`/`dc` are then null.
+ * - `status: "pending"` — a manual save is deferred to the client (issue #76):
+ *   `dc`/`saveBonus` are populated, `held`/`roll`/`total` are null, and the
+ *   client must follow up with a `ConcentrationSaveOperation` keyed by `entryId`.
  */
 export interface ConcentrationCheck {
+  status: "resolved" | "pending";
+  entryId: string;
   spellName: string;
   reason: "damage" | "death";
-  held: boolean;
+  held: boolean | null;
   roll: number | null;
   saveBonus: number | null;
   total: number | null;

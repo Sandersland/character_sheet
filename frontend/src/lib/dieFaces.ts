@@ -9,7 +9,9 @@
  * component or a physics body builder without dragging React along.
  */
 import * as THREE from "three";
+import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { mergeVertices, toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 // Mirrors index.css's garnet/parchment tokens — R3F materials can't read
 // CSS custom properties, so the values are duplicated here by hand.
@@ -26,16 +28,16 @@ export const DIE_LABEL_OUTLINE_COLOR = "#7a0c18";
 export const FACE_LABEL_FONT_SIZE: Readonly<Record<number, number>> = {
   4: 0.42,
   6: 0.55,
-  8: 0.4,
-  12: 0.3,
-  20: 0.26,
+  8: 0.46,
+  12: 0.36,
+  20: 0.34,
 };
 export const DEFAULT_FACE_LABEL_FONT_SIZE = 0.36;
-export const FACE_LABEL_OUTLINE_WIDTH = 0.015;
+export const FACE_LABEL_OUTLINE_WIDTH = 0.02;
 
-// Bumped from the original 0.045 so the larger labels below clear the
-// rounded d6's slightly proud-rendered surface without z-fighting.
-export const LABEL_SURFACE_OFFSET = 0.06;
+// Clears the rounded d6's proud surface and the bevelled polyhedra's faces
+// (pushed out ~DIE_ROUND_RADIUS by the rounding below) without z-fighting.
+export const LABEL_SURFACE_OFFSET = 0.11;
 // The d6 box (side 1.3) has a circumscribed-sphere diameter of ~2.25
 // (1.3 * sqrt(3)) — the gap between die centers needs to clear that with
 // real margin or spinning corners visibly intersect the neighboring die.
@@ -88,11 +90,72 @@ export function createDieGeometry(faces: number): THREE.BufferGeometry {
  * actually rolled in the app today — gets a rounded box for the realistic
  * "resin die from a game shop" look; other die types aren't rounded yet
  * and just reuse the sharp logic solid. */
-export function createVisualDieGeometry(faces: number): THREE.BufferGeometry {
-  if (faces === 6) {
-    return new RoundedBoxGeometry(D6_SIZE, D6_SIZE, D6_SIZE, D6_ROUNDING_SEGMENTS, D6_ROUNDING_RADIUS);
+// Edge-rounding for the platonic dice. A real resin die has flat number faces
+// with rounded edges/corners — exactly what RoundedBoxGeometry gives the d6.
+// For the other solids we approximate the same "round the edges, keep the faces
+// flat" result with a Minkowski-style round: take the convex hull of every
+// vertex expanded into a small sphere of points. The flat faces survive (the
+// outer tangent plane of three coplanar vertex-spheres is the original face,
+// pushed out by the radius); the edges and corners become rounded. Tunable.
+const DIE_ROUND_RADIUS = 0.08;
+const DIE_ROUND_SAMPLES = 64;
+// Crease angle (rad) for normal smoothing: the many tiny facets that make up a
+// rounded edge sit a few degrees apart and get smoothed together, while the
+// flat-face boundaries are a sharper angle and stay crisp — so faces read flat
+// and edges read round under smooth shading.
+const DIE_ROUND_CREASE_ANGLE = 0.5;
+
+/** Evenly distributed points on a sphere of `radius` (Fibonacci lattice). */
+function fibonacciSpherePoints(count: number, radius: number): THREE.Vector3[] {
+  const points: THREE.Vector3[] = [];
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < count; i++) {
+    const y = 1 - (i / (count - 1)) * 2;
+    const ringRadius = Math.sqrt(Math.max(0, 1 - y * y));
+    const theta = goldenAngle * i;
+    points.push(
+      new THREE.Vector3(Math.cos(theta) * ringRadius, y, Math.sin(theta) * ringRadius).multiplyScalar(
+        radius,
+      ),
+    );
   }
-  return createDieGeometry(faces);
+  return points;
+}
+
+/** Convex die solid with rounded edges/corners but flat faces (see above). */
+function createRoundedPolyhedron(faces: number): THREE.BufferGeometry {
+  const base = createDieGeometry(faces);
+  const position = base.getAttribute("position");
+  const unique = new Map<string, THREE.Vector3>();
+  for (let i = 0; i < position.count; i++) {
+    const v = new THREE.Vector3().fromBufferAttribute(position, i);
+    const key = `${v.x.toFixed(3)},${v.y.toFixed(3)},${v.z.toFixed(3)}`;
+    if (!unique.has(key)) unique.set(key, v.clone());
+  }
+  base.dispose();
+
+  const sphere = fibonacciSpherePoints(DIE_ROUND_SAMPLES, DIE_ROUND_RADIUS);
+  const points: THREE.Vector3[] = [];
+  for (const vertex of unique.values()) {
+    for (const offset of sphere) points.push(vertex.clone().add(offset));
+  }
+
+  const hull = mergeVertices(new ConvexGeometry(points));
+  return toCreasedNormals(hull, DIE_ROUND_CREASE_ANGLE);
+}
+
+export function createVisualDieGeometry(faces: number): THREE.BufferGeometry {
+  switch (faces) {
+    case 6:
+      return new RoundedBoxGeometry(D6_SIZE, D6_SIZE, D6_SIZE, D6_ROUNDING_SEGMENTS, D6_ROUNDING_RADIUS);
+    case 4:
+    case 8:
+    case 12:
+    case 20:
+      return createRoundedPolyhedron(faces);
+    default:
+      return createDieGeometry(faces);
+  }
 }
 
 /**
