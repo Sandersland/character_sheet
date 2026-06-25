@@ -33,16 +33,21 @@ export default function ConcentrationSaveModal({
   onClose,
 }: ConcentrationSaveModalProps) {
   const [phase, setPhase] = useState<"prompt" | "rolling" | "result">("prompt");
-  const [outcome, setOutcome] = useState<{ total: number; held: boolean } | null>(null);
+  const [outcome, setOutcome] = useState<{ natural: number; total: number; held: boolean } | null>(
+    null,
+  );
 
   const bonusLabel = save.saveBonus >= 0 ? `+${save.saveBonus}` : String(save.saveBonus);
 
   function handleResult(result: RollResult) {
-    // total = natural d20 + save bonus; held mirrors the server's recompute.
-    const held = result.total >= save.dc;
-    setOutcome({ total: result.total, held });
+    // The die lands on the natural d20; the save total adds the CON bonus on top.
+    // Track both so the readout matches the face that's showing (the bonus is
+    // applied in text, not on the die — otherwise the face wouldn't match).
+    const natural = result.dice[0]?.value ?? 1;
+    const total = natural + save.saveBonus;
+    setOutcome({ natural, total, held: total >= save.dc });
     setPhase("result");
-    void onResolve(result.dice[0]?.value ?? 1);
+    void onResolve(natural);
   }
 
   return (
@@ -73,16 +78,28 @@ export default function ConcentrationSaveModal({
           </button>
         ) : (
           <DiceRoller
-            spec={{ count: 1, faces: 20, modifier: save.saveBonus }}
+            spec={{ count: 1, faces: 20 }}
             label={`Concentration save — DC ${save.dc}`}
             onResult={handleResult}
             autoRollOnMount
+            showTotal={false}
             className="w-full"
           />
         )}
 
         {phase === "result" && outcome && (
           <div className="flex w-full flex-col items-center gap-3">
+            {/* Breakdown so the die face (the natural d20) reads clearly and the
+                CON bonus that produces the total is explicit. */}
+            <p className="text-sm text-parchment-600">
+              Rolled <span className="font-semibold text-parchment-900">{outcome.natural}</span>
+              {save.saveBonus !== 0 && (
+                <>
+                  {" "}
+                  {bonusLabel} CON = <span className="font-semibold text-parchment-900">{outcome.total}</span>
+                </>
+              )}
+            </p>
             <p
               className={`text-base font-semibold ${
                 outcome.held ? "text-arcane-800" : "text-garnet-800"
