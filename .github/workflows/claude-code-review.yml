@@ -18,7 +18,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: write # Required to post inline review comments + tracking comment
       issues: read
       id-token: write
 
@@ -46,5 +46,9 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
-          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
+          # Show a live "review in progress" tracking comment on the PR.
+          track_progress: true
+          # --comment posts findings as inline review comments on the diff,
+          # instead of leaving them in the Action log.
+          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }} --comment'
           claude_args: ${{ steps.cfg.outputs.claude_args }}
