@@ -12,6 +12,9 @@ export const hitPointsRouter = Router();
 const damageOpSchema = z.object({
   type: z.literal("damage"),
   amount: z.number().int().positive(),
+  // Issue #76: defer the concentration save to the client when false. Omitted
+  // or true keeps the server-side auto-roll.
+  autoRollConcentration: z.boolean().optional(),
 });
 
 const healOpSchema = z.object({
@@ -52,6 +55,16 @@ const stabilizeOpSchema = z.object({
   type: z.literal("stabilize"),
 });
 
+// Issue #76: resolve a deferred concentration save with a client-rolled d20.
+// `damage` lets the server recompute the DC (it never trusts a client DC);
+// `roll` is the only trusted-but-validated input, like deathSave.
+const concentrationSaveOpSchema = z.object({
+  type: z.literal("concentrationSave"),
+  entryId: z.string().min(1),
+  roll: z.number().int().min(1).max(20),
+  damage: z.number().int().positive(),
+});
+
 const operationSchema = z.discriminatedUnion("type", [
   damageOpSchema,
   healOpSchema,
@@ -61,6 +74,7 @@ const operationSchema = z.discriminatedUnion("type", [
   levelUpOpSchema,
   deathSaveOpSchema,
   stabilizeOpSchema,
+  concentrationSaveOpSchema,
 ]);
 
 const hpRequestSchema = z.object({
