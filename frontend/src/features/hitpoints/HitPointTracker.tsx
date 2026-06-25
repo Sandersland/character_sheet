@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from "react";
 
 import { applyHitPointOperations } from "@/api/client";
 import { rollDie } from "@/lib/dice";
-import type { RollResult } from "@/lib/dice";
 import type { Character, ConcentrationCheck, HitPointOperation } from "@/types/character";
 import Card from "@/components/ui/Card";
 import MeterBar from "@/components/ui/MeterBar";
 import Modal from "@/components/ui/Modal";
-import DiceRoller from "@/features/dice/DiceRoller";
+import ConcentrationSaveModal from "@/features/hitpoints/ConcentrationSaveModal";
+import type { PendingConcentrationSave } from "@/features/hitpoints/ConcentrationSaveModal";
 import { useAutoRollConcentrationPref } from "@/features/hitpoints/concentrationPreference";
 
 interface HitPointTrackerProps {
@@ -136,17 +136,10 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
     text: string;
     held: boolean;
   } | null>(null);
-  // A deferred manual concentration save awaiting the player's roll (issue #76).
-  // Only one is tracked at a time — a fresh qualifying damage overwrites it.
-  const [pendingSave, setPendingSave] = useState<{
-    entryId: string;
-    spellName: string;
-    dc: number;
-    saveBonus: number;
-    damage: number;
-  } | null>(null);
-  // True while the 3D save die is tumbling (button → DiceRoller mounted).
-  const [saveRolling, setSaveRolling] = useState(false);
+  // A deferred manual concentration save awaiting the player's roll (issue #76),
+  // surfaced in a modal. Only one is tracked at a time — a fresh qualifying
+  // damage overwrites it.
+  const [pendingSave, setPendingSave] = useState<PendingConcentrationSave | null>(null);
 
   // "Auto-roll concentration saves" preference (issue #76). Only spellcasters
   // can concentrate, so the toggle is only shown for them.
@@ -176,8 +169,15 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
       : { text: `Concentration save: ${roll} — lost ${check.spellName}`, held: false };
   }
 
-  /** Submit a batch of operations, returns true on success. */
-  async function submit(ops: HitPointOperation[]): Promise<boolean> {
+  /**
+   * Submit a batch of operations, returns true on success.
+   * `silentConcentration` skips the inline banner/modal handling — used when the
+   * concentration-save modal is already showing the result itself (issue #76).
+   */
+  async function submit(
+    ops: HitPointOperation[],
+    opts: { silentConcentration?: boolean } = {},
+  ): Promise<boolean> {
     setPending(true);
     setError(null);
     try {
@@ -186,24 +186,25 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
         ops,
       );
       onUpdate(updated);
-      // Surface the most recent concentration check (single damage op per submit
-      // in practice; if a batch produced several, show the last).
-      const last = concentrationChecks.at(-1);
-      if (last?.status === "pending") {
-        // Manual path (issue #76): a save is deferred — prompt the player to roll.
-        setPendingSave({
-          entryId: last.entryId,
-          spellName: last.spellName,
-          dc: last.dc ?? 0,
-          saveBonus: last.saveBonus ?? 0,
-          damage: last.damage,
-        });
-        setConcentrationNote(null);
-      } else {
-        setConcentrationNote(last ? concentrationMessage(last) : null);
-        setPendingSave(null);
+      if (!opts.silentConcentration) {
+        // Surface the most recent concentration check (single damage op per
+        // submit in practice; if a batch produced several, show the last).
+        const last = concentrationChecks.at(-1);
+        if (last?.status === "pending") {
+          // Manual path (issue #76): a save is deferred — open the roll modal.
+          setPendingSave({
+            entryId: last.entryId,
+            spellName: last.spellName,
+            dc: last.dc ?? 0,
+            saveBonus: last.saveBonus ?? 0,
+            damage: last.damage,
+          });
+          setConcentrationNote(null);
+        } else {
+          setConcentrationNote(last ? concentrationMessage(last) : null);
+          setPendingSave(null);
+        }
       }
-      setSaveRolling(false);
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong — try again");
@@ -222,23 +223,23 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
     if (ok) setDamageValue("");
   }
 
-  /** Player clicked "Roll CON save" — start the 3D tumble. */
-  function handleConcentrationSaveRoll() {
-    setSaveRolling(true);
-  }
-
-  /** The save die settled — resolve the save with the natural d20 (issue #76). */
-  function handleConcentrationSaveResult(result: RollResult) {
+  /**
+   * The save die settled in the modal — persist it with the natural d20 (issue
+   * #76). Silent: the modal shows the result, so no inline banner is set.
+   */
+  async function resolveConcentrationSave(roll: number) {
     if (!pendingSave) return;
-    const natural = result.dice[0]?.value ?? 1;
-    void submit([
-      {
-        type: "concentrationSave",
-        entryId: pendingSave.entryId,
-        roll: natural,
-        damage: pendingSave.damage,
-      },
-    ]);
+    await submit(
+      [
+        {
+          type: "concentrationSave",
+          entryId: pendingSave.entryId,
+          roll,
+          damage: pendingSave.damage,
+        },
+      ],
+      { silentConcentration: true },
+    );
   }
 
   async function handleHeal() {
@@ -534,35 +535,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
           </div>
         )}
 
-        {/* Deferred manual concentration save — roll the d20 (issue #76) */}
-        {pendingSave && (
-          <div className="rounded-card border border-arcane-300 bg-arcane-50 p-3">
-            {saveRolling ? (
-              <DiceRoller
-                spec={{ count: 1, faces: 20, modifier: pendingSave.saveBonus }}
-                label={`Concentration save — DC ${pendingSave.dc}`}
-                onResult={handleConcentrationSaveResult}
-                autoRollOnMount
-              />
-            ) : (
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <span className="text-sm font-semibold text-arcane-800">
-                  Concentrating on {pendingSave.spellName} — roll a CON save (DC {pendingSave.dc}).
-                </span>
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={handleConcentrationSaveRoll}
-                  className="rounded-control bg-arcane-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-arcane-800 disabled:cursor-not-allowed disabled:bg-parchment-200 disabled:text-parchment-400 disabled:hover:bg-parchment-200"
-                >
-                  Roll CON save
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Concentration save result (issue #41) */}
+        {/* Concentration save result (issue #41, auto-roll path) */}
         {concentrationNote && (
           <div
             role="status"
@@ -591,6 +564,15 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
           pending={pending}
           onConfirm={handleLevelUp}
           onClose={() => setLevelUpOpen(false)}
+        />
+      )}
+
+      {/* Manual concentration-save modal (issue #76) */}
+      {pendingSave && (
+        <ConcentrationSaveModal
+          save={pendingSave}
+          onResolve={resolveConcentrationSave}
+          onClose={() => setPendingSave(null)}
         />
       )}
     </Card>

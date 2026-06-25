@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import HitPointTracker from "@/features/hitpoints/HitPointTracker";
@@ -19,13 +19,20 @@ vi.mock("@/api/client", () => ({
 // natural d20 (14), standing in for a completed tumble.
 const SAVE_DIE = 14;
 vi.mock("@/features/dice/DiceRoller", () => {
-  function MockDiceRoller({ onResult }: { onResult?: (r: RollResult) => void }) {
+  function MockDiceRoller({
+    onResult,
+    spec,
+  }: {
+    onResult?: (r: RollResult) => void;
+    spec?: { count: number; faces: number; modifier?: number };
+  }) {
     useEffect(() => {
+      const modifier = spec?.modifier ?? 0;
       onResult?.({
         dice: [{ value: SAVE_DIE, dropped: false }],
-        modifier: 0,
-        total: SAVE_DIE,
-        spec: { count: 1, faces: 20 },
+        modifier,
+        total: SAVE_DIE + modifier,
+        spec: { count: 1, faces: 20, modifier },
       });
       // Fire exactly once when the roller mounts.
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -146,20 +153,20 @@ describe("HitPointTracker concentration toast (issue #41)", () => {
 });
 
 describe("HitPointTracker interactive concentration save (issue #76)", () => {
-  it("auto-roll on (default) shows the banner and no Roll CON save button", async () => {
+  it("auto-roll on (default) shows the banner and no save modal", async () => {
     mockResolve([check({ held: true, roll: 12, saveBonus: 2, total: 14, dc: 12 })]);
     render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
 
     await applyDamage();
 
     expect(await screen.findByRole("status")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /roll con save/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     // The damage op carries the auto-roll preference (default true).
     const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
     expect(ops[0]).toMatchObject({ type: "damage", autoRollConcentration: true });
   });
 
-  it("turning off auto-roll defers the save and prompts to roll", async () => {
+  it("turning off auto-roll defers the save and opens the roll modal", async () => {
     const user = userEvent.setup();
     mockResolve([
       check({ status: "pending", entryId: "entry-1", dc: 15, saveBonus: 2, held: null, damage: 30 }),
@@ -169,14 +176,15 @@ describe("HitPointTracker interactive concentration save (issue #76)", () => {
     await user.click(screen.getByRole("checkbox", { name: /auto-roll concentration saves/i }));
     await applyDamage();
 
-    // A roll prompt appears instead of an immediate result banner.
-    expect(await screen.findByRole("button", { name: /roll con save/i })).toBeInTheDocument();
+    // A modal opens (no inline banner / UI shift in the HP card).
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: /roll save/i })).toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
     expect(ops[0]).toMatchObject({ type: "damage", autoRollConcentration: false });
   });
 
-  it("rolling the save submits a concentrationSave op with the natural d20", async () => {
+  it("rolling in the modal submits a concentrationSave op and shows the result", async () => {
     const user = userEvent.setup();
     // First the damage op returns a pending check; then the save op resolves.
     vi.mocked(client.applyHitPointOperations)
@@ -188,15 +196,17 @@ describe("HitPointTracker interactive concentration save (issue #76)", () => {
       })
       .mockResolvedValueOnce({
         character: makeCharacter(),
-        concentrationChecks: [check({ held: false, roll: SAVE_DIE, saveBonus: 2, total: 16, dc: 15, damage: 30 })],
+        concentrationChecks: [check({ held: true, roll: SAVE_DIE, saveBonus: 2, total: 16, dc: 15, damage: 30 })],
       });
     render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
 
     await user.click(screen.getByRole("checkbox", { name: /auto-roll concentration saves/i }));
     await applyDamage();
-    await user.click(await screen.findByRole("button", { name: /roll con save/i }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /roll save/i }));
 
-    // The mocked DiceRoller fires onResult → a concentrationSave op is submitted.
+    // The mocked DiceRoller fires onResult → a concentrationSave op is submitted
+    // with the natural d20 (not the bonus-inclusive total).
     const secondCall = vi.mocked(client.applyHitPointOperations).mock.calls[1];
     expect(secondCall[1][0]).toEqual({
       type: "concentrationSave",
@@ -204,7 +214,9 @@ describe("HitPointTracker interactive concentration save (issue #76)", () => {
       roll: SAVE_DIE,
       damage: 30,
     });
-    // The resolved outcome surfaces in the banner.
-    expect(await screen.findByRole("status")).toHaveTextContent(/lost/i);
+    // The result lingers in the modal (14 + 2 = 16 vs DC 15 → holds).
+    expect(within(dialog).getByText(/16 vs DC 15/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/holds/i)).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /done/i })).toBeInTheDocument();
   });
 });
