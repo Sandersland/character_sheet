@@ -14,9 +14,9 @@ const STORAGE_KEY = "cs:pref:autoRollConcentration";
 
 export function loadAutoRollConcentration(): boolean {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return true;
-    return raw === "true";
+    // Default on: only an explicit "false" disables it, so a missing or
+    // corrupted value falls back to auto-roll.
+    return localStorage.getItem(STORAGE_KEY) !== "false";
   } catch {
     return true;
   }
