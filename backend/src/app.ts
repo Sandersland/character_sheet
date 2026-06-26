@@ -47,5 +47,11 @@ export function createApp() {
   app.use("/api", actionsRouter);
   app.use("/api", journalRouter);
 
+  // Unknown /api/* paths 404 as JSON (matching every route's { error } shape),
+  // rather than falling through to Express's default HTML 404 page.
+  app.use("/api", (_req, res) => {
+    res.status(404).json({ error: "Not found" });
+  });
+
   return app;
 }
