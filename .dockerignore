@@ -7,4 +7,7 @@ backend/src/generated
 .github
 **/.env
 **/.env.*
-*.md
+# Documentation — not needed at runtime. Scoped to where docs actually live so
+# a build-relevant .md elsewhere isn't silently dropped if the layout changes.
+/*.md
+.claude

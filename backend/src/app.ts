@@ -26,9 +26,10 @@ import { spellcastingRouter } from "./routes/spellcasting.js";
 
 // CORS origins are env-driven so the API can be deployed anywhere without a
 // code change. `CORS_ORIGIN` is a comma-separated allowlist
-// (e.g. "https://dev.example.com,https://example.com"). When unset, every
-// origin is reflected — convenient for local dev and for single-origin
-// deployments where the SPA is served from this same host (no CORS at all).
+// (e.g. "https://dev.example.com,https://example.com"). When unset, `cors({})`
+// allows every origin via a `*` wildcard — convenient for local dev and for
+// single-origin deployments where the SPA is served from this same host (no
+// CORS at all).
 function corsOptions(): CorsOptions {
   const configured = process.env.CORS_ORIGIN?.trim();
   if (!configured) return {};

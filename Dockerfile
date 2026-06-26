@@ -34,4 +34,7 @@ COPY --from=frontend /frontend/dist ./public
 ENV SERVE_STATIC_DIR=/app/public
 ENV PORT=4000
 EXPOSE 4000
+# Apply migrations, run the seed, then start the server. The seed is idempotent
+# (upserts only, catalog/reference data) so running it on every container start
+# is safe; it adds a little startup latency but keeps reference data current.
 CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && node dist/index.js"]

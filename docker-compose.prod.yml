@@ -15,7 +15,7 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-character_sheet}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-character_sheet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       POSTGRES_DB: ${POSTGRES_DB:-character_sheet}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -29,17 +29,24 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
       - "${APP_PORT:-4000}:4000"
     environment:
       PORT: 4000
-      DATABASE_URL: postgresql://${POSTGRES_USER:-character_sheet}:${POSTGRES_PASSWORD:-character_sheet}@db:5432/${POSTGRES_DB:-character_sheet}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-character_sheet}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-character_sheet}
       SERVE_STATIC_DIR: /app/public
       # Single-origin → no CORS needed. For split mode, set CORS_ORIGIN here.
       CORS_ORIGIN: ${CORS_ORIGIN:-}
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
 volumes:
   postgres_data:
