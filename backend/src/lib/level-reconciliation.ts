@@ -24,7 +24,7 @@
  * 3. Add a matching clamp-on-read in serializeCharacter.
  * 4. Add new EventType values as needed (schema.prisma + events.ts + migrate).
  *
- * Future slots: `reconcileFeats`, `reconcileAbilityImprovements`.
+ * Feats and Ability Score Improvements ship via `reconcileAdvancements`.
  */
 
 import { Prisma } from "../generated/prisma/client.js";

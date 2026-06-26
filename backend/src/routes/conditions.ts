@@ -1,3 +1,7 @@
+// Owns POST /characters/:id/conditions/transactions (apply/remove conditions,
+// set exhaustion). Mutation-router contract: apply ops atomically in the lib
+// layer, then re-fetch with characterInclude and return
+// serializeCharacter(updated).
 import { Router } from "express";
 import { z } from "zod";
 
