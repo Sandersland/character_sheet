@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-D&D 5e character sheet app — **Phase 4: live play & automation**. The stack is Postgres + Prisma 7 + Express (backend) and Vite + React + TypeScript + Tailwind v4 (frontend), in an npm workspaces monorepo (`backend/`, `frontend/`). The sheet is fully interactive: HP management (damage, healing, rests, death saves, level-up), XP tracking (auto-derives level + proficiency bonus), full inventory CRUD (catalog + custom items, currency), and spellcasting (slot management, casting rolls dice, learns/prepares/forgets spells). Every meaningful mutation is recorded in a unified audit log with LIFO undo. A guided character-creation flow (`/characters/new`) is also shipped.
+D&D 5e character sheet app — **Phase 4: live play & automation**. The stack is Postgres + Prisma 7 + Express (backend) and Vite + React + TypeScript + Tailwind v4 (frontend), in an npm workspaces monorepo (`backend/`, `frontend/`). The sheet is fully interactive: HP management (damage, healing, rests, death saves, level-up), XP tracking (auto-derives level + proficiency bonus), full inventory CRUD (catalog + custom items, currency), spellcasting (slot management, casting rolls dice, learns/prepares/forgets spells), conditions (status effects + exhaustion), feats & Ability Score Improvements, maneuvers & fighting styles, and class resource pools. Beyond the printed sheet there's a live-play mode: sessions with combat/turn tracking and dice rolls, plus per-character journal entries. Every meaningful mutation is recorded in a unified audit log with LIFO undo. A guided character-creation flow (`/characters/new`) is also shipped.
 
 ## Quickstart
 
@@ -22,9 +22,9 @@ See `.claude/docs/development.md` for per-workspace commands, running outside Do
 
 **Level-gated state reconciles through one registry.** Any persisted state whose legal maximum depends on character level (subclass choice, maneuvers known, future feats, Ability Score Improvements) must add a reconciler to `LEVEL_GATED_RECONCILERS` in `backend/src/lib/level-reconciliation.ts` **and** a matching clamp-on-read in `serializeCharacter`. Never hand-roll level-down logic at a new call site. See `.claude/docs/leveling.md` for the full pattern and checklist.
 
-**5e rules data lives only in `lib/`.** `backend/src/lib/experience.ts` (XP curve) and `backend/src/lib/srd.ts` (everything else: alignments, skills, ability math, spellcasting ability, slot tables, starting equipment, `deriveCreatedCharacter`). Never duplicate rules on the frontend or inline them in a route.
+**5e rules data lives only in `lib/`.** `backend/src/lib/experience.ts` (XP curve), `backend/src/lib/srd.ts` (alignments, skills, ability math, spellcasting ability, slot tables, `deriveCreatedCharacter`), and `backend/src/lib/starting-equipment.ts` (class equipment packages). Never duplicate rules on the frontend or inline them in a route. (Catalog data — items, spells, packs — lives in DB tables, not here.)
 
-**State changes go through intent-bearing transaction endpoints.** `PATCH /api/characters/:id` is a thin field-patch for cosmetic/DM-assigned fields (`name`, `armorClass`, `currency`, etc.). Inventory, HP, XP, and spellcasting are mutated only through their dedicated `POST …/transactions` endpoints, which validate ops, apply them atomically, write audit events, and return the updated character. Do not add new mutable domains to PATCH.
+**State changes go through intent-bearing transaction endpoints.** `PATCH /api/characters/:id` is a thin field-patch for cosmetic/DM-assigned fields (`name`, `armorClass`, `currency`, etc.). Every meaningful mutable domain (inventory, HP, XP, spellcasting, conditions, class choices, resources, advancement, …) is mutated only through its dedicated `POST …/transactions` endpoint, which validates ops, applies them atomically, writes audit events, and returns the updated character. `lib/inventory.ts` is the reference implementation. Do not add new mutable domains to PATCH. (Full router list: `.claude/docs/architecture.md`.)
 
 **All backend calls go through `frontend/src/api/client.ts`.** Never call `fetch` directly from a component.
 
@@ -35,6 +35,18 @@ See `.claude/docs/development.md` for per-workspace commands, running outside Do
 **Never render a skill/ability/save key directly in the UI.** Skills are stored as camelCase keys (`animalHandling`, `sleightOfHand`); abilities and saving throws as lowercase words (`strength`). Resolve all display text through `skillLabel` / `abilityLabel` / `abilityAbbr`, or iterate the ready-made `SKILL_OPTIONS` / `ABILITY_OPTIONS` lists — all from `frontend/src/lib/abilities.ts`. Never hand-roll a `{ key, label }` array or capitalize keys ad-hoc (`key.charAt(0).toUpperCase() + …`); that hack only "works" for single-word abilities and silently breaks camelCase skill keys (this footgun has shipped twice). `SKILL_LABELS`/`ABILITY_LABELS` are typed `Record<SkillName/AbilityName, string>`, so a missing or renamed key is a compile error.
 
 **Backend tests need Postgres.** Run `docker compose up db -d` first and export `DATABASE_URL` in the same shell command as `vitest` (not a prior `export`). See `.claude/docs/testing.md`.
+
+**Documentation is part of Done.** A wrong doc is worse than no doc, so when a change touches a surface below, update the mapped doc/comment in the same PR. Put each fact at its lowest-drift home (code comments for single-file facts, on-demand docs for cross-cutting patterns); see `.claude/docs/documentation.md`. The `/doc-sync` skill and the PR review gate enforce this.
+
+| When a change touches… | Update… |
+|---|---|
+| `backend/src/routes/*`, `app.ts` mounts | architecture.md router map |
+| `backend/src/lib/*` | architecture.md lib table (+ leveling.md if `level-reconciliation`/`experience*`; this file if `srd.ts` rules) |
+| `schema.prisma` JSON cols / models / `CharacterEventType`; `lib/events.ts` `EventCategory` | architecture.md (JSON columns + audit log) |
+| `frontend/src/{features,pages,components/ui,lib}/*` | frontend.md |
+| new mutable domain / `…/transactions` endpoint | this file (non-negotiables) + architecture.md transaction pattern |
+| `Dockerfile*`, `docker-compose*`, env vars | deployment.md |
+| `package.json` scripts / Prisma workflow | development.md |
 
 ## Doc map
 
@@ -48,4 +60,5 @@ Read these on demand — they are **not** auto-loaded:
 | `.claude/docs/leveling.md` | You're touching XP, level-up/level-down, or any feature whose availability/count is gated by character level (subclass, maneuvers, future feats/ASI) |
 | `.claude/docs/frontend.md` | You're writing frontend code: directory structure + where components/hooks/types belong, `@/` alias, Tailwind footgun, inline-panel-vs-Modal rule, primitives, dice engine, orchestrator pattern |
 | `.claude/docs/deployment.md` | You're packaging the app for hosting (combined single-origin vs split images, prod compose, env vars) or deploying the dev environment to Railway behind Cloudflare Access |
+| `.claude/docs/documentation.md` | You're adding or substantially editing any doc, or deciding where a piece of knowledge should live (the placement/tiering rule + house style) |
 | `.claude/agent-memory/frontend-design-architect/design_system.md` | You need exact color/type/radius/shadow token names and the design direction rationale |

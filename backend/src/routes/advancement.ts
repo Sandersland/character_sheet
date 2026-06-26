@@ -1,3 +1,6 @@
+// Owns POST /characters/:id/advancement/transactions (take/remove ASIs + feats).
+// Mutation-router contract: apply ops atomically in the lib layer, then
+// re-fetch with characterInclude and return serializeCharacter(updated).
 import { Router } from "express";
 import { z } from "zod";
 
