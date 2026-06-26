@@ -1,4 +1,7 @@
+import path from "node:path";
+
 import cors from "cors";
+import type { CorsOptions } from "cors";
 import express from "express";
 
 import { actionsRouter } from "./routes/actions.js";
@@ -21,10 +24,25 @@ import { resourcesRouter } from "./routes/resources.js";
 import { spellsRouter } from "./routes/spells.js";
 import { spellcastingRouter } from "./routes/spellcasting.js";
 
+// CORS origins are env-driven so the API can be deployed anywhere without a
+// code change. `CORS_ORIGIN` is a comma-separated allowlist
+// (e.g. "https://dev.example.com,https://example.com"). When unset, every
+// origin is reflected — convenient for local dev and for single-origin
+// deployments where the SPA is served from this same host (no CORS at all).
+function corsOptions(): CorsOptions {
+  const configured = process.env.CORS_ORIGIN?.trim();
+  if (!configured) return {};
+  const allowlist = configured
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  return { origin: allowlist };
+}
+
 export function createApp() {
   const app = express();
 
-  app.use(cors());
+  app.use(cors(corsOptions()));
   app.use(express.json());
 
   app.use("/api", healthRouter);
@@ -46,6 +64,22 @@ export function createApp() {
   app.use("/api", sessionsRouter);
   app.use("/api", actionsRouter);
   app.use("/api", journalRouter);
+
+  // Optional single-origin mode: when SERVE_STATIC_DIR points at a built SPA,
+  // serve it from this same server so the frontend and API share one origin
+  // (one hostname, one Cloudflare Access policy, no CORS). Mounted AFTER the
+  // /api routers; unknown /api/* paths still 404 as JSON rather than falling
+  // through to index.html. When the env var is unset the backend stays
+  // API-only, so split deployments are unchanged.
+  const staticDir = process.env.SERVE_STATIC_DIR?.trim();
+  if (staticDir) {
+    const resolvedDir = path.resolve(staticDir);
+    app.use(express.static(resolvedDir));
+    app.get("*", (req, res, next) => {
+      if (req.path.startsWith("/api")) return next();
+      res.sendFile(path.join(resolvedDir, "index.html"));
+    });
+  }
 
   return app;
 }
