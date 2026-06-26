@@ -1,5 +1,5 @@
-# Production image for the API (also the base for the combined single-origin
-# image at the repo root). devDependencies are kept on purpose: the start
+# API-only image for split-mode deployments where the frontend is hosted
+# separately. devDependencies are kept on purpose: the start
 # command relies on the Prisma CLI (`prisma migrate deploy`) and on tsx, since
 # the seed is `tsx prisma/seed.ts` per prisma.config.ts.
 FROM node:22-alpine
