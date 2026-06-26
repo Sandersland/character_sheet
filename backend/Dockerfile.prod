@@ -1,0 +1,28 @@
+# API-only image for split-mode deployments where the frontend is hosted
+# separately. (The combined single-origin image at the repo root is a sibling,
+# not derived from this — it defines its own backend build stage inline.)
+# devDependencies are kept on purpose: the start command relies on the Prisma
+# CLI (`prisma migrate deploy`) and on tsx, since the seed is
+# `tsx prisma/seed.ts` per prisma.config.ts.
+FROM node:22-alpine
+
+WORKDIR /app
+
+# No per-workspace lockfile exists in this monorepo, so install rather than
+# `npm ci` (mirrors the dev Dockerfile).
+COPY package.json package-lock.json* ./
+RUN npm install
+
+COPY . .
+
+# Generate the Prisma client (gitignored output: src/generated/prisma) and
+# compile TypeScript to dist/.
+# prisma.config.ts resolves env("DATABASE_URL") when the CLI loads it, so a
+# placeholder is required even though `generate` never connects to a database.
+RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate && npm run build
+
+EXPOSE 4000
+
+# Apply migrations, run the idempotent seed (upserts only), then start the
+# compiled server. PORT and DATABASE_URL come from the environment.
+CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && node dist/index.js"]

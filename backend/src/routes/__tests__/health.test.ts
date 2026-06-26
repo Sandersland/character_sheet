@@ -11,3 +11,12 @@ describe("GET /api/health", () => {
     expect(response.body).toEqual({ status: "ok" });
   });
 });
+
+describe("unknown /api paths", () => {
+  it("404 as JSON, not Express's default HTML", async () => {
+    const response = await supertest(createApp()).get("/api/does-not-exist");
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "Not found" });
+  });
+});

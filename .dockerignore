@@ -1,0 +1,13 @@
+# Keep the build context small and prevent host artifacts from clobbering
+# what we install/generate inside the image.
+**/node_modules
+**/dist
+backend/src/generated
+.git
+.github
+**/.env
+**/.env.*
+# Documentation — not needed at runtime. Scoped to where docs actually live so
+# a build-relevant .md elsewhere isn't silently dropped if the layout changes.
+/*.md
+.claude

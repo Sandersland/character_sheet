@@ -47,4 +47,5 @@ Read these on demand — they are **not** auto-loaded:
 | `.claude/docs/testing.md` | You need to run tests, write a new test file, or understand the fixture-isolation rules |
 | `.claude/docs/leveling.md` | You're touching XP, level-up/level-down, or any feature whose availability/count is gated by character level (subclass, maneuvers, future feats/ASI) |
 | `.claude/docs/frontend.md` | You're writing frontend code: directory structure + where components/hooks/types belong, `@/` alias, Tailwind footgun, inline-panel-vs-Modal rule, primitives, dice engine, orchestrator pattern |
+| `.claude/docs/deployment.md` | You're packaging the app for hosting (combined single-origin vs split images, prod compose, env vars) or deploying the dev environment to Railway behind Cloudflare Access |
 | `.claude/agent-memory/frontend-design-architect/design_system.md` | You need exact color/type/radius/shadow token names and the design direction rationale |
