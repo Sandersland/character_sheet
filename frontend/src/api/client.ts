@@ -274,14 +274,19 @@ export async function applyExperienceOperations(
 // Fetches the unified activity timeline — all events across all domains in
 // one chronological stream, newest-first. Optional params:
 //   category — filter to one domain (inventory|hitPoints|experience|currency)
+//   type — filter to one event type (e.g. sold, damage, castSpell)
+//   sessionId — filter to events recorded during one play session
 //   entityId — filter to events for one entity (e.g. one InventoryItem id)
 //   includeFields — when true, include per-field diff rows on each event
+// type/sessionId/entityId compose with category via AND server-side.
 export async function fetchActivity(
   characterId: string,
-  opts?: { category?: string; entityId?: string; includeFields?: boolean }
+  opts?: { category?: string; type?: string; sessionId?: string; entityId?: string; includeFields?: boolean }
 ): Promise<CharacterEvent[]> {
   const params = new URLSearchParams();
   if (opts?.category) params.set("category", opts.category);
+  if (opts?.type) params.set("type", opts.type);
+  if (opts?.sessionId) params.set("sessionId", opts.sessionId);
   if (opts?.entityId) params.set("entityId", opts.entityId);
   if (opts?.includeFields) params.set("includeFields", "1");
   const query = params.toString() ? `?${params.toString()}` : "";
