@@ -1,7 +1,6 @@
 import { formatModifier } from "@/lib/abilities";
 import RollButton from "@/features/dice/RollButton";
 import type { Character } from "@/types/character";
-import MeterBar from "@/components/ui/MeterBar";
 import type { RollSpec } from "@/lib/dice";
 
 interface VitalsStripProps {
@@ -49,14 +48,13 @@ function VitalStat({
 
 /**
  * The "vitals strip" — AC / Initiative / Speed / Proficiency are terse
- * single numbers (no value in a table here), HP gets a meter since it's
- * the one stat that actively depletes during play.
+ * single numbers (no value in a table here). HP is intentionally absent:
+ * the HitPointTracker panel owns the live, depleting HP readout, so
+ * duplicating it here would be a second source of truth.
  */
 export default function VitalsStrip({ character }: VitalsStripProps) {
-  const { hitPoints, hitDice } = character;
-
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <VitalStat label="Armor Class" value={String(character.armorClass)} />
       <VitalStat
         label="Initiative"
@@ -68,31 +66,6 @@ export default function VitalsStrip({ character }: VitalsStripProps) {
         label="Proficiency"
         value={formatModifier(character.proficiencyBonus)}
       />
-
-      <div className="col-span-2 flex flex-col justify-center gap-1.5 rounded-card border border-parchment-200 bg-parchment-50 px-4 py-3 shadow-card sm:col-span-4 lg:col-span-1">
-        <div className="flex items-baseline justify-between">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
-            Hit Points
-          </span>
-          <span className="text-xs text-parchment-500">
-            {hitDice.total - hitDice.spent}/{hitDice.total}{hitDice.die}
-          </span>
-        </div>
-        <p className="font-display text-xl font-semibold leading-none text-garnet-800">
-          {hitPoints.current}
-          <span className="text-sm font-normal text-parchment-500">
-            {" "}
-            / {hitPoints.max}
-            {hitPoints.temp > 0 && ` (+${hitPoints.temp})`}
-          </span>
-        </p>
-        <MeterBar
-          current={hitPoints.current}
-          max={hitPoints.max}
-          tone="garnet"
-          label={`${hitPoints.current} of ${hitPoints.max} hit points`}
-        />
-      </div>
     </div>
   );
 }
