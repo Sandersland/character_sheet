@@ -70,6 +70,27 @@ If you accidentally delete a seeded row, restore it:
 cd backend && npx prisma db seed
 ```
 
+### Parallel test isolation (one shared DB)
+
+Vitest runs test **files in parallel** (no `fileParallelism` override — and don't add one; the speed matters), but every file hits **one shared Postgres**. Each suite deletes only its own rows in `afterEach`, so at any instant the tables hold the **union of every currently-running suite's live fixtures** — a set that churns as siblings create and tear down. Two rules keep that safe:
+
+1. **Unique, file-prefixed fixture IDs + a per-file owner.** Prefix fixture ids with the file's domain (`test-activity-1`, `test-sessions-1`, …) and own them with `ensureTestOwner("owner-<domain>")` (`backend/src/test-support/owner.ts`). Distinct ids per file mean two suites never write the same row.
+
+2. **Never assert on an unscoped/global collection — scope to your own fixture.** A bare list endpoint (`GET /api/characters`) returns *everyone's* fixtures, so its length and membership change mid-test. Don't compare two whole-list snapshots, and don't assert exact length/membership of an unscoped list. Instead find your own row and assert on it:
+
+```typescript
+import { findInList } from "../../test-support/list.js";
+
+// eslint-disable-next-line no-restricted-syntax -- lists all, asserts only on own fixture
+const res = await supertest(createApp()).get("/api/characters");
+const mine = findInList(res.body, FIXTURE.id);   // not res.body.length / toEqual(wholeList)
+expect(mine).toMatchObject({ name: "Test Fixture", level: 3 });
+```
+
+The healthy reference is the `GET /api/characters returns summaries…` test in `characters.test.ts`. The anti-pattern — comparing an unfiltered and a filtered `GET /api/characters` snapshot for equality — flaked PR #134 in CI and is the subject of #135. A `no-restricted-syntax` eslint rule (`backend/eslint.config.js`, scoped to `__tests__`) flags reads of the unscoped `/api/characters` list as a backstop, so a new suite must consciously scope (or disable with a reason). (Scoped sub-resources like a single character's `res.body.inventory` are fine — they belong to your fixture.)
+
+> **Connection teardown.** `backend/vitest.setup.ts` ends each file's Prisma pool in `afterAll` (`prisma.$disconnect()` + `pool.end()`). Without it, pooled sockets linger after a file finishes and have surfaced as an intermittent "socket hang up" under parallel load. `prisma.$disconnect()` alone does **not** end the externally-supplied `pg.Pool` — hence the explicit `pool.end()` (the pool is exported from `lib/prisma.ts` for exactly this).
+
 ### 400 vs 404 pattern
 
 Every transaction endpoint should have:
