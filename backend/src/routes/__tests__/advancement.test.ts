@@ -11,6 +11,9 @@ import supertest from "supertest";
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
+import { ensureTestOwner } from "../../test-support/owner.js";
+
+const OWNER_ID = "owner-advancement";
 
 // XP thresholds
 const XP_LVL_4 = 2700; // level 4 — 1 ASI slot (first unlock)
@@ -143,9 +146,11 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
 
   beforeEach(async () => {
     // Each test gets a fresh fixture character with a class entry.
+    await ensureTestOwner(OWNER_ID);
     await prisma.character.create({
       data: {
         ...FIXTURE,
+        ownerId: OWNER_ID,
         spellcasting: Prisma.JsonNull,
         classEntries: {
           create: [{ position: 0, name: CLASS_NAME, level: 3 }],

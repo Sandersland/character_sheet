@@ -43,6 +43,7 @@ import { normalizeResourcesMutable, type ToolProfEntry } from "../lib/resources.
 import { normalizeConditionsMutable } from "../lib/conditions.js";
 import { reverseAdvancementEffects } from "../lib/advancement.js";
 import { normalizeSpellcastingMutable } from "../lib/spellcasting.js";
+import { resolveBootstrapOwnerId } from "../lib/owner.js";
 
 export const charactersRouter = Router();
 
@@ -70,6 +71,7 @@ type CharacterWithRelations = Prisma.CharacterGetPayload<{ include: typeof chara
 function serializeCharacterSummary(row: {
   id: string;
   name: string;
+  ownerId: string;
   portraitUrl: string | null;
   experiencePoints: number;
   raceSelection: { name: string } | null;
@@ -78,6 +80,9 @@ function serializeCharacterSummary(row: {
   return {
     id: row.id,
     name: row.name,
+    // Owning user id. Surfaced now so the frontend/#101 can filter by owner;
+    // not yet used for access control (the API serves every character today).
+    ownerId: row.ownerId,
     // raceSelection/classEntries are optional in Prisma's types only
     // because they're the non-FK side of the relation — every character
     // created via POST /characters has exactly one of each.
@@ -488,6 +493,9 @@ export function serializeCharacter(row: CharacterWithRelations) {
   return {
     id: row.id,
     name: row.name,
+    // Owning user id — legitimately persisted (see Character.ownerId comment in
+    // schema.prisma), so it round-trips here rather than being derived.
+    ownerId: row.ownerId,
     race: row.raceSelection?.name ?? "",
     class: primaryClass?.name ?? "",
     subclass: primaryClass?.subclass ?? undefined,
@@ -618,11 +626,30 @@ export function serializeCharacter(row: CharacterWithRelations) {
   };
 }
 
-charactersRouter.get("/characters", async (_req, res) => {
+// Optional `?owner=<userId>` filter. Parsed for forward-compatibility with the
+// authenticated, owner-scoped listing in #101, but NOT yet applied — the API is
+// single-player today and returns every character regardless of this value.
+const listCharactersQuerySchema = z.object({
+  owner: z.string().min(1).optional(),
+});
+
+charactersRouter.get("/characters", async (req, res) => {
+  const parsedQuery = listCharactersQuerySchema.safeParse(req.query);
+  if (!parsedQuery.success) {
+    res
+      .status(400)
+      .json({ error: "Invalid query", details: parsedQuery.error.flatten() });
+    return;
+  }
+  // TODO(#101): enforce — scope the findMany to parsedQuery.data.owner once
+  // requests carry an authenticated user. Intentionally inert for now.
+  void parsedQuery.data.owner;
+
   const characters = await prisma.character.findMany({
     select: {
       id: true,
       name: true,
+      ownerId: true,
       portraitUrl: true,
       experiencePoints: true,
       raceSelection: { select: { name: true } },
@@ -1026,8 +1053,14 @@ charactersRouter.post("/characters", async (req, res) => {
     { race, characterClass }
   );
 
+  // Resolve the owning user. Placeholder for real auth — #100 wires sign-in
+  // and threads the authenticated user here; #101 enforces per-owner access.
+  // Today this returns a single bootstrap owner (see lib/owner.ts).
+  const ownerId = await resolveBootstrapOwnerId();
+
   const created = await prisma.character.create({
     data: {
+      owner: { connect: { id: ownerId } },
       name: input.name,
       alignment: input.alignment,
       portraitUrl: input.portraitUrl ?? null,

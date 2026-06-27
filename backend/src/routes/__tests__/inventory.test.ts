@@ -4,6 +4,9 @@ import supertest from "supertest";
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
+import { ensureTestOwner } from "../../test-support/owner.js";
+
+const OWNER_ID = "owner-inventory-routes";
 
 const TEST_ITEM = {
   name: "Route Test Dagger",
@@ -54,7 +57,8 @@ describe("POST /api/characters/:id/inventory/transactions", () => {
     });
     itemId = item.id;
 
-    await prisma.character.create({ data: { ...FIXTURE, spellcasting: Prisma.JsonNull } });
+    await ensureTestOwner(OWNER_ID);
+    await prisma.character.create({ data: { ...FIXTURE, ownerId: OWNER_ID, spellcasting: Prisma.JsonNull } });
   });
 
   afterEach(async () => {
@@ -203,7 +207,8 @@ describe("GET /api/characters/:id/inventory/transactions", () => {
     });
     itemId = item.id;
 
-    await prisma.character.create({ data: { ...FIXTURE, spellcasting: Prisma.JsonNull } });
+    await ensureTestOwner(OWNER_ID);
+    await prisma.character.create({ data: { ...FIXTURE, ownerId: OWNER_ID, spellcasting: Prisma.JsonNull } });
   });
 
   afterEach(async () => {

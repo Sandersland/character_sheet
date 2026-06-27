@@ -4,6 +4,9 @@ import supertest from "supertest";
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
+import { ensureTestOwner } from "../../test-support/owner.js";
+
+const OWNER_ID = "owner-hitpoints";
 
 // A fixture character with known state for HP / hit-dice tests.
 // Constitution 14 → conMod +2; d10 hit die; level 2 (XP 300).
@@ -49,7 +52,8 @@ async function post(characterId: string, body: object) {
 
 describe("POST /api/characters/:id/hp", () => {
   beforeEach(async () => {
-    await prisma.character.create({ data: { ...FIXTURE, spellcasting: Prisma.JsonNull } });
+    await ensureTestOwner(OWNER_ID);
+    await prisma.character.create({ data: { ...FIXTURE, ownerId: OWNER_ID, spellcasting: Prisma.JsonNull } });
   });
 
   afterEach(async () => {
@@ -172,7 +176,7 @@ describe("POST /api/characters/:id/hp", () => {
 
   it("shortRest (low Con): floors each die's heal at 0, not negative", async () => {
     await prisma.character.create({
-      data: { ...FIXTURE_LOW_CON, spellcasting: Prisma.JsonNull },
+      data: { ...FIXTURE_LOW_CON, ownerId: OWNER_ID, spellcasting: Prisma.JsonNull },
     });
     // conMod -2; rolls [1]: gain = max(0, 1-2) = 0; current stays 20
     const res = await post(FIXTURE_LOW_CON.id, {

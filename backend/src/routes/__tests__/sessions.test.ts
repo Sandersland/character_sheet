@@ -14,10 +14,12 @@ import supertest from "supertest";
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
+import { ensureTestOwner } from "../../test-support/owner.js";
 
 // ── Character fixture ─────────────────────────────────────────────────────────
 
 const FIXTURE_ID = "test-sessions-character-1";
+const OWNER_ID = "owner-sessions";
 
 const FIXTURE = {
   id: FIXTURE_ID,
@@ -50,7 +52,8 @@ function sessionsUrl(suffix = "") {
 }
 
 beforeEach(async () => {
-  await prisma.character.create({ data: { ...FIXTURE, spellcasting: Prisma.JsonNull } });
+  await ensureTestOwner(OWNER_ID);
+  await prisma.character.create({ data: { ...FIXTURE, ownerId: OWNER_ID, spellcasting: Prisma.JsonNull } });
 });
 
 afterEach(async () => {
@@ -410,6 +413,53 @@ describe("POST /…/sessions/:sessionId/roll", () => {
     expect(data?.damageType).toBe("slashing");
   });
 
+  it("persists raw die faces when provided", async () => {
+    const sessionId = await startSession();
+
+    const attackRes = await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/roll`))
+      .send({ kind: "attack", source: "Longsword", total: 17, specLabel: "1d20+5", faces: [12] });
+    expect(attackRes.status).toBe(201);
+
+    const damageRes = await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/roll`))
+      .send({ kind: "damage", source: "Longsword", total: 8, faces: [3, 5] });
+    expect(damageRes.status).toBe(201);
+
+    const attack = await prisma.characterEvent.findFirst({
+      where: { characterId: FIXTURE_ID, type: "attackRoll" },
+    });
+    expect((attack?.data as { faces: number[] } | null)?.faces).toEqual([12]);
+
+    const damage = await prisma.characterEvent.findFirst({
+      where: { characterId: FIXTURE_ID, type: "damageRoll" },
+    });
+    expect((damage?.data as { faces: number[] } | null)?.faces).toEqual([3, 5]);
+  });
+
+  it("stores faces as null when omitted and still 201s", async () => {
+    const sessionId = await startSession();
+
+    const res = await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/roll`))
+      .send({ kind: "attack", source: "Longsword", total: 17 });
+    expect(res.status).toBe(201);
+
+    const event = await prisma.characterEvent.findFirst({
+      where: { characterId: FIXTURE_ID, type: "attackRoll" },
+    });
+    expect((event?.data as { faces: number[] | null } | null)?.faces).toBeNull();
+  });
+
+  it("400s for non-integer faces", async () => {
+    const sessionId = await startSession();
+    const res = await supertest(app)
+      .post(sessionsUrl(`/${sessionId}/roll`))
+      .send({ kind: "attack", source: "Longsword", total: 17, faces: [1.5] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/faces/);
+  });
+
   it("400s for an invalid kind", async () => {
     const sessionId = await startSession();
     const res = await supertest(app)
@@ -609,7 +659,7 @@ describe("retroactive XP to a past (ended) session", () => {
     // Create a throwaway character + session it owns.
     const otherId = "test-sessions-character-other";
     await prisma.character.create({
-      data: { ...FIXTURE, id: otherId, name: "Other", spellcasting: Prisma.JsonNull },
+      data: { ...FIXTURE, id: otherId, name: "Other", ownerId: OWNER_ID, spellcasting: Prisma.JsonNull },
     });
     try {
       const startRes = await supertest(app)

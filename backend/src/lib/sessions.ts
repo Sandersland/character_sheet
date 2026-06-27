@@ -164,6 +164,8 @@ export async function logRollEvent(
     total: number;
     specLabel?: string;
     damageType?: string;
+    /** Raw kept die faces (non-dropped), e.g. [12] for 1d20 or [3, 5] for 2d6. */
+    faces?: number[];
   },
 ) {
   const session = await prisma.session.findUnique({
@@ -178,7 +180,7 @@ export async function logRollEvent(
     throw new CombatError(`Session ${sessionId} is not active`);
   }
 
-  const { kind, source, total, specLabel, damageType } = params;
+  const { kind, source, total, specLabel, damageType, faces } = params;
   const batchId = randomUUID();
 
   const summary =
@@ -194,7 +196,14 @@ export async function logRollEvent(
       summary,
       batchId,
       sessionId,
-      data: { kind, source, total, specLabel: specLabel ?? null, damageType: damageType ?? null },
+      data: {
+        kind,
+        source,
+        total,
+        specLabel: specLabel ?? null,
+        damageType: damageType ?? null,
+        faces: faces ?? null,
+      },
     });
   });
 }

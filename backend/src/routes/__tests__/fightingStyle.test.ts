@@ -13,6 +13,9 @@ import supertest from "supertest";
 
 import { createApp } from "../../app.js";
 import { prisma } from "../../lib/prisma.js";
+import { ensureTestOwner } from "../../test-support/owner.js";
+
+const OWNER_ID = "owner-fightingstyle";
 
 const FIXTURE_ID = "test-fighting-style-character-1";
 const FIGHTER_CATALOG_NAME = "FS Route Test Fighter";
@@ -91,6 +94,7 @@ describe("POST /api/characters/:id/class/transactions — setFightingStyle", () 
   });
 
   beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
     const fighter = await prisma.characterClass.upsert({
       where: { name: FIGHTER_CATALOG_NAME },
       create: {
@@ -122,6 +126,7 @@ describe("POST /api/characters/:id/class/transactions — setFightingStyle", () 
     await prisma.character.create({
       data: {
         ...FIXTURE_BASE,
+        ownerId: OWNER_ID,
         classEntries: { create: [{ name: "fighter", classId: fighterClassId, position: 0 }] },
         inventoryItems: { create: [RANGED_WEAPON, MELEE_WEAPON] },
       },

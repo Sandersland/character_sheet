@@ -81,16 +81,13 @@ describe("VitalsStrip", () => {
     expect(screen.getByText("+2")).toBeInTheDocument();
   });
 
-  it("renders current and max HP", () => {
+  it("does not render an HP readout (HitPointTracker owns HP)", () => {
     renderWithRoll(<VitalsStrip character={mockCharacter} />);
-    expect(screen.getByText(/28/)).toBeInTheDocument();
-    expect(screen.getByText(/36/)).toBeInTheDocument();
+    expect(screen.queryByText("Hit Points")).not.toBeInTheDocument();
   });
 
-  it("renders an HP MeterBar", () => {
+  it("does not render an HP MeterBar (no duplicate of HitPointTracker)", () => {
     renderWithRoll(<VitalsStrip character={mockCharacter} />);
-    const meter = screen.getByRole("meter");
-    expect(meter).toHaveAttribute("aria-valuenow", "28");
-    expect(meter).toHaveAttribute("aria-valuemax", "36");
+    expect(screen.queryByRole("meter")).not.toBeInTheDocument();
   });
 });

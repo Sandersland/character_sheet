@@ -22,37 +22,25 @@ export default function BackendStatus() {
     };
   }, []);
 
-  const dotColor =
-    status === "ok"
-      ? "bg-vitality-500"
-      : status === "down"
-        ? "bg-garnet-500"
-        : "bg-parchment-400";
+  // Healthy (and the brief initial "checking" flicker) render nothing — a
+  // connected backend needs no chrome. The indicator only appears to flag a
+  // problem, so it reads as a genuine alert rather than ambient noise.
+  if (status !== "down") return null;
 
-  const label =
-    status === "ok"
-      ? "Backend connected"
-      : status === "down"
-        ? "Backend unreachable"
-        : "Checking backend…";
-
-  // The healthy state stays a quiet dot-only proof-of-life (the label is
-  // preserved for screen readers / hover via aria-label + title); only the
-  // problem states get visible prose so they actually draw the eye.
-  const showText = status !== "ok";
+  const label = "Backend unreachable";
 
   return (
     <span
-      className="inline-flex items-center gap-1.5 text-xs text-parchment-500"
+      className="inline-flex items-center gap-1.5 text-xs text-garnet-700"
       role="status"
       aria-label={label}
       title={label}
     >
       <span
-        className={`h-1.5 w-1.5 rounded-full ${dotColor}`}
+        className="h-1.5 w-1.5 rounded-full bg-garnet-500"
         aria-hidden="true"
       />
-      {showText && label}
+      {label}
     </span>
   );
 }

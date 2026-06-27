@@ -87,3 +87,18 @@ export function formatRollSpec(spec: RollSpec): string {
   }
   return label;
 }
+
+/**
+ * Injects raw kept die faces into a spec label for the Session Log, matching
+ * `RollResultToast`'s `buildBreakdown` formatting: the leading `NdM` token is
+ * suffixed with `(face, face, …)`, and any trailing modifier from `specLabel`
+ * is preserved as-is (so a Unicode-minus modifier from `formatRollSpec` carries
+ * through unchanged). e.g. `formatRollBreakdown("1d20 + 5", [12])` → "1d20 (12) + 5".
+ * Returns `specLabel` untouched when `faces` is empty or the leading token is
+ * not an `NdM` spec.
+ */
+export function formatRollBreakdown(specLabel: string, faces: number[]): string {
+  if (faces.length === 0) return specLabel;
+  // Match the leading `NdM` dice token; everything after it (modifiers, etc.) is preserved.
+  return specLabel.replace(/^(\d+d\d+)/, `$1 (${faces.join(", ")})`);
+}
