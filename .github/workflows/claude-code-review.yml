@@ -48,6 +48,13 @@ jobs:
             echo 'claude_args=--model claude-sonnet-4-6 --allowed-tools "Bash(gh:*)" "Read" "Grep" "Glob" --append-system-prompt "'"$SHARED"' This is a feature-branch PR targeting a non-main branch. Keep the review tightly scoped: report only correctness bugs and clear logic errors in the changed lines. Skip style, naming, and minor nitpicks. Be concise."' >> "$GITHUB_OUTPUT"
           fi
 
+      # Record a UTC marker before the review runs. "Enforce verdict" only counts
+      # reviews submitted after this instant, so a stale CHANGES_REQUESTED from an
+      # earlier run (or a human) can't fail or pass the check on its own.
+      - name: Mark review start
+        id: marker
+        run: echo "ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
@@ -61,3 +68,23 @@ jobs:
           # instead of leaving them in the Action log.
           prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }} --comment'
           claude_args: ${{ steps.cfg.outputs.claude_args }}
+
+      # anthropics/claude-code-action@v1 exits 0 regardless of the review verdict
+      # and exposes no conclusion/verdict output, so the formal REQUEST_CHANGES
+      # review it submits would not, on its own, fail this check. Re-read the PR's
+      # reviews and fail when a blocking review landed during this run. We filter
+      # by submit time (the concurrency group guarantees a single in-flight run
+      # per PR) rather than by reviewer identity, which the action doesn't expose.
+      # Applies to BOTH base branches so main gets a red check too.
+      - name: Enforce verdict
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          marker='${{ steps.marker.outputs.ts }}'
+          reviews=$(gh pr view ${{ github.event.pull_request.number }} --json reviews --jq '.reviews')
+          blocking=$(printf '%s' "$reviews" | jq --arg marker "$marker" '[.[] | select(.submittedAt > $marker and .state == "CHANGES_REQUESTED")] | length')
+          if [ "$blocking" -gt 0 ]; then
+            echo "::error::Claude Code Review requested changes on this PR. Resolve the blocking findings and push to re-run."
+            exit 1
+          fi
+          echo "No blocking review verdict — claude-review passes."
