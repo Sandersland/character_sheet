@@ -19,19 +19,12 @@ export function enabledProviders(): AuthProvider[] {
     const clientId = readEnv(definition.clientIdEnv);
     const clientSecret = readEnv(definition.clientSecretEnv);
     if (!clientId || !clientSecret) return [];
-    return [
-      {
-        id: definition.id,
-        displayName: definition.displayName,
-        authUrl: definition.authUrl,
-        tokenUrl: definition.tokenUrl,
-        userInfoUrl: definition.userInfoUrl,
-        scopes: definition.scopes,
-        mapProfile: definition.mapProfile,
-        clientId,
-        clientSecret,
-      },
-    ];
+    // Spread the whole definition so every field — scopes, extraAuthParams, and
+    // any future provider field — is forwarded automatically. (Manually listing
+    // fields here previously dropped extraAuthParams.) The clientIdEnv/
+    // clientSecretEnv names ride along harmlessly — they're env-var NAMES, not
+    // secrets, and the resolved clientId/clientSecret below are what's used.
+    return [{ ...definition, clientId, clientSecret }];
   });
 }
 

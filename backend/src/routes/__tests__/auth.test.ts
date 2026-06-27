@@ -138,6 +138,10 @@ describe("auth router", () => {
       expect(url.searchParams.get("state")).toBeTruthy();
       expect(url.searchParams.get("response_type")).toBe("code");
       expect(url.searchParams.get("client_id")).toBe("client-abc");
+      // Google's provider-specific params must reach the authorize URL (they
+      // are what make Google return a refresh token).
+      expect(url.searchParams.get("access_type")).toBe("offline");
+      expect(url.searchParams.get("prompt")).toBe("consent");
 
       const cookies = res.headers["set-cookie"] as unknown as string[];
       const tx = cookies.find((c) => c.startsWith("cs_oauth_tx="));

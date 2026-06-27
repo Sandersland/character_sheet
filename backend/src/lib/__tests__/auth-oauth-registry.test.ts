@@ -42,6 +42,12 @@ describe("auth provider registry", () => {
       expect(google.clientSecret).toBe("secret-xyz");
       expect(google.scopes).toEqual(["openid", "email", "profile"]);
       expect(google.authUrl).toBe("https://accounts.google.com/o/oauth2/v2/auth");
+      // Resolution must forward provider-specific descriptor fields, not just
+      // the enumerated core ones — extraAuthParams was previously dropped here.
+      expect(google.extraAuthParams).toEqual({
+        access_type: "offline",
+        prompt: "consent",
+      });
     });
   });
 
