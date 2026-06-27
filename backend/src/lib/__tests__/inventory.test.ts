@@ -9,6 +9,7 @@ import {
   currencyDebit,
   InsufficientCurrencyError,
   InvalidInventoryOperationError,
+  revertInventoryEvent,
 } from "../inventory.js";
 
 const OWNER_ID = "owner-inventory-lib";
@@ -351,5 +352,134 @@ describe("applyInventoryOperations", () => {
     // Untouched — the rejected op never reached character A's row.
     const items = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
     expect(items).toHaveLength(1);
+  });
+
+  // ── revertInventoryEvent reconstruction (Issue #117) ─────────────────────────
+
+  async function latestEventOfType(characterId: string, type: string) {
+    return prisma.characterEvent.findFirstOrThrow({
+      where: { characterId, type },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  describe("revertInventoryEvent", () => {
+    it("recreates a deleted row + its weapon detail, reusing the original id", async () => {
+      await applyInventoryOperations(characterAId, [
+        {
+          type: "acquire",
+          custom: {
+            name: "Revert Test Dagger",
+            category: "weapon",
+            weight: 1,
+            cost: { cp: 0, sp: 0, gp: 2, pp: 0 },
+            description: "blade",
+            weapon: { damageDiceCount: 1, damageDiceFaces: 4, damageType: "piercing", finesse: true },
+          },
+          quantity: 4,
+          equipped: true,
+          notes: "sheathed",
+        },
+      ]);
+      const [created] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+
+      await applyInventoryOperations(characterAId, [{ type: "remove", inventoryItemId: created.id }]);
+      expect(await prisma.inventoryItem.findUnique({ where: { id: created.id } })).toBeNull();
+
+      const removed = await latestEventOfType(characterAId, "removed");
+      await prisma.$transaction((tx) => revertInventoryEvent(tx, characterAId, removed));
+
+      const restored = await prisma.inventoryItem.findUniqueOrThrow({
+        where: { id: created.id },
+        include: { weaponDetail: true },
+      });
+      expect(restored).toMatchObject({
+        id: created.id,
+        name: "Revert Test Dagger",
+        quantity: 4,
+        equipped: true,
+        notes: "sheathed",
+        position: created.position,
+      });
+      expect(restored.weaponDetail).toMatchObject({
+        damageDiceFaces: 4,
+        damageType: "piercing",
+        finesse: true,
+      });
+    });
+
+    it("deletes a created row when before is null (acquire undo)", async () => {
+      await applyInventoryOperations(characterAId, [{ type: "acquire", itemId, quantity: 1 }]);
+      const [created] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+
+      const acquired = await latestEventOfType(characterAId, "acquired");
+      expect(acquired.before).toBeNull();
+      await prisma.$transaction((tx) => revertInventoryEvent(tx, characterAId, acquired));
+
+      expect(await prisma.inventoryItem.findUnique({ where: { id: created.id } })).toBeNull();
+    });
+
+    it("restores quantity from before for a partial adjust (row survives)", async () => {
+      await applyInventoryOperations(characterAId, [{ type: "acquire", itemId, quantity: 5 }]);
+      const [created] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+
+      await applyInventoryOperations(characterAId, [
+        { type: "adjustQuantity", inventoryItemId: created.id, delta: -2 },
+      ]);
+      const consumed = await latestEventOfType(characterAId, "consumed");
+      await prisma.$transaction((tx) => revertInventoryEvent(tx, characterAId, consumed));
+
+      const restored = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
+      expect(restored.quantity).toBe(5);
+    });
+
+    it("restores equipped from before for a setEquipped event", async () => {
+      await applyInventoryOperations(characterAId, [{ type: "acquire", itemId, quantity: 1 }]);
+      const [created] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+
+      await applyInventoryOperations(characterAId, [
+        { type: "setEquipped", inventoryItemId: created.id, equipped: true },
+      ]);
+      const equipped = await latestEventOfType(characterAId, "equipped");
+      await prisma.$transaction((tx) => revertInventoryEvent(tx, characterAId, equipped));
+
+      const restored = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
+      expect(restored.equipped).toBe(false);
+    });
+
+    it("reverses a purchase debit (adds the gold back)", async () => {
+      await applyInventoryOperations(characterAId, [
+        { type: "acquire", itemId, quantity: 1, currencyDelta: { cp: 0, sp: 1, gp: 0, pp: 0 } },
+      ]);
+      // Start currency { sp: 5, gp: 10 } → after buying for 1 sp → { sp: 4 }.
+      let character = await prisma.character.findUniqueOrThrow({ where: { id: characterAId } });
+      expect(character.currency).toEqual({ cp: 0, sp: 4, gp: 10, pp: 0 });
+
+      const bought = await latestEventOfType(characterAId, "bought");
+      await prisma.$transaction((tx) => revertInventoryEvent(tx, characterAId, bought));
+
+      character = await prisma.character.findUniqueOrThrow({ where: { id: characterAId } });
+      expect(character.currency).toEqual({ cp: 0, sp: 5, gp: 10, pp: 0 }); // refunded
+    });
+
+    it("reverses a sale credit (subtracts the proceeds back)", async () => {
+      await applyInventoryOperations(characterAId, [{ type: "acquire", itemId, quantity: 2 }]);
+      const [created] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+
+      await applyInventoryOperations(characterAId, [
+        { type: "sell", inventoryItemId: created.id, currencyDelta: { cp: 0, sp: 3, gp: 0, pp: 0 } },
+      ]);
+      let character = await prisma.character.findUniqueOrThrow({ where: { id: characterAId } });
+      expect(character.currency).toEqual({ cp: 0, sp: 8, gp: 10, pp: 0 }); // 5 + 3
+
+      const sold = await latestEventOfType(characterAId, "sold");
+      await prisma.$transaction((tx) => revertInventoryEvent(tx, characterAId, sold));
+
+      character = await prisma.character.findUniqueOrThrow({ where: { id: characterAId } });
+      expect(character.currency).toEqual({ cp: 0, sp: 5, gp: 10, pp: 0 }); // proceeds removed
+      // …and the row is back (full sell deleted it).
+      const restored = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
+      expect(restored.quantity).toBe(2);
+    });
   });
 });

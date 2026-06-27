@@ -799,6 +799,95 @@ async function applySell(tx: Prisma.TransactionClient, characterId: string, op: 
   }
 }
 
+// ── Undo / revert ────────────────────────────────────────────────────────────
+//
+// Reverses one already-applied inventory CharacterEvent inside the caller's
+// revert transaction (routes/activity.ts). Shape-driven, NOT type-driven:
+// event `type` names (acquired/consumed/sold/…) are shared across ops, so the
+// row action is decided by the snapshot shape instead:
+//
+//   before == null            → the op CREATED the row (acquire) → delete it
+//   data.deletedItem present  → the op DELETED the row → recreate from snapshot
+//   else                      → the row still exists → restore scalar(s) from before
+//
+// Currency is reversed first: data.currencyDelta is the signed amount applied
+// at write time (negative for a purchase, positive for a sale), so subtracting
+// it per-denomination undoes either direction. A negative result (the player
+// has since spent the proceeds) throws InsufficientCurrencyError, which rolls
+// back the whole revert batch.
+export async function revertInventoryEvent(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  event: {
+    entityId: string | null;
+    before: Prisma.JsonValue | null;
+    data: Prisma.JsonValue | null;
+  }
+): Promise<void> {
+  const data = event.data as
+    | { currencyDelta?: Currency | null; deletedItem?: DeletedInventoryItemSnapshot }
+    | null;
+
+  // 1. Reverse any currency movement (purchase or sale proceeds).
+  const currencyDelta = data?.currencyDelta ?? undefined;
+  if (hasNonzeroCurrency(currencyDelta)) {
+    const current = await getCharacterCurrency(tx, characterId);
+    await setCharacterCurrency(tx, characterId, currencyDebit(current, currencyDelta));
+  }
+
+  if (!event.entityId) return; // defensive: nothing to act on without a row id
+
+  // 2. Reverse the row mutation, shape-driven.
+  if (event.before === null) {
+    // Creation (acquire) → delete the created row; detail rows cascade.
+    await tx.inventoryItem.delete({ where: { id: event.entityId } });
+    return;
+  }
+
+  const deletedItem = data?.deletedItem;
+  if (deletedItem) {
+    // The row was deleted → recreate it, reusing the original id so the
+    // soft-reference entityId on other events stays valid.
+    let itemId = deletedItem.itemId;
+    if (itemId) {
+      const catalogItem = await tx.item.findUnique({ where: { id: itemId }, select: { id: true } });
+      if (!catalogItem) itemId = null; // catalog row gone → snapshot is self-contained
+    }
+    await tx.inventoryItem.create({
+      data: {
+        id: event.entityId,
+        characterId,
+        itemId,
+        name: deletedItem.name,
+        category: deletedItem.category,
+        weight: deletedItem.weight ?? undefined,
+        cost: toJsonInput(deletedItem.cost),
+        description: deletedItem.description ?? undefined,
+        quantity: deletedItem.quantity,
+        equipped: deletedItem.equipped,
+        notes: deletedItem.notes ?? undefined,
+        position: deletedItem.position,
+        weaponDetail: deletedItem.weaponDetail ? { create: deletedItem.weaponDetail } : undefined,
+        armorDetail: deletedItem.armorDetail ? { create: deletedItem.armorDetail } : undefined,
+        consumableDetail: deletedItem.consumableDetail
+          ? { create: deletedItem.consumableDetail }
+          : undefined,
+      },
+    });
+    return;
+  }
+
+  // The row still exists → restore the scalar(s) captured in before
+  // (quantity for partial sell/adjust, equipped for setEquipped).
+  const before = event.before as { quantity?: number; equipped?: boolean };
+  const updateData: Prisma.InventoryItemUpdateInput = {};
+  if (before.quantity !== undefined) updateData.quantity = before.quantity;
+  if (before.equipped !== undefined) updateData.equipped = before.equipped;
+  if (Object.keys(updateData).length > 0) {
+    await tx.inventoryItem.update({ where: { id: event.entityId }, data: updateData });
+  }
+}
+
 // Applies a batch of operations atomically — one InventoryTransaction
 // batchId groups whatever ledger rows the batch produces (a single inline
 // edit is a batch of one; a bulk action is a batch of several). Any thrown
