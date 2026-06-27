@@ -36,7 +36,7 @@ See `.claude/docs/development.md` for per-workspace commands, running outside Do
 
 **Backend tests need Postgres.** Run `docker compose up db -d` first and export `DATABASE_URL` in the same shell command as `vitest` (not a prior `export`). See `.claude/docs/testing.md`.
 
-**Documentation is part of Done.** A wrong doc is worse than no doc, so when a change touches a surface below, update the mapped doc/comment in the same PR. Put each fact at its lowest-drift home (code comments for single-file facts, on-demand docs for cross-cutting patterns); see `.claude/docs/documentation.md`. The `/doc-sync` skill and the PR review gate enforce this.
+**Documentation is part of Done.** A wrong doc is worse than no doc, so when a change touches a surface below, update the mapped doc/comment in the same PR. Put each fact at its lowest-drift home (code comments for single-file facts, on-demand docs for cross-cutting patterns); see `.claude/docs/documentation.md`. The `/doc-sync` skill and the PR review gate enforce this — the gate now submits a blocking verdict (red `claude-review` check) on PRs into `staging` as well as `main`.
 
 | When a change touches… | Update… |
 |---|---|
