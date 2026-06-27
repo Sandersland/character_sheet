@@ -898,3 +898,156 @@ describe("GET /:id/activity — ?category= filter", () => {
     expect(categories.has("hitPoints")).toBe(true);
   });
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// GET /:id/activity — ?type= and ?sessionId= filters (issue #105)
+//
+// Events are seeded directly via prisma so type/sessionId combinations are
+// deterministic. Pins:
+//   - ?type= filters to one event type (validate-or-ignore, like ?category=)
+//   - an unknown ?type value is ignored (200, unfiltered) — not a 400
+//   - ?sessionId= filters to events recorded during one play session
+//   - type + sessionId + category compose with AND semantics
+// ════════════════════════════════════════════════════════════════════════════
+
+const TYPEFILTER_ID = "test-activity-typefilter-1";
+const TYPEFILTER_NAME = "Activity Type Filter Fighter";
+
+describe("GET /:id/activity — ?type= and ?sessionId= filters", () => {
+  let classId: string;
+  let sessionA: string;
+  let sessionB: string;
+
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: TYPEFILTER_NAME } });
+  });
+
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    const cls = await prisma.characterClass.upsert({
+      where: { name: TYPEFILTER_NAME },
+      create: {
+        name: TYPEFILTER_NAME,
+        hitDie: "d10",
+        savingThrows: ["strength", "constitution"],
+        skillChoiceCount: 2,
+        skillChoices: ["athletics", "intimidation"],
+        isSpellcaster: false,
+      },
+      update: {},
+    });
+    classId = cls.id;
+
+    await prisma.character.create({
+      data: {
+        id: TYPEFILTER_ID,
+        ownerId: OWNER_ID,
+        name: TYPEFILTER_NAME,
+        alignment: "Neutral Good",
+        experiencePoints: 0,
+        armorClass: 16,
+        initiativeBonus: 1,
+        speed: 30,
+        hitPoints: { current: 12, max: 12, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 1, die: "d10", spent: 0 },
+        abilityScores: {
+          strength: 16, dexterity: 12, constitution: 14,
+          intelligence: 10, wisdom: 10, charisma: 10,
+        },
+        savingThrowProficiencies: ["strength", "constitution"],
+        skills: [],
+        toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 10, pp: 0 },
+        classEntries: { create: [{ name: "fighter", classId, position: 0 }] },
+      },
+    });
+
+    const sA = await prisma.session.create({
+      data: { characterId: TYPEFILTER_ID, status: "ended", title: "Session A" },
+    });
+    const sB = await prisma.session.create({
+      data: { characterId: TYPEFILTER_ID, status: "ended", title: "Session B" },
+    });
+    sessionA = sA.id;
+    sessionB = sB.id;
+
+    // Seed three events with distinct (type, sessionId) combinations:
+    //   - inventory/sold during session A
+    //   - inventory/bought during session B
+    //   - hitPoints/damage outside any session
+    await prisma.characterEvent.createMany({
+      data: [
+        {
+          characterId: TYPEFILTER_ID,
+          category: "inventory",
+          type: "sold",
+          summary: "Sold Shortsword ×1",
+          sessionId: sessionA,
+          batchId: "batch-sold",
+        },
+        {
+          characterId: TYPEFILTER_ID,
+          category: "inventory",
+          type: "bought",
+          summary: "Bought Longsword ×1",
+          sessionId: sessionB,
+          batchId: "batch-bought",
+        },
+        {
+          characterId: TYPEFILTER_ID,
+          category: "hitPoints",
+          type: "damage",
+          summary: "Took 3 damage",
+          batchId: "batch-damage",
+        },
+      ],
+    });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: TYPEFILTER_ID } });
+  });
+
+  it("?type=sold returns ONLY sold events", async () => {
+    const res = await supertest(app()).get(`/api/characters/${TYPEFILTER_ID}/activity?type=sold`);
+    expect(res.status).toBe(200);
+    const events = res.body as Array<{ type: string }>;
+    expect(events.length).toBe(1);
+    expect(events.every((e) => e.type === "sold")).toBe(true);
+  });
+
+  it("an unknown ?type value is ignored (returns unfiltered, no 400)", async () => {
+    const res = await supertest(app()).get(`/api/characters/${TYPEFILTER_ID}/activity?type=not-a-real-type`);
+    expect(res.status).toBe(200);
+    const events = res.body as Array<{ type: string }>;
+    const types = new Set(events.map((e) => e.type));
+    expect(types.has("sold")).toBe(true);
+    expect(types.has("bought")).toBe(true);
+    expect(types.has("damage")).toBe(true);
+  });
+
+  it("?sessionId= filters to events recorded during one session", async () => {
+    const res = await supertest(app()).get(`/api/characters/${TYPEFILTER_ID}/activity?sessionId=${sessionA}`);
+    expect(res.status).toBe(200);
+    const events = res.body as Array<{ type: string }>;
+    expect(events.length).toBe(1);
+    expect(events[0].type).toBe("sold");
+  });
+
+  it("type + sessionId + category compose with AND semantics", async () => {
+    // sold is in inventory/sessionA → matches; bought (sessionB) and damage
+    // (no session) are excluded by the other two predicates.
+    const matched = await supertest(app()).get(
+      `/api/characters/${TYPEFILTER_ID}/activity?category=inventory&type=sold&sessionId=${sessionA}`,
+    );
+    expect(matched.status).toBe(200);
+    expect((matched.body as unknown[]).length).toBe(1);
+
+    // sold did not happen during sessionB → the AND yields nothing.
+    const unmatched = await supertest(app()).get(
+      `/api/characters/${TYPEFILTER_ID}/activity?category=inventory&type=sold&sessionId=${sessionB}`,
+    );
+    expect(unmatched.status).toBe(200);
+    expect((unmatched.body as unknown[]).length).toBe(0);
+  });
+});
