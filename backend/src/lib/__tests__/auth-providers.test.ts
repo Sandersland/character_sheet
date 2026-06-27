@@ -3,9 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   enabledProviders,
   getProvider,
-} from "../auth/providers.js";
+} from "../auth/providers/index.js";
 
 // No Postgres: the provider registry is pure (env in, descriptors out).
+// Per-provider profile mapping is tested in isolation in the provider's own
+// test (e.g. auth-google-provider.test.ts).
 
 describe("auth provider registry", () => {
   beforeEach(() => {
@@ -58,48 +60,6 @@ describe("auth provider registry", () => {
       vi.stubEnv("GOOGLE_CLIENT_ID", "client-abc");
       vi.stubEnv("GOOGLE_CLIENT_SECRET", "secret-xyz");
       expect(getProvider("google")?.id).toBe("google");
-    });
-  });
-
-  describe("google mapProfile", () => {
-    function google() {
-      vi.stubEnv("GOOGLE_CLIENT_ID", "client-abc");
-      vi.stubEnv("GOOGLE_CLIENT_SECRET", "secret-xyz");
-      const provider = getProvider("google");
-      if (!provider) throw new Error("expected google provider");
-      return provider;
-    }
-
-    it("maps a verified-email profile", () => {
-      const profile = google().mapProfile({
-        sub: "1234567890",
-        email: "player@example.com",
-        email_verified: true,
-        name: "Player One",
-        picture: "https://img.example.com/p.png",
-      });
-      expect(profile).toEqual({
-        providerAccountId: "1234567890",
-        email: "player@example.com",
-        name: "Player One",
-        imageUrl: "https://img.example.com/p.png",
-      });
-    });
-
-    it("nulls the email when unverified", () => {
-      const profile = google().mapProfile({
-        sub: "99",
-        email: "sketchy@example.com",
-        email_verified: false,
-        name: "Sketchy",
-      });
-      expect(profile.email).toBeNull();
-      expect(profile.providerAccountId).toBe("99");
-      expect(profile.imageUrl).toBeNull();
-    });
-
-    it("rejects an unknown/invalid shape (no sub)", () => {
-      expect(() => google().mapProfile({ email: "x@y.z" })).toThrow();
     });
   });
 });

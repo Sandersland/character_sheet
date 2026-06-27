@@ -5,8 +5,11 @@ import type { Response } from "express";
 import { z } from "zod";
 
 import { appRedirectUri, config } from "../lib/config.js";
-import { enabledProviders, getProvider } from "../lib/auth/providers.js";
-import type { AuthProvider, NormalizedProfile } from "../lib/auth/providers.js";
+import { enabledProviders, getProvider } from "../lib/auth/providers/index.js";
+import type {
+  AuthProvider,
+  NormalizedProfile,
+} from "../lib/auth/providers/index.js";
 import {
   createSession,
   createVerifier,
