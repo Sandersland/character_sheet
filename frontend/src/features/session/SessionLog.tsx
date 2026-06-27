@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 
 import { fetchSession } from "@/api/client";
 import Badge from "@/components/ui/Badge";
+import { formatRollBreakdown } from "@/lib/dice";
 import type { CharacterEvent, CharacterEventCategory } from "@/types/character";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -64,6 +65,29 @@ const TYPE_LABEL: Partial<Record<string, string>> = {
   damageRoll: "damage",
   revert: "undo",
 };
+
+// Roll events logged by the new client carry their kept die faces in `data.faces`.
+// When present, rebuild the summary with the raw breakdown injected after the dice
+// token (e.g. "Longsword: 17 (1d20 (12) + 5)") so the log mirrors the roll toast.
+// Old events lack faces → return null and fall back to the stored summary.
+type RollEventData = {
+  source?: string;
+  total?: number;
+  specLabel?: string | null;
+  damageType?: string | null;
+  faces?: number[] | null;
+};
+
+function rollBreakdownSummary(event: CharacterEvent): string | null {
+  if (event.type !== "attackRoll" && event.type !== "damageRoll") return null;
+  const data = event.data as RollEventData | undefined;
+  if (!data?.faces || data.faces.length === 0 || typeof data.specLabel !== "string") {
+    return null;
+  }
+  const breakdown = formatRollBreakdown(data.specLabel, data.faces);
+  const damagePart = data.damageType ? ` ${data.damageType}` : "";
+  return `${data.source}: ${data.total}${damagePart} (${breakdown})`;
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -145,7 +169,9 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
               <Badge tone="neutral">R{round}</Badge>
             )}
             <Badge tone={tone}>{label}</Badge>
-            <span className="text-parchment-800">{event.summary}</span>
+            <span className="text-parchment-800">
+              {rollBreakdownSummary(event) ?? event.summary}
+            </span>
           </li>
         );
       })}
