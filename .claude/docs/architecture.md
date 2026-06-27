@@ -147,13 +147,13 @@ The Character row carries these JSON columns: `hitPoints`, `hitDice`, `abilitySc
 
 - **Single-Table Inheritance**: `category` + `type` discriminators. Full `EventCategory` set (source of truth: `lib/events.ts`): `inventory`, `hitPoints`, `experience`, `currency`, `spellcasting`, `class`, `resources`, `advancement`, `session`, `combat`, `conditions`.
 - **Polymorphic soft-reference**: `entityType`/`entityId` (no FK — the entity may be deleted).
-- **before/after JSON snapshots**: the state before and after the operation, used by the revert handler to restore.
+- **before/after JSON snapshots**: the state before and after the operation, used by the revert handler to restore. The free-form `data` JSON carries op-specific extras the revert handler also reads — e.g. inventory delete ops stash a self-contained `data.deletedItem` snapshot (all scalar columns + the weapon/armor/consumable detail block) so the deleted row can be rebuilt on undo. (`data` lives outside `before`/`after` precisely so it is never fed to `diffToFields`.)
 - **Append-only**: events are flagged `reverted:true`, never deleted. A `revert` meta-event is appended on undo.
 - **Session tagging**: `sessionId String?` — events fired while a session is active get its id. Between-session events (shopping, leveling between adventures) get `null`. `getActiveSessionId(characterId)` is called at the top of every `apply*Operations()` function.
 
 `logEvent(tx, params)` in `lib/events.ts` writes the event + computes `CharacterEventField` diffs (via `diffToFields`) inside the caller's `$transaction`. All ops in a single request share a `randomUUID()` `batchId`.
 
-Undo: `POST /characters/:id/events/:batchId/revert` in `routes/activity.ts`. LIFO-only (returns 409 if not the most-recent non-reverted batch). Restores `before` snapshots in a transaction; inventory undo is intentionally deferred. **The LIFO guard skips events from ended sessions** (`OR: [{ sessionId: null }, { session: { status: "active" } }]`) — a closed session's history is frozen and cannot be undone.
+Undo: `POST /characters/:id/events/:batchId/revert` in `routes/activity.ts`. LIFO-only (returns 409 if not the most-recent non-reverted batch). Restores `before` snapshots in a transaction. Inventory events are fully revertable: `revertInventoryEvent` (`lib/inventory.ts`) reconstructs deleted `InventoryItem` + detail rows from `data.deletedItem` (reusing the original id) and reverses currency from `data.currencyDelta` — handled at the top of the revert loop before the `if (!before) continue` guard, since an `acquire` event carries `before == null` and undoing it deletes the created row. **The LIFO guard skips events from ended sessions** (`OR: [{ sessionId: null }, { session: { status: "active" } }]`) — a closed session's history is frozen and cannot be undone.
 
 ### Intent-bearing transaction pattern
 
