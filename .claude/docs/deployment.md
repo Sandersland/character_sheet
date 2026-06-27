@@ -176,12 +176,16 @@ After any restore, restart the app/backend so Prisma reconnects, and verify data
 round-trips: `…/api/health` is `{"status":"ok"}`, `/api/characters` lists the
 expected characters, and a character's audit log still shows its history.
 
-> **⚠️ Procedure documented, not yet exercised.** These steps have **not** been run
-> end-to-end against a real backup in this repo as of writing. "A backup nobody has
-> restored is not a backup" — before relying on this, do one real dry run: take a
-> dump, restore it into a throwaway database (e.g. `docker compose exec db createdb -U
-> character_sheet restore_test`, restore with `-d restore_test`, spot-check rows), and
-> update this note to record that the restore path actually works.
+> **✅ Restore path verified (2026-06-26, dev stack).** The full round-trip was run
+> end-to-end with the exact commands above: `pg_dump -Fc` → `createdb restore_test` →
+> `pg_restore -d restore_test`. All 27 tables matched the source **row-for-row**, a
+> 6-table relational join (character → race / class / inventory) was identical, and an
+> FK-integrity check found **0 orphaned rows**; the throwaway DB was dropped and the
+> live database left untouched. Caveat: the dev dataset's audit-log tables
+> (`CharacterEvent`, `Session`, `JournalEntry`) were empty, so populated-history
+> fidelity is inferred from the mechanism (every populated table + all FKs restored
+> exactly), not separately exercised. Re-run this dry run after major schema changes —
+> the recipe is the dump/restore commands above into a throwaway DB.
 
 ### Automated backups for hosted (Railway) dev
 
