@@ -18,7 +18,7 @@ See `.claude/docs/development.md` for per-workspace commands, running outside Do
 
 ## Non-negotiables (always apply)
 
-**Derive, don't persist.** `level` and `proficiencyBonus` are computed from `experiencePoints` in `serializeCharacter`; spellcasting slot totals/save DC/attack bonus are computed from class+level+ability scores via `deriveSpellcasting()` in `srd.ts`. `race`/`class`/`background` are read from the selection relations. None of these are columns; don't add them back.
+**Derive, don't persist.** `level` and `proficiencyBonus` are computed from `experiencePoints` in `serializeCharacter`; spellcasting slot totals/save DC/attack bonus are computed from class+level+ability scores via `deriveSpellcasting()` in `srd.ts`. `race`/`class`/`background` are read from the selection relations. None of these are columns; don't add them back. (Exempt: `Character.ownerId` is legitimately persisted — ownership is identity state, not a function of any other column. See the User/AuthAccount/AuthSession identity model in `.claude/docs/architecture.md`.)
 
 **Level-gated state reconciles through one registry.** Any persisted state whose legal maximum depends on character level (subclass choice, maneuvers known, future feats, Ability Score Improvements) must add a reconciler to `LEVEL_GATED_RECONCILERS` in `backend/src/lib/level-reconciliation.ts` **and** a matching clamp-on-read in `serializeCharacter`. Never hand-roll level-down logic at a new call site. See `.claude/docs/leveling.md` for the full pattern and checklist.
 
