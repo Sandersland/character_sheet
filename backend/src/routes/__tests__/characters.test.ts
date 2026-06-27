@@ -157,7 +157,7 @@ describe("characters routes", () => {
     const fixture = response.body.find(
       (c: { id: string }) => c.id === FIXTURE.id
     );
-    expect(fixture).toMatchObject({ name: "Test Fixture", level: 3 });
+    expect(fixture).toMatchObject({ name: "Test Fixture", level: 3, ownerId: TEST_USER.id });
   });
 
   it("GET /api/characters/:id returns full character with derived fields", async () => {
@@ -174,6 +174,7 @@ describe("characters routes", () => {
     expect(response.body.race).toBe(TEST_RACE.name);
     expect(response.body.class).toBe(TEST_CLASS.name);
     expect(response.body.background).toBe(TEST_BACKGROUND.name);
+    expect(response.body.ownerId).toBe(TEST_USER.id);
 
     expect(response.body.inventory).toHaveLength(2);
     const [catalogRow, homebrewRow] = response.body.inventory;
@@ -742,6 +743,60 @@ describe("characters routes", () => {
       createdCharacterIds.push(response.body.id);
       expect(response.body.inventory).toHaveLength(0);
       expect(response.body.currency).toEqual({ cp: 0, sp: 0, gp: 0, pp: 0 });
+    });
+  });
+
+  describe("character ownership (#99)", () => {
+    const createBody = {
+      name: "Owned Hero",
+      alignment: "Lawful Good",
+      race: TEST_RACE.name,
+      background: TEST_BACKGROUND.name,
+      classes: [{ name: TEST_CLASS.name }],
+      abilityScores: {
+        strength: 15,
+        dexterity: 12,
+        constitution: 14,
+        intelligence: 8,
+        wisdom: 10,
+        charisma: 8,
+      },
+      skillProficiencies: ["athletics", "perception"],
+    };
+
+    it("POST sets a non-null ownerId equal to the resolved bootstrap owner", async () => {
+      const expectedOwner = await resolveBootstrapOwnerId();
+
+      const response = await supertest(createApp())
+        .post("/api/characters")
+        .send(createBody);
+
+      expect(response.status).toBe(201);
+      createdCharacterIds.push(response.body.id);
+
+      expect(response.body.ownerId).toEqual(expect.any(String));
+      expect(response.body.ownerId).toBe(expectedOwner);
+
+      // Persisted, not just serialized.
+      const row = await prisma.character.findUnique({
+        where: { id: response.body.id },
+        select: { ownerId: true },
+      });
+      expect(row?.ownerId).toBe(expectedOwner);
+    });
+
+    it("GET /api/characters?owner= is inert — returns the full set regardless of value", async () => {
+      const unfiltered = await supertest(createApp()).get("/api/characters");
+      const filtered = await supertest(createApp()).get(
+        "/api/characters?owner=some-nonexistent-user-id",
+      );
+
+      expect(filtered.status).toBe(200);
+      // Same characters as the unfiltered call — the owner filter is not applied.
+      const unfilteredIds = unfiltered.body.map((c: { id: string }) => c.id).sort();
+      const filteredIds = filtered.body.map((c: { id: string }) => c.id).sort();
+      expect(filteredIds).toEqual(unfilteredIds);
+      expect(filteredIds).toContain(FIXTURE.id);
     });
   });
 
