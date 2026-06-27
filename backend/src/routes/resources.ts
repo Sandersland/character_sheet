@@ -1,3 +1,8 @@
+// Owns POST /characters/:id/resources/transactions (spend/restore class
+// resources, learn/forget maneuvers + tool profs). Like every mutation router
+// here, it validates a Zod op union, applies it atomically in the lib layer,
+// then re-fetches with characterInclude and returns serializeCharacter(updated)
+// so the response carries the full, freshly-derived character.
 import { Router } from "express";
 import { z } from "zod";
 

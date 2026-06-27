@@ -2,7 +2,7 @@
 
 Read this when you are:
 - touching XP or the level-up/level-down flow
-- adding any feature whose **availability or count depends on character level** (subclass, maneuvers known, future feats, Ability Score Improvements)
+- adding any feature whose **availability or count depends on character level** (subclass, maneuvers known, tool proficiencies, fighting style, feats, Ability Score Improvements)
 - trying to understand why `level` is not a column
 
 ---
@@ -52,7 +52,7 @@ It reads the most recent `levelUp` CharacterEvents newest-first to recover exact
 
 ## Level-gated reconciliation — the pattern
 
-Level-gated state is **persisted state whose legal maximum is determined by the character's level**. Examples: subclass choice (locked until `class.subclassLevel`), maneuvers known (`battleMasterManeuverCount(level)`), future feats (granted at fixed class levels), Ability Score Improvements (ditto).
+Level-gated state is **persisted state whose legal maximum is determined by the character's level**. Examples (each has a registered reconciler): subclass choice (locked until `class.subclassLevel`), maneuvers known, tool proficiencies, fighting style, and Ability Score Improvements / feats (granted at fixed class levels, handled by `reconcileAdvancements`).
 
 When level drops, this state must be reconciled. The system uses two complementary layers.
 
@@ -71,8 +71,11 @@ backend/src/lib/level-reconciliation.ts
 |---|---|
 | `reconcileSubclass` | Clears `subclassId`/`subclass` on the primary class entry if `newDerivedLevel < class.subclassLevel`. Emits `class/subclassRemoved`. |
 | `reconcileManeuvers` | Runs after `reconcileSubclass` so it sees a cleared subclass. Calls `deriveResources(...)` for the new level; `allowed = maneuverChoiceCount ?? 0`. Trims `maneuversKnown` to the first `allowed` entries (oldest kept, LIFO). Emits `resources/maneuversReconciled`. |
+| `reconcileToolProficiencies` | Trims `toolProficienciesKnown` when the subclass no longer grants a tool choice (level dropped below 3, or subclass cleared). Also runs after `reconcileSubclass` for the same reason. Creation-fixed tool profs (in `Character.toolProficiencies`) are untouched. Uses a `resources`-category event. |
+| `reconcileFightingStyle` | Clears the persisted `fightingStyle` when `fightingStyleChoiceCount` drops to 0 at the new level (e.g. a class change away from Fighter). Uses a `resources`-category event. |
+| `reconcileAdvancements` | LIFO-reverses the tail of `advancements[]` (ASIs/feats) whose required level is now above the derived level — subtracting the stored deltas from `abilityScores`/`hitPoints`/`initiativeBonus`. Order-independent (ASI slots are class-level-gated, not subclass-gated), so it runs last. Uses `advancement`-category events. |
 
-Order matters: later reconcilers observe earlier ones' writes (maneuvers must see the already-cleared subclass so that `deriveResources` returns `null → allowed = 0` for a full reset).
+Order matters: later reconcilers observe earlier ones' writes (maneuvers and tool profs must see the already-cleared subclass so that `deriveResources` returns `null → allowed = 0` for a full reset).
 
 Each reconciler is an async function with the same signature:
 ```typescript

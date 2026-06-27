@@ -2,25 +2,36 @@
 
 ## Directory structure — where things belong
 
+Source of truth: `ls frontend/src/features` — regenerate if stale.
+
 ```
 frontend/src/
 ├── components/
 │   └── ui/              # domain-agnostic primitives (Card, Badge, MeterBar, Modal, Tabs, ErrorBoundary)
 ├── features/
-│   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable
-│   ├── character-meta/  # CharacterCard, VitalsStrip, JournalSection, ActivityModal,
-│   │                    #   DeleteCharacterModal, BackendStatus
-│   ├── dice/            # DiceRoller, PhysicsDiceRoller, DiceScene, DieMesh,
+│   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable, ProficienciesCard
+│   ├── advancement/     # AdvancementSection, AdvancementPanel
+│   ├── character-meta/  # CharacterCard, VitalsStrip, JournalSection, JournalEntryPanel,
+│   │                    #   ActivityModal, DeleteCharacterModal, BackendStatus
+│   ├── class/           # ClassFeaturesSection, FightingStylePanel, AddManeuverPanel,
+│   │                    #   ManeuverRow, ResourcePoolRow
+│   ├── conditions/      # ConditionsStrip, AddConditionPanel
+│   ├── dice/            # DiceRoller, PhysicsDiceRoller, DiceScene, DieMesh, DiceRollSequence,
+│   │                    #   RollButton, RollContext, RollResultToast,
 │   │                    #   diceRollerTypes.ts, useDieFaceData.ts
 │   ├── experience/      # ExperienceTracker
-│   ├── hitpoints/       # HitPointTracker
+│   ├── hitpoints/       # HitPointTracker (inline Card; hosts LevelUpModal + ConcentrationSaveModal)
 │   ├── inventory/       # InventoryList, InventoryRow, AddItemPanel, LedgerModal,
 │   │                    #   StartingEquipmentEditor
+│   ├── session/         # TurnHub, TurnTracker, useTurnState, SessionLog, SessionsModal,
+│   │                    #   SessionSummaryModal, Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
+│   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie
 │   └── spells/          # SpellsSection, SpellRow, AddSpellPanel
 ├── hooks/               # reusable React hooks used by pages or multiple clusters
 │   │                    #   (useCharacter, useCharacterList, useCharacterDraft, useReferenceData)
-├── lib/                 # pure TS logic — NO React/JSX (dice, abilities, timeline, startingEquipment)
-├── pages/               # route-level views (CharacterListPage, CharacterSheetPage, CharacterCreatePage)
+├── lib/                 # pure TS logic — NO React/JSX (dice, abilities, timeline, startingEquipment, …)
+├── pages/               # route-level views (CharacterListPage, CharacterSheetPage,
+│   │                    #   CharacterCreatePage, SessionPage)
 ├── api/
 │   └── client.ts        # the only fetch() call site
 ├── types/
@@ -38,6 +49,29 @@ Work through this checklist in order; stop at the first match:
 3. **A component with no D&D knowledge** — no imports from `@/types/character`, no `@/api` calls, no game-rule logic, could ship in a different app unchanged → `components/ui/`.
 4. **Any other component** → `features/<domain>/` (the cluster that owns it; create a new folder if none fits).
 5. **Types** — used app-wide → `types/character.ts`; used by one cluster only → that cluster's folder.
+
+### `lib/` — pure-logic inventory
+
+Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isolation.
+
+| File | Purpose |
+|---|---|
+| `dice.ts` | The sole `Math.random` dice site — `rollDie`/`rollSpec`/`summarizeRoll`/`formatRollSpec` (see Dice engine below). |
+| `abilities.ts` | Ability/skill/save labels + `abilityModifier` math; resolve all display keys through here. |
+| `timeline.ts` | Groups/formats audit events for the activity timeline. |
+| `startingEquipment.ts` | Character-creation equipment helpers (`isPackageComplete`, `isGoldValid`, `EquipmentDraft`). |
+| `characterCreationValidation.ts` | Explains *why* the creation Save button is disabled (`missingRequirements`). |
+| `abilityGen.ts` | Ability-score generation methods (point-buy / standard array / roll). |
+| `dieFaces.ts` | Static die-face geometry data for the 3D rollers. |
+| `physicsDice.ts` | Physics-roller setup (cannon/three glue) for `PhysicsDiceRoller`. |
+| `spellCast.ts` | Pure cast-roll math (cantrip scaling, upcast dice, heal modifier) shared by SpellsSection + InlineSpellPicker. |
+| `spellMeta.ts` | Pure spell display helpers (school tone, metadata) shared across spell surfaces. |
+| `turnRules.ts` | 5e turn economy derived from class/level (`deriveAttacksPerAction`, action lists). |
+| `encumbrance.ts` | Carrying capacity (`carryingCapacity` = STR × 15), derive-on-read. |
+| `fightingStyles.ts` | Fighting-style labels/descriptions (presentation; backend is rules source of truth). |
+| `maneuvers.ts` | Battle Master maneuver classification data (mechanic/slot) for ManeuverPrompt. |
+| `conditions.ts` | 5e condition labels/descriptions for the chip strip + picker. |
+| `formatJournalDate.ts` | Formats ISO journal dates in UTC ("Jun 22, 2026"). |
 
 ### `@/` path alias
 
@@ -73,7 +107,7 @@ Use `@/...` for **every** source import — including same-folder siblings — s
 
 Genuine non-token values still use arbitrary syntax: `text-[11px]`, `max-h-[80vh]`, `max-w-[36rem]`.
 
-**One footgun to never reintroduce:** bare `--spacing-{name}` custom tokens (e.g. `--spacing-sm`) collide with Tailwind's `--container-*` scale and silently break `max-w-sm/md/lg/xl/2xl`. Use a `--space-*` prefix if a named spacing rhythm is ever wanted.
+**Footgun:** never reintroduce bare `--spacing-{name}` tokens — see the Tailwind non-negotiable in CLAUDE.md.
 
 ## Design tokens
 
@@ -98,14 +132,15 @@ Use idiomatic utility classes — tokens auto-generate them in v4: `text-garnet-
 | `LedgerModal` — read-only inventory ledger | `AddItemPanel` — add item form |
 | `ActivityModal` — read-only audit timeline + undo | `AddSpellPanel` — learn spell form |
 | `DeleteCharacterModal` — confirm destructive action | `InventoryRow` edit/sell mode |
-| `HitPointTracker` rest/level-up flows | `ExperienceTracker` award/set inputs |
+| `LevelUpModal` / `ConcentrationSaveModal` — hosted *inside* `HitPointTracker` | `HitPointTracker` itself — inline Card (damage/heal/rest/death-save controls) |
+| | `ExperienceTracker` award/set inputs |
 | | `AbilityScoreEditor` method tabs |
 
 When adding a new editing surface: **default to inline**. Reach for `Modal` only if the surface is read-only or a destructive confirmation. If you need an overlay for an editing surface, make the case explicitly.
 
 ## Primitive components
 
-These live in `src/components/ui/` and are intentionally domain-agnostic — they must not import from `@/features`, `@/api`, or `@/types/character`. They know nothing about D&D.
+These six live in `src/components/ui/` and are intentionally domain-agnostic — they must not import from `@/features`, `@/api`, or `@/types/character`. They know nothing about D&D.
 
 | Component | Usage |
 |---|---|
@@ -113,6 +148,7 @@ These live in `src/components/ui/` and are intentionally domain-agnostic — the
 | `Badge` | Soft-background pill. Prop `tone`: `garnet` / `arcane` / `gold` / `vitality` / `neutral`. |
 | `MeterBar` | Horizontal resource meter. Always pair with numeric text (e.g. `9/10 HP`) — never rely on color alone. Prop `tone`: `garnet` / `arcane` / `gold`. |
 | `Modal` | Overlay primitive. See inline-vs-modal rule above. |
+| `Tabs` | Controlled segmented-control tab switcher (WAI-ARIA tablist, arrow-key nav, optional per-tab `badge`). Renders only the switcher; the caller renders the active panel below it. Props: `tabs`, `active`, `onChange`. |
 | `ErrorBoundary` | Class error boundary wrapping the route tree in `App.tsx`. Catches render-time crashes and shows a parchment "something went wrong" fallback (Reload / Back to characters) instead of a blank page. Optional `fallback?: (error, reset) => ReactNode` for custom recovery UI. |
 
 ## API calls — `client.ts` is the only call site

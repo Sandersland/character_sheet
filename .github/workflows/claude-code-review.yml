@@ -30,11 +30,17 @@ jobs:
 
       # Full Sonnet review for PRs merging into main; a lighter, tightly-scoped
       # Haiku review for feature-branch PRs targeting a non-main branch.
+      # The main path also runs a documentation-impact + comment-drift check and
+      # can submit a REQUEST_CHANGES verdict. NOTE: the broad --allowed-tools list
+      # is intentional — it must keep the reviewer's read/search tools AND permit
+      # `gh pr review` regardless of whether the action merges or replaces the
+      # default allowlist. Verify in the first live run that the verdict posts and
+      # the reviewer still has its read tools (see .claude/plans verification step).
       - name: Select review depth by base branch
         id: cfg
         run: |
           if [ "${{ github.event.pull_request.base.ref }}" = "main" ]; then
-            echo 'claude_args=--model claude-sonnet-4-6' >> "$GITHUB_OUTPUT"
+            echo 'claude_args=--model claude-sonnet-4-6 --allowed-tools "Bash(gh:*)" "Read" "Grep" "Glob" --append-system-prompt "After reviewing code, assess DOCUMENTATION IMPACT: map the PR changed paths through the doc-ownership map in CLAUDE.md (backend/src/routes or app.ts -> architecture.md router map; backend/src/lib -> architecture.md lib table / leveling.md; schema.prisma JSON columns/models/event types -> architecture.md; backend/src/lib/events.ts EventCategory -> architecture.md audit log; frontend/src/{features,pages,components/ui,lib} -> frontend.md; new mutable transaction domain -> CLAUDE.md + architecture.md; Dockerfile/compose/env -> deployment.md; package.json/Prisma -> development.md). For any doc-significant change lacking a matching doc update in this PR, post a comment naming the specific doc + section to update. COMMENT DRIFT: inspect the diff for code comments, docstrings, or schema.prisma model comments that the change contradicts or strands (code under a comment changed but the comment claim is now stale, or new behavior a nearby comment misdescribes); flag each inline. VERDICT: submit a formal PR review of REQUEST_CHANGES (run: gh pr review ${{ github.event.pull_request.number }} --request-changes --body <summary>) when EITHER documentation/comments need updating OR there are findings beyond minor nits; otherwise approve or comment as usual. Keep the inline --comment findings; the verdict just summarizes."' >> "$GITHUB_OUTPUT"
           else
             echo 'claude_args=--model claude-haiku-4-5-20251001 --append-system-prompt "This is a feature-branch PR targeting a non-main branch. Keep the review tightly scoped: report only correctness bugs and clear logic errors in the changed lines. Skip style, naming, and minor nitpicks. Be concise."' >> "$GITHUB_OUTPUT"
           fi
