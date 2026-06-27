@@ -9,6 +9,7 @@
 | File | Endpoints |
 |---|---|
 | `routes/health.ts` | `GET /health` |
+| `routes/auth.ts` | `GET /auth/providers`, `GET /auth/:provider/start`, `GET /auth/:provider/callback`, `POST /auth/logout`, `GET /auth/me` — hand-rolled Google OAuth + PKCE sign-in and opaque session. **Public mechanism only** (#100): no `requireAuth` here and none on the routers below; per-owner enforcement is **#101**. A provider is listed/usable only when its id+secret env pair is set. |
 | `routes/characters.ts` | `GET /characters`, `GET /characters/:id`, `POST /characters`, `PATCH /characters/:id`, `DELETE /characters/:id` |
 | `routes/reference.ts` | `GET /reference` — race/class/background catalog + alignments + per-class starting equipment options |
 | `routes/items.ts` | `GET /items` — item catalog with weapon/armor/consumable detail |
@@ -37,6 +38,9 @@
 | File | Responsibility |
 |---|---|
 | `lib/prisma.ts` | Singleton `PrismaClient` with `@prisma/adapter-pg` (required for Prisma 7). Reads `DATABASE_URL`. |
+| `lib/config.ts` | Zod-validated, frozen snapshot of the auth-facing env, read once at import. Optional `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (a no-creds deploy still boots), `APP_BASE_URL` (default `http://localhost:4000`), tri-state `SESSION_COOKIE_SECURE` (production-default), `BOOTSTRAP_OWNER_EMAIL`, plus pass-through `CORS_ORIGIN`/`SERVE_STATIC_DIR`/`PORT`. `appRedirectUri(provider)` = `${APP_BASE_URL}/api/auth/${provider}/callback`. (Does **not** subsume logger/security/prisma, which read env directly.) |
+| `lib/auth/providers.ts` | OAuth provider registry. `enabledProviders()`/`getProvider(id)` read creds from **live env** so a provider can be toggled on without a re-import (only id+secret-both-set providers are enabled). One entry, `google` (OIDC), whose `mapProfile` zod-parses userinfo and nulls an unverified email. |
+| `lib/auth/session.ts` | Opaque server-side sessions: `createSession`/`lookupSession`/`destroySession` over `AuthSession` (the token IS the row id; ~30-day TTL; expired rows rejected + best-effort deleted). Hand-rolled cookie `parseCookies`/`getCookie`/`serializeCookie` (HttpOnly, SameSite=Lax, Secure-per-config; no cookie-parser) and the state/PKCE-S256 primitives. Cookie names `cs_session`/`cs_oauth_tx`. |
 | `lib/logger.ts` | Pino structured logger + `httpLogger` (pino-http) request-logging middleware. JSON in prod, pretty in dev, silent under test. Level via `LOG_LEVEL`; redacts auth/cookie/password fields. |
 | `lib/error-handler.ts` | Terminal Express error middleware (`errorHandler`). Turns uncaught/async route throws into a consistent `{ error }` JSON response; preserves an intentional `status`/`statusCode`; hides 500 detail in prod; logs server-side via the logger. Mounted last in `app.ts`. |
 | `lib/security.ts` | `securityHeaders(servesStatic)` (helmet; CSP tuned for the SPA in single-origin mode) + `globalRateLimiter`/`creationRateLimiter` (express-rate-limit, `RATE_LIMIT_*` env knobs, auto-off under test). Mounted high in `app.ts`. |
