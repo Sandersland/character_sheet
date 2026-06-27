@@ -11,5 +11,10 @@ export function findInList<T extends { id: string }>(
   body: unknown,
   id: string
 ): T | undefined {
-  return (body as T[]).find((row) => row.id === id);
+  // Guard non-array bodies (null/undefined, or an error object from a non-200
+  // response) so the helper honors its `T | undefined` contract instead of
+  // throwing a TypeError at `.find`.
+  return Array.isArray(body)
+    ? (body as T[]).find((row) => row.id === id)
+    : undefined;
 }

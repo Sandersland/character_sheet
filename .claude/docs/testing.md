@@ -84,6 +84,7 @@ import { findInList } from "../../test-support/list.js";
 // eslint-disable-next-line no-restricted-syntax -- lists all, asserts only on own fixture
 const res = await supertest(createApp()).get("/api/characters");
 const mine = findInList(res.body, FIXTURE.id);   // not res.body.length / toEqual(wholeList)
+expect(mine).toBeDefined();                      // clear "fixture not found" message
 expect(mine).toMatchObject({ name: "Test Fixture", level: 3 });
 ```
 

@@ -160,6 +160,7 @@ describe("characters routes", () => {
       response.body,
       FIXTURE.id
     );
+    expect(fixture).toBeDefined();
     expect(fixture).toMatchObject({ name: "Test Fixture", level: 3, ownerId: TEST_USER.id });
   });
 

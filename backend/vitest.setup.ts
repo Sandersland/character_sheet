@@ -12,6 +12,11 @@ import { prisma, pool } from "./src/lib/prisma.js";
 // prisma.$disconnect() does not end an externally-supplied pg.Pool, so end the
 // pool explicitly too.
 afterAll(async () => {
-  await prisma.$disconnect();
-  await pool.end();
+  // try/finally so the pool is ended even if $disconnect() throws — otherwise
+  // the very leak this file fixes would silently return on an error path.
+  try {
+    await prisma.$disconnect();
+  } finally {
+    await pool.end();
+  }
 });
