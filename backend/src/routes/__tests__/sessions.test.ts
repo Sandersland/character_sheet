@@ -14,10 +14,12 @@ import supertest from "supertest";
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
+import { ensureTestOwner } from "../../test-support/owner.js";
 
 // ── Character fixture ─────────────────────────────────────────────────────────
 
 const FIXTURE_ID = "test-sessions-character-1";
+const OWNER_ID = "owner-sessions";
 
 const FIXTURE = {
   id: FIXTURE_ID,
@@ -50,7 +52,8 @@ function sessionsUrl(suffix = "") {
 }
 
 beforeEach(async () => {
-  await prisma.character.create({ data: { ...FIXTURE, spellcasting: Prisma.JsonNull } });
+  await ensureTestOwner(OWNER_ID);
+  await prisma.character.create({ data: { ...FIXTURE, ownerId: OWNER_ID, spellcasting: Prisma.JsonNull } });
 });
 
 afterEach(async () => {
@@ -609,7 +612,7 @@ describe("retroactive XP to a past (ended) session", () => {
     // Create a throwaway character + session it owns.
     const otherId = "test-sessions-character-other";
     await prisma.character.create({
-      data: { ...FIXTURE, id: otherId, name: "Other", spellcasting: Prisma.JsonNull },
+      data: { ...FIXTURE, id: otherId, name: "Other", ownerId: OWNER_ID, spellcasting: Prisma.JsonNull },
     });
     try {
       const startRes = await supertest(app)

@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../prisma.js";
+import { ensureTestOwner } from "../../test-support/owner.js";
 import {
   applyInventoryOperations,
   currencyCredit,
@@ -9,6 +10,8 @@ import {
   InsufficientCurrencyError,
   InvalidInventoryOperationError,
 } from "../inventory.js";
+
+const OWNER_ID = "owner-inventory-lib";
 
 describe("currencyDebit", () => {
   it("subtracts each denomination", () => {
@@ -76,6 +79,7 @@ describe("applyInventoryOperations", () => {
   });
 
   beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
     const item = await prisma.item.upsert({
       where: { name: TEST_ITEM.name },
       create: { ...TEST_ITEM, weaponDetail: { create: TEST_WEAPON_DETAIL } },
@@ -87,12 +91,12 @@ describe("applyInventoryOperations", () => {
     itemId = item.id;
 
     const characterA = await prisma.character.create({
-      data: { ...MINIMAL_CHARACTER, spellcasting: Prisma.JsonNull, currency: { cp: 0, sp: 5, gp: 10, pp: 0 } },
+      data: { ...MINIMAL_CHARACTER, ownerId: OWNER_ID, spellcasting: Prisma.JsonNull, currency: { cp: 0, sp: 5, gp: 10, pp: 0 } },
     });
     characterAId = characterA.id;
 
     const characterB = await prisma.character.create({
-      data: { ...MINIMAL_CHARACTER, spellcasting: Prisma.JsonNull, currency: { cp: 0, sp: 0, gp: 0, pp: 0 } },
+      data: { ...MINIMAL_CHARACTER, ownerId: OWNER_ID, spellcasting: Prisma.JsonNull, currency: { cp: 0, sp: 0, gp: 0, pp: 0 } },
     });
     characterBId = characterB.id;
   });

@@ -10,6 +10,9 @@ import supertest from "supertest";
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
+import { ensureTestOwner } from "../../test-support/owner.js";
+
+const OWNER_ID = "owner-spellcasting";
 
 // ── Catalog fixtures ─────────────────────────────────────────────────────────
 
@@ -160,6 +163,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   });
 
   beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
     // Upsert a uniquely-named wizard class for this test suite.
     const cls = await prisma.characterClass.upsert({
       where: { name: WIZARD_CATALOG_NAME },
@@ -193,6 +197,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     await prisma.character.create({
       data: {
         ...FIXTURE_BASE,
+        ownerId: OWNER_ID,
         spellcasting: FIXTURE_SPELLCASTING_JSON as Prisma.InputJsonValue,
         classEntries: {
           create: [{ name: "wizard", classId: wizardClassId, position: 0 }],
@@ -720,6 +725,7 @@ describe("Warlock Pact Magic + Mystic Arcanum", () => {
   });
 
   beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
     const cls = await prisma.characterClass.upsert({
       where: { name: WARLOCK_CATALOG_NAME },
       create: {
@@ -732,6 +738,7 @@ describe("Warlock Pact Magic + Mystic Arcanum", () => {
     await prisma.character.create({
       data: {
         ...WARLOCK_BASE,
+        ownerId: OWNER_ID,
         spellcasting: WARLOCK_SPELLCASTING_JSON as Prisma.InputJsonValue,
         classEntries: { create: [{ name: "warlock", classId: cls.id, position: 0 }] },
       },

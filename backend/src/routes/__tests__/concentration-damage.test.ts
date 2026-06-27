@@ -20,8 +20,11 @@ import supertest from "supertest";
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
+import { ensureTestOwner } from "../../test-support/owner.js";
 
 const app = createApp();
+
+const OWNER_ID = "owner-concentration";
 
 const CONC = {
   entryId: "fixture-conc-entry",
@@ -96,11 +99,12 @@ async function getSpellcasting(id: string): Promise<Record<string, unknown>> {
 
 describe("Concentration on damage (issue #41)", () => {
   beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
     await prisma.character.create({
-      data: { ...FIXTURE, spellcasting: SPELLCASTING_JSON as Prisma.InputJsonValue },
+      data: { ...FIXTURE, ownerId: OWNER_ID, spellcasting: SPELLCASTING_JSON as Prisma.InputJsonValue },
     });
     await prisma.character.create({
-      data: { ...FIXTURE_HIGH_CON, spellcasting: SPELLCASTING_JSON as Prisma.InputJsonValue },
+      data: { ...FIXTURE_HIGH_CON, ownerId: OWNER_ID, spellcasting: SPELLCASTING_JSON as Prisma.InputJsonValue },
     });
   });
 
@@ -274,11 +278,12 @@ describe("Concentration on damage (issue #41)", () => {
 
 describe("Interactive concentration save (issue #76)", () => {
   beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
     await prisma.character.create({
-      data: { ...FIXTURE, spellcasting: SPELLCASTING_JSON as Prisma.InputJsonValue },
+      data: { ...FIXTURE, ownerId: OWNER_ID, spellcasting: SPELLCASTING_JSON as Prisma.InputJsonValue },
     });
     await prisma.character.create({
-      data: { ...FIXTURE_HIGH_CON, spellcasting: SPELLCASTING_JSON as Prisma.InputJsonValue },
+      data: { ...FIXTURE_HIGH_CON, ownerId: OWNER_ID, spellcasting: SPELLCASTING_JSON as Prisma.InputJsonValue },
     });
   });
 
