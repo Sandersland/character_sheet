@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { googleProvider } from "../auth/providers/google.js";
+import { googleProvider } from "../auth/oauth/providers/google.js";
 
 // The provider's profile mapping is pure and independent of the registry/env —
 // test it directly off the exported definition (no creds, no stubbing).

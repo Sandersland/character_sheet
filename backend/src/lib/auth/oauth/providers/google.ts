@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { NormalizedProfile, ProviderDefinition } from "./types.js";
+import type { NormalizedProfile, ProviderDefinition } from "../types.js";
 
 // Google's OIDC userinfo payload (the subset we use). `email_verified` gates
 // whether we trust the address; unverified → we store null rather than risk

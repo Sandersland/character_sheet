@@ -1,20 +1,9 @@
-// OAuth provider registry.
-//
-// Register a provider by adding its definition to PROVIDER_DEFINITIONS below —
-// that is the ONLY line that changes when a new provider is added. Each
-// provider's descriptor, profile schema, and `mapProfile` live in its own
-// module (e.g. `./google.ts`), so this file stays provider-agnostic.
+import type { AuthProvider } from "./types.js";
 
-import { googleProvider } from "./google.js";
-import type { AuthProvider, ProviderDefinition } from "./types.js";
+import { PROVIDERS } from "./providers/index.js";
 
-export type {
-  AuthProvider,
-  NormalizedProfile,
-  ProviderDefinition,
-} from "./types.js";
-
-const PROVIDER_DEFINITIONS: ProviderDefinition[] = [googleProvider];
+// Resolves the provider manifest (./providers) against env. Kept separate from
+// the manifest so adding a provider only ever touches the array, not this logic.
 
 function readEnv(name: string): string | undefined {
   const value = process.env[name]?.trim();
@@ -26,7 +15,7 @@ function readEnv(name: string): string | undefined {
 // tests rely on this, and a no-creds boot can have creds injected later. Only
 // providers with BOTH a client id and secret configured are considered enabled.
 export function enabledProviders(): AuthProvider[] {
-  return PROVIDER_DEFINITIONS.flatMap((definition) => {
+  return PROVIDERS.flatMap((definition) => {
     const clientId = readEnv(definition.clientIdEnv);
     const clientSecret = readEnv(definition.clientSecretEnv);
     if (!clientId || !clientSecret) return [];

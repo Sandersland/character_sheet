@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   enabledProviders,
   getProvider,
-} from "../auth/providers/index.js";
+} from "../auth/oauth/registry.js";
 
 // No Postgres: the provider registry is pure (env in, descriptors out).
 // Per-provider profile mapping is tested in isolation in the provider's own

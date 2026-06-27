@@ -6,7 +6,7 @@ import { z } from "zod";
 // Design notes:
 //   - Provider creds (GOOGLE_CLIENT_ID/SECRET) are OPTIONAL: a no-creds deploy
 //     must still boot (the provider is simply reported as disabled, see
-//     lib/auth/providers/). Never make them required here.
+//     lib/auth/oauth/registry.ts). Never make them required here.
 //   - Empty-string env vars are treated as "unset" so a blank value in a .env
 //     file or a CI default doesn't masquerade as a configured cred.
 //   - logger.ts / security.ts / prisma.ts deliberately read env directly at

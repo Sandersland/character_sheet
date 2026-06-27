@@ -1,20 +1,17 @@
 import crypto from "node:crypto";
 
-import type { Request } from "express";
-
-import { config } from "../config.js";
 import { prisma } from "../prisma.js";
 
-// Opaque server-side sessions + the low-level cookie/PKCE primitives the auth
-// router builds on. No cookie-parser dependency — cookies are parsed/serialized
-// by hand so the only state on the client is two opaque, HttpOnly tokens.
+// Opaque server-side sessions — the method-agnostic identity layer. Any auth
+// method (OAuth today, password/magic-link later) mints a session the same way.
+// Cookie handling lives in ./cookies.js; OAuth-only PKCE/state in ./oauth/pkce.js.
 
-// Cookie names. `cs_` = character-sheet namespace.
+// Session cookie name. `cs_` = character-sheet namespace.
 export const SESSION_COOKIE = "cs_session";
-export const OAUTH_TX_COOKIE = "cs_oauth_tx";
 
-// 30-day session lifetime.
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+// 30-day session lifetime, exposed in seconds for the Set-Cookie Max-Age.
+export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+const SESSION_TTL_MS = SESSION_TTL_SECONDS * 1000;
 
 export interface SessionUser {
   id: string;
@@ -22,8 +19,6 @@ export interface SessionUser {
   name: string | null;
   imageUrl: string | null;
 }
-
-// ── Session lifecycle ────────────────────────────────────────────────────────
 
 // Mint a new session. The token is the AuthSession primary key (the schema
 // gives `id` no default precisely so we store this opaque value verbatim).
@@ -63,71 +58,4 @@ export async function lookupSession(token: string): Promise<SessionUser | null> 
 export async function destroySession(token: string): Promise<void> {
   if (!token) return;
   await prisma.authSession.deleteMany({ where: { id: token } });
-}
-
-// ── Cookie helpers ───────────────────────────────────────────────────────────
-
-// Parse a raw Cookie header into a name→value map. Tolerates missing header,
-// stray whitespace, empty segments, and values containing "=".
-export function parseCookies(header: string | undefined): Record<string, string> {
-  const out: Record<string, string> = {};
-  if (!header) return out;
-
-  for (const segment of header.split(";")) {
-    const eq = segment.indexOf("=");
-    if (eq < 0) continue;
-    const name = segment.slice(0, eq).trim();
-    if (!name) continue;
-    const value = segment.slice(eq + 1).trim();
-    out[name] = decodeURIComponent(value);
-  }
-  return out;
-}
-
-export function getCookie(req: Request, name: string): string | undefined {
-  return parseCookies(req.headers.cookie)[name];
-}
-
-export interface CookieOptions {
-  maxAgeSeconds?: number;
-  // Defaults to config.SESSION_COOKIE_SECURE; pass explicitly to override.
-  secure?: boolean;
-}
-
-// Serialize a Set-Cookie value. Always HttpOnly + SameSite=Lax + Path=/. Secure
-// follows config unless overridden. A maxAge of 0 expires the cookie (clear).
-export function serializeCookie(
-  name: string,
-  value: string,
-  options: CookieOptions = {},
-): string {
-  const secure = options.secure ?? config.SESSION_COOKIE_SECURE;
-  const parts = [
-    `${name}=${encodeURIComponent(value)}`,
-    "HttpOnly",
-    "SameSite=Lax",
-    "Path=/",
-  ];
-  if (options.maxAgeSeconds !== undefined) {
-    parts.push(`Max-Age=${options.maxAgeSeconds}`);
-  }
-  if (secure) parts.push("Secure");
-  return parts.join("; ");
-}
-
-// ── State + PKCE primitives ──────────────────────────────────────────────────
-
-// Anti-CSRF state token.
-export function randomState(): string {
-  return crypto.randomBytes(16).toString("base64url");
-}
-
-// PKCE code verifier (RFC 7636): 32 random bytes, base64url.
-export function createVerifier(): string {
-  return crypto.randomBytes(32).toString("base64url");
-}
-
-// PKCE S256 code challenge: base64url(SHA-256(verifier)). Deterministic.
-export function challengeFromVerifier(verifier: string): string {
-  return crypto.createHash("sha256").update(verifier).digest("base64url");
 }

@@ -1,8 +1,8 @@
-// Shared contracts for the OAuth provider registry.
+// Shared contracts for the third-party OAuth method.
 //
-// Each provider lives in its own module (e.g. `google.ts`) and exports a single
-// `ProviderDefinition`. The registry (`index.ts`) resolves a definition's creds
-// from env and hands the auth router a fully-resolved `AuthProvider`.
+// Each provider lives in its own module under `providers/` and exports a single
+// `ProviderDefinition`. The registry (`registry.ts`) resolves a definition's
+// creds from env and hands the flow a fully-resolved `AuthProvider`.
 
 export interface NormalizedProfile {
   providerAccountId: string;
@@ -27,7 +27,7 @@ export interface ProviderDefinition {
   mapProfile: (raw: unknown) => NormalizedProfile;
 }
 
-// A provider with its creds resolved from env — what the auth router consumes.
+// A provider with its creds resolved from env — what the OAuth flow consumes.
 // Creds are optional in the type for symmetry with the descriptor, but
 // `enabledProviders()` only ever returns providers where both are present.
 export type AuthProvider = Omit<
