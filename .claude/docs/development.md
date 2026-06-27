@@ -15,7 +15,9 @@ docker compose up --build
 docker compose --profile tools up pgadmin   # localhost:5050
 ```
 
-On every container start, the backend runs `prisma generate && prisma migrate deploy && prisma db seed` before starting `tsx watch`. All three are idempotent (migrate deploy no-ops if already applied; seed uses upserts). Three sample characters (a Fighter, a Cleric, and a Wizard) land automatically.
+On every container start, both dev containers run `npm install` first, then the backend runs `prisma generate && prisma migrate deploy && prisma db seed` before starting `tsx watch`. All are idempotent (npm install is a fast no-op when nothing changed; migrate deploy no-ops if already applied; seed uses upserts). Three sample characters (a Fighter, a Cleric, and a Wizard) land automatically.
+
+> **Adding a dependency?** Just edit `package.json` (or `npm install <pkg>` locally) and `docker compose up --build`. The startup `npm install` reconciles the `node_modules` named volume, so a new dependency is picked up without manually removing the volume. (The volume is seeded from the image only on first creation, so without this it would otherwise shadow newly-built deps.)
 
 ## Root scripts (fan out to both workspaces)
 

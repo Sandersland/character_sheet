@@ -9,4 +9,7 @@ COPY . .
 
 EXPOSE 5173
 
-CMD ["npm", "run", "dev"]
+# `npm install` runs on every start so the node_modules named volume reconciles
+# with package.json — adding a dependency just needs `docker compose up --build`,
+# no manual volume reset. It's a fast no-op when nothing changed.
+CMD ["sh", "-c", "npm install --no-package-lock && npm run dev"]
