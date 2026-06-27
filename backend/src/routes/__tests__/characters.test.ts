@@ -5,6 +5,7 @@ import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 import { resolveBootstrapOwnerId } from "../../lib/owner.js";
+import { findInList } from "../../test-support/list.js";
 
 const TEST_USER = { id: "test-user-1", email: "fixture-owner@test.local" };
 const TEST_RACE = { name: "Test Race", speed: 30 };
@@ -151,12 +152,15 @@ describe("characters routes", () => {
   });
 
   it("GET /api/characters returns summaries with derived level", async () => {
+    // eslint-disable-next-line no-restricted-syntax -- lists every character, but asserts only on this suite's own fixture via findInList (see .claude/docs/testing.md)
     const response = await supertest(createApp()).get("/api/characters");
 
     expect(response.status).toBe(200);
-    const fixture = response.body.find(
-      (c: { id: string }) => c.id === FIXTURE.id
+    const fixture = findInList<{ id: string; name: string; level: number; ownerId: string }>(
+      response.body,
+      FIXTURE.id
     );
+    expect(fixture).toBeDefined();
     expect(fixture).toMatchObject({ name: "Test Fixture", level: 3, ownerId: TEST_USER.id });
   });
 
