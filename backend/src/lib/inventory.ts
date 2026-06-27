@@ -342,6 +342,92 @@ function snapshotItemDetail(item: CatalogItemWithDetails) {
   };
 }
 
+// ── Undo snapshot ────────────────────────────────────────────────────────────
+//
+// When an op DELETES an InventoryItem row (full sell, remove, adjust-to-zero)
+// the relational row + its detail rows are gone, so `before`/`after` alone
+// can't reconstruct it on undo. We stash a self-contained snapshot under
+// `data.deletedItem` (NOT `before` — `before`/`after` feed diffToFields and
+// would spray spurious field-diff rows; `data` is never diffed). On revert,
+// revertInventoryEvent recreates the row from this snapshot reusing the
+// original id. The detail blocks are typed as Prisma nested-create inputs so
+// they drop straight into inventoryItem.create's `{ create: … }`.
+export interface DeletedInventoryItemSnapshot {
+  id: string;
+  itemId: string | null;
+  name: string;
+  category: ItemCategoryName;
+  weight: number | null;
+  cost: Currency | null;
+  description: string | null;
+  quantity: number;
+  equipped: boolean;
+  notes: string | null;
+  position: number;
+  weaponDetail: Prisma.InventoryWeaponDetailCreateWithoutInventoryItemInput | null;
+  armorDetail: Prisma.InventoryArmorDetailCreateWithoutInventoryItemInput | null;
+  consumableDetail: Prisma.InventoryConsumableDetailCreateWithoutInventoryItemInput | null;
+}
+
+// Serializes an already-fetched InventoryItemWithDetails into the
+// `data.deletedItem` snapshot. Mirror of snapshotItemDetail's field-by-field
+// style, but reads from an InventoryItem (live row) rather than a catalog Item
+// and keeps the scalar item columns alongside the detail blocks.
+function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): DeletedInventoryItemSnapshot {
+  return {
+    id: item.id,
+    itemId: item.itemId,
+    name: item.name,
+    category: item.category,
+    weight: item.weight,
+    cost: asCurrency(item.cost),
+    description: item.description,
+    quantity: item.quantity,
+    equipped: item.equipped,
+    notes: item.notes,
+    position: item.position,
+    weaponDetail: item.weaponDetail
+      ? {
+          damageDiceCount: item.weaponDetail.damageDiceCount,
+          damageDiceFaces: item.weaponDetail.damageDiceFaces,
+          damageModifier: item.weaponDetail.damageModifier,
+          damageType: item.weaponDetail.damageType,
+          versatileDiceCount: item.weaponDetail.versatileDiceCount,
+          versatileDiceFaces: item.weaponDetail.versatileDiceFaces,
+          finesse: item.weaponDetail.finesse,
+          light: item.weaponDetail.light,
+          heavy: item.weaponDetail.heavy,
+          twoHanded: item.weaponDetail.twoHanded,
+          reach: item.weaponDetail.reach,
+          thrown: item.weaponDetail.thrown,
+          ammunition: item.weaponDetail.ammunition,
+          rangeNormal: item.weaponDetail.rangeNormal,
+          rangeLong: item.weaponDetail.rangeLong,
+          weaponClass: item.weaponDetail.weaponClass,
+          weaponRange: item.weaponDetail.weaponRange,
+        }
+      : null,
+    armorDetail: item.armorDetail
+      ? {
+          armorCategory: item.armorDetail.armorCategory,
+          baseArmorClass: item.armorDetail.baseArmorClass,
+          dexModifierApplies: item.armorDetail.dexModifierApplies,
+          dexModifierMax: item.armorDetail.dexModifierMax,
+          stealthDisadvantage: item.armorDetail.stealthDisadvantage,
+          strengthRequirement: item.armorDetail.strengthRequirement,
+        }
+      : null,
+    consumableDetail: item.consumableDetail
+      ? {
+          effectDiceCount: item.consumableDetail.effectDiceCount,
+          effectDiceFaces: item.consumableDetail.effectDiceFaces,
+          effectModifier: item.consumableDetail.effectModifier,
+          effectDescription: item.consumableDetail.effectDescription,
+        }
+      : null,
+  };
+}
+
 // Builds the nested-create payload for an InventoryItem from a catalog Item
 // that has already been fetched with catalogItemDetailInclude. Used by
 // routes/characters.ts to create starting-equipment rows atomically inside
@@ -566,7 +652,13 @@ export async function applyAdjustQuantity(
     entityId: item.id,
     before: { quantity: item.quantity },
     after: nextQuantity === 0 ? null : { quantity: nextQuantity },
-    data: { itemName: item.name, quantityDelta: op.delta },
+    // Only snapshot for undo when the row is actually deleted (quantity hits 0);
+    // a partial adjust leaves the row, so `before.quantity` is enough to restore.
+    data: {
+      itemName: item.name,
+      quantityDelta: op.delta,
+      ...(nextQuantity === 0 ? { deletedItem: snapshotInventoryItemForUndo(item) } : {}),
+    },
     batchId,
     sessionId,
   });
@@ -654,7 +746,12 @@ async function applyRemove(
     entityId: item.id,
     before: { name: item.name, quantity: item.quantity, category: item.category },
     after: null,
-    data: { itemName: item.name, quantityDelta: -item.quantity },
+    // `remove` always deletes the whole row, so always snapshot for undo.
+    data: {
+      itemName: item.name,
+      quantityDelta: -item.quantity,
+      deletedItem: snapshotInventoryItemForUndo(item),
+    },
     batchId,
     sessionId,
   });
@@ -683,7 +780,14 @@ async function applySell(tx: Prisma.TransactionClient, characterId: string, op: 
     entityId: item.id,
     before: { quantity: item.quantity },
     after: remaining === 0 ? null : { quantity: remaining },
-    data: { itemName: item.name, quantityDelta: -quantitySold, currencyDelta: op.currencyDelta },
+    // Only snapshot for undo when the FULL stack is sold (row deleted); a
+    // partial sell leaves the row, so `before.quantity` is enough to restore.
+    data: {
+      itemName: item.name,
+      quantityDelta: -quantitySold,
+      currencyDelta: op.currencyDelta,
+      ...(quantitySold === item.quantity ? { deletedItem: snapshotInventoryItemForUndo(item) } : {}),
+    },
     batchId,
     sessionId,
   });
