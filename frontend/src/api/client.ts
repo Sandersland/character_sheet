@@ -552,6 +552,8 @@ export async function logRoll(
     total: number;
     specLabel?: string;
     damageType?: string;
+    /** Raw kept die faces (non-dropped) so the Session Log can show the breakdown. */
+    faces?: number[];
   },
 ): Promise<void> {
   const response = await fetch(
