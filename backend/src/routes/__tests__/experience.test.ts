@@ -4,6 +4,9 @@ import supertest from "supertest";
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
+import { ensureTestOwner } from "../../test-support/owner.js";
+
+const OWNER_ID = "owner-experience";
 
 // XP thresholds from the 5e table (levelForExperience).
 const XP_LVL_1 = 0;
@@ -121,9 +124,11 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
 
   // Helper: create a fighter with hitDice.total = 3 (HP level-ups applied) at XP level 3.
   async function createFighterWithHpLevelUps(id: string) {
+    await ensureTestOwner(OWNER_ID);
     const char = await prisma.character.create({
       data: {
         ...BASE_CHARACTER,
+        ownerId: OWNER_ID,
         id,
         name: `Fighter ${id}`,
         experiencePoints: XP_LVL_3,
@@ -170,9 +175,11 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
 
   // Helper: create a fighter with hitDice.total = 1 (XP at level 3 but no HP level-ups clicked).
   async function createFighterNoHpLevelUps(id: string) {
+    await ensureTestOwner(OWNER_ID);
     return prisma.character.create({
       data: {
         ...BASE_CHARACTER,
+        ownerId: OWNER_ID,
         id,
         name: `Fighter No HP ${id}`,
         experiencePoints: XP_LVL_3,
@@ -276,9 +283,11 @@ describe("POST /api/characters/:id/experience — subclass reset on level-down",
   // ── subclassLevel = 1 class preserves its subclass at level 1 ─────────────
 
   it("preserves a subclassLevel=1 subclass (Cleric) when XP drops to level 1", async () => {
+    await ensureTestOwner(OWNER_ID);
     const cleric = await prisma.character.create({
       data: {
         ...BASE_CHARACTER,
+        ownerId: OWNER_ID,
         id: "test-xp-cleric-1",
         name: "Cleric test-xp-cleric-1",
         experiencePoints: XP_LVL_3,
@@ -402,9 +411,11 @@ describe("POST /api/characters/:id/experience — maneuvers reconciled on level-
 
   /** Creates a level-7 Fighter with Battle Master and 5 known maneuvers. */
   async function createLvl7FighterWithManeuvers(id: string) {
+    await ensureTestOwner(OWNER_ID);
     return prisma.character.create({
       data: {
         ...BASE_CHARACTER,
+        ownerId: OWNER_ID,
         id,
         name: `Maneuver ${id}`,
         experiencePoints: XP_LVL_7,
@@ -533,9 +544,11 @@ describe("POST /api/characters/:id/experience — maneuvers reconciled on level-
 
   it("GET serializes only 3 maneuvers for a level-3 character with 5 stored (read-clamp)", async () => {
     // Create directly at level 3 with 5 stored maneuvers (no reconciling XP op).
+    await ensureTestOwner(OWNER_ID);
     await prisma.character.create({
       data: {
         ...BASE_CHARACTER,
+        ownerId: OWNER_ID,
         id: "test-man-clamp",
         name: "Maneuver test-man-clamp",
         experiencePoints: XP_LVL_3,
@@ -628,9 +641,11 @@ describe("POST /api/characters/:id/experience — fighting style reconciled on c
 
   /** Creates a level-5 Fighter (entry name "fighter") with a chosen Defense style. */
   async function createFighterWithStyle(id: string) {
+    await ensureTestOwner(OWNER_ID);
     return prisma.character.create({
       data: {
         ...BASE_CHARACTER,
+        ownerId: OWNER_ID,
         id,
         name: `FSRecon ${id}`,
         experiencePoints: XP_LVL_5,
@@ -711,9 +726,11 @@ describe("POST /api/characters/:id/experience — fighting style reconciled on c
   });
 
   it("read-clamp serves null fightingStyle for a non-Fighter with a stored style (no XP op)", async () => {
+    await ensureTestOwner(OWNER_ID);
     await prisma.character.create({
       data: {
         ...BASE_CHARACTER,
+        ownerId: OWNER_ID,
         id: "test-fs-clamp",
         name: "FSRecon test-fs-clamp",
         experiencePoints: XP_LVL_5,

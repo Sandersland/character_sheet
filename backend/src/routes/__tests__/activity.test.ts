@@ -38,10 +38,13 @@ import supertest from "supertest";
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
+import { ensureTestOwner } from "../../test-support/owner.js";
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
 const app = () => createApp();
+
+const OWNER_ID = "owner-activity";
 
 /**
  * Returns the batchId of the most-recent non-revert event for a character, by
@@ -123,6 +126,7 @@ describe("POST /:id/events/:batchId/revert — Wizard scenarios", () => {
   });
 
   beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
     const cls = await prisma.characterClass.upsert({
       where: { name: WIZARD_CATALOG_NAME },
       create: {
@@ -140,6 +144,7 @@ describe("POST /:id/events/:batchId/revert — Wizard scenarios", () => {
     await prisma.character.create({
       data: {
         ...WIZARD_BASE,
+        ownerId: OWNER_ID,
         spellcasting: WIZARD_SPELLCASTING_JSON as Prisma.InputJsonValue,
         classEntries: { create: [{ name: "wizard", classId: wizardClassId, position: 0 }] },
       },
@@ -434,6 +439,7 @@ describe("POST /:id/events/:batchId/revert — Fighter scenarios", () => {
   });
 
   beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
     const cls = await prisma.characterClass.upsert({
       where: { name: FIGHTER_CATALOG_NAME },
       create: {
@@ -459,6 +465,7 @@ describe("POST /:id/events/:batchId/revert — Fighter scenarios", () => {
     await prisma.character.create({
       data: {
         ...FIGHTER_BASE,
+        ownerId: OWNER_ID,
         // class entry snapshot name "fighter" → drives deriveResources / advancement slots
         classEntries: { create: [{ name: "fighter", classId: fighterClassId, position: 0 }] },
       },
@@ -560,6 +567,7 @@ describe("POST /:id/events/:batchId/revert — inventory deferral", () => {
   });
 
   beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
     const cls = await prisma.characterClass.upsert({
       where: { name: INV_CATALOG_NAME },
       create: {
@@ -577,6 +585,7 @@ describe("POST /:id/events/:batchId/revert — inventory deferral", () => {
     await prisma.character.create({
       data: {
         id: INV_ID,
+        ownerId: OWNER_ID,
         name: "Activity Test Rogue",
         alignment: "Chaotic Good",
         experiencePoints: 0,
@@ -687,6 +696,7 @@ describe("POST /:id/events/:batchId/revert — level-up / level-down class-entry
   });
 
   beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
     const cls = await prisma.characterClass.upsert({
       where: { name: LVL_CATALOG_NAME },
       create: {
@@ -704,6 +714,7 @@ describe("POST /:id/events/:batchId/revert — level-up / level-down class-entry
     await prisma.character.create({
       data: {
         ...LVL_BASE,
+        ownerId: OWNER_ID,
         // class entry starts at level 1 (snapshot name drives nothing level-relevant here)
         classEntries: { create: [{ name: "fighter", classId: levelClassId, position: 0, level: 1 }] },
       },
@@ -813,6 +824,7 @@ describe("GET /:id/activity — ?category= filter", () => {
   });
 
   beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
     const cls = await prisma.characterClass.upsert({
       where: { name: FILTER_CATALOG_NAME },
       create: {
@@ -830,6 +842,7 @@ describe("GET /:id/activity — ?category= filter", () => {
     await prisma.character.create({
       data: {
         id: FILTER_ID,
+        ownerId: OWNER_ID,
         name: "Activity Filter Test Fighter",
         alignment: "Neutral Good",
         experiencePoints: 0,

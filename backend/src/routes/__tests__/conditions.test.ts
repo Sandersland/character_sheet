@@ -10,8 +10,11 @@ import supertest from "supertest";
 
 import { createApp } from "../../app.js";
 import { prisma } from "../../lib/prisma.js";
+import { ensureTestOwner } from "../../test-support/owner.js";
 
 // ── Character fixture ─────────────────────────────────────────────────────────
+
+const OWNER_ID = "owner-conditions";
 
 const FIXTURE_ID = "test-conditions-character-1";
 
@@ -48,6 +51,7 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
   });
 
   beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
     const cls = await prisma.characterClass.upsert({
       where: { name: FIGHTER_CATALOG_NAME },
       create: {
@@ -65,6 +69,7 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
     await prisma.character.create({
       data: {
         ...FIXTURE_BASE,
+        ownerId: OWNER_ID,
         classEntries: { create: [{ name: "fighter", classId: fighterClassId, position: 0 }] },
       },
     });
