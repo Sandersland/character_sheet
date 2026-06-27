@@ -4,7 +4,9 @@ import supertest from "supertest";
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
+import { resolveBootstrapOwnerId } from "../../lib/owner.js";
 
+const TEST_USER = { id: "test-user-1", email: "fixture-owner@test.local" };
 const TEST_RACE = { name: "Test Race", speed: 30 };
 const TEST_CLASS = {
   name: "Test Class",
@@ -60,6 +62,13 @@ describe("characters routes", () => {
   let createdCharacterIds: string[] = [];
 
   beforeEach(async () => {
+    // Every character needs an owner (Character.ownerId is NOT NULL). Upsert a
+    // dedicated fixture user so the create below can connect to it.
+    await prisma.user.upsert({
+      where: { id: TEST_USER.id },
+      create: TEST_USER,
+      update: TEST_USER,
+    });
     // Sequential rather than Promise.all — see the matching comment in
     // routes/characters.ts's POST handler.
     const race = await prisma.race.upsert({
@@ -89,6 +98,7 @@ describe("characters routes", () => {
     await prisma.character.create({
       data: {
         ...FIXTURE,
+        owner: { connect: { id: TEST_USER.id } },
         spellcasting: Prisma.JsonNull,
         raceSelection: { create: { name: race.name, raceId: race.id } },
         backgroundSelection: { create: { name: background.name, backgroundId: background.id } },
@@ -137,6 +147,7 @@ describe("characters routes", () => {
     await prisma.characterClass.deleteMany({ where: { name: TEST_CLASS.name } });
     await prisma.background.deleteMany({ where: { name: TEST_BACKGROUND.name } });
     await prisma.item.deleteMany({ where: { name: TEST_ITEM.name } });
+    await prisma.user.deleteMany({ where: { id: TEST_USER.id } });
   });
 
   it("GET /api/characters returns summaries with derived level", async () => {

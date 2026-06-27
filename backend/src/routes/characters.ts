@@ -43,6 +43,7 @@ import { normalizeResourcesMutable, type ToolProfEntry } from "../lib/resources.
 import { normalizeConditionsMutable } from "../lib/conditions.js";
 import { reverseAdvancementEffects } from "../lib/advancement.js";
 import { normalizeSpellcastingMutable } from "../lib/spellcasting.js";
+import { resolveBootstrapOwnerId } from "../lib/owner.js";
 
 export const charactersRouter = Router();
 
@@ -1026,8 +1027,14 @@ charactersRouter.post("/characters", async (req, res) => {
     { race, characterClass }
   );
 
+  // Resolve the owning user. Placeholder for real auth — #100 wires sign-in
+  // and threads the authenticated user here; #101 enforces per-owner access.
+  // Today this returns a single bootstrap owner (see lib/owner.ts).
+  const ownerId = await resolveBootstrapOwnerId();
+
   const created = await prisma.character.create({
     data: {
+      owner: { connect: { id: ownerId } },
       name: input.name,
       alignment: input.alignment,
       portraitUrl: input.portraitUrl ?? null,
