@@ -82,7 +82,7 @@ When a change touches a code surface in the **doc-ownership map** (the Doc-map t
 This is enforced, not aspirational:
 
 - The **`/doc-sync` skill** audits a change set against the docs it should have touched, updates them in house-style, and offers to file a `documentation` issue for anything out of scope.
-- The **PR review gate** runs the same checks automatically on PRs into `main`.
+- The **PR review gate** runs the same checks automatically on PRs into `main` **and** `staging`. On both base branches the reviewer submits a formal verdict and the `claude-review` check fails (red) when it requests changes — e.g. a doc-significant change that ships without its mapped doc update — so a blocking finding holds the PR.
 
 ---
 

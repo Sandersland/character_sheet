@@ -14,8 +14,10 @@ import supertest from "supertest";
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
+import { ensureTestOwner } from "../../test-support/owner.js";
 
 const FIXTURE_ID = "test-journal-character-1";
+const OWNER_ID = "owner-journal";
 
 const FIXTURE = {
   id: FIXTURE_ID,
@@ -48,7 +50,8 @@ function journalUrl(suffix = "") {
 }
 
 beforeEach(async () => {
-  await prisma.character.create({ data: { ...FIXTURE, spellcasting: Prisma.JsonNull } });
+  await ensureTestOwner(OWNER_ID);
+  await prisma.character.create({ data: { ...FIXTURE, ownerId: OWNER_ID, spellcasting: Prisma.JsonNull } });
 });
 
 afterEach(async () => {

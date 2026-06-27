@@ -18,7 +18,7 @@ See `.claude/docs/development.md` for per-workspace commands, running outside Do
 
 ## Non-negotiables (always apply)
 
-**Derive, don't persist.** `level` and `proficiencyBonus` are computed from `experiencePoints` in `serializeCharacter`; spellcasting slot totals/save DC/attack bonus are computed from class+level+ability scores via `deriveSpellcasting()` in `srd.ts`. `race`/`class`/`background` are read from the selection relations. None of these are columns; don't add them back.
+**Derive, don't persist.** `level` and `proficiencyBonus` are computed from `experiencePoints` in `serializeCharacter`; spellcasting slot totals/save DC/attack bonus are computed from class+level+ability scores via `deriveSpellcasting()` in `srd.ts`. `race`/`class`/`background` are read from the selection relations. None of these are columns; don't add them back. (Exempt: `Character.ownerId` is legitimately persisted — ownership is identity state, not a function of any other column. See the User/AuthAccount/AuthSession identity model in `.claude/docs/architecture.md`.)
 
 **Level-gated state reconciles through one registry.** Any persisted state whose legal maximum depends on character level (subclass choice, maneuvers known, future feats, Ability Score Improvements) must add a reconciler to `LEVEL_GATED_RECONCILERS` in `backend/src/lib/level-reconciliation.ts` **and** a matching clamp-on-read in `serializeCharacter`. Never hand-roll level-down logic at a new call site. See `.claude/docs/leveling.md` for the full pattern and checklist.
 
@@ -36,7 +36,7 @@ See `.claude/docs/development.md` for per-workspace commands, running outside Do
 
 **Backend tests need Postgres.** Run `docker compose up db -d` first and export `DATABASE_URL` in the same shell command as `vitest` (not a prior `export`). See `.claude/docs/testing.md`.
 
-**Documentation is part of Done.** A wrong doc is worse than no doc, so when a change touches a surface below, update the mapped doc/comment in the same PR. Put each fact at its lowest-drift home (code comments for single-file facts, on-demand docs for cross-cutting patterns); see `.claude/docs/documentation.md`. The `/doc-sync` skill and the PR review gate enforce this.
+**Documentation is part of Done.** A wrong doc is worse than no doc, so when a change touches a surface below, update the mapped doc/comment in the same PR. Put each fact at its lowest-drift home (code comments for single-file facts, on-demand docs for cross-cutting patterns); see `.claude/docs/documentation.md`. The `/doc-sync` skill and the PR review gate enforce this — the gate now submits a blocking verdict (red `claude-review` check) on PRs into `staging` as well as `main`.
 
 | When a change touches… | Update… |
 |---|---|

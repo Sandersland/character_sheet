@@ -247,12 +247,13 @@ sessionsRouter.post("/characters/:id/sessions/:sessionId/roll", async (req, res)
   const character = await resolveCombatCharacter(req.params.id, res);
   if (!character) return;
 
-  const { kind, source, total, specLabel, damageType } = req.body as {
+  const { kind, source, total, specLabel, damageType, faces } = req.body as {
     kind?: unknown;
     source?: unknown;
     total?: unknown;
     specLabel?: unknown;
     damageType?: unknown;
+    faces?: unknown;
   };
 
   if (kind !== "attack" && kind !== "damage") {
@@ -267,6 +268,15 @@ sessionsRouter.post("/characters/:id/sessions/:sessionId/roll", async (req, res)
     res.status(400).json({ error: "total must be a number" });
     return;
   }
+  // faces is optional (back-compat); when present it must be an array of positive integers.
+  if (
+    faces !== undefined &&
+    (!Array.isArray(faces) ||
+      !faces.every((f) => typeof f === "number" && Number.isInteger(f) && f > 0))
+  ) {
+    res.status(400).json({ error: "faces must be an array of positive integers" });
+    return;
+  }
 
   try {
     await logRollEvent(character.id, req.params.sessionId, {
@@ -275,6 +285,7 @@ sessionsRouter.post("/characters/:id/sessions/:sessionId/roll", async (req, res)
       total,
       specLabel: typeof specLabel === "string" ? specLabel : undefined,
       damageType: typeof damageType === "string" ? damageType : undefined,
+      faces: faces as number[] | undefined,
     });
     res.status(201).json({ ok: true });
   } catch (err) {

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { applyInventoryTransactions, fetchItems, updateCharacter } from "@/api/client";
 import type { Character, Currency, InventoryOperation, Item } from "@/types/character";
 import AddItemPanel from "@/features/inventory/AddItemPanel";
+import BulkSellPanel from "@/features/inventory/BulkSellPanel";
 import Card from "@/components/ui/Card";
 import InventoryRow from "@/features/inventory/InventoryRow";
 import LedgerModal from "@/features/inventory/LedgerModal";
@@ -83,6 +84,7 @@ function CurrencyEditor({ character, onUpdate }: InventoryListProps) {
 export default function InventoryList({ character, onUpdate }: InventoryListProps) {
   const [catalog, setCatalog] = useState<Item[]>([]);
   const [addOpen, setAddOpen] = useState(false);
+  const [bulkSellOpen, setBulkSellOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sellingId, setSellingId] = useState<string | null>(null);
   const [ledgerFilter, setLedgerFilter] = useState<LedgerFilter>(undefined);
@@ -110,6 +112,7 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
       const updated = await applyInventoryTransactions(character.id, operations);
       onUpdate(updated);
       setAddOpen(false);
+      setBulkSellOpen(false);
       setEditingId(null);
       setSellingId(null);
     } catch (err) {
@@ -131,10 +134,32 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
           >
             History
           </button>
+          {character.inventory.length > 0 && (
+            <>
+              <span className="text-parchment-300">·</span>
+              <button
+                type="button"
+                onClick={() =>
+                  setBulkSellOpen((open) => {
+                    if (!open) setAddOpen(false);
+                    return !open;
+                  })
+                }
+                className="text-xs font-semibold text-garnet-700 hover:underline"
+              >
+                {bulkSellOpen ? "Cancel" : "Sell multiple"}
+              </button>
+            </>
+          )}
           <span className="text-parchment-300">·</span>
           <button
             type="button"
-            onClick={() => setAddOpen((open) => !open)}
+            onClick={() =>
+              setAddOpen((open) => {
+                if (!open) setBulkSellOpen(false);
+                return !open;
+              })
+            }
             className="text-xs font-semibold text-garnet-700 hover:underline"
           >
             {addOpen ? "Cancel" : "+ Add item"}
@@ -150,6 +175,15 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
             pending={pending}
             onSubmit={submitOperations}
             onClose={() => setAddOpen(false)}
+          />
+        )}
+
+        {bulkSellOpen && (
+          <BulkSellPanel
+            items={character.inventory}
+            pending={pending}
+            onSubmit={submitOperations}
+            onClose={() => setBulkSellOpen(false)}
           />
         )}
 

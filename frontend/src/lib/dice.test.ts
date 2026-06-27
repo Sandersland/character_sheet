@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { formatRollSpec, rollDie, rollSpec, summarizeRoll } from "./dice";
+import { formatRollBreakdown, formatRollSpec, rollDie, rollSpec, summarizeRoll } from "./dice";
 
 describe("rollDie", () => {
   afterEach(() => {
@@ -152,5 +152,23 @@ describe("formatRollSpec", () => {
 
   it("formats a negative modifier", () => {
     expect(formatRollSpec({ count: 2, faces: 4, modifier: -1 })).toBe("2d4 - 1");
+  });
+});
+
+describe("formatRollBreakdown", () => {
+  it("injects a single die face after the dice token", () => {
+    expect(formatRollBreakdown("1d20 + 5", [12])).toBe("1d20 (12) + 5");
+  });
+
+  it("injects multiple comma-separated faces", () => {
+    expect(formatRollBreakdown("2d6", [3, 5])).toBe("2d6 (3, 5)");
+  });
+
+  it("preserves a negative modifier tail unchanged", () => {
+    expect(formatRollBreakdown("1d8 - 1", [4])).toBe("1d8 (4) - 1");
+  });
+
+  it("returns the label untouched when faces is empty", () => {
+    expect(formatRollBreakdown("1d20 + 5", [])).toBe("1d20 + 5");
   });
 });
