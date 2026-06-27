@@ -15,7 +15,7 @@ Invocation: `/parallel-issues <issue-numbers...> [integration-branch]`
 
 ## Steps
 
-### 1. Gather the issues (read-only)
+### 1. Gather the issues + readiness gate (read-only)
 
 For each issue number, read it and its discussion:
 
@@ -23,7 +23,16 @@ For each issue number, read it and its discussion:
 gh issue view <#> --json title,body,labels,comments
 ```
 
-Summarize, per issue: what it requires, the acceptance criteria, and which areas of the codebase it touches. Do **not** create branches or write code yet.
+**Readiness gate — check the label before doing anything else.** This pipeline only builds issues that have been refined and marked `ready` (see the `issues` skill for the readiness convention). Inspect each issue's readiness label:
+
+- **`ready`** → proceed.
+- **`epic`** → refuse. An epic is a tracker, not a unit of work — point the user at its sub-issues and offer to build those instead.
+- **`needs-refinement`** → refuse. The issue has open decisions/ambiguity and must be refined first (run the `issues` skill). Building it would mean guessing at unsettled scope.
+- **no readiness label** → proceed only with a warning that the issue hasn't been triaged; recommend refining it via the `issues` skill first.
+
+If any requested issue is not `ready`, **stop here before the planning fan-out** and report which issues are blocked and why, rather than silently building an under-specified or non-atomic issue.
+
+For the `ready` issues, summarize per issue: what it requires, the acceptance criteria, and which areas of the codebase it touches. Do **not** create branches or write code yet.
 
 ### 2. Plan every issue (parallel Plan agents) → one batch approval
 
