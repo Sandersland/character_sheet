@@ -85,6 +85,7 @@ export default function InlineAttackPicker({
       total: result.total,
       specLabel: formatRollSpec(spec),
       damageType,
+      faces: result.dice.filter((d) => !d.dropped).map((d) => d.value),
     })
       .then(onLogChanged)
       .catch((e) => console.error("roll log failed", e));
