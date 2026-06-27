@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import { CharacterEventCategory, Prisma } from "../generated/prisma/client.js";
+import { revertInventoryEvent } from "../lib/inventory.js";
 import { prisma } from "../lib/prisma.js";
 
 // Runtime-checkable set of every valid CharacterEventCategory, derived from the
@@ -104,8 +105,9 @@ activityRouter.get("/characters/:id/activity", async (req, res) => {
 // `reverted: true`, and appends a `revert` meta-event for the timeline.
 // Returns the updated serialized character.
 //
-// Scoped to CharacterEvent (HP/XP/currency) only for now; the plan explicitly
-// defers full inventory-delete-row undo to a later phase.
+// Inventory events are fully revertable: deleted InventoryItem + detail rows
+// are reconstructed from `data.deletedItem` and currency is reversed from
+// `data.currencyDelta` (see revertInventoryEvent in lib/inventory.ts).
 
 activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) => {
   const character = await prisma.character.findUnique({
@@ -184,10 +186,20 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
 
   await prisma.$transaction(async (tx) => {
     for (const event of reversed) {
+      const category = event.category as string;
+
+      // Inventory is handled BEFORE the `if (!before) continue` short-circuit:
+      // an acquire event carries before==null (it created the row), and undoing
+      // it means DELETING that row — so it must not be skipped. The reversal is
+      // shape-driven inside revertInventoryEvent (delete created / recreate
+      // deleted / restore scalar + reverse currency).
+      if (category === "inventory") {
+        await revertInventoryEvent(tx, character.id, event);
+        continue;
+      }
+
       const before = event.before as Record<string, unknown> | null;
       if (!before) continue; // no before snapshot = nothing to restore
-
-      const category = event.category as string;
 
       if (category === "hitPoints" || category === "experience") {
         // Restore hitPoints/hitDice from before snapshot.
@@ -281,9 +293,7 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
           });
         }
       }
-      // inventory undo (restore deleted rows) is explicitly deferred to a later
-      // phase per the plan — complex because it requires recreating relational
-      // InventoryItem + detail rows. For now: skip inventory events in undo.
+      // (inventory is handled at the top of the loop, before the `before` guard)
     }
 
     // Mark all events in the batch as reverted.
