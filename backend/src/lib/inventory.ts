@@ -828,14 +828,18 @@ export async function revertInventoryEvent(
     | { currencyDelta?: Currency | null; deletedItem?: DeletedInventoryItemSnapshot }
     | null;
 
+  // Defensive: nothing to act on without a row id. Checked BEFORE the currency
+  // reversal so a malformed event carrying a currencyDelta but no entityId can't
+  // mutate currency without a corresponding row action. Well-formed events
+  // always have an entityId, so this is a pure no-op for them.
+  if (!event.entityId) return;
+
   // 1. Reverse any currency movement (purchase or sale proceeds).
   const currencyDelta = data?.currencyDelta ?? undefined;
   if (hasNonzeroCurrency(currencyDelta)) {
     const current = await getCharacterCurrency(tx, characterId);
     await setCharacterCurrency(tx, characterId, currencyDebit(current, currencyDelta));
   }
-
-  if (!event.entityId) return; // defensive: nothing to act on without a row id
 
   // 2. Reverse the row mutation, shape-driven.
   if (event.before === null) {

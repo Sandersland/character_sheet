@@ -36,6 +36,10 @@
  *     - setEquipped undo (restore equipped flag)
  *     - bulk batch (sell + remove in one tx) restored atomically
  *     - LIFO guard still applies to inventory batches
+ *     - undoing a sale whose proceeds were already spent → 409 (not 500),
+ *       leaving rows + currency unchanged (whole revert rolls back)
+ *     - undoing a remove of a catalog item whose catalog row is gone →
+ *       recreates with itemId:null (no FK error)
  */
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -565,12 +569,16 @@ describe("POST /:id/events/:batchId/revert — Fighter scenarios", () => {
 
 const INV_ID = "test-activity-inventory-1";
 const INV_CATALOG_NAME = "Activity Revert Test Rogue";
+const INV_CATALOG_ITEM_NAME = "Activity Revert Catalog Torch";
 
 describe("POST /:id/events/:batchId/revert — inventory undo", () => {
   let classId: string;
 
   afterAll(async () => {
     await prisma.characterClass.deleteMany({ where: { name: INV_CATALOG_NAME } });
+    // Safety net: the catalog-gone test deletes this row itself, but clean up
+    // if it ever fails before reaching that step.
+    await prisma.item.deleteMany({ where: { name: INV_CATALOG_ITEM_NAME } });
   });
 
   beforeEach(async () => {
@@ -807,6 +815,92 @@ describe("POST /:id/events/:batchId/revert — inventory undo", () => {
     const res = await revert(INV_ID, oldBatch);
     expect(res.status).toBe(409);
     expect(res.body.error).toMatch(/most recent/i);
+  });
+
+  it("409s (not 500) when undoing a sale whose proceeds were already spent, leaving rows + currency unchanged", async () => {
+    // Sell a custom dagger for 5gp (10 → 15), then have the player spend it all
+    // so they can't afford to refund the proceeds on undo. We drop currency
+    // directly (not via another transaction op) so the SELL stays the most-recent
+    // batch — otherwise the LIFO guard, not the currency-reversal failure, would
+    // be what 409s, and this test wouldn't exercise the InsufficientCurrencyError
+    // path at all.
+    const acquire = await inv([
+      { type: "acquire", custom: { name: "Spent-Proceeds Dagger", category: "gear" }, quantity: 1 },
+    ]);
+    expect(acquire.status).toBe(200);
+    const itemId = findItem(acquire.body, "Spent-Proceeds Dagger")!.id as string;
+
+    const sell = await inv([
+      { type: "sell", inventoryItemId: itemId, currencyDelta: { cp: 0, sp: 0, gp: 5, pp: 0 } },
+    ]);
+    expect(sell.status).toBe(200);
+    expect(sell.body.currency).toEqual({ cp: 0, sp: 0, gp: 15, pp: 0 }); // 10 + 5
+    expect(findItem(sell.body, "Spent-Proceeds Dagger")).toBeUndefined(); // full stack sold → row gone
+
+    // Player spends everything (proceeds + starting gold) elsewhere.
+    await prisma.character.update({
+      where: { id: INV_ID },
+      data: { currency: { cp: 0, sp: 0, gp: 0, pp: 0 } },
+    });
+
+    const batchId = await latestBatchId(INV_ID);
+    const res = await revert(INV_ID, batchId);
+    expect(res.status).toBe(409); // NOT a 500
+    expect(res.body.error).toMatch(/not enough currency/i);
+
+    // The whole revert transaction rolled back: currency is still 0 (not -5),
+    // the sold row was NOT recreated, and the sold event is NOT marked reverted.
+    const after = await prisma.character.findUniqueOrThrow({ where: { id: INV_ID } });
+    expect(after.currency).toEqual({ cp: 0, sp: 0, gp: 0, pp: 0 });
+    expect(await prisma.inventoryItem.findUnique({ where: { id: itemId } })).toBeNull();
+
+    const sellEvents = await prisma.characterEvent.findMany({ where: { characterId: INV_ID, batchId } });
+    expect(sellEvents.length).toBeGreaterThan(0);
+    expect(sellEvents.every((e) => !e.reverted)).toBe(true); // batch left intact
+    const metas = await prisma.characterEvent.findMany({ where: { characterId: INV_ID, type: "revert" } });
+    expect(metas).toHaveLength(0); // no meta revert appended
+  });
+
+  it("undoes a remove of a CATALOG item whose catalog row is gone → recreates with itemId:null (no FK error)", async () => {
+    // A real catalog Item the player acquires, then the DM later deletes from the
+    // catalog. Undoing the remove must fall back to the self-contained snapshot.
+    const catalogItem = await prisma.item.create({
+      data: {
+        name: INV_CATALOG_ITEM_NAME,
+        category: "gear",
+        weight: 1,
+        cost: { cp: 0, sp: 0, gp: 1, pp: 0 },
+        description: "A bundled catalog torch.",
+      },
+    });
+
+    const acquire = await inv([{ type: "acquire", itemId: catalogItem.id, quantity: 3 }]);
+    expect(acquire.status).toBe(200);
+    const acquired = findItem(acquire.body, INV_CATALOG_ITEM_NAME)!;
+    const itemId = acquired.id as string;
+    // Sanity: the InventoryItem snapshot links back to the catalog row.
+    expect(
+      (await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).itemId,
+    ).toBe(catalogItem.id);
+
+    // Remove it (writes data.deletedItem carrying itemId), then delete the
+    // catalog row. The InventoryItem is already gone, so no FK conflict here.
+    await inv([{ type: "remove", inventoryItemId: itemId }]);
+    expect(await prisma.inventoryItem.findUnique({ where: { id: itemId } })).toBeNull();
+    await prisma.item.delete({ where: { id: catalogItem.id } });
+
+    // Undo the remove: the snapshot's itemId no longer resolves, so the row is
+    // recreated with itemId:null (self-contained) rather than throwing an FK error.
+    const batchId = await latestBatchId(INV_ID);
+    const res = await revert(INV_ID, batchId);
+    expect(res.status).toBe(200);
+
+    const restored = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } });
+    expect(restored.itemId).toBeNull(); // catalog gone → detached snapshot
+    expect(restored.name).toBe(INV_CATALOG_ITEM_NAME);
+    expect(restored.category).toBe("gear");
+    expect(restored.quantity).toBe(3);
+    expect(restored.weight).toBe(1);
   });
 });
 
