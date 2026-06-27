@@ -785,17 +785,18 @@ describe("characters routes", () => {
       expect(row?.ownerId).toBe(expectedOwner);
     });
 
-    it("GET /api/characters?owner= is inert — returns the full set regardless of value", async () => {
-      const unfiltered = await supertest(createApp()).get("/api/characters");
+    it("GET /api/characters?owner= is inert — the owner filter is not applied", async () => {
       const filtered = await supertest(createApp()).get(
         "/api/characters?owner=some-nonexistent-user-id",
       );
 
       expect(filtered.status).toBe(200);
-      // Same characters as the unfiltered call — the owner filter is not applied.
-      const unfilteredIds = unfiltered.body.map((c: { id: string }) => c.id).sort();
-      const filteredIds = filtered.body.map((c: { id: string }) => c.id).sort();
-      expect(filteredIds).toEqual(unfilteredIds);
+      // The filter is parsed but not enforced (#101): this fixture is owned by the
+      // bootstrap owner — not "some-nonexistent-user-id" — yet it is still returned.
+      // (Asserting presence of our own fixture, rather than comparing two full-list
+      // snapshots, keeps this robust against characters other test files create or
+      // delete in the shared DB between requests.)
+      const filteredIds = filtered.body.map((c: { id: string }) => c.id);
       expect(filteredIds).toContain(FIXTURE.id);
     });
   });
