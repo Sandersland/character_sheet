@@ -23,10 +23,25 @@ Components are env-driven so any of them can be deployed anywhere:
 | `PORT` | backend | Listen port (default 4000). Railway injects its own. |
 | `SERVE_STATIC_DIR` | backend | When set, the API serves the SPA from this dir (single-origin). Combined image sets `/app/public`. Unset → API-only. |
 | `CORS_ORIGIN` | backend | Comma-separated allowlist. Empty → reflect all (fine for single-origin/local). Set for split mode. |
+| `LOG_LEVEL` | backend | Pino log level (`fatal`…`trace`, or `silent`). Default `info`; tests run `silent`. JSON output in prod, pretty in dev. |
+| `RATE_LIMIT_WINDOW_MS` | backend | Rate-limit window in ms. Default `900000` (15 min). |
+| `RATE_LIMIT_MAX` | backend | Max requests per window per IP, global. Default `600`. |
+| `RATE_LIMIT_CREATE_MAX` | backend | Tighter cap for `POST /api/characters` per window. Default `30`. |
+| `RATE_LIMIT_DISABLED` | backend | `true` disables rate limiting entirely (also auto-off under test). |
 | `VITE_API_URL` | frontend **build** | Baked at build time. `/api` for single-origin; the API's absolute URL for split. |
 
 The single-origin design is deliberate: one hostname means one Cloudflare Access
 policy, same-origin `fetch` (no CORS), and no cross-origin Access-cookie problems.
+
+### Security headers & rate limiting
+
+The backend applies `helmet` (HSTS, `nosniff`, `X-Frame-Options`, CSP, …) and
+`express-rate-limit` (the `RATE_LIMIT_*` knobs above). In single-origin mode
+(`SERVE_STATIC_DIR` set) the Content-Security-Policy is tuned to allow the
+Vite-built assets (self-hosted scripts, `'unsafe-inline'` styles, `data:`
+fonts/images); if a future asset is blocked, adjust the directives in
+`backend/src/lib/security.ts`. Rate limiting is auto-disabled under test and can
+be turned off in any environment with `RATE_LIMIT_DISABLED=true`.
 
 ## Local production smoke test
 

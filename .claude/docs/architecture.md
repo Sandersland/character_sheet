@@ -37,6 +37,9 @@
 | File | Responsibility |
 |---|---|
 | `lib/prisma.ts` | Singleton `PrismaClient` with `@prisma/adapter-pg` (required for Prisma 7). Reads `DATABASE_URL`. |
+| `lib/logger.ts` | Pino structured logger + `httpLogger` (pino-http) request-logging middleware. JSON in prod, pretty in dev, silent under test. Level via `LOG_LEVEL`; redacts auth/cookie/password fields. |
+| `lib/error-handler.ts` | Terminal Express error middleware (`errorHandler`). Turns uncaught/async route throws into a consistent `{ error }` JSON response; preserves an intentional `status`/`statusCode`; hides 500 detail in prod; logs server-side via the logger. Mounted last in `app.ts`. |
+| `lib/security.ts` | `securityHeaders(servesStatic)` (helmet; CSP tuned for the SPA in single-origin mode) + `globalRateLimiter`/`creationRateLimiter` (express-rate-limit, `RATE_LIMIT_*` env knobs, auto-off under test). Mounted high in `app.ts`. |
 | `lib/events.ts` | `logEvent(tx, params)` — writes one `CharacterEvent` + per-field `CharacterEventField` diffs inside the caller's transaction. `EventCategory`/`EventType` type unions. |
 | `lib/srd.ts` | **All 5e rules data**: alignments, skills, ability-modifier math, `SPELLCASTING_ABILITY`, `FULL_CASTER_SLOTS`, `deriveCreatedCharacter()`, `deriveSpellcasting()`, `deriveWeaponAttackBonus()`, `deriveWeaponDamage()` (grip-aware: versatile die when off-hand is free). **This is the only permitted location for rules data.** |
 | `lib/class-features.ts` | Class features + trackable resources for all base classes/subclasses (extracted from `srd.ts`). `deriveResources()` — the non-slot analog to `deriveSpellcasting()` (superiority dice, ki, rage). Pure, called inside `serializeCharacter`. |
