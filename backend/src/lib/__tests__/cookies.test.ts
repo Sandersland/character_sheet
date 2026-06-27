@@ -25,6 +25,10 @@ describe("parseCookies", () => {
   it("URL-decodes values", () => {
     expect(parseCookies("x=a%20b")).toEqual({ x: "a b" });
   });
+
+  it("falls back to the raw value on malformed percent-encoding", () => {
+    expect(parseCookies("x=%GG")).toEqual({ x: "%GG" });
+  });
 });
 
 describe("serializeCookie", () => {

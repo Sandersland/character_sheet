@@ -25,6 +25,9 @@ export interface ProviderDefinition {
   clientIdEnv: string;
   clientSecretEnv: string;
   mapProfile: (raw: unknown) => NormalizedProfile;
+  // Provider-specific authorize-URL params (e.g. Google's access_type/prompt).
+  // Spread into the authorize URL so provider-agnostic flow code stays generic.
+  extraAuthParams?: Record<string, string>;
 }
 
 // A provider with its creds resolved from env — what the OAuth flow consumes.

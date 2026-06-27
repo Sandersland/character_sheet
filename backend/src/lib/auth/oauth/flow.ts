@@ -56,8 +56,7 @@ export function buildAuthorizeUrl(
     state: params.state,
     code_challenge: params.challenge,
     code_challenge_method: "S256",
-    access_type: "offline",
-    prompt: "consent",
+    ...(provider.extraAuthParams ?? {}),
   }).toString();
   return url.toString();
 }

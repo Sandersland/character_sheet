@@ -18,7 +18,13 @@ export function parseCookies(header: string | undefined): Record<string, string>
     const name = segment.slice(0, eq).trim();
     if (!name) continue;
     const value = segment.slice(eq + 1).trim();
-    out[name] = decodeURIComponent(value);
+    // decodeURIComponent throws on malformed percent-encoding (e.g. "%GG"). One
+    // malformed cookie must not 500 every auth endpoint — fall back to the raw value.
+    try {
+      out[name] = decodeURIComponent(value);
+    } catch {
+      out[name] = value;
+    }
   }
   return out;
 }

@@ -278,6 +278,49 @@ describe("auth router", () => {
       );
       expect(res.status).toBe(502);
     });
+
+    it("502s when the userinfo request is non-200", async () => {
+      mockGoogleFetch({ userinfoStatus: 500 });
+      const agent = supertest.agent(buildApp());
+      const { state } = await beginFlow(agent);
+      const res = await agent.get(
+        `/api/auth/google/callback?code=c&state=${state}`,
+      );
+      expect(res.status).toBe(502);
+    });
+
+    it("does not transfer an existing account link to a different signed-in user", async () => {
+      TEST_SUBS.add("sub-link-a");
+      TEST_SUBS.add("sub-link-b");
+
+      // User A already owns the (google, sub-link-a) link.
+      const userA = await prisma.user.create({ data: { email: "owner-a@example.com" } });
+      await prisma.authAccount.create({
+        data: { userId: userA.id, provider: "google", providerAccountId: "sub-link-a" },
+      });
+
+      // Sign in as a fresh user B via their own sub.
+      mockGoogleFetch({ profile: googleProfile("sub-link-b") });
+      const agent = supertest.agent(buildApp());
+      const b1 = await beginFlow(agent);
+      await agent.get(`/api/auth/google/callback?code=c&state=${b1.state}`);
+
+      // User B now completes a callback for the sub that belongs to user A.
+      mockGoogleFetch({ profile: googleProfile("sub-link-a") });
+      const b2 = await beginFlow(agent);
+      await agent.get(`/api/auth/google/callback?code=c&state=${b2.state}`);
+
+      const account = await prisma.authAccount.findUnique({
+        where: {
+          provider_providerAccountId: {
+            provider: "google",
+            providerAccountId: "sub-link-a",
+          },
+        },
+      });
+      // Ownership stays with user A; only tokens are refreshed.
+      expect(account?.userId).toBe(userA.id);
+    });
   });
 
   describe("GET /auth/me + POST /auth/logout", () => {

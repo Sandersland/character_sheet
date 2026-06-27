@@ -33,4 +33,7 @@ export const googleProvider: ProviderDefinition = {
   clientIdEnv: "GOOGLE_CLIENT_ID",
   clientSecretEnv: "GOOGLE_CLIENT_SECRET",
   mapProfile: mapGoogleProfile,
+  // Google-specific OAuth2 extensions: ask for a refresh token (offline) and
+  // force the consent screen so the refresh token is actually returned.
+  extraAuthParams: { access_type: "offline", prompt: "consent" },
 };

@@ -30,7 +30,10 @@ export async function resolveUserId(
           providerAccountId: profile.providerAccountId,
           ...tokens,
         },
-        update: { userId: currentUserId, ...tokens },
+        // Never reassign userId on an existing link: if this (provider,
+        // providerAccountId) already belongs to another user, refresh only the
+        // tokens — silently transferring ownership would be account-link theft.
+        update: tokens,
       });
     }
     return currentUserId;
