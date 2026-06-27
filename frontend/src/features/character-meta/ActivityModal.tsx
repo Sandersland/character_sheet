@@ -132,8 +132,15 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
   // label (TODAY, JUN 21, …) isn't repeated per batch.
   const dateGroups = groupByDate(batches);
 
-  // The most-recent non-reverted batch is the only one eligible for undo.
-  const undoableBatchId = batches.find((b) => b.rows.every((r) => !r.reverted))?.key ?? null;
+  // The most-recent non-reverted batch is the only one eligible for undo — but
+  // only against the FULL, unfiltered timeline. Under any active filter the
+  // top-visible batch may not be the global most-recent one, so the server's
+  // LIFO guard would reject the undo with 409; hide the affordance instead.
+  const filtersActive =
+    categoryFilter !== "all" || typeFilter !== null || sessionFilter !== "" || !!entityId;
+  const undoableBatchId = filtersActive
+    ? null
+    : batches.find((b) => b.rows.every((r) => !r.reverted))?.key ?? null;
 
   return (
     <Modal title="Character Activity" onClose={onClose}>
@@ -190,7 +197,7 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
 
         {events !== null && events.length === 0 && (
           <p className="py-6 text-center text-sm text-parchment-500">
-            No activity matches the current filters.
+            {filtersActive ? "No activity matches the current filters." : "No activity yet."}
           </p>
         )}
 

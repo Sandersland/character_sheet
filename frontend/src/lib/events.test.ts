@@ -18,6 +18,13 @@ describe("eventTypeLabel", () => {
     expect(eventTypeLabel("concentrationDropped")).toBe("concentration dropped");
   });
 
+  it("maps newly-added types to clean labels", () => {
+    expect(eventTypeLabel("subclassChosen")).toBe("Subclass chosen");
+    expect(eventTypeLabel("spendResource")).toBe("Spend resource");
+    expect(eventTypeLabel("conditionApplied")).toBe("Condition applied");
+    expect(eventTypeLabel("sessionStarted")).toBe("Session started");
+  });
+
   it("degrades an unknown type to the raw key (no crash, no inline-capitalize)", () => {
     expect(eventTypeLabel("someFutureType")).toBe("someFutureType");
   });
@@ -26,6 +33,12 @@ describe("eventTypeLabel", () => {
 describe("categoryLabel", () => {
   it("maps a known category to a human label", () => {
     expect(categoryLabel("hitPoints")).toBe("Hit Points");
+  });
+
+  it("maps the newly-added categories to human labels", () => {
+    expect(categoryLabel("advancement")).toBe("Advancement");
+    expect(categoryLabel("session")).toBe("Session");
+    expect(categoryLabel("conditions")).toBe("Conditions");
   });
 
   it("degrades an unknown category to the raw key", () => {

@@ -103,3 +103,32 @@ describe("ActivityModal filtering", () => {
     );
   });
 });
+
+describe("ActivityModal undo eligibility", () => {
+  it("shows Undo on the most-recent batch when unfiltered", async () => {
+    render(<ActivityModal characterId="char-1" onClose={vi.fn()} onUpdate={vi.fn()} />);
+    await screen.findByText("Sold Shortsword ×1");
+    expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument();
+  });
+
+  it("hides Undo while a category filter is active (server LIFO guard would 409)", async () => {
+    const user = userEvent.setup();
+    render(<ActivityModal characterId="char-1" onClose={vi.fn()} onUpdate={vi.fn()} />);
+    await screen.findByText("Sold Shortsword ×1");
+    expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Inventory" }));
+    await screen.findByText("Sold Shortsword ×1");
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("hides Undo when scoped to a single entity", async () => {
+    render(
+      <ActivityModal characterId="char-1" onClose={vi.fn()} onUpdate={vi.fn()} entityId="item-42" />,
+    );
+    await screen.findByText("Sold Shortsword ×1");
+    expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
+  });
+});

@@ -37,6 +37,43 @@ export const EVENT_TYPE_LABELS: Partial<Record<string, string>> = {
   prepareSpell: "prepared",
   unprepareSpell: "unprepared",
   concentrationDropped: "concentration dropped",
+  // class
+  subclassChosen: "Subclass chosen",
+  subclassRemoved: "Subclass removed",
+  fightingStyleChosen: "Fighting style chosen",
+  fightingStyleRemoved: "Fighting style removed",
+  // resources
+  spendResource: "Spend resource",
+  restoreResource: "Restore resource",
+  learnManeuver: "Maneuver learned",
+  forgetManeuver: "Maneuver forgotten",
+  maneuversReconciled: "Maneuvers reconciled",
+  learnToolProficiency: "Tool proficiency learned",
+  forgetToolProficiency: "Tool proficiency forgotten",
+  toolProficienciesReconciled: "Tool proficiencies reconciled",
+  // advancement (ASI + feats)
+  abilityScoreImprovement: "Ability score improvement",
+  featTaken: "Feat taken",
+  advancementRemoved: "Advancement removed",
+  advancementsReconciled: "Advancements reconciled",
+  // inventory (equip)
+  equipped: "Equipped",
+  unequipped: "Unequipped",
+  // session lifecycle
+  sessionStarted: "Session started",
+  sessionEnded: "Session ended",
+  // combat lifecycle
+  combatStarted: "Combat started",
+  combatEnded: "Combat ended",
+  combatRoundAdvanced: "Round advanced",
+  // conditions
+  conditionApplied: "Condition applied",
+  conditionRemoved: "Condition removed",
+  exhaustionSet: "Exhaustion set",
+  // combat rolls
+  attackRoll: "Attack roll",
+  damageRoll: "Damage roll",
+  // meta
   revert: "undo",
 };
 
@@ -56,7 +93,10 @@ export const CATEGORY_TONE: Partial<
   spellcasting: "arcane",
   class: "neutral",
   resources: "gold",
+  advancement: "arcane",
+  session: "neutral",
   combat: "garnet",
+  conditions: "garnet",
 };
 
 /** Resolve an event category to its badge tone, defaulting to neutral. */
@@ -75,7 +115,10 @@ export const CATEGORY_LABELS: Partial<Record<CharacterEventCategory, string>> = 
   spellcasting: "Spellcasting",
   class: "Class",
   resources: "Resources",
+  advancement: "Advancement",
+  session: "Session",
   combat: "Combat",
+  conditions: "Conditions",
 };
 
 /** Resolve a category to its display label, falling back to the raw key. */
