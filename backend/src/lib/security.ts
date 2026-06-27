@@ -24,9 +24,13 @@ export function securityHeaders(servesStatic: boolean): RequestHandler {
             scriptSrc: ["'self'"],
             // Vite/Tailwind emit a real stylesheet, but inline styles slip in
             // (e.g. dynamic widths on the HP bar) — allow them for style only.
-            styleSrc: ["'self'", "'unsafe-inline'"],
+            // The SPA also pulls Source Sans/Serif from Google Fonts: the
+            // stylesheet from fonts.googleapis.com, the font files from
+            // fonts.gstatic.com (see frontend/index.html). Both must be allowed
+            // or the app falls back to system fonts in single-origin mode.
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             imgSrc: ["'self'", "data:"],
-            fontSrc: ["'self'", "data:"],
+            fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
             connectSrc: ["'self'"],
             objectSrc: ["'none'"],
           },
