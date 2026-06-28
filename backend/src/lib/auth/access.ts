@@ -21,8 +21,13 @@ export async function assertCharacterAccess(
   db: Db,
   userId: string,
   characterId: string,
-  _level: "view" | "edit",
+  level: "view" | "edit",
 ): Promise<{ id: string; ownerId: string }> {
+  // `level` is owner-only today (both view and edit require ownership); it is
+  // the reserved seam where #116 sharing will distinguish read collaborators
+  // from editors. Referenced here so the contract stays explicit at call sites.
+  void level;
+
   const character = await db.character.findUnique({
     where: { id: characterId },
     select: { id: true, ownerId: true },

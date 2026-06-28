@@ -6,6 +6,7 @@ import {
   InsufficientCurrencyError,
   InvalidInventoryOperationError,
 } from "../lib/inventory.js";
+import { assertCharacterAccess } from "../lib/auth/access.js";
 import { prisma } from "../lib/prisma.js";
 import { characterInclude, serializeCharacter } from "./characters.js";
 
@@ -156,14 +157,7 @@ const transactionsRequestSchema = z.object({
 });
 
 inventoryRouter.post("/characters/:id/inventory/transactions", async (req, res) => {
-  const character = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    select: { id: true },
-  });
-  if (!character) {
-    res.status(404).json({ error: "Character not found" });
-    return;
-  }
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const parseResult = transactionsRequestSchema.safeParse(req.body);
   if (!parseResult.success) {
@@ -174,7 +168,7 @@ inventoryRouter.post("/characters/:id/inventory/transactions", async (req, res) 
   }
 
   try {
-    await applyInventoryOperations(character.id, parseResult.data.operations);
+    await applyInventoryOperations(req.params.id, parseResult.data.operations);
   } catch (error) {
     if (error instanceof InsufficientCurrencyError || error instanceof InvalidInventoryOperationError) {
       res.status(400).json({ error: error.message });
@@ -184,7 +178,7 @@ inventoryRouter.post("/characters/:id/inventory/transactions", async (req, res) 
   }
 
   const updated = await prisma.character.findUnique({
-    where: { id: character.id },
+    where: { id: req.params.id },
     include: characterInclude,
   });
   res.json(serializeCharacter(updated!));
@@ -199,21 +193,14 @@ inventoryRouter.post("/characters/:id/inventory/transactions", async (req, res) 
 // former inventoryItemId column on InventoryTransaction). The unfiltered list
 // remains the durable record for fully-disposed items via event.data.itemName.
 inventoryRouter.get("/characters/:id/inventory/transactions", async (req, res) => {
-  const character = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    select: { id: true },
-  });
-  if (!character) {
-    res.status(404).json({ error: "Character not found" });
-    return;
-  }
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
 
   const inventoryItemId =
     typeof req.query.inventoryItemId === "string" ? req.query.inventoryItemId : undefined;
 
   const events = await prisma.characterEvent.findMany({
     where: {
-      characterId: character.id,
+      characterId: req.params.id,
       category: "inventory",
       ...(inventoryItemId ? { entityId: inventoryItemId } : {}),
     },

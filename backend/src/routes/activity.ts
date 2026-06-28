@@ -6,6 +6,7 @@ import {
   InvalidInventoryOperationError,
   revertInventoryEvent,
 } from "../lib/inventory.js";
+import { assertCharacterAccess } from "../lib/auth/access.js";
 import { prisma } from "../lib/prisma.js";
 
 // Runtime-checkable set of every valid CharacterEventCategory, derived from the
@@ -51,14 +52,7 @@ export const activityRouter = Router();
 //   ?reverted=0|1     — include (1) or exclude (0) reverted events (default: include all)
 
 activityRouter.get("/characters/:id/activity", async (req, res) => {
-  const character = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    select: { id: true },
-  });
-  if (!character) {
-    res.status(404).json({ error: "Character not found" });
-    return;
-  }
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
 
   // Only apply the category filter when the query value is a real enum member;
   // an unknown value is silently ignored (unfiltered), matching prior behavior.
@@ -84,7 +78,7 @@ activityRouter.get("/characters/:id/activity", async (req, res) => {
   // Build where clause. `category` is already validated/narrowed to a real
   // CharacterEventCategory by asCategory(), so no hand-maintained cast is needed.
   const whereClause = {
-    characterId: character.id,
+    characterId: req.params.id,
     ...(category ? { category } : {}),
     ...(type ? { type } : {}),
     ...(sessionId ? { sessionId } : {}),
@@ -138,19 +132,12 @@ activityRouter.get("/characters/:id/activity", async (req, res) => {
 // `data.currencyDelta` (see revertInventoryEvent in lib/inventory.ts).
 
 activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) => {
-  const character = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    select: { id: true },
-  });
-  if (!character) {
-    res.status(404).json({ error: "Character not found" });
-    return;
-  }
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const { batchId } = req.params;
 
   const batchEvents = await prisma.characterEvent.findMany({
-    where: { characterId: character.id, batchId },
+    where: { characterId: req.params.id, batchId },
     orderBy: { createdAt: "asc" },
   });
 
@@ -169,7 +156,7 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
   // so the summary/XP that was awarded at session-end stays coherent.
   const latestEvent = await prisma.characterEvent.findFirst({
     where: {
-      characterId: character.id,
+      characterId: req.params.id,
       reverted: false,
       type: { not: "revert" },
       // Don't look through events whose session has been ended.
@@ -223,7 +210,7 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
         // shape-driven inside revertInventoryEvent (delete created / recreate
         // deleted / restore scalar + reverse currency).
         if (category === "inventory") {
-          await revertInventoryEvent(tx, character.id, event);
+          await revertInventoryEvent(tx, req.params.id, event);
           continue;
         }
 
@@ -242,7 +229,7 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
           if (before.resources !== undefined) updateData.resources = before.resources;
           if (Object.keys(updateData).length > 0) {
             await tx.character.update({
-              where: { id: character.id },
+              where: { id: req.params.id },
               data: updateData as Prisma.CharacterUpdateInput,
             });
           }
@@ -259,7 +246,7 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
           const beforeCurrency = before.currency as Record<string, number> | undefined;
           if (beforeCurrency) {
             await tx.character.update({
-              where: { id: character.id },
+              where: { id: req.params.id },
               data: { currency: beforeCurrency as Prisma.InputJsonValue },
             });
           }
@@ -268,7 +255,7 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
           const beforeSpellcasting = before.spellcasting as Record<string, unknown> | undefined;
           if (beforeSpellcasting !== undefined) {
             await tx.character.update({
-              where: { id: character.id },
+              where: { id: req.params.id },
               data: { spellcasting: beforeSpellcasting as Prisma.InputJsonValue },
             });
           }
@@ -278,7 +265,7 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
           const beforeResources = before.resources as Record<string, unknown> | undefined;
           if (beforeResources !== undefined) {
             await tx.character.update({
-              where: { id: character.id },
+              where: { id: req.params.id },
               data: { resources: beforeResources as Prisma.InputJsonValue },
             });
           }
@@ -288,7 +275,7 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
           const beforeConditions = before.conditions as Record<string, unknown> | undefined;
           if (beforeConditions !== undefined) {
             await tx.character.update({
-              where: { id: character.id },
+              where: { id: req.params.id },
               data: { conditions: beforeConditions as Prisma.InputJsonValue },
             });
           }
@@ -317,7 +304,7 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
           if (before.resources !== undefined) updateData.resources = before.resources;
           if (Object.keys(updateData).length > 0) {
             await tx.character.update({
-              where: { id: character.id },
+              where: { id: req.params.id },
               data: updateData as Prisma.CharacterUpdateInput,
             });
           }
@@ -327,14 +314,14 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
 
       // Mark all events in the batch as reverted.
       await tx.characterEvent.updateMany({
-        where: { characterId: character.id, batchId },
+        where: { characterId: req.params.id, batchId },
         data: { reverted: true },
       });
 
       // Append a meta `revert` event so the timeline shows the undo.
       await tx.characterEvent.create({
         data: {
-          characterId: character.id,
+          characterId: req.params.id,
           category: reversed[0]?.category ?? "hitPoints",
           type: "revert",
           summary: `Undid: ${reversed[0]?.summary ?? "previous action"}`,
@@ -363,7 +350,7 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
   // Re-fetch the character with full relations and return.
   const { characterInclude, serializeCharacter } = await import("./characters.js");
   const updated = await prisma.character.findUnique({
-    where: { id: character.id },
+    where: { id: req.params.id },
     include: characterInclude,
   });
   res.json(serializeCharacter(updated!));
