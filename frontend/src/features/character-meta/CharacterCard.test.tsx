@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import CharacterCard from "@/features/character-meta/CharacterCard";
+import { axe } from "@/test/axe";
 import type { CharacterSummary } from "@/types/character";
 
 const base: CharacterSummary = {
@@ -53,9 +54,24 @@ describe("CharacterCard", () => {
 
   it("shows an img when portraitUrl is set", () => {
     const { container } = renderCard({ ...base, portraitUrl: "https://example.com/portrait.jpg" });
-    // alt="" gives the img role=presentation, so query directly.
+    // Query the node directly rather than by role to assert on its src attribute.
     const img = container.querySelector("img");
     expect(img).toBeInTheDocument();
     expect(img).toHaveAttribute("src", "https://example.com/portrait.jpg");
+  });
+
+  // Regression for #180: the card title must be an <h2> so the list page
+  // (page <h1> → card titles) has no skipped heading level. A standalone
+  // <h3> here used to trip axe's heading-order rule in page context.
+  it("renders the card title as an h2", () => {
+    renderCard();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Gandalf the Grey" })
+    ).toBeInTheDocument();
+  });
+
+  it("has no axe accessibility violations", async () => {
+    const { container } = renderCard();
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

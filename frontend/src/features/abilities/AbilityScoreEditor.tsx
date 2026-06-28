@@ -195,17 +195,32 @@ export default function AbilityScoreEditor({
             )
           );
 
+          // pointBuy has no single labelable target — its +/- buttons carry aria-labels instead.
+          const controlId = `ability-score-${ability}`;
+          const abilityLabel = ABILITY_LABELS[ability];
+          const labelsAControl = method !== "pointBuy";
+
           return (
             <div
               key={ability}
               className="flex flex-col gap-1.5 rounded-card border border-parchment-200 bg-parchment-50 p-3"
             >
-              <span className="text-xs font-semibold uppercase tracking-wide text-parchment-500">
-                {ABILITY_LABELS[ability]}
-              </span>
+              {labelsAControl ? (
+                <label
+                  htmlFor={controlId}
+                  className="text-xs font-semibold uppercase tracking-wide text-parchment-500"
+                >
+                  {abilityLabel}
+                </label>
+              ) : (
+                <span className="text-xs font-semibold uppercase tracking-wide text-parchment-500">
+                  {abilityLabel}
+                </span>
+              )}
 
               {(method === "roll" || method === "standardArray") && pool ? (
                 <select
+                  id={controlId}
                   value={assignments[ability] ?? ""}
                   onChange={(e) =>
                     assignSlot(ability, e.target.value === "" ? null : Number(e.target.value))
@@ -226,6 +241,7 @@ export default function AbilityScoreEditor({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    aria-label={`Decrease ${abilityLabel}`}
                     onClick={() => adjustPointBuy(ability, -1)}
                     disabled={abilityScores[ability] <= POINT_BUY_FLOOR}
                     className="flex h-6 w-6 items-center justify-center rounded-full border border-parchment-300 text-sm leading-none disabled:opacity-40"
@@ -237,6 +253,7 @@ export default function AbilityScoreEditor({
                   </span>
                   <button
                     type="button"
+                    aria-label={`Increase ${abilityLabel}`}
                     onClick={() => adjustPointBuy(ability, 1)}
                     disabled={
                       abilityScores[ability] >= POINT_BUY_CEILING ||
@@ -250,6 +267,7 @@ export default function AbilityScoreEditor({
                 </div>
               ) : (
                 <input
+                  id={controlId}
                   type="number"
                   value={abilityScores[ability]}
                   onChange={(e) => setManualScore(ability, e.target.value)}

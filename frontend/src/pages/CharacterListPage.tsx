@@ -61,7 +61,7 @@ export default function CharacterListPage() {
 
   return (
     <div className="min-h-screen bg-parchment-100">
-      <header className="border-b border-parchment-200 bg-parchment-50">
+      <div className="border-b border-parchment-200 bg-parchment-50">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-5">
           <div>
             <p className="font-sans text-xs font-semibold uppercase tracking-wide text-garnet-700">
@@ -73,7 +73,7 @@ export default function CharacterListPage() {
           </div>
           <BackendStatus />
         </div>
-      </header>
+      </div>
 
       <main className="mx-auto max-w-6xl px-6 py-8">
         {error ? (

@@ -337,6 +337,7 @@ export default function AdvancementPanel({
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
+                      aria-label={`Decrease ${label}`}
                       disabled={!canDecrease || busy}
                       onClick={() => adjustAsi(key, -1)}
                       className="flex h-6 w-6 items-center justify-center rounded-control border border-parchment-300 text-sm text-parchment-600 hover:bg-parchment-100 disabled:opacity-30"
@@ -348,6 +349,7 @@ export default function AdvancementPanel({
                     </span>
                     <button
                       type="button"
+                      aria-label={`Increase ${label}`}
                       disabled={!canIncrease || busy}
                       onClick={() => adjustAsi(key, +1)}
                       className="flex h-6 w-6 items-center justify-center rounded-control border border-parchment-300 text-sm text-parchment-600 hover:bg-parchment-100 disabled:opacity-30"
@@ -579,8 +581,8 @@ export default function AdvancementPanel({
                   ))}
                 </div>
                 {abilityOptionsArr.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-parchment-700">Amount:</label>
+                  <label className="flex items-center gap-2 text-xs text-parchment-700">
+                    Amount:
                     <input
                       type="number"
                       min={1}
@@ -589,7 +591,7 @@ export default function AdvancementPanel({
                       onChange={(e) => setAbilityIncrease(Math.max(1, parseInt(e.target.value) || 1))}
                       className="w-16 rounded-control border border-parchment-300 bg-white px-2 py-1 text-xs text-parchment-900 focus:border-gold-500 focus:outline-none"
                     />
-                  </div>
+                  </label>
                 )}
                 {/* Player choice picker — only shown when taking the feat and >1 option */}
                 {abilityOptionsArr.length > 1 && (

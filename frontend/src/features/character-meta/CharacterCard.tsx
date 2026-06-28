@@ -42,9 +42,9 @@ export default function CharacterCard({ character }: CharacterCardProps) {
         )}
       </div>
       <div className="flex flex-1 flex-col gap-2 p-4">
-        <h3 className="font-display text-lg font-semibold leading-tight text-parchment-900 group-hover:text-garnet-700">
+        <h2 className="font-display text-lg font-semibold leading-tight text-parchment-900 group-hover:text-garnet-700">
           {character.name}
-        </h3>
+        </h2>
         <p className="text-sm text-parchment-600">
           {character.race} {character.class}
         </p>

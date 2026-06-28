@@ -100,7 +100,7 @@ export default function CharacterSheetPage() {
   return (
     <RollProvider>
     <div className="min-h-screen bg-parchment-100">
-      <header className="border-b border-parchment-200 bg-parchment-50">
+      <div className="border-b border-parchment-200 bg-parchment-50">
         <div className="mx-auto flex max-w-6xl flex-wrap items-start justify-between gap-4 px-6 py-5">
           <div>
             <Link
@@ -173,7 +173,7 @@ export default function CharacterSheetPage() {
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
       {confirmDeleteOpen && (
         <DeleteCharacterModal

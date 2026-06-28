@@ -160,12 +160,14 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
           <div className="flex flex-wrap gap-2">
             <input
               type="search"
+              aria-label="Search spells"
               placeholder="Search by name or school…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className={`${inputCls} flex-1 min-w-[140px]`}
             />
             <select
+              aria-label="Filter by level"
               value={levelFilter}
               onChange={(e) => setLevelFilter(e.target.value)}
               className={`${inputCls} w-auto`}
@@ -346,8 +348,8 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
             </label>
             {hasEffect && (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div>
-                  <label className={labelCls}>Effect kind</label>
+                <label className="block">
+                  <span className={labelCls}>Effect kind</span>
                   <select
                     className={inputCls}
                     value={custom.effectKind ?? ""}
@@ -357,45 +359,45 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
                     <option value="damage">Damage</option>
                     <option value="heal">Healing</option>
                   </select>
-                </div>
-                <div>
-                  <label className={labelCls}>Dice count</label>
+                </label>
+                <label className="block">
+                  <span className={labelCls}>Dice count</span>
                   <input type="number" min={1} className={inputCls} value={custom.effectDiceCount ?? ""} onChange={(e) => setCustom((p) => ({ ...p, effectDiceCount: Number(e.target.value) || undefined }))} placeholder="e.g. 8" />
-                </div>
-                <div>
-                  <label className={labelCls}>Dice faces</label>
+                </label>
+                <label className="block">
+                  <span className={labelCls}>Dice faces</span>
                   <input type="number" min={2} className={inputCls} value={custom.effectDiceFaces ?? ""} onChange={(e) => setCustom((p) => ({ ...p, effectDiceFaces: Number(e.target.value) || undefined }))} placeholder="e.g. 6" />
-                </div>
-                <div>
-                  <label className={labelCls}>Flat modifier</label>
+                </label>
+                <label className="block">
+                  <span className={labelCls}>Flat modifier</span>
                   <input type="number" className={inputCls} value={custom.effectModifier ?? ""} onChange={(e) => setCustom((p) => ({ ...p, effectModifier: e.target.value === "" ? undefined : Number(e.target.value) }))} placeholder="0" />
-                </div>
+                </label>
                 {custom.effectKind === "damage" && (
                   <>
-                    <div>
-                      <label className={labelCls}>Damage type</label>
+                    <label className="block">
+                      <span className={labelCls}>Damage type</span>
                       <input className={inputCls} value={custom.damageType ?? ""} onChange={(e) => setCustom((p) => ({ ...p, damageType: e.target.value || undefined }))} placeholder="fire" />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Attack type</label>
+                    </label>
+                    <label className="block">
+                      <span className={labelCls}>Attack type</span>
                       <select className={inputCls} value={custom.attackType ?? ""} onChange={(e) => setCustom((p) => ({ ...p, attackType: e.target.value as "attack" | "save" || undefined }))}>
                         <option value="">— none —</option>
                         <option value="attack">Spell attack</option>
                         <option value="save">Saving throw</option>
                       </select>
-                    </div>
+                    </label>
                     {custom.attackType === "save" && (
-                      <div>
-                        <label className={labelCls}>Save ability</label>
+                      <label className="block">
+                        <span className={labelCls}>Save ability</span>
                         <input className={inputCls} value={custom.saveAbility ?? ""} onChange={(e) => setCustom((p) => ({ ...p, saveAbility: e.target.value || undefined }))} placeholder="dexterity" />
-                      </div>
+                      </label>
                     )}
                   </>
                 )}
-                <div>
-                  <label className={labelCls}>Upcast dice/level</label>
+                <label className="block">
+                  <span className={labelCls}>Upcast dice/level</span>
                   <input type="number" min={0} className={inputCls} value={custom.upcastDicePerLevel ?? ""} onChange={(e) => setCustom((p) => ({ ...p, upcastDicePerLevel: Number(e.target.value) || undefined }))} placeholder="0" />
-                </div>
+                </label>
                 {custom.level === 0 && (
                   <div className="flex items-center gap-2">
                     <label className="flex items-center gap-1.5 text-xs text-parchment-700">
