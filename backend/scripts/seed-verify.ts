@@ -41,8 +41,11 @@ async function api<T>(
   init: RequestInit & { cookie?: string } = {},
 ): Promise<{ status: number; body: T; setCookie: string | null }> {
   const { cookie, headers, ...rest } = init;
+  // Fail fast instead of hanging the verification gate if the backend is down
+  // or still booting (race with `docker compose up`).
   const res = await fetch(`${BACKEND_URL}${path}`, {
     ...rest,
+    signal: AbortSignal.timeout(10_000),
     headers: {
       "content-type": "application/json",
       ...(cookie ? { cookie } : {}),
@@ -147,6 +150,7 @@ async function main() {
     die(`POST /api/characters returned ${create.status}: ${JSON.stringify(create.body)}`);
   }
   const charId = create.body.id;
+  if (!charId) die(`POST /api/characters returned no id: ${JSON.stringify(create.body)}`);
   console.log(`✓ created character "${create.body.name}" (${chosenClass.name}) ${charId}`);
 
   // 4. Add representative inventory: an equippable weapon + armor, plus two
