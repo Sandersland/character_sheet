@@ -88,3 +88,34 @@ jobs:
             exit 1
           fi
           echo "No blocking review verdict — claude-review passes."
+
+      # A clean run leaves the CHECK green, but a CHANGES_REQUESTED review the
+      # bot submitted on an EARLIER run is never auto-dismissed (main/staging
+      # keep dismiss_stale_reviews:false so human approvals survive a push). That
+      # stale verdict keeps reviewDecision = CHANGES_REQUESTED and blocks merge
+      # until a human dismisses it by hand. Since this step only runs when
+      # "Enforce verdict" passed (no post-marker CHANGES_REQUESTED exists), any
+      # remaining CHANGES_REQUESTED by the bot is provably stale — dismiss it.
+      # Scope to the reviewer bot's own login so a HUMAN change-request is never
+      # touched. REST /reviews is used (not gh pr view) because the dismissals
+      # endpoint needs the integer review id, not a GraphQL node id.
+      - name: Dismiss stale bot change-request
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pr='${{ github.event.pull_request.number }}'
+          repo='${{ github.repository }}'
+          bot='claude[bot]'
+          ids=$(gh api "/repos/$repo/pulls/$pr/reviews" --paginate \
+            --jq ".[] | select(.state == \"CHANGES_REQUESTED\" and .user.login == \"$bot\") | .id")
+          if [ -z "$ids" ]; then
+            echo "No stale ${bot} change-request to dismiss."
+            exit 0
+          fi
+          for id in $ids; do
+            echo "Dismissing stale ${bot} review $id (superseded by clean re-run)."
+            gh api -X PUT "/repos/$repo/pulls/$pr/reviews/$id/dismissals" \
+              -f message="Superseded: claude-review re-ran clean on a later commit." \
+              -f event="DISMISS" >/dev/null
+          done
