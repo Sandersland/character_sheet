@@ -99,7 +99,10 @@ export async function fetchCharacters(): Promise<CharacterSummary[]> {
 
 export async function fetchCharacter(id: string): Promise<Character | null> {
   const response = await apiFetch(`${API_URL}/characters/${id}`);
-  if (response.status === 404) return null;
+  // 404 (missing) and 403 (not the caller's) both resolve to null so the sheet
+  // page renders its graceful "not found" screen — and a 403 doesn't reveal that
+  // the character exists. (A 401 is handled globally by apiFetch → login.)
+  if (response.status === 404 || response.status === 403) return null;
   if (!response.ok) {
     throw new Error(`Failed to fetch character ${id} (${response.status})`);
   }
