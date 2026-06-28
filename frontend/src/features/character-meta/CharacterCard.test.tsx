@@ -54,7 +54,7 @@ describe("CharacterCard", () => {
 
   it("shows an img when portraitUrl is set", () => {
     const { container } = renderCard({ ...base, portraitUrl: "https://example.com/portrait.jpg" });
-    // alt="" gives the img role=presentation, so query directly.
+    // Query the node directly rather than by role to assert on its src attribute.
     const img = container.querySelector("img");
     expect(img).toBeInTheDocument();
     expect(img).toHaveAttribute("src", "https://example.com/portrait.jpg");
