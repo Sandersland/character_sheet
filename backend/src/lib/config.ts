@@ -29,11 +29,23 @@ function parseSecure(raw: string | undefined, isProd: boolean): boolean {
   return value === "true" || value === "1" || value === "yes";
 }
 
+// ALLOW_DEV_LOGIN gates the non-prod /auth/dev-login session primitive. Same
+// truthy-string parse as parseSecure, but it DEFAULTS TO FALSE everywhere and
+// is hard-forced false in production: a prod deploy must never be able to mint
+// a session without going through a real provider, regardless of env value.
+function parseDevLogin(raw: string | undefined, isProd: boolean): boolean {
+  if (isProd) return false;
+  const value = clean(raw)?.toLowerCase();
+  if (value === undefined) return false;
+  return value === "true" || value === "1" || value === "yes";
+}
+
 const schema = z.object({
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
   APP_BASE_URL: z.string().url().default("http://localhost:4000"),
   SESSION_COOKIE_SECURE: z.boolean(),
+  ALLOW_DEV_LOGIN: z.boolean(),
   // Pass-through values other modules read; kept here so the full auth-relevant
   // surface is documented in one place.
   CORS_ORIGIN: z.string().optional(),
@@ -52,6 +64,7 @@ function loadConfig(): Config {
     GOOGLE_CLIENT_SECRET: clean(env.GOOGLE_CLIENT_SECRET),
     APP_BASE_URL: clean(env.APP_BASE_URL),
     SESSION_COOKIE_SECURE: parseSecure(env.SESSION_COOKIE_SECURE, isProd),
+    ALLOW_DEV_LOGIN: parseDevLogin(env.ALLOW_DEV_LOGIN, isProd),
     CORS_ORIGIN: clean(env.CORS_ORIGIN),
     SERVE_STATIC_DIR: clean(env.SERVE_STATIC_DIR),
     PORT: clean(env.PORT),
