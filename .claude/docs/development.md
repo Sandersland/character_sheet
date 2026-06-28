@@ -28,6 +28,19 @@ npm run test      # Vitest in each workspace
 npm run build     # production build in each workspace
 ```
 
+## Guardrails (local git hooks)
+
+[lefthook](https://lefthook.dev) runs fast, infra-free gates before code reaches CI. Hooks install automatically via the root `prepare` script on `npm install` — config is `lefthook.yml`.
+
+| Hook | Runs | Why |
+|---|---|---|
+| `pre-commit` | `eslint --fix` on staged `*.{ts,tsx}` | catch + auto-fix lint before it lands |
+| `pre-push` | `tsc --noEmit` + (frontend) unit tests | the **tsc** gate is the key one — vitest transpiles via esbuild and does NOT type-check, so type-only errors otherwise only surface in CI's `build` job |
+
+Jobs are **scoped per workspace** via lefthook `root:` — a backend-only push runs `typecheck-backend` and skips the frontend jobs (and vice-versa), since the two workspaces share no types. The first push of a brand-new branch can't resolve a file range, so it skips (CI is the backstop); subsequent pushes gate normally.
+
+Backend vitest stays **CI-only** (it needs Postgres) so pre-push never blocks on a DB. **Do not bypass with `--no-verify`** — fix the failure. Run a hook manually with `npx lefthook run pre-commit` / `pre-push`.
+
 ## Running outside Docker (faster iteration)
 
 ```bash
