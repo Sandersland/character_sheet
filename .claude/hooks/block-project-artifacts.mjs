@@ -15,9 +15,13 @@
 import { normalize, isAbsolute } from "node:path";
 
 const IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"];
-// Locations that are always fine to write artifacts into.
+// Locations that are always fine to write artifacts into. The temp prefixes
+// already cover the session scratchpad (it lives under /private/tmp); the
+// "/scratchpad/" substring is a belt-and-suspenders catch for any other
+// scratchpad path. (.svg is intentionally NOT blocked — it's a legit frontend
+// source asset, not a screenshot artifact.)
 const ALLOWED_PREFIXES = ["/tmp", "/private/tmp", "/var/folders"];
-const ALLOWED_SUBSTRINGS = ["/scratchpad/", "claude-501"];
+const ALLOWED_SUBSTRINGS = ["/scratchpad/"];
 
 function isAllowed(path) {
   const p = path.replace(/\\/g, "/");
@@ -78,10 +82,12 @@ if (tool === "Write" || tool === "Edit" || tool === "NotebookEdit") {
   }
 }
 
-// 2) Playwright screenshots: require an absolute, non-repo destination.
+// 2) Playwright screenshots: require an allowed (tmp/scratchpad) destination.
+// isAllowed already excludes every project-tree path, so no separate inProject
+// check is needed here.
 if (tool.endsWith("browser_take_screenshot")) {
   const fname = ti.filename ?? "";
-  if (!fname || !isAllowed(fname) || inProject(fname, projectDir)) {
+  if (!fname || !isAllowed(fname)) {
     block(
       "Blocked: Playwright screenshot must save to an absolute /tmp path, " +
         "not the project tree.\n" +

@@ -208,6 +208,19 @@ export const CLASSES = [
   },
 ];
 
+export const BACKGROUNDS = [
+  { name: "Sage",      skillProficiencies: ["arcana", "history"] },
+  { name: "Soldier",   skillProficiencies: ["athletics", "intimidation"] },
+  { name: "Charlatan", skillProficiencies: ["deception", "sleightOfHand"],
+    toolProficiencies: ["Disguise Kit", "Forgery Kit"] },
+  { name: "Acolyte",   skillProficiencies: ["insight", "religion"] },
+  // Criminal: Thieves' Tools (fixed) + one gaming set (Dice Set by default).
+  { name: "Criminal",  skillProficiencies: ["deception", "stealth"],
+    toolProficiencies: ["Thieves' Tools", "Dice Set"] },
+  { name: "Folk Hero", skillProficiencies: ["animalHandling", "survival"] },
+  { name: "Noble",     skillProficiencies: ["history", "persuasion"] },
+];
+
 export function coins(gp: number, sp = 0, cp = 0) {
   return { cp, sp, gp, pp: 0 };
 }

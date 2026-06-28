@@ -3,7 +3,7 @@ import pg from "pg";
 
 import { PrismaClient } from "../src/generated/prisma/client.js";
 // Pure catalog seed data (no side effects) — see prisma/catalog-data.ts.
-import { RACES, CLASSES, ITEMS, type CatalogItem } from "./catalog-data.js";
+import { RACES, CLASSES, BACKGROUNDS, ITEMS, type CatalogItem } from "./catalog-data.js";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
@@ -806,19 +806,6 @@ const FEATS: FeatSeed[] = [
       { target: "unarmedDamageDie", amount: 4 },
     ],
   },
-];
-
-const BACKGROUNDS = [
-  { name: "Sage",      skillProficiencies: ["arcana", "history"] },
-  { name: "Soldier",   skillProficiencies: ["athletics", "intimidation"] },
-  { name: "Charlatan", skillProficiencies: ["deception", "sleightOfHand"],
-    toolProficiencies: ["Disguise Kit", "Forgery Kit"] },
-  { name: "Acolyte",   skillProficiencies: ["insight", "religion"] },
-  // Criminal: Thieves' Tools (fixed) + one gaming set (Dice Set by default).
-  { name: "Criminal",  skillProficiencies: ["deception", "stealth"],
-    toolProficiencies: ["Thieves' Tools", "Dice Set"] },
-  { name: "Folk Hero", skillProficiencies: ["animalHandling", "survival"] },
-  { name: "Noble",     skillProficiencies: ["history", "persuasion"] },
 ];
 
 

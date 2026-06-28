@@ -2,7 +2,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Write|Edit|NotebookEdit|mcp__plugin_playwright_playwright__browser_take_screenshot",
+        "matcher": "Write|Edit|NotebookEdit|.*browser_take_screenshot",
         "hooks": [
           {
             "type": "command",
