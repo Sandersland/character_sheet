@@ -38,14 +38,14 @@ Capture the full output (pass/fail count, any failing test names and assertions)
 
 **Browser verification** — invoke the `/verify` skill concurrently. It will launch the app and drive the changed UI at the browser surface.
 
-**Design review** — launch the `frontend-design-architect` agent against the changed surfaces (give it the list of changed `features/`, `pages/`, and `components/ui/` files). Its brief: judge the rendered UI against this app's design system, not generic taste. Point it at `.claude/agent-memory/frontend-design-architect/design_system.md` (token names + direction) and `.claude/docs/frontend.md` (conventions), and have it check for:
+**Design review** — launch the design agent against the changed surfaces (give it the list of changed `features/`, `pages/`, and `components/ui/` files). Use `subagent_type: "frontend-design-architect"` (a registered agent type); if that type isn't available in the current environment, fall back to a `general-purpose` agent briefed with the two design docs below. Its brief: judge the rendered UI against this app's design system, not generic taste. Point it at `.claude/agent-memory/frontend-design-architect/design_system.md` (token names + direction) and `.claude/docs/frontend.md` (conventions), and have it check for:
 - **Off-system values** — arbitrary colors/radii/shadows instead of the `parchment`/`garnet`/`arcane`/`gold`/`vitality` tokens, `rounded-card`/`rounded-control`, `shadow-card`/`shadow-raised`; ad-hoc spacing that breaks the rhythm. (These are the top "AI slop" tells.)
 - **Visual hierarchy** — is the primary action obvious, is type scale used purposefully, is whitespace deliberate rather than uniform.
 - **Component reuse** — reuses `Card`/`Badge`/`MeterBar`/`Tabs`/`Modal` rather than reinventing a one-off; respects the inline-panel-vs-Modal rule.
 - **Convention violations** — raw skill/ability keys in the UI, color-only meaning (e.g. a meter with no numeric label), missing focus/hover states.
 - **Accessibility** — anything `jsx-a11y` lint and axe can't catch at the markup level (contrast, focus order, hit targets).
 
-For changes that touch a whole page or a new flow, also run `/ux-review` concurrently for the page-level Learnability / Heuristics / Visual scores. For a single-component change, the architect agent alone is enough — skipping `/ux-review` then is fine, but say so in the report.
+For changes that touch a whole page or a new flow, also run the `/ux-review` skill concurrently (when available in the environment) for the page-level Learnability / Heuristics / Visual scores. For a single-component change, the architect agent alone is enough. If you skip `/ux-review` — because the change is component-scoped or the skill isn't installed here — say so in the report rather than silently dropping it.
 
 Have the design lane return **severity-tagged findings** (`blocking` / `advisory`), each naming the file and the specific token/convention at issue, plus a one-line "what good looks like" fix.
 
