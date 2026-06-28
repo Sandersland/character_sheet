@@ -28,6 +28,36 @@ jobs:
 
       - run: npm run lint
 
+  build:
+    # Production type-check + bundle. vitest transpiles via esbuild and does NOT
+    # type-check, so type-only errors slip past `test`/`lint` and only surface in
+    # the `tsc` build Railway runs. This job is that gate. No Postgres needed —
+    # it only type-checks and bundles; `prisma generate` provides the client
+    # types the backend `tsc` imports.
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm install -g npm@11  # align with npm 11 that generated package-lock.json (npm/cli#4828)
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Prisma generate
+        working-directory: backend
+        # prisma.config.ts validates DATABASE_URL at load even for `generate`,
+        # which never connects — a dummy URL satisfies it without a Postgres.
+        env:
+          DATABASE_URL: postgresql://unused:unused@localhost:5432/unused
+        run: npx prisma generate
+
+      - run: npm run build
+
   test:
     runs-on: ubuntu-latest
 

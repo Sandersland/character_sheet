@@ -15,21 +15,14 @@ import { useEffect, useState } from "react";
 import { fetchSession } from "@/api/client";
 import Badge from "@/components/ui/Badge";
 import { formatRollBreakdown } from "@/lib/dice";
-import type { CharacterEvent, CharacterEventCategory } from "@/types/character";
+import { categoryTone } from "@/lib/events";
+import type { CharacterEvent } from "@/types/character";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const CATEGORY_TONE: Record<CharacterEventCategory, "vitality" | "gold" | "garnet" | "neutral" | "arcane"> = {
-  inventory: "gold",
-  hitPoints: "vitality",
-  experience: "arcane",
-  currency: "gold",
-  spellcasting: "arcane",
-  class: "neutral",
-  resources: "gold",
-  combat: "garnet",
-};
-
+// Category → badge tone resolves through the shared lookup in lib/events so new
+// event categories stay covered. The session log keeps its own terser TYPE_LABEL
+// map below (e.g. "combat" vs the activity log's "Combat started").
 const TYPE_LABEL: Partial<Record<string, string>> = {
   acquired: "acquired",
   bought: "bought",
@@ -157,7 +150,7 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
   return (
     <ul className="flex flex-col gap-2">
       {displayEvents.map((event) => {
-        const tone = CATEGORY_TONE[event.category] ?? "neutral";
+        const tone = categoryTone(event.category);
         const label = TYPE_LABEL[event.type] ?? event.type;
         const round = roundById.get(event.id);
         return (
