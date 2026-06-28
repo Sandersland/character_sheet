@@ -6,10 +6,9 @@ import type {
   ArmorCategory,
   InventoryItem,
   InventoryOperation,
-  ItemCategory,
   WeaponDetail,
 } from "@/types/character";
-import Badge from "@/components/ui/Badge";
+import OverflowMenu from "@/components/ui/OverflowMenu";
 
 interface InventoryRowProps {
   item: InventoryItem;
@@ -19,13 +18,6 @@ interface InventoryRowProps {
   onCancel: () => void;
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
 }
-
-const CATEGORY_TONE: Record<ItemCategory, "garnet" | "arcane" | "gold" | "neutral"> = {
-  weapon: "garnet",
-  armor: "arcane",
-  consumable: "gold",
-  gear: "neutral",
-};
 
 const ARMOR_CATEGORIES: ArmorCategory[] = ["light", "medium", "heavy", "shield"];
 
@@ -69,15 +61,7 @@ const checkboxLabelClass = "flex items-center gap-1.5 text-xs text-parchment-700
 const linkButtonClass =
   "text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40 disabled:no-underline";
 
-/**
- * One inventory row, in one of two modes: read-only display, or an inline
- * edit form (cosmetic fields + quantity + the matching weapon/armor/
- * consumable detail, if any — the "Club +1" path). Equip/Edit/Remove are
- * low-emphasis text links rather than icon buttons, matching the existing
- * "← All characters" link style — no icon-button row exists elsewhere in
- * this app to match instead. Selling is handled by the bulk-sell flow and
- * per-item history by the Activity log, so neither lives on the row.
- */
+// One inventory row: read-only display (Equip toggle + a kebab for Edit/Remove, prose disclosed on expand) or an inline edit form.
 export default function InventoryRow({
   item,
   mode,
@@ -95,6 +79,9 @@ export default function InventoryRow({
   const [weaponEdit, setWeaponEdit] = useState(weapon);
   const [armorEdit, setArmorEdit] = useState(armor);
   const [consumableEdit, setConsumableEdit] = useState(consumable);
+
+  const [expanded, setExpanded] = useState(false);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   async function submitEdit() {
     const operations: InventoryOperation[] = [
@@ -382,58 +369,90 @@ export default function InventoryRow({
     effectRoll,
   ].filter((part): part is string => part !== null);
 
+  const hasProse = Boolean(item.description || consumable?.effectDescription || item.notes);
+
   return (
-    <li className="flex items-start justify-between gap-3 py-2.5">
-      <div>
-        <p className="text-sm font-medium text-parchment-900">
-          {item.name}
-          <Badge tone={CATEGORY_TONE[item.category]} className="ml-2">
-            {item.category}
-          </Badge>
-          {item.equipped && (
-            <Badge tone="vitality" className="ml-1.5">
-              Equipped
-            </Badge>
+    <li className="flex flex-col gap-1.5 py-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-parchment-900">{item.name}</p>
+          <p className="mt-0.5 text-xs text-parchment-600">{details.join(" · ")}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+          {hasProse && (
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-label={expanded ? "Hide details" : "Show details"}
+              onClick={() => setExpanded((v) => !v)}
+              className="flex h-7 w-7 items-center justify-center rounded-control text-parchment-500 transition-colors hover:bg-parchment-200 hover:text-parchment-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
+            >
+              {expanded ? "⌃" : "⌄"}
+            </button>
           )}
-        </p>
-        <p className="mt-0.5 text-xs text-parchment-600">{details.join(" · ")}</p>
-        {item.description && (
-          <p className="mt-1 text-xs text-parchment-600">{item.description}</p>
-        )}
-        {consumable?.effectDescription && (
-          <p className="mt-1 text-xs text-parchment-600">{consumable.effectDescription}</p>
-        )}
-        {item.notes && <p className="mt-1 text-xs italic text-parchment-600">{item.notes}</p>}
-      </div>
-      <div className="flex shrink-0 items-center gap-2 pt-0.5">
-        {isEquippable(item.category) && (
-          <>
+          {isEquippable(item.category) && (
             <button
               type="button"
               disabled={pending}
+              aria-pressed={item.equipped}
               onClick={() =>
                 onSubmit([{ type: "setEquipped", inventoryItemId: item.id, equipped: !item.equipped }])
               }
-              className={linkButtonClass}
+              className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                item.equipped
+                  ? "border-vitality-200 bg-vitality-50 text-vitality-800 hover:bg-vitality-100"
+                  : "border-parchment-300 bg-parchment-50 text-parchment-700 hover:bg-parchment-100"
+              }`}
             >
-              {item.equipped ? "Unequip" : "Equip"}
+              {item.equipped ? "Equipped" : "Equip"}
             </button>
-            <span className="text-parchment-300">·</span>
-          </>
-        )}
-        <button type="button" disabled={pending} onClick={onEdit} className={linkButtonClass}>
-          Edit
-        </button>
-        <span className="text-parchment-300">·</span>
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => onSubmit([{ type: "remove", inventoryItemId: item.id }])}
-          className={linkButtonClass}
-        >
-          Remove
-        </button>
+          )}
+          <OverflowMenu
+            label={`Actions for ${item.name}`}
+            items={[
+              { label: "Edit", onSelect: onEdit },
+              {
+                label: "Remove",
+                onSelect: () => setConfirmingRemove(true),
+                danger: true,
+                separatorBefore: true,
+              },
+            ]}
+          />
+        </div>
       </div>
+
+      {confirmingRemove && (
+        <div className="flex items-center justify-end gap-3 text-xs">
+          <span className="text-parchment-700">Remove {item.name}?</span>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => onSubmit([{ type: "remove", inventoryItemId: item.id }])}
+            className="font-semibold text-garnet-700 hover:underline disabled:opacity-40"
+          >
+            Confirm
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => setConfirmingRemove(false)}
+            className="font-semibold text-parchment-600 hover:underline disabled:opacity-40"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {expanded && hasProse && (
+        <div className="flex flex-col gap-1 pl-0.5">
+          {item.description && <p className="text-xs text-parchment-600">{item.description}</p>}
+          {consumable?.effectDescription && (
+            <p className="text-xs text-parchment-600">{consumable.effectDescription}</p>
+          )}
+          {item.notes && <p className="text-xs italic text-parchment-600">{item.notes}</p>}
+        </div>
+      )}
     </li>
   );
 }
