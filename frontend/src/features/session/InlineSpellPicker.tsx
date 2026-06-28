@@ -343,7 +343,7 @@ export default function InlineSpellPicker({
                   <p className="text-xs text-parchment-600">{preview}</p>
                 )}
                 {compStr && (
-                  <p className="text-[11px] text-parchment-400">{compStr}</p>
+                  <p className="text-[11px] text-parchment-600">{compStr}</p>
                 )}
               </div>
 
@@ -420,7 +420,7 @@ export default function InlineSpellPicker({
 
                   {/* Save-half hint */}
                   {isSave && spell.saveEffect === "half" && (
-                    <span className="text-[11px] text-parchment-400">½ on save</span>
+                    <span className="text-[11px] text-parchment-600">½ on save</span>
                   )}
 
                   {/* Attack roll button (attack spells) — consumes the economy slot and

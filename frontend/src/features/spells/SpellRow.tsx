@@ -100,7 +100,7 @@ export default function SpellRow({
             <p className="text-xs text-parchment-500">{effect}</p>
           )}
           {compStr && (
-            <p className="text-[11px] text-parchment-400">{compStr}</p>
+            <p className="text-[11px] text-parchment-600">{compStr}</p>
           )}
         </div>
 
@@ -198,7 +198,7 @@ export default function SpellRow({
             <p className="text-xs text-parchment-500">{attackTypeLabel(spell)}</p>
           )}
           {spell.components?.material && spell.components.materialDescription && (
-            <p className="text-xs text-parchment-400 italic">
+            <p className="text-xs text-parchment-600 italic">
               Material: {spell.components.materialDescription}
             </p>
           )}

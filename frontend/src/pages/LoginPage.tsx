@@ -30,7 +30,7 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-parchment-100 p-4">
       <Card title="Sign in" className="w-full max-w-sm">
         <div className="flex flex-col gap-4 p-6">
-          <p className="font-display text-2xl text-parchment-800">Character Sheet</p>
+          <h1 className="font-display text-2xl text-parchment-800">Character Sheet</h1>
           <p className="text-sm text-parchment-600">
             Sign in to manage your characters.
           </p>
