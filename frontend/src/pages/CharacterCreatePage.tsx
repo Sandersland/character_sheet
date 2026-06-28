@@ -331,6 +331,7 @@ export default function CharacterCreatePage() {
                     <div className="flex gap-2">
                       <input
                         type="text"
+                        aria-label="Background"
                         value={draft.customBackground}
                         onChange={(e) => update({ customBackground: e.target.value })}
                         placeholder="Invent your own…"

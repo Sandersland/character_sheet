@@ -7,13 +7,6 @@ import { ABILITY_LABELS } from "@/lib/abilities";
 import { axe } from "@/test/axe";
 import type { AbilityName, AbilityScores } from "@/types/character";
 
-/**
- * Regression guard for issue #178 (axe `label` ×6 + `select-name`): every
- * ability-score control in the character-creation editor must carry a
- * programmatic label. The manual-entry inputs and the slot-assignment selects
- * are the controls axe flagged; point buy's stepper buttons get aria-labels.
- */
-
 const SCORES: AbilityScores = {
   strength: 15,
   dexterity: 14,
@@ -96,12 +89,15 @@ describe("AbilityScoreEditor accessibility", () => {
       />
     );
 
-    expect(
-      screen.getByRole("button", { name: "Increase Strength" })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Decrease Strength" })
-    ).toBeInTheDocument();
+    for (const ability of Object.keys(ABILITY_LABELS) as AbilityName[]) {
+      const label = ABILITY_LABELS[ability];
+      expect(
+        screen.getByRole("button", { name: `Increase ${label}` })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: `Decrease ${label}` })
+      ).toBeInTheDocument();
+    }
 
     expect(await axe(container)).toHaveNoViolations();
   });

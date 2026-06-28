@@ -195,10 +195,7 @@ export default function AbilityScoreEditor({
             )
           );
 
-          // Each ability box owns one labelable control (the slot-assignment
-          // select or the manual-entry input). Point buy is the exception: it
-          // has no single control to label, only a +/- stepper, so it keeps a
-          // plain heading and labels each button instead.
+          // pointBuy has no single labelable target — its +/- buttons carry aria-labels instead.
           const controlId = `ability-score-${ability}`;
           const abilityLabel = ABILITY_LABELS[ability];
           const labelsAControl = method !== "pointBuy";
