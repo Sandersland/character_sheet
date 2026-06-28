@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit|mcp__plugin_playwright_playwright__browser_take_screenshot",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-project-artifacts.mjs\""
+          }
+        ]
+      }
+    ]
+  }
+}
