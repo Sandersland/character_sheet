@@ -50,6 +50,10 @@ jobs:
 
       - name: Prisma generate
         working-directory: backend
+        # prisma.config.ts validates DATABASE_URL at load even for `generate`,
+        # which never connects — a dummy URL satisfies it without a Postgres.
+        env:
+          DATABASE_URL: postgresql://unused:unused@localhost:5432/unused
         run: npx prisma generate
 
       - run: npm run build
