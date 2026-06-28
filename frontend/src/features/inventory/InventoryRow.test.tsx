@@ -32,9 +32,7 @@ function renderRow(overrides: Partial<Parameters<typeof InventoryRow>[0]> = {}) 
     mode: "view" as const,
     pending: false,
     onEdit: vi.fn(),
-    onSell: vi.fn(),
     onCancel: vi.fn(),
-    onHistory: vi.fn(),
     onSubmit: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -65,20 +63,6 @@ describe("InventoryRow (view mode)", () => {
     expect(props.onEdit).toHaveBeenCalledOnce();
   });
 
-  it("calls onSell when Sell is clicked", async () => {
-    const user = userEvent.setup();
-    const { props } = renderRow();
-    await user.click(screen.getByRole("button", { name: "Sell" }));
-    expect(props.onSell).toHaveBeenCalledOnce();
-  });
-
-  it("calls onHistory when History is clicked", async () => {
-    const user = userEvent.setup();
-    const { props } = renderRow();
-    await user.click(screen.getByRole("button", { name: "History" }));
-    expect(props.onHistory).toHaveBeenCalledOnce();
-  });
-
   it("calls onSubmit with a remove operation when Remove is clicked", async () => {
     const user = userEvent.setup();
     const { props } = renderRow();
@@ -106,7 +90,7 @@ describe("InventoryRow (view mode)", () => {
 
   it("disables action buttons when pending", () => {
     renderRow({ pending: true });
-    for (const name of ["Edit", "Sell", "History", "Remove"]) {
+    for (const name of ["Equip", "Edit", "Remove"]) {
       expect(screen.getByRole("button", { name })).toBeDisabled();
     }
   });

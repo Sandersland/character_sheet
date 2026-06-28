@@ -4,7 +4,6 @@ import { formatRollSpec } from "@/lib/dice";
 import { isEquippable } from "@/lib/items";
 import type {
   ArmorCategory,
-  Currency,
   InventoryItem,
   InventoryOperation,
   ItemCategory,
@@ -14,12 +13,10 @@ import Badge from "@/components/ui/Badge";
 
 interface InventoryRowProps {
   item: InventoryItem;
-  mode: "view" | "edit" | "sell";
+  mode: "view" | "edit";
   pending: boolean;
   onEdit: () => void;
-  onSell: () => void;
   onCancel: () => void;
-  onHistory: () => void;
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
 }
 
@@ -72,29 +69,21 @@ const checkboxLabelClass = "flex items-center gap-1.5 text-xs text-parchment-700
 const linkButtonClass =
   "text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40 disabled:no-underline";
 
-function currencyTimesQuantity(cost: Currency | undefined, quantity: number): Currency {
-  if (!cost) return { cp: 0, sp: 0, gp: 0, pp: 0 };
-  return { cp: cost.cp * quantity, sp: cost.sp * quantity, gp: cost.gp * quantity, pp: cost.pp * quantity };
-}
-
 /**
- * One inventory row, in one of three modes: read-only display (Phase A's
- * rendering, unchanged), an inline edit form (cosmetic fields + quantity +
- * the matching weapon/armor/consumable detail, if any — the "Club +1"
- * path), or an inline sell form. Edit/Sell/History/Remove are low-emphasis
- * text links rather than icon buttons, matching the existing "← All
- * characters" link style — no icon-button row exists elsewhere in this app
- * to match instead. History (Phase C) doesn't have its own mode here since
- * it opens a modal owned by the parent `InventoryList`, not an inline form.
+ * One inventory row, in one of two modes: read-only display, or an inline
+ * edit form (cosmetic fields + quantity + the matching weapon/armor/
+ * consumable detail, if any — the "Club +1" path). Equip/Edit/Remove are
+ * low-emphasis text links rather than icon buttons, matching the existing
+ * "← All characters" link style — no icon-button row exists elsewhere in
+ * this app to match instead. Selling is handled by the bulk-sell flow and
+ * per-item history by the Activity log, so neither lives on the row.
  */
 export default function InventoryRow({
   item,
   mode,
   pending,
   onEdit,
-  onSell,
   onCancel,
-  onHistory,
   onSubmit,
 }: InventoryRowProps) {
   const { weapon, armor, consumable } = item;
@@ -106,11 +95,6 @@ export default function InventoryRow({
   const [weaponEdit, setWeaponEdit] = useState(weapon);
   const [armorEdit, setArmorEdit] = useState(armor);
   const [consumableEdit, setConsumableEdit] = useState(consumable);
-
-  const [sellQuantity, setSellQuantity] = useState(String(item.quantity));
-  const [sellCurrency, setSellCurrency] = useState<Currency>(
-    currencyTimesQuantity(item.cost, item.quantity)
-  );
 
   async function submitEdit() {
     const operations: InventoryOperation[] = [
@@ -130,12 +114,6 @@ export default function InventoryRow({
       operations.push({ type: "adjustQuantity", inventoryItemId: item.id, delta });
     }
     await onSubmit(operations);
-  }
-
-  async function submitSell() {
-    await onSubmit([
-      { type: "sell", inventoryItemId: item.id, quantity: Number(sellQuantity), currencyDelta: sellCurrency },
-    ]);
   }
 
   if (mode === "edit") {
@@ -376,54 +354,6 @@ export default function InventoryRow({
     );
   }
 
-  if (mode === "sell") {
-    return (
-      <li className="flex flex-col gap-3 py-3">
-        <p className="text-sm font-medium text-parchment-900">Sell {item.name}</p>
-        <div className="flex flex-wrap items-end gap-3">
-          <label className={labelClass}>
-            Quantity
-            <input
-              type="number"
-              min={1}
-              max={item.quantity}
-              className={`${inputClass} w-20 tabular-nums`}
-              value={sellQuantity}
-              onChange={(e) => setSellQuantity(e.target.value)}
-            />
-          </label>
-          {(["pp", "gp", "sp", "cp"] as const).map((denomination) => (
-            <label key={denomination} className={labelClass}>
-              {denomination}
-              <input
-                type="number"
-                min={0}
-                className={`${inputClass} w-16 tabular-nums`}
-                value={sellCurrency[denomination]}
-                onChange={(e) =>
-                  setSellCurrency({ ...sellCurrency, [denomination]: Number(e.target.value) })
-                }
-              />
-            </label>
-          ))}
-        </div>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            disabled={pending}
-            onClick={submitSell}
-            className="rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
-          >
-            Sell
-          </button>
-          <button type="button" disabled={pending} onClick={onCancel} className={linkButtonClass}>
-            Cancel
-          </button>
-        </div>
-      </li>
-    );
-  }
-
   const effectRoll =
     consumable?.effectDiceCount && consumable?.effectDiceFaces
       ? formatRollSpec({
@@ -493,14 +423,6 @@ export default function InventoryRow({
         )}
         <button type="button" disabled={pending} onClick={onEdit} className={linkButtonClass}>
           Edit
-        </button>
-        <span className="text-parchment-300">·</span>
-        <button type="button" disabled={pending} onClick={onSell} className={linkButtonClass}>
-          Sell
-        </button>
-        <span className="text-parchment-300">·</span>
-        <button type="button" disabled={pending} onClick={onHistory} className={linkButtonClass}>
-          History
         </button>
         <span className="text-parchment-300">·</span>
         <button

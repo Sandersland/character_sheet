@@ -11,12 +11,12 @@ const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
- * This app's first overlay primitive — every prior "extra" surface (Add
- * Item, Edit, Sell) is an inline expand-in-place panel within a Card, but
- * the inventory ledger (Phase C) is read-only review with its own scroll
- * needs, not an edit bound to a row, so it gets a real modal instead. Built
- * generically so a future modal (confirm dialogs, etc.) can reuse it rather
- * than reinventing focus management.
+ * This app's overlay primitive — most "extra" surfaces (Add Item, Edit) are
+ * inline expand-in-place panels within a Card, but read-only review surfaces
+ * with their own scroll needs (the ActivityModal timeline) and confirm
+ * dialogs are not edits bound to a row, so they get a real modal instead.
+ * Built generically so any such surface can reuse it rather than reinventing
+ * focus management.
  *
  * Visual DNA matches `Card` (parchment surface, `--radius-card`) but with
  * `--shadow-raised` instead of `--shadow-card` — already used elsewhere

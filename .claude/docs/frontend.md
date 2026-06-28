@@ -22,8 +22,8 @@ frontend/src/
 │   │                    #   diceRollerTypes.ts, useDieFaceData.ts
 │   ├── experience/      # ExperienceTracker
 │   ├── hitpoints/       # HitPointTracker (inline Card; hosts LevelUpModal + ConcentrationSaveModal)
-│   ├── inventory/       # InventoryList, InventoryRow, AddItemPanel, LedgerModal,
-│   │                    #   StartingEquipmentEditor
+│   ├── inventory/       # InventoryList, InventoryRow, AddItemPanel,
+│   │                    #   BulkSellPanel, StartingEquipmentEditor
 │   ├── session/         # TurnHub, TurnTracker, useTurnState, SessionLog, SessionsModal,
 │   │                    #   SessionSummaryModal, Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
 │   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie
@@ -142,10 +142,10 @@ Staying on-system is what keeps the UI from reading as generic. The `verify-fron
 
 | Modal | Inline panel |
 |---|---|
-| `LedgerModal` — read-only inventory ledger | `AddItemPanel` — add item form |
-| `ActivityModal` — filterable audit timeline (category + session selects + inventory type chips; optional `entityId` scope) + undo | `AddSpellPanel` — learn spell form |
-| `DeleteCharacterModal` — confirm destructive action | `InventoryRow` edit/sell mode |
-| `LevelUpModal` / `ConcentrationSaveModal` — hosted *inside* `HitPointTracker` | `HitPointTracker` itself — inline Card (damage/heal/rest/death-save controls) |
+| `ActivityModal` — filterable audit timeline (category + session selects + inventory type chips; optional `entityId` scope) + undo — also serves as inventory history | `AddItemPanel` — add item form |
+| `DeleteCharacterModal` — confirm destructive action | `AddSpellPanel` — learn spell form |
+| `LevelUpModal` / `ConcentrationSaveModal` — hosted *inside* `HitPointTracker` | `InventoryRow` edit mode |
+| | `HitPointTracker` itself — inline Card (damage/heal/rest/death-save controls) |
 | | `ExperienceTracker` award/set inputs |
 | | `AbilityScoreEditor` method tabs |
 
@@ -229,7 +229,7 @@ Large interactive sections follow the orchestrator/row pattern:
 ```
 
 Examples:
-- `features/inventory/`: `InventoryList` (orchestrator) / `InventoryRow` / `AddItemPanel` / `LedgerModal`
+- `features/inventory/`: `InventoryList` (orchestrator) / `InventoryRow` / `AddItemPanel` / `BulkSellPanel`
 - `features/spells/`: `SpellsSection` (orchestrator) / `SpellRow` / `AddSpellPanel`
 
 The orchestrator pattern keeps async state and API batching in one place and makes rows easy to unit-test in isolation — pass mock callbacks, assert they fire with the right args. See `testing.md` for component test patterns.
