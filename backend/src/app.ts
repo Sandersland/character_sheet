@@ -35,18 +35,23 @@ import { spellcastingRouter } from "./routes/spellcasting.js";
 
 // CORS origins are env-driven so the API can be deployed anywhere without a
 // code change. `CORS_ORIGIN` is a comma-separated allowlist
-// (e.g. "https://dev.example.com,https://example.com"). When unset, `cors({})`
-// allows every origin via a `*` wildcard — convenient for local dev and for
-// single-origin deployments where the SPA is served from this same host (no
-// CORS at all).
+// (e.g. "https://dev.example.com,https://example.com").
+//
+// `credentials: true` is always set: the SPA sends the session cookie with
+// `credentials: "include"`, which the browser only honors when the response
+// carries `Access-Control-Allow-Credentials: true` AND a concrete (non-`*`)
+// origin. So when no allowlist is configured we reflect the request origin
+// (`origin: true`) rather than `*` — convenient for local dev and single-origin
+// deploys (where CORS isn't exercised anyway). Harden a split-origin prod by
+// setting `CORS_ORIGIN` to the explicit allowlist.
 function corsOptions(): CorsOptions {
   const configured = process.env.CORS_ORIGIN?.trim();
-  if (!configured) return {};
+  if (!configured) return { origin: true, credentials: true };
   const allowlist = configured
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
-  return { origin: allowlist };
+  return { origin: allowlist, credentials: true };
 }
 
 export function createApp() {

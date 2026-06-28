@@ -22,7 +22,7 @@ Components are env-driven so any of them can be deployed anywhere:
 | `DATABASE_URL` | backend | Postgres connection string. Required. |
 | `PORT` | backend | Listen port (default 4000). Railway injects its own. |
 | `SERVE_STATIC_DIR` | backend | When set, the API serves the SPA from this dir (single-origin). Combined image sets `/app/public`. Unset → API-only. |
-| `CORS_ORIGIN` | backend | Comma-separated allowlist. Empty → reflect all (fine for single-origin/local). Set for split mode. |
+| `CORS_ORIGIN` | backend | Comma-separated allowlist. Empty → reflect the request origin (fine for single-origin/local). Set for split mode. CORS always sends `Access-Control-Allow-Credentials: true` (the SPA sends the session cookie), so the origin is always a concrete value, never `*` — set the allowlist explicitly to harden a split-origin prod. |
 | `LOG_LEVEL` | backend | Pino log level (`fatal`…`trace`, or `silent`). Default `info`; tests run `silent`. JSON output in prod, pretty in dev. |
 | `RATE_LIMIT_WINDOW_MS` | backend | Rate-limit window in ms. Default `900000` (15 min). |
 | `RATE_LIMIT_MAX` | backend | Max requests per window per IP, global. Default `600`. |

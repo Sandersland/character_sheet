@@ -11,6 +11,7 @@ frontend/src/
 ├── features/
 │   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable, ProficienciesCard
 │   ├── advancement/     # AdvancementSection, AdvancementPanel
+│   ├── auth/            # AuthProvider (useAuth), AuthGate, AppHeader
 │   ├── character-meta/  # CharacterCard, VitalsStrip, JournalSection, JournalEntryPanel,
 │   │                    #   ActivityModal, DeleteCharacterModal, BackendStatus
 │   ├── class/           # ClassFeaturesSection, FightingStylePanel, AddManeuverPanel,
@@ -31,11 +32,12 @@ frontend/src/
 │   │                    #   (useCharacter, useCharacterList, useCharacterDraft, useReferenceData)
 ├── lib/                 # pure TS logic — NO React/JSX (dice, abilities, timeline, startingEquipment, …)
 ├── pages/               # route-level views (CharacterListPage, CharacterSheetPage,
-│   │                    #   CharacterCreatePage, SessionPage)
+│   │                    #   CharacterCreatePage, SessionPage, LoginPage)
 ├── api/
-│   └── client.ts        # the only fetch() call site
+│   └── client.ts        # the only fetch() call site (apiFetch wrapper: credentials + 401)
 ├── types/
-│   └── character.ts     # shared domain types
+│   ├── character.ts     # shared domain types
+│   └── auth.ts          # AuthUser, AuthProviderInfo
 └── test/
     └── setup.ts         # vitest/jsdom setup (jest-dom + RTL cleanup)
 ```
@@ -161,6 +163,31 @@ When adding a new backend endpoint:
 2. Import it in the component
 
 This keeps all URL construction, error handling, and type casting in one place.
+
+Every domain call goes through `apiFetch`, which adds `credentials: "include"`
+(so the `cs_session` cookie flows cross-origin in dev: 5173 → 4000) and routes
+any **401** to a single registered handler — `setUnauthorizedHandler` — instead
+of per-call handling. `AuthProvider` registers that handler to drop auth state to
+anonymous (the router then shows login). The auth bootstrap `fetchMe` uses a
+plain credentialed `fetch` so its expected 401 ("not signed in") doesn't trip
+the global handler. Auth functions: `fetchAuthProviders`, `fetchMe`, `logout`.
+
+## Auth — `features/auth/`
+
+OAuth-only (no passwords). Pieces:
+- **`AuthProvider.tsx`** — context (`useAuth`): bootstraps from `fetchMe`
+  (`loading → authenticated | anonymous`), exposes `user` + `logout()`, and
+  registers the client's unauthorized handler.
+- **`AuthGate.tsx`** — renders the app only when authenticated; a loading
+  placeholder during the probe; `LoginPage` for anonymous (so a 401 anywhere
+  lands on login, never a white screen).
+- **`AppHeader.tsx`** — chrome showing the signed-in identity + a Log out button.
+- **`pages/LoginPage.tsx`** — buttons are **data-driven** from
+  `GET /api/auth/providers` (each a plain anchor to its `startUrl`), so enabling
+  a provider server-side needs no frontend change.
+
+`App.tsx` order: `BrowserRouter → ErrorBoundary → AuthProvider → AuthGate →
+(AppHeader + Routes)` — ErrorBoundary stays outermost over the app content.
 
 ## Dice engine
 
