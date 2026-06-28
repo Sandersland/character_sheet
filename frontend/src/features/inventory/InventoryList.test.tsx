@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import InventoryList from "@/features/inventory/InventoryList";
 import type { Character, InventoryItem } from "@/types/character";
@@ -141,6 +142,61 @@ describe("InventoryList empty state", () => {
     // Two "+ Add item" affordances when empty: the header button + the empty-state CTA.
     expect(screen.getAllByRole("button", { name: "+ Add item" })).toHaveLength(2);
     expect(screen.queryByRole("meter")).toBeNull();
+    expect(screen.queryByRole("heading", { level: 4 })).toBeNull();
+  });
+});
+
+describe("InventoryList search and filter", () => {
+  const inventory = [
+    makeItem({ id: "w1", name: "Longsword", category: "weapon", equipped: true }),
+    makeItem({ id: "w2", name: "Dagger", category: "weapon" }),
+    makeItem({ id: "a1", name: "Shield", category: "armor" }),
+    makeItem({ id: "g1", name: "Torch", category: "gear" }),
+  ];
+
+  it("filters rows by a case-insensitive name substring", async () => {
+    const user = userEvent.setup();
+    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    await user.type(screen.getByRole("searchbox", { name: /search items/i }), "SWORD");
+    expect(screen.getByText("Longsword")).toBeInTheDocument();
+    expect(screen.queryByText("Dagger")).toBeNull();
+    expect(screen.queryByText("Shield")).toBeNull();
+  });
+
+  it("filters by a category chip", async () => {
+    const user = userEvent.setup();
+    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Armor" }));
+    expect(screen.getByText("Shield")).toBeInTheDocument();
+    expect(screen.queryByText("Longsword")).toBeNull();
+    expect(screen.queryByText("Torch")).toBeNull();
+  });
+
+  it("filters to equipped items via the Equipped chip", async () => {
+    const user = userEvent.setup();
+    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    // Scope to the filter group — an equipped row's toggle is also named "Equipped".
+    const filters = screen.getByRole("group", { name: /filter items/i });
+    await user.click(within(filters).getByRole("button", { name: "Equipped" }));
+    expect(screen.getByText("Longsword")).toBeInTheDocument();
+    expect(screen.queryByText("Dagger")).toBeNull();
+  });
+
+  it("composes the search within the active filter", async () => {
+    const user = userEvent.setup();
+    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Weapons" }));
+    await user.type(screen.getByRole("searchbox"), "dag");
+    expect(screen.getByText("Dagger")).toBeInTheDocument();
+    expect(screen.queryByText("Longsword")).toBeNull();
+    expect(screen.queryByText("Shield")).toBeNull();
+  });
+
+  it("shows a no-match state when nothing matches", async () => {
+    const user = userEvent.setup();
+    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    await user.type(screen.getByRole("searchbox"), "zzz");
+    expect(screen.getByText(/no items match/i)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 4 })).toBeNull();
   });
 });
