@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { formatRollSpec } from "@/lib/dice";
+import { isEquippable } from "@/lib/items";
 import type {
   ArmorCategory,
   Currency,
@@ -475,17 +476,21 @@ export default function InventoryRow({
         {item.notes && <p className="mt-1 text-xs italic text-parchment-500">{item.notes}</p>}
       </div>
       <div className="flex shrink-0 items-center gap-2 pt-0.5">
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() =>
-            onSubmit([{ type: "setEquipped", inventoryItemId: item.id, equipped: !item.equipped }])
-          }
-          className={linkButtonClass}
-        >
-          {item.equipped ? "Unequip" : "Equip"}
-        </button>
-        <span className="text-parchment-300">·</span>
+        {isEquippable(item.category) && (
+          <>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() =>
+                onSubmit([{ type: "setEquipped", inventoryItemId: item.id, equipped: !item.equipped }])
+              }
+              className={linkButtonClass}
+            >
+              {item.equipped ? "Unequip" : "Equip"}
+            </button>
+            <span className="text-parchment-300">·</span>
+          </>
+        )}
         <button type="button" disabled={pending} onClick={onEdit} className={linkButtonClass}>
           Edit
         </button>
