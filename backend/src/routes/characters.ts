@@ -80,8 +80,9 @@ function serializeCharacterSummary(row: {
   return {
     id: row.id,
     name: row.name,
-    // Owning user id. Surfaced now so the frontend/#101 can filter by owner;
-    // not yet used for access control (the API serves every character today).
+    // Owning user id (legitimately persisted — see Character.ownerId in
+    // schema.prisma). Access is enforced per-owner via assertCharacterAccess;
+    // emitted here so the frontend can identify/display the owner.
     ownerId: row.ownerId,
     // raceSelection/classEntries are optional in Prisma's types only
     // because they're the non-FK side of the relation — every character

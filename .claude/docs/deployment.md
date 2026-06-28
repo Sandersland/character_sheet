@@ -1,9 +1,10 @@
 # Deployment
 
-How this app is packaged for hosting, and the runbook for the **dev** environment
-(Railway behind Cloudflare Access). **Prod is intentionally not deployed yet** —
-the app has no in-app auth and characters are globally editable, so a public prod
-environment must wait until authentication + character ownership exist.
+How this app is packaged for hosting, and the runbook for the **dev/staging**
+environment (Railway behind Cloudflare Access). In-app auth + per-owner character
+ownership now exist (#101/#102): every `/api` route requires a session and a user
+only sees/edits their own characters, so a public prod environment is no longer
+blocked on the auth gap — see "When prod comes" for what remains.
 
 ## Packaging model
 
@@ -255,6 +256,9 @@ Therefore:
 
 ## When prod comes
 
-Prod is blocked on in-app authentication + a user/character ownership model. Once
-that exists, prod can reuse the same combined image in a second Railway
-environment, public (no Access) or with its own policy as desired.
+In-app authentication + per-owner ownership are shipped (#101/#102), so prod is no
+longer blocked on them. Prod reuses the same combined image in a second Railway
+environment — public (no Cloudflare Access, since the app gates itself) or with its
+own Access policy as desired. Remaining prod prerequisites: register a prod Google
+OAuth client + redirect URI, set `APP_BASE_URL`/`GOOGLE_CLIENT_*`/`SESSION_COOKIE_SECURE=true`
+for the prod origin, and resolve the open CSP items (#149/#150/#151).
