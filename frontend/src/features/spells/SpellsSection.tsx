@@ -384,12 +384,12 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
             Spellbook ({spells.length})
           </h3>
           {busy && (
-            <span className="text-[10px] text-parchment-400">Saving…</span>
+            <span className="text-[10px] text-parchment-600">Saving…</span>
           )}
         </div>
 
         {spells.length === 0 ? (
-          <p className="py-4 text-center text-sm text-parchment-400">
+          <p className="py-4 text-center text-sm text-parchment-600">
             No spells yet — add one below.
           </p>
         ) : (

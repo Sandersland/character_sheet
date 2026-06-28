@@ -34,7 +34,7 @@ export default function CompactHpBar({ character }: CompactHpBarProps) {
             ].join(" ")}
           >
             {current}
-            <span className="font-normal text-parchment-400"> / {max}</span>
+            <span className="font-normal text-parchment-600"> / {max}</span>
           </span>
           {temp > 0 && (
             <span className="rounded-control bg-arcane-50 px-2 py-0.5 text-xs font-semibold text-arcane-700">

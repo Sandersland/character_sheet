@@ -186,7 +186,7 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
               Maneuvers
             </h3>
             {busy && (
-              <span className="text-[10px] text-parchment-400">Saving…</span>
+              <span className="text-[10px] text-parchment-600">Saving…</span>
             )}
           </div>
 
@@ -202,7 +202,7 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
 
           {/* Known maneuvers list */}
           {resources!.maneuversKnown.length === 0 ? (
-            <p className="py-3 text-center text-sm text-parchment-400">
+            <p className="py-3 text-center text-sm text-parchment-600">
               No maneuvers learned yet.
             </p>
           ) : (
@@ -237,7 +237,7 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
             <h3 className="text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
               Fighting Style
             </h3>
-            {busy && <span className="text-[10px] text-parchment-400">Saving…</span>}
+            {busy && <span className="text-[10px] text-parchment-600">Saving…</span>}
           </div>
 
           {fightingStyle ? (
@@ -291,7 +291,7 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
 
       {/* Empty state — no class resource data at all */}
       {!hasPools && !hasManeuvers && !hasFeatures && !hasFightingStyle && !character.subclass && !needsSubclass && (
-        <p className="py-4 text-center text-sm text-parchment-400">
+        <p className="py-4 text-center text-sm text-parchment-600">
           No class features available at this level.
         </p>
       )}

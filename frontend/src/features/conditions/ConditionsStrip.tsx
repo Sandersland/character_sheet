@@ -68,12 +68,12 @@ export default function ConditionsStrip({ character, onUpdate }: Props) {
         <h2 className="text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
           Conditions
         </h2>
-        {busy && <span className="text-[11px] text-parchment-400">Saving…</span>}
+        {busy && <span className="text-[11px] text-parchment-600">Saving…</span>}
       </div>
 
       {/* Active condition chips */}
       {active.length === 0 ? (
-        <p className="text-xs text-parchment-400">No active conditions.</p>
+        <p className="text-xs text-parchment-600">No active conditions.</p>
       ) : (
         <ul className="flex flex-wrap gap-2">
           {active.map((entry) => (
