@@ -20,6 +20,16 @@ describe("Card", () => {
     expect(screen.getByRole("heading", { name: "Skills" })).toBeInTheDocument();
   });
 
+  it("defaults the title to an h3", () => {
+    render(<Card title="Skills">Content</Card>);
+    expect(screen.getByRole("heading", { level: 3, name: "Skills" })).toBeInTheDocument();
+  });
+
+  it("renders the title at the requested heading level", () => {
+    render(<Card title="Identity" headingLevel={2}>Content</Card>);
+    expect(screen.getByRole("heading", { level: 2, name: "Identity" })).toBeInTheDocument();
+  });
+
   it("renders titleAccessory alongside the title", () => {
     render(
       <Card title="Inventory" titleAccessory={<span>Accessory</span>}>

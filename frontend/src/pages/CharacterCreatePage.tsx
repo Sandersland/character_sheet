@@ -155,7 +155,7 @@ export default function CharacterCreatePage() {
 
   return (
     <div className="min-h-screen bg-parchment-100">
-      <header className="border-b border-parchment-200 bg-parchment-50">
+      <div className="border-b border-parchment-200 bg-parchment-50">
         <div className="mx-auto flex max-w-4xl flex-wrap items-start justify-between gap-4 px-6 py-5">
           <div>
             <Link
@@ -174,7 +174,7 @@ export default function CharacterCreatePage() {
           </div>
           <BackendStatus />
         </div>
-      </header>
+      </div>
 
       <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
         {referenceError ? (
@@ -190,6 +190,7 @@ export default function CharacterCreatePage() {
           <>
             <Card
               title="Identity"
+              headingLevel={2}
               titleAccessory={
                 <span className="text-xs font-normal normal-case text-parchment-500">
                   <span className="text-garnet-700">*</span> required
@@ -386,7 +387,7 @@ export default function CharacterCreatePage() {
               </div>
             </Card>
 
-            <Card title="Ability Scores">
+            <Card title="Ability Scores" headingLevel={2}>
               <div className="p-4">
                 <AbilityScoreEditor
                   method={draft.abilityMethod}
@@ -405,7 +406,7 @@ export default function CharacterCreatePage() {
               </div>
             </Card>
 
-            <Card title="Skill Proficiencies">
+            <Card title="Skill Proficiencies" headingLevel={2}>
               <div className="flex flex-col gap-3 p-4">
                 {!selectedClass ? (
                   <p className="text-sm text-parchment-600">
@@ -449,7 +450,7 @@ export default function CharacterCreatePage() {
                 choice (e.g. Bard → 3 instruments; Monk → 1 artisan or
                 instrument). Also shows any granted tool profs as read-only. */}
             {(grantedToolProfs.length > 0 || toolChoiceOptions.length > 0) && (
-              <Card title="Tool Proficiencies">
+              <Card title="Tool Proficiencies" headingLevel={2}>
                 <div className="flex flex-col gap-3 p-4">
                   {grantedToolProfs.length > 0 && (
                     <p className="text-xs text-parchment-600">
@@ -493,6 +494,7 @@ export default function CharacterCreatePage() {
             {selectedClass?.startingEquipment && draft.equipmentDraft && (
               <Card
                 title="Starting Equipment"
+                headingLevel={2}
                 titleAccessory={
                   <span className="text-xs font-normal normal-case text-parchment-500">
                     All choices required
@@ -510,7 +512,7 @@ export default function CharacterCreatePage() {
               </Card>
             )}
 
-            <Card title="Preview" titleAccessory={<span className="text-xs text-parchment-500">Level 1</span>}>
+            <Card title="Preview" headingLevel={2} titleAccessory={<span className="text-xs text-parchment-500">Level 1</span>}>
               <div className="grid grid-cols-2 gap-4 p-4 text-sm sm:grid-cols-4">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-parchment-500">
