@@ -9,6 +9,7 @@
 | File | Endpoints |
 |---|---|
 | `routes/health.ts` | `GET /health` |
+| `routes/auth.ts` | `GET /auth/providers`, `GET /auth/:provider/start`, `GET /auth/:provider/callback`, `POST /auth/logout`, `GET /auth/me` — hand-rolled Google OAuth + PKCE sign-in and opaque session. **Public mechanism only** (#100): no `requireAuth` here and none on the routers below; per-owner enforcement is **#101**. A provider is listed/usable only when its id+secret env pair is set. |
 | `routes/characters.ts` | `GET /characters`, `GET /characters/:id`, `POST /characters`, `PATCH /characters/:id`, `DELETE /characters/:id` |
 | `routes/reference.ts` | `GET /reference` — race/class/background catalog + alignments + per-class starting equipment options |
 | `routes/items.ts` | `GET /items` — item catalog with weapon/armor/consumable detail |
@@ -37,6 +38,10 @@
 | File | Responsibility |
 |---|---|
 | `lib/prisma.ts` | Singleton `PrismaClient` with `@prisma/adapter-pg` (required for Prisma 7). Reads `DATABASE_URL`. |
+| `lib/config.ts` | Zod-validated, frozen snapshot of the auth-facing env, read once at import. Optional `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (a no-creds deploy still boots), `APP_BASE_URL` (default `http://localhost:4000`), tri-state `SESSION_COOKIE_SECURE` (production-default), `BOOTSTRAP_OWNER_EMAIL`, plus pass-through `CORS_ORIGIN`/`SERVE_STATIC_DIR`/`PORT`. `appRedirectUri(provider)` = `${APP_BASE_URL}/api/auth/${provider}/callback`. (Does **not** subsume logger/security/prisma, which read env directly.) |
+| `lib/auth/session.ts` | Method-agnostic identity layer: opaque server-side sessions `createSession`/`lookupSession`/`destroySession` over `AuthSession` (the token IS the row id; ~30-day TTL; expired rows rejected + best-effort deleted). `SESSION_COOKIE` = `cs_session`. Any auth method mints sessions the same way. |
+| `lib/auth/cookies.ts` | Method-agnostic, hand-rolled cookie handling (no cookie-parser): `parseCookies`/`getCookie`/`serializeCookie` (HttpOnly, SameSite=Lax, Secure-per-config) + `setCookie`/`clearCookie` Response helpers. |
+| `lib/auth/oauth/` | The third-party authorization-code **method**, self-contained behind `index.ts` (the seam `routes/auth.ts` imports). `flow.ts` = the provider-agnostic flow (`buildAuthorizeUrl`, `exchangeCode`, `fetchProfile`, the `cs_oauth_tx` state/PKCE codec). `pkce.ts` = PKCE-S256 + state primitives + `OAUTH_TX_COOKIE`. `account.ts` = `resolveUserId` (upsert `AuthAccount`→`User`, link-when-signed-in). `registry.ts` = `enabledProviders()`/`getProvider(id)` reading creds from **live env** (only id+secret-both-set providers enabled). `types.ts` = `ProviderDefinition`/`AuthProvider`/`NormalizedProfile`. `providers/index.ts` is the **manifest** (imports each provider + the array, nothing else); each `providers/<name>.ts` exports one `ProviderDefinition` (descriptor + its own `clientIdEnv`/`clientSecretEnv` + `mapProfile`). **Add a provider = new `providers/<name>.ts` + one array entry + env vars. Add a method (password/magic-link) = a new `lib/auth/<method>/` sibling reusing session + cookies; no OAuth code touched.** |
 | `lib/logger.ts` | Pino structured logger + `httpLogger` (pino-http) request-logging middleware. JSON in prod, pretty in dev, silent under test. Level via `LOG_LEVEL`; redacts auth/cookie/password fields. |
 | `lib/error-handler.ts` | Terminal Express error middleware (`errorHandler`). Turns uncaught/async route throws into a consistent `{ error }` JSON response; preserves an intentional `status`/`statusCode`; hides 500 detail in prod; logs server-side via the logger. Mounted last in `app.ts`. |
 | `lib/security.ts` | `securityHeaders(servesStatic)` (helmet; CSP tuned for the SPA in single-origin mode) + `globalRateLimiter`/`creationRateLimiter` (express-rate-limit, `RATE_LIMIT_*` env knobs, auto-off under test). Mounted high in `app.ts`. |
@@ -97,6 +102,7 @@ The only permitted backend-call site. Every exported function maps to one endpoi
 | `dice.ts` | `RollSpec`, `rollSpec`, `summarizeRoll`, `formatRollSpec`. The **only** place `Math.random` is called for dice. |
 | `abilities.ts` | `abilityModifier`, `formatModifier`, `skillBonus`, labels. |
 | `abilityGen.ts` | Four score-generation methods as pure functions; delegates to `dice.ts`. |
+| `events.ts` | Frontend activity-log display lookups — `eventTypeLabel`/`categoryLabel`/`categoryTone` + `INVENTORY_EVENT_TYPES`. |
 | `timeline.ts` | `groupByBatch`, `formatBatchDate` — shared by `ActivityModal` and `LedgerModal`. |
 | `startingEquipment.ts` | `PackageState`, `EquipmentDraft`, draft helpers, `draftToInput`, `rollGold`. |
 | `dieFaces.ts`, `physicsDice.ts` | React-free three.js geometry and cannon-es physics for the 3D dice rollers. |
@@ -147,13 +153,15 @@ The Character row carries these JSON columns: `hitPoints`, `hitDice`, `abilitySc
 
 - **Single-Table Inheritance**: `category` + `type` discriminators. Full `EventCategory` set (source of truth: `lib/events.ts`): `inventory`, `hitPoints`, `experience`, `currency`, `spellcasting`, `class`, `resources`, `advancement`, `session`, `combat`, `conditions`.
 - **Polymorphic soft-reference**: `entityType`/`entityId` (no FK — the entity may be deleted).
-- **before/after JSON snapshots**: the state before and after the operation, used by the revert handler to restore.
+- **before/after JSON snapshots**: the state before and after the operation, used by the revert handler to restore. The free-form `data` JSON carries op-specific extras the revert handler also reads — e.g. inventory delete ops stash a self-contained `data.deletedItem` snapshot (all scalar columns + the weapon/armor/consumable detail block) so the deleted row can be rebuilt on undo. (`data` lives outside `before`/`after` precisely so it is never fed to `diffToFields`.)
 - **Append-only**: events are flagged `reverted:true`, never deleted. A `revert` meta-event is appended on undo.
 - **Session tagging**: `sessionId String?` — events fired while a session is active get its id. Between-session events (shopping, leveling between adventures) get `null`. `getActiveSessionId(characterId)` is called at the top of every `apply*Operations()` function.
 
 `logEvent(tx, params)` in `lib/events.ts` writes the event + computes `CharacterEventField` diffs (via `diffToFields`) inside the caller's `$transaction`. All ops in a single request share a `randomUUID()` `batchId`.
 
-Undo: `POST /characters/:id/events/:batchId/revert` in `routes/activity.ts`. LIFO-only (returns 409 if not the most-recent non-reverted batch). Restores `before` snapshots in a transaction; inventory undo is intentionally deferred. **The LIFO guard skips events from ended sessions** (`OR: [{ sessionId: null }, { session: { status: "active" } }]`) — a closed session's history is frozen and cannot be undone.
+Read: `GET /characters/:id/activity` returns the chronological (newest-first) stream. Optional, composable (AND) query params — all validate-or-ignore (an unknown enum value is silently dropped, never a 400): `?category=<CharacterEventCategory>`, `?type=<CharacterEventType>`, `?sessionId=<id>` (per-session view), `?entityId=<id>` (per-entity view, e.g. one InventoryItem), `?includeFields=1` (attach the per-field diff rows), `?reverted=0|1` (exclude/include reverted events; default: all). The frontend `ActivityModal` drives `category`/`type`/`sessionId`/`entityId` from its filter bar.
+
+Undo: `POST /characters/:id/events/:batchId/revert` in `routes/activity.ts`. LIFO-only (returns 409 if not the most-recent non-reverted batch). Restores `before` snapshots in a transaction. Inventory events are fully revertable: `revertInventoryEvent` (`lib/inventory.ts`) reconstructs deleted `InventoryItem` + detail rows from `data.deletedItem` (reusing the original id) and reverses currency from `data.currencyDelta` — handled at the top of the revert loop before the `if (!before) continue` guard, since an `acquire` event carries `before == null` and undoing it deletes the created row. **The LIFO guard skips events from ended sessions** (`OR: [{ sessionId: null }, { session: { status: "active" } }]`) — a closed session's history is frozen and cannot be undone.
 
 ### Intent-bearing transaction pattern
 

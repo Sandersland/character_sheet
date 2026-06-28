@@ -13,6 +13,7 @@ import { httpLogger } from "./lib/logger.js";
 import { creationRateLimiter, globalRateLimiter, securityHeaders } from "./lib/security.js";
 import { actionsRouter } from "./routes/actions.js";
 import { activityRouter } from "./routes/activity.js";
+import { authRouter } from "./routes/auth.js";
 import { advancementRouter } from "./routes/advancement.js";
 import { classRouter } from "./routes/class.js";
 import { charactersRouter } from "./routes/characters.js";
@@ -63,6 +64,9 @@ export function createApp() {
   app.use(creationRateLimiter);
 
   app.use("/api", healthRouter);
+  // Public auth mechanism (OAuth sign-in + session). No requireAuth here — and
+  // none on the routers below yet; per-owner enforcement lands in #101.
+  app.use("/api", authRouter);
   app.use("/api", charactersRouter);
   app.use("/api", referenceRouter);
   app.use("/api", itemsRouter);

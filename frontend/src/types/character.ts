@@ -309,7 +309,10 @@ export type CharacterEventCategory =
   | "spellcasting"
   | "class"
   | "resources"
-  | "combat";
+  | "advancement"
+  | "session"
+  | "combat"
+  | "conditions";
 
 export type CharacterEventType =
   | "acquired" | "consumed" | "sold" | "bought" | "removed"  // inventory
@@ -319,11 +322,18 @@ export type CharacterEventType =
   | "currencyAdjust"                                           // currency
   | "castSpell" | "expendSlot" | "restoreSlot"                // spellcasting
   | "learnSpell" | "forgetSpell" | "prepareSpell" | "unprepareSpell" // spellcasting (cont.)
-  | "subclassChosen"                                           // class
+  | "concentrationDropped"                                     // spellcasting (cont.)
+  | "subclassChosen" | "subclassRemoved"                       // class
+  | "fightingStyleChosen" | "fightingStyleRemoved"            // class (cont.)
   | "spendResource" | "restoreResource"                       // resources
   | "learnManeuver" | "forgetManeuver" | "maneuversReconciled" // resources (cont.)
   | "learnToolProficiency" | "forgetToolProficiency" | "toolProficienciesReconciled" // resources
+  | "abilityScoreImprovement" | "featTaken"                   // advancement
+  | "advancementRemoved" | "advancementsReconciled"           // advancement (cont.)
+  | "equipped" | "unequipped"                                  // inventory (equip)
+  | "sessionStarted" | "sessionEnded"                          // session lifecycle
   | "combatStarted" | "combatEnded" | "combatRoundAdvanced"   // combat lifecycle
+  | "conditionApplied" | "conditionRemoved" | "exhaustionSet" // conditions
   | "attackRoll" | "damageRoll"                               // combat rolls
   | "revert";                                                  // meta
 

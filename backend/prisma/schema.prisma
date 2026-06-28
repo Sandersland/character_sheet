@@ -744,6 +744,9 @@ model CharacterEvent {
   after       Json?
   // Op-specific inputs that aren't derivable from before/after alone, e.g.
   // method/roll/conMod for levelUp, itemName/currencyDelta for inventory.
+  // Also carries undo-reconstruction data the revert handler reads but that
+  // must NOT be diffed: inventory delete ops stash a self-contained
+  // `data.deletedItem` snapshot here so the deleted row can be rebuilt.
   data        Json?
   // Future-proofs multi-user "who performed this action" — single-player
   // today, so always "player".

@@ -28,8 +28,18 @@
  *     - multi-event batch reverts all-or-nothing
  *     - a meta "revert" event is appended
  *     - batch events are marked reverted:true
- *   Inventory deferral
- *     - inventory events are NOT reverted (limitation documented + locked)
+ *   Inventory undo (Issue #117)
+ *     - purchase undo (delete created row + refund currency)
+ *     - full sell of a custom weapon (restore row + weapon detail + reverse currency)
+ *     - remove undo (restore full row + detail)
+ *     - adjust-to-zero (restore row) + partial adjust (restore quantity)
+ *     - setEquipped undo (restore equipped flag)
+ *     - bulk batch (sell + remove in one tx) restored atomically
+ *     - LIFO guard still applies to inventory batches
+ *     - undoing a sale whose proceeds were already spent → 409 (not 500),
+ *       leaving rows + currency unchanged (whole revert rolls back)
+ *     - undoing a remove of a catalog item whose catalog row is gone →
+ *       recreates with itemId:null (no FK error)
  */
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -553,17 +563,22 @@ describe("POST /:id/events/:batchId/revert — Fighter scenarios", () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// Inventory deferral: inventory events are NOT reverted (documented limitation).
+// Inventory undo (Issue #117): inventory events restore deleted rows + detail
+// rows from data.deletedItem and reverse currency from data.currencyDelta.
 // ════════════════════════════════════════════════════════════════════════════
 
 const INV_ID = "test-activity-inventory-1";
 const INV_CATALOG_NAME = "Activity Revert Test Rogue";
+const INV_CATALOG_ITEM_NAME = "Activity Revert Catalog Torch";
 
-describe("POST /:id/events/:batchId/revert — inventory deferral", () => {
+describe("POST /:id/events/:batchId/revert — inventory undo", () => {
   let classId: string;
 
   afterAll(async () => {
     await prisma.characterClass.deleteMany({ where: { name: INV_CATALOG_NAME } });
+    // Safety net: the catalog-gone test deletes this row itself, but clean up
+    // if it ever fails before reaching that step.
+    await prisma.item.deleteMany({ where: { name: INV_CATALOG_ITEM_NAME } });
   });
 
   beforeEach(async () => {
@@ -611,38 +626,281 @@ describe("POST /:id/events/:batchId/revert — inventory deferral", () => {
     await prisma.character.deleteMany({ where: { id: INV_ID } });
   });
 
-  it("does NOT restore an acquired inventory item on revert (deferral asserted)", async () => {
-    // Acquire a custom item — writes an inventory CharacterEvent.
-    const acquire = await supertest(app())
-      .post(`/api/characters/${INV_ID}/inventory/transactions`)
-      .send({
-        operations: [{
-          type: "acquire",
-          custom: { name: "Activity Test Torch", category: "gear" },
-          quantity: 1,
-        }],
-      });
+  const inv = (operations: unknown[]) =>
+    supertest(app()).post(`/api/characters/${INV_ID}/inventory/transactions`).send({ operations });
+
+  const findItem = (body: { inventory: Array<{ name: string }> }, name: string) =>
+    body.inventory.find((i) => i.name === name);
+
+  it("undoes a purchase: deletes the created row AND refunds the currency", async () => {
+    const acquire = await inv([
+      {
+        type: "acquire",
+        custom: { name: "Bought Torch", category: "gear" },
+        quantity: 1,
+        currencyDelta: { cp: 0, sp: 0, gp: 2, pp: 0 },
+      },
+    ]);
     expect(acquire.status).toBe(200);
-    const itemBefore = acquire.body.inventory.find((i: { name: string }) => i.name === "Activity Test Torch");
-    expect(itemBefore).toBeDefined();
+    expect(findItem(acquire.body, "Bought Torch")).toBeDefined();
+    expect(acquire.body.currency).toEqual({ cp: 0, sp: 0, gp: 8, pp: 0 }); // 10 - 2
 
     const batchId = await latestBatchId(INV_ID);
     const res = await revert(INV_ID, batchId);
     expect(res.status).toBe(200);
 
-    // DOCUMENTED LIMITATION: inventory ops are explicitly skipped in undo, so
-    // the acquired item is STILL present after the revert. The audit event is
-    // marked reverted (timeline reflects the undo) but the relational row is not
-    // removed.
-    const itemAfter = res.body.inventory.find((i: { name: string }) => i.name === "Activity Test Torch");
-    expect(itemAfter).toBeDefined(); // still here — inventory undo deferred
+    expect(findItem(res.body, "Bought Torch")).toBeUndefined(); // row deleted
+    expect(res.body.currency).toEqual({ cp: 0, sp: 0, gp: 10, pp: 0 }); // refunded
 
-    // The batch event was still flagged reverted (process ran), confirming the
-    // skip is in the per-category restore, not a refusal to process the batch.
-    const events = await prisma.characterEvent.findMany({
-      where: { characterId: INV_ID, batchId },
-    });
+    // The batch event is marked reverted and a meta `revert` event is appended.
+    const events = await prisma.characterEvent.findMany({ where: { characterId: INV_ID, batchId } });
     expect(events.every((e) => e.reverted)).toBe(true);
+    const timeline = await supertest(app()).get(`/api/characters/${INV_ID}/activity`);
+    expect((timeline.body as Array<{ type: string }>).some((e) => e.type === "revert")).toBe(true);
+  });
+
+  it("undoes a full sell of a custom weapon: restores the row + weapon detail + reverses currency", async () => {
+    const acquire = await inv([
+      {
+        type: "acquire",
+        custom: {
+          name: "Sellable Saber",
+          category: "weapon",
+          weight: 3,
+          description: "a fine blade",
+          weapon: { damageDiceCount: 1, damageDiceFaces: 6, damageType: "slashing", finesse: true },
+        },
+        quantity: 2,
+        equipped: true,
+        notes: "heirloom",
+      },
+    ]);
+    expect(acquire.status).toBe(200);
+    const itemId = findItem(acquire.body, "Sellable Saber")!.id as string;
+    const original = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } });
+
+    const sell = await inv([
+      { type: "sell", inventoryItemId: itemId, currencyDelta: { cp: 0, sp: 0, gp: 5, pp: 0 } },
+    ]);
+    expect(sell.status).toBe(200);
+    expect(findItem(sell.body, "Sellable Saber")).toBeUndefined(); // full stack sold → row gone
+    expect(sell.body.currency).toEqual({ cp: 0, sp: 0, gp: 15, pp: 0 }); // 10 + 5
+
+    const batchId = await latestBatchId(INV_ID);
+    const res = await revert(INV_ID, batchId);
+    expect(res.status).toBe(200);
+    expect(res.body.currency).toEqual({ cp: 0, sp: 0, gp: 10, pp: 0 }); // proceeds removed
+
+    const restored = await prisma.inventoryItem.findUniqueOrThrow({
+      where: { id: itemId },
+      include: { weaponDetail: true },
+    });
+    expect(restored).toMatchObject({
+      id: itemId,
+      name: "Sellable Saber",
+      quantity: 2,
+      equipped: true,
+      notes: "heirloom",
+      position: original.position,
+    });
+    expect(restored.weaponDetail).toMatchObject({
+      damageDiceCount: 1,
+      damageDiceFaces: 6,
+      damageType: "slashing",
+      finesse: true,
+    });
+  });
+
+  it("undoes a remove: restores the full row and its detail", async () => {
+    const acquire = await inv([
+      {
+        type: "acquire",
+        custom: {
+          name: "Removable Robe",
+          category: "armor",
+          armor: { armorCategory: "light", baseArmorClass: 11, dexModifierApplies: true },
+        },
+        quantity: 1,
+      },
+    ]);
+    const itemId = findItem(acquire.body, "Removable Robe")!.id as string;
+
+    await inv([{ type: "remove", inventoryItemId: itemId }]);
+    expect(await prisma.inventoryItem.findUnique({ where: { id: itemId } })).toBeNull();
+
+    const batchId = await latestBatchId(INV_ID);
+    const res = await revert(INV_ID, batchId);
+    expect(res.status).toBe(200);
+
+    const restored = await prisma.inventoryItem.findUniqueOrThrow({
+      where: { id: itemId },
+      include: { armorDetail: true },
+    });
+    expect(restored.name).toBe("Removable Robe");
+    expect(restored.armorDetail).toMatchObject({ armorCategory: "light", baseArmorClass: 11 });
+  });
+
+  it("undoes an adjust-to-zero (restores row) and a partial adjust (restores quantity)", async () => {
+    const acquire = await inv([
+      { type: "acquire", custom: { name: "Stack of Rations", category: "gear" }, quantity: 5 },
+    ]);
+    const itemId = findItem(acquire.body, "Stack of Rations")!.id as string;
+
+    // Partial adjust 5 → 3, then undo → back to 5 (row survived).
+    await inv([{ type: "adjustQuantity", inventoryItemId: itemId, delta: -2 }]);
+    const partialBatch = await latestBatchId(INV_ID);
+    await revert(INV_ID, partialBatch);
+    expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).quantity).toBe(5);
+
+    // Adjust 5 → 0 (row deleted), then undo → row recreated at quantity 5.
+    await inv([{ type: "adjustQuantity", inventoryItemId: itemId, delta: -5 }]);
+    expect(await prisma.inventoryItem.findUnique({ where: { id: itemId } })).toBeNull();
+    const zeroBatch = await latestBatchId(INV_ID);
+    const res = await revert(INV_ID, zeroBatch);
+    expect(res.status).toBe(200);
+    expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).quantity).toBe(5);
+  });
+
+  it("undoes a setEquipped, restoring the prior equipped flag", async () => {
+    const acquire = await inv([
+      { type: "acquire", custom: { name: "Plain Cloak", category: "gear" }, quantity: 1 },
+    ]);
+    const itemId = findItem(acquire.body, "Plain Cloak")!.id as string;
+
+    await inv([{ type: "setEquipped", inventoryItemId: itemId, equipped: true }]);
+    expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).equipped).toBe(true);
+
+    const batchId = await latestBatchId(INV_ID);
+    await revert(INV_ID, batchId);
+    expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).equipped).toBe(false);
+  });
+
+  it("undoes a bulk batch (sell A + remove B in one tx), restoring both atomically", async () => {
+    const acquire = await inv([
+      { type: "acquire", custom: { name: "Bulk Item A", category: "gear" }, quantity: 1 },
+      { type: "acquire", custom: { name: "Bulk Item B", category: "gear" }, quantity: 1 },
+    ]);
+    const idA = findItem(acquire.body, "Bulk Item A")!.id as string;
+    const idB = findItem(acquire.body, "Bulk Item B")!.id as string;
+
+    // One transaction: sell A (full) + remove B.
+    const batch = await inv([
+      { type: "sell", inventoryItemId: idA, currencyDelta: { cp: 0, sp: 0, gp: 1, pp: 0 } },
+      { type: "remove", inventoryItemId: idB },
+    ]);
+    expect(batch.status).toBe(200);
+    expect(findItem(batch.body, "Bulk Item A")).toBeUndefined();
+    expect(findItem(batch.body, "Bulk Item B")).toBeUndefined();
+    expect(batch.body.currency).toEqual({ cp: 0, sp: 0, gp: 11, pp: 0 }); // 10 + 1
+
+    const batchId = await latestBatchId(INV_ID);
+    const res = await revert(INV_ID, batchId);
+    expect(res.status).toBe(200);
+
+    expect(await prisma.inventoryItem.findUnique({ where: { id: idA } })).not.toBeNull();
+    expect(await prisma.inventoryItem.findUnique({ where: { id: idB } })).not.toBeNull();
+    expect(res.body.currency).toEqual({ cp: 0, sp: 0, gp: 10, pp: 0 }); // proceeds reversed
+  });
+
+  it("still enforces the LIFO guard (409 on an older inventory batch)", async () => {
+    const acquire = await inv([
+      { type: "acquire", custom: { name: "Old Lantern", category: "gear" }, quantity: 1 },
+    ]);
+    const oldBatch = await latestBatchId(INV_ID);
+    const itemId = findItem(acquire.body, "Old Lantern")!.id as string;
+
+    // A newer action makes the older batch un-undoable.
+    await inv([{ type: "setEquipped", inventoryItemId: itemId, equipped: true }]);
+
+    const res = await revert(INV_ID, oldBatch);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/most recent/i);
+  });
+
+  it("409s (not 500) when undoing a sale whose proceeds were already spent, leaving rows + currency unchanged", async () => {
+    // Sell a custom dagger for 5gp (10 → 15), then have the player spend it all
+    // so they can't afford to refund the proceeds on undo. We drop currency
+    // directly (not via another transaction op) so the SELL stays the most-recent
+    // batch — otherwise the LIFO guard, not the currency-reversal failure, would
+    // be what 409s, and this test wouldn't exercise the InsufficientCurrencyError
+    // path at all.
+    const acquire = await inv([
+      { type: "acquire", custom: { name: "Spent-Proceeds Dagger", category: "gear" }, quantity: 1 },
+    ]);
+    expect(acquire.status).toBe(200);
+    const itemId = findItem(acquire.body, "Spent-Proceeds Dagger")!.id as string;
+
+    const sell = await inv([
+      { type: "sell", inventoryItemId: itemId, currencyDelta: { cp: 0, sp: 0, gp: 5, pp: 0 } },
+    ]);
+    expect(sell.status).toBe(200);
+    expect(sell.body.currency).toEqual({ cp: 0, sp: 0, gp: 15, pp: 0 }); // 10 + 5
+    expect(findItem(sell.body, "Spent-Proceeds Dagger")).toBeUndefined(); // full stack sold → row gone
+
+    // Player spends everything (proceeds + starting gold) elsewhere.
+    await prisma.character.update({
+      where: { id: INV_ID },
+      data: { currency: { cp: 0, sp: 0, gp: 0, pp: 0 } },
+    });
+
+    const batchId = await latestBatchId(INV_ID);
+    const res = await revert(INV_ID, batchId);
+    expect(res.status).toBe(409); // NOT a 500
+    expect(res.body.error).toMatch(/not enough currency/i);
+
+    // The whole revert transaction rolled back: currency is still 0 (not -5),
+    // the sold row was NOT recreated, and the sold event is NOT marked reverted.
+    const after = await prisma.character.findUniqueOrThrow({ where: { id: INV_ID } });
+    expect(after.currency).toEqual({ cp: 0, sp: 0, gp: 0, pp: 0 });
+    expect(await prisma.inventoryItem.findUnique({ where: { id: itemId } })).toBeNull();
+
+    const sellEvents = await prisma.characterEvent.findMany({ where: { characterId: INV_ID, batchId } });
+    expect(sellEvents.length).toBeGreaterThan(0);
+    expect(sellEvents.every((e) => !e.reverted)).toBe(true); // batch left intact
+    const metas = await prisma.characterEvent.findMany({ where: { characterId: INV_ID, type: "revert" } });
+    expect(metas).toHaveLength(0); // no meta revert appended
+  });
+
+  it("undoes a remove of a CATALOG item whose catalog row is gone → recreates with itemId:null (no FK error)", async () => {
+    // A real catalog Item the player acquires, then the DM later deletes from the
+    // catalog. Undoing the remove must fall back to the self-contained snapshot.
+    const catalogItem = await prisma.item.create({
+      data: {
+        name: INV_CATALOG_ITEM_NAME,
+        category: "gear",
+        weight: 1,
+        cost: { cp: 0, sp: 0, gp: 1, pp: 0 },
+        description: "A bundled catalog torch.",
+      },
+    });
+
+    const acquire = await inv([{ type: "acquire", itemId: catalogItem.id, quantity: 3 }]);
+    expect(acquire.status).toBe(200);
+    const acquired = findItem(acquire.body, INV_CATALOG_ITEM_NAME)!;
+    const itemId = acquired.id as string;
+    // Sanity: the InventoryItem snapshot links back to the catalog row.
+    expect(
+      (await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).itemId,
+    ).toBe(catalogItem.id);
+
+    // Remove it (writes data.deletedItem carrying itemId), then delete the
+    // catalog row. The InventoryItem is already gone, so no FK conflict here.
+    await inv([{ type: "remove", inventoryItemId: itemId }]);
+    expect(await prisma.inventoryItem.findUnique({ where: { id: itemId } })).toBeNull();
+    await prisma.item.delete({ where: { id: catalogItem.id } });
+
+    // Undo the remove: the snapshot's itemId no longer resolves, so the row is
+    // recreated with itemId:null (self-contained) rather than throwing an FK error.
+    const batchId = await latestBatchId(INV_ID);
+    const res = await revert(INV_ID, batchId);
+    expect(res.status).toBe(200);
+
+    const restored = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } });
+    expect(restored.itemId).toBeNull(); // catalog gone → detached snapshot
+    expect(restored.name).toBe(INV_CATALOG_ITEM_NAME);
+    expect(restored.category).toBe("gear");
+    expect(restored.quantity).toBe(3);
+    expect(restored.weight).toBe(1);
   });
 });
 
@@ -896,5 +1154,158 @@ describe("GET /:id/activity — ?category= filter", () => {
     const categories = new Set(events.map((e) => e.category));
     expect(categories.has("conditions")).toBe(true);
     expect(categories.has("hitPoints")).toBe(true);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// GET /:id/activity — ?type= and ?sessionId= filters (issue #105)
+//
+// Events are seeded directly via prisma so type/sessionId combinations are
+// deterministic. Pins:
+//   - ?type= filters to one event type (validate-or-ignore, like ?category=)
+//   - an unknown ?type value is ignored (200, unfiltered) — not a 400
+//   - ?sessionId= filters to events recorded during one play session
+//   - type + sessionId + category compose with AND semantics
+// ════════════════════════════════════════════════════════════════════════════
+
+const TYPEFILTER_ID = "test-activity-typefilter-1";
+const TYPEFILTER_NAME = "Activity Type Filter Fighter";
+
+describe("GET /:id/activity — ?type= and ?sessionId= filters", () => {
+  let classId: string;
+  let sessionA: string;
+  let sessionB: string;
+
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: TYPEFILTER_NAME } });
+  });
+
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    const cls = await prisma.characterClass.upsert({
+      where: { name: TYPEFILTER_NAME },
+      create: {
+        name: TYPEFILTER_NAME,
+        hitDie: "d10",
+        savingThrows: ["strength", "constitution"],
+        skillChoiceCount: 2,
+        skillChoices: ["athletics", "intimidation"],
+        isSpellcaster: false,
+      },
+      update: {},
+    });
+    classId = cls.id;
+
+    await prisma.character.create({
+      data: {
+        id: TYPEFILTER_ID,
+        ownerId: OWNER_ID,
+        name: TYPEFILTER_NAME,
+        alignment: "Neutral Good",
+        experiencePoints: 0,
+        armorClass: 16,
+        initiativeBonus: 1,
+        speed: 30,
+        hitPoints: { current: 12, max: 12, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 1, die: "d10", spent: 0 },
+        abilityScores: {
+          strength: 16, dexterity: 12, constitution: 14,
+          intelligence: 10, wisdom: 10, charisma: 10,
+        },
+        savingThrowProficiencies: ["strength", "constitution"],
+        skills: [],
+        toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 10, pp: 0 },
+        classEntries: { create: [{ name: "fighter", classId, position: 0 }] },
+      },
+    });
+
+    const sA = await prisma.session.create({
+      data: { characterId: TYPEFILTER_ID, status: "ended", title: "Session A" },
+    });
+    const sB = await prisma.session.create({
+      data: { characterId: TYPEFILTER_ID, status: "ended", title: "Session B" },
+    });
+    sessionA = sA.id;
+    sessionB = sB.id;
+
+    // Seed three events with distinct (type, sessionId) combinations:
+    //   - inventory/sold during session A
+    //   - inventory/bought during session B
+    //   - hitPoints/damage outside any session
+    await prisma.characterEvent.createMany({
+      data: [
+        {
+          characterId: TYPEFILTER_ID,
+          category: "inventory",
+          type: "sold",
+          summary: "Sold Shortsword ×1",
+          sessionId: sessionA,
+          batchId: "batch-sold",
+        },
+        {
+          characterId: TYPEFILTER_ID,
+          category: "inventory",
+          type: "bought",
+          summary: "Bought Longsword ×1",
+          sessionId: sessionB,
+          batchId: "batch-bought",
+        },
+        {
+          characterId: TYPEFILTER_ID,
+          category: "hitPoints",
+          type: "damage",
+          summary: "Took 3 damage",
+          batchId: "batch-damage",
+        },
+      ],
+    });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: TYPEFILTER_ID } });
+  });
+
+  it("?type=sold returns ONLY sold events", async () => {
+    const res = await supertest(app()).get(`/api/characters/${TYPEFILTER_ID}/activity?type=sold`);
+    expect(res.status).toBe(200);
+    const events = res.body as Array<{ type: string }>;
+    expect(events.length).toBe(1);
+    expect(events.every((e) => e.type === "sold")).toBe(true);
+  });
+
+  it("an unknown ?type value is ignored (returns unfiltered, no 400)", async () => {
+    const res = await supertest(app()).get(`/api/characters/${TYPEFILTER_ID}/activity?type=not-a-real-type`);
+    expect(res.status).toBe(200);
+    const events = res.body as Array<{ type: string }>;
+    const types = new Set(events.map((e) => e.type));
+    expect(types.has("sold")).toBe(true);
+    expect(types.has("bought")).toBe(true);
+    expect(types.has("damage")).toBe(true);
+  });
+
+  it("?sessionId= filters to events recorded during one session", async () => {
+    const res = await supertest(app()).get(`/api/characters/${TYPEFILTER_ID}/activity?sessionId=${sessionA}`);
+    expect(res.status).toBe(200);
+    const events = res.body as Array<{ type: string }>;
+    expect(events.length).toBe(1);
+    expect(events[0].type).toBe("sold");
+  });
+
+  it("type + sessionId + category compose with AND semantics", async () => {
+    // sold is in inventory/sessionA → matches; bought (sessionB) and damage
+    // (no session) are excluded by the other two predicates.
+    const matched = await supertest(app()).get(
+      `/api/characters/${TYPEFILTER_ID}/activity?category=inventory&type=sold&sessionId=${sessionA}`,
+    );
+    expect(matched.status).toBe(200);
+    expect((matched.body as unknown[]).length).toBe(1);
+
+    // sold did not happen during sessionB → the AND yields nothing.
+    const unmatched = await supertest(app()).get(
+      `/api/characters/${TYPEFILTER_ID}/activity?category=inventory&type=sold&sessionId=${sessionB}`,
+    );
+    expect(unmatched.status).toBe(200);
+    expect((unmatched.body as unknown[]).length).toBe(0);
   });
 });
