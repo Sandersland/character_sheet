@@ -160,12 +160,14 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
           <div className="flex flex-wrap gap-2">
             <input
               type="search"
+              aria-label="Search spells"
               placeholder="Search by name or school…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className={`${inputCls} flex-1 min-w-[140px]`}
             />
             <select
+              aria-label="Filter by level"
               value={levelFilter}
               onChange={(e) => setLevelFilter(e.target.value)}
               className={`${inputCls} w-auto`}
