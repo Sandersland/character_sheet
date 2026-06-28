@@ -80,6 +80,22 @@ First boot builds images and runs `prisma migrate deploy && prisma db seed` agai
 
 Launch one background subagent per issue (`run_in_background: true`), so they build concurrently. Give each agent: its worktree path (`.claude/worktrees/feat/issue-<#>-<slug>`), its slot + ports, the approved plan, the issue number, and the integration branch name. Each agent follows this loop:
 
+> **Paste the house-rules preamble into every build agent's brief.** A delegated agent does **not** inherit CLAUDE.md — if you don't restate the non-negotiables, it will violate them and burn a review cycle (e.g. shipping a multi-line comment block that the `claude-review` gate then rejects). Include this verbatim in each agent prompt:
+>
+> ```
+> House rules (CLAUDE.md non-negotiables — follow exactly):
+> - Comments: one short line max. Never write multi-line comment blocks or JSDoc-style docstrings; let names and a single line carry intent. Issue/PR references go in the commit message, not a block comment.
+> - Imports: use the `@/` alias for every cross-file import — never relative `../` paths.
+> - Display text: never render a raw skill/ability/save key. Resolve through `skillLabel`/`abilityLabel`/`abilityAbbr` or the `SKILL_OPTIONS`/`ABILITY_OPTIONS` lists in `@/lib/abilities`.
+> - Backend calls: only through `frontend/src/api/client.ts` — never `fetch` directly from a component.
+> - Frontend placement: domain-agnostic primitives in `components/ui/`, domain components in `features/<domain>/`, pure logic (no JSX) in `lib/`.
+> - Backend (if touched): derive-don't-persist; 5e rules data only in `lib/`; mutate state only through `…/transactions` endpoints; level-gated state through `LEVEL_GATED_RECONCILERS` + a clamp-on-read.
+> - Docs: if your change touches a surface in the CLAUDE.md doc-map, update the mapped doc in the same PR.
+> - Artifacts: screenshots/captures go to `/tmp` only — never the project tree.
+> ```
+>
+> Tailor the list to the issue's surface (drop the backend rules for a frontend-only issue, etc.), but keep the comment-style and `@/`-import rules in every brief — those are the ones delegated agents most often miss.
+
 > **Run all tooling _inside the containers_, not on the host.** A worktree's `node_modules` are empty Docker-volume mountpoints — host-run `npx vitest`/`prisma` will fail. Each container bind-mounts its workspace at `/app` (`./backend:/app`, `./frontend:/app`) with deps in a named volume, and the backend container already has `DATABASE_URL` preset to the internal `db:5432`. Because source is bind-mounted, your host file edits are live in-container immediately, and any migration files / generated Prisma client land back in the worktree (so they get committed). (`.claude/docs/testing.md` describes the host-run flow — that is for the **main** checkout, which has real `node_modules`; the worktree diverges.) Run everything below from the worktree dir.
 
 **Per chunk — test first:**
