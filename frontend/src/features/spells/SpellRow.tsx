@@ -97,7 +97,7 @@ export default function SpellRow({
             </div>
           </div>
           {effect && (
-            <p className="text-xs text-parchment-500">{effect}</p>
+            <p className="text-xs text-parchment-600">{effect}</p>
           )}
           {compStr && (
             <p className="text-[11px] text-parchment-600">{compStr}</p>
@@ -115,7 +115,7 @@ export default function SpellRow({
               className={`rounded px-2 py-0.5 text-xs font-semibold transition-colors disabled:opacity-40 ${
                 spell.prepared
                   ? "bg-arcane-100 text-arcane-800 hover:bg-arcane-200"
-                  : "bg-parchment-100 text-parchment-500 hover:bg-parchment-200"
+                  : "bg-parchment-100 text-parchment-600 hover:bg-parchment-200"
               }`}
               title={spell.prepared ? "Mark as unprepared" : "Mark as prepared"}
             >
@@ -139,7 +139,7 @@ export default function SpellRow({
             type="button"
             disabled={busy}
             onClick={() => onForget(spell)}
-            className="text-parchment-400 hover:text-garnet-600 disabled:opacity-40"
+            className="text-parchment-600 hover:text-garnet-600 disabled:opacity-40"
             title={`Remove ${spell.name} from spellbook`}
             aria-label={`Remove ${spell.name}`}
           >
@@ -151,7 +151,7 @@ export default function SpellRow({
       {/* Slot picker (for leveled spells with multiple available slot levels) */}
       {slotPickerOpen && !isCantrip && (
         <div className="mt-2 flex flex-wrap items-start gap-2">
-          <span className="py-0.5 text-xs text-parchment-500">Cast with slot:</span>
+          <span className="py-0.5 text-xs text-parchment-600">Cast with slot:</span>
           {availableSlots.map((slotLevel) => {
             const isUpcast = slotLevel > spell.level;
             // Scaled effect at this slot level (e.g. "10d6 fire damage"); null for utility spells.
@@ -181,7 +181,7 @@ export default function SpellRow({
           <button
             type="button"
             onClick={() => setSlotPickerOpen(false)}
-            className="py-0.5 text-xs text-parchment-400 hover:text-parchment-700"
+            className="py-0.5 text-xs text-parchment-600 hover:text-parchment-700"
           >
             cancel
           </button>
@@ -191,11 +191,11 @@ export default function SpellRow({
       {/* Expand: description + stats */}
       {expanded && (
         <div className="mt-2 space-y-1 rounded-control bg-parchment-50 p-3">
-          <p className="text-xs text-parchment-500">
+          <p className="text-xs text-parchment-600">
             {spell.castingTime} · {spell.range} · {spell.duration}
           </p>
           {attackTypeLabel(spell) && (
-            <p className="text-xs text-parchment-500">{attackTypeLabel(spell)}</p>
+            <p className="text-xs text-parchment-600">{attackTypeLabel(spell)}</p>
           )}
           {spell.components?.material && spell.components.materialDescription && (
             <p className="text-xs text-parchment-600 italic">

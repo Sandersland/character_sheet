@@ -197,7 +197,7 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
             <h1 className="mt-1 font-display text-2xl font-semibold text-parchment-900">
               {character.name}
             </h1>
-            <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-parchment-500">
+            <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-parchment-600">
               <span>
                 {character.race} {character.class}
                 {character.subclass ? ` (${character.subclass})` : ""}

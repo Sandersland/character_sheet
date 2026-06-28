@@ -78,7 +78,7 @@ export default function JournalEntryPanel({
         <button
           type="button"
           onClick={onClose}
-          className="text-parchment-400 hover:text-parchment-700"
+          className="text-parchment-600 hover:text-parchment-700"
           aria-label="Close journal entry panel"
         >
           ✕

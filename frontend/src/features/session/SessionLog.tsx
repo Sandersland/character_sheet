@@ -111,7 +111,7 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
   }
 
   if (!events) {
-    return <p className="text-sm text-parchment-500">Loading…</p>;
+    return <p className="text-sm text-parchment-600">Loading…</p>;
   }
 
   // Filter out reverted events — they're confusing without context.
@@ -119,7 +119,7 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
 
   if (activeEvents.length === 0) {
     return (
-      <p className="py-6 text-center text-sm text-parchment-500">
+      <p className="py-6 text-center text-sm text-parchment-600">
         No events yet — actions taken during this session will appear here.
       </p>
     );

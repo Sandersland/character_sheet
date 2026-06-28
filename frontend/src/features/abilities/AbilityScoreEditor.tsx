@@ -208,12 +208,12 @@ export default function AbilityScoreEditor({
               {labelsAControl ? (
                 <label
                   htmlFor={controlId}
-                  className="text-xs font-semibold uppercase tracking-wide text-parchment-500"
+                  className="text-xs font-semibold uppercase tracking-wide text-parchment-600"
                 >
                   {abilityLabel}
                 </label>
               ) : (
-                <span className="text-xs font-semibold uppercase tracking-wide text-parchment-500">
+                <span className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
                   {abilityLabel}
                 </span>
               )}
@@ -275,7 +275,7 @@ export default function AbilityScoreEditor({
                 />
               )}
 
-              <span className="text-xs text-parchment-500">
+              <span className="text-xs text-parchment-600">
                 Modifier {formatModifier(abilityModifier(abilityScores[ability]))}
               </span>
             </div>

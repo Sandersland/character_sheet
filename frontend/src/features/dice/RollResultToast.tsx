@@ -77,11 +77,11 @@ export default function RollResultToast() {
           </p>
         )}
         {isFumble && (
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-parchment-400">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-parchment-600">
             Natural 1 — Fumble
           </p>
         )}
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
           {label}
         </p>
         <p
@@ -89,13 +89,13 @@ export default function RollResultToast() {
             isCrit
               ? "text-gold-700"
               : isFumble
-                ? "text-parchment-400"
+                ? "text-parchment-600"
                 : "text-garnet-800"
           }`}
         >
           {total}
         </p>
-        <p className="text-[11px] tabular-nums text-parchment-400">
+        <p className="text-[11px] tabular-nums text-parchment-600">
           {buildBreakdown(displayed)}
         </p>
       </div>

@@ -67,7 +67,7 @@ function weaponPropertyTags(weapon: WeaponDetail): string[] {
 
 const inputClass =
   "rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm";
-const labelClass = "flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500";
+const labelClass = "flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600";
 const checkboxLabelClass = "flex items-center gap-1.5 text-xs text-parchment-700";
 const linkButtonClass =
   "text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40 disabled:no-underline";
@@ -466,14 +466,14 @@ export default function InventoryRow({
             </Badge>
           )}
         </p>
-        <p className="mt-0.5 text-xs text-parchment-500">{details.join(" · ")}</p>
+        <p className="mt-0.5 text-xs text-parchment-600">{details.join(" · ")}</p>
         {item.description && (
           <p className="mt-1 text-xs text-parchment-600">{item.description}</p>
         )}
         {consumable?.effectDescription && (
           <p className="mt-1 text-xs text-parchment-600">{consumable.effectDescription}</p>
         )}
-        {item.notes && <p className="mt-1 text-xs italic text-parchment-500">{item.notes}</p>}
+        {item.notes && <p className="mt-1 text-xs italic text-parchment-600">{item.notes}</p>}
       </div>
       <div className="flex shrink-0 items-center gap-2 pt-0.5">
         {isEquippable(item.category) && (

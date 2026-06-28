@@ -28,7 +28,7 @@ export default function SkillsTable({
     <table className="w-full table-fixed border-collapse text-sm">
       <caption className="sr-only">Skills and their modifiers</caption>
       <thead>
-        <tr className="text-left text-[11px] uppercase tracking-wide text-parchment-500">
+        <tr className="text-left text-[11px] uppercase tracking-wide text-parchment-600">
           <th scope="col" className="w-6 py-1.5 pl-4">
             <span className="sr-only">Proficient</span>
           </th>

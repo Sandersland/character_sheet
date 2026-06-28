@@ -23,7 +23,7 @@ function isNonzero(currency: Currency): boolean {
 
 const inputClass =
   "rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm";
-const labelClass = "flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500";
+const labelClass = "flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600";
 
 /**
  * Inline panel (no modal/dialog component exists anywhere in this app —
@@ -235,7 +235,7 @@ export default function AddItemPanel({ items, pending, onSubmit, onClose }: AddI
               </label>
             </>
           )}
-          <p className="w-full text-xs text-parchment-500">
+          <p className="w-full text-xs text-parchment-600">
             Other weapon/armor/consumable details can be refined afterward via Edit.
           </p>
         </div>

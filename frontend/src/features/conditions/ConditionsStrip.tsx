@@ -65,7 +65,7 @@ export default function ConditionsStrip({ character, onUpdate }: Props) {
       aria-label="Conditions"
     >
       <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+        <h2 className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
           Conditions
         </h2>
         {busy && <span className="text-[11px] text-parchment-600">Saving…</span>}
@@ -132,7 +132,7 @@ export default function ConditionsStrip({ character, onUpdate }: Props) {
           </button>
         </div>
         {exhaustion > 0 && (
-          <span className="text-[11px] text-parchment-500">{exhaustionEffect(exhaustion)}</span>
+          <span className="text-[11px] text-parchment-600">{exhaustionEffect(exhaustion)}</span>
         )}
       </div>
 

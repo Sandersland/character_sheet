@@ -268,7 +268,7 @@ export default function AdvancementPanel({
           + Choose advancement
         </button>
         {slotsRemaining > 0 && (
-          <span className="text-[11px] text-parchment-400">
+          <span className="text-[11px] text-parchment-600">
             {slotsRemaining} slot{slotsRemaining > 1 ? "s" : ""} available
           </span>
         )}
@@ -286,7 +286,7 @@ export default function AdvancementPanel({
         <button
           type="button"
           onClick={() => { setOpen(false); setAsiIncreases({}); setSelectedFeat(null); setCustomMode(false); resetCustomForm(); }}
-          className="text-parchment-400 hover:text-parchment-700"
+          className="text-parchment-600 hover:text-parchment-700"
           aria-label="Close advancement panel"
         >
           ✕
@@ -328,7 +328,7 @@ export default function AdvancementPanel({
               return (
                 <div key={key} className="flex items-center justify-between gap-2">
                   <span className="w-28 text-sm text-parchment-900">{label}</span>
-                  <span className="tabular-nums text-sm text-parchment-500">
+                  <span className="tabular-nums text-sm text-parchment-600">
                     {current}
                     {bonus > 0 && (
                       <span className="ml-1 font-semibold text-gold-700">→ {newVal}</span>
@@ -381,13 +381,13 @@ export default function AdvancementPanel({
               <button
                 type="button"
                 onClick={() => { setSelectedFeat(null); setAbilityChoice(""); }}
-                className="mb-3 text-xs text-parchment-500 hover:text-parchment-800"
+                className="mb-3 text-xs text-parchment-600 hover:text-parchment-800"
               >
                 ← Back to list
               </button>
               <p className="font-semibold text-parchment-900">{selectedFeat.name}</p>
               {selectedFeat.prerequisite && (
-                <p className="mt-0.5 text-[11px] italic text-parchment-400">
+                <p className="mt-0.5 text-[11px] italic text-parchment-600">
                   Prerequisite: {selectedFeat.prerequisite}
                 </p>
               )}
@@ -438,7 +438,7 @@ export default function AdvancementPanel({
               <button
                 type="button"
                 onClick={() => { setCustomMode(false); resetCustomForm(); }}
-                className="mb-3 text-xs text-parchment-500 hover:text-parchment-800"
+                className="mb-3 text-xs text-parchment-600 hover:text-parchment-800"
               >
                 ← Back to list
               </button>
@@ -463,7 +463,7 @@ export default function AdvancementPanel({
 
               {/* ── Stat bonuses ── */}
               <div className="mt-4">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
                   Stat Bonuses
                 </p>
                 {statBonuses.length > 0 && (
@@ -479,7 +479,7 @@ export default function AdvancementPanel({
                             <option key={t.value} value={t.value}>{t.label}</option>
                           ))}
                         </select>
-                        <span className="text-xs text-parchment-500">+</span>
+                        <span className="text-xs text-parchment-600">+</span>
                         <input
                           type="number"
                           min={1}
@@ -501,7 +501,7 @@ export default function AdvancementPanel({
                         <button
                           type="button"
                           onClick={() => removeStatBonus(row.id)}
-                          className="ml-auto text-[11px] text-parchment-400 hover:text-garnet-600"
+                          className="ml-auto text-[11px] text-parchment-600 hover:text-garnet-600"
                           aria-label="Remove stat bonus"
                         >
                           ✕
@@ -521,7 +521,7 @@ export default function AdvancementPanel({
 
               {/* ── Skill proficiencies ── */}
               <div className="mt-4">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
                   Skill Proficiencies
                 </p>
                 <div className="flex flex-wrap gap-x-3 gap-y-1.5">
@@ -541,7 +541,7 @@ export default function AdvancementPanel({
 
               {/* ── Saving throw proficiencies ── */}
               <div className="mt-4">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
                   Saving Throw Proficiencies
                 </p>
                 <div className="flex flex-wrap gap-x-3 gap-y-1.5">
@@ -561,10 +561,10 @@ export default function AdvancementPanel({
 
               {/* ── Ability score increase (half-feat style) ── */}
               <div className="mt-4">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
                   Ability Score Increase
                 </p>
-                <p className="mb-2 text-[11px] text-parchment-500">
+                <p className="mb-2 text-[11px] text-parchment-600">
                   Check abilities the player may choose from when taking this feat.
                 </p>
                 <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1.5">
@@ -614,7 +614,7 @@ export default function AdvancementPanel({
                   </div>
                 )}
                 {abilityOptionsArr.length === 1 && (
-                  <p className="mt-1.5 text-[11px] text-parchment-500">
+                  <p className="mt-1.5 text-[11px] text-parchment-600">
                     +{abilityIncrease} to {abilityLabel(abilityOptionsArr[0])} will be applied automatically.
                   </p>
                 )}
@@ -645,10 +645,10 @@ export default function AdvancementPanel({
                 <p className="text-xs text-garnet-700">{catalogError}</p>
               )}
               {catalog === null && !catalogError && (
-                <p className="text-xs text-parchment-500">Loading…</p>
+                <p className="text-xs text-parchment-600">Loading…</p>
               )}
               {catalog !== null && filteredCatalog.length === 0 && (
-                <p className="py-2 text-center text-xs text-parchment-500">
+                <p className="py-2 text-center text-xs text-parchment-600">
                   {search ? "No feats match your search." : "No feats in catalog."}
                 </p>
               )}
@@ -669,11 +669,11 @@ export default function AdvancementPanel({
                           )}
                         </p>
                         {feat.prerequisite && (
-                          <p className="text-[10px] italic text-parchment-400">
+                          <p className="text-[10px] italic text-parchment-600">
                             Req: {feat.prerequisite}
                           </p>
                         )}
-                        <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-parchment-500">
+                        <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-parchment-600">
                           {feat.description}
                         </p>
                       </div>
@@ -693,7 +693,7 @@ export default function AdvancementPanel({
               <button
                 type="button"
                 onClick={() => setCustomMode(true)}
-                className="mt-3 w-full rounded-control border border-dashed border-parchment-300 px-3 py-1.5 text-xs text-parchment-500 hover:border-parchment-400 hover:bg-white"
+                className="mt-3 w-full rounded-control border border-dashed border-parchment-300 px-3 py-1.5 text-xs text-parchment-600 hover:border-parchment-400 hover:bg-white"
               >
                 + Add custom feat
               </button>

@@ -218,7 +218,7 @@ export default function InlineAttackPicker({
   return (
     <div className="flex flex-col divide-y divide-parchment-200">
       {equippedWeapons.length === 0 && attackOptionManeuvers.length === 0 && (
-        <p className="pb-3 text-sm text-parchment-500">
+        <p className="pb-3 text-sm text-parchment-600">
           {unequippedWeapons.length > 0
             ? "No weapons equipped. Equip one below, or use the Inventory tab."
             : "No weapons equipped. Add a weapon from the Inventory tab, then equip it here."}
@@ -228,7 +228,7 @@ export default function InlineAttackPicker({
       {/* ── Equip an owned-but-unequipped weapon, inline ─────────────────────── */}
       {unequippedWeapons.length > 0 && (
         <div className="flex flex-col gap-1.5 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
             Equip a weapon
           </p>
           {unequippedWeapons.map((item) => (
@@ -266,7 +266,7 @@ export default function InlineAttackPicker({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-parchment-900">{item.name}</p>
-                <p className="text-xs text-parchment-500">
+                <p className="text-xs text-parchment-600">
                   Attack: +{w.attackBonus ?? 0} · Damage: {damageLabel}{gripLabel}
                 </p>
                 {/* Auto-summed overrides display */}
@@ -333,7 +333,7 @@ export default function InlineAttackPicker({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-parchment-900">Unarmed Strike</p>
-            <p className="text-xs text-parchment-500">
+            <p className="text-xs text-parchment-600">
               Attack: +{unarmedStrike.attackBonus} · Damage: {unarmedDamageDisplay} bludgeoning
             </p>
             {attackTotals["unarmed"] !== null && attackTotals["unarmed"] !== undefined && (
@@ -394,7 +394,7 @@ export default function InlineAttackPicker({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-parchment-900">Improvised Weapon</p>
-            <p className="text-xs text-parchment-500">
+            <p className="text-xs text-parchment-600">
               Attack: {improvisedWeapon.attackBonus >= 0 ? "+" : ""}
               {improvisedWeapon.attackBonus} · Damage:{" "}
               {formatRollSpec(improvisedDamageSpec)} bludgeoning
@@ -464,7 +464,7 @@ export default function InlineAttackPicker({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-parchment-900">{m.name}</p>
-                <p className="text-xs text-parchment-500">
+                <p className="text-xs text-parchment-600">
                   Forfeit 1 attack · Costs bonus action · Spend {dieLabel}
                 </p>
                 {message && (

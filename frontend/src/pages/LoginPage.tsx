@@ -36,7 +36,7 @@ export default function LoginPage() {
           </p>
 
           {state.status === "loading" && (
-            <p className="text-sm text-parchment-500">Loading sign-in options…</p>
+            <p className="text-sm text-parchment-600">Loading sign-in options…</p>
           )}
 
           {state.status === "error" && (

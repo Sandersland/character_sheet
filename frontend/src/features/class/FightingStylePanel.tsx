@@ -47,7 +47,7 @@ export default function FightingStylePanel({ current, busy, onChoose }: Props) {
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="text-parchment-400 hover:text-parchment-700"
+          className="text-parchment-600 hover:text-parchment-700"
           aria-label="Close fighting style panel"
         >
           ✕
@@ -64,7 +64,7 @@ export default function FightingStylePanel({ current, busy, onChoose }: Props) {
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium text-parchment-900">{style.label}</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-parchment-500">
+                <p className="mt-0.5 text-xs leading-relaxed text-parchment-600">
                   {style.description}
                 </p>
               </div>

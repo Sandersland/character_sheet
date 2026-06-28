@@ -172,7 +172,7 @@ export default function TurnTracker({ character, turnState, onUpdate }: TurnTrac
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-parchment-800">Your Turn</p>
-            <p className="mt-0.5 text-xs text-parchment-500">
+            <p className="mt-0.5 text-xs text-parchment-600">
               When the DM calls your turn, start tracking your action economy.
             </p>
           </div>
@@ -212,12 +212,12 @@ export default function TurnTracker({ character, turnState, onUpdate }: TurnTrac
               <SlotPip filled={actionsRemaining > 0 || attack !== null} />
               <span className="text-sm font-semibold text-parchment-800">Action</span>
               {actionsRemaining > 0 && (
-                <span className="text-xs text-parchment-500">
+                <span className="text-xs text-parchment-600">
                   {actionsRemaining} available
                 </span>
               )}
               {actionsRemaining === 0 && attack === null && (
-                <span className="text-xs text-parchment-400 italic">used</span>
+                <span className="text-xs text-parchment-600 italic">used</span>
               )}
             </div>
             {actionsRemaining > 0 && (
@@ -293,7 +293,7 @@ export default function TurnTracker({ character, turnState, onUpdate }: TurnTrac
               <SlotPip filled={!bonusActionUsed && bonusAttack === null} />
               <span className="text-sm font-semibold text-parchment-800">Bonus Action</span>
               {bonusActionUsed && bonusAttack === null && (
-                <span className="text-xs text-parchment-400 italic">used</span>
+                <span className="text-xs text-parchment-600 italic">used</span>
               )}
             </div>
             {!bonusActionUsed && (
@@ -366,9 +366,9 @@ export default function TurnTracker({ character, turnState, onUpdate }: TurnTrac
               <SlotPip filled={!reactionUsed} />
               <span className="text-sm font-semibold text-parchment-800">Reaction</span>
               {reactionUsed ? (
-                <span className="text-xs text-parchment-400 italic">used</span>
+                <span className="text-xs text-parchment-600 italic">used</span>
               ) : (
-                <span className="text-xs text-parchment-500">available</span>
+                <span className="text-xs text-parchment-600">available</span>
               )}
             </div>
             {!reactionUsed && (
@@ -437,7 +437,7 @@ export default function TurnTracker({ character, turnState, onUpdate }: TurnTrac
         )}
 
         {/* Note about movement */}
-        <p className="text-[11px] text-parchment-400 italic">
+        <p className="text-[11px] text-parchment-600 italic">
           ⚑ Movement is not tracked here. Speed / difficult-terrain tracking is a future feature.
         </p>
       </div>
