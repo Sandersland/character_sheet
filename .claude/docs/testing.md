@@ -127,7 +127,7 @@ No DB needed. Run with `cd frontend && npx vitest run`.
 
 ### Setup
 
-`vite.config.ts` carries the `test` block (`environment: "jsdom"`, `setupFiles: ["./src/test/setup.ts"]`, `globals: false`). Vitest inherits the `@/` alias from the same config. `src/test/setup.ts` registers jest-dom matchers and runs RTL `cleanup()` after each test. Test deps: `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, `@testing-library/dom`.
+`vite.config.ts` carries the `test` block (`environment: "jsdom"`, `setupFiles: ["./src/test/setup.ts"]`, `globals: false`). Vitest inherits the `@/` alias from the same config. `src/test/setup.ts` registers jest-dom matchers, the jest-axe `toHaveNoViolations` matcher, and runs RTL `cleanup()` after each test. Test deps: `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, `@testing-library/dom`, `jest-axe`.
 
 ### Two flavors — both colocated next to their source file (no `__tests__/` subdirectory)
 
@@ -170,6 +170,17 @@ screen.getByRole("dialog")
 **Two gotchas from the existing suite:**
 - An `<img alt="">` has ARIA role `presentation`, not `img` — query it with `container.querySelector("img")` instead of `getByRole("img")`.
 - A button's accessible name comes from its text content, not its `title` attribute — use the text (e.g. `"Cast"`, not `"Cast Fireball"`).
+
+**Runtime accessibility checks** — import `axe` from `@/test/axe` and assert no violations on rendered output. The matcher is registered globally in `setup.ts`; the helper re-exports `axe` and carries the vitest type augmentation. Add this to component tests for any surface with form controls, interactive widgets, or non-trivial structure:
+```tsx
+import { axe } from "@/test/axe";
+
+it("has no axe accessibility violations", async () => {
+  const { container } = render(<Card title="Skills">Content</Card>);
+  expect(await axe(container)).toHaveNoViolations();
+});
+```
+This complements the static `eslint-plugin-jsx-a11y` lint (in `frontend/eslint.config.js`, recommended ruleset): lint catches markup-level mistakes (unassociated labels, non-semantic interactive elements, bad ARIA) at dev time; axe catches computed/runtime issues. `src/components/ui/Card.test.tsx` is the reference example.
 
 **Router-dependent components** — wrap in `MemoryRouter`:
 ```tsx
