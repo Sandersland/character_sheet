@@ -14,7 +14,18 @@ import { logger } from "./logger.js";
 //     production. Intentional 4xx errors keep their message (it's meant for the
 //     client); a 500 gets a generic message in prod, the real one in dev.
 //   - Logs server-side with the stack via the structured logger.
+// Prisma's "record required but not found" error (thrown by findUniqueOrThrow /
+// update / delete when the row is gone — e.g. a delete racing a second query
+// after an access check). It carries no `.status`, so without this it would fall
+// through to 500; semantically it's a 404.
+function isPrismaRecordNotFound(err: unknown): boolean {
+  return Boolean(
+    err && typeof err === "object" && (err as { code?: unknown }).code === "P2025",
+  );
+}
+
 function statusFromError(err: unknown): number {
+  if (isPrismaRecordNotFound(err)) return 404;
   if (err && typeof err === "object") {
     const candidate = (err as { status?: unknown; statusCode?: unknown }).status ??
       (err as { statusCode?: unknown }).statusCode;
@@ -34,7 +45,13 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   }
 
   const status = statusFromError(err);
-  const message = err instanceof Error ? err.message : String(err);
+  // Prisma's record-not-found message is verbose internal detail; surface a
+  // clean "Not found" to the client instead.
+  const message = isPrismaRecordNotFound(err)
+    ? "Not found"
+    : err instanceof Error
+      ? err.message
+      : String(err);
   const isProd = process.env.NODE_ENV === "production";
 
   // Log every unexpected (500) error with its stack, server-side only. Prefer
