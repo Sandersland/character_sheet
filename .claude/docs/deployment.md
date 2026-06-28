@@ -28,7 +28,17 @@ Components are env-driven so any of them can be deployed anywhere:
 | `RATE_LIMIT_MAX` | backend | Max requests per window per IP, global. Default `600`. |
 | `RATE_LIMIT_CREATE_MAX` | backend | Tighter cap for `POST /api/characters` per window. Default `30`. |
 | `RATE_LIMIT_DISABLED` | backend | `true` disables rate limiting entirely (also auto-off under test). |
+| `APP_BASE_URL` | backend | Public origin of the API, used to build the OAuth redirect URI. Default `http://localhost:4000`. Set to the deployed origin in prod. |
+| `GOOGLE_CLIENT_ID` | backend | Google OAuth client id. Optional — Google sign-in is enabled only when **both** id and secret are set; absent → the app boots with no providers. |
+| `GOOGLE_CLIENT_SECRET` | backend | Google OAuth client secret. See above; both must be set together. |
+| `SESSION_COOKIE_SECURE` | backend | Whether session/oauth cookies get the `Secure` flag. Tri-state: defaults to on in production, off elsewhere; set `true`/`false` to override (e.g. force off behind a local proxy). |
+| `BOOTSTRAP_OWNER_EMAIL` | backend | Pins the single placeholder character owner to this email (upserted). Optional; unused once #101 enforces per-user ownership. |
 | `VITE_API_URL` | frontend **build** | Baked at build time. `/api` for single-origin; the API's absolute URL for split. |
+
+**OAuth setup:** register the redirect URI `${APP_BASE_URL}/api/auth/google/callback`
+(e.g. `http://localhost:4000/api/auth/google/callback` in dev) as an authorized
+redirect URI on the Google OAuth client. A provider appears in
+`GET /api/auth/providers` and is usable only when its id+secret pair is set.
 
 The single-origin design is deliberate: one hostname means one Cloudflare Access
 policy, same-origin `fetch` (no CORS), and no cross-origin Access-cookie problems.

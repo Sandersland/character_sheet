@@ -58,6 +58,7 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 |---|---|
 | `dice.ts` | The sole `Math.random` dice site — `rollDie`/`rollSpec`/`summarizeRoll`/`formatRollSpec` (see Dice engine below). |
 | `abilities.ts` | Ability/skill/save labels + `abilityModifier` math; resolve all display keys through here. |
+| `events.ts` | Activity-log display lookups — `eventTypeLabel`/`categoryLabel`/`categoryTone` (tolerant `Partial<Record>` maps, raw-key fallback) + `INVENTORY_EVENT_TYPES` for the filter chips. Resolve all event type/category keys through here, never inline-capitalize. |
 | `timeline.ts` | Groups/formats audit events for the activity timeline. |
 | `startingEquipment.ts` | Character-creation equipment helpers (`isPackageComplete`, `isGoldValid`, `EquipmentDraft`). |
 | `characterCreationValidation.ts` | Explains *why* the creation Save button is disabled (`missingRequirements`). |
@@ -130,7 +131,7 @@ Use idiomatic utility classes — tokens auto-generate them in v4: `text-garnet-
 | Modal | Inline panel |
 |---|---|
 | `LedgerModal` — read-only inventory ledger | `AddItemPanel` — add item form |
-| `ActivityModal` — read-only audit timeline + undo | `AddSpellPanel` — learn spell form |
+| `ActivityModal` — filterable audit timeline (category + session selects + inventory type chips; optional `entityId` scope) + undo | `AddSpellPanel` — learn spell form |
 | `DeleteCharacterModal` — confirm destructive action | `InventoryRow` edit/sell mode |
 | `LevelUpModal` / `ConcentrationSaveModal` — hosted *inside* `HitPointTracker` | `HitPointTracker` itself — inline Card (damage/heal/rest/death-save controls) |
 | | `ExperienceTracker` award/set inputs |

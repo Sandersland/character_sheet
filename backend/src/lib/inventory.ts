@@ -342,6 +342,92 @@ function snapshotItemDetail(item: CatalogItemWithDetails) {
   };
 }
 
+// ── Undo snapshot ────────────────────────────────────────────────────────────
+//
+// When an op DELETES an InventoryItem row (full sell, remove, adjust-to-zero)
+// the relational row + its detail rows are gone, so `before`/`after` alone
+// can't reconstruct it on undo. We stash a self-contained snapshot under
+// `data.deletedItem` (NOT `before` — `before`/`after` feed diffToFields and
+// would spray spurious field-diff rows; `data` is never diffed). On revert,
+// revertInventoryEvent recreates the row from this snapshot reusing the
+// original id. The detail blocks are typed as Prisma nested-create inputs so
+// they drop straight into inventoryItem.create's `{ create: … }`.
+export interface DeletedInventoryItemSnapshot {
+  id: string;
+  itemId: string | null;
+  name: string;
+  category: ItemCategoryName;
+  weight: number | null;
+  cost: Currency | null;
+  description: string | null;
+  quantity: number;
+  equipped: boolean;
+  notes: string | null;
+  position: number;
+  weaponDetail: Prisma.InventoryWeaponDetailCreateWithoutInventoryItemInput | null;
+  armorDetail: Prisma.InventoryArmorDetailCreateWithoutInventoryItemInput | null;
+  consumableDetail: Prisma.InventoryConsumableDetailCreateWithoutInventoryItemInput | null;
+}
+
+// Serializes an already-fetched InventoryItemWithDetails into the
+// `data.deletedItem` snapshot. Mirror of snapshotItemDetail's field-by-field
+// style, but reads from an InventoryItem (live row) rather than a catalog Item
+// and keeps the scalar item columns alongside the detail blocks.
+function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): DeletedInventoryItemSnapshot {
+  return {
+    id: item.id,
+    itemId: item.itemId,
+    name: item.name,
+    category: item.category,
+    weight: item.weight,
+    cost: asCurrency(item.cost),
+    description: item.description,
+    quantity: item.quantity,
+    equipped: item.equipped,
+    notes: item.notes,
+    position: item.position,
+    weaponDetail: item.weaponDetail
+      ? {
+          damageDiceCount: item.weaponDetail.damageDiceCount,
+          damageDiceFaces: item.weaponDetail.damageDiceFaces,
+          damageModifier: item.weaponDetail.damageModifier,
+          damageType: item.weaponDetail.damageType,
+          versatileDiceCount: item.weaponDetail.versatileDiceCount,
+          versatileDiceFaces: item.weaponDetail.versatileDiceFaces,
+          finesse: item.weaponDetail.finesse,
+          light: item.weaponDetail.light,
+          heavy: item.weaponDetail.heavy,
+          twoHanded: item.weaponDetail.twoHanded,
+          reach: item.weaponDetail.reach,
+          thrown: item.weaponDetail.thrown,
+          ammunition: item.weaponDetail.ammunition,
+          rangeNormal: item.weaponDetail.rangeNormal,
+          rangeLong: item.weaponDetail.rangeLong,
+          weaponClass: item.weaponDetail.weaponClass,
+          weaponRange: item.weaponDetail.weaponRange,
+        }
+      : null,
+    armorDetail: item.armorDetail
+      ? {
+          armorCategory: item.armorDetail.armorCategory,
+          baseArmorClass: item.armorDetail.baseArmorClass,
+          dexModifierApplies: item.armorDetail.dexModifierApplies,
+          dexModifierMax: item.armorDetail.dexModifierMax,
+          stealthDisadvantage: item.armorDetail.stealthDisadvantage,
+          strengthRequirement: item.armorDetail.strengthRequirement,
+        }
+      : null,
+    consumableDetail: item.consumableDetail
+      ? {
+          effectDiceCount: item.consumableDetail.effectDiceCount,
+          effectDiceFaces: item.consumableDetail.effectDiceFaces,
+          effectModifier: item.consumableDetail.effectModifier,
+          effectDescription: item.consumableDetail.effectDescription,
+        }
+      : null,
+  };
+}
+
 // Builds the nested-create payload for an InventoryItem from a catalog Item
 // that has already been fetched with catalogItemDetailInclude. Used by
 // routes/characters.ts to create starting-equipment rows atomically inside
@@ -566,7 +652,13 @@ export async function applyAdjustQuantity(
     entityId: item.id,
     before: { quantity: item.quantity },
     after: nextQuantity === 0 ? null : { quantity: nextQuantity },
-    data: { itemName: item.name, quantityDelta: op.delta },
+    // Only snapshot for undo when the row is actually deleted (quantity hits 0);
+    // a partial adjust leaves the row, so `before.quantity` is enough to restore.
+    data: {
+      itemName: item.name,
+      quantityDelta: op.delta,
+      ...(nextQuantity === 0 ? { deletedItem: snapshotInventoryItemForUndo(item) } : {}),
+    },
     batchId,
     sessionId,
   });
@@ -654,7 +746,12 @@ async function applyRemove(
     entityId: item.id,
     before: { name: item.name, quantity: item.quantity, category: item.category },
     after: null,
-    data: { itemName: item.name, quantityDelta: -item.quantity },
+    // `remove` always deletes the whole row, so always snapshot for undo.
+    data: {
+      itemName: item.name,
+      quantityDelta: -item.quantity,
+      deletedItem: snapshotInventoryItemForUndo(item),
+    },
     batchId,
     sessionId,
   });
@@ -683,7 +780,14 @@ async function applySell(tx: Prisma.TransactionClient, characterId: string, op: 
     entityId: item.id,
     before: { quantity: item.quantity },
     after: remaining === 0 ? null : { quantity: remaining },
-    data: { itemName: item.name, quantityDelta: -quantitySold, currencyDelta: op.currencyDelta },
+    // Only snapshot for undo when the FULL stack is sold (row deleted); a
+    // partial sell leaves the row, so `before.quantity` is enough to restore.
+    data: {
+      itemName: item.name,
+      quantityDelta: -quantitySold,
+      currencyDelta: op.currencyDelta,
+      ...(quantitySold === item.quantity ? { deletedItem: snapshotInventoryItemForUndo(item) } : {}),
+    },
     batchId,
     sessionId,
   });
@@ -692,6 +796,99 @@ async function applySell(tx: Prisma.TransactionClient, characterId: string, op: 
     await tx.inventoryItem.delete({ where: { id: item.id } });
   } else {
     await tx.inventoryItem.update({ where: { id: item.id }, data: { quantity: item.quantity - quantitySold } });
+  }
+}
+
+// ── Undo / revert ────────────────────────────────────────────────────────────
+//
+// Reverses one already-applied inventory CharacterEvent inside the caller's
+// revert transaction (routes/activity.ts). Shape-driven, NOT type-driven:
+// event `type` names (acquired/consumed/sold/…) are shared across ops, so the
+// row action is decided by the snapshot shape instead:
+//
+//   before == null            → the op CREATED the row (acquire) → delete it
+//   data.deletedItem present  → the op DELETED the row → recreate from snapshot
+//   else                      → the row still exists → restore scalar(s) from before
+//
+// Currency is reversed first: data.currencyDelta is the signed amount applied
+// at write time (negative for a purchase, positive for a sale), so subtracting
+// it per-denomination undoes either direction. A negative result (the player
+// has since spent the proceeds) throws InsufficientCurrencyError, which rolls
+// back the whole revert batch.
+export async function revertInventoryEvent(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  event: {
+    entityId: string | null;
+    before: Prisma.JsonValue | null;
+    data: Prisma.JsonValue | null;
+  }
+): Promise<void> {
+  const data = event.data as
+    | { currencyDelta?: Currency | null; deletedItem?: DeletedInventoryItemSnapshot }
+    | null;
+
+  // Defensive: nothing to act on without a row id. Checked BEFORE the currency
+  // reversal so a malformed event carrying a currencyDelta but no entityId can't
+  // mutate currency without a corresponding row action. Well-formed events
+  // always have an entityId, so this is a pure no-op for them.
+  if (!event.entityId) return;
+
+  // 1. Reverse any currency movement (purchase or sale proceeds).
+  const currencyDelta = data?.currencyDelta ?? undefined;
+  if (hasNonzeroCurrency(currencyDelta)) {
+    const current = await getCharacterCurrency(tx, characterId);
+    await setCharacterCurrency(tx, characterId, currencyDebit(current, currencyDelta));
+  }
+
+  // 2. Reverse the row mutation, shape-driven.
+  if (event.before === null) {
+    // Creation (acquire) → delete the created row; detail rows cascade.
+    await tx.inventoryItem.delete({ where: { id: event.entityId } });
+    return;
+  }
+
+  const deletedItem = data?.deletedItem;
+  if (deletedItem) {
+    // The row was deleted → recreate it, reusing the original id so the
+    // soft-reference entityId on other events stays valid.
+    let itemId = deletedItem.itemId;
+    if (itemId) {
+      const catalogItem = await tx.item.findUnique({ where: { id: itemId }, select: { id: true } });
+      if (!catalogItem) itemId = null; // catalog row gone → snapshot is self-contained
+    }
+    await tx.inventoryItem.create({
+      data: {
+        id: event.entityId,
+        characterId,
+        itemId,
+        name: deletedItem.name,
+        category: deletedItem.category,
+        weight: deletedItem.weight ?? undefined,
+        cost: toJsonInput(deletedItem.cost),
+        description: deletedItem.description ?? undefined,
+        quantity: deletedItem.quantity,
+        equipped: deletedItem.equipped,
+        notes: deletedItem.notes ?? undefined,
+        position: deletedItem.position,
+        weaponDetail: deletedItem.weaponDetail ? { create: deletedItem.weaponDetail } : undefined,
+        armorDetail: deletedItem.armorDetail ? { create: deletedItem.armorDetail } : undefined,
+        consumableDetail: deletedItem.consumableDetail
+          ? { create: deletedItem.consumableDetail }
+          : undefined,
+      },
+    });
+    return;
+  }
+
+  // The row still exists → restore the scalar(s) captured in before
+  // (quantity for partial sell/adjust, equipped for setEquipped).
+  const before = event.before as { quantity?: number; equipped?: boolean };
+  const updateData: Prisma.InventoryItemUpdateInput = {};
+  if (before.quantity !== undefined) updateData.quantity = before.quantity;
+  if (before.equipped !== undefined) updateData.equipped = before.equipped;
+  if (Object.keys(updateData).length > 0) {
+    await tx.inventoryItem.update({ where: { id: event.entityId }, data: updateData });
   }
 }
 
