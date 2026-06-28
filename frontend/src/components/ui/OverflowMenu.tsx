@@ -1,0 +1,137 @@
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+
+export interface OverflowMenuItem {
+  label: string;
+  onSelect: () => void;
+  danger?: boolean;
+  separatorBefore?: boolean;
+}
+
+interface OverflowMenuProps {
+  items: OverflowMenuItem[];
+  label?: string;
+  className?: string;
+}
+
+// Icon-only kebab menu-button: WAI-ARIA menu pattern, roving tabindex, focus returns to trigger.
+export default function OverflowMenu({ items, label, className = "" }: OverflowMenuProps) {
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  function close() {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
+  function moveTo(index: number) {
+    setActiveIndex(index);
+    itemRefs.current[index]?.focus();
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    setActiveIndex(0);
+    itemRefs.current[0]?.focus();
+
+    function handleKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") close();
+    }
+    function handleMouseDown(event: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleMouseDown);
+    };
+  }, [open]);
+
+  function select(item: OverflowMenuItem) {
+    item.onSelect();
+    close();
+  }
+
+  function handleTriggerKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
+    if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setOpen(true);
+    }
+  }
+
+  function handleItemKeyDown(e: KeyboardEvent<HTMLButtonElement>, index: number) {
+    const count = items.length;
+    let next = index;
+
+    if (e.key === "ArrowDown") {
+      next = (index + 1) % count;
+    } else if (e.key === "ArrowUp") {
+      next = (index - 1 + count) % count;
+    } else if (e.key === "Home") {
+      next = 0;
+    } else if (e.key === "End") {
+      next = count - 1;
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      select(items[index]);
+      return;
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      close();
+      return;
+    } else {
+      return;
+    }
+
+    e.preventDefault();
+    moveTo(next);
+  }
+
+  return (
+    <div ref={wrapperRef} className={`relative inline-block ${className}`}>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={label ?? "More actions"}
+        onClick={() => setOpen((v) => !v)}
+        onKeyDown={handleTriggerKeyDown}
+        className="flex h-7 w-7 items-center justify-center rounded-control text-lg leading-none text-parchment-600 transition-colors hover:bg-parchment-200 hover:text-parchment-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
+      >
+        ⋮
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 z-10 mt-1 min-w-[10rem] overflow-hidden rounded-card border border-parchment-200 bg-parchment-50 py-1 shadow-raised"
+        >
+          {items.map((item, i) => (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitem"
+              ref={(el) => { itemRefs.current[i] = el; }}
+              tabIndex={i === activeIndex ? 0 : -1}
+              onClick={() => select(item)}
+              onKeyDown={(e) => handleItemKeyDown(e, i)}
+              className={[
+                "block w-full px-3 py-1.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:bg-parchment-100 hover:bg-parchment-100",
+                item.separatorBefore ? "border-t border-parchment-200" : "",
+                item.danger ? "text-garnet-700" : "text-parchment-800",
+              ].join(" ")}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
