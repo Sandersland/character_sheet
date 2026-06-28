@@ -32,7 +32,6 @@ Components are env-driven so any of them can be deployed anywhere:
 | `GOOGLE_CLIENT_ID` | backend | Google OAuth client id. Optional — Google sign-in is enabled only when **both** id and secret are set; absent → the app boots with no providers. |
 | `GOOGLE_CLIENT_SECRET` | backend | Google OAuth client secret. See above; both must be set together. |
 | `SESSION_COOKIE_SECURE` | backend | Whether session/oauth cookies get the `Secure` flag. Tri-state: defaults to on in production, off elsewhere; set `true`/`false` to override (e.g. force off behind a local proxy). |
-| `BOOTSTRAP_OWNER_EMAIL` | backend | Pins the single placeholder character owner to this email (upserted). Optional; unused once #101 enforces per-user ownership. |
 | `VITE_API_URL` | frontend **build** | Baked at build time. `/api` for single-origin; the API's absolute URL for split. |
 
 **OAuth setup:** register the redirect URI `${APP_BASE_URL}/api/auth/google/callback`

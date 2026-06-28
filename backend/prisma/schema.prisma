@@ -34,9 +34,9 @@ model Character {
   // Owning user. Legitimately persisted (NOT derived) — ownership is identity
   // state, not a function of any other column, so it's exempt from the
   // derive-don't-persist rule that excludes level/proficiencyBonus/race/etc.
-  // onDelete: Cascade — deleting a user removes their characters. Enforcement
-  // of "only the owner may read/write" is deferred to #101; today the API is
-  // single-player and every character resolves to one bootstrap owner.
+  // onDelete: Cascade — deleting a user removes their characters. "Only the
+  // owner may read/write" is enforced (#101) via requireAuth (app.ts) +
+  // assertCharacterAccess (lib/auth/access.ts), the single sharing seam (#116).
   ownerId     String
   owner       User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
@@ -84,12 +84,10 @@ model Character {
 }
 
 // --- Identity & ownership ---------------------------------------------------
-// Authentication-ready user model. Wired to Character via ownerId so every
-// sheet has an owner, but read/write enforcement is deferred to #101 — today
-// the API resolves a single bootstrap owner (see lib/owner.ts) and serves
-// every character regardless of caller. The auth tables (AuthAccount /
-// AuthSession) are added now so the OAuth/session work in #100 is a pure
-// app-layer change with no further migration.
+// Authentication user model. Wired to Character via ownerId so every sheet has
+// an owner; per-owner read/write is enforced (#101) by requireAuth +
+// assertCharacterAccess. Sign-in is OAuth/session via the AuthAccount /
+// AuthSession tables (#100).
 
 model User {
   id       String  @id @default(uuid())
