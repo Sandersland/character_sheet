@@ -331,6 +331,7 @@ export default function CharacterCreatePage() {
                     <div className="flex gap-2">
                       <input
                         type="text"
+                        aria-label="Background"
                         value={draft.customBackground}
                         onChange={(e) => update({ customBackground: e.target.value })}
                         placeholder="Invent your own…"
@@ -347,6 +348,7 @@ export default function CharacterCreatePage() {
                   ) : (
                     <div className="flex gap-2">
                       <select
+                        aria-label="Background"
                         value={draft.background}
                         onChange={(e) => update({ background: e.target.value, skillProficiencies: [], toolChoices: [] })}
                         className="flex-1 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
