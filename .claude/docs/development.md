@@ -77,7 +77,7 @@ npx prisma db seed
 
 ## Parallel worktrees (build several features at once)
 
-`scripts/worktree.sh` runs an **isolated, fully-dockerized stack per git worktree** so multiple branches can run and be tested at the same time. Each worktree gets a port "slot" (1–9; slot 0 = this main checkout on default ports). Everything is derived from the slot:
+`.claude/skills/worktree/worktree.sh` runs an **isolated, fully-dockerized stack per git worktree** so multiple branches can run and be tested at the same time. Each worktree gets a port "slot" (1–9; slot 0 = this main checkout on default ports). Everything is derived from the slot:
 
 | Var (slot N) | Formula | Slot 1 |
 |---|---|---|
@@ -90,10 +90,10 @@ npx prisma db seed
 A distinct `COMPOSE_PROJECT_NAME` gives each worktree its **own** `postgres_data`/`node_modules` volumes — so a migration in one worktree is invisible to the others. The slot↔branch map persists in `.claude/worktrees/registry.json` (gitignored); the per-worktree `.env` is generated, never committed.
 
 ```bash
-./scripts/worktree.sh create <branch> --up   # worktree under .claude/worktrees/<branch>, assign slot, build & start
-./scripts/worktree.sh ls                      # table: branch | slot | URLs | running status
-./scripts/worktree.sh up|down <branch>        # start / stop (down keeps the DB volume)
-./scripts/worktree.sh rm <branch>             # down -v + remove worktree + free the slot
+./.claude/skills/worktree/worktree.sh create <branch> --up   # worktree under .claude/worktrees/<branch>, assign slot, build & start
+./.claude/skills/worktree/worktree.sh ls                      # table: branch | slot | URLs | running status
+./.claude/skills/worktree/worktree.sh up|down <branch>        # start / stop (down keeps the DB volume)
+./.claude/skills/worktree/worktree.sh rm <branch>             # down -v + remove worktree + free the slot
 docker compose ls                             # all running stacks across worktrees, built-in
 docker compose -p cs-<branch> logs -f         # tail one worktree's stack
 ```
