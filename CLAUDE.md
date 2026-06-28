@@ -36,6 +36,10 @@ See `.claude/docs/development.md` for per-workspace commands, running outside Do
 
 **Backend tests need Postgres.** Run `docker compose up db -d` first and export `DATABASE_URL` in the same shell command as `vitest` (not a prior `export`). See `.claude/docs/testing.md`.
 
+**Decompose large features before building, not after.** Anything bigger than ~one screen or one endpoint gets sliced into GitHub issues up front (use the `/issues` skill), then built one-PR-per-issue — in parallel via `/parallel-issues` + worktrees when the slices are independent. This is a hard-won lesson: the features tackled as a single monolithic session (spellcasting, turn-tracking, subclasses) each blew through context and needed 3–4 compaction handoffs, while the same-sized work decomposed into issues first shipped cleanly as reviewable PRs. When a request is large, the first move is a plan that names the PR/issue boundaries — not code. See `.claude/skills/issues` and `.claude/skills/parallel-issues`.
+
+**Keep build artifacts out of the repo.** Screenshots, Playwright captures, and any generated images go to `/tmp` or the session scratchpad — never the project tree. A `PreToolUse` hook (`.claude/hooks/block-project-artifacts.mjs`, wired in `.claude/settings.json`) enforces this for `Write`/`Edit` of image files and for Playwright screenshots; don't work around it by renaming — fix the destination path.
+
 **Documentation is part of Done.** A wrong doc is worse than no doc, so when a change touches a surface below, update the mapped doc/comment in the same PR. Put each fact at its lowest-drift home (code comments for single-file facts, on-demand docs for cross-cutting patterns); see `.claude/docs/documentation.md`. The `/doc-sync` skill and the PR review gate enforce this — the gate now submits a blocking verdict (red `claude-review` check) on PRs into `staging` as well as `main`.
 
 | When a change touches… | Update… |
