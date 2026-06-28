@@ -90,7 +90,7 @@ describe("InventoryRow (view mode)", () => {
 
   it("disables action buttons when pending", () => {
     renderRow({ pending: true });
-    for (const name of ["Edit", "Remove"]) {
+    for (const name of ["Equip", "Edit", "Remove"]) {
       expect(screen.getByRole("button", { name })).toBeDisabled();
     }
   });
