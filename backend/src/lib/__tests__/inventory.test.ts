@@ -282,6 +282,49 @@ describe("applyInventoryOperations", () => {
     });
   });
 
+  it("setEquipped rejects equipping a non-equippable (gear) item", async () => {
+    await applyInventoryOperations(characterAId, [
+      { type: "acquire", custom: { name: "Test Rope", category: "gear" }, quantity: 1 },
+    ]);
+    const [created] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+
+    await expect(
+      applyInventoryOperations(characterAId, [
+        { type: "setEquipped", inventoryItemId: created.id, equipped: true },
+      ]),
+    ).rejects.toThrow(InvalidInventoryOperationError);
+
+    const after = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
+    expect(after.equipped).toBe(false);
+  });
+
+  it("setEquipped equips a weapon row", async () => {
+    await applyInventoryOperations(characterAId, [{ type: "acquire", itemId, quantity: 1 }]);
+    const [created] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+
+    await applyInventoryOperations(characterAId, [
+      { type: "setEquipped", inventoryItemId: created.id, equipped: true },
+    ]);
+
+    const after = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
+    expect(after.equipped).toBe(true);
+  });
+
+  it("setEquipped can unequip a gear row that is stuck equipped", async () => {
+    await applyInventoryOperations(characterAId, [
+      { type: "acquire", custom: { name: "Stuck Gear", category: "gear" }, quantity: 1, equipped: true },
+    ]);
+    const [created] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+    expect(created.equipped).toBe(true);
+
+    await applyInventoryOperations(characterAId, [
+      { type: "setEquipped", inventoryItemId: created.id, equipped: false },
+    ]);
+
+    const after = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
+    expect(after.equipped).toBe(false);
+  });
+
   it("selling the FULL stack snapshots data.deletedItem; a partial sell does not", async () => {
     await applyInventoryOperations(characterAId, [{ type: "acquire", itemId, quantity: 5 }]);
     const [created] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
