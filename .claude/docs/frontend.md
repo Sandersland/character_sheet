@@ -155,7 +155,7 @@ These six live in `src/components/ui/` and are intentionally domain-agnostic —
 
 | Component | Usage |
 |---|---|
-| `Card` | Base parchment surface for every major section. Props: `title?`, `titleAccessory?`, `className?`. |
+| `Card` | Base parchment surface for every major section. Props: `title?`, `titleAccessory?`, `className?`, `headingLevel?` (`2`\|`3`, default `3` — set `2` when the card is a top-level page section directly under the page's `h1` so heading order doesn't skip). |
 | `Badge` | Soft-background pill. Prop `tone`: `garnet` / `arcane` / `gold` / `vitality` / `neutral`. |
 | `MeterBar` | Horizontal resource meter. Always pair with numeric text (e.g. `9/10 HP`) — never rely on color alone. Prop `tone`: `garnet` / `arcane` / `gold`. |
 | `Modal` | Overlay primitive. See inline-vs-modal rule above. |
