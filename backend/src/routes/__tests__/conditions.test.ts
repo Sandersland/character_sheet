@@ -11,10 +11,12 @@ import supertest from "supertest";
 import { createApp } from "../../app.js";
 import { prisma } from "../../lib/prisma.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
+import { authCookie } from "../../test-support/auth.js";
 
 // ── Character fixture ─────────────────────────────────────────────────────────
 
 const OWNER_ID = "owner-conditions";
+let COOKIE: string;
 
 const FIXTURE_ID = "test-conditions-character-1";
 
@@ -52,6 +54,7 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
     const cls = await prisma.characterClass.upsert({
       where: { name: FIGHTER_CATALOG_NAME },
       create: {
@@ -84,28 +87,28 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
   // ── 404 / 400 guards ──────────────────────────────────────────────────────
 
   it("404s for an unknown character", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post("/api/characters/does-not-exist/conditions/transactions")
       .send({ operations: [{ type: "applyCondition", key: "prone" }] });
     expect(res.status).toBe(404);
   });
 
   it("400s on a malformed body (invalid op type)", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(url)
       .send({ operations: [{ type: "notARealType" }] });
     expect(res.status).toBe(400);
   });
 
   it("400s on an unknown condition key", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(url)
       .send({ operations: [{ type: "applyCondition", key: "onFire" }] });
     expect(res.status).toBe(400);
   });
 
   it("defaults a fresh character to empty conditions + exhaustion 0", async () => {
-    const res = await supertest(createApp()).get(`/api/characters/${FIXTURE_ID}`);
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     expect(res.status).toBe(200);
     expect(res.body.conditions).toEqual({ active: [], exhaustion: 0 });
   });
@@ -113,7 +116,7 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
   // ── applyCondition ────────────────────────────────────────────────────────
 
   it("applyCondition adds the condition to the active list", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(url)
       .send({ operations: [{ type: "applyCondition", key: "poisoned", source: "Giant Spider" }] });
 
@@ -131,15 +134,15 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
 
   it("400s when applying a condition that is already active", async () => {
     const app = createApp();
-    await supertest(app).post(url).send({ operations: [{ type: "applyCondition", key: "prone" }] });
-    const dup = await supertest(app).post(url).send({ operations: [{ type: "applyCondition", key: "prone" }] });
+    await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "applyCondition", key: "prone" }] });
+    const dup = await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "applyCondition", key: "prone" }] });
     expect(dup.status).toBe(400);
   });
 
   // ── batch ─────────────────────────────────────────────────────────────────
 
   it("applies multiple conditions in one batch", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(url)
       .send({
         operations: [
@@ -156,7 +159,7 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
   });
 
   it("a multi-op batch is atomic: a later failing op rolls back an earlier valid one", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(url)
       .send({
         operations: [
@@ -166,7 +169,7 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
       });
     expect(res.status).toBe(400);
 
-    const char = await supertest(createApp()).get(`/api/characters/${FIXTURE_ID}`);
+    const char = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     expect(char.body.conditions.active).toHaveLength(0);
   });
 
@@ -174,15 +177,15 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
 
   it("removeCondition removes an active condition", async () => {
     const app = createApp();
-    await supertest(app).post(url).send({ operations: [{ type: "applyCondition", key: "frightened" }] });
-    const res = await supertest(app).post(url).send({ operations: [{ type: "removeCondition", key: "frightened" }] });
+    await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "applyCondition", key: "frightened" }] });
+    const res = await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "removeCondition", key: "frightened" }] });
 
     expect(res.status).toBe(200);
     expect(res.body.conditions.active).toHaveLength(0);
   });
 
   it("400s when removing a condition that is not active", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(url)
       .send({ operations: [{ type: "removeCondition", key: "restrained" }] });
     expect(res.status).toBe(400);
@@ -191,7 +194,7 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
   // ── setExhaustion (0–6 incl. clamping) ────────────────────────────────────
 
   it("setExhaustion sets the exhaustion level", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(url)
       .send({ operations: [{ type: "setExhaustion", level: 3 }] });
     expect(res.status).toBe(200);
@@ -199,7 +202,7 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
   });
 
   it("setExhaustion accepts the upper bound of 6", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(url)
       .send({ operations: [{ type: "setExhaustion", level: 6 }] });
     expect(res.status).toBe(200);
@@ -207,14 +210,14 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
   });
 
   it("400s on setExhaustion above 6", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(url)
       .send({ operations: [{ type: "setExhaustion", level: 7 }] });
     expect(res.status).toBe(400);
   });
 
   it("400s on setExhaustion below 0", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(url)
       .send({ operations: [{ type: "setExhaustion", level: -1 }] });
     expect(res.status).toBe(400);
@@ -226,7 +229,7 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
       where: { id: FIXTURE_ID },
       data: { conditions: { active: [], exhaustion: 99 } },
     });
-    const res = await supertest(createApp()).get(`/api/characters/${FIXTURE_ID}`);
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     expect(res.body.conditions.exhaustion).toBe(6);
   });
 
@@ -243,7 +246,7 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
         },
       },
     });
-    const res = await supertest(createApp()).get(`/api/characters/${FIXTURE_ID}`);
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     const keys = (res.body.conditions.active as Array<{ key: string }>).map((c) => c.key);
     expect(keys).toEqual(["poisoned"]);
   });
@@ -253,20 +256,20 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
   it("undo restores conditions removed by a batch", async () => {
     const app = createApp();
     // Apply two conditions.
-    await supertest(app)
+    await supertest.agent(app).set("Cookie", COOKIE)
       .post(url)
       .send({ operations: [{ type: "applyCondition", key: "prone" }, { type: "applyCondition", key: "poisoned" }] });
 
     // Remove one in a fresh batch.
-    await supertest(app).post(url).send({ operations: [{ type: "removeCondition", key: "prone" }] });
+    await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "removeCondition", key: "prone" }] });
 
     // Find the latest non-reverted batch (the removeCondition) and undo it.
-    const activity = await supertest(app).get(`/api/characters/${FIXTURE_ID}/activity`);
+    const activity = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}/activity`);
     const events = activity.body as Array<{ type: string; reverted: boolean; batchId?: string }>;
     const latestRemove = events.find((e) => e.type === "conditionRemoved" && !e.reverted)!;
     expect(latestRemove).toBeDefined();
 
-    const undo = await supertest(app)
+    const undo = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/events/${latestRemove.batchId}/revert`);
     expect(undo.status).toBe(200);
     const keys = (undo.body.conditions.active as Array<{ key: string }>).map((c) => c.key).sort();
@@ -275,14 +278,14 @@ describe("POST /api/characters/:id/conditions/transactions", () => {
 
   it("undo restores a prior exhaustion level", async () => {
     const app = createApp();
-    await supertest(app).post(url).send({ operations: [{ type: "setExhaustion", level: 2 }] });
-    await supertest(app).post(url).send({ operations: [{ type: "setExhaustion", level: 5 }] });
+    await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "setExhaustion", level: 2 }] });
+    await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "setExhaustion", level: 5 }] });
 
-    const activity = await supertest(app).get(`/api/characters/${FIXTURE_ID}/activity`);
+    const activity = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}/activity`);
     const events = activity.body as Array<{ type: string; reverted: boolean; batchId?: string }>;
     const latest = events.find((e) => e.type === "exhaustionSet" && !e.reverted)!;
 
-    const undo = await supertest(app)
+    const undo = await supertest.agent(app).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/events/${latest.batchId}/revert`);
     expect(undo.status).toBe(200);
     expect(undo.body.conditions.exhaustion).toBe(2);

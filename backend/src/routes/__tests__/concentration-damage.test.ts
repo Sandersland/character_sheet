@@ -21,10 +21,12 @@ import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
+import { authCookie } from "../../test-support/auth.js";
 
 const app = createApp();
 
 const OWNER_ID = "owner-concentration";
+let COOKIE: string;
 
 const CONC = {
   entryId: "fixture-conc-entry",
@@ -86,7 +88,7 @@ const FIXTURE_HIGH_CON = {
 };
 
 async function post(characterId: string, body: object) {
-  return supertest(app).post(`/api/characters/${characterId}/hp`).send(body);
+  return supertest(app).post(`/api/characters/${characterId}/hp`).set("Cookie", COOKIE).send(body);
 }
 
 async function getSpellcasting(id: string): Promise<Record<string, unknown>> {
@@ -100,6 +102,7 @@ async function getSpellcasting(id: string): Promise<Record<string, unknown>> {
 describe("Concentration on damage (issue #41)", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
     await prisma.character.create({
       data: { ...FIXTURE, ownerId: OWNER_ID, spellcasting: SPELLCASTING_JSON as Prisma.InputJsonValue },
     });
@@ -247,7 +250,7 @@ describe("Concentration on damage (issue #41)", () => {
     });
     expect(dmgEvent?.batchId).toBeTruthy();
 
-    const revert = await supertest(app).post(
+    const revert = await supertest.agent(app).set("Cookie", COOKIE).post(
       `/api/characters/${FIXTURE.id}/events/${dmgEvent!.batchId}/revert`,
     );
     expect(revert.status).toBe(200);
@@ -279,6 +282,7 @@ describe("Concentration on damage (issue #41)", () => {
 describe("Interactive concentration save (issue #76)", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
     await prisma.character.create({
       data: { ...FIXTURE, ownerId: OWNER_ID, spellcasting: SPELLCASTING_JSON as Prisma.InputJsonValue },
     });
@@ -418,7 +422,7 @@ describe("Interactive concentration save (issue #76)", () => {
       where: { characterId: FIXTURE.id, type: "concentrationDropped" },
       orderBy: { createdAt: "desc" },
     });
-    const revert = await supertest(app).post(
+    const revert = await supertest.agent(app).set("Cookie", COOKIE).post(
       `/api/characters/${FIXTURE.id}/events/${dropEvent!.batchId}/revert`,
     );
     expect(revert.status).toBe(200);

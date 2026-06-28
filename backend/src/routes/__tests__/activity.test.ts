@@ -49,12 +49,14 @@ import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
+import { authCookie } from "../../test-support/auth.js";
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
 const app = () => createApp();
 
 const OWNER_ID = "owner-activity";
+let COOKIE: string;
 
 /**
  * Returns the batchId of the most-recent non-revert event for a character, by
@@ -62,7 +64,7 @@ const OWNER_ID = "owner-activity";
  * the LIFO endpoint expects to undo.
  */
 async function latestBatchId(characterId: string): Promise<string> {
-  const res = await supertest(app()).get(`/api/characters/${characterId}/activity`);
+  const res = await supertest.agent(app()).set("Cookie", COOKIE).get(`/api/characters/${characterId}/activity`);
   expect(res.status).toBe(200);
   const events = res.body as Array<{ batchId?: string; type: string }>;
   const ev = events.find((e) => e.type !== "revert" && e.batchId);
@@ -71,7 +73,7 @@ async function latestBatchId(characterId: string): Promise<string> {
 }
 
 function revert(characterId: string, batchId: string) {
-  return supertest(app()).post(`/api/characters/${characterId}/events/${batchId}/revert`).send();
+  return supertest.agent(app()).set("Cookie", COOKIE).post(`/api/characters/${characterId}/events/${batchId}/revert`).send();
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -137,6 +139,7 @@ describe("POST /:id/events/:batchId/revert — Wizard scenarios", () => {
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
     const cls = await prisma.characterClass.upsert({
       where: { name: WIZARD_CATALOG_NAME },
       create: {
@@ -180,7 +183,7 @@ describe("POST /:id/events/:batchId/revert — Wizard scenarios", () => {
   });
 
   it("409s when the batch has already been reverted", async () => {
-    await supertest(app())
+    await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${WIZARD_ID}/hp`)
       .send({ operations: [{ type: "damage", amount: 3 }] });
     const batchId = await latestBatchId(WIZARD_ID);
@@ -195,13 +198,13 @@ describe("POST /:id/events/:batchId/revert — Wizard scenarios", () => {
 
   it("409s when the batch is not the most-recent action (LIFO-only)", async () => {
     // First action: damage. Capture its batch.
-    await supertest(app())
+    await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${WIZARD_ID}/hp`)
       .send({ operations: [{ type: "damage", amount: 2 }] });
     const firstBatch = await latestBatchId(WIZARD_ID);
 
     // Second action: another damage (now the most recent).
-    await supertest(app())
+    await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${WIZARD_ID}/hp`)
       .send({ operations: [{ type: "damage", amount: 1 }] });
 
@@ -243,7 +246,7 @@ describe("POST /:id/events/:batchId/revert — Wizard scenarios", () => {
   // ── Per-category: hitPoints ────────────────────────────────────────────────
 
   it("reverts an HP damage event, restoring before.hitPoints", async () => {
-    const dmg = await supertest(app())
+    const dmg = await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${WIZARD_ID}/hp`)
       .send({ operations: [{ type: "damage", amount: 5 }] });
     expect(dmg.status).toBe(200);
@@ -260,7 +263,7 @@ describe("POST /:id/events/:batchId/revert — Wizard scenarios", () => {
   it("reverts an XP award, restoring experiencePoints AND derived level/proficiency", async () => {
     // Award enough XP to reach level 2 (300 XP) → prof bonus still +2,
     // but level changes 1 → 2. Undo must put both back.
-    const award = await supertest(app())
+    const award = await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${WIZARD_ID}/experience`)
       .send({ operations: [{ type: "award", amount: 6500 }] }); // level 5
     expect(award.status).toBe(200);
@@ -279,7 +282,7 @@ describe("POST /:id/events/:batchId/revert — Wizard scenarios", () => {
   // ── Per-category: spellcasting ─────────────────────────────────────────────
 
   it("reverts a spell cast, restoring before.spellcasting slot usage", async () => {
-    const cast = await supertest(app())
+    const cast = await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${WIZARD_ID}/spellcasting/transactions`)
       .send({ operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 10 }] });
     expect(cast.status).toBe(200);
@@ -299,7 +302,7 @@ describe("POST /:id/events/:batchId/revert — Wizard scenarios", () => {
     const url = `/api/characters/${WIZARD_ID}/spellcasting/transactions`;
 
     // Spend a slot and take self-damage so the long rest has something to undo.
-    await supertest(app()).post(url).send({
+    await supertest.agent(app()).set("Cookie", COOKIE).post(url).send({
       operations: [{
         type: "castSpell",
         entryId: "fixture-spell-1",
@@ -310,7 +313,7 @@ describe("POST /:id/events/:batchId/revert — Wizard scenarios", () => {
     });
 
     // Long rest: restores HP to full and refreshes spell slots.
-    const rest = await supertest(app())
+    const rest = await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${WIZARD_ID}/hp`)
       .send({ operations: [{ type: "longRest" }] });
     expect(rest.status).toBe(200);
@@ -330,7 +333,7 @@ describe("POST /:id/events/:batchId/revert — Wizard scenarios", () => {
   // ── Per-category: currency ─────────────────────────────────────────────────
 
   it("reverts a currency adjustment (PATCH currencyAdjust), restoring currency JSON", async () => {
-    const patch = await supertest(app())
+    const patch = await supertest.agent(app()).set("Cookie", COOKIE)
       .patch(`/api/characters/${WIZARD_ID}`)
       .send({ currency: { cp: 0, sp: 0, gp: 50, pp: 0 } });
     expect(patch.status).toBe(200);
@@ -345,7 +348,7 @@ describe("POST /:id/events/:batchId/revert — Wizard scenarios", () => {
   // ── Process invariants: meta event + reverted flags ────────────────────────
 
   it("appends a meta 'revert' event and marks the original events reverted:true", async () => {
-    await supertest(app())
+    await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${WIZARD_ID}/hp`)
       .send({ operations: [{ type: "damage", amount: 4 }] });
     const batchId = await latestBatchId(WIZARD_ID);
@@ -373,7 +376,7 @@ describe("POST /:id/events/:batchId/revert — Wizard scenarios", () => {
   it("a revert of a multi-event batch restores all-or-nothing (HP + self-damage in one cast batch)", async () => {
     // A single castSpell-with-self-damage batch produces two events
     // (spellcasting cast + hitPoints self-damage) sharing one batchId.
-    const cast = await supertest(app())
+    const cast = await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${WIZARD_ID}/spellcasting/transactions`)
       .send({
         operations: [{
@@ -450,6 +453,7 @@ describe("POST /:id/events/:batchId/revert — Fighter scenarios", () => {
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
     const cls = await prisma.characterClass.upsert({
       where: { name: FIGHTER_CATALOG_NAME },
       create: {
@@ -489,7 +493,7 @@ describe("POST /:id/events/:batchId/revert — Fighter scenarios", () => {
   // ── Per-category: class (subclass selection) ───────────────────────────────
 
   it("reverts a subclass selection, restoring subclassId/subclass to null", async () => {
-    const set = await supertest(app())
+    const set = await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIGHTER_ID}/class/transactions`)
       .send({ operations: [{ type: "setSubclass", subclassId }] });
     expect(set.status).toBe(200);
@@ -508,7 +512,7 @@ describe("POST /:id/events/:batchId/revert — Fighter scenarios", () => {
   it("reverts an ASI, restoring abilityScores, hitPoints, initiativeBonus AND resources", async () => {
     // +2 CON: raises CON 14 → 16 (+1 mod → +5 max HP at 5 levels), and adds an
     // advancement entry to resources. Undo must restore all four.
-    const asi = await supertest(app())
+    const asi = await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIGHTER_ID}/advancement/transactions`)
       .send({ operations: [{ type: "takeAsi", increases: [{ ability: "constitution", amount: 2 }] }] });
     expect(asi.status).toBe(200);
@@ -527,7 +531,7 @@ describe("POST /:id/events/:batchId/revert — Fighter scenarios", () => {
 
   it("reverts a DEX ASI, restoring initiativeBonus", async () => {
     // +2 DEX: 14 → 16 (+1 mod) bumps initiativeBonus by +1.
-    const asi = await supertest(app())
+    const asi = await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIGHTER_ID}/advancement/transactions`)
       .send({ operations: [{ type: "takeAsi", increases: [{ ability: "dexterity", amount: 2 }] }] });
     expect(asi.status).toBe(200);
@@ -545,7 +549,7 @@ describe("POST /:id/events/:batchId/revert — Fighter scenarios", () => {
 
   it("reverts a spendResource, restoring resources pool used counts", async () => {
     // Fighter base pool: Second Wind (1 use). Spend it, then undo.
-    const spend = await supertest(app())
+    const spend = await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIGHTER_ID}/resources/transactions`)
       .send({ operations: [{ type: "spendResource", key: "secondWind", amount: 1 }] });
     expect(spend.status).toBe(200);
@@ -583,6 +587,7 @@ describe("POST /:id/events/:batchId/revert — inventory undo", () => {
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
     const cls = await prisma.characterClass.upsert({
       where: { name: INV_CATALOG_NAME },
       create: {
@@ -627,7 +632,7 @@ describe("POST /:id/events/:batchId/revert — inventory undo", () => {
   });
 
   const inv = (operations: unknown[]) =>
-    supertest(app()).post(`/api/characters/${INV_ID}/inventory/transactions`).send({ operations });
+    supertest.agent(app()).set("Cookie", COOKIE).post(`/api/characters/${INV_ID}/inventory/transactions`).send({ operations });
 
   const findItem = (body: { inventory: Array<{ name: string; id: string }> }, name: string) =>
     body.inventory.find((i) => i.name === name);
@@ -655,7 +660,7 @@ describe("POST /:id/events/:batchId/revert — inventory undo", () => {
     // The batch event is marked reverted and a meta `revert` event is appended.
     const events = await prisma.characterEvent.findMany({ where: { characterId: INV_ID, batchId } });
     expect(events.every((e) => e.reverted)).toBe(true);
-    const timeline = await supertest(app()).get(`/api/characters/${INV_ID}/activity`);
+    const timeline = await supertest.agent(app()).set("Cookie", COOKIE).get(`/api/characters/${INV_ID}/activity`);
     expect((timeline.body as Array<{ type: string }>).some((e) => e.type === "revert")).toBe(true);
   });
 
@@ -955,6 +960,7 @@ describe("POST /:id/events/:batchId/revert — level-up / level-down class-entry
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
     const cls = await prisma.characterClass.upsert({
       where: { name: LVL_CATALOG_NAME },
       create: {
@@ -1004,7 +1010,7 @@ describe("POST /:id/events/:batchId/revert — level-up / level-down class-entry
     // Click a real level-up. XP already derives level 3 > hitDice.total 1, so
     // the op is valid; it bumps hitDice.total → 2 and classEntry.level → 2 and
     // writes a `levelUp` event carrying data.primaryEntryId + before.classEntryLevel.
-    const levelUp = await supertest(app())
+    const levelUp = await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${LVL_ID}/hp`)
       .send({ operations: [{ type: "levelUp", method: "average" }] });
     expect(levelUp.status).toBe(200);
@@ -1025,11 +1031,11 @@ describe("POST /:id/events/:batchId/revert — level-up / level-down class-entry
 
   it("reverts an XP-driven level-down, restoring the lowered CharacterClassEntry.level", async () => {
     // First, apply two real level-ups so hitDice.total = 3 and classEntry.level = 3.
-    const up1 = await supertest(app())
+    const up1 = await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${LVL_ID}/hp`)
       .send({ operations: [{ type: "levelUp", method: "average" }] });
     expect(up1.status).toBe(200);
-    const up2 = await supertest(app())
+    const up2 = await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${LVL_ID}/hp`)
       .send({ operations: [{ type: "levelUp", method: "average" }] });
     expect(up2.status).toBe(200);
@@ -1040,7 +1046,7 @@ describe("POST /:id/events/:batchId/revert — level-up / level-down class-entry
     // level-ups (revertLevelUps) in the SAME batch, emitting a `levelDown`
     // event that snapshots before.classEntryLevel = 3 and data.primaryEntryId,
     // and writes classEntry.level down to 2.
-    const down = await supertest(app())
+    const down = await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${LVL_ID}/experience`)
       .send({ operations: [{ type: "set", value: XP_LEVEL_2 }] });
     expect(down.status).toBe(200);
@@ -1083,6 +1089,7 @@ describe("GET /:id/activity — ?category= filter", () => {
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
     const cls = await prisma.characterClass.upsert({
       where: { name: FILTER_CATALOG_NAME },
       create: {
@@ -1124,10 +1131,10 @@ describe("GET /:id/activity — ?category= filter", () => {
     // Seed events in two different categories so a filter is observable:
     //   - one `conditions` event (the value missing from the old drifted cast)
     //   - one `hitPoints` event (damage)
-    await supertest(app())
+    await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${FILTER_ID}/conditions/transactions`)
       .send({ operations: [{ type: "applyCondition", key: "poisoned" }] });
-    await supertest(app())
+    await supertest.agent(app()).set("Cookie", COOKIE)
       .post(`/api/characters/${FILTER_ID}/hp`)
       .send({ operations: [{ type: "damage", amount: 3 }] });
   });
@@ -1137,7 +1144,7 @@ describe("GET /:id/activity — ?category= filter", () => {
   });
 
   it("?category=conditions returns ONLY conditions events (regression: was missing from the cast)", async () => {
-    const res = await supertest(app()).get(`/api/characters/${FILTER_ID}/activity?category=conditions`);
+    const res = await supertest.agent(app()).set("Cookie", COOKIE).get(`/api/characters/${FILTER_ID}/activity?category=conditions`);
     expect(res.status).toBe(200);
     const events = res.body as Array<{ category: string }>;
     expect(events.length).toBeGreaterThan(0);
@@ -1147,7 +1154,7 @@ describe("GET /:id/activity — ?category= filter", () => {
   });
 
   it("an unknown ?category value is ignored (returns unfiltered, no 400)", async () => {
-    const res = await supertest(app()).get(`/api/characters/${FILTER_ID}/activity?category=not-a-real-category`);
+    const res = await supertest.agent(app()).set("Cookie", COOKIE).get(`/api/characters/${FILTER_ID}/activity?category=not-a-real-category`);
     expect(res.status).toBe(200);
     const events = res.body as Array<{ category: string }>;
     // Unfiltered: both seeded domains are present.
@@ -1182,6 +1189,7 @@ describe("GET /:id/activity — ?type= and ?sessionId= filters", () => {
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
     const cls = await prisma.characterClass.upsert({
       where: { name: TYPEFILTER_NAME },
       create: {
@@ -1267,7 +1275,7 @@ describe("GET /:id/activity — ?type= and ?sessionId= filters", () => {
   });
 
   it("?type=sold returns ONLY sold events", async () => {
-    const res = await supertest(app()).get(`/api/characters/${TYPEFILTER_ID}/activity?type=sold`);
+    const res = await supertest.agent(app()).set("Cookie", COOKIE).get(`/api/characters/${TYPEFILTER_ID}/activity?type=sold`);
     expect(res.status).toBe(200);
     const events = res.body as Array<{ type: string }>;
     expect(events.length).toBe(1);
@@ -1275,7 +1283,7 @@ describe("GET /:id/activity — ?type= and ?sessionId= filters", () => {
   });
 
   it("an unknown ?type value is ignored (returns unfiltered, no 400)", async () => {
-    const res = await supertest(app()).get(`/api/characters/${TYPEFILTER_ID}/activity?type=not-a-real-type`);
+    const res = await supertest.agent(app()).set("Cookie", COOKIE).get(`/api/characters/${TYPEFILTER_ID}/activity?type=not-a-real-type`);
     expect(res.status).toBe(200);
     const events = res.body as Array<{ type: string }>;
     const types = new Set(events.map((e) => e.type));
@@ -1285,7 +1293,7 @@ describe("GET /:id/activity — ?type= and ?sessionId= filters", () => {
   });
 
   it("?sessionId= filters to events recorded during one session", async () => {
-    const res = await supertest(app()).get(`/api/characters/${TYPEFILTER_ID}/activity?sessionId=${sessionA}`);
+    const res = await supertest.agent(app()).set("Cookie", COOKIE).get(`/api/characters/${TYPEFILTER_ID}/activity?sessionId=${sessionA}`);
     expect(res.status).toBe(200);
     const events = res.body as Array<{ type: string }>;
     expect(events.length).toBe(1);
@@ -1295,14 +1303,14 @@ describe("GET /:id/activity — ?type= and ?sessionId= filters", () => {
   it("type + sessionId + category compose with AND semantics", async () => {
     // sold is in inventory/sessionA → matches; bought (sessionB) and damage
     // (no session) are excluded by the other two predicates.
-    const matched = await supertest(app()).get(
+    const matched = await supertest.agent(app()).set("Cookie", COOKIE).get(
       `/api/characters/${TYPEFILTER_ID}/activity?category=inventory&type=sold&sessionId=${sessionA}`,
     );
     expect(matched.status).toBe(200);
     expect((matched.body as unknown[]).length).toBe(1);
 
     // sold did not happen during sessionB → the AND yields nothing.
-    const unmatched = await supertest(app()).get(
+    const unmatched = await supertest.agent(app()).set("Cookie", COOKIE).get(
       `/api/characters/${TYPEFILTER_ID}/activity?category=inventory&type=sold&sessionId=${sessionB}`,
     );
     expect(unmatched.status).toBe(200);

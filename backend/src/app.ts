@@ -8,6 +8,7 @@ import cors from "cors";
 import type { CorsOptions } from "cors";
 import express from "express";
 
+import { requireAuth } from "./lib/auth/middleware.js";
 import { errorHandler } from "./lib/error-handler.js";
 import { httpLogger } from "./lib/logger.js";
 import { creationRateLimiter, globalRateLimiter, securityHeaders } from "./lib/security.js";
@@ -63,10 +64,15 @@ export function createApp() {
   app.use(globalRateLimiter);
   app.use(creationRateLimiter);
 
+  // Public allowlist: health + the auth mechanism (OAuth sign-in + session)
+  // are mounted BEFORE requireAuth so they stay reachable without a session.
   app.use("/api", healthRouter);
-  // Public auth mechanism (OAuth sign-in + session). No requireAuth here — and
-  // none on the routers below yet; per-owner enforcement lands in #101.
   app.use("/api", authRouter);
+
+  // The gate: every router mounted past this point requires a valid session.
+  // An unauthenticated request is 401'd here and never reaches them.
+  app.use("/api", requireAuth);
+
   app.use("/api", charactersRouter);
   app.use("/api", referenceRouter);
   app.use("/api", itemsRouter);

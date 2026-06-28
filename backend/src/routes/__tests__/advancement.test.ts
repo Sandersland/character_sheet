@@ -12,8 +12,10 @@ import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
+import { authCookie } from "../../test-support/auth.js";
 
 const OWNER_ID = "owner-advancement";
+let COOKIE: string;
 
 // XP thresholds
 const XP_LVL_4 = 2700; // level 4 — 1 ASI slot (first unlock)
@@ -25,22 +27,25 @@ const app = createApp();
 async function postAdvancement(characterId: string, body: object) {
   return supertest(app)
     .post(`/api/characters/${characterId}/advancement/transactions`)
+    .set("Cookie", COOKIE)
     .send(body);
 }
 
 async function getCharacter(characterId: string) {
-  return supertest(app).get(`/api/characters/${characterId}`);
+  return supertest(app).get(`/api/characters/${characterId}`).set("Cookie", COOKIE);
 }
 
 async function postHp(characterId: string, body: object) {
   return supertest(app)
     .post(`/api/characters/${characterId}/hp`)
+    .set("Cookie", COOKIE)
     .send(body);
 }
 
 async function postUndo(characterId: string, batchId: string) {
   return supertest(app)
     .post(`/api/characters/${characterId}/events/${batchId}/revert`)
+    .set("Cookie", COOKIE)
     .send({});
 }
 
@@ -147,6 +152,7 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
   beforeEach(async () => {
     // Each test gets a fresh fixture character with a class entry.
     await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
     await prisma.character.create({
       data: {
         ...FIXTURE,
@@ -197,7 +203,7 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
       await postAdvancement(FIXTURE_ID, {
         operations: [{ type: "takeFeat", featId: alertFeatId }],
       });
-      const activityRes = await supertest(app).get(`/api/characters/${FIXTURE_ID}/activity`);
+      const activityRes = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}/activity`);
       expect(activityRes.status).toBe(200);
       const batchId: string = activityRes.body[0]?.batchId;
       expect(batchId).toBeTruthy();
@@ -412,7 +418,7 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
 
   describe("GET /api/feats", () => {
     it("returns improvements on catalog feats", async () => {
-      const res = await supertest(app).get("/api/feats");
+      const res = await supertest.agent(app).set("Cookie", COOKIE).get("/api/feats");
       expect(res.status).toBe(200);
       const alert = res.body.find((f: { name: string }) => f.name === "Alert (Advancement Suite)");
       expect(alert).toBeDefined();

@@ -5,8 +5,10 @@ import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
+import { authCookie } from "../../test-support/auth.js";
 
 const OWNER_ID = "owner-hitpoints";
+let COOKIE: string;
 
 // A fixture character with known state for HP / hit-dice tests.
 // Constitution 14 → conMod +2; d10 hit die; level 2 (XP 300).
@@ -47,12 +49,14 @@ const app = createApp();
 async function post(characterId: string, body: object) {
   return supertest(app)
     .post(`/api/characters/${characterId}/hp`)
+    .set("Cookie", COOKIE)
     .send(body);
 }
 
 describe("POST /api/characters/:id/hp", () => {
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
     await prisma.character.create({ data: { ...FIXTURE, ownerId: OWNER_ID, spellcasting: Prisma.JsonNull } });
   });
 

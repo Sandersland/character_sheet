@@ -11,8 +11,10 @@ import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
+import { authCookie } from "../../test-support/auth.js";
 
 const OWNER_ID = "owner-spellcasting";
+let COOKIE: string;
 
 // ── Catalog fixtures ─────────────────────────────────────────────────────────
 
@@ -164,6 +166,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
     // Upsert a uniquely-named wizard class for this test suite.
     const cls = await prisma.characterClass.upsert({
       where: { name: WIZARD_CATALOG_NAME },
@@ -213,21 +216,21 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   // ── 404 / 400 guards ──────────────────────────────────────────────────────
 
   it("404s for an unknown character", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post("/api/characters/does-not-exist/spellcasting/transactions")
       .send({ operations: [{ type: "expendSlot", level: 1 }] });
     expect(res.status).toBe(404);
   });
 
   it("400s on a malformed body (invalid op type)", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({ operations: [{ type: "notARealType" }] });
     expect(res.status).toBe(400);
   });
 
   it("400s on a missing required field (castSpell without entryId)", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({ operations: [{ type: "castSpell", roll: 10 }] });
     expect(res.status).toBe(400);
@@ -236,7 +239,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   // ── castSpell ─────────────────────────────────────────────────────────────
 
   it("casting a cantrip rolls (non-zero total expected) and does NOT expend a slot", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({ operations: [{ type: "castSpell", entryId: "fixture-cantrip-1", roll: 7 }] });
 
@@ -247,7 +250,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   });
 
   it("casting a leveled spell expends a slot at that level", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({ operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 14 }] });
 
@@ -264,11 +267,11 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
 
     // Use both L1 slots.
-    await supertest(app).post(url).send({ operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 10 }] });
-    await supertest(app).post(url).send({ operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 12 }] });
+    await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 10 }] });
+    await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 12 }] });
 
     // Third cast should fail.
-    const res = await supertest(app).post(url).send({ operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 9 }] });
+    const res = await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 9 }] });
     expect(res.status).toBe(400);
   });
 
@@ -276,7 +279,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     // Level 1 wizard has no L0 slots for leveled spells — only L1.
     // We'll test an invalid pairing by using a high-level spell with a low slot.
     // fixture-spell-1 is level 1, but slotLevel: 0 is invalid (must be >= spell.level).
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({ operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 0, roll: 5 }] });
     expect(res.status).toBe(400);
@@ -288,26 +291,26 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     const app = createApp();
     const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
 
-    const expend = await supertest(app).post(url).send({ operations: [{ type: "expendSlot", level: 1 }] });
+    const expend = await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "expendSlot", level: 1 }] });
     expect(expend.status).toBe(200);
     const afterExpend = expend.body.spellcasting.slots.find((s: { level: number }) => s.level === 1);
     expect(afterExpend.used).toBe(1);
 
-    const restore = await supertest(app).post(url).send({ operations: [{ type: "restoreSlot", level: 1 }] });
+    const restore = await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "restoreSlot", level: 1 }] });
     expect(restore.status).toBe(200);
     const afterRestore = restore.body.spellcasting.slots.find((s: { level: number }) => s.level === 1);
     expect(afterRestore.used).toBe(0);
   });
 
   it("400s on restoreSlot when no slots of that level are used", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({ operations: [{ type: "restoreSlot", level: 1 }] });
     expect(res.status).toBe(400);
   });
 
   it("400s on expendSlot for a level the character doesn't have (level 9 for a L1 wizard)", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({ operations: [{ type: "expendSlot", level: 9 }] });
     expect(res.status).toBe(400);
@@ -316,7 +319,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   // ── learnSpell ────────────────────────────────────────────────────────────
 
   it("learnSpell from catalog snapshots the spell into spells[]", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({ operations: [{ type: "learnSpell", spellId: catalogSpellId }] });
 
@@ -330,7 +333,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   });
 
   it("learnSpell with a custom payload creates a spell without a spellId", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({
         operations: [{
@@ -355,7 +358,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   });
 
   it("400s on learnSpell when both spellId and custom are provided", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({
         operations: [{
@@ -371,15 +374,15 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     const app = createApp();
     const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
 
-    await supertest(app).post(url).send({ operations: [{ type: "learnSpell", spellId: catalogSpellId }] });
-    const dup = await supertest(app).post(url).send({ operations: [{ type: "learnSpell", spellId: catalogSpellId }] });
+    await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "learnSpell", spellId: catalogSpellId }] });
+    const dup = await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "learnSpell", spellId: catalogSpellId }] });
     expect(dup.status).toBe(400);
   });
 
   // ── forgetSpell ───────────────────────────────────────────────────────────
 
   it("forgetSpell removes the spell from spells[]", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({ operations: [{ type: "forgetSpell", entryId: "fixture-cantrip-1" }] });
 
@@ -389,7 +392,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   });
 
   it("400s on forgetSpell for a non-existent entryId", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({ operations: [{ type: "forgetSpell", entryId: "does-not-exist" }] });
     expect(res.status).toBe(400);
@@ -402,14 +405,14 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
 
     // fixture-spell-1 starts prepared=true; unprepare it.
-    const unprep = await supertest(app).post(url).send({ operations: [{ type: "unprepareSpell", entryId: "fixture-spell-1" }] });
+    const unprep = await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "unprepareSpell", entryId: "fixture-spell-1" }] });
     expect(unprep.status).toBe(200);
     const afterUnprep = (unprep.body.spellcasting.spells as Array<{ id: string; prepared: boolean }>)
       .find((s) => s.id === "fixture-spell-1");
     expect(afterUnprep!.prepared).toBe(false);
 
     // Prepare it again.
-    const prep = await supertest(app).post(url).send({ operations: [{ type: "prepareSpell", entryId: "fixture-spell-1" }] });
+    const prep = await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "prepareSpell", entryId: "fixture-spell-1" }] });
     expect(prep.status).toBe(200);
     const afterPrep = (prep.body.spellcasting.spells as Array<{ id: string; prepared: boolean }>)
       .find((s) => s.id === "fixture-spell-1");
@@ -417,7 +420,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   });
 
   it("400s on prepareSpell for a cantrip (always prepared, no toggle)", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({ operations: [{ type: "prepareSpell", entryId: "fixture-cantrip-1" }] });
     expect(res.status).toBe(400);
@@ -426,7 +429,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   // ── Atomicity ─────────────────────────────────────────────────────────────
 
   it("a multi-op batch is atomic: a later failing op rolls back an earlier valid one", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({
         operations: [
@@ -438,7 +441,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     expect(res.status).toBe(400);
 
     // Verify the character is unchanged.
-    const char = await supertest(createApp()).get(`/api/characters/${FIXTURE_ID}`);
+    const char = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     const slot1 = char.body.spellcasting.slots.find((s: { level: number }) => s.level === 1);
     expect(slot1.used).toBe(0); // rolled back
   });
@@ -446,7 +449,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   // ── castSpell self-apply (target: self) ───────────────────────────────────
 
   it("castSpell with apply:{self,damage} subtracts HP and expends the slot in one batch", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({
         operations: [{
@@ -469,12 +472,12 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
 
     // Take 5 self-damage first (8 → 3).
-    await supertest(app).post(url).send({
+    await supertest.agent(app).set("Cookie", COOKIE).post(url).send({
       operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 5, apply: { target: "self", kind: "damage", amount: 5 } }],
     });
 
     // Heal 3 (3 → 6).
-    const heal = await supertest(app).post(url).send({
+    const heal = await supertest.agent(app).set("Cookie", COOKIE).post(url).send({
       operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 3, apply: { target: "self", kind: "heal", amount: 3 } }],
     });
     expect(heal.status).toBe(200);
@@ -482,7 +485,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   });
 
   it("self-damage clamps at 0 HP", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({
         operations: [{ type: "castSpell", entryId: "fixture-cantrip-1", roll: 100, apply: { target: "self", kind: "damage", amount: 100 } }],
@@ -492,7 +495,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   });
 
   it("a failing later op rolls back BOTH the slot spend and the self-HP change", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
       .send({
         operations: [
@@ -502,7 +505,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
       });
     expect(res.status).toBe(400);
 
-    const char = await supertest(createApp()).get(`/api/characters/${FIXTURE_ID}`);
+    const char = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     expect(char.body.hitPoints.current).toBe(8); // HP unchanged
     const slot1 = char.body.spellcasting.slots.find((s: { level: number }) => s.level === 1);
     expect(slot1.used).toBe(0); // slot unchanged
@@ -514,7 +517,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     // No op needed — just read back the character via an expendSlot (or we could
     // do a GET, but the route returns the full character on every mutating response).
     // Use a GET instead to avoid touching state.
-    const res = await supertest(createApp()).get(`/api/characters/${FIXTURE_ID}`);
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
 
     expect(res.status).toBe(200);
     // L1 proficiency bonus = 2; INT mod = +3. DC = 8+2+3 = 13. Attack = 2+3 = 5.
@@ -532,7 +535,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     const hpUrl = `/api/characters/${FIXTURE_ID}/hp`;
 
     it("casting a concentration spell sets active concentration", async () => {
-      const res = await supertest(createApp())
+      const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
         .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
         .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-1", slotLevel: 1, roll: 0 }] });
 
@@ -544,7 +547,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     });
 
     it("casting a non-concentration spell does not start concentration", async () => {
-      const res = await supertest(createApp())
+      const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
         .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
         .send({ operations: [{ type: "castSpell", entryId: "fixture-spell-1", slotLevel: 1, roll: 9 }] });
 
@@ -555,11 +558,11 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     it("casting a second concentration spell drops the first and logs it", async () => {
       const app = createApp();
       const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
-      await supertest(app)
+      await supertest.agent(app).set("Cookie", COOKIE)
         .post(url)
         .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-1", slotLevel: 1, roll: 0 }] });
 
-      const res = await supertest(app)
+      const res = await supertest.agent(app).set("Cookie", COOKIE)
         .post(url)
         .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-2", slotLevel: 1, roll: 0 }] });
 
@@ -569,7 +572,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
         spellName: "Fixture Shield of Faith",
       });
 
-      const activity = await supertest(app).get(`/api/characters/${FIXTURE_ID}/activity`);
+      const activity = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}/activity`);
       const dropEvents = (activity.body as Array<{ type: string; summary: string }>).filter(
         (e) => e.type === "concentrationDropped",
       );
@@ -580,10 +583,10 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     it("re-casting the same concentration spell keeps it concentrated (no spurious drop)", async () => {
       const app = createApp();
       const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
-      await supertest(app)
+      await supertest.agent(app).set("Cookie", COOKIE)
         .post(url)
         .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-1", slotLevel: 1, roll: 0 }] });
-      const res = await supertest(app)
+      const res = await supertest.agent(app).set("Cookie", COOKIE)
         .post(url)
         .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-1", slotLevel: 1, roll: 0 }] });
 
@@ -592,7 +595,7 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
         entryId: "fixture-conc-1",
         spellName: "Fixture Bless",
       });
-      const activity = await supertest(app).get(`/api/characters/${FIXTURE_ID}/activity`);
+      const activity = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}/activity`);
       const dropEvents = (activity.body as Array<{ type: string }>).filter(
         (e) => e.type === "concentrationDropped",
       );
@@ -602,17 +605,17 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     it("dropConcentration op clears active concentration", async () => {
       const app = createApp();
       const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
-      await supertest(app)
+      await supertest.agent(app).set("Cookie", COOKIE)
         .post(url)
         .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-1", slotLevel: 1, roll: 0 }] });
 
-      const res = await supertest(app).post(url).send({ operations: [{ type: "dropConcentration" }] });
+      const res = await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "dropConcentration" }] });
       expect(res.status).toBe(200);
       expect(res.body.spellcasting.concentratingOn ?? null).toBeNull();
     });
 
     it("dropConcentration with nothing concentrated is a no-op", async () => {
-      const res = await supertest(createApp())
+      const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
         .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
         .send({ operations: [{ type: "dropConcentration" }] });
       expect(res.status).toBe(200);
@@ -622,11 +625,11 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     it("forgetting the concentrated spell clears concentration", async () => {
       const app = createApp();
       const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
-      await supertest(app)
+      await supertest.agent(app).set("Cookie", COOKIE)
         .post(url)
         .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-1", slotLevel: 1, roll: 0 }] });
 
-      const res = await supertest(app)
+      const res = await supertest.agent(app).set("Cookie", COOKIE)
         .post(url)
         .send({ operations: [{ type: "forgetSpell", entryId: "fixture-conc-1" }] });
       expect(res.status).toBe(200);
@@ -635,11 +638,11 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
 
     it("a long rest clears active concentration", async () => {
       const app = createApp();
-      await supertest(app)
+      await supertest.agent(app).set("Cookie", COOKIE)
         .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
         .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-1", slotLevel: 1, roll: 0 }] });
 
-      const rest = await supertest(app).post(hpUrl).send({ operations: [{ type: "longRest" }] });
+      const rest = await supertest.agent(app).set("Cookie", COOKIE).post(hpUrl).send({ operations: [{ type: "longRest" }] });
       expect(rest.status).toBe(200);
       expect(rest.body.spellcasting.concentratingOn ?? null).toBeNull();
     });
@@ -647,21 +650,21 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
     it("undo restores concentration dropped by casting a second spell", async () => {
       const app = createApp();
       const url = `/api/characters/${FIXTURE_ID}/spellcasting/transactions`;
-      await supertest(app)
+      await supertest.agent(app).set("Cookie", COOKIE)
         .post(url)
         .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-1", slotLevel: 1, roll: 0 }] });
       // Casting the second spell drops the first (this batch holds two events:
       // concentrationDropped + castSpell).
-      await supertest(app)
+      await supertest.agent(app).set("Cookie", COOKIE)
         .post(url)
         .send({ operations: [{ type: "castSpell", entryId: "fixture-conc-2", slotLevel: 1, roll: 0 }] });
 
       // Undo the most recent batch (the second cast). Revert is LIFO + keyed by
       // batchId; the full spellcasting JSON is restored from the before-snapshot.
-      const activity = await supertest(app).get(`/api/characters/${FIXTURE_ID}/activity`);
+      const activity = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}/activity`);
       const events = activity.body as Array<{ type: string; reverted: boolean; batchId?: string }>;
       const latestCast = events.find((e) => e.type === "castSpell" && !e.reverted)!;
-      const undo = await supertest(app)
+      const undo = await supertest.agent(app).set("Cookie", COOKIE)
         .post(`/api/characters/${FIXTURE_ID}/events/${latestCast.batchId}/revert`);
       expect(undo.status).toBe(200);
       expect(undo.body.spellcasting.concentratingOn).toEqual({
@@ -726,6 +729,7 @@ describe("Warlock Pact Magic + Mystic Arcanum", () => {
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
     const cls = await prisma.characterClass.upsert({
       where: { name: WARLOCK_CATALOG_NAME },
       create: {
@@ -753,7 +757,7 @@ describe("Warlock Pact Magic + Mystic Arcanum", () => {
   const hpUrl = `/api/characters/${WARLOCK_ID}/hp`;
 
   it("derives 3 Pact slots at level 5 and a 6th-level Mystic Arcanum charge", async () => {
-    const res = await supertest(createApp()).get(`/api/characters/${WARLOCK_ID}`);
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${WARLOCK_ID}`);
     expect(res.status).toBe(200);
     const slots = res.body.spellcasting.slots as Array<{ level: number; total: number }>;
     expect(slots).toEqual([{ level: 5, total: 3, used: 0 }]);
@@ -764,7 +768,7 @@ describe("Warlock Pact Magic + Mystic Arcanum", () => {
   });
 
   it("casts a 6th-level spell via the Mystic Arcanum charge, not a Pact slot", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(castUrl)
       .send({ operations: [{ type: "castSpell", entryId: "arcanum-spell-6", slotLevel: 6, roll: 0 }] });
     expect(res.status).toBe(200);
@@ -776,18 +780,18 @@ describe("Warlock Pact Magic + Mystic Arcanum", () => {
 
   it("rejects a second arcanum cast of the same level until a long rest", async () => {
     const app = createApp();
-    await supertest(app).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "arcanum-spell-6", slotLevel: 6, roll: 0 }] });
-    const res = await supertest(app).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "arcanum-spell-6", slotLevel: 6, roll: 0 }] });
+    await supertest.agent(app).set("Cookie", COOKIE).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "arcanum-spell-6", slotLevel: 6, roll: 0 }] });
+    const res = await supertest.agent(app).set("Cookie", COOKIE).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "arcanum-spell-6", slotLevel: 6, roll: 0 }] });
     expect(res.status).toBe(400);
   });
 
   it("recharges Pact slots on a short rest but NOT Mystic Arcanum", async () => {
     const app = createApp();
     // Spend a Pact slot (5th) and the 6th-level arcanum.
-    await supertest(app).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "pact-spell-5", slotLevel: 5, roll: 12 }] });
-    await supertest(app).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "arcanum-spell-6", slotLevel: 6, roll: 0 }] });
+    await supertest.agent(app).set("Cookie", COOKIE).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "pact-spell-5", slotLevel: 5, roll: 12 }] });
+    await supertest.agent(app).set("Cookie", COOKIE).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "arcanum-spell-6", slotLevel: 6, roll: 0 }] });
 
-    const rest = await supertest(app).post(hpUrl).send({ operations: [{ type: "shortRest", rolls: [5] }] });
+    const rest = await supertest.agent(app).set("Cookie", COOKIE).post(hpUrl).send({ operations: [{ type: "shortRest", rolls: [5] }] });
     expect(rest.status).toBe(200);
     const pact = rest.body.spellcasting.slots.find((s: { level: number }) => s.level === 5);
     expect(pact.used).toBe(0); // Pact slot recharged
@@ -797,10 +801,10 @@ describe("Warlock Pact Magic + Mystic Arcanum", () => {
 
   it("recharges both Pact slots and Mystic Arcanum on a long rest", async () => {
     const app = createApp();
-    await supertest(app).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "pact-spell-5", slotLevel: 5, roll: 12 }] });
-    await supertest(app).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "arcanum-spell-6", slotLevel: 6, roll: 0 }] });
+    await supertest.agent(app).set("Cookie", COOKIE).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "pact-spell-5", slotLevel: 5, roll: 12 }] });
+    await supertest.agent(app).set("Cookie", COOKIE).post(castUrl).send({ operations: [{ type: "castSpell", entryId: "arcanum-spell-6", slotLevel: 6, roll: 0 }] });
 
-    const rest = await supertest(app).post(hpUrl).send({ operations: [{ type: "longRest" }] });
+    const rest = await supertest.agent(app).set("Cookie", COOKIE).post(hpUrl).send({ operations: [{ type: "longRest" }] });
     expect(rest.status).toBe(200);
     const pact = rest.body.spellcasting.slots.find((s: { level: number }) => s.level === 5);
     expect(pact.used).toBe(0);
