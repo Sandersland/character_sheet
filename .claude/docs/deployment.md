@@ -260,5 +260,6 @@ In-app authentication + per-owner ownership are shipped (#101/#102), so prod is 
 longer blocked on them. Prod reuses the same combined image in a second Railway
 environment — public (no Cloudflare Access, since the app gates itself) or with its
 own Access policy as desired. Remaining prod prerequisites: register a prod Google
-OAuth client + redirect URI, set `APP_BASE_URL`/`GOOGLE_CLIENT_*`/`SESSION_COOKIE_SECURE=true`
-for the prod origin, and resolve the open CSP items (#149/#150/#151).
+OAuth client + redirect URI, and set `APP_BASE_URL`/`GOOGLE_CLIENT_*`/`SESSION_COOKIE_SECURE=true`
+for the prod origin. (The single-origin CSP allowances for Google avatars, the 3D
+dice worker, and the Cloudflare beacon are in place — see `backend/src/lib/security.ts`.)
