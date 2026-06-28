@@ -58,6 +58,18 @@ describe("summarizeSellBatch", () => {
     ]);
   });
 
+  it("keeps the total in the denominations transacted (no carry to platinum)", () => {
+    // three 15 gp sales — must read "45 gp", not the normalized "4 pp 5 gp"
+    const rows = [
+      soldEvent({ itemName: "Ruby", quantityDelta: -1, currencyDelta: gp(15) }),
+      soldEvent({ itemName: "Sapphire", quantityDelta: -1, currencyDelta: gp(15) }),
+      soldEvent({ itemName: "Emerald", quantityDelta: -1, currencyDelta: gp(15) }),
+    ];
+    const summary = summarizeSellBatch(rows);
+    expect(summary!.total).toEqual(gp(45));
+    expect(summary!.totalLabel).toBe("45 gp");
+  });
+
   it("tolerates a row with missing/garbage data — currency treated as zero", () => {
     const rows = [
       soldEvent({ itemName: "Dagger", quantityDelta: -1, currencyDelta: gp(4) }),
