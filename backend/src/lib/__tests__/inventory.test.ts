@@ -232,6 +232,66 @@ describe("applyInventoryOperations", () => {
     expect(items).toHaveLength(0);
   });
 
+  // ── bulk sell: N sold events under one batchId (Issue #104) ──────────────────
+
+  it("bulk sell produces N sold events sharing one batchId", async () => {
+    // Two DISTINCT rows: the catalog item + a fully-custom item.
+    await applyInventoryOperations(characterAId, [
+      { type: "acquire", itemId, quantity: 1 },
+      {
+        type: "acquire",
+        custom: { name: "Bulk Custom Gem", category: "gear", cost: { cp: 0, sp: 0, gp: 0, pp: 0 } },
+        quantity: 1,
+      },
+    ]);
+    const rows = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+    expect(rows).toHaveLength(2);
+    const catalogRow = rows.find((r) => r.itemId === itemId);
+    const customRow = rows.find((r) => r.name === "Bulk Custom Gem");
+    expect(catalogRow).toBeDefined();
+    expect(customRow).toBeDefined();
+
+    // ONE transaction, TWO sell ops, each with its own currencyDelta.
+    await applyInventoryOperations(characterAId, [
+      { type: "sell", inventoryItemId: catalogRow!.id, currencyDelta: { cp: 0, sp: 0, gp: 2, pp: 0 } },
+      { type: "sell", inventoryItemId: customRow!.id, currencyDelta: { cp: 0, sp: 0, gp: 3, pp: 0 } },
+    ]);
+
+    const sold = await prisma.characterEvent.findMany({
+      where: { characterId: characterAId, type: "sold" },
+      orderBy: { createdAt: "asc" },
+    });
+    // Exactly two sold events.
+    expect(sold).toHaveLength(2);
+
+    // Both share ONE non-null batchId.
+    expect(sold[0].batchId).not.toBeNull();
+    expect(new Set(sold.map((e) => e.batchId)).size).toBe(1);
+
+    // Each event's entityId == its own inventoryItemId.
+    const byEntity = new Map(sold.map((e) => [e.entityId, e.data as Record<string, unknown>]));
+    expect(byEntity.has(catalogRow!.id)).toBe(true);
+    expect(byEntity.has(customRow!.id)).toBe(true);
+
+    // Correct data.itemName / quantityDelta / currencyDelta per row.
+    const catalogData = byEntity.get(catalogRow!.id)!;
+    expect(catalogData.itemName).toBe("Lib Test Club");
+    expect(catalogData.quantityDelta).toBe(-1);
+    expect(catalogData.currencyDelta).toEqual({ cp: 0, sp: 0, gp: 2, pp: 0 });
+    const customData = byEntity.get(customRow!.id)!;
+    expect(customData.itemName).toBe("Bulk Custom Gem");
+    expect(customData.quantityDelta).toBe(-1);
+    expect(customData.currencyDelta).toEqual({ cp: 0, sp: 0, gp: 3, pp: 0 });
+
+    // Derivable batch total + count: summed currencyDelta = { gp: 5 }, rows = 2.
+    const totalGp = sold.reduce(
+      (sum, e) => sum + (((e.data as Record<string, unknown>).currencyDelta as { gp: number }).gp ?? 0),
+      0
+    );
+    expect(totalGp).toBe(5);
+    expect(sold.length).toBe(2);
+  });
+
   // ── data.deletedItem undo snapshot (Issue #117) ──────────────────────────────
 
   it("removing a custom weapon snapshots the full row + weapon detail under data.deletedItem", async () => {
@@ -280,6 +340,49 @@ describe("applyInventoryOperations", () => {
       finesse: true,
       light: true,
     });
+  });
+
+  it("setEquipped rejects equipping a non-equippable (gear) item", async () => {
+    await applyInventoryOperations(characterAId, [
+      { type: "acquire", custom: { name: "Test Rope", category: "gear" }, quantity: 1 },
+    ]);
+    const [created] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+
+    await expect(
+      applyInventoryOperations(characterAId, [
+        { type: "setEquipped", inventoryItemId: created.id, equipped: true },
+      ]),
+    ).rejects.toThrow(InvalidInventoryOperationError);
+
+    const after = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
+    expect(after.equipped).toBe(false);
+  });
+
+  it("setEquipped equips a weapon row", async () => {
+    await applyInventoryOperations(characterAId, [{ type: "acquire", itemId, quantity: 1 }]);
+    const [created] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+
+    await applyInventoryOperations(characterAId, [
+      { type: "setEquipped", inventoryItemId: created.id, equipped: true },
+    ]);
+
+    const after = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
+    expect(after.equipped).toBe(true);
+  });
+
+  it("setEquipped can unequip a gear row that is stuck equipped", async () => {
+    await applyInventoryOperations(characterAId, [
+      { type: "acquire", custom: { name: "Stuck Gear", category: "gear" }, quantity: 1, equipped: true },
+    ]);
+    const [created] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+    expect(created.equipped).toBe(true);
+
+    await applyInventoryOperations(characterAId, [
+      { type: "setEquipped", inventoryItemId: created.id, equipped: false },
+    ]);
+
+    const after = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
+    expect(after.equipped).toBe(false);
   });
 
   it("selling the FULL stack snapshots data.deletedItem; a partial sell does not", async () => {

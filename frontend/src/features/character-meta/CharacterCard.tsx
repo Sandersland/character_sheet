@@ -32,7 +32,7 @@ export default function CharacterCard({ character }: CharacterCardProps) {
         {character.portraitUrl ? (
           <img
             src={character.portraitUrl}
-            alt=""
+            alt={`Portrait of ${character.name}`}
             className="h-full w-full object-cover"
           />
         ) : (

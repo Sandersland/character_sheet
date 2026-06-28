@@ -399,7 +399,7 @@ export default function InlineAttackPicker({
               {improvisedWeapon.attackBonus} · Damage:{" "}
               {formatRollSpec(improvisedDamageSpec)} bludgeoning
               {!improvisedWeapon.proficient && (
-                <span className="ml-1 italic text-parchment-400">(no proficiency)</span>
+                <span className="ml-1 italic text-parchment-600">(no proficiency)</span>
               )}
             </p>
             {attackTotals["improvised"] !== null && attackTotals["improvised"] !== undefined && (

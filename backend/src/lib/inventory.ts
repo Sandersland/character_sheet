@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma } from "../generated/prisma/client.js";
 import { logEvent } from "./events.js";
+import { isEquippable } from "./items.js";
 import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
 
@@ -708,6 +709,12 @@ async function applySetEquipped(
   sessionId: string | null,
 ) {
   const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
+
+  // Only weapons/armor are equippable. Gate equipping only — unequip is always
+  // legal so a legacy row stuck `equipped` can still be cleared.
+  if (op.equipped && !isEquippable(item.category)) {
+    throw new InvalidInventoryOperationError(`${item.name} (${item.category}) cannot be equipped`);
+  }
 
   await tx.inventoryItem.update({
     where: { id: item.id },

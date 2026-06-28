@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { fromCopper, splitLumpSum, toCopper } from "@/lib/currency";
+import { addCurrency, formatCurrency, fromCopper, splitLumpSum, toCopper } from "@/lib/currency";
 import type { Currency } from "@/types/character";
 
 function sumCurrencies(lines: Currency[]): Currency {
@@ -38,6 +38,42 @@ describe("fromCopper", () => {
     for (const n of [0, 1, 9, 10, 99, 100, 555, 1000, 1234, 99999]) {
       expect(toCopper(fromCopper(n))).toBe(n);
     }
+  });
+});
+
+describe("addCurrency", () => {
+  it("adds each denomination independently without carrying up", () => {
+    // three 15 gp sales stay 45 gp — not normalized to 4 pp 5 gp
+    expect(
+      addCurrency(addCurrency({ cp: 0, sp: 0, gp: 15, pp: 0 }, { cp: 0, sp: 0, gp: 15, pp: 0 }), {
+        cp: 0,
+        sp: 0,
+        gp: 15,
+        pp: 0,
+      })
+    ).toEqual({ cp: 0, sp: 0, gp: 45, pp: 0 });
+  });
+
+  it("sums mixed denominations field-wise", () => {
+    expect(
+      addCurrency({ cp: 4, sp: 3, gp: 2, pp: 1 }, { cp: 1, sp: 2, gp: 3, pp: 4 })
+    ).toEqual({ cp: 5, sp: 5, gp: 5, pp: 5 });
+  });
+});
+
+describe("formatCurrency", () => {
+  it("renders a single nonzero denomination", () => {
+    expect(formatCurrency({ cp: 0, sp: 0, gp: 45, pp: 0 })).toBe("45 gp");
+    expect(formatCurrency({ cp: 7, sp: 0, gp: 0, pp: 0 })).toBe("7 cp");
+  });
+
+  it("joins multiple nonzero denominations largest-first", () => {
+    expect(formatCurrency({ cp: 0, sp: 0, gp: 2, pp: 1 })).toBe("1 pp 2 gp");
+    expect(formatCurrency({ cp: 4, sp: 3, gp: 2, pp: 1 })).toBe("1 pp 2 gp 3 sp 4 cp");
+  });
+
+  it("renders an all-zero amount as '0 gp'", () => {
+    expect(formatCurrency({ cp: 0, sp: 0, gp: 0, pp: 0 })).toBe("0 gp");
   });
 });
 

@@ -85,7 +85,7 @@ export default function SkillsTable({
                   </span>
                 )}
               </td>
-              <td className="py-1.5 text-xs text-parchment-400">
+              <td className="py-1.5 text-xs text-parchment-600">
                 {abilityAbbr(skill.ability)}{" "}
                 <span className="tabular-nums">
                   ({formatModifier(abilityModifier(score))})

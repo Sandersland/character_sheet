@@ -31,6 +31,35 @@ export function fromCopper(total: number): Currency {
 }
 
 /**
+ * Field-wise sum of two Currency values — adds each denomination on its own
+ * and does NOT carry up (so 8 gp + 7 gp stays "15 gp", never "1 pp 5 gp").
+ * Use this to keep a summary faithful to the denominations actually
+ * transacted; use `toCopper`/`fromCopper` when a normalized minimal
+ * representation is wanted instead.
+ */
+export function addCurrency(a: Currency, b: Currency): Currency {
+  return { cp: a.cp + b.cp, sp: a.sp + b.sp, gp: a.gp + b.gp, pp: a.pp + b.pp };
+}
+
+/**
+ * Render a Currency as an UNSIGNED, human-readable amount: only nonzero
+ * denominations, largest-first (pp → gp → sp → cp), joined by a space —
+ * e.g. `{gp:45}` → "45 gp", `{pp:1,gp:2}` → "1 pp 2 gp". An all-zero amount
+ * renders as "0 gp" so a free/zero-value line still reads naturally.
+ *
+ * (For a SIGNED ledger delta — "+5 gp" / "-2 sp" — use `formatCurrencyDelta`
+ * in LedgerModal; this is the plain-magnitude formatter.)
+ */
+export function formatCurrency(c: Currency): string {
+  const parts: string[] = [];
+  if (c.pp) parts.push(`${c.pp} pp`);
+  if (c.gp) parts.push(`${c.gp} gp`);
+  if (c.sp) parts.push(`${c.sp} sp`);
+  if (c.cp) parts.push(`${c.cp} cp`);
+  return parts.length > 0 ? parts.join(" ") : "0 gp";
+}
+
+/**
  * Split a lump-sum payment evenly across `n` lines so the lines sum EXACTLY
  * to the original total (no copper lost to rounding). Working in copper, each
  * line gets the base share `floor(total/n)`; the leftover copper (`total % n`)

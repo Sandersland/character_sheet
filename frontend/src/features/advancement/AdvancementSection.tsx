@@ -137,7 +137,7 @@ export default function AdvancementSection({ character, onUpdate }: Props) {
         <span className="text-xs text-parchment-500">
           {advancementSlots.used}/{advancementSlots.total} used
         </span>
-        {busy && <span className="text-[10px] text-parchment-400">Saving…</span>}
+        {busy && <span className="text-[10px] text-parchment-600">Saving…</span>}
       </div>
 
       {/* Taken advancements list */}
@@ -187,7 +187,7 @@ export default function AdvancementSection({ character, onUpdate }: Props) {
 
       {/* Empty state */}
       {advancements.length === 0 && advancementSlots.total > 0 && (
-        <p className="text-sm text-parchment-400">
+        <p className="text-sm text-parchment-600">
           No advancements taken yet. You have {advancementSlots.total} slot{advancementSlots.total > 1 ? "s" : ""} available.
         </p>
       )}
