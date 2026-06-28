@@ -38,7 +38,11 @@ Capture the full output (pass/fail count, any failing test names and assertions)
 
 **Browser verification** — invoke the `/verify` skill concurrently. It will launch the app and drive the changed UI at the browser surface.
 
-**Design review** — launch the design agent against the changed surfaces (give it the list of changed `features/`, `pages/`, and `components/ui/` files). Use `subagent_type: "frontend-design-architect"` (a registered agent type); if that type isn't available in the current environment, fall back to a `general-purpose` agent briefed with the two design docs below. Its brief: judge the rendered UI against this app's design system, not generic taste. Point it at `.claude/agent-memory/frontend-design-architect/design_system.md` (token names + direction) and `.claude/docs/frontend.md` (conventions), and have it check for:
+**Design review** — derive the changed UI surfaces with:
+```bash
+git diff --name-only origin/staging...HEAD | grep -E '^frontend/src/(features|pages|components/ui)/'
+```
+and launch the design agent against them. Try `subagent_type: "frontend-design-architect"`, falling back to a `general-purpose` agent briefed with the two design docs below if that type isn't available in the current environment. Its brief: judge the rendered UI against this app's design system, not generic taste. Point it at `.claude/agent-memory/frontend-design-architect/design_system.md` (token names + direction) and `.claude/docs/frontend.md` (conventions), and have it check for:
 - **Off-system values** — arbitrary colors/radii/shadows instead of the `parchment`/`garnet`/`arcane`/`gold`/`vitality` tokens, `rounded-card`/`rounded-control`, `shadow-card`/`shadow-raised`; ad-hoc spacing that breaks the rhythm. (These are the top "AI slop" tells.)
 - **Visual hierarchy** — is the primary action obvious, is type scale used purposefully, is whitespace deliberate rather than uniform.
 - **Component reuse** — reuses `Card`/`Badge`/`MeterBar`/`Tabs`/`Modal` rather than reinventing a one-off; respects the inline-panel-vs-Modal rule.
