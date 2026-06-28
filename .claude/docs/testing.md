@@ -184,6 +184,16 @@ renderRow({ item: { ...base, equipped: true } });
 
 **Interaction** — use `userEvent.setup()` for clicks, typing, and keyboard events that involve real browser-like sequencing; use `fireEvent` only for low-level event injection (e.g. `fireEvent.keyDown(document, { key: "Escape" })` in Modal tests).
 
+## Browser / UI verification (behind auth)
+
+Unit tests mock the network, but driving the real UI in a browser hits `requireAuth` — a fresh stack shows the `LoginPage` and OAuth can't complete headless. To get a signed-in session with something to look at:
+
+1. Bring the stack up and wait for `/api/health`.
+2. `npm run seed:verify` — mints a session via `POST /api/auth/dev-login` and builds a representative "Verify Dummy" character through the real endpoints (idempotent). Needs `ALLOW_DEV_LOGIN=true` (dev compose default). See development.md.
+3. In Playwright, sign in with an in-page `fetch('/api/auth/dev-login', { method: 'POST' })` then reload (`cs_session` is HttpOnly, so it can't be set from `document.cookie`).
+
+The **`verify-frontend` skill** automates all of this (seed → sign in → run RTL tests + browser verification in parallel). e2e Playwright coverage of full flows is tracked in #97.
+
 ## Lib-level unit tests
 
 Pure domain logic goes in `backend/src/lib/__tests__/`:

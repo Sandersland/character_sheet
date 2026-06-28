@@ -58,14 +58,14 @@ git checkout -b <integration-branch>
 git push -u origin <integration-branch>
 ```
 
-> **Critical ordering — do this before step 4.** `scripts/worktree.sh create` forks each new branch from the **main checkout's current HEAD**. So the main checkout must be sitting on the integration branch *before* you create any worktree, or the issue branches fork from the wrong base and their PRs won't target integration cleanly.
+> **Critical ordering — do this before step 4.** `.claude/skills/worktree/worktree.sh create` forks each new branch from the **main checkout's current HEAD**. So the main checkout must be sitting on the integration branch *before* you create any worktree, or the issue branches fork from the wrong base and their PRs won't target integration cleanly.
 
 ### 4. Spin up an isolated worktree per issue
 
 From the main checkout root, for each issue (reusing the `worktree` skill / its script):
 
 ```bash
-./scripts/worktree.sh create feat/issue-<#>-<slug> --up
+./.claude/skills/worktree/worktree.sh create feat/issue-<#>-<slug> --up
 ```
 
 This assigns a slot (1–9), writes a gitignored `.env` with the slot's ports + `COMPOSE_PROJECT_NAME`, and boots an isolated `db + backend + frontend` stack (own Postgres volume → migrations are isolated). Capture each worktree's **slot** from the output. Ports are `base + slot*10`:
@@ -144,4 +144,4 @@ Collect every background result into one table:
 |---|---|---|---|
 | #<#> | feat/issue-<#>-<slug> | slot N · frontend/backend URLs | PR link **or** failure reason + link to the issue comment |
 
-Note that `claude-code-review.yml` auto-reviews each opened PR, and `ci.yml` runs lint + Postgres tests on it. Leave worktrees up for inspection; tear one down with `./scripts/worktree.sh rm feat/issue-<#>-<slug>` (frees its slot in `.claude/worktrees/registry.json` — an abandoned worktree holds its slot until `rm`).
+Note that `claude-code-review.yml` auto-reviews each opened PR, and `ci.yml` runs lint + Postgres tests on it. Leave worktrees up for inspection; tear one down with `./.claude/skills/worktree/worktree.sh rm feat/issue-<#>-<slug>` (frees its slot in `.claude/worktrees/registry.json` — an abandoned worktree holds its slot until `rm`).

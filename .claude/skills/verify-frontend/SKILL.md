@@ -9,6 +9,23 @@ Run this skill after making frontend changes to gate a PR. It runs frontend unit
 
 ## Steps
 
+### 0. Ensure a signed-in session (auth is required)
+
+Every `/api` route is behind `requireAuth`, so the browser surface shows the `LoginPage` until a session exists. OAuth can't complete headless, so provision a dev session instead:
+
+1. **Make sure the stack is running** (`docker compose up -d`, or `… worktree.sh up <branch>` for a worktree) and the backend is healthy (`curl -s localhost:4000/api/health`).
+2. **Seed a user + representative character** (idempotent — reuses an existing "Verify Dummy"):
+   ```bash
+   npm run seed:verify
+   # worktree slot N: BACKEND_URL=http://localhost:40<N>0 FRONTEND_URL=http://localhost:51<N>3 npm run seed:verify
+   ```
+   This needs `ALLOW_DEV_LOGIN=true` (the dev compose sets it by default).
+3. **Sign in inside Playwright** — `cs_session` is HttpOnly, so don't try to set it from `document.cookie`. Instead `browser_navigate` to the frontend, then run an in-page fetch and reload:
+   ```js
+   await fetch('/api/auth/dev-login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+   ```
+   The SPA proxies `/api`, so the browser stores the session for the frontend origin. Reload → you land in the app as "Dev User" with the seeded character visible.
+
 ### 1. Launch both in parallel
 
 Kick off the unit tests and browser verification at the same time using two background agents (or by launching them as parallel tool calls):

@@ -1,11 +1,11 @@
 ---
 name: worktree
-description: Spin up an isolated, fully-dockerized dev stack for a git worktree so several features can be built and tested in parallel without port or database collisions. Each worktree gets its own Compose project (own Postgres volume, isolated migrations) and its own port block, with port math owned by scripts/worktree.sh. Use when the user wants to work on multiple branches/issues at once, or asks to "spin up a worktree for X".
+description: Spin up an isolated, fully-dockerized dev stack for a git worktree so several features can be built and tested in parallel without port or database collisions. Each worktree gets its own Compose project (own Postgres volume, isolated migrations) and its own port block, with port math owned by .claude/skills/worktree/worktree.sh. Use when the user wants to work on multiple branches/issues at once, or asks to "spin up a worktree for X".
 ---
 
 # worktree
 
-Spin up an isolated, fully-dockerized dev stack for a git worktree so several features can be built and tested in parallel without port or database collisions. Each worktree gets its own Compose project (own Postgres volume → migrations are isolated) and its own port block. Port math is owned by `scripts/worktree.sh` — never assign ports by hand.
+Spin up an isolated, fully-dockerized dev stack for a git worktree so several features can be built and tested in parallel without port or database collisions. Each worktree gets its own Compose project (own Postgres volume → migrations are isolated) and its own port block. Port math is owned by `.claude/skills/worktree/worktree.sh` — never assign ports by hand.
 
 Use this when the user wants to work on multiple branches/issues at once, or asks to "spin up a worktree for X".
 
@@ -16,7 +16,7 @@ Use this when the user wants to work on multiple branches/issues at once, or ask
 Run from the **main checkout** root:
 
 ```bash
-./scripts/worktree.sh create <branch> --up
+./.claude/skills/worktree/worktree.sh create <branch> --up
 ```
 
 This creates the worktree under `.claude/worktrees/<branch>` (new branch from HEAD, or attaches an existing branch), assigns the lowest free slot (1–9), writes a gitignored `.env` with the slot's ports + `COMPOSE_PROJECT_NAME`, and (with `--up`) builds and starts `db + backend + frontend` detached. Drop `--up` to set up without starting; start later with `up <branch>`.
@@ -36,10 +36,10 @@ Worktree 'spell-upcasting' (slot 1) is up:
 
 ### 3. Manage and review
 
-- **See everything at once:** `./scripts/worktree.sh ls` → table of branch / slot / frontend URL / backend URL / running status.
+- **See everything at once:** `./.claude/skills/worktree/worktree.sh ls` → table of branch / slot / frontend URL / backend URL / running status.
 - **Tail one stack's logs:** `docker compose -p cs-<sanitized-branch> logs -f`.
-- **Stop (keep DB):** `./scripts/worktree.sh down <branch>` · restart: `up <branch>`.
-- **Tear down completely (drops the isolated DB volume + removes the worktree):** `./scripts/worktree.sh rm <branch>`.
+- **Stop (keep DB):** `./.claude/skills/worktree/worktree.sh down <branch>` · restart: `up <branch>`.
+- **Tear down completely (drops the isolated DB volume + removes the worktree):** `./.claude/skills/worktree/worktree.sh rm <branch>`.
 
 ### 4. Work inside a worktree
 

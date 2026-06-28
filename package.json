@@ -10,9 +10,14 @@
   },
   "packageManager": "npm@11.15.0",
   "scripts": {
+    "prepare": "lefthook install || true",
     "dev": "npm run dev --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "seed:verify": "npm run seed:verify --workspace=backend"
+  },
+  "devDependencies": {
+    "lefthook": "^2.1.9"
   }
 }

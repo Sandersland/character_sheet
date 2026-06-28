@@ -15,7 +15,7 @@ docker compose up --build
 docker compose --profile tools up pgadmin   # localhost:5050
 ```
 
-On every container start, both dev containers run `npm install` first, then the backend runs `prisma generate && prisma migrate deploy && prisma db seed` before starting `tsx watch`. All are idempotent (npm install is a fast no-op when nothing changed; migrate deploy no-ops if already applied; seed uses upserts). Three sample characters (a Fighter, a Cleric, and a Wizard) land automatically.
+On every container start, both dev containers run `npm install` first, then the backend runs `prisma generate && prisma migrate deploy && prisma db seed` before starting `tsx watch`. All are idempotent (npm install is a fast no-op when nothing changed; migrate deploy no-ops if already applied; seed uses upserts). The seed is **catalog-only** (items, spells, classes, races, …) — it creates no users or characters, so a fresh stack has an empty party behind the login screen. To get a signed-in user + a representative character for viewing/UI verification, run `npm run seed:verify` (see below).
 
 > **Adding a dependency?** Just edit `package.json` (or `npm install <pkg>` locally) and `docker compose up --build`. The startup `npm install` reconciles the `node_modules` named volume, so a new dependency is picked up without manually removing the volume. (The volume is seeded from the image only on first creation, so without this it would otherwise shadow newly-built deps.)
 
@@ -27,6 +27,19 @@ npm run lint      # ESLint in each workspace
 npm run test      # Vitest in each workspace
 npm run build     # production build in each workspace
 ```
+
+## Guardrails (local git hooks)
+
+[lefthook](https://lefthook.dev) runs fast, infra-free gates before code reaches CI. Hooks install automatically via the root `prepare` script on `npm install` — config is `lefthook.yml`.
+
+| Hook | Runs | Why |
+|---|---|---|
+| `pre-commit` | `eslint --fix` on staged `*.{ts,tsx}` | catch + auto-fix lint before it lands |
+| `pre-push` | `tsc --noEmit` + (frontend) unit tests | the **tsc** gate is the key one — vitest transpiles via esbuild and does NOT type-check, so type-only errors otherwise only surface in CI's `build` job |
+
+Jobs are **scoped per workspace** via lefthook `root:` — a backend-only push runs `typecheck-backend` and skips the frontend jobs (and vice-versa), since the two workspaces share no types. The first push of a brand-new branch can't resolve a file range, so it skips (CI is the backstop); subsequent pushes gate normally.
+
+Backend vitest stays **CI-only** (it needs Postgres) so pre-push never blocks on a DB. **Do not bypass with `--no-verify`** — fix the failure. Run a hook manually with `npx lefthook run pre-commit` / `pre-push`.
 
 ## Running outside Docker (faster iteration)
 
@@ -75,9 +88,21 @@ npx prisma db seed
 
 `schema.prisma` lives at `backend/prisma/schema.prisma`. The `prisma.config.ts` at the backend root tells the CLI where to find it.
 
+## Verification data (`seed:verify`)
+
+The catalog seed creates no users/characters, and OAuth can't complete headless or on a worktree port. `npm run seed:verify` bridges that gap for UI verification: against a **running** stack it mints a session via the guarded `POST /api/auth/dev-login` endpoint and builds a representative character ("Verify Dummy" — equippable weapon + armor, trinkets, a bulk sale) through the real API endpoints, then prints the `cs_session` cookie + frontend URL. It's idempotent (reuses an existing "Verify Dummy").
+
+```bash
+npm run seed:verify                                  # default localhost:4000 / :5173
+BACKEND_URL=http://localhost:4010 \
+FRONTEND_URL=http://localhost:5183 npm run seed:verify   # a worktree slot
+```
+
+Requires `ALLOW_DEV_LOGIN=true` (the dev compose sets it by default; it is **hard-disabled when `NODE_ENV=production`**, so it can never expose a passwordless login in prod). To sign in from Playwright, run an in-page `fetch('/api/auth/dev-login', { method: 'POST' })` then reload — `cs_session` is HttpOnly so it can't be set from `document.cookie`. The `verify-frontend` skill automates this.
+
 ## Parallel worktrees (build several features at once)
 
-`scripts/worktree.sh` runs an **isolated, fully-dockerized stack per git worktree** so multiple branches can run and be tested at the same time. Each worktree gets a port "slot" (1–9; slot 0 = this main checkout on default ports). Everything is derived from the slot:
+`.claude/skills/worktree/worktree.sh` runs an **isolated, fully-dockerized stack per git worktree** so multiple branches can run and be tested at the same time. Each worktree gets a port "slot" (1–9; slot 0 = this main checkout on default ports). Everything is derived from the slot:
 
 | Var (slot N) | Formula | Slot 1 |
 |---|---|---|
@@ -90,10 +115,10 @@ npx prisma db seed
 A distinct `COMPOSE_PROJECT_NAME` gives each worktree its **own** `postgres_data`/`node_modules` volumes — so a migration in one worktree is invisible to the others. The slot↔branch map persists in `.claude/worktrees/registry.json` (gitignored); the per-worktree `.env` is generated, never committed.
 
 ```bash
-./scripts/worktree.sh create <branch> --up   # worktree under .claude/worktrees/<branch>, assign slot, build & start
-./scripts/worktree.sh ls                      # table: branch | slot | URLs | running status
-./scripts/worktree.sh up|down <branch>        # start / stop (down keeps the DB volume)
-./scripts/worktree.sh rm <branch>             # down -v + remove worktree + free the slot
+./.claude/skills/worktree/worktree.sh create <branch> --up   # worktree under .claude/worktrees/<branch>, assign slot, build & start
+./.claude/skills/worktree/worktree.sh ls                      # table: branch | slot | URLs | running status
+./.claude/skills/worktree/worktree.sh up|down <branch>        # start / stop (down keeps the DB volume)
+./.claude/skills/worktree/worktree.sh rm <branch>             # down -v + remove worktree + free the slot
 docker compose ls                             # all running stacks across worktrees, built-in
 docker compose -p cs-<branch> logs -f         # tail one worktree's stack
 ```
