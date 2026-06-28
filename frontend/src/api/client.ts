@@ -281,7 +281,8 @@ export async function applyExperienceOperations(
 // type/sessionId/entityId compose with category via AND server-side.
 export async function fetchActivity(
   characterId: string,
-  opts?: { category?: string; type?: string; sessionId?: string; entityId?: string; includeFields?: boolean }
+  opts?: { category?: string; type?: string; sessionId?: string; entityId?: string; includeFields?: boolean },
+  signal?: AbortSignal,
 ): Promise<CharacterEvent[]> {
   const params = new URLSearchParams();
   if (opts?.category) params.set("category", opts.category);
@@ -290,7 +291,7 @@ export async function fetchActivity(
   if (opts?.entityId) params.set("entityId", opts.entityId);
   if (opts?.includeFields) params.set("includeFields", "1");
   const query = params.toString() ? `?${params.toString()}` : "";
-  const response = await fetch(`${API_URL}/characters/${characterId}/activity${query}`);
+  const response = await fetch(`${API_URL}/characters/${characterId}/activity${query}`, { signal });
   if (!response.ok) {
     throw new Error(`Failed to fetch activity (${response.status})`);
   }

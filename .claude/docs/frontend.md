@@ -131,7 +131,7 @@ Use idiomatic utility classes — tokens auto-generate them in v4: `text-garnet-
 | Modal | Inline panel |
 |---|---|
 | `LedgerModal` — read-only inventory ledger | `AddItemPanel` — add item form |
-| `ActivityModal` — filterable audit timeline (category Tabs + inventory type chips + session select; optional `entityId` scope) + undo | `AddSpellPanel` — learn spell form |
+| `ActivityModal` — filterable audit timeline (category + session selects + inventory type chips; optional `entityId` scope) + undo | `AddSpellPanel` — learn spell form |
 | `DeleteCharacterModal` — confirm destructive action | `InventoryRow` edit/sell mode |
 | `LevelUpModal` / `ConcentrationSaveModal` — hosted *inside* `HitPointTracker` | `HitPointTracker` itself — inline Card (damage/heal/rest/death-save controls) |
 | | `ExperienceTracker` award/set inputs |

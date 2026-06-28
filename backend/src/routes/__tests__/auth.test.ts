@@ -41,11 +41,13 @@ async function cleanupSubs() {
 function mockGoogleFetch(opts: {
   tokenStatus?: number;
   userinfoStatus?: number;
+  tokenBody?: Record<string, unknown>;
   profile?: Record<string, unknown>;
 }) {
   const {
     tokenStatus = 200,
     userinfoStatus = 200,
+    tokenBody,
     profile = {
       sub: "sub-default",
       email: "player@example.com",
@@ -59,14 +61,16 @@ function mockGoogleFetch(opts: {
     const url = typeof input === "string" ? input : input.toString();
     if (url.includes("oauth2.googleapis.com/token")) {
       return new Response(
-        JSON.stringify({
-          access_token: "access-tok",
-          token_type: "Bearer",
-          expires_in: 3600,
-          refresh_token: "refresh-tok",
-          scope: "openid email profile",
-          id_token: "id-tok",
-        }),
+        JSON.stringify(
+          tokenBody ?? {
+            access_token: "access-tok",
+            token_type: "Bearer",
+            expires_in: 3600,
+            refresh_token: "refresh-tok",
+            scope: "openid email profile",
+            id_token: "id-tok",
+          },
+        ),
         { status: tokenStatus, headers: { "Content-Type": "application/json" } },
       );
     }
@@ -285,6 +289,29 @@ describe("auth router", () => {
 
     it("502s when the userinfo request is non-200", async () => {
       mockGoogleFetch({ userinfoStatus: 500 });
+      const agent = supertest.agent(buildApp());
+      const { state } = await beginFlow(agent);
+      const res = await agent.get(
+        `/api/auth/google/callback?code=c&state=${state}`,
+      );
+      expect(res.status).toBe(502);
+    });
+
+    it("502s (not 500) when the token response is a malformed 200", async () => {
+      // 200 OK but the body fails tokenResponseSchema — must surface as 502, not
+      // a ZodError escaping to the 500 handler.
+      mockGoogleFetch({ tokenBody: { unexpected: "shape" } });
+      const agent = supertest.agent(buildApp());
+      const { state } = await beginFlow(agent);
+      const res = await agent.get(
+        `/api/auth/google/callback?code=c&state=${state}`,
+      );
+      expect(res.status).toBe(502);
+    });
+
+    it("502s (not 500) when the userinfo response is a malformed 200", async () => {
+      // 200 OK but missing `sub` — mapProfile's zod parse throws; must be 502.
+      mockGoogleFetch({ profile: { email: "x@y.z", email_verified: true } });
       const agent = supertest.agent(buildApp());
       const { state } = await beginFlow(agent);
       const res = await agent.get(

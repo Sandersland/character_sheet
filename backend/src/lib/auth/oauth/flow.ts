@@ -117,7 +117,13 @@ export async function exchangeCode(
     body: body.toString(),
   });
   if (!response.ok) return null;
-  return tokenResponseSchema.parse(await response.json());
+  // A malformed-but-200 token body must surface as 502 (the caller maps null →
+  // 502), not a ZodError escaping to the 500 handler. Parse defensively.
+  try {
+    return tokenResponseSchema.parse(await response.json());
+  } catch {
+    return null;
+  }
 }
 
 // Fetch the provider's userinfo and normalize it. Returns null on a non-200.
@@ -129,5 +135,11 @@ export async function fetchProfile(
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) return null;
-  return provider.mapProfile(await response.json());
+  // mapProfile zod-parses the userinfo; a malformed-but-200 body must surface as
+  // 502, not a ZodError → 500.
+  try {
+    return provider.mapProfile(await response.json());
+  } catch {
+    return null;
+  }
 }

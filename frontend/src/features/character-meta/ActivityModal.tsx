@@ -63,22 +63,37 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
 
   // Load events (with field-level diffs) on mount, when a filter changes, and
   // after an undo. Only defined filters are forwarded so an unfiltered load
-  // sends exactly { includeFields: true }.
-  function load() {
+  // sends exactly { includeFields: true }. An optional signal lets a superseded
+  // filter-change load be aborted so a slow stale response can't overwrite a
+  // fresher one.
+  function load(signal?: AbortSignal) {
     setEvents(null);
     setError(null);
-    fetchActivity(characterId, {
-      includeFields: true,
-      ...(categoryFilter !== "all" ? { category: categoryFilter } : {}),
-      ...(typeFilter ? { type: typeFilter } : {}),
-      ...(sessionFilter ? { sessionId: sessionFilter } : {}),
-      ...(entityId ? { entityId } : {}),
-    })
+    fetchActivity(
+      characterId,
+      {
+        includeFields: true,
+        ...(categoryFilter !== "all" ? { category: categoryFilter } : {}),
+        ...(typeFilter ? { type: typeFilter } : {}),
+        ...(sessionFilter ? { sessionId: sessionFilter } : {}),
+        ...(entityId ? { entityId } : {}),
+      },
+      signal,
+    )
       .then(setEvents)
-      .catch(() => setError("Couldn't load the activity log — try again."));
+      .catch((err) => {
+        // A superseded load was aborted — ignore it; the newer load wins.
+        if (signal?.aborted || (err instanceof DOMException && err.name === "AbortError")) return;
+        setError("Couldn't load the activity log — try again.");
+      });
   }
 
-  useEffect(load, [characterId, categoryFilter, typeFilter, sessionFilter, entityId]);
+  useEffect(() => {
+    const controller = new AbortController();
+    load(controller.signal);
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [characterId, categoryFilter, typeFilter, sessionFilter, entityId]);
 
   // Populate the session picker once per character.
   useEffect(() => {

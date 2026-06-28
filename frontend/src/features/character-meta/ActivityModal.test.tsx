@@ -42,10 +42,15 @@ describe("ActivityModal filtering", () => {
   it("loads unfiltered on mount (only includeFields)", async () => {
     render(<ActivityModal characterId="char-1" onClose={vi.fn()} onUpdate={vi.fn()} />);
     await screen.findByText("Sold Shortsword ×1");
-    expect(client.fetchActivity).toHaveBeenNthCalledWith(1, "char-1", { includeFields: true });
+    expect(client.fetchActivity).toHaveBeenNthCalledWith(
+      1,
+      "char-1",
+      { includeFields: true },
+      expect.any(AbortSignal),
+    );
   });
 
-  it("refetches with category + type when Inventory tab and a type chip are chosen", async () => {
+  it("refetches with category + type when Inventory category and a type chip are chosen", async () => {
     const user = userEvent.setup();
     render(<ActivityModal characterId="char-1" onClose={vi.fn()} onUpdate={vi.fn()} />);
     await screen.findByText("Sold Shortsword ×1");
@@ -56,11 +61,11 @@ describe("ActivityModal filtering", () => {
     await user.click(soldChip);
 
     await waitFor(() =>
-      expect(client.fetchActivity).toHaveBeenLastCalledWith("char-1", {
-        includeFields: true,
-        category: "inventory",
-        type: "sold",
-      }),
+      expect(client.fetchActivity).toHaveBeenLastCalledWith(
+        "char-1",
+        { includeFields: true, category: "inventory", type: "sold" },
+        expect.any(AbortSignal),
+      ),
     );
   });
 
@@ -74,10 +79,11 @@ describe("ActivityModal filtering", () => {
     await user.selectOptions(select, "sess-1");
 
     await waitFor(() =>
-      expect(client.fetchActivity).toHaveBeenLastCalledWith("char-1", {
-        includeFields: true,
-        sessionId: "sess-1",
-      }),
+      expect(client.fetchActivity).toHaveBeenLastCalledWith(
+        "char-1",
+        { includeFields: true, sessionId: "sess-1" },
+        expect.any(AbortSignal),
+      ),
     );
   });
 
@@ -100,7 +106,24 @@ describe("ActivityModal filtering", () => {
     expect(client.fetchActivity).toHaveBeenCalledWith(
       "char-1",
       expect.objectContaining({ includeFields: true, entityId: "item-42" }),
+      expect.any(AbortSignal),
     );
+  });
+
+  it("aborts a superseded load when the filter changes again", async () => {
+    const user = userEvent.setup();
+    render(<ActivityModal characterId="char-1" onClose={vi.fn()} onUpdate={vi.fn()} />);
+    await screen.findByText("Sold Shortsword ×1");
+
+    // The mount load's AbortSignal (3rd arg of the first call).
+    const firstSignal = vi.mocked(client.fetchActivity).mock.calls[0][2] as AbortSignal;
+    expect(firstSignal).toBeInstanceOf(AbortSignal);
+    expect(firstSignal.aborted).toBe(false);
+
+    // Changing the category supersedes that load — its signal must abort so a
+    // slow stale response can't overwrite the fresher one.
+    await user.selectOptions(screen.getByRole("combobox", { name: "Category" }), "inventory");
+    await waitFor(() => expect(firstSignal.aborted).toBe(true));
   });
 });
 
