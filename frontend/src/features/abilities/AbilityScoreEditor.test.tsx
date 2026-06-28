@@ -75,6 +75,29 @@ describe("AbilityScoreEditor accessibility", () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 
+  it("labels every slot-assignment select (method=roll, with a rolled pool)", async () => {
+    const { container } = render(
+      <AbilityScoreEditor
+        method="roll"
+        pool={[15, 14, 13, 12, 10, 8]}
+        assignments={EMPTY_ASSIGNMENTS}
+        abilityScores={SCORES}
+        onMethodChange={noop}
+        onPoolChange={noop}
+        onAssignmentsChange={noop}
+        onScoresChange={noop}
+      />
+    );
+
+    for (const ability of Object.keys(ABILITY_LABELS) as AbilityName[]) {
+      expect(
+        screen.getByLabelText(ABILITY_LABELS[ability])
+      ).toBeInTheDocument();
+    }
+
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
   it("names every point-buy stepper button (method=pointBuy)", async () => {
     const { container } = render(
       <AbilityScoreEditor

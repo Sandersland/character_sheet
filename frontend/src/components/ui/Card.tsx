@@ -1,4 +1,3 @@
-import { createElement } from "react";
 import type { ReactNode } from "react";
 
 interface CardProps {
@@ -28,20 +27,16 @@ export default function Card({
   titleAccessory,
   headingLevel = 3,
 }: CardProps) {
+  const HeadingTag = `h${headingLevel}` as "h2" | "h3";
   return (
     <section
       className={`rounded-card border border-parchment-200 bg-parchment-50 shadow-card ${className}`}
     >
       {title && (
         <div className="flex items-center justify-between gap-2 border-b border-parchment-200 px-4 py-2.5">
-          {createElement(
-            `h${headingLevel}`,
-            {
-              className:
-                "font-sans text-xs font-semibold uppercase tracking-wide text-parchment-600",
-            },
-            title
-          )}
+          <HeadingTag className="font-sans text-xs font-semibold uppercase tracking-wide text-parchment-600">
+            {title}
+          </HeadingTag>
           {titleAccessory}
         </div>
       )}
