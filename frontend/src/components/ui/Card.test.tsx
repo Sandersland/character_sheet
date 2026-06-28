@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 import Card from "@/components/ui/Card";
+import { axe } from "@/test/axe";
 
 describe("Card", () => {
   it("renders children", () => {
@@ -41,5 +42,10 @@ describe("Card", () => {
   it("appends extra className to the section element", () => {
     const { container } = render(<Card className="p-4">Content</Card>);
     expect(container.firstChild).toHaveClass("p-4");
+  });
+
+  it("has no axe accessibility violations", async () => {
+    const { container } = render(<Card title="Skills">Content</Card>);
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

@@ -39,7 +39,8 @@ frontend/src/
 │   ├── character.ts     # shared domain types
 │   └── auth.ts          # AuthUser, AuthProviderInfo
 └── test/
-    └── setup.ts         # vitest/jsdom setup (jest-dom + RTL cleanup)
+    ├── setup.ts         # vitest/jsdom setup (jest-dom + jest-axe matchers + RTL cleanup)
+    └── axe.ts           # re-exports jest-axe `axe` + vitest type augmentation
 ```
 
 ### Decision rule — "where does X go?"
