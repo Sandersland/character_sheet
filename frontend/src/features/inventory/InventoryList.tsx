@@ -6,12 +6,7 @@ import AddItemPanel from "@/features/inventory/AddItemPanel";
 import BulkSellPanel from "@/features/inventory/BulkSellPanel";
 import Card from "@/components/ui/Card";
 import InventoryRow from "@/features/inventory/InventoryRow";
-import LedgerModal from "@/features/inventory/LedgerModal";
 import { carryingCapacity } from "@/lib/encumbrance";
-
-// undefined = closed, null = open unfiltered, {id,name} = open filtered to
-// one row — see LedgerModal's comment for why both views share one modal.
-type LedgerFilter = { id: string; name?: string } | null | undefined;
 
 interface InventoryListProps {
   character: Character;
@@ -86,8 +81,6 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
   const [addOpen, setAddOpen] = useState(false);
   const [bulkSellOpen, setBulkSellOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [sellingId, setSellingId] = useState<string | null>(null);
-  const [ledgerFilter, setLedgerFilter] = useState<LedgerFilter>(undefined);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -114,7 +107,6 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
       setAddOpen(false);
       setBulkSellOpen(false);
       setEditingId(null);
-      setSellingId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save — try again.");
     } finally {
@@ -127,16 +119,8 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
       title="Inventory"
       titleAccessory={
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setLedgerFilter(null)}
-            className="text-xs font-semibold text-garnet-700 hover:underline"
-          >
-            History
-          </button>
           {character.inventory.length > 0 && (
             <>
-              <span className="text-parchment-300">·</span>
               <button
                 type="button"
                 onClick={() =>
@@ -149,9 +133,9 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
               >
                 {bulkSellOpen ? "Cancel" : "Sell multiple"}
               </button>
+              <span className="text-parchment-300">·</span>
             </>
           )}
-          <span className="text-parchment-300">·</span>
           <button
             type="button"
             onClick={() =>
@@ -196,21 +180,10 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
             <InventoryRow
               key={item.id}
               item={item}
-              mode={editingId === item.id ? "edit" : sellingId === item.id ? "sell" : "view"}
+              mode={editingId === item.id ? "edit" : "view"}
               pending={pending}
-              onEdit={() => {
-                setSellingId(null);
-                setEditingId(item.id);
-              }}
-              onSell={() => {
-                setEditingId(null);
-                setSellingId(item.id);
-              }}
-              onCancel={() => {
-                setEditingId(null);
-                setSellingId(null);
-              }}
-              onHistory={() => setLedgerFilter({ id: item.id, name: item.name })}
+              onEdit={() => setEditingId(item.id)}
+              onCancel={() => setEditingId(null)}
               onSubmit={submitOperations}
             />
           ))}
@@ -229,15 +202,6 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
 
         <CurrencyEditor character={character} onUpdate={onUpdate} />
       </div>
-
-      {ledgerFilter !== undefined && (
-        <LedgerModal
-          characterId={character.id}
-          inventoryItemId={ledgerFilter?.id}
-          itemName={ledgerFilter?.name}
-          onClose={() => setLedgerFilter(undefined)}
-        />
-      )}
     </Card>
   );
 }

@@ -16,7 +16,7 @@
 | `routes/reference.ts` | `GET /reference` — race/class/background catalog + alignments + per-class starting equipment options |
 | `routes/items.ts` | `GET /items` — item catalog with weapon/armor/consumable detail |
 | `routes/hitpoints.ts` | `POST /characters/:id/hp` — batch HP ops |
-| `routes/inventory.ts` | `POST /characters/:id/inventory/transactions`, `GET /characters/:id/inventory/transactions` |
+| `routes/inventory.ts` | `POST /characters/:id/inventory/transactions` (inventory history reads via the unified activity log, `?category=inventory`) |
 | `routes/experience.ts` | `POST /characters/:id/experience` — batch XP ops |
 | `routes/activity.ts` | `GET /characters/:id/activity`, `POST /characters/:id/events/:batchId/revert` |
 | `routes/spells.ts` | `GET /spells` — spell catalog |
@@ -109,7 +109,7 @@ The only permitted backend-call site. Every exported function maps to one endpoi
 | `abilities.ts` | `abilityModifier`, `formatModifier`, `skillBonus`, labels. |
 | `abilityGen.ts` | Four score-generation methods as pure functions; delegates to `dice.ts`. |
 | `events.ts` | Frontend activity-log display lookups — `eventTypeLabel`/`categoryLabel`/`categoryTone` + `INVENTORY_EVENT_TYPES`. |
-| `timeline.ts` | `groupByBatch`, `formatBatchDate` — shared by `ActivityModal` and `LedgerModal`. |
+| `timeline.ts` | `groupByBatch`, `formatBatchDate` — used by `ActivityModal`. |
 | `startingEquipment.ts` | `PackageState`, `EquipmentDraft`, draft helpers, `draftToInput`, `rollGold`. |
 | `dieFaces.ts`, `physicsDice.ts` | React-free three.js geometry and cannon-es physics for the 3D dice rollers. |
 

@@ -8,7 +8,6 @@ import {
   fetchCharacter,
   fetchCharacters,
   fetchItems,
-  fetchLedger,
   fetchReference,
   updateCharacter,
 } from "./client";
@@ -208,39 +207,6 @@ describe("applyInventoryTransactions", () => {
         { type: "sell", inventoryItemId: "i1", currencyDelta: { cp: 0, sp: 0, gp: 1, pp: 0 } },
       ])
     ).rejects.toThrow("Not enough currency for this transaction");
-  });
-});
-
-describe("fetchLedger", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("fetches the unfiltered ledger when no inventoryItemId is given", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
-    vi.stubGlobal("fetch", fetchMock);
-
-    await fetchLedger("1");
-
-    const [url] = fetchMock.mock.calls[0];
-    expect(url).toContain("/characters/1/inventory/transactions");
-    expect(url).not.toContain("?");
-  });
-
-  it("appends ?inventoryItemId= when filtering to one item", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
-    vi.stubGlobal("fetch", fetchMock);
-
-    await fetchLedger("1", "item-42");
-
-    const [url] = fetchMock.mock.calls[0];
-    expect(url).toContain("/characters/1/inventory/transactions?inventoryItemId=item-42");
-  });
-
-  it("throws on a non-ok response", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
-
-    await expect(fetchLedger("1")).rejects.toThrow();
   });
 });
 

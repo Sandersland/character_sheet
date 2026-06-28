@@ -279,26 +279,6 @@ export type InventoryOperation =
   /** Equips or unequips an item. Unlike `update`, this IS logged on the timeline. */
   | { type: "setEquipped"; inventoryItemId: string; equipped: boolean };
 
-export type LedgerEntryType = "acquired" | "consumed" | "sold" | "bought" | "removed";
-
-/**
- * One row from `GET /api/characters/:id/inventory/transactions` — the
- * read-only inventory ledger. Shape is unchanged from before the unified
- * CharacterEvent table migration; the backend maps CharacterEvent fields back
- * to this shape so LedgerModal keeps working.
- */
-export interface LedgerEntry {
-  id: string;
-  type: LedgerEntryType;
-  quantityDelta: number;
-  currencyDelta?: Currency;
-  itemName: string;
-  inventoryItemId?: string;
-  note?: string;
-  batchId?: string;
-  createdAt: string;
-}
-
 // ── Unified activity timeline ─────────────────────────────────────────────────
 
 export type CharacterEventCategory =

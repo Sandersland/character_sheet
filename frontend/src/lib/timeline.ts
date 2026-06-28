@@ -1,6 +1,6 @@
 /**
- * Shared timeline utilities used by both LedgerModal (inventory history) and
- * ActivityModal (unified character event timeline).
+ * Timeline utilities for ActivityModal (the unified character event timeline,
+ * which now also covers inventory history).
  */
 
 /** Human-readable date header — "Today", "Jun 19", or "Jun 19, 2024" when the
