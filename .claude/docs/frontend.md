@@ -7,7 +7,7 @@ Source of truth: `ls frontend/src/features` — regenerate if stale.
 ```
 frontend/src/
 ├── components/
-│   └── ui/              # domain-agnostic primitives (Card, Badge, MeterBar, Modal, Tabs, ErrorBoundary)
+│   └── ui/              # domain-agnostic primitives (Card, Badge, MeterBar, Modal, Tabs, OverflowMenu, ErrorBoundary)
 ├── features/
 │   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable, ProficienciesCard
 │   ├── advancement/     # AdvancementSection, AdvancementPanel
@@ -153,7 +153,7 @@ When adding a new editing surface: **default to inline**. Reach for `Modal` only
 
 ## Primitive components
 
-These six live in `src/components/ui/` and are intentionally domain-agnostic — they must not import from `@/features`, `@/api`, or `@/types/character`. They know nothing about D&D.
+These seven live in `src/components/ui/` and are intentionally domain-agnostic — they must not import from `@/features`, `@/api`, or `@/types/character`. They know nothing about D&D.
 
 | Component | Usage |
 |---|---|
@@ -162,6 +162,7 @@ These six live in `src/components/ui/` and are intentionally domain-agnostic —
 | `MeterBar` | Horizontal resource meter. Always pair with numeric text (e.g. `9/10 HP`) — never rely on color alone. Prop `tone`: `garnet` / `arcane` / `gold`. |
 | `Modal` | Overlay primitive. See inline-vs-modal rule above. |
 | `Tabs` | Controlled segmented-control tab switcher (WAI-ARIA tablist, arrow-key nav, optional per-tab `badge`). Renders only the switcher; the caller renders the active panel below it. Props: `tabs`, `active`, `onChange`. |
+| `OverflowMenu` | Icon-only kebab (`⋮`) menu-button (WAI-ARIA menu-button: `aria-haspopup`, roving tabindex, Arrow/Home/End/Esc nav, click-outside to close, focus returns to trigger). No portal — `relative`-anchored popup. Per-item `danger?` (garnet) / `separatorBefore?` (divider). Props: `items`, `label?` (trigger accessible name, default "More actions"), `className?`. |
 | `ErrorBoundary` | Class error boundary wrapping the route tree in `App.tsx`. Catches render-time crashes and shows a parchment "something went wrong" fallback (Reload / Back to characters) instead of a blank page. Optional `fallback?: (error, reset) => ReactNode` for custom recovery UI. |
 
 ## API calls — `client.ts` is the only call site
