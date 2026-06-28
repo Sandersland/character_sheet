@@ -10,6 +10,7 @@ import {
   applyResourceOperations,
   InvalidResourceOperationError,
 } from "../lib/resources.js";
+import { assertCharacterAccess } from "../lib/auth/access.js";
 import { prisma } from "../lib/prisma.js";
 import { characterInclude, serializeCharacter } from "./characters.js";
 
@@ -84,14 +85,7 @@ const transactionsRequestSchema = z.object({
 // Returns the full updated character on success.
 
 resourcesRouter.post("/characters/:id/resources/transactions", async (req, res) => {
-  const character = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    select: { id: true },
-  });
-  if (!character) {
-    res.status(404).json({ error: "Character not found" });
-    return;
-  }
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const parseResult = transactionsRequestSchema.safeParse(req.body);
   if (!parseResult.success) {
@@ -100,7 +94,7 @@ resourcesRouter.post("/characters/:id/resources/transactions", async (req, res) 
   }
 
   try {
-    await applyResourceOperations(character.id, parseResult.data.operations);
+    await applyResourceOperations(req.params.id, parseResult.data.operations);
   } catch (error) {
     if (error instanceof InvalidResourceOperationError) {
       res.status(400).json({ error: error.message });
@@ -110,7 +104,7 @@ resourcesRouter.post("/characters/:id/resources/transactions", async (req, res) 
   }
 
   const updated = await prisma.character.findUnique({
-    where: { id: character.id },
+    where: { id: req.params.id },
     include: characterInclude,
   });
   res.json(serializeCharacter(updated!));

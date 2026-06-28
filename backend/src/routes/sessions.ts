@@ -1,5 +1,6 @@
 import { Router } from "express";
 
+import { assertCharacterAccess } from "../lib/auth/access.js";
 import { prisma } from "../lib/prisma.js";
 import { startSession, endSession, getActiveSession, logCombatEvent, logRollEvent, SessionError, CombatError } from "../lib/sessions.js";
 import { serializeCharacter, characterInclude } from "./characters.js";
@@ -13,22 +14,15 @@ export const sessionsRouter = Router();
 // character so the frontend can navigate to the session view immediately.
 
 sessionsRouter.post("/characters/:id/sessions", async (req, res) => {
-  const character = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    select: { id: true },
-  });
-  if (!character) {
-    res.status(404).json({ error: "Character not found" });
-    return;
-  }
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const { title } = req.body as { title?: string };
 
   try {
-    const session = await startSession(character.id, title);
+    const session = await startSession(req.params.id, title);
 
     const updated = await prisma.character.findUniqueOrThrow({
-      where: { id: character.id },
+      where: { id: req.params.id },
       include: characterInclude,
     });
 
@@ -48,17 +42,10 @@ sessionsRouter.post("/characters/:id/sessions", async (req, res) => {
 // to this character, or is already ended.
 
 sessionsRouter.post("/characters/:id/sessions/:sessionId/end", async (req, res) => {
-  const character = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    select: { id: true },
-  });
-  if (!character) {
-    res.status(404).json({ error: "Character not found" });
-    return;
-  }
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   try {
-    const session = await endSession(character.id, req.params.sessionId);
+    const session = await endSession(req.params.id, req.params.sessionId);
     res.json({ session });
   } catch (err) {
     if (err instanceof SessionError) {
@@ -75,17 +62,10 @@ sessionsRouter.post("/characters/:id/sessions/:sessionId/end", async (req, res) 
 // List all sessions for a character, newest first.
 
 sessionsRouter.get("/characters/:id/sessions", async (req, res) => {
-  const character = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    select: { id: true },
-  });
-  if (!character) {
-    res.status(404).json({ error: "Character not found" });
-    return;
-  }
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
 
   const sessions = await prisma.session.findMany({
-    where: { characterId: character.id },
+    where: { characterId: req.params.id },
     orderBy: { startedAt: "desc" },
   });
 
@@ -98,16 +78,9 @@ sessionsRouter.get("/characters/:id/sessions", async (req, res) => {
 // 404 is reserved for an unknown character id.
 
 sessionsRouter.get("/characters/:id/sessions/active", async (req, res) => {
-  const character = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    select: { id: true },
-  });
-  if (!character) {
-    res.status(404).json({ error: "Character not found" });
-    return;
-  }
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
 
-  const session = await getActiveSession(character.id);
+  const session = await getActiveSession(req.params.id);
   res.json(session ?? null);
 });
 
@@ -117,19 +90,12 @@ sessionsRouter.get("/characters/:id/sessions/active", async (req, res) => {
 // serialization shape.
 
 sessionsRouter.get("/characters/:id/sessions/:sessionId", async (req, res) => {
-  const character = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    select: { id: true },
-  });
-  if (!character) {
-    res.status(404).json({ error: "Character not found" });
-    return;
-  }
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
 
   const session = await prisma.session.findUnique({
     where: { id: req.params.sessionId },
   });
-  if (!session || session.characterId !== character.id) {
+  if (!session || session.characterId !== req.params.id) {
     res.status(404).json({ error: "Session not found" });
     return;
   }
@@ -172,23 +138,10 @@ sessionsRouter.get("/characters/:id/sessions/:sessionId", async (req, res) => {
 // POST /…/combat/end     — logs "combatEnded"
 // POST /…/combat/round   — logs "combatRoundAdvanced" (body: { round: number })
 
-async function resolveCombatCharacter(id: string, res: Parameters<Parameters<typeof sessionsRouter.post>[1]>[1]) {
-  const character = await prisma.character.findUnique({
-    where: { id },
-    select: { id: true },
-  });
-  if (!character) {
-    res.status(404).json({ error: "Character not found" });
-    return null;
-  }
-  return character;
-}
-
 sessionsRouter.post("/characters/:id/sessions/:sessionId/combat/start", async (req, res) => {
-  const character = await resolveCombatCharacter(req.params.id, res);
-  if (!character) return;
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
   try {
-    await logCombatEvent(character.id, req.params.sessionId, "combatStarted");
+    await logCombatEvent(req.params.id, req.params.sessionId, "combatStarted");
     res.status(201).json({ ok: true });
   } catch (err) {
     if (err instanceof CombatError) {
@@ -201,10 +154,9 @@ sessionsRouter.post("/characters/:id/sessions/:sessionId/combat/start", async (r
 });
 
 sessionsRouter.post("/characters/:id/sessions/:sessionId/combat/end", async (req, res) => {
-  const character = await resolveCombatCharacter(req.params.id, res);
-  if (!character) return;
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
   try {
-    await logCombatEvent(character.id, req.params.sessionId, "combatEnded");
+    await logCombatEvent(req.params.id, req.params.sessionId, "combatEnded");
     res.status(201).json({ ok: true });
   } catch (err) {
     if (err instanceof CombatError) {
@@ -217,15 +169,14 @@ sessionsRouter.post("/characters/:id/sessions/:sessionId/combat/end", async (req
 });
 
 sessionsRouter.post("/characters/:id/sessions/:sessionId/combat/round", async (req, res) => {
-  const character = await resolveCombatCharacter(req.params.id, res);
-  if (!character) return;
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
   const { round } = req.body as { round?: number };
   if (typeof round !== "number" || round < 1) {
     res.status(400).json({ error: "round must be a positive integer" });
     return;
   }
   try {
-    await logCombatEvent(character.id, req.params.sessionId, "combatRoundAdvanced", { round });
+    await logCombatEvent(req.params.id, req.params.sessionId, "combatRoundAdvanced", { round });
     res.status(201).json({ ok: true });
   } catch (err) {
     if (err instanceof CombatError) {
@@ -244,8 +195,7 @@ sessionsRouter.post("/characters/:id/sessions/:sessionId/combat/round", async (r
 // summary and persists the event tagged with the active session.
 
 sessionsRouter.post("/characters/:id/sessions/:sessionId/roll", async (req, res) => {
-  const character = await resolveCombatCharacter(req.params.id, res);
-  if (!character) return;
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const { kind, source, total, specLabel, damageType, faces } = req.body as {
     kind?: unknown;
@@ -279,7 +229,7 @@ sessionsRouter.post("/characters/:id/sessions/:sessionId/roll", async (req, res)
   }
 
   try {
-    await logRollEvent(character.id, req.params.sessionId, {
+    await logRollEvent(req.params.id, req.params.sessionId, {
       kind,
       source,
       total,

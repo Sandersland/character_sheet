@@ -14,8 +14,10 @@ import supertest from "supertest";
 import { createApp } from "../../app.js";
 import { prisma } from "../../lib/prisma.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
+import { authCookie } from "../../test-support/auth.js";
 
 const OWNER_ID = "owner-fightingstyle";
+let COOKIE: string;
 
 const FIXTURE_ID = "test-fighting-style-character-1";
 const FIGHTER_CATALOG_NAME = "FS Route Test Fighter";
@@ -95,6 +97,7 @@ describe("POST /api/characters/:id/class/transactions — setFightingStyle", () 
 
   beforeEach(async () => {
     await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
     const fighter = await prisma.characterClass.upsert({
       where: { name: FIGHTER_CATALOG_NAME },
       create: {
@@ -140,21 +143,21 @@ describe("POST /api/characters/:id/class/transactions — setFightingStyle", () 
   // ── guards ──────────────────────────────────────────────────────────────────
 
   it("404s for an unknown character", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post("/api/characters/does-not-exist/class/transactions")
       .send({ operations: [{ type: "setFightingStyle", key: "defense" }] });
     expect(res.status).toBe(404);
   });
 
   it("400s on a malformed body (invalid op type)", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(url)
       .send({ operations: [{ type: "notARealType" }] });
     expect(res.status).toBe(400);
   });
 
   it("400s on an invalid fighting style key", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(url)
       .send({ operations: [{ type: "setFightingStyle", key: "notARealStyle" }] });
     expect(res.status).toBe(400);
@@ -163,7 +166,7 @@ describe("POST /api/characters/:id/class/transactions — setFightingStyle", () 
   // ── surface on read ───────────────────────────────────────────────────────────
 
   it("a fresh L5 Fighter surfaces fightingStyleChoiceCount=1 and null fightingStyle", async () => {
-    const res = await supertest(createApp()).get(`/api/characters/${FIXTURE_ID}`);
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     expect(res.status).toBe(200);
     expect(res.body.resources.fightingStyleChoiceCount).toBe(1);
     expect(res.body.resources.fightingStyle).toBeNull();
@@ -172,10 +175,10 @@ describe("POST /api/characters/:id/class/transactions — setFightingStyle", () 
   // ── defense → +1 AC ───────────────────────────────────────────────────────────
 
   it("setFightingStyle:defense raises armorClass by 1 and persists the choice", async () => {
-    const before = await supertest(createApp()).get(`/api/characters/${FIXTURE_ID}`);
+    const before = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     const baseAC = before.body.armorClass as number;
 
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(url)
       .send({ operations: [{ type: "setFightingStyle", key: "defense" }] });
     expect(res.status).toBe(200);
@@ -183,7 +186,7 @@ describe("POST /api/characters/:id/class/transactions — setFightingStyle", () 
     expect(res.body.resources.fightingStyle).toBe("defense");
 
     // Persists across a fresh read.
-    const after = await supertest(createApp()).get(`/api/characters/${FIXTURE_ID}`);
+    const after = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     expect(after.body.armorClass).toBe(baseAC + 1);
     expect(after.body.resources.fightingStyle).toBe("defense");
   });
@@ -191,11 +194,11 @@ describe("POST /api/characters/:id/class/transactions — setFightingStyle", () 
   // ── archery → +2 ranged attack only ──────────────────────────────────────────
 
   it("setFightingStyle:archery adds +2 to ranged weapon attack, leaves melee unchanged", async () => {
-    const before = await supertest(createApp()).get(`/api/characters/${FIXTURE_ID}`);
+    const before = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     const baseRanged = findWeapon(before.body, "Longbow")!.attackBonus;
     const baseMelee = findWeapon(before.body, "Longsword")!.attackBonus;
 
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(url)
       .send({ operations: [{ type: "setFightingStyle", key: "archery" }] });
     expect(res.status).toBe(200);
@@ -213,7 +216,7 @@ describe("POST /api/characters/:id/class/transactions — setFightingStyle", () 
       where: { characterId: FIXTURE_ID },
       data: { name: "wizard", classId: wizardClassId },
     });
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(url)
       .send({ operations: [{ type: "setFightingStyle", key: "archery" }] });
     expect(res.status).toBe(400);
@@ -222,7 +225,7 @@ describe("POST /api/characters/:id/class/transactions — setFightingStyle", () 
   // ── atomic batch ──────────────────────────────────────────────────────────────
 
   it("a multi-op batch is atomic: a later failing op rolls back an earlier valid one", async () => {
-    const res = await supertest(createApp())
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(url)
       .send({
         operations: [
@@ -232,7 +235,7 @@ describe("POST /api/characters/:id/class/transactions — setFightingStyle", () 
       });
     expect(res.status).toBe(400);
 
-    const after = await supertest(createApp()).get(`/api/characters/${FIXTURE_ID}`);
+    const after = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     expect(after.body.resources.fightingStyle).toBeNull();
   });
 
@@ -248,7 +251,7 @@ describe("POST /api/characters/:id/class/transactions — setFightingStyle", () 
       where: { characterId: FIXTURE_ID },
       data: { name: "wizard", classId: wizardClassId },
     });
-    const res = await supertest(createApp()).get(`/api/characters/${FIXTURE_ID}`);
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     expect(res.body.resources?.fightingStyle ?? null).toBeNull();
   });
 
@@ -256,9 +259,9 @@ describe("POST /api/characters/:id/class/transactions — setFightingStyle", () 
 
   it("logs a resources/fightingStyleChosen event and undo restores before.resources", async () => {
     const app = createApp();
-    await supertest(app).post(url).send({ operations: [{ type: "setFightingStyle", key: "defense" }] });
+    await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "setFightingStyle", key: "defense" }] });
 
-    const activity = await supertest(app).get(`/api/characters/${FIXTURE_ID}/activity`);
+    const activity = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}/activity`);
     const events = activity.body as Array<{
       category: string;
       type: string;
@@ -270,7 +273,7 @@ describe("POST /api/characters/:id/class/transactions — setFightingStyle", () 
     expect(ev.category).toBe("resources");
 
     const baseAC = FIXTURE_BASE.armorClass;
-    const undo = await supertest(app).post(`/api/characters/${FIXTURE_ID}/events/${ev.batchId}/revert`);
+    const undo = await supertest.agent(app).set("Cookie", COOKIE).post(`/api/characters/${FIXTURE_ID}/events/${ev.batchId}/revert`);
     expect(undo.status).toBe(200);
     expect(undo.body.resources.fightingStyle).toBeNull();
     expect(undo.body.armorClass).toBe(baseAC);

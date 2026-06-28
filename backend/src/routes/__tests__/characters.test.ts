@@ -4,10 +4,11 @@ import supertest from "supertest";
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
-import { resolveBootstrapOwnerId } from "../../lib/owner.js";
 import { findInList } from "../../test-support/list.js";
+import { authCookie } from "../../test-support/auth.js";
 
 const TEST_USER = { id: "test-user-1", email: "fixture-owner@test.local" };
+let COOKIE: string;
 const TEST_RACE = { name: "Test Race", speed: 30 };
 const TEST_CLASS = {
   name: "Test Class",
@@ -70,6 +71,7 @@ describe("characters routes", () => {
       create: TEST_USER,
       update: TEST_USER,
     });
+    COOKIE = await authCookie(TEST_USER.id);
     // Sequential rather than Promise.all — see the matching comment in
     // routes/characters.ts's POST handler.
     const race = await prisma.race.upsert({
@@ -153,7 +155,7 @@ describe("characters routes", () => {
 
   it("GET /api/characters returns summaries with derived level", async () => {
     // eslint-disable-next-line no-restricted-syntax -- lists every character, but asserts only on this suite's own fixture via findInList (see .claude/docs/testing.md)
-    const response = await supertest(createApp()).get("/api/characters");
+    const response = await supertest.agent(createApp()).set("Cookie", COOKIE).get("/api/characters");
 
     expect(response.status).toBe(200);
     const fixture = findInList<{ id: string; name: string; level: number; ownerId: string }>(
@@ -165,7 +167,7 @@ describe("characters routes", () => {
   });
 
   it("GET /api/characters/:id returns full character with derived fields", async () => {
-    const response = await supertest(createApp()).get(
+    const response = await supertest.agent(createApp()).set("Cookie", COOKIE).get(
       `/api/characters/${FIXTURE.id}`
     );
 
@@ -208,7 +210,7 @@ describe("characters routes", () => {
   });
 
   it("GET /api/characters/:id 404s for unknown id", async () => {
-    const response = await supertest(createApp()).get(
+    const response = await supertest.agent(createApp()).set("Cookie", COOKIE).get(
       "/api/characters/does-not-exist"
     );
 
@@ -217,7 +219,7 @@ describe("characters routes", () => {
 
   it("POST /api/characters/:id/experience sets XP and recomputes level", async () => {
     // experiencePoints was removed from PATCH — use the dedicated XP endpoint
-    const response = await supertest(createApp())
+    const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .post(`/api/characters/${FIXTURE.id}/experience`)
       .send({ operations: [{ type: "set", value: 6500 }] });
 
@@ -228,7 +230,7 @@ describe("characters routes", () => {
   });
 
   it("PATCH rejects attempts to set level directly", async () => {
-    const response = await supertest(createApp())
+    const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .patch(`/api/characters/${FIXTURE.id}`)
       .send({ level: 99 });
 
@@ -236,7 +238,7 @@ describe("characters routes", () => {
   });
 
   it("PATCH rejects negative experiencePoints", async () => {
-    const response = await supertest(createApp())
+    const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .patch(`/api/characters/${FIXTURE.id}`)
       .send({ experiencePoints: -5 });
 
@@ -244,7 +246,7 @@ describe("characters routes", () => {
   });
 
   it("PATCH rejects attempts to set race/class/background directly", async () => {
-    const response = await supertest(createApp())
+    const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .patch(`/api/characters/${FIXTURE.id}`)
       .send({ race: "Human" });
 
@@ -253,7 +255,7 @@ describe("characters routes", () => {
 
   it("PATCH 404s for unknown id", async () => {
     // experiencePoints was removed from PATCH — use currency which is still patchable
-    const response = await supertest(createApp())
+    const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
       .patch("/api/characters/does-not-exist")
       .send({ currency: { cp: 0, sp: 0, gp: 1, pp: 0 } });
 
@@ -279,7 +281,7 @@ describe("characters routes", () => {
     };
 
     it("creates a character and derives mechanical fields from the catalog", async () => {
-      const response = await supertest(createApp())
+      const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
         .post("/api/characters")
         .send(createBody);
 
@@ -318,7 +320,7 @@ describe("characters routes", () => {
     });
 
     it("persists the race/background/class as cascade-deleted selection rows", async () => {
-      const response = await supertest(createApp())
+      const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
         .post("/api/characters")
         .send(createBody);
 
@@ -340,7 +342,7 @@ describe("characters routes", () => {
     });
 
     it("allows a homebrew background with no catalog match", async () => {
-      const response = await supertest(createApp())
+      const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
         .post("/api/characters")
         .send({ ...createBody, background: "Wandering Storyteller" });
 
@@ -350,7 +352,7 @@ describe("characters routes", () => {
     });
 
     it("rejects an unresolvable race with 400", async () => {
-      const response = await supertest(createApp())
+      const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
         .post("/api/characters")
         .send({ ...createBody, race: "Not A Real Race" });
 
@@ -358,7 +360,7 @@ describe("characters routes", () => {
     });
 
     it("rejects an unresolvable class with 400", async () => {
-      const response = await supertest(createApp())
+      const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
         .post("/api/characters")
         .send({ ...createBody, classes: [{ name: "Not A Real Class" }] });
 
@@ -366,7 +368,7 @@ describe("characters routes", () => {
     });
 
     it("rejects an unknown alignment with 400", async () => {
-      const response = await supertest(createApp())
+      const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
         .post("/api/characters")
         .send({ ...createBody, alignment: "Mostly Good" });
 
@@ -377,7 +379,7 @@ describe("characters routes", () => {
       const { name, ...withoutName } = createBody;
       void name;
 
-      const response = await supertest(createApp())
+      const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
         .post("/api/characters")
         .send(withoutName);
 
@@ -385,7 +387,7 @@ describe("characters routes", () => {
     });
 
     it("rejects a derived/mechanical field via .strict() with 400", async () => {
-      const response = await supertest(createApp())
+      const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
         .post("/api/characters")
         .send({ ...createBody, armorClass: 99 });
 
@@ -429,7 +431,7 @@ describe("characters routes", () => {
       };
 
       it("creates inventory rows from a package selection (no open picks)", async () => {
-        const response = await supertest(createApp())
+        const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
           .post("/api/characters")
           .send(wizardBody);
 
@@ -453,7 +455,7 @@ describe("characters routes", () => {
 
       it("creates inventory rows with an open-pick weapon (Fighter martial weapon)", async () => {
         // Fighter group 1, option 0: martial weapon + shield. Open pick: Longsword
-        const response = await supertest(createApp())
+        const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({
             name: "Sir Gawain",
@@ -523,7 +525,7 @@ describe("characters routes", () => {
       it("auto-equips a two-handed weapon alone — no second weapon (issue #51)", async () => {
         // Fighter group 1, option 1: two martial weapons. The first pick is a
         // Greataxe (two-handed); the rules preclude equipping the second weapon.
-        const response = await supertest(createApp())
+        const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({
             name: "Hrothgar",
@@ -575,7 +577,7 @@ describe("characters routes", () => {
       });
 
       it("rejects optionIndex out of range with 400", async () => {
-        const response = await supertest(createApp())
+        const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({
             ...wizardBody,
@@ -595,7 +597,7 @@ describe("characters routes", () => {
       });
 
       it("rejects wrong number of selections with 400", async () => {
-        const response = await supertest(createApp())
+        const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({
             ...wizardBody,
@@ -610,7 +612,7 @@ describe("characters routes", () => {
       });
 
       it("rejects an open pick that is not in the catalog with 400", async () => {
-        const response = await supertest(createApp())
+        const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({
             name: "Bad Fighter",
@@ -642,7 +644,7 @@ describe("characters routes", () => {
       });
 
       it("rejects an open pick with wrong weapon class with 400", async () => {
-        const response = await supertest(createApp())
+        const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({
             name: "Sneaky Fighter",
@@ -677,7 +679,7 @@ describe("characters routes", () => {
 
       it("rejects mode:package for a class with no package definition with 400", async () => {
         // TEST_CLASS ("Test Class") is not in STARTING_EQUIPMENT
-        const response = await supertest(createApp())
+        const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({
             ...createBody,
@@ -708,7 +710,7 @@ describe("characters routes", () => {
 
       it("sets currency.gp and leaves inventory empty", async () => {
         // Wizard gold: 4d4×10 → min 40, max 160
-        const response = await supertest(createApp())
+        const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({ ...baseBody, startingEquipment: { mode: "gold", gold: 100 } });
 
@@ -721,7 +723,7 @@ describe("characters routes", () => {
 
       it("rejects gold below the class minimum with 400", async () => {
         // Wizard min = 4×10 = 40
-        const response = await supertest(createApp())
+        const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({ ...baseBody, startingEquipment: { mode: "gold", gold: 0 } });
 
@@ -730,7 +732,7 @@ describe("characters routes", () => {
 
       it("rejects gold above the class maximum with 400", async () => {
         // Wizard max = 4×4×10 = 160
-        const response = await supertest(createApp())
+        const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
           .post("/api/characters")
           .send({ ...baseBody, startingEquipment: { mode: "gold", gold: 999 } });
 
@@ -739,7 +741,7 @@ describe("characters routes", () => {
     });
 
     it("omitting startingEquipment creates an empty-inventory character (regression)", async () => {
-      const response = await supertest(createApp())
+      const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
         .post("/api/characters")
         .send(createBody); // createBody has no startingEquipment
 
@@ -768,38 +770,32 @@ describe("characters routes", () => {
       skillProficiencies: ["athletics", "perception"],
     };
 
-    it("POST sets a non-null ownerId equal to the resolved bootstrap owner", async () => {
-      const expectedOwner = await resolveBootstrapOwnerId();
-
-      const response = await supertest(createApp())
+    it("POST stamps ownerId with the authenticated user (#101)", async () => {
+      const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
         .post("/api/characters")
         .send(createBody);
 
       expect(response.status).toBe(201);
       createdCharacterIds.push(response.body.id);
 
-      expect(response.body.ownerId).toEqual(expect.any(String));
-      expect(response.body.ownerId).toBe(expectedOwner);
+      expect(response.body.ownerId).toBe(TEST_USER.id);
 
       // Persisted, not just serialized.
       const row = await prisma.character.findUnique({
         where: { id: response.body.id },
         select: { ownerId: true },
       });
-      expect(row?.ownerId).toBe(expectedOwner);
+      expect(row?.ownerId).toBe(TEST_USER.id);
     });
 
-    it("GET /api/characters?owner= is inert — the owner filter is not applied", async () => {
-      const filtered = await supertest(createApp()).get(
+    it("GET /api/characters is owner-scoped (any ?owner param is ignored)", async () => {
+      // The list is always scoped to the authenticated user; a leftover ?owner
+      // query param has no effect. Our fixture (owned by the caller) appears.
+      const filtered = await supertest.agent(createApp()).set("Cookie", COOKIE).get(
         "/api/characters?owner=some-nonexistent-user-id",
       );
 
       expect(filtered.status).toBe(200);
-      // The filter is parsed but not enforced (#101): this fixture is owned by the
-      // bootstrap owner — not "some-nonexistent-user-id" — yet it is still returned.
-      // (Asserting presence of our own fixture, rather than comparing two full-list
-      // snapshots, keeps this robust against characters other test files create or
-      // delete in the shared DB between requests.)
       const filteredIds = filtered.body.map((c: { id: string }) => c.id);
       expect(filteredIds).toContain(FIXTURE.id);
     });
@@ -807,7 +803,7 @@ describe("characters routes", () => {
 
   describe("DELETE /api/characters/:id", () => {
     it("returns 204 and removes the character", async () => {
-      const response = await supertest(createApp()).delete(`/api/characters/${FIXTURE.id}`);
+      const response = await supertest.agent(createApp()).set("Cookie", COOKIE).delete(`/api/characters/${FIXTURE.id}`);
 
       expect(response.status).toBe(204);
       await expect(
@@ -820,7 +816,7 @@ describe("characters routes", () => {
     });
 
     it("cascades to inventory and selection rows", async () => {
-      await supertest(createApp()).delete(`/api/characters/${FIXTURE.id}`);
+      await supertest.agent(createApp()).set("Cookie", COOKIE).delete(`/api/characters/${FIXTURE.id}`);
 
       await expect(
         prisma.inventoryItem.findMany({ where: { characterId: FIXTURE.id } })
@@ -836,7 +832,7 @@ describe("characters routes", () => {
     });
 
     it("returns 404 for a non-existent id", async () => {
-      const response = await supertest(createApp()).delete("/api/characters/does-not-exist");
+      const response = await supertest.agent(createApp()).set("Cookie", COOKIE).delete("/api/characters/does-not-exist");
 
       expect(response.status).toBe(404);
       expect(response.body).toMatchObject({ error: "Character not found" });

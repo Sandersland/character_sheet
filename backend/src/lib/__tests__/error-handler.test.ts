@@ -66,6 +66,21 @@ describe("global error handler", () => {
     expect(res.body).toEqual({ error: "bad input" });
   });
 
+  it("maps a Prisma P2025 (record-not-found) to a clean 404", async () => {
+    // A second query racing a delete (e.g. findUniqueOrThrow/update/delete after
+    // an access check) throws P2025 with no `.status`. It must surface as 404,
+    // not 500, and must not leak Prisma's verbose internal message.
+    const app = appThatThrows(() => {
+      throw Object.assign(new Error("No Character found for the given where"), {
+        name: "PrismaClientKnownRequestError",
+        code: "P2025",
+      });
+    });
+    const res = await supertest(app).get("/sync");
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: "Not found" });
+  });
+
   it("does not leak the error message on a 500 in production", async () => {
     process.env.NODE_ENV = "production";
     const app = appThatThrows(() => {

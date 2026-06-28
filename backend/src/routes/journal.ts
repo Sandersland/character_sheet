@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 
+import { assertCharacterAccess } from "../lib/auth/access.js";
 import { prisma } from "../lib/prisma.js";
 import { serializeCharacter, characterInclude } from "./characters.js";
 
@@ -54,6 +55,8 @@ async function serializeForCharacter(characterId: string) {
 // Create a new journal entry.
 
 journalRouter.post("/characters/:id/journal", async (req, res) => {
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
+
   const parseResult = createJournalSchema.safeParse(req.body);
   if (!parseResult.success) {
     res
@@ -62,18 +65,9 @@ journalRouter.post("/characters/:id/journal", async (req, res) => {
     return;
   }
 
-  const character = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    select: { id: true },
-  });
-  if (!character) {
-    res.status(404).json({ error: "Character not found" });
-    return;
-  }
-
   await prisma.journalEntry.create({
     data: {
-      characterId: character.id,
+      characterId: req.params.id,
       title: parseResult.data.title,
       date: parseResult.data.date,
       body: parseResult.data.body,
@@ -81,13 +75,15 @@ journalRouter.post("/characters/:id/journal", async (req, res) => {
     },
   });
 
-  res.status(201).json(await serializeForCharacter(character.id));
+  res.status(201).json(await serializeForCharacter(req.params.id));
 });
 
 // ── PATCH /api/characters/:id/journal/:entryId ───────────────────────────────
 // Partial update of an existing entry.
 
 journalRouter.patch("/characters/:id/journal/:entryId", async (req, res) => {
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
+
   const parseResult = updateJournalSchema.safeParse(req.body);
   if (!parseResult.success) {
     res
@@ -96,20 +92,11 @@ journalRouter.patch("/characters/:id/journal/:entryId", async (req, res) => {
     return;
   }
 
-  const character = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    select: { id: true },
-  });
-  if (!character) {
-    res.status(404).json({ error: "Character not found" });
-    return;
-  }
-
   const entry = await prisma.journalEntry.findUnique({
     where: { id: req.params.entryId },
     select: { id: true, characterId: true },
   });
-  if (!entry || entry.characterId !== character.id) {
+  if (!entry || entry.characterId !== req.params.id) {
     res.status(404).json({ error: "Journal entry not found" });
     return;
   }
@@ -119,32 +106,25 @@ journalRouter.patch("/characters/:id/journal/:entryId", async (req, res) => {
     data: parseResult.data,
   });
 
-  res.json(await serializeForCharacter(character.id));
+  res.json(await serializeForCharacter(req.params.id));
 });
 
 // ── DELETE /api/characters/:id/journal/:entryId ──────────────────────────────
 // Delete an entry.
 
 journalRouter.delete("/characters/:id/journal/:entryId", async (req, res) => {
-  const character = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    select: { id: true },
-  });
-  if (!character) {
-    res.status(404).json({ error: "Character not found" });
-    return;
-  }
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const entry = await prisma.journalEntry.findUnique({
     where: { id: req.params.entryId },
     select: { id: true, characterId: true },
   });
-  if (!entry || entry.characterId !== character.id) {
+  if (!entry || entry.characterId !== req.params.id) {
     res.status(404).json({ error: "Journal entry not found" });
     return;
   }
 
   await prisma.journalEntry.delete({ where: { id: entry.id } });
 
-  res.json(await serializeForCharacter(character.id));
+  res.json(await serializeForCharacter(req.params.id));
 });

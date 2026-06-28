@@ -22,23 +22,31 @@ Components are env-driven so any of them can be deployed anywhere:
 | `DATABASE_URL` | backend | Postgres connection string. Required. |
 | `PORT` | backend | Listen port (default 4000). Railway injects its own. |
 | `SERVE_STATIC_DIR` | backend | When set, the API serves the SPA from this dir (single-origin). Combined image sets `/app/public`. Unset → API-only. |
-| `CORS_ORIGIN` | backend | Comma-separated allowlist. Empty → reflect all (fine for single-origin/local). Set for split mode. |
+| `CORS_ORIGIN` | backend | Comma-separated allowlist. Empty → reflect the request origin (fine for single-origin/local). Set for split mode. CORS always sends `Access-Control-Allow-Credentials: true` (the SPA sends the session cookie), so the origin is always a concrete value, never `*` — set the allowlist explicitly to harden a split-origin prod. |
 | `LOG_LEVEL` | backend | Pino log level (`fatal`…`trace`, or `silent`). Default `info`; tests run `silent`. JSON output in prod, pretty in dev. |
 | `RATE_LIMIT_WINDOW_MS` | backend | Rate-limit window in ms. Default `900000` (15 min). |
 | `RATE_LIMIT_MAX` | backend | Max requests per window per IP, global. Default `600`. |
 | `RATE_LIMIT_CREATE_MAX` | backend | Tighter cap for `POST /api/characters` per window. Default `30`. |
 | `RATE_LIMIT_DISABLED` | backend | `true` disables rate limiting entirely (also auto-off under test). |
-| `APP_BASE_URL` | backend | Public origin of the API, used to build the OAuth redirect URI. Default `http://localhost:4000`. Set to the deployed origin in prod. |
-| `GOOGLE_CLIENT_ID` | backend | Google OAuth client id. Optional — Google sign-in is enabled only when **both** id and secret are set; absent → the app boots with no providers. |
+| `APP_BASE_URL` | backend | Browser-facing app origin. Builds the OAuth `redirect_uri` **and** the post-login redirect, so it must be the origin the user's browser uses — the SPA's. Dev Compose default `http://localhost:5173` (the SPA, which proxies `/api`); single-origin prod = the one deployed origin. |
+| `GOOGLE_CLIENT_ID` | backend | Google OAuth client id. Optional — Google sign-in is enabled only when **both** id and secret are set; absent → the app boots with no providers. Injected into the backend container via Compose (the app does **not** read `backend/.env`). |
 | `GOOGLE_CLIENT_SECRET` | backend | Google OAuth client secret. See above; both must be set together. |
 | `SESSION_COOKIE_SECURE` | backend | Whether session/oauth cookies get the `Secure` flag. Tri-state: defaults to on in production, off elsewhere; set `true`/`false` to override (e.g. force off behind a local proxy). |
-| `BOOTSTRAP_OWNER_EMAIL` | backend | Pins the single placeholder character owner to this email (upserted). Optional; unused once #101 enforces per-user ownership. |
-| `VITE_API_URL` | frontend **build** | Baked at build time. `/api` for single-origin; the API's absolute URL for split. |
+| `VITE_API_URL` | frontend **build/dev** | Where the SPA sends API calls. Dev Compose default `/api` (same-origin via the Vite proxy); `/api` for single-origin prod; the API's absolute URL for split. |
+| `VITE_PROXY_TARGET` | frontend **dev** | Where the Vite dev proxy forwards `/api`. Compose default `http://backend:4000`; bare `npm run dev` falls back to `http://localhost:4000`. |
 
-**OAuth setup:** register the redirect URI `${APP_BASE_URL}/api/auth/google/callback`
-(e.g. `http://localhost:4000/api/auth/google/callback` in dev) as an authorized
-redirect URI on the Google OAuth client. A provider appears in
-`GET /api/auth/providers` and is usable only when its id+secret pair is set.
+**OAuth setup (dev):** dev runs single-origin from the browser's view — the SPA on
+`:5173` proxies `/api/*` to the backend (`vite.config.ts` `server.proxy`), so the
+session cookie is same-origin and login redirects back to the app. Steps:
+1. Google Cloud Console → create an OAuth **Web application** client; configure the
+   consent screen (add yourself as a test user while unpublished).
+2. Authorized redirect URI: `http://localhost:5173/api/auth/google/callback`
+   (= `${APP_BASE_URL}/api/auth/google/callback`).
+3. Put `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in a root `.env` (gitignored);
+   `docker compose up -d --force-recreate backend frontend`.
+
+A provider appears in `GET /api/auth/providers` and is usable only when its
+id+secret pair is set.
 
 The single-origin design is deliberate: one hostname means one Cloudflare Access
 policy, same-origin `fetch` (no CORS), and no cross-origin Access-cookie problems.

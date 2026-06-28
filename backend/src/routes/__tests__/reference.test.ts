@@ -1,11 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
 import { createApp } from "../../app.js";
+import { authCookie } from "../../test-support/auth.js";
+
+const OWNER_ID = "owner-reference";
+let COOKIE: string;
+
+beforeAll(async () => {
+  COOKIE = await authCookie(OWNER_ID);
+});
 
 describe("GET /api/reference", () => {
   it("returns the catalog lists and alignment set used to drive character creation", async () => {
-    const response = await supertest(createApp()).get("/api/reference");
+    const response = await supertest.agent(createApp()).set("Cookie", COOKIE).get("/api/reference");
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveProperty("races");

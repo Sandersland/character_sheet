@@ -8,6 +8,7 @@ import cors from "cors";
 import type { CorsOptions } from "cors";
 import express from "express";
 
+import { requireAuth } from "./lib/auth/middleware.js";
 import { errorHandler } from "./lib/error-handler.js";
 import { httpLogger } from "./lib/logger.js";
 import { creationRateLimiter, globalRateLimiter, securityHeaders } from "./lib/security.js";
@@ -34,18 +35,23 @@ import { spellcastingRouter } from "./routes/spellcasting.js";
 
 // CORS origins are env-driven so the API can be deployed anywhere without a
 // code change. `CORS_ORIGIN` is a comma-separated allowlist
-// (e.g. "https://dev.example.com,https://example.com"). When unset, `cors({})`
-// allows every origin via a `*` wildcard — convenient for local dev and for
-// single-origin deployments where the SPA is served from this same host (no
-// CORS at all).
+// (e.g. "https://dev.example.com,https://example.com").
+//
+// `credentials: true` is always set: the SPA sends the session cookie with
+// `credentials: "include"`, which the browser only honors when the response
+// carries `Access-Control-Allow-Credentials: true` AND a concrete (non-`*`)
+// origin. So when no allowlist is configured we reflect the request origin
+// (`origin: true`) rather than `*` — convenient for local dev and single-origin
+// deploys (where CORS isn't exercised anyway). Harden a split-origin prod by
+// setting `CORS_ORIGIN` to the explicit allowlist.
 function corsOptions(): CorsOptions {
   const configured = process.env.CORS_ORIGIN?.trim();
-  if (!configured) return {};
+  if (!configured) return { origin: true, credentials: true };
   const allowlist = configured
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
-  return { origin: allowlist };
+  return { origin: allowlist, credentials: true };
 }
 
 export function createApp() {
@@ -63,10 +69,15 @@ export function createApp() {
   app.use(globalRateLimiter);
   app.use(creationRateLimiter);
 
+  // Public allowlist: health + the auth mechanism (OAuth sign-in + session)
+  // are mounted BEFORE requireAuth so they stay reachable without a session.
   app.use("/api", healthRouter);
-  // Public auth mechanism (OAuth sign-in + session). No requireAuth here — and
-  // none on the routers below yet; per-owner enforcement lands in #101.
   app.use("/api", authRouter);
+
+  // The gate: every router mounted past this point requires a valid session.
+  // An unauthenticated request is 401'd here and never reaches them.
+  app.use("/api", requireAuth);
+
   app.use("/api", charactersRouter);
   app.use("/api", referenceRouter);
   app.use("/api", itemsRouter);
