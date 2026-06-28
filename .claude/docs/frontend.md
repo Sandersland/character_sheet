@@ -62,7 +62,9 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 | `abilities.ts` | Ability/skill/save labels + `abilityModifier` math; resolve all display keys through here. |
 | `items.ts` | `isEquippable(category)` + `EQUIPPABLE_CATEGORIES` — equippability rule (weapon/armor yes, consumable/gear no). Mirror of backend `lib/items.ts`; gate the Equip control through here, never inline-check `category`. |
 | `events.ts` | Activity-log display lookups — `eventTypeLabel`/`categoryLabel`/`categoryTone` (tolerant `Partial<Record>` maps, raw-key fallback) + `INVENTORY_EVENT_TYPES` for the filter chips. Resolve all event type/category keys through here, never inline-capitalize. |
-| `timeline.ts` | Groups/formats audit events for the activity timeline. |
+| `timeline.ts` | Groups/formats audit events for the activity timeline (`groupByBatch`/`groupByDate`, generic over `{id,batchId,createdAt}`). |
+| `currency.ts` | Copper-based currency math — `toCopper`/`fromCopper`/`splitLumpSum` + `formatCurrency` (unsigned, largest-first denomination string). |
+| `sellBatch.ts` | `summarizeSellBatch` collapses a bulk-sale batch (>1 row, all `sold`) into one line summary for ActivityModal; returns `null` for non-bulk-sale batches. |
 | `startingEquipment.ts` | Character-creation equipment helpers (`isPackageComplete`, `isGoldValid`, `EquipmentDraft`). |
 | `characterCreationValidation.ts` | Explains *why* the creation Save button is disabled (`missingRequirements`). |
 | `abilityGen.ts` | Ability-score generation methods (point-buy / standard array / roll). |
