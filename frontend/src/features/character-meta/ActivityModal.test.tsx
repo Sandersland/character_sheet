@@ -50,7 +50,7 @@ describe("ActivityModal filtering", () => {
     render(<ActivityModal characterId="char-1" onClose={vi.fn()} onUpdate={vi.fn()} />);
     await screen.findByText("Sold Shortsword ×1");
 
-    await user.click(screen.getByRole("tab", { name: "Inventory" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Category" }), "inventory");
     // The inventory type chips appear under Inventory.
     const soldChip = await screen.findByRole("button", { name: "sold", pressed: false });
     await user.click(soldChip);
@@ -70,7 +70,7 @@ describe("ActivityModal filtering", () => {
     await screen.findByText("Sold Shortsword ×1");
 
     // Wait for the session picker (populated async) to appear, then select.
-    const select = await screen.findByRole("combobox");
+    const select = await screen.findByRole("combobox", { name: "Session" });
     await user.selectOptions(select, "sess-1");
 
     await waitFor(() =>
@@ -117,7 +117,7 @@ describe("ActivityModal undo eligibility", () => {
     await screen.findByText("Sold Shortsword ×1");
     expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("tab", { name: "Inventory" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Category" }), "inventory");
     await screen.findByText("Sold Shortsword ×1");
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument(),

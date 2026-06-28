@@ -12,7 +12,6 @@ import { groupByBatch, groupByDate } from "@/lib/timeline";
 import type { Character, CharacterEvent, CharacterEventCategory, CharacterEventField, Session } from "@/types/character";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
-import Tabs from "@/components/ui/Tabs";
 
 interface ActivityModalProps {
   characterId: string;
@@ -23,13 +22,10 @@ interface ActivityModalProps {
   entityId?: string;
 }
 
-// Category filter tabs: an "All" sentinel followed by every event category, in
-// a stable order. Labels are resolved through lib/events so keys never leak.
-const CATEGORY_TAB_IDS = Object.keys(CATEGORY_LABELS) as CharacterEventCategory[];
-const CATEGORY_TABS = [
-  { id: "all", label: "All" },
-  ...CATEGORY_TAB_IDS.map((id) => ({ id, label: categoryLabel(id) })),
-];
+// Category filter options: an "All" sentinel followed by every event category,
+// in a stable order. Labels resolve through lib/events so keys never leak. These
+// feed a compact <select> (not a tab strip) so all 11 categories fit the modal.
+const CATEGORY_FILTER_IDS = Object.keys(CATEGORY_LABELS) as CharacterEventCategory[];
 
 function FieldDiffs({ fields }: { fields: CharacterEventField[] }) {
   if (fields.length === 0) return null;
@@ -147,8 +143,44 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
       <div className="flex flex-col gap-3">
         {/* ── Filter bar ─────────────────────────────────────────────── */}
         <div className="flex flex-col gap-2">
-          <Tabs tabs={CATEGORY_TABS} active={categoryFilter} onChange={selectCategory} />
+          {/* Category + Session as a matched pair of compact selects. */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <label className="flex items-center gap-2 text-xs text-parchment-600">
+              <span className="font-semibold">Category</span>
+              <select
+                value={categoryFilter}
+                onChange={(e) => selectCategory(e.target.value)}
+                className="rounded-control border border-parchment-200 bg-parchment-50 px-2 py-1 text-xs text-parchment-800"
+              >
+                <option value="all">All</option>
+                {CATEGORY_FILTER_IDS.map((id) => (
+                  <option key={id} value={id}>
+                    {categoryLabel(id)}
+                  </option>
+                ))}
+              </select>
+            </label>
 
+            {sessions.length > 0 && (
+              <label className="flex items-center gap-2 text-xs text-parchment-600">
+                <span className="font-semibold">Session</span>
+                <select
+                  value={sessionFilter}
+                  onChange={(e) => setSessionFilter(e.target.value)}
+                  className="rounded-control border border-parchment-200 bg-parchment-50 px-2 py-1 text-xs text-parchment-800"
+                >
+                  <option value="">All sessions</option>
+                  {sessions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.title ?? new Date(s.startedAt).toLocaleDateString()}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+
+          {/* Inventory event-type chips — only meaningful under Inventory. */}
           {categoryFilter === "inventory" && (
             <div className="flex flex-wrap items-center gap-1.5" aria-label="Inventory event type filter">
               {INVENTORY_EVENT_TYPES.map((type) => {
@@ -168,24 +200,6 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
                 );
               })}
             </div>
-          )}
-
-          {sessions.length > 0 && (
-            <label className="flex items-center gap-2 text-xs text-parchment-600">
-              <span className="font-semibold">Session</span>
-              <select
-                value={sessionFilter}
-                onChange={(e) => setSessionFilter(e.target.value)}
-                className="rounded-control border border-parchment-200 bg-parchment-50 px-2 py-1 text-xs text-parchment-800"
-              >
-                <option value="">All sessions</option>
-                {sessions.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.title ?? new Date(s.startedAt).toLocaleDateString()}
-                  </option>
-                ))}
-              </select>
-            </label>
           )}
         </div>
 
