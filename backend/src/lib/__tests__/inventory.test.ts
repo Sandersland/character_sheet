@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { Prisma } from "../../generated/prisma/client.js";
+import { Prisma, type CharacterEventType } from "../../generated/prisma/client.js";
 import { prisma } from "../prisma.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
 import {
@@ -356,7 +356,7 @@ describe("applyInventoryOperations", () => {
 
   // ── revertInventoryEvent reconstruction (Issue #117) ─────────────────────────
 
-  async function latestEventOfType(characterId: string, type: string) {
+  async function latestEventOfType(characterId: string, type: CharacterEventType) {
     return prisma.characterEvent.findFirstOrThrow({
       where: { characterId, type },
       orderBy: { createdAt: "desc" },

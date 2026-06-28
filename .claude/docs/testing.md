@@ -1,5 +1,11 @@
 # Testing
 
+> **Tests don't type-check.** Vitest transpiles with esbuild, which strips types
+> without checking them, so a type-only error passes `npm test` and `npm run lint`
+> but breaks the production `tsc` build (and the Railway deploy). The CI `build`
+> job (`.github/workflows/ci.yml`) is the type gate — run `npm run build` locally
+> before pushing if you've changed type-significant code or test signatures.
+
 ## Running tests
 
 ```bash

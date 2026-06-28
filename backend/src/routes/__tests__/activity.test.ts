@@ -629,7 +629,7 @@ describe("POST /:id/events/:batchId/revert — inventory undo", () => {
   const inv = (operations: unknown[]) =>
     supertest(app()).post(`/api/characters/${INV_ID}/inventory/transactions`).send({ operations });
 
-  const findItem = (body: { inventory: Array<{ name: string }> }, name: string) =>
+  const findItem = (body: { inventory: Array<{ name: string; id: string }> }, name: string) =>
     body.inventory.find((i) => i.name === name);
 
   it("undoes a purchase: deletes the created row AND refunds the currency", async () => {
