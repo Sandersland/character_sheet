@@ -33,6 +33,7 @@ Components are env-driven so any of them can be deployed anywhere:
 | `GOOGLE_CLIENT_ID` | backend | Google OAuth client id. Optional — Google sign-in is enabled only when **both** id and secret are set; absent → the app boots with no providers. Injected into the backend container via Compose (the app does **not** read `backend/.env`). |
 | `GOOGLE_CLIENT_SECRET` | backend | Google OAuth client secret. See above; both must be set together. |
 | `SESSION_COOKIE_SECURE` | backend | Whether session/oauth cookies get the `Secure` flag. Tri-state: defaults to on in production, off elsewhere; set `true`/`false` to override (e.g. force off behind a local proxy). |
+| `ALLOW_DEV_LOGIN` | backend | Enables `POST /api/auth/dev-login` (passwordless session for headless/worktree UI verification — see `seed:verify`). **Never set in production**: hard-forced off when `NODE_ENV=production` regardless of value. Dev Compose defaults it to `true`. |
 | `VITE_API_URL` | frontend **build/dev** | Where the SPA sends API calls. Dev Compose default `/api` (same-origin via the Vite proxy); `/api` for single-origin prod; the API's absolute URL for split. |
 | `VITE_PROXY_TARGET` | frontend **dev** | Where the Vite dev proxy forwards `/api`. Compose default `http://backend:4000`; bare `npm run dev` falls back to `http://localhost:4000`. |
 

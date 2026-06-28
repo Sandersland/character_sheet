@@ -15,7 +15,7 @@ docker compose up --build
 docker compose --profile tools up pgadmin   # localhost:5050
 ```
 
-On every container start, both dev containers run `npm install` first, then the backend runs `prisma generate && prisma migrate deploy && prisma db seed` before starting `tsx watch`. All are idempotent (npm install is a fast no-op when nothing changed; migrate deploy no-ops if already applied; seed uses upserts). Three sample characters (a Fighter, a Cleric, and a Wizard) land automatically.
+On every container start, both dev containers run `npm install` first, then the backend runs `prisma generate && prisma migrate deploy && prisma db seed` before starting `tsx watch`. All are idempotent (npm install is a fast no-op when nothing changed; migrate deploy no-ops if already applied; seed uses upserts). The seed is **catalog-only** (items, spells, classes, races, …) — it creates no users or characters, so a fresh stack has an empty party behind the login screen. To get a signed-in user + a representative character for viewing/UI verification, run `npm run seed:verify` (see below).
 
 > **Adding a dependency?** Just edit `package.json` (or `npm install <pkg>` locally) and `docker compose up --build`. The startup `npm install` reconciles the `node_modules` named volume, so a new dependency is picked up without manually removing the volume. (The volume is seeded from the image only on first creation, so without this it would otherwise shadow newly-built deps.)
 
@@ -87,6 +87,18 @@ npx prisma db seed
 ```
 
 `schema.prisma` lives at `backend/prisma/schema.prisma`. The `prisma.config.ts` at the backend root tells the CLI where to find it.
+
+## Verification data (`seed:verify`)
+
+The catalog seed creates no users/characters, and OAuth can't complete headless or on a worktree port. `npm run seed:verify` bridges that gap for UI verification: against a **running** stack it mints a session via the guarded `POST /api/auth/dev-login` endpoint and builds a representative character ("Verify Dummy" — equippable weapon + armor, trinkets, a bulk sale) through the real API endpoints, then prints the `cs_session` cookie + frontend URL. It's idempotent (reuses an existing "Verify Dummy").
+
+```bash
+npm run seed:verify                                  # default localhost:4000 / :5173
+BACKEND_URL=http://localhost:4010 \
+FRONTEND_URL=http://localhost:5183 npm run seed:verify   # a worktree slot
+```
+
+Requires `ALLOW_DEV_LOGIN=true` (the dev compose sets it by default; it is **hard-disabled when `NODE_ENV=production`**, so it can never expose a passwordless login in prod). To sign in from Playwright, run an in-page `fetch('/api/auth/dev-login', { method: 'POST' })` then reload — `cs_session` is HttpOnly so it can't be set from `document.cookie`. The `verify-frontend` skill automates this.
 
 ## Parallel worktrees (build several features at once)
 
