@@ -61,7 +61,7 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 |---|---|
 | `dice.ts` | The sole `Math.random` dice site — `rollDie`/`rollSpec`/`summarizeRoll`/`formatRollSpec` (see Dice engine below). |
 | `abilities.ts` | Ability/skill/save labels + `abilityModifier` math; resolve all display keys through here. |
-| `items.ts` | `isEquippable(category)` + `EQUIPPABLE_CATEGORIES` — equippability rule (weapon/armor yes, consumable/gear no). Mirror of backend `lib/items.ts`; gate the Equip control through here, never inline-check `category`. |
+| `items.ts` | `isEquippable(category)` + `EQUIPPABLE_CATEGORIES` — equippability rule (weapon/armor yes, consumable/gear no). Mirror of backend `lib/items.ts`; gate the Equip control through here, never inline-check `category`. Also `itemCategoryLabel` + `ITEM_CATEGORY_LABELS`/`ITEM_CATEGORY_ORDER`/`ITEM_CATEGORY_OPTIONS` — resolve category display through here, never a raw key. |
 | `events.ts` | Activity-log display lookups — `eventTypeLabel`/`categoryLabel`/`categoryTone` (tolerant `Partial<Record>` maps, raw-key fallback) + `INVENTORY_EVENT_TYPES` for the filter chips. Resolve all event type/category keys through here, never inline-capitalize. |
 | `timeline.ts` | Groups/formats audit events for the activity timeline (`groupByBatch`/`groupByDate`, generic over `{id,batchId,createdAt}`). |
 | `currency.ts` | Copper-based currency math — `toCopper`/`fromCopper`/`splitLumpSum` + `formatCurrency` (unsigned, largest-first denomination string). |
