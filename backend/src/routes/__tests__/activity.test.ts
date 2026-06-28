@@ -768,9 +768,19 @@ describe("POST /:id/events/:batchId/revert — inventory undo", () => {
 
   it("undoes a setEquipped, restoring the prior equipped flag", async () => {
     const acquire = await inv([
-      { type: "acquire", custom: { name: "Plain Cloak", category: "gear" }, quantity: 1 },
+      // Must be an equippable category (weapon/armor) — setEquipped now rejects
+      // non-equippable gear server-side (#120). Armor needs an armor detail.
+      {
+        type: "acquire",
+        custom: {
+          name: "Padded Armor",
+          category: "armor",
+          armor: { armorCategory: "light", baseArmorClass: 11, dexModifierApplies: true },
+        },
+        quantity: 1,
+      },
     ]);
-    const itemId = findItem(acquire.body, "Plain Cloak")!.id as string;
+    const itemId = findItem(acquire.body, "Padded Armor")!.id as string;
 
     await inv([{ type: "setEquipped", inventoryItemId: itemId, equipped: true }]);
     expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).equipped).toBe(true);
@@ -809,10 +819,19 @@ describe("POST /:id/events/:batchId/revert — inventory undo", () => {
 
   it("still enforces the LIFO guard (409 on an older inventory batch)", async () => {
     const acquire = await inv([
-      { type: "acquire", custom: { name: "Old Lantern", category: "gear" }, quantity: 1 },
+      // Equippable (armor) so the newer setEquipped below is accepted (#120).
+      {
+        type: "acquire",
+        custom: {
+          name: "Spare Leathers",
+          category: "armor",
+          armor: { armorCategory: "light", baseArmorClass: 11, dexModifierApplies: true },
+        },
+        quantity: 1,
+      },
     ]);
     const oldBatch = await latestBatchId(INV_ID);
-    const itemId = findItem(acquire.body, "Old Lantern")!.id as string;
+    const itemId = findItem(acquire.body, "Spare Leathers")!.id as string;
 
     // A newer action makes the older batch un-undoable.
     await inv([{ type: "setEquipped", inventoryItemId: itemId, equipped: true }]);

@@ -66,6 +66,7 @@
 | `lib/actions.ts` | `DERIVED_ACTIONS` + `deriveActions()` (filters the action catalog for a character's class/level/subclass, called from `serializeCharacter`) and `ACTION_EFFECT_FN` dispatch table for applying an action's effects. |
 | `lib/inventory.ts` | Currency math, catalog→snapshot builders, `applyInventoryOperations()`. Reference implementation for the intent-bearing transaction pattern. Includes the `setEquipped` op (logged as `equipped`/`unequipped` events). |
 | `lib/itemDetail.ts` | `serializeWeaponDetail`/`serializeArmorDetail`/`serializeConsumableDetail` — shared by both `routes/items.ts` (catalog) and `routes/characters.ts` (inventory rows). |
+| `lib/items.ts` | `isEquippable(category)` + `EQUIPPABLE_CATEGORIES` — the equippability rule (weapon/armor yes, consumable/gear no). Single backend source of truth; mirrored in `frontend/src/lib/items.ts`. Enforced in `applySetEquipped`. |
 | `lib/sessions.ts` | `startSession`, `endSession`, `getActiveSessionId`. Enforces single-active-session per character. Called by session routes and by `getActiveSessionId()` which is threaded into every `apply*Operations()` lib function to tag events. |
 | `lib/session-summary.ts` | `computeSessionSummary()` — pure aggregation of a session's `CharacterEvent` rows into an end-of-session summary. No new bookkeeping; derive-don't-persist. Unit-testable without Postgres. |
 

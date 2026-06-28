@@ -9,6 +9,7 @@ import {
   INVENTORY_EVENT_TYPES,
 } from "@/lib/events";
 import { groupByBatch, groupByDate } from "@/lib/timeline";
+import { summarizeSellBatch } from "@/lib/sellBatch";
 import type { Character, CharacterEvent, CharacterEventCategory, CharacterEventField, Session } from "@/types/character";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
@@ -51,6 +52,10 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
   const [events, setEvents] = useState<CharacterEvent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedFields, setExpandedFields] = useState<Set<string>>(new Set());
+  // Bulk-sale summary collapse (issue #104). Keyed by batch.key, kept INDEPENDENT
+  // of expandedFields (keyed by event.id) so the summary line and the per-row
+  // field-diff toggles can't collide.
+  const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set());
   const [undoing, setUndoing] = useState(false);
   const [undoError, setUndoError] = useState<string | null>(null);
 
@@ -118,6 +123,15 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleBatch(key: string) {
+    setExpandedBatches((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }
@@ -244,6 +258,10 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
                 {group.items.map((batch) => {
                   const isUndoable = batch.key === undoableBatchId;
                   const allReverted = batch.rows.every((r) => r.reverted);
+                  // A bulk sale (>1 row, all `sold`) collapses to one summary
+                  // line unless the user has expanded it.
+                  const sell = summarizeSellBatch(batch.rows);
+                  const collapsed = sell !== null && !expandedBatches.has(batch.key);
                   return (
                     <li key={batch.key}>
                       {isUndoable && (
@@ -258,7 +276,42 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
                           </button>
                         </div>
                       )}
+                      {collapsed ? (
+                        <div
+                          className={`flex items-start justify-between gap-3 text-sm transition-opacity ${
+                            allReverted ? "opacity-40" : ""
+                          }`}
+                        >
+                          <span className="flex flex-wrap items-center gap-2">
+                            <Badge tone={categoryTone("inventory")}>{eventTypeLabel("sold")}</Badge>
+                            <span className="text-parchment-900">
+                              Sold {sell!.itemCount} items for {sell!.totalLabel}
+                            </span>
+                            {allReverted && <Badge tone="neutral">reverted</Badge>}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => toggleBatch(batch.key)}
+                            className="shrink-0 text-xs text-parchment-400 hover:text-parchment-700"
+                            aria-label="Show sold items"
+                          >
+                            ▼
+                          </button>
+                        </div>
+                      ) : (
                       <ul className="flex flex-col gap-1.5">
+                        {sell !== null && (
+                          <li className="flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => toggleBatch(batch.key)}
+                              className="text-xs text-parchment-400 hover:text-parchment-700"
+                              aria-label="Collapse sold items"
+                            >
+                              ▲
+                            </button>
+                          </li>
+                        )}
                         {batch.rows.map((event) => {
                           const hasFields = (event.fields?.length ?? 0) > 0;
                           const tone = categoryTone(event.category);
@@ -298,6 +351,7 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
                           );
                         })}
                       </ul>
+                      )}
                     </li>
                   );
                 })}
