@@ -579,8 +579,8 @@ export default function AdvancementPanel({
                   ))}
                 </div>
                 {abilityOptionsArr.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-parchment-700">Amount:</label>
+                  <label className="flex items-center gap-2 text-xs text-parchment-700">
+                    Amount:
                     <input
                       type="number"
                       min={1}
@@ -589,7 +589,7 @@ export default function AdvancementPanel({
                       onChange={(e) => setAbilityIncrease(Math.max(1, parseInt(e.target.value) || 1))}
                       className="w-16 rounded-control border border-parchment-300 bg-white px-2 py-1 text-xs text-parchment-900 focus:border-gold-500 focus:outline-none"
                     />
-                  </div>
+                  </label>
                 )}
                 {/* Player choice picker — only shown when taking the feat and >1 option */}
                 {abilityOptionsArr.length > 1 && (
