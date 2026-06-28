@@ -153,6 +153,7 @@ describe("character-scoped routers reject non-owners (#101)", () => {
     { method: "post", suffix: "/conditions/transactions" },
     { method: "post", suffix: "/class/transactions" },
     { method: "post", suffix: "/advancement/transactions" },
+    { method: "post", suffix: "/actions/transactions" },
     { method: "get", suffix: "/activity" },
     { method: "post", suffix: "/sessions" },
     { method: "get", suffix: "/sessions" },

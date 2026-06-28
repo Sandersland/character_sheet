@@ -22,6 +22,7 @@ import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
 
+import { assertCharacterAccess } from "../lib/auth/access.js";
 import { prisma } from "../lib/prisma.js";
 import { ACTION_EFFECT_FN } from "../lib/actions.js";
 import type { SpendResourceOperation } from "../lib/resources.js";
@@ -98,15 +99,8 @@ actionsRouter.post(
   async (req, res) => {
     const { id: characterId } = req.params;
 
-    // 404 guard — fail fast before opening a transaction.
-    const exists = await prisma.character.findUnique({
-      where: { id: characterId },
-      select: { id: true },
-    });
-    if (!exists) {
-      res.status(404).json({ error: "Character not found" });
-      return;
-    }
+    // Ownership chokepoint — 403 non-owner, 404 missing — before any work.
+    await assertCharacterAccess(prisma, req.user!.id, characterId, "edit");
 
     const parsed = actionTransactionsSchema.safeParse(req.body);
     if (!parsed.success) {
