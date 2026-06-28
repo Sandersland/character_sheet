@@ -3,7 +3,8 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import InventoryList from "@/features/inventory/InventoryList";
-import type { Character, InventoryItem } from "@/types/character";
+import { applyInventoryTransactions, updateCharacter } from "@/api/client";
+import type { Character, Currency, InventoryItem } from "@/types/character";
 
 // InventoryList calls fetchItems() on mount to load the catalog; stub the
 // client so the component renders without a real network request.
@@ -27,11 +28,15 @@ function makeItem(overrides: Partial<InventoryItem> = {}): InventoryItem {
 
 // Minimal Character stub — InventoryList reads id, inventory, currency, and
 // abilityScores.strength (for carrying capacity).
-function makeCharacter(strength: number, inventory: InventoryItem[]): Character {
+function makeCharacter(
+  strength: number,
+  inventory: InventoryItem[],
+  currency: Currency = { cp: 0, sp: 0, gp: 0, pp: 0 }
+): Character {
   return {
     id: "char-1",
     inventory,
-    currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+    currency,
     abilityScores: { strength } as Character["abilityScores"],
   } as unknown as Character;
 }
@@ -198,5 +203,68 @@ describe("InventoryList search and filter", () => {
     await user.type(screen.getByRole("searchbox"), "zzz");
     expect(screen.getByText(/no items match/i)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 4 })).toBeNull();
+  });
+});
+
+describe("InventoryList purse", () => {
+  it("shows the purse display-first and reveals inputs on Edit purse", async () => {
+    const user = userEvent.setup();
+    const character = makeCharacter(10, [makeItem()], { cp: 8, sp: 5, gp: 12, pp: 0 });
+    render(<InventoryList character={character} onUpdate={vi.fn()} />);
+    expect(screen.getByText("12 gp 5 sp 8 cp")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Edit purse" }));
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+  });
+
+  it("saves the edited currency via updateCharacter", async () => {
+    const user = userEvent.setup();
+    const character = makeCharacter(10, [makeItem()], { cp: 0, sp: 0, gp: 5, pp: 0 });
+    render(<InventoryList character={character} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Edit purse" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(updateCharacter).toHaveBeenCalledWith("char-1", {
+      currency: { cp: 0, sp: 0, gp: 5, pp: 0 },
+    });
+  });
+});
+
+describe("InventoryList multi-select sell", () => {
+  const inventory = [
+    makeItem({ id: "w1", name: "Longsword", category: "weapon", cost: { cp: 0, sp: 0, gp: 10, pp: 0 } }),
+    makeItem({ id: "a1", name: "Shield", category: "armor", cost: { cp: 0, sp: 0, gp: 5, pp: 0 } }),
+  ];
+
+  it("enters select mode: rows show checkboxes and per-row actions hide", async () => {
+    const user = userEvent.setup();
+    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Sell items" }));
+    expect(screen.getByRole("checkbox", { name: "Select Longsword" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Equip" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Actions for/ })).toBeNull();
+  });
+
+  it("shows a running total and sells the selection atomically", async () => {
+    const user = userEvent.setup();
+    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Sell items" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
+    expect(screen.getByText(/1 selected · ~10 gp/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+    expect(applyInventoryTransactions).toHaveBeenCalledWith(
+      "char-1",
+      expect.arrayContaining([
+        expect.objectContaining({ type: "sell", inventoryItemId: "w1", quantity: 1 }),
+      ])
+    );
+  });
+
+  it("Cancel exits select mode", async () => {
+    const user = userEvent.setup();
+    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Sell items" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("button", { name: "Sell items" })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Select Longsword" })).toBeNull();
   });
 });

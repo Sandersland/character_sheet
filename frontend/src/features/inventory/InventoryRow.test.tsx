@@ -123,4 +123,16 @@ describe("InventoryRow (view mode)", () => {
     renderRow({ pending: true });
     expect(screen.getByRole("button", { name: "Equip" })).toBeDisabled();
   });
+
+  it("in select mode shows a checkbox and hides the per-row actions", async () => {
+    const user = userEvent.setup();
+    const onToggleSelect = vi.fn();
+    renderRow({ selectMode: true, selected: false, onToggleSelect });
+    const checkbox = screen.getByRole("checkbox", { name: "Select Club" });
+    expect(checkbox).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Equip" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Actions for/ })).toBeNull();
+    await user.click(checkbox);
+    expect(onToggleSelect).toHaveBeenCalledOnce();
+  });
 });
