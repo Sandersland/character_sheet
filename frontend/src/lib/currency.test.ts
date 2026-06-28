@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { fromCopper, splitLumpSum, toCopper } from "@/lib/currency";
+import { formatCurrency, fromCopper, splitLumpSum, toCopper } from "@/lib/currency";
 import type { Currency } from "@/types/character";
 
 function sumCurrencies(lines: Currency[]): Currency {
@@ -38,6 +38,22 @@ describe("fromCopper", () => {
     for (const n of [0, 1, 9, 10, 99, 100, 555, 1000, 1234, 99999]) {
       expect(toCopper(fromCopper(n))).toBe(n);
     }
+  });
+});
+
+describe("formatCurrency", () => {
+  it("renders a single nonzero denomination", () => {
+    expect(formatCurrency({ cp: 0, sp: 0, gp: 45, pp: 0 })).toBe("45 gp");
+    expect(formatCurrency({ cp: 7, sp: 0, gp: 0, pp: 0 })).toBe("7 cp");
+  });
+
+  it("joins multiple nonzero denominations largest-first", () => {
+    expect(formatCurrency({ cp: 0, sp: 0, gp: 2, pp: 1 })).toBe("1 pp 2 gp");
+    expect(formatCurrency({ cp: 4, sp: 3, gp: 2, pp: 1 })).toBe("1 pp 2 gp 3 sp 4 cp");
+  });
+
+  it("renders an all-zero amount as '0 gp'", () => {
+    expect(formatCurrency({ cp: 0, sp: 0, gp: 0, pp: 0 })).toBe("0 gp");
   });
 });
 
