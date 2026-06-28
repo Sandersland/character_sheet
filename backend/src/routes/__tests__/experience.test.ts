@@ -5,8 +5,10 @@ import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
+import { authCookie } from "../../test-support/auth.js";
 
 const OWNER_ID = "owner-experience";
+let COOKIE: string;
 
 // XP thresholds from the 5e table (levelForExperience).
 const XP_LVL_1 = 0;
@@ -14,22 +16,27 @@ const XP_LVL_3 = 900;
 
 const app = createApp();
 
+beforeAll(async () => {
+  await ensureTestOwner(OWNER_ID);
+  COOKIE = await authCookie(OWNER_ID);
+});
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 async function postXp(characterId: string, body: object) {
-  return supertest(app).post(`/api/characters/${characterId}/experience`).send(body);
+  return supertest(app).post(`/api/characters/${characterId}/experience`).set("Cookie", COOKIE).send(body);
 }
 
 async function postUndo(characterId: string, batchId: string) {
-  return supertest(app).post(`/api/characters/${characterId}/events/${batchId}/revert`).send({});
+  return supertest(app).post(`/api/characters/${characterId}/events/${batchId}/revert`).set("Cookie", COOKIE).send({});
 }
 
 async function postResource(characterId: string, body: object) {
-  return supertest(app).post(`/api/characters/${characterId}/resources/transactions`).send(body);
+  return supertest(app).post(`/api/characters/${characterId}/resources/transactions`).set("Cookie", COOKIE).send(body);
 }
 
 async function getActivity(characterId: string) {
-  return supertest(app).get(`/api/characters/${characterId}/activity`);
+  return supertest(app).get(`/api/characters/${characterId}/activity`).set("Cookie", COOKIE);
 }
 
 // ── Common catalog fixtures ───────────────────────────────────────────────────
@@ -571,7 +578,7 @@ describe("POST /api/characters/:id/experience — maneuvers reconciled on level-
       },
     });
 
-    const res = await supertest(app).get("/api/characters/test-man-clamp");
+    const res = await supertest.agent(app).set("Cookie", COOKIE).get("/api/characters/test-man-clamp");
     expect(res.status).toBe(200);
     // Read-clamp: serialized to 3 even though 5 are stored.
     expect(res.body.resources?.maneuversKnown).toHaveLength(3);
@@ -750,7 +757,7 @@ describe("POST /api/characters/:id/experience — fighting style reconciled on c
       },
     });
 
-    const res = await supertest(app).get("/api/characters/test-fs-clamp");
+    const res = await supertest.agent(app).set("Cookie", COOKIE).get("/api/characters/test-fs-clamp");
     expect(res.status).toBe(200);
     expect(res.body.resources?.fightingStyle ?? null).toBeNull();
     // DB still holds the stale value (write-side reconcile has not run).

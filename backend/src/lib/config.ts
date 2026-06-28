@@ -34,7 +34,6 @@ const schema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
   APP_BASE_URL: z.string().url().default("http://localhost:4000"),
   SESSION_COOKIE_SECURE: z.boolean(),
-  BOOTSTRAP_OWNER_EMAIL: z.string().min(1).optional(),
   // Pass-through values other modules read; kept here so the full auth-relevant
   // surface is documented in one place.
   CORS_ORIGIN: z.string().optional(),
@@ -53,7 +52,6 @@ function loadConfig(): Config {
     GOOGLE_CLIENT_SECRET: clean(env.GOOGLE_CLIENT_SECRET),
     APP_BASE_URL: clean(env.APP_BASE_URL),
     SESSION_COOKIE_SECURE: parseSecure(env.SESSION_COOKIE_SECURE, isProd),
-    BOOTSTRAP_OWNER_EMAIL: clean(env.BOOTSTRAP_OWNER_EMAIL),
     CORS_ORIGIN: clean(env.CORS_ORIGIN),
     SERVE_STATIC_DIR: clean(env.SERVE_STATIC_DIR),
     PORT: clean(env.PORT),

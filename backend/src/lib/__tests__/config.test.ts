@@ -18,7 +18,6 @@ describe("config", () => {
     vi.stubEnv("GOOGLE_CLIENT_SECRET", "");
     vi.stubEnv("APP_BASE_URL", "");
     vi.stubEnv("SESSION_COOKIE_SECURE", "");
-    vi.stubEnv("BOOTSTRAP_OWNER_EMAIL", "");
     vi.stubEnv("NODE_ENV", "test");
   });
 
@@ -69,12 +68,6 @@ describe("config", () => {
     vi.stubEnv("SESSION_COOKIE_SECURE", "false");
     const { config } = await loadConfig();
     expect(config.SESSION_COOKIE_SECURE).toBe(false);
-  });
-
-  it("exposes BOOTSTRAP_OWNER_EMAIL when set", async () => {
-    vi.stubEnv("BOOTSTRAP_OWNER_EMAIL", "dm@example.com");
-    const { config } = await loadConfig();
-    expect(config.BOOTSTRAP_OWNER_EMAIL).toBe("dm@example.com");
   });
 
   it("appRedirectUri builds the per-provider callback path", async () => {

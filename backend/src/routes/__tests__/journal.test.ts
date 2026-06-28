@@ -15,9 +15,11 @@ import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
+import { authCookie } from "../../test-support/auth.js";
 
 const FIXTURE_ID = "test-journal-character-1";
 const OWNER_ID = "owner-journal";
+let COOKIE: string;
 
 const FIXTURE = {
   id: FIXTURE_ID,
@@ -51,6 +53,7 @@ function journalUrl(suffix = "") {
 
 beforeEach(async () => {
   await ensureTestOwner(OWNER_ID);
+  COOKIE = await authCookie(OWNER_ID);
   await prisma.character.create({ data: { ...FIXTURE, ownerId: OWNER_ID, spellcasting: Prisma.JsonNull } });
 });
 
@@ -62,7 +65,7 @@ afterEach(async () => {
 
 describe("POST /api/characters/:id/journal — create entry", () => {
   it("creates an entry and returns the updated character with it under journal", async () => {
-    const res = await supertest(app)
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(journalUrl())
       .send({ title: "The Sunken Library", date: "2026-06-22", body: "Found three tomes." });
 
@@ -77,7 +80,7 @@ describe("POST /api/characters/:id/journal — create entry", () => {
   });
 
   it("persists the entry to the JournalEntry table", async () => {
-    await supertest(app)
+    await supertest.agent(app).set("Cookie", COOKIE)
       .post(journalUrl())
       .send({ title: "A Debt Repaid", date: "2026-06-23", body: "Helped the militia." });
 
@@ -87,14 +90,14 @@ describe("POST /api/characters/:id/journal — create entry", () => {
   });
 
   it("400s on a missing required field (empty title)", async () => {
-    const res = await supertest(app)
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(journalUrl())
       .send({ title: "", date: "2026-06-22", body: "x" });
     expect(res.status).toBe(400);
   });
 
   it("404s for an unknown character", async () => {
-    const res = await supertest(app)
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post("/api/characters/does-not-exist/journal")
       .send({ title: "x", date: "2026-06-22", body: "y" });
     expect(res.status).toBe(404);
@@ -102,14 +105,14 @@ describe("POST /api/characters/:id/journal — create entry", () => {
   });
 
   it("400s on a tz-offset datetime (only yyyy-mm-dd calendar dates allowed)", async () => {
-    const res = await supertest(app)
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(journalUrl())
       .send({ title: "Off by one?", date: "2026-06-22T23:00:00-05:00", body: "x" });
     expect(res.status).toBe(400);
   });
 
   it("pins a yyyy-mm-dd date to UTC midnight", async () => {
-    const res = await supertest(app)
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(journalUrl())
       .send({ title: "Midnight", date: "2026-06-22", body: "x" });
     expect(res.status).toBe(201);
@@ -121,7 +124,7 @@ describe("POST /api/characters/:id/journal — create entry", () => {
 
 describe("PATCH /api/characters/:id/journal/:entryId — update entry", () => {
   async function seedEntry() {
-    const res = await supertest(app)
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(journalUrl())
       .send({ title: "Original", date: "2026-06-22", body: "Original body." });
     return res.body.journal[0].id as string;
@@ -129,7 +132,7 @@ describe("PATCH /api/characters/:id/journal/:entryId — update entry", () => {
 
   it("partially updates the entry (body only) and returns the character", async () => {
     const entryId = await seedEntry();
-    const res = await supertest(app)
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
       .patch(journalUrl(`/${entryId}`))
       .send({ body: "Edited body." });
 
@@ -141,7 +144,7 @@ describe("PATCH /api/characters/:id/journal/:entryId — update entry", () => {
 
   it("404s for an unknown character", async () => {
     const entryId = await seedEntry();
-    const res = await supertest(app)
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
       .patch(`/api/characters/does-not-exist/journal/${entryId}`)
       .send({ body: "x" });
     expect(res.status).toBe(404);
@@ -150,7 +153,7 @@ describe("PATCH /api/characters/:id/journal/:entryId — update entry", () => {
 
   it("404s when the entry doesn't belong to the character", async () => {
     await seedEntry();
-    const res = await supertest(app)
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
       .patch(journalUrl("/not-a-real-entry-id"))
       .send({ body: "x" });
     expect(res.status).toBe(404);
@@ -162,7 +165,7 @@ describe("PATCH /api/characters/:id/journal/:entryId — update entry", () => {
 
 describe("DELETE /api/characters/:id/journal/:entryId — delete entry", () => {
   async function seedEntry() {
-    const res = await supertest(app)
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
       .post(journalUrl())
       .send({ title: "To Delete", date: "2026-06-22", body: "Goodbye." });
     return res.body.journal[0].id as string;
@@ -170,7 +173,7 @@ describe("DELETE /api/characters/:id/journal/:entryId — delete entry", () => {
 
   it("deletes the entry and returns the character without it", async () => {
     const entryId = await seedEntry();
-    const res = await supertest(app).delete(journalUrl(`/${entryId}`));
+    const res = await supertest.agent(app).set("Cookie", COOKIE).delete(journalUrl(`/${entryId}`));
 
     expect(res.status).toBe(200);
     expect(res.body.journal).toHaveLength(0);
@@ -181,14 +184,14 @@ describe("DELETE /api/characters/:id/journal/:entryId — delete entry", () => {
 
   it("404s for an unknown character", async () => {
     const entryId = await seedEntry();
-    const res = await supertest(app).delete(`/api/characters/does-not-exist/journal/${entryId}`);
+    const res = await supertest.agent(app).set("Cookie", COOKIE).delete(`/api/characters/does-not-exist/journal/${entryId}`);
     expect(res.status).toBe(404);
     expect(res.body.error).toBe("Character not found");
   });
 
   it("404s when the entry doesn't belong to the character", async () => {
     await seedEntry();
-    const res = await supertest(app).delete(journalUrl("/not-a-real-entry-id"));
+    const res = await supertest.agent(app).set("Cookie", COOKIE).delete(journalUrl("/not-a-real-entry-id"));
     expect(res.status).toBe(404);
     expect(res.body.error).toBe("Journal entry not found");
   });
@@ -198,29 +201,29 @@ describe("DELETE /api/characters/:id/journal/:entryId — delete entry", () => {
 
 describe("journal ordering", () => {
   it("returns entries newest-first by the user-entered date", async () => {
-    await supertest(app)
+    await supertest.agent(app).set("Cookie", COOKIE)
       .post(journalUrl())
       .send({ title: "First", date: "2026-06-20", body: "a" });
-    await supertest(app)
+    await supertest.agent(app).set("Cookie", COOKIE)
       .post(journalUrl())
       .send({ title: "Second", date: "2026-06-21", body: "b" });
 
-    const res = await supertest(app).get(`/api/characters/${FIXTURE_ID}`);
+    const res = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     expect(res.status).toBe(200);
     expect(res.body.journal.map((e: { title: string }) => e.title)).toEqual(["Second", "First"]);
   });
 
   it("orders by the entered date, not creation order (a back-dated entry sorts by its date)", async () => {
     // Created first, but with the LATEST date → must sort to the top.
-    await supertest(app)
+    await supertest.agent(app).set("Cookie", COOKIE)
       .post(journalUrl())
       .send({ title: "Future", date: "2026-07-01", body: "written first, dated latest" });
     // Created second, but back-dated → must sort to the bottom.
-    await supertest(app)
+    await supertest.agent(app).set("Cookie", COOKIE)
       .post(journalUrl())
       .send({ title: "Past", date: "2026-01-01", body: "written second, dated earliest" });
 
-    const res = await supertest(app).get(`/api/characters/${FIXTURE_ID}`);
+    const res = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     expect(res.status).toBe(200);
     expect(res.body.journal.map((e: { title: string }) => e.title)).toEqual(["Future", "Past"]);
   });

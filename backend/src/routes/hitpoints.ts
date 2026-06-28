@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 
+import { assertCharacterAccess } from "../lib/auth/access.js";
 import { applyHitPointOperations, InvalidHitPointOperationError } from "../lib/hitpoints.js";
 import { prisma } from "../lib/prisma.js";
 import { characterInclude, serializeCharacter } from "./characters.js";
@@ -84,14 +85,7 @@ const hpRequestSchema = z.object({
 // ---- Route ----------------------------------------------------------------
 
 hitPointsRouter.post("/characters/:id/hp", async (req, res) => {
-  const character = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    select: { id: true },
-  });
-  if (!character) {
-    res.status(404).json({ error: "Character not found" });
-    return;
-  }
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const parseResult = hpRequestSchema.safeParse(req.body);
   if (!parseResult.success) {
@@ -106,7 +100,7 @@ hitPointsRouter.post("/characters/:id/hp", async (req, res) => {
   >["concentrationChecks"] = [];
   try {
     ({ concentrationChecks } = await applyHitPointOperations(
-      character.id,
+      req.params.id,
       parseResult.data.operations,
     ));
   } catch (error) {
@@ -118,7 +112,7 @@ hitPointsRouter.post("/characters/:id/hp", async (req, res) => {
   }
 
   const updated = await prisma.character.findUnique({
-    where: { id: character.id },
+    where: { id: req.params.id },
     include: characterInclude,
   });
   // Response = serialized character plus any concentration check(s) triggered by

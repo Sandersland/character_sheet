@@ -75,6 +75,12 @@ describe("fetchCharacter", () => {
     await expect(fetchCharacter("missing")).resolves.toBeNull();
   });
 
+  it("returns null for a 403 (someone else's character) — graceful not-found, no leak", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 403 }));
+
+    await expect(fetchCharacter("not-mine")).resolves.toBeNull();
+  });
+
   it("throws on other non-ok responses", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
 

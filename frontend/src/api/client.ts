@@ -22,12 +22,65 @@ import type {
   Session,
   SpellcastingOperation,
 } from "@/types/character";
+import type { AuthProviderInfo, AuthUser } from "@/types/auth";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
 
+// Centralized handling for an expired/absent session. AuthProvider registers a
+// handler (which flips auth state to "anonymous" so the router shows the login
+// screen) so a 401 from ANY domain call is handled in one place — never per
+// call site. The auth bootstrap (fetchMe) deliberately bypasses this: a 401
+// there is the expected "not signed in" answer, not a session that just died.
+let unauthorizedHandler: (() => void) | null = null;
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  unauthorizedHandler = handler;
+}
+
+// Always send the session cookie (cross-origin in dev: 5173 → 4000), and route
+// every domain response through the shared 401 handler.
+async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
+  const response = await fetch(input, { credentials: "include", ...init });
+  if (response.status === 401) unauthorizedHandler?.();
+  return response;
+}
+
+// ── Auth ────────────────────────────────────────────────────────────────────
+
+// The enabled sign-in providers — drives the login screen's buttons (data-driven
+// so adding a provider server-side needs no frontend change). Public endpoint.
+export async function fetchAuthProviders(): Promise<AuthProviderInfo[]> {
+  const response = await apiFetch(`${API_URL}/auth/providers`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch auth providers (${response.status})`);
+  }
+  const data = (await response.json()) as { providers: AuthProviderInfo[] };
+  return data.providers;
+}
+
+// The current session's user, or null when not signed in. Uses a plain
+// credentialed fetch (not apiFetch) so an expected 401 here does NOT trip the
+// global unauthorized handler — this IS the "are we signed in?" probe.
+export async function fetchMe(): Promise<AuthUser | null> {
+  const response = await fetch(`${API_URL}/auth/me`, { credentials: "include" });
+  if (response.status === 401) return null;
+  if (!response.ok) {
+    throw new Error(`Failed to fetch current user (${response.status})`);
+  }
+  const data = (await response.json()) as { user: AuthUser };
+  return data.user;
+}
+
+// End the session server-side and clear the cookie.
+export async function logout(): Promise<void> {
+  const response = await apiFetch(`${API_URL}/auth/logout`, { method: "POST" });
+  if (!response.ok) {
+    throw new Error(`Failed to log out (${response.status})`);
+  }
+}
+
 export async function checkHealth(): Promise<boolean> {
   try {
-    const response = await fetch(`${API_URL}/health`);
+    const response = await apiFetch(`${API_URL}/health`);
     if (!response.ok) return false;
     const data = await response.json();
     return data.status === "ok";
@@ -37,7 +90,7 @@ export async function checkHealth(): Promise<boolean> {
 }
 
 export async function fetchCharacters(): Promise<CharacterSummary[]> {
-  const response = await fetch(`${API_URL}/characters`);
+  const response = await apiFetch(`${API_URL}/characters`);
   if (!response.ok) {
     throw new Error(`Failed to fetch characters (${response.status})`);
   }
@@ -45,8 +98,11 @@ export async function fetchCharacters(): Promise<CharacterSummary[]> {
 }
 
 export async function fetchCharacter(id: string): Promise<Character | null> {
-  const response = await fetch(`${API_URL}/characters/${id}`);
-  if (response.status === 404) return null;
+  const response = await apiFetch(`${API_URL}/characters/${id}`);
+  // 404 (missing) and 403 (not the caller's) both resolve to null so the sheet
+  // page renders its graceful "not found" screen — and a 403 doesn't reveal that
+  // the character exists. (A 401 is handled globally by apiFetch → login.)
+  if (response.status === 404 || response.status === 403) return null;
   if (!response.ok) {
     throw new Error(`Failed to fetch character ${id} (${response.status})`);
   }
@@ -59,7 +115,7 @@ export async function updateCharacter(
   // instead so XP changes are logged and trigger HP auto-reverse on level-down.
   patch: Partial<Pick<Character, "currency">>
 ): Promise<Character> {
-  const response = await fetch(`${API_URL}/characters/${id}`, {
+  const response = await apiFetch(`${API_URL}/characters/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
@@ -71,7 +127,7 @@ export async function updateCharacter(
 }
 
 export async function fetchReference(): Promise<ReferenceData> {
-  const response = await fetch(`${API_URL}/reference`);
+  const response = await apiFetch(`${API_URL}/reference`);
   if (!response.ok) {
     throw new Error(`Failed to fetch reference data (${response.status})`);
   }
@@ -80,7 +136,7 @@ export async function fetchReference(): Promise<ReferenceData> {
 
 // Feeds the inventory editor's "add from catalog" picker (Phase B).
 export async function fetchItems(): Promise<Item[]> {
-  const response = await fetch(`${API_URL}/items`);
+  const response = await apiFetch(`${API_URL}/items`);
   if (!response.ok) {
     throw new Error(`Failed to fetch items (${response.status})`);
   }
@@ -90,7 +146,7 @@ export async function fetchItems(): Promise<Item[]> {
 // Feeds the spellcasting section's "learn from catalog" picker.
 // Ordered by level then name server-side; no client-side re-sort needed.
 export async function fetchSpells(): Promise<CatalogSpell[]> {
-  const response = await fetch(`${API_URL}/spells`);
+  const response = await apiFetch(`${API_URL}/spells`);
   if (!response.ok) {
     throw new Error(`Failed to fetch spell catalog (${response.status})`);
   }
@@ -104,7 +160,7 @@ export async function applySpellcastingTransactions(
   characterId: string,
   operations: SpellcastingOperation[]
 ): Promise<Character> {
-  const response = await fetch(`${API_URL}/characters/${characterId}/spellcasting/transactions`, {
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/spellcasting/transactions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ operations }),
@@ -123,7 +179,7 @@ export async function applyInventoryTransactions(
   characterId: string,
   operations: InventoryOperation[]
 ): Promise<Character> {
-  const response = await fetch(`${API_URL}/characters/${characterId}/inventory/transactions`, {
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/inventory/transactions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ operations }),
@@ -141,7 +197,7 @@ export async function applyInventoryTransactions(
 // covers currently-held items.
 export async function fetchLedger(characterId: string, inventoryItemId?: string): Promise<LedgerEntry[]> {
   const query = inventoryItemId ? `?inventoryItemId=${encodeURIComponent(inventoryItemId)}` : "";
-  const response = await fetch(`${API_URL}/characters/${characterId}/inventory/transactions${query}`);
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/inventory/transactions${query}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch ledger (${response.status})`);
   }
@@ -161,7 +217,7 @@ export async function applyHitPointOperations(
   characterId: string,
   operations: HitPointOperation[]
 ): Promise<{ character: Character; concentrationChecks: ConcentrationCheck[] }> {
-  const response = await fetch(`${API_URL}/characters/${characterId}/hp`, {
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/hp`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ operations }),
@@ -177,7 +233,7 @@ export async function applyHitPointOperations(
 }
 
 export async function deleteCharacter(id: string): Promise<void> {
-  const response = await fetch(`${API_URL}/characters/${id}`, { method: "DELETE" });
+  const response = await apiFetch(`${API_URL}/characters/${id}`, { method: "DELETE" });
   if (!response.ok) {
     throw new Error(`Failed to delete character ${id} (${response.status})`);
   }
@@ -192,7 +248,7 @@ export async function createJournalEntry(
   characterId: string,
   entry: { title: string; date: string; body: string; sessionId?: string }
 ): Promise<Character> {
-  const response = await fetch(`${API_URL}/characters/${characterId}/journal`, {
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/journal`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(entry),
@@ -209,7 +265,7 @@ export async function updateJournalEntry(
   entryId: string,
   patch: { title?: string; date?: string; body?: string }
 ): Promise<Character> {
-  const response = await fetch(`${API_URL}/characters/${characterId}/journal/${entryId}`, {
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/journal/${entryId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
@@ -225,7 +281,7 @@ export async function deleteJournalEntry(
   characterId: string,
   entryId: string
 ): Promise<Character> {
-  const response = await fetch(`${API_URL}/characters/${characterId}/journal/${entryId}`, {
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/journal/${entryId}`, {
     method: "DELETE",
   });
   if (!response.ok) {
@@ -236,7 +292,7 @@ export async function deleteJournalEntry(
 }
 
 export async function createCharacter(input: CreateCharacterInput): Promise<Character> {
-  const response = await fetch(`${API_URL}/characters`, {
+  const response = await apiFetch(`${API_URL}/characters`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -259,7 +315,7 @@ export async function applyExperienceOperations(
   operations: ExperienceOperation[],
   sessionId?: string,
 ): Promise<Character> {
-  const response = await fetch(`${API_URL}/characters/${characterId}/experience`, {
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/experience`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(sessionId ? { operations, sessionId } : { operations }),
@@ -291,7 +347,7 @@ export async function fetchActivity(
   if (opts?.entityId) params.set("entityId", opts.entityId);
   if (opts?.includeFields) params.set("includeFields", "1");
   const query = params.toString() ? `?${params.toString()}` : "";
-  const response = await fetch(`${API_URL}/characters/${characterId}/activity${query}`, { signal });
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/activity${query}`, { signal });
   if (!response.ok) {
     throw new Error(`Failed to fetch activity (${response.status})`);
   }
@@ -301,7 +357,7 @@ export async function fetchActivity(
 // Feeds the class-features section's "learn a maneuver" picker. Ordered
 // alphabetically server-side; no client-side re-sort needed.
 export async function fetchManeuvers(): Promise<CatalogManeuver[]> {
-  const response = await fetch(`${API_URL}/maneuvers`);
+  const response = await apiFetch(`${API_URL}/maneuvers`);
   if (!response.ok) {
     throw new Error(`Failed to fetch maneuver catalog (${response.status})`);
   }
@@ -314,7 +370,7 @@ export async function applyResourceTransactions(
   characterId: string,
   operations: ResourceOperation[]
 ): Promise<Character> {
-  const response = await fetch(`${API_URL}/characters/${characterId}/resources/transactions`, {
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/resources/transactions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ operations }),
@@ -332,7 +388,7 @@ export async function applyConditionTransactions(
   characterId: string,
   operations: ConditionOperation[]
 ): Promise<Character> {
-  const response = await fetch(`${API_URL}/characters/${characterId}/conditions/transactions`, {
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/conditions/transactions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ operations }),
@@ -349,7 +405,7 @@ export async function applyClassTransactions(
   characterId: string,
   operations: ClassOperation[]
 ): Promise<Character> {
-  const response = await fetch(`${API_URL}/characters/${characterId}/class/transactions`, {
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/class/transactions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ operations }),
@@ -364,7 +420,7 @@ export async function applyClassTransactions(
 // Feeds the advancement section's feat picker — same role as fetchManeuvers.
 // Ordered alphabetically server-side.
 export async function fetchFeats(): Promise<CatalogFeat[]> {
-  const response = await fetch(`${API_URL}/feats`);
+  const response = await apiFetch(`${API_URL}/feats`);
   if (!response.ok) {
     throw new Error(`Failed to fetch feat catalog (${response.status})`);
   }
@@ -377,7 +433,7 @@ export async function applyAdvancementTransactions(
   characterId: string,
   operations: AdvancementOperation[]
 ): Promise<Character> {
-  const response = await fetch(`${API_URL}/characters/${characterId}/advancement/transactions`, {
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/advancement/transactions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ operations }),
@@ -396,7 +452,7 @@ export async function revertBatch(
   characterId: string,
   batchId: string
 ): Promise<Character> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_URL}/characters/${characterId}/events/${encodeURIComponent(batchId)}/revert`,
     { method: "POST" }
   );
@@ -411,7 +467,7 @@ export async function revertBatch(
 
 // Feeds the TurnTracker's action catalog picker. Ordered by cost then name.
 export async function fetchActions(): Promise<CatalogAction[]> {
-  const response = await fetch(`${API_URL}/actions`);
+  const response = await apiFetch(`${API_URL}/actions`);
   if (!response.ok) {
     throw new Error(`Failed to fetch action catalog (${response.status})`);
   }
@@ -427,7 +483,7 @@ export async function applyActionTransactions(
   characterId: string,
   operations: ActionOperation[]
 ): Promise<Character> {
-  const response = await fetch(`${API_URL}/characters/${characterId}/actions/transactions`, {
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/actions/transactions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ operations }),
@@ -446,7 +502,7 @@ export async function startSession(
   characterId: string,
   title?: string,
 ): Promise<{ session: Session; character: Character }> {
-  const response = await fetch(`${API_URL}/characters/${characterId}/sessions`, {
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/sessions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title }),
@@ -463,7 +519,7 @@ export async function endSession(
   characterId: string,
   sessionId: string,
 ): Promise<{ session: Session }> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_URL}/characters/${characterId}/sessions/${sessionId}/end`,
     { method: "POST" },
   );
@@ -476,14 +532,14 @@ export async function endSession(
 
 /** List all sessions for a character (newest first). */
 export async function fetchSessions(characterId: string): Promise<Session[]> {
-  const response = await fetch(`${API_URL}/characters/${characterId}/sessions`);
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/sessions`);
   if (!response.ok) throw new Error(`Failed to fetch sessions (${response.status})`);
   return response.json();
 }
 
 /** Get the currently-active session, or null if none is active. */
 export async function fetchActiveSession(characterId: string): Promise<Session | null> {
-  const response = await fetch(`${API_URL}/characters/${characterId}/sessions/active`);
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/sessions/active`);
   if (!response.ok) throw new Error(`Failed to fetch active session (${response.status})`);
   return response.json(); // 200 with null body when no session is active
 }
@@ -493,7 +549,7 @@ export async function fetchSession(
   characterId: string,
   sessionId: string,
 ): Promise<Session & { events: CharacterEvent[] }> {
-  const response = await fetch(`${API_URL}/characters/${characterId}/sessions/${sessionId}`);
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/sessions/${sessionId}`);
   if (!response.ok) throw new Error(`Failed to fetch session (${response.status})`);
   return response.json();
 }
@@ -503,7 +559,7 @@ export async function startCombat(
   characterId: string,
   sessionId: string,
 ): Promise<void> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_URL}/characters/${characterId}/sessions/${sessionId}/combat/start`,
     { method: "POST" },
   );
@@ -518,7 +574,7 @@ export async function endCombat(
   characterId: string,
   sessionId: string,
 ): Promise<void> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_URL}/characters/${characterId}/sessions/${sessionId}/combat/end`,
     { method: "POST" },
   );
@@ -534,7 +590,7 @@ export async function advanceCombatRound(
   sessionId: string,
   round: number,
 ): Promise<void> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_URL}/characters/${characterId}/sessions/${sessionId}/combat/round`,
     {
       method: "POST",
@@ -562,7 +618,7 @@ export async function logRoll(
     faces?: number[];
   },
 ): Promise<void> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_URL}/characters/${characterId}/sessions/${sessionId}/roll`,
     {
       method: "POST",

@@ -1,8 +1,16 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
 import { createApp } from "../../app.js";
 import { prisma } from "../../lib/prisma.js";
+import { authCookie } from "../../test-support/auth.js";
+
+const OWNER_ID = "owner-items";
+let COOKIE: string;
+
+beforeAll(async () => {
+  COOKIE = await authCookie(OWNER_ID);
+});
 
 const TEST_ITEM = {
   name: "Test Catalog Dagger",
@@ -34,7 +42,7 @@ describe("GET /api/items", () => {
       },
     });
 
-    const response = await supertest(createApp()).get("/api/items");
+    const response = await supertest.agent(createApp()).set("Cookie", COOKIE).get("/api/items");
 
     expect(response.status).toBe(200);
     expect(Array.isArray(response.body)).toBe(true);

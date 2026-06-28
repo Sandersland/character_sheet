@@ -9,6 +9,7 @@ import {
   applyConditionsOperations,
   InvalidConditionOperationError,
 } from "../lib/conditions.js";
+import { assertCharacterAccess } from "../lib/auth/access.js";
 import { prisma } from "../lib/prisma.js";
 import { CONDITIONS, EXHAUSTION_MAX, type ConditionKey } from "../lib/srd.js";
 import { characterInclude, serializeCharacter } from "./characters.js";
@@ -58,14 +59,7 @@ const transactionsRequestSchema = z.object({
 // Returns the full updated character on success.
 
 conditionsRouter.post("/characters/:id/conditions/transactions", async (req, res) => {
-  const character = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    select: { id: true },
-  });
-  if (!character) {
-    res.status(404).json({ error: "Character not found" });
-    return;
-  }
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const parseResult = transactionsRequestSchema.safeParse(req.body);
   if (!parseResult.success) {
@@ -74,7 +68,7 @@ conditionsRouter.post("/characters/:id/conditions/transactions", async (req, res
   }
 
   try {
-    await applyConditionsOperations(character.id, parseResult.data.operations);
+    await applyConditionsOperations(req.params.id, parseResult.data.operations);
   } catch (error) {
     if (error instanceof InvalidConditionOperationError) {
       res.status(400).json({ error: error.message });
@@ -84,7 +78,7 @@ conditionsRouter.post("/characters/:id/conditions/transactions", async (req, res
   }
 
   const updated = await prisma.character.findUnique({
-    where: { id: character.id },
+    where: { id: req.params.id },
     include: characterInclude,
   });
   res.json(serializeCharacter(updated!));

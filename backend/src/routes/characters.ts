@@ -43,7 +43,7 @@ import { normalizeResourcesMutable, type ToolProfEntry } from "../lib/resources.
 import { normalizeConditionsMutable } from "../lib/conditions.js";
 import { reverseAdvancementEffects } from "../lib/advancement.js";
 import { normalizeSpellcastingMutable } from "../lib/spellcasting.js";
-import { resolveBootstrapOwnerId } from "../lib/owner.js";
+import { assertCharacterAccess } from "../lib/auth/access.js";
 
 export const charactersRouter = Router();
 
@@ -80,8 +80,9 @@ function serializeCharacterSummary(row: {
   return {
     id: row.id,
     name: row.name,
-    // Owning user id. Surfaced now so the frontend/#101 can filter by owner;
-    // not yet used for access control (the API serves every character today).
+    // Owning user id (legitimately persisted — see Character.ownerId in
+    // schema.prisma). Access is enforced per-owner via assertCharacterAccess;
+    // emitted here so the frontend can identify/display the owner.
     ownerId: row.ownerId,
     // raceSelection/classEntries are optional in Prisma's types only
     // because they're the non-FK side of the relation — every character
@@ -626,26 +627,11 @@ export function serializeCharacter(row: CharacterWithRelations) {
   };
 }
 
-// Optional `?owner=<userId>` filter. Parsed for forward-compatibility with the
-// authenticated, owner-scoped listing in #101, but NOT yet applied — the API is
-// single-player today and returns every character regardless of this value.
-const listCharactersQuerySchema = z.object({
-  owner: z.string().min(1).optional(),
-});
-
+// Owner-scoped listing: a caller only ever sees their own characters. The
+// authenticated user is attached by requireAuth (app.ts).
 charactersRouter.get("/characters", async (req, res) => {
-  const parsedQuery = listCharactersQuerySchema.safeParse(req.query);
-  if (!parsedQuery.success) {
-    res
-      .status(400)
-      .json({ error: "Invalid query", details: parsedQuery.error.flatten() });
-    return;
-  }
-  // TODO(#101): enforce — scope the findMany to parsedQuery.data.owner once
-  // requests carry an authenticated user. Intentionally inert for now.
-  void parsedQuery.data.owner;
-
   const characters = await prisma.character.findMany({
+    where: { ownerId: req.user!.id },
     select: {
       id: true,
       name: true,
@@ -662,15 +648,12 @@ charactersRouter.get("/characters", async (req, res) => {
 });
 
 charactersRouter.get("/characters/:id", async (req, res) => {
-  const character = await prisma.character.findUnique({
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
+
+  const character = await prisma.character.findUniqueOrThrow({
     where: { id: req.params.id },
     include: characterInclude,
   });
-
-  if (!character) {
-    res.status(404).json({ error: "Character not found" });
-    return;
-  }
 
   res.json(serializeCharacter(character));
 });
@@ -1053,14 +1036,10 @@ charactersRouter.post("/characters", async (req, res) => {
     { race, characterClass }
   );
 
-  // Resolve the owning user. Placeholder for real auth — #100 wires sign-in
-  // and threads the authenticated user here; #101 enforces per-owner access.
-  // Today this returns a single bootstrap owner (see lib/owner.ts).
-  const ownerId = await resolveBootstrapOwnerId();
-
+  // The creating user owns the character (requireAuth guarantees req.user).
   const created = await prisma.character.create({
     data: {
-      owner: { connect: { id: ownerId } },
+      owner: { connect: { id: req.user!.id } },
       name: input.name,
       alignment: input.alignment,
       portraitUrl: input.portraitUrl ?? null,
@@ -1172,15 +1151,12 @@ charactersRouter.patch("/characters/:id", async (req, res) => {
     return;
   }
 
-  const existing = await prisma.character.findUnique({
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
+
+  const existing = await prisma.character.findUniqueOrThrow({
     where: { id: req.params.id },
     select: { id: true, currency: true },
   });
-
-  if (!existing) {
-    res.status(404).json({ error: "Character not found" });
-    return;
-  }
 
   // If currency is changing, log a currencyAdjust event in the same
   // transaction so the activity timeline records bare DM-handed-over amounts.
@@ -1227,15 +1203,7 @@ charactersRouter.patch("/characters/:id", async (req, res) => {
 });
 
 charactersRouter.delete("/characters/:id", async (req, res) => {
-  const existing = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    select: { id: true },
-  });
-
-  if (!existing) {
-    res.status(404).json({ error: "Character not found" });
-    return;
-  }
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   // All child relations (CharacterRace, CharacterBackground, CharacterClassEntry,
   // InventoryItem, CharacterEvent/CharacterEventField, and their grandchildren)
