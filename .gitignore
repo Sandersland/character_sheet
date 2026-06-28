@@ -15,3 +15,7 @@ page-*.png
 test-results/
 playwright-report/
 driver.mjs
+
+# npm workspaces: the only lockfile is the root one
+backend/package-lock.json
+frontend/package-lock.json
