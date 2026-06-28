@@ -6,7 +6,9 @@ import AddItemPanel from "@/features/inventory/AddItemPanel";
 import BulkSellPanel from "@/features/inventory/BulkSellPanel";
 import Card from "@/components/ui/Card";
 import InventoryRow from "@/features/inventory/InventoryRow";
+import MeterBar from "@/components/ui/MeterBar";
 import { carryingCapacity } from "@/lib/encumbrance";
+import { ITEM_CATEGORY_ORDER, itemCategoryLabel } from "@/lib/items";
 
 interface InventoryListProps {
   character: Character;
@@ -15,6 +17,11 @@ interface InventoryListProps {
 
 const inputClass =
   "rounded-control border border-parchment-300 bg-parchment-50 px-1.5 py-0.5 text-xs tabular-nums";
+
+// Compact weight: drop a trailing ".0" so section headers read "8 lb" not "8.0 lb".
+function formatWeight(weight: number): string {
+  return (Math.round(weight * 10) / 10).toString();
+}
 
 /** Currency purse editor — reuses the existing PATCH /api/characters/:id (currency is untouched by the Phase B endpoint, exactly like experiencePoints), not the transactions endpoint, since a bare currency edit has no item and isn't ledgered. */
 function CurrencyEditor({ character, onUpdate }: InventoryListProps) {
@@ -68,14 +75,7 @@ function CurrencyEditor({ character, onUpdate }: InventoryListProps) {
   );
 }
 
-/**
- * The character sheet's inventory editor: a read-only display (Phase A) per
- * row (`InventoryRow`) plus an "+ Add Item" panel (`AddItemPanel`), both
- * funneling through one `submitOperations` here that calls the
- * `POST .../inventory/transactions` batch endpoint and swaps in the
- * returned character via `onUpdate` — the same whole-character-replace
- * pattern `ExperienceTracker` already uses for `PATCH`.
- */
+// The sheet's inventory editor: category-sectioned rows + add/sell panels, all funneling through one submitOperations that calls POST .../inventory/transactions and swaps in the returned character.
 export default function InventoryList({ character, onUpdate }: InventoryListProps) {
   const [catalog, setCatalog] = useState<Item[]>([]);
   const [addOpen, setAddOpen] = useState(false);
@@ -97,6 +97,18 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
   // 5e carrying capacity = STR × 15, derive-on-read so it tracks STR changes.
   const capacity = carryingCapacity(character.abilityScores.strength);
   const overCapacity = totalWeight > capacity;
+  const hasItems = character.inventory.length > 0;
+
+  // Group into the canonical category order, equipped-first then alphabetical; drop empty sections.
+  const sections = ITEM_CATEGORY_ORDER.map((category) => {
+    const items = character.inventory
+      .filter((item) => item.category === category)
+      .sort((a, b) =>
+        a.equipped !== b.equipped ? (a.equipped ? -1 : 1) : a.name.localeCompare(b.name)
+      );
+    const weight = items.reduce((sum, item) => sum + (item.weight ?? 0) * item.quantity, 0);
+    return { category, items, weight };
+  }).filter((section) => section.items.length > 0);
 
   async function submitOperations(operations: InventoryOperation[]) {
     setPending(true);
@@ -153,6 +165,30 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
       className="p-4"
     >
       <div className="flex flex-col gap-3">
+        {hasItems && (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold uppercase tracking-wide text-parchment-600">
+                Encumbrance
+              </span>
+              <span className={overCapacity ? "font-semibold text-garnet-700" : "text-parchment-600"}>
+                {totalWeight.toFixed(1)} / {capacity} lb
+                {overCapacity && (
+                  <span className="ml-2 rounded-control bg-garnet-700 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-parchment-50">
+                    Over capacity
+                  </span>
+                )}
+              </span>
+            </div>
+            <MeterBar
+              current={totalWeight}
+              max={capacity}
+              tone={overCapacity ? "garnet" : "gold"}
+              label={`Encumbrance ${totalWeight.toFixed(1)} of ${capacity} lb`}
+            />
+          </div>
+        )}
+
         {addOpen && (
           <AddItemPanel
             items={catalog}
@@ -175,30 +211,43 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
           <p className="text-xs font-semibold text-garnet-700">{error}</p>
         )}
 
-        <ul className="flex flex-col divide-y divide-parchment-200">
-          {character.inventory.map((item) => (
-            <InventoryRow
-              key={item.id}
-              item={item}
-              mode={editingId === item.id ? "edit" : "view"}
-              pending={pending}
-              onEdit={() => setEditingId(item.id)}
-              onCancel={() => setEditingId(null)}
-              onSubmit={submitOperations}
-            />
-          ))}
-        </ul>
-
-        <div className="flex items-center justify-between text-xs text-parchment-600">
-          <span className={overCapacity ? "font-semibold text-garnet-700" : undefined}>
-            {totalWeight.toFixed(1)} / {capacity} lb
-            {overCapacity && (
-              <span className="ml-2 rounded-control bg-garnet-700 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-parchment-50">
-                Over capacity
-              </span>
-            )}
-          </span>
-        </div>
+        {hasItems ? (
+          sections.map((section) => (
+            <section
+              key={section.category}
+              className="border-t border-parchment-200 pt-3 first:border-t-0 first:pt-0"
+            >
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
+                {itemCategoryLabel(section.category)} · {section.items.length} ·{" "}
+                {formatWeight(section.weight)} lb
+              </h4>
+              <ul className="flex flex-col divide-y divide-parchment-200">
+                {section.items.map((item) => (
+                  <InventoryRow
+                    key={item.id}
+                    item={item}
+                    mode={editingId === item.id ? "edit" : "view"}
+                    pending={pending}
+                    onEdit={() => setEditingId(item.id)}
+                    onCancel={() => setEditingId(null)}
+                    onSubmit={submitOperations}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))
+        ) : (
+          <div className="flex flex-col items-center gap-2 py-8 text-center">
+            <p className="text-sm text-parchment-600">Your pack is empty.</p>
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="text-xs font-semibold text-garnet-700 hover:underline"
+            >
+              + Add item
+            </button>
+          </div>
+        )}
 
         <CurrencyEditor character={character} onUpdate={onUpdate} />
       </div>
