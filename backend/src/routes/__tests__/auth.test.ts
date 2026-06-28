@@ -7,6 +7,31 @@ import { errorHandler } from "../../lib/error-handler.js";
 import { prisma } from "../../lib/prisma.js";
 import { authRouter } from "../auth.js";
 
+// config is frozen at import, so ALLOW_DEV_LOGIN can't be flipped via env at
+// runtime. Mock the config module to read the flag from a hoisted, mutable
+// holder while passing everything else (APP_BASE_URL, appRedirectUri, …) through.
+const hoisted = vi.hoisted(() => ({ devLoginEnabled: false }));
+vi.mock("../../lib/config.js", async (importActual) => {
+  const actual = await importActual<typeof import("../../lib/config.js")>();
+  return {
+    ...actual,
+    get config() {
+      return { ...actual.config, ALLOW_DEV_LOGIN: hoisted.devLoginEnabled };
+    },
+  };
+});
+
+const DEV_USER_ID = "dev-user-local";
+// Track whether a test created the dev user so the disabled/no-DB path stays
+// free of Postgres calls (mirrors the cleanupSubs early-return guard).
+let devUserTouched = false;
+async function cleanupDevUser() {
+  if (!devUserTouched) return;
+  // Cascade removes the dev user's sessions.
+  await prisma.user.deleteMany({ where: { id: DEV_USER_ID } });
+  devUserTouched = false;
+}
+
 // PG-backed router test. fetch (token exchange + userinfo) is mocked; creds are
 // set per-test so enabledProviders() reports google. The auth router is mounted
 // on a minimal app so this test is independent of the app.ts wiring (covered by
@@ -104,18 +129,24 @@ describe("auth router", () => {
   afterEach(async () => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
+    hoisted.devLoginEnabled = false;
     await cleanupSubs();
+    await cleanupDevUser();
   });
 
   describe("GET /auth/providers", () => {
-    it("lists google when creds are set", async () => {
-      const res = await supertest(buildApp()).get("/api/auth/providers");
+    it("lists google with a startUrl origin-relative to the request", async () => {
+      // Hermetic: the expected origin is driven by the request's Host header, not
+      // ambient APP_BASE_URL (which varies in compose/worktree stacks — see #166).
+      const res = await supertest(buildApp())
+        .get("/api/auth/providers")
+        .set("Host", "sheet.example:8080");
       expect(res.status).toBe(200);
       expect(res.body.providers).toEqual([
         {
           id: "google",
           displayName: "Google",
-          startUrl: "http://localhost:4000/api/auth/google/start",
+          startUrl: "http://sheet.example:8080/api/auth/google/start",
         },
       ]);
     });
@@ -125,6 +156,32 @@ describe("auth router", () => {
       vi.stubEnv("GOOGLE_CLIENT_SECRET", "");
       const res = await supertest(buildApp()).get("/api/auth/providers");
       expect(res.body.providers).toEqual([]);
+    });
+  });
+
+  describe("POST /auth/dev-login", () => {
+    it("404s when ALLOW_DEV_LOGIN is disabled (no DB needed)", async () => {
+      hoisted.devLoginEnabled = false;
+      const res = await supertest(buildApp()).post("/api/auth/dev-login");
+      expect(res.status).toBe(404);
+    });
+
+    it("mints a session for the dev user when enabled", async () => {
+      hoisted.devLoginEnabled = true;
+      devUserTouched = true;
+      const res = await supertest(buildApp()).post("/api/auth/dev-login");
+      expect(res.status).toBe(200);
+      expect(res.body.token).toBeTruthy();
+      expect(res.body.user.id).toBe(DEV_USER_ID);
+      expect(res.body.user.email).toBe("dev@local.test");
+
+      const cookies = res.headers["set-cookie"] as unknown as string[];
+      expect(cookies.some((c) => c.startsWith("cs_session="))).toBe(true);
+
+      const sessions = await prisma.authSession.count({
+        where: { userId: DEV_USER_ID },
+      });
+      expect(sessions).toBe(1);
     });
   });
 

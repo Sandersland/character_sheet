@@ -1,6 +1,8 @@
 import { Router } from "express";
+import type { Request } from "express";
 
 import { config } from "../lib/config.js";
+import { prisma } from "../lib/prisma.js";
 import { clearCookie, getCookie, setCookie } from "../lib/auth/cookies.js";
 import {
   createSession,
@@ -35,16 +37,70 @@ import {
 
 export const authRouter = Router();
 
+// Origin (scheme + host) of the incoming request, honoring the reverse-proxy
+// X-Forwarded-Proto/Host headers, then the Host header, falling back to the
+// configured APP_BASE_URL when no host is present. Used for USER-FACING URLs
+// (the SPA start link + the post-callback redirect) so the browser is sent back
+// to whatever origin it actually reached us on (compose/worktree stacks expose
+// the app on varying hosts/ports). NOTE: this is deliberately NOT used for the
+// OAuth redirect_uri — that must stay APP_BASE_URL-based (appRedirectUri) to
+// exactly match the URI registered with the provider.
+function requestOrigin(req: Request): string {
+  const forwardedHost = req.headers["x-forwarded-host"];
+  const host =
+    (typeof forwardedHost === "string" ? forwardedHost.split(",")[0].trim() : undefined) ??
+    req.headers.host;
+  if (!host) return config.APP_BASE_URL;
+
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  const proto =
+    (typeof forwardedProto === "string" ? forwardedProto.split(",")[0].trim() : undefined) ??
+    req.protocol ??
+    "http";
+  return `${proto}://${host}`;
+}
+
 // ── GET /api/auth/providers ──────────────────────────────────────────────────
 // List the sign-in providers this deployment has configured.
 
-authRouter.get("/auth/providers", (_req, res) => {
+authRouter.get("/auth/providers", (req, res) => {
+  const origin = requestOrigin(req);
   const providers = enabledProviders().map((provider) => ({
     id: provider.id,
     displayName: provider.displayName,
-    startUrl: `${config.APP_BASE_URL}/api/auth/${provider.id}/start`,
+    startUrl: `${origin}/api/auth/${provider.id}/start`,
   }));
   res.json({ providers });
+});
+
+// ── POST /api/auth/dev-login ─────────────────────────────────────────────────
+// Non-prod session primitive: mints a session for a fixed dev user WITHOUT a
+// real provider, so headless/worktree UI verification (and local scripts) can
+// authenticate without driving the OAuth dance. Guarded by config.ALLOW_DEV_LOGIN
+// (defaults off, hard-forced off in production), and returns the same 404 shape
+// as an unknown provider so it's invisible in normal/prod deploys.
+
+const DEV_USER = {
+  id: "dev-user-local",
+  email: "dev@local.test",
+  name: "Dev User",
+} as const;
+
+authRouter.post("/auth/dev-login", async (_req, res) => {
+  if (!config.ALLOW_DEV_LOGIN) {
+    res.status(404).json({ error: "Unknown or disabled provider" });
+    return;
+  }
+
+  const user = await prisma.user.upsert({
+    where: { id: DEV_USER.id },
+    create: { id: DEV_USER.id, email: DEV_USER.email, name: DEV_USER.name },
+    update: { email: DEV_USER.email, name: DEV_USER.name },
+  });
+
+  const token = await createSession(user.id);
+  setCookie(res, SESSION_COOKIE, token, SESSION_TTL_SECONDS);
+  res.json({ token, user });
 });
 
 // ── GET /api/auth/:provider/start ────────────────────────────────────────────
@@ -133,7 +189,9 @@ authRouter.get("/auth/:provider/callback", async (req, res) => {
   const sessionToken = await createSession(userId);
   setCookie(res, SESSION_COOKIE, sessionToken, SESSION_TTL_SECONDS);
 
-  res.redirect(302, config.APP_BASE_URL);
+  // Origin-relative: send the browser back to the origin it arrived on, not a
+  // hardcoded APP_BASE_URL. (The OAuth redirect_uri above stays APP_BASE_URL.)
+  res.redirect(302, requestOrigin(req));
 });
 
 // ── POST /api/auth/logout ────────────────────────────────────────────────────
