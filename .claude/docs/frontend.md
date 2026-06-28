@@ -130,6 +130,8 @@ Summary of what's available:
 
 Use idiomatic utility classes — tokens auto-generate them in v4: `text-garnet-700`, `bg-arcane-50`, `rounded-card`, `shadow-raised`. Only fall back to `[var(...)]` syntax for non-token one-off values.
 
+**Text-contrast policy (WCAG AA).** On the `parchment-50` background nothing lighter than `parchment-600` clears 4.5:1, so **readable text uses `parchment-600` or darker** (`-600` secondary, `-700`/`-900` primary). `text-parchment-400`/`-500` are **reserved for WCAG-exempt uses only** — `placeholder:`, `disabled:`, and decorative `aria-hidden` glyphs — never for content text. Don't reintroduce `-400`/`-500` on readable text (see #158/#98).
+
 ### Design gate
 
 Staying on-system is what keeps the UI from reading as generic. The `verify-frontend` skill runs a **design-review lane** (the `frontend-design-architect` agent — or a `general-purpose` agent briefed with the design docs if that type isn't available — plus the `/ux-review` skill for whole-page changes when it's installed) alongside unit tests and browser verification. It judges changes against this token set and the conventions in this doc — off-token colors/radii/shadows, broken hierarchy, reinvented primitives, and raw skill/ability keys are `blocking` findings that fail the gate; subjective polish is `advisory`. Run `/verify-frontend` before opening a frontend PR (it's also invoked automatically by `/parallel-issues`).

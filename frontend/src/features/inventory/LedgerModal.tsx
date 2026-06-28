@@ -92,11 +92,11 @@ export default function LedgerModal({ characterId, inventoryItemId, itemName, on
         {error && <p className="text-xs font-semibold text-garnet-700">{error}</p>}
 
         {entries === null && !error && (
-          <p className="text-sm text-parchment-500">Loading…</p>
+          <p className="text-sm text-parchment-600">Loading…</p>
         )}
 
         {entries !== null && entries.length === 0 && (
-          <p className="py-6 text-center text-sm text-parchment-500">
+          <p className="py-6 text-center text-sm text-parchment-600">
             No transactions yet. Acquiring, selling, or using items will record history here.
           </p>
         )}
@@ -104,7 +104,7 @@ export default function LedgerModal({ characterId, inventoryItemId, itemName, on
         <ul className="flex flex-col gap-3">
           {batches.map((batch) => (
             <li key={batch.key}>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
                 {formatBatchDate(batch.createdAt)}
               </p>
               <ul className="flex flex-col gap-1">

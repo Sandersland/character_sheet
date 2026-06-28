@@ -8,7 +8,7 @@ function NewCharacterCard() {
   return (
     <Link
       to="/characters/new"
-      className="flex flex-col items-center justify-center gap-2 rounded-card border-2 border-dashed border-parchment-300 bg-transparent p-4 text-parchment-500 transition-colors hover:border-garnet-400 hover:text-garnet-700 focus-visible:border-garnet-400 focus-visible:text-garnet-700"
+      className="flex flex-col items-center justify-center gap-2 rounded-card border-2 border-dashed border-parchment-300 bg-transparent p-4 text-parchment-600 transition-colors hover:border-garnet-400 hover:text-garnet-700 focus-visible:border-garnet-400 focus-visible:text-garnet-700"
       style={{ aspectRatio: "4 / 3" }}
     >
       <span

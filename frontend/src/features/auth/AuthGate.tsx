@@ -14,7 +14,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     return (
       <div
         role="status"
-        className="flex min-h-screen items-center justify-center bg-parchment-100 text-sm text-parchment-500"
+        className="flex min-h-screen items-center justify-center bg-parchment-100 text-sm text-parchment-600"
       >
         Loading…
       </div>

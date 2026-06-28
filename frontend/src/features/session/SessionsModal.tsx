@@ -76,11 +76,11 @@ export default function SessionsModal({ characterId, onClose }: SessionsModalPro
         {error && <p className="text-xs font-semibold text-garnet-700">{error}</p>}
 
         {sessions === null && !error && (
-          <p className="text-sm text-parchment-500">Loading…</p>
+          <p className="text-sm text-parchment-600">Loading…</p>
         )}
 
         {sessions !== null && sessions.length === 0 && (
-          <p className="py-6 text-center text-sm text-parchment-500">
+          <p className="py-6 text-center text-sm text-parchment-600">
             No sessions yet. Start a session from the character sheet to begin live play.
           </p>
         )}
@@ -102,7 +102,7 @@ export default function SessionsModal({ characterId, onClose }: SessionsModalPro
                       <span className="text-sm font-semibold text-parchment-900">
                         {session.title ?? "Untitled session"}
                       </span>
-                      <span className="text-xs text-parchment-500">
+                      <span className="text-xs text-parchment-600">
                         {formatDate(session.startedAt)}
                       </span>
                     </span>

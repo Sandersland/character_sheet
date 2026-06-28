@@ -32,7 +32,7 @@ export default function AbilityScoreBox({
 
   return (
     <div className="flex flex-col items-center rounded-card border border-parchment-200 bg-parchment-50 px-3 py-2.5 shadow-card">
-      <span className="font-sans text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+      <span className="font-sans text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
         {label}
       </span>
       <RollButton
@@ -57,7 +57,7 @@ export default function AbilityScoreBox({
         <RollButton
           spec={saveSpec}
           label={`${label} save`}
-          className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-parchment-400 hover:text-garnet-700"
+          className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-parchment-600 hover:text-garnet-700"
         >
           Save
         </RollButton>

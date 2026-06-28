@@ -65,7 +65,7 @@ export default function AddManeuverPanel({
         >
           + Learn maneuver
         </button>
-        <span className="text-[11px] text-parchment-400">
+        <span className="text-[11px] text-parchment-600">
           {knownCount} of {choiceCount} known
         </span>
       </div>
@@ -78,14 +78,14 @@ export default function AddManeuverPanel({
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gold-900">
           Learn a Maneuver
-          <span className="ml-2 text-xs font-normal text-parchment-500">
+          <span className="ml-2 text-xs font-normal text-parchment-600">
             {knownCount} of {choiceCount} known
           </span>
         </h3>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="text-parchment-400 hover:text-parchment-700"
+          className="text-parchment-600 hover:text-parchment-700"
           aria-label="Close maneuver panel"
         >
           ✕
@@ -106,10 +106,10 @@ export default function AddManeuverPanel({
         <p className="text-xs text-garnet-700">{catalogError}</p>
       )}
       {catalog === null && !catalogError && (
-        <p className="text-xs text-parchment-500">Loading…</p>
+        <p className="text-xs text-parchment-600">Loading…</p>
       )}
       {catalog !== null && filteredCatalog.length === 0 && (
-        <p className="py-2 text-center text-xs text-parchment-500">
+        <p className="py-2 text-center text-xs text-parchment-600">
           {search ? "No maneuvers match your search." : "All maneuvers already known."}
         </p>
       )}
@@ -125,7 +125,7 @@ export default function AddManeuverPanel({
                 <p className="text-sm font-medium text-parchment-900">
                   {maneuver.name}
                 </p>
-                <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-parchment-500">
+                <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-parchment-600">
                   {maneuver.description}
                 </p>
               </div>

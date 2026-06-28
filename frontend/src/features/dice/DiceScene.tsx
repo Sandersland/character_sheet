@@ -42,7 +42,7 @@ export default function DiceScene({
       className={`flex flex-col items-center gap-1 ${className}`}
     >
       {label && (
-        <span className="text-xs font-semibold uppercase tracking-wide text-parchment-500">
+        <span className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
           {label}
         </span>
       )}

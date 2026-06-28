@@ -277,7 +277,7 @@ export default function InlineSpellPicker({
   if (castableSpells.length === 0 && !slotUsedHint) {
     return (
       <div className="flex flex-col gap-3">
-        <p className="text-sm text-parchment-500">
+        <p className="text-sm text-parchment-600">
           {availableSlotLevels.length === 0
             ? "No spell slots remaining."
             : "No prepared spells available to cast right now."}
@@ -297,7 +297,7 @@ export default function InlineSpellPicker({
     <div className="flex flex-col gap-0">
       {/* Economy / 5e restriction hint */}
       {slotUsedHint && (
-        <p className="mb-2 rounded bg-parchment-100 px-3 py-2 text-[11px] font-semibold text-parchment-500">
+        <p className="mb-2 rounded bg-parchment-100 px-3 py-2 text-[11px] font-semibold text-parchment-600">
           {slotUsedHint}
         </p>
       )}
@@ -336,7 +336,7 @@ export default function InlineSpellPicker({
                     {usesArcanum && <Badge tone="gold">arcanum</Badge>}
                   </div>
                 </div>
-                <p className="text-xs text-parchment-500">
+                <p className="text-xs text-parchment-600">
                   {spell.castingTime} · {spell.range}
                 </p>
                 {preview && (
@@ -352,7 +352,7 @@ export default function InlineSpellPicker({
                 {/* Slot / upcast selector (leveled only, multiple options) */}
                 {!isCantrip && availableSlots.length > 1 && (
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] text-parchment-500">Slot:</span>
+                    <span className="text-[11px] text-parchment-600">Slot:</span>
                     {availableSlots.map((lvl) => (
                       <button
                         key={lvl}
@@ -373,7 +373,7 @@ export default function InlineSpellPicker({
 
                 {/* Slot display when only one option */}
                 {!isCantrip && availableSlots.length === 1 && (
-                  <span className="text-[11px] text-parchment-500">
+                  <span className="text-[11px] text-parchment-600">
                     {usesArcanum ? "Mystic Arcanum" : `Slot: L${availableSlots[0]}`}
                   </span>
                 )}
@@ -381,7 +381,7 @@ export default function InlineSpellPicker({
                 {/* Target toggle */}
                 {spell.effectKind && (
                   <div className="flex items-center gap-1">
-                    <span className="text-[11px] text-parchment-500">Target:</span>
+                    <span className="text-[11px] text-parchment-600">Target:</span>
                     <button
                       type="button"
                       disabled={locked || row.casting}
@@ -475,7 +475,7 @@ export default function InlineSpellPicker({
 
       {/* Empty state when 5e rule blocks everything */}
       {castableSpells.length === 0 && slotUsedHint && (
-        <p className="py-2 text-sm text-parchment-500">No spells available.</p>
+        <p className="py-2 text-sm text-parchment-600">No spells available.</p>
       )}
 
       {/* ── Done button ── */}

@@ -47,7 +47,7 @@ function StatTile({ label, value, tone }: { label: string; value: string | numbe
   return (
     <div className="flex flex-col items-center justify-center rounded-card border border-parchment-200 bg-parchment-50 px-3 py-3 text-center">
       <span className={`font-display text-2xl font-semibold ${tone}`}>{value}</span>
-      <span className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+      <span className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
         {label}
       </span>
     </div>
@@ -70,7 +70,7 @@ function JournalEntryRow({ entry }: { entry: JournalEntry }) {
         <span className="font-display text-sm font-semibold text-parchment-900">
           {entry.title}
         </span>
-        <span className="whitespace-nowrap text-xs text-parchment-500">
+        <span className="whitespace-nowrap text-xs text-parchment-600">
           {formatJournalDate(entry.date)}
         </span>
       </button>
@@ -185,7 +185,7 @@ function AddXpForm({
           Cancel
         </button>
       </div>
-      <p className="text-xs text-parchment-500">
+      <p className="text-xs text-parchment-600">
         This session is closed, so the award is permanent — it can't be undone.
       </p>
       {error && <p className="text-xs font-semibold text-garnet-700">{error}</p>}
@@ -239,13 +239,13 @@ export default function SessionSummaryModal({
     <Modal title={session.title ? `Session Recap — ${session.title}` : "Session Recap"} onClose={onClose}>
       <div className="flex flex-col gap-5">
         {!summary ? (
-          <p className="py-6 text-center text-sm text-parchment-500">
+          <p className="py-6 text-center text-sm text-parchment-600">
             No summary is available for this session.
           </p>
         ) : (
           <div className="flex flex-col gap-5">
           {/* ── Time window ──────────────────────────────────────────────── */}
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-parchment-500">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-parchment-600">
             <span>{formatTimeRange(summary.startedAt, summary.endedAt)}</span>
             <Badge tone="neutral">{formatDuration(summary.durationMs)}</Badge>
           </div>
@@ -303,11 +303,11 @@ export default function SessionSummaryModal({
 
           {/* ── Items acquired ───────────────────────────────────────────── */}
           <div className="flex flex-col gap-1.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-parchment-500">
+            <p className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
               Items acquired
             </p>
             {summary.itemsAcquired.length === 0 ? (
-              <p className="text-sm text-parchment-500">No items gained this session.</p>
+              <p className="text-sm text-parchment-600">No items gained this session.</p>
             ) : (
               <ul className="flex flex-col gap-1">
                 {summary.itemsAcquired.map((item) => (
@@ -324,11 +324,11 @@ export default function SessionSummaryModal({
 
         {/* ── Session journals ─────────────────────────────────────────────── */}
         <div className="flex flex-col gap-1.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-parchment-500">
+          <p className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
             Journal
           </p>
           {journalEntries.length === 0 ? (
-            <p className="text-sm text-parchment-500">No journal entries for this session.</p>
+            <p className="text-sm text-parchment-600">No journal entries for this session.</p>
           ) : (
             <ul className="flex flex-col divide-y divide-parchment-200">
               {journalEntries.map((entry) => (

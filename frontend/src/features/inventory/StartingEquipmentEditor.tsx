@@ -124,7 +124,7 @@ export default function StartingEquipmentEditor({
                   // Auto-granted — display only, no choice needed
                   <div className="rounded-control border border-parchment-200 bg-parchment-100 px-3 py-2 text-sm text-parchment-700">
                     {bundleFixedSummary(group.options[0])}
-                    <span className="ml-2 text-xs text-parchment-400">
+                    <span className="ml-2 text-xs text-parchment-600">
                       (auto-granted)
                     </span>
                   </div>
@@ -172,7 +172,7 @@ export default function StartingEquipmentEditor({
                                 const unfilled = !currentPick;
                                 return (
                                   <div key={pickIdx} className="flex flex-col gap-1">
-                                    <span className="text-xs text-parchment-500">
+                                    <span className="text-xs text-parchment-600">
                                       {pick.label}
                                       {unfilled && (
                                         <span className="ml-1 font-semibold text-red-600">
@@ -207,7 +207,7 @@ export default function StartingEquipmentEditor({
 
                           {/* Fixed item summary for the chosen option */}
                           {isChosen && (option.items?.length ?? 0) > 0 && (
-                            <p className="ml-5 text-xs text-parchment-500">
+                            <p className="ml-5 text-xs text-parchment-600">
                               {bundleFixedSummary(option)}
                             </p>
                           )}
@@ -235,7 +235,7 @@ export default function StartingEquipmentEditor({
                     const unfilled = !currentPick;
                     return (
                       <div key={pickIdx} className="flex flex-col gap-1">
-                        <span className="text-xs text-parchment-500">
+                        <span className="text-xs text-parchment-600">
                           {pick.label}
                           {unfilled && (
                             <span className="ml-1 font-semibold text-red-600">

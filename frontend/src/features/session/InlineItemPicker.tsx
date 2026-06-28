@@ -64,7 +64,7 @@ export default function InlineItemPicker({
   return (
     <div className="flex flex-col gap-1">
       {consumables.length === 0 ? (
-        <p className="py-3 text-sm text-parchment-500">No consumable items in inventory.</p>
+        <p className="py-3 text-sm text-parchment-600">No consumable items in inventory.</p>
       ) : (
         <div className="flex flex-col divide-y divide-parchment-200">
           {consumables.map((item) => {
@@ -78,7 +78,7 @@ export default function InlineItemPicker({
               <div key={item.id} className="flex items-center justify-between py-2.5">
                 <div>
                   <p className="text-sm font-medium text-parchment-900">{item.name}</p>
-                  <p className="text-xs text-parchment-500">
+                  <p className="text-xs text-parchment-600">
                     Qty: {item.quantity}
                     {effectLabel && (
                       <span className="ml-1.5 text-vitality-700">{effectLabel}</span>

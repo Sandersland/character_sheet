@@ -75,7 +75,7 @@ export default function Tabs({ tabs, active, onChange, className = "" }: TabsPro
           >
             <span>{tab.label}</span>
             {tab.badge !== undefined && (
-              <span className={isActive ? "text-parchment-200" : "text-parchment-400"}>
+              <span className={isActive ? "text-parchment-200" : "text-parchment-600"}>
                 {tab.badge}
               </span>
             )}

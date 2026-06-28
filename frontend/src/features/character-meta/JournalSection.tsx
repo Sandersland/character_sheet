@@ -109,7 +109,7 @@ export default function JournalSection({ character, onUpdate }: JournalSectionPr
         )}
 
         {sortedEntries.length === 0 && !addPanelOpen ? (
-          <p className="px-4 py-6 text-center text-sm text-parchment-500">
+          <p className="px-4 py-6 text-center text-sm text-parchment-600">
             No journal entries yet. Notes from your sessions will show up here.
           </p>
         ) : (
@@ -131,7 +131,7 @@ export default function JournalSection({ character, onUpdate }: JournalSectionPr
                     <p className="font-display text-base font-semibold text-parchment-900">
                       {entry.title}
                     </p>
-                    <span className="whitespace-nowrap text-xs text-parchment-500">
+                    <span className="whitespace-nowrap text-xs text-parchment-600">
                       {formatJournalDate(entry.date)}
                     </span>
                   </div>
@@ -153,7 +153,7 @@ export default function JournalSection({ character, onUpdate }: JournalSectionPr
                       <button
                         type="button"
                         onClick={() => setConfirmDeleteId(null)}
-                        className="font-semibold text-parchment-500 hover:underline"
+                        className="font-semibold text-parchment-600 hover:underline"
                       >
                         Keep
                       </button>
@@ -177,7 +177,7 @@ export default function JournalSection({ character, onUpdate }: JournalSectionPr
                           setEditingId(null);
                           setConfirmDeleteId(entry.id);
                         }}
-                        className="font-semibold text-parchment-500 hover:underline"
+                        className="font-semibold text-parchment-600 hover:underline"
                       >
                         Delete
                       </button>

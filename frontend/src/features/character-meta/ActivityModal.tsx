@@ -31,7 +31,7 @@ const CATEGORY_FILTER_IDS = Object.keys(CATEGORY_LABELS) as CharacterEventCatego
 function FieldDiffs({ fields }: { fields: CharacterEventField[] }) {
   if (fields.length === 0) return null;
   return (
-    <ul className="mt-1 flex flex-col gap-0.5 pl-4 text-xs text-parchment-500">
+    <ul className="mt-1 flex flex-col gap-0.5 pl-4 text-xs text-parchment-600">
       {fields.map((f) => (
         <li key={f.id}>
           <span className="font-mono">{f.path}</span>{" "}
@@ -235,11 +235,11 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
         {error && <p className="text-xs font-semibold text-garnet-700">{error}</p>}
 
         {events === null && !error && (
-          <p className="text-sm text-parchment-500">Loading…</p>
+          <p className="text-sm text-parchment-600">Loading…</p>
         )}
 
         {events !== null && events.length === 0 && (
-          <p className="py-6 text-center text-sm text-parchment-500">
+          <p className="py-6 text-center text-sm text-parchment-600">
             {filtersActive ? "No activity matches the current filters." : "No activity yet."}
           </p>
         )}
@@ -251,7 +251,7 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
         <ul className="flex flex-col gap-4">
           {dateGroups.map((group) => (
             <li key={group.label} className="flex flex-col gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-parchment-500">
+              <p className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
                 {group.label}
               </p>
               <ul className="flex flex-col gap-3">
@@ -292,7 +292,7 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
                           <button
                             type="button"
                             onClick={() => toggleBatch(batch.key)}
-                            className="shrink-0 text-xs text-parchment-400 hover:text-parchment-700"
+                            className="shrink-0 text-xs text-parchment-600 hover:text-parchment-700"
                             aria-label="Show sold items"
                           >
                             ▼
@@ -305,7 +305,7 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
                             <button
                               type="button"
                               onClick={() => toggleBatch(batch.key)}
-                              className="text-xs text-parchment-400 hover:text-parchment-700"
+                              className="text-xs text-parchment-600 hover:text-parchment-700"
                               aria-label="Collapse sold items"
                             >
                               ▲
@@ -337,7 +337,7 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
                                   <button
                                     type="button"
                                     onClick={() => toggleFields(event.id)}
-                                    className="shrink-0 text-xs text-parchment-400 hover:text-parchment-700"
+                                    className="shrink-0 text-xs text-parchment-600 hover:text-parchment-700"
                                     aria-label={expandedFields.has(event.id) ? "Hide field changes" : "Show field changes"}
                                   >
                                     {expandedFields.has(event.id) ? "▲" : "▼"}

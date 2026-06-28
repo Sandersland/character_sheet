@@ -61,7 +61,7 @@ export default function AddConditionPanel({ activeKeys, busy, onApply }: Props) 
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="text-parchment-400 hover:text-parchment-700"
+          className="text-parchment-600 hover:text-parchment-700"
           aria-label="Close condition panel"
         >
           ✕
@@ -88,7 +88,7 @@ export default function AddConditionPanel({ activeKeys, busy, onApply }: Props) 
       </label>
 
       {available.length === 0 ? (
-        <p className="py-2 text-center text-xs text-parchment-500">
+        <p className="py-2 text-center text-xs text-parchment-600">
           {search ? "No conditions match your search." : "All conditions already applied."}
         </p>
       ) : (
@@ -100,7 +100,7 @@ export default function AddConditionPanel({ activeKeys, busy, onApply }: Props) 
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium text-parchment-900">{condition.label}</p>
-                <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-parchment-500">
+                <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-parchment-600">
                   {condition.description}
                 </p>
               </div>
