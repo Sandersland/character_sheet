@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { CharacterEventCategory, Prisma } from "../generated/prisma/client.js";
+import { CharacterEventCategory, CharacterEventType, Prisma } from "../generated/prisma/client.js";
 import {
   InsufficientCurrencyError,
   InvalidInventoryOperationError,
@@ -18,6 +18,17 @@ function asCategory(value: string | undefined): CharacterEventCategory | undefin
     : undefined;
 }
 
+// Runtime-checkable set of every valid CharacterEventType, derived from the
+// Prisma-generated enum so it can never drift from the schema. Mirrors
+// asCategory: an unknown type value is silently ignored (unfiltered), not a 400.
+const TYPE_VALUES = new Set<string>(Object.values(CharacterEventType));
+
+function asType(value: string | undefined): CharacterEventType | undefined {
+  return value !== undefined && TYPE_VALUES.has(value)
+    ? (value as CharacterEventType)
+    : undefined;
+}
+
 export const activityRouter = Router();
 
 // ── GET /api/characters/:id/activity ─────────────────────────────────────────
@@ -31,6 +42,10 @@ export const activityRouter = Router();
 //   ?category=<CharacterEventCategory>  — filter to one domain (e.g. inventory,
 //                     hitPoints, experience, currency, conditions, combat,
 //                     session, …); unknown values are ignored (no filter)
+//   ?type=<CharacterEventType>  — filter to one event type (e.g. sold, damage,
+//                     castSpell); unknown values are ignored (no filter).
+//                     Composes with ?category= (AND).
+//   ?sessionId=<id>   — filter to events recorded during one play session
 //   ?entityId=<id>    — filter to events for one entity (e.g. one InventoryItem)
 //   ?includeFields=1  — include the per-field diff rows alongside each event
 //   ?reverted=0|1     — include (1) or exclude (0) reverted events (default: include all)
@@ -50,6 +65,13 @@ activityRouter.get("/characters/:id/activity", async (req, res) => {
   const category = asCategory(
     typeof req.query.category === "string" ? req.query.category : undefined,
   );
+  // Same validate-or-ignore contract as category: an unknown event type is
+  // silently dropped (unfiltered) rather than 400-ing.
+  const type = asType(
+    typeof req.query.type === "string" ? req.query.type : undefined,
+  );
+  const sessionId =
+    typeof req.query.sessionId === "string" ? req.query.sessionId : undefined;
   const entityId =
     typeof req.query.entityId === "string" ? req.query.entityId : undefined;
   const includeFields = req.query.includeFields === "1";
@@ -64,6 +86,8 @@ activityRouter.get("/characters/:id/activity", async (req, res) => {
   const whereClause = {
     characterId: character.id,
     ...(category ? { category } : {}),
+    ...(type ? { type } : {}),
+    ...(sessionId ? { sessionId } : {}),
     ...(entityId ? { entityId } : {}),
     ...(revertedFilter !== undefined ? { reverted: revertedFilter } : {}),
   };

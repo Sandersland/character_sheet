@@ -102,6 +102,7 @@ The only permitted backend-call site. Every exported function maps to one endpoi
 | `dice.ts` | `RollSpec`, `rollSpec`, `summarizeRoll`, `formatRollSpec`. The **only** place `Math.random` is called for dice. |
 | `abilities.ts` | `abilityModifier`, `formatModifier`, `skillBonus`, labels. |
 | `abilityGen.ts` | Four score-generation methods as pure functions; delegates to `dice.ts`. |
+| `events.ts` | Frontend activity-log display lookups — `eventTypeLabel`/`categoryLabel`/`categoryTone` + `INVENTORY_EVENT_TYPES`. |
 | `timeline.ts` | `groupByBatch`, `formatBatchDate` — shared by `ActivityModal` and `LedgerModal`. |
 | `startingEquipment.ts` | `PackageState`, `EquipmentDraft`, draft helpers, `draftToInput`, `rollGold`. |
 | `dieFaces.ts`, `physicsDice.ts` | React-free three.js geometry and cannon-es physics for the 3D dice rollers. |
@@ -157,6 +158,8 @@ The Character row carries these JSON columns: `hitPoints`, `hitDice`, `abilitySc
 - **Session tagging**: `sessionId String?` — events fired while a session is active get its id. Between-session events (shopping, leveling between adventures) get `null`. `getActiveSessionId(characterId)` is called at the top of every `apply*Operations()` function.
 
 `logEvent(tx, params)` in `lib/events.ts` writes the event + computes `CharacterEventField` diffs (via `diffToFields`) inside the caller's `$transaction`. All ops in a single request share a `randomUUID()` `batchId`.
+
+Read: `GET /characters/:id/activity` returns the chronological (newest-first) stream. Optional, composable (AND) query params — all validate-or-ignore (an unknown enum value is silently dropped, never a 400): `?category=<CharacterEventCategory>`, `?type=<CharacterEventType>`, `?sessionId=<id>` (per-session view), `?entityId=<id>` (per-entity view, e.g. one InventoryItem), `?includeFields=1` (attach the per-field diff rows), `?reverted=0|1` (exclude/include reverted events; default: all). The frontend `ActivityModal` drives `category`/`type`/`sessionId`/`entityId` from its filter bar.
 
 Undo: `POST /characters/:id/events/:batchId/revert` in `routes/activity.ts`. LIFO-only (returns 409 if not the most-recent non-reverted batch). Restores `before` snapshots in a transaction. Inventory events are fully revertable: `revertInventoryEvent` (`lib/inventory.ts`) reconstructs deleted `InventoryItem` + detail rows from `data.deletedItem` (reusing the original id) and reverses currency from `data.currencyDelta` — handled at the top of the revert loop before the `if (!before) continue` guard, since an `acquire` event carries `before == null` and undoing it deletes the created row. **The LIFO guard skips events from ended sessions** (`OR: [{ sessionId: null }, { session: { status: "active" } }]`) — a closed session's history is frozen and cannot be undone.
 
