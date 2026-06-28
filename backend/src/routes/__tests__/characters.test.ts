@@ -4,7 +4,6 @@ import supertest from "supertest";
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
-import { resolveBootstrapOwnerId } from "../../lib/owner.js";
 import { findInList } from "../../test-support/list.js";
 import { authCookie } from "../../test-support/auth.js";
 
@@ -771,9 +770,7 @@ describe("characters routes", () => {
       skillProficiencies: ["athletics", "perception"],
     };
 
-    it("POST sets a non-null ownerId equal to the resolved bootstrap owner", async () => {
-      const expectedOwner = await resolveBootstrapOwnerId();
-
+    it("POST stamps ownerId with the authenticated user (#101)", async () => {
       const response = await supertest.agent(createApp()).set("Cookie", COOKIE)
         .post("/api/characters")
         .send(createBody);
@@ -781,28 +778,24 @@ describe("characters routes", () => {
       expect(response.status).toBe(201);
       createdCharacterIds.push(response.body.id);
 
-      expect(response.body.ownerId).toEqual(expect.any(String));
-      expect(response.body.ownerId).toBe(expectedOwner);
+      expect(response.body.ownerId).toBe(TEST_USER.id);
 
       // Persisted, not just serialized.
       const row = await prisma.character.findUnique({
         where: { id: response.body.id },
         select: { ownerId: true },
       });
-      expect(row?.ownerId).toBe(expectedOwner);
+      expect(row?.ownerId).toBe(TEST_USER.id);
     });
 
-    it("GET /api/characters?owner= is inert — the owner filter is not applied", async () => {
+    it("GET /api/characters is owner-scoped (any ?owner param is ignored)", async () => {
+      // The list is always scoped to the authenticated user; a leftover ?owner
+      // query param has no effect. Our fixture (owned by the caller) appears.
       const filtered = await supertest.agent(createApp()).set("Cookie", COOKIE).get(
         "/api/characters?owner=some-nonexistent-user-id",
       );
 
       expect(filtered.status).toBe(200);
-      // The filter is parsed but not enforced (#101): this fixture is owned by the
-      // bootstrap owner — not "some-nonexistent-user-id" — yet it is still returned.
-      // (Asserting presence of our own fixture, rather than comparing two full-list
-      // snapshots, keeps this robust against characters other test files create or
-      // delete in the shared DB between requests.)
       const filteredIds = filtered.body.map((c: { id: string }) => c.id);
       expect(filteredIds).toContain(FIXTURE.id);
     });
