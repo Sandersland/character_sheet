@@ -88,6 +88,17 @@ describe("InventoryRow (view mode)", () => {
     ]);
   });
 
+  it("shows the Equip control for an equippable (weapon) item", () => {
+    renderRow();
+    expect(screen.getByRole("button", { name: "Equip" })).toBeInTheDocument();
+  });
+
+  it("hides the Equip/Unequip control for a non-equippable (gear) item", () => {
+    renderRow({ item: { ...mockItem, category: "gear" } });
+    expect(screen.queryByRole("button", { name: "Equip" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Unequip" })).toBeNull();
+  });
+
   it("shows Equipped badge when item is equipped", () => {
     renderRow({ item: { ...mockItem, equipped: true } });
     expect(screen.getByText("Equipped")).toBeInTheDocument();
