@@ -13,7 +13,7 @@
  * `{ id, batchId, createdAt }`; the sell-specific shape lives here.
  */
 
-import { formatCurrency, fromCopper, toCopper } from "@/lib/currency";
+import { addCurrency, formatCurrency } from "@/lib/currency";
 import type { CharacterEvent, Currency } from "@/types/character";
 
 const ZERO: Currency = { cp: 0, sp: 0, gp: 0, pp: 0 };
@@ -55,22 +55,22 @@ export interface SellBatchSummary {
 /**
  * Returns a one-line summary of a sold batch, or `null` when the rows are not
  * a collapsible bulk sale (≤1 row, or any non-`sold` row). Currency is summed
- * in copper to avoid mixed-denomination drift; `totalLabel` is the unsigned
- * `formatCurrency` rendering. Item quantities use the absolute value of each
- * row's (negative) `quantityDelta`.
+ * field-wise (via `addCurrency`) so the total stays in the denominations the
+ * items actually sold for — three 15 gp sales read "45 gp", not the normalized
+ * "4 pp 5 gp". `totalLabel` is the unsigned `formatCurrency` rendering. Item
+ * quantities use the absolute value of each row's (negative) `quantityDelta`.
  */
 export function summarizeSellBatch(rows: CharacterEvent[]): SellBatchSummary | null {
   if (rows.length <= 1) return null;
   if (!rows.every((r) => r.type === "sold")) return null;
 
-  let totalCopper = 0;
+  let total: Currency = { ...ZERO };
   const items = rows.map((r) => {
     const { itemName, quantityDelta, currencyDelta } = narrowSoldData(r.data);
-    totalCopper += toCopper(currencyDelta ?? ZERO);
+    total = addCurrency(total, currencyDelta ?? ZERO);
     return { name: itemName ?? "", quantity: Math.abs(quantityDelta ?? 0) };
   });
 
-  const total = fromCopper(totalCopper);
   return {
     itemCount: rows.length,
     total,

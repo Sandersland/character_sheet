@@ -31,6 +31,17 @@ export function fromCopper(total: number): Currency {
 }
 
 /**
+ * Field-wise sum of two Currency values — adds each denomination on its own
+ * and does NOT carry up (so 8 gp + 7 gp stays "15 gp", never "1 pp 5 gp").
+ * Use this to keep a summary faithful to the denominations actually
+ * transacted; use `toCopper`/`fromCopper` when a normalized minimal
+ * representation is wanted instead.
+ */
+export function addCurrency(a: Currency, b: Currency): Currency {
+  return { cp: a.cp + b.cp, sp: a.sp + b.sp, gp: a.gp + b.gp, pp: a.pp + b.pp };
+}
+
+/**
  * Render a Currency as an UNSIGNED, human-readable amount: only nonzero
  * denominations, largest-first (pp → gp → sp → cp), joined by a space —
  * e.g. `{gp:45}` → "45 gp", `{pp:1,gp:2}` → "1 pp 2 gp". An all-zero amount
