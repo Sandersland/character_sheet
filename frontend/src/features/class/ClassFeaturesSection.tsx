@@ -128,7 +128,7 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
       {/* ── Subclass header ── */}
       {(character.subclass || needsSubclass) && (
         <div>
-          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
             Subclass
           </h3>
           {character.subclass ? (
@@ -161,7 +161,7 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
       {/* ── Resource pools ── */}
       {hasPools && (
         <div>
-          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
             Resources
           </h3>
           <div className="flex flex-col gap-4">
@@ -182,7 +182,7 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
       {hasManeuvers && (
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
               Maneuvers
             </h3>
             {busy && (
@@ -234,7 +234,7 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
       {hasFightingStyle && (
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
               Fighting Style
             </h3>
             {busy && <span className="text-[10px] text-parchment-600">Saving…</span>}
@@ -266,7 +266,7 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
       {/* ── Class features (static) ── */}
       {hasFeatures && (
         <div>
-          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
             Class Features
           </h3>
           <ul className="flex flex-col gap-3">
@@ -275,7 +275,7 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
                 <p className="text-sm font-semibold text-parchment-900">
                   {feature.name}
                   {feature.source === "subclass" && (
-                    <span className="ml-1.5 text-[11px] font-normal text-parchment-400">
+                    <span className="ml-1.5 text-[11px] font-normal text-parchment-600">
                       subclass
                     </span>
                   )}

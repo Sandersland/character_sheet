@@ -129,7 +129,7 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
         <button
           type="button"
           onClick={onClose}
-          className="text-parchment-400 hover:text-parchment-700"
+          className="text-parchment-600 hover:text-parchment-700"
           aria-label="Close add spell panel"
         >
           ✕
@@ -146,7 +146,7 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
             className={`px-3 py-1 text-xs font-semibold transition-colors ${
               tab === t
                 ? "border-b-2 border-arcane-600 text-arcane-800"
-                : "text-parchment-500 hover:text-parchment-800"
+                : "text-parchment-600 hover:text-parchment-800"
             }`}
           >
             {t === "catalog" ? "From catalog" : "Custom spell"}
@@ -182,10 +182,10 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
             <p className="text-xs text-garnet-700">{catalogError}</p>
           )}
           {catalog === null && !catalogError && (
-            <p className="text-xs text-parchment-500">Loading…</p>
+            <p className="text-xs text-parchment-600">Loading…</p>
           )}
           {catalog !== null && filteredCatalog.length === 0 && (
-            <p className="py-2 text-center text-xs text-parchment-500">No spells match your filter.</p>
+            <p className="py-2 text-center text-xs text-parchment-600">No spells match your filter.</p>
           )}
 
           <ul className="max-h-[320px] overflow-y-auto">
@@ -200,7 +200,7 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
                     <p className="truncate text-sm font-medium text-parchment-900">
                       {spell.name}
                     </p>
-                    <p className="text-xs text-parchment-500">
+                    <p className="text-xs text-parchment-600">
                       {spell.level === 0 ? "Cantrip" : `Level ${spell.level}`} · {spell.school}
                       {spell.concentration && " · conc"}
                       {spell.ritual && " · ritual"}

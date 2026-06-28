@@ -58,12 +58,12 @@ export default function ResourcePoolRow({ pool, busy, onOperations }: Props) {
         <span className="text-sm font-semibold text-parchment-800">
           {pool.label}
           {pool.die && (
-            <span className="ml-1.5 text-xs font-normal text-parchment-500">
+            <span className="ml-1.5 text-xs font-normal text-parchment-600">
               · {pool.die}
             </span>
           )}
         </span>
-        <span className="text-xs tabular-nums text-parchment-500">
+        <span className="text-xs tabular-nums text-parchment-600">
           {pool.remaining}/{pool.total}
         </span>
       </div>
@@ -96,7 +96,7 @@ export default function ResourcePoolRow({ pool, busy, onOperations }: Props) {
         >
           + Restore
         </button>
-        <span className="ml-auto text-[11px] text-parchment-400">
+        <span className="ml-auto text-[11px] text-parchment-600">
           {rechargeLabel(pool.recharge)}
         </span>
       </div>

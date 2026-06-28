@@ -21,7 +21,7 @@ function VitalStat({
       <span className="font-display text-2xl font-semibold leading-none text-parchment-900">
         {value}
       </span>
-      <span className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+      <span className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
         {label}
       </span>
     </>

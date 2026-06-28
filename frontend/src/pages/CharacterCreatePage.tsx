@@ -192,13 +192,13 @@ export default function CharacterCreatePage() {
               title="Identity"
               headingLevel={2}
               titleAccessory={
-                <span className="text-xs font-normal normal-case text-parchment-500">
+                <span className="text-xs font-normal normal-case text-parchment-600">
                   <span className="text-garnet-700">*</span> required
                 </span>
               }
             >
               <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
-                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
+                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
                   <span>
                     Name
                     <RequiredMark />
@@ -211,7 +211,7 @@ export default function CharacterCreatePage() {
                   />
                 </label>
 
-                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
+                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
                   <span>
                     Alignment
                     <RequiredMark />
@@ -230,7 +230,7 @@ export default function CharacterCreatePage() {
                   </select>
                 </label>
 
-                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
+                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
                   <span>
                     Race
                     <RequiredMark />
@@ -249,7 +249,7 @@ export default function CharacterCreatePage() {
                   </select>
                 </label>
 
-                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
+                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
                   <span>
                     Class
                     <RequiredMark />
@@ -293,7 +293,7 @@ export default function CharacterCreatePage() {
                   if (!classDef || classDef.subclasses.length === 0) return null;
                   const unlockedAtCreation = classDef.subclassLevel === 1;
                   return (
-                    <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
+                    <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
                       Subclass
                       {unlockedAtCreation ? (
                         <select
@@ -315,7 +315,7 @@ export default function CharacterCreatePage() {
                           ))}
                         </select>
                       ) : (
-                        <div className="rounded-control border border-parchment-200 bg-parchment-100 px-2 py-1.5 text-sm font-normal normal-case text-parchment-500">
+                        <div className="rounded-control border border-parchment-200 bg-parchment-100 px-2 py-1.5 text-sm font-normal normal-case text-parchment-600">
                           Chosen at level {classDef.subclassLevel}
                         </div>
                       )}
@@ -323,7 +323,7 @@ export default function CharacterCreatePage() {
                   );
                 })()}
 
-                <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
+                <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
                   <span>
                     Background
                     <RequiredMark />
@@ -374,7 +374,7 @@ export default function CharacterCreatePage() {
                   )}
                 </div>
 
-                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500 sm:col-span-2">
+                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600 sm:col-span-2">
                   Portrait URL (optional)
                   <input
                     type="text"
@@ -496,7 +496,7 @@ export default function CharacterCreatePage() {
                 title="Starting Equipment"
                 headingLevel={2}
                 titleAccessory={
-                  <span className="text-xs font-normal normal-case text-parchment-500">
+                  <span className="text-xs font-normal normal-case text-parchment-600">
                     All choices required
                   </span>
                 }
@@ -512,16 +512,16 @@ export default function CharacterCreatePage() {
               </Card>
             )}
 
-            <Card title="Preview" headingLevel={2} titleAccessory={<span className="text-xs text-parchment-500">Level 1</span>}>
+            <Card title="Preview" headingLevel={2} titleAccessory={<span className="text-xs text-parchment-600">Level 1</span>}>
               <div className="grid grid-cols-2 gap-4 p-4 text-sm sm:grid-cols-4">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-parchment-500">
+                  <p className="text-xs uppercase tracking-wide text-parchment-600">
                     Armor Class
                   </p>
                   <p className="font-display text-xl text-garnet-800">{previewArmorClass}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-parchment-500">
+                  <p className="text-xs uppercase tracking-wide text-parchment-600">
                     Initiative
                   </p>
                   <p className="font-display text-xl text-garnet-800">
@@ -529,13 +529,13 @@ export default function CharacterCreatePage() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-parchment-500">Speed</p>
+                  <p className="text-xs uppercase tracking-wide text-parchment-600">Speed</p>
                   <p className="font-display text-xl text-garnet-800">
                     {selectedRace ? `${selectedRace.speed} ft` : "—"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-parchment-500">
+                  <p className="text-xs uppercase tracking-wide text-parchment-600">
                     Hit Points
                   </p>
                   <p className="font-display text-xl text-garnet-800">

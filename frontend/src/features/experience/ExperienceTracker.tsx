@@ -65,7 +65,7 @@ export default function ExperienceTracker({
     <Card
       title="Experience"
       titleAccessory={
-        <span className="text-xs font-semibold text-parchment-500">
+        <span className="text-xs font-semibold text-parchment-600">
           Level {level}
         </span>
       }
@@ -74,7 +74,7 @@ export default function ExperienceTracker({
         <div className="flex items-baseline justify-between">
           <p className="font-display text-xl font-semibold leading-none text-arcane-800">
             {experiencePoints.toLocaleString()}
-            <span className="text-sm font-normal text-parchment-500">
+            <span className="text-sm font-normal text-parchment-600">
               {" "}
               XP{!isMaxed && ` / ${nextLevelThreshold.toLocaleString()}`}
             </span>
@@ -98,7 +98,7 @@ export default function ExperienceTracker({
         />
 
         <div className="flex flex-wrap items-end gap-3 pt-1">
-          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
+          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
             Set total XP
             <input
               type="number"
@@ -118,7 +118,7 @@ export default function ExperienceTracker({
             Set
           </button>
 
-          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
+          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
             Award XP
             <input
               type="number"

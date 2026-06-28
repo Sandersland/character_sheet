@@ -134,7 +134,7 @@ export default function AdvancementSection({ character, onUpdate }: Props) {
             />
           ))}
         </div>
-        <span className="text-xs text-parchment-500">
+        <span className="text-xs text-parchment-600">
           {advancementSlots.used}/{advancementSlots.total} used
         </span>
         {busy && <span className="text-[10px] text-parchment-600">Saving…</span>}
@@ -150,7 +150,7 @@ export default function AdvancementSection({ character, onUpdate }: Props) {
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-parchment-400">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-parchment-600">
                     Lv {entry.level}
                   </span>
                   <span
@@ -165,7 +165,7 @@ export default function AdvancementSection({ character, onUpdate }: Props) {
                   {entryLabel(entry)}
                 </p>
                 {entryDetail(entry) && (
-                  <p className="mt-0.5 text-xs leading-relaxed text-parchment-500">
+                  <p className="mt-0.5 text-xs leading-relaxed text-parchment-600">
                     {entryDetail(entry)}
                   </p>
                 )}
@@ -176,7 +176,7 @@ export default function AdvancementSection({ character, onUpdate }: Props) {
                 onClick={() => handleRemove(entry.id)}
                 title="Remove this advancement"
                 aria-label={`Remove: ${entryLabel(entry)}`}
-                className="shrink-0 rounded-control px-1.5 py-0.5 text-[10px] text-parchment-400 hover:text-garnet-600 disabled:opacity-40"
+                className="shrink-0 rounded-control px-1.5 py-0.5 text-[10px] text-parchment-600 hover:text-garnet-600 disabled:opacity-40"
               >
                 ✕
               </button>

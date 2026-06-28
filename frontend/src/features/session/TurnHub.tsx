@@ -179,9 +179,9 @@ function ReactionSlot({
           <SlotPip filled={!reactionUsed} />
           <span className="text-sm font-semibold text-parchment-800">Reaction</span>
           {reactionUsed ? (
-            <span className="text-xs text-parchment-400 italic">used</span>
+            <span className="text-xs text-parchment-600 italic">used</span>
           ) : (
-            <span className="text-xs text-parchment-500">available</span>
+            <span className="text-xs text-parchment-600">available</span>
           )}
         </div>
         {!reactionUsed && (
@@ -299,7 +299,7 @@ function LayOnHandsInput({
       <button
         type="button"
         onClick={onClose}
-        className="ml-auto text-xs text-parchment-400 hover:text-parchment-600"
+        className="ml-auto text-xs text-parchment-600 hover:text-parchment-600"
       >
         Cancel
       </button>
@@ -593,7 +593,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-semibold text-parchment-800">Not in Combat</p>
-              <p className="mt-0.5 text-xs text-parchment-500">
+              <p className="mt-0.5 text-xs text-parchment-600">
                 When a combat encounter begins, start it here to track your turn.
               </p>
             </div>
@@ -618,7 +618,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
               <p className="text-sm font-semibold text-parchment-800">
                 Combat — Round {round}
               </p>
-              <p className="mt-0.5 text-xs text-parchment-500">
+              <p className="mt-0.5 text-xs text-parchment-600">
                 When the DM calls your turn, start tracking your action economy.
               </p>
             </div>
@@ -675,7 +675,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
         <div>
           <p className="font-semibold text-parchment-800">Your Turn</p>
           {inCombat && (
-            <p className="mt-0.5 text-xs text-parchment-500">Round {round}</p>
+            <p className="mt-0.5 text-xs text-parchment-600">Round {round}</p>
           )}
         </div>
         <button
@@ -712,12 +712,12 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
               <SlotPip filled={actionsRemaining > 0 || attack !== null} />
               <span className="text-sm font-semibold text-parchment-800">Action</span>
               {actionsRemaining > 0 && (
-                <span className="text-xs text-parchment-500">
+                <span className="text-xs text-parchment-600">
                   {actionsRemaining} available
                 </span>
               )}
               {actionsRemaining === 0 && attack === null && (
-                <span className="text-xs text-parchment-400 italic">used</span>
+                <span className="text-xs text-parchment-600 italic">used</span>
               )}
             </div>
             {actionsRemaining > 0 && (
@@ -779,7 +779,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
               <SlotPip filled={!bonusActionUsed && bonusAttack === null} />
               <span className="text-sm font-semibold text-parchment-800">Bonus Action</span>
               {bonusActionUsed && bonusAttack === null && (
-                <span className="text-xs text-parchment-400 italic">used</span>
+                <span className="text-xs text-parchment-600 italic">used</span>
               )}
             </div>
             {!bonusActionUsed && (
@@ -867,7 +867,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
         {/* ── Inline tool area ──────────────────────────────────────────────── */}
         {activeResolution?.resolver.kind === "attack-picker" && (
           <div className="rounded-card border border-parchment-200 bg-parchment-50 p-3">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
               Select Attack
             </p>
             <InlineAttackPicker
@@ -891,7 +891,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
 
         {activeResolution?.resolver.kind === "item-picker" && (
           <div className="rounded-card border border-parchment-200 bg-parchment-50 p-3">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
               Use Item
             </p>
             <InlineItemPicker
@@ -987,7 +987,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
         )}
 
         {/* Note about movement */}
-        <p className="text-[11px] text-parchment-400 italic">
+        <p className="text-[11px] text-parchment-600 italic">
           ⚑ Movement is not tracked here. Speed / difficult-terrain tracking is a future feature.
         </p>
       </div>

@@ -83,7 +83,7 @@ function LevelUpModal({
           >
             <div>
               <p className="font-semibold text-parchment-900">Take average</p>
-              <p className="text-xs text-parchment-500">
+              <p className="text-xs text-parchment-600">
                 Predictable — {Math.floor(faces / 2) + 1} ({conLabel} Con)
               </p>
             </div>
@@ -99,11 +99,11 @@ function LevelUpModal({
           >
             <div>
               <p className="font-semibold text-parchment-900">Roll {hitDie}</p>
-              <p className="text-xs text-parchment-500">
+              <p className="text-xs text-parchment-600">
                 Luck-based — {conLabel} Con applied
               </p>
             </div>
-            <span className="text-sm text-parchment-500">
+            <span className="text-sm text-parchment-600">
               {minRoll}–{maxRoll} HP
             </span>
           </button>
@@ -293,7 +293,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
           <div className="mb-1.5 flex items-baseline justify-between">
             <p className="font-display text-xl font-semibold leading-none text-garnet-800">
               {hitPoints.current}
-              <span className="text-sm font-normal text-parchment-500">
+              <span className="text-sm font-normal text-parchment-600">
                 {" "}
                 / {hitPoints.max}
                 {hitPoints.temp > 0 && (
@@ -301,7 +301,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
                 )}
               </span>
             </p>
-            <span className="text-xs text-parchment-500">
+            <span className="text-xs text-parchment-600">
               {availableDice}/{hitDice.total}
               {hitDice.die} available
             </span>
@@ -362,7 +362,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
         {/* ── Damage / Heal / Temp HP controls ── */}
         <div className="flex flex-wrap items-end gap-3">
           {/* Damage */}
-          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
+          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
             Damage
             <div className="flex gap-2">
               <input
@@ -388,7 +388,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
           </label>
 
           {/* Heal */}
-          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
+          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
             Heal
             <div className="flex gap-2">
               <input
@@ -414,7 +414,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
           </label>
 
           {/* Temporary HP */}
-          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
+          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
             Temp HP
             <div className="flex gap-2">
               <input
@@ -457,7 +457,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
         {/* ── Rest controls ── */}
         <div className="flex flex-wrap items-end gap-3 border-t border-parchment-200 pt-3">
           {/* Short rest */}
-          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
+          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
             Short rest — dice to spend
             <div className="flex gap-2">
               <input
@@ -483,7 +483,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
 
           {/* Long rest */}
           <div className="flex flex-col gap-1">
-            <span className="text-xs font-semibold uppercase tracking-wide text-parchment-500">
+            <span className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
               Long rest
             </span>
             <button

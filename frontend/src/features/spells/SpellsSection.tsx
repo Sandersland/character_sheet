@@ -238,11 +238,11 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
       {/* ── Spell slot meters ── */}
       {slots.length > 0 && (
         <div>
-          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
             {isWarlock ? (
               <>
                 Pact Magic{" "}
-                <span className="font-normal normal-case tracking-normal text-parchment-400">
+                <span className="font-normal normal-case tracking-normal text-parchment-600">
                   — recharges on a short rest
                 </span>
               </>
@@ -297,9 +297,9 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
       {/* ── Mystic Arcanum (Warlock 6th–9th) ── */}
       {arcana.length > 0 && (
         <div>
-          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
             Mystic Arcanum{" "}
-            <span className="font-normal normal-case tracking-normal text-parchment-400">
+            <span className="font-normal normal-case tracking-normal text-parchment-600">
               — one cast each per long rest
             </span>
           </h3>
@@ -380,7 +380,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
       {/* ── Spell list (grouped by level) ── */}
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
             Spellbook ({spells.length})
           </h3>
           {busy && (

@@ -118,7 +118,7 @@ export default function CharacterSheetPage() {
                 {character.subclass ? ` (${character.subclass})` : ""}
               </span>
               <Badge tone="garnet">Level {character.level}</Badge>
-              <span className="text-parchment-400">
+              <span className="text-parchment-600">
                 {character.background} · {character.alignment}
               </span>
             </p>

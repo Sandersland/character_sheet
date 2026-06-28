@@ -20,7 +20,7 @@ export default function CompactHpBar({ character }: CompactHpBarProps) {
     <div className="rounded-card border border-parchment-200 bg-parchment-50 px-4 py-3 shadow-card">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <span className="font-sans text-xs font-semibold uppercase tracking-wide text-parchment-500">
+          <span className="font-sans text-xs font-semibold uppercase tracking-wide text-parchment-600">
             Hit Points
           </span>
           <span

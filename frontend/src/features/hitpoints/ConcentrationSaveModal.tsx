@@ -59,7 +59,7 @@ export default function ConcentrationSaveModal({
           Constitution saving throw.
         </p>
 
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-parchment-500">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-parchment-600">
           <span className="rounded-control bg-parchment-100 px-2 py-1 text-parchment-700">
             DC {save.dc}
           </span>

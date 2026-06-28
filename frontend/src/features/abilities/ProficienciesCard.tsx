@@ -112,7 +112,7 @@ function ProficiencyRow({
       </span>
 
       {/* Source pill — muted metadata tag, quieter than the primary Badge component */}
-      <span className="shrink-0 rounded-full bg-parchment-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-parchment-500">
+      <span className="shrink-0 rounded-full bg-parchment-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-parchment-600">
         {SOURCE_LABELS[source]}
       </span>
 
@@ -132,7 +132,7 @@ function ProficiencyRow({
           disabled={disabled}
           title="Remove this tool proficiency choice"
           aria-label={`Remove proficiency: ${label}`}
-          className="w-5 shrink-0 rounded-control text-center text-[10px] text-parchment-400 hover:text-garnet-600 disabled:opacity-40"
+          className="w-5 shrink-0 rounded-control text-center text-[10px] text-parchment-600 hover:text-garnet-600 disabled:opacity-40"
         >
           ✕
         </button>
@@ -154,7 +154,7 @@ function ProficiencySection({
 }) {
   return (
     <div>
-      <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+      <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
         {title}
       </h4>
       {/* Responsive chip grid — fills horizontal space so names don't float
@@ -294,7 +294,7 @@ export default function ProficienciesCard({
       {/* Student of War artisan's-tool picker */}
       {canChooseArtisanTool && (
         <div>
-          <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
+          <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
             Student of War
           </h4>
           <p className="mb-2 text-xs text-parchment-600">
@@ -320,7 +320,7 @@ export default function ProficienciesCard({
               ))}
           </select>
           {busy && (
-            <span className="mt-1 block text-[10px] text-parchment-400">
+            <span className="mt-1 block text-[10px] text-parchment-600">
               Saving…
             </span>
           )}

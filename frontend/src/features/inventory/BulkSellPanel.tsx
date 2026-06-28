@@ -21,7 +21,7 @@ function currencyTimesQuantity(cost: Currency | undefined, quantity: number): Cu
 
 const inputClass =
   "rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm";
-const labelClass = "flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-500";
+const labelClass = "flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600";
 
 /**
  * Inline expand-in-place panel (frontend.md: mutate surfaces are inline, not a
@@ -103,7 +103,7 @@ export default function BulkSellPanel({ items, pending, onSubmit, onClose }: Bul
                 <span>
                   {item.name}
                   {item.quantity > 1 && (
-                    <span className="ml-1.5 text-xs text-parchment-500">×{item.quantity}</span>
+                    <span className="ml-1.5 text-xs text-parchment-600">×{item.quantity}</span>
                   )}
                 </span>
               </label>
@@ -131,7 +131,7 @@ export default function BulkSellPanel({ items, pending, onSubmit, onClose }: Bul
 
       {mode === "lumpSum" && (
         <div className="flex flex-wrap items-end gap-3 border-t border-parchment-200 pt-3">
-          <span className="text-xs font-semibold uppercase tracking-wide text-parchment-500">
+          <span className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
             Lump-sum total
           </span>
           {DENOMINATIONS.map((denomination) => (
