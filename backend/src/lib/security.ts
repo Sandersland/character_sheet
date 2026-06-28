@@ -13,15 +13,26 @@ const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
 // default CSP would block the Vite-built assets, so we tune the directives to
 // allow self-hosted scripts/styles (Tailwind injects a stylesheet; some inline
 // styles exist, hence 'unsafe-inline' for style only) plus data: URIs for
-// fonts/images. In API-only mode the responses are JSON, so CSP is moot — but a
-// tuned policy is harmless and keeps one code path.
+// fonts/images. Beyond self-hosting we also allow a few specific third parties
+// surfaced by the live single-origin deployment: Google-hosted profile avatars
+// (img), the 3D dice roller's blob: Web Worker (worker), and Cloudflare Web
+// Analytics' beacon (script + connect). In API-only mode the responses are JSON,
+// so CSP is moot — but a tuned policy is harmless and keeps one code path.
 export function securityHeaders(servesStatic: boolean): RequestHandler {
   return helmet({
     contentSecurityPolicy: servesStatic
       ? {
           directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'"],
+            // Cloudflare Web Analytics injects its beacon script from
+            // static.cloudflareinsights.com; allow it here. Workers are NOT
+            // covered by scriptSrc — they get their own workerSrc below so we
+            // don't have to loosen script execution to permit the dice worker.
+            scriptSrc: ["'self'", "https://static.cloudflareinsights.com"],
+            // The 3D dice roller (@react-three) spawns a Web Worker from a
+            // blob: URL; without an explicit workerSrc it falls back to
+            // scriptSrc and gets blocked in single-origin mode.
+            workerSrc: ["'self'", "blob:"],
             // Vite/Tailwind emit a real stylesheet, but inline styles slip in
             // (e.g. dynamic widths on the HP bar) — allow them for style only.
             // The SPA also pulls Source Sans/Serif from Google Fonts: the
@@ -29,9 +40,13 @@ export function securityHeaders(servesStatic: boolean): RequestHandler {
             // fonts.gstatic.com (see frontend/index.html). Both must be allowed
             // or the app falls back to system fonts in single-origin mode.
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-            imgSrc: ["'self'", "data:"],
+            // lh3.googleusercontent.com serves Google sign-in profile avatars
+            // rendered in the app header (AppHeader.tsx).
+            imgSrc: ["'self'", "data:", "https://lh3.googleusercontent.com"],
             fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
-            connectSrc: ["'self'"],
+            // Cloudflare Web Analytics' beacon POSTs metrics to
+            // cloudflareinsights.com.
+            connectSrc: ["'self'", "https://cloudflareinsights.com"],
             objectSrc: ["'none'"],
           },
         }
