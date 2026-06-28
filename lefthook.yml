@@ -22,12 +22,12 @@ pre-commit:
   commands:
     lint-backend:
       root: "backend/"
-      glob: "*.{ts,tsx}"
+      glob: "**/*.{ts,tsx}"
       run: npx eslint --fix {staged_files}
       stage_fixed: true
     lint-frontend:
       root: "frontend/"
-      glob: "*.{ts,tsx}"
+      glob: "**/*.{ts,tsx}"
       run: npx eslint --fix {staged_files}
       stage_fixed: true
 
