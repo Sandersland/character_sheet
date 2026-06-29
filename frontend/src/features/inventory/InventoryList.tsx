@@ -3,12 +3,21 @@ import { useEffect, useState } from "react";
 import { applyInventoryTransactions, fetchItems, updateCharacter } from "@/api/client";
 import type { Character, Currency, InventoryOperation, Item, ItemCategory } from "@/types/character";
 import AddItemPanel from "@/features/inventory/AddItemPanel";
-import BulkSellPanel from "@/features/inventory/BulkSellPanel";
 import Card from "@/components/ui/Card";
 import InventoryRow from "@/features/inventory/InventoryRow";
 import MeterBar from "@/components/ui/MeterBar";
+import { buildSellOperations } from "@/lib/bulkSell";
+import { formatCurrency, toCopper } from "@/lib/currency";
 import { carryingCapacity } from "@/lib/encumbrance";
 import { ITEM_CATEGORY_OPTIONS, ITEM_CATEGORY_ORDER, itemCategoryLabel } from "@/lib/items";
+
+const ZERO_CURRENCY: Currency = { cp: 0, sp: 0, gp: 0, pp: 0 };
+
+// Default sale price of a stack — catalog cost × quantity, per denomination (keeps the item's own denominations, no platinum roll-up).
+function stackValue(cost: Currency | undefined, quantity: number): Currency {
+  const c = cost ?? ZERO_CURRENCY;
+  return { cp: c.cp * quantity, sp: c.sp * quantity, gp: c.gp * quantity, pp: c.pp * quantity };
+}
 
 interface InventoryListProps {
   character: Character;
@@ -32,8 +41,9 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "equipped", label: "Equipped" },
 ];
 
-/** Currency purse editor — reuses the existing PATCH /api/characters/:id (currency is untouched by the Phase B endpoint, exactly like experiencePoints), not the transactions endpoint, since a bare currency edit has no item and isn't ledgered. */
+// Display-first purse: shows the formatted currency with an "Edit purse" toggle revealing the denomination inputs. Reuses PATCH /api/characters/:id (a bare currency edit has no item and isn't ledgered).
 function CurrencyEditor({ character, onUpdate }: InventoryListProps) {
+  const [editing, setEditing] = useState(false);
   const [currency, setCurrency] = useState<Currency>(character.currency);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
@@ -48,11 +58,31 @@ function CurrencyEditor({ character, onUpdate }: InventoryListProps) {
     try {
       const updated = await updateCharacter(character.id, { currency });
       onUpdate(updated);
+      setEditing(false);
     } catch {
       setError(true);
     } finally {
       setPending(false);
     }
+  }
+
+  if (!editing) {
+    return (
+      <div className="flex items-center justify-between gap-3 border-t border-parchment-200 pt-3 text-xs">
+        <span className="text-parchment-700">{formatCurrency(character.currency)}</span>
+        <button
+          type="button"
+          onClick={() => {
+            setCurrency(character.currency);
+            setError(false);
+            setEditing(true);
+          }}
+          className="font-semibold text-garnet-700 hover:underline"
+        >
+          Edit purse
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -78,6 +108,14 @@ function CurrencyEditor({ character, onUpdate }: InventoryListProps) {
         >
           Save
         </button>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => setEditing(false)}
+          className="font-semibold text-garnet-700 hover:underline disabled:opacity-40"
+        >
+          Cancel
+        </button>
         {error && <span className="text-garnet-700">Couldn't save.</span>}
       </div>
     </div>
@@ -88,12 +126,13 @@ function CurrencyEditor({ character, onUpdate }: InventoryListProps) {
 export default function InventoryList({ character, onUpdate }: InventoryListProps) {
   const [catalog, setCatalog] = useState<Item[]>([]);
   const [addOpen, setAddOpen] = useState(false);
-  const [bulkSellOpen, setBulkSellOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchItems()
@@ -131,57 +170,110 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
     return { category, items, weight };
   }).filter((section) => section.items.length > 0);
 
-  async function submitOperations(operations: InventoryOperation[]) {
+  const selectedItems = character.inventory.filter((item) => selectedIds.has(item.id));
+  // Rough gp estimate for the selection bar; the sale itself uses exact per-denomination prices.
+  const selectedGp = Math.round(
+    selectedItems.reduce((sum, item) => sum + toCopper(item.cost ?? ZERO_CURRENCY) * item.quantity, 0) / 100
+  );
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }
+
+  async function applyOps(operations: InventoryOperation[]): Promise<boolean> {
     setPending(true);
     setError(null);
     try {
       const updated = await applyInventoryTransactions(character.id, operations);
       onUpdate(updated);
       setAddOpen(false);
-      setBulkSellOpen(false);
       setEditingId(null);
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save — try again.");
+      return false;
     } finally {
       setPending(false);
     }
+  }
+
+  async function submitOperations(operations: InventoryOperation[]): Promise<void> {
+    await applyOps(operations);
+  }
+
+  async function sellSelected() {
+    if (selectedItems.length === 0) return;
+    const lines = selectedItems.map((item) => ({ inventoryItemId: item.id, quantity: item.quantity }));
+    const prices = Object.fromEntries(
+      selectedItems.map((item) => [item.id, stackValue(item.cost, item.quantity)])
+    );
+    const ok = await applyOps(buildSellOperations(lines, { mode: "perItem", prices }));
+    if (ok) exitSelectMode();
   }
 
   return (
     <Card
       title="Inventory"
       titleAccessory={
-        <div className="flex items-center gap-2">
-          {character.inventory.length > 0 && (
-            <>
-              <button
-                type="button"
-                onClick={() =>
-                  setBulkSellOpen((open) => {
-                    if (!open) setAddOpen(false);
-                    return !open;
-                  })
-                }
-                className="text-xs font-semibold text-garnet-700 hover:underline"
-              >
-                {bulkSellOpen ? "Cancel" : "Sell multiple"}
-              </button>
-              <span className="text-parchment-300">·</span>
-            </>
-          )}
-          <button
-            type="button"
-            onClick={() =>
-              setAddOpen((open) => {
-                if (!open) setBulkSellOpen(false);
-                return !open;
-              })
-            }
-            className="text-xs font-semibold text-garnet-700 hover:underline"
-          >
-            {addOpen ? "Cancel" : "+ Add item"}
-          </button>
-        </div>
+        selectMode ? (
+          <div className="flex items-center gap-3 text-xs">
+            <span className="text-parchment-600">
+              {selectedIds.size} selected · ~{selectedGp} gp
+            </span>
+            <button
+              type="button"
+              disabled={pending || selectedIds.size === 0}
+              onClick={sellSelected}
+              className="font-semibold text-garnet-700 hover:underline disabled:opacity-40"
+            >
+              Sell
+            </button>
+            <button
+              type="button"
+              onClick={exitSelectMode}
+              className="font-semibold text-parchment-600 hover:underline"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            {hasItems && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddOpen(false);
+                    setEditingId(null);
+                    setSelectedIds(new Set());
+                    setSelectMode(true);
+                  }}
+                  className="text-xs font-semibold text-garnet-700 hover:underline"
+                >
+                  Sell items
+                </button>
+                <span className="text-parchment-300">·</span>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => setAddOpen((open) => !open)}
+              className="text-xs font-semibold text-garnet-700 hover:underline"
+            >
+              {addOpen ? "Cancel" : "+ Add item"}
+            </button>
+          </div>
+        )
       }
       className="p-4"
     >
@@ -249,15 +341,6 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
           />
         )}
 
-        {bulkSellOpen && (
-          <BulkSellPanel
-            items={character.inventory}
-            pending={pending}
-            onSubmit={submitOperations}
-            onClose={() => setBulkSellOpen(false)}
-          />
-        )}
-
         {error && (
           <p className="text-xs font-semibold text-garnet-700">{error}</p>
         )}
@@ -291,6 +374,9 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
                       onEdit={() => setEditingId(item.id)}
                       onCancel={() => setEditingId(null)}
                       onSubmit={submitOperations}
+                      selectMode={selectMode}
+                      selected={selectedIds.has(item.id)}
+                      onToggleSelect={() => toggleSelect(item.id)}
                     />
                   ))}
                 </ul>

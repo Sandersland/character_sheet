@@ -23,7 +23,7 @@ frontend/src/
 │   ├── experience/      # ExperienceTracker
 │   ├── hitpoints/       # HitPointTracker (inline Card; hosts LevelUpModal + ConcentrationSaveModal)
 │   ├── inventory/       # InventoryList, InventoryRow, AddItemPanel,
-│   │                    #   BulkSellPanel, StartingEquipmentEditor
+│   │                    #   StartingEquipmentEditor
 │   ├── session/         # TurnHub, TurnTracker, useTurnState, SessionLog, SessionsModal,
 │   │                    #   SessionSummaryModal, Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
 │   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie
@@ -230,7 +230,7 @@ Large interactive sections follow the orchestrator/row pattern:
 ```
 
 Examples:
-- `features/inventory/`: `InventoryList` (orchestrator) / `InventoryRow` / `AddItemPanel` / `BulkSellPanel`
+- `features/inventory/`: `InventoryList` (orchestrator) / `InventoryRow` / `AddItemPanel`
 - `features/spells/`: `SpellsSection` (orchestrator) / `SpellRow` / `AddSpellPanel`
 
 The orchestrator pattern keeps async state and API batching in one place and makes rows easy to unit-test in isolation — pass mock callbacks, assert they fire with the right args. See `testing.md` for component test patterns.
