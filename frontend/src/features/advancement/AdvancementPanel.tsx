@@ -302,7 +302,7 @@ export default function AdvancementPanel({
             onClick={() => handleTabChange(t)}
             className={`rounded-control px-3 py-1.5 text-xs font-semibold transition-colors ${
               tab === t
-                ? "bg-gold-400 text-parchment-900"
+                ? "bg-gold-400 text-ink"
                 : "bg-parchment-50 text-parchment-600 border border-parchment-300 hover:bg-parchment-100"
             }`}
           >
@@ -365,7 +365,7 @@ export default function AdvancementPanel({
             type="button"
             disabled={totalPoints !== 2 || busy}
             onClick={handleAsiSubmit}
-            className="mt-4 w-full rounded-control bg-gold-400 px-4 py-2 text-sm font-semibold text-parchment-900 hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
+            className="mt-4 w-full rounded-control bg-gold-400 px-4 py-2 text-sm font-semibold text-ink hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Apply ASI
           </button>
@@ -425,7 +425,7 @@ export default function AdvancementPanel({
                 type="button"
                 disabled={busy || (selectedFeat.abilityOptions.length > 1 && !abilityChoice)}
                 onClick={handleFeatSubmit}
-                className="mt-4 w-full rounded-control bg-gold-400 px-4 py-2 text-sm font-semibold text-parchment-900 hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
+                className="mt-4 w-full rounded-control bg-gold-400 px-4 py-2 text-sm font-semibold text-ink hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Take feat
               </button>
@@ -624,7 +624,7 @@ export default function AdvancementPanel({
                 type="button"
                 disabled={customSubmitDisabled}
                 onClick={handleFeatSubmit}
-                className="mt-4 w-full rounded-control bg-gold-400 px-4 py-2 text-sm font-semibold text-parchment-900 hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
+                className="mt-4 w-full rounded-control bg-gold-400 px-4 py-2 text-sm font-semibold text-ink hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Add custom feat
               </button>
@@ -681,7 +681,7 @@ export default function AdvancementPanel({
                         type="button"
                         disabled={busy}
                         onClick={() => handleSelectFeat(feat)}
-                        className="shrink-0 rounded bg-gold-400 px-2.5 py-1 text-xs font-semibold text-parchment-900 hover:bg-gold-500 disabled:opacity-40"
+                        className="shrink-0 rounded bg-gold-400 px-2.5 py-1 text-xs font-semibold text-ink hover:bg-gold-500 disabled:opacity-40"
                       >
                         Select
                       </button>

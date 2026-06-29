@@ -86,7 +86,7 @@ export default function SpellRow({
               <Badge tone={schoolTone}>{spell.school}</Badge>
               {spell.concentration &&
                 (isConcentrating ? (
-                  <Badge tone="arcane" className="bg-arcane-700 text-white">
+                  <Badge tone="arcane" className="bg-arcane-700 text-parchment-50">
                     concentrating
                   </Badge>
                 ) : (
@@ -128,7 +128,7 @@ export default function SpellRow({
             type="button"
             disabled={busy}
             onClick={handleCastClick}
-            className="rounded bg-garnet-600 px-2.5 py-0.5 text-xs font-semibold text-white hover:bg-garnet-700 disabled:opacity-40"
+            className="rounded bg-garnet-600 px-2.5 py-0.5 text-xs font-semibold text-parchment-50 hover:bg-garnet-700 disabled:opacity-40"
             title={isCantrip ? `Cast ${spell.name}` : `Cast ${spell.name} (choose slot)`}
           >
             Cast
