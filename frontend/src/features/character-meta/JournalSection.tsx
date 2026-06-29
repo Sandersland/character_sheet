@@ -17,6 +17,8 @@ import {
   deleteJournalEntry,
 } from "@/api/client";
 import Card from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
+import { GiQuillInk } from "@/components/ui/icons";
 import JournalEntryPanel, {
   type JournalEntryDraft,
 } from "@/features/character-meta/JournalEntryPanel";
@@ -109,9 +111,12 @@ export default function JournalSection({ character, onUpdate }: JournalSectionPr
         )}
 
         {sortedEntries.length === 0 && !addPanelOpen ? (
-          <p className="px-4 py-6 text-center text-sm text-parchment-600">
-            No journal entries yet. Notes from your sessions will show up here.
-          </p>
+          <EmptyState
+            icon={<GiQuillInk />}
+            title="Your journal is empty"
+            description="Notes from your sessions will show up here."
+            action={{ label: "+ Add entry", onClick: () => setAddPanelOpen(true) }}
+          />
         ) : (
           <ul className="flex flex-col divide-y divide-parchment-200">
             {sortedEntries.map((entry) =>
