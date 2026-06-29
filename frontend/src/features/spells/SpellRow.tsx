@@ -173,7 +173,7 @@ export default function SpellRow({
                   {isUpcast && <span aria-hidden="true"> ↑</span>}
                 </span>
                 {isUpcast && slotEffect && (
-                  <span className="font-normal text-[10px] text-arcane-600">{slotEffect}</span>
+                  <span className="font-normal text-[10px] text-arcane-800">{slotEffect}</span>
                 )}
               </button>
             );

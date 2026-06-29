@@ -80,7 +80,7 @@ export default function SkillsTable({
               >
                 {skillLabel(skill.name)}
                 {skill.expertise && (
-                  <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-gold-700">
+                  <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-gold-800">
                     Expertise
                   </span>
                 )}
