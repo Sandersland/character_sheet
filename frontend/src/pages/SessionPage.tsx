@@ -264,7 +264,7 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
                   id: "spells",
                   label: "Spells",
                   badge: remainingSlots > 0 ? (
-                    <span className="ml-1 rounded-full bg-arcane-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    <span className="ml-1 rounded-full bg-arcane-700 px-1.5 py-0.5 text-[10px] font-bold text-white">
                       {remainingSlots}
                     </span>
                   ) : undefined,
