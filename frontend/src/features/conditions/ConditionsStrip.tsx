@@ -8,9 +8,12 @@
  * since conditions are central to live play.
  */
 
+import { Minus, Plus, X } from "lucide-react";
 import { useState } from "react";
 
 import { applyConditionTransactions } from "@/api/client";
+import EmptyState from "@/components/ui/EmptyState";
+import { GiHealthNormal } from "@/components/ui/icons";
 import {
   CONDITION_DESCRIPTIONS,
   conditionLabel,
@@ -73,7 +76,11 @@ export default function ConditionsStrip({ character, onUpdate }: Props) {
 
       {/* Active condition chips */}
       {active.length === 0 ? (
-        <p className="text-xs text-parchment-600">No active conditions.</p>
+        <EmptyState
+          icon={<GiHealthNormal />}
+          title="No active conditions"
+          size="sm"
+        />
       ) : (
         <ul className="flex flex-wrap gap-2">
           {active.map((entry) => (
@@ -94,7 +101,7 @@ export default function ConditionsStrip({ character, onUpdate }: Props) {
                   aria-label={`Remove ${conditionLabel(entry.key)}`}
                   title={`Remove ${conditionLabel(entry.key)}`}
                 >
-                  ✕
+                  <X aria-hidden="true" className="h-3 w-3" />
                 </button>
               </span>
             </li>
@@ -113,7 +120,7 @@ export default function ConditionsStrip({ character, onUpdate }: Props) {
             className="flex h-6 w-6 items-center justify-center rounded-control border border-parchment-300 bg-parchment-50 text-sm font-semibold text-parchment-700 hover:bg-parchment-100 disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Decrease exhaustion"
           >
-            −
+            <Minus aria-hidden="true" className="h-3.5 w-3.5" />
           </button>
           <span
             className="min-w-[1.5rem] text-center font-display text-lg font-semibold leading-none text-parchment-900"
@@ -128,7 +135,7 @@ export default function ConditionsStrip({ character, onUpdate }: Props) {
             className="flex h-6 w-6 items-center justify-center rounded-control border border-parchment-300 bg-parchment-50 text-sm font-semibold text-parchment-700 hover:bg-parchment-100 disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Increase exhaustion"
           >
-            +
+            <Plus aria-hidden="true" className="h-3.5 w-3.5" />
           </button>
         </div>
         {exhaustion > 0 && (

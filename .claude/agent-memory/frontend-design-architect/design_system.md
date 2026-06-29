@@ -108,6 +108,13 @@ mid/high steps read as text/affordances against dark surfaces.
 - `SkillsTable`, `InventoryList`, `SpellsSection`, `JournalSection`,
   `VitalsStrip`, `BackendStatus`, `CharacterCard` — page-specific composed
   components, all consuming the shared tokens above.
+- Icons — all resolve through `components/ui/icons.ts`: `lucide-react` for UI
+  chrome (kebab, chevron, search, +/−/✕), `react-icons/gi` for D&D flavor
+  (abilities, item categories, empty-state heroes). Subpath imports only;
+  domain→icon lookups are typed `Record<…, IconType>` maps. Icons are
+  monochrome `currentColor` (never `fill`/hex) — they inherit a parent
+  `text-*` token, so they read correctly in both light and dark. Decorative
+  icons get `aria-hidden`; icon-only buttons keep their `aria-label`.
 
 ## Mock data layer
 

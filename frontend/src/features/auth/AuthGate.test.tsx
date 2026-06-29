@@ -45,8 +45,9 @@ describe("AuthGate + AppHeader", () => {
     expect(screen.queryByText("secret content")).not.toBeInTheDocument();
 
     expect(await screen.findByText("secret content")).toBeInTheDocument();
-    // Chrome surfaces the signed-in identity.
-    expect(screen.getByText(/ada/i)).toBeInTheDocument();
+    // Chrome surfaces the signed-in identity behind the account menu.
+    await userEvent.click(screen.getByRole("button", { name: "Account" }));
+    expect(screen.getByText("Ada")).toBeInTheDocument();
   });
 
   it("shows the login screen and hides children when anonymous", async () => {
@@ -64,7 +65,8 @@ describe("AuthGate + AppHeader", () => {
     renderGate();
     await screen.findByText("secret content");
 
-    await userEvent.click(screen.getByRole("button", { name: /log out/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Account" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /log out/i }));
 
     expect(clientLogout).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.queryByText("secret content")).not.toBeInTheDocument());

@@ -1,3 +1,4 @@
+import { MoreVertical } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 export interface OverflowMenuItem {
@@ -105,7 +106,7 @@ export default function OverflowMenu({ items, label, className = "" }: OverflowM
         onKeyDown={handleTriggerKeyDown}
         className="flex h-7 w-7 items-center justify-center rounded-control text-lg leading-none text-parchment-600 transition-colors hover:bg-parchment-200 hover:text-parchment-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
       >
-        ⋮
+        <MoreVertical aria-hidden="true" className="h-4 w-4" />
       </button>
       {open && (
         <div

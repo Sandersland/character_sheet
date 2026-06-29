@@ -25,6 +25,8 @@ import type {
   Spell,
 } from "@/types/character";
 import AddSpellPanel from "@/features/spells/AddSpellPanel";
+import EmptyState from "@/components/ui/EmptyState";
+import { GiSpellBook } from "@/components/ui/icons";
 import MeterBar from "@/components/ui/MeterBar";
 import SpellRow from "@/features/spells/SpellRow";
 
@@ -389,9 +391,12 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
         </div>
 
         {spells.length === 0 ? (
-          <p className="py-4 text-center text-sm text-parchment-600">
-            No spells yet — add one below.
-          </p>
+          <EmptyState
+            icon={<GiSpellBook />}
+            title="No spells yet"
+            description="Learn or prepare spells to start casting."
+            action={{ label: "+ Add spell", onClick: () => setAddPanelOpen(true) }}
+          />
         ) : (
           <div className="flex flex-col gap-4">
             {spellLevels.map((lvl) => {

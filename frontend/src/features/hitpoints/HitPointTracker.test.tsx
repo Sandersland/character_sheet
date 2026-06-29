@@ -70,11 +70,10 @@ function mockResolve(concentrationChecks: ConcentrationCheck[]) {
 
 async function applyDamage() {
   const user = userEvent.setup();
-  // Damage / Heal / Temp inputs all share placeholder "0"; the Damage field is
-  // the first and its "Apply" button is unique to the damage control.
-  const damageInput = screen.getAllByPlaceholderText("0")[0];
+  // Damage is the default segmented mode; type into its stepper field and apply.
+  const damageInput = screen.getByRole("spinbutton", { name: /damage amount/i });
   await user.type(damageInput, "8");
-  await user.click(screen.getByRole("button", { name: "Apply" }));
+  await user.click(screen.getByRole("button", { name: /apply damage/i }));
 }
 
 beforeEach(() => {
@@ -98,6 +97,70 @@ function check(partial: Partial<ConcentrationCheck>): ConcentrationCheck {
     ...partial,
   };
 }
+
+describe("HitPointTracker segmented action control (issue #225)", () => {
+  it("damage is the default mode and fires a damage op", async () => {
+    mockResolve([]);
+    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+
+    await applyDamage();
+
+    const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
+    expect(ops[0]).toMatchObject({ type: "damage", amount: 8 });
+  });
+
+  it("switching to Heal fires a heal op (vitality verb)", async () => {
+    const user = userEvent.setup();
+    mockResolve([]);
+    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+
+    await user.click(screen.getByRole("radio", { name: /heal/i }));
+    await user.type(screen.getByRole("spinbutton", { name: /heal amount/i }), "5");
+    await user.click(screen.getByRole("button", { name: /^heal$/i }));
+
+    const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
+    expect(ops[0]).toEqual({ type: "heal", amount: 5 });
+  });
+
+  it("switching to Temp HP fires a setTemp op", async () => {
+    const user = userEvent.setup();
+    mockResolve([]);
+    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+
+    await user.click(screen.getByRole("radio", { name: /temp hp/i }));
+    await user.type(screen.getByRole("spinbutton", { name: /temporary hit points/i }), "7");
+    await user.click(screen.getByRole("button", { name: /set temp hp/i }));
+
+    const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
+    expect(ops[0]).toEqual({ type: "setTemp", amount: 7 });
+  });
+
+  it("the stepper +/- adjusts the shared amount", async () => {
+    const user = userEvent.setup();
+    mockResolve([]);
+    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+
+    const field = screen.getByRole("spinbutton", { name: /damage amount/i });
+    await user.click(screen.getByRole("button", { name: /increase amount/i }));
+    await user.click(screen.getByRole("button", { name: /increase amount/i }));
+    expect(field).toHaveValue(2);
+    await user.click(screen.getByRole("button", { name: /decrease amount/i }));
+    expect(field).toHaveValue(1);
+  });
+
+  it("Enter submits the active mode", async () => {
+    const user = userEvent.setup();
+    mockResolve([]);
+    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+
+    await user.click(screen.getByRole("radio", { name: /heal/i }));
+    const field = screen.getByRole("spinbutton", { name: /heal amount/i });
+    await user.type(field, "4{Enter}");
+
+    const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
+    expect(ops[0]).toEqual({ type: "heal", amount: 4 });
+  });
+});
 
 describe("HitPointTracker concentration toast (issue #41)", () => {
   it("toasts a held concentration save", async () => {
