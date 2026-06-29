@@ -1,7 +1,10 @@
+import { ABILITY_ICONS } from "@/components/ui/icons";
 import { abilityModifier, formatModifier } from "@/lib/abilities";
 import RollButton from "@/features/dice/RollButton";
+import type { AbilityName } from "@/types/character";
 
 interface AbilityScoreBoxProps {
+  ability: AbilityName;
   label: string;
   score: number;
   saveProficient?: boolean;
@@ -19,6 +22,7 @@ interface AbilityScoreBoxProps {
  * to `RollResultToast` via `RollContext`.
  */
 export default function AbilityScoreBox({
+  ability,
   label,
   score,
   saveProficient,
@@ -29,10 +33,12 @@ export default function AbilityScoreBox({
 
   const checkSpec = { count: 1, faces: 20, modifier } as const;
   const saveSpec = { count: 1, faces: 20, modifier: saveBonus } as const;
+  const AbilityIcon = ABILITY_ICONS[ability];
 
   return (
     <div className="flex flex-col items-center rounded-card border border-parchment-200 bg-parchment-50 px-3 py-2.5 shadow-card">
-      <span className="font-sans text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
+      <span className="inline-flex items-center gap-1 font-sans text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
+        <AbilityIcon aria-hidden="true" className="text-xs text-parchment-400" />
         {label}
       </span>
       <RollButton

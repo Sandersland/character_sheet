@@ -229,6 +229,7 @@ export default function CharacterSheetPage() {
             {abilityEntries.map(([key, score]) => (
               <AbilityScoreBox
                 key={key}
+                ability={key}
                 label={abilityAbbr(key)}
                 score={score}
                 saveProficient={character.savingThrowProficiencies.includes(key)}
