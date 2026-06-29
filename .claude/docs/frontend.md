@@ -164,8 +164,12 @@ These seven live in `src/components/ui/` and are intentionally domain-agnostic �
 | `MeterBar` | Horizontal resource meter. Always pair with numeric text (e.g. `9/10 HP`) — never rely on color alone. Prop `tone`: `garnet` / `arcane` / `gold`. |
 | `Modal` | Overlay primitive. See inline-vs-modal rule above. |
 | `Tabs` | Controlled segmented-control tab switcher (WAI-ARIA tablist, arrow-key nav, optional per-tab `badge`). Renders only the switcher; the caller renders the active panel below it. Props: `tabs`, `active`, `onChange`. |
-| `OverflowMenu` | Icon-only kebab (`⋮`) menu-button (WAI-ARIA menu-button: `aria-haspopup`, roving tabindex, Arrow/Home/End/Esc nav, click-outside to close, focus returns to trigger). No portal — `relative`-anchored popup. Per-item `danger?` (garnet) / `separatorBefore?` (divider). Props: `items`, `label?` (trigger accessible name, default "More actions"), `className?`. |
+| `OverflowMenu` | Icon-only kebab (`MoreVertical`) menu-button (WAI-ARIA menu-button: `aria-haspopup`, roving tabindex, Arrow/Home/End/Esc nav, click-outside to close, focus returns to trigger). No portal — `relative`-anchored popup. Per-item `danger?` (garnet) / `separatorBefore?` (divider). Props: `items`, `label?` (trigger accessible name, default "More actions"), `className?`. |
 | `ErrorBoundary` | Class error boundary wrapping the route tree in `App.tsx`. Catches render-time crashes and shows a parchment "something went wrong" fallback (Reload / Back to characters) instead of a blank page. Optional `fallback?: (error, reset) => ReactNode` for custom recovery UI. |
+
+## Iconography — `components/ui/icons.ts`
+
+All icons resolve through `components/ui/icons.ts`. Two libraries: `lucide-react` for UI chrome (kebab, chevron, search, +/−/✕) and `react-icons/gi` (game-icons) for D&D flavor (abilities, item categories, empty-state heroes). Always use per-icon subpath imports (`lucide-react`, `react-icons/gi`) — never `react-icons/all`. Domain→icon lookups are typed `Record<…, IconType>` maps (`ABILITY_ICONS`, `ITEM_CATEGORY_ICONS`) so a missing/renamed key is a compile error; `icons.ts` is the single allowed `components/ui` file that imports `@/types/character` for exactly this reason. Icons are monochrome `currentColor`: never set `fill`/hex — give the icon a parent with a `text-*` token so it works in light and dark. Decorative icons get `aria-hidden="true"`; icon-only buttons keep their `aria-label`.
 
 ## API calls — `client.ts` is the only call site
 
