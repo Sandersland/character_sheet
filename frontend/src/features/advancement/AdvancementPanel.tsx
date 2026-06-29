@@ -303,7 +303,7 @@ export default function AdvancementPanel({
             className={`rounded-control px-3 py-1.5 text-xs font-semibold transition-colors ${
               tab === t
                 ? "bg-gold-400 text-parchment-900"
-                : "bg-white text-parchment-600 border border-parchment-300 hover:bg-parchment-50"
+                : "bg-parchment-50 text-parchment-600 border border-parchment-300 hover:bg-parchment-100"
             }`}
           >
             {t === "asi" ? "Ability Score" : "Feat"}
@@ -693,7 +693,7 @@ export default function AdvancementPanel({
               <button
                 type="button"
                 onClick={() => setCustomMode(true)}
-                className="mt-3 w-full rounded-control border border-dashed border-parchment-300 px-3 py-1.5 text-xs text-parchment-600 hover:border-parchment-400 hover:bg-white"
+                className="mt-3 w-full rounded-control border border-dashed border-parchment-300 px-3 py-1.5 text-xs text-parchment-600 hover:border-parchment-400 hover:bg-parchment-50"
               >
                 + Add custom feat
               </button>
