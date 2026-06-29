@@ -33,7 +33,7 @@ export default function FightingStylePanel({ current, busy, onChoose }: Props) {
         type="button"
         disabled={busy}
         onClick={() => setOpen(true)}
-        className="self-start rounded-control border border-dashed border-gold-400 px-3 py-1.5 text-xs font-semibold text-gold-700 hover:border-gold-600 hover:bg-gold-50 disabled:cursor-not-allowed disabled:opacity-40"
+        className="self-start rounded-control border border-dashed border-gold-400 px-3 py-1.5 text-xs font-semibold text-gold-800 hover:border-gold-600 hover:bg-gold-50 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {current ? `Change fighting style (${fightingStyleLabel(current)})` : "+ Choose a fighting style"}
       </button>

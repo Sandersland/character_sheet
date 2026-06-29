@@ -263,7 +263,7 @@ export default function AdvancementPanel({
           type="button"
           disabled={slotsRemaining <= 0 || busy}
           onClick={() => setOpen(true)}
-          className="self-start rounded-control border border-dashed border-gold-400 px-3 py-1.5 text-xs font-semibold text-gold-700 hover:border-gold-600 hover:bg-gold-50 disabled:cursor-not-allowed disabled:opacity-40"
+          className="self-start rounded-control border border-dashed border-gold-400 px-3 py-1.5 text-xs font-semibold text-gold-800 hover:border-gold-600 hover:bg-gold-50 disabled:cursor-not-allowed disabled:opacity-40"
         >
           + Choose advancement
         </button>
@@ -331,7 +331,7 @@ export default function AdvancementPanel({
                   <span className="tabular-nums text-sm text-parchment-600">
                     {current}
                     {bonus > 0 && (
-                      <span className="ml-1 font-semibold text-gold-700">→ {newVal}</span>
+                      <span className="ml-1 font-semibold text-gold-800">→ {newVal}</span>
                     )}
                   </span>
                   <div className="flex items-center gap-1.5">
@@ -344,7 +344,7 @@ export default function AdvancementPanel({
                     >
                       −
                     </button>
-                    <span className="w-4 text-center text-sm font-semibold text-gold-700">
+                    <span className="w-4 text-center text-sm font-semibold text-gold-800">
                       {bonus > 0 ? `+${bonus}` : ""}
                     </span>
                     <button
@@ -513,7 +513,7 @@ export default function AdvancementPanel({
                 <button
                   type="button"
                   onClick={addStatBonus}
-                  className="text-xs text-gold-700 hover:text-gold-900"
+                  className="text-xs text-gold-800 hover:text-gold-900"
                 >
                   + Add stat bonus
                 </button>
@@ -663,7 +663,7 @@ export default function AdvancementPanel({
                         <p className="text-sm font-medium text-parchment-900">
                           {feat.name}
                           {feat.abilityOptions.length > 0 && (
-                            <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-gold-600">
+                            <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-gold-800">
                               half-feat
                             </span>
                           )}

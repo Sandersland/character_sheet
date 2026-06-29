@@ -297,7 +297,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
                 {" "}
                 / {hitPoints.max}
                 {hitPoints.temp > 0 && (
-                  <span className="text-gold-700"> (+{hitPoints.temp} temp)</span>
+                  <span className="text-gold-800"> (+{hitPoints.temp} temp)</span>
                 )}
               </span>
             </p>

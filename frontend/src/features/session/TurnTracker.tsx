@@ -431,7 +431,7 @@ export default function TurnTracker({ character, turnState, onUpdate }: TurnTrac
             <span>⚡</span>
             <span>Action Surge</span>
             {actionSurgePool && actionSurgePool.remaining > 1 && (
-              <span className="text-gold-600">({actionSurgePool.remaining} left)</span>
+              <span className="text-gold-800">({actionSurgePool.remaining} left)</span>
             )}
           </button>
         )}

@@ -27,6 +27,13 @@ here: see `frontend/src/index.css` header comment block.
 - Accents: `--color-arcane-{50..900}` (teal, for spellcasting/magic UI),
   `--color-gold-{50..900}` (yellow, for resource meters/expertise),
   `--color-vitality-{50..900}` (green, for positive/equipped states).
+- **Accent text on light must clear WCAG AA 4.5:1.** The mid accent steps are
+  light enough to fail as text on near-white surfaces (e.g. `gold-700` ≈ 3.7:1,
+  `arcane-600`/`garnet-500` ≈ 3.6–3.9:1). Use a step that clears AA against the
+  *actual* background: as a baseline `gold` ≥ 800, `arcane` ≥ 700, `garnet` ≥ 600
+  for text on parchment-50/white; bump one step darker on a tinted fill (e.g.
+  `arcane-800` on `bg-arcane-100`). The lighter accent steps are for
+  fills/borders/meters/badges, not text. (See #187 / #158.)
 - Fonts: `--font-display` = Source Serif 4 (headings only, h1-h3), `--font-sans`
   = Source Sans 3 (body/UI default). Loaded via Google Fonts `<link>` tags in
   `frontend/index.html` (no local font files, no extra build dep).

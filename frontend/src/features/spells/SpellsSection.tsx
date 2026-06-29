@@ -206,7 +206,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
           </p>
           <p className="font-display text-xl font-semibold text-arcane-900">
             {ability ? abilityAbbr(ability) : "—"}
-            <span className="ml-1 text-sm font-normal text-arcane-600">
+            <span className="ml-1 text-sm font-normal text-arcane-700">
               ({formatModifier(abilityMod)})
             </span>
           </p>
@@ -405,7 +405,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
                       {lvl === 0 ? "Cantrips" : `Level ${lvl}`}
                     </h4>
                     {slotInfo && (
-                      <span className="text-[11px] tabular-nums text-arcane-600">
+                      <span className="text-[11px] tabular-nums text-arcane-700">
                         {slotInfo.total - slotInfo.used}/{slotInfo.total} slots
                       </span>
                     )}
