@@ -59,6 +59,7 @@ describe("orderedAbilityEntries", () => {
           {orderedAbilityEntries(scrambledScores).map(([key, score]) => (
             <AbilityScoreBox
               key={key}
+              ability={key}
               label={abilityAbbr(key)}
               score={score}
               proficiencyBonus={2}

@@ -58,25 +58,57 @@ describe("AccountMenu", () => {
     expect(screen.getByText("ada@x.dev")).toBeInTheDocument();
   });
 
-  it("cycles theme system -> light -> dark -> system without closing", async () => {
+  it("renders Light/Dark/System options with the current one checked", async () => {
     const user = userEvent.setup();
     renderMenu();
     await user.click(screen.getByRole("button", { name: "Account" }));
 
-    const theme = () => screen.getByRole("menuitem", { name: /Theme:/ });
-    expect(theme()).toHaveAccessibleName(/Theme: System/);
+    const light = screen.getByRole("menuitemradio", { name: "Light" });
+    const dark = screen.getByRole("menuitemradio", { name: "Dark" });
+    const system = screen.getByRole("menuitemradio", { name: "System" });
+    expect(light).toBeInTheDocument();
+    expect(dark).toBeInTheDocument();
+    expect(system).toBeInTheDocument();
 
-    await user.click(theme());
+    // Defaults to system.
+    expect(system).toHaveAttribute("aria-checked", "true");
+    expect(light).toHaveAttribute("aria-checked", "false");
+    expect(dark).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("picks a theme directly and marks it active without closing the menu", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: "Account" }));
+
+    await user.click(screen.getByRole("menuitemradio", { name: "Dark" }));
+    expect(localStorage.getItem("cs:pref:theme")).toBe("dark");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(screen.getByRole("menuitemradio", { name: "Dark" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("menuitemradio", { name: "Light" }));
     expect(localStorage.getItem("cs:pref:theme")).toBe("light");
     expect(document.documentElement.dataset.theme).toBe("light");
     expect(screen.getByRole("menu")).toBeInTheDocument();
 
-    await user.click(theme());
-    expect(localStorage.getItem("cs:pref:theme")).toBe("dark");
-    expect(document.documentElement.dataset.theme).toBe("dark");
-
-    await user.click(theme());
+    await user.click(screen.getByRole("menuitemradio", { name: "System" }));
     expect(localStorage.getItem("cs:pref:theme")).toBe("system");
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+  });
+
+  it("exposes the theme options to keyboard navigation", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: "Account" }));
+
+    // Roving focus starts on the first menu item; Arrow keys reach the options.
+    await user.keyboard("{ArrowDown}");
+    await user.keyboard("{Enter}");
+    expect(localStorage.getItem("cs:pref:theme")).toBe("dark");
     expect(screen.getByRole("menu")).toBeInTheDocument();
   });
 
