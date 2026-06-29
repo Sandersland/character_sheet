@@ -49,6 +49,25 @@ here: see `frontend/src/index.css` header comment block.
   two radius values, reused everywhere per components.md's "pick one
   corner-radius convention."
   Shadows: `--shadow-card` and `--shadow-raised` — a 2-level elevation system.
+  `--shadow-card` leads with a soft top-edge inset highlight
+  (`inset 0 1px 0 rgb(255 255 255 / .4)` light, near-none in dark) for "pressed
+  paper" depth (#228).
+
+## Parchment texture (#228) — `index.css`
+
+Subtle paper grain over the flat color surfaces, pure CSS + inline SVG (no
+raster asset). One reusable token `--texture-grain` (a `feTurbulence`
+fractal-noise data-URI; note `%` is encoded `%25` inside the SVG) is painted at
+`background-size: 200px`. Two layers consume it:
+- **Page canvas**: a fixed `pointer-events:none` `body::before` (`z-index:-1`,
+  behind content) at `--texture-page-opacity` (0.06 light / 0.04 dark).
+- **Card grain**: the `.surface-grain` class (added to `Card.tsx`) paints an
+  absolutely-positioned `::after` with `border-radius: inherit` at
+  `--texture-card-opacity` (0.035 light / 0.025 dark).
+
+Both use `--texture-blend`: `multiply` in light (darkens), `screen` in dark
+(lightens). Per-theme opacity/blend props live under `:root` /
+`[data-theme="dark"]`. Subtle by design — visible grain, no text/contrast impact.
 
 None of the 24 pre-built `palette-themes.md` palettes targeted a parchment
 mood, so the palette was assembled from individual hue families in

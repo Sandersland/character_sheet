@@ -30,7 +30,7 @@ export default function Card({
   const HeadingTag = `h${headingLevel}` as "h2" | "h3";
   return (
     <section
-      className={`rounded-card border border-parchment-200 bg-parchment-50 shadow-card ${className}`}
+      className={`surface-grain relative rounded-card border border-parchment-200 bg-parchment-50 shadow-card ${className}`}
     >
       {title && (
         <div className="flex items-center justify-between gap-2 border-b border-parchment-200 px-4 py-2.5">
