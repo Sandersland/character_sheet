@@ -93,13 +93,24 @@
   --radius-control: 0.375rem;
 
   /* Shadows — small elevation system per principles.md (Creating Depth) */
+  /* Leading inset highlight = soft top-edge "pressed paper" depth (#228). */
   --shadow-card:
+    inset 0 1px 0 rgb(255 255 255 / 0.4),
     0 1px 2px 0 rgb(39 36 29 / 0.06), 0 2px 8px -2px rgb(39 36 29 / 0.10);
   --shadow-raised:
     0 4px 6px -2px rgb(39 36 29 / 0.08), 0 12px 24px -8px rgb(39 36 29 / 0.16);
 
   /* Modal/overlay scrim — overridden in dark mode. */
   --color-backdrop: rgb(39 36 29 / 0.45);
+}
+
+/* Parchment texture (#228): inline SVG fractal-noise grain, per-theme blend.
+   Light multiplies (darkens) the surface; dark screens (lightens) it. */
+:root {
+  --texture-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --texture-blend: multiply;
+  --texture-page-opacity: 0.06;
+  --texture-card-opacity: 0.035;
 }
 
 @layer base {
@@ -111,6 +122,19 @@
   body {
     background-color: var(--color-parchment-100);
     color: var(--color-parchment-900);
+  }
+
+  /* Fixed page-canvas grain; behind content, never captures clicks (#228). */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: var(--texture-grain);
+    background-size: 200px 200px;
+    mix-blend-mode: var(--texture-blend);
+    opacity: var(--texture-page-opacity);
   }
 
   h1,
@@ -126,6 +150,19 @@
     outline-offset: 2px;
     border-radius: var(--radius-control);
   }
+}
+
+/* Faint card-surface grain (#228); overlay layer, never tints interaction. */
+.surface-grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image: var(--texture-grain);
+  background-size: 200px 200px;
+  mix-blend-mode: var(--texture-blend);
+  opacity: var(--texture-card-opacity);
 }
 
 /* Dark mode: reversed neutral ramp (-50 darkest surface … -900 lightest text), warm. */
@@ -187,8 +224,15 @@
   --color-vitality-800: #c0f2c4;
   --color-vitality-900: #ddf8df;
 
-  /* Deeper shadows for elevation against dark surfaces. */
-  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.50), 0 2px 8px -2px rgb(0 0 0 / 0.65);
+  /* Grain screens (lightens) on dark; fainter than light. */
+  --texture-blend: screen;
+  --texture-page-opacity: 0.04;
+  --texture-card-opacity: 0.025;
+
+  /* Deeper shadows for elevation against dark surfaces; near-none top highlight. */
+  --shadow-card:
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    0 1px 2px 0 rgb(0 0 0 / 0.50), 0 2px 8px -2px rgb(0 0 0 / 0.65);
   --shadow-raised: 0 6px 10px -3px rgb(0 0 0 / 0.55),
     0 16px 32px -10px rgb(0 0 0 / 0.75);
 

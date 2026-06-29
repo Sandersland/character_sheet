@@ -64,6 +64,17 @@ describe("JournalSection", () => {
     expect(onUpdate).toHaveBeenCalledWith(updated);
   });
 
+  it("renders the date input with a value and a shrinkable width (#235)", async () => {
+    const user = userEvent.setup();
+    render(<JournalSection character={makeCharacter([])} onUpdate={vi.fn()} />);
+
+    await user.click(screen.getAllByRole("button", { name: "+ Add entry" })[0]);
+    const dateInput = screen.getByLabelText("Date") as HTMLInputElement;
+    expect(dateInput).toHaveAttribute("type", "date");
+    expect(dateInput.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(dateInput.className).toContain("min-w-0");
+  });
+
   it("does not submit the add form with an empty title", async () => {
     const user = userEvent.setup();
     render(<JournalSection character={makeCharacter([])} onUpdate={vi.fn()} />);

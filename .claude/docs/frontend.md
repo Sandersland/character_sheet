@@ -129,6 +129,7 @@ Summary of what's available:
 - Fonts: `--font-display` (Source Serif 4, headings), `--font-sans` (Source Sans 3, body/UI)
 - Radius: `--radius-card` (0.625rem), `--radius-control` (0.375rem) — just two, used everywhere
 - Shadows: `--shadow-card`, `--shadow-raised`
+- Texture (#228): `--texture-grain` (inline-SVG fractal-noise data-URI) plus per-theme `--texture-blend`/`--texture-page-opacity`/`--texture-card-opacity`. A fixed `body::before` paints the page-canvas grain; the `.surface-grain` class (on `Card`) paints a faint `::after` grain clipped to the card radius. Both are `pointer-events:none`. See `design_system.md`.
 
 Use idiomatic utility classes — tokens auto-generate them in v4: `text-garnet-700`, `bg-arcane-50`, `rounded-card`, `shadow-raised`. Only fall back to `[var(...)]` syntax for non-token one-off values.
 
