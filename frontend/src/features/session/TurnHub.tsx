@@ -286,7 +286,7 @@ function LayOnHandsInput({
         max={maxPool}
         value={amount}
         onChange={(e) => setAmount(Math.min(maxPool, Math.max(1, Number(e.target.value))))}
-        className="w-16 rounded-control border border-vitality-300 bg-white px-2 py-1 text-center text-sm tabular-nums text-parchment-900 focus:outline-none focus:ring-1 focus:ring-vitality-400"
+        className="w-16 rounded-control border border-vitality-300 bg-parchment-50 px-2 py-1 text-center text-sm tabular-nums text-parchment-900 focus:outline-none focus:ring-1 focus:ring-vitality-400"
         aria-label="Healing amount"
       />
       <QuickBtn
@@ -600,7 +600,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
             <button
               type="button"
               onClick={handleStartCombat}
-              className="shrink-0 rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-garnet-800"
+              className="shrink-0 rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 shadow-sm transition-colors hover:bg-garnet-800"
             >
               Start Combat
             </button>
@@ -638,7 +638,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
                   setError(null);
                   startTurn();
                 }}
-                className="rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-garnet-800"
+                className="rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 shadow-sm transition-colors hover:bg-garnet-800"
               >
                 Start Turn
               </button>

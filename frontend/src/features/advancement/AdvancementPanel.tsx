@@ -302,8 +302,8 @@ export default function AdvancementPanel({
             onClick={() => handleTabChange(t)}
             className={`rounded-control px-3 py-1.5 text-xs font-semibold transition-colors ${
               tab === t
-                ? "bg-gold-600 text-white"
-                : "bg-white text-parchment-600 border border-parchment-300 hover:bg-parchment-50"
+                ? "bg-gold-400 text-ink"
+                : "bg-parchment-50 text-parchment-600 border border-parchment-300 hover:bg-parchment-100"
             }`}
           >
             {t === "asi" ? "Ability Score" : "Feat"}
@@ -365,7 +365,7 @@ export default function AdvancementPanel({
             type="button"
             disabled={totalPoints !== 2 || busy}
             onClick={handleAsiSubmit}
-            className="mt-4 w-full rounded-control bg-gold-600 px-4 py-2 text-sm font-semibold text-white hover:bg-gold-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="mt-4 w-full rounded-control bg-gold-400 px-4 py-2 text-sm font-semibold text-ink hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Apply ASI
           </button>
@@ -404,7 +404,7 @@ export default function AdvancementPanel({
                   <select
                     value={abilityChoice}
                     onChange={(e) => setAbilityChoice(e.target.value)}
-                    className="w-full max-w-xs rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 focus:border-gold-500 focus:outline-none"
+                    className="w-full max-w-xs rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 focus:border-gold-500 focus:outline-none"
                   >
                     <option value="" disabled>Choose an ability…</option>
                     {selectedFeat.abilityOptions.map((a) => (
@@ -425,7 +425,7 @@ export default function AdvancementPanel({
                 type="button"
                 disabled={busy || (selectedFeat.abilityOptions.length > 1 && !abilityChoice)}
                 onClick={handleFeatSubmit}
-                className="mt-4 w-full rounded-control bg-gold-600 px-4 py-2 text-sm font-semibold text-white hover:bg-gold-700 disabled:cursor-not-allowed disabled:opacity-40"
+                className="mt-4 w-full rounded-control bg-gold-400 px-4 py-2 text-sm font-semibold text-ink hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Take feat
               </button>
@@ -450,14 +450,14 @@ export default function AdvancementPanel({
                   placeholder="Feat name"
                   value={customName}
                   onChange={(e) => setCustomName(e.target.value)}
-                  className="w-full rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
+                  className="w-full rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
                 />
                 <textarea
                   placeholder="Description (optional)"
                   value={customDesc}
                   onChange={(e) => setCustomDesc(e.target.value)}
                   rows={2}
-                  className="w-full rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
+                  className="w-full rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
                 />
               </div>
 
@@ -473,7 +473,7 @@ export default function AdvancementPanel({
                         <select
                           value={row.target}
                           onChange={(e) => updateStatBonus(row.id, { target: e.target.value })}
-                          className="rounded-control border border-parchment-300 bg-white px-2 py-1 text-xs text-parchment-900 focus:border-gold-500 focus:outline-none"
+                          className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-xs text-parchment-900 focus:border-gold-500 focus:outline-none"
                         >
                           {NUMERIC_TARGETS.map((t) => (
                             <option key={t.value} value={t.value}>{t.label}</option>
@@ -486,7 +486,7 @@ export default function AdvancementPanel({
                           max={99}
                           value={row.amount || ""}
                           onChange={(e) => updateStatBonus(row.id, { amount: Math.max(0, parseInt(e.target.value) || 0) })}
-                          className="w-16 rounded-control border border-parchment-300 bg-white px-2 py-1 text-xs text-parchment-900 focus:border-gold-500 focus:outline-none"
+                          className="w-16 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-xs text-parchment-900 focus:border-gold-500 focus:outline-none"
                           placeholder="0"
                         />
                         <label className="flex items-center gap-1 text-[11px] text-parchment-600">
@@ -589,7 +589,7 @@ export default function AdvancementPanel({
                       max={10}
                       value={abilityIncrease}
                       onChange={(e) => setAbilityIncrease(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-16 rounded-control border border-parchment-300 bg-white px-2 py-1 text-xs text-parchment-900 focus:border-gold-500 focus:outline-none"
+                      className="w-16 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-xs text-parchment-900 focus:border-gold-500 focus:outline-none"
                     />
                   </label>
                 )}
@@ -602,7 +602,7 @@ export default function AdvancementPanel({
                     <select
                       value={customAbilityChoice}
                       onChange={(e) => setCustomAbilityChoice(e.target.value)}
-                      className="w-full max-w-xs rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 focus:border-gold-500 focus:outline-none"
+                      className="w-full max-w-xs rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 focus:border-gold-500 focus:outline-none"
                     >
                       <option value="" disabled>Choose an ability…</option>
                       {abilityOptionsArr.map((a) => (
@@ -624,7 +624,7 @@ export default function AdvancementPanel({
                 type="button"
                 disabled={customSubmitDisabled}
                 onClick={handleFeatSubmit}
-                className="mt-4 w-full rounded-control bg-gold-600 px-4 py-2 text-sm font-semibold text-white hover:bg-gold-700 disabled:cursor-not-allowed disabled:opacity-40"
+                className="mt-4 w-full rounded-control bg-gold-400 px-4 py-2 text-sm font-semibold text-ink hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Add custom feat
               </button>
@@ -639,7 +639,7 @@ export default function AdvancementPanel({
                 placeholder="Filter feats…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="mb-3 w-full rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
+                className="mb-3 w-full rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
               />
               {catalogError && (
                 <p className="text-xs text-garnet-700">{catalogError}</p>
@@ -681,7 +681,7 @@ export default function AdvancementPanel({
                         type="button"
                         disabled={busy}
                         onClick={() => handleSelectFeat(feat)}
-                        className="shrink-0 rounded bg-gold-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-gold-700 disabled:opacity-40"
+                        className="shrink-0 rounded bg-gold-400 px-2.5 py-1 text-xs font-semibold text-ink hover:bg-gold-500 disabled:opacity-40"
                       >
                         Select
                       </button>
@@ -693,7 +693,7 @@ export default function AdvancementPanel({
               <button
                 type="button"
                 onClick={() => setCustomMode(true)}
-                className="mt-3 w-full rounded-control border border-dashed border-parchment-300 px-3 py-1.5 text-xs text-parchment-600 hover:border-parchment-400 hover:bg-white"
+                className="mt-3 w-full rounded-control border border-dashed border-parchment-300 px-3 py-1.5 text-xs text-parchment-600 hover:border-parchment-400 hover:bg-parchment-50"
               >
                 + Add custom feat
               </button>

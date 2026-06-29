@@ -72,8 +72,7 @@ export default function Modal({ title, onClose, children }: ModalProps) {
       // convenience only — closing is keyboard-accessible via the Escape
       // handler above, so this element is not an interactive widget.
       role="presentation"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
-      style={{ backgroundColor: "rgb(39 36 29 / 0.45)" }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-backdrop p-4 backdrop-blur-sm"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
