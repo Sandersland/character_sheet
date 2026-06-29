@@ -223,6 +223,7 @@ defaulting to `system`.
   there from `useThemePreference.ts`).
 - **`AppHeader.tsx`** — a 3-state cycle toggle (light → dark → system) with a
   dynamic `aria-label`.
+- Input/control surfaces use `bg-parchment-50` (never `bg-white`) so they flip in dark mode; paired `text-parchment-900`/`placeholder:text-parchment-400` tokens already flip (#212).
 
 ## Dice engine
 
