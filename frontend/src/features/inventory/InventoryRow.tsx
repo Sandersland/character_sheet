@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 import { formatRollSpec } from "@/lib/dice";
@@ -406,7 +407,10 @@ export default function InventoryRow({
               onClick={() => setExpanded((v) => !v)}
               className="flex h-7 w-7 items-center justify-center rounded-control text-parchment-500 transition-colors hover:bg-parchment-200 hover:text-parchment-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
             >
-              {expanded ? "⌃" : "⌄"}
+              <ChevronDown
+                aria-hidden="true"
+                className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`}
+              />
             </button>
           )}
           {isEquippable(item.category) && (
