@@ -94,6 +94,9 @@
     0 1px 2px 0 rgb(39 36 29 / 0.06), 0 2px 8px -2px rgb(39 36 29 / 0.10);
   --shadow-raised:
     0 4px 6px -2px rgb(39 36 29 / 0.08), 0 12px 24px -8px rgb(39 36 29 / 0.16);
+
+  /* Modal/overlay scrim — overridden in dark mode. */
+  --color-backdrop: rgb(39 36 29 / 0.45);
 }
 
 @layer base {
@@ -185,6 +188,8 @@
   --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.50), 0 2px 8px -2px rgb(0 0 0 / 0.65);
   --shadow-raised: 0 6px 10px -3px rgb(0 0 0 / 0.55),
     0 16px 32px -10px rgb(0 0 0 / 0.75);
+
+  --color-backdrop: rgb(0 0 0 / 0.66);
 }
 
 /* One-shot pop for a freshly-settled dice total (DiceRollSequence chips). */
