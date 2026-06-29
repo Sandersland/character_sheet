@@ -86,8 +86,8 @@ function CurrencyEditor({ character, onUpdate }: InventoryListProps) {
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-parchment-200 pt-3">
-      <div className="flex items-center gap-2 text-xs text-parchment-600">
+    <div className="flex flex-col gap-2 border-t border-parchment-200 pt-3">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-parchment-600">
         {(["pp", "gp", "sp", "cp"] as const).map((denomination) => (
           <label key={denomination} className="flex items-center gap-1">
             <input
@@ -100,11 +100,13 @@ function CurrencyEditor({ character, onUpdate }: InventoryListProps) {
             {denomination}
           </label>
         ))}
+      </div>
+      <div className="flex items-center gap-3 text-xs">
         <button
           type="button"
           disabled={pending}
           onClick={save}
-          className="rounded-control bg-arcane-700 px-2.5 py-1 text-xs font-semibold text-parchment-50 transition-colors hover:bg-arcane-800 disabled:opacity-50"
+          className="rounded-control bg-arcane-700 px-2.5 py-1 font-semibold text-parchment-50 transition-colors hover:bg-arcane-800 disabled:opacity-50"
         >
           Save
         </button>
