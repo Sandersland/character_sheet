@@ -133,7 +133,7 @@ export default function AddManeuverPanel({
                 type="button"
                 disabled={busy || atCap}
                 onClick={() => onLearn({ type: "learnManeuver", maneuverId: maneuver.id })}
-                className="shrink-0 rounded bg-gold-400 px-2.5 py-1 text-xs font-semibold text-parchment-900 hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
+                className="shrink-0 rounded bg-gold-400 px-2.5 py-1 text-xs font-semibold text-ink hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
                 title={atCap ? `Already at maximum (${choiceCount})` : `Learn ${maneuver.name}`}
               >
                 Learn

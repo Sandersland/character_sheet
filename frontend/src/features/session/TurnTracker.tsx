@@ -179,7 +179,7 @@ export default function TurnTracker({ character, turnState, onUpdate }: TurnTrac
           <button
             type="button"
             onClick={startTurn}
-            className="shrink-0 rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-garnet-800"
+            className="shrink-0 rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 shadow-sm transition-colors hover:bg-garnet-800"
           >
             Start Turn
           </button>

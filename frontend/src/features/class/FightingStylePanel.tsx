@@ -72,7 +72,7 @@ export default function FightingStylePanel({ current, busy, onChoose }: Props) {
                 type="button"
                 disabled={busy || isCurrent}
                 onClick={() => handleChoose(style.key)}
-                className="shrink-0 rounded bg-gold-400 px-2.5 py-1 text-xs font-semibold text-parchment-900 hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
+                className="shrink-0 rounded bg-gold-400 px-2.5 py-1 text-xs font-semibold text-ink hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
                 title={`Choose ${style.label}`}
               >
                 {isCurrent ? "Chosen" : "Choose"}

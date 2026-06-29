@@ -108,7 +108,7 @@ export default function AddConditionPanel({ activeKeys, busy, onApply }: Props) 
                 type="button"
                 disabled={busy}
                 onClick={() => handleApply(condition.key)}
-                className="shrink-0 rounded bg-gold-400 px-2.5 py-1 text-xs font-semibold text-parchment-900 hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
+                className="shrink-0 rounded bg-gold-400 px-2.5 py-1 text-xs font-semibold text-ink hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
                 title={`Apply ${condition.label}`}
               >
                 Apply

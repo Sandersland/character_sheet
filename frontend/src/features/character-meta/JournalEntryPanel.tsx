@@ -139,7 +139,7 @@ export default function JournalEntryPanel({
         <button
           type="submit"
           disabled={!canSubmit}
-          className="rounded-control bg-garnet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-garnet-700 disabled:opacity-40"
+          className="rounded-control bg-garnet-600 px-3 py-1.5 text-xs font-semibold text-parchment-50 hover:bg-garnet-700 disabled:opacity-40"
         >
           {busy ? "Saving…" : mode === "add" ? "Add entry" : "Save changes"}
         </button>

@@ -600,7 +600,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
             <button
               type="button"
               onClick={handleStartCombat}
-              className="shrink-0 rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-garnet-800"
+              className="shrink-0 rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 shadow-sm transition-colors hover:bg-garnet-800"
             >
               Start Combat
             </button>
@@ -638,7 +638,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
                   setError(null);
                   startTurn();
                 }}
-                className="rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-garnet-800"
+                className="rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 shadow-sm transition-colors hover:bg-garnet-800"
               >
                 Start Turn
               </button>

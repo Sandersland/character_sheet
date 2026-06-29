@@ -218,7 +218,7 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
                     type="button"
                     disabled={busy || alreadyKnown}
                     onClick={() => handleCatalogLearn(spell)}
-                    className="shrink-0 rounded bg-arcane-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-arcane-800 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="shrink-0 rounded bg-arcane-700 px-2.5 py-1 text-xs font-semibold text-parchment-50 hover:bg-arcane-800 disabled:cursor-not-allowed disabled:opacity-40"
                     title={alreadyKnown ? "Already in your spellbook" : `Learn ${spell.name}`}
                   >
                     {alreadyKnown ? "Known" : "Learn"}
@@ -417,7 +417,7 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
             <button
               type="submit"
               disabled={busy || !custom.name.trim()}
-              className="rounded-control bg-arcane-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-arcane-800 disabled:opacity-40"
+              className="rounded-control bg-arcane-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 hover:bg-arcane-800 disabled:opacity-40"
             >
               {busy ? "Saving…" : "Add custom spell"}
             </button>
