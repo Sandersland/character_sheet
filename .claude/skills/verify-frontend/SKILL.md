@@ -36,7 +36,22 @@ npm run test --workspace=frontend
 ```
 Capture the full output (pass/fail count, any failing test names and assertions). This includes the `jest-axe` runtime accessibility assertions in component tests.
 
-**Browser verification** — invoke the `/verify` skill concurrently. It will launch the app and drive the changed UI at the browser surface.
+**Browser verification** — invoke the `/verify` skill concurrently. It will launch the app and drive the changed UI at the browser surface. Verify **both viewports**, not desktop alone:
+
+- **Desktop** — the default surface (resize to ~1440×900).
+- **Mobile (375px)** — resize to **375×667** (iPhone SE — the tightest realistic width, where overflow bites) and re-drive the same changed UI. Most of this app's recent regressions were mobile-overflow bugs that desktop-only checks never saw, so this pass is mandatory, not optional.
+
+At 375px, run the **objective overflow assertion** on every changed surface (and inside any modal/panel the change opens) — a deterministic pass/fail, not a judgment call:
+
+```js
+// browser_evaluate — overflow:true is a blocking defect
+() => {
+  const el = document.documentElement;
+  return { overflow: el.scrollWidth > el.clientWidth, scrollWidth: el.scrollWidth, clientWidth: el.clientWidth };
+}
+```
+
+Also confirm at 375px: no content clipped or cut off, sticky/bottom controls stay reachable, modals fit the viewport, and interactive hit targets are ≥44px. Screenshot the mobile state to `/tmp/verify-<feature>-mobile.png` as evidence.
 
 **Design review** — derive the changed UI surfaces with:
 ```bash
@@ -47,6 +62,7 @@ and launch the design agent against them. Try `subagent_type: "frontend-design-a
 - **Visual hierarchy** — is the primary action obvious, is type scale used purposefully, is whitespace deliberate rather than uniform.
 - **Component reuse** — reuses `Card`/`Badge`/`MeterBar`/`Tabs`/`Modal` rather than reinventing a one-off; respects the inline-panel-vs-Modal rule.
 - **Convention violations** — raw skill/ability keys in the UI, color-only meaning (e.g. a meter with no numeric label), missing focus/hover states.
+- **Mobile layout (375px)** — judge the rendered UI at a 375px width, not desktop alone: does the layout reflow sensibly (stack/wrap rather than overflow), is text still readable, are controls still reachable and ≥44px, do modals/panels fit? Horizontal overflow, clipped content, and unreachable controls at 375px are `blocking`; cramped-but-functional spacing is `advisory`.
 - **Accessibility** — anything `jsx-a11y` lint and axe can't catch at the markup level (contrast, focus order, hit targets).
 
 For changes that touch a whole page or a new flow, also run the `/ux-review` skill concurrently (when available in the environment) for the page-level Learnability / Heuristics / Visual scores. For a single-component change, the architect agent alone is enough. If you skip `/ux-review` — because the change is component-scoped or the skill isn't installed here — say so in the report rather than silently dropping it.
@@ -73,7 +89,8 @@ Use this format:
 <paste the full vitest output — pass/fail summary and any failure details>
 
 ### Browser verification
-<paste the full verdict block from /verify>
+✅/❌ Desktop (~1440) · ✅/❌ Mobile (375) — overflow assertion: <scrollWidth>/<clientWidth> per changed surface
+<paste the full verdict block from /verify, covering both viewports>
 
 ### Design review
 ✅/⚠️/❌ frontend-design-architect (+ /ux-review if run; note if skipped and why)
@@ -84,8 +101,9 @@ Use this format:
 ```
 
 **Verdict rules:**
-- **PASS** only if unit tests pass, browser verification passes, AND the design review has **no `blocking` findings**.
+- **PASS** only if unit tests pass, browser verification passes at **both desktop and 375px mobile**, AND the design review has **no `blocking` findings**.
 - **FAIL** if any lane fails — include which one(s) and why. A design review with one or more `blocking` findings is a FAIL.
+- **Mobile severity:** at 375px, objective defects are `blocking` and FAIL the gate — horizontal overflow (the `scrollWidth > clientWidth` assertion returns true), clipped/cut-off content, controls that become unreachable, and interactive hit targets under 44px. Subjective mobile polish (tighter-than-ideal spacing, a layout that works but could reflow more elegantly) is `advisory` and does not fail the gate. When the overflow assertion fires, the gate is a FAIL regardless of how the layout looks.
 - **Design severity:** `blocking` = a design-system or convention violation that's objectively wrong here (off-token color/radius/shadow, raw skill/ability key in the UI, color-only meaning, broken hierarchy that obscures the primary action, an a11y defect). `advisory` = subjective polish (a nicer arrangement, optional spacing tweaks) — list it, but it does not fail the gate. When unsure whether a finding is taste or a real regression, mark it `advisory` and call it out, don't block on it.
 - If any lane fails, still report the others (running in parallel means you have them).
 - Never skip a lane because another "already covers it" — they are complementary, not substitutes.
