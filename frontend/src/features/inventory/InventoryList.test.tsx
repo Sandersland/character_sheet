@@ -127,6 +127,13 @@ describe("InventoryList sectioning", () => {
     expect(names).toEqual(["Longsword", "Club"]);
   });
 
+  it("renders a decorative icon inside each category header", () => {
+    const inventory = [makeItem({ id: "w1", name: "Axe", category: "weapon", weight: 4 })];
+    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    const header = screen.getByRole("heading", { level: 4 });
+    expect(header.querySelector("svg")).toBeInTheDocument();
+  });
+
   it("hides categories with no items", () => {
     render(
       <InventoryList

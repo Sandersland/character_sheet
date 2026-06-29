@@ -5,6 +5,7 @@ import { applyInventoryTransactions, fetchItems, updateCharacter } from "@/api/c
 import type { Character, Currency, InventoryOperation, Item, ItemCategory } from "@/types/character";
 import AddItemPanel from "@/features/inventory/AddItemPanel";
 import Card from "@/components/ui/Card";
+import { ITEM_CATEGORY_ICONS } from "@/components/ui/icons";
 import InventoryRow from "@/features/inventory/InventoryRow";
 import MeterBar from "@/components/ui/MeterBar";
 import { buildSellOperations } from "@/lib/bulkSell";
@@ -367,9 +368,12 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
           </div>
         ) : hasMatches ? (
           <div className="max-h-96 overflow-y-auto">
-            {sections.map((section) => (
+            {sections.map((section) => {
+              const CategoryIcon = ITEM_CATEGORY_ICONS[section.category];
+              return (
               <section key={section.category} className="pt-3 first:pt-0">
-                <h4 className="sticky top-0 z-10 border-b border-parchment-200 bg-parchment-50 py-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
+                <h4 className="sticky top-0 z-10 inline-flex w-full items-center gap-1.5 border-b border-parchment-200 bg-parchment-50 py-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
+                  <CategoryIcon aria-hidden="true" className="text-sm" />
                   {itemCategoryLabel(section.category)} · {section.items.length} ·{" "}
                   {formatWeight(section.weight)} lb
                 </h4>
@@ -390,7 +394,8 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
                   ))}
                 </ul>
               </section>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <p className="py-8 text-center text-sm text-parchment-600">No items match your search.</p>
