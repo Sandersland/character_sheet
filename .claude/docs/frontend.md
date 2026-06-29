@@ -27,9 +27,11 @@ frontend/src/
 │   ├── session/         # TurnHub, TurnTracker, useTurnState, SessionLog, SessionsModal,
 │   │                    #   SessionSummaryModal, Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
 │   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie
-│   └── spells/          # SpellsSection, SpellRow, AddSpellPanel
+│   ├── spells/          # SpellsSection, SpellRow, AddSpellPanel
+│   └── theme/           # ThemeProvider (useTheme) — applies data-theme app-wide
 ├── hooks/               # reusable React hooks used by pages or multiple clusters
-│   │                    #   (useCharacter, useCharacterList, useCharacterDraft, useReferenceData)
+│   │                    #   (useCharacter, useCharacterList, useCharacterDraft, useReferenceData,
+│   │                    #    useThemePreference)
 ├── lib/                 # pure TS logic — NO React/JSX (dice, abilities, timeline, startingEquipment, …)
 ├── pages/               # route-level views (CharacterListPage, CharacterSheetPage,
 │   │                    #   CharacterCreatePage, SessionPage, LoginPage)
@@ -130,7 +132,7 @@ Summary of what's available:
 
 Use idiomatic utility classes — tokens auto-generate them in v4: `text-garnet-700`, `bg-arcane-50`, `rounded-card`, `shadow-raised`. Only fall back to `[var(...)]` syntax for non-token one-off values.
 
-**Text-contrast policy (WCAG AA).** On the `parchment-50` background nothing lighter than `parchment-600` clears 4.5:1, so **readable text uses `parchment-600` or darker** (`-600` secondary, `-700`/`-900` primary). `text-parchment-400`/`-500` are **reserved for WCAG-exempt uses only** — `placeholder:`, `disabled:`, and decorative `aria-hidden` glyphs — never for content text. Don't reintroduce `-400`/`-500` on readable text (see #158/#98). The same 4.5:1 floor applies to **accent text on light surfaces**: `gold` ≥ 800, `arcane` ≥ 700, `garnet` ≥ 600 (bump one step darker on a tinted fill, e.g. `arcane-800` on `bg-arcane-100`) — the mid steps (`gold-700`, `arcane-600`, `garnet-500`) fail as text. Lighter accent steps are for fills/borders/meters, not text (see #187/#207). Full rationale in `design_system.md`.
+**Text-contrast policy (WCAG AA).** On the `parchment-50` background nothing lighter than `parchment-600` clears 4.5:1, so **readable text uses `parchment-600` or darker** (`-600` secondary, `-700`/`-900` primary). `text-parchment-400`/`-500` are **reserved for WCAG-exempt uses only** — `placeholder:`, `disabled:`, and decorative `aria-hidden` glyphs — never for content text. Don't reintroduce `-400`/`-500` on readable text (see #158/#98). The same 4.5:1 floor applies to **accent text on light surfaces**: `gold` ≥ 800, `arcane` ≥ 700, `garnet` ≥ 600 (bump one step darker on a tinted fill, e.g. `arcane-800` on `bg-arcane-100`) — the mid steps (`gold-700`, `arcane-600`, `garnet-500`) fail as text. Lighter accent steps are for fills/borders/meters, not text (see #187/#207). The mirror rule applies to **light text on an accent fill** — it must also clear 4.5:1, so only the darker accents can carry white: `garnet-600` (≈5.5:1) and `vitality-600` (≈4.9:1) do; `arcane` carries white only from `arcane-700` down (`arcane-600` ≈3.8:1, `arcane-700` ≈5.07:1, hover `arcane-800` ≈6.44:1); and **gold can never carry white** (`gold-800` technically passes at ~6:1 but reads muddy), so filled gold flips to **dark text on a bright fill** on `bg-gold-400` (hover `bg-gold-500`) (see #207). **Dark mode (#211/#213): a label token on an accent fill must co-flip with its fill or stay fixed.** Garnet/arcane/vitality fills **invert** between modes, so their labels use **`text-parchment-50`** (near-white in light, near-black in dark) — never hard-coded `text-white`. Gold is light-ish in **both** modes, so its label uses **`text-ink`** (the fixed `--color-ink` #27241d that never flips), ≈10.5:1 light / ≈5.6:1 dark — never `text-parchment-900` (which flips light in dark and fails AA). Full rationale in `design_system.md`.
 
 ### Design gate
 
@@ -197,8 +199,32 @@ OAuth-only (no passwords). Pieces:
   `GET /api/auth/providers` (each a plain anchor to its `startUrl`), so enabling
   a provider server-side needs no frontend change.
 
-`App.tsx` order: `BrowserRouter → ErrorBoundary → AuthProvider → AuthGate →
-(AppHeader + Routes)` — ErrorBoundary stays outermost over the app content.
+`App.tsx` order: `BrowserRouter → ErrorBoundary → ThemeProvider → AuthProvider →
+AuthGate → (AppHeader + Routes)` — ErrorBoundary stays outermost over the app
+content; ThemeProvider wraps auth so `data-theme` applies app-wide.
+
+## Theme / dark mode — `features/theme/`
+
+Dark mode is a set of `--color-*` overrides under `[data-theme="dark"]` in
+`index.css` (the dark palette uses reversed ramps + dark shadows + a
+`--color-backdrop` token; #211 — see `design_system.md`; light mode is
+unchanged). The preference is persisted at `localStorage["cs:pref:theme"]`,
+defaulting to `system`.
+
+- **`hooks/useThemePreference.ts`** — pure persistence + resolution:
+  `ThemePreference = light | dark | system`, `loadThemePreference` /
+  `saveThemePreference`, `getSystemTheme` (via `matchMedia`), `resolveTheme`, and
+  the `useThemePreference` hook (a `useState`-shaped pair).
+- **`features/theme/ThemeProvider.tsx`** — context (`useTheme`): exposes
+  `{ preference, resolved, setPreference }` and writes the resolved theme onto
+  `document.documentElement.dataset.theme`; while on `system` it re-resolves on
+  OS `prefers-color-scheme` changes.
+- **`index.html`** — a tiny blocking inline script applies `data-theme`
+  pre-paint to avoid a flash of the wrong theme (the storage key is duplicated
+  there from `useThemePreference.ts`).
+- **`AppHeader.tsx`** — a 3-state cycle toggle (light → dark → system) with a
+  dynamic `aria-label`.
+- Input/control surfaces use `bg-parchment-50` (never `bg-white`) so they flip in dark mode; paired `text-parchment-900`/`placeholder:text-parchment-400` tokens already flip (#212).
 
 ## Dice engine
 

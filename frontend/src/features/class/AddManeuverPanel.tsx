@@ -98,7 +98,7 @@ export default function AddManeuverPanel({
         placeholder="Filter maneuvers…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="mb-3 w-full rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
+        className="mb-3 w-full rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
       />
 
       {/* Catalog list */}
@@ -133,7 +133,7 @@ export default function AddManeuverPanel({
                 type="button"
                 disabled={busy || atCap}
                 onClick={() => onLearn({ type: "learnManeuver", maneuverId: maneuver.id })}
-                className="shrink-0 rounded bg-gold-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-gold-700 disabled:cursor-not-allowed disabled:opacity-40"
+                className="shrink-0 rounded bg-gold-400 px-2.5 py-1 text-xs font-semibold text-ink hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
                 title={atCap ? `Already at maximum (${choiceCount})` : `Learn ${maneuver.name}`}
               >
                 Learn

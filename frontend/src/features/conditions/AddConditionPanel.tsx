@@ -73,7 +73,7 @@ export default function AddConditionPanel({ activeKeys, busy, onApply }: Props) 
         placeholder="Filter conditions…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="mb-3 w-full rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
+        className="mb-3 w-full rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
       />
 
       <label className="mb-3 block">
@@ -83,7 +83,7 @@ export default function AddConditionPanel({ activeKeys, busy, onApply }: Props) 
           placeholder="Giant Spider"
           value={source}
           onChange={(e) => setSource(e.target.value)}
-          className="w-full rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
+          className="w-full rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
         />
       </label>
 
@@ -108,7 +108,7 @@ export default function AddConditionPanel({ activeKeys, busy, onApply }: Props) 
                 type="button"
                 disabled={busy}
                 onClick={() => handleApply(condition.key)}
-                className="shrink-0 rounded bg-gold-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-gold-700 disabled:cursor-not-allowed disabled:opacity-40"
+                className="shrink-0 rounded bg-gold-400 px-2.5 py-1 text-xs font-semibold text-ink hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
                 title={`Apply ${condition.label}`}
               >
                 Apply

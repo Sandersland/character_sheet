@@ -13,17 +13,20 @@ import { fetchMe, logout as clientLogout, fetchAuthProviders } from "@/api/clien
 import { AuthProvider } from "@/features/auth/AuthProvider";
 import AuthGate from "@/features/auth/AuthGate";
 import AppHeader from "@/features/auth/AppHeader";
+import { ThemeProvider } from "@/features/theme/ThemeProvider";
 
 const USER = { id: "u1", email: "ada@x.dev", name: "Ada", imageUrl: null };
 
 function renderGate() {
   return render(
-    <AuthProvider>
-      <AuthGate>
-        <AppHeader />
-        <div>secret content</div>
-      </AuthGate>
-    </AuthProvider>,
+    <ThemeProvider>
+      <AuthProvider>
+        <AuthGate>
+          <AppHeader />
+          <div>secret content</div>
+        </AuthGate>
+      </AuthProvider>
+    </ThemeProvider>,
   );
 }
 

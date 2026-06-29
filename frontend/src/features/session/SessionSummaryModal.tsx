@@ -143,7 +143,7 @@ function AddXpForm({
   }
 
   const inputCls =
-    "w-28 rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
+    "w-28 rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -169,7 +169,7 @@ function AddXpForm({
           type="button"
           onClick={handleSubmit}
           disabled={!valid || busy}
-          className="rounded-control bg-garnet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-garnet-700 disabled:opacity-40"
+          className="rounded-control bg-garnet-600 px-3 py-1.5 text-xs font-semibold text-parchment-50 hover:bg-garnet-700 disabled:opacity-40"
         >
           {busy ? "Awarding…" : "Award"}
         </button>

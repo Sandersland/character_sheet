@@ -360,7 +360,7 @@ export default function InlineSpellPicker({
                         onClick={() => patchRow(spell.id, { slotLevel: lvl })}
                         className={`rounded px-1.5 py-0.5 text-[11px] font-semibold transition-colors ${
                           spellSlot === lvl
-                            ? "bg-arcane-600 text-white"
+                            ? "bg-arcane-700 text-parchment-50"
                             : "bg-arcane-100 text-arcane-800 hover:bg-arcane-200"
                         }`}
                       >
@@ -388,7 +388,7 @@ export default function InlineSpellPicker({
                       onClick={() => patchRow(spell.id, { target: "self" })}
                       className={`rounded px-1.5 py-0.5 text-[11px] font-semibold transition-colors disabled:opacity-40 ${
                         row.target === "self"
-                          ? "bg-vitality-600 text-white"
+                          ? "bg-vitality-600 text-parchment-50"
                           : "bg-parchment-100 text-parchment-600 hover:bg-parchment-200"
                       }`}
                     >
@@ -400,7 +400,7 @@ export default function InlineSpellPicker({
                       onClick={() => patchRow(spell.id, { target: "other" })}
                       className={`rounded px-1.5 py-0.5 text-[11px] font-semibold transition-colors disabled:opacity-40 ${
                         row.target === "other"
-                          ? "bg-garnet-600 text-white"
+                          ? "bg-garnet-600 text-parchment-50"
                           : "bg-parchment-100 text-parchment-600 hover:bg-parchment-200"
                       }`}
                     >
@@ -457,7 +457,7 @@ export default function InlineSpellPicker({
                     type="button"
                     disabled={castDisabled}
                     onClick={() => handleCast(spell)}
-                    className="rounded-control bg-arcane-600 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-arcane-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="rounded-control bg-arcane-700 px-2.5 py-1 text-xs font-semibold text-parchment-50 transition-colors hover:bg-arcane-800 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {row.casting ? "Casting…" : isCantrip ? "Cast" : usesArcanum ? "Cast (Arcanum)" : `Cast (L${spellSlot ?? spell.level})`}
                   </button>

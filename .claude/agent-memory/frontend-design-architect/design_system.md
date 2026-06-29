@@ -34,6 +34,13 @@ here: see `frontend/src/index.css` header comment block.
   for text on parchment-50/white; bump one step darker on a tinted fill (e.g.
   `arcane-800` on `bg-arcane-100`). The lighter accent steps are for
   fills/borders/meters/badges, not text. (See #187 / #158.)
+- **Light text on an accent FILL must also clear 4.5:1.** Mirror of the rule
+  above: only the darker accents carry white — `garnet-600` (≈5.5:1) and
+  `vitality-600` (≈4.9:1) do; `arcane` carries white only from `arcane-700`
+  down (`arcane-600` ≈3.8:1, `arcane-700` ≈5.07:1, hover `arcane-800` ≈6.44:1).
+  `gold` can never carry white (`gold-800` passes at ~6:1 but reads muddy), so
+  filled gold flips to dark text on a bright fill: `text-parchment-900` on
+  `bg-gold-400` (hover `bg-gold-500`), ≈10.5/8.5:1. (See #207.)
 - Fonts: `--font-display` = Source Serif 4 (headings only, h1-h3), `--font-sans`
   = Source Sans 3 (body/UI default). Loaded via Google Fonts `<link>` tags in
   `frontend/index.html` (no local font files, no extra build dep).
@@ -48,6 +55,32 @@ mood, so the palette was assembled from individual hue families in
 `swatches.json` directly, following `colors.md`'s "greys don't have to be
 neutral" + shade-scale rules. If revisiting colors later, check
 `palette-themes.md` again in case new palettes have been added.
+
+## Dark mode (#211) — `[data-theme="dark"]` in `index.css`
+
+Dark mode redefines the same `--color-*` tokens under `[data-theme="dark"]`; no
+component changes. Architecture: **reversed ramps** — `-50` is the darkest
+surface and `-900` the lightest text, the mirror of light mode. The neutral
+parchment ramp stays warm (umber-tinted darks, cream-tinted lights), and each
+accent (garnet/arcane/gold/vitality) is rebuilt as a dark-to-light ramp so its
+mid/high steps read as text/affordances against dark surfaces.
+
+- **Shadows**: `--shadow-card`/`--shadow-raised` get deeper, near-black opacities
+  for elevation against dark surfaces.
+- **Backdrop**: `--color-backdrop` (modal scrim) is a `@theme` token —
+  `rgb(39 36 29 / 0.45)` light, `rgb(0 0 0 / 0.66)` dark — consumed via the
+  `bg-backdrop` utility in `Modal.tsx` (kept out of `@theme inline` so the
+  runtime override applies). The focus ring uses `var(--color-garnet-600)` and
+  auto-adapts.
+- **Filled-button labels (resolved in #213)**: a hard-coded `text-white` /
+  `text-parchment-900` label does **not** co-flip with a remapped fill, so #211's
+  ramp reversal broke AA on filled buttons in dark mode. Resolution: labels on
+  fills that **invert** between modes (garnet/arcane/vitality `-600`/`-700`) use
+  `text-parchment-50` — near-white in light, near-black in dark — so the label
+  always contrasts its fill. Gold is **light-ish in both modes** (`gold-400`
+  #f7d070 light / #c2991f dark), so its label uses `--color-ink` (#27241d, the
+  fixed `text-ink` token that does **not** flip), giving ≈10.5:1 light / ≈5.6:1
+  dark. Apply the same choice to any new filled accent control.
 
 ## Component conventions (`frontend/src/components/`)
 
