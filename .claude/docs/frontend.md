@@ -7,11 +7,11 @@ Source of truth: `ls frontend/src/features` — regenerate if stale.
 ```
 frontend/src/
 ├── components/
-│   └── ui/              # domain-agnostic primitives (Card, Badge, MeterBar, Modal, Tabs, OverflowMenu, ErrorBoundary)
+│   └── ui/              # domain-agnostic primitives (Card, Badge, MeterBar, Modal, Tabs, OverflowMenu, DropdownMenu, Avatar, ErrorBoundary)
 ├── features/
 │   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable, ProficienciesCard
 │   ├── advancement/     # AdvancementSection, AdvancementPanel
-│   ├── auth/            # AuthProvider (useAuth), AuthGate, AppHeader
+│   ├── auth/            # AuthProvider (useAuth), AuthGate, AppHeader, AccountMenu
 │   ├── character-meta/  # CharacterCard, VitalsStrip, JournalSection, JournalEntryPanel,
 │   │                    #   ActivityModal, DeleteCharacterModal, BackendStatus
 │   ├── class/           # ClassFeaturesSection, FightingStylePanel, AddManeuverPanel,
@@ -155,7 +155,7 @@ When adding a new editing surface: **default to inline**. Reach for `Modal` only
 
 ## Primitive components
 
-These seven live in `src/components/ui/` and are intentionally domain-agnostic — they must not import from `@/features`, `@/api`, or `@/types/character`. They know nothing about D&D.
+These nine live in `src/components/ui/` and are intentionally domain-agnostic — they must not import from `@/features`, `@/api`, or `@/types/character`. They know nothing about D&D.
 
 | Component | Usage |
 |---|---|
@@ -165,6 +165,8 @@ These seven live in `src/components/ui/` and are intentionally domain-agnostic �
 | `Modal` | Overlay primitive. See inline-vs-modal rule above. |
 | `Tabs` | Controlled segmented-control tab switcher (WAI-ARIA tablist, arrow-key nav, optional per-tab `badge`). Renders only the switcher; the caller renders the active panel below it. Props: `tabs`, `active`, `onChange`. |
 | `OverflowMenu` | Icon-only kebab (`MoreVertical`) menu-button (WAI-ARIA menu-button: `aria-haspopup`, roving tabindex, Arrow/Home/End/Esc nav, click-outside to close, focus returns to trigger). No portal — `relative`-anchored popup. Per-item `danger?` (garnet) / `separatorBefore?` (divider). Props: `items`, `label?` (trigger accessible name, default "More actions"), `className?`. |
+| `DropdownMenu` | Owned-trigger popup menu for **arbitrary** content (vs `OverflowMenu`'s fixed item array). Owns the `<button>` and takes the trigger as `trigger` content; `children` is a render-prop `(close) => ReactNode`. Keyboard nav (Arrow/Home/End + roving tabindex) is driven by a **live** `[role="menuitem"]` DOM query, so presentational rows carry no role and are skipped for free. `aria-haspopup`/`aria-expanded`, ArrowDown/Enter/Space opens, Esc + click-outside close, focus returns to trigger. No portal — `relative`-anchored. Props: `trigger`, `label` (trigger accessible name), `children`, `align?` (`right`\|`left`, default `right`), `className?`. |
+| `Avatar` | Circular identity badge. Renders `<img alt="">` when `imageUrl` is set, else initials (up to two from `name`, then the `email` initial, then `?`). Decorative — the accessible label lives on the trigger. Props: `name`, `email`, `imageUrl` (all primitive, nullable), `className?` (default `h-8 w-8`). |
 | `ErrorBoundary` | Class error boundary wrapping the route tree in `App.tsx`. Catches render-time crashes and shows a parchment "something went wrong" fallback (Reload / Back to characters) instead of a blank page. Optional `fallback?: (error, reset) => ReactNode` for custom recovery UI. |
 
 ## Iconography — `components/ui/icons.ts`
@@ -198,7 +200,8 @@ OAuth-only (no passwords). Pieces:
 - **`AuthGate.tsx`** — renders the app only when authenticated; a loading
   placeholder during the probe; `LoginPage` for anonymous (so a 401 anywhere
   lands on login, never a white screen).
-- **`AppHeader.tsx`** — chrome showing the signed-in identity + a Log out button.
+- **`AppHeader.tsx`** — slim chrome that renders only the avatar-triggered `AccountMenu`.
+- **`AccountMenu.tsx`** — composes `DropdownMenu` + `Avatar`; the avatar is the trigger. The open panel holds a presentational identity row (name + email, no `menuitem` role), the theme cycle toggle (light → dark → system, owns `THEME_CYCLE`/`THEME_META`; does not close the menu), and a danger Log out `menuitem` (calls `logout()` then `close()`).
 - **`pages/LoginPage.tsx`** — buttons are **data-driven** from
   `GET /api/auth/providers` (each a plain anchor to its `startUrl`), so enabling
   a provider server-side needs no frontend change.
@@ -226,8 +229,8 @@ defaulting to `system`.
 - **`index.html`** — a tiny blocking inline script applies `data-theme`
   pre-paint to avoid a flash of the wrong theme (the storage key is duplicated
   there from `useThemePreference.ts`).
-- **`AppHeader.tsx`** — a 3-state cycle toggle (light → dark → system) with a
-  dynamic `aria-label`.
+- **`AccountMenu.tsx`** — hosts the 3-state cycle toggle (light → dark → system)
+  with a dynamic `aria-label`, inside the account dropdown.
 - Input/control surfaces use `bg-parchment-50` (never `bg-white`) so they flip in dark mode; paired `text-parchment-900`/`placeholder:text-parchment-400` tokens already flip (#212).
 
 ## Dice engine
