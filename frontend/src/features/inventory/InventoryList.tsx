@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { applyInventoryTransactions, fetchItems, updateCharacter } from "@/api/client";
@@ -306,14 +307,20 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
 
         {hasItems && (
           <div className="flex flex-col gap-2">
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search items…"
-              aria-label="Search items"
-              className="rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1 text-sm"
-            />
+            <div className="relative">
+              <Search
+                aria-hidden="true"
+                className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-parchment-500"
+              />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search items…"
+                aria-label="Search items"
+                className="w-full rounded-control border border-parchment-300 bg-parchment-50 pl-8 pr-2.5 py-1 text-sm"
+              />
+            </div>
             <div role="group" aria-label="Filter items" className="flex flex-wrap gap-1.5">
               {FILTERS.map((option) => (
                 <button
