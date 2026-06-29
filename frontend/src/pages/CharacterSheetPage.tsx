@@ -9,6 +9,7 @@ import AdvancementSection from "@/features/advancement/AdvancementSection";
 import BackendStatus from "@/features/character-meta/BackendStatus";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
+import Spinner from "@/components/ui/Spinner";
 import ClassFeaturesSection from "@/features/class/ClassFeaturesSection";
 import DeleteCharacterModal from "@/features/character-meta/DeleteCharacterModal";
 import ExperienceTracker from "@/features/experience/ExperienceTracker";
@@ -22,6 +23,7 @@ import ProficienciesCard from "@/features/abilities/ProficienciesCard";
 import VitalsStrip from "@/features/character-meta/VitalsStrip";
 import ConditionsStrip from "@/features/conditions/ConditionsStrip";
 import { useCharacter } from "@/hooks/useCharacter";
+import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { useReferenceData } from "@/hooks/useReferenceData";
 import { abilityAbbr, orderedAbilityEntries } from "@/lib/abilities";
 import { fetchActiveSession, startSession } from "@/api/client";
@@ -37,6 +39,7 @@ export default function CharacterSheetPage() {
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [activeSession, setActiveSession] = useState<Session | null | undefined>(undefined);
   const [sessionPending, setSessionPending] = useState(false);
+  const showSpinner = useDelayedFlag(character === undefined && !error);
 
   // Resolve active session on mount so the header button can say
   // "Start Session" or "Resume Session" correctly.
@@ -66,11 +69,7 @@ export default function CharacterSheetPage() {
   }
 
   if (character === undefined) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-parchment-100">
-        <p className="text-sm text-parchment-600">Loading character…</p>
-      </div>
-    );
+    return showSpinner ? <Spinner variant="page" /> : null;
   }
 
   if (character === null) {

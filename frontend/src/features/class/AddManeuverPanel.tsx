@@ -7,6 +7,8 @@
 import { useEffect, useRef, useState } from "react";
 
 import { fetchManeuvers } from "@/api/client";
+import Spinner from "@/components/ui/Spinner";
+import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import type { CatalogManeuver, LearnManeuverOperation } from "@/types/character";
 
 interface Props {
@@ -30,6 +32,7 @@ export default function AddManeuverPanel({
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const hasFetched = useRef(false);
+  const showSpinner = useDelayedFlag(open && catalog === null && !catalogError);
 
   const atCap = knownCount >= choiceCount;
 
@@ -105,9 +108,7 @@ export default function AddManeuverPanel({
       {catalogError && (
         <p className="text-xs text-garnet-700">{catalogError}</p>
       )}
-      {catalog === null && !catalogError && (
-        <p className="text-xs text-parchment-600">Loading…</p>
-      )}
+      {catalog === null && !catalogError && showSpinner && <Spinner />}
       {catalog !== null && filteredCatalog.length === 0 && (
         <p className="py-2 text-center text-xs text-parchment-600">
           {search ? "No maneuvers match your search." : "All maneuvers already known."}

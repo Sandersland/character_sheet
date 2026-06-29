@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
+import Spinner from "@/components/ui/Spinner";
 import SessionSummaryModal from "@/features/session/SessionSummaryModal";
 import { fetchSessions } from "@/api/client";
+import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import type { Session } from "@/types/character";
 
 interface SessionsModalProps {
@@ -37,6 +39,7 @@ export default function SessionsModal({ characterId, onClose }: SessionsModalPro
   );
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Session | null>(null);
+  const showSpinner = useDelayedFlag(sessions === null && !error);
 
   useEffect(() => {
     const cached = sessionsCache.get(characterId);
@@ -75,9 +78,7 @@ export default function SessionsModal({ characterId, onClose }: SessionsModalPro
       <div className="flex flex-col gap-3">
         {error && <p className="text-xs font-semibold text-garnet-700">{error}</p>}
 
-        {sessions === null && !error && (
-          <p className="text-sm text-parchment-600">Loading…</p>
-        )}
+        {sessions === null && !error && showSpinner && <Spinner />}
 
         {sessions !== null && sessions.length === 0 && (
           <p className="py-6 text-center text-sm text-parchment-600">
