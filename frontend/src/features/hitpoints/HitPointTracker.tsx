@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { Minus, Plus, Shield } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { GiBleedingWound, GiHealthPotion } from "react-icons/gi";
+import type { IconType } from "react-icons";
 
 import { applyHitPointOperations } from "@/api/client";
 import { rollDie } from "@/lib/dice";
@@ -113,6 +117,45 @@ function LevelUpModal({
   );
 }
 
+// ---- HP action control ----------------------------------------------------
+
+type HpMode = "damage" | "heal" | "temp";
+
+// Per-mode segment icon, verb, button tone, and field aria-label.
+const HP_MODES: {
+  mode: HpMode;
+  label: string;
+  icon: IconType | LucideIcon;
+  verb: string;
+  fieldLabel: string;
+  buttonClass: string;
+}[] = [
+  {
+    mode: "damage",
+    label: "Damage",
+    icon: GiBleedingWound,
+    verb: "Apply damage",
+    fieldLabel: "Damage amount",
+    buttonClass: "bg-garnet-700 text-parchment-50 hover:bg-garnet-800",
+  },
+  {
+    mode: "heal",
+    label: "Heal",
+    icon: GiHealthPotion,
+    verb: "Heal",
+    fieldLabel: "Heal amount",
+    buttonClass: "bg-vitality-700 text-parchment-50 hover:bg-vitality-800",
+  },
+  {
+    mode: "temp",
+    label: "Temp HP",
+    icon: Shield,
+    verb: "Set temp HP",
+    fieldLabel: "Temporary hit points",
+    buttonClass: "bg-gold-400 text-ink hover:bg-gold-500",
+  },
+];
+
 // ---- Main component -------------------------------------------------------
 
 export default function HitPointTracker({ character, onUpdate }: HitPointTrackerProps) {
@@ -121,9 +164,8 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
   const conMod = Math.floor((abilityScores.constitution - 10) / 2);
 
   // Form field values
-  const [damageValue, setDamageValue] = useState("");
-  const [healValue, setHealValue] = useState("");
-  const [tempValue, setTempValue] = useState("");
+  const [mode, setMode] = useState<HpMode>("damage");
+  const [amount, setAmount] = useState("");
   const [diceToSpend, setDiceToSpend] = useState("1");
 
   // Modal / pending state
@@ -215,12 +257,12 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
   }
 
   async function handleDamage() {
-    const amount = parseInt(damageValue, 10);
-    if (!amount || amount <= 0) return;
+    const value = parseInt(amount, 10);
+    if (!value || value <= 0) return;
     // When auto-roll is off (issue #76), the server defers the concentration
     // save and returns a pending check; the player rolls it via the 3D die.
-    const ok = await submit([{ type: "damage", amount, autoRollConcentration }]);
-    if (ok) setDamageValue("");
+    const ok = await submit([{ type: "damage", amount: value, autoRollConcentration }]);
+    if (ok) setAmount("");
   }
 
   /**
@@ -243,18 +285,37 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
   }
 
   async function handleHeal() {
-    const amount = parseInt(healValue, 10);
-    if (!amount || amount <= 0) return;
-    const ok = await submit([{ type: "heal", amount }]);
-    if (ok) setHealValue("");
+    const value = parseInt(amount, 10);
+    if (!value || value <= 0) return;
+    const ok = await submit([{ type: "heal", amount: value }]);
+    if (ok) setAmount("");
   }
 
   async function handleSetTemp() {
-    const amount = parseInt(tempValue, 10);
-    if (isNaN(amount) || amount < 0) return;
-    const ok = await submit([{ type: "setTemp", amount }]);
-    if (ok) setTempValue("");
+    const value = parseInt(amount, 10);
+    if (isNaN(value) || value < 0) return;
+    const ok = await submit([{ type: "setTemp", amount: value }]);
+    if (ok) setAmount("");
   }
+
+  // Dispatch the active mode's submit handler.
+  function handleApply() {
+    if (mode === "damage") return handleDamage();
+    if (mode === "heal") return handleHeal();
+    return handleSetTemp();
+  }
+
+  // Step the shared amount by ±1, clamped at 0.
+  function stepAmount(delta: number) {
+    const next = Math.max(0, (parseInt(amount, 10) || 0) + delta);
+    setAmount(String(next));
+  }
+
+  const activeMode = HP_MODES.find((m) => m.mode === mode)!;
+  const ApplyIcon = activeMode.icon;
+  // Temp HP accepts 0 (clears temp); damage/heal require a positive amount.
+  const applyDisabled =
+    pending || (mode === "temp" ? amount === "" : !amount || parseInt(amount, 10) <= 0);
 
   async function handleShortRest() {
     const n = parseInt(diceToSpend, 10);
@@ -359,85 +420,81 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
           </div>
         )}
 
-        {/* ── Damage / Heal / Temp HP controls ── */}
-        <div className="flex flex-wrap items-end gap-3">
-          {/* Damage */}
-          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
-            Damage
-            <div className="flex gap-2">
-              <input
-                type="number"
-                min={1}
-                step={1}
-                value={damageValue}
-                onChange={(e) => setDamageValue(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleDamage()}
-                placeholder="0"
-                disabled={pending}
-                className="w-20 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm tabular-nums text-parchment-900 disabled:opacity-50"
-              />
-              <button
-                type="button"
-                disabled={pending || !damageValue}
-                onClick={handleDamage}
-                className="rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:cursor-not-allowed disabled:bg-parchment-200 disabled:text-parchment-400 disabled:hover:bg-parchment-200"
-              >
-                Apply
-              </button>
-            </div>
-          </label>
+        {/* ── HP action control (segmented mode + stepper + verb) ── */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Mode picker */}
+          <div
+            role="radiogroup"
+            aria-label="Hit point action"
+            className="inline-flex rounded-control bg-parchment-100 p-0.5"
+          >
+            {HP_MODES.map(({ mode: m, label, icon: SegIcon }) => {
+              const active = m === mode;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  disabled={pending}
+                  onClick={() => setMode(m)}
+                  className={`inline-flex items-center gap-1.5 rounded-control px-3 py-1.5 text-sm font-semibold transition-colors disabled:opacity-50 ${
+                    active
+                      ? "bg-parchment-50 text-parchment-900 shadow-card"
+                      : "text-parchment-600 hover:text-parchment-900"
+                  }`}
+                >
+                  <SegIcon aria-hidden="true" className="h-4 w-4" />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
 
-          {/* Heal */}
-          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
-            Heal
-            <div className="flex gap-2">
-              <input
-                type="number"
-                min={1}
-                step={1}
-                value={healValue}
-                onChange={(e) => setHealValue(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleHeal()}
-                placeholder="0"
-                disabled={pending}
-                className="w-20 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm tabular-nums text-parchment-900 disabled:opacity-50"
-              />
-              <button
-                type="button"
-                disabled={pending || !healValue}
-                onClick={handleHeal}
-                className="rounded-control bg-arcane-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-arcane-800 disabled:cursor-not-allowed disabled:bg-parchment-200 disabled:text-parchment-400 disabled:hover:bg-parchment-200"
-              >
-                Heal
-              </button>
-            </div>
-          </label>
+          {/* Stepper */}
+          <div className="inline-flex items-center rounded-control border border-parchment-300 bg-parchment-50">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => stepAmount(-1)}
+              aria-label="Decrease amount"
+              className="flex h-8 w-8 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50"
+            >
+              <Minus aria-hidden="true" className="h-4 w-4" />
+            </button>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleApply()}
+              placeholder="0"
+              disabled={pending}
+              aria-label={activeMode.fieldLabel}
+              className="w-16 border-0 bg-transparent text-center text-lg tabular-nums text-parchment-900 disabled:opacity-50"
+            />
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => stepAmount(1)}
+              aria-label="Increase amount"
+              className="flex h-8 w-8 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50"
+            >
+              <Plus aria-hidden="true" className="h-4 w-4" />
+            </button>
+          </div>
 
-          {/* Temporary HP */}
-          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
-            Temp HP
-            <div className="flex gap-2">
-              <input
-                type="number"
-                min={0}
-                step={1}
-                value={tempValue}
-                onChange={(e) => setTempValue(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSetTemp()}
-                placeholder="0"
-                disabled={pending}
-                className="w-20 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm tabular-nums text-parchment-900 disabled:opacity-50"
-              />
-              <button
-                type="button"
-                disabled={pending || !tempValue}
-                onClick={handleSetTemp}
-                className="rounded-control bg-gold-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-gold-800 disabled:cursor-not-allowed disabled:bg-parchment-200 disabled:text-parchment-400 disabled:hover:bg-parchment-200"
-              >
-                Set
-              </button>
-            </div>
-          </label>
+          {/* Contextual primary action */}
+          <button
+            type="button"
+            disabled={applyDisabled}
+            onClick={handleApply}
+            className={`inline-flex items-center gap-1.5 rounded-control px-3 py-1.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:bg-parchment-200 disabled:text-parchment-400 disabled:hover:bg-parchment-200 ${activeMode.buttonClass}`}
+          >
+            <ApplyIcon aria-hidden="true" className="h-4 w-4" />
+            {activeMode.verb}
+          </button>
         </div>
 
         {/* ── Concentration save preference (spellcasters only, issue #76) ── */}
@@ -457,19 +514,46 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
         {/* ── Rest controls ── */}
         <div className="flex flex-wrap items-end gap-3 border-t border-parchment-200 pt-3">
           {/* Short rest */}
-          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
-            Short rest — dice to spend
+          <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
+            <span>Short rest — dice to spend</span>
             <div className="flex gap-2">
-              <input
-                type="number"
-                min={1}
-                max={availableDice}
-                step={1}
-                value={diceToSpend}
-                onChange={(e) => setDiceToSpend(e.target.value)}
-                disabled={pending || availableDice === 0}
-                className="w-16 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm tabular-nums text-parchment-900 disabled:opacity-50"
-              />
+              <div className="inline-flex items-center rounded-control border border-parchment-300 bg-parchment-50">
+                <button
+                  type="button"
+                  disabled={pending || availableDice === 0}
+                  onClick={() =>
+                    setDiceToSpend(String(Math.max(1, (parseInt(diceToSpend, 10) || 1) - 1)))
+                  }
+                  aria-label="Decrease dice to spend"
+                  className="flex h-8 w-8 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50"
+                >
+                  <Minus aria-hidden="true" className="h-4 w-4" />
+                </button>
+                <input
+                  type="number"
+                  min={1}
+                  max={availableDice}
+                  step={1}
+                  value={diceToSpend}
+                  onChange={(e) => setDiceToSpend(e.target.value)}
+                  disabled={pending || availableDice === 0}
+                  aria-label="Dice to spend"
+                  className="w-12 border-0 bg-transparent text-center text-lg tabular-nums text-parchment-900 disabled:opacity-50"
+                />
+                <button
+                  type="button"
+                  disabled={pending || availableDice === 0}
+                  onClick={() =>
+                    setDiceToSpend(
+                      String(Math.min(availableDice, (parseInt(diceToSpend, 10) || 1) + 1)),
+                    )
+                  }
+                  aria-label="Increase dice to spend"
+                  className="flex h-8 w-8 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50"
+                >
+                  <Plus aria-hidden="true" className="h-4 w-4" />
+                </button>
+              </div>
               <button
                 type="button"
                 disabled={pending || availableDice === 0}
@@ -479,7 +563,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
                 Rest
               </button>
             </div>
-          </label>
+          </div>
 
           {/* Long rest */}
           <div className="flex flex-col gap-1">
