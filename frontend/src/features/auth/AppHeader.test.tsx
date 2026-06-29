@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { axe } from "@/test/axe";
 
 vi.mock("@/features/auth/AuthProvider", () => ({
@@ -21,11 +20,7 @@ function renderHeader() {
   );
 }
 
-function themeButton() {
-  return screen.getByRole("button", { name: /Theme:/ });
-}
-
-describe("AppHeader theme toggle", () => {
+describe("AppHeader", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.stubGlobal("matchMedia", (query: string) => ({
@@ -46,28 +41,16 @@ describe("AppHeader theme toggle", () => {
     vi.unstubAllGlobals();
   });
 
-  it("cycles system -> light -> dark -> system, persisting each step", async () => {
+  it("renders the account menu trigger", () => {
     renderHeader();
-    const user = userEvent.setup();
-
-    // Default preference is system.
-    expect(themeButton()).toHaveAccessibleName(/Theme: System/);
-
-    await user.click(themeButton());
-    expect(localStorage.getItem("cs:pref:theme")).toBe("light");
-    expect(document.documentElement.dataset.theme).toBe("light");
-
-    await user.click(themeButton());
-    expect(localStorage.getItem("cs:pref:theme")).toBe("dark");
-    expect(document.documentElement.dataset.theme).toBe("dark");
-
-    await user.click(themeButton());
-    expect(localStorage.getItem("cs:pref:theme")).toBe("system");
+    expect(screen.getByRole("button", { name: "Account" })).toBeInTheDocument();
   });
 
-  it("exposes an accessible name describing the next action", () => {
+  it("shows no theme button, logout button, or identity at rest", () => {
     renderHeader();
-    expect(themeButton()).toHaveAccessibleName(/Switch to/);
+    expect(screen.queryByRole("button", { name: /Theme:/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Log out/ })).toBeNull();
+    expect(screen.queryByText("ada@x.dev")).toBeNull();
   });
 
   it("has no axe violations", async () => {

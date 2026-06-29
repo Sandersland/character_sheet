@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Plus } from "lucide-react";
 
 import { applyExperienceOperations } from "@/api/client";
 import type { Character } from "@/types/character";
@@ -18,6 +19,7 @@ export default function ExperienceTracker({
     character;
   const [setValue, setSetValue] = useState(String(experiencePoints));
   const [awardValue, setAwardValue] = useState("");
+  const [showSetTotal, setShowSetTotal] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
 
@@ -97,48 +99,61 @@ export default function ExperienceTracker({
           }
         />
 
-        <div className="flex flex-wrap items-end gap-3 pt-1">
-          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
-            Set total XP
+        {/* Award XP — primary action */}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={awardValue}
+            onChange={(e) => setAwardValue(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submitAward(Number(awardValue))}
+            placeholder="e.g. 450"
+            aria-label="XP to award"
+            className="w-28 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm tabular-nums text-parchment-900"
+          />
+          <button
+            type="button"
+            disabled={pending || !awardValue}
+            onClick={() => submitAward(Number(awardValue))}
+            className="inline-flex items-center gap-1.5 rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
+          >
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            Award XP
+          </button>
+        </div>
+
+        {/* Set exact total — low-emphasis disclosure */}
+        {!showSetTotal ? (
+          <button
+            type="button"
+            onClick={() => setShowSetTotal(true)}
+            className="self-start text-xs font-semibold text-parchment-600 hover:underline"
+          >
+            Set exact total…
+          </button>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
             <input
               type="number"
               min={0}
               step={1}
               value={setValue}
               onChange={(e) => setSetValue(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submitSet(Number(setValue))}
+              aria-label="Exact XP total"
               className="w-28 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm tabular-nums text-parchment-900"
             />
-          </label>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => submitSet(Number(setValue))}
-            className="rounded-control bg-arcane-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-arcane-800 disabled:opacity-50"
-          >
-            Set
-          </button>
-
-          <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
-            Award XP
-            <input
-              type="number"
-              min={0}
-              step={1}
-              value={awardValue}
-              onChange={(e) => setAwardValue(e.target.value)}
-              placeholder="e.g. 450"
-              className="w-28 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm tabular-nums text-parchment-900"
-            />
-          </label>
-          <button
-            type="button"
-            disabled={pending || !awardValue}
-            onClick={() => submitAward(Number(awardValue))}
-            className="rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
-          >
-            Add
-          </button>
-        </div>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => submitSet(Number(setValue))}
+              className="rounded-control bg-parchment-300 px-3 py-1.5 text-sm font-semibold text-parchment-800 transition-colors hover:bg-parchment-400 disabled:opacity-50"
+            >
+              Set
+            </button>
+          </div>
+        )}
 
         {error && (
           <p className="text-xs font-semibold text-garnet-700">

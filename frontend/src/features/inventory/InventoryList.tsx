@@ -1,9 +1,12 @@
+import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { applyInventoryTransactions, fetchItems, updateCharacter } from "@/api/client";
 import type { Character, Currency, InventoryOperation, Item, ItemCategory } from "@/types/character";
 import AddItemPanel from "@/features/inventory/AddItemPanel";
 import Card from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
+import { GiKnapsack, ITEM_CATEGORY_ICONS } from "@/components/ui/icons";
 import InventoryRow from "@/features/inventory/InventoryRow";
 import MeterBar from "@/components/ui/MeterBar";
 import { buildSellOperations } from "@/lib/bulkSell";
@@ -306,14 +309,20 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
 
         {hasItems && (
           <div className="flex flex-col gap-2">
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search items…"
-              aria-label="Search items"
-              className="rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1 text-sm"
-            />
+            <div className="relative">
+              <Search
+                aria-hidden="true"
+                className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-parchment-500"
+              />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search items…"
+                aria-label="Search items"
+                className="w-full rounded-control border border-parchment-300 bg-parchment-50 pl-8 pr-2.5 py-1 text-sm"
+              />
+            </div>
             <div role="group" aria-label="Filter items" className="flex flex-wrap gap-1.5">
               {FILTERS.map((option) => (
                 <button
@@ -348,21 +357,20 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
         )}
 
         {!hasItems ? (
-          <div className="flex flex-col items-center gap-2 py-8 text-center">
-            <p className="text-sm text-parchment-600">Your pack is empty.</p>
-            <button
-              type="button"
-              onClick={() => setAddOpen(true)}
-              className="text-xs font-semibold text-garnet-700 hover:underline"
-            >
-              + Add item
-            </button>
-          </div>
+          <EmptyState
+            icon={<GiKnapsack />}
+            title="Your pack is empty"
+            description="Add gear, weapons, and treasure to track what you're carrying."
+            action={{ label: "+ Add item", onClick: () => setAddOpen(true) }}
+          />
         ) : hasMatches ? (
           <div className="max-h-96 overflow-y-auto">
-            {sections.map((section) => (
+            {sections.map((section) => {
+              const CategoryIcon = ITEM_CATEGORY_ICONS[section.category];
+              return (
               <section key={section.category} className="pt-3 first:pt-0">
-                <h4 className="sticky top-0 z-10 border-b border-parchment-200 bg-parchment-50 py-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
+                <h4 className="sticky top-0 z-10 inline-flex w-full items-center gap-1.5 border-b border-parchment-200 bg-parchment-50 py-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
+                  <CategoryIcon aria-hidden="true" className="text-sm" />
                   {itemCategoryLabel(section.category)} · {section.items.length} ·{" "}
                   {formatWeight(section.weight)} lb
                 </h4>
@@ -383,7 +391,8 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
                   ))}
                 </ul>
               </section>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <p className="py-8 text-center text-sm text-parchment-600">No items match your search.</p>

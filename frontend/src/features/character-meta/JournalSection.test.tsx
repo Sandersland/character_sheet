@@ -33,7 +33,7 @@ beforeEach(() => {
 describe("JournalSection", () => {
   it("renders the empty state when there are no entries", () => {
     render(<JournalSection character={makeCharacter([])} onUpdate={vi.fn()} />);
-    expect(screen.getByText(/No journal entries yet/i)).toBeInTheDocument();
+    expect(screen.getByText("Your journal is empty")).toBeInTheDocument();
   });
 
   it("renders existing entries with formatted date", () => {
@@ -52,7 +52,7 @@ describe("JournalSection", () => {
 
     render(<JournalSection character={makeCharacter([])} onUpdate={onUpdate} />);
 
-    await user.click(screen.getByRole("button", { name: "+ Add entry" }));
+    await user.click(screen.getAllByRole("button", { name: "+ Add entry" })[0]);
     await user.type(screen.getByLabelText(/Title/), "New Quest");
     await user.type(screen.getByLabelText(/Notes/), "We set out at dawn.");
     await user.click(screen.getByRole("button", { name: "Add entry" }));
@@ -68,7 +68,7 @@ describe("JournalSection", () => {
     const user = userEvent.setup();
     render(<JournalSection character={makeCharacter([])} onUpdate={vi.fn()} />);
 
-    await user.click(screen.getByRole("button", { name: "+ Add entry" }));
+    await user.click(screen.getAllByRole("button", { name: "+ Add entry" })[0]);
     // Fill only the body, leave title blank.
     await user.type(screen.getByLabelText(/Notes/), "body only");
     expect(screen.getByRole("button", { name: "Add entry" })).toBeDisabled();
@@ -122,7 +122,7 @@ describe("JournalSection", () => {
 
     render(<JournalSection character={makeCharacter([])} onUpdate={vi.fn()} />);
 
-    await user.click(screen.getByRole("button", { name: "+ Add entry" }));
+    await user.click(screen.getAllByRole("button", { name: "+ Add entry" })[0]);
     await user.type(screen.getByLabelText(/Title/), "T");
     await user.type(screen.getByLabelText(/Notes/), "B");
     await user.click(screen.getByRole("button", { name: "Add entry" }));
