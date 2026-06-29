@@ -155,7 +155,7 @@ export default function AdvancementSection({ character, onUpdate }: Props) {
                   </span>
                   <span
                     className={`text-[10px] font-semibold uppercase tracking-wide ${
-                      entry.kind === "feat" ? "text-arcane-600" : "text-gold-600"
+                      entry.kind === "feat" ? "text-arcane-700" : "text-gold-800"
                     }`}
                   >
                     {entry.kind === "feat" ? "Feat" : "ASI"}

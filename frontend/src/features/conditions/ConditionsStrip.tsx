@@ -90,7 +90,7 @@ export default function ConditionsStrip({ character, onUpdate }: Props) {
                   type="button"
                   disabled={busy}
                   onClick={() => handleRemove(entry.key)}
-                  className="flex h-4 w-4 items-center justify-center rounded-full text-garnet-500 hover:bg-garnet-200 hover:text-garnet-900 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex h-4 w-4 items-center justify-center rounded-full text-garnet-700 hover:bg-garnet-200 hover:text-garnet-900 disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label={`Remove ${conditionLabel(entry.key)}`}
                   title={`Remove ${conditionLabel(entry.key)}`}
                 >

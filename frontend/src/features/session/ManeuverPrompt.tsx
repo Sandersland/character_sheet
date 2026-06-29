@@ -98,7 +98,7 @@ export default function ManeuverPrompt({
 
   return (
     <div className="mt-1.5 flex flex-col gap-1.5 rounded-control border border-gold-200 bg-gold-50 px-3 py-2">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-gold-700">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-gold-800">
         Superiority Die ({dieLabel}, {pool.remaining} left)
       </p>
 

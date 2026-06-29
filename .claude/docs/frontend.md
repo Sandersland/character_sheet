@@ -130,7 +130,7 @@ Summary of what's available:
 
 Use idiomatic utility classes — tokens auto-generate them in v4: `text-garnet-700`, `bg-arcane-50`, `rounded-card`, `shadow-raised`. Only fall back to `[var(...)]` syntax for non-token one-off values.
 
-**Text-contrast policy (WCAG AA).** On the `parchment-50` background nothing lighter than `parchment-600` clears 4.5:1, so **readable text uses `parchment-600` or darker** (`-600` secondary, `-700`/`-900` primary). `text-parchment-400`/`-500` are **reserved for WCAG-exempt uses only** — `placeholder:`, `disabled:`, and decorative `aria-hidden` glyphs — never for content text. Don't reintroduce `-400`/`-500` on readable text (see #158/#98).
+**Text-contrast policy (WCAG AA).** On the `parchment-50` background nothing lighter than `parchment-600` clears 4.5:1, so **readable text uses `parchment-600` or darker** (`-600` secondary, `-700`/`-900` primary). `text-parchment-400`/`-500` are **reserved for WCAG-exempt uses only** — `placeholder:`, `disabled:`, and decorative `aria-hidden` glyphs — never for content text. Don't reintroduce `-400`/`-500` on readable text (see #158/#98). The same 4.5:1 floor applies to **accent text on light surfaces**: `gold` ≥ 800, `arcane` ≥ 700, `garnet` ≥ 600 (bump one step darker on a tinted fill, e.g. `arcane-800` on `bg-arcane-100`) — the mid steps (`gold-700`, `arcane-600`, `garnet-500`) fail as text. Lighter accent steps are for fills/borders/meters, not text (see #187/#207). Full rationale in `design_system.md`.
 
 ### Design gate
 

@@ -468,7 +468,7 @@ export default function InlineAttackPicker({
                   Forfeit 1 attack · Costs bonus action · Spend {dieLabel}
                 </p>
                 {message && (
-                  <p className="mt-1 text-xs italic text-gold-700">{message}</p>
+                  <p className="mt-1 text-xs italic text-gold-800">{message}</p>
                 )}
               </div>
               <button

@@ -80,7 +80,7 @@ export default function ExperienceTracker({
             </span>
           </p>
           {isMaxed && (
-            <span className="text-xs font-semibold uppercase tracking-wide text-gold-700">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gold-800">
               Max level
             </span>
           )}

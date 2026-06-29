@@ -72,7 +72,7 @@ export default function RollResultToast() {
         `}
       >
         {isCrit && (
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-gold-700">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-gold-800">
             Natural 20 — Critical!
           </p>
         )}
@@ -87,7 +87,7 @@ export default function RollResultToast() {
         <p
           className={`font-display text-3xl font-semibold leading-none ${
             isCrit
-              ? "text-gold-700"
+              ? "text-gold-800"
               : isFumble
                 ? "text-parchment-600"
                 : "text-garnet-800"
