@@ -2,7 +2,9 @@ import { Link } from "react-router-dom";
 
 import BackendStatus from "@/features/character-meta/BackendStatus";
 import CharacterCard from "@/features/character-meta/CharacterCard";
+import Spinner from "@/components/ui/Spinner";
 import { useCharacterList } from "@/hooks/useCharacterList";
+import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 
 function NewCharacterCard() {
   return (
@@ -58,6 +60,7 @@ function ErrorState() {
 
 export default function CharacterListPage() {
   const { characters, error } = useCharacterList();
+  const showSpinner = useDelayedFlag(characters === null && !error);
 
   return (
     <div className="min-h-screen bg-parchment-100">
@@ -79,7 +82,7 @@ export default function CharacterListPage() {
         {error ? (
           <ErrorState />
         ) : characters === null ? (
-          <p className="text-sm text-parchment-600">Loading characters…</p>
+          showSpinner ? <Spinner className="py-16" /> : null
         ) : characters.length === 0 ? (
           <EmptyState />
         ) : (

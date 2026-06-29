@@ -8,6 +8,8 @@
 import { useEffect, useState } from "react";
 
 import { fetchSpells } from "@/api/client";
+import Spinner from "@/components/ui/Spinner";
+import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import type {
   CatalogSpell,
   CustomSpellInput,
@@ -62,6 +64,7 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
+  const showSpinner = useDelayedFlag(catalog === null && !catalogError);
 
   // Custom tab
   const [custom, setCustom] = useState<CustomSpellInput>(BLANK_CUSTOM);
@@ -181,9 +184,7 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
           {catalogError && (
             <p className="text-xs text-garnet-700">{catalogError}</p>
           )}
-          {catalog === null && !catalogError && (
-            <p className="text-xs text-parchment-600">Loading…</p>
-          )}
+          {catalog === null && !catalogError && showSpinner && <Spinner />}
           {catalog !== null && filteredCatalog.length === 0 && (
             <p className="py-2 text-center text-xs text-parchment-600">No spells match your filter.</p>
           )}

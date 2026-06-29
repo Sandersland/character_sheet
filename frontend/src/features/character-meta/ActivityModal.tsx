@@ -13,6 +13,8 @@ import { summarizeSellBatch } from "@/lib/sellBatch";
 import type { Character, CharacterEvent, CharacterEventCategory, CharacterEventField, Session } from "@/types/character";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
+import Spinner from "@/components/ui/Spinner";
+import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 
 interface ActivityModalProps {
   characterId: string;
@@ -58,6 +60,7 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
   const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set());
   const [undoing, setUndoing] = useState(false);
   const [undoError, setUndoError] = useState<string | null>(null);
+  const showSpinner = useDelayedFlag(events === null && !error);
 
   // Filter state. "all" category disables the category predicate; an empty
   // typeFilter/sessionFilter disables those. Type chips are inventory-only.
@@ -234,9 +237,7 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
 
         {error && <p className="text-xs font-semibold text-garnet-700">{error}</p>}
 
-        {events === null && !error && (
-          <p className="text-sm text-parchment-600">Loading…</p>
-        )}
+        {events === null && !error && showSpinner && <Spinner />}
 
         {events !== null && events.length === 0 && (
           <p className="py-6 text-center text-sm text-parchment-600">
