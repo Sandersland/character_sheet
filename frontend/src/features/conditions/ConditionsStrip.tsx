@@ -12,6 +12,8 @@ import { Minus, Plus, X } from "lucide-react";
 import { useState } from "react";
 
 import { applyConditionTransactions } from "@/api/client";
+import EmptyState from "@/components/ui/EmptyState";
+import { GiHealthNormal } from "@/components/ui/icons";
 import {
   CONDITION_DESCRIPTIONS,
   conditionLabel,
@@ -74,7 +76,11 @@ export default function ConditionsStrip({ character, onUpdate }: Props) {
 
       {/* Active condition chips */}
       {active.length === 0 ? (
-        <p className="text-xs text-parchment-600">No active conditions.</p>
+        <EmptyState
+          icon={<GiHealthNormal />}
+          title="No active conditions"
+          size="sm"
+        />
       ) : (
         <ul className="flex flex-wrap gap-2">
           {active.map((entry) => (

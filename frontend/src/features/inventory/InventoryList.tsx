@@ -5,6 +5,8 @@ import { applyInventoryTransactions, fetchItems, updateCharacter } from "@/api/c
 import type { Character, Currency, InventoryOperation, Item, ItemCategory } from "@/types/character";
 import AddItemPanel from "@/features/inventory/AddItemPanel";
 import Card from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
+import { GiKnapsack } from "@/components/ui/icons";
 import InventoryRow from "@/features/inventory/InventoryRow";
 import MeterBar from "@/components/ui/MeterBar";
 import { buildSellOperations } from "@/lib/bulkSell";
@@ -355,16 +357,12 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
         )}
 
         {!hasItems ? (
-          <div className="flex flex-col items-center gap-2 py-8 text-center">
-            <p className="text-sm text-parchment-600">Your pack is empty.</p>
-            <button
-              type="button"
-              onClick={() => setAddOpen(true)}
-              className="text-xs font-semibold text-garnet-700 hover:underline"
-            >
-              + Add item
-            </button>
-          </div>
+          <EmptyState
+            icon={<GiKnapsack />}
+            title="Your pack is empty"
+            description="Add gear, weapons, and treasure to track what you're carrying."
+            action={{ label: "+ Add item", onClick: () => setAddOpen(true) }}
+          />
         ) : hasMatches ? (
           <div className="max-h-96 overflow-y-auto">
             {sections.map((section) => (
