@@ -99,6 +99,7 @@
 @layer base {
   html {
     font-family: var(--font-sans);
+    color-scheme: light;
   }
 
   body {
@@ -119,6 +120,14 @@
     outline-offset: 2px;
     border-radius: var(--radius-control);
   }
+}
+
+/* Placeholder dark overrides — real palette lands in #211; just enough to flip body bg/text. */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-parchment-50: #27241d;
+  --color-parchment-100: #2c2a22;
+  --color-parchment-900: #faf9f7;
 }
 
 /* One-shot pop for a freshly-settled dice total (DiceRollSequence chips). */

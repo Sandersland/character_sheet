@@ -27,9 +27,11 @@ frontend/src/
 │   ├── session/         # TurnHub, TurnTracker, useTurnState, SessionLog, SessionsModal,
 │   │                    #   SessionSummaryModal, Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
 │   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie
-│   └── spells/          # SpellsSection, SpellRow, AddSpellPanel
+│   ├── spells/          # SpellsSection, SpellRow, AddSpellPanel
+│   └── theme/           # ThemeProvider (useTheme) — applies data-theme app-wide
 ├── hooks/               # reusable React hooks used by pages or multiple clusters
-│   │                    #   (useCharacter, useCharacterList, useCharacterDraft, useReferenceData)
+│   │                    #   (useCharacter, useCharacterList, useCharacterDraft, useReferenceData,
+│   │                    #    useThemePreference)
 ├── lib/                 # pure TS logic — NO React/JSX (dice, abilities, timeline, startingEquipment, …)
 ├── pages/               # route-level views (CharacterListPage, CharacterSheetPage,
 │   │                    #   CharacterCreatePage, SessionPage, LoginPage)
@@ -197,8 +199,30 @@ OAuth-only (no passwords). Pieces:
   `GET /api/auth/providers` (each a plain anchor to its `startUrl`), so enabling
   a provider server-side needs no frontend change.
 
-`App.tsx` order: `BrowserRouter → ErrorBoundary → AuthProvider → AuthGate →
-(AppHeader + Routes)` — ErrorBoundary stays outermost over the app content.
+`App.tsx` order: `BrowserRouter → ErrorBoundary → ThemeProvider → AuthProvider →
+AuthGate → (AppHeader + Routes)` — ErrorBoundary stays outermost over the app
+content; ThemeProvider wraps auth so `data-theme` applies app-wide.
+
+## Theme / dark mode — `features/theme/`
+
+Dark mode is a set of `--color-*` overrides under `[data-theme="dark"]` in
+`index.css` (the dark palette is a placeholder pending #211 — light mode is
+unchanged). The preference is persisted at `localStorage["cs:pref:theme"]`,
+defaulting to `system`.
+
+- **`hooks/useThemePreference.ts`** — pure persistence + resolution:
+  `ThemePreference = light | dark | system`, `loadThemePreference` /
+  `saveThemePreference`, `getSystemTheme` (via `matchMedia`), `resolveTheme`, and
+  the `useThemePreference` hook (a `useState`-shaped pair).
+- **`features/theme/ThemeProvider.tsx`** — context (`useTheme`): exposes
+  `{ preference, resolved, setPreference }` and writes the resolved theme onto
+  `document.documentElement.dataset.theme`; while on `system` it re-resolves on
+  OS `prefers-color-scheme` changes.
+- **`index.html`** — a tiny blocking inline script applies `data-theme`
+  pre-paint to avoid a flash of the wrong theme (the storage key is duplicated
+  there from `useThemePreference.ts`).
+- **`AppHeader.tsx`** — a 3-state cycle toggle (light → dark → system) with a
+  dynamic `aria-label`.
 
 ## Dice engine
 
