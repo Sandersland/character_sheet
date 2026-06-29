@@ -7,7 +7,7 @@ Source of truth: `ls frontend/src/features` — regenerate if stale.
 ```
 frontend/src/
 ├── components/
-│   └── ui/              # domain-agnostic primitives (Card, Badge, MeterBar, Modal, Tabs, OverflowMenu, DropdownMenu, Avatar, ErrorBoundary, EmptyState)
+│   └── ui/              # domain-agnostic primitives (Card, Badge, MeterBar, Modal, Tabs, OverflowMenu, DropdownMenu, Avatar, ErrorBoundary, EmptyState, Spinner)
 ├── features/
 │   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable, ProficienciesCard
 │   ├── advancement/     # AdvancementSection, AdvancementPanel
@@ -156,7 +156,7 @@ When adding a new editing surface: **default to inline**. Reach for `Modal` only
 
 ## Primitive components
 
-These ten live in `src/components/ui/` and are intentionally domain-agnostic — they must not import from `@/features`, `@/api`, or `@/types/character`. They know nothing about D&D.
+These eleven live in `src/components/ui/` and are intentionally domain-agnostic — they must not import from `@/features`, `@/api`, or `@/types/character`. They know nothing about D&D.
 
 | Component | Usage |
 |---|---|
@@ -170,10 +170,33 @@ These ten live in `src/components/ui/` and are intentionally domain-agnostic —
 | `Avatar` | Circular identity badge. Renders `<img alt="">` when `imageUrl` is set, else initials (up to two from `name`, then the `email` initial, then `?`). Decorative — the accessible label lives on the trigger. Props: `name`, `email`, `imageUrl` (all primitive, nullable), `className?` (default `h-8 w-8`). |
 | `ErrorBoundary` | Class error boundary wrapping the route tree in `App.tsx`. Catches render-time crashes and shows a parchment "something went wrong" fallback (Reload / Back to characters) instead of a blank page. Optional `fallback?: (error, reset) => ReactNode` for custom recovery UI. |
 | `EmptyState` | Warm zero-state: decorative hero icon (pass a game-icon from `icons.ts`) + `font-display` title + optional `description` and `action` CTA. Prop `size`: `md` (card-body, default) / `sm` (in-card strip). Used for empty journal / inventory / spellbook / conditions. |
+| `Spinner` | Loading indicator (`role="status"` + visually-hidden "Loading…"). Prop `variant`: `page` (larger, centered in a full-screen `min-h-screen` container) / `inline` (small, centered in its block, default). **Always gate it with `useDelayedFlag`** (see Loading pattern below) so it only appears for genuinely slow loads — fast loads must render nothing, never a flashing spinner or text. |
 
 ## Iconography — `components/ui/icons.ts`
 
 All icons resolve through `components/ui/icons.ts`. Two libraries: `lucide-react` for UI chrome (kebab, chevron, search, +/−/✕) and `react-icons/gi` (game-icons) for D&D flavor (abilities, item categories, empty-state heroes). Always use per-icon subpath imports (`lucide-react`, `react-icons/gi`) — never `react-icons/all`. Domain→icon lookups are typed `Record<…, IconType>` maps (`ABILITY_ICONS`, `ITEM_CATEGORY_ICONS`) so a missing/renamed key is a compile error; `icons.ts` is the single allowed `components/ui` file that imports `@/types/character` for exactly this reason. Icons are monochrome `currentColor`: never set `fill`/hex — give the icon a parent with a `text-*` token so it works in light and dark. Decorative icons get `aria-hidden="true"`; icon-only buttons keep their `aria-label`.
+
+## Loading — delay-gated, never flashing
+
+Loading indicators are **delay-gated**: a fast fetch (the common case) must render
+**nothing** — no text, no spinner — so it can't flash up and vanish. Only a load
+still pending after a threshold shows feedback. The mechanism is one hook,
+`hooks/useDelayedFlag.ts`:
+
+```ts
+const showSpinner = useDelayedFlag(isLoading);   // true only after isLoading
+…                                                 // stays true for 400ms (default)
+{isLoading && (showSpinner ? <Spinner /> : null)}
+```
+
+`useDelayedFlag(active, delayMs = 400)` returns `true` only once `active` has been
+continuously `true` for `delayMs`, and resets to `false` immediately when `active`
+clears. Feed it the existing "is loading" expression (e.g. `character === undefined
+&& !error`, `catalog === null && !catalogError`); keep the surrounding
+loading/error/empty/content branching unchanged — only the indicator JSX is gated.
+Pair it with the `Spinner` primitive: `variant="page"` for full-screen route loads
+(centered), `variant="inline"` (default) for loads inside an already-rendered
+panel/modal. **Never** render bare `Loading…` text as a stand-in for a spinner.
 
 ## API calls — `client.ts` is the only call site
 

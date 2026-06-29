@@ -27,8 +27,10 @@ import TurnHub from "@/features/session/TurnHub";
 import BackendStatus from "@/features/character-meta/BackendStatus";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
+import Spinner from "@/components/ui/Spinner";
 import Tabs from "@/components/ui/Tabs";
 import { useCharacter } from "@/hooks/useCharacter";
+import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { useReferenceData } from "@/hooks/useReferenceData";
 import { useTurnState } from "@/features/session/useTurnState";
 import { clearTurnState } from "@/features/session/turnStatePersistence";
@@ -55,6 +57,9 @@ function SessionPageInner() {
   const { character, error, setCharacter } = useCharacter(id);
   const { reference } = useReferenceData();
   const [session, setSession] = useState<Session | null>(null);
+  const showSpinner = useDelayedFlag(
+    (character === undefined || session === null) && !error,
+  );
 
   // Resolve the active session on mount. If none found, bounce back to the sheet.
   useEffect(() => {
@@ -80,11 +85,7 @@ function SessionPageInner() {
   }
 
   if (character === undefined || session === null) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-parchment-100">
-        <p className="text-sm text-parchment-600">Loading session…</p>
-      </div>
-    );
+    return showSpinner ? <Spinner variant="page" /> : null;
   }
 
   if (character === null) {

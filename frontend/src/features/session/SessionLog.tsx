@@ -14,6 +14,8 @@ import { useEffect, useState } from "react";
 
 import { fetchSession } from "@/api/client";
 import Badge from "@/components/ui/Badge";
+import Spinner from "@/components/ui/Spinner";
+import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { formatRollBreakdown } from "@/lib/dice";
 import { categoryTone } from "@/lib/events";
 import type { CharacterEvent } from "@/types/character";
@@ -97,6 +99,7 @@ interface SessionLogProps {
 export default function SessionLog({ characterId, sessionId, refreshKey }: SessionLogProps) {
   const [events, setEvents] = useState<CharacterEvent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const showSpinner = useDelayedFlag(!events && !error);
 
   useEffect(() => {
     setEvents(null);
@@ -111,7 +114,7 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
   }
 
   if (!events) {
-    return <p className="text-sm text-parchment-600">Loading…</p>;
+    return showSpinner ? <Spinner /> : null;
   }
 
   // Filter out reverted events — they're confusing without context.

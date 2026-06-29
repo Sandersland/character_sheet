@@ -18,6 +18,8 @@
 import { useEffect, useRef, useState } from "react";
 
 import { fetchFeats } from "@/api/client";
+import Spinner from "@/components/ui/Spinner";
+import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { ABILITY_OPTIONS, abilityLabel, skillLabel } from "@/lib/abilities";
 import type {
   AdvancementOperation,
@@ -72,6 +74,7 @@ export default function AdvancementPanel({
   const [abilityChoice, setAbilityChoice] = useState("");
   const [customMode, setCustomMode] = useState(false);
   const hasFetched = useRef(false);
+  const showSpinner = useDelayedFlag(open && catalog === null && !catalogError);
 
   // ── Custom feat form state ─────────────────────────────────────────────────
   const [customName, setCustomName] = useState("");
@@ -644,9 +647,7 @@ export default function AdvancementPanel({
               {catalogError && (
                 <p className="text-xs text-garnet-700">{catalogError}</p>
               )}
-              {catalog === null && !catalogError && (
-                <p className="text-xs text-parchment-600">Loading…</p>
-              )}
+              {catalog === null && !catalogError && showSpinner && <Spinner />}
               {catalog !== null && filteredCatalog.length === 0 && (
                 <p className="py-2 text-center text-xs text-parchment-600">
                   {search ? "No feats match your search." : "No feats in catalog."}

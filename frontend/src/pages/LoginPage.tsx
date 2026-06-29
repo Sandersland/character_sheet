@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 
 import { fetchAuthProviders } from "@/api/client";
 import Card from "@/components/ui/Card";
+import Spinner from "@/components/ui/Spinner";
+import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import type { AuthProviderInfo } from "@/types/auth";
 
 // Sign-in screen. Provider buttons are data-driven from GET /api/auth/providers,
@@ -15,6 +17,7 @@ type LoadState =
 
 export default function LoginPage() {
   const [state, setState] = useState<LoadState>({ status: "loading" });
+  const showSpinner = useDelayedFlag(state.status === "loading");
 
   useEffect(() => {
     let active = true;
@@ -35,9 +38,7 @@ export default function LoginPage() {
             Sign in to manage your characters.
           </p>
 
-          {state.status === "loading" && (
-            <p className="text-sm text-parchment-600">Loading sign-in options…</p>
-          )}
+          {state.status === "loading" && showSpinner && <Spinner />}
 
           {state.status === "error" && (
             <p className="text-sm text-garnet-700">

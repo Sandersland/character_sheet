@@ -5,12 +5,14 @@ import { createCharacter, fetchItems } from "@/api/client";
 import AbilityScoreEditor from "@/features/abilities/AbilityScoreEditor";
 import BackendStatus from "@/features/character-meta/BackendStatus";
 import Card from "@/components/ui/Card";
+import Spinner from "@/components/ui/Spinner";
 import StartingEquipmentEditor from "@/features/inventory/StartingEquipmentEditor";
 import { draftToInput, emptyPackageState } from "@/lib/startingEquipment";
 import { missingRequirements } from "@/lib/characterCreationValidation";
 import { abilityModifier, formatModifier, skillLabel } from "@/lib/abilities";
 import type { Item, SkillName } from "@/types/character";
 import { useCharacterDraft } from "@/hooks/useCharacterDraft";
+import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { useReferenceData } from "@/hooks/useReferenceData";
 
 function hitDieFace(hitDie: string): number {
@@ -34,6 +36,7 @@ export default function CharacterCreatePage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(false);
   const [catalog, setCatalog] = useState<Item[]>([]);
+  const showSpinner = useDelayedFlag(!reference && !referenceError);
 
   // Load the item catalog once for the equipment picker's open-pick dropdowns.
   useEffect(() => {
@@ -185,7 +188,7 @@ export default function CharacterCreatePage() {
             </p>
           </Card>
         ) : !reference ? (
-          <p className="text-sm text-parchment-600">Loading options…</p>
+          showSpinner ? <Spinner className="py-16" /> : null
         ) : (
           <>
             <Card
