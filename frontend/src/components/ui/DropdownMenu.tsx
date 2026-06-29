@@ -9,7 +9,7 @@ interface DropdownMenuProps {
 }
 
 // Owned-trigger popup menu: arbitrary render-prop children, keyboard nav driven
-// by a live `[role="menuitem"]` query so presentational rows are skipped for free.
+// by a live `[role^="menuitem"]` query (covers menuitemradio) so presentational rows are skipped.
 export default function DropdownMenu({
   trigger,
   label,
@@ -29,7 +29,7 @@ export default function DropdownMenu({
 
   function items(): HTMLElement[] {
     if (!panelRef.current) return [];
-    return Array.from(panelRef.current.querySelectorAll<HTMLElement>('[role="menuitem"]'));
+    return Array.from(panelRef.current.querySelectorAll<HTMLElement>('[role^="menuitem"]'));
   }
 
   function setRovingTabIndex(activeIndex: number) {
