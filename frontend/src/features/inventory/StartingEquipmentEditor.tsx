@@ -186,7 +186,7 @@ export default function StartingEquipmentEditor({
                                       onChange={(e) =>
                                         setOpenPick(groupIdx, pickIdx, e.target.value)
                                       }
-                                      className={`rounded-control border bg-white px-2 py-1.5 text-sm text-parchment-900 focus:outline-none ${
+                                      className={`rounded-control border bg-parchment-50 px-2 py-1.5 text-sm text-parchment-900 focus:outline-none ${
                                         unfilled
                                           ? "border-red-400 focus:border-red-500"
                                           : "border-parchment-300 focus:border-arcane-500"
@@ -247,7 +247,7 @@ export default function StartingEquipmentEditor({
                           value={currentPick}
                           aria-invalid={unfilled}
                           onChange={(e) => setOpenPick(groupIdx, pickIdx, e.target.value)}
-                          className={`rounded-control border bg-white px-2 py-1.5 text-sm text-parchment-900 focus:outline-none ${
+                          className={`rounded-control border bg-parchment-50 px-2 py-1.5 text-sm text-parchment-900 focus:outline-none ${
                             unfilled
                               ? "border-red-400 focus:border-red-500"
                               : "border-parchment-300 focus:border-arcane-500"
@@ -296,7 +296,7 @@ export default function StartingEquipmentEditor({
                   if (!isNaN(n)) setGold(n);
                 }}
                 placeholder={`${goldMin(startingEquipment.gold)}–${goldMax(startingEquipment.gold)}`}
-                className="w-24 rounded-control border border-parchment-300 bg-white px-2 py-1.5 text-center text-sm text-parchment-900 focus:border-arcane-500 focus:outline-none"
+                className="w-24 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-center text-sm text-parchment-900 focus:border-arcane-500 focus:outline-none"
               />
               <span className="text-sm text-parchment-600">gp</span>
             </div>

@@ -286,7 +286,7 @@ function LayOnHandsInput({
         max={maxPool}
         value={amount}
         onChange={(e) => setAmount(Math.min(maxPool, Math.max(1, Number(e.target.value))))}
-        className="w-16 rounded-control border border-vitality-300 bg-white px-2 py-1 text-center text-sm tabular-nums text-parchment-900 focus:outline-none focus:ring-1 focus:ring-vitality-400"
+        className="w-16 rounded-control border border-vitality-300 bg-parchment-50 px-2 py-1 text-center text-sm tabular-nums text-parchment-900 focus:outline-none focus:ring-1 focus:ring-vitality-400"
         aria-label="Healing amount"
       />
       <QuickBtn

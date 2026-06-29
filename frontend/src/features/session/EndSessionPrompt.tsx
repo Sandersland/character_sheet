@@ -39,7 +39,7 @@ export default function EndSessionPrompt({
   }
 
   const inputCls =
-    "w-full rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
+    "w-full rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
 
   return (
     <Modal title="End Session" onClose={onCancel}>

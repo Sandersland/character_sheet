@@ -63,7 +63,7 @@ export default function JournalEntryPanel({
   }
 
   const inputCls =
-    "w-full rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
+    "w-full rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
   const labelCls = "block text-xs font-semibold text-parchment-700";
 
   return (
