@@ -7,7 +7,7 @@ Source of truth: `ls frontend/src/features` — regenerate if stale.
 ```
 frontend/src/
 ├── components/
-│   └── ui/              # domain-agnostic primitives (Card, Badge, MeterBar, Modal, Tabs, ErrorBoundary)
+│   └── ui/              # domain-agnostic primitives (Card, Badge, MeterBar, Modal, Tabs, OverflowMenu, ErrorBoundary)
 ├── features/
 │   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable, ProficienciesCard
 │   ├── advancement/     # AdvancementSection, AdvancementPanel
@@ -22,7 +22,7 @@ frontend/src/
 │   │                    #   diceRollerTypes.ts, useDieFaceData.ts
 │   ├── experience/      # ExperienceTracker
 │   ├── hitpoints/       # HitPointTracker (inline Card; hosts LevelUpModal + ConcentrationSaveModal)
-│   ├── inventory/       # InventoryList, InventoryRow, AddItemPanel, LedgerModal,
+│   ├── inventory/       # InventoryList, InventoryRow, AddItemPanel,
 │   │                    #   StartingEquipmentEditor
 │   ├── session/         # TurnHub, TurnTracker, useTurnState, SessionLog, SessionsModal,
 │   │                    #   SessionSummaryModal, Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
@@ -61,7 +61,7 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 |---|---|
 | `dice.ts` | The sole `Math.random` dice site — `rollDie`/`rollSpec`/`summarizeRoll`/`formatRollSpec` (see Dice engine below). |
 | `abilities.ts` | Ability/skill/save labels + `abilityModifier` math; resolve all display keys through here. |
-| `items.ts` | `isEquippable(category)` + `EQUIPPABLE_CATEGORIES` — equippability rule (weapon/armor yes, consumable/gear no). Mirror of backend `lib/items.ts`; gate the Equip control through here, never inline-check `category`. |
+| `items.ts` | `isEquippable(category)` + `EQUIPPABLE_CATEGORIES` — equippability rule (weapon/armor yes, consumable/gear no). Mirror of backend `lib/items.ts`; gate the Equip control through here, never inline-check `category`. Also `itemCategoryLabel` + `ITEM_CATEGORY_LABELS`/`ITEM_CATEGORY_ORDER`/`ITEM_CATEGORY_OPTIONS` — resolve category display through here, never a raw key. |
 | `events.ts` | Activity-log display lookups — `eventTypeLabel`/`categoryLabel`/`categoryTone` (tolerant `Partial<Record>` maps, raw-key fallback) + `INVENTORY_EVENT_TYPES` for the filter chips. Resolve all event type/category keys through here, never inline-capitalize. |
 | `timeline.ts` | Groups/formats audit events for the activity timeline (`groupByBatch`/`groupByDate`, generic over `{id,batchId,createdAt}`). |
 | `currency.ts` | Copper-based currency math — `toCopper`/`fromCopper`/`splitLumpSum` + `formatCurrency` (unsigned, largest-first denomination string). |
@@ -142,10 +142,10 @@ Staying on-system is what keeps the UI from reading as generic. The `verify-fron
 
 | Modal | Inline panel |
 |---|---|
-| `LedgerModal` — read-only inventory ledger | `AddItemPanel` — add item form |
-| `ActivityModal` — filterable audit timeline (category + session selects + inventory type chips; optional `entityId` scope) + undo | `AddSpellPanel` — learn spell form |
-| `DeleteCharacterModal` — confirm destructive action | `InventoryRow` edit/sell mode |
-| `LevelUpModal` / `ConcentrationSaveModal` — hosted *inside* `HitPointTracker` | `HitPointTracker` itself — inline Card (damage/heal/rest/death-save controls) |
+| `ActivityModal` — filterable audit timeline (category + session selects + inventory type chips; optional `entityId` scope) + undo — also serves as inventory history | `AddItemPanel` — add item form |
+| `DeleteCharacterModal` — confirm destructive action | `AddSpellPanel` — learn spell form |
+| `LevelUpModal` / `ConcentrationSaveModal` — hosted *inside* `HitPointTracker` | `InventoryRow` edit mode |
+| | `HitPointTracker` itself — inline Card (damage/heal/rest/death-save controls) |
 | | `ExperienceTracker` award/set inputs |
 | | `AbilityScoreEditor` method tabs |
 
@@ -153,7 +153,7 @@ When adding a new editing surface: **default to inline**. Reach for `Modal` only
 
 ## Primitive components
 
-These six live in `src/components/ui/` and are intentionally domain-agnostic — they must not import from `@/features`, `@/api`, or `@/types/character`. They know nothing about D&D.
+These seven live in `src/components/ui/` and are intentionally domain-agnostic — they must not import from `@/features`, `@/api`, or `@/types/character`. They know nothing about D&D.
 
 | Component | Usage |
 |---|---|
@@ -162,6 +162,7 @@ These six live in `src/components/ui/` and are intentionally domain-agnostic —
 | `MeterBar` | Horizontal resource meter. Always pair with numeric text (e.g. `9/10 HP`) — never rely on color alone. Prop `tone`: `garnet` / `arcane` / `gold`. |
 | `Modal` | Overlay primitive. See inline-vs-modal rule above. |
 | `Tabs` | Controlled segmented-control tab switcher (WAI-ARIA tablist, arrow-key nav, optional per-tab `badge`). Renders only the switcher; the caller renders the active panel below it. Props: `tabs`, `active`, `onChange`. |
+| `OverflowMenu` | Icon-only kebab (`⋮`) menu-button (WAI-ARIA menu-button: `aria-haspopup`, roving tabindex, Arrow/Home/End/Esc nav, click-outside to close, focus returns to trigger). No portal — `relative`-anchored popup. Per-item `danger?` (garnet) / `separatorBefore?` (divider). Props: `items`, `label?` (trigger accessible name, default "More actions"), `className?`. |
 | `ErrorBoundary` | Class error boundary wrapping the route tree in `App.tsx`. Catches render-time crashes and shows a parchment "something went wrong" fallback (Reload / Back to characters) instead of a blank page. Optional `fallback?: (error, reset) => ReactNode` for custom recovery UI. |
 
 ## API calls — `client.ts` is the only call site
@@ -229,7 +230,7 @@ Large interactive sections follow the orchestrator/row pattern:
 ```
 
 Examples:
-- `features/inventory/`: `InventoryList` (orchestrator) / `InventoryRow` / `AddItemPanel` / `LedgerModal`
+- `features/inventory/`: `InventoryList` (orchestrator) / `InventoryRow` / `AddItemPanel`
 - `features/spells/`: `SpellsSection` (orchestrator) / `SpellRow` / `AddSpellPanel`
 
 The orchestrator pattern keeps async state and API batching in one place and makes rows easy to unit-test in isolation — pass mock callbacks, assert they fire with the right args. See `testing.md` for component test patterns.

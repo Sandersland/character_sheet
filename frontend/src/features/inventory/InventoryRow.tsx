@@ -4,31 +4,24 @@ import { formatRollSpec } from "@/lib/dice";
 import { isEquippable } from "@/lib/items";
 import type {
   ArmorCategory,
-  Currency,
   InventoryItem,
   InventoryOperation,
-  ItemCategory,
   WeaponDetail,
 } from "@/types/character";
-import Badge from "@/components/ui/Badge";
+import OverflowMenu from "@/components/ui/OverflowMenu";
 
 interface InventoryRowProps {
   item: InventoryItem;
-  mode: "view" | "edit" | "sell";
+  mode: "view" | "edit";
   pending: boolean;
   onEdit: () => void;
-  onSell: () => void;
   onCancel: () => void;
-  onHistory: () => void;
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
+  // Multi-select sell mode: a leading checkbox replaces the per-row actions.
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
-
-const CATEGORY_TONE: Record<ItemCategory, "garnet" | "arcane" | "gold" | "neutral"> = {
-  weapon: "garnet",
-  armor: "arcane",
-  consumable: "gold",
-  gear: "neutral",
-};
 
 const ARMOR_CATEGORIES: ArmorCategory[] = ["light", "medium", "heavy", "shield"];
 
@@ -72,30 +65,17 @@ const checkboxLabelClass = "flex items-center gap-1.5 text-xs text-parchment-700
 const linkButtonClass =
   "text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40 disabled:no-underline";
 
-function currencyTimesQuantity(cost: Currency | undefined, quantity: number): Currency {
-  if (!cost) return { cp: 0, sp: 0, gp: 0, pp: 0 };
-  return { cp: cost.cp * quantity, sp: cost.sp * quantity, gp: cost.gp * quantity, pp: cost.pp * quantity };
-}
-
-/**
- * One inventory row, in one of three modes: read-only display (Phase A's
- * rendering, unchanged), an inline edit form (cosmetic fields + quantity +
- * the matching weapon/armor/consumable detail, if any — the "Club +1"
- * path), or an inline sell form. Edit/Sell/History/Remove are low-emphasis
- * text links rather than icon buttons, matching the existing "← All
- * characters" link style — no icon-button row exists elsewhere in this app
- * to match instead. History (Phase C) doesn't have its own mode here since
- * it opens a modal owned by the parent `InventoryList`, not an inline form.
- */
+// One inventory row: read-only display (Equip toggle + a kebab for Edit/Remove, prose disclosed on expand) or an inline edit form.
 export default function InventoryRow({
   item,
   mode,
   pending,
   onEdit,
-  onSell,
   onCancel,
-  onHistory,
   onSubmit,
+  selectMode = false,
+  selected = false,
+  onToggleSelect,
 }: InventoryRowProps) {
   const { weapon, armor, consumable } = item;
 
@@ -107,10 +87,8 @@ export default function InventoryRow({
   const [armorEdit, setArmorEdit] = useState(armor);
   const [consumableEdit, setConsumableEdit] = useState(consumable);
 
-  const [sellQuantity, setSellQuantity] = useState(String(item.quantity));
-  const [sellCurrency, setSellCurrency] = useState<Currency>(
-    currencyTimesQuantity(item.cost, item.quantity)
-  );
+  const [expanded, setExpanded] = useState(false);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   async function submitEdit() {
     const operations: InventoryOperation[] = [
@@ -130,12 +108,6 @@ export default function InventoryRow({
       operations.push({ type: "adjustQuantity", inventoryItemId: item.id, delta });
     }
     await onSubmit(operations);
-  }
-
-  async function submitSell() {
-    await onSubmit([
-      { type: "sell", inventoryItemId: item.id, quantity: Number(sellQuantity), currencyDelta: sellCurrency },
-    ]);
   }
 
   if (mode === "edit") {
@@ -376,54 +348,6 @@ export default function InventoryRow({
     );
   }
 
-  if (mode === "sell") {
-    return (
-      <li className="flex flex-col gap-3 py-3">
-        <p className="text-sm font-medium text-parchment-900">Sell {item.name}</p>
-        <div className="flex flex-wrap items-end gap-3">
-          <label className={labelClass}>
-            Quantity
-            <input
-              type="number"
-              min={1}
-              max={item.quantity}
-              className={`${inputClass} w-20 tabular-nums`}
-              value={sellQuantity}
-              onChange={(e) => setSellQuantity(e.target.value)}
-            />
-          </label>
-          {(["pp", "gp", "sp", "cp"] as const).map((denomination) => (
-            <label key={denomination} className={labelClass}>
-              {denomination}
-              <input
-                type="number"
-                min={0}
-                className={`${inputClass} w-16 tabular-nums`}
-                value={sellCurrency[denomination]}
-                onChange={(e) =>
-                  setSellCurrency({ ...sellCurrency, [denomination]: Number(e.target.value) })
-                }
-              />
-            </label>
-          ))}
-        </div>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            disabled={pending}
-            onClick={submitSell}
-            className="rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
-          >
-            Sell
-          </button>
-          <button type="button" disabled={pending} onClick={onCancel} className={linkButtonClass}>
-            Cancel
-          </button>
-        </div>
-      </li>
-    );
-  }
-
   const effectRoll =
     consumable?.effectDiceCount && consumable?.effectDiceFaces
       ? formatRollSpec({
@@ -452,66 +376,103 @@ export default function InventoryRow({
     effectRoll,
   ].filter((part): part is string => part !== null);
 
+  const hasProse = Boolean(item.description || consumable?.effectDescription || item.notes);
+
   return (
-    <li className="flex items-start justify-between gap-3 py-2.5">
-      <div>
-        <p className="text-sm font-medium text-parchment-900">
-          {item.name}
-          <Badge tone={CATEGORY_TONE[item.category]} className="ml-2">
-            {item.category}
-          </Badge>
-          {item.equipped && (
-            <Badge tone="vitality" className="ml-1.5">
-              Equipped
-            </Badge>
+    <li className="flex flex-col gap-1.5 py-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2">
+          {selectMode && (
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={onToggleSelect}
+              aria-label={`Select ${item.name}`}
+              className="mt-1"
+            />
           )}
-        </p>
-        <p className="mt-0.5 text-xs text-parchment-600">{details.join(" · ")}</p>
-        {item.description && (
-          <p className="mt-1 text-xs text-parchment-600">{item.description}</p>
-        )}
-        {consumable?.effectDescription && (
-          <p className="mt-1 text-xs text-parchment-600">{consumable.effectDescription}</p>
-        )}
-        {item.notes && <p className="mt-1 text-xs italic text-parchment-600">{item.notes}</p>}
-      </div>
-      <div className="flex shrink-0 items-center gap-2 pt-0.5">
-        {isEquippable(item.category) && (
-          <>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-parchment-900">{item.name}</p>
+            <p className="mt-0.5 text-xs text-parchment-600">{details.join(" · ")}</p>
+          </div>
+        </div>
+        {!selectMode && (
+        <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+          {hasProse && (
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-label={expanded ? "Hide details" : "Show details"}
+              onClick={() => setExpanded((v) => !v)}
+              className="flex h-7 w-7 items-center justify-center rounded-control text-parchment-500 transition-colors hover:bg-parchment-200 hover:text-parchment-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
+            >
+              {expanded ? "⌃" : "⌄"}
+            </button>
+          )}
+          {isEquippable(item.category) && (
             <button
               type="button"
               disabled={pending}
+              aria-pressed={item.equipped}
               onClick={() =>
                 onSubmit([{ type: "setEquipped", inventoryItemId: item.id, equipped: !item.equipped }])
               }
-              className={linkButtonClass}
+              className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                item.equipped
+                  ? "border-vitality-200 bg-vitality-50 text-vitality-800 hover:bg-vitality-100"
+                  : "border-parchment-300 bg-parchment-50 text-parchment-700 hover:bg-parchment-100"
+              }`}
             >
-              {item.equipped ? "Unequip" : "Equip"}
+              {item.equipped ? "Equipped" : "Equip"}
             </button>
-            <span className="text-parchment-300">·</span>
-          </>
+          )}
+          <OverflowMenu
+            label={`Actions for ${item.name}`}
+            items={[
+              { label: "Edit", onSelect: onEdit },
+              {
+                label: "Remove",
+                onSelect: () => setConfirmingRemove(true),
+                danger: true,
+                separatorBefore: true,
+              },
+            ]}
+          />
+        </div>
         )}
-        <button type="button" disabled={pending} onClick={onEdit} className={linkButtonClass}>
-          Edit
-        </button>
-        <span className="text-parchment-300">·</span>
-        <button type="button" disabled={pending} onClick={onSell} className={linkButtonClass}>
-          Sell
-        </button>
-        <span className="text-parchment-300">·</span>
-        <button type="button" disabled={pending} onClick={onHistory} className={linkButtonClass}>
-          History
-        </button>
-        <span className="text-parchment-300">·</span>
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => onSubmit([{ type: "remove", inventoryItemId: item.id }])}
-          className={linkButtonClass}
-        >
-          Remove
-        </button>
       </div>
+
+      {!selectMode && confirmingRemove && (
+        <div className="flex items-center justify-end gap-3 text-xs">
+          <span className="text-parchment-700">Remove {item.name}?</span>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => onSubmit([{ type: "remove", inventoryItemId: item.id }])}
+            className="font-semibold text-garnet-700 hover:underline disabled:opacity-40"
+          >
+            Confirm
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => setConfirmingRemove(false)}
+            className="font-semibold text-parchment-600 hover:underline disabled:opacity-40"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {!selectMode && expanded && hasProse && (
+        <div className="flex flex-col gap-1 pl-0.5">
+          {item.description && <p className="text-xs text-parchment-600">{item.description}</p>}
+          {consumable?.effectDescription && (
+            <p className="text-xs text-parchment-600">{consumable.effectDescription}</p>
+          )}
+          {item.notes && <p className="text-xs italic text-parchment-600">{item.notes}</p>}
+        </div>
+      )}
     </li>
   );
 }

@@ -47,8 +47,8 @@ export function addCurrency(a: Currency, b: Currency): Currency {
  * e.g. `{gp:45}` → "45 gp", `{pp:1,gp:2}` → "1 pp 2 gp". An all-zero amount
  * renders as "0 gp" so a free/zero-value line still reads naturally.
  *
- * (For a SIGNED ledger delta — "+5 gp" / "-2 sp" — use `formatCurrencyDelta`
- * in LedgerModal; this is the plain-magnitude formatter.)
+ * (This is the plain-magnitude formatter; signed deltas — "+5 gp" / "-2 sp"
+ * — are rendered where activity-log deltas are shown.)
  */
 export function formatCurrency(c: Currency): string {
   const parts: string[] = [];

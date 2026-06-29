@@ -146,7 +146,6 @@ describe("character-scoped routers reject non-owners (#101)", () => {
   const ROUTES: Array<{ method: "get" | "post"; suffix: string }> = [
     { method: "post", suffix: "/hp" },
     { method: "post", suffix: "/inventory/transactions" },
-    { method: "get", suffix: "/inventory/transactions" },
     { method: "post", suffix: "/experience" },
     { method: "post", suffix: "/spellcasting/transactions" },
     { method: "post", suffix: "/resources/transactions" },

@@ -16,7 +16,6 @@ import type {
   HitPointOperation,
   InventoryOperation,
   Item,
-  LedgerEntry,
   ReferenceData,
   ResourceOperation,
   Session,
@@ -187,19 +186,6 @@ export async function applyInventoryTransactions(
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     throw new Error(body?.error ?? `Failed to apply inventory transactions (${response.status})`);
-  }
-  return response.json();
-}
-
-// The read-only ledger (Phase C) — unfiltered for the global history view,
-// or scoped to one still-held row for the per-item view. Both are the same
-// LedgerModal component; see its comment for why filtering only ever
-// covers currently-held items.
-export async function fetchLedger(characterId: string, inventoryItemId?: string): Promise<LedgerEntry[]> {
-  const query = inventoryItemId ? `?inventoryItemId=${encodeURIComponent(inventoryItemId)}` : "";
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/inventory/transactions${query}`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ledger (${response.status})`);
   }
   return response.json();
 }
