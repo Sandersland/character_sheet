@@ -122,12 +122,19 @@
   }
 }
 
-/* Placeholder dark overrides — real palette lands in #211; just enough to flip body bg/text. */
+/* Dark mode: reversed neutral ramp (-50 darkest surface … -900 lightest text), warm. */
 [data-theme="dark"] {
   color-scheme: dark;
-  --color-parchment-50: #27241d;
-  --color-parchment-100: #2c2a22;
-  --color-parchment-900: #faf9f7;
+  --color-parchment-50: #1f1c15;
+  --color-parchment-100: #28241c;
+  --color-parchment-200: #363023;
+  --color-parchment-300: #4a4233;
+  --color-parchment-400: #6d6450;
+  --color-parchment-500: #8f8770;
+  --color-parchment-600: #b6ac96;
+  --color-parchment-700: #d2c9b6;
+  --color-parchment-800: #e8e2d6;
+  --color-parchment-900: #f7f5f0;
 }
 
 /* One-shot pop for a freshly-settled dice total (DiceRollSequence chips). */
