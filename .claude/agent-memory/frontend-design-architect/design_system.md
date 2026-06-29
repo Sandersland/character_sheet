@@ -34,6 +34,13 @@ here: see `frontend/src/index.css` header comment block.
   for text on parchment-50/white; bump one step darker on a tinted fill (e.g.
   `arcane-800` on `bg-arcane-100`). The lighter accent steps are for
   fills/borders/meters/badges, not text. (See #187 / #158.)
+- **Light text on an accent FILL must also clear 4.5:1.** Mirror of the rule
+  above: only the darker accents carry white — `garnet-600` (≈5.5:1) and
+  `vitality-600` (≈4.9:1) do; `arcane` carries white only from `arcane-700`
+  down (`arcane-600` ≈3.8:1, `arcane-700` ≈5.07:1, hover `arcane-800` ≈6.44:1).
+  `gold` can never carry white (`gold-800` passes at ~6:1 but reads muddy), so
+  filled gold flips to dark text on a bright fill: `text-parchment-900` on
+  `bg-gold-400` (hover `bg-gold-500`), ≈10.5/8.5:1. (See #207.)
 - Fonts: `--font-display` = Source Serif 4 (headings only, h1-h3), `--font-sans`
   = Source Sans 3 (body/UI default). Loaded via Google Fonts `<link>` tags in
   `frontend/index.html` (no local font files, no extra build dep).

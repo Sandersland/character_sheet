@@ -86,7 +86,7 @@ export default function SpellRow({
               <Badge tone={schoolTone}>{spell.school}</Badge>
               {spell.concentration &&
                 (isConcentrating ? (
-                  <Badge tone="arcane" className="bg-arcane-600 text-white">
+                  <Badge tone="arcane" className="bg-arcane-700 text-white">
                     concentrating
                   </Badge>
                 ) : (
