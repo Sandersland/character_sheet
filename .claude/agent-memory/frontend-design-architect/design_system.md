@@ -56,6 +56,29 @@ mood, so the palette was assembled from individual hue families in
 neutral" + shade-scale rules. If revisiting colors later, check
 `palette-themes.md` again in case new palettes have been added.
 
+## Dark mode (#211) — `[data-theme="dark"]` in `index.css`
+
+Dark mode redefines the same `--color-*` tokens under `[data-theme="dark"]`; no
+component changes. Architecture: **reversed ramps** — `-50` is the darkest
+surface and `-900` the lightest text, the mirror of light mode. The neutral
+parchment ramp stays warm (umber-tinted darks, cream-tinted lights), and each
+accent (garnet/arcane/gold/vitality) is rebuilt as a dark-to-light ramp so its
+mid/high steps read as text/affordances against dark surfaces.
+
+- **Shadows**: `--shadow-card`/`--shadow-raised` get deeper, near-black opacities
+  for elevation against dark surfaces.
+- **Backdrop**: `--color-backdrop` (modal scrim) is a `@theme` token —
+  `rgb(39 36 29 / 0.45)` light, `rgb(0 0 0 / 0.66)` dark — consumed via the
+  `bg-backdrop` utility in `Modal.tsx` (kept out of `@theme inline` so the
+  runtime override applies). The focus ring uses `var(--color-garnet-600)` and
+  auto-adapts.
+- **Known limitation (deferred to #213)**: filled accent buttons whose label is
+  hard-coded `text-white`/`text-parchment-900` do **not** co-flip with the
+  remapped fills, so contrast must be re-verified per the light/dark mirror rule
+  in frontend.md. Casualties: the white-on-`garnet-600`/`vitality-600`/`arcane-700`
+  filled buttons and the dark-on-`gold-400` filled button. #213 normalizes these
+  filled-button labels.
+
 ## Component conventions (`frontend/src/components/`)
 
 - `Card` — base surface, optional `title` header row, used for every major

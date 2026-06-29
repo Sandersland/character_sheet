@@ -206,7 +206,8 @@ content; ThemeProvider wraps auth so `data-theme` applies app-wide.
 ## Theme / dark mode — `features/theme/`
 
 Dark mode is a set of `--color-*` overrides under `[data-theme="dark"]` in
-`index.css` (the dark palette is a placeholder pending #211 — light mode is
+`index.css` (the dark palette uses reversed ramps + dark shadows + a
+`--color-backdrop` token; #211 — see `design_system.md`; light mode is
 unchanged). The preference is persisted at `localStorage["cs:pref:theme"]`,
 defaulting to `system`.
 
