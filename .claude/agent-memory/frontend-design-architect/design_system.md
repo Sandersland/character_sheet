@@ -72,12 +72,15 @@ mid/high steps read as text/affordances against dark surfaces.
   `bg-backdrop` utility in `Modal.tsx` (kept out of `@theme inline` so the
   runtime override applies). The focus ring uses `var(--color-garnet-600)` and
   auto-adapts.
-- **Known limitation (deferred to #213)**: filled accent buttons whose label is
-  hard-coded `text-white`/`text-parchment-900` do **not** co-flip with the
-  remapped fills, so contrast must be re-verified per the light/dark mirror rule
-  in frontend.md. Casualties: the white-on-`garnet-600`/`vitality-600`/`arcane-700`
-  filled buttons and the dark-on-`gold-400` filled button. #213 normalizes these
-  filled-button labels.
+- **Filled-button labels (resolved in #213)**: a hard-coded `text-white` /
+  `text-parchment-900` label does **not** co-flip with a remapped fill, so #211's
+  ramp reversal broke AA on filled buttons in dark mode. Resolution: labels on
+  fills that **invert** between modes (garnet/arcane/vitality `-600`/`-700`) use
+  `text-parchment-50` — near-white in light, near-black in dark — so the label
+  always contrasts its fill. Gold is **light-ish in both modes** (`gold-400`
+  #f7d070 light / #c2991f dark), so its label uses `--color-ink` (#27241d, the
+  fixed `text-ink` token that does **not** flip), giving ≈10.5:1 light / ≈5.6:1
+  dark. Apply the same choice to any new filled accent control.
 
 ## Component conventions (`frontend/src/components/`)
 
