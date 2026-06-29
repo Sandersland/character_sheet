@@ -110,7 +110,7 @@ export default function ConditionsStrip({ character, onUpdate }: Props) {
             type="button"
             disabled={busy || exhaustion <= 0}
             onClick={() => handleExhaustion(exhaustion - 1)}
-            className="flex h-6 w-6 items-center justify-center rounded-control border border-parchment-300 bg-white text-sm font-semibold text-parchment-700 hover:bg-parchment-100 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-6 w-6 items-center justify-center rounded-control border border-parchment-300 bg-parchment-50 text-sm font-semibold text-parchment-700 hover:bg-parchment-100 disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Decrease exhaustion"
           >
             −
@@ -125,7 +125,7 @@ export default function ConditionsStrip({ character, onUpdate }: Props) {
             type="button"
             disabled={busy || exhaustion >= EXHAUSTION_MAX}
             onClick={() => handleExhaustion(exhaustion + 1)}
-            className="flex h-6 w-6 items-center justify-center rounded-control border border-parchment-300 bg-white text-sm font-semibold text-parchment-700 hover:bg-parchment-100 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-6 w-6 items-center justify-center rounded-control border border-parchment-300 bg-parchment-50 text-sm font-semibold text-parchment-700 hover:bg-parchment-100 disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Increase exhaustion"
           >
             +

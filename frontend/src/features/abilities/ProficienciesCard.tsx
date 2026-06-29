@@ -306,7 +306,7 @@ export default function ProficienciesCard({
             onChange={(e) => {
               if (e.target.value) handleLearnToolProf(e.target.value);
             }}
-            className="w-full max-w-xs rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 focus:border-garnet-500 focus:outline-none disabled:opacity-50"
+            className="w-full max-w-xs rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 focus:border-garnet-500 focus:outline-none disabled:opacity-50"
           >
             <option value="" disabled>
               Choose an artisan's tool…

@@ -139,7 +139,7 @@ export default function ManeuverPrompt({
                 value={activeDamageManeuver}
                 onChange={(e) => setSelectedDamageManeuver(e.target.value)}
                 disabled={busy}
-                className="rounded-control border border-gold-300 bg-white px-1.5 py-0.5 text-xs text-parchment-800 focus:outline-none focus:ring-1 focus:ring-gold-400"
+                className="rounded-control border border-gold-300 bg-parchment-50 px-1.5 py-0.5 text-xs text-parchment-800 focus:outline-none focus:ring-1 focus:ring-gold-400"
                 aria-label="Select maneuver to add to damage"
               >
                 {damageRollManeuvers.map((m) => (

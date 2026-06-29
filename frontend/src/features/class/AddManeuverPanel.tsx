@@ -98,7 +98,7 @@ export default function AddManeuverPanel({
         placeholder="Filter maneuvers…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="mb-3 w-full rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
+        className="mb-3 w-full rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
       />
 
       {/* Catalog list */}

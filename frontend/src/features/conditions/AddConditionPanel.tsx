@@ -73,7 +73,7 @@ export default function AddConditionPanel({ activeKeys, busy, onApply }: Props) 
         placeholder="Filter conditions…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="mb-3 w-full rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
+        className="mb-3 w-full rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
       />
 
       <label className="mb-3 block">
@@ -83,7 +83,7 @@ export default function AddConditionPanel({ activeKeys, busy, onApply }: Props) 
           placeholder="Giant Spider"
           value={source}
           onChange={(e) => setSource(e.target.value)}
-          className="w-full rounded-control border border-parchment-300 bg-white px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
+          className="w-full rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
         />
       </label>
 
