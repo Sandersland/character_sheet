@@ -107,6 +107,7 @@ The only permitted backend-call site. Every exported function maps to one endpoi
 - `updateCharacter` — thin PATCH, `currency` only
 - `startSession`, `endSession`, `fetchActiveSession`, `fetchSessions`, `fetchSession` — session lifecycle
 - `fetchCampaigns`, `createCampaign`, `fetchCampaign`, `joinCampaign`, `addCharacterToCampaign` — shared campaigns (#246); the attach call returns the full `Character` (or throws on the 409 reassignment guard)
+- `fetchEntities`, `createEntity`, `updateEntity`, `deleteEntity`, `fetchEntityBacklinks` — campaign entity registry & @-tagging (#248); backlinks come pre-filtered to the caller's own notes
 
 ### `lib/`
 
