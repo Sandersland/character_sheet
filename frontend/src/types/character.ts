@@ -437,12 +437,22 @@ export interface SpellSlots {
   used: number;
 }
 
+export type JournalEntryKind = "NOTE" | "ENTRY";
+export type EntryVisibility = "PRIVATE" | "CAMPAIGN";
+
 export interface JournalEntry {
   id: string;
-  title: string;
+  /** ENTRY = full 3-field form; NOTE = fast one-line in-session capture. */
+  kind: JournalEntryKind;
+  /** Optional: NOTE rows have no title. */
+  title?: string;
   /** ISO-8601 date string from the API (the JournalEntry.date DateTime). */
   date: string;
+  /** ISO-8601 capture timestamp shown on NOTE rows (JournalEntry.loggedAt). */
+  loggedAt: string;
   body: string;
+  /** Private-by-default; the CAMPAIGN share toggle ships in a later slice. */
+  visibility: EntryVisibility;
   /** Provenance: the session this entry was written during, if any. */
   sessionId?: string;
 }
