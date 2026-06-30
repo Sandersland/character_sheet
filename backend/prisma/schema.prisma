@@ -791,23 +791,43 @@ model Session {
   @@index([characterId, status])
 }
 
+// kind distinguishes the two capture surfaces sharing this table: full ENTRY
+// rows (3-field title/date/body form) vs. fast NOTE rows (one-line in-session
+// capture, no title). EntryVisibility ships private-by-default; the CAMPAIGN
+// share toggle is deferred but needs no schema change to enable later.
+enum JournalEntryKind {
+  NOTE
+  ENTRY
+}
+
+enum EntryVisibility {
+  PRIVATE
+  CAMPAIGN
+}
+
 // Freeform campaign journal — purely user-authored notes with no mechanical
 // effect, so (unlike inventory/HP/XP/spellcasting) it is NOT routed through
 // the audit log / transaction pattern: plain REST CRUD writes directly here.
 // Optionally tagged with the session it was written during (SetNull so a
 // deleted session leaves the note intact). `date` is the in-world / real date
 // the player assigns to the entry; `createdAt` is the system write time used
-// for stable newest-first ordering.
+// for stable newest-first ordering. `loggedAt` is the capture timestamp shown
+// on NOTE rows. `authorUserId` denormalizes the writing user so visibleEntries
+// can filter private-by-default without a join.
 model JournalEntry {
-  id          String    @id @default(uuid())
-  characterId String
-  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  sessionId   String?
-  session     Session?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
-  title       String
-  date        DateTime
-  body        String
-  createdAt   DateTime  @default(now())
+  id           String           @id @default(uuid())
+  characterId  String
+  character    Character        @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  sessionId    String?
+  session      Session?         @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  kind         JournalEntryKind @default(ENTRY)
+  title        String?
+  date         DateTime
+  loggedAt     DateTime         @default(now())
+  body         String
+  visibility   EntryVisibility  @default(PRIVATE)
+  authorUserId String
+  createdAt    DateTime         @default(now())
 
   @@index([characterId, createdAt])
 }
