@@ -14,6 +14,7 @@ import supertest from "supertest";
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
+import { visibleEntries } from "../journal.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
 import { authCookie } from "../../test-support/auth.js";
 
@@ -117,6 +118,89 @@ describe("POST /api/characters/:id/journal — create entry", () => {
       .send({ title: "Midnight", date: "2026-06-22", body: "x" });
     expect(res.status).toBe(201);
     expect(res.body.journal[0].date).toBe("2026-06-22T00:00:00.000Z");
+  });
+
+  it("sets authorUserId to the requesting user on create", async () => {
+    await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ title: "Authored", date: "2026-06-22", body: "by me" });
+
+    const rows = await prisma.journalEntry.findMany({ where: { characterId: FIXTURE_ID } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].authorUserId).toBe(OWNER_ID);
+    expect(rows[0].visibility).toBe("PRIVATE");
+  });
+});
+
+// ── Capture notes ─────────────────────────────────────────────────────────────
+
+describe("POST /api/characters/:id/journal — capture NOTE rows", () => {
+  it("creates a NOTE with no title (and no date) → 201", async () => {
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ kind: "NOTE", body: "The bridge collapsed!" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.journal).toHaveLength(1);
+    expect(res.body.journal[0].kind).toBe("NOTE");
+    expect(res.body.journal[0].title).toBeUndefined();
+    expect(res.body.journal[0].body).toBe("The bridge collapsed!");
+    expect(typeof res.body.journal[0].loggedAt).toBe("string");
+  });
+
+  it("auto-attaches a NOTE to the character's active session when one exists", async () => {
+    const session = await prisma.session.create({
+      data: { characterId: FIXTURE_ID, status: "active" },
+    });
+
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ kind: "NOTE", body: "mid-session jot" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.journal[0].sessionId).toBe(session.id);
+  });
+
+  it("leaves sessionId null for a NOTE when no session is active", async () => {
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ kind: "NOTE", body: "between sessions" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.journal[0].sessionId).toBeUndefined();
+  });
+});
+
+// ── visibleEntries (private-by-default read path) ─────────────────────────────
+
+describe("visibleEntries", () => {
+  it("returns only the author's own entries", async () => {
+    await prisma.journalEntry.create({
+      data: {
+        characterId: FIXTURE_ID,
+        kind: "NOTE",
+        date: new Date("2026-06-22T00:00:00.000Z"),
+        body: "mine",
+        authorUserId: OWNER_ID,
+      },
+    });
+    await prisma.journalEntry.create({
+      data: {
+        characterId: FIXTURE_ID,
+        kind: "NOTE",
+        date: new Date("2026-06-22T00:00:00.000Z"),
+        body: "someone else's private note",
+        authorUserId: "other-user",
+      },
+    });
+
+    const mine = await visibleEntries(prisma, OWNER_ID, { id: FIXTURE_ID });
+    expect(mine).toHaveLength(1);
+    expect(mine[0].body).toBe("mine");
+
+    const theirs = await visibleEntries(prisma, "other-user", { id: FIXTURE_ID });
+    expect(theirs).toHaveLength(1);
+    expect(theirs[0].body).toBe("someone else's private note");
   });
 });
 
