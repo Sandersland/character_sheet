@@ -5,6 +5,7 @@ import { assertCharacterAccess } from "../lib/auth/access.js";
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
 import { extractEntityIds, reconcileEntryRefs } from "../lib/journal-refs.js";
 import { prisma } from "../lib/prisma.js";
+import { getActiveSessionId } from "../lib/sessions.js";
 import { serializeCharacter, characterInclude } from "./characters.js";
 
 // Freeform campaign journal CRUD. Unlike inventory/HP/XP/spellcasting, journal
@@ -148,11 +149,7 @@ journalRouter.post("/characters/:id/journal", async (req, res) => {
   // session (if one is running), so in-session capture lands on the right log.
   let sessionId = data.sessionId ?? null;
   if (data.kind === "NOTE" && !sessionId) {
-    const active = await prisma.session.findFirst({
-      where: { characterId: req.params.id, status: "active" },
-      select: { id: true },
-    });
-    sessionId = active?.id ?? null;
+    sessionId = await getActiveSessionId(req.params.id);
   }
 
   await prisma.$transaction(async (tx) => {

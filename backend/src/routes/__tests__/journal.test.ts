@@ -8,6 +8,8 @@
  * afterEach only deletes the character row.
  */
 
+import { randomUUID } from "node:crypto";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -149,8 +151,24 @@ describe("POST /api/characters/:id/journal — capture NOTE rows", () => {
   });
 
   it("auto-attaches a NOTE to the character's active session when one exists", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        name: "Journal Campaign",
+        ownerId: OWNER_ID,
+        inviteCode: randomUUID(),
+        members: { create: { userId: OWNER_ID, role: "OWNER" } },
+      },
+    });
+    await prisma.character.update({
+      where: { id: FIXTURE_ID },
+      data: { campaignId: campaign.id },
+    });
     const session = await prisma.session.create({
-      data: { characterId: FIXTURE_ID, status: "active" },
+      data: {
+        campaignId: campaign.id,
+        status: "active",
+        participants: { create: { characterId: FIXTURE_ID } },
+      },
     });
 
     const res = await supertest.agent(app).set("Cookie", COOKIE)
