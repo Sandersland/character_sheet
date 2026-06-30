@@ -68,8 +68,8 @@
 | `lib/inventory.ts` | Currency math, catalog→snapshot builders, `applyInventoryOperations()`. Reference implementation for the intent-bearing transaction pattern. Includes the `setEquipped` op (logged as `equipped`/`unequipped` events). |
 | `lib/itemDetail.ts` | `serializeWeaponDetail`/`serializeArmorDetail`/`serializeConsumableDetail` — shared by both `routes/items.ts` (catalog) and `routes/characters.ts` (inventory rows). |
 | `lib/items.ts` | `isEquippable(category)` + `EQUIPPABLE_CATEGORIES` — the equippability rule (weapon/armor yes, consumable/gear no). Single backend source of truth; mirrored in `frontend/src/lib/items.ts`. Enforced in `applySetEquipped`. |
-| `lib/sessions.ts` | `startSession`, `endSession`, `getActiveSessionId`. Enforces single-active-session per character. Called by session routes and by `getActiveSessionId()` which is threaded into every `apply*Operations()` lib function to tag events. |
-| `lib/session-summary.ts` | `computeSessionSummary()` — pure aggregation of a session's `CharacterEvent` rows into an end-of-session summary. No new bookkeeping; derive-don't-persist. Unit-testable without Postgres. |
+| `lib/sessions.ts` | Campaign-level session lifecycle (#245): `startCampaignSession`, `joinSession`, `leaveSession`, `endSession`, `getActiveSession`/`getActiveSessionId`, plus `maybeAutoClose`/`autoCloseIfStale` (close a session `SESSION_GRACE_MS` after the last participant leaves) and `recomputeSummaries` (per-participant summary + campaign recap, reused by end + retroactive XP). Enforces one active session per **campaign**. `getActiveSessionId(characterId)` resolves the character's `campaignId` → active campaign session and is threaded into every `apply*Operations()` lib to tag events (signature unchanged). |
+| `lib/session-summary.ts` | Pure aggregation (no Postgres): `computeSessionSummary()` folds a participant's `CharacterEvent` rows into a summary; `computeCampaignRecap()` aggregates per-participant `ParticipantSummary`s into the campaign-level `CampaignRecap` (sum XP/spells/rounds/rolls, union items, participant count, present-time). Derive-don't-persist. |
 
 Prisma client is generated into `src/generated/prisma` (gitignored). Run `npx prisma generate` from `backend/` after a fresh clone or any schema change.
 
@@ -90,10 +90,10 @@ Prisma client is generated into `src/generated/prisma` (gitignored). Run `npx pr
 | `/join/:code` | `JoinCampaignRoute` (`features/campaign`) | Joins by code on mount, then redirects to `/campaigns`. |
 
 **`CharacterSheetPage` layout (printed-sheet order, top to bottom):**
-Header (+ "Start Session" / "Resume Session" button) → `VitalsStrip` → `HitPointTracker` + `ExperienceTracker` (2-col) → ability rail + `SkillsTable` (auto/1fr) → `ProficienciesCard` → `ClassFeaturesSection` → `AdvancementSection` → `InventoryList` + Spells / Journal (2-col) → Journal (if spellcaster, full-width).
+Header (+ a campaign-aware session button: "Start Session" / "Resume Session" / "Join Session", or a "Join a campaign" link when uncampaigned) → `VitalsStrip` → `HitPointTracker` + `ExperienceTracker` (2-col) → ability rail + `SkillsTable` (auto/1fr) → `ProficienciesCard` → `ClassFeaturesSection` → `AdvancementSection` → `InventoryList` + Spells / Journal (2-col) → Journal (if spellcaster, full-width).
 
 **`SessionPage` layout (action-first, top to bottom):**
-Header (character identity + "End Session" button) → `HitPointTracker` → Attacks card (equipped weapons only, Attack + Damage roll buttons with correct versatile die) → `ClassFeaturesSection` (resource pools) → `InventoryList`.
+Header (character identity + "Leave Session" + "End Session" buttons — Leave records this character's departure and returns to the sheet, leaving the shared session open for the rest of the party) → `HitPointTracker` → Attacks card (equipped weapons only, Attack + Damage roll buttons with correct versatile die) → `ClassFeaturesSection` (resource pools) → `InventoryList`.
 
 ### `api/client.ts`
 
@@ -103,7 +103,7 @@ The only permitted backend-call site. Every exported function maps to one endpoi
 - `fetchActivity`, `revertBatch` — unified audit log
 - `fetchReference`, `fetchItems`, `fetchSpells` — catalog reads
 - `updateCharacter` — thin PATCH, `currency` only
-- `startSession`, `endSession`, `fetchActiveSession`, `fetchSessions`, `fetchSession` — session lifecycle
+- `startCampaignSession`, `joinSession`, `leaveSession`, `endSession`, `fetchCampaignSessions`, `fetchCampaignSession` — campaign-scoped session lifecycle (#245); `fetchActiveSession`, `fetchSessions`, `fetchSession` stay character-scoped reads
 - `fetchCampaigns`, `createCampaign`, `fetchCampaign`, `joinCampaign`, `addCharacterToCampaign` — shared campaigns (#246); the attach call returns the full `Character` (or throws on the 409 reassignment guard)
 
 ### `lib/`
@@ -168,7 +168,7 @@ The Character row carries these JSON columns: `hitPoints`, `hitDice`, `abilitySc
 - **Polymorphic soft-reference**: `entityType`/`entityId` (no FK — the entity may be deleted).
 - **before/after JSON snapshots**: the state before and after the operation, used by the revert handler to restore. The free-form `data` JSON carries op-specific extras the revert handler also reads — e.g. inventory delete ops stash a self-contained `data.deletedItem` snapshot (all scalar columns + the weapon/armor/consumable detail block) so the deleted row can be rebuilt on undo. (`data` lives outside `before`/`after` precisely so it is never fed to `diffToFields`.)
 - **Append-only**: events are flagged `reverted:true`, never deleted. A `revert` meta-event is appended on undo.
-- **Session tagging**: `sessionId String?` — events fired while a session is active get its id. Between-session events (shopping, leveling between adventures) get `null`. `getActiveSessionId(characterId)` is called at the top of every `apply*Operations()` function.
+- **Session tagging**: `sessionId String?` — events fired while a session is active get its id; between-session events (shopping, leveling between adventures) get `null`. Events stay **per-character** (`CharacterEvent.characterId` is unchanged); a campaign session aggregates them by `sessionId`. `getActiveSessionId(characterId)` (called at the top of every `apply*Operations()`) now resolves the character's `campaignId` → the campaign's active session — so a character with no campaign always tags `null`.
 
 `logEvent(tx, params)` in `lib/events.ts` writes the event + computes `CharacterEventField` diffs (via `diffToFields`) inside the caller's `$transaction`. All ops in a single request share a `randomUUID()` `batchId`.
 
