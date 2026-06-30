@@ -74,4 +74,25 @@ describe("CampaignsPage (#246)", () => {
     await waitFor(() => expect(vi.mocked(client.fetchCampaigns)).toHaveBeenCalledTimes(2));
     expect(await screen.findByRole("link", { name: /new campaign/i })).toBeInTheDocument();
   });
+
+  it("extracts the code when a full invite URL is pasted into the join form", async () => {
+    const user = userEvent.setup();
+    vi.mocked(client.fetchCampaigns).mockResolvedValue([]);
+    vi.mocked(client.joinCampaign).mockResolvedValue(makeCampaign());
+
+    render(
+      <MemoryRouter>
+        <CampaignsPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText(/no campaigns yet/i);
+    await user.type(
+      screen.getByLabelText(/invite code/i),
+      "https://example.com/join/abc123",
+    );
+    await user.click(screen.getByRole("button", { name: /join campaign/i }));
+
+    expect(vi.mocked(client.joinCampaign)).toHaveBeenCalledWith("abc123");
+  });
 });

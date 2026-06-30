@@ -60,7 +60,11 @@ export default function CampaignsPage() {
     setPending(true);
     setError(null);
     try {
-      await joinCampaign(code.trim());
+      // Accept either a bare code or a pasted full invite URL (…/join/<code>).
+      const raw = code.trim();
+      const afterJoin = raw.includes("/join/") ? (raw.split("/join/").pop() ?? raw) : raw;
+      const inviteCode = afterJoin.replace(/[/?#].*$/, "");
+      await joinCampaign(inviteCode);
       setCode("");
       await load();
     } catch (err) {

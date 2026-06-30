@@ -71,6 +71,7 @@ campaignsRouter.get("/campaigns", async (req, res) => {
   res.json(
     campaigns.map((campaign) => ({
       ...campaign,
+      // The membership always exists (the WHERE filters to it); ?? satisfies the type.
       role: campaign.members.find((m) => m.userId === userId)?.role ?? "PLAYER",
     })),
   );
