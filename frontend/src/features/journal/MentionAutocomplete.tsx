@@ -44,6 +44,7 @@ interface MentionAutocompleteProps {
   id?: string;
   required?: boolean;
   "aria-label"?: string;
+  "aria-labelledby"?: string;
   onKeyDown?: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
 }
 
@@ -65,6 +66,7 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
     const [error, setError] = useState<string | null>(null);
 
     const ariaLabel = rest["aria-label"];
+    const ariaLabelledBy = rest["aria-labelledby"];
 
     function setRef(el: HTMLDivElement | null) {
       innerRef.current = el;
@@ -252,6 +254,7 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
           aria-multiline="true"
           aria-required={required}
           aria-label={ariaLabel}
+          aria-labelledby={ariaLabelledBy}
           contentEditable
           suppressContentEditableWarning
           className={`whitespace-pre-wrap break-words ${className}`}

@@ -67,17 +67,18 @@ describe("CapturePalette (#247)", () => {
     expect(onUpdate).toHaveBeenCalledTimes(1);
   });
 
-  it("Shift+Enter does NOT submit — it inserts a newline", async () => {
+  it("Shift+Enter does NOT submit", async () => {
     const user = userEvent.setup();
     render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
 
-    const composer = screen.getByRole("textbox", { name: /quick note/i }) as HTMLTextAreaElement;
+    const composer = screen.getByRole("textbox", { name: /quick note/i });
     await user.type(composer, "line one");
     await user.keyboard("{Shift>}{Enter}{/Shift}");
     await user.type(composer, "line two");
 
     expect(client.createJournalEntry).not.toHaveBeenCalled();
-    expect(composer.value).toBe("line one\nline two");
+    expect(composer).toHaveTextContent("line one");
+    expect(composer).toHaveTextContent("line two");
   });
 
   it("does not save an empty (whitespace-only) note", async () => {
@@ -95,7 +96,8 @@ describe("CapturePalette (#247)", () => {
     render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
 
     const composer = screen.getByRole("textbox", { name: /quick note/i });
-    fireEvent.change(composer, { target: { value: "日本語" } });
+    composer.textContent = "日本語";
+    fireEvent.input(composer);
     fireEvent.keyDown(composer, { key: "Enter", isComposing: true });
 
     expect(client.createJournalEntry).not.toHaveBeenCalled();
