@@ -4,7 +4,13 @@ import userEvent from "@testing-library/user-event";
 
 import SessionSummaryModal from "@/features/session/SessionSummaryModal";
 import { applyExperienceOperations, fetchSession } from "@/api/client";
-import type { Character, Session, SessionSummary } from "@/types/character";
+import type {
+  CampaignRecap,
+  Character,
+  ParticipantSummary,
+  Session,
+  SessionParticipant,
+} from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   applyExperienceOperations: vi.fn(),
@@ -18,61 +24,114 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-const summary: SessionSummary = {
+const recap: CampaignRecap = {
   startedAt: "2026-06-22T18:00:00.000Z",
   endedAt: "2026-06-22T21:30:00.000Z",
   durationMs: 3.5 * 60 * 60 * 1000,
+  participantCount: 2,
   xpGained: 450,
   levelsGained: 1,
-  itemsAcquired: [
-    { name: "Healing Potion", qty: 2 },
-    { name: "Longsword", qty: 1 },
-  ],
-  slotsSpent: { "1": 2, "3": 1 },
   spellsCast: 3,
   combatRounds: 4,
   attackRolls: 5,
   damageRolls: 4,
-  featsOrAsis: [{ type: "featTaken", label: "Feat: Sharpshooter" }],
+  itemsAcquired: [
+    { name: "Healing Potion", qty: 2 },
+    { name: "Longsword", qty: 1 },
+  ],
+  totalPresentMs: 6 * 60 * 60 * 1000,
 };
+
+function participantSummary(overrides: Partial<ParticipantSummary>): ParticipantSummary {
+  return {
+    startedAt: "2026-06-22T18:00:00.000Z",
+    endedAt: "2026-06-22T21:30:00.000Z",
+    durationMs: 3.5 * 60 * 60 * 1000,
+    xpGained: 225,
+    levelsGained: 0,
+    itemsAcquired: [],
+    slotsSpent: {},
+    spellsCast: 1,
+    combatRounds: 4,
+    attackRolls: 2,
+    damageRolls: 2,
+    featsOrAsis: [],
+    characterId: "c1",
+    characterName: "Aldric",
+    joinedAt: "2026-06-22T18:00:00.000Z",
+    leftAt: null,
+    presentMs: 3.5 * 60 * 60 * 1000,
+    ...overrides,
+  };
+}
+
+function participant(overrides: Partial<SessionParticipant>): SessionParticipant {
+  return {
+    id: `p-${overrides.characterId ?? "c1"}`,
+    sessionId: "s1",
+    characterId: "c1",
+    joinedAt: "2026-06-22T18:00:00.000Z",
+    leftAt: null,
+    summary: participantSummary({}),
+    ...overrides,
+  };
+}
+
+const participants: SessionParticipant[] = [
+  participant({ characterId: "c1", summary: participantSummary({ characterId: "c1", characterName: "Aldric" }) }),
+  participant({
+    characterId: "c2",
+    summary: participantSummary({ characterId: "c2", characterName: "Bromm", xpGained: 225 }),
+  }),
+];
 
 // journalEntries is set (even if empty) so the modal does NOT lazily fetch
 // session detail — these tests exercise the rendered props directly.
 const baseSession: Session = {
   id: "s1",
-  characterId: "c1",
+  campaignId: "camp1",
   status: "ended",
   startedAt: "2026-06-22T18:00:00.000Z",
   endedAt: "2026-06-22T21:30:00.000Z",
   title: "The Sunless Citadel",
-  summary,
+  summary: recap,
+  participants,
   journalEntries: [],
 };
 
 describe("SessionSummaryModal", () => {
-  it("renders the headline aggregates and item list", () => {
+  it("renders the campaign recap aggregates, party size, and item list", () => {
     render(<SessionSummaryModal characterId="c1" session={baseSession} onClose={() => {}} />);
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/Session Recap — The Sunless Citadel/)).toBeInTheDocument();
 
-    // Headline tiles.
-    expect(screen.getByText("450")).toBeInTheDocument(); // XP
+    // Recap tiles + party size.
+    expect(screen.getByText("450")).toBeInTheDocument(); // XP gained (recap)
     expect(screen.getByText("XP gained")).toBeInTheDocument();
     expect(screen.getByText("Attack rolls")).toBeInTheDocument();
+    expect(screen.getByText(/2 players/)).toBeInTheDocument();
 
     // Secondary facts.
     expect(screen.getByText(/Gained 1 level/)).toBeInTheDocument();
     expect(screen.getByText(/4 combat rounds/)).toBeInTheDocument();
-    expect(screen.getByText(/Feat: Sharpshooter/)).toBeInTheDocument();
 
-    // Items acquired.
+    // Items acquired (party-wide).
     expect(screen.getByText("Healing Potion")).toBeInTheDocument();
     expect(screen.getByText("Longsword")).toBeInTheDocument();
   });
 
+  it("lists each participant with their name and present time", () => {
+    render(<SessionSummaryModal characterId="c1" session={baseSession} onClose={() => {}} />);
+    expect(screen.getByText("Participants")).toBeInTheDocument();
+    expect(screen.getByText("Aldric")).toBeInTheDocument();
+    expect(screen.getByText("Bromm")).toBeInTheDocument();
+    // Each participant card shows their present duration.
+    expect(screen.getAllByText(/present/).length).toBeGreaterThanOrEqual(2);
+  });
+
   it("shows an empty-state for no acquired items", () => {
-    const session: Session = { ...baseSession, summary: { ...summary, itemsAcquired: [] } };
+    const session: Session = { ...baseSession, summary: { ...recap, itemsAcquired: [] } };
     render(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />);
     expect(screen.getByText("No items gained this session.")).toBeInTheDocument();
   });
@@ -90,15 +149,17 @@ describe("SessionSummaryModal", () => {
       journalEntries: [
         {
           id: "j1",
+          kind: "ENTRY",
           title: "We found the dragon",
           date: "2026-06-22T00:00:00.000Z",
+          loggedAt: "2026-06-22T00:00:00.000Z",
           body: "It was huge and very angry.",
+          visibility: "PRIVATE",
         },
       ],
     };
     render(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />);
 
-    // Title shows; body is collapsed until clicked.
     expect(screen.getByText("We found the dragon")).toBeInTheDocument();
     expect(screen.queryByText("It was huge and very angry.")).not.toBeInTheDocument();
 
@@ -111,12 +172,12 @@ describe("SessionSummaryModal", () => {
     expect(screen.getByText("No journal entries for this session.")).toBeInTheDocument();
   });
 
-  it("awards XP retroactively with the explicit sessionId and refreshes the summary", async () => {
+  it("awards XP retroactively with the explicit sessionId and refreshes the recap", async () => {
     const user = userEvent.setup();
     mockApplyXp.mockResolvedValue({} as Character);
     mockFetchSession.mockResolvedValue({
       ...baseSession,
-      summary: { ...summary, xpGained: 950 },
+      summary: { ...recap, xpGained: 950 },
       events: [],
     });
 
@@ -127,7 +188,6 @@ describe("SessionSummaryModal", () => {
     await user.click(screen.getByRole("button", { name: /^award$/i }));
 
     expect(mockApplyXp).toHaveBeenCalledWith("c1", [{ type: "award", amount: 500 }], "s1");
-    // Summary tile reflects the refreshed value.
     expect(await screen.findByText("950")).toBeInTheDocument();
   });
 
@@ -153,7 +213,7 @@ describe("SessionSummaryModal", () => {
     mockApplyXp.mockResolvedValue(updatedCharacter);
     mockFetchSession.mockResolvedValue({
       ...baseSession,
-      summary: { ...summary, xpGained: 950 },
+      summary: { ...recap, xpGained: 950 },
       events: [],
     });
 

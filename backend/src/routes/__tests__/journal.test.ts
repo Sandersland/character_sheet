@@ -8,12 +8,15 @@
  * afterEach only deletes the character row.
  */
 
+import { randomUUID } from "node:crypto";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
+import { visibleEntries } from "../journal.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
 import { authCookie } from "../../test-support/auth.js";
 
@@ -118,6 +121,105 @@ describe("POST /api/characters/:id/journal — create entry", () => {
     expect(res.status).toBe(201);
     expect(res.body.journal[0].date).toBe("2026-06-22T00:00:00.000Z");
   });
+
+  it("sets authorUserId to the requesting user on create", async () => {
+    await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ title: "Authored", date: "2026-06-22", body: "by me" });
+
+    const rows = await prisma.journalEntry.findMany({ where: { characterId: FIXTURE_ID } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].authorUserId).toBe(OWNER_ID);
+    expect(rows[0].visibility).toBe("PRIVATE");
+  });
+});
+
+// ── Capture notes ─────────────────────────────────────────────────────────────
+
+describe("POST /api/characters/:id/journal — capture NOTE rows", () => {
+  it("creates a NOTE with no title (and no date) → 201", async () => {
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ kind: "NOTE", body: "The bridge collapsed!" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.journal).toHaveLength(1);
+    expect(res.body.journal[0].kind).toBe("NOTE");
+    expect(res.body.journal[0].title).toBeUndefined();
+    expect(res.body.journal[0].body).toBe("The bridge collapsed!");
+    expect(typeof res.body.journal[0].loggedAt).toBe("string");
+  });
+
+  it("auto-attaches a NOTE to the character's active session when one exists", async () => {
+    const campaign = await prisma.campaign.create({
+      data: {
+        name: "Journal Campaign",
+        ownerId: OWNER_ID,
+        inviteCode: randomUUID(),
+        members: { create: { userId: OWNER_ID, role: "OWNER" } },
+      },
+    });
+    await prisma.character.update({
+      where: { id: FIXTURE_ID },
+      data: { campaignId: campaign.id },
+    });
+    const session = await prisma.session.create({
+      data: {
+        campaignId: campaign.id,
+        status: "active",
+        participants: { create: { characterId: FIXTURE_ID } },
+      },
+    });
+
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ kind: "NOTE", body: "mid-session jot" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.journal[0].sessionId).toBe(session.id);
+  });
+
+  it("leaves sessionId null for a NOTE when no session is active", async () => {
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ kind: "NOTE", body: "between sessions" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.journal[0].sessionId).toBeUndefined();
+  });
+});
+
+// ── visibleEntries (private-by-default read path) ─────────────────────────────
+
+describe("visibleEntries", () => {
+  it("returns only the author's own entries", async () => {
+    await prisma.journalEntry.create({
+      data: {
+        characterId: FIXTURE_ID,
+        kind: "NOTE",
+        date: new Date("2026-06-22T00:00:00.000Z"),
+        body: "mine",
+        authorUserId: OWNER_ID,
+      },
+    });
+    await prisma.journalEntry.create({
+      data: {
+        characterId: FIXTURE_ID,
+        kind: "NOTE",
+        date: new Date("2026-06-22T00:00:00.000Z"),
+        body: "someone else's private note",
+        authorUserId: "other-user",
+      },
+    });
+
+    const mine = await visibleEntries(prisma, OWNER_ID, { id: FIXTURE_ID });
+    expect(mine).toHaveLength(1);
+    expect(mine[0].body).toBe("mine");
+
+    const theirs = await visibleEntries(prisma, "other-user", { id: FIXTURE_ID });
+    expect(theirs).toHaveLength(1);
+    expect(theirs[0].body).toBe("someone else's private note");
+  });
 });
 
 // ── Update ─────────────────────────────────────────────────────────────────
@@ -194,6 +296,83 @@ describe("DELETE /api/characters/:id/journal/:entryId — delete entry", () => {
     const res = await supertest.agent(app).set("Cookie", COOKIE).delete(journalUrl("/not-a-real-entry-id"));
     expect(res.status).toBe(404);
     expect(res.body.error).toBe("Journal entry not found");
+  });
+});
+
+// ── Entity ref derivation (#248) ──────────────────────────────────────────────
+
+describe("JournalEntryRef derivation from @[uuid] tokens", () => {
+  async function attachToFreshCampaign() {
+    const created = await supertest.agent(app).set("Cookie", COOKIE)
+      .post("/api/campaigns")
+      .send({ name: "Ref Campaign" });
+    const campaignId = created.body.id as string;
+    await supertest.agent(app).set("Cookie", COOKIE)
+      .post(`/api/campaigns/${campaignId}/characters`)
+      .send({ characterId: FIXTURE_ID });
+    return campaignId;
+  }
+
+  async function makeEntity(campaignId: string, name: string) {
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(`/api/campaigns/${campaignId}/entities`)
+      .send({ type: "NPC", name });
+    return res.body.id as string;
+  }
+
+  afterEach(async () => {
+    await prisma.campaign.deleteMany({ where: { name: "Ref Campaign" } });
+  });
+
+  it("creates a ref for a valid token", async () => {
+    const campaignId = await attachToFreshCampaign();
+    const entityId = await makeEntity(campaignId, "Tagged NPC");
+
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ kind: "NOTE", body: `Met @[${entityId}] in the tavern` });
+    const entryId = res.body.journal[0].id as string;
+
+    const refs = await prisma.journalEntryRef.findMany({ where: { entryId } });
+    expect(refs).toHaveLength(1);
+    expect(refs[0].entityId).toBe(entityId);
+  });
+
+  it("removes the ref when the token is edited out", async () => {
+    const campaignId = await attachToFreshCampaign();
+    const entityId = await makeEntity(campaignId, "Fleeting NPC");
+
+    const created = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ title: "T", date: "2026-06-22", body: `Saw @[${entityId}]` });
+    const entryId = created.body.journal[0].id as string;
+    expect(await prisma.journalEntryRef.count({ where: { entryId } })).toBe(1);
+
+    await supertest.agent(app).set("Cookie", COOKIE)
+      .patch(journalUrl(`/${entryId}`))
+      .send({ body: "No tags anymore" });
+    expect(await prisma.journalEntryRef.count({ where: { entryId } })).toBe(0);
+  });
+
+  it("creates no ref for a foreign or bogus uuid", async () => {
+    await attachToFreshCampaign();
+    const foreign = "99999999-9999-9999-9999-999999999999";
+
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ kind: "NOTE", body: `Bogus @[${foreign}] and @[not-a-uuid]` });
+    const entryId = res.body.journal[0].id as string;
+    expect(await prisma.journalEntryRef.count({ where: { entryId } })).toBe(0);
+  });
+
+  it("stores the body but no refs when the character has no campaign", async () => {
+    const entityish = "12345678-1234-1234-1234-123456789012";
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ kind: "NOTE", body: `Tag @[${entityish}] outside a campaign` });
+    const entryId = res.body.journal[0].id as string;
+    expect(res.body.journal[0].body).toBe(`Tag @[${entityish}] outside a campaign`);
+    expect(await prisma.journalEntryRef.count({ where: { entryId } })).toBe(0);
   });
 });
 

@@ -12,6 +12,9 @@ frontend/src/
 │   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable, ProficienciesCard
 │   ├── advancement/     # AdvancementSection, AdvancementPanel
 │   ├── auth/            # AuthProvider (useAuth), AuthGate, AppHeader, AccountMenu
+│   ├── campaign/        # CampaignsPage (list+create+join), CampaignDetailPage (mgmt hub:
+│   │                    #   invite link, roster, add-character dropdown), CampaignInviteLink,
+│   │                    #   CampaignIndicator (sheet badge/link), JoinCampaignRoute (#246)
 │   ├── character-meta/  # CharacterCard, VitalsStrip, JournalSection, JournalEntryPanel,
 │   │                    #   ActivityModal, DeleteCharacterModal, BackendStatus
 │   ├── class/           # ClassFeaturesSection, FightingStylePanel, AddManeuverPanel,
@@ -24,6 +27,7 @@ frontend/src/
 │   ├── hitpoints/       # HitPointTracker (inline Card; hosts LevelUpModal + ConcentrationSaveModal)
 │   ├── inventory/       # InventoryList, InventoryRow, AddItemPanel,
 │   │                    #   StartingEquipmentEditor
+│   ├── journal/         # CapturePalette (Cmd/Ctrl+J quick-capture NOTE overlay)
 │   ├── session/         # TurnHub, TurnTracker, useTurnState, SessionLog, SessionsModal,
 │   │                    #   SessionSummaryModal, Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
 │   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie
@@ -31,7 +35,7 @@ frontend/src/
 │   └── theme/           # ThemeProvider (useTheme) — applies data-theme app-wide
 ├── hooks/               # reusable React hooks used by pages or multiple clusters
 │   │                    #   (useCharacter, useCharacterList, useCharacterDraft, useReferenceData,
-│   │                    #    useThemePreference)
+│   │                    #    useThemePreference, useGlobalKeyboard)
 ├── lib/                 # pure TS logic — NO React/JSX (dice, abilities, timeline, startingEquipment, …)
 ├── pages/               # route-level views (CharacterListPage, CharacterSheetPage,
 │   │                    #   CharacterCreatePage, SessionPage, LoginPage)
@@ -76,6 +80,7 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 | `spellCast.ts` | Pure cast-roll math (cantrip scaling, upcast dice, heal modifier) shared by SpellsSection + InlineSpellPicker. |
 | `spellMeta.ts` | Pure spell display helpers (school tone, metadata) shared across spell surfaces. |
 | `turnRules.ts` | 5e turn economy derived from class/level (`deriveAttacksPerAction`, action lists). |
+| `mentions.ts` | @-tagging primitives (#248/#269): `parseMentionBody` (text/mention segment split of a stored body), `normalizeForMatch` (search key, parity with backend `lib/journal-refs.ts`), `matchEntities`, `parseTrigger` (the in-progress `@…`/`@type:` autocomplete trigger). Edit-time DOM helpers (contenteditable composer): `buildMentionChip`, `mentionBodyToFragment` (body→DOM with chips), `serializeMentionDom` (DOM→body round-trip), `serializeMentionDomBeforeCaret` (pre-caret slice for trigger parsing), `placeCaretAtBodyOffset`, plus the `MentionResolved` type. Pure — no JSX. |
 | `encumbrance.ts` | Carrying capacity (`carryingCapacity` = STR × 15), derive-on-read. |
 | `fightingStyles.ts` | Fighting-style labels/descriptions (presentation; backend is rules source of truth). |
 | `maneuvers.ts` | Battle Master maneuver classification data (mechanic/slot) for ManeuverPrompt. |
@@ -293,3 +298,24 @@ Examples:
 - `features/spells/`: `SpellsSection` (orchestrator) / `SpellRow` / `AddSpellPanel`
 
 The orchestrator pattern keeps async state and API batching in one place and makes rows easy to unit-test in isolation — pass mock callbacks, assert they fire with the right args. See `testing.md` for component test patterns.
+
+## Quick-capture palette — `features/journal/CapturePalette.tsx`
+
+The fast in-session note surface; the sheet's own `features/character-meta/JournalSection.tsx` is now a body-only NOTE-row composer (mirroring this palette) rather than the old 3-field ENTRY form. `hooks/useGlobalKeyboard.ts` registers a document-level Cmd/Ctrl+J listener (held in a ref so it binds once); both `CharacterSheetPage` and `SessionPage` use it to open the palette. The palette is a centered, top-anchored, wide overlay with a light scrim (the sheet peeks behind) — it reuses Modal's Esc/auto-focus/scroll-lock behavior but is its own overlay, not an inline-edit panel. The auto-focused composer commits a `NOTE` on Enter (Shift+Enter = newline) via `createJournalEntry({ kind: "NOTE", body, sessionId })`; the returned Character propagates through the page's `onUpdate`. Below the composer is a per-session NOTE feed with `loggedAt` shown as a time (`formatJournalTime`) and per-line edit/delete.
+
+## Entity registry & @-tagging — `features/journal/` + `features/entities/` (#248)
+
+The shared campaign wiki surface. Three pieces, all scoped to `character.campaignId`:
+
+- **`features/journal/MentionAutocomplete.tsx`** — a **contenteditable** wrapper that drives the `@…` autocomplete and renders each stored `@[<uuid>]` token as an atomic `@Name` chip while editing (#248/#269). Public contract is unchanged: `value` (raw `@[<uuid>]` body) in, `onChange(rawBody)` out — the DOM is serialized back to tokens on every input via `lib/mentions.serializeMentionDom`, so hosts and entity backlinks are unaffected. Selecting a match or running "➕ Create <Type> …" inserts a chip; Backspace/Delete next to a chip removes it atomically. It intercepts Up/Down/Enter/Esc *only while the popover is open* (Enter selects a match instead of submitting; Esc `stopPropagation`s so it closes the popover, not the palette), and falls through to the composer's own `onKeyDown` otherwise. No `campaignId` → a "create or join a campaign" CTA instead of matches. Wired into `CapturePalette` (NOTE) and `JournalEntryPanel` (NOTE body).
+- **`features/journal/MentionText.tsx`** — renders a stored body with `parseMentionBody`: text verbatim, each known `@[<uuid>]` as a Badge-styled chip linking to the entity detail page (name resolved AT RENDER, so a rename reflects instantly); unknown id → literal token text. Replaces the raw `{body}` renders in `CapturePalette` and `JournalSection`.
+- **`hooks/useCampaignEntities.ts`** — fetches + module-level-caches the campaign entity list once, exposing an id→entity map for chip resolution.
+- **`features/entities/EntityDetailPage.tsx`** (route `/campaigns/:id/entities/:entityId`) — name/type/aliases/notes with inline edit (any member) and OWNER-only delete (gated on the campaign `role` from `fetchCampaign`), plus a backlinks list (`fetchEntityBacklinks`) grouped by session.
+
+Type display/tone resolve through `lib/mentions` (`ENTITY_TYPE_LABELS` / `ENTITY_TYPE_OPTIONS` / `ENTITY_TYPE_TONE`) — never capitalize the raw enum key.
+
+## Campaign sessions — `features/session/`
+
+Sessions are **campaign-level** (#245): one shared session per play night that party members join and leave. The `CharacterSheetPage` header button is driven by `character.campaignId` + the campaign's active session (from `fetchActiveSession`) + whether this character is an active participant: no campaign → a "Join a campaign" link to `/campaigns`; an active session this character is in → "Resume Session"; an active session it isn't in → "Join Session" (`joinSession` then navigate); no active session → "Start Session" (`startCampaignSession`). `SessionPage` adds a "Leave Session" affordance (`leaveSession`) next to "End Session" (`endSession`, campaign-scoped); leaving returns to the sheet and keeps the session open for the rest of the party (it auto-closes server-side an hour after the last member leaves).
+
+Client functions (all in `client.ts`): `startCampaignSession`, `joinSession`, `leaveSession`, `endSession`, `fetchCampaignSessions`, `fetchCampaignSession` are campaign-scoped; `fetchActiveSession`, `fetchSessions`, `fetchSession` stay character-scoped reads. `SessionsModal` lists the **campaign's** session history (`fetchCampaignSessions`, keyed by `campaignId`); `SessionSummaryModal` renders the campaign recap aggregate up top (XP/spells/rolls/combat/items + party size) then a per-participant card (name, time present, stat tiles) for each member, plus the session's journals and the retroactive "add XP to this session" form (which refreshes the participant summary + recap in place).

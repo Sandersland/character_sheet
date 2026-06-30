@@ -437,12 +437,22 @@ export interface SpellSlots {
   used: number;
 }
 
+export type JournalEntryKind = "NOTE" | "ENTRY";
+export type EntryVisibility = "PRIVATE" | "CAMPAIGN";
+
 export interface JournalEntry {
   id: string;
-  title: string;
+  /** ENTRY = full 3-field form; NOTE = fast one-line in-session capture. */
+  kind: JournalEntryKind;
+  /** Optional: NOTE rows have no title. */
+  title?: string;
   /** ISO-8601 date string from the API (the JournalEntry.date DateTime). */
   date: string;
+  /** ISO-8601 capture timestamp shown on NOTE rows (JournalEntry.loggedAt). */
+  loggedAt: string;
   body: string;
+  /** Private-by-default; the CAMPAIGN share toggle ships in a later slice. */
+  visibility: EntryVisibility;
   /** Provenance: the session this entry was written during, if any. */
   sessionId?: string;
 }
@@ -787,6 +797,63 @@ export interface Character {
   classes?: ClassEntry[];
 
   journal: JournalEntry[];
+
+  /** Shared-campaign link (#246), or undefined when the character isn't in one. */
+  campaignId?: string;
+}
+
+// ── Shared campaigns (#246) ───────────────────────────────────────────────────
+
+export type CampaignRole = "OWNER" | "PLAYER";
+
+export interface CampaignMember {
+  id: string;
+  userId: string;
+  role: CampaignRole;
+  user: { id: string; name: string | null; email: string | null; imageUrl: string | null };
+}
+
+export interface Campaign {
+  id: string;
+  name: string;
+  ownerId: string;
+  inviteCode: string;
+  createdAt: string;
+  members: CampaignMember[];
+  /** Present on GET /api/campaigns/:id — each member character (id, name, ownerId). */
+  characters?: { id: string; name: string; ownerId: string }[];
+  /** The caller's role in this campaign — surfaced by the list + detail reads. */
+  role?: CampaignRole;
+}
+
+// ── Campaign entity registry & @-tagging (#248) ───────────────────────────────
+
+export type EntityType = "NPC" | "LOCATION" | "FACTION" | "ITEM" | "PC" | "OTHER";
+
+export interface CampaignEntity {
+  id: string;
+  campaignId: string;
+  type: EntityType;
+  name: string;
+  aliases: string[];
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** One note that @-tags an entity, surfaced on the entity detail page. */
+export interface EntityBacklink {
+  entry: {
+    id: string;
+    characterId: string;
+    sessionId?: string | null;
+    kind: JournalEntryKind;
+    title: string | null;
+    date: string;
+    loggedAt: string;
+    body: string;
+  };
+  characterName: string;
 }
 
 export interface CharacterSummary {
@@ -796,6 +863,8 @@ export interface CharacterSummary {
   class: string;
   level: number;
   portraitUrl?: string;
+  /** Shared-campaign link (#246), or undefined when the character isn't in one. */
+  campaignId?: string;
 }
 
 /**
@@ -1237,14 +1306,56 @@ export interface SessionSummary {
   featsOrAsis: SessionSummaryAdvancement[];
 }
 
+/** One character's session summary plus their presence window (#245). */
+export interface ParticipantSummary extends SessionSummary {
+  characterId: string;
+  characterName: string;
+  joinedAt: string; // ISO 8601
+  leftAt: string | null; // ISO 8601, null if present at session end
+  presentMs: number;
+}
+
+/** A character's membership in a shared session (#245). */
+export interface SessionParticipant {
+  id: string;
+  sessionId: string;
+  characterId: string;
+  joinedAt: string; // ISO 8601
+  leftAt?: string | null;
+  summary?: ParticipantSummary | null;
+  character?: { id: string; name: string };
+}
+
+/**
+ * Campaign recap aggregate computed at session-end (#245). Mirrors the backend
+ * `CampaignRecap`. Stored on `Session.summary`; null while the session is active.
+ */
+export interface CampaignRecap {
+  startedAt: string | null; // ISO 8601
+  endedAt: string | null; // ISO 8601
+  durationMs: number;
+  participantCount: number;
+  xpGained: number;
+  levelsGained: number;
+  spellsCast: number;
+  combatRounds: number;
+  attackRolls: number;
+  damageRolls: number;
+  itemsAcquired: SessionSummaryItem[];
+  totalPresentMs: number;
+}
+
 export interface Session {
   id: string;
-  characterId: string;
+  campaignId: string;
   status: SessionStatus;
   startedAt: string; // ISO 8601
   endedAt?: string;
   title?: string;
-  summary?: SessionSummary | null;
+  /** Campaign recap aggregate (#245); null while the session is still active. */
+  summary?: CampaignRecap | null;
+  /** Party members in this session, with their presence + per-participant summary. */
+  participants?: SessionParticipant[];
   /**
    * Journal entries written during this session (linked by
    * JournalEntry.sessionId). Present on the end-session response and the

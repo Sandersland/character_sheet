@@ -29,7 +29,7 @@ function makeEvent(over: Partial<CharacterEvent>): CharacterEvent {
 }
 
 const SESSIONS: Session[] = [
-  { id: "sess-1", characterId: "char-1", status: "ended", startedAt: "2026-06-20T00:00:00.000Z", title: "Session One" },
+  { id: "sess-1", campaignId: "camp-1", status: "ended", startedAt: "2026-06-20T00:00:00.000Z", title: "Session One" },
 ];
 
 beforeEach(() => {

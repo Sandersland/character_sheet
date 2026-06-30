@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "../../generated/prisma/client.js";
+import type { CampaignRole, Prisma, PrismaClient } from "../../generated/prisma/client.js";
 
 import { AuthorizationError, NotFoundError } from "./errors.js";
 
@@ -40,4 +40,33 @@ export async function assertCharacterAccess(
     throw new AuthorizationError("You do not have access to this character");
   }
   return character;
+}
+
+// The campaign-access chokepoint (#246), mirroring assertCharacterAccess: 404 if
+// the campaign doesn't exist, 403 if the caller isn't a member. `level` is the
+// reserved view/edit seam (no role gradient enforced today).
+export async function assertCampaignMembership(
+  db: Db,
+  userId: string,
+  campaignId: string,
+  level: "view" | "edit",
+): Promise<{ campaignId: string; role: CampaignRole }> {
+  void level;
+
+  const campaign = await db.campaign.findUnique({
+    where: { id: campaignId },
+    select: { id: true },
+  });
+  if (!campaign) {
+    throw new NotFoundError("Campaign not found");
+  }
+
+  const membership = await db.campaignMembership.findUnique({
+    where: { campaignId_userId: { campaignId, userId } },
+    select: { role: true },
+  });
+  if (!membership) {
+    throw new AuthorizationError("You do not have access to this campaign");
+  }
+  return { campaignId, role: membership.role };
 }

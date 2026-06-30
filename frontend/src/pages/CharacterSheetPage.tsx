@@ -7,6 +7,7 @@ import { RollProvider } from "@/features/dice/RollContext";
 import ActivityModal from "@/features/character-meta/ActivityModal";
 import AdvancementSection from "@/features/advancement/AdvancementSection";
 import BackendStatus from "@/features/character-meta/BackendStatus";
+import CampaignIndicator from "@/features/campaign/CampaignIndicator";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import Spinner from "@/components/ui/Spinner";
@@ -16,6 +17,7 @@ import ExperienceTracker from "@/features/experience/ExperienceTracker";
 import HitPointTracker from "@/features/hitpoints/HitPointTracker";
 import InventoryList from "@/features/inventory/InventoryList";
 import JournalSection from "@/features/character-meta/JournalSection";
+import CapturePalette from "@/features/journal/CapturePalette";
 import SessionsModal from "@/features/session/SessionsModal";
 import SkillsTable from "@/features/abilities/SkillsTable";
 import SpellsSection from "@/features/spells/SpellsSection";
@@ -24,9 +26,10 @@ import VitalsStrip from "@/features/character-meta/VitalsStrip";
 import ConditionsStrip from "@/features/conditions/ConditionsStrip";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
+import { useGlobalKeyboard } from "@/hooks/useGlobalKeyboard";
 import { useReferenceData } from "@/hooks/useReferenceData";
 import { abilityAbbr, orderedAbilityEntries } from "@/lib/abilities";
-import { fetchActiveSession, startSession } from "@/api/client";
+import { fetchActiveSession, joinSession, startCampaignSession } from "@/api/client";
 import type { Session } from "@/types/character";
 
 export default function CharacterSheetPage() {
@@ -39,7 +42,12 @@ export default function CharacterSheetPage() {
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [activeSession, setActiveSession] = useState<Session | null | undefined>(undefined);
   const [sessionPending, setSessionPending] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [captureOpen, setCaptureOpen] = useState(false);
   const showSpinner = useDelayedFlag(character === undefined && !error);
+
+  // Cmd/Ctrl+J opens the quick-capture palette from anywhere on the sheet.
+  useGlobalKeyboard(() => setCaptureOpen(true));
 
   // Resolve active session on mount so the header button can say
   // "Start Session" or "Resume Session" correctly.
@@ -96,6 +104,38 @@ export default function CharacterSheetPage() {
   // surprised D&D players (it read WIS-CHA-STR-DEX-CON-INT).
   const abilityEntries = orderedAbilityEntries(character.abilityScores);
 
+  // Header session button (#245): driven by campaign membership + whether this
+  // character is an active participant of the campaign's live session.
+  const campaignId = character.campaignId;
+  const inActiveSession =
+    activeSession?.participants?.some((p) => p.characterId === character.id && !p.leftAt) ?? false;
+  const sessionLabel = activeSession
+    ? inActiveSession
+      ? "Resume Session"
+      : "Join Session"
+    : "Start Session";
+
+  const handleSessionButton = async () => {
+    if (!id || !campaignId) return;
+    setSessionPending(true);
+    setSessionError(null);
+    try {
+      if (activeSession) {
+        if (!inActiveSession) {
+          await joinSession(campaignId, activeSession.id, id);
+        }
+      } else {
+        const { session } = await startCampaignSession(campaignId, id);
+        setActiveSession(session);
+      }
+      navigate(`/characters/${id}/session`);
+    } catch (err) {
+      setSessionError(err instanceof Error ? err.message : "Could not start or join the session.");
+    } finally {
+      setSessionPending(false);
+    }
+  };
+
   return (
     <RollProvider>
     <div className="min-h-screen bg-parchment-100">
@@ -120,34 +160,32 @@ export default function CharacterSheetPage() {
               <span className="text-parchment-600">
                 {character.background} · {character.alignment}
               </span>
+              <CampaignIndicator character={character} />
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
             <BackendStatus />
             <div className="flex flex-wrap items-center gap-3">
-              {/* Start / Resume Session — the primary live-play entry point */}
-              <button
-                type="button"
-                disabled={sessionPending || activeSession === undefined}
-                onClick={async () => {
-                  if (!id) return;
-                  setSessionPending(true);
-                  try {
-                    if (activeSession) {
-                      navigate(`/characters/${id}/session`);
-                    } else {
-                      const { session } = await startSession(id);
-                      setActiveSession(session);
-                      navigate(`/characters/${id}/session`);
-                    }
-                  } finally {
-                    setSessionPending(false);
-                  }
-                }}
-                className="rounded-control bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
-              >
-                {activeSession ? "Resume Session" : "Start Session"}
-              </button>
+              {/* Start / Join / Resume Session — the primary live-play entry
+                  point. Requires a campaign; sessions are shared per campaign. */}
+              {campaignId ? (
+                <button
+                  type="button"
+                  disabled={sessionPending || activeSession === undefined}
+                  onClick={handleSessionButton}
+                  className="rounded-control bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
+                >
+                  {sessionLabel}
+                </button>
+              ) : (
+                <Link
+                  to="/campaigns"
+                  title="Join a campaign to play a shared session"
+                  className="rounded-control border border-garnet-700 px-3 py-1.5 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-50"
+                >
+                  Join a campaign
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={() => setSessionsOpen(true)}
@@ -170,6 +208,9 @@ export default function CharacterSheetPage() {
                 Delete
               </button>
             </div>
+            {sessionError && (
+              <p className="text-xs font-semibold text-garnet-700">{sessionError}</p>
+            )}
           </div>
         </div>
       </div>
@@ -193,7 +234,17 @@ export default function CharacterSheetPage() {
       {sessionsOpen && (
         <SessionsModal
           characterId={character.id}
+          campaignId={character.campaignId}
           onClose={() => setSessionsOpen(false)}
+        />
+      )}
+
+      {captureOpen && (
+        <CapturePalette
+          character={character}
+          sessionId={activeSession?.id}
+          onClose={() => setCaptureOpen(false)}
+          onUpdate={setCharacter}
         />
       )}
 
@@ -299,14 +350,22 @@ export default function CharacterSheetPage() {
               <SpellsSection character={character} onUpdate={setCharacter} />
             </Card>
           ) : (
-            <JournalSection character={character} onUpdate={setCharacter} />
+            <JournalSection
+              character={character}
+              onUpdate={setCharacter}
+              sessionId={inActiveSession ? activeSession?.id : undefined}
+            />
           )}
         </div>
 
         {/* ── Campaign Journal (spellcasters only — the 2-col row above
             uses the right column for Spells, so Journal gets its own row) */}
         {character.spellcasting && (
-          <JournalSection character={character} onUpdate={setCharacter} />
+          <JournalSection
+            character={character}
+            onUpdate={setCharacter}
+            sessionId={inActiveSession ? activeSession?.id : undefined}
+          />
         )}
       </main>
       <RollResultToast />
