@@ -4,12 +4,19 @@ import { applyExperienceOperations, fetchSession } from "@/api/client";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import { formatJournalDate } from "@/lib/formatJournalDate";
-import type { Character, JournalEntry, Session, SessionSummary } from "@/types/character";
+import type {
+  CampaignRecap,
+  Character,
+  JournalEntry,
+  ParticipantSummary,
+  Session,
+  SessionParticipant,
+} from "@/types/character";
 
 interface SessionSummaryModalProps {
   /** Owning character — needed to retroactively award XP to this session. */
   characterId: string;
-  /** The ended session whose `summary` is displayed. */
+  /** The ended session whose recap + participants are displayed. */
   session: Session;
   onClose: () => void;
   /**
@@ -54,6 +61,38 @@ function StatTile({ label, value, tone }: { label: string; value: string | numbe
   );
 }
 
+// ── Participant card ──────────────────────────────────────────────────────────
+
+/** One party member's contribution + time present in the shared session. */
+function ParticipantCard({ summary }: { summary: ParticipantSummary }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-card border border-parchment-200 bg-parchment-50/60 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-display text-sm font-semibold text-parchment-900">
+          {summary.characterName}
+        </span>
+        <Badge tone="neutral">{formatDuration(summary.presentMs)} present</Badge>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatTile label="XP" value={summary.xpGained.toLocaleString()} tone="text-arcane-700" />
+        <StatTile label="Spells" value={summary.spellsCast} tone="text-arcane-700" />
+        <StatTile label="Attacks" value={summary.attackRolls} tone="text-garnet-700" />
+        <StatTile label="Damage" value={summary.damageRolls} tone="text-garnet-700" />
+      </div>
+      {summary.itemsAcquired.length > 0 && (
+        <ul className="flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-parchment-900">
+          {summary.itemsAcquired.map((item) => (
+            <li key={item.name} className="flex items-center gap-1.5">
+              <Badge tone="gold">×{item.qty}</Badge>
+              <span>{item.name}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // ── Journal list ────────────────────────────────────────────────────────────
 
 /** Read-only, expandable list of the session's journal entries. */
@@ -85,8 +124,8 @@ function JournalEntryRow({ entry }: { entry: JournalEntry }) {
 
 /**
  * "Add XP to this session" — awards XP tagged to this (already-ended) session
- * via the explicit-sessionId override, then refreshes the displayed summary so
- * the XP-gained tile updates in place.
+ * via the explicit-sessionId override, then refreshes the session so the
+ * participant's stats + the recap update in place.
  */
 function AddXpForm({
   characterId,
@@ -96,7 +135,7 @@ function AddXpForm({
 }: {
   characterId: string;
   sessionId: string;
-  onAwarded: (summary: SessionSummary) => void;
+  onAwarded: (session: Session) => void;
   onCharacterUpdate?: (character: Character) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -118,9 +157,9 @@ function AddXpForm({
         sessionId,
       );
       onCharacterUpdate?.(updated);
-      // Re-fetch the session to pick up its freshly recomputed summary.
+      // Re-fetch the session to pick up its freshly recomputed summaries.
       const refreshed = await fetchSession(characterId, sessionId);
-      if (refreshed.summary) onAwarded(refreshed.summary as SessionSummary);
+      onAwarded(refreshed);
       setXp("");
       setOpen(false);
     } catch (err) {
@@ -195,11 +234,19 @@ function AddXpForm({
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
 
+// A participant carrying a computed summary (post-end participants always do).
+type SummarizedParticipant = SessionParticipant & { summary: ParticipantSummary };
+
+function withSummary(participants: SessionParticipant[]): SummarizedParticipant[] {
+  return participants.filter(
+    (p): p is SummarizedParticipant => Boolean(p.summary),
+  );
+}
+
 /**
- * Read-only end-of-session recap. Per the inline-vs-Modal rule this is review
- * content (not a row-bound edit), so it lives in a Modal — modeled on
- * ActivityModal's styling. Renders the persisted `Session.summary`, the
- * session's journal entries, and a retroactive "add XP" affordance.
+ * Read-only end-of-session recap (#245). Shows the campaign recap aggregate up
+ * top, then each participant's contribution + time present, the session's
+ * journals, and a retroactive "add XP" affordance.
  */
 export default function SessionSummaryModal({
   characterId,
@@ -207,17 +254,17 @@ export default function SessionSummaryModal({
   onClose,
   onCharacterUpdate,
 }: SessionSummaryModalProps) {
-  const [summary, setSummary] = useState<SessionSummary | null | undefined>(
-    session.summary as SessionSummary | null | undefined,
+  const [recap, setRecap] = useState<CampaignRecap | null | undefined>(session.summary);
+  const [participants, setParticipants] = useState<SummarizedParticipant[]>(
+    withSummary(session.participants ?? []),
   );
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>(
     session.journalEntries ?? [],
   );
 
-  // When opened from a list that doesn't carry journals (SessionsModal seeds
-  // from the sessions list endpoint), lazily fetch the full session detail so
-  // its journal entries surface here. The end-session path already supplies
-  // them, so this only fires when they're absent.
+  // When opened from a list that doesn't carry full detail (SessionsModal seeds
+  // from the sessions list), lazily fetch the session so journals + participant
+  // summaries surface. The end-session path already supplies them.
   useEffect(() => {
     if (session.journalEntries !== undefined) return;
     let cancelled = false;
@@ -225,100 +272,107 @@ export default function SessionSummaryModal({
       .then((full) => {
         if (cancelled) return;
         setJournalEntries(full.journalEntries ?? []);
-        if (full.summary) setSummary(full.summary as SessionSummary);
+        setParticipants(withSummary(full.participants ?? []));
+        setRecap(full.summary);
       })
       .catch(() => {
-        /* leave the seeded summary in place if detail fetch fails */
+        /* leave the seeded data in place if detail fetch fails */
       });
     return () => {
       cancelled = true;
     };
   }, [characterId, session.id, session.journalEntries]);
 
+  function applyRefreshed(full: Session) {
+    setRecap(full.summary);
+    setParticipants(withSummary(full.participants ?? []));
+    if (full.journalEntries !== undefined) setJournalEntries(full.journalEntries);
+  }
+
+  const hasWindow = Boolean(recap?.startedAt && recap?.endedAt);
+
   return (
     <Modal title={session.title ? `Session Recap — ${session.title}` : "Session Recap"} onClose={onClose}>
       <div className="flex flex-col gap-5">
-        {!summary ? (
+        {!recap ? (
           <p className="py-6 text-center text-sm text-parchment-600">
             No summary is available for this session.
           </p>
         ) : (
           <div className="flex flex-col gap-5">
-          {/* ── Time window ──────────────────────────────────────────────── */}
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-parchment-600">
-            <span>{formatTimeRange(summary.startedAt, summary.endedAt)}</span>
-            <Badge tone="neutral">{formatDuration(summary.durationMs)}</Badge>
-          </div>
+            {/* ── Time window + party size ────────────────────────────────── */}
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-parchment-600">
+              {hasWindow && (
+                <span>{formatTimeRange(recap.startedAt!, recap.endedAt!)}</span>
+              )}
+              <span className="flex items-center gap-2">
+                <Badge tone="neutral">{formatDuration(recap.durationMs)}</Badge>
+                <Badge tone="arcane">
+                  {recap.participantCount} player{recap.participantCount === 1 ? "" : "s"}
+                </Badge>
+              </span>
+            </div>
 
-          {/* ── Headline stat tiles ──────────────────────────────────────── */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <StatTile label="XP gained" value={summary.xpGained.toLocaleString()} tone="text-arcane-700" />
-            <StatTile label="Spells cast" value={summary.spellsCast} tone="text-arcane-700" />
-            <StatTile label="Attack rolls" value={summary.attackRolls} tone="text-garnet-700" />
-            <StatTile label="Damage rolls" value={summary.damageRolls} tone="text-garnet-700" />
-          </div>
+            {/* ── Campaign recap tiles ────────────────────────────────────── */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <StatTile label="XP gained" value={recap.xpGained.toLocaleString()} tone="text-arcane-700" />
+              <StatTile label="Spells cast" value={recap.spellsCast} tone="text-arcane-700" />
+              <StatTile label="Attack rolls" value={recap.attackRolls} tone="text-garnet-700" />
+              <StatTile label="Damage rolls" value={recap.damageRolls} tone="text-garnet-700" />
+            </div>
 
-          {/* ── Secondary facts ──────────────────────────────────────────── */}
-          <ul className="flex flex-col gap-2 text-sm text-parchment-900">
-            {summary.levelsGained > 0 && (
-              <li className="flex items-center gap-2">
-                <Badge tone="vitality">level up</Badge>
-                <span>
-                  Gained {summary.levelsGained} level{summary.levelsGained === 1 ? "" : "s"}
-                </span>
-              </li>
+            {/* ── Secondary recap facts ───────────────────────────────────── */}
+            <ul className="flex flex-col gap-2 text-sm text-parchment-900">
+              {recap.levelsGained > 0 && (
+                <li className="flex items-center gap-2">
+                  <Badge tone="vitality">level up</Badge>
+                  <span>
+                    Gained {recap.levelsGained} level{recap.levelsGained === 1 ? "" : "s"}
+                  </span>
+                </li>
+              )}
+              {recap.combatRounds > 0 && (
+                <li className="flex items-center gap-2">
+                  <Badge tone="garnet">combat</Badge>
+                  <span>
+                    {recap.combatRounds} combat round{recap.combatRounds === 1 ? "" : "s"}
+                  </span>
+                </li>
+              )}
+            </ul>
+
+            {/* ── Items acquired (party-wide) ─────────────────────────────── */}
+            <div className="flex flex-col gap-1.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
+                Items acquired
+              </p>
+              {recap.itemsAcquired.length === 0 ? (
+                <p className="text-sm text-parchment-600">No items gained this session.</p>
+              ) : (
+                <ul className="flex flex-col gap-1">
+                  {recap.itemsAcquired.map((item) => (
+                    <li key={item.name} className="flex items-center gap-2 text-sm text-parchment-900">
+                      <Badge tone="gold">×{item.qty}</Badge>
+                      <span>{item.name}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* ── Participants ────────────────────────────────────────────── */}
+            {participants.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
+                  Participants
+                </p>
+                <div className="flex flex-col gap-2">
+                  {participants.map((p) => (
+                    <ParticipantCard key={p.characterId} summary={p.summary} />
+                  ))}
+                </div>
+              </div>
             )}
-
-            {summary.combatRounds > 0 && (
-              <li className="flex items-center gap-2">
-                <Badge tone="garnet">combat</Badge>
-                <span>
-                  {summary.combatRounds} combat round{summary.combatRounds === 1 ? "" : "s"}
-                </span>
-              </li>
-            )}
-
-            {Object.keys(summary.slotsSpent).length > 0 && (
-              <li className="flex flex-wrap items-center gap-2">
-                <Badge tone="arcane">slots spent</Badge>
-                <span className="flex flex-wrap gap-x-3 gap-y-0.5">
-                  {Object.entries(summary.slotsSpent)
-                    .sort(([a], [b]) => Number(a) - Number(b))
-                    .map(([level, count]) => (
-                      <span key={level}>
-                        L{level}: {count}
-                      </span>
-                    ))}
-                </span>
-              </li>
-            )}
-
-            {summary.featsOrAsis.map((adv, i) => (
-              <li key={`${adv.type}-${i}`} className="flex items-center gap-2">
-                <Badge tone="vitality">advancement</Badge>
-                <span>{adv.label}</span>
-              </li>
-            ))}
-          </ul>
-
-          {/* ── Items acquired ───────────────────────────────────────────── */}
-          <div className="flex flex-col gap-1.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
-              Items acquired
-            </p>
-            {summary.itemsAcquired.length === 0 ? (
-              <p className="text-sm text-parchment-600">No items gained this session.</p>
-            ) : (
-              <ul className="flex flex-col gap-1">
-                {summary.itemsAcquired.map((item) => (
-                  <li key={item.name} className="flex items-center gap-2 text-sm text-parchment-900">
-                    <Badge tone="gold">×{item.qty}</Badge>
-                    <span>{item.name}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
           </div>
         )}
 
@@ -344,7 +398,7 @@ export default function SessionSummaryModal({
           <AddXpForm
             characterId={characterId}
             sessionId={session.id}
-            onAwarded={(s) => setSummary(s)}
+            onAwarded={applyRefreshed}
             onCharacterUpdate={onCharacterUpdate}
           />
         )}

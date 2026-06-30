@@ -4,12 +4,15 @@ import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import Spinner from "@/components/ui/Spinner";
 import SessionSummaryModal from "@/features/session/SessionSummaryModal";
-import { fetchSessions } from "@/api/client";
+import { fetchCampaignSessions } from "@/api/client";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import type { Session } from "@/types/character";
 
 interface SessionsModalProps {
+  /** Owning character — still needed for the recap's retroactive XP form. */
   characterId: string;
+  /** Campaign whose session history is listed; undefined when uncampaigned. */
+  campaignId?: string;
   onClose: () => void;
 }
 
@@ -24,34 +27,38 @@ function formatDate(iso: string): string {
 // Module-level cache for stale-while-revalidate: reopening the modal renders the
 // last-known sessions list instantly while a fresh fetch confirms it in the
 // background. The cache never short-circuits the network — every open refetches,
-// so a just-ended session can't linger as "active". Keyed by characterId.
+// so a just-ended session can't linger as "active". Keyed by campaignId.
 const sessionsCache = new Map<string, { sessions: Session[] }>();
 
 /**
- * Lists a character's play sessions (newest first). Clicking an ended session
- * opens its read-only recap (SessionSummaryModal). This is the entry point for
- * reviewing a past session's summary from the character sheet.
+ * Lists a campaign's play sessions (newest first, #245). Clicking an ended
+ * session opens its read-only recap (SessionSummaryModal). This is the entry
+ * point for reviewing a past shared session from the character sheet.
  */
-export default function SessionsModal({ characterId, onClose }: SessionsModalProps) {
-  // Seed from cache so a recently-loaded list renders instantly on reopen.
-  const [sessions, setSessions] = useState<Session[] | null>(
-    () => sessionsCache.get(characterId)?.sessions ?? null
+export default function SessionsModal({ characterId, campaignId, onClose }: SessionsModalProps) {
+  // Uncampaigned characters have no shared sessions — render an empty list.
+  const [sessions, setSessions] = useState<Session[] | null>(() =>
+    campaignId ? (sessionsCache.get(campaignId)?.sessions ?? null) : [],
   );
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Session | null>(null);
   const showSpinner = useDelayedFlag(sessions === null && !error);
 
   useEffect(() => {
-    const cached = sessionsCache.get(characterId);
+    if (!campaignId) {
+      setSessions([]);
+      return;
+    }
+    const cached = sessionsCache.get(campaignId);
     setSessions(cached?.sessions ?? null);
     setError(null);
 
     // Always refetch on open so a just-ended session can't render as stale; the
     // cached list above is only a placeholder until the network confirms.
     let cancelled = false;
-    fetchSessions(characterId)
+    fetchCampaignSessions(campaignId)
       .then((fetched) => {
-        sessionsCache.set(characterId, { sessions: fetched });
+        sessionsCache.set(campaignId, { sessions: fetched });
         if (!cancelled) setSessions(fetched);
       })
       .catch(() => {
@@ -60,7 +67,7 @@ export default function SessionsModal({ characterId, onClose }: SessionsModalPro
     return () => {
       cancelled = true;
     };
-  }, [characterId]);
+  }, [campaignId]);
 
   // While a past session's recap is open, render it on top of the list.
   if (selected) {
