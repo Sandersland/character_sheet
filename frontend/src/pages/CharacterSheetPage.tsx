@@ -7,6 +7,7 @@ import { RollProvider } from "@/features/dice/RollContext";
 import ActivityModal from "@/features/character-meta/ActivityModal";
 import AdvancementSection from "@/features/advancement/AdvancementSection";
 import BackendStatus from "@/features/character-meta/BackendStatus";
+import CampaignIndicator from "@/features/campaign/CampaignIndicator";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import Spinner from "@/components/ui/Spinner";
@@ -120,6 +121,7 @@ export default function CharacterSheetPage() {
               <span className="text-parchment-600">
                 {character.background} · {character.alignment}
               </span>
+              <CampaignIndicator character={character} onUpdate={setCharacter} />
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">

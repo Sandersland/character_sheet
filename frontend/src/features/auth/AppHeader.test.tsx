@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { axe } from "@/test/axe";
 
 vi.mock("@/features/auth/AuthProvider", () => ({
@@ -14,9 +15,11 @@ import { ThemeProvider } from "@/features/theme/ThemeProvider";
 
 function renderHeader() {
   return render(
-    <ThemeProvider>
-      <AppHeader />
-    </ThemeProvider>,
+    <MemoryRouter>
+      <ThemeProvider>
+        <AppHeader />
+      </ThemeProvider>
+    </MemoryRouter>,
   );
 }
 
