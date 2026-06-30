@@ -68,6 +68,22 @@ describe("JournalSection", () => {
     expect(onUpdate).toHaveBeenCalledWith(updated);
   });
 
+  it("forwards the active sessionId to createJournalEntry", async () => {
+    const user = userEvent.setup();
+    vi.mocked(client.createJournalEntry).mockResolvedValue(makeCharacter([]));
+
+    render(<JournalSection character={makeCharacter([])} onUpdate={vi.fn()} sessionId="session-42" />);
+
+    await user.click(screen.getAllByRole("button", { name: "+ Add entry" })[0]);
+    await user.type(screen.getByLabelText(/Note/), "Tagged the goblin.");
+    await user.click(screen.getByRole("button", { name: "Add note" }));
+
+    expect(client.createJournalEntry).toHaveBeenCalledWith(
+      "char-1",
+      expect.objectContaining({ kind: "NOTE", sessionId: "session-42" }),
+    );
+  });
+
   it("has no Title or Date fields in the composer", async () => {
     const user = userEvent.setup();
     render(<JournalSection character={makeCharacter([])} onUpdate={vi.fn()} />);
