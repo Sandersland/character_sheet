@@ -14,6 +14,7 @@ vi.mock("@/api/client", () => ({
   deleteJournalEntry: vi.fn(),
 }));
 
+// A legacy 3-field ENTRY still renders (body + date); its title stops showing.
 const ENTRY: JournalEntry = {
   id: "entry-1",
   kind: "ENTRY",
@@ -39,15 +40,16 @@ describe("JournalSection", () => {
     expect(screen.getByText("Your journal is empty")).toBeInTheDocument();
   });
 
-  it("renders existing entries with formatted date", () => {
+  it("renders entries as dated note rows (body + date, no title)", () => {
     render(<JournalSection character={makeCharacter([ENTRY])} onUpdate={vi.fn()} />);
-    expect(screen.getByText("The Sunken Library")).toBeInTheDocument();
     expect(screen.getByText("Found three waterlogged tomes.")).toBeInTheDocument();
+    // Legacy ENTRY title no longer shows in the note-row model.
+    expect(screen.queryByText("The Sunken Library")).not.toBeInTheDocument();
     // 2026-06-22 formatted for display (not the raw ISO string).
     expect(screen.queryByText(/2026-06-22T/)).not.toBeInTheDocument();
   });
 
-  it("creates an entry through the add panel and calls onUpdate", async () => {
+  it("creates a NOTE through the body-only composer and calls onUpdate", async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     const updated = makeCharacter([ENTRY]);
@@ -56,40 +58,35 @@ describe("JournalSection", () => {
     render(<JournalSection character={makeCharacter([])} onUpdate={onUpdate} />);
 
     await user.click(screen.getAllByRole("button", { name: "+ Add entry" })[0]);
-    await user.type(screen.getByLabelText(/Title/), "New Quest");
-    await user.type(screen.getByLabelText(/Notes/), "We set out at dawn.");
-    await user.click(screen.getByRole("button", { name: "Add entry" }));
+    await user.type(screen.getByLabelText(/Note/), "We set out at dawn.");
+    await user.click(screen.getByRole("button", { name: "Add note" }));
 
     expect(client.createJournalEntry).toHaveBeenCalledWith(
       "char-1",
-      expect.objectContaining({ title: "New Quest", body: "We set out at dawn." }),
+      expect.objectContaining({ kind: "NOTE", body: "We set out at dawn." }),
     );
     expect(onUpdate).toHaveBeenCalledWith(updated);
   });
 
-  it("renders the date input with a value and a shrinkable width (#235)", async () => {
+  it("has no Title or Date fields in the composer", async () => {
     const user = userEvent.setup();
     render(<JournalSection character={makeCharacter([])} onUpdate={vi.fn()} />);
 
     await user.click(screen.getAllByRole("button", { name: "+ Add entry" })[0]);
-    const dateInput = screen.getByLabelText("Date") as HTMLInputElement;
-    expect(dateInput).toHaveAttribute("type", "date");
-    expect(dateInput.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(dateInput.className).toContain("min-w-0");
+    expect(screen.queryByLabelText(/Title/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Date")).not.toBeInTheDocument();
   });
 
-  it("does not submit the add form with an empty title", async () => {
+  it("does not submit the composer with an empty body", async () => {
     const user = userEvent.setup();
     render(<JournalSection character={makeCharacter([])} onUpdate={vi.fn()} />);
 
     await user.click(screen.getAllByRole("button", { name: "+ Add entry" })[0]);
-    // Fill only the body, leave title blank.
-    await user.type(screen.getByLabelText(/Notes/), "body only");
-    expect(screen.getByRole("button", { name: "Add entry" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add note" })).toBeDisabled();
     expect(client.createJournalEntry).not.toHaveBeenCalled();
   });
 
-  it("edits an entry through the inline edit panel", async () => {
+  it("edits a note through the inline edit panel", async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     vi.mocked(client.updateJournalEntry).mockResolvedValue(makeCharacter([ENTRY]));
@@ -97,15 +94,15 @@ describe("JournalSection", () => {
     render(<JournalSection character={makeCharacter([ENTRY])} onUpdate={onUpdate} />);
 
     await user.click(screen.getByRole("button", { name: "Edit" }));
-    const titleInput = screen.getByLabelText(/Title/);
-    await user.clear(titleInput);
-    await user.type(titleInput, "Revised Title");
+    const bodyInput = screen.getByLabelText(/Note/);
+    await user.clear(bodyInput);
+    await user.type(bodyInput, "Revised body");
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
     expect(client.updateJournalEntry).toHaveBeenCalledWith(
       "char-1",
       "entry-1",
-      expect.objectContaining({ title: "Revised Title" }),
+      expect.objectContaining({ body: "Revised body" }),
     );
     expect(onUpdate).toHaveBeenCalled();
   });
@@ -137,9 +134,8 @@ describe("JournalSection", () => {
     render(<JournalSection character={makeCharacter([])} onUpdate={vi.fn()} />);
 
     await user.click(screen.getAllByRole("button", { name: "+ Add entry" })[0]);
-    await user.type(screen.getByLabelText(/Title/), "T");
-    await user.type(screen.getByLabelText(/Notes/), "B");
-    await user.click(screen.getByRole("button", { name: "Add entry" }));
+    await user.type(screen.getByLabelText(/Note/), "B");
+    await user.click(screen.getByRole("button", { name: "Add note" }));
 
     expect(await screen.findByText("Boom")).toBeInTheDocument();
   });

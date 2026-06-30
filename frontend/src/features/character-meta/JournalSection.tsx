@@ -30,9 +30,11 @@ import type { Character } from "@/types/character";
 interface JournalSectionProps {
   character: Character;
   onUpdate: (character: Character) => void;
+  /** Active session to stamp new notes with, when one is live. */
+  sessionId?: string;
 }
 
-export default function JournalSection({ character, onUpdate }: JournalSectionProps) {
+export default function JournalSection({ character, onUpdate, sessionId }: JournalSectionProps) {
   const entries = character.journal;
   const { byId } = useCampaignEntities(character.campaignId);
 
@@ -65,12 +67,16 @@ export default function JournalSection({ character, onUpdate }: JournalSectionPr
   }
 
   async function handleAdd(draft: JournalEntryDraft) {
-    const ok = await run(() => createJournalEntry(character.id, draft));
+    const ok = await run(() =>
+      createJournalEntry(character.id, { ...draft, sessionId }),
+    );
     if (ok) setAddPanelOpen(false);
   }
 
   async function handleEdit(entryId: string, draft: JournalEntryDraft) {
-    const ok = await run(() => updateJournalEntry(character.id, entryId, draft));
+    const ok = await run(() =>
+      updateJournalEntry(character.id, entryId, { body: draft.body }),
+    );
     if (ok) setEditingId(null);
   }
 
@@ -137,20 +143,17 @@ export default function JournalSection({ character, onUpdate }: JournalSectionPr
                 </li>
               ) : (
                 <li key={entry.id} className="py-3">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className="font-display text-base font-semibold text-parchment-900">
-                      {entry.title}
-                    </p>
+                  <div className="flex items-start justify-between gap-3">
+                    <MentionText
+                      body={entry.body}
+                      entities={byId}
+                      campaignId={character.campaignId}
+                      className="min-w-0 flex-1 whitespace-pre-wrap text-sm text-parchment-800"
+                    />
                     <span className="whitespace-nowrap text-xs text-parchment-600">
                       {formatJournalDate(entry.date)}
                     </span>
                   </div>
-                  <MentionText
-                    body={entry.body}
-                    entities={byId}
-                    campaignId={character.campaignId}
-                    className="mt-1 whitespace-pre-wrap text-sm text-parchment-700"
-                  />
 
                   {confirmDeleteId === entry.id ? (
                     <div className="mt-2 flex items-center gap-3 text-xs">
