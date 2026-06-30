@@ -47,6 +47,31 @@ export interface SessionSummary {
   featsOrAsis: SummaryAdvancement[];
 }
 
+/** One participant's session summary, plus their presence window (#245). */
+export interface ParticipantSummary extends SessionSummary {
+  characterId: string;
+  characterName: string;
+  joinedAt: string; // ISO 8601
+  leftAt: string | null; // ISO 8601, null if still present at session end
+  presentMs: number;
+}
+
+/** Campaign-level recap: aggregate of every participant's summary (#245). */
+export interface CampaignRecap {
+  startedAt: string | null; // ISO 8601 — earliest join, null when no participants
+  endedAt: string | null; // ISO 8601 — latest leave/end, null when no participants
+  durationMs: number;
+  participantCount: number;
+  xpGained: number;
+  levelsGained: number;
+  spellsCast: number;
+  combatRounds: number;
+  attackRolls: number;
+  damageRolls: number;
+  itemsAcquired: SummaryItem[];
+  totalPresentMs: number;
+}
+
 // ── Input shape ──────────────────────────────────────────────────────────────
 
 /**
@@ -277,5 +302,59 @@ export function computeSessionSummary(
     attackRolls,
     damageRolls,
     featsOrAsis,
+  };
+}
+
+/**
+ * Aggregates per-participant summaries into a campaign recap (#245). Sums XP,
+ * spells, combat rounds, and rolls; unions acquired items by name; reports the
+ * participant count and total present-time. Pure: deterministic given inputs.
+ */
+export function computeCampaignRecap(participants: ParticipantSummary[]): CampaignRecap {
+  const itemNet = new Map<string, number>();
+  let xpGained = 0;
+  let levelsGained = 0;
+  let spellsCast = 0;
+  let combatRounds = 0;
+  let attackRolls = 0;
+  let damageRolls = 0;
+  let totalPresentMs = 0;
+  let startMs = Number.POSITIVE_INFINITY;
+  let endMs = Number.NEGATIVE_INFINITY;
+
+  for (const p of participants) {
+    xpGained += p.xpGained;
+    levelsGained += p.levelsGained;
+    spellsCast += p.spellsCast;
+    combatRounds += p.combatRounds;
+    attackRolls += p.attackRolls;
+    damageRolls += p.damageRolls;
+    totalPresentMs += p.presentMs;
+    startMs = Math.min(startMs, new Date(p.joinedAt).getTime());
+    endMs = Math.max(endMs, new Date(p.leftAt ?? p.endedAt).getTime());
+    for (const item of p.itemsAcquired) {
+      itemNet.set(item.name, (itemNet.get(item.name) ?? 0) + item.qty);
+    }
+  }
+
+  const itemsAcquired: SummaryItem[] = [...itemNet.entries()]
+    .filter(([, qty]) => qty !== 0)
+    .map(([name, qty]) => ({ name, qty }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const hasParticipants = participants.length > 0;
+  return {
+    startedAt: hasParticipants ? new Date(startMs).toISOString() : null,
+    endedAt: hasParticipants ? new Date(endMs).toISOString() : null,
+    durationMs: hasParticipants ? Math.max(0, endMs - startMs) : 0,
+    participantCount: participants.length,
+    xpGained,
+    levelsGained,
+    spellsCast,
+    combatRounds,
+    attackRolls,
+    damageRolls,
+    itemsAcquired,
+    totalPresentMs,
   };
 }

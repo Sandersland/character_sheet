@@ -7,8 +7,7 @@ import { reconcileLevelGatedState } from "./level-reconciliation.js";
 import { prisma } from "./prisma.js";
 import { fixedAverageForDie, normalizeHitDice, normalizeHitPoints } from "./hitpoints.js";
 import { abilityModifier, hitDieFace } from "./srd.js";
-import { computeSessionSummary } from "./session-summary.js";
-import { getActiveSessionId } from "./sessions.js";
+import { getActiveSessionId, recomputeSummaries } from "./sessions.js";
 
 export class InvalidExperienceOperationError extends Error {}
 
@@ -150,11 +149,11 @@ export async function applyExperienceOperations(
   // event tagging; otherwise fall back to the auto-detected active session.
   let sessionId: string | null;
   if (explicitSessionId) {
-    const target = await prisma.session.findUnique({
-      where: { id: explicitSessionId },
-      select: { id: true, characterId: true },
+    const participant = await prisma.sessionParticipant.findUnique({
+      where: { sessionId_characterId: { sessionId: explicitSessionId, characterId } },
+      select: { id: true },
     });
-    if (!target || target.characterId !== characterId) {
+    if (!participant) {
       throw new InvalidExperienceOperationError(
         `Session not found: ${explicitSessionId}`,
       );
@@ -242,22 +241,12 @@ export async function applyExperienceOperations(
     if (explicitSessionId) {
       const session = await tx.session.findUnique({
         where: { id: explicitSessionId },
-        select: { startedAt: true, endedAt: true },
+        include: {
+          participants: { include: { character: { select: { id: true, name: true } } } },
+        },
       });
       if (session) {
-        const events = await tx.characterEvent.findMany({
-          where: { sessionId: explicitSessionId, type: { not: "sessionEnded" } },
-          select: { type: true, reverted: true, before: true, after: true, data: true },
-          orderBy: { createdAt: "asc" },
-        });
-        const summary = computeSessionSummary(events, {
-          startedAt: session.startedAt,
-          endedAt: session.endedAt ?? new Date(),
-        });
-        await tx.session.update({
-          where: { id: explicitSessionId },
-          data: { summary: summary as unknown as Prisma.InputJsonValue },
-        });
+        await recomputeSummaries(tx, session);
       }
     }
   });

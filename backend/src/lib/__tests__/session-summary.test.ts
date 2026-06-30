@@ -7,7 +7,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  computeCampaignRecap,
   computeSessionSummary,
+  type ParticipantSummary,
   type SummaryEventInput,
 } from "../session-summary.js";
 
@@ -255,5 +257,112 @@ describe("computeSessionSummary", () => {
       endedAt: new Date("2026-06-22T20:00:00.000Z"),
     });
     expect(s.durationMs).toBe(0);
+  });
+});
+
+// ── computeCampaignRecap (#245) ───────────────────────────────────────────────
+
+function participant(overrides: Partial<ParticipantSummary>): ParticipantSummary {
+  return {
+    startedAt: "2026-06-22T18:00:00.000Z",
+    endedAt: "2026-06-22T21:00:00.000Z",
+    durationMs: 0,
+    xpGained: 0,
+    levelsGained: 0,
+    itemsAcquired: [],
+    slotsSpent: {},
+    spellsCast: 0,
+    combatRounds: 0,
+    attackRolls: 0,
+    damageRolls: 0,
+    featsOrAsis: [],
+    characterId: "c1",
+    characterName: "Hero",
+    joinedAt: "2026-06-22T18:00:00.000Z",
+    leftAt: null,
+    presentMs: 0,
+    ...overrides,
+  };
+}
+
+describe("computeCampaignRecap", () => {
+  it("returns a zeroed recap with null bounds for no participants", () => {
+    const recap = computeCampaignRecap([]);
+    expect(recap.participantCount).toBe(0);
+    expect(recap.startedAt).toBeNull();
+    expect(recap.endedAt).toBeNull();
+    expect(recap.durationMs).toBe(0);
+    expect(recap.xpGained).toBe(0);
+    expect(recap.totalPresentMs).toBe(0);
+    expect(recap.itemsAcquired).toEqual([]);
+  });
+
+  it("mirrors a single participant's stats", () => {
+    const recap = computeCampaignRecap([
+      participant({
+        xpGained: 450,
+        spellsCast: 3,
+        combatRounds: 4,
+        attackRolls: 5,
+        presentMs: 90 * 60 * 1000,
+        joinedAt: "2026-06-22T18:00:00.000Z",
+        leftAt: "2026-06-22T19:30:00.000Z",
+        itemsAcquired: [{ name: "Potion", qty: 2 }],
+      }),
+    ]);
+    expect(recap.participantCount).toBe(1);
+    expect(recap.xpGained).toBe(450);
+    expect(recap.spellsCast).toBe(3);
+    expect(recap.combatRounds).toBe(4);
+    expect(recap.totalPresentMs).toBe(90 * 60 * 1000);
+    expect(recap.itemsAcquired).toEqual([{ name: "Potion", qty: 2 }]);
+    expect(recap.startedAt).toBe("2026-06-22T18:00:00.000Z");
+    expect(recap.endedAt).toBe("2026-06-22T19:30:00.000Z");
+  });
+
+  it("sums stats, unions items by name, and spans the widest present window", () => {
+    const recap = computeCampaignRecap([
+      participant({
+        characterId: "a",
+        xpGained: 300,
+        spellsCast: 2,
+        combatRounds: 3,
+        attackRolls: 4,
+        damageRolls: 3,
+        levelsGained: 1,
+        presentMs: 60 * 60 * 1000,
+        joinedAt: "2026-06-22T18:00:00.000Z",
+        leftAt: "2026-06-22T19:00:00.000Z",
+        itemsAcquired: [{ name: "Rope", qty: 1 }, { name: "Torch", qty: 2 }],
+      }),
+      participant({
+        characterId: "b",
+        xpGained: 200,
+        spellsCast: 1,
+        combatRounds: 2,
+        attackRolls: 1,
+        damageRolls: 1,
+        presentMs: 120 * 60 * 1000,
+        joinedAt: "2026-06-22T18:30:00.000Z",
+        leftAt: null,
+        endedAt: "2026-06-22T20:30:00.000Z",
+        itemsAcquired: [{ name: "Torch", qty: 3 }],
+      }),
+    ]);
+    expect(recap.participantCount).toBe(2);
+    expect(recap.xpGained).toBe(500);
+    expect(recap.spellsCast).toBe(3);
+    expect(recap.combatRounds).toBe(5);
+    expect(recap.attackRolls).toBe(5);
+    expect(recap.damageRolls).toBe(4);
+    expect(recap.levelsGained).toBe(1);
+    expect(recap.totalPresentMs).toBe(180 * 60 * 1000);
+    expect(recap.itemsAcquired).toEqual([
+      { name: "Rope", qty: 1 },
+      { name: "Torch", qty: 5 },
+    ]);
+    expect(recap.startedAt).toBe("2026-06-22T18:00:00.000Z");
+    // b never left → falls back to its endedAt for the window's upper bound.
+    expect(recap.endedAt).toBe("2026-06-22T20:30:00.000Z");
   });
 });
