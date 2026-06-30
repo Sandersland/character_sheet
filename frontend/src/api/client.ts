@@ -231,9 +231,7 @@ export async function deleteCharacter(id: string): Promise<void> {
 // effect, so they aren't routed through the audit log. Each call returns the
 // full updated Character so the caller can swap its state in one assignment.
 
-// Creates an ENTRY (3-field form: title + date + body) or a fast NOTE
-// (kind:"NOTE", body only — the server defaults date to today and auto-attaches
-// the active session). title/date stay optional so both callers compose.
+// kind defaults to ENTRY; NOTE omits title/date (server fills both).
 export async function createJournalEntry(
   characterId: string,
   entry: { kind?: JournalEntryKind; title?: string; date?: string; body: string; sessionId?: string }

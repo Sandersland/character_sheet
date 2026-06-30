@@ -17,11 +17,7 @@ export function formatJournalDate(iso: string): string {
   });
 }
 
-/**
- * Format a capture timestamp as a local time-of-day, e.g. "3:45 PM". Unlike
- * `date`, `loggedAt` is a precise instant, so it's formatted in local time.
- * An unparseable input is returned verbatim.
- */
+// Format a capture timestamp as local time-of-day ("3:45 PM"); returns verbatim on parse failure.
 export function formatJournalTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;

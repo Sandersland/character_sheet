@@ -1,10 +1,6 @@
 import { useEffect, useRef } from "react";
 
-// Document-level keydown listener that fires `onTrigger` on Cmd/Ctrl+J — the
-// global shortcut that opens the quick-capture palette from anywhere on a
-// character page. Mirrors the keydown attach/cleanup pattern in
-// components/ui/Modal.tsx. The callback is held in a ref so the listener binds
-// once and never goes stale, regardless of how the caller passes it.
+// Cmd/Ctrl+J listener — callback held in a ref so the listener binds once and stays current.
 export function useGlobalKeyboard(onTrigger: () => void): void {
   const handlerRef = useRef(onTrigger);
   handlerRef.current = onTrigger;
