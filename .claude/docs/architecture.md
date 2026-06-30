@@ -28,7 +28,7 @@
 | `routes/feats.ts` | `GET /feats` — feat catalog |
 | `routes/advancement.ts` | `POST /characters/:id/advancement/transactions` — take/remove ASIs and feats |
 | `routes/actions.ts` | `GET /actions` (catalog), `POST /characters/:id/actions/transactions` — apply an action's resource/quantity/heal effects |
-| `routes/journal.ts` | `POST /characters/:id/journal`, `PATCH /characters/:id/journal/:entryId`, `DELETE /characters/:id/journal/:entryId` |
+| `routes/journal.ts` | `POST /characters/:id/journal`, `PATCH /characters/:id/journal/:entryId`, `DELETE /characters/:id/journal/:entryId` — plain-REST; `POST` accepts a full `ENTRY` (title+date+body) or a fast `NOTE` (body only; date defaults to today, auto-attaches the active session). Reads route through the exported `visibleEntries(db, userId, character)` helper (private-by-default == author's own entries; the `CAMPAIGN`-visible branch is inert until sharing ships). |
 | `routes/sessions.ts` | `POST /characters/:id/sessions` (start), `POST …/sessions/:sessionId/end`, `GET …/sessions`, `GET …/sessions/active`, `GET …/sessions/:sessionId`, `POST …/sessions/:sessionId/combat/start`, `…/combat/end`, `…/combat/round`, `…/roll` (log an attack/damage roll) |
 
 `characters.ts` exports `characterInclude` and `serializeCharacter`; every other mutation router imports and calls them to return the same full-character wire shape after applying changes.
@@ -144,7 +144,7 @@ All three auth children cascade-delete with their `User`. **Ownership is enforce
 
 ### JSON columns on Character
 
-*Source of truth: Character model in `schema.prisma`.* (Journal is **not** a JSON column — it's a separate `JournalEntry` table.)
+*Source of truth: Character model in `schema.prisma`.* (Journal is **not** a JSON column — it's a separate `JournalEntry` table: `kind` (`NOTE` | `ENTRY`), nullable `title`, `date`, `loggedAt` (capture timestamp), `body`, `visibility` (`PRIVATE` | `CAMPAIGN`, default `PRIVATE`), and a denormalized `authorUserId`. The `add_journal_capture_fields` migration backfilled `authorUserId` from `character.ownerId` before enforcing `NOT NULL`. Surfaced under `serializeCharacter().journal`, newest-first by `date` then `loggedAt`.)
 
 The Character row carries these JSON columns: `hitPoints`, `hitDice`, `abilityScores`, `skills`, `toolProficiencies`, `currency`, `spellcasting?`, `resources?`, `conditions?`. Notable ones:
 
