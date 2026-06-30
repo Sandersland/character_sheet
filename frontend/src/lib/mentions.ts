@@ -17,6 +17,20 @@ const ENTITY_TYPES: readonly EntityType[] = [
   "OTHER",
 ];
 
+// Display labels for the entity-type discriminator. Resolve type text through
+// here, never by capitalizing the raw enum key.
+export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
+  NPC: "NPC",
+  LOCATION: "Location",
+  FACTION: "Faction",
+  ITEM: "Item",
+  PC: "PC",
+  OTHER: "Other",
+};
+
+export const ENTITY_TYPE_OPTIONS: { value: EntityType; label: string }[] =
+  ENTITY_TYPES.map((value) => ({ value, label: ENTITY_TYPE_LABELS[value] }));
+
 const MENTION_TOKEN =
   /@\[([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]/gi;
 

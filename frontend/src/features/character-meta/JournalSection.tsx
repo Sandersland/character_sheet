@@ -105,6 +105,7 @@ export default function JournalSection({ character, onUpdate }: JournalSectionPr
           <JournalEntryPanel
             mode="add"
             busy={busy}
+            campaignId={character.campaignId}
             onSubmit={handleAdd}
             onClose={() => setAddPanelOpen(false)}
           />
@@ -126,6 +127,7 @@ export default function JournalSection({ character, onUpdate }: JournalSectionPr
                     mode="edit"
                     initial={entry}
                     busy={busy}
+                    campaignId={character.campaignId}
                     onSubmit={(draft) => handleEdit(entry.id, draft)}
                     onClose={() => setEditingId(null)}
                   />

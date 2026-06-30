@@ -7,6 +7,7 @@
 
 import { useState } from "react";
 
+import MentionAutocomplete from "@/features/journal/MentionAutocomplete";
 import type { JournalEntry } from "@/types/character";
 
 export interface JournalEntryDraft {
@@ -20,6 +21,8 @@ interface JournalEntryPanelProps {
   /** Pre-fill values (edit mode, or to re-open a draft). */
   initial?: JournalEntry;
   busy: boolean;
+  /** Campaign the character belongs to (enables @-tagging in the body). */
+  campaignId?: string | null;
   onSubmit: (draft: JournalEntryDraft) => void;
   onClose: () => void;
 }
@@ -47,6 +50,7 @@ export default function JournalEntryPanel({
   mode,
   initial,
   busy,
+  campaignId,
   onSubmit,
   onClose,
 }: JournalEntryPanelProps) {
@@ -117,14 +121,15 @@ export default function JournalEntryPanel({
         <label className={labelCls} htmlFor="journal-body">
           Notes *
         </label>
-        <textarea
+        <MentionAutocomplete
           id="journal-body"
           required
           rows={4}
+          campaignId={campaignId}
           className={`${inputCls} resize-y`}
           value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="What happened?"
+          onChange={setBody}
+          placeholder="What happened? Use @ to tag people, places and things"
         />
       </div>
 

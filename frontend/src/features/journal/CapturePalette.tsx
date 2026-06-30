@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { createJournalEntry, deleteJournalEntry, updateJournalEntry } from "@/api/client";
+import MentionAutocomplete from "@/features/journal/MentionAutocomplete";
 import { formatJournalTime } from "@/lib/formatJournalDate";
 import type { Character } from "@/types/character";
 
@@ -125,14 +126,15 @@ export default function CapturePalette({
         </div>
 
         <div className="flex shrink-0 flex-col gap-1 border-b border-parchment-200 p-4">
-          <textarea
+          <MentionAutocomplete
             ref={composerRef}
             rows={2}
             aria-label="Quick note"
+            campaignId={character.campaignId}
             className={`${inputCls} resize-none`}
-            placeholder="Jot a note… Enter to save, Shift+Enter for a new line"
+            placeholder="Jot a note… Enter to save, Shift+Enter for a new line, @ to tag"
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={setValue}
             onKeyDown={handleComposerKeyDown}
           />
           {error && <p className="text-xs font-semibold text-garnet-700">{error}</p>}
