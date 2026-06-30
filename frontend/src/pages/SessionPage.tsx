@@ -39,7 +39,7 @@ import SessionSummaryModal from "@/features/session/SessionSummaryModal";
 import EndSessionPrompt from "@/features/session/EndSessionPrompt";
 import CapturePalette from "@/features/journal/CapturePalette";
 import { useGlobalKeyboard } from "@/hooks/useGlobalKeyboard";
-import { applyExperienceOperations, endSession, fetchActiveSession } from "@/api/client";
+import { applyExperienceOperations, endSession, fetchActiveSession, leaveSession } from "@/api/client";
 import type { Character, Session, ReferenceData } from "@/types/character";
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -143,6 +143,7 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
   // so the Log tab refreshes on both.
   const [logRefresh, setLogRefresh] = useState(0);
   const [captureOpen, setCaptureOpen] = useState(false);
+  const [leavePending, setLeavePending] = useState(false);
 
   // Cmd/Ctrl+J opens the quick-capture palette during live play.
   useGlobalKeyboard(() => setCaptureOpen(true));
@@ -174,7 +175,7 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
       }
       // Clear persisted turn state — the session is over either way.
       clearTurnState(session.id);
-      const { session: ended } = await endSession(character.id, session.id);
+      const { session: ended } = await endSession(session.campaignId, session.id);
       // Show the recap modal; navigation happens when the modal is dismissed.
       setEndPromptOpen(false);
       setEndedSession(ended);
@@ -186,6 +187,19 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
       );
     } finally {
       setEndPending(false);
+    }
+  }
+
+  // Leave the shared session: record this character's departure and return to
+  // the sheet. The session stays open for the rest of the party.
+  async function handleLeave() {
+    setLeavePending(true);
+    try {
+      await leaveSession(session.campaignId, session.id, character.id);
+      clearTurnState(session.id);
+      navigate(`/characters/${character.id}`);
+    } finally {
+      setLeavePending(false);
     }
   }
 
@@ -215,18 +229,28 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
           </div>
           <div className="flex flex-col items-end gap-2">
             <BackendStatus />
-            <button
-              type="button"
-              disabled={endPending}
-              onClick={() => {
-                awardedRef.current = false;
-                setEndError(null);
-                setEndPromptOpen(true);
-              }}
-              className="rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100 disabled:opacity-50"
-            >
-              End Session
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={leavePending || endPending}
+                onClick={handleLeave}
+                className="rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100 disabled:opacity-50"
+              >
+                Leave Session
+              </button>
+              <button
+                type="button"
+                disabled={endPending}
+                onClick={() => {
+                  awardedRef.current = false;
+                  setEndError(null);
+                  setEndPromptOpen(true);
+                }}
+                className="rounded-control border border-garnet-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-50 disabled:opacity-50"
+              >
+                End Session
+              </button>
+            </div>
           </div>
         </div>
       </div>

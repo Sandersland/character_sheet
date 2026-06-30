@@ -29,7 +29,7 @@ import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { useGlobalKeyboard } from "@/hooks/useGlobalKeyboard";
 import { useReferenceData } from "@/hooks/useReferenceData";
 import { abilityAbbr, orderedAbilityEntries } from "@/lib/abilities";
-import { fetchActiveSession, startSession } from "@/api/client";
+import { fetchActiveSession, joinSession, startCampaignSession } from "@/api/client";
 import type { Session } from "@/types/character";
 
 export default function CharacterSheetPage() {
@@ -103,6 +103,35 @@ export default function CharacterSheetPage() {
   // surprised D&D players (it read WIS-CHA-STR-DEX-CON-INT).
   const abilityEntries = orderedAbilityEntries(character.abilityScores);
 
+  // Header session button (#245): driven by campaign membership + whether this
+  // character is an active participant of the campaign's live session.
+  const campaignId = character.campaignId;
+  const inActiveSession =
+    activeSession?.participants?.some((p) => p.characterId === character.id && !p.leftAt) ?? false;
+  const sessionLabel = activeSession
+    ? inActiveSession
+      ? "Resume Session"
+      : "Join Session"
+    : "Start Session";
+
+  const handleSessionButton = async () => {
+    if (!id || !campaignId) return;
+    setSessionPending(true);
+    try {
+      if (activeSession) {
+        if (!inActiveSession) {
+          await joinSession(campaignId, activeSession.id, id);
+        }
+      } else {
+        const { session } = await startCampaignSession(campaignId, id);
+        setActiveSession(session);
+      }
+      navigate(`/characters/${id}/session`);
+    } finally {
+      setSessionPending(false);
+    }
+  };
+
   return (
     <RollProvider>
     <div className="min-h-screen bg-parchment-100">
@@ -133,29 +162,26 @@ export default function CharacterSheetPage() {
           <div className="flex flex-col items-end gap-2">
             <BackendStatus />
             <div className="flex flex-wrap items-center gap-3">
-              {/* Start / Resume Session — the primary live-play entry point */}
-              <button
-                type="button"
-                disabled={sessionPending || activeSession === undefined}
-                onClick={async () => {
-                  if (!id) return;
-                  setSessionPending(true);
-                  try {
-                    if (activeSession) {
-                      navigate(`/characters/${id}/session`);
-                    } else {
-                      const { session } = await startSession(id);
-                      setActiveSession(session);
-                      navigate(`/characters/${id}/session`);
-                    }
-                  } finally {
-                    setSessionPending(false);
-                  }
-                }}
-                className="rounded-control bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
-              >
-                {activeSession ? "Resume Session" : "Start Session"}
-              </button>
+              {/* Start / Join / Resume Session — the primary live-play entry
+                  point. Requires a campaign; sessions are shared per campaign. */}
+              {campaignId ? (
+                <button
+                  type="button"
+                  disabled={sessionPending || activeSession === undefined}
+                  onClick={handleSessionButton}
+                  className="rounded-control bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
+                >
+                  {sessionLabel}
+                </button>
+              ) : (
+                <Link
+                  to="/campaigns"
+                  title="Join a campaign to play a shared session"
+                  className="rounded-control border border-garnet-700 px-3 py-1.5 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-50"
+                >
+                  Join a campaign
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={() => setSessionsOpen(true)}
@@ -201,6 +227,7 @@ export default function CharacterSheetPage() {
       {sessionsOpen && (
         <SessionsModal
           characterId={character.id}
+          campaignId={character.campaignId}
           onClose={() => setSessionsOpen(false)}
         />
       )}
