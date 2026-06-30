@@ -247,7 +247,7 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
               </button>
               <button
                 type="button"
-                disabled={endPending}
+                disabled={endPending || leavePending}
                 onClick={() => {
                   awardedRef.current = false;
                   setEndError(null);
