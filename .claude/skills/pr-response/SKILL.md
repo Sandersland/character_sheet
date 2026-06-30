@@ -19,11 +19,12 @@ Invocation: `/pr-response [pr-number]` — omit the number to use the PR for the
 
 ### 1. Gather all feedback (read-only)
 
-Resolve the PR number (the arg, or `gh pr view --json number -q .number` for the current branch), then pull every channel of feedback:
+Resolve the PR number (the arg, or `gh pr view --json number -q .number` for the current branch) and the repo slug once — don't hard-code it, so the skill works on forks/renames — then pull every channel of feedback:
 
 ```bash
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)   # e.g. owner/repo
 gh pr view <N> --json number,title,headRefName,baseRefName,state,reviews,comments
-gh api repos/Sandersland/character_sheet/pulls/<N>/comments    # inline diff threads (path+line)
+gh api repos/$REPO/pulls/<N>/comments    # inline diff threads (path+line)
 ```
 
 For inline threads you'll also want their GraphQL node IDs + resolved state (needed to reply/resolve in step 6):
@@ -33,13 +34,13 @@ gh api graphql -f query='
 query($owner:String!,$repo:String!,$pr:Int!){
   repository(owner:$owner,name:$repo){
     pullRequest(number:$pr){
-      reviewThreads(first:50){ nodes {
+      reviewThreads(first:100){ nodes {
         id isResolved
         comments(first:20){ nodes { databaseId path line body author{login} } }
       } }
     }
   }
-}' -f owner=Sandersland -f repo=character_sheet -F pr=<N>
+}' -f owner="${REPO%/*}" -f repo="${REPO#*/}" -F pr=<N>
 ```
 
 > **Know the two comment shapes.** In this repo the automated `claude-review` bot posts an **issue-level conversation comment** (the structured findings list, author `claude`) plus one **PR-level `CHANGES_REQUESTED` review** — it does **not** leave inline threads. Inline review threads only appear when a human or `/code-review --comment` leaves them. Step 4 and step 6 handle both.
@@ -55,7 +56,7 @@ For each finding, **open the actual code and verify the claim** — the reviewer
 - **Address** — real correctness bugs, races, data-integrity/security issues, accessibility regressions, doc-drift the gate blocks on, and nits that carry **genuine** clarity or performance benefit.
 - **Decline** — not relevant, speculative, out of scope for this PR, conflicts with a deliberate decision already made, or where the suggested "fix" would *violate* a CLAUDE.md non-negotiable (e.g. expanding a one-line comment into a block) or actually reduce clarity. Every decline needs a concrete one-line reason.
 
-Produce a triage table — `finding → verdict → reason → chunk` — and keep it; it becomes the PR response in step 4 and the report in step 8.
+Produce a triage table — `finding → verdict → reason` — and keep it; it becomes the PR response in step 4 and the report in step 8. (Grouping the accepted findings into chunks is a separate step-3 planning artifact — it doesn't belong in the public response table.)
 
 ### 3. Plan: context, chunking, parallelism
 
@@ -72,7 +73,7 @@ Post the verdict for **every** finding (address *and* decline), matched to the c
 - **Inline review threads** (human / `--comment`): reply on each thread stating intent + reason, e.g.
 
   ```bash
-  gh api repos/Sandersland/character_sheet/pulls/<N>/comments/<comment_databaseId>/replies \
+  gh api repos/$REPO/pulls/<N>/comments/<comment_databaseId>/replies \
     -f body="Addressing — will guard the ended-session case. (fix incoming)"
   ```
   Leave the **resolve** for step 6, when the fix actually lands.
@@ -105,7 +106,11 @@ Per chunk:
 1. **Write the failing regression test first** — capture the exact finding so it can't regress.
 2. **Run it and confirm it's actually red _before_ touching the fix.** This is the step most easily skipped: if you fix first and the test passes on the first run, you never proved the test exercises the bug — it may be a tautology. Run red, then fix. Only mark a chunk **"test: N/A"** when there is genuinely no place to assert (a one-word error string, a doc edit) **or no test harness exists for that surface** (e.g. a page component with no `*.test.tsx`) — say which, and don't scaffold a heavy new harness just to cover a one-line guard.
 3. Implement the fix until **green**.
-4. **Lint** both workspaces as touched (`npm run lint` in each) — CI fails on a lint miss even when tests pass.
+4. **Lint** both workspaces as touched, in-container like the tests above — CI fails on a lint miss even when tests pass:
+   ```bash
+   docker compose exec -T backend  sh -c 'cd /app && npm run lint'
+   docker compose exec -T frontend sh -c 'cd /app && npm run lint'
+   ```
 5. Commit: `fix(<domain>): <finding> (#<issue>)`. The issue/PR reference goes in the **commit message**, never in a code comment.
 
 > **House rules for any delegated agent.** A subagent does not inherit CLAUDE.md. If you fan out in step 3, paste the non-negotiables preamble (see `parallel-issues`' "house-rules preamble") into each brief, tailored to the chunk's surface — keep the one-line-comment and `@/`-import rules in every brief.
