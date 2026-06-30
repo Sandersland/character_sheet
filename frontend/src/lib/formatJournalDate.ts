@@ -16,3 +16,10 @@ export function formatJournalDate(iso: string): string {
     day: "numeric",
   });
 }
+
+// Format a capture timestamp as local time-of-day ("3:45 PM"); returns verbatim on parse failure.
+export function formatJournalTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}

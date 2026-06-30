@@ -61,9 +61,11 @@ export const characterInclude = {
     orderBy: { position: "asc" },
     include: { weaponDetail: true, armorDetail: true, consumableDetail: true },
   },
-  // Newest-first by the user-entered calendar `date`; `createdAt desc` is a
-  // stable tiebreaker so same-date entries stay newest-written-first.
-  journalEntries: { orderBy: [{ date: "desc" }, { createdAt: "desc" }] },
+  // Newest-first by the user-entered calendar `date`; `loggedAt desc` then
+  // `createdAt desc` are stable tiebreakers so same-date NOTE rows (which share
+  // a UTC-midnight date) sort by their capture time.
+  // Unfiltered today (single-owner access); campaign-visible sharing means threading a userId into serializeCharacter to call the visibleEntries helper (routes/journal.ts).
+  journalEntries: { orderBy: [{ date: "desc" }, { loggedAt: "desc" }, { createdAt: "desc" }] },
 } satisfies Prisma.CharacterInclude;
 
 type CharacterWithRelations = Prisma.CharacterGetPayload<{ include: typeof characterInclude }>;
@@ -615,9 +617,12 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // provenance.
     journal: row.journalEntries.map((e) => ({
       id: e.id,
-      title: e.title,
+      kind: e.kind,
+      title: e.title ?? undefined,
       date: e.date.toISOString(),
+      loggedAt: e.loggedAt.toISOString(),
       body: e.body,
+      visibility: e.visibility,
       sessionId: e.sessionId ?? undefined,
     })),
 
