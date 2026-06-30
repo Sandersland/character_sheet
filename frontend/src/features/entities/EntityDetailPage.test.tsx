@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import EntityDetailPage from "@/features/entities/EntityDetailPage";
 import * as client from "@/api/client";
+import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
 import type { Campaign, CampaignEntity, EntityBacklink } from "@/types/character";
 import { axe } from "@/test/axe";
 
@@ -13,6 +15,11 @@ vi.mock("@/api/client", () => ({
   fetchEntityBacklinks: vi.fn(),
   updateEntity: vi.fn(),
   deleteEntity: vi.fn(),
+}));
+
+vi.mock("@/hooks/useCampaignEntities", () => ({
+  useCampaignEntities: vi.fn(),
+  primeCampaignEntities: vi.fn(),
 }));
 
 const ENTITY_ID = "ent-1";
@@ -70,9 +77,33 @@ beforeEach(() => {
   vi.mocked(client.fetchEntities).mockResolvedValue([ENTITY]);
   vi.mocked(client.fetchEntityBacklinks).mockResolvedValue([BACKLINK]);
   vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("PLAYER"));
+  vi.mocked(useCampaignEntities).mockReturnValue({
+    entities: [ENTITY],
+    byId: new Map([[ENTITY_ID, ENTITY]]),
+  });
 });
 
 describe("EntityDetailPage (#248)", () => {
+  it("primes the shared entity cache on rename so live chips update", async () => {
+    const user = userEvent.setup();
+    vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("OWNER"));
+    vi.mocked(client.updateEntity).mockResolvedValue({ ...ENTITY, name: "Goblin King" });
+
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    const nameInput = screen.getByLabelText(/Name/);
+    await user.clear(nameInput);
+    await user.type(nameInput, "Goblin King");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() =>
+      expect(vi.mocked(primeCampaignEntities)).toHaveBeenCalledWith(
+        CAMPAIGN_ID,
+        expect.arrayContaining([expect.objectContaining({ id: ENTITY_ID, name: "Goblin King" })]),
+      ),
+    );
+  });
+
   it("renders the entity and its backlinks", async () => {
     renderPage();
     expect(await screen.findByRole("heading", { name: /Goblin Chief/ })).toBeInTheDocument();

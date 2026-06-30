@@ -14,7 +14,7 @@ import {
   updateEntity,
 } from "@/api/client";
 import MentionText from "@/features/journal/MentionText";
-import { useCampaignEntities } from "@/hooks/useCampaignEntities";
+import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { formatJournalDate } from "@/lib/formatJournalDate";
 import {
   ENTITY_TYPE_LABELS,
@@ -44,7 +44,7 @@ function groupBySession(backlinks: EntityBacklink[]): { key: string; items: Enti
 export default function EntityDetailPage() {
   const { id: campaignId, entityId } = useParams();
   const navigate = useNavigate();
-  const { byId } = useCampaignEntities(campaignId);
+  const { entities, byId } = useCampaignEntities(campaignId);
 
   const [entity, setEntity] = useState<CampaignEntity | null | undefined>(undefined);
   const [role, setRole] = useState<CampaignRole | undefined>(undefined);
@@ -116,6 +116,8 @@ export default function EntityDetailPage() {
         notes: notes.trim() === "" ? null : notes.trim(),
       });
       setEntity(updated);
+      // Keep the shared cache in sync so live @Name chips reflect the rename.
+      primeCampaignEntities(campaignId, entities.map((e) => (e.id === entityId ? updated : e)));
       setEditing(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save entity.");

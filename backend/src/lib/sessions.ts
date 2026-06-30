@@ -147,11 +147,15 @@ async function closeSession(
 ): Promise<void> {
   const batchId = randomUUID();
   await prisma.$transaction(async (tx) => {
-    await recomputeSummaries(tx, { ...session, endedAt });
-    await tx.session.update({
-      where: { id: session.id },
+    // Claim the close atomically: a concurrent end/auto-close that already flipped
+    // the row to "ended" matches no rows here, so the loser skips the duplicate
+    // summary recompute + sessionEnded logs.
+    const { count } = await tx.session.updateMany({
+      where: { id: session.id, status: "active" },
       data: { status: "ended", endedAt },
     });
+    if (count === 0) return;
+    await recomputeSummaries(tx, { ...session, endedAt });
     for (const p of session.participants) {
       await logEvent(tx, {
         characterId: p.characterId,
