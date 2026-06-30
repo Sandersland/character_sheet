@@ -787,6 +787,33 @@ export interface Character {
   classes?: ClassEntry[];
 
   journal: JournalEntry[];
+
+  /** Shared-campaign link (#246), or undefined when the character isn't in one. */
+  campaignId?: string;
+}
+
+// ── Shared campaigns (#246) ───────────────────────────────────────────────────
+
+export type CampaignRole = "OWNER" | "PLAYER";
+
+export interface CampaignMember {
+  id: string;
+  userId: string;
+  role: CampaignRole;
+  user: { id: string; name: string | null; email: string | null; imageUrl: string | null };
+}
+
+export interface Campaign {
+  id: string;
+  name: string;
+  ownerId: string;
+  inviteCode: string;
+  createdAt: string;
+  members: CampaignMember[];
+  /** Present on GET /api/campaigns/:id — each member character (id, name, ownerId). */
+  characters?: { id: string; name: string; ownerId: string }[];
+  /** The caller's role in this campaign — surfaced by the list + detail reads. */
+  role?: CampaignRole;
 }
 
 export interface CharacterSummary {
@@ -796,6 +823,8 @@ export interface CharacterSummary {
   class: string;
   level: number;
   portraitUrl?: string;
+  /** Shared-campaign link (#246), or undefined when the character isn't in one. */
+  campaignId?: string;
 }
 
 /**

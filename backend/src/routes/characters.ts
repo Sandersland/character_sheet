@@ -72,6 +72,7 @@ function serializeCharacterSummary(row: {
   id: string;
   name: string;
   ownerId: string;
+  campaignId: string | null;
   portraitUrl: string | null;
   experiencePoints: number;
   raceSelection: { name: string } | null;
@@ -84,6 +85,9 @@ function serializeCharacterSummary(row: {
     // schema.prisma). Access is enforced per-owner via assertCharacterAccess;
     // emitted here so the frontend can identify/display the owner.
     ownerId: row.ownerId,
+    // Shared-campaign link (#246), or undefined — lets the campaign add-picker
+    // exclude characters already in another campaign.
+    campaignId: row.campaignId ?? undefined,
     // raceSelection/classEntries are optional in Prisma's types only
     // because they're the non-FK side of the relation — every character
     // created via POST /characters has exactly one of each.
@@ -505,6 +509,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
     background: row.backgroundSelection?.name ?? "",
     alignment: row.alignment,
     portraitUrl: row.portraitUrl ?? undefined,
+    // Shared-campaign link (#246), or undefined when unassigned.
+    campaignId: row.campaignId ?? undefined,
 
     armorClass:
       row.armorClass + featBonuses.armorClass + deriveFightingStyleBonuses(fightingStyle).armorClass,
@@ -636,6 +642,7 @@ charactersRouter.get("/characters", async (req, res) => {
       id: true,
       name: true,
       ownerId: true,
+      campaignId: true,
       portraitUrl: true,
       experiencePoints: true,
       raceSelection: { select: { name: true } },

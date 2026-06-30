@@ -12,6 +12,9 @@ frontend/src/
 │   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable, ProficienciesCard
 │   ├── advancement/     # AdvancementSection, AdvancementPanel
 │   ├── auth/            # AuthProvider (useAuth), AuthGate, AppHeader, AccountMenu
+│   ├── campaign/        # CampaignsPage (list+create+join), CampaignDetailPage (mgmt hub:
+│   │                    #   invite link, roster, add-character dropdown), CampaignInviteLink,
+│   │                    #   CampaignIndicator (sheet badge/link), JoinCampaignRoute (#246)
 │   ├── character-meta/  # CharacterCard, VitalsStrip, JournalSection, JournalEntryPanel,
 │   │                    #   ActivityModal, DeleteCharacterModal, BackendStatus
 │   ├── class/           # ClassFeaturesSection, FightingStylePanel, AddManeuverPanel,
