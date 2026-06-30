@@ -826,6 +826,36 @@ export interface Campaign {
   role?: CampaignRole;
 }
 
+// ── Campaign entity registry & @-tagging (#248) ───────────────────────────────
+
+export type EntityType = "NPC" | "LOCATION" | "FACTION" | "ITEM" | "PC" | "OTHER";
+
+export interface CampaignEntity {
+  id: string;
+  campaignId: string;
+  type: EntityType;
+  name: string;
+  aliases: string[];
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** One note that @-tags an entity, surfaced on the entity detail page. */
+export interface EntityBacklink {
+  entry: {
+    id: string;
+    characterId: string;
+    sessionId?: string | null;
+    kind: JournalEntryKind;
+    title: string | null;
+    date: string;
+    loggedAt: string;
+    body: string;
+  };
+  characterName: string;
+}
+
 export interface CharacterSummary {
   id: string;
   name: string;

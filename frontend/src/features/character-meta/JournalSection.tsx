@@ -22,6 +22,8 @@ import { GiQuillInk } from "@/components/ui/icons";
 import JournalEntryPanel, {
   type JournalEntryDraft,
 } from "@/features/character-meta/JournalEntryPanel";
+import MentionText from "@/features/journal/MentionText";
+import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { formatJournalDate } from "@/lib/formatJournalDate";
 import type { Character } from "@/types/character";
 
@@ -32,6 +34,7 @@ interface JournalSectionProps {
 
 export default function JournalSection({ character, onUpdate }: JournalSectionProps) {
   const entries = character.journal;
+  const { byId } = useCampaignEntities(character.campaignId);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +108,7 @@ export default function JournalSection({ character, onUpdate }: JournalSectionPr
           <JournalEntryPanel
             mode="add"
             busy={busy}
+            campaignId={character.campaignId}
             onSubmit={handleAdd}
             onClose={() => setAddPanelOpen(false)}
           />
@@ -126,6 +130,7 @@ export default function JournalSection({ character, onUpdate }: JournalSectionPr
                     mode="edit"
                     initial={entry}
                     busy={busy}
+                    campaignId={character.campaignId}
                     onSubmit={(draft) => handleEdit(entry.id, draft)}
                     onClose={() => setEditingId(null)}
                   />
@@ -140,9 +145,12 @@ export default function JournalSection({ character, onUpdate }: JournalSectionPr
                       {formatJournalDate(entry.date)}
                     </span>
                   </div>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-parchment-700">
-                    {entry.body}
-                  </p>
+                  <MentionText
+                    body={entry.body}
+                    entities={byId}
+                    campaignId={character.campaignId}
+                    className="mt-1 whitespace-pre-wrap text-sm text-parchment-700"
+                  />
 
                   {confirmDeleteId === entry.id ? (
                     <div className="mt-2 flex items-center gap-3 text-xs">

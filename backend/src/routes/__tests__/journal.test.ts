@@ -281,6 +281,83 @@ describe("DELETE /api/characters/:id/journal/:entryId — delete entry", () => {
   });
 });
 
+// ── Entity ref derivation (#248) ──────────────────────────────────────────────
+
+describe("JournalEntryRef derivation from @[uuid] tokens", () => {
+  async function attachToFreshCampaign() {
+    const created = await supertest.agent(app).set("Cookie", COOKIE)
+      .post("/api/campaigns")
+      .send({ name: "Ref Campaign" });
+    const campaignId = created.body.id as string;
+    await supertest.agent(app).set("Cookie", COOKIE)
+      .post(`/api/campaigns/${campaignId}/characters`)
+      .send({ characterId: FIXTURE_ID });
+    return campaignId;
+  }
+
+  async function makeEntity(campaignId: string, name: string) {
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(`/api/campaigns/${campaignId}/entities`)
+      .send({ type: "NPC", name });
+    return res.body.id as string;
+  }
+
+  afterEach(async () => {
+    await prisma.campaign.deleteMany({ where: { name: "Ref Campaign" } });
+  });
+
+  it("creates a ref for a valid token", async () => {
+    const campaignId = await attachToFreshCampaign();
+    const entityId = await makeEntity(campaignId, "Tagged NPC");
+
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ kind: "NOTE", body: `Met @[${entityId}] in the tavern` });
+    const entryId = res.body.journal[0].id as string;
+
+    const refs = await prisma.journalEntryRef.findMany({ where: { entryId } });
+    expect(refs).toHaveLength(1);
+    expect(refs[0].entityId).toBe(entityId);
+  });
+
+  it("removes the ref when the token is edited out", async () => {
+    const campaignId = await attachToFreshCampaign();
+    const entityId = await makeEntity(campaignId, "Fleeting NPC");
+
+    const created = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ title: "T", date: "2026-06-22", body: `Saw @[${entityId}]` });
+    const entryId = created.body.journal[0].id as string;
+    expect(await prisma.journalEntryRef.count({ where: { entryId } })).toBe(1);
+
+    await supertest.agent(app).set("Cookie", COOKIE)
+      .patch(journalUrl(`/${entryId}`))
+      .send({ body: "No tags anymore" });
+    expect(await prisma.journalEntryRef.count({ where: { entryId } })).toBe(0);
+  });
+
+  it("creates no ref for a foreign or bogus uuid", async () => {
+    await attachToFreshCampaign();
+    const foreign = "99999999-9999-9999-9999-999999999999";
+
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ kind: "NOTE", body: `Bogus @[${foreign}] and @[not-a-uuid]` });
+    const entryId = res.body.journal[0].id as string;
+    expect(await prisma.journalEntryRef.count({ where: { entryId } })).toBe(0);
+  });
+
+  it("stores the body but no refs when the character has no campaign", async () => {
+    const entityish = "12345678-1234-1234-1234-123456789012";
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ kind: "NOTE", body: `Tag @[${entityish}] outside a campaign` });
+    const entryId = res.body.journal[0].id as string;
+    expect(res.body.journal[0].body).toBe(`Tag @[${entityish}] outside a campaign`);
+    expect(await prisma.journalEntryRef.count({ where: { entryId } })).toBe(0);
+  });
+});
+
 // ── Ordering ─────────────────────────────────────────────────────────────────
 
 describe("journal ordering", () => {

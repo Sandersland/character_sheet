@@ -81,6 +81,8 @@ model Character {
   events              CharacterEvent[]
   sessions            Session[]
   journalEntries      JournalEntry[]
+  // Back-relation to the PC CampaignEntity auto-created on attach (#248).
+  campaignLink        CampaignCharacterLink?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -133,6 +135,8 @@ model Campaign {
 
   members    CampaignMembership[]
   characters Character[]
+  // Shared campaign wiki: NPCs/locations/factions/etc. tagged in notes (#248).
+  entities   CampaignEntity[]
 }
 
 enum CampaignRole {
@@ -151,6 +155,62 @@ model CampaignMembership {
   updatedAt  DateTime     @updatedAt
 
   @@unique([campaignId, userId])
+}
+
+// --- Campaign entity registry & @-tagging (#248) ----------------------------
+// A shared campaign wiki: a polymorphic registry of the people/places/things a
+// table references. Fully polymorphic (one `type` discriminator, NO per-type FK
+// columns) so a new entity kind is an enum value, not a table. Notes @-tag an
+// entity via an @[<uuid>] token in the body; JournalEntryRef materializes each
+// tag as a backlink. A PC entity is auto-created + linked when a character
+// attaches to the campaign (CampaignCharacterLink).
+
+enum EntityType {
+  NPC
+  LOCATION
+  FACTION
+  ITEM
+  PC
+  OTHER
+}
+
+model CampaignEntity {
+  id         String     @id @default(uuid())
+  campaignId String
+  campaign   Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  type       EntityType
+  name       String
+  aliases    String[]   @default([])
+  notes      String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  refs          JournalEntryRef[]
+  characterLink CampaignCharacterLink?
+
+  @@index([campaignId, type])
+}
+
+// Materialized backlink: one row per (entry, entity) tag. Derived from the
+// @[<uuid>] tokens in the entry body on journal write; cascades from both sides.
+model JournalEntryRef {
+  id       String         @id @default(uuid())
+  entryId  String
+  entry    JournalEntry   @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  entityId String
+  entity   CampaignEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@unique([entryId, entityId])
+  @@index([entityId])
+}
+
+// Links a character to its auto-created PC entity (1:1 both ways).
+model CampaignCharacterLink {
+  id               String         @id @default(uuid())
+  campaignEntityId String         @unique
+  campaignEntity   CampaignEntity @relation(fields: [campaignEntityId], references: [id], onDelete: Cascade)
+  characterId      String         @unique
+  character        Character      @relation(fields: [characterId], references: [id], onDelete: Cascade)
 }
 
 // One row per linked sign-in method (OAuth provider account or, later, a
@@ -876,6 +936,9 @@ model JournalEntry {
   visibility   EntryVisibility  @default(PRIVATE)
   authorUserId String
   createdAt    DateTime         @default(now())
+
+  // Materialized @-tags pointing at CampaignEntity rows (#248).
+  refs JournalEntryRef[]
 
   @@index([characterId, createdAt])
 }

@@ -147,27 +147,49 @@ campaignsRouter.post("/campaigns/:id/characters", async (req, res) => {
   }
 
   const userId = req.user!.id;
-  await assertCharacterAccess(prisma, userId, parseResult.data.characterId, "edit");
-  await assertCampaignMembership(prisma, userId, req.params.id, "view");
+  const characterId = parseResult.data.characterId;
+  const campaignId = req.params.id;
+  await assertCharacterAccess(prisma, userId, characterId, "edit");
+  await assertCampaignMembership(prisma, userId, campaignId, "view");
 
-  // Atomic conditional update guards against reassigning a character already in a
-  // different campaign without a TOCTOU race: only a null or same-campaign FK
-  // matches, so a same-campaign re-attach stays a no-op success and a
-  // different-campaign attach matches nothing → count 0 → 409.
-  const { count } = await prisma.character.updateMany({
-    where: {
-      id: parseResult.data.characterId,
-      OR: [{ campaignId: null }, { campaignId: req.params.id }],
-    },
-    data: { campaignId: req.params.id },
+  // Attach + PC-entity auto-register in one transaction so the character is never
+  // attached without its wiki link. The conditional update guards a TOCTOU race:
+  // only a null or same-campaign FK matches, so a different-campaign attach
+  // matches nothing → count 0 → 409, and a same-campaign re-attach is a no-op
+  // success (the @unique characterId link keeps the entity creation idempotent).
+  const attached = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.character.updateMany({
+      where: { id: characterId, OR: [{ campaignId: null }, { campaignId }] },
+      data: { campaignId },
+    });
+    if (count === 0) return false;
+
+    const existingLink = await tx.campaignCharacterLink.findUnique({
+      where: { characterId },
+      select: { id: true },
+    });
+    if (!existingLink) {
+      const character = await tx.character.findUniqueOrThrow({
+        where: { id: characterId },
+        select: { name: true },
+      });
+      const entity = await tx.campaignEntity.create({
+        data: { campaignId, type: "PC", name: character.name },
+      });
+      await tx.campaignCharacterLink.create({
+        data: { campaignEntityId: entity.id, characterId },
+      });
+    }
+    return true;
   });
-  if (count === 0) {
+
+  if (!attached) {
     res.status(409).json({ error: "Character already in a campaign" });
     return;
   }
 
   const updated = await prisma.character.findUniqueOrThrow({
-    where: { id: parseResult.data.characterId },
+    where: { id: characterId },
     include: characterInclude,
   });
   res.json(serializeCharacter(updated));

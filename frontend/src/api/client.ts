@@ -12,7 +12,10 @@ import type {
   CharacterSummary,
   ClassOperation,
   ConditionOperation,
+  CampaignEntity,
   CreateCharacterInput,
+  EntityBacklink,
+  EntityType,
   ExperienceOperation,
   HitPointOperation,
   JournalEntryKind,
@@ -542,6 +545,82 @@ export async function addCharacterToCampaign(
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     throw new Error(body?.error ?? `Failed to add character to campaign (${response.status})`);
+  }
+  return response.json();
+}
+
+// ── Campaign entities & @-tagging (#248) ───────────────────────────────────────
+// Plain REST. Search/list is campaign-scoped; create/edit are any-member; delete
+// is OWNER-only (server-enforced). Backlinks come pre-filtered to the caller's
+// own notes (private-by-default), so no client-side visibility logic is needed.
+
+export async function fetchEntities(
+  campaignId: string,
+  opts?: { q?: string; type?: EntityType },
+): Promise<CampaignEntity[]> {
+  const params = new URLSearchParams();
+  if (opts?.q) params.set("q", opts.q);
+  if (opts?.type) params.set("type", opts.type);
+  const query = params.toString() ? `?${params.toString()}` : "";
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities${query}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch entities (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function createEntity(
+  campaignId: string,
+  input: { type: EntityType; name: string; aliases?: string[]; notes?: string },
+): Promise<CampaignEntity> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to create entity (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function updateEntity(
+  campaignId: string,
+  entityId: string,
+  patch: { type?: EntityType; name?: string; aliases?: string[]; notes?: string | null },
+): Promise<CampaignEntity> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities/${entityId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to update entity (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function deleteEntity(campaignId: string, entityId: string): Promise<void> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities/${entityId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to delete entity (${response.status})`);
+  }
+}
+
+export async function fetchEntityBacklinks(
+  campaignId: string,
+  entityId: string,
+): Promise<EntityBacklink[]> {
+  const response = await apiFetch(
+    `${API_URL}/campaigns/${campaignId}/entities/${entityId}/backlinks`,
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to fetch entity backlinks (${response.status})`);
   }
   return response.json();
 }

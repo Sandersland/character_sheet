@@ -31,6 +31,7 @@
 | `routes/journal.ts` | `POST /characters/:id/journal`, `PATCH /characters/:id/journal/:entryId`, `DELETE /characters/:id/journal/:entryId` — plain-REST; `POST` accepts a full `ENTRY` (title+date+body) or a fast `NOTE` (body only; date defaults to today, auto-attaches the active session). Reads route through the exported `visibleEntries(db, userId, character)` helper (private-by-default == author's own entries; the `CAMPAIGN`-visible branch is inert until sharing ships). |
 | `routes/sessions.ts` | `POST /characters/:id/sessions` (start), `POST …/sessions/:sessionId/end`, `GET …/sessions`, `GET …/sessions/active`, `GET …/sessions/:sessionId`, `POST …/sessions/:sessionId/combat/start`, `…/combat/end`, `…/combat/round`, `…/roll` (log an attack/damage roll) |
 | `routes/campaigns.ts` | `GET /campaigns` (the caller's campaigns, each with their `role`), `POST /campaigns` (create + OWNER membership), `GET /campaigns/:id` (members + their characters + caller's `role`), `POST /campaigns/join` (join by invite code as PLAYER, idempotent — an existing OWNER stays OWNER), `POST /campaigns/:id/characters` (attach a character — returns the full serialized character; **409** if the character is already in a different campaign, same-campaign re-attach is a no-op success). Plain-REST shared-campaign backbone (#246); access gated via `assertCampaignMembership` (`lib/auth/access.ts`). |
+| `routes/entities.ts` | Campaign entity registry & backlinks (#248), mounted after `campaigns`. `GET /campaigns/:id/entities?q=&type=` (list/search — normalized name+alias match in memory, invalid `type` ignored), `POST /campaigns/:id/entities` (create — any member), `PATCH /campaigns/:id/entities/:entityId` (edit — any member; 404 if not in campaign), `DELETE /campaigns/:id/entities/:entityId` (**OWNER only** → 403 for a PLAYER; cascades refs; 204), `GET /campaigns/:id/entities/:entityId/backlinks` (notes tagging the entity, newest-first `{ entry, characterName }`, filtered through the SAME private-by-default rule as `visibleEntries` so other members' PRIVATE notes never leak). Plain-REST; access gated via `assertCampaignMembership`. |
 
 `characters.ts` exports `characterInclude` and `serializeCharacter`; every other mutation router imports and calls them to return the same full-character wire shape after applying changes.
 
@@ -70,6 +71,7 @@
 | `lib/items.ts` | `isEquippable(category)` + `EQUIPPABLE_CATEGORIES` — the equippability rule (weapon/armor yes, consumable/gear no). Single backend source of truth; mirrored in `frontend/src/lib/items.ts`. Enforced in `applySetEquipped`. |
 | `lib/sessions.ts` | `startSession`, `endSession`, `getActiveSessionId`. Enforces single-active-session per character. Called by session routes and by `getActiveSessionId()` which is threaded into every `apply*Operations()` lib function to tag events. |
 | `lib/session-summary.ts` | `computeSessionSummary()` — pure aggregation of a session's `CharacterEvent` rows into an end-of-session summary. No new bookkeeping; derive-don't-persist. Unit-testable without Postgres. |
+| `lib/journal-refs.ts` | `@`-tag parsing for the entity registry (#248): `extractEntityIds(body)` (pure, DB-free — pulls ordered-unique entity ids out of `@[<uuid>]` tokens, ignoring malformed), `reconcileEntryRefs(tx, entryId, ids)` (diffs `JournalEntryRef` rows), and `normalizeForMatch(s)` (diacritic/punctuation-stripping search key, in parity with the frontend `lib/mentions.ts`). |
 
 Prisma client is generated into `src/generated/prisma` (gitignored). Run `npx prisma generate` from `backend/` after a fresh clone or any schema change.
 
@@ -87,6 +89,7 @@ Prisma client is generated into `src/generated/prisma` (gitignored). Run `npx pr
 | `/characters/:id/session` | `SessionPage` | Live-play mode. Requires an active `Session`; auto-bounces to the sheet if none found. |
 | `/campaigns` | `CampaignsPage` (`features/campaign`) | Lists the caller's campaigns (real list endpoint) + create/join; each card links to the detail page (#246). |
 | `/campaigns/:id` | `CampaignDetailPage` (`features/campaign`) | Management hub: invite link + copy, roster, and an "Add a character" dropdown of the caller's unattached characters. |
+| `/campaigns/:id/entities/:entityId` | `EntityDetailPage` (`features/entities`) | Entity registry detail (#248): name/type/aliases/notes, inline edit (any member), delete (OWNER-only, gated on campaign role), and a backlinks list grouped by session. Mention chips link here. |
 | `/join/:code` | `JoinCampaignRoute` (`features/campaign`) | Joins by code on mount, then redirects to `/campaigns`. |
 
 **`CharacterSheetPage` layout (printed-sheet order, top to bottom):**
@@ -105,6 +108,7 @@ The only permitted backend-call site. Every exported function maps to one endpoi
 - `updateCharacter` — thin PATCH, `currency` only
 - `startSession`, `endSession`, `fetchActiveSession`, `fetchSessions`, `fetchSession` — session lifecycle
 - `fetchCampaigns`, `createCampaign`, `fetchCampaign`, `joinCampaign`, `addCharacterToCampaign` — shared campaigns (#246); the attach call returns the full `Character` (or throws on the 409 reassignment guard)
+- `fetchEntities`, `createEntity`, `updateEntity`, `deleteEntity`, `fetchEntityBacklinks` — campaign entity registry & @-tagging (#248); backlinks come pre-filtered to the caller's own notes
 
 ### `lib/`
 
@@ -146,6 +150,8 @@ See `schema.prisma` model comments for the detailed snapshot-vs-overlay reasonin
 - `Character.ownerId` — required FK to `User` (`onDelete: Cascade`, `@@index`). Emitted by `serializeCharacter`/`serializeCharacterSummary`.
 
 **Shared campaigns (#246):** `Campaign` (name, `ownerId` → `User` relation `"CampaignOwner"`, unique `inviteCode`, `createdAt`/`updatedAt`, `characters Character[]`) and `CampaignMembership` (`@@unique([campaignId, userId])`, `role: CampaignRole = OWNER|PLAYER`, `joinedAt`/`updatedAt`) add a shared backbone. `Character.campaignId` is a nullable FK (`onDelete: SetNull`, `@@index`) emitted by `serializeCharacter`. `User` gains back-relations `ownedCampaigns` + `campaignMemberships`. Access is gated by `assertCampaignMembership(db, userId, campaignId, level)` in `lib/auth/access.ts` — the campaign mirror of `assertCharacterAccess` (404 missing / 403 non-member). Plain-REST domain (no audit log).
+
+**Campaign entity registry & @-tagging (#248):** `CampaignEntity` (`campaignId` → `Campaign` `onDelete: Cascade`, `type: EntityType = NPC|LOCATION|FACTION|ITEM|PC|OTHER`, `name`, `aliases String[]`, nullable `notes`, `@@index([campaignId, type])`) is a fully-polymorphic shared wiki — NO per-type FK columns. `JournalEntryRef` (`@@unique([entryId, entityId])`, `@@index([entityId])`, cascades from both `JournalEntry` and `CampaignEntity`) materializes one backlink per @-tag, derived from `@[<uuid>]` tokens in the entry body on journal write (`lib/journal-refs.ts`). `CampaignCharacterLink` (1:1, both `@unique`) ties a character to its auto-created PC entity (made on attach). Back-relations: `Campaign.entities`, `JournalEntry.refs`, `Character.campaignLink`. Plain-REST domain (no audit log); access gated via `assertCampaignMembership`.
 
 All three auth children cascade-delete with their `User`. **Ownership is enforced (#101):** `requireAuth` (`lib/auth/middleware.ts`) attaches `req.user` from the session; `POST /characters` stamps `ownerId = req.user.id`; `GET /characters` is scoped to `req.user`; and every character-scoped route resolves access through `assertCharacterAccess` (`lib/auth/access.ts`) — owner-only today, 403 for a non-owner, 404 for a missing character, with `level: "view" | "edit"` as the single seam where sharing (#116) will widen. There is no bootstrap-owner fallback; a caller must be signed in. (The migration that introduced `ownerId` backfilled pre-existing characters onto one minted user before enforcing `NOT NULL`.)
 
