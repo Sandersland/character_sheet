@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { createJournalEntry, deleteJournalEntry, updateJournalEntry } from "@/api/client";
+import MentionAutocomplete from "@/features/journal/MentionAutocomplete";
+import MentionText from "@/features/journal/MentionText";
+import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { formatJournalTime } from "@/lib/formatJournalDate";
 import type { Character } from "@/types/character";
 
@@ -21,7 +24,8 @@ export default function CapturePalette({
   onClose,
   onUpdate,
 }: CapturePaletteProps) {
-  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
+  const { byId } = useCampaignEntities(character.campaignId);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +80,7 @@ export default function CapturePalette({
     }
   }
 
-  function handleComposerKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+  function handleComposerKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     // Enter saves; Shift+Enter newlines; isComposing skips an IME-commit Enter.
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
@@ -125,14 +129,15 @@ export default function CapturePalette({
         </div>
 
         <div className="flex shrink-0 flex-col gap-1 border-b border-parchment-200 p-4">
-          <textarea
+          <MentionAutocomplete
             ref={composerRef}
             rows={2}
             aria-label="Quick note"
+            campaignId={character.campaignId}
             className={`${inputCls} resize-none`}
-            placeholder="Jot a note… Enter to save, Shift+Enter for a new line"
+            placeholder="Jot a note… Enter to save, Shift+Enter for a new line, @ to tag"
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={setValue}
             onKeyDown={handleComposerKeyDown}
           />
           {error && <p className="text-xs font-semibold text-garnet-700">{error}</p>}
@@ -173,9 +178,12 @@ export default function CapturePalette({
                   </li>
                 ) : (
                   <li key={note.id} className="flex items-start justify-between gap-3 py-2">
-                    <p className="min-w-0 flex-1 whitespace-pre-wrap text-sm text-parchment-800">
-                      {note.body}
-                    </p>
+                    <MentionText
+                      body={note.body}
+                      entities={byId}
+                      campaignId={character.campaignId}
+                      className="min-w-0 flex-1 whitespace-pre-wrap text-sm text-parchment-800"
+                    />
                     <div className="flex shrink-0 items-center gap-3">
                       <span className="whitespace-nowrap text-xs text-parchment-500">
                         {formatJournalTime(note.loggedAt)}

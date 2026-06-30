@@ -79,8 +79,10 @@ model Character {
   classEntries        CharacterClassEntry[]
   inventoryItems      InventoryItem[]
   events              CharacterEvent[]
-  sessions            Session[]
+  sessionParticipants SessionParticipant[]
   journalEntries      JournalEntry[]
+  // Back-relation to the PC CampaignEntity auto-created on attach (#248).
+  campaignLink        CampaignCharacterLink?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -133,6 +135,9 @@ model Campaign {
 
   members    CampaignMembership[]
   characters Character[]
+  // Shared campaign wiki: NPCs/locations/factions/etc. tagged in notes (#248).
+  entities   CampaignEntity[]
+  sessions   Session[]
 }
 
 enum CampaignRole {
@@ -151,6 +156,62 @@ model CampaignMembership {
   updatedAt  DateTime     @updatedAt
 
   @@unique([campaignId, userId])
+}
+
+// --- Campaign entity registry & @-tagging (#248) ----------------------------
+// A shared campaign wiki: a polymorphic registry of the people/places/things a
+// table references. Fully polymorphic (one `type` discriminator, NO per-type FK
+// columns) so a new entity kind is an enum value, not a table. Notes @-tag an
+// entity via an @[<uuid>] token in the body; JournalEntryRef materializes each
+// tag as a backlink. A PC entity is auto-created + linked when a character
+// attaches to the campaign (CampaignCharacterLink).
+
+enum EntityType {
+  NPC
+  LOCATION
+  FACTION
+  ITEM
+  PC
+  OTHER
+}
+
+model CampaignEntity {
+  id         String     @id @default(uuid())
+  campaignId String
+  campaign   Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  type       EntityType
+  name       String
+  aliases    String[]   @default([])
+  notes      String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  refs          JournalEntryRef[]
+  characterLink CampaignCharacterLink?
+
+  @@index([campaignId, type])
+}
+
+// Materialized backlink: one row per (entry, entity) tag. Derived from the
+// @[<uuid>] tokens in the entry body on journal write; cascades from both sides.
+model JournalEntryRef {
+  id       String         @id @default(uuid())
+  entryId  String
+  entry    JournalEntry   @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  entityId String
+  entity   CampaignEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@unique([entryId, entityId])
+  @@index([entityId])
+}
+
+// Links a character to its auto-created PC entity (1:1 both ways).
+model CampaignCharacterLink {
+  id               String         @id @default(uuid())
+  campaignEntityId String         @unique
+  campaignEntity   CampaignEntity @relation(fields: [campaignEntityId], references: [id], onDelete: Cascade)
+  characterId      String         @unique
+  character        Character      @relation(fields: [characterId], references: [id], onDelete: Cascade)
 }
 
 // One row per linked sign-in method (OAuth provider account or, later, a
@@ -815,28 +876,41 @@ model CharacterEvent {
   @@index([sessionId, createdAt])
 }
 
-// A play session groups everything that happens during one sitting at the
-// table. Events carry a nullable `sessionId` FK so the full timeline remains
-// queryable without filtering, while a per-session view is a simple WHERE.
-// At most one session per character may be `active` at a time (enforced in
-// application logic, not a DB partial-unique, to stay consistent with the
-// "rules live in lib" convention).
+// One shared play session per campaign sitting; participants join/leave it (#245).
+// At most one `active` session per campaign (enforced in lib, not a DB partial-unique).
 model Session {
   id          String        @id @default(uuid())
-  characterId String
-  character   Character     @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  campaignId  String
+  campaign    Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   status      SessionStatus @default(active)
   startedAt   DateTime      @default(now())
   endedAt     DateTime?
   // Optional human-readable name for the session, e.g. "Session 4 — The Sunless Citadel".
   title       String?
-  // Computed summary stored at session-end (Phase 3). Null while active.
+  // Campaign recap aggregate computed at session-end (#245). Null while active.
   summary     Json?
 
   events         CharacterEvent[]
   journalEntries JournalEntry[]
+  participants   SessionParticipant[]
 
-  @@index([characterId, status])
+  @@index([campaignId, status])
+}
+
+// One character's membership in a shared session, with their present-interval
+// (joinedAt..leftAt) and per-participant summary computed at session-end (#245).
+model SessionParticipant {
+  id          String    @id @default(uuid())
+  sessionId   String
+  session     Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  joinedAt    DateTime  @default(now())
+  leftAt      DateTime?
+  summary     Json?
+
+  @@unique([sessionId, characterId])
+  @@index([sessionId])
 }
 
 // kind distinguishes the two capture surfaces sharing this table: full ENTRY
@@ -876,6 +950,9 @@ model JournalEntry {
   visibility   EntryVisibility  @default(PRIVATE)
   authorUserId String
   createdAt    DateTime         @default(now())
+
+  // Materialized @-tags pointing at CampaignEntity rows (#248).
+  refs JournalEntryRef[]
 
   @@index([characterId, createdAt])
 }

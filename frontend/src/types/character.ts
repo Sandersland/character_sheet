@@ -826,6 +826,36 @@ export interface Campaign {
   role?: CampaignRole;
 }
 
+// ── Campaign entity registry & @-tagging (#248) ───────────────────────────────
+
+export type EntityType = "NPC" | "LOCATION" | "FACTION" | "ITEM" | "PC" | "OTHER";
+
+export interface CampaignEntity {
+  id: string;
+  campaignId: string;
+  type: EntityType;
+  name: string;
+  aliases: string[];
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** One note that @-tags an entity, surfaced on the entity detail page. */
+export interface EntityBacklink {
+  entry: {
+    id: string;
+    characterId: string;
+    sessionId?: string | null;
+    kind: JournalEntryKind;
+    title: string | null;
+    date: string;
+    loggedAt: string;
+    body: string;
+  };
+  characterName: string;
+}
+
 export interface CharacterSummary {
   id: string;
   name: string;
@@ -1276,14 +1306,56 @@ export interface SessionSummary {
   featsOrAsis: SessionSummaryAdvancement[];
 }
 
+/** One character's session summary plus their presence window (#245). */
+export interface ParticipantSummary extends SessionSummary {
+  characterId: string;
+  characterName: string;
+  joinedAt: string; // ISO 8601
+  leftAt: string | null; // ISO 8601, null if present at session end
+  presentMs: number;
+}
+
+/** A character's membership in a shared session (#245). */
+export interface SessionParticipant {
+  id: string;
+  sessionId: string;
+  characterId: string;
+  joinedAt: string; // ISO 8601
+  leftAt?: string | null;
+  summary?: ParticipantSummary | null;
+  character?: { id: string; name: string };
+}
+
+/**
+ * Campaign recap aggregate computed at session-end (#245). Mirrors the backend
+ * `CampaignRecap`. Stored on `Session.summary`; null while the session is active.
+ */
+export interface CampaignRecap {
+  startedAt: string | null; // ISO 8601
+  endedAt: string | null; // ISO 8601
+  durationMs: number;
+  participantCount: number;
+  xpGained: number;
+  levelsGained: number;
+  spellsCast: number;
+  combatRounds: number;
+  attackRolls: number;
+  damageRolls: number;
+  itemsAcquired: SessionSummaryItem[];
+  totalPresentMs: number;
+}
+
 export interface Session {
   id: string;
-  characterId: string;
+  campaignId: string;
   status: SessionStatus;
   startedAt: string; // ISO 8601
   endedAt?: string;
   title?: string;
-  summary?: SessionSummary | null;
+  /** Campaign recap aggregate (#245); null while the session is still active. */
+  summary?: CampaignRecap | null;
+  /** Party members in this session, with their presence + per-participant summary. */
+  participants?: SessionParticipant[];
   /**
    * Journal entries written during this session (linked by
    * JournalEntry.sessionId). Present on the end-session response and the

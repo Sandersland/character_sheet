@@ -3,7 +3,9 @@ import { z } from "zod";
 
 import { assertCharacterAccess } from "../lib/auth/access.js";
 import type { Prisma, PrismaClient } from "../generated/prisma/client.js";
+import { extractEntityIds, reconcileEntryRefs } from "../lib/journal-refs.js";
 import { prisma } from "../lib/prisma.js";
+import { getActiveSessionId } from "../lib/sessions.js";
 import { serializeCharacter, characterInclude } from "./characters.js";
 
 // Freeform campaign journal CRUD. Unlike inventory/HP/XP/spellcasting, journal
@@ -87,6 +89,38 @@ export async function visibleEntries(
   });
 }
 
+// Materialize @[<uuid>] tags in a body as JournalEntryRef rows (#248). A
+// character outside any campaign stores its body verbatim with no refs; inside
+// one, only tokens that resolve to a CampaignEntity in the SAME campaign survive
+// (unknown/foreign ids are dropped). Runs inside the caller's transaction.
+async function syncEntryRefs(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  entryId: string,
+  body: string,
+) {
+  const character = await tx.character.findUnique({
+    where: { id: characterId },
+    select: { campaignId: true },
+  });
+  if (!character?.campaignId) {
+    await reconcileEntryRefs(tx, entryId, []);
+    return;
+  }
+
+  const ids = extractEntityIds(body);
+  if (ids.length === 0) {
+    await reconcileEntryRefs(tx, entryId, []);
+    return;
+  }
+
+  const valid = await tx.campaignEntity.findMany({
+    where: { id: { in: ids }, campaignId: character.campaignId },
+    select: { id: true },
+  });
+  await reconcileEntryRefs(tx, entryId, valid.map((e) => e.id));
+}
+
 async function serializeForCharacter(characterId: string) {
   const updated = await prisma.character.findUniqueOrThrow({
     where: { id: characterId },
@@ -115,24 +149,23 @@ journalRouter.post("/characters/:id/journal", async (req, res) => {
   // session (if one is running), so in-session capture lands on the right log.
   let sessionId = data.sessionId ?? null;
   if (data.kind === "NOTE" && !sessionId) {
-    const active = await prisma.session.findFirst({
-      where: { characterId: req.params.id, status: "active" },
-      select: { id: true },
-    });
-    sessionId = active?.id ?? null;
+    sessionId = await getActiveSessionId(req.params.id);
   }
 
-  await prisma.journalEntry.create({
-    data: {
-      characterId: req.params.id,
-      kind: data.kind,
-      title: data.title ?? null,
-      date: data.date ?? utcMidnightToday(),
-      body: data.body,
-      visibility: "PRIVATE",
-      authorUserId: req.user!.id,
-      sessionId,
-    },
+  await prisma.$transaction(async (tx) => {
+    const entry = await tx.journalEntry.create({
+      data: {
+        characterId: req.params.id,
+        kind: data.kind,
+        title: data.title ?? null,
+        date: data.date ?? utcMidnightToday(),
+        body: data.body,
+        visibility: "PRIVATE",
+        authorUserId: req.user!.id,
+        sessionId,
+      },
+    });
+    await syncEntryRefs(tx, req.params.id, entry.id, data.body);
   });
 
   res.status(201).json(await serializeForCharacter(req.params.id));
@@ -161,9 +194,15 @@ journalRouter.patch("/characters/:id/journal/:entryId", async (req, res) => {
     return;
   }
 
-  await prisma.journalEntry.update({
-    where: { id: entry.id },
-    data: parseResult.data,
+  await prisma.$transaction(async (tx) => {
+    await tx.journalEntry.update({
+      where: { id: entry.id },
+      data: parseResult.data,
+    });
+    // Re-derive refs only when the body changed.
+    if (parseResult.data.body !== undefined) {
+      await syncEntryRefs(tx, req.params.id, entry.id, parseResult.data.body);
+    }
   });
 
   res.json(await serializeForCharacter(req.params.id));

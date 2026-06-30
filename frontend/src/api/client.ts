@@ -12,7 +12,10 @@ import type {
   CharacterSummary,
   ClassOperation,
   ConditionOperation,
+  CampaignEntity,
   CreateCharacterInput,
+  EntityBacklink,
+  EntityType,
   ExperienceOperation,
   HitPointOperation,
   JournalEntryKind,
@@ -546,17 +549,94 @@ export async function addCharacterToCampaign(
   return response.json();
 }
 
+// ── Campaign entities & @-tagging (#248) ───────────────────────────────────────
+// Plain REST. Search/list is campaign-scoped; create/edit are any-member; delete
+// is OWNER-only (server-enforced). Backlinks come pre-filtered to the caller's
+// own notes (private-by-default), so no client-side visibility logic is needed.
+
+export async function fetchEntities(
+  campaignId: string,
+  opts?: { q?: string; type?: EntityType },
+): Promise<CampaignEntity[]> {
+  const params = new URLSearchParams();
+  if (opts?.q) params.set("q", opts.q);
+  if (opts?.type) params.set("type", opts.type);
+  const query = params.toString() ? `?${params.toString()}` : "";
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities${query}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch entities (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function createEntity(
+  campaignId: string,
+  input: { type: EntityType; name: string; aliases?: string[]; notes?: string },
+): Promise<CampaignEntity> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to create entity (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function updateEntity(
+  campaignId: string,
+  entityId: string,
+  patch: { type?: EntityType; name?: string; aliases?: string[]; notes?: string | null },
+): Promise<CampaignEntity> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities/${entityId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to update entity (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function deleteEntity(campaignId: string, entityId: string): Promise<void> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities/${entityId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to delete entity (${response.status})`);
+  }
+}
+
+export async function fetchEntityBacklinks(
+  campaignId: string,
+  entityId: string,
+): Promise<EntityBacklink[]> {
+  const response = await apiFetch(
+    `${API_URL}/campaigns/${campaignId}/entities/${entityId}/backlinks`,
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to fetch entity backlinks (${response.status})`);
+  }
+  return response.json();
+}
+
 // ── Sessions ──────────────────────────────────────────────────────────────────
 
-/** Start a new play session. Rejects (throws) if one is already active. */
-export async function startSession(
+/** Start a shared campaign session with the given character as first participant. */
+export async function startCampaignSession(
+  campaignId: string,
   characterId: string,
   title?: string,
 ): Promise<{ session: Session; character: Character }> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/sessions`, {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/sessions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title }),
+    body: JSON.stringify({ characterId, title }),
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
@@ -565,13 +645,53 @@ export async function startSession(
   return response.json();
 }
 
-/** End a play session by id. */
-export async function endSession(
+/** Add (or re-add) a character to an active campaign session. */
+export async function joinSession(
+  campaignId: string,
+  sessionId: string,
   characterId: string,
+): Promise<void> {
+  const response = await apiFetch(
+    `${API_URL}/campaigns/${campaignId}/sessions/${sessionId}/join`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ characterId }),
+    },
+  );
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to join session (${response.status})`);
+  }
+}
+
+/** Record that a character left a session; it stays open for the rest of the party. */
+export async function leaveSession(
+  campaignId: string,
+  sessionId: string,
+  characterId: string,
+): Promise<void> {
+  const response = await apiFetch(
+    `${API_URL}/campaigns/${campaignId}/sessions/${sessionId}/leave`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ characterId }),
+    },
+  );
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to leave session (${response.status})`);
+  }
+}
+
+/** End a shared campaign session by id. */
+export async function endSession(
+  campaignId: string,
   sessionId: string,
 ): Promise<{ session: Session }> {
   const response = await apiFetch(
-    `${API_URL}/characters/${characterId}/sessions/${sessionId}/end`,
+    `${API_URL}/campaigns/${campaignId}/sessions/${sessionId}/end`,
     { method: "POST" },
   );
   if (!response.ok) {
@@ -581,7 +701,24 @@ export async function endSession(
   return response.json();
 }
 
-/** List all sessions for a character (newest first). */
+/** List a campaign's sessions (newest first), with participants. */
+export async function fetchCampaignSessions(campaignId: string): Promise<Session[]> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/sessions`);
+  if (!response.ok) throw new Error(`Failed to fetch sessions (${response.status})`);
+  return response.json();
+}
+
+/** Get one campaign session with its participants, events, and journals. */
+export async function fetchCampaignSession(
+  campaignId: string,
+  sessionId: string,
+): Promise<Session & { events: CharacterEvent[] }> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/sessions/${sessionId}`);
+  if (!response.ok) throw new Error(`Failed to fetch session (${response.status})`);
+  return response.json();
+}
+
+/** List sessions a character participated in (newest first) — activity filter. */
 export async function fetchSessions(characterId: string): Promise<Session[]> {
   const response = await apiFetch(`${API_URL}/characters/${characterId}/sessions`);
   if (!response.ok) throw new Error(`Failed to fetch sessions (${response.status})`);
