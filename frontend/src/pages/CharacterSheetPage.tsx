@@ -42,6 +42,7 @@ export default function CharacterSheetPage() {
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [activeSession, setActiveSession] = useState<Session | null | undefined>(undefined);
   const [sessionPending, setSessionPending] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [captureOpen, setCaptureOpen] = useState(false);
   const showSpinner = useDelayedFlag(character === undefined && !error);
 
@@ -117,6 +118,7 @@ export default function CharacterSheetPage() {
   const handleSessionButton = async () => {
     if (!id || !campaignId) return;
     setSessionPending(true);
+    setSessionError(null);
     try {
       if (activeSession) {
         if (!inActiveSession) {
@@ -127,6 +129,8 @@ export default function CharacterSheetPage() {
         setActiveSession(session);
       }
       navigate(`/characters/${id}/session`);
+    } catch (err) {
+      setSessionError(err instanceof Error ? err.message : "Could not start or join the session.");
     } finally {
       setSessionPending(false);
     }
@@ -204,6 +208,9 @@ export default function CharacterSheetPage() {
                 Delete
               </button>
             </div>
+            {sessionError && (
+              <p className="text-xs font-semibold text-garnet-700">{sessionError}</p>
+            )}
           </div>
         </div>
       </div>

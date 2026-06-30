@@ -183,4 +183,21 @@ describe("CharacterSheetPage header session button (#245)", () => {
     await waitFor(() => expect(mockStart).toHaveBeenCalledWith("camp1", "c1"));
     expect(navigateMock).toHaveBeenCalledWith("/characters/c1/session");
   });
+
+  it("surfaces an error and does not navigate when starting a session fails", async () => {
+    mockUseCharacter.mockReturnValue({
+      character: makeCharacter({ campaignId: "camp1" }),
+      error: null,
+      setCharacter: vi.fn(),
+    } as never);
+    mockFetchActive.mockResolvedValue(null);
+    mockStart.mockRejectedValue(new Error("Character already in a campaign"));
+
+    renderPage();
+    const button = await screen.findByRole("button", { name: "Start Session" });
+    button.click();
+
+    expect(await screen.findByText("Character already in a campaign")).toBeInTheDocument();
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
 });
