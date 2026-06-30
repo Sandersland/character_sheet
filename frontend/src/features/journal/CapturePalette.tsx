@@ -24,7 +24,7 @@ export default function CapturePalette({
   onClose,
   onUpdate,
 }: CapturePaletteProps) {
-  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
   const { byId } = useCampaignEntities(character.campaignId);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
@@ -80,7 +80,7 @@ export default function CapturePalette({
     }
   }
 
-  function handleComposerKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+  function handleComposerKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     // Enter saves; Shift+Enter newlines; isComposing skips an IME-commit Enter.
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();

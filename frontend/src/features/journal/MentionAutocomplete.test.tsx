@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
 import MentionAutocomplete from "@/features/journal/MentionAutocomplete";
+import { primeCampaignEntities } from "@/hooks/useCampaignEntities";
 import * as client from "@/api/client";
 import type { CampaignEntity } from "@/types/character";
 import { axe } from "@/test/axe";
@@ -36,8 +37,14 @@ const ENTITIES: CampaignEntity[] = [
   entity({ id: GATE, name: "Baldur's Gate", type: "LOCATION" }),
 ];
 
-function Harness({ campaignId }: { campaignId?: string | null }) {
-  const [value, setValue] = useState("");
+function Harness({
+  campaignId,
+  initialValue = "",
+}: {
+  campaignId?: string | null;
+  initialValue?: string;
+}) {
+  const [value, setValue] = useState(initialValue);
   return (
     <MemoryRouter>
       <MentionAutocomplete
@@ -54,6 +61,9 @@ function Harness({ campaignId }: { campaignId?: string | null }) {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(client.fetchEntities).mockResolvedValue(ENTITIES);
+  // Seed the module cache so entities are present synchronously at mount — keeps
+  // the popover deterministic regardless of fetch timing / prior-test state.
+  primeCampaignEntities("camp-1", ENTITIES);
 });
 
 describe("MentionAutocomplete (#248)", () => {
@@ -121,6 +131,43 @@ describe("MentionAutocomplete (#248)", () => {
 
     expect(await screen.findByRole("link", { name: /create or join a campaign/i })).toBeInTheDocument();
     expect(client.fetchEntities).not.toHaveBeenCalled();
+  });
+
+  it("renders a stored token as an @Name chip, not the raw uuid (#269)", async () => {
+    render(<Harness campaignId="camp-1" initialValue={`Met @[${GOBLIN}] today`} />);
+
+    const chip = await screen.findByText("@Goblin Chief");
+    expect(chip).toBeInTheDocument();
+    expect(chip).toHaveAttribute("data-mention-id", GOBLIN);
+    expect(screen.getByLabelText("Note body")).not.toHaveTextContent(GOBLIN);
+  });
+
+  it("renders an unknown id as literal token text (#269)", async () => {
+    const UNKNOWN = "99999999-9999-9999-9999-999999999999";
+    render(<Harness campaignId="camp-1" initialValue={`Met @[${UNKNOWN}] today`} />);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Note body")).toHaveTextContent(`@[${UNKNOWN}]`),
+    );
+  });
+
+  it("removes a chip with Backspace and serializes the body without it (#269)", async () => {
+    render(<Harness campaignId="camp-1" initialValue={`Hi @[${GOBLIN}]`} />);
+
+    const editor = await screen.findByLabelText("Note body");
+    const chip = await screen.findByText("@Goblin Chief");
+    // Place the caret immediately after the chip, then Backspace deletes it atomically.
+    editor.focus();
+    const range = document.createRange();
+    range.setStartAfter(chip);
+    range.collapse(true);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+    fireEvent.keyDown(editor, { key: "Backspace" });
+
+    await waitFor(() => expect(screen.getByTestId("value")).not.toHaveTextContent(GOBLIN));
+    expect(screen.getByTestId("value")).toHaveTextContent("Hi");
   });
 
   it("has no axe violations", async () => {

@@ -129,3 +129,165 @@ export function parseTrigger(textBeforeCaret: string): MentionTrigger | null {
 
   return { active: true, query: raw, triggerStart: at };
 }
+
+// --- contenteditable DOM ⇄ @[<uuid>] string (the edit-time chip editor, #269) ---
+
+export interface MentionResolved {
+  name: string;
+  type: EntityType;
+}
+
+// Chip background/text per type — mirrors ENTITY_TYPE_TONE + Badge's TONE_CLASSES.
+const MENTION_CHIP_TONE_CLASS: Record<EntityType, string> = {
+  NPC: "bg-garnet-50 text-garnet-800",
+  LOCATION: "bg-vitality-50 text-vitality-800",
+  FACTION: "bg-arcane-50 text-arcane-800",
+  ITEM: "bg-gold-50 text-gold-800",
+  PC: "bg-garnet-50 text-garnet-800",
+  OTHER: "bg-parchment-100 text-parchment-700",
+};
+
+// An atomic, non-editable @Name chip carrying its uuid in data-mention-id.
+export function buildMentionChip(id: string, name: string, type: EntityType): HTMLElement {
+  const span = document.createElement("span");
+  span.dataset.mentionId = id;
+  span.setAttribute("contenteditable", "false");
+  span.className = `inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium align-baseline ${MENTION_CHIP_TONE_CLASS[type]}`;
+  span.textContent = `@${name}`;
+  return span;
+}
+
+// Build editor DOM from a stored body: text → text nodes, known id → chip,
+// unknown id → literal @[<uuid>] text (matches MentionText's fallback).
+export function mentionBodyToFragment(
+  body: string,
+  resolve: (id: string) => MentionResolved | null,
+): DocumentFragment {
+  const frag = document.createDocumentFragment();
+  for (const seg of parseMentionBody(body)) {
+    if (seg.type === "text") {
+      if (seg.value) frag.appendChild(document.createTextNode(seg.value));
+      continue;
+    }
+    const ent = resolve(seg.id);
+    frag.appendChild(
+      ent ? buildMentionChip(seg.id, ent.name, ent.type) : document.createTextNode(`@[${seg.id}]`),
+    );
+  }
+  return frag;
+}
+
+// Walk editor DOM back into a @[<uuid>] body string. Chips emit their token;
+// <br> and block elements (DIV/P) emit newlines; trailing placeholder <br>s drop.
+export function serializeMentionDom(root: Node): string {
+  let out = "";
+  let started = false;
+  const walk = (node: Node) => {
+    node.childNodes.forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        out += child.textContent ?? "";
+        if (child.textContent) started = true;
+        return;
+      }
+      if (child.nodeType !== Node.ELEMENT_NODE) return;
+      const el = child as HTMLElement;
+      if (el.dataset.mentionId) {
+        out += `@[${el.dataset.mentionId}]`;
+        started = true;
+        return;
+      }
+      if (el.tagName === "BR") {
+        if (!child.nextSibling) return;
+        out += "\n";
+        return;
+      }
+      if (el.tagName === "DIV" || el.tagName === "P") {
+        if (started) out += "\n";
+        walk(el);
+        started = true;
+        return;
+      }
+      walk(el);
+    });
+  };
+  walk(root);
+  return out;
+}
+
+// Serialize only the content left of the collapsed caret (for parseTrigger).
+export function serializeMentionDomBeforeCaret(root: HTMLElement): string {
+  const sel = typeof window !== "undefined" ? window.getSelection() : null;
+  if (!sel || sel.rangeCount === 0 || !root.contains(sel.anchorNode)) {
+    return serializeMentionDom(root);
+  }
+  const caret = sel.getRangeAt(0);
+  const pre = document.createRange();
+  pre.selectNodeContents(root);
+  pre.setEnd(caret.endContainer, caret.endOffset);
+  return serializeMentionDom(pre.cloneContents());
+}
+
+// Place the caret at a body-string offset (chips count as their token length).
+export function placeCaretAtBodyOffset(root: HTMLElement, target: number): void {
+  const sel = typeof window !== "undefined" ? window.getSelection() : null;
+  if (!sel) return;
+  const range = document.createRange();
+  let remaining = target;
+  let placed = false;
+  let started = false;
+  const walk = (node: Node) => {
+    for (let i = 0; i < node.childNodes.length && !placed; i += 1) {
+      const child = node.childNodes[i];
+      if (child.nodeType === Node.TEXT_NODE) {
+        const len = child.textContent?.length ?? 0;
+        if (remaining <= len) {
+          range.setStart(child, remaining);
+          placed = true;
+          return;
+        }
+        remaining -= len;
+        started = true;
+        continue;
+      }
+      if (child.nodeType !== Node.ELEMENT_NODE) continue;
+      const el = child as HTMLElement;
+      if (el.dataset.mentionId) {
+        const len = `@[${el.dataset.mentionId}]`.length;
+        if (remaining <= 0) {
+          range.setStartBefore(el);
+          placed = true;
+          return;
+        }
+        if (remaining <= len) {
+          range.setStartAfter(el);
+          placed = true;
+          return;
+        }
+        remaining -= len;
+        started = true;
+        continue;
+      }
+      if (el.tagName === "BR") {
+        if (remaining <= 0) {
+          range.setStartBefore(el);
+          placed = true;
+          return;
+        }
+        remaining -= 1;
+        started = true;
+        continue;
+      }
+      if ((el.tagName === "DIV" || el.tagName === "P") && started) remaining -= 1;
+      walk(el);
+    }
+  };
+  walk(root);
+  if (!placed) {
+    range.selectNodeContents(root);
+    range.collapse(false);
+  } else {
+    range.collapse(true);
+  }
+  sel.removeAllRanges();
+  sel.addRange(range);
+}

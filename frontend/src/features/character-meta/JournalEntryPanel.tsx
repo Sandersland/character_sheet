@@ -69,11 +69,12 @@ export default function JournalEntryPanel({
       </div>
 
       <div>
-        <label className={labelCls} htmlFor="journal-body">
+        <label id="journal-body-label" className={labelCls} htmlFor="journal-body">
           Note
         </label>
         <MentionAutocomplete
           id="journal-body"
+          aria-labelledby="journal-body-label"
           required
           rows={4}
           campaignId={campaignId}
