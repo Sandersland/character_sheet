@@ -5,6 +5,8 @@ import { createPortal } from "react-dom";
 
 import { createJournalEntry, deleteJournalEntry, updateJournalEntry } from "@/api/client";
 import MentionAutocomplete from "@/features/journal/MentionAutocomplete";
+import MentionText from "@/features/journal/MentionText";
+import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { formatJournalTime } from "@/lib/formatJournalDate";
 import type { Character } from "@/types/character";
 
@@ -23,6 +25,7 @@ export default function CapturePalette({
   onUpdate,
 }: CapturePaletteProps) {
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const { byId } = useCampaignEntities(character.campaignId);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -175,9 +178,12 @@ export default function CapturePalette({
                   </li>
                 ) : (
                   <li key={note.id} className="flex items-start justify-between gap-3 py-2">
-                    <p className="min-w-0 flex-1 whitespace-pre-wrap text-sm text-parchment-800">
-                      {note.body}
-                    </p>
+                    <MentionText
+                      body={note.body}
+                      entities={byId}
+                      campaignId={character.campaignId}
+                      className="min-w-0 flex-1 whitespace-pre-wrap text-sm text-parchment-800"
+                    />
                     <div className="flex shrink-0 items-center gap-3">
                       <span className="whitespace-nowrap text-xs text-parchment-500">
                         {formatJournalTime(note.loggedAt)}

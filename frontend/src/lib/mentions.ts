@@ -31,6 +31,20 @@ export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
 export const ENTITY_TYPE_OPTIONS: { value: EntityType; label: string }[] =
   ENTITY_TYPES.map((value) => ({ value, label: ENTITY_TYPE_LABELS[value] }));
 
+// Badge tone per entity type — shared by the autocomplete popover and the
+// rendered mention chips so a type reads the same colour everywhere.
+export const ENTITY_TYPE_TONE: Record<
+  EntityType,
+  "garnet" | "arcane" | "gold" | "vitality" | "neutral"
+> = {
+  NPC: "garnet",
+  LOCATION: "vitality",
+  FACTION: "arcane",
+  ITEM: "gold",
+  PC: "garnet",
+  OTHER: "neutral",
+};
+
 const MENTION_TOKEN =
   /@\[([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]/gi;
 

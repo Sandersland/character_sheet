@@ -16,7 +16,7 @@ import { Link } from "react-router-dom";
 
 import { createEntity, fetchEntities } from "@/api/client";
 import Badge from "@/components/ui/Badge";
-import { ENTITY_TYPE_LABELS, matchEntities, parseTrigger } from "@/lib/mentions";
+import { ENTITY_TYPE_LABELS, ENTITY_TYPE_TONE, matchEntities, parseTrigger } from "@/lib/mentions";
 import type { CampaignEntity, EntityType } from "@/types/character";
 
 interface MentionAutocompleteProps {
@@ -31,15 +31,6 @@ interface MentionAutocompleteProps {
   "aria-label"?: string;
   onKeyDown?: (event: ReactKeyboardEvent<HTMLTextAreaElement>) => void;
 }
-
-const TYPE_TONE: Record<EntityType, "garnet" | "arcane" | "gold" | "vitality" | "neutral"> = {
-  NPC: "garnet",
-  LOCATION: "vitality",
-  FACTION: "arcane",
-  ITEM: "gold",
-  PC: "garnet",
-  OTHER: "neutral",
-};
 
 const MAX_MATCHES = 6;
 
@@ -218,7 +209,7 @@ const MentionAutocomplete = forwardRef<HTMLTextAreaElement, MentionAutocompleteP
                 onMouseEnter={() => setActiveIndex(index)}
               >
                 <span className="min-w-0 truncate">{entity.name}</span>
-                <Badge tone={TYPE_TONE[entity.type]}>{ENTITY_TYPE_LABELS[entity.type]}</Badge>
+                <Badge tone={ENTITY_TYPE_TONE[entity.type]}>{ENTITY_TYPE_LABELS[entity.type]}</Badge>
               </li>
             ))}
             {showCreate && (
