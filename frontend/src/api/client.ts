@@ -483,8 +483,16 @@ export async function applyActionTransactions(
 }
 
 // ── Campaigns (#246) ──────────────────────────────────────────────────────────
-// Plain REST: create/join/attach. The attach call returns the full updated
+// Plain REST: list/create/join/attach. The attach call returns the full updated
 // Character (same shape as every character-mutating endpoint).
+
+export async function fetchCampaigns(): Promise<Campaign[]> {
+  const response = await apiFetch(`${API_URL}/campaigns`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch campaigns (${response.status})`);
+  }
+  return response.json();
+}
 
 export async function createCampaign(name: string): Promise<Campaign> {
   const response = await apiFetch(`${API_URL}/campaigns`, {

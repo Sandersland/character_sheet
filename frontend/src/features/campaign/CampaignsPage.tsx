@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
+import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
-import CampaignCard from "@/features/campaign/CampaignCard";
-import { createCampaign, joinCampaign } from "@/api/client";
+import Spinner from "@/components/ui/Spinner";
+import { createCampaign, fetchCampaigns, joinCampaign } from "@/api/client";
+import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import type { Campaign } from "@/types/character";
 
 const inputCls =
@@ -12,19 +15,28 @@ const labelCls = "block text-xs font-semibold text-parchment-700";
 const primaryBtn =
   "rounded-control bg-garnet-700 px-4 py-2 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-40";
 
-// Campaigns hub: create a campaign or join one by code, then see each campaign's
-// invite link + roster. Created/joined campaigns are held in page state and
-// de-duped by id (the backend has no list endpoint by design).
+// Campaigns hub: lists the campaigns the caller belongs to (real list endpoint),
+// plus create/join surfaces. Each card links to the management detail page.
 export default function CampaignsPage() {
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const showSpinner = useDelayedFlag(campaigns === null);
 
-  function upsert(campaign: Campaign) {
-    setCampaigns((prev) => [campaign, ...prev.filter((c) => c.id !== campaign.id)]);
+  async function load() {
+    try {
+      setCampaigns(await fetchCampaigns());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load campaigns");
+      setCampaigns([]);
+    }
   }
+
+  useEffect(() => {
+    void load();
+  }, []);
 
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault();
@@ -32,8 +44,9 @@ export default function CampaignsPage() {
     setPending(true);
     setError(null);
     try {
-      upsert(await createCampaign(name.trim()));
+      await createCampaign(name.trim());
       setName("");
+      await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create campaign");
     } finally {
@@ -47,8 +60,9 @@ export default function CampaignsPage() {
     setPending(true);
     setError(null);
     try {
-      upsert(await joinCampaign(code.trim()));
+      await joinCampaign(code.trim());
       setCode("");
+      await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to join campaign");
     } finally {
@@ -118,15 +132,36 @@ export default function CampaignsPage() {
           </Card>
         </div>
 
-        {campaigns.length === 0 ? (
+        {campaigns === null ? (
+          showSpinner ? <Spinner /> : null
+        ) : campaigns.length === 0 ? (
           <EmptyState
             title="No campaigns yet"
             description="Create a campaign to get a shareable invite link, or join one with a code your DM sent you."
           />
         ) : (
-          <div className="flex flex-col gap-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {campaigns.map((campaign) => (
-              <CampaignCard key={campaign.id} campaign={campaign} />
+              <Link
+                key={campaign.id}
+                to={`/campaigns/${campaign.id}`}
+                className="rounded-card border border-parchment-200 bg-parchment-50 p-4 shadow-card transition-colors hover:border-garnet-400"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-display text-lg font-semibold text-parchment-900">
+                    {campaign.name}
+                  </span>
+                  {campaign.role && (
+                    <Badge tone={campaign.role === "OWNER" ? "garnet" : "neutral"}>
+                      {campaign.role === "OWNER" ? "Owner" : "Player"}
+                    </Badge>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-parchment-600">
+                  {campaign.members.length}{" "}
+                  {campaign.members.length === 1 ? "member" : "members"}
+                </p>
+              </Link>
             ))}
           </div>
         )}

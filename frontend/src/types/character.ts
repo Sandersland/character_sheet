@@ -812,6 +812,8 @@ export interface Campaign {
   members: CampaignMember[];
   /** Present on GET /api/campaigns/:id — each member character (id, name, ownerId). */
   characters?: { id: string; name: string; ownerId: string }[];
+  /** The caller's role in this campaign — surfaced by the list + detail reads. */
+  role?: CampaignRole;
 }
 
 export interface CharacterSummary {

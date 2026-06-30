@@ -57,11 +57,30 @@ campaignsRouter.post("/campaigns", async (req, res) => {
   res.status(201).json(campaign);
 });
 
+// ── GET /api/campaigns ───────────────────────────────────────────────────────
+// Every campaign the caller is a member of, with their own role surfaced.
+
+campaignsRouter.get("/campaigns", async (req, res) => {
+  const userId = req.user!.id;
+  const campaigns = await prisma.campaign.findMany({
+    where: { members: { some: { userId } } },
+    include: campaignInclude,
+    orderBy: { createdAt: "desc" },
+  });
+
+  res.json(
+    campaigns.map((campaign) => ({
+      ...campaign,
+      role: campaign.members.find((m) => m.userId === userId)?.role ?? "PLAYER",
+    })),
+  );
+});
+
 // ── GET /api/campaigns/:id ───────────────────────────────────────────────────
 // Members + each member's characters (id + name).
 
 campaignsRouter.get("/campaigns/:id", async (req, res) => {
-  await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
+  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
 
   const campaign = await prisma.campaign.findUniqueOrThrow({
     where: { id: req.params.id },
@@ -75,7 +94,7 @@ campaignsRouter.get("/campaigns/:id", async (req, res) => {
     },
   });
 
-  res.json(campaign);
+  res.json({ ...campaign, role });
 });
 
 // ── POST /api/campaigns/join ─────────────────────────────────────────────────
@@ -129,6 +148,17 @@ campaignsRouter.post("/campaigns/:id/characters", async (req, res) => {
   const userId = req.user!.id;
   await assertCharacterAccess(prisma, userId, parseResult.data.characterId, "edit");
   await assertCampaignMembership(prisma, userId, req.params.id, "view");
+
+  // Guard against silently reassigning a character that's already in a different
+  // campaign. Re-attaching to the SAME campaign stays an idempotent no-op success.
+  const existing = await prisma.character.findUniqueOrThrow({
+    where: { id: parseResult.data.characterId },
+    select: { campaignId: true },
+  });
+  if (existing.campaignId && existing.campaignId !== req.params.id) {
+    res.status(409).json({ error: "Character already in a campaign" });
+    return;
+  }
 
   await prisma.character.update({
     where: { id: parseResult.data.characterId },

@@ -121,7 +121,7 @@ export default function CharacterSheetPage() {
               <span className="text-parchment-600">
                 {character.background} · {character.alignment}
               </span>
-              <CampaignIndicator character={character} onUpdate={setCharacter} />
+              <CampaignIndicator character={character} />
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">

@@ -129,6 +129,7 @@ model Campaign {
   // resolves a campaign by code.
   inviteCode String   @unique
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   members    CampaignMembership[]
   characters Character[]
@@ -147,6 +148,7 @@ model CampaignMembership {
   user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   role       CampaignRole @default(PLAYER)
   joinedAt   DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
 
   @@unique([campaignId, userId])
 }

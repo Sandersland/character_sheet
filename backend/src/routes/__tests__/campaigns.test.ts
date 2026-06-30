@@ -11,6 +11,7 @@ const OWNER_A = "owner-campaigns-a"; // creator
 const OWNER_B = "owner-campaigns-b"; // a different user
 const CHAR_A = "test-campaigns-char-a";
 const CHAR_B = "test-campaigns-char-b";
+const CHAR_C = "test-campaigns-char-c"; // owned by A, used for the reassignment guard
 
 async function makeCharacter(id: string, ownerId: string) {
   await prisma.character.deleteMany({ where: { id } });
@@ -45,10 +46,11 @@ describe("campaigns (#246)", () => {
     cookieB = await authCookie(OWNER_B);
     await makeCharacter(CHAR_A, OWNER_A);
     await makeCharacter(CHAR_B, OWNER_B);
+    await makeCharacter(CHAR_C, OWNER_A);
   });
 
   afterAll(async () => {
-    await prisma.character.deleteMany({ where: { id: { in: [CHAR_A, CHAR_B] } } });
+    await prisma.character.deleteMany({ where: { id: { in: [CHAR_A, CHAR_B, CHAR_C] } } });
     await prisma.campaign.deleteMany({ where: { ownerId: { in: [OWNER_A, OWNER_B] } } });
     await prisma.user.deleteMany({ where: { id: { in: [OWNER_A, OWNER_B] } } });
   });
@@ -138,5 +140,73 @@ describe("campaigns (#246)", () => {
       .set("Cookie", cookieA)
       .send({ characterId: CHAR_B });
     expect(res.status).toBe(403);
+  });
+
+  it("GET /api/campaigns returns only the caller's campaigns with their role", async () => {
+    const mine = await supertest(createApp())
+      .post("/api/campaigns")
+      .set("Cookie", cookieA)
+      .send({ name: "A's Campaign" });
+    const theirs = await supertest(createApp())
+      .post("/api/campaigns")
+      .set("Cookie", cookieB)
+      .send({ name: "B's Campaign" });
+
+    const res = await supertest(createApp()).get("/api/campaigns").set("Cookie", cookieA);
+    expect(res.status).toBe(200);
+    const list = res.body as { id: string; role: string }[];
+    const mineRow = list.find((c) => c.id === mine.body.id);
+    expect(mineRow?.role).toBe("OWNER");
+    expect(list.some((c) => c.id === theirs.body.id)).toBe(false);
+  });
+
+  it("keeps an OWNER as OWNER when they /join their own invite code", async () => {
+    const created = await supertest(createApp())
+      .post("/api/campaigns")
+      .set("Cookie", cookieA)
+      .send({ name: "Self Join" });
+    const { inviteCode } = created.body as { inviteCode: string };
+
+    const res = await supertest(createApp())
+      .post("/api/campaigns/join")
+      .set("Cookie", cookieA)
+      .send({ inviteCode });
+
+    expect(res.status).toBe(200);
+    const member = (res.body.members as { userId: string; role: string }[]).find(
+      (m) => m.userId === OWNER_A,
+    );
+    expect(member?.role).toBe("OWNER");
+  });
+
+  it("409s attaching a character already in a different campaign", async () => {
+    const first = await supertest(createApp())
+      .post("/api/campaigns")
+      .set("Cookie", cookieA)
+      .send({ name: "First Home" });
+    const second = await supertest(createApp())
+      .post("/api/campaigns")
+      .set("Cookie", cookieA)
+      .send({ name: "Second Home" });
+
+    const attach = await supertest(createApp())
+      .post(`/api/campaigns/${first.body.id}/characters`)
+      .set("Cookie", cookieA)
+      .send({ characterId: CHAR_C });
+    expect(attach.status).toBe(200);
+
+    // Same-campaign re-attach is an idempotent success.
+    const reSame = await supertest(createApp())
+      .post(`/api/campaigns/${first.body.id}/characters`)
+      .set("Cookie", cookieA)
+      .send({ characterId: CHAR_C });
+    expect(reSame.status).toBe(200);
+
+    // Reassigning to a different campaign is rejected.
+    const reOther = await supertest(createApp())
+      .post(`/api/campaigns/${second.body.id}/characters`)
+      .set("Cookie", cookieA)
+      .send({ characterId: CHAR_C });
+    expect(reOther.status).toBe(409);
   });
 });
