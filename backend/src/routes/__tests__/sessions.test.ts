@@ -180,6 +180,29 @@ describe("join / leave", () => {
       .send({ characterId: CHAR_OWNER });
     expect(res.status).toBe(409);
   });
+
+  it("rejects a double-leave and keeps the original leftAt", async () => {
+    const campaignId = await setupCampaign();
+    const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
+    const sessionId = start.body.session.id as string;
+
+    const first = await agent(cookieOwner)
+      .post(`${startUrl(campaignId)}/${sessionId}/leave`)
+      .send({ characterId: CHAR_OWNER });
+    expect(first.status).toBe(200);
+    const afterFirst = await prisma.sessionParticipant.findUniqueOrThrow({
+      where: { sessionId_characterId: { sessionId, characterId: CHAR_OWNER } },
+    });
+
+    const second = await agent(cookieOwner)
+      .post(`${startUrl(campaignId)}/${sessionId}/leave`)
+      .send({ characterId: CHAR_OWNER });
+    expect(second.status).toBe(409);
+    const afterSecond = await prisma.sessionParticipant.findUniqueOrThrow({
+      where: { sessionId_characterId: { sessionId, characterId: CHAR_OWNER } },
+    });
+    expect(afterSecond.leftAt?.getTime()).toBe(afterFirst.leftAt?.getTime());
+  });
 });
 
 // ── Auto-close ──────────────────────────────────────────────────────────────

@@ -272,10 +272,14 @@ export async function leaveSession(sessionId: string, characterId: string) {
 
   const participant = await prisma.sessionParticipant.findUnique({
     where: { sessionId_characterId: { sessionId, characterId } },
-    select: { id: true },
+    select: { id: true, leftAt: true },
   });
   if (!participant) {
     throw new SessionError(`Character is not a participant of session ${sessionId}`);
+  }
+  // Don't overwrite an existing leftAt — a double-leave would push the auto-close timer later.
+  if (participant.leftAt !== null) {
+    throw new SessionError(`Character has already left session ${sessionId}`);
   }
   return prisma.sessionParticipant.update({
     where: { id: participant.id },
