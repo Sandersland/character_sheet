@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
 import MentionAutocomplete from "@/features/journal/MentionAutocomplete";
+import { primeCampaignEntities } from "@/hooks/useCampaignEntities";
 import * as client from "@/api/client";
 import type { CampaignEntity } from "@/types/character";
 import { axe } from "@/test/axe";
@@ -60,6 +61,9 @@ function Harness({
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(client.fetchEntities).mockResolvedValue(ENTITIES);
+  // Seed the module cache so entities are present synchronously at mount — keeps
+  // the popover deterministic regardless of fetch timing / prior-test state.
+  primeCampaignEntities("camp-1", ENTITIES);
 });
 
 describe("MentionAutocomplete (#248)", () => {
