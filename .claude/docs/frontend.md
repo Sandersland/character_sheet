@@ -302,3 +302,14 @@ The orchestrator pattern keeps async state and API batching in one place and mak
 ## Quick-capture palette — `features/journal/CapturePalette.tsx`
 
 The fast in-session note surface, distinct from the 3-field `ENTRY` form in `features/character-meta/JournalSection.tsx` (which is unchanged). `hooks/useGlobalKeyboard.ts` registers a document-level Cmd/Ctrl+J listener (held in a ref so it binds once); both `CharacterSheetPage` and `SessionPage` use it to open the palette. The palette is a centered, top-anchored, wide overlay with a light scrim (the sheet peeks behind) — it reuses Modal's Esc/auto-focus/scroll-lock behavior but is its own overlay, not an inline-edit panel. The auto-focused composer commits a `NOTE` on Enter (Shift+Enter = newline) via `createJournalEntry({ kind: "NOTE", body, sessionId })`; the returned Character propagates through the page's `onUpdate`. Below the composer is a per-session NOTE feed with `loggedAt` shown as a time (`formatJournalTime`) and per-line edit/delete.
+
+## Entity registry & @-tagging — `features/journal/` + `features/entities/` (#248)
+
+The shared campaign wiki surface. Three pieces, all scoped to `character.campaignId`:
+
+- **`features/journal/MentionAutocomplete.tsx`** — a textarea wrapper that drives the `@…` autocomplete off the caret via `lib/mentions.parseTrigger`. It owns the textarea so it can intercept Up/Down/Enter/Esc *only while the popover is open* (Enter selects a match instead of submitting; Esc `stopPropagation`s so it closes the popover, not the palette), and falls through to the composer's own `onKeyDown` otherwise. Selecting inserts an `@[<uuid>]` token at the trigger; a "➕ Create <Type> …" row calls `createEntity` then inserts the new id. No `campaignId` → a "create or join a campaign" CTA instead of matches. Wired into `CapturePalette` (NOTE) and `JournalEntryPanel` (ENTRY body).
+- **`features/journal/MentionText.tsx`** — renders a stored body with `parseMentionBody`: text verbatim, each known `@[<uuid>]` as a Badge-styled chip linking to the entity detail page (name resolved AT RENDER, so a rename reflects instantly); unknown id → literal token text. Replaces the raw `{body}` renders in `CapturePalette` and `JournalSection`.
+- **`hooks/useCampaignEntities.ts`** — fetches + module-level-caches the campaign entity list once, exposing an id→entity map for chip resolution.
+- **`features/entities/EntityDetailPage.tsx`** (route `/campaigns/:id/entities/:entityId`) — name/type/aliases/notes with inline edit (any member) and OWNER-only delete (gated on the campaign `role` from `fetchCampaign`), plus a backlinks list (`fetchEntityBacklinks`) grouped by session.
+
+Type display/tone resolve through `lib/mentions` (`ENTITY_TYPE_LABELS` / `ENTITY_TYPE_OPTIONS` / `ENTITY_TYPE_TONE`) — never capitalize the raw enum key.

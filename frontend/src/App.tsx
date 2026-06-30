@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/features/theme/ThemeProvider";
 import CampaignDetailPage from "@/features/campaign/CampaignDetailPage";
 import CampaignsPage from "@/features/campaign/CampaignsPage";
 import JoinCampaignRoute from "@/features/campaign/JoinCampaignRoute";
+import EntityDetailPage from "@/features/entities/EntityDetailPage";
 import CharacterCreatePage from "@/pages/CharacterCreatePage";
 import CharacterListPage from "@/pages/CharacterListPage";
 import CharacterSheetPage from "@/pages/CharacterSheetPage";
@@ -37,6 +38,11 @@ export default function App() {
                 {/* Shared campaigns (#246) */}
                 <Route path="/campaigns" element={<CampaignsPage />} />
                 <Route path="/campaigns/:id" element={<CampaignDetailPage />} />
+                {/* Entity registry detail + backlinks (#248) */}
+                <Route
+                  path="/campaigns/:id/entities/:entityId"
+                  element={<EntityDetailPage />}
+                />
                 <Route path="/join/:code" element={<JoinCampaignRoute />} />
               </Routes>
             </AuthGate>

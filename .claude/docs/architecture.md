@@ -89,6 +89,7 @@ Prisma client is generated into `src/generated/prisma` (gitignored). Run `npx pr
 | `/characters/:id/session` | `SessionPage` | Live-play mode. Requires an active `Session`; auto-bounces to the sheet if none found. |
 | `/campaigns` | `CampaignsPage` (`features/campaign`) | Lists the caller's campaigns (real list endpoint) + create/join; each card links to the detail page (#246). |
 | `/campaigns/:id` | `CampaignDetailPage` (`features/campaign`) | Management hub: invite link + copy, roster, and an "Add a character" dropdown of the caller's unattached characters. |
+| `/campaigns/:id/entities/:entityId` | `EntityDetailPage` (`features/entities`) | Entity registry detail (#248): name/type/aliases/notes, inline edit (any member), delete (OWNER-only, gated on campaign role), and a backlinks list grouped by session. Mention chips link here. |
 | `/join/:code` | `JoinCampaignRoute` (`features/campaign`) | Joins by code on mount, then redirects to `/campaigns`. |
 
 **`CharacterSheetPage` layout (printed-sheet order, top to bottom):**
