@@ -21,15 +21,14 @@ export default function CampaignDetailPage() {
   useEffect(() => {
     if (!id) return;
     let active = true;
-    Promise.all([fetchCampaign(id), fetchCharacters()])
-      .then(([c, chars]) => {
-        if (!active) return;
-        setCampaign(c);
-        setCharacters(chars);
-      })
-      .catch(() => {
-        if (active) setCampaign(null);
-      });
+    // Independent fetches: only a failed campaign load means "not found". A
+    // characters-load failure leaves the campaign visible and shows its own error.
+    fetchCampaign(id)
+      .then((c) => active && setCampaign(c))
+      .catch(() => active && setCampaign(null));
+    fetchCharacters()
+      .then((chars) => active && setCharacters(chars))
+      .catch(() => active && setError("Failed to load your characters"));
     return () => {
       active = false;
     };
@@ -54,9 +53,12 @@ export default function CampaignDetailPage() {
     );
   }
 
-  // Characters the caller owns that aren't already attached to this campaign.
+  // Characters the caller owns that can join: not already in this campaign and
+  // not committed to a different one (a cross-campaign attach would 409).
   const attachedIds = new Set((campaign.characters ?? []).map((c) => c.id));
-  const addable = characters.filter((c) => !attachedIds.has(c.id));
+  const addable = characters.filter(
+    (c) => !attachedIds.has(c.id) && (!c.campaignId || c.campaignId === id),
+  );
 
   async function handleAdd() {
     if (!id || !selected) return;

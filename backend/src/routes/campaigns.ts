@@ -149,21 +149,21 @@ campaignsRouter.post("/campaigns/:id/characters", async (req, res) => {
   await assertCharacterAccess(prisma, userId, parseResult.data.characterId, "edit");
   await assertCampaignMembership(prisma, userId, req.params.id, "view");
 
-  // Guard against silently reassigning a character that's already in a different
-  // campaign. Re-attaching to the SAME campaign stays an idempotent no-op success.
-  const existing = await prisma.character.findUniqueOrThrow({
-    where: { id: parseResult.data.characterId },
-    select: { campaignId: true },
+  // Atomic conditional update guards against reassigning a character already in a
+  // different campaign without a TOCTOU race: only a null or same-campaign FK
+  // matches, so a same-campaign re-attach stays a no-op success and a
+  // different-campaign attach matches nothing → count 0 → 409.
+  const { count } = await prisma.character.updateMany({
+    where: {
+      id: parseResult.data.characterId,
+      OR: [{ campaignId: null }, { campaignId: req.params.id }],
+    },
+    data: { campaignId: req.params.id },
   });
-  if (existing.campaignId && existing.campaignId !== req.params.id) {
+  if (count === 0) {
     res.status(409).json({ error: "Character already in a campaign" });
     return;
   }
-
-  await prisma.character.update({
-    where: { id: parseResult.data.characterId },
-    data: { campaignId: req.params.id },
-  });
 
   const updated = await prisma.character.findUniqueOrThrow({
     where: { id: parseResult.data.characterId },

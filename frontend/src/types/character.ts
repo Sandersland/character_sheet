@@ -823,6 +823,8 @@ export interface CharacterSummary {
   class: string;
   level: number;
   portraitUrl?: string;
+  /** Shared-campaign link (#246), or undefined when the character isn't in one. */
+  campaignId?: string;
 }
 
 /**

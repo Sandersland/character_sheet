@@ -84,4 +84,20 @@ describe("CampaignDetailPage (#246)", () => {
     // "Owner" appears in both the header role badge and the roster.
     expect(screen.getAllByText("Owner").length).toBeGreaterThan(0);
   });
+
+  it("excludes a character already in a different campaign from the dropdown", async () => {
+    vi.mocked(client.fetchCampaign).mockResolvedValue(makeCampaign());
+    vi.mocked(client.fetchCharacters).mockResolvedValue([
+      { id: "char-1", name: "Thordak", race: "Dwarf", class: "Fighter", level: 3 },
+      { id: "char-2", name: "Elsewhere", race: "Elf", class: "Wizard", level: 2, campaignId: "other-camp" },
+    ]);
+
+    renderDetail();
+
+    await screen.findByText("The Sunless Citadel");
+    const select = screen.getByLabelText(/your characters/i);
+    const optionLabels = Array.from(select.querySelectorAll("option")).map((o) => o.textContent);
+    expect(optionLabels).toContain("Thordak");
+    expect(optionLabels).not.toContain("Elsewhere");
+  });
 });

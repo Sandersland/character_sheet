@@ -1,18 +1,20 @@
 import { useState } from "react";
 
+type CopyStatus = "idle" | "copied" | "failed";
+
 // Read-only invite URL with a copy button — shared by the campaign detail header.
 export default function CampaignInviteLink({ inviteCode }: { inviteCode: string }) {
-  const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState<CopyStatus>("idle");
   const inviteUrl = `${window.location.origin}/join/${inviteCode}`;
 
   async function copyInvite() {
     try {
       await navigator.clipboard.writeText(inviteUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setStatus("copied");
     } catch {
-      setCopied(false);
+      setStatus("failed");
     }
+    setTimeout(() => setStatus("idle"), 2000);
   }
 
   return (
@@ -33,9 +35,14 @@ export default function CampaignInviteLink({ inviteCode }: { inviteCode: string 
           onClick={copyInvite}
           className="shrink-0 rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800"
         >
-          {copied ? "Copied" : "Copy"}
+          {status === "copied" ? "Copied" : "Copy"}
         </button>
       </div>
+      {status === "failed" && (
+        <p role="status" className="text-xs font-semibold text-garnet-700">
+          Copy failed — select the link and copy manually.
+        </p>
+      )}
     </div>
   );
 }
