@@ -1,14 +1,4 @@
-/**
- * CapturePalette — the fast in-session note surface. A centered, top-anchored,
- * wide overlay with a light scrim so the sheet peeks behind. The composer is
- * auto-focused: type a line and press Enter to commit a timestamped NOTE
- * (Shift+Enter inserts a newline), Esc closes. Below the composer is a feed of
- * the session's NOTE rows with per-line edit/delete.
- *
- * This is a DISTINCT capture surface, not the 3-field ENTRY form (which stays in
- * JournalSection). It reuses Modal's Esc/auto-focus/scroll-lock behavior but is
- * not an inline-edit panel, so it lives as its own overlay.
- */
+// Fast in-session note capture: auto-focused composer (Enter saves a NOTE, Shift+Enter newlines, Esc closes) over a per-session NOTE feed with edit/delete.
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -37,6 +27,7 @@ export default function CapturePalette({
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
   // The NOTE feed: newest-first, scoped to the active session when one is given.
   const notes = character.journal
@@ -86,8 +77,8 @@ export default function CapturePalette({
   }
 
   function handleComposerKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
-    // Enter saves; Shift+Enter falls through to insert a newline.
-    if (event.key === "Enter" && !event.shiftKey) {
+    // Enter saves; Shift+Enter newlines; isComposing skips an IME-commit Enter.
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       void handleSave();
     }
@@ -101,7 +92,8 @@ export default function CapturePalette({
   }
 
   async function handleDelete(entryId: string) {
-    await run(() => deleteJournalEntry(character.id, entryId));
+    const ok = await run(() => deleteJournalEntry(character.id, entryId));
+    if (ok) setConfirmingDeleteId(null);
   }
 
   const inputCls =
@@ -188,24 +180,50 @@ export default function CapturePalette({
                       <span className="whitespace-nowrap text-xs text-parchment-500">
                         {formatJournalTime(note.loggedAt)}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingId(note.id);
-                          setEditValue(note.body);
-                        }}
-                        className="text-xs font-semibold text-garnet-700 hover:underline"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => handleDelete(note.id)}
-                        className="text-xs font-semibold text-parchment-600 hover:underline disabled:opacity-40"
-                      >
-                        Delete
-                      </button>
+                      {confirmingDeleteId === note.id ? (
+                        <>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => handleDelete(note.id)}
+                            className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
+                          >
+                            Delete?
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmingDeleteId(null)}
+                            className="text-xs font-semibold text-parchment-600 hover:underline"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setConfirmingDeleteId(null);
+                              setEditingId(note.id);
+                              setEditValue(note.body);
+                            }}
+                            className="text-xs font-semibold text-garnet-700 hover:underline"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => {
+                              setEditingId(null);
+                              setConfirmingDeleteId(note.id);
+                            }}
+                            className="text-xs font-semibold text-parchment-600 hover:underline disabled:opacity-40"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
                     </div>
                   </li>
                 ),

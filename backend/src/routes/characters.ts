@@ -64,6 +64,7 @@ export const characterInclude = {
   // Newest-first by the user-entered calendar `date`; `loggedAt desc` then
   // `createdAt desc` are stable tiebreakers so same-date NOTE rows (which share
   // a UTC-midnight date) sort by their capture time.
+  // Unfiltered today (single-owner access); campaign-visible sharing means threading a userId into serializeCharacter to call the visibleEntries helper (routes/journal.ts).
   journalEntries: { orderBy: [{ date: "desc" }, { loggedAt: "desc" }, { createdAt: "desc" }] },
 } satisfies Prisma.CharacterInclude;
 
