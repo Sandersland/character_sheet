@@ -350,14 +350,22 @@ export default function CharacterSheetPage() {
               <SpellsSection character={character} onUpdate={setCharacter} />
             </Card>
           ) : (
-            <JournalSection character={character} onUpdate={setCharacter} />
+            <JournalSection
+              character={character}
+              onUpdate={setCharacter}
+              sessionId={inActiveSession ? activeSession?.id : undefined}
+            />
           )}
         </div>
 
         {/* ── Campaign Journal (spellcasters only — the 2-col row above
             uses the right column for Spells, so Journal gets its own row) */}
         {character.spellcasting && (
-          <JournalSection character={character} onUpdate={setCharacter} />
+          <JournalSection
+            character={character}
+            onUpdate={setCharacter}
+            sessionId={inActiveSession ? activeSession?.id : undefined}
+          />
         )}
       </main>
       <RollResultToast />
