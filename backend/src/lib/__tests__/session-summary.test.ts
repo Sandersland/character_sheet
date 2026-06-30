@@ -352,7 +352,7 @@ describe("computeCampaignRecap", () => {
     expect(recap.participantCount).toBe(2);
     expect(recap.xpGained).toBe(500);
     expect(recap.spellsCast).toBe(3);
-    expect(recap.combatRounds).toBe(5);
+    expect(recap.combatRounds).toBe(3);
     expect(recap.attackRolls).toBe(5);
     expect(recap.damageRolls).toBe(4);
     expect(recap.levelsGained).toBe(1);

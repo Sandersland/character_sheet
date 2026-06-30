@@ -144,6 +144,8 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
   const [logRefresh, setLogRefresh] = useState(0);
   const [captureOpen, setCaptureOpen] = useState(false);
   const [leavePending, setLeavePending] = useState(false);
+  // Error from the most recent leave-session attempt (shown by the Leave button).
+  const [leaveError, setLeaveError] = useState<string | null>(null);
 
   // Cmd/Ctrl+J opens the quick-capture palette during live play.
   useGlobalKeyboard(() => setCaptureOpen(true));
@@ -194,10 +196,15 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
   // the sheet. The session stays open for the rest of the party.
   async function handleLeave() {
     setLeavePending(true);
+    setLeaveError(null);
     try {
       await leaveSession(session.campaignId, session.id, character.id);
       clearTurnState(session.id);
       navigate(`/characters/${character.id}`);
+    } catch (err) {
+      setLeaveError(
+        err instanceof Error ? err.message : "Failed to leave the session. Please try again."
+      );
     } finally {
       setLeavePending(false);
     }
@@ -251,6 +258,9 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
                 End Session
               </button>
             </div>
+            {leaveError && (
+              <p className="text-right text-xs text-garnet-700">{leaveError}</p>
+            )}
           </div>
         </div>
       </div>

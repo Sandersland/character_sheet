@@ -307,8 +307,9 @@ export function computeSessionSummary(
 
 /**
  * Aggregates per-participant summaries into a campaign recap (#245). Sums XP,
- * spells, combat rounds, and rolls; unions acquired items by name; reports the
- * participant count and total present-time. Pure: deterministic given inputs.
+ * spells, and rolls; takes the max combat rounds (how long combat lasted, not a
+ * per-participant total); unions acquired items by name; reports the participant
+ * count and total present-time. Pure: deterministic given inputs.
  */
 export function computeCampaignRecap(participants: ParticipantSummary[]): CampaignRecap {
   const itemNet = new Map<string, number>();
@@ -326,7 +327,7 @@ export function computeCampaignRecap(participants: ParticipantSummary[]): Campai
     xpGained += p.xpGained;
     levelsGained += p.levelsGained;
     spellsCast += p.spellsCast;
-    combatRounds += p.combatRounds;
+    combatRounds = Math.max(combatRounds, p.combatRounds);
     attackRolls += p.attackRolls;
     damageRolls += p.damageRolls;
     totalPresentMs += p.presentMs;

@@ -161,12 +161,24 @@ describe("join / leave", () => {
 
     await agent(cookieOwner).post(`${startUrl(campaignId)}/${sessionId}/leave`).send({ characterId: CHAR_OWNER });
     const rejoin = await agent(cookieOwner).post(`${startUrl(campaignId)}/${sessionId}/join`).send({ characterId: CHAR_OWNER });
-    expect(rejoin.status).toBe(201);
+    expect(rejoin.status).toBe(200);
 
     const participant = await prisma.sessionParticipant.findUniqueOrThrow({
       where: { sessionId_characterId: { sessionId, characterId: CHAR_OWNER } },
     });
     expect(participant.leftAt).toBeNull();
+  });
+
+  it("rejects a leave on an already-ended session", async () => {
+    const campaignId = await setupCampaign();
+    const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
+    const sessionId = start.body.session.id as string;
+    await agent(cookieOwner).post(`${startUrl(campaignId)}/${sessionId}/end`).send({});
+
+    const res = await agent(cookieOwner)
+      .post(`${startUrl(campaignId)}/${sessionId}/leave`)
+      .send({ characterId: CHAR_OWNER });
+    expect(res.status).toBe(409);
   });
 });
 
@@ -437,6 +449,6 @@ describe("retroactive XP to a past session", () => {
       .post(`/api/characters/${CHAR_PLAYER}/experience`)
       .send({ operations: [{ type: "award", amount: 100 }], sessionId });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/session not found/i);
+    expect(res.body.error).toMatch(/not a participant/i);
   });
 });

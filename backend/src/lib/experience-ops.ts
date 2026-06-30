@@ -155,7 +155,7 @@ export async function applyExperienceOperations(
     });
     if (!participant) {
       throw new InvalidExperienceOperationError(
-        `Session not found: ${explicitSessionId}`,
+        `Character ${characterId} is not a participant of session ${explicitSessionId}`,
       );
     }
     sessionId = explicitSessionId;

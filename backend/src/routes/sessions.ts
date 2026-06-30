@@ -94,8 +94,13 @@ sessionsRouter.post("/campaigns/:campaignId/sessions/:sessionId/join", async (re
   try {
     await assertSessionInCampaign(req.params.sessionId, req.params.campaignId);
     await assertCharacterInCampaign(characterId, req.params.campaignId);
+    // 201 only on first join; a rejoin updates an existing row, so 200.
+    const existing = await prisma.sessionParticipant.findUnique({
+      where: { sessionId_characterId: { sessionId: req.params.sessionId, characterId } },
+      select: { id: true },
+    });
     const participant = await joinSession(req.params.sessionId, characterId);
-    res.status(201).json({ participant });
+    res.status(existing ? 200 : 201).json({ participant });
   } catch (err) {
     if (err instanceof SessionError) {
       res.status(sessionErrorStatus(err.message)).json({ error: err.message });

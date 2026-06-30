@@ -205,6 +205,18 @@ export async function startCampaignSession(
 
   const batchId = randomUUID();
   return prisma.$transaction(async (tx) => {
+    // Authoritative guard: re-check inside the tx so two concurrent starts can't
+    // both pass the pre-check above and create rival sessions.
+    const conflict = await tx.session.findFirst({
+      where: { campaignId, status: "active" },
+      select: { id: true },
+    });
+    if (conflict) {
+      throw new SessionError(
+        `A session is already active (id: ${conflict.id}). End it before starting a new one.`,
+      );
+    }
+
     const session = await tx.session.create({
       data: {
         campaignId,
@@ -251,6 +263,13 @@ export async function joinSession(sessionId: string, characterId: string) {
  * the party; it auto-closes once everyone has left for the grace period.
  */
 export async function leaveSession(sessionId: string, characterId: string) {
+  const session = await prisma.session.findUnique({
+    where: { id: sessionId },
+    select: { status: true },
+  });
+  if (!session) throw new SessionError(`Session not found: ${sessionId}`);
+  if (session.status !== "active") throw new SessionError(`Session ${sessionId} is not active`);
+
   const participant = await prisma.sessionParticipant.findUnique({
     where: { sessionId_characterId: { sessionId, characterId } },
     select: { id: true },
