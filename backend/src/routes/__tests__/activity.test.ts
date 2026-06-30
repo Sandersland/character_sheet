@@ -42,6 +42,8 @@
  *       recreates with itemId:null (no FK error)
  */
 
+import { randomUUID } from "node:crypto";
+
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -50,6 +52,15 @@ import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
 import { authCookie } from "../../test-support/auth.js";
+
+// Sessions are campaign-level (#245): create a throwaway campaign to host a
+// Session row when a test only needs a valid sessionId to tag events with.
+async function makeCampaign(ownerId: string): Promise<string> {
+  const campaign = await prisma.campaign.create({
+    data: { name: "Activity Test Campaign", ownerId, inviteCode: randomUUID() },
+  });
+  return campaign.id;
+}
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
@@ -216,8 +227,9 @@ describe("POST /:id/events/:batchId/revert — Wizard scenarios", () => {
 
   it("409s when the batch belongs to an ENDED session (frozen history)", async () => {
     // Create an ended session and a damage event tagged with that sessionId.
+    const campaignId = await makeCampaign(OWNER_ID);
     const session = await prisma.session.create({
-      data: { characterId: WIZARD_ID, status: "ended", endedAt: new Date() },
+      data: { campaignId, status: "ended", endedAt: new Date() },
     });
     const batchId = "ended-session-batch";
     await prisma.characterEvent.create({
@@ -1247,11 +1259,12 @@ describe("GET /:id/activity — ?type= and ?sessionId= filters", () => {
       },
     });
 
+    const campaignId = await makeCampaign(OWNER_ID);
     const sA = await prisma.session.create({
-      data: { characterId: TYPEFILTER_ID, status: "ended", title: "Session A" },
+      data: { campaignId, status: "ended", title: "Session A" },
     });
     const sB = await prisma.session.create({
-      data: { characterId: TYPEFILTER_ID, status: "ended", title: "Session B" },
+      data: { campaignId, status: "ended", title: "Session B" },
     });
     sessionA = sA.id;
     sessionB = sB.id;

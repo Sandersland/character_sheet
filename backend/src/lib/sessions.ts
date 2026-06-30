@@ -51,6 +51,18 @@ export async function getActiveSession(characterId: string) {
   return activeSessionForCampaign(character.campaignId);
 }
 
+/**
+ * Loads a session and runs maybeAutoClose so a stale one settles before a read.
+ * No-op when the session is unknown or already ended.
+ */
+export async function autoCloseIfStale(sessionId: string): Promise<void> {
+  const session = await prisma.session.findUnique({
+    where: { id: sessionId },
+    include: sessionWithParticipants,
+  });
+  if (session) await maybeAutoClose(session);
+}
+
 async function activeSessionForCampaign(campaignId: string) {
   const session = await prisma.session.findFirst({
     where: { campaignId, status: "active" },
