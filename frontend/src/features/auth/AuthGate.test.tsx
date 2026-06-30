@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 
 vi.mock("@/api/client", () => ({
   fetchMe: vi.fn(),
@@ -19,14 +20,16 @@ const USER = { id: "u1", email: "ada@x.dev", name: "Ada", imageUrl: null };
 
 function renderGate() {
   return render(
-    <ThemeProvider>
-      <AuthProvider>
-        <AuthGate>
-          <AppHeader />
-          <div>secret content</div>
-        </AuthGate>
-      </AuthProvider>
-    </ThemeProvider>,
+    <MemoryRouter>
+      <ThemeProvider>
+        <AuthProvider>
+          <AuthGate>
+            <AppHeader />
+            <div>secret content</div>
+          </AuthGate>
+        </AuthProvider>
+      </ThemeProvider>
+    </MemoryRouter>,
   );
 }
 
