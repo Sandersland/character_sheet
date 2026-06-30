@@ -37,6 +37,8 @@ import { clearTurnState } from "@/features/session/turnStatePersistence";
 import SessionLog from "@/features/session/SessionLog";
 import SessionSummaryModal from "@/features/session/SessionSummaryModal";
 import EndSessionPrompt from "@/features/session/EndSessionPrompt";
+import CapturePalette from "@/features/journal/CapturePalette";
+import { useGlobalKeyboard } from "@/hooks/useGlobalKeyboard";
 import { applyExperienceOperations, endSession, fetchActiveSession } from "@/api/client";
 import type { Character, Session, ReferenceData } from "@/types/character";
 
@@ -140,6 +142,10 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
   // logRefresh bumps whenever character state or a combat log event changes,
   // so the Log tab refreshes on both.
   const [logRefresh, setLogRefresh] = useState(0);
+  const [captureOpen, setCaptureOpen] = useState(false);
+
+  // Cmd/Ctrl+J opens the quick-capture palette during live play.
+  useGlobalKeyboard(() => setCaptureOpen(true));
 
   // Turn/combat state — persisted to localStorage keyed by session.id.
   const turnState = useTurnState(character, session.id);
@@ -343,6 +349,15 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
           session={endedSession}
           onClose={() => navigate(`/characters/${character.id}`)}
           onCharacterUpdate={handleCharacterUpdate}
+        />
+      )}
+
+      {captureOpen && (
+        <CapturePalette
+          character={character}
+          sessionId={session.id}
+          onClose={() => setCaptureOpen(false)}
+          onUpdate={handleCharacterUpdate}
         />
       )}
     </div>

@@ -1,6 +1,7 @@
 import type {
   ActionOperation,
   AdvancementOperation,
+  Campaign,
   CatalogAction,
   CatalogFeat,
   CatalogManeuver,
@@ -14,6 +15,7 @@ import type {
   CreateCharacterInput,
   ExperienceOperation,
   HitPointOperation,
+  JournalEntryKind,
   InventoryOperation,
   Item,
   ReferenceData,
@@ -230,9 +232,10 @@ export async function deleteCharacter(id: string): Promise<void> {
 // effect, so they aren't routed through the audit log. Each call returns the
 // full updated Character so the caller can swap its state in one assignment.
 
+// kind defaults to ENTRY; NOTE omits title/date (server fills both).
 export async function createJournalEntry(
   characterId: string,
-  entry: { title: string; date: string; body: string; sessionId?: string }
+  entry: { kind?: JournalEntryKind; title?: string; date?: string; body: string; sessionId?: string }
 ): Promise<Character> {
   const response = await apiFetch(`${API_URL}/characters/${characterId}/journal`, {
     method: "POST",
@@ -477,6 +480,68 @@ export async function applyActionTransactions(
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     throw new Error(body?.error ?? `Failed to apply action operations (${response.status})`);
+  }
+  return response.json();
+}
+
+// ── Campaigns (#246) ──────────────────────────────────────────────────────────
+// Plain REST: list/create/join/attach. The attach call returns the full updated
+// Character (same shape as every character-mutating endpoint).
+
+export async function fetchCampaigns(): Promise<Campaign[]> {
+  const response = await apiFetch(`${API_URL}/campaigns`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch campaigns (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function createCampaign(name: string): Promise<Campaign> {
+  const response = await apiFetch(`${API_URL}/campaigns`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to create campaign (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function fetchCampaign(id: string): Promise<Campaign> {
+  const response = await apiFetch(`${API_URL}/campaigns/${id}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch campaign ${id} (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function joinCampaign(inviteCode: string): Promise<Campaign> {
+  const response = await apiFetch(`${API_URL}/campaigns/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ inviteCode }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to join campaign (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function addCharacterToCampaign(
+  characterId: string,
+  campaignId: string,
+): Promise<Character> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/characters`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ characterId }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to add character to campaign (${response.status})`);
   }
   return response.json();
 }

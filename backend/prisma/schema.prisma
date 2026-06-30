@@ -40,6 +40,11 @@ model Character {
   ownerId     String
   owner       User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
+  // Optional shared-campaign link (#246). SetNull so deleting a campaign leaves
+  // the character intact (just unassigned).
+  campaignId  String?
+  campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
   experiencePoints Int @default(0)
 
   armorClass      Int
@@ -81,6 +86,7 @@ model Character {
   updatedAt DateTime @updatedAt
 
   @@index([ownerId])
+  @@index([campaignId])
 }
 
 // --- Identity & ownership ---------------------------------------------------
@@ -101,8 +107,50 @@ model User {
   sessions   AuthSession[]
   characters Character[]
 
+  // Shared campaigns (#246): ones this user owns + memberships in any campaign.
+  ownedCampaigns      Campaign[]           @relation("CampaignOwner")
+  campaignMemberships CampaignMembership[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// --- Shared campaigns (#246) ------------------------------------------------
+// A Campaign is a shared backbone several characters (and their owners) join.
+// Plain-REST domain (NOT the transaction/audit pattern): membership is identity
+// state, access is gated by CampaignMembership via assertCampaignMembership.
+
+model Campaign {
+  id         String   @id @default(uuid())
+  name       String
+  ownerId    String
+  owner      User     @relation("CampaignOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  // Opaque random join code (same crypto as session tokens). Unique so /join
+  // resolves a campaign by code.
+  inviteCode String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  members    CampaignMembership[]
+  characters Character[]
+}
+
+enum CampaignRole {
+  OWNER
+  PLAYER
+}
+
+model CampaignMembership {
+  id         String       @id @default(uuid())
+  campaignId String
+  campaign   Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       CampaignRole @default(PLAYER)
+  joinedAt   DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([campaignId, userId])
 }
 
 // One row per linked sign-in method (OAuth provider account or, later, a
@@ -791,23 +839,43 @@ model Session {
   @@index([characterId, status])
 }
 
+// kind distinguishes the two capture surfaces sharing this table: full ENTRY
+// rows (3-field title/date/body form) vs. fast NOTE rows (one-line in-session
+// capture, no title). EntryVisibility ships private-by-default; the CAMPAIGN
+// share toggle is deferred but needs no schema change to enable later.
+enum JournalEntryKind {
+  NOTE
+  ENTRY
+}
+
+enum EntryVisibility {
+  PRIVATE
+  CAMPAIGN
+}
+
 // Freeform campaign journal — purely user-authored notes with no mechanical
 // effect, so (unlike inventory/HP/XP/spellcasting) it is NOT routed through
 // the audit log / transaction pattern: plain REST CRUD writes directly here.
 // Optionally tagged with the session it was written during (SetNull so a
 // deleted session leaves the note intact). `date` is the in-world / real date
 // the player assigns to the entry; `createdAt` is the system write time used
-// for stable newest-first ordering.
+// for stable newest-first ordering. `loggedAt` is the capture timestamp shown
+// on NOTE rows. `authorUserId` denormalizes the writing user so visibleEntries
+// can filter private-by-default without a join.
 model JournalEntry {
-  id          String    @id @default(uuid())
-  characterId String
-  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  sessionId   String?
-  session     Session?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
-  title       String
-  date        DateTime
-  body        String
-  createdAt   DateTime  @default(now())
+  id           String           @id @default(uuid())
+  characterId  String
+  character    Character        @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  sessionId    String?
+  session      Session?         @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  kind         JournalEntryKind @default(ENTRY)
+  title        String?
+  date         DateTime
+  loggedAt     DateTime         @default(now())
+  body         String
+  visibility   EntryVisibility  @default(PRIVATE)
+  authorUserId String
+  createdAt    DateTime         @default(now())
 
   @@index([characterId, createdAt])
 }

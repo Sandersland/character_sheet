@@ -90,9 +90,12 @@ describe("SessionSummaryModal", () => {
       journalEntries: [
         {
           id: "j1",
+          kind: "ENTRY",
           title: "We found the dragon",
           date: "2026-06-22T00:00:00.000Z",
+          loggedAt: "2026-06-22T00:00:00.000Z",
           body: "It was huge and very angry.",
+          visibility: "PRIVATE",
         },
       ],
     };

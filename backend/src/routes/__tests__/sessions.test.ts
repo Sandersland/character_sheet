@@ -543,6 +543,7 @@ describe("session journals returned with the ended session", () => {
         title: "The Sunken Library",
         date: new Date("2026-06-22T00:00:00.000Z"),
         body: "We found a hidden door.",
+        authorUserId: OWNER_ID,
       },
     });
     await prisma.journalEntry.create({
@@ -552,6 +553,7 @@ describe("session journals returned with the ended session", () => {
         title: "Unrelated note",
         date: new Date("2026-06-21T00:00:00.000Z"),
         body: "Not part of any session.",
+        authorUserId: OWNER_ID,
       },
     });
 

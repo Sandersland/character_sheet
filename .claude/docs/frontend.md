@@ -12,6 +12,9 @@ frontend/src/
 │   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable, ProficienciesCard
 │   ├── advancement/     # AdvancementSection, AdvancementPanel
 │   ├── auth/            # AuthProvider (useAuth), AuthGate, AppHeader, AccountMenu
+│   ├── campaign/        # CampaignsPage (list+create+join), CampaignDetailPage (mgmt hub:
+│   │                    #   invite link, roster, add-character dropdown), CampaignInviteLink,
+│   │                    #   CampaignIndicator (sheet badge/link), JoinCampaignRoute (#246)
 │   ├── character-meta/  # CharacterCard, VitalsStrip, JournalSection, JournalEntryPanel,
 │   │                    #   ActivityModal, DeleteCharacterModal, BackendStatus
 │   ├── class/           # ClassFeaturesSection, FightingStylePanel, AddManeuverPanel,
@@ -24,6 +27,7 @@ frontend/src/
 │   ├── hitpoints/       # HitPointTracker (inline Card; hosts LevelUpModal + ConcentrationSaveModal)
 │   ├── inventory/       # InventoryList, InventoryRow, AddItemPanel,
 │   │                    #   StartingEquipmentEditor
+│   ├── journal/         # CapturePalette (Cmd/Ctrl+J quick-capture NOTE overlay)
 │   ├── session/         # TurnHub, TurnTracker, useTurnState, SessionLog, SessionsModal,
 │   │                    #   SessionSummaryModal, Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
 │   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie
@@ -31,7 +35,7 @@ frontend/src/
 │   └── theme/           # ThemeProvider (useTheme) — applies data-theme app-wide
 ├── hooks/               # reusable React hooks used by pages or multiple clusters
 │   │                    #   (useCharacter, useCharacterList, useCharacterDraft, useReferenceData,
-│   │                    #    useThemePreference)
+│   │                    #    useThemePreference, useGlobalKeyboard)
 ├── lib/                 # pure TS logic — NO React/JSX (dice, abilities, timeline, startingEquipment, …)
 ├── pages/               # route-level views (CharacterListPage, CharacterSheetPage,
 │   │                    #   CharacterCreatePage, SessionPage, LoginPage)
@@ -293,3 +297,7 @@ Examples:
 - `features/spells/`: `SpellsSection` (orchestrator) / `SpellRow` / `AddSpellPanel`
 
 The orchestrator pattern keeps async state and API batching in one place and makes rows easy to unit-test in isolation — pass mock callbacks, assert they fire with the right args. See `testing.md` for component test patterns.
+
+## Quick-capture palette — `features/journal/CapturePalette.tsx`
+
+The fast in-session note surface, distinct from the 3-field `ENTRY` form in `features/character-meta/JournalSection.tsx` (which is unchanged). `hooks/useGlobalKeyboard.ts` registers a document-level Cmd/Ctrl+J listener (held in a ref so it binds once); both `CharacterSheetPage` and `SessionPage` use it to open the palette. The palette is a centered, top-anchored, wide overlay with a light scrim (the sheet peeks behind) — it reuses Modal's Esc/auto-focus/scroll-lock behavior but is its own overlay, not an inline-edit panel. The auto-focused composer commits a `NOTE` on Enter (Shift+Enter = newline) via `createJournalEntry({ kind: "NOTE", body, sessionId })`; the returned Character propagates through the page's `onUpdate`. Below the composer is a per-session NOTE feed with `loggedAt` shown as a time (`formatJournalTime`) and per-line edit/delete.

@@ -61,9 +61,11 @@ export const characterInclude = {
     orderBy: { position: "asc" },
     include: { weaponDetail: true, armorDetail: true, consumableDetail: true },
   },
-  // Newest-first by the user-entered calendar `date`; `createdAt desc` is a
-  // stable tiebreaker so same-date entries stay newest-written-first.
-  journalEntries: { orderBy: [{ date: "desc" }, { createdAt: "desc" }] },
+  // Newest-first by the user-entered calendar `date`; `loggedAt desc` then
+  // `createdAt desc` are stable tiebreakers so same-date NOTE rows (which share
+  // a UTC-midnight date) sort by their capture time.
+  // Unfiltered today (single-owner access); campaign-visible sharing means threading a userId into serializeCharacter to call the visibleEntries helper (routes/journal.ts).
+  journalEntries: { orderBy: [{ date: "desc" }, { loggedAt: "desc" }, { createdAt: "desc" }] },
 } satisfies Prisma.CharacterInclude;
 
 type CharacterWithRelations = Prisma.CharacterGetPayload<{ include: typeof characterInclude }>;
@@ -72,6 +74,7 @@ function serializeCharacterSummary(row: {
   id: string;
   name: string;
   ownerId: string;
+  campaignId: string | null;
   portraitUrl: string | null;
   experiencePoints: number;
   raceSelection: { name: string } | null;
@@ -84,6 +87,9 @@ function serializeCharacterSummary(row: {
     // schema.prisma). Access is enforced per-owner via assertCharacterAccess;
     // emitted here so the frontend can identify/display the owner.
     ownerId: row.ownerId,
+    // Shared-campaign link (#246), or undefined — lets the campaign add-picker
+    // exclude characters already in another campaign.
+    campaignId: row.campaignId ?? undefined,
     // raceSelection/classEntries are optional in Prisma's types only
     // because they're the non-FK side of the relation — every character
     // created via POST /characters has exactly one of each.
@@ -505,6 +511,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
     background: row.backgroundSelection?.name ?? "",
     alignment: row.alignment,
     portraitUrl: row.portraitUrl ?? undefined,
+    // Shared-campaign link (#246), or undefined when unassigned.
+    campaignId: row.campaignId ?? undefined,
 
     armorClass:
       row.armorClass + featBonuses.armorClass + deriveFightingStyleBonuses(fightingStyle).armorClass,
@@ -609,9 +617,12 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // provenance.
     journal: row.journalEntries.map((e) => ({
       id: e.id,
-      title: e.title,
+      kind: e.kind,
+      title: e.title ?? undefined,
       date: e.date.toISOString(),
+      loggedAt: e.loggedAt.toISOString(),
       body: e.body,
+      visibility: e.visibility,
       sessionId: e.sessionId ?? undefined,
     })),
 
@@ -636,6 +647,7 @@ charactersRouter.get("/characters", async (req, res) => {
       id: true,
       name: true,
       ownerId: true,
+      campaignId: true,
       portraitUrl: true,
       experiencePoints: true,
       raceSelection: { select: { name: true } },

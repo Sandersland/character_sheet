@@ -7,6 +7,7 @@ import { RollProvider } from "@/features/dice/RollContext";
 import ActivityModal from "@/features/character-meta/ActivityModal";
 import AdvancementSection from "@/features/advancement/AdvancementSection";
 import BackendStatus from "@/features/character-meta/BackendStatus";
+import CampaignIndicator from "@/features/campaign/CampaignIndicator";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import Spinner from "@/components/ui/Spinner";
@@ -16,6 +17,7 @@ import ExperienceTracker from "@/features/experience/ExperienceTracker";
 import HitPointTracker from "@/features/hitpoints/HitPointTracker";
 import InventoryList from "@/features/inventory/InventoryList";
 import JournalSection from "@/features/character-meta/JournalSection";
+import CapturePalette from "@/features/journal/CapturePalette";
 import SessionsModal from "@/features/session/SessionsModal";
 import SkillsTable from "@/features/abilities/SkillsTable";
 import SpellsSection from "@/features/spells/SpellsSection";
@@ -24,6 +26,7 @@ import VitalsStrip from "@/features/character-meta/VitalsStrip";
 import ConditionsStrip from "@/features/conditions/ConditionsStrip";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
+import { useGlobalKeyboard } from "@/hooks/useGlobalKeyboard";
 import { useReferenceData } from "@/hooks/useReferenceData";
 import { abilityAbbr, orderedAbilityEntries } from "@/lib/abilities";
 import { fetchActiveSession, startSession } from "@/api/client";
@@ -39,7 +42,11 @@ export default function CharacterSheetPage() {
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [activeSession, setActiveSession] = useState<Session | null | undefined>(undefined);
   const [sessionPending, setSessionPending] = useState(false);
+  const [captureOpen, setCaptureOpen] = useState(false);
   const showSpinner = useDelayedFlag(character === undefined && !error);
+
+  // Cmd/Ctrl+J opens the quick-capture palette from anywhere on the sheet.
+  useGlobalKeyboard(() => setCaptureOpen(true));
 
   // Resolve active session on mount so the header button can say
   // "Start Session" or "Resume Session" correctly.
@@ -120,6 +127,7 @@ export default function CharacterSheetPage() {
               <span className="text-parchment-600">
                 {character.background} · {character.alignment}
               </span>
+              <CampaignIndicator character={character} />
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -194,6 +202,15 @@ export default function CharacterSheetPage() {
         <SessionsModal
           characterId={character.id}
           onClose={() => setSessionsOpen(false)}
+        />
+      )}
+
+      {captureOpen && (
+        <CapturePalette
+          character={character}
+          sessionId={activeSession?.id}
+          onClose={() => setCaptureOpen(false)}
+          onUpdate={setCharacter}
         />
       )}
 

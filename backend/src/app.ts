@@ -16,6 +16,7 @@ import { actionsRouter } from "./routes/actions.js";
 import { activityRouter } from "./routes/activity.js";
 import { authRouter } from "./routes/auth.js";
 import { advancementRouter } from "./routes/advancement.js";
+import { campaignsRouter } from "./routes/campaigns.js";
 import { classRouter } from "./routes/class.js";
 import { charactersRouter } from "./routes/characters.js";
 import { conditionsRouter } from "./routes/conditions.js";
@@ -96,6 +97,7 @@ export function createApp() {
   app.use("/api", sessionsRouter);
   app.use("/api", actionsRouter);
   app.use("/api", journalRouter);
+  app.use("/api", campaignsRouter);
 
   // Optional single-origin mode: when SERVE_STATIC_DIR points at a built SPA,
   // serve it from this same server so the frontend and API share one origin

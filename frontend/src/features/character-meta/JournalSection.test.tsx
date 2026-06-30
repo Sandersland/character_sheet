@@ -16,9 +16,12 @@ vi.mock("@/api/client", () => ({
 
 const ENTRY: JournalEntry = {
   id: "entry-1",
+  kind: "ENTRY",
   title: "The Sunken Library",
   date: "2026-06-22T00:00:00.000Z",
+  loggedAt: "2026-06-22T00:00:00.000Z",
   body: "Found three waterlogged tomes.",
+  visibility: "PRIVATE",
 };
 
 // Minimal Character stub — JournalSection only reads `id` and `journal`.
