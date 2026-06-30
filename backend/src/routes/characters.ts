@@ -505,6 +505,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
     background: row.backgroundSelection?.name ?? "",
     alignment: row.alignment,
     portraitUrl: row.portraitUrl ?? undefined,
+    // Shared-campaign link (#246), or undefined when unassigned.
+    campaignId: row.campaignId ?? undefined,
 
     armorClass:
       row.armorClass + featBonuses.armorClass + deriveFightingStyleBonuses(fightingStyle).armorClass,

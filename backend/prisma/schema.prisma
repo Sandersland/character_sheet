@@ -40,6 +40,11 @@ model Character {
   ownerId     String
   owner       User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
+  // Optional shared-campaign link (#246). SetNull so deleting a campaign leaves
+  // the character intact (just unassigned).
+  campaignId  String?
+  campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
   experiencePoints Int @default(0)
 
   armorClass      Int
@@ -81,6 +86,7 @@ model Character {
   updatedAt DateTime @updatedAt
 
   @@index([ownerId])
+  @@index([campaignId])
 }
 
 // --- Identity & ownership ---------------------------------------------------
@@ -101,8 +107,48 @@ model User {
   sessions   AuthSession[]
   characters Character[]
 
+  // Shared campaigns (#246): ones this user owns + memberships in any campaign.
+  ownedCampaigns      Campaign[]           @relation("CampaignOwner")
+  campaignMemberships CampaignMembership[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// --- Shared campaigns (#246) ------------------------------------------------
+// A Campaign is a shared backbone several characters (and their owners) join.
+// Plain-REST domain (NOT the transaction/audit pattern): membership is identity
+// state, access is gated by CampaignMembership via assertCampaignMembership.
+
+model Campaign {
+  id         String   @id @default(uuid())
+  name       String
+  ownerId    String
+  owner      User     @relation("CampaignOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  // Opaque random join code (same crypto as session tokens). Unique so /join
+  // resolves a campaign by code.
+  inviteCode String   @unique
+  createdAt  DateTime @default(now())
+
+  members    CampaignMembership[]
+  characters Character[]
+}
+
+enum CampaignRole {
+  OWNER
+  PLAYER
+}
+
+model CampaignMembership {
+  id         String       @id @default(uuid())
+  campaignId String
+  campaign   Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       CampaignRole @default(PLAYER)
+  joinedAt   DateTime     @default(now())
+
+  @@unique([campaignId, userId])
 }
 
 // One row per linked sign-in method (OAuth provider account or, later, a
