@@ -13,6 +13,8 @@ import {
   fetchEntityBacklinks,
   updateEntity,
 } from "@/api/client";
+import MentionText from "@/features/journal/MentionText";
+import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { formatJournalDate } from "@/lib/formatJournalDate";
 import {
   ENTITY_TYPE_LABELS,
@@ -29,19 +31,20 @@ import type {
 // Group backlinks by their source session (preserving the newest-first order
 // the API returns); a null sessionId collects under "Outside a session".
 function groupBySession(backlinks: EntityBacklink[]): { key: string; items: EntityBacklink[] }[] {
-  const groups: { key: string; items: EntityBacklink[] }[] = [];
+  const groups = new Map<string, EntityBacklink[]>();
   for (const link of backlinks) {
     const key = link.entry.sessionId ?? "none";
-    const existing = groups.find((g) => g.key === key);
-    if (existing) existing.items.push(link);
-    else groups.push({ key, items: [link] });
+    const items = groups.get(key) ?? [];
+    items.push(link);
+    groups.set(key, items);
   }
-  return groups;
+  return [...groups.entries()].map(([key, items]) => ({ key, items }));
 }
 
 export default function EntityDetailPage() {
   const { id: campaignId, entityId } = useParams();
   const navigate = useNavigate();
+  const { byId } = useCampaignEntities(campaignId);
 
   const [entity, setEntity] = useState<CampaignEntity | null | undefined>(undefined);
   const [role, setRole] = useState<CampaignRole | undefined>(undefined);
@@ -308,9 +311,12 @@ export default function EntityDetailPage() {
                               {formatJournalDate(link.entry.date)}
                             </span>
                           </div>
-                          <p className="mt-0.5 line-clamp-2 whitespace-pre-wrap text-sm text-parchment-700">
-                            {link.entry.body}
-                          </p>
+                          <MentionText
+                            body={link.entry.body}
+                            entities={byId}
+                            campaignId={campaignId}
+                            className="mt-0.5 line-clamp-2 whitespace-pre-wrap text-sm text-parchment-700"
+                          />
                         </li>
                       ))}
                     </ul>

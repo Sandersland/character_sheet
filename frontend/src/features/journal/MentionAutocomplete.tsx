@@ -6,7 +6,6 @@
 
 import {
   forwardRef,
-  useEffect,
   useId,
   useRef,
   useState,
@@ -14,8 +13,9 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 
-import { createEntity, fetchEntities } from "@/api/client";
+import { createEntity } from "@/api/client";
 import Badge from "@/components/ui/Badge";
+import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { ENTITY_TYPE_LABELS, ENTITY_TYPE_TONE, matchEntities, parseTrigger } from "@/lib/mentions";
 import type { CampaignEntity, EntityType } from "@/types/character";
 
@@ -41,28 +41,13 @@ const MentionAutocomplete = forwardRef<HTMLTextAreaElement, MentionAutocompleteP
   ) {
     const innerRef = useRef<HTMLTextAreaElement | null>(null);
     const listboxId = useId();
-    const [entities, setEntities] = useState<CampaignEntity[]>([]);
+    const { entities } = useCampaignEntities(campaignId);
     const [trigger, setTrigger] = useState<ReturnType<typeof parseTrigger>>(null);
     const [activeIndex, setActiveIndex] = useState(0);
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const ariaLabel = rest["aria-label"];
-
-    // Load the campaign's entity list once per campaign (small, campaign-scoped).
-    useEffect(() => {
-      if (!campaignId) {
-        setEntities([]);
-        return;
-      }
-      let active = true;
-      fetchEntities(campaignId)
-        .then((list) => active && setEntities(list))
-        .catch(() => active && setEntities([]));
-      return () => {
-        active = false;
-      };
-    }, [campaignId]);
 
     function setRef(el: HTMLTextAreaElement | null) {
       innerRef.current = el;
@@ -116,7 +101,7 @@ const MentionAutocomplete = forwardRef<HTMLTextAreaElement, MentionAutocompleteP
       setError(null);
       try {
         const created = await createEntity(campaignId, { type: createType, name: createName });
-        setEntities((prev) => [...prev, created]);
+        primeCampaignEntities(campaignId, [...entities, created]);
         insertToken(created.id);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to create entity.");
