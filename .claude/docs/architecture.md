@@ -70,6 +70,7 @@
 | `lib/items.ts` | `isEquippable(category)` + `EQUIPPABLE_CATEGORIES` — the equippability rule (weapon/armor yes, consumable/gear no). Single backend source of truth; mirrored in `frontend/src/lib/items.ts`. Enforced in `applySetEquipped`. |
 | `lib/sessions.ts` | `startSession`, `endSession`, `getActiveSessionId`. Enforces single-active-session per character. Called by session routes and by `getActiveSessionId()` which is threaded into every `apply*Operations()` lib function to tag events. |
 | `lib/session-summary.ts` | `computeSessionSummary()` — pure aggregation of a session's `CharacterEvent` rows into an end-of-session summary. No new bookkeeping; derive-don't-persist. Unit-testable without Postgres. |
+| `lib/journal-refs.ts` | `@`-tag parsing for the entity registry (#248): `extractEntityIds(body)` (pure, DB-free — pulls ordered-unique entity ids out of `@[<uuid>]` tokens, ignoring malformed), `reconcileEntryRefs(tx, entryId, ids)` (diffs `JournalEntryRef` rows), and `normalizeForMatch(s)` (diacritic/punctuation-stripping search key, in parity with the frontend `lib/mentions.ts`). |
 
 Prisma client is generated into `src/generated/prisma` (gitignored). Run `npx prisma generate` from `backend/` after a fresh clone or any schema change.
 
