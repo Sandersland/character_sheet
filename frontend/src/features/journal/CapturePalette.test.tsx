@@ -77,8 +77,7 @@ describe("CapturePalette (#247)", () => {
     await user.type(composer, "line two");
 
     expect(client.createJournalEntry).not.toHaveBeenCalled();
-    expect(composer).toHaveTextContent("line one");
-    expect(composer).toHaveTextContent("line two");
+    expect(composer.textContent ?? "").toMatch(/line one[\s\S]*line two/);
   });
 
   it("does not save an empty (whitespace-only) note", async () => {
