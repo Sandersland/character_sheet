@@ -12,6 +12,7 @@ const OWNER_B = "owner-campaigns-b"; // a different user
 const CHAR_A = "test-campaigns-char-a";
 const CHAR_B = "test-campaigns-char-b";
 const CHAR_C = "test-campaigns-char-c"; // owned by A, used for the reassignment guard
+const CHAR_D = "test-campaigns-char-d"; // owned by A, used for the PC-entity attach test
 
 async function makeCharacter(id: string, ownerId: string) {
   await prisma.character.deleteMany({ where: { id } });
@@ -47,10 +48,11 @@ describe("campaigns (#246)", () => {
     await makeCharacter(CHAR_A, OWNER_A);
     await makeCharacter(CHAR_B, OWNER_B);
     await makeCharacter(CHAR_C, OWNER_A);
+    await makeCharacter(CHAR_D, OWNER_A);
   });
 
   afterAll(async () => {
-    await prisma.character.deleteMany({ where: { id: { in: [CHAR_A, CHAR_B, CHAR_C] } } });
+    await prisma.character.deleteMany({ where: { id: { in: [CHAR_A, CHAR_B, CHAR_C, CHAR_D] } } });
     await prisma.campaign.deleteMany({ where: { ownerId: { in: [OWNER_A, OWNER_B] } } });
     await prisma.user.deleteMany({ where: { id: { in: [OWNER_A, OWNER_B] } } });
   });
@@ -177,6 +179,45 @@ describe("campaigns (#246)", () => {
       (m) => m.userId === OWNER_A,
     );
     expect(member?.role).toBe("OWNER");
+  });
+
+  it("auto-creates a PC entity + link on attach, idempotent on re-attach", async () => {
+    const created = await supertest(createApp())
+      .post("/api/campaigns")
+      .set("Cookie", cookieA)
+      .send({ name: "PC Entity Campaign" });
+    const { id, inviteCode } = created.body as { id: string; inviteCode: string };
+
+    await supertest(createApp())
+      .post(`/api/campaigns/${id}/characters`)
+      .set("Cookie", cookieA)
+      .send({ characterId: CHAR_D });
+
+    // A PC entity now exists for the attached character, with a 1:1 link.
+    const link = await prisma.campaignCharacterLink.findUnique({
+      where: { characterId: CHAR_D },
+      include: { campaignEntity: true },
+    });
+    expect(link).not.toBeNull();
+    expect(link?.campaignEntity.type).toBe("PC");
+    expect(link?.campaignEntity.name).toBe(`Char ${CHAR_D}`);
+    expect(link?.campaignEntity.campaignId).toBe(id);
+
+    // Re-attach (same campaign) does not duplicate the entity.
+    await supertest(createApp())
+      .post(`/api/campaigns/${id}/characters`)
+      .set("Cookie", cookieA)
+      .send({ characterId: CHAR_D });
+    const pcEntities = await prisma.campaignEntity.findMany({ where: { campaignId: id, type: "PC" } });
+    expect(pcEntities).toHaveLength(1);
+
+    // A second member sees the PC entity via GET …/entities.
+    await supertest(createApp()).post("/api/campaigns/join").set("Cookie", cookieB).send({ inviteCode });
+    const list = await supertest(createApp())
+      .get(`/api/campaigns/${id}/entities`)
+      .set("Cookie", cookieB);
+    expect(list.status).toBe(200);
+    expect((list.body as { name: string }[]).some((e) => e.name === `Char ${CHAR_D}`)).toBe(true);
   });
 
   it("409s attaching a character already in a different campaign", async () => {

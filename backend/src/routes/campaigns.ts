@@ -166,6 +166,27 @@ campaignsRouter.post("/campaigns/:id/characters", async (req, res) => {
     return;
   }
 
+  // Auto-register the character as a PC entity in the campaign wiki (#248),
+  // idempotent: the @unique characterId link makes a re-attach a no-op.
+  await prisma.$transaction(async (tx) => {
+    const existingLink = await tx.campaignCharacterLink.findUnique({
+      where: { characterId: parseResult.data.characterId },
+      select: { id: true },
+    });
+    if (existingLink) return;
+
+    const character = await tx.character.findUniqueOrThrow({
+      where: { id: parseResult.data.characterId },
+      select: { name: true },
+    });
+    const entity = await tx.campaignEntity.create({
+      data: { campaignId: req.params.id, type: "PC", name: character.name },
+    });
+    await tx.campaignCharacterLink.create({
+      data: { campaignEntityId: entity.id, characterId: parseResult.data.characterId },
+    });
+  });
+
   const updated = await prisma.character.findUniqueOrThrow({
     where: { id: parseResult.data.characterId },
     include: characterInclude,
