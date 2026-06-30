@@ -80,6 +80,7 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 | `spellCast.ts` | Pure cast-roll math (cantrip scaling, upcast dice, heal modifier) shared by SpellsSection + InlineSpellPicker. |
 | `spellMeta.ts` | Pure spell display helpers (school tone, metadata) shared across spell surfaces. |
 | `turnRules.ts` | 5e turn economy derived from class/level (`deriveAttacksPerAction`, action lists). |
+| `mentions.ts` | @-tagging primitives (#248): `parseMentionBody` (text/mention segment split of a stored body), `normalizeForMatch` (search key, parity with backend `lib/journal-refs.ts`), `matchEntities`, and `parseTrigger` (the in-progress `@…`/`@type:` autocomplete trigger). Pure — no JSX. |
 | `encumbrance.ts` | Carrying capacity (`carryingCapacity` = STR × 15), derive-on-read. |
 | `fightingStyles.ts` | Fighting-style labels/descriptions (presentation; backend is rules source of truth). |
 | `maneuvers.ts` | Battle Master maneuver classification data (mechanic/slot) for ManeuverPrompt. |
