@@ -196,6 +196,21 @@ sessionsRouter.get("/campaigns/:campaignId/sessions/:sessionId", async (req, res
   res.json({ ...session, journalEntries, events: events.map(serializeEvent) });
 });
 
+// ── GET /api/characters/:id/sessions ──────────────────────────────────────────
+// Sessions this character participated in, newest first — powers the activity
+// log's session filter. Character-scoped (gated by assertCharacterAccess).
+
+sessionsRouter.get("/characters/:id/sessions", async (req, res) => {
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
+
+  const sessions = await prisma.session.findMany({
+    where: { participants: { some: { characterId: req.params.id } } },
+    orderBy: { startedAt: "desc" },
+  });
+
+  res.json(sessions);
+});
+
 // ── GET /api/characters/:id/sessions/active ───────────────────────────────────
 // The active session for the character's campaign, or null (200) when there's no
 // campaign / no active session. 404 only for an unknown character id.
