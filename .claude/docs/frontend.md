@@ -28,8 +28,8 @@ frontend/src/
 │   ├── hitpoints/       # HitPointTracker orchestrator (inline Card; hosts LevelUpModal + ConcentrationSaveModal)
 │   │                    #   Sub-components: HpActionControl, HpMeter, RestControls,
 │   │                    #   DeathSaveTracker, LevelUpCallout, AdvancementCallout
-│   ├── inventory/       # InventoryList, InventoryRow, AddItemPanel,
-│   │                    #   StartingEquipmentEditor
+│   ├── inventory/       # InventoryList, InventoryRow (→ InventoryEditForm/EquipToggle/
+│   │                    #   ItemSummary/ItemProse), AddItemPanel, StartingEquipmentEditor
 │   ├── journal/         # CapturePalette (Cmd/Ctrl+J quick-capture NOTE overlay)
 │   ├── session/         # TurnHub, useTurnState, SessionLog, SessionsModal,
 │   │                    #   SessionSummaryModal, Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
@@ -86,6 +86,7 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 | `turnRules.ts` | 5e turn economy derived from class/level (`deriveAttacksPerAction`, action lists). |
 | `mentions.ts` | @-tagging primitives (#248/#269): `parseMentionBody` (text/mention segment split of a stored body), `normalizeForMatch` (search key, parity with backend `lib/journal-refs.ts`), `matchEntities`, `parseTrigger` (the in-progress `@…`/`@type:` autocomplete trigger). Edit-time DOM helpers (contenteditable composer): `buildMentionChip`, `mentionBodyToFragment` (body→DOM with chips), `serializeMentionDom` (DOM→body round-trip), `serializeMentionDomBeforeCaret` (pre-caret slice for trigger parsing), `placeCaretAtBodyOffset`, plus the `MentionResolved` type. Pure — no JSX. |
 | `encumbrance.ts` | Carrying capacity (`carryingCapacity` = STR × 15), derive-on-read. |
+| `itemDetails.ts` | Pure inventory-row presentation: `itemDetailParts` (the dotted summary line), `hasItemProse`, plus `weaponDamageParts`/`weaponPropertyTags`. Shared by InventoryRow/ItemSummary. |
 | `fightingStyles.ts` | Fighting-style labels/descriptions (presentation; backend is rules source of truth). |
 | `maneuvers.ts` | Battle Master maneuver classification data (mechanic/slot) for ManeuverPrompt. |
 | `conditions.ts` | 5e condition labels/descriptions for the chip strip + picker. |
@@ -299,7 +300,7 @@ Large interactive sections follow the orchestrator/row pattern:
 ```
 
 Examples:
-- `features/inventory/`: `InventoryList` (orchestrator) / `InventoryRow` / `AddItemPanel`
+- `features/inventory/`: `InventoryList` (orchestrator) / `InventoryRow` (delegates to `InventoryEditForm`/`EquipToggle`/`ItemSummary`/`ItemProse`) / `AddItemPanel`
 - `features/spells/`: `SpellsSection` (orchestrator) / `SpellRow` / `AddSpellPanel`
 
 The orchestrator pattern keeps async state and API batching in one place and makes rows easy to unit-test in isolation — pass mock callbacks, assert they fire with the right args. See `testing.md` for component test patterns.
