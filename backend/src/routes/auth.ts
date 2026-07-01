@@ -4,6 +4,7 @@ import type { Request } from "express";
 import { config } from "../lib/config.js";
 import { prisma } from "../lib/prisma.js";
 import { clearCookie, getCookie, setCookie } from "../lib/auth/cookies.js";
+import { AuthenticationError } from "../lib/auth/errors.js";
 import {
   createSession,
   destroySession,
@@ -207,8 +208,7 @@ authRouter.post("/auth/logout", async (req, res) => {
 authRouter.get("/auth/me", async (req, res) => {
   const user = await lookupSession(getCookie(req, SESSION_COOKIE) ?? "");
   if (!user) {
-    res.status(401).json({ error: "Not authenticated" });
-    return;
+    throw new AuthenticationError();
   }
   res.json({ user });
 });
