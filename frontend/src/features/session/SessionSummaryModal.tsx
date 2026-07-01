@@ -1,16 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { applyExperienceOperations, fetchSession } from "@/api/client";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
+import MentionText from "@/features/journal/MentionText";
+import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { formatJournalDate } from "@/lib/formatJournalDate";
 import type {
+  CampaignEntity,
   CampaignRecap,
   Character,
   JournalEntry,
   ParticipantSummary,
   Session,
   SessionParticipant,
+  SessionSummaryAdvancement,
+  SessionSummaryItem,
 } from "@/types/character";
 
 interface SessionSummaryModalProps {
@@ -61,6 +66,67 @@ function StatTile({ label, value, tone }: { label: string; value: string | numbe
   );
 }
 
+// ── Shared recap sub-lists ────────────────────────────────────────────────────
+
+/** A wrapped row of "×{qty} {name}" item badges (acquired or sold). */
+function ItemBadgeList({ items }: { items: SessionSummaryItem[] }) {
+  return (
+    <ul className="flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-parchment-900">
+      {items.map((item) => (
+        <li key={item.name} className="flex items-center gap-1.5">
+          <Badge tone="gold">×{item.qty}</Badge>
+          <span>{item.name}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Spell slots spent, one badge per level ("L1 ×2"), ascending by level. */
+function SlotsSpentRow({ slotsSpent }: { slotsSpent: Record<string, number> }) {
+  const levels = Object.entries(slotsSpent)
+    .filter(([, count]) => count > 0)
+    .sort(([a], [b]) => Number(a) - Number(b));
+  if (levels.length === 0) return null;
+  return (
+    <ul className="flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-parchment-900">
+      {levels.map(([level, count]) => (
+        <li key={level} className="flex items-center gap-1.5">
+          <Badge tone="arcane">
+            L{level} ×{count}
+          </Badge>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Feats + Ability Score Improvements taken, as labelled rows. */
+function AdvancementsList({ advancements }: { advancements: SessionSummaryAdvancement[] }) {
+  if (advancements.length === 0) return null;
+  return (
+    <ul className="flex flex-col gap-1 text-sm text-parchment-900">
+      {advancements.map((adv, i) => (
+        <li key={`${adv.type}-${i}`} className="flex items-center gap-2">
+          <Badge tone="vitality">{adv.type === "featTaken" ? "feat" : "ASI"}</Badge>
+          <span>{adv.label}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** A small labelled recap group, rendered only when it has children. */
+function RecapGroup({ label, children }: { label: string; children: ReactNode }) {
+  if (!children) return null;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="text-xs font-semibold uppercase tracking-wide text-parchment-600">{label}</p>
+      {children}
+    </div>
+  );
+}
+
 // ── Participant card ──────────────────────────────────────────────────────────
 
 /** One party member's contribution + time present in the shared session. */
@@ -80,14 +146,24 @@ function ParticipantCard({ summary }: { summary: ParticipantSummary }) {
         <StatTile label="Damage" value={summary.damageRolls} tone="text-garnet-700" />
       </div>
       {summary.itemsAcquired.length > 0 && (
-        <ul className="flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-parchment-900">
-          {summary.itemsAcquired.map((item) => (
-            <li key={item.name} className="flex items-center gap-1.5">
-              <Badge tone="gold">×{item.qty}</Badge>
-              <span>{item.name}</span>
-            </li>
-          ))}
-        </ul>
+        <RecapGroup label="Acquired">
+          <ItemBadgeList items={summary.itemsAcquired} />
+        </RecapGroup>
+      )}
+      {summary.itemsSold.length > 0 && (
+        <RecapGroup label="Sold">
+          <ItemBadgeList items={summary.itemsSold} />
+        </RecapGroup>
+      )}
+      {Object.keys(summary.slotsSpent).length > 0 && (
+        <RecapGroup label="Slots spent">
+          <SlotsSpentRow slotsSpent={summary.slotsSpent} />
+        </RecapGroup>
+      )}
+      {summary.featsOrAsis.length > 0 && (
+        <RecapGroup label="Feats & ASIs">
+          <AdvancementsList advancements={summary.featsOrAsis} />
+        </RecapGroup>
       )}
     </div>
   );
@@ -95,27 +171,31 @@ function ParticipantCard({ summary }: { summary: ParticipantSummary }) {
 
 // ── Journal list ────────────────────────────────────────────────────────────
 
-/** Read-only, expandable list of the session's journal entries. */
-function JournalEntryRow({ entry }: { entry: JournalEntry }) {
-  const [open, setOpen] = useState(false);
+/**
+ * Read-only note row: the body rendered inline (with @-mention chips resolved),
+ * alongside its date — mirroring JournalSection's note-row presentation. NOTE
+ * rows have no title, so there's nothing to collapse behind.
+ */
+function JournalEntryRow({
+  entry,
+  entities,
+  campaignId,
+}: {
+  entry: JournalEntry;
+  entities: Map<string, CampaignEntity>;
+  campaignId?: string | null;
+}) {
   return (
-    <li className="py-2">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-baseline justify-between gap-2 text-left"
-        aria-expanded={open}
-      >
-        <span className="font-display text-sm font-semibold text-parchment-900">
-          {entry.title}
-        </span>
-        <span className="whitespace-nowrap text-xs text-parchment-600">
-          {formatJournalDate(entry.date)}
-        </span>
-      </button>
-      {open && (
-        <p className="mt-1 whitespace-pre-wrap text-sm text-parchment-700">{entry.body}</p>
-      )}
+    <li className="flex items-start justify-between gap-3 py-2">
+      <MentionText
+        body={entry.body}
+        entities={entities}
+        campaignId={campaignId}
+        className="min-w-0 flex-1 whitespace-pre-wrap text-sm text-parchment-800"
+      />
+      <span className="whitespace-nowrap text-xs text-parchment-600">
+        {formatJournalDate(entry.date)}
+      </span>
     </li>
   );
 }
@@ -261,6 +341,9 @@ export default function SessionSummaryModal({
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>(
     session.journalEntries ?? [],
   );
+  // Resolve @[<uuid>] tokens in note bodies to entity chips (renders as plain
+  // text outside a campaign or before the entities load).
+  const { byId } = useCampaignEntities(session.campaignId);
 
   // When opened from a list that doesn't carry full detail (SessionsModal seeds
   // from the sessions list), lazily fetch the session so journals + participant
@@ -349,19 +432,35 @@ export default function SessionSummaryModal({
               {recap.itemsAcquired.length === 0 ? (
                 <p className="text-sm text-parchment-600">No items gained this session.</p>
               ) : (
-                <ul className="flex flex-col gap-1">
-                  {recap.itemsAcquired.map((item) => (
-                    <li key={item.name} className="flex items-center gap-2 text-sm text-parchment-900">
-                      <Badge tone="gold">×{item.qty}</Badge>
-                      <span>{item.name}</span>
-                    </li>
-                  ))}
-                </ul>
+                <ItemBadgeList items={recap.itemsAcquired} />
               )}
             </div>
 
+            {/* ── Items sold (party-wide) ─────────────────────────────────── */}
+            {recap.itemsSold.length > 0 && (
+              <RecapGroup label="Items sold">
+                <ItemBadgeList items={recap.itemsSold} />
+              </RecapGroup>
+            )}
+
+            {/* ── Spell slots spent (party-wide) ──────────────────────────── */}
+            {Object.keys(recap.slotsSpent).length > 0 && (
+              <RecapGroup label="Slots spent">
+                <SlotsSpentRow slotsSpent={recap.slotsSpent} />
+              </RecapGroup>
+            )}
+
+            {/* ── Feats & ASIs (party-wide) ───────────────────────────────── */}
+            {recap.featsOrAsis.length > 0 && (
+              <RecapGroup label="Feats & ASIs">
+                <AdvancementsList advancements={recap.featsOrAsis} />
+              </RecapGroup>
+            )}
+
             {/* ── Participants ────────────────────────────────────────────── */}
-            {participants.length > 0 && (
+            {/* Solo sessions would duplicate the aggregate above; only surface
+                per-participant cards for a multi-player session (#278). */}
+            {recap.participantCount > 1 && participants.length > 0 && (
               <div className="flex flex-col gap-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
                   Participants
@@ -386,7 +485,12 @@ export default function SessionSummaryModal({
           ) : (
             <ul className="flex flex-col divide-y divide-parchment-200">
               {journalEntries.map((entry) => (
-                <JournalEntryRow key={entry.id} entry={entry} />
+                <JournalEntryRow
+                  key={entry.id}
+                  entry={entry}
+                  entities={byId}
+                  campaignId={session.campaignId}
+                />
               ))}
             </ul>
           )}

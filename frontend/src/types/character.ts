@@ -442,10 +442,8 @@ export type EntryVisibility = "PRIVATE" | "CAMPAIGN";
 
 export interface JournalEntry {
   id: string;
-  /** ENTRY = full 3-field form; NOTE = fast one-line in-session capture. */
+  /** ENTRY = full date/body form; NOTE = fast one-line in-session capture. */
   kind: JournalEntryKind;
-  /** Optional: NOTE rows have no title. */
-  title?: string;
   /** ISO-8601 date string from the API (the JournalEntry.date DateTime). */
   date: string;
   /** ISO-8601 capture timestamp shown on NOTE rows (JournalEntry.loggedAt). */
@@ -1298,6 +1296,8 @@ export interface SessionSummary {
   xpGained: number;
   levelsGained: number;
   itemsAcquired: SessionSummaryItem[];
+  /** Items sold this session (positive counts) — kept separate from acquired. */
+  itemsSold: SessionSummaryItem[];
   slotsSpent: Record<string, number>;
   spellsCast: number;
   combatRounds: number;
@@ -1342,6 +1342,12 @@ export interface CampaignRecap {
   attackRolls: number;
   damageRolls: number;
   itemsAcquired: SessionSummaryItem[];
+  /** Items sold across the party this session (positive counts). */
+  itemsSold: SessionSummaryItem[];
+  /** Spell slots spent, keyed by slot level → count, summed across participants. */
+  slotsSpent: Record<string, number>;
+  /** ASIs + feats taken across all participants (level-ups counted separately). */
+  featsOrAsis: SessionSummaryAdvancement[];
   totalPresentMs: number;
 }
 

@@ -186,6 +186,15 @@ export default function CharacterSheetPage() {
                   Join a campaign
                 </Link>
               )}
+              {/* Visible quick-capture affordance (#274) — opens the same
+                  palette as Cmd/Ctrl+J, discoverable and usable on touch. */}
+              <button
+                type="button"
+                onClick={() => setCaptureOpen(true)}
+                className="rounded-control border border-arcane-700 px-3 py-1.5 text-xs font-semibold text-arcane-700 transition-colors hover:bg-arcane-50"
+              >
+                ＋ Note
+              </button>
               <button
                 type="button"
                 onClick={() => setSessionsOpen(true)}

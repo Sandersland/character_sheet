@@ -33,6 +33,9 @@ export interface SessionSummary {
   levelsGained: number;
   /** Net quantity acquired per item, alphabetical, zero-net items omitted. */
   itemsAcquired: SummaryItem[];
+  /** Quantity sold per item (positive counts), alphabetical. Kept separate from
+   * acquired so a sale never shows as a negative "acquired" line. */
+  itemsSold: SummaryItem[];
   /** Spell slots spent this session, keyed by slot level → count (net of restores). */
   slotsSpent: Record<string, number>;
   /** Number of castSpell events (includes cantrips). */
@@ -69,6 +72,11 @@ export interface CampaignRecap {
   attackRolls: number;
   damageRolls: number;
   itemsAcquired: SummaryItem[];
+  itemsSold: SummaryItem[];
+  /** Spell slots spent, keyed by slot level → count, summed across participants. */
+  slotsSpent: Record<string, number>;
+  /** ASIs + feats taken across all participants (level-ups counted separately). */
+  featsOrAsis: SummaryAdvancement[];
   totalPresentMs: number;
 }
 
@@ -174,6 +182,7 @@ export function computeSessionSummary(
   let damageRolls = 0;
 
   const itemNet = new Map<string, number>();
+  const soldNet = new Map<string, number>();
   const slotsSpent: Record<string, number> = {};
   const featsOrAsis: SummaryAdvancement[] = [];
 
@@ -200,13 +209,26 @@ export function computeSessionSummary(
       case "acquired":
       case "bought":
       case "consumed":
-      case "sold":
       case "removed": {
+        // Net inventory change (gains minus uses). Sales are tallied separately
+        // (see the `sold` case) so they never surface as a negative "acquired".
         const data = asRecord(event.data);
         const name = typeof data.itemName === "string" ? data.itemName : null;
         const delta = numField(event.data, "quantityDelta");
         if (name && delta !== undefined) {
           itemNet.set(name, (itemNet.get(name) ?? 0) + delta);
+        }
+        break;
+      }
+
+      case "sold": {
+        // A sale's quantityDelta is negative; record the magnitude as a positive
+        // "sold" count so the recap can show "Sold ×N" in its own section.
+        const data = asRecord(event.data);
+        const name = typeof data.itemName === "string" ? data.itemName : null;
+        const delta = numField(event.data, "quantityDelta");
+        if (name && delta !== undefined) {
+          soldNet.set(name, (soldNet.get(name) ?? 0) + Math.abs(delta));
         }
         break;
       }
@@ -284,10 +306,8 @@ export function computeSessionSummary(
     }
   }
 
-  const itemsAcquired: SummaryItem[] = [...itemNet.entries()]
-    .filter(([, qty]) => qty !== 0)
-    .map(([name, qty]) => ({ name, qty }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const itemsAcquired = itemsFromMap(itemNet);
+  const itemsSold = itemsFromMap(soldNet);
 
   return {
     startedAt: window.startedAt.toISOString(),
@@ -296,6 +316,7 @@ export function computeSessionSummary(
     xpGained,
     levelsGained,
     itemsAcquired,
+    itemsSold,
     slotsSpent,
     spellsCast,
     combatRounds,
@@ -303,6 +324,14 @@ export function computeSessionSummary(
     damageRolls,
     featsOrAsis,
   };
+}
+
+/** Net a name→qty map into a sorted SummaryItem[], dropping zero-net entries. */
+function itemsFromMap(map: Map<string, number>): SummaryItem[] {
+  return [...map.entries()]
+    .filter(([, qty]) => qty !== 0)
+    .map(([name, qty]) => ({ name, qty }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
@@ -313,6 +342,9 @@ export function computeSessionSummary(
  */
 export function computeCampaignRecap(participants: ParticipantSummary[]): CampaignRecap {
   const itemNet = new Map<string, number>();
+  const soldNet = new Map<string, number>();
+  const slotsSpent: Record<string, number> = {};
+  const featsOrAsis: SummaryAdvancement[] = [];
   let xpGained = 0;
   let levelsGained = 0;
   let spellsCast = 0;
@@ -336,12 +368,14 @@ export function computeCampaignRecap(participants: ParticipantSummary[]): Campai
     for (const item of p.itemsAcquired) {
       itemNet.set(item.name, (itemNet.get(item.name) ?? 0) + item.qty);
     }
+    for (const item of p.itemsSold) {
+      soldNet.set(item.name, (soldNet.get(item.name) ?? 0) + item.qty);
+    }
+    for (const [level, count] of Object.entries(p.slotsSpent)) {
+      slotsSpent[level] = (slotsSpent[level] ?? 0) + count;
+    }
+    featsOrAsis.push(...p.featsOrAsis);
   }
-
-  const itemsAcquired: SummaryItem[] = [...itemNet.entries()]
-    .filter(([, qty]) => qty !== 0)
-    .map(([name, qty]) => ({ name, qty }))
-    .sort((a, b) => a.name.localeCompare(b.name));
 
   const hasParticipants = participants.length > 0;
   return {
@@ -355,7 +389,10 @@ export function computeCampaignRecap(participants: ParticipantSummary[]): Campai
     combatRounds,
     attackRolls,
     damageRolls,
-    itemsAcquired,
+    itemsAcquired: itemsFromMap(itemNet),
+    itemsSold: itemsFromMap(soldNet),
+    slotsSpent,
+    featsOrAsis,
     totalPresentMs,
   };
 }
