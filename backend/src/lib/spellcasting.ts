@@ -638,51 +638,20 @@ export async function applySpellcastingOperations(
         arcanaTotals,
       };
 
-      let summary = "";
-      let eventData: Record<string, unknown> = {};
-      let eventType: string;
-
+      // Route to the per-op helper. A null outcome means no-op — skip both the
+      // state write-back and the logEvent below.
+      let outcome: OpOutcome | null = null;
       switch (op.type) {
-        case "castSpell": {
-          ({ eventType, summary, eventData } = await applyCastSpellOp(ctx, op));
-          break;
-        }
-
-        case "expendSlot": {
-          ({ eventType, summary, eventData } = applyExpendSlotOp(ctx, op));
-          break;
-        }
-
-        case "restoreSlot": {
-          ({ eventType, summary, eventData } = applyRestoreSlotOp(ctx, op));
-          break;
-        }
-
-        case "learnSpell": {
-          ({ eventType, summary, eventData } = await applyLearnSpellOp(ctx, op));
-          break;
-        }
-
-        case "forgetSpell": {
-          ({ eventType, summary, eventData } = applyForgetSpellOp(ctx, op));
-          break;
-        }
-
+        case "castSpell": outcome = await applyCastSpellOp(ctx, op); break;
+        case "expendSlot": outcome = applyExpendSlotOp(ctx, op); break;
+        case "restoreSlot": outcome = applyRestoreSlotOp(ctx, op); break;
+        case "learnSpell": outcome = await applyLearnSpellOp(ctx, op); break;
+        case "forgetSpell": outcome = applyForgetSpellOp(ctx, op); break;
         case "prepareSpell":
-        case "unprepareSpell": {
-          const outcome = applyPrepareSpellOp(ctx, op);
-          if (outcome === null) continue;
-          ({ eventType, summary, eventData } = outcome);
-          break;
-        }
-
-        case "dropConcentration": {
-          const outcome = applyDropConcentrationOp(ctx);
-          if (outcome === null) continue;
-          ({ eventType, summary, eventData } = outcome);
-          break;
-        }
+        case "unprepareSpell": outcome = applyPrepareSpellOp(ctx, op); break;
+        case "dropConcentration": outcome = applyDropConcentrationOp(ctx); break;
       }
+      if (outcome === null) continue;
 
       // Write the updated state back as a compact object.
       await tx.character.update({
@@ -709,11 +678,11 @@ export async function applySpellcastingOperations(
       await logEvent(tx, {
         characterId,
         category: "spellcasting",
-        type: eventType! as Parameters<typeof logEvent>[1]["type"],
-        summary: summary!,
+        type: outcome.eventType as Parameters<typeof logEvent>[1]["type"],
+        summary: outcome.summary,
         before: beforeState,
         after: afterState,
-        data: eventData,
+        data: outcome.eventData,
         batchId,
         sessionId,
       });
