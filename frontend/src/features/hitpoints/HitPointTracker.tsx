@@ -5,10 +5,10 @@ import { rollDie } from "@/lib/dice";
 import { dieFaces } from "@/lib/hitDice";
 import type { Character, ConcentrationCheck, HitPointOperation } from "@/types/character";
 import Card from "@/components/ui/Card";
-import MeterBar from "@/components/ui/MeterBar";
 import ConcentrationSaveModal from "@/features/hitpoints/ConcentrationSaveModal";
 import DeathSaveTracker from "@/features/hitpoints/DeathSaveTracker";
 import HpActionControl from "@/features/hitpoints/HpActionControl";
+import HpMeter from "@/features/hitpoints/HpMeter";
 import type { HpMode } from "@/features/hitpoints/HpActionControl";
 import LevelUpModal from "@/features/hitpoints/LevelUpModal";
 import RestControls from "@/features/hitpoints/RestControls";
@@ -180,30 +180,14 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
     <Card title="Hit Points">
       <div className="flex flex-col gap-4 p-4">
         {/* ── HP display ── */}
-        <div>
-          <div className="mb-1.5 flex items-baseline justify-between">
-            <p className="font-display text-xl font-semibold leading-none text-garnet-800">
-              {hitPoints.current}
-              <span className="text-sm font-normal text-parchment-600">
-                {" "}
-                / {hitPoints.max}
-                {hitPoints.temp > 0 && (
-                  <span className="text-gold-800"> (+{hitPoints.temp} temp)</span>
-                )}
-              </span>
-            </p>
-            <span className="text-xs text-parchment-600">
-              {availableDice}/{hitDice.total}
-              {hitDice.die} available
-            </span>
-          </div>
-          <MeterBar
-            current={hitPoints.current}
-            max={hitPoints.max}
-            tone="garnet"
-            label={`${hitPoints.current} of ${hitPoints.max} hit points`}
-          />
-        </div>
+        <HpMeter
+          current={hitPoints.current}
+          max={hitPoints.max}
+          temp={hitPoints.temp}
+          availableDice={availableDice}
+          hitDiceTotal={hitDice.total}
+          die={hitDice.die}
+        />
 
         {/* ── Death save tracker (shown at 0 HP) ── */}
         {isDying && (
