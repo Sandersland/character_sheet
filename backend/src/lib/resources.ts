@@ -292,6 +292,87 @@ function applyRestoreResourceOp(
   };
 }
 
+async function applyLearnManeuverOp(
+  tx: Prisma.TransactionClient,
+  state: ResourcesMutableState,
+  op: LearnManeuverOperation,
+  derivedInfo: DerivedClassInfo | null,
+): Promise<ResourceOpAudit> {
+  if (Boolean(op.maneuverId) === Boolean(op.custom)) {
+    throw new InvalidResourceOperationError(
+      "learnManeuver: provide exactly one of maneuverId or custom"
+    );
+  }
+
+  // Enforce choice count limit.
+  const choiceCount = derivedInfo?.maneuverChoiceCount;
+  if (choiceCount !== undefined && state.maneuversKnown.length >= choiceCount) {
+    throw new InvalidResourceOperationError(
+      `Cannot learn more maneuvers: already know ${state.maneuversKnown.length}/${choiceCount}`
+    );
+  }
+
+  let newEntry: ManeuverEntry;
+
+  if (op.maneuverId) {
+    // Dedup check.
+    if (state.maneuversKnown.some((m) => m.maneuverId === op.maneuverId)) {
+      throw new InvalidResourceOperationError(
+        `Maneuver already known (maneuverId: ${op.maneuverId})`
+      );
+    }
+    const catalogManeuver = await tx.maneuver.findUnique({ where: { id: op.maneuverId } });
+    if (!catalogManeuver) {
+      throw new InvalidResourceOperationError(
+        `Maneuver not found in catalog: ${op.maneuverId}`
+      );
+    }
+    newEntry = {
+      id: randomUUID(),
+      maneuverId: catalogManeuver.id,
+      name: catalogManeuver.name,
+      description: catalogManeuver.description,
+    };
+  } else {
+    const custom = op.custom!;
+    newEntry = {
+      id: randomUUID(),
+      name: custom.name,
+      description: custom.description,
+    };
+  }
+
+  state.maneuversKnown.push(newEntry);
+  return {
+    eventType: "learnManeuver",
+    summary: `Learned maneuver: ${newEntry.name}`,
+    eventData: {
+      entryId: newEntry.id,
+      maneuverName: newEntry.name,
+      maneuverId: newEntry.maneuverId ?? null,
+    },
+  };
+}
+
+function applyForgetManeuverOp(
+  state: ResourcesMutableState,
+  op: ForgetManeuverOperation,
+): ResourceOpAudit {
+  const idx = state.maneuversKnown.findIndex((m) => m.id === op.entryId);
+  if (idx === -1) {
+    throw new InvalidResourceOperationError(
+      `Maneuver entry not found: ${op.entryId}`
+    );
+  }
+  const forgotten = state.maneuversKnown[idx];
+  state.maneuversKnown.splice(idx, 1);
+  return {
+    eventType: "forgetManeuver",
+    summary: `Forgot maneuver: ${forgotten.name}`,
+    eventData: { entryId: op.entryId, maneuverName: forgotten.name },
+  };
+}
+
 // ── Transaction handler ───────────────────────────────────────────────────────
 
 /**
@@ -360,80 +441,13 @@ export async function applyResourceOperations(
           audit = applyRestoreResourceOp(state, op, derivedInfo);
           break;
 
-        case "learnManeuver": {
-          if (Boolean(op.maneuverId) === Boolean(op.custom)) {
-            throw new InvalidResourceOperationError(
-              "learnManeuver: provide exactly one of maneuverId or custom"
-            );
-          }
-
-          // Enforce choice count limit.
-          const choiceCount = derivedInfo?.maneuverChoiceCount;
-          if (choiceCount !== undefined && state.maneuversKnown.length >= choiceCount) {
-            throw new InvalidResourceOperationError(
-              `Cannot learn more maneuvers: already know ${state.maneuversKnown.length}/${choiceCount}`
-            );
-          }
-
-          let newEntry: ManeuverEntry;
-
-          if (op.maneuverId) {
-            // Dedup check.
-            if (state.maneuversKnown.some((m) => m.maneuverId === op.maneuverId)) {
-              throw new InvalidResourceOperationError(
-                `Maneuver already known (maneuverId: ${op.maneuverId})`
-              );
-            }
-            const catalogManeuver = await tx.maneuver.findUnique({ where: { id: op.maneuverId } });
-            if (!catalogManeuver) {
-              throw new InvalidResourceOperationError(
-                `Maneuver not found in catalog: ${op.maneuverId}`
-              );
-            }
-            newEntry = {
-              id: randomUUID(),
-              maneuverId: catalogManeuver.id,
-              name: catalogManeuver.name,
-              description: catalogManeuver.description,
-            };
-          } else {
-            const custom = op.custom!;
-            newEntry = {
-              id: randomUUID(),
-              name: custom.name,
-              description: custom.description,
-            };
-          }
-
-          state.maneuversKnown.push(newEntry);
-          audit = {
-            eventType: "learnManeuver",
-            summary: `Learned maneuver: ${newEntry.name}`,
-            eventData: {
-              entryId: newEntry.id,
-              maneuverName: newEntry.name,
-              maneuverId: newEntry.maneuverId ?? null,
-            },
-          };
+        case "learnManeuver":
+          audit = await applyLearnManeuverOp(tx, state, op, derivedInfo);
           break;
-        }
 
-        case "forgetManeuver": {
-          const idx = state.maneuversKnown.findIndex((m) => m.id === op.entryId);
-          if (idx === -1) {
-            throw new InvalidResourceOperationError(
-              `Maneuver entry not found: ${op.entryId}`
-            );
-          }
-          const forgotten = state.maneuversKnown[idx];
-          state.maneuversKnown.splice(idx, 1);
-          audit = {
-            eventType: "forgetManeuver",
-            summary: `Forgot maneuver: ${forgotten.name}`,
-            eventData: { entryId: op.entryId, maneuverName: forgotten.name },
-          };
+        case "forgetManeuver":
+          audit = applyForgetManeuverOp(state, op);
           break;
-        }
 
         case "learnToolProficiency": {
           // Validate the name is a known artisan's tool.
