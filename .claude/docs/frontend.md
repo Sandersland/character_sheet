@@ -34,8 +34,9 @@ frontend/src/
 │   ├── inventory/       # InventoryList, InventoryRow (→ InventoryEditForm/EquipToggle/
 │   │                    #   ItemSummary/ItemProse), AddItemPanel, StartingEquipmentEditor
 │   ├── journal/         # CapturePalette (Cmd/Ctrl+J quick-capture NOTE overlay)
-│   ├── session/         # TurnHub, useTurnState, SessionLog, SessionsModal,
-│   │                    #   SessionSummaryModal, Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
+│   ├── session/         # TurnHub (→ useTurnActions + TurnControls/ActionSlot/BonusActionSlot/
+│   │                    #   ReactionSlot/EffectManeuverStrip/LayOnHandsInput), useTurnState, SessionLog,
+│   │                    #   SessionsModal, SessionSummaryModal, Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
 │   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie,
 │   │                    #   useSessionButton (sheet-header Start/Join/Resume session state)
 │   ├── spells/          # SpellsSection, SpellRow, AddSpellPanel
