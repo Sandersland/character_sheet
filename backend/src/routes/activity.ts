@@ -1,34 +1,14 @@
 import { Router } from "express";
 
-import { CharacterEventCategory, CharacterEventType, Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "../generated/prisma/client.js";
 import {
   InsufficientCurrencyError,
   InvalidInventoryOperationError,
   revertInventoryEvent,
 } from "../lib/inventory.js";
+import { buildActivityQuery, serializeActivityEvent } from "../lib/activity.js";
 import { assertCharacterAccess } from "../lib/auth/access.js";
 import { prisma } from "../lib/prisma.js";
-
-// Runtime-checkable set of every valid CharacterEventCategory, derived from the
-// Prisma-generated enum so it can never drift from the schema.
-const CATEGORY_VALUES = new Set<string>(Object.values(CharacterEventCategory));
-
-function asCategory(value: string | undefined): CharacterEventCategory | undefined {
-  return value !== undefined && CATEGORY_VALUES.has(value)
-    ? (value as CharacterEventCategory)
-    : undefined;
-}
-
-// Runtime-checkable set of every valid CharacterEventType, derived from the
-// Prisma-generated enum so it can never drift from the schema. Mirrors
-// asCategory: an unknown type value is silently ignored (unfiltered), not a 400.
-const TYPE_VALUES = new Set<string>(Object.values(CharacterEventType));
-
-function asType(value: string | undefined): CharacterEventType | undefined {
-  return value !== undefined && TYPE_VALUES.has(value)
-    ? (value as CharacterEventType)
-    : undefined;
-}
 
 export const activityRouter = Router();
 
@@ -54,68 +34,10 @@ export const activityRouter = Router();
 activityRouter.get("/characters/:id/activity", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
 
-  // Only apply the category filter when the query value is a real enum member;
-  // an unknown value is silently ignored (unfiltered), matching prior behavior.
-  const category = asCategory(
-    typeof req.query.category === "string" ? req.query.category : undefined,
+  const events = await prisma.characterEvent.findMany(
+    buildActivityQuery(req.params.id, req.query),
   );
-  // Same validate-or-ignore contract as category: an unknown event type is
-  // silently dropped (unfiltered) rather than 400-ing.
-  const type = asType(
-    typeof req.query.type === "string" ? req.query.type : undefined,
-  );
-  const sessionId =
-    typeof req.query.sessionId === "string" ? req.query.sessionId : undefined;
-  const entityId =
-    typeof req.query.entityId === "string" ? req.query.entityId : undefined;
-  const includeFields = req.query.includeFields === "1";
-  const revertedFilter = req.query.reverted === "0"
-    ? false
-    : req.query.reverted === "1"
-    ? true
-    : undefined; // undefined = no filter (include all)
-
-  // Build where clause. `category` is already validated/narrowed to a real
-  // CharacterEventCategory by asCategory(), so no hand-maintained cast is needed.
-  const whereClause = {
-    characterId: req.params.id,
-    ...(category ? { category } : {}),
-    ...(type ? { type } : {}),
-    ...(sessionId ? { sessionId } : {}),
-    ...(entityId ? { entityId } : {}),
-    ...(revertedFilter !== undefined ? { reverted: revertedFilter } : {}),
-  };
-
-  const events = await prisma.characterEvent.findMany({
-    where: whereClause,
-    orderBy: { createdAt: "desc" },
-    include: includeFields ? { fields: true } : undefined,
-  });
-
-  res.json(events.map((row) => ({
-    id: row.id,
-    category: row.category,
-    type: row.type,
-    summary: row.summary,
-    entityType: row.entityType ?? undefined,
-    entityId: row.entityId ?? undefined,
-    before: row.before ?? undefined,
-    after: row.after ?? undefined,
-    data: row.data ?? undefined,
-    actor: row.actor,
-    reverted: row.reverted,
-    batchId: row.batchId ?? undefined,
-    createdAt: row.createdAt,
-    fields: "fields" in row
-      ? (row as typeof row & { fields: Array<{ id: string; path: string; oldValue: unknown; newValue: unknown }> })
-          .fields.map((f) => ({
-            id: f.id,
-            path: f.path,
-            oldValue: f.oldValue ?? undefined,
-            newValue: f.newValue ?? undefined,
-          }))
-      : undefined,
-  })));
+  res.json(events.map(serializeActivityEvent));
 });
 
 // ── POST /api/characters/:id/events/:batchId/revert ──────────────────────────
