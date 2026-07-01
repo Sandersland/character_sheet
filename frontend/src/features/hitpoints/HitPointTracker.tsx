@@ -13,6 +13,7 @@ import MeterBar from "@/components/ui/MeterBar";
 import ConcentrationSaveModal from "@/features/hitpoints/ConcentrationSaveModal";
 import DeathSaveTracker from "@/features/hitpoints/DeathSaveTracker";
 import LevelUpModal from "@/features/hitpoints/LevelUpModal";
+import RestControls from "@/features/hitpoints/RestControls";
 import type { PendingConcentrationSave } from "@/features/hitpoints/ConcentrationSaveModal";
 import { useAutoRollConcentrationPref } from "@/features/hitpoints/concentrationPreference";
 
@@ -70,7 +71,6 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
   // Form field values
   const [mode, setMode] = useState<HpMode>("damage");
   const [amount, setAmount] = useState("");
-  const [diceToSpend, setDiceToSpend] = useState("1");
 
   // Modal / pending state
   const [levelUpOpen, setLevelUpOpen] = useState(false);
@@ -221,8 +221,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
   const applyDisabled =
     pending || (mode === "temp" ? amount === "" : !amount || parseInt(amount, 10) <= 0);
 
-  async function handleShortRest() {
-    const n = parseInt(diceToSpend, 10);
+  async function handleShortRest(n: number) {
     if (!n || n < 1 || n > availableDice) return;
     const faces = dieFaces(hitDice.die);
     const rolls = Array.from({ length: n }, () => rollDie(faces));
@@ -381,74 +380,12 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
         )}
 
         {/* ── Rest controls ── */}
-        <div className="flex flex-wrap items-end gap-3 border-t border-parchment-200 pt-3">
-          {/* Short rest */}
-          <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
-            <span>Short rest — dice to spend</span>
-            <div className="flex gap-2">
-              <div className="inline-flex items-center rounded-control border border-parchment-300 bg-parchment-50">
-                <button
-                  type="button"
-                  disabled={pending || availableDice === 0}
-                  onClick={() =>
-                    setDiceToSpend(String(Math.max(1, (parseInt(diceToSpend, 10) || 1) - 1)))
-                  }
-                  aria-label="Decrease dice to spend"
-                  className="flex h-8 w-8 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50"
-                >
-                  <Minus aria-hidden="true" className="h-4 w-4" />
-                </button>
-                <input
-                  type="number"
-                  min={1}
-                  max={availableDice}
-                  step={1}
-                  value={diceToSpend}
-                  onChange={(e) => setDiceToSpend(e.target.value)}
-                  disabled={pending || availableDice === 0}
-                  aria-label="Dice to spend"
-                  className="w-12 border-0 bg-transparent text-center text-lg tabular-nums text-parchment-900 disabled:opacity-50"
-                />
-                <button
-                  type="button"
-                  disabled={pending || availableDice === 0}
-                  onClick={() =>
-                    setDiceToSpend(
-                      String(Math.min(availableDice, (parseInt(diceToSpend, 10) || 1) + 1)),
-                    )
-                  }
-                  aria-label="Increase dice to spend"
-                  className="flex h-8 w-8 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50"
-                >
-                  <Plus aria-hidden="true" className="h-4 w-4" />
-                </button>
-              </div>
-              <button
-                type="button"
-                disabled={pending || availableDice === 0}
-                onClick={handleShortRest}
-                className="rounded-control bg-parchment-300 px-3 py-1.5 text-sm font-semibold text-parchment-800 transition-colors hover:bg-parchment-400 disabled:opacity-50"
-              >
-                Rest
-              </button>
-            </div>
-          </div>
-
-          {/* Long rest */}
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
-              Long rest
-            </span>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={handleLongRest}
-              className="rounded-control bg-arcane-100 px-3 py-1.5 text-sm font-semibold text-arcane-800 transition-colors hover:bg-arcane-200 disabled:opacity-50"
-            >
-              Full rest
-            </button>
-          </div>
-        </div>
+        <RestControls
+          availableDice={availableDice}
+          pending={pending}
+          onShortRest={handleShortRest}
+          onLongRest={handleLongRest}
+        />
 
         {/* ── Level-up affordance ── */}
         {pendingLevelUps > 0 && (
