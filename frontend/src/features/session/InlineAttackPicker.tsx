@@ -27,6 +27,14 @@ import { useState } from "react";
 import { useRoll } from "@/features/dice/RollContext";
 import { applyInventoryTransactions, logRoll } from "@/api/client";
 import { formatRollSpec } from "@/lib/dice";
+import {
+  attacksExhausted as computeAttacksExhausted,
+  hasSuperiorityDice,
+  unarmedDamageDisplay,
+  weaponDamageSpec,
+  weaponDamageType,
+  weaponGripLabel,
+} from "@/lib/attackMath";
 import { maneuverPlacement, mechanicsFor } from "@/lib/maneuvers";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
 import ManeuverPrompt from "@/features/session/ManeuverPrompt";
@@ -49,15 +57,6 @@ interface InlineAttackPickerProps {
   onUpdate: (c: Character) => void;
   /** Called after a roll is logged so the Session Log can refresh. */
   onLogChanged: () => void;
-}
-
-// Gate: only show maneuver affordances when the character has a Battle Master die pool.
-function hasSuperiorityDice(character: Character): boolean {
-  return (
-    character.resources?.pools?.some(
-      (p) => p.key === "superiorityDice" && p.total > 0,
-    ) ?? false
-  );
 }
 
 export default function InlineAttackPicker({
@@ -141,9 +140,7 @@ export default function InlineAttackPicker({
   const { unarmedStrike, improvisedWeapon } = character;
   const showManeuvers = hasSuperiorityDice(character);
 
-  // Attacks are exhausted when the counter has reached total (used >= total).
-  // When attack is null (Flurry/Opportunity context), there is no counter → always allow.
-  const attacksExhausted = turnState.attack !== null && turnState.attack.used >= turnState.attack.total;
+  const attacksExhausted = computeAttacksExhausted(turnState.attack);
 
   // "attackOption" maneuvers (Commander's Strike, etc.) — shown when in attack context.
   const attackOptionManeuvers = showManeuvers && turnState.attack !== null
@@ -152,16 +149,12 @@ export default function InlineAttackPicker({
       )
     : [];
 
-  // Unarmed damage display — flat value when faces === 1 (baseline), or die notation.
   const unarmedDamageSpec = {
     count: unarmedStrike.damage.count,
     faces: unarmedStrike.damage.faces,
     modifier: unarmedStrike.damage.modifier,
   };
-  const unarmedDamageDisplay =
-    unarmedStrike.damage.faces === 1
-      ? Math.max(1, 1 + unarmedStrike.damage.modifier)
-      : `1d${unarmedStrike.damage.faces}${unarmedStrike.damage.modifier !== 0 ? ` + ${unarmedStrike.damage.modifier}` : ""}`;
+  const unarmedDamage = unarmedDamageDisplay(unarmedStrike);
 
   const improvisedDamageSpec = {
     count: improvisedWeapon.damage.count,
@@ -249,14 +242,9 @@ export default function InlineAttackPicker({
 
       {equippedWeapons.map((item) => {
         const w = item.weapon!;
-        const damageSpec = w.damage
-          ? { count: w.damage.damageDiceCount, faces: w.damage.damageDiceFaces, modifier: w.damage.damageModifier }
-          : { count: w.damageDiceCount, faces: w.damageDiceFaces, modifier: w.damageModifier };
-        const damageLabel = `${formatRollSpec(damageSpec)} ${w.damage?.damageType ?? w.damageType}`;
-        const gripLabel =
-          w.damage?.grip === "versatile-two-handed" || w.damage?.grip === "two-handed"
-            ? " (two-handed)"
-            : "";
+        const damageSpec = weaponDamageSpec(w);
+        const damageLabel = `${formatRollSpec(damageSpec)} ${weaponDamageType(w)}`;
+        const gripLabel = weaponGripLabel(w);
 
         const atkOverride = attackTotals[item.id];
         const dmgOverride = damageTotals[item.id];
@@ -302,7 +290,7 @@ export default function InlineAttackPicker({
                 <button
                   type="button"
                   onClick={() => {
-                    const dmgType = w.damage?.damageType ?? w.damageType;
+                    const dmgType = weaponDamageType(w);
                     const result = roll(damageSpec, `${item.name} damage (${dmgType})`);
                     logRollSafe("damage", item.name, result, damageSpec, dmgType);
                     setLastDamageRolls((prev) => ({ ...prev, [item.id]: result }));
@@ -334,7 +322,7 @@ export default function InlineAttackPicker({
           <div>
             <p className="text-sm font-medium text-parchment-900">Unarmed Strike</p>
             <p className="text-xs text-parchment-600">
-              Attack: +{unarmedStrike.attackBonus} · Damage: {unarmedDamageDisplay} bludgeoning
+              Attack: +{unarmedStrike.attackBonus} · Damage: {unarmedDamage} bludgeoning
             </p>
             {attackTotals["unarmed"] !== null && attackTotals["unarmed"] !== undefined && (
               <p className="text-xs font-semibold text-gold-800">
