@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { Minus, Plus, Shield } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import { GiBleedingWound, GiHealthPotion } from "react-icons/gi";
-import type { IconType } from "react-icons";
 
 import { applyHitPointOperations } from "@/api/client";
 import { rollDie } from "@/lib/dice";
+import { dieFaces } from "@/lib/hitDice";
 import type { Character, ConcentrationCheck, HitPointOperation } from "@/types/character";
 import Card from "@/components/ui/Card";
-import MeterBar from "@/components/ui/MeterBar";
-import Modal from "@/components/ui/Modal";
+import AdvancementCallout from "@/features/hitpoints/AdvancementCallout";
 import ConcentrationSaveModal from "@/features/hitpoints/ConcentrationSaveModal";
+import DeathSaveTracker from "@/features/hitpoints/DeathSaveTracker";
+import LevelUpCallout from "@/features/hitpoints/LevelUpCallout";
+import HpActionControl from "@/features/hitpoints/HpActionControl";
+import HpMeter from "@/features/hitpoints/HpMeter";
+import type { HpMode } from "@/features/hitpoints/HpActionControl";
+import LevelUpModal from "@/features/hitpoints/LevelUpModal";
+import RestControls from "@/features/hitpoints/RestControls";
 import type { PendingConcentrationSave } from "@/features/hitpoints/ConcentrationSaveModal";
 import { useAutoRollConcentrationPref } from "@/features/hitpoints/concentrationPreference";
 
@@ -19,154 +22,10 @@ interface HitPointTrackerProps {
   onUpdate: (character: Character) => void;
 }
 
-// ---- Sub-components -------------------------------------------------------
-
-function DeathSavePips({
-  label,
-  count,
-  tone,
-}: {
-  label: string;
-  count: number;
-  tone: "success" | "failure";
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="w-20 text-xs text-parchment-600">{label}:</span>
-      <div className="flex gap-1.5">
-        {Array.from({ length: 3 }, (_, i) => (
-          <div
-            key={i}
-            aria-hidden="true"
-            className={`h-4 w-4 rounded-full border ${
-              i < count
-                ? tone === "success"
-                  ? "border-arcane-600 bg-arcane-500"
-                  : "border-garnet-700 bg-garnet-600"
-                : "border-parchment-400 bg-parchment-100"
-            }`}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function LevelUpModal({
-  hitDie,
-  conMod,
-  pending,
-  onConfirm,
-  onClose,
-}: {
-  hitDie: string;
-  conMod: number;
-  pending: boolean;
-  onConfirm: (method: "average" | "roll") => void;
-  onClose: () => void;
-}) {
-  const faces = Number(hitDie.replace(/^d/i, ""));
-  // Fixed average per 5e PHB: floor(faces/2) + 1; then add Con modifier and clamp at 1.
-  const averageGain = Math.max(1, Math.floor(faces / 2) + 1 + conMod);
-  const minRoll = Math.max(1, 1 + conMod);
-  const maxRoll = Math.max(1, faces + conMod);
-  const conLabel = conMod >= 0 ? `+${conMod}` : String(conMod);
-
-  return (
-    <Modal title="Level Up" onClose={onClose}>
-      <div className="flex flex-col gap-4">
-        <p className="text-sm text-parchment-700">
-          Choose how to gain hit points for this level ({hitDie} {conLabel} Con):
-        </p>
-        <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => onConfirm("average")}
-            className="flex items-center justify-between rounded-card border border-parchment-300 bg-parchment-50 px-4 py-3 text-left transition-colors hover:bg-parchment-100 disabled:opacity-50"
-          >
-            <div>
-              <p className="font-semibold text-parchment-900">Take average</p>
-              <p className="text-xs text-parchment-600">
-                Predictable — {Math.floor(faces / 2) + 1} ({conLabel} Con)
-              </p>
-            </div>
-            <span className="font-display text-2xl font-semibold text-arcane-800">
-              +{averageGain}
-            </span>
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => onConfirm("roll")}
-            className="flex items-center justify-between rounded-card border border-parchment-300 bg-parchment-50 px-4 py-3 text-left transition-colors hover:bg-parchment-100 disabled:opacity-50"
-          >
-            <div>
-              <p className="font-semibold text-parchment-900">Roll {hitDie}</p>
-              <p className="text-xs text-parchment-600">
-                Luck-based — {conLabel} Con applied
-              </p>
-            </div>
-            <span className="text-sm text-parchment-600">
-              {minRoll}–{maxRoll} HP
-            </span>
-          </button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-// ---- HP action control ----------------------------------------------------
-
-type HpMode = "damage" | "heal" | "temp";
-
-// Per-mode segment icon, verb, button tone, and field aria-label.
-const HP_MODES: {
-  mode: HpMode;
-  label: string;
-  icon: IconType | LucideIcon;
-  verb: string;
-  fieldLabel: string;
-  buttonClass: string;
-}[] = [
-  {
-    mode: "damage",
-    label: "Damage",
-    icon: GiBleedingWound,
-    verb: "Apply damage",
-    fieldLabel: "Damage amount",
-    buttonClass: "bg-garnet-700 text-parchment-50 hover:bg-garnet-800",
-  },
-  {
-    mode: "heal",
-    label: "Heal",
-    icon: GiHealthPotion,
-    verb: "Heal",
-    fieldLabel: "Heal amount",
-    buttonClass: "bg-vitality-700 text-parchment-50 hover:bg-vitality-800",
-  },
-  {
-    mode: "temp",
-    label: "Temp HP",
-    icon: Shield,
-    verb: "Set temp HP",
-    fieldLabel: "Temporary hit points",
-    buttonClass: "bg-gold-400 text-ink hover:bg-gold-500",
-  },
-];
-
-// ---- Main component -------------------------------------------------------
-
 export default function HitPointTracker({ character, onUpdate }: HitPointTrackerProps) {
   const { hitPoints, hitDice, abilityScores, pendingLevelUps } = character;
   const availableDice = hitDice.total - hitDice.spent;
   const conMod = Math.floor((abilityScores.constitution - 10) / 2);
-
-  // Form field values
-  const [mode, setMode] = useState<HpMode>("damage");
-  const [amount, setAmount] = useState("");
-  const [diceToSpend, setDiceToSpend] = useState("1");
 
   // Modal / pending state
   const [levelUpOpen, setLevelUpOpen] = useState(false);
@@ -256,13 +115,20 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
     }
   }
 
-  async function handleDamage() {
-    const value = parseInt(amount, 10);
-    if (!value || value <= 0) return;
-    // When auto-roll is off (issue #76), the server defers the concentration
-    // save and returns a pending check; the player rolls it via the 3D die.
-    const ok = await submit([{ type: "damage", amount: value, autoRollConcentration }]);
-    if (ok) setAmount("");
+  // Apply the active HP mode; returns true on success so the child clears its field.
+  async function handleApply(mode: HpMode, value: number): Promise<boolean> {
+    if (mode === "damage") {
+      if (!value || value <= 0) return false;
+      // When auto-roll is off (issue #76), the server defers the concentration
+      // save and returns a pending check; the player rolls it via the 3D die.
+      return submit([{ type: "damage", amount: value, autoRollConcentration }]);
+    }
+    if (mode === "heal") {
+      if (!value || value <= 0) return false;
+      return submit([{ type: "heal", amount: value }]);
+    }
+    if (isNaN(value) || value < 0) return false;
+    return submit([{ type: "setTemp", amount: value }]);
   }
 
   /**
@@ -284,43 +150,9 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
     );
   }
 
-  async function handleHeal() {
-    const value = parseInt(amount, 10);
-    if (!value || value <= 0) return;
-    const ok = await submit([{ type: "heal", amount: value }]);
-    if (ok) setAmount("");
-  }
-
-  async function handleSetTemp() {
-    const value = parseInt(amount, 10);
-    if (isNaN(value) || value < 0) return;
-    const ok = await submit([{ type: "setTemp", amount: value }]);
-    if (ok) setAmount("");
-  }
-
-  // Dispatch the active mode's submit handler.
-  function handleApply() {
-    if (mode === "damage") return handleDamage();
-    if (mode === "heal") return handleHeal();
-    return handleSetTemp();
-  }
-
-  // Step the shared amount by ±1, clamped at 0.
-  function stepAmount(delta: number) {
-    const next = Math.max(0, (parseInt(amount, 10) || 0) + delta);
-    setAmount(String(next));
-  }
-
-  const activeMode = HP_MODES.find((m) => m.mode === mode)!;
-  const ApplyIcon = activeMode.icon;
-  // Temp HP accepts 0 (clears temp); damage/heal require a positive amount.
-  const applyDisabled =
-    pending || (mode === "temp" ? amount === "" : !amount || parseInt(amount, 10) <= 0);
-
-  async function handleShortRest() {
-    const n = parseInt(diceToSpend, 10);
+  async function handleShortRest(n: number) {
     if (!n || n < 1 || n > availableDice) return;
-    const faces = Number(hitDice.die.replace(/^d/i, ""));
+    const faces = dieFaces(hitDice.die);
     const rolls = Array.from({ length: n }, () => rollDie(faces));
     await submit([{ type: "shortRest", rolls }]);
   }
@@ -339,7 +171,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
   }
 
   async function handleLevelUp(method: "average" | "roll") {
-    const faces = Number(hitDice.die.replace(/^d/i, ""));
+    const faces = dieFaces(hitDice.die);
     const roll = method === "roll" ? rollDie(faces) : undefined;
     const ok = await submit([{ type: "levelUp", method, roll }]);
     if (ok) setLevelUpOpen(false);
@@ -350,152 +182,27 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
     <Card title="Hit Points">
       <div className="flex flex-col gap-4 p-4">
         {/* ── HP display ── */}
-        <div>
-          <div className="mb-1.5 flex items-baseline justify-between">
-            <p className="font-display text-xl font-semibold leading-none text-garnet-800">
-              {hitPoints.current}
-              <span className="text-sm font-normal text-parchment-600">
-                {" "}
-                / {hitPoints.max}
-                {hitPoints.temp > 0 && (
-                  <span className="text-gold-800"> (+{hitPoints.temp} temp)</span>
-                )}
-              </span>
-            </p>
-            <span className="text-xs text-parchment-600">
-              {availableDice}/{hitDice.total}
-              {hitDice.die} available
-            </span>
-          </div>
-          <MeterBar
-            current={hitPoints.current}
-            max={hitPoints.max}
-            tone="garnet"
-            label={`${hitPoints.current} of ${hitPoints.max} hit points`}
-          />
-        </div>
+        <HpMeter
+          current={hitPoints.current}
+          max={hitPoints.max}
+          temp={hitPoints.temp}
+          availableDice={availableDice}
+          hitDiceTotal={hitDice.total}
+          die={hitDice.die}
+        />
 
         {/* ── Death save tracker (shown at 0 HP) ── */}
         {isDying && (
-          <div className="rounded-card border border-garnet-300 bg-garnet-50 p-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-garnet-800">
-              {hitPoints.deathSaves.failures >= 3
-                ? "Character Dead"
-                : hitPoints.deathSaves.successes === 0 && hitPoints.deathSaves.failures === 0 && !pending
-                  ? "Unconscious — Roll Death Saves"
-                  : "Death Saves"}
-            </p>
-            <div className="flex flex-col gap-1.5">
-              <DeathSavePips
-                label="Successes"
-                count={hitPoints.deathSaves.successes}
-                tone="success"
-              />
-              <DeathSavePips
-                label="Failures"
-                count={hitPoints.deathSaves.failures}
-                tone="failure"
-              />
-            </div>
-            {hitPoints.deathSaves.failures < 3 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={handleDeathSaveRoll}
-                  className="rounded-control bg-garnet-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:cursor-not-allowed disabled:bg-parchment-200 disabled:text-parchment-400 disabled:hover:bg-parchment-200"
-                >
-                  Roll death save (d20)
-                </button>
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={handleStabilize}
-                  className="text-sm font-semibold text-garnet-700 hover:underline disabled:opacity-50"
-                >
-                  Stabilize
-                </button>
-              </div>
-            )}
-          </div>
+          <DeathSaveTracker
+            deathSaves={hitPoints.deathSaves}
+            pending={pending}
+            onRollDeathSave={handleDeathSaveRoll}
+            onStabilize={handleStabilize}
+          />
         )}
 
         {/* ── HP action control (segmented mode + stepper + verb) ── */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Mode picker */}
-          <div
-            role="radiogroup"
-            aria-label="Hit point action"
-            className="inline-flex rounded-control bg-parchment-100 p-0.5"
-          >
-            {HP_MODES.map(({ mode: m, label, icon: SegIcon }) => {
-              const active = m === mode;
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  disabled={pending}
-                  onClick={() => setMode(m)}
-                  className={`inline-flex items-center gap-1.5 rounded-control px-3 py-1.5 text-sm font-semibold transition-colors disabled:opacity-50 ${
-                    active
-                      ? "bg-parchment-50 text-parchment-900 shadow-card"
-                      : "text-parchment-600 hover:text-parchment-900"
-                  }`}
-                >
-                  <SegIcon aria-hidden="true" className="h-4 w-4" />
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Stepper */}
-          <div className="inline-flex items-center rounded-control border border-parchment-300 bg-parchment-50">
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => stepAmount(-1)}
-              aria-label="Decrease amount"
-              className="flex h-8 w-8 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50"
-            >
-              <Minus aria-hidden="true" className="h-4 w-4" />
-            </button>
-            <input
-              type="number"
-              min={0}
-              step={1}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleApply()}
-              placeholder="0"
-              disabled={pending}
-              aria-label={activeMode.fieldLabel}
-              className="w-16 border-0 bg-transparent text-center text-lg tabular-nums text-parchment-900 disabled:opacity-50"
-            />
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => stepAmount(1)}
-              aria-label="Increase amount"
-              className="flex h-8 w-8 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50"
-            >
-              <Plus aria-hidden="true" className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Contextual primary action */}
-          <button
-            type="button"
-            disabled={applyDisabled}
-            onClick={handleApply}
-            className={`inline-flex items-center gap-1.5 rounded-control px-3 py-1.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:bg-parchment-200 disabled:text-parchment-400 disabled:hover:bg-parchment-200 ${activeMode.buttonClass}`}
-          >
-            <ApplyIcon aria-hidden="true" className="h-4 w-4" />
-            {activeMode.verb}
-          </button>
-        </div>
+        <HpActionControl pending={pending} onApply={handleApply} />
 
         {/* ── Concentration save preference (spellcasters only, issue #76) ── */}
         {isSpellcaster && (
@@ -512,111 +219,30 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
         )}
 
         {/* ── Rest controls ── */}
-        <div className="flex flex-wrap items-end gap-3 border-t border-parchment-200 pt-3">
-          {/* Short rest */}
-          <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
-            <span>Short rest — dice to spend</span>
-            <div className="flex gap-2">
-              <div className="inline-flex items-center rounded-control border border-parchment-300 bg-parchment-50">
-                <button
-                  type="button"
-                  disabled={pending || availableDice === 0}
-                  onClick={() =>
-                    setDiceToSpend(String(Math.max(1, (parseInt(diceToSpend, 10) || 1) - 1)))
-                  }
-                  aria-label="Decrease dice to spend"
-                  className="flex h-8 w-8 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50"
-                >
-                  <Minus aria-hidden="true" className="h-4 w-4" />
-                </button>
-                <input
-                  type="number"
-                  min={1}
-                  max={availableDice}
-                  step={1}
-                  value={diceToSpend}
-                  onChange={(e) => setDiceToSpend(e.target.value)}
-                  disabled={pending || availableDice === 0}
-                  aria-label="Dice to spend"
-                  className="w-12 border-0 bg-transparent text-center text-lg tabular-nums text-parchment-900 disabled:opacity-50"
-                />
-                <button
-                  type="button"
-                  disabled={pending || availableDice === 0}
-                  onClick={() =>
-                    setDiceToSpend(
-                      String(Math.min(availableDice, (parseInt(diceToSpend, 10) || 1) + 1)),
-                    )
-                  }
-                  aria-label="Increase dice to spend"
-                  className="flex h-8 w-8 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50"
-                >
-                  <Plus aria-hidden="true" className="h-4 w-4" />
-                </button>
-              </div>
-              <button
-                type="button"
-                disabled={pending || availableDice === 0}
-                onClick={handleShortRest}
-                className="rounded-control bg-parchment-300 px-3 py-1.5 text-sm font-semibold text-parchment-800 transition-colors hover:bg-parchment-400 disabled:opacity-50"
-              >
-                Rest
-              </button>
-            </div>
-          </div>
-
-          {/* Long rest */}
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
-              Long rest
-            </span>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={handleLongRest}
-              className="rounded-control bg-arcane-100 px-3 py-1.5 text-sm font-semibold text-arcane-800 transition-colors hover:bg-arcane-200 disabled:opacity-50"
-            >
-              Full rest
-            </button>
-          </div>
-        </div>
+        <RestControls
+          availableDice={availableDice}
+          pending={pending}
+          onShortRest={handleShortRest}
+          onLongRest={handleLongRest}
+        />
 
         {/* ── Level-up affordance ── */}
         {pendingLevelUps > 0 && (
-          <div className="flex items-center justify-between gap-3 rounded-card border border-gold-300 bg-gold-50 px-3 py-2">
-            <span className="text-sm font-semibold text-gold-800">
-              {pendingLevelUps === 1
-                ? "Level up available!"
-                : `${pendingLevelUps} level-ups available!`}
-            </span>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => setLevelUpOpen(true)}
-              className="rounded-control bg-gold-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-gold-800 disabled:cursor-not-allowed disabled:bg-parchment-200 disabled:text-parchment-400 disabled:hover:bg-parchment-200"
-            >
-              Level up
-            </button>
-          </div>
+          <LevelUpCallout
+            pendingLevelUps={pendingLevelUps}
+            pending={pending}
+            onLevelUp={() => setLevelUpOpen(true)}
+          />
         )}
 
         {/* ── Advancement slot unlocked callout ── */}
         {advancementCallout && (
-          <div className="flex items-center justify-between gap-3 rounded-card border border-arcane-300 bg-arcane-50 px-3 py-2">
-            <span className="text-sm font-semibold text-arcane-800">
-              New advancement slot! Choose an ASI or feat.
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                setAdvancementCallout(false);
-                document.getElementById("advancement-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
-              className="rounded-control bg-arcane-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-arcane-800"
-            >
-              Go to Advancements
-            </button>
-          </div>
+          <AdvancementCallout
+            onGoToAdvancements={() => {
+              setAdvancementCallout(false);
+              document.getElementById("advancement-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          />
         )}
 
         {/* Concentration save result (issue #41, auto-roll path) */}
