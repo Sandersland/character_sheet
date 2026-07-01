@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import AbilityScoreBox from "@/features/abilities/AbilityScoreBox";
+import AbilityScoresPanel from "@/features/abilities/AbilityScoresPanel";
 import RollResultToast from "@/features/dice/RollResultToast";
 import { RollProvider } from "@/features/dice/RollContext";
 import ActivityModal from "@/features/character-meta/ActivityModal";
@@ -17,7 +17,6 @@ import InventoryList from "@/features/inventory/InventoryList";
 import JournalSection from "@/features/character-meta/JournalSection";
 import CapturePalette from "@/features/journal/CapturePalette";
 import SessionsModal from "@/features/session/SessionsModal";
-import SkillsTable from "@/features/abilities/SkillsTable";
 import SpellsSection from "@/features/spells/SpellsSection";
 import ProficienciesCard from "@/features/abilities/ProficienciesCard";
 import VitalsStrip from "@/features/character-meta/VitalsStrip";
@@ -27,7 +26,6 @@ import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { useGlobalKeyboard } from "@/hooks/useGlobalKeyboard";
 import { useReferenceData } from "@/hooks/useReferenceData";
 import { useSessionButton } from "@/features/session/useSessionButton";
-import { abilityAbbr, orderedAbilityEntries } from "@/lib/abilities";
 
 export default function CharacterSheetPage() {
   const { id } = useParams();
@@ -85,11 +83,6 @@ export default function CharacterSheetPage() {
       </div>
     );
   }
-
-  // Render abilities in canonical 5e order (STR-DEX-CON-INT-WIS-CHA) via the
-  // shared helper rather than raw object key order, which is arbitrary and
-  // surprised D&D players (it read WIS-CHA-STR-DEX-CON-INT).
-  const abilityEntries = orderedAbilityEntries(character.abilityScores);
 
   return (
     <RollProvider>
@@ -151,39 +144,7 @@ export default function CharacterSheetPage() {
         </div>
 
         {/* ── Ability scores · Saves · Skills ────────────────────────── */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_1fr] lg:items-start">
-          {/* Ability scores rail — fixed intrinsic width per
-              principles.md ("don't over-rely on grid systems" for
-              elements with a natural fixed width). `lg:items-start` on
-              the parent is the actual fix for box proportions: CSS
-              grid's default `align-items: stretch` was forcing this
-              rail to match the Skills card's full height (~660px) and
-              distributing that across 3 rows, ballooning every box to
-              ~210px tall regardless of column count or padding — 2x3
-              vs 3x2 only changed how many rows split that same forced
-              height. With `items-start` the rail sizes to its own
-              content and each box sits near its natural ~120x100px. */}
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-6 lg:w-[16rem] lg:grid-cols-2 lg:gap-3">
-            {abilityEntries.map(([key, score]) => (
-              <AbilityScoreBox
-                key={key}
-                ability={key}
-                label={abilityAbbr(key)}
-                score={score}
-                saveProficient={character.savingThrowProficiencies.includes(key)}
-                proficiencyBonus={character.proficiencyBonus}
-              />
-            ))}
-          </div>
-
-          <Card title="Skills">
-            <SkillsTable
-              skills={character.skills}
-              abilityScores={character.abilityScores}
-              proficiencyBonus={character.proficiencyBonus}
-            />
-          </Card>
-        </div>
+        <AbilityScoresPanel character={character} />
 
         {/* ── Proficiencies & Languages ───────────────────────────────── */}
         {/* Weapons, armor (derived from class/race/feats), and tools
