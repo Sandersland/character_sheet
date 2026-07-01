@@ -99,13 +99,24 @@ describe("MentionAutocomplete (#248)", () => {
     );
   });
 
+  // Longest typed query in this suite (12 chars through the debounce). Under heavy
+  // CPU contention — lefthook runs this suite parallel to the two tsc jobs on
+  // pre-push, oversubscribing cores against vitest's own worker pool — the
+  // keystroke/debounce/render chain starved and blew vitest's default 5000ms
+  // per-test ceiling, flaking the required gate and forcing push retries. Raising
+  // findByRole's wait alone can't help (the test-level timeout fires first), so we
+  // lift the test timeout to 15s and let findByRole poll up to 12s. Both only
+  // spend wall-time on genuine failure, never on the happy path; behaviour is
+  // unchanged.
   it("still matches a multiword apostrophe name (Baldur's Ga)", async () => {
     const user = userEvent.setup();
     render(<Harness campaignId="camp-1" />);
     await user.type(screen.getByLabelText("Note body"), "@Baldur's Ga");
 
-    expect(await screen.findByRole("option", { name: /Baldur's Gate/ })).toBeInTheDocument();
-  });
+    expect(
+      await screen.findByRole("option", { name: /Baldur's Gate/ }, { timeout: 12000 }),
+    ).toBeInTheDocument();
+  }, 15000);
 
   it("offers a create row that calls createEntity for a no-match query", async () => {
     vi.mocked(client.createEntity).mockResolvedValue(
