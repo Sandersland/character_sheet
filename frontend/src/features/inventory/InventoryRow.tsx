@@ -5,6 +5,7 @@ import { hasItemProse, itemDetailParts } from "@/lib/itemDetails";
 import { isEquippable } from "@/lib/items";
 import type { InventoryItem, InventoryOperation } from "@/types/character";
 import OverflowMenu from "@/components/ui/OverflowMenu";
+import EquipToggle from "@/features/inventory/EquipToggle";
 import InventoryEditForm from "@/features/inventory/InventoryEditForm";
 
 interface InventoryRowProps {
@@ -96,21 +97,7 @@ export default function InventoryRow({
             </button>
           )}
           {isEquippable(item.category) && (
-            <button
-              type="button"
-              disabled={pending}
-              aria-pressed={item.equipped}
-              onClick={() =>
-                onSubmit([{ type: "setEquipped", inventoryItemId: item.id, equipped: !item.equipped }])
-              }
-              className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors disabled:opacity-50 ${
-                item.equipped
-                  ? "border-vitality-200 bg-vitality-50 text-vitality-800 hover:bg-vitality-100"
-                  : "border-parchment-300 bg-parchment-50 text-parchment-700 hover:bg-parchment-100"
-              }`}
-            >
-              {item.equipped ? "Equipped" : "Equip"}
-            </button>
+            <EquipToggle item={item} pending={pending} onSubmit={onSubmit} />
           )}
           <OverflowMenu
             label={`Actions for ${item.name}`}
