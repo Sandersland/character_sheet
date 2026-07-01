@@ -63,7 +63,7 @@ interface ResourcePool {
 const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // ── Universal actions ──────────────────────────────────────────────────────
   // These are intentionally NOT included in `availableActions` on the character
-  // because TurnTracker already renders them from the client-side UNIVERSAL_ACTIONS
+  // because TurnHub already renders them from the client-side UNIVERSAL_ACTIONS
   // list (lib/turnRules.ts). Including them here would duplicate them.
   // Only class-specific (non-universal) actions go in availableActions.
 
@@ -109,7 +109,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
  * each with `enabled` based on current resource pool `remaining` values.
  *
  * Returns only CLASS-SPECIFIC actions (not universal ones — those are rendered
- * by TurnTracker from the client-side UNIVERSAL_ACTIONS list in turnRules.ts
+ * by TurnHub from the client-side UNIVERSAL_ACTIONS list in turnRules.ts
  * to avoid double-rendering).
  *
  * Pure function — no DB access. Safe to call in synchronous serializeCharacter.

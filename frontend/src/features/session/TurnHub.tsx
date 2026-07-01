@@ -1,7 +1,6 @@
 /**
- * TurnHub — turn-economy orchestrator for the SessionPage.
- *
- * Replaces TurnTracker.tsx as the primary turn panel. Adds:
+ * TurnHub — turn-economy orchestrator for the SessionPage. The primary turn
+ * panel. Features:
  *   - useActiveResolution() for inline-tool state (replaces the three
  *     show*Menu booleans and the fragile onAttackRolled callback prop).
  *   - send() helper that calls applyActionTransactions for every server-

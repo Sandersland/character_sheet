@@ -673,21 +673,6 @@ export interface AvailableAction {
   disabledReason?: string;
 }
 
-/** Full catalog entry served by `GET /api/actions`. */
-export interface CatalogAction {
-  id: string;
-  key: string;
-  name: string;
-  description: string;
-  cost: ActionCost;
-  universal: boolean;
-  grantClass?: string;
-  grantSubclass?: string;
-  grantLevel?: number;
-  resourceKey?: string;
-  resourceAmount?: number;
-}
-
 // ── Subclass option (from GET /api/reference) ─────────────────────────────────
 
 export interface SubclassOption {
