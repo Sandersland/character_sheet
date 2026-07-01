@@ -16,7 +16,7 @@ import {
 import { rollDie } from "./dice.js";
 import { deriveResources } from "./class-features.js";
 import { normalizeResourcesMutable, serializeResourcesState } from "./resources.js";
-import { normalizeSpellcastingMutable } from "./spellcasting.js";
+import { normalizeSpellcastingMutable } from "./spell-state.js";
 
 export class InvalidHitPointOperationError extends Error {}
 
