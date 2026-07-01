@@ -93,17 +93,20 @@ export default function InlineSpellPicker({
         </p>
       )}
 
-      {picker.sortedSpells.map((spell) => (
-        <SpellPickerRow
-          key={spell.id}
-          spell={spell}
-          view={picker.viewFor(spell)}
-          row={picker.rowFor(spell)}
-          onPatch={(patch) => picker.patchRow(spell.id, patch)}
-          onCast={() => picker.handleCast(spell)}
-          onAttackRoll={() => picker.handleAttackRoll(spell)}
-        />
-      ))}
+      {picker.sortedSpells.map((spell) => {
+        const row = picker.rowFor(spell);
+        return (
+          <SpellPickerRow
+            key={spell.id}
+            spell={spell}
+            view={picker.viewFor(spell, row)}
+            row={row}
+            onPatch={(patch) => picker.patchRow(spell.id, patch)}
+            onCast={() => picker.handleCast(spell)}
+            onAttackRoll={() => picker.handleAttackRoll(spell)}
+          />
+        );
+      })}
 
       {/* Empty state when the 5e rule blocks everything */}
       {!picker.hasCastable && picker.slotUsedHint && (
