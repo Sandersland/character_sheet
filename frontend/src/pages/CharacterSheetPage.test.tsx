@@ -40,7 +40,9 @@ vi.mock("@/features/experience/ExperienceTracker", () => ({ default: () => null 
 vi.mock("@/features/hitpoints/HitPointTracker", () => ({ default: () => null }));
 vi.mock("@/features/inventory/InventoryList", () => ({ default: () => null }));
 vi.mock("@/features/character-meta/JournalSection", () => ({ default: () => null }));
-vi.mock("@/features/journal/CapturePalette", () => ({ default: () => null }));
+vi.mock("@/features/journal/CapturePalette", () => ({
+  default: () => <div>capture-palette-open</div>,
+}));
 vi.mock("@/features/session/SessionsModal", () => ({ default: () => null }));
 vi.mock("@/features/abilities/SkillsTable", () => ({ default: () => null }));
 vi.mock("@/features/spells/SpellsSection", () => ({ default: () => null }));
@@ -199,5 +201,22 @@ describe("CharacterSheetPage header session button (#245)", () => {
 
     expect(await screen.findByText("Character already in a campaign")).toBeInTheDocument();
     expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it("opens the quick-capture palette when the visible '＋ Note' button is clicked (#274)", async () => {
+    mockUseCharacter.mockReturnValue({
+      character: makeCharacter({ campaignId: "camp1" }),
+      error: null,
+      setCharacter: vi.fn(),
+    } as never);
+    mockFetchActive.mockResolvedValue(null);
+
+    renderPage();
+
+    // Palette is closed until the button is pressed — no keyboard shortcut needed.
+    expect(screen.queryByText("capture-palette-open")).not.toBeInTheDocument();
+    const noteButton = await screen.findByRole("button", { name: /note/i });
+    noteButton.click();
+    expect(await screen.findByText("capture-palette-open")).toBeInTheDocument();
   });
 });

@@ -235,10 +235,10 @@ export async function deleteCharacter(id: string): Promise<void> {
 // effect, so they aren't routed through the audit log. Each call returns the
 // full updated Character so the caller can swap its state in one assignment.
 
-// kind defaults to ENTRY; NOTE omits title/date (server fills both).
+// kind defaults to ENTRY; NOTE omits date (server fills it with today).
 export async function createJournalEntry(
   characterId: string,
-  entry: { kind?: JournalEntryKind; title?: string; date?: string; body: string; sessionId?: string }
+  entry: { kind?: JournalEntryKind; date?: string; body: string; sessionId?: string }
 ): Promise<Character> {
   const response = await apiFetch(`${API_URL}/characters/${characterId}/journal`, {
     method: "POST",
@@ -255,7 +255,7 @@ export async function createJournalEntry(
 export async function updateJournalEntry(
   characterId: string,
   entryId: string,
-  patch: { title?: string; date?: string; body?: string }
+  patch: { date?: string; body?: string }
 ): Promise<Character> {
   const response = await apiFetch(`${API_URL}/characters/${characterId}/journal/${entryId}`, {
     method: "PATCH",

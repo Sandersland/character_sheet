@@ -914,8 +914,8 @@ model SessionParticipant {
 }
 
 // kind distinguishes the two capture surfaces sharing this table: full ENTRY
-// rows (3-field title/date/body form) vs. fast NOTE rows (one-line in-session
-// capture, no title). EntryVisibility ships private-by-default; the CAMPAIGN
+// rows (date/body form) vs. fast NOTE rows (one-line in-session capture, date
+// defaults to today). EntryVisibility ships private-by-default; the CAMPAIGN
 // share toggle is deferred but needs no schema change to enable later.
 enum JournalEntryKind {
   NOTE
@@ -943,7 +943,6 @@ model JournalEntry {
   sessionId    String?
   session      Session?         @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   kind         JournalEntryKind @default(ENTRY)
-  title        String?
   date         DateTime
   loggedAt     DateTime         @default(now())
   body         String

@@ -237,6 +237,15 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
           <div className="flex flex-col items-end gap-2">
             <BackendStatus />
             <div className="flex items-center gap-2">
+              {/* Visible quick-capture affordance (#274) — opens the same
+                  palette as Cmd/Ctrl+J, discoverable and usable on touch. */}
+              <button
+                type="button"
+                onClick={() => setCaptureOpen(true)}
+                className="rounded-control border border-arcane-700 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-arcane-700 transition-colors hover:bg-arcane-50"
+              >
+                ＋ Note
+              </button>
               <button
                 type="button"
                 disabled={leavePending || endPending}
