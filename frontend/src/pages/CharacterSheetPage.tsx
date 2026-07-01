@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
 
 import AbilityScoreBox from "@/features/abilities/AbilityScoreBox";
 import RollResultToast from "@/features/dice/RollResultToast";
@@ -28,33 +28,22 @@ import { useCharacter } from "@/hooks/useCharacter";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { useGlobalKeyboard } from "@/hooks/useGlobalKeyboard";
 import { useReferenceData } from "@/hooks/useReferenceData";
+import { useSessionButton } from "@/features/session/useSessionButton";
 import { abilityAbbr, orderedAbilityEntries } from "@/lib/abilities";
-import { fetchActiveSession, joinSession, startCampaignSession } from "@/api/client";
-import type { Session } from "@/types/character";
 
 export default function CharacterSheetPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const { character, error, setCharacter } = useCharacter(id);
   const { reference } = useReferenceData();
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(false);
-  const [activeSession, setActiveSession] = useState<Session | null | undefined>(undefined);
-  const [sessionPending, setSessionPending] = useState(false);
-  const [sessionError, setSessionError] = useState<string | null>(null);
   const [captureOpen, setCaptureOpen] = useState(false);
   const showSpinner = useDelayedFlag(character === undefined && !error);
+  const session = useSessionButton(id, character);
 
   // Cmd/Ctrl+J opens the quick-capture palette from anywhere on the sheet.
   useGlobalKeyboard(() => setCaptureOpen(true));
-
-  // Resolve active session on mount so the header button can say
-  // "Start Session" or "Resume Session" correctly.
-  useEffect(() => {
-    if (!id) return;
-    fetchActiveSession(id).then(setActiveSession).catch(() => setActiveSession(null));
-  }, [id]);
 
   if (error) {
     return (
@@ -104,38 +93,6 @@ export default function CharacterSheetPage() {
   // surprised D&D players (it read WIS-CHA-STR-DEX-CON-INT).
   const abilityEntries = orderedAbilityEntries(character.abilityScores);
 
-  // Header session button (#245): driven by campaign membership + whether this
-  // character is an active participant of the campaign's live session.
-  const campaignId = character.campaignId;
-  const inActiveSession =
-    activeSession?.participants?.some((p) => p.characterId === character.id && !p.leftAt) ?? false;
-  const sessionLabel = activeSession
-    ? inActiveSession
-      ? "Resume Session"
-      : "Join Session"
-    : "Start Session";
-
-  const handleSessionButton = async () => {
-    if (!id || !campaignId) return;
-    setSessionPending(true);
-    setSessionError(null);
-    try {
-      if (activeSession) {
-        if (!inActiveSession) {
-          await joinSession(campaignId, activeSession.id, id);
-        }
-      } else {
-        const { session } = await startCampaignSession(campaignId, id);
-        setActiveSession(session);
-      }
-      navigate(`/characters/${id}/session`);
-    } catch (err) {
-      setSessionError(err instanceof Error ? err.message : "Could not start or join the session.");
-    } finally {
-      setSessionPending(false);
-    }
-  };
-
   return (
     <RollProvider>
     <div className="min-h-screen bg-parchment-100">
@@ -168,14 +125,14 @@ export default function CharacterSheetPage() {
             <div className="flex flex-wrap items-center gap-3">
               {/* Start / Join / Resume Session — the primary live-play entry
                   point. Requires a campaign; sessions are shared per campaign. */}
-              {campaignId ? (
+              {session.hasCampaign ? (
                 <button
                   type="button"
-                  disabled={sessionPending || activeSession === undefined}
-                  onClick={handleSessionButton}
+                  disabled={session.sessionPending || !session.sessionReady}
+                  onClick={session.handleSessionButton}
                   className="rounded-control bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
                 >
-                  {sessionLabel}
+                  {session.sessionLabel}
                 </button>
               ) : (
                 <Link
@@ -217,8 +174,8 @@ export default function CharacterSheetPage() {
                 Delete
               </button>
             </div>
-            {sessionError && (
-              <p className="text-xs font-semibold text-garnet-700">{sessionError}</p>
+            {session.sessionError && (
+              <p className="text-xs font-semibold text-garnet-700">{session.sessionError}</p>
             )}
           </div>
         </div>
@@ -251,7 +208,7 @@ export default function CharacterSheetPage() {
       {captureOpen && (
         <CapturePalette
           character={character}
-          sessionId={activeSession?.id}
+          sessionId={session.activeSessionId}
           onClose={() => setCaptureOpen(false)}
           onUpdate={setCharacter}
         />
@@ -362,7 +319,7 @@ export default function CharacterSheetPage() {
             <JournalSection
               character={character}
               onUpdate={setCharacter}
-              sessionId={inActiveSession ? activeSession?.id : undefined}
+              sessionId={session.inActiveSession ? session.activeSessionId : undefined}
             />
           )}
         </div>
@@ -373,7 +330,7 @@ export default function CharacterSheetPage() {
           <JournalSection
             character={character}
             onUpdate={setCharacter}
-            sessionId={inActiveSession ? activeSession?.id : undefined}
+            sessionId={session.inActiveSession ? session.activeSessionId : undefined}
           />
         )}
       </main>
