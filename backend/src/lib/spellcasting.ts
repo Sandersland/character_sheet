@@ -236,6 +236,64 @@ export type SpellcastingOperation =
   | UnprepareSpellOperation
   | DropConcentrationOperation;
 
+// ── Per-op helper context + outcome ───────────────────────────────────────────
+// Each helper mutates ctx.state in place and returns an OpOutcome, or null for a
+// no-op (which skips both the state write-back and the logEvent in the dispatcher).
+
+interface SpellOpContext {
+  tx: Prisma.TransactionClient;
+  characterId: string;
+  batchId: string;
+  sessionId: string | null;
+  state: SpellcastingMutableState;
+  slotTotals: Record<number, number>;
+  arcanaTotals: Record<number, number>;
+}
+
+interface OpOutcome {
+  eventType: string;
+  summary: string;
+  eventData: Record<string, unknown>;
+}
+
+function applyExpendSlotOp(ctx: SpellOpContext, op: ExpendSlotOperation): OpOutcome {
+  const { state, slotTotals } = ctx;
+  const total = slotTotals[op.level] ?? 0;
+  const used = state.slotsUsed[String(op.level)] ?? 0;
+  if (total === 0) {
+    throw new InvalidSpellcastingOperationError(`No level-${op.level} slots exist`);
+  }
+  if (used >= total) {
+    throw new InvalidSpellcastingOperationError(`No level-${op.level} spell slots remaining`);
+  }
+  state.slotsUsed[String(op.level)] = used + 1;
+  return {
+    eventType: "expendSlot",
+    summary: `Expended 1 level-${op.level} spell slot`,
+    eventData: { level: op.level },
+  };
+}
+
+function applyRestoreSlotOp(ctx: SpellOpContext, op: RestoreSlotOperation): OpOutcome {
+  const { state } = ctx;
+  const slotUsed = state.slotsUsed[String(op.level)] ?? 0;
+  const arcanumUsed = state.arcanumUsed[String(op.level)] ?? 0;
+  let summary: string;
+  if (slotUsed > 0) {
+    state.slotsUsed[String(op.level)] = slotUsed - 1;
+    summary = `Restored 1 level-${op.level} spell slot`;
+  } else if (arcanumUsed > 0) {
+    // No expended slot at this level, but a Mystic Arcanum charge was spent — undo that.
+    state.arcanumUsed[String(op.level)] = arcanumUsed - 1;
+    summary = `Restored level-${op.level} Mystic Arcanum`;
+  } else {
+    throw new InvalidSpellcastingOperationError(
+      `No expended level-${op.level} slots to restore`
+    );
+  }
+  return { eventType: "restoreSlot", summary, eventData: { level: op.level } };
+}
+
 // ── Transaction handler ───────────────────────────────────────────────────────
 
 /**
@@ -305,6 +363,16 @@ export async function applySpellcastingOperations(
           spells: [...state.spells],
           concentratingOn: state.concentratingOn ? { ...state.concentratingOn } : null,
         },
+      };
+
+      const ctx: SpellOpContext = {
+        tx,
+        characterId,
+        batchId,
+        sessionId,
+        state,
+        slotTotals,
+        arcanaTotals,
       };
 
       let summary = "";
@@ -431,39 +499,12 @@ export async function applySpellcastingOperations(
         }
 
         case "expendSlot": {
-          const total = slotTotals[op.level] ?? 0;
-          const used = state.slotsUsed[String(op.level)] ?? 0;
-          if (total === 0) {
-            throw new InvalidSpellcastingOperationError(`No level-${op.level} slots exist`);
-          }
-          if (used >= total) {
-            throw new InvalidSpellcastingOperationError(`No level-${op.level} spell slots remaining`);
-          }
-          state.slotsUsed[String(op.level)] = used + 1;
-          eventType = "expendSlot";
-          summary = `Expended 1 level-${op.level} spell slot`;
-          eventData = { level: op.level };
+          ({ eventType, summary, eventData } = applyExpendSlotOp(ctx, op));
           break;
         }
 
         case "restoreSlot": {
-          const slotUsed = state.slotsUsed[String(op.level)] ?? 0;
-          const arcanumUsed = state.arcanumUsed[String(op.level)] ?? 0;
-          if (slotUsed > 0) {
-            state.slotsUsed[String(op.level)] = slotUsed - 1;
-            summary = `Restored 1 level-${op.level} spell slot`;
-          } else if (arcanumUsed > 0) {
-            // No expended slot at this level, but a Mystic Arcanum charge was
-            // spent — undo that instead.
-            state.arcanumUsed[String(op.level)] = arcanumUsed - 1;
-            summary = `Restored level-${op.level} Mystic Arcanum`;
-          } else {
-            throw new InvalidSpellcastingOperationError(
-              `No expended level-${op.level} slots to restore`
-            );
-          }
-          eventType = "restoreSlot";
-          eventData = { level: op.level };
+          ({ eventType, summary, eventData } = applyRestoreSlotOp(ctx, op));
           break;
         }
 
