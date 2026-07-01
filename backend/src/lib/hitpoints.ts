@@ -845,6 +845,89 @@ async function applyShortRestOp(ctx: HpOpContext, op: ShortRestOperation): Promi
   return { summary, eventData };
 }
 
+async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
+  const { tx, characterId, row, hp, hd, effMax } = ctx;
+  const prevCurrent = hp.current;
+  hp.current = effMax;
+  hp.temp = 0;
+  hp.deathSaves = { successes: 0, failures: 0 };
+  // Recover hit dice equal to half your total (round down, min 1).
+  const recovered = Math.max(1, Math.floor(hd.total / 2));
+  hd.spent = Math.max(0, hd.spent - recovered);
+
+  // Reset all spell slot used-counts (long-rest recovery for every caster,
+  // including Warlock Pact slots) and clear Warlock Mystic Arcanum charges.
+  const spellState = normalizeSpellcastingMutable(row.spellcasting);
+  const beforeSpellState = {
+    slotsUsed: { ...spellState.slotsUsed },
+    arcanumUsed: { ...spellState.arcanumUsed },
+    spells: spellState.spells.map((s) => ({ ...s })),
+    concentratingOn: spellState.concentratingOn ? { ...spellState.concentratingOn } : null,
+  };
+  const slotsRestored =
+    Object.values(spellState.slotsUsed).reduce((s, n) => s + n, 0) +
+    Object.values(spellState.arcanumUsed).reduce((s, n) => s + n, 0);
+  spellState.slotsUsed = {};
+  spellState.arcanumUsed = {};
+  // A long rest ends any active concentration.
+  spellState.concentratingOn = null;
+
+  // Reset subclass resources that recharge on a long rest or short-or-long rest.
+  const abilityScores = row.abilityScores as Record<string, number>;
+  const derivedLevel = levelForExperience(row.experiencePoints);
+  const profBonus = proficiencyBonusForLevel(derivedLevel);
+  const primaryClassEntry = row.classEntries[0];
+  const derivedRes = deriveResources(
+    primaryClassEntry?.name ?? "",
+    primaryClassEntry?.subclass ?? undefined,
+    derivedLevel,
+    abilityScores,
+    profBonus,
+  );
+  const resourceState = normalizeResourcesMutable(row.resources);
+  const beforeResourceState = {
+    used: { ...resourceState.used },
+    maneuversKnown: resourceState.maneuversKnown.map((m) => ({ ...m })),
+  };
+  let resourcesRestored = 0;
+  if (derivedRes) {
+    for (const pool of derivedRes.resources) {
+      if (pool.recharge === "longRest" || pool.recharge === "short-or-long") {
+        resourcesRestored += resourceState.used[pool.key] ?? 0;
+        resourceState.used[pool.key] = 0;
+      }
+    }
+  }
+
+  const hpRestored = effMax - prevCurrent;
+  const eventData: Record<string, unknown> = { recovered, hpRestored, slotsRestored, resourcesRestored };
+  const parts: string[] = [];
+  if (hpRestored > 0) parts.push(`+${hpRestored} HP`);
+  else parts.push("HP already full");
+  if (slotsRestored > 0) parts.push(`${slotsRestored} slot${slotsRestored !== 1 ? "s" : ""} restored`);
+  if (resourcesRestored > 0) parts.push(`resources restored`);
+  const summary = `Long rest — ${parts.join(", ")}`;
+
+  // Write spellcasting + resources; the dispatcher writes HP separately below.
+  await tx.character.update({
+    where: { id: characterId },
+    data: {
+      spellcasting: {
+        slotsUsed: spellState.slotsUsed,
+        arcanumUsed: spellState.arcanumUsed,
+        spells: spellState.spells,
+        concentratingOn: null,
+      } as unknown as Prisma.InputJsonValue,
+      resources: serializeResourcesState(resourceState),
+    },
+  });
+
+  // Include spellcasting + resources in the before/after snapshot for undo.
+  eventData.beforeSpellState = beforeSpellState;
+  eventData.beforeResourceState = beforeResourceState;
+  return { summary, eventData };
+}
+
 // ---- Transaction handler ----
 
 /**
@@ -970,89 +1053,9 @@ export async function applyHitPointOperations(
           result = await applyShortRestOp(ctx, op);
           break;
 
-        case "longRest": {
-          const prevCurrent = hp.current;
-          hp.current = effMax;
-          hp.temp = 0;
-          hp.deathSaves = { successes: 0, failures: 0 };
-          // Recover hit dice equal to half your total (round down, min 1).
-          const recovered = Math.max(1, Math.floor(hd.total / 2));
-          hd.spent = Math.max(0, hd.spent - recovered);
-
-          // Reset all spell slot used-counts to 0 (long-rest recovery for every
-          // caster, including Warlock Pact slots) and clear Warlock Mystic Arcanum
-          // charges. Snapshot the full blob (incl. spells) so undo restores it
-          // faithfully rather than wiping the known-spell list.
-          const spellState = normalizeSpellcastingMutable(row.spellcasting);
-          const beforeSpellState = {
-            slotsUsed: { ...spellState.slotsUsed },
-            arcanumUsed: { ...spellState.arcanumUsed },
-            spells: spellState.spells.map((s) => ({ ...s })),
-            concentratingOn: spellState.concentratingOn ? { ...spellState.concentratingOn } : null,
-          };
-          const slotsRestored =
-            Object.values(spellState.slotsUsed).reduce((s, n) => s + n, 0) +
-            Object.values(spellState.arcanumUsed).reduce((s, n) => s + n, 0);
-          spellState.slotsUsed = {};
-          spellState.arcanumUsed = {};
-          // A long rest ends any active concentration.
-          spellState.concentratingOn = null;
-
-          // Reset subclass resources that recharge on a long rest or short-or-long rest.
-          const abilityScores = row.abilityScores as Record<string, number>;
-          const derivedLevel = levelForExperience(row.experiencePoints);
-          const profBonus = proficiencyBonusForLevel(derivedLevel);
-          const primaryClassEntry = row.classEntries[0];
-          const derivedRes = deriveResources(
-            primaryClassEntry?.name ?? "",
-            primaryClassEntry?.subclass ?? undefined,
-            derivedLevel,
-            abilityScores,
-            profBonus,
-          );
-          const resourceState = normalizeResourcesMutable(row.resources);
-          const beforeResourceState = {
-            used: { ...resourceState.used },
-            maneuversKnown: resourceState.maneuversKnown.map((m) => ({ ...m })),
-          };
-          let resourcesRestored = 0;
-          if (derivedRes) {
-            for (const pool of derivedRes.resources) {
-              if (pool.recharge === "longRest" || pool.recharge === "short-or-long") {
-                resourcesRestored += resourceState.used[pool.key] ?? 0;
-                resourceState.used[pool.key] = 0;
-              }
-            }
-          }
-
-          const hpRestored = effMax - prevCurrent;
-          eventData = { recovered, hpRestored, slotsRestored, resourcesRestored };
-          const parts: string[] = [];
-          if (hpRestored > 0) parts.push(`+${hpRestored} HP`);
-          else parts.push("HP already full");
-          if (slotsRestored > 0) parts.push(`${slotsRestored} slot${slotsRestored !== 1 ? "s" : ""} restored`);
-          if (resourcesRestored > 0) parts.push(`resources restored`);
-          summary = `Long rest — ${parts.join(", ")}`;
-
-          // Write spellcasting + resources in the same character.update below.
-          await tx.character.update({
-            where: { id: characterId },
-            data: {
-              spellcasting: {
-                slotsUsed: spellState.slotsUsed,
-                arcanumUsed: spellState.arcanumUsed,
-                spells: spellState.spells,
-                concentratingOn: null,
-              } as unknown as Prisma.InputJsonValue,
-              resources: serializeResourcesState(resourceState),
-            },
-          });
-
-          // Include spellcasting + resources in the before/after snapshot for undo.
-          (eventData as Record<string, unknown>).beforeSpellState = beforeSpellState;
-          (eventData as Record<string, unknown>).beforeResourceState = beforeResourceState;
+        case "longRest":
+          result = await applyLongRestOp(ctx);
           break;
-        }
 
         case "levelUp":
           result = await applyLevelUpOp(ctx, op);
