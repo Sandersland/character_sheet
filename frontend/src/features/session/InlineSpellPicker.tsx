@@ -47,7 +47,21 @@ import {
   effectPreviewWithMod,
   componentsLabel,
   saveDcLabel,
+  defaultTarget,
+  targetLocked,
+  type Target,
 } from "@/lib/spellMeta";
+import {
+  availableSlotLevels as computeSlotLevels,
+  availableArcanaLevels as computeArcanaLevels,
+  isArcanumLevel as computeIsArcanumLevel,
+  availableSlotsForSpell as computeSlotsForSpell,
+  resolvedSlot as computeResolvedSlot,
+  spellRestrictionFlags,
+  slotRestrictionHint,
+  filterCastableSpells,
+  sortSpells,
+} from "@/lib/spellPicker";
 import Badge from "@/components/ui/Badge";
 import type { Character, Spell } from "@/types/character";
 import type { SpellCastKind } from "@/features/session/useTurnState";
@@ -82,28 +96,12 @@ interface InlineSpellPickerProps {
   castingTimeFilter?: string;
 }
 
-type Target = "self" | "other";
-
 interface SpellRowState {
   slotLevel: number | undefined;  // chosen slot level (undefined = not picked yet)
   target: Target;
   casting: boolean;
   attackRolled: boolean;  // true once Attack was pressed (attack spells only); gates Cast
   error: string | null;
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/** Default target: heal spells or "Self" range → self; everything else → other. */
-function defaultTarget(spell: Spell): Target {
-  if (spell.range?.toLowerCase() === "self") return "self";
-  if (spell.effectKind === "heal") return "self";
-  return "other";
-}
-
-/** True when the target is locked to "self" (range is exactly "Self"). */
-function targetLocked(spell: Spell): boolean {
-  return spell.range?.toLowerCase() === "self";
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -144,77 +142,30 @@ export default function InlineSpellPicker({
     }));
   }
 
-  // Available slot levels with remaining uses.
-  const availableSlotLevels = slots
-    .filter((s) => s.used < s.total)
-    .map((s) => s.level)
-    .sort((a, b) => a - b);
+  // Available slot / Mystic Arcanum levels with remaining uses.
+  const slotLevels = computeSlotLevels(slots);
+  const arcanaLevels = computeArcanaLevels(arcana);
 
-  // Warlock Mystic Arcanum levels (6th–9th) with a charge remaining. These are
-  // cast at their natural level; the backend routes the cast to the arcanum
-  // charge since Pact slots never reach level 6+.
-  const availableArcanaLevels = arcana
-    .filter((a) => a.used < a.total)
-    .map((a) => a.level);
+  const isArcanumLevel = (level: number | undefined) => computeIsArcanumLevel(level, arcanaLevels);
+  const availableSlotsForSpell = (spell: Spell) =>
+    computeSlotsForSpell(spell, slotLevels, arcanaLevels);
+  const resolvedSlot = (spell: Spell, row: SpellRowState) =>
+    computeResolvedSlot(spell, row.slotLevel, slotLevels, arcanaLevels);
 
-  /** True when a cast at this level draws from a Mystic Arcanum charge, not a slot. */
-  function isArcanumLevel(level: number | undefined): boolean {
-    return level !== undefined && availableArcanaLevels.includes(level);
-  }
-
-  // 5e bonus-action restriction helpers.
-  // Cast leveled spell as action → bonus-action spell picker is fully blocked.
-  const bonusActionBlockedByActionSpell =
-    slot === "bonusAction" && spellCastThisTurn.action === "leveled";
-  // Cast leveled spell as bonus action → only cantrips allowed with the action.
-  const actionLimitedToCantrips =
-    slot === "action" && spellCastThisTurn.bonus === "leveled";
-
-  // Castable spells: prepared (or cantrips), slot available, casting-time matches,
-  // and not blocked by the 5e bonus-action restriction.
-  const castableSpells = spells.filter((spell) => {
-    if (!spell.prepared && spell.level > 0) return false;
-
-    // Casting-time filter applies to ALL spells including cantrips.
-    if (castingTimeFilter) {
-      if (!spell.castingTime?.toLowerCase().startsWith(castingTimeFilter.toLowerCase())) return false;
-    }
-
-    // 5e restriction: bonus-action spell picker blocked entirely by leveled action spell.
-    if (bonusActionBlockedByActionSpell) return false;
-
-    // 5e restriction: action picker limited to cantrips when a bonus-action leveled spell was cast.
-    if (actionLimitedToCantrips && spell.level > 0) return false;
-
-    if (spell.level === 0) return true; // cantrip — no slot needed
-    const hasSlotsAvailable = availableSlotLevels.some((l) => l >= spell.level);
-    return hasSlotsAvailable || isArcanumLevel(spell.level);
-  });
-
-  // Sort: cantrips first, then ascending level, then alphabetically.
-  const sortedSpells = [...castableSpells].sort(
-    (a, b) => a.level - b.level || a.name.localeCompare(b.name),
+  // 5e bonus-action restriction flags.
+  const { bonusActionBlockedByActionSpell, actionLimitedToCantrips } = spellRestrictionFlags(
+    slot,
+    spellCastThisTurn,
   );
 
-  // ── Slot picker helpers ──────────────────────────────────────────────────────
-
-  /** Available slot levels for a given leveled spell (incl. a Mystic Arcanum charge). */
-  function availableSlotsForSpell(spell: Spell): number[] {
-    if (spell.level === 0) return [];
-    const levels = availableSlotLevels.filter((l) => l >= spell.level);
-    if (isArcanumLevel(spell.level) && !levels.includes(spell.level)) {
-      levels.push(spell.level);
-    }
-    return levels.sort((a, b) => a - b);
-  }
-
-  /** Resolved slot level for a spell: the row's chosen level, or the lowest available. */
-  function resolvedSlot(spell: Spell, row: SpellRowState): number | undefined {
-    if (spell.level === 0) return undefined;
-    if (row.slotLevel !== undefined) return row.slotLevel;
-    const s = availableSlotsForSpell(spell);
-    return s[0];
-  }
+  const castableSpells = filterCastableSpells(spells, {
+    castingTimeFilter,
+    slotLevels,
+    arcanaLevels,
+    bonusActionBlockedByActionSpell,
+    actionLimitedToCantrips,
+  });
+  const sortedSpells = sortSpells(castableSpells);
 
   // ── Cast handler ─────────────────────────────────────────────────────────────
 
@@ -268,17 +219,13 @@ export default function InlineSpellPicker({
   // ── Render ───────────────────────────────────────────────────────────────────
 
   // Economy hint shown when no further casts are possible.
-  const slotUsedHint = bonusActionBlockedByActionSpell
-      ? "Leveled spell cast this turn — bonus-action spell casting is not allowed (5e)."
-      : actionLimitedToCantrips
-        ? "Bonus-action spell cast this turn — only cantrips may be cast with the action (5e)."
-        : null;
+  const slotUsedHint = slotRestrictionHint(bonusActionBlockedByActionSpell, actionLimitedToCantrips);
 
   if (castableSpells.length === 0 && !slotUsedHint) {
     return (
       <div className="flex flex-col gap-3">
         <p className="text-sm text-parchment-600">
-          {availableSlotLevels.length === 0
+          {slotLevels.length === 0
             ? "No spell slots remaining."
             : "No prepared spells available to cast right now."}
         </p>
