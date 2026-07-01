@@ -9,6 +9,8 @@ import IdentitySection from "@/features/character-create/IdentitySection";
 import SkillSection from "@/features/character-create/SkillSection";
 import Spinner from "@/components/ui/Spinner";
 import StartingEquipmentEditor from "@/features/inventory/StartingEquipmentEditor";
+import ToolProficiencySection from "@/features/character-create/ToolProficiencySection";
+import { useToolProficiencyChoices } from "@/features/character-create/useToolProficiencyChoices";
 import { draftToInput } from "@/lib/startingEquipment";
 import { missingRequirements } from "@/lib/characterCreationValidation";
 import { abilityModifier, formatModifier } from "@/lib/abilities";
@@ -55,32 +57,13 @@ export default function CharacterCreatePage() {
     }
   }
 
-  // ── Tool proficiencies ────────────────────────────────────────────────────
-  // Granted = fixed from background/class/race (read-only display).
-  // Choices = player-selectable from class.toolChoices up to toolChoiceCount.
-
-  const grantedToolProfs = [
-    ...(draft.useCustomBackground ? [] : selectedBackground?.toolProficiencies ?? []),
-    ...(selectedClass?.toolProficiencies ?? []),
-    ...(selectedRace?.toolProficiencies ?? []),
-  ].filter((name, idx, arr) => arr.indexOf(name) === idx); // dedup
-
-  const toolChoiceOptions = (selectedClass?.toolChoices ?? []).filter(
-    (name) => !grantedToolProfs.includes(name)
-  );
-  const maxToolChoices = selectedClass?.toolChoiceCount ?? 0;
-  const selectedToolChoices = draft.toolChoices.filter((t) =>
-    toolChoiceOptions.includes(t)
-  );
-
-  function toggleToolChoice(name: string) {
-    const isSelected = selectedToolChoices.includes(name);
-    if (isSelected) {
-      update({ toolChoices: draft.toolChoices.filter((t) => t !== name) });
-    } else if (selectedToolChoices.length < maxToolChoices) {
-      update({ toolChoices: [...draft.toolChoices, name] });
-    }
-  }
+  const toolChoices = useToolProficiencyChoices({
+    draft,
+    selectedClass,
+    selectedRace,
+    selectedBackground,
+    update,
+  });
 
   const backgroundNameForSubmit = draft.useCustomBackground
     ? draft.customBackground.trim()
@@ -133,7 +116,8 @@ export default function CharacterCreatePage() {
         }],
         abilityScores: draft.abilityScores,
         skillProficiencies: [...grantedSkills, ...selectedClassChoices],
-        toolChoices: selectedToolChoices.length > 0 ? selectedToolChoices : undefined,
+        toolChoices:
+          toolChoices.selectedToolChoices.length > 0 ? toolChoices.selectedToolChoices : undefined,
         portraitUrl: draft.portraitUrl.trim() || null,
         startingEquipment: equipmentInput ?? undefined,
       });
@@ -196,50 +180,14 @@ export default function CharacterCreatePage() {
               onToggle={toggleSkill}
             />
 
-            {/* Tool Proficiency Choices — only shown when the class grants a
-                choice (e.g. Bard → 3 instruments; Monk → 1 artisan or
-                instrument). Also shows any granted tool profs as read-only. */}
-            {(grantedToolProfs.length > 0 || toolChoiceOptions.length > 0) && (
-              <Card title="Tool Proficiencies" headingLevel={2}>
-                <div className="flex flex-col gap-3 p-4">
-                  {grantedToolProfs.length > 0 && (
-                    <p className="text-xs text-parchment-600">
-                      Granted:{" "}
-                      <span className="font-medium text-parchment-800">
-                        {grantedToolProfs.join(", ")}
-                      </span>
-                    </p>
-                  )}
-                  {toolChoiceOptions.length > 0 && (
-                    <>
-                      <p className="text-xs font-semibold text-parchment-600">
-                        Choose {maxToolChoices} (
-                        {selectedToolChoices.length}/{maxToolChoices} selected)
-                      </p>
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                        {toolChoiceOptions.map((name) => (
-                          <label
-                            key={name}
-                            className="flex items-center gap-2 text-sm text-parchment-800"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedToolChoices.includes(name)}
-                              onChange={() => toggleToolChoice(name)}
-                              disabled={
-                                !selectedToolChoices.includes(name) &&
-                                selectedToolChoices.length >= maxToolChoices
-                              }
-                            />
-                            {name}
-                          </label>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </Card>
-            )}
+            {/* Tool Proficiency Choices — shown only when the class grants tool profs or choices. */}
+            <ToolProficiencySection
+              grantedToolProfs={toolChoices.grantedToolProfs}
+              toolChoiceOptions={toolChoices.toolChoiceOptions}
+              maxToolChoices={toolChoices.maxToolChoices}
+              selectedToolChoices={toolChoices.selectedToolChoices}
+              toggleToolChoice={toolChoices.toggleToolChoice}
+            />
 
             {selectedClass?.startingEquipment && draft.equipmentDraft && (
               <Card
