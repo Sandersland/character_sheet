@@ -15,6 +15,8 @@ frontend/src/
 │   ├── campaign/        # CampaignsPage (list+create+join), CampaignDetailPage (mgmt hub:
 │   │                    #   invite link, roster, add-character dropdown), CampaignInviteLink,
 │   │                    #   CampaignIndicator (sheet badge/link), JoinCampaignRoute (#246)
+│   ├── character-create/ # IdentitySection, AbilityScoresSection, SkillSection,
+│   │                    #   ToolProficiencySection + useToolProficiencyChoices (CharacterCreatePage sections)
 │   ├── character-meta/  # CharacterCard, VitalsStrip, JournalSection, JournalEntryPanel,
 │   │                    #   ActivityModal, DeleteCharacterModal, BackendStatus,
 │   │                    #   CharacterSheet{Header,Body,Modals}, CharacterLoadError (sheet-page sections)
