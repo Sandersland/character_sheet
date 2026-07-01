@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { fetchActiveSession, joinSession, startCampaignSession } from "@/api/client";
 import type { Character, Session } from "@/types/character";
 
-// Drives the sheet header's Start/Join/Resume Session button (#245).
 export function useSessionButton(
   id: string | undefined,
   character: Character | null | undefined,

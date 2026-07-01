@@ -16,17 +16,7 @@ export default function AbilityScoresPanel({ character }: AbilityScoresPanelProp
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_1fr] lg:items-start">
-      {/* Ability scores rail — fixed intrinsic width per
-          principles.md ("don't over-rely on grid systems" for
-          elements with a natural fixed width). `lg:items-start` on
-          the parent is the actual fix for box proportions: CSS
-          grid's default `align-items: stretch` was forcing this
-          rail to match the Skills card's full height (~660px) and
-          distributing that across 3 rows, ballooning every box to
-          ~210px tall regardless of column count or padding — 2x3
-          vs 3x2 only changed how many rows split that same forced
-          height. With `items-start` the rail sizes to its own
-          content and each box sits near its natural ~120x100px. */}
+      {/* lg:items-start on the parent stops grid align-items:stretch from ballooning this rail to the Skills card's height. */}
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-6 lg:w-[16rem] lg:grid-cols-2 lg:gap-3">
         {abilityEntries.map(([key, score]) => (
           <AbilityScoreBox

@@ -5,7 +5,6 @@ interface CharacterLoadErrorProps {
   characterId?: string;
 }
 
-// Full-screen fallback for the two non-happy load states on the sheet.
 export default function CharacterLoadError({ variant, characterId }: CharacterLoadErrorProps) {
   const isError = variant === "error";
   return (

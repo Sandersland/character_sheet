@@ -18,7 +18,6 @@ interface CharacterSheetModalsProps {
   onCloseCapture: () => void;
 }
 
-// The four overlay surfaces reachable from the sheet header + Cmd/Ctrl+J.
 export default function CharacterSheetModals({
   character,
   onUpdate,
