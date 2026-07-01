@@ -10,7 +10,8 @@ frontend/src/
 │   └── ui/              # domain-agnostic primitives (Card, Badge, MeterBar, Modal, Tabs, OverflowMenu, DropdownMenu, Avatar, ErrorBoundary, EmptyState, Spinner)
 ├── features/
 │   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable, ProficienciesCard, AbilityScoresPanel
-│   ├── advancement/     # AdvancementSection, AdvancementPanel
+│   ├── advancement/     # AdvancementSection, AdvancementPanel (shell) → AsiFlow, FeatFlow,
+│   │                    #   CustomFeatForm; hooks useAsiDraft/useFeatCatalog/useCustomFeatDraft; featView reducer
 │   ├── auth/            # AuthProvider (useAuth), AuthGate, AppHeader, AccountMenu
 │   ├── campaign/        # CampaignsPage (list+create+join), CampaignDetailPage (mgmt hub:
 │   │                    #   invite link, roster, add-character dropdown), CampaignInviteLink,
