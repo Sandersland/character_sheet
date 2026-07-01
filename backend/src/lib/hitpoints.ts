@@ -699,6 +699,53 @@ async function applyStabilizeOp(ctx: HpOpContext): Promise<HpOpResult> {
   return { summary: "Stabilized", eventData: {} };
 }
 
+async function applyLevelUpOp(ctx: HpOpContext, op: LevelUpOperation): Promise<HpOpResult> {
+  const { tx, row, hp, hd, conMod, faces, primaryEntry, beforeClassLevel } = ctx;
+  const derivedLevel = levelForExperience(row.experiencePoints);
+  if (hd.total >= derivedLevel) {
+    throw new InvalidHitPointOperationError(
+      `No pending level-up: already at level ${hd.total} (XP derives level ${derivedLevel})`
+    );
+  }
+  if (op.method === "roll") {
+    if (op.roll === undefined || op.roll < 1 || op.roll > faces) {
+      throw new InvalidHitPointOperationError(
+        `Roll for level-up must be between 1 and ${faces} (got ${String(op.roll)})`
+      );
+    }
+  }
+  const gain = levelUpHpGain(faces, conMod, op.method, op.roll);
+  hd.total += 1;
+  hp.max += gain;
+  hp.current += gain;
+
+  // Repair the position-0 class entry's `level` to match the newly-applied
+  // total. The seed defaults all entries to level 1 even for level-7 chars;
+  // this self-heals that on the first real level-up.
+  if (primaryEntry) {
+    await tx.characterClassEntry.update({
+      where: { id: primaryEntry.id },
+      data: { level: hd.total },
+    });
+  }
+
+  // Store enough data to exactly reverse this level-up later (Phase 4 undo)
+  // or when XP is lowered (auto-reverse in experience-ops.ts).
+  return {
+    summary: `Leveled up to ${hd.total} (+${gain} HP)`,
+    eventData: {
+      method: op.method,
+      roll: op.roll ?? null,
+      conMod,
+      faces,
+      hpGain: gain,
+      primaryEntryId: primaryEntry?.id ?? null,
+      prevEntryLevel: beforeClassLevel,
+      newEntryLevel: hd.total,
+    },
+  };
+}
+
 // ---- Transaction handler ----
 
 /**
@@ -1002,50 +1049,9 @@ export async function applyHitPointOperations(
           break;
         }
 
-        case "levelUp": {
-          const derivedLevel = levelForExperience(row.experiencePoints);
-          if (hd.total >= derivedLevel) {
-            throw new InvalidHitPointOperationError(
-              `No pending level-up: already at level ${hd.total} (XP derives level ${derivedLevel})`
-            );
-          }
-          if (op.method === "roll") {
-            if (op.roll === undefined || op.roll < 1 || op.roll > faces) {
-              throw new InvalidHitPointOperationError(
-                `Roll for level-up must be between 1 and ${faces} (got ${String(op.roll)})`
-              );
-            }
-          }
-          const gain = levelUpHpGain(faces, conMod, op.method, op.roll);
-          hd.total += 1;
-          hp.max += gain;
-          hp.current += gain;
-
-          // Repair the position-0 class entry's `level` to match the newly-applied
-          // total. The seed defaults all entries to level 1 even for level-7 chars;
-          // this self-heals that on the first real level-up.
-          if (primaryEntry) {
-            await tx.characterClassEntry.update({
-              where: { id: primaryEntry.id },
-              data: { level: hd.total },
-            });
-          }
-
-          // Store enough data to exactly reverse this level-up later (Phase 4
-          // undo) or when XP is lowered (auto-reverse in experience-ops.ts).
-          eventData = {
-            method: op.method,
-            roll: op.roll ?? null,
-            conMod,
-            faces,
-            hpGain: gain,
-            primaryEntryId: primaryEntry?.id ?? null,
-            prevEntryLevel: beforeClassLevel,
-            newEntryLevel: hd.total,
-          };
-          summary = `Leveled up to ${hd.total} (+${gain} HP)`;
+        case "levelUp":
+          result = await applyLevelUpOp(ctx, op);
           break;
-        }
 
         case "deathSave":
           result = await applyDeathSaveOp(ctx, op);
