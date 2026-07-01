@@ -29,15 +29,13 @@ import { applyInventoryTransactions, logRoll } from "@/api/client";
 import { formatRollSpec } from "@/lib/dice";
 import {
   attacksExhausted as computeAttacksExhausted,
+  buildAttackEntries,
   hasSuperiorityDice,
-  unarmedDamageDisplay,
-  weaponDamageSpec,
-  weaponDamageType,
-  weaponGripLabel,
 } from "@/lib/attackMath";
 import { maneuverPlacement, mechanicsFor } from "@/lib/maneuvers";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
-import ManeuverPrompt from "@/features/session/ManeuverPrompt";
+import AttackRow from "@/features/session/AttackRow";
+import type { AttackEntry } from "@/lib/attackMath";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
 import type { RollResult } from "@/lib/dice";
@@ -137,10 +135,11 @@ export default function InlineAttackPicker({
     }
   }
 
-  const { unarmedStrike, improvisedWeapon } = character;
   const showManeuvers = hasSuperiorityDice(character);
 
   const attacksExhausted = computeAttacksExhausted(turnState.attack);
+
+  const attackEntries = buildAttackEntries(character);
 
   // "attackOption" maneuvers (Commander's Strike, etc.) — shown when in attack context.
   const attackOptionManeuvers = showManeuvers && turnState.attack !== null
@@ -149,18 +148,22 @@ export default function InlineAttackPicker({
       )
     : [];
 
-  const unarmedDamageSpec = {
-    count: unarmedStrike.damage.count,
-    faces: unarmedStrike.damage.faces,
-    modifier: unarmedStrike.damage.modifier,
-  };
-  const unarmedDamage = unarmedDamageDisplay(unarmedStrike);
+  // Roll an attack for a row: log it, retain the result, clear any override, spend one attack.
+  function handleAttack(entry: AttackEntry) {
+    const result = roll(entry.attackSpec, entry.attackRollLabel);
+    logRollSafe("attack", entry.logSource, result, entry.attackSpec);
+    setLastAttackRolls((prev) => ({ ...prev, [entry.id]: result }));
+    setAttackTotals((prev) => ({ ...prev, [entry.id]: null }));
+    turnState.recordAttack();
+  }
 
-  const improvisedDamageSpec = {
-    count: improvisedWeapon.damage.count,
-    faces: improvisedWeapon.damage.faces,
-    modifier: improvisedWeapon.damage.modifier,
-  };
+  // Roll damage for a row: log it, retain the result, clear any override.
+  function handleDamage(entry: AttackEntry) {
+    const result = roll(entry.damageSpec, entry.damageRollLabel);
+    logRollSafe("damage", entry.logSource, result, entry.damageSpec, entry.damageType);
+    setLastDamageRolls((prev) => ({ ...prev, [entry.id]: result }));
+    setDamageTotals((prev) => ({ ...prev, [entry.id]: null }));
+  }
 
   // Callback for ManeuverPrompt — stores auto-sum overrides per weapon.
   function makeOnRollsUpdated(weaponId: string) {
@@ -240,208 +243,23 @@ export default function InlineAttackPicker({
         </div>
       )}
 
-      {equippedWeapons.map((item) => {
-        const w = item.weapon!;
-        const damageSpec = weaponDamageSpec(w);
-        const damageLabel = `${formatRollSpec(damageSpec)} ${weaponDamageType(w)}`;
-        const gripLabel = weaponGripLabel(w);
-
-        const atkOverride = attackTotals[item.id];
-        const dmgOverride = damageTotals[item.id];
-
-        return (
-          <div key={item.id} className="flex flex-col gap-1.5 py-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-parchment-900">{item.name}</p>
-                <p className="text-xs text-parchment-600">
-                  Attack: +{w.attackBonus ?? 0} · Damage: {damageLabel}{gripLabel}
-                </p>
-                {/* Auto-summed overrides display */}
-                {atkOverride !== null && atkOverride !== undefined && (
-                  <p className="text-xs font-semibold text-gold-800">
-                    Attack total: {atkOverride} <span className="font-normal opacity-70">(+maneuver)</span>
-                  </p>
-                )}
-                {dmgOverride !== null && dmgOverride !== undefined && (
-                  <p className="text-xs font-semibold text-gold-800">
-                    Damage total: {dmgOverride} <span className="font-normal opacity-70">(+maneuver)</span>
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={attacksExhausted}
-                  onClick={() => {
-                    const spec = { count: 1, faces: 20, modifier: w.attackBonus ?? 0 };
-                    const result = roll(spec, `${item.name} attack`);
-                    logRollSafe("attack", item.name, result, spec);
-                    setLastAttackRolls((prev) => ({ ...prev, [item.id]: result }));
-                    // Clear any previous override when re-rolling
-                    setAttackTotals((prev) => ({ ...prev, [item.id]: null }));
-                    turnState.recordAttack();
-                  }}
-                  title={attacksExhausted ? "No attacks remaining" : undefined}
-                  className="rounded-control border border-garnet-200 bg-garnet-50 px-2.5 py-1 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-100 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Attack
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const dmgType = weaponDamageType(w);
-                    const result = roll(damageSpec, `${item.name} damage (${dmgType})`);
-                    logRollSafe("damage", item.name, result, damageSpec, dmgType);
-                    setLastDamageRolls((prev) => ({ ...prev, [item.id]: result }));
-                    // Clear any previous override when re-rolling
-                    setDamageTotals((prev) => ({ ...prev, [item.id]: null }));
-                  }}
-                  className="rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
-                >
-                  Damage
-                </button>
-              </div>
-            </div>
-            {showManeuvers && (
-              <ManeuverPrompt
-                character={character}
-                lastAttackRoll={lastAttackRolls[item.id] ?? null}
-                lastDamageRoll={lastDamageRolls[item.id] ?? null}
-                onRollsUpdated={makeOnRollsUpdated(item.id)}
-                onUpdate={onUpdate}
-              />
-            )}
-          </div>
-        );
-      })}
-
-      {/* Unarmed strike */}
-      <div className="flex flex-col gap-1.5 py-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-parchment-900">Unarmed Strike</p>
-            <p className="text-xs text-parchment-600">
-              Attack: +{unarmedStrike.attackBonus} · Damage: {unarmedDamage} bludgeoning
-            </p>
-            {attackTotals["unarmed"] !== null && attackTotals["unarmed"] !== undefined && (
-              <p className="text-xs font-semibold text-gold-800">
-                Attack total: {attackTotals["unarmed"]} <span className="font-normal opacity-70">(+maneuver)</span>
-              </p>
-            )}
-            {damageTotals["unarmed"] !== null && damageTotals["unarmed"] !== undefined && (
-              <p className="text-xs font-semibold text-gold-800">
-                Damage total: {damageTotals["unarmed"]} <span className="font-normal opacity-70">(+maneuver)</span>
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={attacksExhausted}
-              onClick={() => {
-                const spec = { count: 1, faces: 20, modifier: unarmedStrike.attackBonus };
-                const result = roll(spec, "Unarmed strike attack");
-                logRollSafe("attack", "Unarmed Strike", result, spec);
-                setLastAttackRolls((prev) => ({ ...prev, unarmed: result }));
-                setAttackTotals((prev) => ({ ...prev, unarmed: null }));
-                turnState.recordAttack();
-              }}
-              title={attacksExhausted ? "No attacks remaining" : undefined}
-              className="rounded-control border border-garnet-200 bg-garnet-50 px-2.5 py-1 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-100 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Attack
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const result = roll(unarmedDamageSpec, "Unarmed strike damage (bludgeoning)");
-                logRollSafe("damage", "Unarmed Strike", result, unarmedDamageSpec, "bludgeoning");
-                setLastDamageRolls((prev) => ({ ...prev, unarmed: result }));
-                setDamageTotals((prev) => ({ ...prev, unarmed: null }));
-              }}
-              className="rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
-            >
-              Damage
-            </button>
-          </div>
-        </div>
-        {showManeuvers && (
-          <ManeuverPrompt
-            character={character}
-            lastAttackRoll={lastAttackRolls["unarmed"] ?? null}
-            lastDamageRoll={lastDamageRolls["unarmed"] ?? null}
-            onRollsUpdated={makeOnRollsUpdated("unarmed")}
-            onUpdate={onUpdate}
-          />
-        )}
-      </div>
-
-      {/* Improvised weapon */}
-      <div className="flex flex-col gap-1.5 py-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-parchment-900">Improvised Weapon</p>
-            <p className="text-xs text-parchment-600">
-              Attack: {improvisedWeapon.attackBonus >= 0 ? "+" : ""}
-              {improvisedWeapon.attackBonus} · Damage:{" "}
-              {formatRollSpec(improvisedDamageSpec)} bludgeoning
-              {!improvisedWeapon.proficient && (
-                <span className="ml-1 italic text-parchment-600">(no proficiency)</span>
-              )}
-            </p>
-            {attackTotals["improvised"] !== null && attackTotals["improvised"] !== undefined && (
-              <p className="text-xs font-semibold text-gold-800">
-                Attack total: {attackTotals["improvised"]} <span className="font-normal opacity-70">(+maneuver)</span>
-              </p>
-            )}
-            {damageTotals["improvised"] !== null && damageTotals["improvised"] !== undefined && (
-              <p className="text-xs font-semibold text-gold-800">
-                Damage total: {damageTotals["improvised"]} <span className="font-normal opacity-70">(+maneuver)</span>
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={attacksExhausted}
-              onClick={() => {
-                const spec = { count: 1, faces: 20, modifier: improvisedWeapon.attackBonus };
-                const result = roll(spec, "Improvised weapon attack");
-                logRollSafe("attack", "Improvised Weapon", result, spec);
-                setLastAttackRolls((prev) => ({ ...prev, improvised: result }));
-                setAttackTotals((prev) => ({ ...prev, improvised: null }));
-                turnState.recordAttack();
-              }}
-              title={attacksExhausted ? "No attacks remaining" : undefined}
-              className="rounded-control border border-garnet-200 bg-garnet-50 px-2.5 py-1 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-100 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Attack
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const result = roll(improvisedDamageSpec, "Improvised weapon damage (bludgeoning)");
-                logRollSafe("damage", "Improvised Weapon", result, improvisedDamageSpec, "bludgeoning");
-                setLastDamageRolls((prev) => ({ ...prev, improvised: result }));
-                setDamageTotals((prev) => ({ ...prev, improvised: null }));
-              }}
-              className="rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
-            >
-              Damage
-            </button>
-          </div>
-        </div>
-        {showManeuvers && (
-          <ManeuverPrompt
-            character={character}
-            lastAttackRoll={lastAttackRolls["improvised"] ?? null}
-            lastDamageRoll={lastDamageRolls["improvised"] ?? null}
-            onRollsUpdated={makeOnRollsUpdated("improvised")}
-            onUpdate={onUpdate}
-          />
-        )}
-      </div>
+      {attackEntries.map((entry) => (
+        <AttackRow
+          key={entry.id}
+          entry={entry}
+          attacksExhausted={attacksExhausted}
+          showManeuvers={showManeuvers}
+          character={character}
+          attackTotal={attackTotals[entry.id]}
+          damageTotal={damageTotals[entry.id]}
+          lastAttackRoll={lastAttackRolls[entry.id] ?? null}
+          lastDamageRoll={lastDamageRolls[entry.id] ?? null}
+          onAttack={handleAttack}
+          onDamage={handleDamage}
+          onRollsUpdated={makeOnRollsUpdated(entry.id)}
+          onUpdate={onUpdate}
+        />
+      ))}
 
       {/* ── Attack-option maneuvers (e.g. Commander's Strike) ────────────────── */}
       {attackOptionManeuvers.map((m) => {
