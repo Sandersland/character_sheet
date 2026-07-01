@@ -35,6 +35,8 @@ import {
 import { maneuverPlacement, mechanicsFor } from "@/lib/maneuvers";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
 import AttackRow from "@/features/session/AttackRow";
+import AttackOptionRow from "@/features/session/AttackOptionRow";
+import EquipWeaponPanel from "@/features/session/EquipWeaponPanel";
 import type { AttackEntry } from "@/lib/attackMath";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
@@ -222,26 +224,7 @@ export default function InlineAttackPicker({
       )}
 
       {/* ── Equip an owned-but-unequipped weapon, inline ─────────────────────── */}
-      {unequippedWeapons.length > 0 && (
-        <div className="flex flex-col gap-1.5 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
-            Equip a weapon
-          </p>
-          {unequippedWeapons.map((item) => (
-            <div key={item.id} className="flex items-center justify-between">
-              <p className="text-sm text-parchment-700">{item.name}</p>
-              <button
-                type="button"
-                disabled={equipping !== null}
-                onClick={() => handleEquip(item.id)}
-                className="rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {equipping === item.id ? "Equipping…" : "Equip"}
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      <EquipWeaponPanel weapons={unequippedWeapons} equipping={equipping} onEquip={handleEquip} />
 
       {attackEntries.map((entry) => (
         <AttackRow
@@ -264,30 +247,17 @@ export default function InlineAttackPicker({
       {/* ── Attack-option maneuvers (e.g. Commander's Strike) ────────────────── */}
       {attackOptionManeuvers.map((m) => {
         const { enabled, reason } = attackOptionEnabled(m.name);
-        const message = maneuverMessages[m.name];
         return (
-          <div key={m.id} className="flex flex-col gap-1.5 py-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-parchment-900">{m.name}</p>
-                <p className="text-xs text-parchment-600">
-                  Forfeit 1 attack · Costs bonus action · Spend {dieLabel}
-                </p>
-                {message && (
-                  <p className="mt-1 text-xs italic text-gold-800">{message}</p>
-                )}
-              </div>
-              <button
-                type="button"
-                disabled={!enabled || dieBusy}
-                onClick={() => handleAttackOption(m.name)}
-                title={reason}
-                className="rounded-control border border-gold-300 bg-gold-50 px-2.5 py-1 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-100 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Use
-              </button>
-            </div>
-          </div>
+          <AttackOptionRow
+            key={m.id}
+            name={m.name}
+            enabled={enabled}
+            reason={reason}
+            message={maneuverMessages[m.name]}
+            dieLabel={dieLabel}
+            dieBusy={dieBusy}
+            onUse={handleAttackOption}
+          />
         );
       })}
 
