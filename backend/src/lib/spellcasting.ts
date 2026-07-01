@@ -396,6 +396,44 @@ function applyForgetSpellOp(ctx: SpellOpContext, op: ForgetSpellOperation): OpOu
   };
 }
 
+function applyPrepareSpellOp(
+  ctx: SpellOpContext,
+  op: PrepareSpellOperation | UnprepareSpellOperation
+): OpOutcome | null {
+  const { state } = ctx;
+  const entry = state.spells.find((s) => s.id === op.entryId);
+  if (!entry) {
+    throw new InvalidSpellcastingOperationError(`Spell entry not found: ${op.entryId}`);
+  }
+  if (entry.level === 0) {
+    throw new InvalidSpellcastingOperationError(
+      "Cantrips are always prepared and cannot be toggled"
+    );
+  }
+  const preparing = op.type === "prepareSpell";
+  // Already in the desired state — no-op (skip write + log).
+  if (preparing === entry.prepared) return null;
+  entry.prepared = preparing;
+  return {
+    eventType: op.type,
+    summary: preparing ? `Prepared ${entry.name}` : `Unprepared ${entry.name}`,
+    eventData: { entryId: op.entryId, spellName: entry.name, prepared: preparing },
+  };
+}
+
+function applyDropConcentrationOp(ctx: SpellOpContext): OpOutcome | null {
+  const { state } = ctx;
+  const prior = state.concentratingOn;
+  // Nothing to drop — idempotent no-op (skip write + log).
+  if (!prior) return null;
+  state.concentratingOn = null;
+  return {
+    eventType: "concentrationDropped",
+    summary: `Stopped concentrating on ${prior.spellName}`,
+    eventData: { droppedEntryId: prior.entryId, droppedSpellName: prior.spellName, reason: "manual" },
+  };
+}
+
 // ── Transaction handler ───────────────────────────────────────────────────────
 
 /**
@@ -622,37 +660,16 @@ export async function applySpellcastingOperations(
 
         case "prepareSpell":
         case "unprepareSpell": {
-          const entry = state.spells.find((s) => s.id === op.entryId);
-          if (!entry) {
-            throw new InvalidSpellcastingOperationError(`Spell entry not found: ${op.entryId}`);
-          }
-          if (entry.level === 0) {
-            throw new InvalidSpellcastingOperationError(
-              "Cantrips are always prepared and cannot be toggled"
-            );
-          }
-          const preparing = op.type === "prepareSpell";
-          if (preparing === entry.prepared) {
-            // Already in the desired state — no-op (don't throw, just skip logging).
-            continue;
-          }
-          entry.prepared = preparing;
-          eventType = op.type;
-          summary = preparing ? `Prepared ${entry.name}` : `Unprepared ${entry.name}`;
-          eventData = { entryId: op.entryId, spellName: entry.name, prepared: preparing };
+          const outcome = applyPrepareSpellOp(ctx, op);
+          if (outcome === null) continue;
+          ({ eventType, summary, eventData } = outcome);
           break;
         }
 
         case "dropConcentration": {
-          const prior = state.concentratingOn;
-          if (!prior) {
-            // Nothing to drop — no-op (don't throw; idempotent), skip logging.
-            continue;
-          }
-          state.concentratingOn = null;
-          eventType = "concentrationDropped";
-          summary = `Stopped concentrating on ${prior.spellName}`;
-          eventData = { droppedEntryId: prior.entryId, droppedSpellName: prior.spellName, reason: "manual" };
+          const outcome = applyDropConcentrationOp(ctx);
+          if (outcome === null) continue;
+          ({ eventType, summary, eventData } = outcome);
           break;
         }
       }
