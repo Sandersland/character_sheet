@@ -2,7 +2,6 @@ import type {
   ActionOperation,
   AdvancementOperation,
   Campaign,
-  CatalogAction,
   CatalogFeat,
   CatalogManeuver,
   CatalogSpell,
@@ -46,6 +45,30 @@ async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(input, { credentials: "include", ...init });
   if (response.status === 401) unauthorizedHandler?.();
   return response;
+}
+
+// Shared POST-check-throw-json flow for the intent-bearing transaction endpoints:
+// POST …/characters/:id/<domain>/transactions with { operations }, returning the
+// full updated Character. Every uniform domain funnels through here — the only
+// per-domain differences are the URL segment and the error label. (applyHitPoint-
+// Operations and applyExperienceOperations deliberately don't use this: HP unwraps
+// { character, concentrationChecks } and XP threads an optional sessionId.)
+async function postTransactions<TOp>(
+  characterId: string,
+  domain: string,
+  operations: TOp[],
+  errorLabel: string,
+): Promise<Character> {
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/${domain}/transactions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ operations }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `${errorLabel} (${response.status})`);
+  }
+  return response.json();
 }
 
 // ── Auth ────────────────────────────────────────────────────────────────────
@@ -164,16 +187,7 @@ export async function applySpellcastingTransactions(
   characterId: string,
   operations: SpellcastingOperation[]
 ): Promise<Character> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/spellcasting/transactions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ operations }),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to apply spellcasting operations (${response.status})`);
-  }
-  return response.json();
+  return postTransactions(characterId, "spellcasting", operations, "Failed to apply spellcasting operations");
 }
 
 // One inline edit is a batch of one operation; a bulk action (e.g. selling
@@ -183,16 +197,7 @@ export async function applyInventoryTransactions(
   characterId: string,
   operations: InventoryOperation[]
 ): Promise<Character> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/inventory/transactions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ operations }),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to apply inventory transactions (${response.status})`);
-  }
-  return response.json();
+  return postTransactions(characterId, "inventory", operations, "Failed to apply inventory transactions");
 }
 
 // Applies a batch of HP operations atomically (damage, heal, rest, level-up,
@@ -362,16 +367,7 @@ export async function applyResourceTransactions(
   characterId: string,
   operations: ResourceOperation[]
 ): Promise<Character> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/resources/transactions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ operations }),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to apply resource operations (${response.status})`);
-  }
-  return response.json();
+  return postTransactions(characterId, "resources", operations, "Failed to apply resource operations");
 }
 
 // Applies a batch of condition operations atomically (apply/remove a status
@@ -380,16 +376,7 @@ export async function applyConditionTransactions(
   characterId: string,
   operations: ConditionOperation[]
 ): Promise<Character> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/conditions/transactions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ operations }),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to apply condition operations (${response.status})`);
-  }
-  return response.json();
+  return postTransactions(characterId, "conditions", operations, "Failed to apply condition operations");
 }
 
 // Applies class-level mutations (today: setSubclass). Returns the updated character.
@@ -397,16 +384,7 @@ export async function applyClassTransactions(
   characterId: string,
   operations: ClassOperation[]
 ): Promise<Character> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/class/transactions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ operations }),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to apply class operations (${response.status})`);
-  }
-  return response.json();
+  return postTransactions(characterId, "class", operations, "Failed to apply class operations");
 }
 
 // Feeds the advancement section's feat picker — same role as fetchManeuvers.
@@ -425,16 +403,7 @@ export async function applyAdvancementTransactions(
   characterId: string,
   operations: AdvancementOperation[]
 ): Promise<Character> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/advancement/transactions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ operations }),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to apply advancement operations (${response.status})`);
-  }
-  return response.json();
+  return postTransactions(characterId, "advancement", operations, "Failed to apply advancement operations");
 }
 
 // Reverts the most-recent non-reverted batch (LIFO undo). Returns the updated
@@ -457,15 +426,6 @@ export async function revertBatch(
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
-// Feeds the TurnTracker's action catalog picker. Ordered by cost then name.
-export async function fetchActions(): Promise<CatalogAction[]> {
-  const response = await apiFetch(`${API_URL}/actions`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch action catalog (${response.status})`);
-  }
-  return response.json();
-}
-
 // Applies a batch of action operations atomically via the Phase-C orchestrator:
 // each action's effect function (spend resource, consume item, heal, etc.) runs
 // in a single Prisma transaction with a shared batchId, so "drink potion" is
@@ -475,16 +435,7 @@ export async function applyActionTransactions(
   characterId: string,
   operations: ActionOperation[]
 ): Promise<Character> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/actions/transactions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ operations }),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to apply action operations (${response.status})`);
-  }
-  return response.json();
+  return postTransactions(characterId, "actions", operations, "Failed to apply action operations");
 }
 
 // ── Campaigns (#246) ──────────────────────────────────────────────────────────

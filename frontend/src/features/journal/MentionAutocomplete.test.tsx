@@ -5,7 +5,10 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
 import MentionAutocomplete from "@/features/journal/MentionAutocomplete";
-import { primeCampaignEntities } from "@/hooks/useCampaignEntities";
+import {
+  primeCampaignEntities,
+  __resetCampaignEntitiesCacheForTests,
+} from "@/hooks/useCampaignEntities";
 import * as client from "@/api/client";
 import type { CampaignEntity } from "@/types/character";
 import { axe } from "@/test/axe";
@@ -60,6 +63,11 @@ function Harness({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Clear module-level cache/subscribers/inflight FIRST so no prior test's state
+  // (a leaked subscriber or a still-inflight fetch) bleeds into this one (#282).
+  __resetCampaignEntitiesCacheForTests();
+  // Default the fetch to a resolved value so the effect's loadCampaignEntities
+  // never calls .finally on `undefined` (vi.fn()'s default return).
   vi.mocked(client.fetchEntities).mockResolvedValue(ENTITIES);
   // Seed the module cache so entities are present synchronously at mount — keeps
   // the popover deterministic regardless of fetch timing / prior-test state.
@@ -68,7 +76,7 @@ beforeEach(() => {
 
 describe("MentionAutocomplete (#248)", () => {
   it("shows matches for @gob", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<Harness campaignId="camp-1" />);
     await user.click(screen.getByLabelText("Note body"));
     await user.type(screen.getByLabelText("Note body"), "@gob");
@@ -78,7 +86,7 @@ describe("MentionAutocomplete (#248)", () => {
   });
 
   it("filters by a reserved type prefix (@item:)", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<Harness campaignId="camp-1" />);
     await user.type(screen.getByLabelText("Note body"), "@item:");
 
@@ -87,7 +95,7 @@ describe("MentionAutocomplete (#248)", () => {
   });
 
   it("inserts an @[uuid] token when a match is selected", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<Harness campaignId="camp-1" />);
     await user.type(screen.getByLabelText("Note body"), "@gob");
 
@@ -99,19 +107,30 @@ describe("MentionAutocomplete (#248)", () => {
     );
   });
 
+  // Longest typed query in this suite (12 chars through the debounce). Under heavy
+  // CPU contention — lefthook runs this suite parallel to the two tsc jobs on
+  // pre-push, oversubscribing cores against vitest's own worker pool — the
+  // keystroke/debounce/render chain starved and blew vitest's default 5000ms
+  // per-test ceiling, flaking the required gate and forcing push retries. Raising
+  // findByRole's wait alone can't help (the test-level timeout fires first), so we
+  // lift the test timeout to 15s and let findByRole poll up to 12s. Both only
+  // spend wall-time on genuine failure, never on the happy path; behaviour is
+  // unchanged.
   it("still matches a multiword apostrophe name (Baldur's Ga)", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<Harness campaignId="camp-1" />);
     await user.type(screen.getByLabelText("Note body"), "@Baldur's Ga");
 
-    expect(await screen.findByRole("option", { name: /Baldur's Gate/ })).toBeInTheDocument();
-  });
+    expect(
+      await screen.findByRole("option", { name: /Baldur's Gate/ }, { timeout: 12000 }),
+    ).toBeInTheDocument();
+  }, 15000);
 
   it("offers a create row that calls createEntity for a no-match query", async () => {
     vi.mocked(client.createEntity).mockResolvedValue(
       entity({ id: "44444444-4444-4444-4444-444444444444", name: "Mysterious Stranger" }),
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<Harness campaignId="camp-1" />);
     await user.type(screen.getByLabelText("Note body"), "@Mysterious Stranger");
 
@@ -125,7 +144,7 @@ describe("MentionAutocomplete (#248)", () => {
   });
 
   it("renders a create/join CTA when there is no campaign", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<Harness campaignId={null} />);
     await user.type(screen.getByLabelText("Note body"), "@gob");
 

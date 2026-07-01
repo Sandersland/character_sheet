@@ -28,7 +28,7 @@ frontend/src/
 │   ├── inventory/       # InventoryList, InventoryRow, AddItemPanel,
 │   │                    #   StartingEquipmentEditor
 │   ├── journal/         # CapturePalette (Cmd/Ctrl+J quick-capture NOTE overlay)
-│   ├── session/         # TurnHub, TurnTracker, useTurnState, SessionLog, SessionsModal,
+│   ├── session/         # TurnHub, useTurnState, SessionLog, SessionsModal,
 │   │                    #   SessionSummaryModal, Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
 │   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie
 │   ├── spells/          # SpellsSection, SpellRow, AddSpellPanel

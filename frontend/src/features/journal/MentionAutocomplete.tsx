@@ -92,6 +92,18 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
     );
     const lastNamesKey = useRef<string | null>(null);
 
+    // The blur handler defers closing the popover by 120ms (so a click on an
+    // option lands first). Track the pending timer so unmount can cancel it —
+    // otherwise it fires after teardown and calls setState on an unmounted tree
+    // ("window is not defined" under jsdom), which surfaced as a flaky test gate.
+    const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(
+      () => () => {
+        if (blurTimer.current) clearTimeout(blurTimer.current);
+      },
+      [],
+    );
+
     // Reflect `value` into the editor DOM only when the structure differs from
     // what's typed or a name resolved — never mid-keystroke, so the caret holds.
     useEffect(() => {
@@ -264,7 +276,10 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
           onClick={syncTrigger}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
-          onBlur={() => setTimeout(() => setTrigger(null), 120)}
+          onBlur={() => {
+            if (blurTimer.current) clearTimeout(blurTimer.current);
+            blurTimer.current = setTimeout(() => setTrigger(null), 120);
+          }}
         />
 
         {placeholder && value === "" && (

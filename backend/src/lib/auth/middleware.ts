@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 
 import { getCookie } from "./cookies.js";
+import { AuthenticationError } from "./errors.js";
 import { lookupSession, SESSION_COOKIE } from "./session.js";
 
 // requireAuth — the gate every non-public /api router sits behind (mounted in
@@ -15,7 +16,9 @@ export async function requireAuth(
 ): Promise<void> {
   const user = await lookupSession(getCookie(req, SESSION_COOKIE) ?? "");
   if (!user) {
-    res.status(401).json({ error: "Not authenticated" });
+    // async middleware — hand the error to Express via next() rather than throw
+    // (a rejected promise here won't reach the terminal error handler).
+    next(new AuthenticationError());
     return;
   }
   req.user = user;
