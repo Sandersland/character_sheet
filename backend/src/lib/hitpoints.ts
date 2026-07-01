@@ -666,6 +666,39 @@ async function applySetTempOp(ctx: HpOpContext, op: SetTempOperation): Promise<H
   };
 }
 
+async function applyDeathSaveOp(ctx: HpOpContext, op: DeathSaveOperation): Promise<HpOpResult> {
+  const { hp } = ctx;
+  if (hp.current !== 0) {
+    throw new InvalidHitPointOperationError(
+      "Can only roll a death save when at 0 HP (unconscious/dying)"
+    );
+  }
+  if (op.roll < 1 || op.roll > 20) {
+    throw new InvalidHitPointOperationError(
+      "Death save roll must be between 1 and 20"
+    );
+  }
+  const rollResult = applyDeathSaveRoll(hp.deathSaves, hp.current, op.roll);
+  hp.deathSaves = rollResult.deathSaves;
+  hp.current = rollResult.current;
+  const ds = hp.deathSaves;
+  const summary = op.roll === 20
+    ? `Death save: natural 20 — regained consciousness`
+    : `Death save: rolled ${op.roll} (${ds.successes} success${ds.successes !== 1 ? "es" : ""}, ${ds.failures} failure${ds.failures !== 1 ? "s" : ""})`;
+  return { summary, eventData: { roll: op.roll } };
+}
+
+async function applyStabilizeOp(ctx: HpOpContext): Promise<HpOpResult> {
+  const { hp } = ctx;
+  if (hp.current !== 0) {
+    throw new InvalidHitPointOperationError(
+      "Can only stabilize when at 0 HP (unconscious/dying)"
+    );
+  }
+  hp.deathSaves = { successes: 0, failures: 0 };
+  return { summary: "Stabilized", eventData: {} };
+}
+
 // ---- Transaction handler ----
 
 /**
@@ -1014,39 +1047,13 @@ export async function applyHitPointOperations(
           break;
         }
 
-        case "deathSave": {
-          if (hp.current !== 0) {
-            throw new InvalidHitPointOperationError(
-              "Can only roll a death save when at 0 HP (unconscious/dying)"
-            );
-          }
-          if (op.roll < 1 || op.roll > 20) {
-            throw new InvalidHitPointOperationError(
-              "Death save roll must be between 1 and 20"
-            );
-          }
-          const result = applyDeathSaveRoll(hp.deathSaves, hp.current, op.roll);
-          hp.deathSaves = result.deathSaves;
-          hp.current = result.current;
-          eventData = { roll: op.roll };
-          const ds = hp.deathSaves;
-          summary = op.roll === 20
-            ? `Death save: natural 20 — regained consciousness`
-            : `Death save: rolled ${op.roll} (${ds.successes} success${ds.successes !== 1 ? "es" : ""}, ${ds.failures} failure${ds.failures !== 1 ? "s" : ""})`;
+        case "deathSave":
+          result = await applyDeathSaveOp(ctx, op);
           break;
-        }
 
-        case "stabilize": {
-          if (hp.current !== 0) {
-            throw new InvalidHitPointOperationError(
-              "Can only stabilize when at 0 HP (unconscious/dying)"
-            );
-          }
-          hp.deathSaves = { successes: 0, failures: 0 };
-          eventData = {};
-          summary = "Stabilized";
+        case "stabilize":
+          result = await applyStabilizeOp(ctx);
           break;
-        }
       }
 
       if (result) {
