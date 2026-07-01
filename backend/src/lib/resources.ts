@@ -373,6 +373,65 @@ function applyForgetManeuverOp(
   };
 }
 
+function applyLearnToolProficiencyOp(
+  state: ResourcesMutableState,
+  op: LearnToolProficiencyOperation,
+  derivedInfo: DerivedClassInfo | null,
+): ResourceOpAudit {
+  // Validate the name is a known artisan's tool.
+  const artisanTools = toolsByCategory("artisan");
+  if (!artisanTools.some((t) => t.name === op.name)) {
+    throw new InvalidResourceOperationError(
+      `"${op.name}" is not a known artisan's tool. Student of War only grants proficiency with artisan's tools.`
+    );
+  }
+  if (!isKnownTool(op.name)) {
+    throw new InvalidResourceOperationError(`Unknown tool: ${op.name}`);
+  }
+
+  // Enforce choice count limit (Student of War = 1).
+  const toolChoiceCount = derivedInfo?.toolProfChoiceCount;
+  if (toolChoiceCount !== undefined && state.toolProficienciesKnown.length >= toolChoiceCount) {
+    throw new InvalidResourceOperationError(
+      `Cannot learn more tool proficiencies: already know ${state.toolProficienciesKnown.length}/${toolChoiceCount} via subclass`
+    );
+  }
+
+  // Dedup check.
+  if (state.toolProficienciesKnown.some((t) => t.name === op.name)) {
+    throw new InvalidResourceOperationError(
+      `Tool proficiency already known: ${op.name}`
+    );
+  }
+
+  const newToolEntry: ToolProfEntry = { id: randomUUID(), name: op.name };
+  state.toolProficienciesKnown.push(newToolEntry);
+  return {
+    eventType: "learnToolProficiency",
+    summary: `Learned tool proficiency: ${op.name} (Student of War)`,
+    eventData: { entryId: newToolEntry.id, toolName: op.name },
+  };
+}
+
+function applyForgetToolProficiencyOp(
+  state: ResourcesMutableState,
+  op: ForgetToolProficiencyOperation,
+): ResourceOpAudit {
+  const toolIdx = state.toolProficienciesKnown.findIndex((t) => t.id === op.entryId);
+  if (toolIdx === -1) {
+    throw new InvalidResourceOperationError(
+      `Tool proficiency entry not found: ${op.entryId}`
+    );
+  }
+  const forgottenTool = state.toolProficienciesKnown[toolIdx];
+  state.toolProficienciesKnown.splice(toolIdx, 1);
+  return {
+    eventType: "forgetToolProficiency",
+    summary: `Forgot tool proficiency: ${forgottenTool.name}`,
+    eventData: { entryId: op.entryId, toolName: forgottenTool.name },
+  };
+}
+
 // ── Transaction handler ───────────────────────────────────────────────────────
 
 /**
@@ -449,59 +508,13 @@ export async function applyResourceOperations(
           audit = applyForgetManeuverOp(state, op);
           break;
 
-        case "learnToolProficiency": {
-          // Validate the name is a known artisan's tool.
-          const artisanTools = toolsByCategory("artisan");
-          if (!artisanTools.some((t) => t.name === op.name)) {
-            throw new InvalidResourceOperationError(
-              `"${op.name}" is not a known artisan's tool. Student of War only grants proficiency with artisan's tools.`
-            );
-          }
-          if (!isKnownTool(op.name)) {
-            throw new InvalidResourceOperationError(`Unknown tool: ${op.name}`);
-          }
-
-          // Enforce choice count limit (Student of War = 1).
-          const toolChoiceCount = derivedInfo?.toolProfChoiceCount;
-          if (toolChoiceCount !== undefined && state.toolProficienciesKnown.length >= toolChoiceCount) {
-            throw new InvalidResourceOperationError(
-              `Cannot learn more tool proficiencies: already know ${state.toolProficienciesKnown.length}/${toolChoiceCount} via subclass`
-            );
-          }
-
-          // Dedup check.
-          if (state.toolProficienciesKnown.some((t) => t.name === op.name)) {
-            throw new InvalidResourceOperationError(
-              `Tool proficiency already known: ${op.name}`
-            );
-          }
-
-          const newToolEntry: ToolProfEntry = { id: randomUUID(), name: op.name };
-          state.toolProficienciesKnown.push(newToolEntry);
-          audit = {
-            eventType: "learnToolProficiency",
-            summary: `Learned tool proficiency: ${op.name} (Student of War)`,
-            eventData: { entryId: newToolEntry.id, toolName: op.name },
-          };
+        case "learnToolProficiency":
+          audit = applyLearnToolProficiencyOp(state, op, derivedInfo);
           break;
-        }
 
-        case "forgetToolProficiency": {
-          const toolIdx = state.toolProficienciesKnown.findIndex((t) => t.id === op.entryId);
-          if (toolIdx === -1) {
-            throw new InvalidResourceOperationError(
-              `Tool proficiency entry not found: ${op.entryId}`
-            );
-          }
-          const forgottenTool = state.toolProficienciesKnown[toolIdx];
-          state.toolProficienciesKnown.splice(toolIdx, 1);
-          audit = {
-            eventType: "forgetToolProficiency",
-            summary: `Forgot tool proficiency: ${forgottenTool.name}`,
-            eventData: { entryId: op.entryId, toolName: forgottenTool.name },
-          };
+        case "forgetToolProficiency":
+          audit = applyForgetToolProficiencyOp(state, op);
           break;
-        }
       }
 
       // Write the updated state back — always via serializeResourcesState so
