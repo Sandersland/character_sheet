@@ -83,7 +83,7 @@ export interface UseSpellPicker {
   emptyMessage: string;
   hasCastable: boolean;
   rowFor: (spell: Spell) => SpellRowState;
-  viewFor: (spell: Spell) => SpellRowView;
+  viewFor: (spell: Spell, row?: SpellRowState) => SpellRowView;
   patchRow: (spellId: string, patch: Partial<SpellRowState>) => void;
   handleCast: (spell: Spell) => Promise<void>;
   handleAttackRoll: (spell: Spell) => void;
@@ -119,9 +119,12 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
   }
 
   function patchRow(spellId: string, patch: Partial<SpellRowState>) {
+    // Seed a fresh row from the real spell so its default target (self for heals) is correct.
+    const spell = spells.find((s) => s.id === spellId);
+    const initialSlot = spell ? availableSlotsForSpell(spell, slotLevels, arcanaLevels)[0] : undefined;
     setRowStates((prev) => ({
       ...prev,
-      [spellId]: { ...getRow(spellId, {} as Spell, undefined), ...prev[spellId], ...patch },
+      [spellId]: { ...getRow(spellId, spell ?? ({} as Spell), initialSlot), ...prev[spellId], ...patch },
     }));
   }
 
@@ -148,10 +151,9 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
     return getRow(spell.id, spell, slotsForSpell[0]);
   }
 
-  function viewFor(spell: Spell): SpellRowView {
+  function viewFor(spell: Spell, row: SpellRowState = rowFor(spell)): SpellRowView {
     const isCantrip = spell.level === 0;
     const availableSlots = availableSlotsForSpell(spell, slotLevels, arcanaLevels);
-    const row = rowFor(spell);
     const spellSlot = resolvedSlot(spell, row.slotLevel, slotLevels, arcanaLevels);
     const usesArcanum = !isCantrip && isArcanumLevel(spellSlot ?? spell.level, arcanaLevels);
     const isAttack = spell.attackType === "attack";
