@@ -6,11 +6,12 @@ import AbilityScoresSection from "@/features/character-create/AbilityScoresSecti
 import BackendStatus from "@/features/character-meta/BackendStatus";
 import Card from "@/components/ui/Card";
 import IdentitySection from "@/features/character-create/IdentitySection";
+import SkillSection from "@/features/character-create/SkillSection";
 import Spinner from "@/components/ui/Spinner";
 import StartingEquipmentEditor from "@/features/inventory/StartingEquipmentEditor";
 import { draftToInput } from "@/lib/startingEquipment";
 import { missingRequirements } from "@/lib/characterCreationValidation";
-import { abilityModifier, formatModifier, skillLabel } from "@/lib/abilities";
+import { abilityModifier, formatModifier } from "@/lib/abilities";
 import type { Item, SkillName } from "@/types/character";
 import { useCharacterDraft } from "@/hooks/useCharacterDraft";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
@@ -186,45 +187,14 @@ export default function CharacterCreatePage() {
 
             <AbilityScoresSection draft={draft} update={update} />
 
-            <Card title="Skill Proficiencies" headingLevel={2}>
-              <div className="flex flex-col gap-3 p-4">
-                {!selectedClass ? (
-                  <p className="text-sm text-parchment-600">
-                    Pick a class above to choose its skill proficiencies.
-                  </p>
-                ) : (
-                  <>
-                    {grantedSkills.length > 0 && (
-                      <p className="text-xs text-parchment-600">
-                        Granted by background: {grantedSkills.map((s) => skillLabel(s)).join(", ")}
-                      </p>
-                    )}
-                    <p className="text-xs font-semibold text-parchment-600">
-                      Choose {maxClassChoices} ({selectedClassChoices.length}/{maxClassChoices} selected)
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                      {classChoiceOptions.map((skill) => (
-                        <label
-                          key={skill}
-                          className="flex items-center gap-2 text-sm text-parchment-800"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedClassChoices.includes(skill)}
-                            onChange={() => toggleSkill(skill)}
-                            disabled={
-                              !selectedClassChoices.includes(skill) &&
-                              selectedClassChoices.length >= maxClassChoices
-                            }
-                          />
-                          {skillLabel(skill)}
-                        </label>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            </Card>
+            <SkillSection
+              hasClass={Boolean(selectedClass)}
+              grantedSkills={grantedSkills}
+              options={classChoiceOptions}
+              maxChoices={maxClassChoices}
+              selected={selectedClassChoices}
+              onToggle={toggleSkill}
+            />
 
             {/* Tool Proficiency Choices — only shown when the class grants a
                 choice (e.g. Bard → 3 instruments; Monk → 1 artisan or
