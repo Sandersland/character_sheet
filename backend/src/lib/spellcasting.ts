@@ -421,6 +421,129 @@ function applyPrepareSpellOp(
   };
 }
 
+// Log + clear the prior concentration when a new concentration spell displaces it.
+async function dropConcentrationOnCastInTx(ctx: SpellOpContext, entry: SpellEntry): Promise<void> {
+  const { tx, characterId, batchId, sessionId, state } = ctx;
+  const prior = state.concentratingOn;
+  if (!prior || prior.entryId === entry.id) return;
+  const dropBefore = {
+    spellcasting: {
+      slotsUsed: { ...state.slotsUsed },
+      arcanumUsed: { ...state.arcanumUsed },
+      spells: [...state.spells],
+      concentratingOn: { ...prior },
+    },
+  };
+  // No intermediate DB write here: the common write-back below persists the final
+  // state (with the newly-cast concentration spell), so writing `concentratingOn:
+  // null` first would just be overwritten. Clearing the in-memory flag is enough
+  // for this drop event's `before`/`after` payloads.
+  state.concentratingOn = null;
+  await logEvent(tx, {
+    characterId,
+    category: "spellcasting",
+    type: "concentrationDropped",
+    summary: `Concentration on ${prior.spellName} dropped (cast ${entry.name})`,
+    before: dropBefore,
+    after: {
+      spellcasting: {
+        slotsUsed: { ...state.slotsUsed },
+        arcanumUsed: { ...state.arcanumUsed },
+        spells: [...state.spells],
+        concentratingOn: null,
+      },
+    },
+    data: { droppedEntryId: prior.entryId, droppedSpellName: prior.spellName, reason: "newCast", castEntryId: entry.id },
+    batchId,
+    sessionId,
+  });
+}
+
+async function applyCastSpellOp(ctx: SpellOpContext, op: CastSpellOperation): Promise<OpOutcome> {
+  const { characterId, batchId, sessionId, state, slotTotals, arcanaTotals } = ctx;
+  const entry = state.spells.find((s) => s.id === op.entryId);
+  if (!entry) {
+    throw new InvalidSpellcastingOperationError(`Spell entry not found: ${op.entryId}`);
+  }
+
+  let summary: string;
+  let eventData: Record<string, unknown>;
+
+  if (entry.level === 0) {
+    // Cantrip — no slot needed.
+    if (entry.effectKind && op.roll > 0) {
+      summary = `Cast ${entry.name}: ${op.roll}${entry.damageType ? " " + entry.damageType : ""} ${entry.effectKind === "heal" ? "healing" : "damage"}`;
+    } else {
+      summary = `Cast ${entry.name}`;
+    }
+    eventData = { entryId: op.entryId, spellName: entry.name, roll: op.roll, slotLevel: null };
+  } else {
+    // Leveled spell — expend a slot, or a Mystic Arcanum charge.
+    const slotLevel = op.slotLevel ?? entry.level;
+    if (slotLevel < entry.level) {
+      throw new InvalidSpellcastingOperationError(
+        `Cannot cast ${entry.name} (L${entry.level}) in a level-${slotLevel} slot`
+      );
+    }
+    const slotTotal = slotTotals[slotLevel] ?? 0;
+    const arcanumTotal = arcanaTotals[slotLevel] ?? 0;
+    const upcasting = slotLevel > entry.level;
+
+    // Real slots take priority; Mystic Arcanum (Warlock 6th–9th) has no
+    // overlapping slot level, so the two paths are mutually exclusive.
+    let slotLabel: string;
+    if (slotTotal > 0) {
+      const used = state.slotsUsed[String(slotLevel)] ?? 0;
+      if (used >= slotTotal) {
+        throw new InvalidSpellcastingOperationError(
+          `No level-${slotLevel} spell slots remaining`
+        );
+      }
+      state.slotsUsed[String(slotLevel)] = used + 1;
+      slotLabel = `L${slotLevel} slot${upcasting ? ` (upcast from L${entry.level})` : ""}`;
+    } else if (arcanumTotal > 0) {
+      const used = state.arcanumUsed[String(slotLevel)] ?? 0;
+      if (used >= arcanumTotal) {
+        throw new InvalidSpellcastingOperationError(
+          `Mystic Arcanum (level ${slotLevel}) already used — recharges on a long rest`
+        );
+      }
+      state.arcanumUsed[String(slotLevel)] = used + 1;
+      slotLabel = `L${slotLevel} Mystic Arcanum`;
+    } else {
+      throw new InvalidSpellcastingOperationError(
+        `No level-${slotLevel} spell slots remaining`
+      );
+    }
+
+    if (entry.effectKind && op.roll > 0) {
+      summary = `Cast ${entry.name} (${slotLabel}): ${op.roll}${entry.damageType ? " " + entry.damageType : ""} ${entry.effectKind === "heal" ? "healing" : "damage"}`;
+    } else {
+      summary = `Cast ${entry.name} (${slotLabel})`;
+    }
+    eventData = { entryId: op.entryId, spellName: entry.name, roll: op.roll, slotLevel };
+  }
+
+  // Concentration: a character maintains at most one concentration spell. Casting
+  // a new one auto-drops the prior (logged separately). Re-casting the same refreshes.
+  if (entry.concentration) {
+    await dropConcentrationOnCastInTx(ctx, entry);
+    state.concentratingOn = { entryId: entry.id, spellName: entry.name };
+  }
+
+  // Self-targeted effect: apply to the caster's own HP in this same batch so the
+  // slot-spend and HP-change revert together as one undo step.
+  if (op.apply && op.apply.target === "self" && op.apply.amount > 0) {
+    if (op.apply.kind === "heal") {
+      await applyHealInTx(ctx.tx, characterId, op.apply.amount, batchId, sessionId);
+    } else {
+      await applyDamageInTx(ctx.tx, characterId, op.apply.amount, batchId, sessionId);
+    }
+  }
+
+  return { eventType: "castSpell", summary, eventData };
+}
+
 function applyDropConcentrationOp(ctx: SpellOpContext): OpOutcome | null {
   const { state } = ctx;
   const prior = state.concentratingOn;
@@ -521,120 +644,7 @@ export async function applySpellcastingOperations(
 
       switch (op.type) {
         case "castSpell": {
-          const entry = state.spells.find((s) => s.id === op.entryId);
-          if (!entry) {
-            throw new InvalidSpellcastingOperationError(`Spell entry not found: ${op.entryId}`);
-          }
-
-          if (entry.level === 0) {
-            // Cantrip — no slot needed.
-            eventType = "castSpell";
-            const roll = op.roll;
-            if (entry.effectKind && roll > 0) {
-              summary = `Cast ${entry.name}: ${roll}${entry.damageType ? " " + entry.damageType : ""} ${entry.effectKind === "heal" ? "healing" : "damage"}`;
-            } else {
-              summary = `Cast ${entry.name}`;
-            }
-            eventData = { entryId: op.entryId, spellName: entry.name, roll: op.roll, slotLevel: null };
-          } else {
-            // Leveled spell — expend a slot, or a Mystic Arcanum charge.
-            const slotLevel = op.slotLevel ?? entry.level;
-            if (slotLevel < entry.level) {
-              throw new InvalidSpellcastingOperationError(
-                `Cannot cast ${entry.name} (L${entry.level}) in a level-${slotLevel} slot`
-              );
-            }
-            const slotTotal = slotTotals[slotLevel] ?? 0;
-            const arcanumTotal = arcanaTotals[slotLevel] ?? 0;
-            eventType = "castSpell";
-            const upcasting = slotLevel > entry.level;
-
-            // Real slots take priority; Mystic Arcanum (Warlock 6th–9th) has no
-            // overlapping slot level, so the two paths are mutually exclusive.
-            let slotLabel: string;
-            if (slotTotal > 0) {
-              const used = state.slotsUsed[String(slotLevel)] ?? 0;
-              if (used >= slotTotal) {
-                throw new InvalidSpellcastingOperationError(
-                  `No level-${slotLevel} spell slots remaining`
-                );
-              }
-              state.slotsUsed[String(slotLevel)] = used + 1;
-              slotLabel = `L${slotLevel} slot${upcasting ? ` (upcast from L${entry.level})` : ""}`;
-            } else if (arcanumTotal > 0) {
-              const used = state.arcanumUsed[String(slotLevel)] ?? 0;
-              if (used >= arcanumTotal) {
-                throw new InvalidSpellcastingOperationError(
-                  `Mystic Arcanum (level ${slotLevel}) already used — recharges on a long rest`
-                );
-              }
-              state.arcanumUsed[String(slotLevel)] = used + 1;
-              slotLabel = `L${slotLevel} Mystic Arcanum`;
-            } else {
-              throw new InvalidSpellcastingOperationError(
-                `No level-${slotLevel} spell slots remaining`
-              );
-            }
-
-            if (entry.effectKind && op.roll > 0) {
-              summary = `Cast ${entry.name} (${slotLabel}): ${op.roll}${entry.damageType ? " " + entry.damageType : ""} ${entry.effectKind === "heal" ? "healing" : "damage"}`;
-            } else {
-              summary = `Cast ${entry.name} (${slotLabel})`;
-            }
-            eventData = { entryId: op.entryId, spellName: entry.name, roll: op.roll, slotLevel };
-          }
-
-          // Concentration: a character maintains at most one concentration spell.
-          // Casting a new one auto-drops the prior (logged separately so it shows
-          // on the timeline and is undoable). Re-casting the same spell refreshes.
-          if (entry.concentration) {
-            const prior = state.concentratingOn;
-            if (prior && prior.entryId !== entry.id) {
-              const dropBefore = {
-                spellcasting: {
-                  slotsUsed: { ...state.slotsUsed },
-                  arcanumUsed: { ...state.arcanumUsed },
-                  spells: [...state.spells],
-                  concentratingOn: { ...prior },
-                },
-              };
-              // No intermediate DB write here: the common write-back below
-              // persists the final state (with the newly-cast concentration
-              // spell), so writing `concentratingOn: null` first would just be
-              // overwritten. Clearing the in-memory flag is enough for this
-              // drop event's `before`/`after` payloads.
-              state.concentratingOn = null;
-              await logEvent(tx, {
-                characterId,
-                category: "spellcasting",
-                type: "concentrationDropped",
-                summary: `Concentration on ${prior.spellName} dropped (cast ${entry.name})`,
-                before: dropBefore,
-                after: {
-                  spellcasting: {
-                    slotsUsed: { ...state.slotsUsed },
-                    arcanumUsed: { ...state.arcanumUsed },
-                    spells: [...state.spells],
-                    concentratingOn: null,
-                  },
-                },
-                data: { droppedEntryId: prior.entryId, droppedSpellName: prior.spellName, reason: "newCast", castEntryId: entry.id },
-                batchId,
-                sessionId,
-              });
-            }
-            state.concentratingOn = { entryId: entry.id, spellName: entry.name };
-          }
-
-          // Self-targeted effect: apply to the caster's own HP in this same batch
-          // so the slot-spend and HP-change revert together as one undo step.
-          if (op.apply && op.apply.target === "self" && op.apply.amount > 0) {
-            if (op.apply.kind === "heal") {
-              await applyHealInTx(tx, characterId, op.apply.amount, batchId, sessionId);
-            } else {
-              await applyDamageInTx(tx, characterId, op.apply.amount, batchId, sessionId);
-            }
-          }
+          ({ eventType, summary, eventData } = await applyCastSpellOp(ctx, op));
           break;
         }
 
