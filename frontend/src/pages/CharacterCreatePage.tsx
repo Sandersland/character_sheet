@@ -2,14 +2,18 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { createCharacter, fetchItems } from "@/api/client";
-import AbilityScoreEditor from "@/features/abilities/AbilityScoreEditor";
+import AbilityScoresSection from "@/features/character-create/AbilityScoresSection";
 import BackendStatus from "@/features/character-meta/BackendStatus";
 import Card from "@/components/ui/Card";
+import IdentitySection from "@/features/character-create/IdentitySection";
+import SkillSection from "@/features/character-create/SkillSection";
 import Spinner from "@/components/ui/Spinner";
 import StartingEquipmentEditor from "@/features/inventory/StartingEquipmentEditor";
-import { draftToInput, emptyPackageState } from "@/lib/startingEquipment";
+import ToolProficiencySection from "@/features/character-create/ToolProficiencySection";
+import { useToolProficiencyChoices } from "@/features/character-create/useToolProficiencyChoices";
+import { draftToInput } from "@/lib/startingEquipment";
 import { missingRequirements } from "@/lib/characterCreationValidation";
-import { abilityModifier, formatModifier, skillLabel } from "@/lib/abilities";
+import { abilityModifier, formatModifier } from "@/lib/abilities";
 import type { Item, SkillName } from "@/types/character";
 import { useCharacterDraft } from "@/hooks/useCharacterDraft";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
@@ -17,16 +21,6 @@ import { useReferenceData } from "@/hooks/useReferenceData";
 
 function hitDieFace(hitDie: string): number {
   return Number(hitDie.replace(/^d/i, ""));
-}
-
-/** Inline marker for required form fields. */
-function RequiredMark() {
-  return (
-    <span className="text-garnet-700" aria-hidden="true" title="Required">
-      {" "}
-      *
-    </span>
-  );
 }
 
 export default function CharacterCreatePage() {
@@ -63,32 +57,13 @@ export default function CharacterCreatePage() {
     }
   }
 
-  // ── Tool proficiencies ────────────────────────────────────────────────────
-  // Granted = fixed from background/class/race (read-only display).
-  // Choices = player-selectable from class.toolChoices up to toolChoiceCount.
-
-  const grantedToolProfs = [
-    ...(draft.useCustomBackground ? [] : selectedBackground?.toolProficiencies ?? []),
-    ...(selectedClass?.toolProficiencies ?? []),
-    ...(selectedRace?.toolProficiencies ?? []),
-  ].filter((name, idx, arr) => arr.indexOf(name) === idx); // dedup
-
-  const toolChoiceOptions = (selectedClass?.toolChoices ?? []).filter(
-    (name) => !grantedToolProfs.includes(name)
-  );
-  const maxToolChoices = selectedClass?.toolChoiceCount ?? 0;
-  const selectedToolChoices = draft.toolChoices.filter((t) =>
-    toolChoiceOptions.includes(t)
-  );
-
-  function toggleToolChoice(name: string) {
-    const isSelected = selectedToolChoices.includes(name);
-    if (isSelected) {
-      update({ toolChoices: draft.toolChoices.filter((t) => t !== name) });
-    } else if (selectedToolChoices.length < maxToolChoices) {
-      update({ toolChoices: [...draft.toolChoices, name] });
-    }
-  }
+  const toolChoices = useToolProficiencyChoices({
+    draft,
+    selectedClass,
+    selectedRace,
+    selectedBackground,
+    update,
+  });
 
   const backgroundNameForSubmit = draft.useCustomBackground
     ? draft.customBackground.trim()
@@ -141,7 +116,8 @@ export default function CharacterCreatePage() {
         }],
         abilityScores: draft.abilityScores,
         skillProficiencies: [...grantedSkills, ...selectedClassChoices],
-        toolChoices: selectedToolChoices.length > 0 ? selectedToolChoices : undefined,
+        toolChoices:
+          toolChoices.selectedToolChoices.length > 0 ? toolChoices.selectedToolChoices : undefined,
         portraitUrl: draft.portraitUrl.trim() || null,
         startingEquipment: equipmentInput ?? undefined,
       });
@@ -191,308 +167,27 @@ export default function CharacterCreatePage() {
           showSpinner ? <Spinner className="py-16" /> : null
         ) : (
           <>
-            <Card
-              title="Identity"
-              headingLevel={2}
-              titleAccessory={
-                <span className="text-xs font-normal normal-case text-parchment-600">
-                  <span className="text-garnet-700">*</span> required
-                </span>
-              }
-            >
-              <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
-                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
-                  <span>
-                    Name
-                    <RequiredMark />
-                  </span>
-                  <input
-                    type="text"
-                    value={draft.name}
-                    onChange={(e) => update({ name: e.target.value })}
-                    className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
-                  />
-                </label>
+            <IdentitySection draft={draft} update={update} reference={reference} />
 
-                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
-                  <span>
-                    Alignment
-                    <RequiredMark />
-                  </span>
-                  <select
-                    value={draft.alignment}
-                    onChange={(e) => update({ alignment: e.target.value })}
-                    className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
-                  >
-                    <option value="">Select alignment…</option>
-                    {reference.alignments.map((alignment) => (
-                      <option key={alignment} value={alignment}>
-                        {alignment}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+            <AbilityScoresSection draft={draft} update={update} />
 
-                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
-                  <span>
-                    Race
-                    <RequiredMark />
-                  </span>
-                  <select
-                    value={draft.race}
-                    onChange={(e) => update({ race: e.target.value })}
-                    className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
-                  >
-                    <option value="">Select race…</option>
-                    {reference.races.map((race) => (
-                      <option key={race.id} value={race.name}>
-                        {race.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+            <SkillSection
+              hasClass={Boolean(selectedClass)}
+              grantedSkills={grantedSkills}
+              options={classChoiceOptions}
+              maxChoices={maxClassChoices}
+              selected={selectedClassChoices}
+              onToggle={toggleSkill}
+            />
 
-                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
-                  <span>
-                    Class
-                    <RequiredMark />
-                  </span>
-                  <select
-                    value={draft.className}
-                    onChange={(e) => {
-                      // Changing class resets skill choices, equipment, and subclass.
-                      const newClassName = e.target.value;
-                      const newClassDef = reference.classes.find(
-                        (c) => c.name === newClassName
-                      );
-                      update({
-                        className: newClassName,
-                        subclass: "",
-                        subclassId: "",
-                        skillProficiencies: [],
-                        toolChoices: [],
-                        equipmentDraft:
-                          newClassDef?.startingEquipment
-                            ? { mode: "package", selections: emptyPackageState(newClassDef.startingEquipment) }
-                            : null,
-                      });
-                    }}
-                    className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
-                  >
-                    <option value="">Select class…</option>
-                    {reference.classes.map((characterClass) => (
-                      <option key={characterClass.id} value={characterClass.name}>
-                        {characterClass.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                {/* Subclass picker — a class-aware select for L1 subclasses (Cleric,
-                    Sorcerer, Warlock); disabled with explanatory text for classes that
-                    grant their subclass later (Fighter L3, Wizard L2, etc.). */}
-                {(() => {
-                  const classDef = reference.classes.find((c) => c.name === draft.className);
-                  if (!classDef || classDef.subclasses.length === 0) return null;
-                  const unlockedAtCreation = classDef.subclassLevel === 1;
-                  return (
-                    <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
-                      Subclass
-                      {unlockedAtCreation ? (
-                        <select
-                          value={draft.subclassId}
-                          onChange={(e) => {
-                            const selected = classDef.subclasses.find((s) => s.id === e.target.value);
-                            update({
-                              subclassId: e.target.value,
-                              subclass: selected?.name ?? "",
-                            });
-                          }}
-                          className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
-                        >
-                          <option value="">Select subclass…</option>
-                          {classDef.subclasses.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.name}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <div className="rounded-control border border-parchment-200 bg-parchment-100 px-2 py-1.5 text-sm font-normal normal-case text-parchment-600">
-                          Chosen at level {classDef.subclassLevel}
-                        </div>
-                      )}
-                    </label>
-                  );
-                })()}
-
-                <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600">
-                  <span>
-                    Background
-                    <RequiredMark />
-                  </span>
-                  {draft.useCustomBackground ? (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        aria-label="Background"
-                        value={draft.customBackground}
-                        onChange={(e) => update({ customBackground: e.target.value })}
-                        placeholder="Invent your own…"
-                        className="flex-1 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => update({ useCustomBackground: false, customBackground: "" })}
-                        className="rounded-control border border-parchment-300 px-2 text-xs font-semibold normal-case text-parchment-600"
-                      >
-                        Use list
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <select
-                        aria-label="Background"
-                        value={draft.background}
-                        onChange={(e) => update({ background: e.target.value, skillProficiencies: [], toolChoices: [] })}
-                        className="flex-1 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
-                      >
-                        <option value="">Select background…</option>
-                        {reference.backgrounds.map((background) => (
-                          <option key={background.id} value={background.name}>
-                            {background.name}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          update({ useCustomBackground: true, background: "", skillProficiencies: [], toolChoices: [] })
-                        }
-                        className="rounded-control border border-parchment-300 px-2 text-xs font-semibold normal-case text-parchment-600"
-                      >
-                        Custom…
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600 sm:col-span-2">
-                  Portrait URL (optional)
-                  <input
-                    type="text"
-                    value={draft.portraitUrl}
-                    onChange={(e) => update({ portraitUrl: e.target.value })}
-                    placeholder="https://…"
-                    className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1.5 text-sm font-normal normal-case text-parchment-900"
-                  />
-                </label>
-              </div>
-            </Card>
-
-            <Card title="Ability Scores" headingLevel={2}>
-              <div className="p-4">
-                <AbilityScoreEditor
-                  method={draft.abilityMethod}
-                  pool={draft.abilityPool}
-                  assignments={draft.abilityAssignments}
-                  abilityScores={draft.abilityScores}
-                  onMethodChange={(method, pool, assignments) =>
-                    update({ abilityMethod: method, abilityPool: pool, abilityAssignments: assignments })
-                  }
-                  onPoolChange={(pool) => update({ abilityPool: pool })}
-                  onAssignmentsChange={(assignments, scores) =>
-                    update({ abilityAssignments: assignments, abilityScores: scores })
-                  }
-                  onScoresChange={(scores) => update({ abilityScores: scores })}
-                />
-              </div>
-            </Card>
-
-            <Card title="Skill Proficiencies" headingLevel={2}>
-              <div className="flex flex-col gap-3 p-4">
-                {!selectedClass ? (
-                  <p className="text-sm text-parchment-600">
-                    Pick a class above to choose its skill proficiencies.
-                  </p>
-                ) : (
-                  <>
-                    {grantedSkills.length > 0 && (
-                      <p className="text-xs text-parchment-600">
-                        Granted by background: {grantedSkills.map((s) => skillLabel(s)).join(", ")}
-                      </p>
-                    )}
-                    <p className="text-xs font-semibold text-parchment-600">
-                      Choose {maxClassChoices} ({selectedClassChoices.length}/{maxClassChoices} selected)
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                      {classChoiceOptions.map((skill) => (
-                        <label
-                          key={skill}
-                          className="flex items-center gap-2 text-sm text-parchment-800"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedClassChoices.includes(skill)}
-                            onChange={() => toggleSkill(skill)}
-                            disabled={
-                              !selectedClassChoices.includes(skill) &&
-                              selectedClassChoices.length >= maxClassChoices
-                            }
-                          />
-                          {skillLabel(skill)}
-                        </label>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            </Card>
-
-            {/* Tool Proficiency Choices — only shown when the class grants a
-                choice (e.g. Bard → 3 instruments; Monk → 1 artisan or
-                instrument). Also shows any granted tool profs as read-only. */}
-            {(grantedToolProfs.length > 0 || toolChoiceOptions.length > 0) && (
-              <Card title="Tool Proficiencies" headingLevel={2}>
-                <div className="flex flex-col gap-3 p-4">
-                  {grantedToolProfs.length > 0 && (
-                    <p className="text-xs text-parchment-600">
-                      Granted:{" "}
-                      <span className="font-medium text-parchment-800">
-                        {grantedToolProfs.join(", ")}
-                      </span>
-                    </p>
-                  )}
-                  {toolChoiceOptions.length > 0 && (
-                    <>
-                      <p className="text-xs font-semibold text-parchment-600">
-                        Choose {maxToolChoices} (
-                        {selectedToolChoices.length}/{maxToolChoices} selected)
-                      </p>
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                        {toolChoiceOptions.map((name) => (
-                          <label
-                            key={name}
-                            className="flex items-center gap-2 text-sm text-parchment-800"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedToolChoices.includes(name)}
-                              onChange={() => toggleToolChoice(name)}
-                              disabled={
-                                !selectedToolChoices.includes(name) &&
-                                selectedToolChoices.length >= maxToolChoices
-                              }
-                            />
-                            {name}
-                          </label>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </Card>
-            )}
+            {/* Tool Proficiency Choices — shown only when the class grants tool profs or choices. */}
+            <ToolProficiencySection
+              grantedToolProfs={toolChoices.grantedToolProfs}
+              toolChoiceOptions={toolChoices.toolChoiceOptions}
+              maxToolChoices={toolChoices.maxToolChoices}
+              selectedToolChoices={toolChoices.selectedToolChoices}
+              toggleToolChoice={toolChoices.toggleToolChoice}
+            />
 
             {selectedClass?.startingEquipment && draft.equipmentDraft && (
               <Card

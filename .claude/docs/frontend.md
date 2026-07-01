@@ -9,14 +9,18 @@ frontend/src/
 ├── components/
 │   └── ui/              # domain-agnostic primitives (Card, Badge, MeterBar, Modal, Tabs, OverflowMenu, DropdownMenu, Avatar, ErrorBoundary, EmptyState, Spinner)
 ├── features/
-│   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable, ProficienciesCard
-│   ├── advancement/     # AdvancementSection, AdvancementPanel
+│   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable, ProficienciesCard, AbilityScoresPanel
+│   ├── advancement/     # AdvancementSection, AdvancementPanel (shell) → AsiFlow, FeatFlow,
+│   │                    #   CustomFeatForm; hooks useAsiDraft/useFeatCatalog/useCustomFeatDraft; featView reducer
 │   ├── auth/            # AuthProvider (useAuth), AuthGate, AppHeader, AccountMenu
 │   ├── campaign/        # CampaignsPage (list+create+join), CampaignDetailPage (mgmt hub:
 │   │                    #   invite link, roster, add-character dropdown), CampaignInviteLink,
 │   │                    #   CampaignIndicator (sheet badge/link), JoinCampaignRoute (#246)
+│   ├── character-create/ # IdentitySection, AbilityScoresSection, SkillSection,
+│   │                    #   ToolProficiencySection + useToolProficiencyChoices (CharacterCreatePage sections)
 │   ├── character-meta/  # CharacterCard, VitalsStrip, JournalSection, JournalEntryPanel,
-│   │                    #   ActivityModal, DeleteCharacterModal, BackendStatus
+│   │                    #   ActivityModal, DeleteCharacterModal, BackendStatus,
+│   │                    #   CharacterSheet{Header,Body,Modals}, CharacterLoadError (sheet-page sections)
 │   ├── class/           # ClassFeaturesSection, FightingStylePanel, AddManeuverPanel,
 │   │                    #   ManeuverRow, ResourcePoolRow
 │   ├── conditions/      # ConditionsStrip, AddConditionPanel
@@ -24,13 +28,19 @@ frontend/src/
 │   │                    #   RollButton, RollContext, RollResultToast,
 │   │                    #   diceRollerTypes.ts, useDieFaceData.ts
 │   ├── experience/      # ExperienceTracker
-│   ├── hitpoints/       # HitPointTracker (inline Card; hosts LevelUpModal + ConcentrationSaveModal)
-│   ├── inventory/       # InventoryList, InventoryRow, AddItemPanel,
-│   │                    #   StartingEquipmentEditor
+│   ├── hitpoints/       # HitPointTracker orchestrator (inline Card; hosts LevelUpModal + ConcentrationSaveModal)
+│   │                    #   Sub-components: HpActionControl, HpMeter, RestControls,
+│   │                    #   DeathSaveTracker, LevelUpCallout, AdvancementCallout
+│   ├── inventory/       # InventoryList, InventoryRow (→ InventoryEditForm/EquipToggle/
+│   │                    #   ItemSummary/ItemProse), AddItemPanel, StartingEquipmentEditor
 │   ├── journal/         # CapturePalette (Cmd/Ctrl+J quick-capture NOTE overlay)
-│   ├── session/         # TurnHub, useTurnState, SessionLog, SessionsModal,
-│   │                    #   SessionSummaryModal, Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
-│   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie
+│   ├── session/         # TurnHub (→ useTurnActions + TurnControls/ActionSlot/BonusActionSlot/
+│   │                    #   ReactionSlot/EffectManeuverStrip/LayOnHandsInput), useTurnState, SessionLog,
+│   │                    #   SessionsModal, SessionSummaryModal, Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
+│   │                    #   AttackRow, EquipWeaponPanel, AttackOptionRow,
+│   │                    #   useSpellPicker + SpellPickerRow/SlotLevelSelector/SpellTargetToggle,
+│   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie,
+│   │                    #   useSessionButton (sheet-header Start/Join/Resume session state)
 │   ├── spells/          # SpellsSection, SpellRow, AddSpellPanel
 │   └── theme/           # ThemeProvider (useTheme) — applies data-theme app-wide
 ├── hooks/               # reusable React hooks used by pages or multiple clusters
@@ -78,14 +88,19 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 | `dieFaces.ts` | Static die-face geometry data for the 3D rollers. |
 | `physicsDice.ts` | Physics-roller setup (cannon/three glue) for `PhysicsDiceRoller`. |
 | `spellCast.ts` | Pure cast-roll math (cantrip scaling, upcast dice, heal modifier) shared by SpellsSection + InlineSpellPicker. |
-| `spellMeta.ts` | Pure spell display helpers (school tone, metadata) shared across spell surfaces. |
+| `spellMeta.ts` | Pure spell display helpers (school tone, metadata, `defaultTarget`/`targetLocked`) shared across spell surfaces. |
+| `spellPicker.ts` | Pure InlineSpellPicker selection/slot predicates (`availableSlotLevels`, `availableSlotsForSpell`, `resolvedSlot`, `filterCastableSpells`, `sortSpells`, `spellRestrictionFlags`, `slotRestrictionHint`). |
 | `turnRules.ts` | 5e turn economy derived from class/level (`deriveAttacksPerAction`, action lists). |
+| `attackMath.ts` | Pure attack-row math for InlineAttackPicker: `buildAttackEntries` (equipped/unarmed/improvised rows + precomputed roll/log label strings), grip-resolved weapon damage/type/grip helpers, unarmed display, `hasSuperiorityDice`, `attacksExhausted`. |
 | `mentions.ts` | @-tagging primitives (#248/#269): `parseMentionBody` (text/mention segment split of a stored body), `normalizeForMatch` (search key, parity with backend `lib/journal-refs.ts`), `matchEntities`, `parseTrigger` (the in-progress `@…`/`@type:` autocomplete trigger). Edit-time DOM helpers (contenteditable composer): `buildMentionChip`, `mentionBodyToFragment` (body→DOM with chips), `serializeMentionDom` (DOM→body round-trip), `serializeMentionDomBeforeCaret` (pre-caret slice for trigger parsing), `placeCaretAtBodyOffset`, plus the `MentionResolved` type. Pure — no JSX. |
 | `encumbrance.ts` | Carrying capacity (`carryingCapacity` = STR × 15), derive-on-read. |
+| `itemDetails.ts` | Pure inventory-row presentation: `itemDetailParts` (the dotted summary line), `hasItemProse`, plus `weaponDamageParts`/`weaponPropertyTags`. Shared by InventoryRow/ItemSummary. |
 | `fightingStyles.ts` | Fighting-style labels/descriptions (presentation; backend is rules source of truth). |
 | `maneuvers.ts` | Battle Master maneuver classification data (mechanic/slot) for ManeuverPrompt. |
 | `conditions.ts` | 5e condition labels/descriptions for the chip strip + picker. |
+| `characterSections.ts` | Sheet-section visibility predicates (`hasProficiencies`/`hasAdvancements`) — the inline card-gate expressions from CharacterSheetPage. |
 | `formatJournalDate.ts` | Formats ISO journal dates in UTC ("Jun 22, 2026"). |
+| `advancement.ts` | `entryDetail` — pretty-prints an AdvancementEntry's ASI/feat effects for AdvancementSection's list view. |
 
 ### `@/` path alias
 
@@ -294,7 +309,7 @@ Large interactive sections follow the orchestrator/row pattern:
 ```
 
 Examples:
-- `features/inventory/`: `InventoryList` (orchestrator) / `InventoryRow` / `AddItemPanel`
+- `features/inventory/`: `InventoryList` (orchestrator) / `InventoryRow` (delegates to `InventoryEditForm`/`EquipToggle`/`ItemSummary`/`ItemProse`) / `AddItemPanel`
 - `features/spells/`: `SpellsSection` (orchestrator) / `SpellRow` / `AddSpellPanel`
 
 The orchestrator pattern keeps async state and API batching in one place and makes rows easy to unit-test in isolation — pass mock callbacks, assert they fire with the right args. See `testing.md` for component test patterns.

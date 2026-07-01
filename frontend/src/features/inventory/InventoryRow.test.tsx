@@ -136,3 +136,211 @@ describe("InventoryRow (view mode)", () => {
     expect(onToggleSelect).toHaveBeenCalledOnce();
   });
 });
+
+// Characterization tests locking the edit-form submit payload before the
+// InventoryRow decomposition (#292). Exact InventoryOperation[] assertions.
+describe("InventoryRow (edit mode)", () => {
+  const weaponItem: InventoryItem = {
+    id: "w1",
+    name: "Club",
+    category: "weapon",
+    quantity: 2,
+    equipped: false,
+    weapon: {
+      damageDiceCount: 1,
+      damageDiceFaces: 4,
+      damageModifier: 0,
+      damageType: "bludgeoning",
+      finesse: false,
+      light: true,
+      heavy: false,
+      twoHanded: false,
+      reach: false,
+      thrown: false,
+      ammunition: false,
+    },
+  };
+
+  const armorItem: InventoryItem = {
+    id: "a1",
+    name: "Leather Armor",
+    category: "armor",
+    quantity: 1,
+    equipped: false,
+    armor: {
+      armorCategory: "light",
+      baseArmorClass: 11,
+      dexModifierApplies: true,
+      stealthDisadvantage: false,
+    },
+  };
+
+  const consumableItem: InventoryItem = {
+    id: "c1",
+    name: "Potion of Healing",
+    category: "consumable",
+    quantity: 3,
+    equipped: false,
+    consumable: {
+      effectDiceCount: 2,
+      effectDiceFaces: 4,
+      effectModifier: 2,
+      effectDescription: "Restores hit points",
+    },
+  };
+
+  function renderEdit(item: InventoryItem) {
+    return renderRow({ item, mode: "edit" });
+  }
+
+  it("Cancel calls onCancel without submitting", async () => {
+    const user = userEvent.setup();
+    const { props } = renderEdit(weaponItem);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(props.onCancel).toHaveBeenCalledOnce();
+    expect(props.onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("submits the exact update + adjustQuantity payload for a weapon", async () => {
+    const user = userEvent.setup();
+    const { props } = renderEdit(weaponItem);
+
+    await user.clear(screen.getByLabelText("Name"));
+    await user.type(screen.getByLabelText("Name"), "Club +1");
+    await user.clear(screen.getByLabelText("Quantity"));
+    await user.type(screen.getByLabelText("Quantity"), "3");
+    await user.click(screen.getByRole("checkbox", { name: "Equipped" }));
+    await user.type(screen.getByLabelText("Notes"), "magic");
+
+    // Spinbuttons in DOM order: Quantity, dmg count, dmg faces, dmg mod, vers count, vers faces.
+    const spins = screen.getAllByRole("spinbutton");
+    await user.clear(spins[2]);
+    await user.type(spins[2], "6");
+    await user.clear(spins[3]);
+    await user.type(spins[3], "2");
+    await user.type(spins[4], "1");
+    await user.type(spins[5], "8");
+    await user.clear(screen.getByLabelText("Damage type"));
+    await user.type(screen.getByLabelText("Damage type"), "slashing");
+    await user.click(screen.getByRole("checkbox", { name: "finesse" }));
+    await user.click(screen.getByRole("checkbox", { name: "two-handed" }));
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(props.onSubmit).toHaveBeenCalledWith([
+      {
+        type: "update",
+        inventoryItemId: "w1",
+        name: "Club +1",
+        notes: "magic",
+        equipped: true,
+        weapon: {
+          damageDiceCount: 1,
+          damageDiceFaces: 6,
+          damageModifier: 2,
+          damageType: "slashing",
+          versatileDiceCount: 1,
+          versatileDiceFaces: 8,
+          finesse: true,
+          light: true,
+          heavy: false,
+          twoHanded: true,
+          reach: false,
+          thrown: false,
+          ammunition: false,
+        },
+        armor: undefined,
+        consumable: undefined,
+      },
+      { type: "adjustQuantity", inventoryItemId: "w1", delta: 1 },
+    ]);
+  });
+
+  it("emits notes:null when the notes field is cleared", async () => {
+    const user = userEvent.setup();
+    const withNotes: InventoryItem = { ...weaponItem, notes: "old note" };
+    const { props } = renderEdit(withNotes);
+    await user.clear(screen.getByLabelText("Notes"));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(props.onSubmit).toHaveBeenCalledWith([
+      expect.objectContaining({ type: "update", inventoryItemId: "w1", notes: null }),
+    ]);
+  });
+
+  it("omits adjustQuantity when the quantity is unchanged", async () => {
+    const user = userEvent.setup();
+    const { props } = renderEdit(weaponItem);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    // A one-element array match asserts no trailing adjustQuantity op.
+    expect(props.onSubmit).toHaveBeenCalledWith([
+      expect.objectContaining({ type: "update", inventoryItemId: "w1" }),
+    ]);
+  });
+
+  it("submits the exact update payload for armor", async () => {
+    const user = userEvent.setup();
+    const { props } = renderEdit(armorItem);
+
+    await user.selectOptions(screen.getByLabelText("Armor type"), "heavy");
+    await user.clear(screen.getByLabelText("Base AC"));
+    await user.type(screen.getByLabelText("Base AC"), "18");
+    await user.click(screen.getByRole("checkbox", { name: "Dex applies" }));
+    await user.click(screen.getByRole("checkbox", { name: "Stealth disadvantage" }));
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(props.onSubmit).toHaveBeenCalledWith([
+      {
+        type: "update",
+        inventoryItemId: "a1",
+        name: "Leather Armor",
+        notes: null,
+        equipped: false,
+        weapon: undefined,
+        armor: {
+          armorCategory: "heavy",
+          baseArmorClass: 18,
+          dexModifierApplies: false,
+          stealthDisadvantage: true,
+        },
+        consumable: undefined,
+      },
+    ]);
+  });
+
+  it("submits the exact update payload for a consumable", async () => {
+    const user = userEvent.setup();
+    const { props } = renderEdit(consumableItem);
+
+    // Spinbuttons in DOM order: Quantity, effect count, effect faces, effect modifier.
+    const spins = screen.getAllByRole("spinbutton");
+    await user.clear(spins[1]);
+    await user.type(spins[1], "3");
+    await user.clear(spins[2]);
+    await user.type(spins[2], "8");
+    await user.clear(spins[3]);
+    await user.type(spins[3], "0");
+    await user.clear(screen.getByLabelText("Effect description"));
+    await user.type(screen.getByLabelText("Effect description"), "Restores more HP");
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(props.onSubmit).toHaveBeenCalledWith([
+      {
+        type: "update",
+        inventoryItemId: "c1",
+        name: "Potion of Healing",
+        notes: null,
+        equipped: false,
+        weapon: undefined,
+        armor: undefined,
+        consumable: {
+          effectDiceCount: 3,
+          effectDiceFaces: 8,
+          effectModifier: 0,
+          effectDescription: "Restores more HP",
+        },
+      },
+    ]);
+  });
+});
