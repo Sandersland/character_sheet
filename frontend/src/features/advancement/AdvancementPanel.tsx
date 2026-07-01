@@ -15,12 +15,11 @@
  *    chooses one when taking the feat)
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
-import { fetchFeats } from "@/api/client";
 import Spinner from "@/components/ui/Spinner";
 import { useAsiDraft } from "@/features/advancement/useAsiDraft";
-import { useDelayedFlag } from "@/hooks/useDelayedFlag";
+import { useFeatCatalog } from "@/features/advancement/useFeatCatalog";
 import { ABILITY_OPTIONS, abilityLabel, skillLabel } from "@/lib/abilities";
 import type {
   AdvancementOperation,
@@ -67,14 +66,11 @@ export default function AdvancementPanel({
   const asi = useAsiDraft();
 
   // ── Feat state ─────────────────────────────────────────────────────────────
-  const [catalog, setCatalog] = useState<CatalogFeat[] | null>(null);
-  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const feats = useFeatCatalog(open && tab === "feat");
   const [search, setSearch] = useState("");
   const [selectedFeat, setSelectedFeat] = useState<CatalogFeat | null>(null);
   const [abilityChoice, setAbilityChoice] = useState("");
   const [customMode, setCustomMode] = useState(false);
-  const hasFetched = useRef(false);
-  const showSpinner = useDelayedFlag(open && catalog === null && !catalogError);
 
   // ── Custom feat form state ─────────────────────────────────────────────────
   const [customName, setCustomName] = useState("");
@@ -91,29 +87,13 @@ export default function AdvancementPanel({
   const [abilityIncrease, setAbilityIncrease] = useState(1);
   const [customAbilityChoice, setCustomAbilityChoice] = useState("");
 
-  // Fetch catalog the first time the panel opens and the feat tab is viewed.
-  useEffect(() => {
-    if (!open || tab !== "feat" || hasFetched.current) return;
-    hasFetched.current = true;
-    let mounted = true;
-    fetchFeats()
-      .then((feats) => { if (mounted) setCatalog(feats); })
-      .catch(() => { if (mounted) setCatalogError("Couldn't load feat catalog."); });
-    return () => { mounted = false; };
-  }, [open, tab]);
-
   // Reset feat panel when switching mode.
   function handleTabChange(next: "asi" | "feat") {
     setTab(next);
     setSelectedFeat(null);
     setAbilityChoice("");
     setCustomMode(false);
-    if (next === "feat" && !hasFetched.current) {
-      hasFetched.current = true;
-      fetchFeats()
-        .then((feats) => { setCatalog(feats); })
-        .catch(() => { setCatalogError("Couldn't load feat catalog."); });
-    }
+    if (next === "feat") feats.ensureFetched();
   }
 
   // ── ASI helpers ────────────────────────────────────────────────────────────
@@ -125,11 +105,7 @@ export default function AdvancementPanel({
   }
 
   // ── Feat helpers ───────────────────────────────────────────────────────────
-  const filteredCatalog = (catalog ?? []).filter((f) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return f.name.toLowerCase().includes(q) || f.description.toLowerCase().includes(q);
-  });
+  const filteredCatalog = feats.filter(search);
 
   function handleSelectFeat(feat: CatalogFeat) {
     setSelectedFeat(feat);
@@ -625,11 +601,11 @@ export default function AdvancementPanel({
                 onChange={(e) => setSearch(e.target.value)}
                 className="mb-3 w-full rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
               />
-              {catalogError && (
-                <p className="text-xs text-garnet-700">{catalogError}</p>
+              {feats.error && (
+                <p className="text-xs text-garnet-700">{feats.error}</p>
               )}
-              {catalog === null && !catalogError && showSpinner && <Spinner />}
-              {catalog !== null && filteredCatalog.length === 0 && (
+              {feats.catalog === null && !feats.error && feats.showSpinner && <Spinner />}
+              {feats.catalog !== null && filteredCatalog.length === 0 && (
                 <p className="py-2 text-center text-xs text-parchment-600">
                   {search ? "No feats match your search." : "No feats in catalog."}
                 </p>
