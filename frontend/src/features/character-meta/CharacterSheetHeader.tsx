@@ -51,8 +51,7 @@ export default function CharacterSheetHeader({
         <div className="flex flex-col items-end gap-2">
           <BackendStatus />
           <div className="flex flex-wrap items-center gap-3">
-            {/* Start / Join / Resume Session — the primary live-play entry
-                point. Requires a campaign; sessions are shared per campaign. */}
+            {/* Session button: campaign-required; sessions are shared per campaign, not per character. */}
             {session.hasCampaign ? (
               <button
                 type="button"
@@ -71,8 +70,7 @@ export default function CharacterSheetHeader({
                 Join a campaign
               </Link>
             )}
-            {/* Visible quick-capture affordance (#274) — opens the same
-                palette as Cmd/Ctrl+J, discoverable and usable on touch. */}
+            {/* Cmd/Ctrl+J quick-capture; this button is the touch-discoverable affordance. */}
             <button
               type="button"
               onClick={onOpenCapture}

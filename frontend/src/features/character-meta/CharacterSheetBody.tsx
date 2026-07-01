@@ -45,9 +45,7 @@ export default function CharacterSheetBody({
       <AbilityScoresPanel character={character} />
 
       {/* ── Proficiencies & Languages ───────────────────────────────── */}
-      {/* Weapons, armor (derived from class/race/feats), and tools
-          (creation-fixed + subclass choices). Hidden only when the character
-          has nothing to display and no pending tool choice (e.g. test fixtures). */}
+      {/* Hidden when there's nothing to display and no pending tool choice. */}
       {hasProficiencies(character) && (
         <Card title="Proficiencies" className="p-4">
           <ProficienciesCard
@@ -59,11 +57,7 @@ export default function CharacterSheetBody({
       )}
 
       {/* ── Features & Traits ──────────────────────────────────────── */}
-      {/* Class features + Advancements grouped together, as they would be
-          on a printed sheet (your class abilities, feats, and ASI sit
-          alongside each other rather than scattered). ClassFeaturesSection
-          handles the subclass picker, resource pools, maneuvers, and feature
-          list. AdvancementSection handles ASI + feats (level 4+ only). */}
+      {/* Class features + Advancements grouped together as on a printed sheet. */}
       {character.class && (
         <Card title="Class Features" className="p-4">
           <ClassFeaturesSection
@@ -99,8 +93,7 @@ export default function CharacterSheetBody({
         )}
       </div>
 
-      {/* ── Campaign Journal (spellcasters only — the 2-col row above
-          uses the right column for Spells, so Journal gets its own row) */}
+      {/* Campaign Journal: spellcasters only — the 2-col row above uses the right column for Spells. */}
       {character.spellcasting && (
         <JournalSection
           character={character}

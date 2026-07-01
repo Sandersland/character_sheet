@@ -9,9 +9,7 @@ interface AbilityScoresPanelProps {
 }
 
 export default function AbilityScoresPanel({ character }: AbilityScoresPanelProps) {
-  // Render abilities in canonical 5e order (STR-DEX-CON-INT-WIS-CHA) via the
-  // shared helper rather than raw object key order, which is arbitrary and
-  // surprised D&D players (it read WIS-CHA-STR-DEX-CON-INT).
+  // orderedAbilityEntries gives canonical 5e order (STR-DEX-CON-INT-WIS-CHA), not arbitrary key order.
   const abilityEntries = orderedAbilityEntries(character.abilityScores);
 
   return (
