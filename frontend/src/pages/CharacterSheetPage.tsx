@@ -26,6 +26,7 @@ import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { useGlobalKeyboard } from "@/hooks/useGlobalKeyboard";
 import { useReferenceData } from "@/hooks/useReferenceData";
 import { useSessionButton } from "@/features/session/useSessionButton";
+import { hasAdvancements, hasProficiencies } from "@/lib/characterSections";
 
 export default function CharacterSheetPage() {
   const { id } = useParams();
@@ -150,10 +151,7 @@ export default function CharacterSheetPage() {
         {/* Weapons, armor (derived from class/race/feats), and tools
             (creation-fixed + subclass choices). Hidden only when the character
             has nothing to display and no pending tool choice (e.g. test fixtures). */}
-        {(character.toolProficiencies.length > 0 ||
-          (character.resources?.toolProfChoiceCount ?? 0) > 0 ||
-          (character.armorProficiencies?.length ?? 0) > 0 ||
-          (character.weaponProficiencies?.length ?? 0) > 0) && (
+        {hasProficiencies(character) && (
           <Card title="Proficiencies" className="p-4">
             <ProficienciesCard
               character={character}
@@ -179,7 +177,7 @@ export default function CharacterSheetPage() {
           </Card>
         )}
 
-        {(character.advancementSlots.total > 0 || character.advancements.length > 0) && (
+        {hasAdvancements(character) && (
           <div id="advancement-card">
             <Card title="Advancements" className="p-4">
               <AdvancementSection
