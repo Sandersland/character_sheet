@@ -585,6 +585,87 @@ export async function applyConcentrationSaveInTx(
   return result;
 }
 
+// ---- Per-op appliers ----
+// Module-private helpers extracted from the applyHitPointOperations switch.
+// Each mutates ctx.hp/ctx.hd in place, does any side-table writes it owns,
+// throws InvalidHitPointOperationError on validation failure, and returns the
+// summary/eventData for the dispatcher to log. Helpers never call logEvent.
+
+interface HpOpContext {
+  tx: Prisma.TransactionClient;
+  characterId: string;
+  row: {
+    hitPoints: Prisma.JsonValue;
+    hitDice: Prisma.JsonValue;
+    abilityScores: Prisma.JsonValue;
+    experiencePoints: number;
+    spellcasting: Prisma.JsonValue;
+    resources: Prisma.JsonValue;
+    classEntries: { id: string; level: number; name: string; subclass: string | null }[];
+  };
+  hp: HitPoints;
+  hd: HitDice;
+  conMod: number;
+  faces: number;
+  effMax: number;
+  primaryEntry: { id: string; level: number; name: string; subclass: string | null } | undefined;
+  beforeClassLevel: number | null;
+}
+
+interface HpOpResult {
+  summary: string;
+  eventData: Record<string, unknown>;
+  damageForConcentration?: number;
+}
+
+async function applyDamageOp(ctx: HpOpContext, op: DamageOperation): Promise<HpOpResult> {
+  const { hp } = ctx;
+  if (op.amount <= 0) {
+    throw new InvalidHitPointOperationError("damage amount must be positive");
+  }
+  const beforeCurrent = hp.current;
+  // Temp HP absorbs first, then current. Both floor at 0.
+  const absorbed = Math.min(hp.temp, op.amount);
+  hp.temp -= absorbed;
+  hp.current = Math.max(0, hp.current - (op.amount - absorbed));
+  // The 5e concentration save uses the full damage of the instance.
+  return {
+    summary: `Took ${op.amount} damage (${beforeCurrent} → ${hp.current} HP)`,
+    eventData: { amount: op.amount },
+    damageForConcentration: op.amount,
+  };
+}
+
+async function applyHealOp(ctx: HpOpContext, op: HealOperation): Promise<HpOpResult> {
+  const { hp, effMax } = ctx;
+  if (op.amount <= 0) {
+    throw new InvalidHitPointOperationError("heal amount must be positive");
+  }
+  const beforeCurrent = hp.current;
+  // Regaining any HP while at 0 (dying) wakes the character and clears death saves.
+  if (hp.current === 0) {
+    hp.deathSaves = { successes: 0, failures: 0 };
+  }
+  hp.current = Math.min(effMax, hp.current + op.amount);
+  return {
+    summary: `Healed ${op.amount} HP (${beforeCurrent} → ${hp.current} HP)`,
+    eventData: { amount: op.amount },
+  };
+}
+
+async function applySetTempOp(ctx: HpOpContext, op: SetTempOperation): Promise<HpOpResult> {
+  const { hp } = ctx;
+  if (op.amount < 0) {
+    throw new InvalidHitPointOperationError("setTemp amount must be non-negative");
+  }
+  // 5e: temp HP doesn't stack — take the higher value.
+  hp.temp = Math.max(hp.temp, op.amount);
+  return {
+    summary: `Set temporary HP to ${op.amount}`,
+    eventData: { amount: op.amount },
+  };
+}
+
 // ---- Transaction handler ----
 
 /**
@@ -679,50 +760,32 @@ export async function applyHitPointOperations(
       // common HP write-back below (needs the post-damage current HP).
       let damageForConcentration: number | null = null;
 
+      const ctx: HpOpContext = {
+        tx,
+        characterId,
+        row,
+        hp,
+        hd,
+        conMod,
+        faces,
+        effMax,
+        primaryEntry,
+        beforeClassLevel,
+      };
+      let result: HpOpResult | null = null;
+
       switch (op.type) {
-        case "damage": {
-          if (op.amount <= 0) {
-            throw new InvalidHitPointOperationError("damage amount must be positive");
-          }
-          // Temp HP absorbs first, then current. Both floor at 0.
-          const absorbed = Math.min(hp.temp, op.amount);
-          hp.temp -= absorbed;
-          hp.current = Math.max(0, hp.current - (op.amount - absorbed));
-          // Note: massive-damage instant-death (remaining damage ≥ max at 0) is
-          // intentionally out of scope for this phase.
-          eventData = { amount: op.amount };
-          summary = `Took ${op.amount} damage (${beforeHp.current} → ${hp.current} HP)`;
-          // The 5e concentration save uses the full damage of the instance,
-          // including any absorbed by temp HP.
-          damageForConcentration = op.amount;
+        case "damage":
+          result = await applyDamageOp(ctx, op);
           break;
-        }
 
-        case "heal": {
-          if (op.amount <= 0) {
-            throw new InvalidHitPointOperationError("heal amount must be positive");
-          }
-          // Regaining any HP while at 0 (dying) wakes the character and clears
-          // the death save accumulation.
-          if (hp.current === 0) {
-            hp.deathSaves = { successes: 0, failures: 0 };
-          }
-          hp.current = Math.min(effMax, hp.current + op.amount);
-          eventData = { amount: op.amount };
-          summary = `Healed ${op.amount} HP (${beforeHp.current} → ${hp.current} HP)`;
+        case "heal":
+          result = await applyHealOp(ctx, op);
           break;
-        }
 
-        case "setTemp": {
-          if (op.amount < 0) {
-            throw new InvalidHitPointOperationError("setTemp amount must be non-negative");
-          }
-          // 5e: temp HP doesn't stack — take the higher value.
-          hp.temp = Math.max(hp.temp, op.amount);
-          eventData = { amount: op.amount };
-          summary = `Set temporary HP to ${op.amount}`;
+        case "setTemp":
+          result = await applySetTempOp(ctx, op);
           break;
-        }
 
         case "shortRest": {
           const available = hd.total - hd.spent;
@@ -983,6 +1046,14 @@ export async function applyHitPointOperations(
           eventData = {};
           summary = "Stabilized";
           break;
+        }
+      }
+
+      if (result) {
+        summary = result.summary;
+        eventData = result.eventData;
+        if (result.damageForConcentration !== undefined) {
+          damageForConcentration = result.damageForConcentration;
         }
       }
 
