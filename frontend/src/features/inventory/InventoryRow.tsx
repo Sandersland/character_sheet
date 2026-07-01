@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useReducer, useState } from "react";
 
 import { formatRollSpec } from "@/lib/dice";
 import { isEquippable } from "@/lib/items";
@@ -59,6 +59,24 @@ function weaponPropertyTags(weapon: WeaponDetail): string[] {
   return tags;
 }
 
+// View-mode local UI state: prose disclosure + the two-step remove confirm.
+interface RowState {
+  expanded: boolean;
+  confirming: boolean;
+}
+type RowAction = "toggleExpand" | "confirmRemove" | "cancelRemove";
+
+function rowReducer(state: RowState, action: RowAction): RowState {
+  switch (action) {
+    case "toggleExpand":
+      return { ...state, expanded: !state.expanded };
+    case "confirmRemove":
+      return { ...state, confirming: true };
+    case "cancelRemove":
+      return { ...state, confirming: false };
+  }
+}
+
 const inputClass =
   "rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm";
 const labelClass = "flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-parchment-600";
@@ -88,8 +106,7 @@ export default function InventoryRow({
   const [armorEdit, setArmorEdit] = useState(armor);
   const [consumableEdit, setConsumableEdit] = useState(consumable);
 
-  const [expanded, setExpanded] = useState(false);
-  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [state, dispatch] = useReducer(rowReducer, { expanded: false, confirming: false });
 
   async function submitEdit() {
     const operations: InventoryOperation[] = [
@@ -402,14 +419,14 @@ export default function InventoryRow({
           {hasProse && (
             <button
               type="button"
-              aria-expanded={expanded}
-              aria-label={expanded ? "Hide details" : "Show details"}
-              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={state.expanded}
+              aria-label={state.expanded ? "Hide details" : "Show details"}
+              onClick={() => dispatch("toggleExpand")}
               className="flex h-7 w-7 items-center justify-center rounded-control text-parchment-500 transition-colors hover:bg-parchment-200 hover:text-parchment-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
             >
               <ChevronDown
                 aria-hidden="true"
-                className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`}
+                className={`h-4 w-4 transition-transform ${state.expanded ? "rotate-180" : ""}`}
               />
             </button>
           )}
@@ -436,7 +453,7 @@ export default function InventoryRow({
               { label: "Edit", onSelect: onEdit },
               {
                 label: "Remove",
-                onSelect: () => setConfirmingRemove(true),
+                onSelect: () => dispatch("confirmRemove"),
                 danger: true,
                 separatorBefore: true,
               },
@@ -446,7 +463,7 @@ export default function InventoryRow({
         )}
       </div>
 
-      {!selectMode && confirmingRemove && (
+      {!selectMode && state.confirming && (
         <div className="flex items-center justify-end gap-3 text-xs">
           <span className="text-parchment-700">Remove {item.name}?</span>
           <button
@@ -460,7 +477,7 @@ export default function InventoryRow({
           <button
             type="button"
             disabled={pending}
-            onClick={() => setConfirmingRemove(false)}
+            onClick={() => dispatch("cancelRemove")}
             className="font-semibold text-parchment-600 hover:underline disabled:opacity-40"
           >
             Cancel
@@ -468,7 +485,7 @@ export default function InventoryRow({
         </div>
       )}
 
-      {!selectMode && expanded && hasProse && (
+      {!selectMode && state.expanded && hasProse && (
         <div className="flex flex-col gap-1 pl-0.5">
           {item.description && <p className="text-xs text-parchment-600">{item.description}</p>}
           {consumable?.effectDescription && (
