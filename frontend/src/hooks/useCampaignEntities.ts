@@ -15,6 +15,15 @@ export function primeCampaignEntities(campaignId: string, entities: CampaignEnti
   subscribers.get(campaignId)?.forEach((notify) => notify(entities));
 }
 
+// Test-only: clear all module-level state so one test's cache/subscribers/inflight
+// can't leak into the next (the source of MentionAutocomplete.test.tsx flakiness,
+// #282). Not used in any production path.
+export function __resetCampaignEntitiesCacheForTests(): void {
+  cache.clear();
+  subscribers.clear();
+  inflight.clear();
+}
+
 // Dedupe concurrent loads so two consumers mounting together share one request.
 function loadCampaignEntities(campaignId: string): Promise<CampaignEntity[]> {
   const existing = inflight.get(campaignId);
