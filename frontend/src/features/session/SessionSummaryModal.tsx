@@ -116,9 +116,13 @@ function AdvancementsList({ advancements }: { advancements: SessionSummaryAdvanc
   );
 }
 
-/** A small labelled recap group, rendered only when it has children. */
+/**
+ * A small labelled recap group. Callers gate visibility themselves (each usage
+ * is wrapped in a `… .length > 0 &&`), so there's no self-suppression here — an
+ * `if (!children)` check would be a false promise anyway, since a ReactElement
+ * child is always truthy even when the child component renders null.
+ */
 function RecapGroup({ label, children }: { label: string; children: ReactNode }) {
-  if (!children) return null;
   return (
     <div className="flex flex-col gap-1.5">
       <p className="text-xs font-semibold uppercase tracking-wide text-parchment-600">{label}</p>
