@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { createCharacter, fetchItems } from "@/api/client";
-import AbilityScoreEditor from "@/features/abilities/AbilityScoreEditor";
+import AbilityScoresSection from "@/features/character-create/AbilityScoresSection";
 import BackendStatus from "@/features/character-meta/BackendStatus";
 import Card from "@/components/ui/Card";
 import IdentitySection from "@/features/character-create/IdentitySection";
@@ -184,24 +184,7 @@ export default function CharacterCreatePage() {
           <>
             <IdentitySection draft={draft} update={update} reference={reference} />
 
-            <Card title="Ability Scores" headingLevel={2}>
-              <div className="p-4">
-                <AbilityScoreEditor
-                  method={draft.abilityMethod}
-                  pool={draft.abilityPool}
-                  assignments={draft.abilityAssignments}
-                  abilityScores={draft.abilityScores}
-                  onMethodChange={(method, pool, assignments) =>
-                    update({ abilityMethod: method, abilityPool: pool, abilityAssignments: assignments })
-                  }
-                  onPoolChange={(pool) => update({ abilityPool: pool })}
-                  onAssignmentsChange={(assignments, scores) =>
-                    update({ abilityAssignments: assignments, abilityScores: scores })
-                  }
-                  onScoresChange={(scores) => update({ abilityScores: scores })}
-                />
-              </div>
-            </Card>
+            <AbilityScoresSection draft={draft} update={update} />
 
             <Card title="Skill Proficiencies" headingLevel={2}>
               <div className="flex flex-col gap-3 p-4">
