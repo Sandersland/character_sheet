@@ -37,6 +37,8 @@ frontend/src/
 │   ├── session/         # TurnHub (→ useTurnActions + TurnControls/ActionSlot/BonusActionSlot/
 │   │                    #   ReactionSlot/EffectManeuverStrip/LayOnHandsInput), useTurnState, SessionLog,
 │   │                    #   SessionsModal, SessionSummaryModal, Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
+│   │                    #   AttackRow, EquipWeaponPanel, AttackOptionRow,
+│   │                    #   useSpellPicker + SpellPickerRow/SlotLevelSelector/SpellTargetToggle,
 │   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie,
 │   │                    #   useSessionButton (sheet-header Start/Join/Resume session state)
 │   ├── spells/          # SpellsSection, SpellRow, AddSpellPanel
@@ -86,8 +88,10 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 | `dieFaces.ts` | Static die-face geometry data for the 3D rollers. |
 | `physicsDice.ts` | Physics-roller setup (cannon/three glue) for `PhysicsDiceRoller`. |
 | `spellCast.ts` | Pure cast-roll math (cantrip scaling, upcast dice, heal modifier) shared by SpellsSection + InlineSpellPicker. |
-| `spellMeta.ts` | Pure spell display helpers (school tone, metadata) shared across spell surfaces. |
+| `spellMeta.ts` | Pure spell display helpers (school tone, metadata, `defaultTarget`/`targetLocked`) shared across spell surfaces. |
+| `spellPicker.ts` | Pure InlineSpellPicker selection/slot predicates (`availableSlotLevels`, `availableSlotsForSpell`, `resolvedSlot`, `filterCastableSpells`, `sortSpells`, `spellRestrictionFlags`, `slotRestrictionHint`). |
 | `turnRules.ts` | 5e turn economy derived from class/level (`deriveAttacksPerAction`, action lists). |
+| `attackMath.ts` | Pure attack-row math for InlineAttackPicker: `buildAttackEntries` (equipped/unarmed/improvised rows + precomputed roll/log label strings), grip-resolved weapon damage/type/grip helpers, unarmed display, `hasSuperiorityDice`, `attacksExhausted`. |
 | `mentions.ts` | @-tagging primitives (#248/#269): `parseMentionBody` (text/mention segment split of a stored body), `normalizeForMatch` (search key, parity with backend `lib/journal-refs.ts`), `matchEntities`, `parseTrigger` (the in-progress `@…`/`@type:` autocomplete trigger). Edit-time DOM helpers (contenteditable composer): `buildMentionChip`, `mentionBodyToFragment` (body→DOM with chips), `serializeMentionDom` (DOM→body round-trip), `serializeMentionDomBeforeCaret` (pre-caret slice for trigger parsing), `placeCaretAtBodyOffset`, plus the `MentionResolved` type. Pure — no JSX. |
 | `encumbrance.ts` | Carrying capacity (`carryingCapacity` = STR × 15), derive-on-read. |
 | `itemDetails.ts` | Pure inventory-row presentation: `itemDetailParts` (the dotted summary line), `hasItemProse`, plus `weaponDamageParts`/`weaponPropertyTags`. Shared by InventoryRow/ItemSummary. |
