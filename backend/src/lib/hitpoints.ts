@@ -618,7 +618,7 @@ interface HpOpResult {
   damageForConcentration?: number;
 }
 
-async function applyDamageOp(ctx: HpOpContext, op: DamageOperation): Promise<HpOpResult> {
+function applyDamageOp(ctx: HpOpContext, op: DamageOperation): HpOpResult {
   const { hp } = ctx;
   if (op.amount <= 0) {
     throw new InvalidHitPointOperationError("damage amount must be positive");
@@ -636,7 +636,7 @@ async function applyDamageOp(ctx: HpOpContext, op: DamageOperation): Promise<HpO
   };
 }
 
-async function applyHealOp(ctx: HpOpContext, op: HealOperation): Promise<HpOpResult> {
+function applyHealOp(ctx: HpOpContext, op: HealOperation): HpOpResult {
   const { hp, effMax } = ctx;
   if (op.amount <= 0) {
     throw new InvalidHitPointOperationError("heal amount must be positive");
@@ -653,7 +653,7 @@ async function applyHealOp(ctx: HpOpContext, op: HealOperation): Promise<HpOpRes
   };
 }
 
-async function applySetTempOp(ctx: HpOpContext, op: SetTempOperation): Promise<HpOpResult> {
+function applySetTempOp(ctx: HpOpContext, op: SetTempOperation): HpOpResult {
   const { hp } = ctx;
   if (op.amount < 0) {
     throw new InvalidHitPointOperationError("setTemp amount must be non-negative");
@@ -666,7 +666,7 @@ async function applySetTempOp(ctx: HpOpContext, op: SetTempOperation): Promise<H
   };
 }
 
-async function applyDeathSaveOp(ctx: HpOpContext, op: DeathSaveOperation): Promise<HpOpResult> {
+function applyDeathSaveOp(ctx: HpOpContext, op: DeathSaveOperation): HpOpResult {
   const { hp } = ctx;
   if (hp.current !== 0) {
     throw new InvalidHitPointOperationError(
@@ -688,7 +688,7 @@ async function applyDeathSaveOp(ctx: HpOpContext, op: DeathSaveOperation): Promi
   return { summary, eventData: { roll: op.roll } };
 }
 
-async function applyStabilizeOp(ctx: HpOpContext): Promise<HpOpResult> {
+function applyStabilizeOp(ctx: HpOpContext): HpOpResult {
   const { hp } = ctx;
   if (hp.current !== 0) {
     throw new InvalidHitPointOperationError(
@@ -1038,15 +1038,15 @@ export async function applyHitPointOperations(
 
       switch (op.type) {
         case "damage":
-          result = await applyDamageOp(ctx, op);
+          result = applyDamageOp(ctx, op);
           break;
 
         case "heal":
-          result = await applyHealOp(ctx, op);
+          result = applyHealOp(ctx, op);
           break;
 
         case "setTemp":
-          result = await applySetTempOp(ctx, op);
+          result = applySetTempOp(ctx, op);
           break;
 
         case "shortRest":
@@ -1062,12 +1062,17 @@ export async function applyHitPointOperations(
           break;
 
         case "deathSave":
-          result = await applyDeathSaveOp(ctx, op);
+          result = applyDeathSaveOp(ctx, op);
           break;
 
         case "stabilize":
-          result = await applyStabilizeOp(ctx);
+          result = applyStabilizeOp(ctx);
           break;
+
+        default: {
+          const _exhaustive: never = op;
+          throw new InvalidHitPointOperationError(`Unknown op type: ${(_exhaustive as { type: string }).type}`);
+        }
       }
 
       if (result) {
