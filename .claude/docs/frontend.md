@@ -24,7 +24,9 @@ frontend/src/
 │   │                    #   RollButton, RollContext, RollResultToast,
 │   │                    #   diceRollerTypes.ts, useDieFaceData.ts
 │   ├── experience/      # ExperienceTracker
-│   ├── hitpoints/       # HitPointTracker (inline Card; hosts LevelUpModal + ConcentrationSaveModal)
+│   ├── hitpoints/       # HitPointTracker orchestrator (inline Card; hosts LevelUpModal + ConcentrationSaveModal)
+│   │                    #   Sub-components: HpActionControl, HpMeter, RestControls,
+│   │                    #   DeathSaveTracker, LevelUpCallout, AdvancementCallout
 │   ├── inventory/       # InventoryList, InventoryRow, AddItemPanel,
 │   │                    #   StartingEquipmentEditor
 │   ├── journal/         # CapturePalette (Cmd/Ctrl+J quick-capture NOTE overlay)
