@@ -14,11 +14,10 @@ vi.mock("@/api/client", () => ({
   deleteJournalEntry: vi.fn(),
 }));
 
-// A legacy 3-field ENTRY still renders (body + date); its title stops showing.
+// A legacy ENTRY still renders as a dated note row (body + date).
 const ENTRY: JournalEntry = {
   id: "entry-1",
   kind: "ENTRY",
-  title: "The Sunken Library",
   date: "2026-06-22T00:00:00.000Z",
   loggedAt: "2026-06-22T00:00:00.000Z",
   body: "Found three waterlogged tomes.",
@@ -40,11 +39,9 @@ describe("JournalSection", () => {
     expect(screen.getByText("Your journal is empty")).toBeInTheDocument();
   });
 
-  it("renders entries as dated note rows (body + date, no title)", () => {
+  it("renders entries as dated note rows (body + date)", () => {
     render(<JournalSection character={makeCharacter([ENTRY])} onUpdate={vi.fn()} />);
     expect(screen.getByText("Found three waterlogged tomes.")).toBeInTheDocument();
-    // Legacy ENTRY title no longer shows in the note-row model.
-    expect(screen.queryByText("The Sunken Library")).not.toBeInTheDocument();
     // 2026-06-22 formatted for display (not the raw ISO string).
     expect(screen.queryByText(/2026-06-22T/)).not.toBeInTheDocument();
   });

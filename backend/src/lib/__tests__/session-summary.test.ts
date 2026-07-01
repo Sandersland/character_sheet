@@ -31,6 +31,7 @@ describe("computeSessionSummary", () => {
     expect(s.xpGained).toBe(0);
     expect(s.levelsGained).toBe(0);
     expect(s.itemsAcquired).toEqual([]);
+    expect(s.itemsSold).toEqual([]);
     expect(s.slotsSpent).toEqual({});
     expect(s.spellsCast).toBe(0);
     expect(s.combatRounds).toBe(0);
@@ -70,6 +71,23 @@ describe("computeSessionSummary", () => {
     expect(s.itemsAcquired).toEqual([
       { name: "Healing Potion", qty: 2 },
       { name: "Torch", qty: 3 },
+    ]);
+    expect(s.itemsSold).toEqual([]);
+  });
+
+  it("tallies sold items as positive counts in itemsSold, never as negative acquisitions", () => {
+    const s = summarize([
+      { type: "acquired", data: { itemName: "Sword", quantityDelta: 1 } },
+      { type: "sold", data: { itemName: "Alms Box", quantityDelta: -2 } },
+      { type: "sold", data: { itemName: "Alms Box", quantityDelta: -1 } },
+      { type: "sold", data: { itemName: "Shield", quantityDelta: -1 } },
+    ]);
+    // Sold items stay OUT of itemsAcquired (no "×-2" acquisition).
+    expect(s.itemsAcquired).toEqual([{ name: "Sword", qty: 1 }]);
+    // …and surface as positive counts under itemsSold, sorted by name.
+    expect(s.itemsSold).toEqual([
+      { name: "Alms Box", qty: 3 },
+      { name: "Shield", qty: 1 },
     ]);
   });
 
@@ -270,6 +288,7 @@ function participant(overrides: Partial<ParticipantSummary>): ParticipantSummary
     xpGained: 0,
     levelsGained: 0,
     itemsAcquired: [],
+    itemsSold: [],
     slotsSpent: {},
     spellsCast: 0,
     combatRounds: 0,
@@ -364,5 +383,31 @@ describe("computeCampaignRecap", () => {
     expect(recap.startedAt).toBe("2026-06-22T18:00:00.000Z");
     // b never left → falls back to its endedAt for the window's upper bound.
     expect(recap.endedAt).toBe("2026-06-22T20:30:00.000Z");
+  });
+
+  it("aggregates sold items, slots spent, and feats/ASIs across participants", () => {
+    const recap = computeCampaignRecap([
+      participant({
+        characterId: "a",
+        itemsSold: [{ name: "Alms Box", qty: 2 }],
+        slotsSpent: { "1": 2, "3": 1 },
+        featsOrAsis: [{ type: "featTaken", label: "Feat: Lucky" }],
+      }),
+      participant({
+        characterId: "b",
+        itemsSold: [{ name: "Alms Box", qty: 1 }, { name: "Torch", qty: 4 }],
+        slotsSpent: { "1": 1 },
+        featsOrAsis: [{ type: "abilityScoreImprovement", label: "Ability Score Improvement" }],
+      }),
+    ]);
+    expect(recap.itemsSold).toEqual([
+      { name: "Alms Box", qty: 3 },
+      { name: "Torch", qty: 4 },
+    ]);
+    expect(recap.slotsSpent).toEqual({ "1": 3, "3": 1 });
+    expect(recap.featsOrAsis).toEqual([
+      { type: "featTaken", label: "Feat: Lucky" },
+      { type: "abilityScoreImprovement", label: "Ability Score Improvement" },
+    ]);
   });
 });

@@ -188,7 +188,6 @@ entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, re
         characterId: ref.entry.characterId,
         sessionId: ref.entry.sessionId,
         kind: ref.entry.kind,
-        title: ref.entry.title,
         date: ref.entry.date,
         loggedAt: ref.entry.loggedAt,
         body: ref.entry.body,

@@ -16,9 +16,10 @@ import { serializeCharacter, characterInclude } from "./characters.js";
 // shape as every other character-mutating endpoint, so the frontend can swap
 // its Character state in one assignment).
 //
-// Two kinds share the table: full ENTRY rows (3-field title/date/body form) and
-// fast NOTE rows (one-line in-session capture, no title). Entries are private by
-// default (authorUserId + visibility) so sharing can be switched on later.
+// Two kinds share the table: full ENTRY rows (date/body form) and fast NOTE rows
+// (one-line in-session capture). Both are date + body; NOTE defaults its date to
+// today. Entries are private by default (authorUserId + visibility) so sharing
+// can be switched on later.
 
 export const journalRouter = Router();
 
@@ -41,21 +42,15 @@ function utcMidnightToday(): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
-// title is required for ENTRY (the 3-field form) but omitted for a NOTE; date is
-// required for ENTRY but defaults to today for a NOTE.
+// date is required for ENTRY (the full form) but defaults to today for a NOTE.
 const createJournalSchema = z
   .object({
     kind: z.enum(["NOTE", "ENTRY"]).default("ENTRY"),
-    title: z.string().min(1).optional(),
     date: dateSchema.optional(),
     body: z.string().min(1),
     sessionId: z.string().optional(),
   })
   .strict()
-  .refine((d) => d.kind !== "ENTRY" || (d.title?.length ?? 0) > 0, {
-    message: "title is required for an ENTRY",
-    path: ["title"],
-  })
   .refine((d) => d.kind !== "ENTRY" || d.date !== undefined, {
     message: "date is required for an ENTRY",
     path: ["date"],
@@ -63,7 +58,6 @@ const createJournalSchema = z
 
 const updateJournalSchema = z
   .object({
-    title: z.string().min(1),
     date: dateSchema,
     body: z.string().min(1),
   })
@@ -157,7 +151,6 @@ journalRouter.post("/characters/:id/journal", async (req, res) => {
       data: {
         characterId: req.params.id,
         kind: data.kind,
-        title: data.title ?? null,
         date: data.date ?? utcMidnightToday(),
         body: data.body,
         visibility: "PRIVATE",

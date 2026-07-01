@@ -618,7 +618,6 @@ export function serializeCharacter(row: CharacterWithRelations) {
     journal: row.journalEntries.map((e) => ({
       id: e.id,
       kind: e.kind,
-      title: e.title ?? undefined,
       date: e.date.toISOString(),
       loggedAt: e.loggedAt.toISOString(),
       body: e.body,

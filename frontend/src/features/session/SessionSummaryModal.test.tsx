@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 
 import SessionSummaryModal from "@/features/session/SessionSummaryModal";
 import { applyExperienceOperations, fetchSession } from "@/api/client";
@@ -12,9 +13,18 @@ import type {
   SessionParticipant,
 } from "@/types/character";
 
+// A well-formed entity uuid for @[<uuid>] mention-token tests. Inlined in the
+// (hoisted) vi.mock factory below to avoid a temporal-dead-zone reference.
+const DRAGON_ID = "11111111-1111-1111-1111-111111111111";
+
 vi.mock("@/api/client", () => ({
   applyExperienceOperations: vi.fn(),
   fetchSession: vi.fn(),
+  // useCampaignEntities (chip resolver) reads this; default to a Dragon NPC so
+  // the mention-chip render can be asserted.
+  fetchEntities: vi.fn(async () => [
+    { id: "11111111-1111-1111-1111-111111111111", type: "NPC", name: "Dragon" },
+  ]),
 }));
 
 const mockApplyXp = vi.mocked(applyExperienceOperations);
@@ -39,6 +49,9 @@ const recap: CampaignRecap = {
     { name: "Healing Potion", qty: 2 },
     { name: "Longsword", qty: 1 },
   ],
+  itemsSold: [],
+  slotsSpent: {},
+  featsOrAsis: [],
   totalPresentMs: 6 * 60 * 60 * 1000,
 };
 
@@ -50,6 +63,7 @@ function participantSummary(overrides: Partial<ParticipantSummary>): Participant
     xpGained: 225,
     levelsGained: 0,
     itemsAcquired: [],
+    itemsSold: [],
     slotsSpent: {},
     spellsCast: 1,
     combatRounds: 4,
@@ -142,29 +156,113 @@ describe("SessionSummaryModal", () => {
     expect(screen.getByText(/No summary is available/)).toBeInTheDocument();
   });
 
-  it("renders the session's journal entries (expandable)", async () => {
-    const user = userEvent.setup();
+  it("renders in-session NOTE entries inline (body visible, no blank row) with @-chips resolved", async () => {
     const session: Session = {
       ...baseSession,
       journalEntries: [
         {
           id: "j1",
-          kind: "ENTRY",
-          title: "We found the dragon",
+          kind: "NOTE",
           date: "2026-06-22T00:00:00.000Z",
           loggedAt: "2026-06-22T00:00:00.000Z",
-          body: "It was huge and very angry.",
+          body: `Slew the @[${DRAGON_ID}] at last.`,
           visibility: "PRIVATE",
         },
       ],
     };
+    render(
+      <MemoryRouter>
+        <SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />
+      </MemoryRouter>,
+    );
+
+    // The note body is visible immediately — no title, no collapse (#278 regression).
+    expect(screen.getByText(/Slew the/)).toBeInTheDocument();
+    // The @[<uuid>] token resolves to the entity's name chip once entities load.
+    expect(await screen.findByText("@Dragon")).toBeInTheDocument();
+    // The raw token never leaks through as text.
+    expect(screen.queryByText(new RegExp(DRAGON_ID))).not.toBeInTheDocument();
+  });
+
+  it("shows sold items in their own section with a positive count (never '×-2 acquired')", () => {
+    const session: Session = {
+      ...baseSession,
+      summary: {
+        ...recap,
+        itemsAcquired: [{ name: "Longsword", qty: 1 }],
+        itemsSold: [{ name: "Alms Box", qty: 2 }],
+      },
+    };
     render(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />);
 
-    expect(screen.getByText("We found the dragon")).toBeInTheDocument();
-    expect(screen.queryByText("It was huge and very angry.")).not.toBeInTheDocument();
+    expect(screen.getByText("Items sold")).toBeInTheDocument();
+    expect(screen.getByText("Alms Box")).toBeInTheDocument();
+    expect(screen.getByText("×2")).toBeInTheDocument();
+    // The mislabel bug: a sold item must never appear as a negative acquisition.
+    expect(screen.queryByText("×-2")).not.toBeInTheDocument();
+  });
 
-    await user.click(screen.getByText("We found the dragon"));
-    expect(screen.getByText("It was huge and very angry.")).toBeInTheDocument();
+  it("drops the redundant participant card for a solo session (aggregate only)", () => {
+    const solo: SessionParticipant[] = [
+      participant({ characterId: "c1", summary: participantSummary({ characterId: "c1", characterName: "Aldric" }) }),
+    ];
+    const session: Session = {
+      ...baseSession,
+      summary: { ...recap, participantCount: 1 },
+      participants: solo,
+    };
+    render(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />);
+
+    // Aggregate is still shown…
+    expect(screen.getByText("XP gained")).toBeInTheDocument();
+    // …but the duplicate Participants section is gone.
+    expect(screen.queryByText("Participants")).not.toBeInTheDocument();
+  });
+
+  it("surfaces party-wide slots spent and feats/ASIs on the aggregate", () => {
+    const session: Session = {
+      ...baseSession,
+      summary: {
+        ...recap,
+        slotsSpent: { "1": 2, "3": 1 },
+        featsOrAsis: [{ type: "featTaken", label: "Feat: Lucky" }],
+      },
+    };
+    render(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />);
+
+    expect(screen.getByText("Slots spent")).toBeInTheDocument();
+    expect(screen.getByText("L1 ×2")).toBeInTheDocument();
+    expect(screen.getByText("Feats & ASIs")).toBeInTheDocument();
+    expect(screen.getByText("Feat: Lucky")).toBeInTheDocument();
+  });
+
+  it("renders a legacy recap blob missing itemsSold/slotsSpent/featsOrAsis without crashing", () => {
+    // Sessions ended before these fields shipped have stored summary blobs that
+    // lack them; the recap is read from storage (not recomputed), so the modal
+    // must tolerate their absence rather than throwing on `.length`/`Object.keys`.
+    const legacyRecap = {
+      startedAt: recap.startedAt,
+      endedAt: recap.endedAt,
+      durationMs: recap.durationMs,
+      participantCount: 1,
+      xpGained: 100,
+      levelsGained: 0,
+      spellsCast: 0,
+      combatRounds: 0,
+      attackRolls: 0,
+      damageRolls: 0,
+      itemsAcquired: [],
+      totalPresentMs: recap.totalPresentMs,
+    } as unknown as CampaignRecap; // intentionally omits itemsSold/slotsSpent/featsOrAsis
+    const session: Session = { ...baseSession, summary: legacyRecap };
+
+    render(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />);
+
+    // The aggregate still renders; the missing-field sections are simply absent.
+    expect(screen.getByText("XP gained")).toBeInTheDocument();
+    expect(screen.queryByText("Items sold")).not.toBeInTheDocument();
+    expect(screen.queryByText("Slots spent")).not.toBeInTheDocument();
+    expect(screen.queryByText("Feats & ASIs")).not.toBeInTheDocument();
   });
 
   it("shows a journal empty-state when there are no entries", () => {

@@ -307,7 +307,7 @@ export default function EntityDetailPage() {
                               to={`/characters/${link.entry.characterId}`}
                               className="text-sm font-semibold text-garnet-700 hover:underline"
                             >
-                              {link.entry.title ?? link.characterName}
+                              {link.characterName}
                             </Link>
                             <span className="whitespace-nowrap text-xs text-parchment-500">
                               {formatJournalDate(link.entry.date)}
