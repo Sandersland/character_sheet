@@ -76,7 +76,7 @@ beforeEach(() => {
 
 describe("MentionAutocomplete (#248)", () => {
   it("shows matches for @gob", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<Harness campaignId="camp-1" />);
     await user.click(screen.getByLabelText("Note body"));
     await user.type(screen.getByLabelText("Note body"), "@gob");
@@ -86,7 +86,7 @@ describe("MentionAutocomplete (#248)", () => {
   });
 
   it("filters by a reserved type prefix (@item:)", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<Harness campaignId="camp-1" />);
     await user.type(screen.getByLabelText("Note body"), "@item:");
 
@@ -95,7 +95,7 @@ describe("MentionAutocomplete (#248)", () => {
   });
 
   it("inserts an @[uuid] token when a match is selected", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<Harness campaignId="camp-1" />);
     await user.type(screen.getByLabelText("Note body"), "@gob");
 
@@ -117,7 +117,7 @@ describe("MentionAutocomplete (#248)", () => {
   // spend wall-time on genuine failure, never on the happy path; behaviour is
   // unchanged.
   it("still matches a multiword apostrophe name (Baldur's Ga)", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<Harness campaignId="camp-1" />);
     await user.type(screen.getByLabelText("Note body"), "@Baldur's Ga");
 
@@ -130,7 +130,7 @@ describe("MentionAutocomplete (#248)", () => {
     vi.mocked(client.createEntity).mockResolvedValue(
       entity({ id: "44444444-4444-4444-4444-444444444444", name: "Mysterious Stranger" }),
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<Harness campaignId="camp-1" />);
     await user.type(screen.getByLabelText("Note body"), "@Mysterious Stranger");
 
@@ -144,7 +144,7 @@ describe("MentionAutocomplete (#248)", () => {
   });
 
   it("renders a create/join CTA when there is no campaign", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<Harness campaignId={null} />);
     await user.type(screen.getByLabelText("Note body"), "@gob");
 
