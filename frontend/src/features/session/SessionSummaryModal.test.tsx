@@ -236,6 +236,35 @@ describe("SessionSummaryModal", () => {
     expect(screen.getByText("Feat: Lucky")).toBeInTheDocument();
   });
 
+  it("renders a legacy recap blob missing itemsSold/slotsSpent/featsOrAsis without crashing", () => {
+    // Sessions ended before these fields shipped have stored summary blobs that
+    // lack them; the recap is read from storage (not recomputed), so the modal
+    // must tolerate their absence rather than throwing on `.length`/`Object.keys`.
+    const legacyRecap = {
+      startedAt: recap.startedAt,
+      endedAt: recap.endedAt,
+      durationMs: recap.durationMs,
+      participantCount: 1,
+      xpGained: 100,
+      levelsGained: 0,
+      spellsCast: 0,
+      combatRounds: 0,
+      attackRolls: 0,
+      damageRolls: 0,
+      itemsAcquired: [],
+      totalPresentMs: recap.totalPresentMs,
+    } as unknown as CampaignRecap; // intentionally omits itemsSold/slotsSpent/featsOrAsis
+    const session: Session = { ...baseSession, summary: legacyRecap };
+
+    render(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />);
+
+    // The aggregate still renders; the missing-field sections are simply absent.
+    expect(screen.getByText("XP gained")).toBeInTheDocument();
+    expect(screen.queryByText("Items sold")).not.toBeInTheDocument();
+    expect(screen.queryByText("Slots spent")).not.toBeInTheDocument();
+    expect(screen.queryByText("Feats & ASIs")).not.toBeInTheDocument();
+  });
+
   it("shows a journal empty-state when there are no entries", () => {
     render(<SessionSummaryModal characterId="c1" session={baseSession} onClose={() => {}} />);
     expect(screen.getByText("No journal entries for this session.")).toBeInTheDocument();

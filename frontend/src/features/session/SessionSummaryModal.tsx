@@ -154,7 +154,8 @@ function ParticipantCard({ summary }: { summary: ParticipantSummary }) {
           <ItemBadgeList items={summary.itemsAcquired} />
         </RecapGroup>
       )}
-      {summary.itemsSold.length > 0 && (
+      {/* Coalesce: legacy participant summary blobs predate itemsSold. */}
+      {(summary.itemsSold ?? []).length > 0 && (
         <RecapGroup label="Sold">
           <ItemBadgeList items={summary.itemsSold} />
         </RecapGroup>
@@ -441,21 +442,24 @@ export default function SessionSummaryModal({
             </div>
 
             {/* ── Items sold (party-wide) ─────────────────────────────────── */}
-            {recap.itemsSold.length > 0 && (
+            {/* Coalesce: sessions ended before these fields shipped have stored
+                summary blobs that lack them (the recap is read from storage, not
+                recomputed), so guard against undefined on legacy recaps. */}
+            {(recap.itemsSold ?? []).length > 0 && (
               <RecapGroup label="Items sold">
                 <ItemBadgeList items={recap.itemsSold} />
               </RecapGroup>
             )}
 
             {/* ── Spell slots spent (party-wide) ──────────────────────────── */}
-            {Object.keys(recap.slotsSpent).length > 0 && (
+            {Object.keys(recap.slotsSpent ?? {}).length > 0 && (
               <RecapGroup label="Slots spent">
                 <SlotsSpentRow slotsSpent={recap.slotsSpent} />
               </RecapGroup>
             )}
 
             {/* ── Feats & ASIs (party-wide) ───────────────────────────────── */}
-            {recap.featsOrAsis.length > 0 && (
+            {(recap.featsOrAsis ?? []).length > 0 && (
               <RecapGroup label="Feats & ASIs">
                 <AdvancementsList advancements={recap.featsOrAsis} />
               </RecapGroup>
