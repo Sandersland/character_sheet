@@ -9,14 +9,15 @@ frontend/src/
 ├── components/
 │   └── ui/              # domain-agnostic primitives (Card, Badge, MeterBar, Modal, Tabs, OverflowMenu, DropdownMenu, Avatar, ErrorBoundary, EmptyState, Spinner)
 ├── features/
-│   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable, ProficienciesCard
+│   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable, ProficienciesCard, AbilityScoresPanel
 │   ├── advancement/     # AdvancementSection, AdvancementPanel
 │   ├── auth/            # AuthProvider (useAuth), AuthGate, AppHeader, AccountMenu
 │   ├── campaign/        # CampaignsPage (list+create+join), CampaignDetailPage (mgmt hub:
 │   │                    #   invite link, roster, add-character dropdown), CampaignInviteLink,
 │   │                    #   CampaignIndicator (sheet badge/link), JoinCampaignRoute (#246)
 │   ├── character-meta/  # CharacterCard, VitalsStrip, JournalSection, JournalEntryPanel,
-│   │                    #   ActivityModal, DeleteCharacterModal, BackendStatus
+│   │                    #   ActivityModal, DeleteCharacterModal, BackendStatus,
+│   │                    #   CharacterSheet{Header,Body,Modals}, CharacterLoadError (sheet-page sections)
 │   ├── class/           # ClassFeaturesSection, FightingStylePanel, AddManeuverPanel,
 │   │                    #   ManeuverRow, ResourcePoolRow
 │   ├── conditions/      # ConditionsStrip, AddConditionPanel
@@ -30,7 +31,8 @@ frontend/src/
 │   ├── journal/         # CapturePalette (Cmd/Ctrl+J quick-capture NOTE overlay)
 │   ├── session/         # TurnHub, useTurnState, SessionLog, SessionsModal,
 │   │                    #   SessionSummaryModal, Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
-│   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie
+│   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie,
+│   │                    #   useSessionButton (sheet-header Start/Join/Resume session state)
 │   ├── spells/          # SpellsSection, SpellRow, AddSpellPanel
 │   └── theme/           # ThemeProvider (useTheme) — applies data-theme app-wide
 ├── hooks/               # reusable React hooks used by pages or multiple clusters
@@ -85,6 +87,7 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 | `fightingStyles.ts` | Fighting-style labels/descriptions (presentation; backend is rules source of truth). |
 | `maneuvers.ts` | Battle Master maneuver classification data (mechanic/slot) for ManeuverPrompt. |
 | `conditions.ts` | 5e condition labels/descriptions for the chip strip + picker. |
+| `characterSections.ts` | Sheet-section visibility predicates (`hasProficiencies`/`hasAdvancements`) — the inline card-gate expressions from CharacterSheetPage. |
 | `formatJournalDate.ts` | Formats ISO journal dates in UTC ("Jun 22, 2026"). |
 
 ### `@/` path alias
