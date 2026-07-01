@@ -7,6 +7,8 @@ import type { InventoryItem, InventoryOperation } from "@/types/character";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import EquipToggle from "@/features/inventory/EquipToggle";
 import InventoryEditForm from "@/features/inventory/InventoryEditForm";
+import ItemProse from "@/features/inventory/ItemProse";
+import ItemSummary from "@/features/inventory/ItemSummary";
 
 interface InventoryRowProps {
   item: InventoryItem;
@@ -51,8 +53,6 @@ export default function InventoryRow({
   selected = false,
   onToggleSelect,
 }: InventoryRowProps) {
-  const { consumable } = item;
-
   const [state, dispatch] = useReducer(rowReducer, { expanded: false, confirming: false });
 
   if (mode === "edit") {
@@ -65,21 +65,13 @@ export default function InventoryRow({
   return (
     <li className="flex flex-col gap-1.5 py-2">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-2">
-          {selectMode && (
-            <input
-              type="checkbox"
-              checked={selected}
-              onChange={onToggleSelect}
-              aria-label={`Select ${item.name}`}
-              className="mt-1"
-            />
-          )}
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-parchment-900">{item.name}</p>
-            <p className="mt-0.5 text-xs text-parchment-600">{details.join(" · ")}</p>
-          </div>
-        </div>
+        <ItemSummary
+          item={item}
+          details={details}
+          selectMode={selectMode}
+          selected={selected}
+          onToggleSelect={onToggleSelect}
+        />
         {!selectMode && (
         <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
           {hasProse && (
@@ -137,15 +129,7 @@ export default function InventoryRow({
         </div>
       )}
 
-      {!selectMode && state.expanded && hasProse && (
-        <div className="flex flex-col gap-1 pl-0.5">
-          {item.description && <p className="text-xs text-parchment-600">{item.description}</p>}
-          {consumable?.effectDescription && (
-            <p className="text-xs text-parchment-600">{consumable.effectDescription}</p>
-          )}
-          {item.notes && <p className="text-xs italic text-parchment-600">{item.notes}</p>}
-        </div>
-      )}
+      {!selectMode && state.expanded && hasProse && <ItemProse item={item} />}
     </li>
   );
 }
