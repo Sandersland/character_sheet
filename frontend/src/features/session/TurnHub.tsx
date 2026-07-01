@@ -23,14 +23,15 @@ import { useState } from "react";
 
 import Card from "@/components/ui/Card";
 import { applyActionTransactions, startCombat, endCombat, advanceCombatRound } from "@/api/client";
-import { UNIVERSAL_ACTIONS } from "@/lib/turnRules";
 import { rollSpec } from "@/lib/dice";
 import { maneuverPlacement } from "@/lib/maneuvers";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { resolverFor } from "@/features/session/actionResolvers";
 import { useActiveResolution } from "@/features/session/useActiveResolution";
-import { SlotPip, QuickBtn, AttackCounter } from "@/features/session/TurnControls";
+import ActionSlot from "@/features/session/ActionSlot";
+import BonusActionSlot from "@/features/session/BonusActionSlot";
 import ReactionSlot from "@/features/session/ReactionSlot";
+import EffectManeuverStrip from "@/features/session/EffectManeuverStrip";
 import LayOnHandsInput from "@/features/session/LayOnHandsInput";
 import InlineAttackPicker from "@/features/session/InlineAttackPicker";
 import InlineItemPicker from "@/features/session/InlineItemPicker";
@@ -437,130 +438,30 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
 
       <div className="flex flex-col gap-3">
         {/* ── Action ──────────────────────────────────────────────────────── */}
-        <div className="rounded-card border border-parchment-200 bg-parchment-50 p-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <SlotPip filled={actionsRemaining > 0 || attack !== null} />
-              <span className="text-sm font-semibold text-parchment-800">Action</span>
-              {actionsRemaining > 0 && (
-                <span className="text-xs text-parchment-600">
-                  {actionsRemaining} available
-                </span>
-              )}
-              {actionsRemaining === 0 && attack === null && (
-                <span className="text-xs text-parchment-600 italic">used</span>
-              )}
-            </div>
-            {actionsRemaining > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowActionMenu((v) => !v)}
-                className="text-xs font-medium text-garnet-700 hover:underline"
-              >
-                {showActionMenu ? "Hide" : "Use Action ▾"}
-              </button>
-            )}
-          </div>
-
-          {attack !== null && (
-            <AttackCounter total={attack.total} used={attack.used} label="Attacks" />
-          )}
-
-          {showActionMenu && actionsRemaining > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {/* Attack — special path through enterAttackMode. */}
-              <QuickBtn tone="garnet" onClick={handleAttackAction}>
-                Attack
-              </QuickBtn>
-              {/* Class-specific action abilities. */}
-              {classActions.map((a) => (
-                <QuickBtn
-                  key={a.key}
-                  tone={a.enabled ? "arcane" : "neutral"}
-                  disabled={!a.enabled || busy}
-                  onClick={() => handleActionClick(a.key, "action")}
-                  title={a.disabledReason}
-                >
-                  {a.name}
-                </QuickBtn>
-              ))}
-              {/* Universal actions (excluding Attack which is above). */}
-              {UNIVERSAL_ACTIONS.filter(
-                (u) =>
-                  u.cost === "action" &&
-                  u.key !== "attack" &&
-                  !classActions.some((c) => c.key === u.key),
-              ).map((u) => (
-                <QuickBtn
-                  key={u.key}
-                  onClick={() => handleActionClick(u.key, "action")}
-                  title={u.description}
-                >
-                  {u.label}
-                </QuickBtn>
-              ))}
-            </div>
-          )}
-        </div>
+        <ActionSlot
+          actionsRemaining={actionsRemaining}
+          attack={attack}
+          showActionMenu={showActionMenu}
+          setShowActionMenu={setShowActionMenu}
+          classActions={classActions}
+          busy={busy}
+          handleAttackAction={handleAttackAction}
+          handleActionClick={handleActionClick}
+        />
 
         {/* ── Bonus Action ─────────────────────────────────────────────────── */}
-        <div className="rounded-card border border-parchment-200 bg-parchment-50 p-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <SlotPip filled={!bonusActionUsed && bonusAttack === null} />
-              <span className="text-sm font-semibold text-parchment-800">Bonus Action</span>
-              {bonusActionUsed && bonusAttack === null && (
-                <span className="text-xs text-parchment-600 italic">used</span>
-              )}
-            </div>
-            {!bonusActionUsed && (
-              <button
-                type="button"
-                onClick={() => setShowBonusMenu((v) => !v)}
-                className="text-xs font-medium text-garnet-700 hover:underline"
-              >
-                {showBonusMenu ? "Hide" : "Use Bonus ▾"}
-              </button>
-            )}
-          </div>
-
-          {bonusAttack !== null && (
-            <AttackCounter
-              total={bonusAttack.total}
-              used={bonusAttack.used}
-              label="Off-hand attack"
-            />
-          )}
-
-          {showBonusMenu && !bonusActionUsed && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {twfAvailable && (
-                <QuickBtn tone="garnet" onClick={handleTwfAction}>
-                  Off-hand Attack (TWF)
-                </QuickBtn>
-              )}
-              {classBonusActions.map((a) => (
-                <QuickBtn
-                  key={a.key}
-                  tone={a.enabled ? "arcane" : "neutral"}
-                  disabled={!a.enabled || busy}
-                  onClick={() => handleActionClick(a.key, "bonusAction")}
-                  title={a.disabledReason}
-                >
-                  {a.name}
-                </QuickBtn>
-              ))}
-              <QuickBtn
-                onClick={() => {
-                  consumeBonusAction();
-                  setShowBonusMenu(false);
-                }}
-              >
-                Other Bonus Action
-              </QuickBtn>
-            </div>
-          )}
-        </div>
+        <BonusActionSlot
+          bonusActionUsed={bonusActionUsed}
+          bonusAttack={bonusAttack}
+          showBonusMenu={showBonusMenu}
+          setShowBonusMenu={setShowBonusMenu}
+          twfAvailable={twfAvailable}
+          classBonusActions={classBonusActions}
+          busy={busy}
+          handleTwfAction={handleTwfAction}
+          handleActionClick={handleActionClick}
+          consumeBonusAction={consumeBonusAction}
+        />
 
         {/* ── Reaction ─────────────────────────────────────────────────────── */}
         <ReactionSlot
@@ -684,26 +585,13 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
         })()}
 
         {/* ── Effect maneuvers (no slot consumed) — e.g. Evasive Footwork ─────── */}
-        {effectManeuvers.length > 0 && superiorityRemaining > 0 && (
-          <div className="rounded-card border border-gold-200 bg-gold-50 p-3">
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-gold-800">
-              Maneuvers ({dieLabel}, {superiorityRemaining} left)
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {effectManeuvers.map((m) => (
-                <QuickBtn
-                  key={m.id}
-                  tone="gold"
-                  disabled={dieBusy}
-                  onClick={() => handleEffectManeuver(m.name)}
-                  title={`Spend ${dieLabel} — ${m.name}`}
-                >
-                  {m.name} ({dieLabel})
-                </QuickBtn>
-              ))}
-            </div>
-          </div>
-        )}
+        <EffectManeuverStrip
+          effectManeuvers={effectManeuvers}
+          superiorityRemaining={superiorityRemaining}
+          dieLabel={dieLabel}
+          dieBusy={dieBusy}
+          handleEffectManeuver={handleEffectManeuver}
+        />
 
         {/* General error display (covers send() failures: Action Surge, Second Wind, etc.) */}
         {error && (
