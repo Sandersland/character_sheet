@@ -236,6 +236,327 @@ export type SpellcastingOperation =
   | UnprepareSpellOperation
   | DropConcentrationOperation;
 
+// ── Per-op helper context + outcome ───────────────────────────────────────────
+// Each helper mutates ctx.state in place and returns an OpOutcome, or null for a
+// no-op (which skips both the state write-back and the logEvent in the dispatcher).
+
+interface SpellOpContext {
+  tx: Prisma.TransactionClient;
+  characterId: string;
+  batchId: string;
+  sessionId: string | null;
+  state: SpellcastingMutableState;
+  slotTotals: Record<number, number>;
+  arcanaTotals: Record<number, number>;
+}
+
+interface OpOutcome {
+  eventType: string;
+  summary: string;
+  eventData: Record<string, unknown>;
+}
+
+function applyExpendSlotOp(ctx: SpellOpContext, op: ExpendSlotOperation): OpOutcome {
+  const { state, slotTotals } = ctx;
+  const total = slotTotals[op.level] ?? 0;
+  const used = state.slotsUsed[String(op.level)] ?? 0;
+  if (total === 0) {
+    throw new InvalidSpellcastingOperationError(`No level-${op.level} slots exist`);
+  }
+  if (used >= total) {
+    throw new InvalidSpellcastingOperationError(`No level-${op.level} spell slots remaining`);
+  }
+  state.slotsUsed[String(op.level)] = used + 1;
+  return {
+    eventType: "expendSlot",
+    summary: `Expended 1 level-${op.level} spell slot`,
+    eventData: { level: op.level },
+  };
+}
+
+function applyRestoreSlotOp(ctx: SpellOpContext, op: RestoreSlotOperation): OpOutcome {
+  const { state } = ctx;
+  const slotUsed = state.slotsUsed[String(op.level)] ?? 0;
+  const arcanumUsed = state.arcanumUsed[String(op.level)] ?? 0;
+  let summary: string;
+  if (slotUsed > 0) {
+    state.slotsUsed[String(op.level)] = slotUsed - 1;
+    summary = `Restored 1 level-${op.level} spell slot`;
+  } else if (arcanumUsed > 0) {
+    // No expended slot at this level, but a Mystic Arcanum charge was spent — undo that.
+    state.arcanumUsed[String(op.level)] = arcanumUsed - 1;
+    summary = `Restored level-${op.level} Mystic Arcanum`;
+  } else {
+    throw new InvalidSpellcastingOperationError(
+      `No expended level-${op.level} slots to restore`
+    );
+  }
+  return { eventType: "restoreSlot", summary, eventData: { level: op.level } };
+}
+
+async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): Promise<OpOutcome> {
+  const { tx, state } = ctx;
+  if (Boolean(op.spellId) === Boolean(op.custom)) {
+    throw new InvalidSpellcastingOperationError(
+      "learnSpell: provide exactly one of spellId or custom"
+    );
+  }
+
+  let newEntry: SpellEntry;
+
+  if (op.spellId) {
+    // Check for duplicate before DB lookup.
+    if (state.spells.some((s) => s.spellId === op.spellId)) {
+      throw new InvalidSpellcastingOperationError(
+        `Spell already in spellbook (spellId: ${op.spellId})`
+      );
+    }
+    const catalogSpell = await tx.spell.findUnique({ where: { id: op.spellId } });
+    if (!catalogSpell) {
+      throw new InvalidSpellcastingOperationError(`Spell not found in catalog: ${op.spellId}`);
+    }
+    newEntry = {
+      id: randomUUID(),
+      spellId: catalogSpell.id,
+      name: catalogSpell.name,
+      level: catalogSpell.level,
+      school: catalogSpell.school as string,
+      prepared: false,
+      castingTime: catalogSpell.castingTime,
+      range: catalogSpell.range,
+      duration: catalogSpell.duration,
+      description: catalogSpell.description,
+      concentration: catalogSpell.concentration,
+      ritual: catalogSpell.ritual,
+      components: (catalogSpell.components as SpellComponents | null) ?? undefined,
+      saveEffect: catalogSpell.saveEffect ?? undefined,
+      effectKind: catalogSpell.effectKind ?? undefined,
+      effectDiceCount: catalogSpell.effectDiceCount ?? undefined,
+      effectDiceFaces: catalogSpell.effectDiceFaces ?? undefined,
+      effectModifier: catalogSpell.effectModifier ?? undefined,
+      damageType: catalogSpell.damageType ?? undefined,
+      attackType: catalogSpell.attackType ?? undefined,
+      saveAbility: catalogSpell.saveAbility ?? undefined,
+      upcastDicePerLevel: catalogSpell.upcastDicePerLevel ?? undefined,
+      cantripScaling: catalogSpell.cantripScaling,
+    };
+  } else {
+    // Custom spell.
+    const custom = op.custom!;
+    newEntry = {
+      id: randomUUID(),
+      name: custom.name,
+      level: custom.level,
+      school: custom.school,
+      prepared: false,
+      castingTime: custom.castingTime,
+      range: custom.range,
+      duration: custom.duration,
+      description: custom.description,
+      concentration: custom.concentration,
+      ritual: custom.ritual,
+      components: custom.components,
+      saveEffect: custom.saveEffect,
+      effectKind: custom.effectKind,
+      effectDiceCount: custom.effectDiceCount,
+      effectDiceFaces: custom.effectDiceFaces,
+      effectModifier: custom.effectModifier,
+      damageType: custom.damageType,
+      attackType: custom.attackType,
+      saveAbility: custom.saveAbility,
+      upcastDicePerLevel: custom.upcastDicePerLevel,
+      cantripScaling: custom.cantripScaling,
+    };
+  }
+
+  state.spells.push(newEntry);
+  return {
+    eventType: "learnSpell",
+    summary: `Learned ${newEntry.name}`,
+    eventData: { entryId: newEntry.id, spellName: newEntry.name, spellId: newEntry.spellId ?? null },
+  };
+}
+
+function applyForgetSpellOp(ctx: SpellOpContext, op: ForgetSpellOperation): OpOutcome {
+  const { state } = ctx;
+  const idx = state.spells.findIndex((s) => s.id === op.entryId);
+  if (idx === -1) {
+    throw new InvalidSpellcastingOperationError(`Spell entry not found: ${op.entryId}`);
+  }
+  const forgotten = state.spells[idx];
+  state.spells.splice(idx, 1);
+  // Forgetting the spell you're concentrating on ends that concentration.
+  if (state.concentratingOn?.entryId === op.entryId) {
+    state.concentratingOn = null;
+  }
+  return {
+    eventType: "forgetSpell",
+    summary: `Removed ${forgotten.name} from spellbook`,
+    eventData: { entryId: op.entryId, spellName: forgotten.name },
+  };
+}
+
+function applyPrepareSpellOp(
+  ctx: SpellOpContext,
+  op: PrepareSpellOperation | UnprepareSpellOperation
+): OpOutcome | null {
+  const { state } = ctx;
+  const entry = state.spells.find((s) => s.id === op.entryId);
+  if (!entry) {
+    throw new InvalidSpellcastingOperationError(`Spell entry not found: ${op.entryId}`);
+  }
+  if (entry.level === 0) {
+    throw new InvalidSpellcastingOperationError(
+      "Cantrips are always prepared and cannot be toggled"
+    );
+  }
+  const preparing = op.type === "prepareSpell";
+  // Already in the desired state — no-op (skip write + log).
+  if (preparing === entry.prepared) return null;
+  entry.prepared = preparing;
+  return {
+    eventType: op.type,
+    summary: preparing ? `Prepared ${entry.name}` : `Unprepared ${entry.name}`,
+    eventData: { entryId: op.entryId, spellName: entry.name, prepared: preparing },
+  };
+}
+
+// Log + clear the prior concentration when a new concentration spell displaces it.
+async function dropConcentrationOnCastInTx(ctx: SpellOpContext, entry: SpellEntry): Promise<void> {
+  const { tx, characterId, batchId, sessionId, state } = ctx;
+  const prior = state.concentratingOn;
+  if (!prior || prior.entryId === entry.id) return;
+  const dropBefore = {
+    spellcasting: {
+      slotsUsed: { ...state.slotsUsed },
+      arcanumUsed: { ...state.arcanumUsed },
+      spells: [...state.spells],
+      concentratingOn: { ...prior },
+    },
+  };
+  // No intermediate DB write here: the common write-back below persists the final
+  // state (with the newly-cast concentration spell), so writing `concentratingOn:
+  // null` first would just be overwritten. Clearing the in-memory flag is enough
+  // for this drop event's `before`/`after` payloads.
+  state.concentratingOn = null;
+  await logEvent(tx, {
+    characterId,
+    category: "spellcasting",
+    type: "concentrationDropped",
+    summary: `Concentration on ${prior.spellName} dropped (cast ${entry.name})`,
+    before: dropBefore,
+    after: {
+      spellcasting: {
+        slotsUsed: { ...state.slotsUsed },
+        arcanumUsed: { ...state.arcanumUsed },
+        spells: [...state.spells],
+        concentratingOn: null,
+      },
+    },
+    data: { droppedEntryId: prior.entryId, droppedSpellName: prior.spellName, reason: "newCast", castEntryId: entry.id },
+    batchId,
+    sessionId,
+  });
+}
+
+async function applyCastSpellOp(ctx: SpellOpContext, op: CastSpellOperation): Promise<OpOutcome> {
+  const { characterId, batchId, sessionId, state, slotTotals, arcanaTotals } = ctx;
+  const entry = state.spells.find((s) => s.id === op.entryId);
+  if (!entry) {
+    throw new InvalidSpellcastingOperationError(`Spell entry not found: ${op.entryId}`);
+  }
+
+  let summary: string;
+  let eventData: Record<string, unknown>;
+
+  if (entry.level === 0) {
+    // Cantrip — no slot needed.
+    if (entry.effectKind && op.roll > 0) {
+      summary = `Cast ${entry.name}: ${op.roll}${entry.damageType ? " " + entry.damageType : ""} ${entry.effectKind === "heal" ? "healing" : "damage"}`;
+    } else {
+      summary = `Cast ${entry.name}`;
+    }
+    eventData = { entryId: op.entryId, spellName: entry.name, roll: op.roll, slotLevel: null };
+  } else {
+    // Leveled spell — expend a slot, or a Mystic Arcanum charge.
+    const slotLevel = op.slotLevel ?? entry.level;
+    if (slotLevel < entry.level) {
+      throw new InvalidSpellcastingOperationError(
+        `Cannot cast ${entry.name} (L${entry.level}) in a level-${slotLevel} slot`
+      );
+    }
+    const slotTotal = slotTotals[slotLevel] ?? 0;
+    const arcanumTotal = arcanaTotals[slotLevel] ?? 0;
+    const upcasting = slotLevel > entry.level;
+
+    // Real slots take priority; Mystic Arcanum (Warlock 6th–9th) has no
+    // overlapping slot level, so the two paths are mutually exclusive.
+    let slotLabel: string;
+    if (slotTotal > 0) {
+      const used = state.slotsUsed[String(slotLevel)] ?? 0;
+      if (used >= slotTotal) {
+        throw new InvalidSpellcastingOperationError(
+          `No level-${slotLevel} spell slots remaining`
+        );
+      }
+      state.slotsUsed[String(slotLevel)] = used + 1;
+      slotLabel = `L${slotLevel} slot${upcasting ? ` (upcast from L${entry.level})` : ""}`;
+    } else if (arcanumTotal > 0) {
+      const used = state.arcanumUsed[String(slotLevel)] ?? 0;
+      if (used >= arcanumTotal) {
+        throw new InvalidSpellcastingOperationError(
+          `Mystic Arcanum (level ${slotLevel}) already used — recharges on a long rest`
+        );
+      }
+      state.arcanumUsed[String(slotLevel)] = used + 1;
+      slotLabel = `L${slotLevel} Mystic Arcanum`;
+    } else {
+      throw new InvalidSpellcastingOperationError(
+        `No level-${slotLevel} spell slots remaining`
+      );
+    }
+
+    if (entry.effectKind && op.roll > 0) {
+      summary = `Cast ${entry.name} (${slotLabel}): ${op.roll}${entry.damageType ? " " + entry.damageType : ""} ${entry.effectKind === "heal" ? "healing" : "damage"}`;
+    } else {
+      summary = `Cast ${entry.name} (${slotLabel})`;
+    }
+    eventData = { entryId: op.entryId, spellName: entry.name, roll: op.roll, slotLevel };
+  }
+
+  // Concentration: a character maintains at most one concentration spell. Casting
+  // a new one auto-drops the prior (logged separately). Re-casting the same refreshes.
+  if (entry.concentration) {
+    await dropConcentrationOnCastInTx(ctx, entry);
+    state.concentratingOn = { entryId: entry.id, spellName: entry.name };
+  }
+
+  // Self-targeted effect: apply to the caster's own HP in this same batch so the
+  // slot-spend and HP-change revert together as one undo step.
+  if (op.apply && op.apply.target === "self" && op.apply.amount > 0) {
+    if (op.apply.kind === "heal") {
+      await applyHealInTx(ctx.tx, characterId, op.apply.amount, batchId, sessionId);
+    } else {
+      await applyDamageInTx(ctx.tx, characterId, op.apply.amount, batchId, sessionId);
+    }
+  }
+
+  return { eventType: "castSpell", summary, eventData };
+}
+
+function applyDropConcentrationOp(ctx: SpellOpContext): OpOutcome | null {
+  const { state } = ctx;
+  const prior = state.concentratingOn;
+  // Nothing to drop — idempotent no-op (skip write + log).
+  if (!prior) return null;
+  state.concentratingOn = null;
+  return {
+    eventType: "concentrationDropped",
+    summary: `Stopped concentrating on ${prior.spellName}`,
+    eventData: { droppedEntryId: prior.entryId, droppedSpellName: prior.spellName, reason: "manual" },
+  };
+}
+
 // ── Transaction handler ───────────────────────────────────────────────────────
 
 /**
@@ -307,300 +628,30 @@ export async function applySpellcastingOperations(
         },
       };
 
-      let summary = "";
-      let eventData: Record<string, unknown> = {};
-      let eventType: string;
+      const ctx: SpellOpContext = {
+        tx,
+        characterId,
+        batchId,
+        sessionId,
+        state,
+        slotTotals,
+        arcanaTotals,
+      };
 
+      // Route to the per-op helper. A null outcome means no-op — skip both the
+      // state write-back and the logEvent below.
+      let outcome: OpOutcome | null = null;
       switch (op.type) {
-        case "castSpell": {
-          const entry = state.spells.find((s) => s.id === op.entryId);
-          if (!entry) {
-            throw new InvalidSpellcastingOperationError(`Spell entry not found: ${op.entryId}`);
-          }
-
-          if (entry.level === 0) {
-            // Cantrip — no slot needed.
-            eventType = "castSpell";
-            const roll = op.roll;
-            if (entry.effectKind && roll > 0) {
-              summary = `Cast ${entry.name}: ${roll}${entry.damageType ? " " + entry.damageType : ""} ${entry.effectKind === "heal" ? "healing" : "damage"}`;
-            } else {
-              summary = `Cast ${entry.name}`;
-            }
-            eventData = { entryId: op.entryId, spellName: entry.name, roll: op.roll, slotLevel: null };
-          } else {
-            // Leveled spell — expend a slot, or a Mystic Arcanum charge.
-            const slotLevel = op.slotLevel ?? entry.level;
-            if (slotLevel < entry.level) {
-              throw new InvalidSpellcastingOperationError(
-                `Cannot cast ${entry.name} (L${entry.level}) in a level-${slotLevel} slot`
-              );
-            }
-            const slotTotal = slotTotals[slotLevel] ?? 0;
-            const arcanumTotal = arcanaTotals[slotLevel] ?? 0;
-            eventType = "castSpell";
-            const upcasting = slotLevel > entry.level;
-
-            // Real slots take priority; Mystic Arcanum (Warlock 6th–9th) has no
-            // overlapping slot level, so the two paths are mutually exclusive.
-            let slotLabel: string;
-            if (slotTotal > 0) {
-              const used = state.slotsUsed[String(slotLevel)] ?? 0;
-              if (used >= slotTotal) {
-                throw new InvalidSpellcastingOperationError(
-                  `No level-${slotLevel} spell slots remaining`
-                );
-              }
-              state.slotsUsed[String(slotLevel)] = used + 1;
-              slotLabel = `L${slotLevel} slot${upcasting ? ` (upcast from L${entry.level})` : ""}`;
-            } else if (arcanumTotal > 0) {
-              const used = state.arcanumUsed[String(slotLevel)] ?? 0;
-              if (used >= arcanumTotal) {
-                throw new InvalidSpellcastingOperationError(
-                  `Mystic Arcanum (level ${slotLevel}) already used — recharges on a long rest`
-                );
-              }
-              state.arcanumUsed[String(slotLevel)] = used + 1;
-              slotLabel = `L${slotLevel} Mystic Arcanum`;
-            } else {
-              throw new InvalidSpellcastingOperationError(
-                `No level-${slotLevel} spell slots remaining`
-              );
-            }
-
-            if (entry.effectKind && op.roll > 0) {
-              summary = `Cast ${entry.name} (${slotLabel}): ${op.roll}${entry.damageType ? " " + entry.damageType : ""} ${entry.effectKind === "heal" ? "healing" : "damage"}`;
-            } else {
-              summary = `Cast ${entry.name} (${slotLabel})`;
-            }
-            eventData = { entryId: op.entryId, spellName: entry.name, roll: op.roll, slotLevel };
-          }
-
-          // Concentration: a character maintains at most one concentration spell.
-          // Casting a new one auto-drops the prior (logged separately so it shows
-          // on the timeline and is undoable). Re-casting the same spell refreshes.
-          if (entry.concentration) {
-            const prior = state.concentratingOn;
-            if (prior && prior.entryId !== entry.id) {
-              const dropBefore = {
-                spellcasting: {
-                  slotsUsed: { ...state.slotsUsed },
-                  arcanumUsed: { ...state.arcanumUsed },
-                  spells: [...state.spells],
-                  concentratingOn: { ...prior },
-                },
-              };
-              // No intermediate DB write here: the common write-back below
-              // persists the final state (with the newly-cast concentration
-              // spell), so writing `concentratingOn: null` first would just be
-              // overwritten. Clearing the in-memory flag is enough for this
-              // drop event's `before`/`after` payloads.
-              state.concentratingOn = null;
-              await logEvent(tx, {
-                characterId,
-                category: "spellcasting",
-                type: "concentrationDropped",
-                summary: `Concentration on ${prior.spellName} dropped (cast ${entry.name})`,
-                before: dropBefore,
-                after: {
-                  spellcasting: {
-                    slotsUsed: { ...state.slotsUsed },
-                    arcanumUsed: { ...state.arcanumUsed },
-                    spells: [...state.spells],
-                    concentratingOn: null,
-                  },
-                },
-                data: { droppedEntryId: prior.entryId, droppedSpellName: prior.spellName, reason: "newCast", castEntryId: entry.id },
-                batchId,
-                sessionId,
-              });
-            }
-            state.concentratingOn = { entryId: entry.id, spellName: entry.name };
-          }
-
-          // Self-targeted effect: apply to the caster's own HP in this same batch
-          // so the slot-spend and HP-change revert together as one undo step.
-          if (op.apply && op.apply.target === "self" && op.apply.amount > 0) {
-            if (op.apply.kind === "heal") {
-              await applyHealInTx(tx, characterId, op.apply.amount, batchId, sessionId);
-            } else {
-              await applyDamageInTx(tx, characterId, op.apply.amount, batchId, sessionId);
-            }
-          }
-          break;
-        }
-
-        case "expendSlot": {
-          const total = slotTotals[op.level] ?? 0;
-          const used = state.slotsUsed[String(op.level)] ?? 0;
-          if (total === 0) {
-            throw new InvalidSpellcastingOperationError(`No level-${op.level} slots exist`);
-          }
-          if (used >= total) {
-            throw new InvalidSpellcastingOperationError(`No level-${op.level} spell slots remaining`);
-          }
-          state.slotsUsed[String(op.level)] = used + 1;
-          eventType = "expendSlot";
-          summary = `Expended 1 level-${op.level} spell slot`;
-          eventData = { level: op.level };
-          break;
-        }
-
-        case "restoreSlot": {
-          const slotUsed = state.slotsUsed[String(op.level)] ?? 0;
-          const arcanumUsed = state.arcanumUsed[String(op.level)] ?? 0;
-          if (slotUsed > 0) {
-            state.slotsUsed[String(op.level)] = slotUsed - 1;
-            summary = `Restored 1 level-${op.level} spell slot`;
-          } else if (arcanumUsed > 0) {
-            // No expended slot at this level, but a Mystic Arcanum charge was
-            // spent — undo that instead.
-            state.arcanumUsed[String(op.level)] = arcanumUsed - 1;
-            summary = `Restored level-${op.level} Mystic Arcanum`;
-          } else {
-            throw new InvalidSpellcastingOperationError(
-              `No expended level-${op.level} slots to restore`
-            );
-          }
-          eventType = "restoreSlot";
-          eventData = { level: op.level };
-          break;
-        }
-
-        case "learnSpell": {
-          if (Boolean(op.spellId) === Boolean(op.custom)) {
-            throw new InvalidSpellcastingOperationError(
-              "learnSpell: provide exactly one of spellId or custom"
-            );
-          }
-
-          let newEntry: SpellEntry;
-
-          if (op.spellId) {
-            // Check for duplicate before DB lookup.
-            if (state.spells.some((s) => s.spellId === op.spellId)) {
-              throw new InvalidSpellcastingOperationError(
-                `Spell already in spellbook (spellId: ${op.spellId})`
-              );
-            }
-            const catalogSpell = await tx.spell.findUnique({ where: { id: op.spellId } });
-            if (!catalogSpell) {
-              throw new InvalidSpellcastingOperationError(`Spell not found in catalog: ${op.spellId}`);
-            }
-            newEntry = {
-              id: randomUUID(),
-              spellId: catalogSpell.id,
-              name: catalogSpell.name,
-              level: catalogSpell.level,
-              school: catalogSpell.school as string,
-              prepared: false,
-              castingTime: catalogSpell.castingTime,
-              range: catalogSpell.range,
-              duration: catalogSpell.duration,
-              description: catalogSpell.description,
-              concentration: catalogSpell.concentration,
-              ritual: catalogSpell.ritual,
-              components: (catalogSpell.components as SpellComponents | null) ?? undefined,
-              saveEffect: catalogSpell.saveEffect ?? undefined,
-              effectKind: catalogSpell.effectKind ?? undefined,
-              effectDiceCount: catalogSpell.effectDiceCount ?? undefined,
-              effectDiceFaces: catalogSpell.effectDiceFaces ?? undefined,
-              effectModifier: catalogSpell.effectModifier ?? undefined,
-              damageType: catalogSpell.damageType ?? undefined,
-              attackType: catalogSpell.attackType ?? undefined,
-              saveAbility: catalogSpell.saveAbility ?? undefined,
-              upcastDicePerLevel: catalogSpell.upcastDicePerLevel ?? undefined,
-              cantripScaling: catalogSpell.cantripScaling,
-            };
-          } else {
-            // Custom spell.
-            const custom = op.custom!;
-            newEntry = {
-              id: randomUUID(),
-              name: custom.name,
-              level: custom.level,
-              school: custom.school,
-              prepared: false,
-              castingTime: custom.castingTime,
-              range: custom.range,
-              duration: custom.duration,
-              description: custom.description,
-              concentration: custom.concentration,
-              ritual: custom.ritual,
-              components: custom.components,
-              saveEffect: custom.saveEffect,
-              effectKind: custom.effectKind,
-              effectDiceCount: custom.effectDiceCount,
-              effectDiceFaces: custom.effectDiceFaces,
-              effectModifier: custom.effectModifier,
-              damageType: custom.damageType,
-              attackType: custom.attackType,
-              saveAbility: custom.saveAbility,
-              upcastDicePerLevel: custom.upcastDicePerLevel,
-              cantripScaling: custom.cantripScaling,
-            };
-          }
-
-          state.spells.push(newEntry);
-          eventType = "learnSpell";
-          summary = `Learned ${newEntry.name}`;
-          eventData = { entryId: newEntry.id, spellName: newEntry.name, spellId: newEntry.spellId ?? null };
-          break;
-        }
-
-        case "forgetSpell": {
-          const idx = state.spells.findIndex((s) => s.id === op.entryId);
-          if (idx === -1) {
-            throw new InvalidSpellcastingOperationError(`Spell entry not found: ${op.entryId}`);
-          }
-          const forgotten = state.spells[idx];
-          state.spells.splice(idx, 1);
-          // Forgetting the spell you're concentrating on ends that concentration.
-          if (state.concentratingOn?.entryId === op.entryId) {
-            state.concentratingOn = null;
-          }
-          eventType = "forgetSpell";
-          summary = `Removed ${forgotten.name} from spellbook`;
-          eventData = { entryId: op.entryId, spellName: forgotten.name };
-          break;
-        }
-
+        case "castSpell": outcome = await applyCastSpellOp(ctx, op); break;
+        case "expendSlot": outcome = applyExpendSlotOp(ctx, op); break;
+        case "restoreSlot": outcome = applyRestoreSlotOp(ctx, op); break;
+        case "learnSpell": outcome = await applyLearnSpellOp(ctx, op); break;
+        case "forgetSpell": outcome = applyForgetSpellOp(ctx, op); break;
         case "prepareSpell":
-        case "unprepareSpell": {
-          const entry = state.spells.find((s) => s.id === op.entryId);
-          if (!entry) {
-            throw new InvalidSpellcastingOperationError(`Spell entry not found: ${op.entryId}`);
-          }
-          if (entry.level === 0) {
-            throw new InvalidSpellcastingOperationError(
-              "Cantrips are always prepared and cannot be toggled"
-            );
-          }
-          const preparing = op.type === "prepareSpell";
-          if (preparing === entry.prepared) {
-            // Already in the desired state — no-op (don't throw, just skip logging).
-            continue;
-          }
-          entry.prepared = preparing;
-          eventType = op.type;
-          summary = preparing ? `Prepared ${entry.name}` : `Unprepared ${entry.name}`;
-          eventData = { entryId: op.entryId, spellName: entry.name, prepared: preparing };
-          break;
-        }
-
-        case "dropConcentration": {
-          const prior = state.concentratingOn;
-          if (!prior) {
-            // Nothing to drop — no-op (don't throw; idempotent), skip logging.
-            continue;
-          }
-          state.concentratingOn = null;
-          eventType = "concentrationDropped";
-          summary = `Stopped concentrating on ${prior.spellName}`;
-          eventData = { droppedEntryId: prior.entryId, droppedSpellName: prior.spellName, reason: "manual" };
-          break;
-        }
+        case "unprepareSpell": outcome = applyPrepareSpellOp(ctx, op); break;
+        case "dropConcentration": outcome = applyDropConcentrationOp(ctx); break;
       }
+      if (outcome === null) continue;
 
       // Write the updated state back as a compact object.
       await tx.character.update({
@@ -627,11 +678,11 @@ export async function applySpellcastingOperations(
       await logEvent(tx, {
         characterId,
         category: "spellcasting",
-        type: eventType! as Parameters<typeof logEvent>[1]["type"],
-        summary: summary!,
+        type: outcome.eventType as Parameters<typeof logEvent>[1]["type"],
+        summary: outcome.summary,
         before: beforeState,
         after: afterState,
-        data: eventData,
+        data: outcome.eventData,
         batchId,
         sessionId,
       });
