@@ -19,13 +19,13 @@ import { useEffect, useRef, useState } from "react";
 
 import { fetchFeats } from "@/api/client";
 import Spinner from "@/components/ui/Spinner";
+import { useAsiDraft } from "@/features/advancement/useAsiDraft";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { ABILITY_OPTIONS, abilityLabel, skillLabel } from "@/lib/abilities";
 import type {
   AdvancementOperation,
   CatalogFeat,
   FeatImprovement,
-  TakeAsiOperation,
 } from "@/types/character";
 
 const ABILITY_CAP = 20;
@@ -64,7 +64,7 @@ export default function AdvancementPanel({
   const [tab, setTab] = useState<"asi" | "feat">("asi");
 
   // ── ASI state ──────────────────────────────────────────────────────────────
-  const [asiIncreases, setAsiIncreases] = useState<Record<string, number>>({});
+  const asi = useAsiDraft();
 
   // ── Feat state ─────────────────────────────────────────────────────────────
   const [catalog, setCatalog] = useState<CatalogFeat[] | null>(null);
@@ -117,29 +117,10 @@ export default function AdvancementPanel({
   }
 
   // ── ASI helpers ────────────────────────────────────────────────────────────
-  const totalPoints = Object.values(asiIncreases).reduce((s, v) => s + v, 0);
-  const pointsLeft = 2 - totalPoints;
-
-  function adjustAsi(ability: string, delta: number) {
-    const current = asiIncreases[ability] ?? 0;
-    const next = current + delta;
-    if (next < 0) return;
-    if (next > 2) return;
-    const newScore = (currentScores[ability] ?? 10) + next;
-    if (newScore > ABILITY_CAP) return;
-    const newTotal = totalPoints - current + next;
-    if (newTotal > 2) return;
-    setAsiIncreases({ ...asiIncreases, [ability]: next });
-  }
-
   function handleAsiSubmit() {
-    if (totalPoints !== 2) return;
-    const increases = Object.entries(asiIncreases)
-      .filter(([, v]) => v > 0)
-      .map(([ability, amount]) => ({ ability, amount: amount as 1 | 2 }));
-    const op: TakeAsiOperation = { type: "takeAsi", increases };
-    onSubmit(op);
-    setAsiIncreases({});
+    if (asi.totalPoints !== 2) return;
+    onSubmit(asi.buildOperation());
+    asi.reset();
     setOpen(false);
   }
 
@@ -288,7 +269,7 @@ export default function AdvancementPanel({
         </h3>
         <button
           type="button"
-          onClick={() => { setOpen(false); setAsiIncreases({}); setSelectedFeat(null); setCustomMode(false); resetCustomForm(); }}
+          onClick={() => { setOpen(false); asi.reset(); setSelectedFeat(null); setCustomMode(false); resetCustomForm(); }}
           className="text-parchment-600 hover:text-parchment-700"
           aria-label="Close advancement panel"
         >
@@ -318,14 +299,14 @@ export default function AdvancementPanel({
       {tab === "asi" && (
         <div>
           <p className="mb-3 text-xs text-parchment-600">
-            Distribute <span className="font-semibold">{pointsLeft} point{pointsLeft !== 1 ? "s" : ""}</span> remaining across any abilities (max 20 per score).
+            Distribute <span className="font-semibold">{asi.pointsLeft} point{asi.pointsLeft !== 1 ? "s" : ""}</span> remaining across any abilities (max 20 per score).
           </p>
           <div className="flex flex-col gap-2">
             {ABILITY_OPTIONS.map(({ key, label }) => {
               const current = currentScores[key] ?? 10;
-              const bonus = asiIncreases[key] ?? 0;
+              const bonus = asi.increases[key] ?? 0;
               const newVal = current + bonus;
-              const canIncrease = pointsLeft > 0 && newVal < ABILITY_CAP;
+              const canIncrease = asi.pointsLeft > 0 && newVal < ABILITY_CAP;
               const canDecrease = bonus > 0;
 
               return (
@@ -342,7 +323,7 @@ export default function AdvancementPanel({
                       type="button"
                       aria-label={`Decrease ${label}`}
                       disabled={!canDecrease || busy}
-                      onClick={() => adjustAsi(key, -1)}
+                      onClick={() => asi.adjust(key, -1, current)}
                       className="flex h-6 w-6 items-center justify-center rounded-control border border-parchment-300 text-sm text-parchment-600 hover:bg-parchment-100 disabled:opacity-30"
                     >
                       −
@@ -354,7 +335,7 @@ export default function AdvancementPanel({
                       type="button"
                       aria-label={`Increase ${label}`}
                       disabled={!canIncrease || busy}
-                      onClick={() => adjustAsi(key, +1)}
+                      onClick={() => asi.adjust(key, +1, current)}
                       className="flex h-6 w-6 items-center justify-center rounded-control border border-parchment-300 text-sm text-parchment-600 hover:bg-parchment-100 disabled:opacity-30"
                     >
                       +
@@ -366,7 +347,7 @@ export default function AdvancementPanel({
           </div>
           <button
             type="button"
-            disabled={totalPoints !== 2 || busy}
+            disabled={asi.totalPoints !== 2 || busy}
             onClick={handleAsiSubmit}
             className="mt-4 w-full rounded-control bg-gold-400 px-4 py-2 text-sm font-semibold text-ink hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
