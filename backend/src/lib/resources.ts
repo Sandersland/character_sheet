@@ -554,7 +554,7 @@ export async function applyResourceOperations(
  *
  * Exported so the actions orchestrator (routes/actions.ts) can include a
  * resource spend alongside an inventory adjust or HP heal in one atomic
- * $transaction. Keep in sync with the `case "spendResource"` branch above.
+ * $transaction. Shares applySpendResourceOp with applyResourceOperations.
  */
 export async function applySpendResourceInTx(
   tx: Prisma.TransactionClient,
@@ -596,34 +596,12 @@ export async function applySpendResourceInTx(
     },
   };
 
-  const amount = op.amount ?? 1;
-  if (amount <= 0) throw new InvalidResourceOperationError("spendResource: amount must be positive");
-
-  const pool = derivedInfo?.resources.find((r) => r.key === op.key);
-  if (!pool) {
-    throw new InvalidResourceOperationError(
-      `Resource "${op.key}" not available for this character's subclass`
-    );
-  }
-
-  const used = state.used[op.key] ?? 0;
-  if (used + amount > pool.total) {
-    throw new InvalidResourceOperationError(
-      `Cannot spend ${amount} ${pool.label}: only ${pool.total - used} remaining`
-    );
-  }
-
-  state.used[op.key] = used + amount;
+  const audit = applySpendResourceOp(state, op, derivedInfo);
 
   await tx.character.update({
     where: { id: characterId },
     data: { resources: serializeResourcesState(state) },
   });
-
-  const remaining = pool.total - state.used[op.key];
-  const summary = op.roll !== undefined
-    ? `Spent ${amount} ${pool.label} (rolled ${pool.die}: ${op.roll}) — ${remaining}/${pool.total} remaining`
-    : `Spent ${amount} ${pool.label} — ${remaining}/${pool.total} remaining`;
 
   const afterState = {
     resources: {
@@ -638,10 +616,10 @@ export async function applySpendResourceInTx(
     characterId,
     category: "resources",
     type: "spendResource",
-    summary,
+    summary: audit.summary,
     before: beforeState,
     after: afterState,
-    data: { key: op.key, amount, roll: op.roll ?? null, remaining },
+    data: audit.eventData,
     batchId,
     sessionId,
   });
