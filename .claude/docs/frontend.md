@@ -92,6 +92,7 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 | `conditions.ts` | 5e condition labels/descriptions for the chip strip + picker. |
 | `characterSections.ts` | Sheet-section visibility predicates (`hasProficiencies`/`hasAdvancements`) — the inline card-gate expressions from CharacterSheetPage. |
 | `formatJournalDate.ts` | Formats ISO journal dates in UTC ("Jun 22, 2026"). |
+| `advancement.ts` | `entryDetail` — pretty-prints an AdvancementEntry's ASI/feat effects for AdvancementSection's list view. |
 
 ### `@/` path alias
 
