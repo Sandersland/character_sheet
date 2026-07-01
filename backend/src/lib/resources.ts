@@ -16,7 +16,7 @@ import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
-import { deriveResources } from "./class-features.js";
+import { deriveResources, type DerivedClassInfo } from "./class-features.js";
 import {
   isKnownTool,
   toolsByCategory,
@@ -218,6 +218,80 @@ export type ResourceOperation =
   | LearnToolProficiencyOperation
   | ForgetToolProficiencyOperation;
 
+// ── Per-op appliers ─────────────────────────────────────────────────────────
+// Each validates + mutates `state` in place (throwing on any illegal op) and
+// returns the audit payload the dispatcher writes to the event log. Kept
+// module-private so the public API (applyResourceOperations) stays byte-stable.
+
+interface ResourceOpAudit {
+  eventType: string;
+  summary: string;
+  eventData: Record<string, unknown>;
+}
+
+function applySpendResourceOp(
+  state: ResourcesMutableState,
+  op: SpendResourceOperation,
+  derivedInfo: DerivedClassInfo | null,
+): ResourceOpAudit {
+  const amount = op.amount ?? 1;
+  if (amount <= 0) {
+    throw new InvalidResourceOperationError("spendResource: amount must be positive");
+  }
+  const pool = derivedInfo?.resources.find((r) => r.key === op.key);
+  if (!pool) {
+    throw new InvalidResourceOperationError(
+      `Resource "${op.key}" not available for this character's subclass`
+    );
+  }
+  const used = state.used[op.key] ?? 0;
+  if (used + amount > pool.total) {
+    throw new InvalidResourceOperationError(
+      `Cannot spend ${amount} ${pool.label}: only ${pool.total - used} remaining`
+    );
+  }
+  state.used[op.key] = used + amount;
+  const remaining = pool.total - state.used[op.key];
+  const summary = op.roll !== undefined
+    ? `Spent ${amount} ${pool.label} (rolled ${pool.die}: ${op.roll}) — ${remaining}/${pool.total} remaining`
+    : `Spent ${amount} ${pool.label} — ${remaining}/${pool.total} remaining`;
+  return {
+    eventType: "spendResource",
+    summary,
+    eventData: { key: op.key, amount, roll: op.roll ?? null, remaining },
+  };
+}
+
+function applyRestoreResourceOp(
+  state: ResourcesMutableState,
+  op: RestoreResourceOperation,
+  derivedInfo: DerivedClassInfo | null,
+): ResourceOpAudit {
+  const amount = op.amount ?? 1;
+  if (amount <= 0) {
+    throw new InvalidResourceOperationError("restoreResource: amount must be positive");
+  }
+  const pool = derivedInfo?.resources.find((r) => r.key === op.key);
+  if (!pool) {
+    throw new InvalidResourceOperationError(
+      `Resource "${op.key}" not available for this character's subclass`
+    );
+  }
+  const used = state.used[op.key] ?? 0;
+  if (used - amount < 0) {
+    throw new InvalidResourceOperationError(
+      `Cannot restore ${amount} ${pool.label}: only ${used} are spent`
+    );
+  }
+  state.used[op.key] = used - amount;
+  const newUsed = state.used[op.key];
+  return {
+    eventType: "restoreResource",
+    summary: `Restored ${amount} ${pool.label} — ${pool.total - newUsed}/${pool.total} remaining`,
+    eventData: { key: op.key, amount },
+  };
+}
+
 // ── Transaction handler ───────────────────────────────────────────────────────
 
 /**
@@ -275,62 +349,16 @@ export async function applyResourceOperations(
         },
       };
 
-      let summary = "";
-      let eventType: string;
-      let eventData: Record<string, unknown> = {};
+      let audit: ResourceOpAudit;
 
       switch (op.type) {
-        case "spendResource": {
-          const amount = op.amount ?? 1;
-          if (amount <= 0) {
-            throw new InvalidResourceOperationError("spendResource: amount must be positive");
-          }
-          const pool = derivedInfo?.resources.find((r) => r.key === op.key);
-          if (!pool) {
-            throw new InvalidResourceOperationError(
-              `Resource "${op.key}" not available for this character's subclass`
-            );
-          }
-          const used = state.used[op.key] ?? 0;
-          if (used + amount > pool.total) {
-            throw new InvalidResourceOperationError(
-              `Cannot spend ${amount} ${pool.label}: only ${pool.total - used} remaining`
-            );
-          }
-          state.used[op.key] = used + amount;
-          eventType = "spendResource";
-          const remaining = pool.total - state.used[op.key];
-          summary = op.roll !== undefined
-            ? `Spent ${amount} ${pool.label} (rolled ${pool.die}: ${op.roll}) — ${remaining}/${pool.total} remaining`
-            : `Spent ${amount} ${pool.label} — ${remaining}/${pool.total} remaining`;
-          eventData = { key: op.key, amount, roll: op.roll ?? null, remaining };
+        case "spendResource":
+          audit = applySpendResourceOp(state, op, derivedInfo);
           break;
-        }
 
-        case "restoreResource": {
-          const amount = op.amount ?? 1;
-          if (amount <= 0) {
-            throw new InvalidResourceOperationError("restoreResource: amount must be positive");
-          }
-          const pool = derivedInfo?.resources.find((r) => r.key === op.key);
-          if (!pool) {
-            throw new InvalidResourceOperationError(
-              `Resource "${op.key}" not available for this character's subclass`
-            );
-          }
-          const used = state.used[op.key] ?? 0;
-          if (used - amount < 0) {
-            throw new InvalidResourceOperationError(
-              `Cannot restore ${amount} ${pool.label}: only ${used} are spent`
-            );
-          }
-          state.used[op.key] = used - amount;
-          eventType = "restoreResource";
-          const newUsed = state.used[op.key];
-          summary = `Restored ${amount} ${pool.label} — ${pool.total - newUsed}/${pool.total} remaining`;
-          eventData = { key: op.key, amount };
+        case "restoreResource":
+          audit = applyRestoreResourceOp(state, op, derivedInfo);
           break;
-        }
 
         case "learnManeuver": {
           if (Boolean(op.maneuverId) === Boolean(op.custom)) {
@@ -378,12 +406,14 @@ export async function applyResourceOperations(
           }
 
           state.maneuversKnown.push(newEntry);
-          eventType = "learnManeuver";
-          summary = `Learned maneuver: ${newEntry.name}`;
-          eventData = {
-            entryId: newEntry.id,
-            maneuverName: newEntry.name,
-            maneuverId: newEntry.maneuverId ?? null,
+          audit = {
+            eventType: "learnManeuver",
+            summary: `Learned maneuver: ${newEntry.name}`,
+            eventData: {
+              entryId: newEntry.id,
+              maneuverName: newEntry.name,
+              maneuverId: newEntry.maneuverId ?? null,
+            },
           };
           break;
         }
@@ -397,9 +427,11 @@ export async function applyResourceOperations(
           }
           const forgotten = state.maneuversKnown[idx];
           state.maneuversKnown.splice(idx, 1);
-          eventType = "forgetManeuver";
-          summary = `Forgot maneuver: ${forgotten.name}`;
-          eventData = { entryId: op.entryId, maneuverName: forgotten.name };
+          audit = {
+            eventType: "forgetManeuver",
+            summary: `Forgot maneuver: ${forgotten.name}`,
+            eventData: { entryId: op.entryId, maneuverName: forgotten.name },
+          };
           break;
         }
 
@@ -432,9 +464,11 @@ export async function applyResourceOperations(
 
           const newToolEntry: ToolProfEntry = { id: randomUUID(), name: op.name };
           state.toolProficienciesKnown.push(newToolEntry);
-          eventType = "learnToolProficiency";
-          summary = `Learned tool proficiency: ${op.name} (Student of War)`;
-          eventData = { entryId: newToolEntry.id, toolName: op.name };
+          audit = {
+            eventType: "learnToolProficiency",
+            summary: `Learned tool proficiency: ${op.name} (Student of War)`,
+            eventData: { entryId: newToolEntry.id, toolName: op.name },
+          };
           break;
         }
 
@@ -447,9 +481,11 @@ export async function applyResourceOperations(
           }
           const forgottenTool = state.toolProficienciesKnown[toolIdx];
           state.toolProficienciesKnown.splice(toolIdx, 1);
-          eventType = "forgetToolProficiency";
-          summary = `Forgot tool proficiency: ${forgottenTool.name}`;
-          eventData = { entryId: op.entryId, toolName: forgottenTool.name };
+          audit = {
+            eventType: "forgetToolProficiency",
+            summary: `Forgot tool proficiency: ${forgottenTool.name}`,
+            eventData: { entryId: op.entryId, toolName: forgottenTool.name },
+          };
           break;
         }
       }
@@ -474,11 +510,11 @@ export async function applyResourceOperations(
       await logEvent(tx, {
         characterId,
         category: "resources",
-        type: eventType! as Parameters<typeof logEvent>[1]["type"],
-        summary: summary!,
+        type: audit.eventType as Parameters<typeof logEvent>[1]["type"],
+        summary: audit.summary,
         before: beforeState,
         after: afterState,
-        data: eventData,
+        data: audit.eventData,
         batchId,
         sessionId,
       });
