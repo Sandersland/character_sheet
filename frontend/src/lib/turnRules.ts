@@ -8,6 +8,8 @@
  * tracking is flagged for a future phase.
  */
 
+import type { ActionCost } from "@/types/character";
+
 // ── Extra Attack ─────────────────────────────────────────────────────────────
 
 /**
@@ -82,8 +84,6 @@ export function canTwoWeaponFight(
 }
 
 // ── Universal action list ─────────────────────────────────────────────────────
-
-export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "special";
 
 export interface TurnActionOption {
   key: string;
