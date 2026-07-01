@@ -114,6 +114,30 @@ describe("useSpellPicker", () => {
     expect(result.current.viewFor(healSpell).spellSlot).toBe(2);
   });
 
+  it("keeps a heal spell's target on 'self' after an upcast patch (regression)", () => {
+    const { result } = render(makeOpts([healSpell]));
+    expect(result.current.rowFor(healSpell).target).toBe("self");
+    act(() => result.current.patchRow("sp-heal", { slotLevel: 2 }));
+    expect(result.current.rowFor(healSpell).target).toBe("self");
+  });
+
+  it("still applies a heal to self when cast after an upcast (regression)", async () => {
+    const opts = makeOpts([healSpell]);
+    const { result } = render(opts);
+    act(() => result.current.patchRow("sp-heal", { slotLevel: 2 }));
+    await act(async () => {
+      await result.current.handleCast(healSpell);
+    });
+    expect(mockApply).toHaveBeenCalledWith("char-1", [
+      expect.objectContaining({
+        type: "castSpell",
+        entryId: "sp-heal",
+        slotLevel: 2,
+        apply: expect.objectContaining({ target: "self", kind: "heal" }),
+      }),
+    ]);
+  });
+
   it("handleCast fires the op, commits the slot, and refreshes", async () => {
     const opts = makeOpts([cantrip]);
     const { result } = render(opts);
