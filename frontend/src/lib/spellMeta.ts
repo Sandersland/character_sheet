@@ -28,6 +28,21 @@ export const SCHOOL_TONE = {
 
 export type SchoolTone = (typeof SCHOOL_TONE)[keyof typeof SCHOOL_TONE];
 
+/** Whether a spell is applied to the caster or an external target. */
+export type Target = "self" | "other";
+
+/** Default target: heal spells or "Self" range → self; everything else → other. */
+export function defaultTarget(spell: Spell): Target {
+  if (spell.range?.toLowerCase() === "self") return "self";
+  if (spell.effectKind === "heal") return "self";
+  return "other";
+}
+
+/** True when the target is locked to "self" (range is exactly "Self"). */
+export function targetLocked(spell: Spell): boolean {
+  return spell.range?.toLowerCase() === "self";
+}
+
 /** "Cantrip" or "Level N" */
 export function levelLabel(level: number): string {
   return level === 0 ? "Cantrip" : `Level ${level}`;

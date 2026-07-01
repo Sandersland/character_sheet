@@ -16,7 +16,7 @@ import {
 import { rollDie } from "./dice.js";
 import { deriveResources } from "./class-features.js";
 import { normalizeResourcesMutable, serializeResourcesState } from "./resources.js";
-import { normalizeSpellcastingMutable } from "./spellcasting.js";
+import { normalizeSpellcastingMutable } from "./spell-state.js";
 
 export class InvalidHitPointOperationError extends Error {}
 
@@ -585,6 +585,349 @@ export async function applyConcentrationSaveInTx(
   return result;
 }
 
+// ---- Per-op appliers ----
+// Module-private helpers extracted from the applyHitPointOperations switch.
+// Each mutates ctx.hp/ctx.hd in place, does any side-table writes it owns,
+// throws InvalidHitPointOperationError on validation failure, and returns the
+// summary/eventData for the dispatcher to log. Helpers never call logEvent.
+
+interface HpOpContext {
+  tx: Prisma.TransactionClient;
+  characterId: string;
+  row: {
+    hitPoints: Prisma.JsonValue;
+    hitDice: Prisma.JsonValue;
+    abilityScores: Prisma.JsonValue;
+    experiencePoints: number;
+    spellcasting: Prisma.JsonValue;
+    resources: Prisma.JsonValue;
+    classEntries: { id: string; level: number; name: string; subclass: string | null }[];
+  };
+  hp: HitPoints;
+  hd: HitDice;
+  conMod: number;
+  faces: number;
+  effMax: number;
+  primaryEntry: { id: string; level: number; name: string; subclass: string | null } | undefined;
+  beforeClassLevel: number | null;
+}
+
+interface HpOpResult {
+  summary: string;
+  eventData: Record<string, unknown>;
+  damageForConcentration?: number;
+}
+
+function applyDamageOp(ctx: HpOpContext, op: DamageOperation): HpOpResult {
+  const { hp } = ctx;
+  if (op.amount <= 0) {
+    throw new InvalidHitPointOperationError("damage amount must be positive");
+  }
+  const beforeCurrent = hp.current;
+  // Temp HP absorbs first, then current. Both floor at 0.
+  const absorbed = Math.min(hp.temp, op.amount);
+  hp.temp -= absorbed;
+  hp.current = Math.max(0, hp.current - (op.amount - absorbed));
+  // The 5e concentration save uses the full damage of the instance.
+  return {
+    summary: `Took ${op.amount} damage (${beforeCurrent} → ${hp.current} HP)`,
+    eventData: { amount: op.amount },
+    damageForConcentration: op.amount,
+  };
+}
+
+function applyHealOp(ctx: HpOpContext, op: HealOperation): HpOpResult {
+  const { hp, effMax } = ctx;
+  if (op.amount <= 0) {
+    throw new InvalidHitPointOperationError("heal amount must be positive");
+  }
+  const beforeCurrent = hp.current;
+  // Regaining any HP while at 0 (dying) wakes the character and clears death saves.
+  if (hp.current === 0) {
+    hp.deathSaves = { successes: 0, failures: 0 };
+  }
+  hp.current = Math.min(effMax, hp.current + op.amount);
+  return {
+    summary: `Healed ${op.amount} HP (${beforeCurrent} → ${hp.current} HP)`,
+    eventData: { amount: op.amount },
+  };
+}
+
+function applySetTempOp(ctx: HpOpContext, op: SetTempOperation): HpOpResult {
+  const { hp } = ctx;
+  if (op.amount < 0) {
+    throw new InvalidHitPointOperationError("setTemp amount must be non-negative");
+  }
+  // 5e: temp HP doesn't stack — take the higher value.
+  hp.temp = Math.max(hp.temp, op.amount);
+  return {
+    summary: `Set temporary HP to ${op.amount}`,
+    eventData: { amount: op.amount },
+  };
+}
+
+function applyDeathSaveOp(ctx: HpOpContext, op: DeathSaveOperation): HpOpResult {
+  const { hp } = ctx;
+  if (hp.current !== 0) {
+    throw new InvalidHitPointOperationError(
+      "Can only roll a death save when at 0 HP (unconscious/dying)"
+    );
+  }
+  if (op.roll < 1 || op.roll > 20) {
+    throw new InvalidHitPointOperationError(
+      "Death save roll must be between 1 and 20"
+    );
+  }
+  const rollResult = applyDeathSaveRoll(hp.deathSaves, hp.current, op.roll);
+  hp.deathSaves = rollResult.deathSaves;
+  hp.current = rollResult.current;
+  const ds = hp.deathSaves;
+  const summary = op.roll === 20
+    ? `Death save: natural 20 — regained consciousness`
+    : `Death save: rolled ${op.roll} (${ds.successes} success${ds.successes !== 1 ? "es" : ""}, ${ds.failures} failure${ds.failures !== 1 ? "s" : ""})`;
+  return { summary, eventData: { roll: op.roll } };
+}
+
+function applyStabilizeOp(ctx: HpOpContext): HpOpResult {
+  const { hp } = ctx;
+  if (hp.current !== 0) {
+    throw new InvalidHitPointOperationError(
+      "Can only stabilize when at 0 HP (unconscious/dying)"
+    );
+  }
+  hp.deathSaves = { successes: 0, failures: 0 };
+  return { summary: "Stabilized", eventData: {} };
+}
+
+async function applyLevelUpOp(ctx: HpOpContext, op: LevelUpOperation): Promise<HpOpResult> {
+  const { tx, row, hp, hd, conMod, faces, primaryEntry, beforeClassLevel } = ctx;
+  const derivedLevel = levelForExperience(row.experiencePoints);
+  if (hd.total >= derivedLevel) {
+    throw new InvalidHitPointOperationError(
+      `No pending level-up: already at level ${hd.total} (XP derives level ${derivedLevel})`
+    );
+  }
+  if (op.method === "roll") {
+    if (op.roll === undefined || op.roll < 1 || op.roll > faces) {
+      throw new InvalidHitPointOperationError(
+        `Roll for level-up must be between 1 and ${faces} (got ${String(op.roll)})`
+      );
+    }
+  }
+  const gain = levelUpHpGain(faces, conMod, op.method, op.roll);
+  hd.total += 1;
+  hp.max += gain;
+  hp.current += gain;
+
+  // Repair the position-0 class entry's `level` to match the newly-applied
+  // total. The seed defaults all entries to level 1 even for level-7 chars;
+  // this self-heals that on the first real level-up.
+  if (primaryEntry) {
+    await tx.characterClassEntry.update({
+      where: { id: primaryEntry.id },
+      data: { level: hd.total },
+    });
+  }
+
+  // Store enough data to exactly reverse this level-up later (Phase 4 undo)
+  // or when XP is lowered (auto-reverse in experience-ops.ts).
+  return {
+    summary: `Leveled up to ${hd.total} (+${gain} HP)`,
+    eventData: {
+      method: op.method,
+      roll: op.roll ?? null,
+      conMod,
+      faces,
+      hpGain: gain,
+      primaryEntryId: primaryEntry?.id ?? null,
+      prevEntryLevel: beforeClassLevel,
+      newEntryLevel: hd.total,
+    },
+  };
+}
+
+async function applyShortRestOp(ctx: HpOpContext, op: ShortRestOperation): Promise<HpOpResult> {
+  const { tx, characterId, row, hp, hd, conMod, faces, effMax } = ctx;
+  const available = hd.total - hd.spent;
+  const spending = op.rolls.length;
+  if (spending > available) {
+    throw new InvalidHitPointOperationError(
+      `Cannot spend ${spending} hit dice; only ${available} available`
+    );
+  }
+  if (op.rolls.some((r) => r < 1 || r > faces)) {
+    throw new InvalidHitPointOperationError(
+      `Hit die rolls must be between 1 and ${faces} (die: ${hd.die})`
+    );
+  }
+  const totalGain = op.rolls.reduce((sum, roll) => sum + hitDieHeal(roll, conMod), 0);
+  hp.current = Math.min(effMax, hp.current + totalGain);
+  hd.spent += spending;
+
+  // Reset subclass resources that recharge on short or short-or-long rest
+  // (e.g. Battle Master superiority dice recharge on a short rest).
+  const srAbilityScores = row.abilityScores as Record<string, number>;
+  const srLevel = levelForExperience(row.experiencePoints);
+  const srProfBonus = proficiencyBonusForLevel(srLevel);
+  const srClassEntry = row.classEntries[0];
+  const srDerivedRes = deriveResources(
+    srClassEntry?.name ?? "",
+    srClassEntry?.subclass ?? undefined,
+    srLevel,
+    srAbilityScores,
+    srProfBonus,
+  );
+  const srResourceState = normalizeResourcesMutable(row.resources);
+  const beforeSrResourceState = {
+    used: { ...srResourceState.used },
+    maneuversKnown: srResourceState.maneuversKnown.map((m) => ({ ...m })),
+  };
+  let srResourcesRestored = 0;
+  if (srDerivedRes) {
+    for (const pool of srDerivedRes.resources) {
+      if (pool.recharge === "shortRest" || pool.recharge === "short-or-long") {
+        srResourcesRestored += srResourceState.used[pool.key] ?? 0;
+        srResourceState.used[pool.key] = 0;
+      }
+    }
+  }
+
+  // Warlock Pact Magic slots recharge on a short rest. A pure Warlock's only
+  // spell slots are Pact slots, so clearing slotsUsed is safe here.
+  // (Mystic Arcanum is long-rest only — leave arcanumUsed untouched.)
+  const srIsWarlock = (srClassEntry?.name ?? "").toLowerCase() === "warlock";
+  const srSpellUpdate: Record<string, unknown> = {
+    resources: serializeResourcesState(srResourceState),
+  };
+  let srSlotsRestored = 0;
+  let beforeSrSpellState: Record<string, unknown> | undefined;
+  if (srIsWarlock) {
+    const srSpellState = normalizeSpellcastingMutable(row.spellcasting);
+    beforeSrSpellState = {
+      slotsUsed: { ...srSpellState.slotsUsed },
+      arcanumUsed: { ...srSpellState.arcanumUsed },
+      spells: srSpellState.spells.map((s) => ({ ...s })),
+      concentratingOn: srSpellState.concentratingOn ? { ...srSpellState.concentratingOn } : null,
+    };
+    srSlotsRestored = Object.values(srSpellState.slotsUsed).reduce((s, n) => s + n, 0);
+    srSpellState.slotsUsed = {};
+    // A short rest does NOT end concentration — preserve it.
+    srSpellUpdate.spellcasting = {
+      slotsUsed: srSpellState.slotsUsed,
+      arcanumUsed: srSpellState.arcanumUsed,
+      spells: srSpellState.spells,
+      concentratingOn: srSpellState.concentratingOn,
+    } as unknown as Prisma.InputJsonValue;
+  }
+
+  const eventData: Record<string, unknown> = {
+    rolls: op.rolls,
+    totalGain,
+    conMod,
+    resourcesRestored: srResourcesRestored,
+    slotsRestored: srSlotsRestored,
+    beforeResourceState: beforeSrResourceState,
+    ...(beforeSrSpellState ? { beforeSpellState: beforeSrSpellState } : {}),
+  };
+  const restParts: string[] = [`+${totalGain} HP`];
+  if (srSlotsRestored > 0) restParts.push(`${srSlotsRestored} Pact slot${srSlotsRestored !== 1 ? "s" : ""} restored`);
+  if (srResourcesRestored > 0) restParts.push(`resources restored`);
+  const summary = `Short rest — spent ${spending} hit ${spending === 1 ? "die" : "dice"}: ${restParts.join(", ")}`;
+
+  // Write the resource reset (and any Pact slot restore) alongside HP in the
+  // dispatcher's character.update below. Route resources through
+  // serializeResourcesState so all keys round-trip — prevents silent data loss.
+  await tx.character.update({
+    where: { id: characterId },
+    data: srSpellUpdate as Prisma.CharacterUpdateInput,
+  });
+
+  return { summary, eventData };
+}
+
+async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
+  const { tx, characterId, row, hp, hd, effMax } = ctx;
+  const prevCurrent = hp.current;
+  hp.current = effMax;
+  hp.temp = 0;
+  hp.deathSaves = { successes: 0, failures: 0 };
+  // Recover hit dice equal to half your total (round down, min 1).
+  const recovered = Math.max(1, Math.floor(hd.total / 2));
+  hd.spent = Math.max(0, hd.spent - recovered);
+
+  // Reset all spell slot used-counts (long-rest recovery for every caster,
+  // including Warlock Pact slots) and clear Warlock Mystic Arcanum charges.
+  const spellState = normalizeSpellcastingMutable(row.spellcasting);
+  const beforeSpellState = {
+    slotsUsed: { ...spellState.slotsUsed },
+    arcanumUsed: { ...spellState.arcanumUsed },
+    spells: spellState.spells.map((s) => ({ ...s })),
+    concentratingOn: spellState.concentratingOn ? { ...spellState.concentratingOn } : null,
+  };
+  const slotsRestored =
+    Object.values(spellState.slotsUsed).reduce((s, n) => s + n, 0) +
+    Object.values(spellState.arcanumUsed).reduce((s, n) => s + n, 0);
+  spellState.slotsUsed = {};
+  spellState.arcanumUsed = {};
+  // A long rest ends any active concentration.
+  spellState.concentratingOn = null;
+
+  // Reset subclass resources that recharge on a long rest or short-or-long rest.
+  const abilityScores = row.abilityScores as Record<string, number>;
+  const derivedLevel = levelForExperience(row.experiencePoints);
+  const profBonus = proficiencyBonusForLevel(derivedLevel);
+  const primaryClassEntry = row.classEntries[0];
+  const derivedRes = deriveResources(
+    primaryClassEntry?.name ?? "",
+    primaryClassEntry?.subclass ?? undefined,
+    derivedLevel,
+    abilityScores,
+    profBonus,
+  );
+  const resourceState = normalizeResourcesMutable(row.resources);
+  const beforeResourceState = {
+    used: { ...resourceState.used },
+    maneuversKnown: resourceState.maneuversKnown.map((m) => ({ ...m })),
+  };
+  let resourcesRestored = 0;
+  if (derivedRes) {
+    for (const pool of derivedRes.resources) {
+      if (pool.recharge === "longRest" || pool.recharge === "short-or-long") {
+        resourcesRestored += resourceState.used[pool.key] ?? 0;
+        resourceState.used[pool.key] = 0;
+      }
+    }
+  }
+
+  const hpRestored = effMax - prevCurrent;
+  const eventData: Record<string, unknown> = { recovered, hpRestored, slotsRestored, resourcesRestored };
+  const parts: string[] = [];
+  if (hpRestored > 0) parts.push(`+${hpRestored} HP`);
+  else parts.push("HP already full");
+  if (slotsRestored > 0) parts.push(`${slotsRestored} slot${slotsRestored !== 1 ? "s" : ""} restored`);
+  if (resourcesRestored > 0) parts.push(`resources restored`);
+  const summary = `Long rest — ${parts.join(", ")}`;
+
+  // Write spellcasting + resources; the dispatcher writes HP separately below.
+  await tx.character.update({
+    where: { id: characterId },
+    data: {
+      spellcasting: {
+        slotsUsed: spellState.slotsUsed,
+        arcanumUsed: spellState.arcanumUsed,
+        spells: spellState.spells,
+        concentratingOn: null,
+      } as unknown as Prisma.InputJsonValue,
+      resources: serializeResourcesState(resourceState),
+    },
+  });
+
+  // Include spellcasting + resources in the before/after snapshot for undo.
+  eventData.beforeSpellState = beforeSpellState;
+  eventData.beforeResourceState = beforeResourceState;
+  return { summary, eventData };
+}
+
 // ---- Transaction handler ----
 
 /**
@@ -679,310 +1022,64 @@ export async function applyHitPointOperations(
       // common HP write-back below (needs the post-damage current HP).
       let damageForConcentration: number | null = null;
 
+      const ctx: HpOpContext = {
+        tx,
+        characterId,
+        row,
+        hp,
+        hd,
+        conMod,
+        faces,
+        effMax,
+        primaryEntry,
+        beforeClassLevel,
+      };
+      let result: HpOpResult | null = null;
+
       switch (op.type) {
-        case "damage": {
-          if (op.amount <= 0) {
-            throw new InvalidHitPointOperationError("damage amount must be positive");
-          }
-          // Temp HP absorbs first, then current. Both floor at 0.
-          const absorbed = Math.min(hp.temp, op.amount);
-          hp.temp -= absorbed;
-          hp.current = Math.max(0, hp.current - (op.amount - absorbed));
-          // Note: massive-damage instant-death (remaining damage ≥ max at 0) is
-          // intentionally out of scope for this phase.
-          eventData = { amount: op.amount };
-          summary = `Took ${op.amount} damage (${beforeHp.current} → ${hp.current} HP)`;
-          // The 5e concentration save uses the full damage of the instance,
-          // including any absorbed by temp HP.
-          damageForConcentration = op.amount;
+        case "damage":
+          result = applyDamageOp(ctx, op);
           break;
+
+        case "heal":
+          result = applyHealOp(ctx, op);
+          break;
+
+        case "setTemp":
+          result = applySetTempOp(ctx, op);
+          break;
+
+        case "shortRest":
+          result = await applyShortRestOp(ctx, op);
+          break;
+
+        case "longRest":
+          result = await applyLongRestOp(ctx);
+          break;
+
+        case "levelUp":
+          result = await applyLevelUpOp(ctx, op);
+          break;
+
+        case "deathSave":
+          result = applyDeathSaveOp(ctx, op);
+          break;
+
+        case "stabilize":
+          result = applyStabilizeOp(ctx);
+          break;
+
+        default: {
+          const _exhaustive: never = op;
+          throw new InvalidHitPointOperationError(`Unknown op type: ${(_exhaustive as { type: string }).type}`);
         }
+      }
 
-        case "heal": {
-          if (op.amount <= 0) {
-            throw new InvalidHitPointOperationError("heal amount must be positive");
-          }
-          // Regaining any HP while at 0 (dying) wakes the character and clears
-          // the death save accumulation.
-          if (hp.current === 0) {
-            hp.deathSaves = { successes: 0, failures: 0 };
-          }
-          hp.current = Math.min(effMax, hp.current + op.amount);
-          eventData = { amount: op.amount };
-          summary = `Healed ${op.amount} HP (${beforeHp.current} → ${hp.current} HP)`;
-          break;
-        }
-
-        case "setTemp": {
-          if (op.amount < 0) {
-            throw new InvalidHitPointOperationError("setTemp amount must be non-negative");
-          }
-          // 5e: temp HP doesn't stack — take the higher value.
-          hp.temp = Math.max(hp.temp, op.amount);
-          eventData = { amount: op.amount };
-          summary = `Set temporary HP to ${op.amount}`;
-          break;
-        }
-
-        case "shortRest": {
-          const available = hd.total - hd.spent;
-          const spending = op.rolls.length;
-          if (spending > available) {
-            throw new InvalidHitPointOperationError(
-              `Cannot spend ${spending} hit dice; only ${available} available`
-            );
-          }
-          if (op.rolls.some((r) => r < 1 || r > faces)) {
-            throw new InvalidHitPointOperationError(
-              `Hit die rolls must be between 1 and ${faces} (die: ${hd.die})`
-            );
-          }
-          const totalGain = op.rolls.reduce((sum, roll) => sum + hitDieHeal(roll, conMod), 0);
-          hp.current = Math.min(effMax, hp.current + totalGain);
-          hd.spent += spending;
-
-          // Reset subclass resources that recharge on short or short-or-long rest
-          // (e.g. Battle Master superiority dice recharge on a short rest).
-          const srAbilityScores = row.abilityScores as Record<string, number>;
-          const srLevel = levelForExperience(row.experiencePoints);
-          const srProfBonus = proficiencyBonusForLevel(srLevel);
-          const srClassEntry = row.classEntries[0];
-          const srDerivedRes = deriveResources(
-            srClassEntry?.name ?? "",
-            srClassEntry?.subclass ?? undefined,
-            srLevel,
-            srAbilityScores,
-            srProfBonus,
-          );
-          const srResourceState = normalizeResourcesMutable(row.resources);
-          const beforeSrResourceState = {
-            used: { ...srResourceState.used },
-            maneuversKnown: srResourceState.maneuversKnown.map((m) => ({ ...m })),
-          };
-          let srResourcesRestored = 0;
-          if (srDerivedRes) {
-            for (const pool of srDerivedRes.resources) {
-              if (pool.recharge === "shortRest" || pool.recharge === "short-or-long") {
-                srResourcesRestored += srResourceState.used[pool.key] ?? 0;
-                srResourceState.used[pool.key] = 0;
-              }
-            }
-          }
-
-          // Warlock Pact Magic slots recharge on a short rest. A pure Warlock's
-          // only spell slots are Pact slots, so clearing slotsUsed is safe here.
-          // (Mystic Arcanum is long-rest only — leave arcanumUsed untouched.)
-          const srIsWarlock = (srClassEntry?.name ?? "").toLowerCase() === "warlock";
-          const srSpellUpdate: Record<string, unknown> = {
-            resources: serializeResourcesState(srResourceState),
-          };
-          let srSlotsRestored = 0;
-          let beforeSrSpellState: Record<string, unknown> | undefined;
-          if (srIsWarlock) {
-            const srSpellState = normalizeSpellcastingMutable(row.spellcasting);
-            beforeSrSpellState = {
-              slotsUsed: { ...srSpellState.slotsUsed },
-              arcanumUsed: { ...srSpellState.arcanumUsed },
-              spells: srSpellState.spells.map((s) => ({ ...s })),
-              concentratingOn: srSpellState.concentratingOn ? { ...srSpellState.concentratingOn } : null,
-            };
-            srSlotsRestored = Object.values(srSpellState.slotsUsed).reduce((s, n) => s + n, 0);
-            srSpellState.slotsUsed = {};
-            // A short rest does NOT end concentration — preserve it.
-            srSpellUpdate.spellcasting = {
-              slotsUsed: srSpellState.slotsUsed,
-              arcanumUsed: srSpellState.arcanumUsed,
-              spells: srSpellState.spells,
-              concentratingOn: srSpellState.concentratingOn,
-            } as unknown as Prisma.InputJsonValue;
-          }
-
-          eventData = {
-            rolls: op.rolls,
-            totalGain,
-            conMod,
-            resourcesRestored: srResourcesRestored,
-            slotsRestored: srSlotsRestored,
-            beforeResourceState: beforeSrResourceState,
-            ...(beforeSrSpellState ? { beforeSpellState: beforeSrSpellState } : {}),
-          };
-          const restParts: string[] = [`+${totalGain} HP`];
-          if (srSlotsRestored > 0) restParts.push(`${srSlotsRestored} Pact slot${srSlotsRestored !== 1 ? "s" : ""} restored`);
-          if (srResourcesRestored > 0) restParts.push(`resources restored`);
-          summary = `Short rest — spent ${spending} hit ${spending === 1 ? "die" : "dice"}: ${restParts.join(", ")}`;
-
-          // Write the resource reset (and any Pact slot restore) alongside HP in
-          // the character.update below. Route resources through
-          // serializeResourcesState so all keys (including toolProficienciesKnown)
-          // round-trip — prevents silent data loss on rest.
-          await tx.character.update({
-            where: { id: characterId },
-            data: srSpellUpdate as Prisma.CharacterUpdateInput,
-          });
-          break;
-        }
-
-        case "longRest": {
-          const prevCurrent = hp.current;
-          hp.current = effMax;
-          hp.temp = 0;
-          hp.deathSaves = { successes: 0, failures: 0 };
-          // Recover hit dice equal to half your total (round down, min 1).
-          const recovered = Math.max(1, Math.floor(hd.total / 2));
-          hd.spent = Math.max(0, hd.spent - recovered);
-
-          // Reset all spell slot used-counts to 0 (long-rest recovery for every
-          // caster, including Warlock Pact slots) and clear Warlock Mystic Arcanum
-          // charges. Snapshot the full blob (incl. spells) so undo restores it
-          // faithfully rather than wiping the known-spell list.
-          const spellState = normalizeSpellcastingMutable(row.spellcasting);
-          const beforeSpellState = {
-            slotsUsed: { ...spellState.slotsUsed },
-            arcanumUsed: { ...spellState.arcanumUsed },
-            spells: spellState.spells.map((s) => ({ ...s })),
-            concentratingOn: spellState.concentratingOn ? { ...spellState.concentratingOn } : null,
-          };
-          const slotsRestored =
-            Object.values(spellState.slotsUsed).reduce((s, n) => s + n, 0) +
-            Object.values(spellState.arcanumUsed).reduce((s, n) => s + n, 0);
-          spellState.slotsUsed = {};
-          spellState.arcanumUsed = {};
-          // A long rest ends any active concentration.
-          spellState.concentratingOn = null;
-
-          // Reset subclass resources that recharge on a long rest or short-or-long rest.
-          const abilityScores = row.abilityScores as Record<string, number>;
-          const derivedLevel = levelForExperience(row.experiencePoints);
-          const profBonus = proficiencyBonusForLevel(derivedLevel);
-          const primaryClassEntry = row.classEntries[0];
-          const derivedRes = deriveResources(
-            primaryClassEntry?.name ?? "",
-            primaryClassEntry?.subclass ?? undefined,
-            derivedLevel,
-            abilityScores,
-            profBonus,
-          );
-          const resourceState = normalizeResourcesMutable(row.resources);
-          const beforeResourceState = {
-            used: { ...resourceState.used },
-            maneuversKnown: resourceState.maneuversKnown.map((m) => ({ ...m })),
-          };
-          let resourcesRestored = 0;
-          if (derivedRes) {
-            for (const pool of derivedRes.resources) {
-              if (pool.recharge === "longRest" || pool.recharge === "short-or-long") {
-                resourcesRestored += resourceState.used[pool.key] ?? 0;
-                resourceState.used[pool.key] = 0;
-              }
-            }
-          }
-
-          const hpRestored = effMax - prevCurrent;
-          eventData = { recovered, hpRestored, slotsRestored, resourcesRestored };
-          const parts: string[] = [];
-          if (hpRestored > 0) parts.push(`+${hpRestored} HP`);
-          else parts.push("HP already full");
-          if (slotsRestored > 0) parts.push(`${slotsRestored} slot${slotsRestored !== 1 ? "s" : ""} restored`);
-          if (resourcesRestored > 0) parts.push(`resources restored`);
-          summary = `Long rest — ${parts.join(", ")}`;
-
-          // Write spellcasting + resources in the same character.update below.
-          await tx.character.update({
-            where: { id: characterId },
-            data: {
-              spellcasting: {
-                slotsUsed: spellState.slotsUsed,
-                arcanumUsed: spellState.arcanumUsed,
-                spells: spellState.spells,
-                concentratingOn: null,
-              } as unknown as Prisma.InputJsonValue,
-              resources: serializeResourcesState(resourceState),
-            },
-          });
-
-          // Include spellcasting + resources in the before/after snapshot for undo.
-          (eventData as Record<string, unknown>).beforeSpellState = beforeSpellState;
-          (eventData as Record<string, unknown>).beforeResourceState = beforeResourceState;
-          break;
-        }
-
-        case "levelUp": {
-          const derivedLevel = levelForExperience(row.experiencePoints);
-          if (hd.total >= derivedLevel) {
-            throw new InvalidHitPointOperationError(
-              `No pending level-up: already at level ${hd.total} (XP derives level ${derivedLevel})`
-            );
-          }
-          if (op.method === "roll") {
-            if (op.roll === undefined || op.roll < 1 || op.roll > faces) {
-              throw new InvalidHitPointOperationError(
-                `Roll for level-up must be between 1 and ${faces} (got ${String(op.roll)})`
-              );
-            }
-          }
-          const gain = levelUpHpGain(faces, conMod, op.method, op.roll);
-          hd.total += 1;
-          hp.max += gain;
-          hp.current += gain;
-
-          // Repair the position-0 class entry's `level` to match the newly-applied
-          // total. The seed defaults all entries to level 1 even for level-7 chars;
-          // this self-heals that on the first real level-up.
-          if (primaryEntry) {
-            await tx.characterClassEntry.update({
-              where: { id: primaryEntry.id },
-              data: { level: hd.total },
-            });
-          }
-
-          // Store enough data to exactly reverse this level-up later (Phase 4
-          // undo) or when XP is lowered (auto-reverse in experience-ops.ts).
-          eventData = {
-            method: op.method,
-            roll: op.roll ?? null,
-            conMod,
-            faces,
-            hpGain: gain,
-            primaryEntryId: primaryEntry?.id ?? null,
-            prevEntryLevel: beforeClassLevel,
-            newEntryLevel: hd.total,
-          };
-          summary = `Leveled up to ${hd.total} (+${gain} HP)`;
-          break;
-        }
-
-        case "deathSave": {
-          if (hp.current !== 0) {
-            throw new InvalidHitPointOperationError(
-              "Can only roll a death save when at 0 HP (unconscious/dying)"
-            );
-          }
-          if (op.roll < 1 || op.roll > 20) {
-            throw new InvalidHitPointOperationError(
-              "Death save roll must be between 1 and 20"
-            );
-          }
-          const result = applyDeathSaveRoll(hp.deathSaves, hp.current, op.roll);
-          hp.deathSaves = result.deathSaves;
-          hp.current = result.current;
-          eventData = { roll: op.roll };
-          const ds = hp.deathSaves;
-          summary = op.roll === 20
-            ? `Death save: natural 20 — regained consciousness`
-            : `Death save: rolled ${op.roll} (${ds.successes} success${ds.successes !== 1 ? "es" : ""}, ${ds.failures} failure${ds.failures !== 1 ? "s" : ""})`;
-          break;
-        }
-
-        case "stabilize": {
-          if (hp.current !== 0) {
-            throw new InvalidHitPointOperationError(
-              "Can only stabilize when at 0 HP (unconscious/dying)"
-            );
-          }
-          hp.deathSaves = { successes: 0, failures: 0 };
-          eventData = {};
-          summary = "Stabilized";
-          break;
+      if (result) {
+        summary = result.summary;
+        eventData = result.eventData;
+        if (result.damageForConcentration !== undefined) {
+          damageForConcentration = result.damageForConcentration;
         }
       }
 
