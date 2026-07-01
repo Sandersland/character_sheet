@@ -5,8 +5,10 @@ import { rollDie } from "@/lib/dice";
 import { dieFaces } from "@/lib/hitDice";
 import type { Character, ConcentrationCheck, HitPointOperation } from "@/types/character";
 import Card from "@/components/ui/Card";
+import AdvancementCallout from "@/features/hitpoints/AdvancementCallout";
 import ConcentrationSaveModal from "@/features/hitpoints/ConcentrationSaveModal";
 import DeathSaveTracker from "@/features/hitpoints/DeathSaveTracker";
+import LevelUpCallout from "@/features/hitpoints/LevelUpCallout";
 import HpActionControl from "@/features/hitpoints/HpActionControl";
 import HpMeter from "@/features/hitpoints/HpMeter";
 import type { HpMode } from "@/features/hitpoints/HpActionControl";
@@ -226,40 +228,21 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
 
         {/* ── Level-up affordance ── */}
         {pendingLevelUps > 0 && (
-          <div className="flex items-center justify-between gap-3 rounded-card border border-gold-300 bg-gold-50 px-3 py-2">
-            <span className="text-sm font-semibold text-gold-800">
-              {pendingLevelUps === 1
-                ? "Level up available!"
-                : `${pendingLevelUps} level-ups available!`}
-            </span>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => setLevelUpOpen(true)}
-              className="rounded-control bg-gold-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-gold-800 disabled:cursor-not-allowed disabled:bg-parchment-200 disabled:text-parchment-400 disabled:hover:bg-parchment-200"
-            >
-              Level up
-            </button>
-          </div>
+          <LevelUpCallout
+            pendingLevelUps={pendingLevelUps}
+            pending={pending}
+            onLevelUp={() => setLevelUpOpen(true)}
+          />
         )}
 
         {/* ── Advancement slot unlocked callout ── */}
         {advancementCallout && (
-          <div className="flex items-center justify-between gap-3 rounded-card border border-arcane-300 bg-arcane-50 px-3 py-2">
-            <span className="text-sm font-semibold text-arcane-800">
-              New advancement slot! Choose an ASI or feat.
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                setAdvancementCallout(false);
-                document.getElementById("advancement-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
-              className="rounded-control bg-arcane-700 px-3 py-1.5 text-sm font-semibold text-parchment-50 transition-colors hover:bg-arcane-800"
-            >
-              Go to Advancements
-            </button>
-          </div>
+          <AdvancementCallout
+            onGoToAdvancements={() => {
+              setAdvancementCallout(false);
+              document.getElementById("advancement-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          />
         )}
 
         {/* Concentration save result (issue #41, auto-roll path) */}
