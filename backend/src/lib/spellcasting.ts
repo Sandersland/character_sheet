@@ -294,6 +294,108 @@ function applyRestoreSlotOp(ctx: SpellOpContext, op: RestoreSlotOperation): OpOu
   return { eventType: "restoreSlot", summary, eventData: { level: op.level } };
 }
 
+async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): Promise<OpOutcome> {
+  const { tx, state } = ctx;
+  if (Boolean(op.spellId) === Boolean(op.custom)) {
+    throw new InvalidSpellcastingOperationError(
+      "learnSpell: provide exactly one of spellId or custom"
+    );
+  }
+
+  let newEntry: SpellEntry;
+
+  if (op.spellId) {
+    // Check for duplicate before DB lookup.
+    if (state.spells.some((s) => s.spellId === op.spellId)) {
+      throw new InvalidSpellcastingOperationError(
+        `Spell already in spellbook (spellId: ${op.spellId})`
+      );
+    }
+    const catalogSpell = await tx.spell.findUnique({ where: { id: op.spellId } });
+    if (!catalogSpell) {
+      throw new InvalidSpellcastingOperationError(`Spell not found in catalog: ${op.spellId}`);
+    }
+    newEntry = {
+      id: randomUUID(),
+      spellId: catalogSpell.id,
+      name: catalogSpell.name,
+      level: catalogSpell.level,
+      school: catalogSpell.school as string,
+      prepared: false,
+      castingTime: catalogSpell.castingTime,
+      range: catalogSpell.range,
+      duration: catalogSpell.duration,
+      description: catalogSpell.description,
+      concentration: catalogSpell.concentration,
+      ritual: catalogSpell.ritual,
+      components: (catalogSpell.components as SpellComponents | null) ?? undefined,
+      saveEffect: catalogSpell.saveEffect ?? undefined,
+      effectKind: catalogSpell.effectKind ?? undefined,
+      effectDiceCount: catalogSpell.effectDiceCount ?? undefined,
+      effectDiceFaces: catalogSpell.effectDiceFaces ?? undefined,
+      effectModifier: catalogSpell.effectModifier ?? undefined,
+      damageType: catalogSpell.damageType ?? undefined,
+      attackType: catalogSpell.attackType ?? undefined,
+      saveAbility: catalogSpell.saveAbility ?? undefined,
+      upcastDicePerLevel: catalogSpell.upcastDicePerLevel ?? undefined,
+      cantripScaling: catalogSpell.cantripScaling,
+    };
+  } else {
+    // Custom spell.
+    const custom = op.custom!;
+    newEntry = {
+      id: randomUUID(),
+      name: custom.name,
+      level: custom.level,
+      school: custom.school,
+      prepared: false,
+      castingTime: custom.castingTime,
+      range: custom.range,
+      duration: custom.duration,
+      description: custom.description,
+      concentration: custom.concentration,
+      ritual: custom.ritual,
+      components: custom.components,
+      saveEffect: custom.saveEffect,
+      effectKind: custom.effectKind,
+      effectDiceCount: custom.effectDiceCount,
+      effectDiceFaces: custom.effectDiceFaces,
+      effectModifier: custom.effectModifier,
+      damageType: custom.damageType,
+      attackType: custom.attackType,
+      saveAbility: custom.saveAbility,
+      upcastDicePerLevel: custom.upcastDicePerLevel,
+      cantripScaling: custom.cantripScaling,
+    };
+  }
+
+  state.spells.push(newEntry);
+  return {
+    eventType: "learnSpell",
+    summary: `Learned ${newEntry.name}`,
+    eventData: { entryId: newEntry.id, spellName: newEntry.name, spellId: newEntry.spellId ?? null },
+  };
+}
+
+function applyForgetSpellOp(ctx: SpellOpContext, op: ForgetSpellOperation): OpOutcome {
+  const { state } = ctx;
+  const idx = state.spells.findIndex((s) => s.id === op.entryId);
+  if (idx === -1) {
+    throw new InvalidSpellcastingOperationError(`Spell entry not found: ${op.entryId}`);
+  }
+  const forgotten = state.spells[idx];
+  state.spells.splice(idx, 1);
+  // Forgetting the spell you're concentrating on ends that concentration.
+  if (state.concentratingOn?.entryId === op.entryId) {
+    state.concentratingOn = null;
+  }
+  return {
+    eventType: "forgetSpell",
+    summary: `Removed ${forgotten.name} from spellbook`,
+    eventData: { entryId: op.entryId, spellName: forgotten.name },
+  };
+}
+
 // ── Transaction handler ───────────────────────────────────────────────────────
 
 /**
@@ -509,100 +611,12 @@ export async function applySpellcastingOperations(
         }
 
         case "learnSpell": {
-          if (Boolean(op.spellId) === Boolean(op.custom)) {
-            throw new InvalidSpellcastingOperationError(
-              "learnSpell: provide exactly one of spellId or custom"
-            );
-          }
-
-          let newEntry: SpellEntry;
-
-          if (op.spellId) {
-            // Check for duplicate before DB lookup.
-            if (state.spells.some((s) => s.spellId === op.spellId)) {
-              throw new InvalidSpellcastingOperationError(
-                `Spell already in spellbook (spellId: ${op.spellId})`
-              );
-            }
-            const catalogSpell = await tx.spell.findUnique({ where: { id: op.spellId } });
-            if (!catalogSpell) {
-              throw new InvalidSpellcastingOperationError(`Spell not found in catalog: ${op.spellId}`);
-            }
-            newEntry = {
-              id: randomUUID(),
-              spellId: catalogSpell.id,
-              name: catalogSpell.name,
-              level: catalogSpell.level,
-              school: catalogSpell.school as string,
-              prepared: false,
-              castingTime: catalogSpell.castingTime,
-              range: catalogSpell.range,
-              duration: catalogSpell.duration,
-              description: catalogSpell.description,
-              concentration: catalogSpell.concentration,
-              ritual: catalogSpell.ritual,
-              components: (catalogSpell.components as SpellComponents | null) ?? undefined,
-              saveEffect: catalogSpell.saveEffect ?? undefined,
-              effectKind: catalogSpell.effectKind ?? undefined,
-              effectDiceCount: catalogSpell.effectDiceCount ?? undefined,
-              effectDiceFaces: catalogSpell.effectDiceFaces ?? undefined,
-              effectModifier: catalogSpell.effectModifier ?? undefined,
-              damageType: catalogSpell.damageType ?? undefined,
-              attackType: catalogSpell.attackType ?? undefined,
-              saveAbility: catalogSpell.saveAbility ?? undefined,
-              upcastDicePerLevel: catalogSpell.upcastDicePerLevel ?? undefined,
-              cantripScaling: catalogSpell.cantripScaling,
-            };
-          } else {
-            // Custom spell.
-            const custom = op.custom!;
-            newEntry = {
-              id: randomUUID(),
-              name: custom.name,
-              level: custom.level,
-              school: custom.school,
-              prepared: false,
-              castingTime: custom.castingTime,
-              range: custom.range,
-              duration: custom.duration,
-              description: custom.description,
-              concentration: custom.concentration,
-              ritual: custom.ritual,
-              components: custom.components,
-              saveEffect: custom.saveEffect,
-              effectKind: custom.effectKind,
-              effectDiceCount: custom.effectDiceCount,
-              effectDiceFaces: custom.effectDiceFaces,
-              effectModifier: custom.effectModifier,
-              damageType: custom.damageType,
-              attackType: custom.attackType,
-              saveAbility: custom.saveAbility,
-              upcastDicePerLevel: custom.upcastDicePerLevel,
-              cantripScaling: custom.cantripScaling,
-            };
-          }
-
-          state.spells.push(newEntry);
-          eventType = "learnSpell";
-          summary = `Learned ${newEntry.name}`;
-          eventData = { entryId: newEntry.id, spellName: newEntry.name, spellId: newEntry.spellId ?? null };
+          ({ eventType, summary, eventData } = await applyLearnSpellOp(ctx, op));
           break;
         }
 
         case "forgetSpell": {
-          const idx = state.spells.findIndex((s) => s.id === op.entryId);
-          if (idx === -1) {
-            throw new InvalidSpellcastingOperationError(`Spell entry not found: ${op.entryId}`);
-          }
-          const forgotten = state.spells[idx];
-          state.spells.splice(idx, 1);
-          // Forgetting the spell you're concentrating on ends that concentration.
-          if (state.concentratingOn?.entryId === op.entryId) {
-            state.concentratingOn = null;
-          }
-          eventType = "forgetSpell";
-          summary = `Removed ${forgotten.name} from spellbook`;
-          eventData = { entryId: op.entryId, spellName: forgotten.name };
+          ({ eventType, summary, eventData } = applyForgetSpellOp(ctx, op));
           break;
         }
 
