@@ -35,7 +35,7 @@ import {
 import { deriveResources } from "../lib/class-features.js";
 import { deriveActions, type AvailableAction } from "../lib/actions.js";
 import { createCharacter } from "../lib/character-create.js";
-import { normalizeResourcesMutable, type ToolProfEntry } from "../lib/resources.js";
+import { normalizeResourcesMutable, type AdvancementEntry, type ToolProfEntry } from "../lib/resources.js";
 import { normalizeConditionsMutable } from "../lib/conditions.js";
 import { reverseAdvancementEffects } from "../lib/advancement.js";
 import { normalizeSpellcastingMutable } from "../lib/spellcasting.js";
@@ -291,28 +291,30 @@ function buildMergedWeaponProficiencies(
   return out;
 }
 
-export function serializeCharacter(row: CharacterWithRelations) {
-  const progress = experienceProgress(row.experiencePoints);
-  const primaryClass = row.classEntries[0];
-  let hitPoints = normalizeHitPoints(row.hitPoints);
-  const hitDice = normalizeHitDice(row.hitDice);
+type PrimaryClass = CharacterWithRelations["classEntries"][number] | undefined;
 
-  // Derive spellcasting stats at read time (ability, DC, attack, slot totals)
-  // rather than persisting them — same pattern as level/proficiencyBonus.
-  // The stored JSON only holds mutable state: slotsUsed + spells[].
-  const abilityScoresMap = row.abilityScores as Record<string, number>;
+// Spellcasting clamp-on-read: derive stats (ability/DC/attack/slot totals) from
+// class+level+scores, then layer the stored mutable state (slotsUsed, spells,
+// concentration) clamped to the derived caps. Same derive-don't-persist pattern
+// as level/proficiencyBonus. Returns undefined for non-casters.
+function buildSpellcastingView(
+  row: CharacterWithRelations,
+  primaryClass: PrimaryClass,
+  level: number,
+  abilityScores: Record<string, number>,
+  proficiencyBonus: number,
+): object | undefined {
   const derivedSpell = deriveSpellcasting(
     primaryClass?.name ?? "",
-    progress.level,
-    abilityScoresMap,
-    progress.proficiencyBonus,
+    level,
+    abilityScores,
+    proficiencyBonus,
     primaryClass?.subclass ?? undefined,
   );
 
-  let spellcasting: object | undefined;
   if (derivedSpell) {
     const stored = normalizeSpellcastingMutable(row.spellcasting);
-    spellcasting = {
+    return {
       ability: derivedSpell.ability,
       spellSaveDC: derivedSpell.spellSaveDC,
       spellAttackBonus: derivedSpell.spellAttackBonus,
@@ -339,7 +341,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
           ? stored.concentratingOn
           : null,
     };
-  } else if (
+  }
+  if (
     row.spellcasting !== null &&
     row.spellcasting !== undefined &&
     Array.isArray((row.spellcasting as { slots?: unknown }).slots)
@@ -351,27 +354,36 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // crashing with slots.filter on undefined).
     // This branch is currently inert for real data (no Warlock/Paladin/Ranger
     // serialized blobs exist), but guards future half/third-caster additions.
-    spellcasting = row.spellcasting as object;
+    return row.spellcasting as object;
   }
+  return undefined;
+}
 
-  // Derive class/subclass resources at read time — same derive-don't-persist
-  // pattern as spellcasting. Only `used` counts and maneuversKnown persist.
+// Resources clamp-on-read: derive class/subclass pools + level-gated caps, then
+// layer stored `used` counts and known lists (clamped to caps). Also resolves
+// the Fighting Style clamp (null when the character isn't entitled). Returns the
+// resources view (undefined for classes with no pools) plus the clamped
+// fightingStyle + its choice count, both reused elsewhere in serializeCharacter.
+function buildResourcesView(
+  row: CharacterWithRelations,
+  primaryClass: PrimaryClass,
+  level: number,
+  abilityScores: Record<string, number>,
+  proficiencyBonus: number,
+): { resources: object | undefined; fightingStyle: FightingStyleKey | null; fightingStyleChoiceCount: number } {
   const derivedRes = deriveResources(
     primaryClass?.name ?? "",
     primaryClass?.subclass ?? undefined,
-    progress.level,
-    abilityScoresMap,
-    progress.proficiencyBonus,
+    level,
+    abilityScores,
+    proficiencyBonus,
   );
 
   // ── Fighting Style clamp-on-read ──────────────────────────────────────────
   // The chosen style key is persisted in resources.fightingStyle. Clamp it to
   // null when the character is no longer entitled (e.g. class change / level
   // drop) — defense-in-depth mirroring reconcileFightingStyle on the write side.
-  const fightingStyleChoices = fightingStyleChoiceCount(
-    primaryClass?.name ?? "",
-    progress.level,
-  );
+  const fightingStyleChoices = fightingStyleChoiceCount(primaryClass?.name ?? "", level);
   const storedFightingStyle = normalizeResourcesMutable(row.resources).fightingStyle;
   const fightingStyle: FightingStyleKey | null =
     fightingStyleChoices > 0 ? storedFightingStyle : null;
@@ -414,16 +426,31 @@ export function serializeCharacter(row: CharacterWithRelations) {
     };
   }
 
-  // ── Advancement clamp-on-read ─────────────────────────────────────────────
-  // Mirrors the reconcile-on-write in level-reconciliation.ts: if the stored
-  // advancements array exceeds the level-derived slot count (e.g. the character
-  // hasn't had a reconciling XP op since leveling down), cap the displayed
-  // values and derive effective ability scores / HP / initiative from the
-  // clamped list. This ensures the sheet always reflects a valid state.
+  return { resources, fightingStyle, fightingStyleChoiceCount: fightingStyleChoices };
+}
+
+// Advancement clamp-on-read: mirrors reconcile-on-write in
+// level-reconciliation.ts. When stored advancements exceed the level-derived
+// slot count, cap them and reverse the excess to compute effective ability
+// scores / HP / initiative for display (without writing). Returns the clamped
+// list + slot total + the effective values.
+function applyAdvancementClamp(
+  row: CharacterWithRelations,
+  primaryClass: PrimaryClass,
+  level: number,
+  hitPoints: ReturnType<typeof normalizeHitPoints>,
+): {
+  effectiveScores: Record<string, number>;
+  hitPoints: ReturnType<typeof normalizeHitPoints>;
+  effectiveInitBonus: number;
+  clampedAdvancements: AdvancementEntry[];
+  advSlotTotal: number;
+} {
   const storedForAdv = normalizeResourcesMutable(row.resources);
-  const advSlotTotal = advancementSlotsForLevel(primaryClass?.name ?? "", progress.level);
+  const advSlotTotal = advancementSlotsForLevel(primaryClass?.name ?? "", level);
   let effectiveScores = row.abilityScores as Record<string, number>;
   let effectiveInitBonus = row.initiativeBonus;
+  let effectiveHitPoints = hitPoints;
   const clampedAdvancements = storedForAdv.advancements.slice(0, advSlotTotal);
 
   if (clampedAdvancements.length < storedForAdv.advancements.length) {
@@ -432,26 +459,91 @@ export function serializeCharacter(row: CharacterWithRelations) {
     const excess = storedForAdv.advancements.slice(advSlotTotal);
     const reversed = reverseAdvancementEffects(
       effectiveScores,
-      hitPoints,
+      effectiveHitPoints,
       effectiveInitBonus,
       excess,
     );
     effectiveScores = reversed.scores;
-    hitPoints = reversed.hitPoints;
+    effectiveHitPoints = reversed.hitPoints;
     effectiveInitBonus = reversed.initiativeBonus;
   }
 
-  // ── Feat improvement modifier layer ───────────────────────────────────────
-  // Sum structured feat improvements over the in-cap advancements. Because
-  // clampedAdvancements already excludes over-cap feats, level-down behavior
-  // is automatic — no separate reversal code needed.
-  // perLevel bonuses (e.g. Tough) scale with hitDice.total (applied level).
-  const featBonuses = deriveFeatBonuses(clampedAdvancements, hitDice.total);
-  const effectiveMaxHp = hitPoints.max + featBonuses.maxHp;
+  return { effectiveScores, hitPoints: effectiveHitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal };
+}
 
+// Feat improvement modifier layer: sum structured feat improvements over the
+// in-cap advancements. Because clampedAdvancements already excludes over-cap
+// feats, level-down behavior is automatic — no separate reversal code needed.
+// perLevel bonuses (e.g. Tough) scale with hitDiceTotal (applied level).
+function applyFeatLayer(
+  clampedAdvancements: AdvancementEntry[],
+  hitDiceTotal: number,
+  maxHp: number,
+): {
+  featBonuses: ReturnType<typeof deriveFeatBonuses>;
+  effectiveMaxHp: number;
+  featProficiencies: ReturnType<typeof deriveFeatProficiencies>;
+} {
+  const featBonuses = deriveFeatBonuses(clampedAdvancements, hitDiceTotal);
+  const effectiveMaxHp = maxHp + featBonuses.maxHp;
   // Proficiency grants from feats (skills + saving throws). Merged with stored
-  // proficiencies below using OR — existing proficiency is never removed.
+  // proficiencies by the caller using OR — existing proficiency is never removed.
   const featProficiencies = deriveFeatProficiencies(clampedAdvancements);
+  return { featBonuses, effectiveMaxHp, featProficiencies };
+}
+
+// Off-hand state is computed once for the whole inventory so versatile weapons
+// know whether to use their two-handed die. Off-hand is "busy" when any equipped
+// item is a shield OR when 2+ weapons are equipped (two-weapon fighting) — the
+// lightweight approach that avoids a full main-hand/off-hand slot model.
+function buildInventoryContext(
+  row: CharacterWithRelations,
+  effectiveScores: Record<string, number>,
+  proficiencyBonus: number,
+  weaponGrants: ReturnType<typeof buildMergedWeaponProficiencies>,
+  fightingStyle: FightingStyleKey | null,
+): InventoryItemContext {
+  const equippedItems = row.inventoryItems.filter((i) => i.equipped);
+  const equippedShieldPresent = equippedItems.some(
+    (i) => i.armorDetail?.armorCategory === "shield",
+  );
+  const equippedWeaponCount = equippedItems.filter((i) => i.category === "weapon").length;
+  const offHandBusy = equippedShieldPresent || equippedWeaponCount >= 2;
+
+  return { effectiveScores, proficiencyBonus, weaponGrants, offHandBusy, fightingStyle };
+}
+
+export function serializeCharacter(row: CharacterWithRelations) {
+  const progress = experienceProgress(row.experiencePoints);
+  const primaryClass = row.classEntries[0];
+  const normalizedHitPoints = normalizeHitPoints(row.hitPoints);
+  const hitDice = normalizeHitDice(row.hitDice);
+  const abilityScoresMap = row.abilityScores as Record<string, number>;
+
+  const spellcasting = buildSpellcastingView(
+    row,
+    primaryClass,
+    progress.level,
+    abilityScoresMap,
+    progress.proficiencyBonus,
+  );
+
+  const { resources, fightingStyle } = buildResourcesView(
+    row,
+    primaryClass,
+    progress.level,
+    abilityScoresMap,
+    progress.proficiencyBonus,
+  );
+
+  const { effectiveScores, hitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal } =
+    applyAdvancementClamp(row, primaryClass, progress.level, normalizedHitPoints);
+
+  const { featBonuses, effectiveMaxHp, featProficiencies } = applyFeatLayer(
+    clampedAdvancements,
+    hitDice.total,
+    hitPoints.max,
+  );
 
   // Pre-compute weapon proficiency grants so they can be reused both in the
   // inventory serialisation (attack-bonus derivation) and the wire response.
@@ -473,25 +565,13 @@ export function serializeCharacter(row: CharacterWithRelations) {
     improvisedProficient,
   );
 
-  // Compute off-hand state once for the whole inventory so versatile weapons
-  // know whether to use their two-handed die. Off-hand is "busy" when any
-  // equipped item is a shield OR when 2+ weapons are equipped (two-weapon
-  // fighting). This is the lightweight approach that avoids a full
-  // main-hand/off-hand slot model.
-  const equippedItems = row.inventoryItems.filter((i) => i.equipped);
-  const equippedShieldPresent = equippedItems.some(
-    (i) => i.armorDetail?.armorCategory === "shield",
-  );
-  const equippedWeaponCount = equippedItems.filter((i) => i.category === "weapon").length;
-  const offHandBusy = equippedShieldPresent || equippedWeaponCount >= 2;
-
-  const inventoryContext: InventoryItemContext = {
+  const inventoryContext = buildInventoryContext(
+    row,
     effectiveScores,
-    proficiencyBonus: progress.proficiencyBonus,
+    progress.proficiencyBonus,
     weaponGrants,
-    offHandBusy,
     fightingStyle,
-  };
+  );
 
   return {
     id: row.id,
