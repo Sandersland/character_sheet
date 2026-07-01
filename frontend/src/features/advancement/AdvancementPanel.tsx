@@ -15,7 +15,7 @@
  *    chooses one when taking the feat)
  */
 
-import { useState } from "react";
+import { useReducer, useState } from "react";
 
 import Spinner from "@/components/ui/Spinner";
 import { useAsiDraft } from "@/features/advancement/useAsiDraft";
@@ -32,6 +32,51 @@ const NUMERIC_TARGETS: { value: string; label: string }[] = [
   { value: "armorClass", label: "Armor Class" },
   { value: "initiative", label: "Initiative" },
 ];
+
+interface FeatView {
+  search: string;
+  selectedFeat: CatalogFeat | null;
+  abilityChoice: string;
+  customMode: boolean;
+}
+
+type FeatViewAction =
+  | { type: "select"; feat: CatalogFeat }
+  | { type: "back" }
+  | { type: "setSearch"; value: string }
+  | { type: "setAbilityChoice"; value: string }
+  | { type: "enterCustom" }
+  | { type: "exitCustom" }
+  | { type: "reset" };
+
+const FEAT_VIEW_INITIAL: FeatView = { search: "", selectedFeat: null, abilityChoice: "", customMode: false };
+
+function featViewReducer(state: FeatView, action: FeatViewAction): FeatView {
+  switch (action.type) {
+    case "select":
+      return {
+        ...state,
+        selectedFeat: action.feat,
+        abilityChoice: action.feat.abilityOptions.length === 1 ? action.feat.abilityOptions[0] : "",
+        customMode: false,
+        search: "",
+      };
+    case "back":
+      return { ...state, selectedFeat: null, abilityChoice: "" };
+    case "setSearch":
+      return { ...state, search: action.value };
+    case "setAbilityChoice":
+      return { ...state, abilityChoice: action.value };
+    case "enterCustom":
+      return { ...state, customMode: true };
+    case "exitCustom":
+      return { ...state, customMode: false };
+    case "reset":
+      return { ...state, selectedFeat: null, abilityChoice: "", customMode: false };
+    default:
+      return state;
+  }
+}
 
 interface Props {
   currentScores: Record<string, number>;
@@ -57,10 +102,8 @@ export default function AdvancementPanel({
 
   // ── Feat state ─────────────────────────────────────────────────────────────
   const feats = useFeatCatalog(open && tab === "feat");
-  const [search, setSearch] = useState("");
-  const [selectedFeat, setSelectedFeat] = useState<CatalogFeat | null>(null);
-  const [abilityChoice, setAbilityChoice] = useState("");
-  const [customMode, setCustomMode] = useState(false);
+  const [view, dispatchView] = useReducer(featViewReducer, FEAT_VIEW_INITIAL);
+  const { search, selectedFeat, abilityChoice, customMode } = view;
 
   // ── Custom feat form state ─────────────────────────────────────────────────
   const custom = useCustomFeatDraft();
@@ -68,9 +111,7 @@ export default function AdvancementPanel({
   // Reset feat panel when switching mode.
   function handleTabChange(next: "asi" | "feat") {
     setTab(next);
-    setSelectedFeat(null);
-    setAbilityChoice("");
-    setCustomMode(false);
+    dispatchView({ type: "reset" });
     if (next === "feat") feats.ensureFetched();
   }
 
@@ -84,13 +125,6 @@ export default function AdvancementPanel({
 
   // ── Feat helpers ───────────────────────────────────────────────────────────
   const filteredCatalog = feats.filter(search);
-
-  function handleSelectFeat(feat: CatalogFeat) {
-    setSelectedFeat(feat);
-    setAbilityChoice(feat.abilityOptions.length === 1 ? feat.abilityOptions[0] : "");
-    setCustomMode(false);
-    setSearch("");
-  }
 
   function handleFeatSubmit() {
     if (customMode) {
@@ -106,9 +140,7 @@ export default function AdvancementPanel({
         abilityChoice: selectedFeat.abilityOptions.length > 0 ? (abilityChoice || selectedFeat.abilityOptions[0]) : undefined,
       });
     }
-    setSelectedFeat(null);
-    setAbilityChoice("");
-    setCustomMode(false);
+    dispatchView({ type: "reset" });
     custom.reset();
     setOpen(false);
   }
@@ -145,7 +177,7 @@ export default function AdvancementPanel({
         </h3>
         <button
           type="button"
-          onClick={() => { setOpen(false); asi.reset(); setSelectedFeat(null); setCustomMode(false); custom.reset(); }}
+          onClick={() => { setOpen(false); asi.reset(); dispatchView({ type: "reset" }); custom.reset(); }}
           className="text-parchment-600 hover:text-parchment-700"
           aria-label="Close advancement panel"
         >
@@ -240,7 +272,7 @@ export default function AdvancementPanel({
             <div>
               <button
                 type="button"
-                onClick={() => { setSelectedFeat(null); setAbilityChoice(""); }}
+                onClick={() => dispatchView({ type: "back" })}
                 className="mb-3 text-xs text-parchment-600 hover:text-parchment-800"
               >
                 ← Back to list
@@ -263,7 +295,7 @@ export default function AdvancementPanel({
                   </label>
                   <select
                     value={abilityChoice}
-                    onChange={(e) => setAbilityChoice(e.target.value)}
+                    onChange={(e) => dispatchView({ type: "setAbilityChoice", value: e.target.value })}
                     className="w-full max-w-xs rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 focus:border-gold-500 focus:outline-none"
                   >
                     <option value="" disabled>Choose an ability…</option>
@@ -297,7 +329,7 @@ export default function AdvancementPanel({
             <div>
               <button
                 type="button"
-                onClick={() => { setCustomMode(false); custom.reset(); }}
+                onClick={() => { dispatchView({ type: "exitCustom" }); custom.reset(); }}
                 className="mb-3 text-xs text-parchment-600 hover:text-parchment-800"
               >
                 ← Back to list
@@ -498,7 +530,7 @@ export default function AdvancementPanel({
                 type="search"
                 placeholder="Filter feats…"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => dispatchView({ type: "setSearch", value: e.target.value })}
                 className="mb-3 w-full rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-gold-500 focus:outline-none"
               />
               {feats.error && (
@@ -538,7 +570,7 @@ export default function AdvancementPanel({
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => handleSelectFeat(feat)}
+                        onClick={() => dispatchView({ type: "select", feat })}
                         className="shrink-0 rounded bg-gold-400 px-2.5 py-1 text-xs font-semibold text-ink hover:bg-gold-500 disabled:opacity-40"
                       >
                         Select
@@ -550,7 +582,7 @@ export default function AdvancementPanel({
               {/* Custom feat entry */}
               <button
                 type="button"
-                onClick={() => setCustomMode(true)}
+                onClick={() => dispatchView({ type: "enterCustom" })}
                 className="mt-3 w-full rounded-control border border-dashed border-parchment-300 px-3 py-1.5 text-xs text-parchment-600 hover:border-parchment-400 hover:bg-parchment-50"
               >
                 + Add custom feat
