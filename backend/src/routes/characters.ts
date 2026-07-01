@@ -11,14 +11,11 @@ import {
   serializeConsumableDetail,
   serializeWeaponDetail,
 } from "../lib/itemDetail.js";
-import { buildInventoryCreateFromCatalog, catalogItemDetailInclude, selectAutoEquip } from "../lib/inventory.js";
 import { prisma } from "../lib/prisma.js";
 import { normalizeHitDice, normalizeHitPoints } from "../lib/hitpoints.js";
 import {
-  ALIGNMENTS,
   advancementSlotsForLevel,
   CLASS_PROFICIENCY_GRANTS,
-  deriveCreatedCharacter,
   deriveFeatBonuses,
   deriveFeatProficiencies,
   deriveSpellcasting,
@@ -29,7 +26,6 @@ import {
   deriveWeaponDamage,
   deriveFightingStyleBonuses,
   fightingStyleChoiceCount,
-  isKnownTool,
   RACE_PROFICIENCY_GRANTS,
   TOOLS,
   type ArmorProficiencyCategory,
@@ -38,8 +34,8 @@ import {
 } from "../lib/srd.js";
 import { deriveResources } from "../lib/class-features.js";
 import { deriveActions, type AvailableAction } from "../lib/actions.js";
-import { STARTING_EQUIPMENT } from "../lib/starting-equipment.js";
-import { normalizeResourcesMutable, type ToolProfEntry } from "../lib/resources.js";
+import { createCharacter } from "../lib/character-create.js";
+import { normalizeResourcesMutable, type AdvancementEntry, type ToolProfEntry } from "../lib/resources.js";
 import { normalizeConditionsMutable } from "../lib/conditions.js";
 import { reverseAdvancementEffects } from "../lib/advancement.js";
 import { normalizeSpellcastingMutable } from "../lib/spellcasting.js";
@@ -295,28 +291,30 @@ function buildMergedWeaponProficiencies(
   return out;
 }
 
-export function serializeCharacter(row: CharacterWithRelations) {
-  const progress = experienceProgress(row.experiencePoints);
-  const primaryClass = row.classEntries[0];
-  let hitPoints = normalizeHitPoints(row.hitPoints);
-  const hitDice = normalizeHitDice(row.hitDice);
+type PrimaryClass = CharacterWithRelations["classEntries"][number] | undefined;
 
-  // Derive spellcasting stats at read time (ability, DC, attack, slot totals)
-  // rather than persisting them — same pattern as level/proficiencyBonus.
-  // The stored JSON only holds mutable state: slotsUsed + spells[].
-  const abilityScoresMap = row.abilityScores as Record<string, number>;
+// Spellcasting clamp-on-read: derive stats (ability/DC/attack/slot totals) from
+// class+level+scores, then layer the stored mutable state (slotsUsed, spells,
+// concentration) clamped to the derived caps. Same derive-don't-persist pattern
+// as level/proficiencyBonus. Returns undefined for non-casters.
+function buildSpellcastingView(
+  row: CharacterWithRelations,
+  primaryClass: PrimaryClass,
+  level: number,
+  abilityScores: Record<string, number>,
+  proficiencyBonus: number,
+): object | undefined {
   const derivedSpell = deriveSpellcasting(
     primaryClass?.name ?? "",
-    progress.level,
-    abilityScoresMap,
-    progress.proficiencyBonus,
+    level,
+    abilityScores,
+    proficiencyBonus,
     primaryClass?.subclass ?? undefined,
   );
 
-  let spellcasting: object | undefined;
   if (derivedSpell) {
     const stored = normalizeSpellcastingMutable(row.spellcasting);
-    spellcasting = {
+    return {
       ability: derivedSpell.ability,
       spellSaveDC: derivedSpell.spellSaveDC,
       spellAttackBonus: derivedSpell.spellAttackBonus,
@@ -343,7 +341,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
           ? stored.concentratingOn
           : null,
     };
-  } else if (
+  }
+  if (
     row.spellcasting !== null &&
     row.spellcasting !== undefined &&
     Array.isArray((row.spellcasting as { slots?: unknown }).slots)
@@ -355,27 +354,36 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // crashing with slots.filter on undefined).
     // This branch is currently inert for real data (no Warlock/Paladin/Ranger
     // serialized blobs exist), but guards future half/third-caster additions.
-    spellcasting = row.spellcasting as object;
+    return row.spellcasting as object;
   }
+  return undefined;
+}
 
-  // Derive class/subclass resources at read time — same derive-don't-persist
-  // pattern as spellcasting. Only `used` counts and maneuversKnown persist.
+// Resources clamp-on-read: derive class/subclass pools + level-gated caps, then
+// layer stored `used` counts and known lists (clamped to caps). Also resolves
+// the Fighting Style clamp (null when the character isn't entitled). Returns the
+// resources view (undefined for classes with no pools) plus the clamped
+// fightingStyle + its choice count, both reused elsewhere in serializeCharacter.
+function buildResourcesView(
+  row: CharacterWithRelations,
+  primaryClass: PrimaryClass,
+  level: number,
+  abilityScores: Record<string, number>,
+  proficiencyBonus: number,
+): { resources: object | undefined; fightingStyle: FightingStyleKey | null; fightingStyleChoiceCount: number } {
   const derivedRes = deriveResources(
     primaryClass?.name ?? "",
     primaryClass?.subclass ?? undefined,
-    progress.level,
-    abilityScoresMap,
-    progress.proficiencyBonus,
+    level,
+    abilityScores,
+    proficiencyBonus,
   );
 
   // ── Fighting Style clamp-on-read ──────────────────────────────────────────
   // The chosen style key is persisted in resources.fightingStyle. Clamp it to
   // null when the character is no longer entitled (e.g. class change / level
   // drop) — defense-in-depth mirroring reconcileFightingStyle on the write side.
-  const fightingStyleChoices = fightingStyleChoiceCount(
-    primaryClass?.name ?? "",
-    progress.level,
-  );
+  const fightingStyleChoices = fightingStyleChoiceCount(primaryClass?.name ?? "", level);
   const storedFightingStyle = normalizeResourcesMutable(row.resources).fightingStyle;
   const fightingStyle: FightingStyleKey | null =
     fightingStyleChoices > 0 ? storedFightingStyle : null;
@@ -418,16 +426,31 @@ export function serializeCharacter(row: CharacterWithRelations) {
     };
   }
 
-  // ── Advancement clamp-on-read ─────────────────────────────────────────────
-  // Mirrors the reconcile-on-write in level-reconciliation.ts: if the stored
-  // advancements array exceeds the level-derived slot count (e.g. the character
-  // hasn't had a reconciling XP op since leveling down), cap the displayed
-  // values and derive effective ability scores / HP / initiative from the
-  // clamped list. This ensures the sheet always reflects a valid state.
+  return { resources, fightingStyle, fightingStyleChoiceCount: fightingStyleChoices };
+}
+
+// Advancement clamp-on-read: mirrors reconcile-on-write in
+// level-reconciliation.ts. When stored advancements exceed the level-derived
+// slot count, cap them and reverse the excess to compute effective ability
+// scores / HP / initiative for display (without writing). Returns the clamped
+// list + slot total + the effective values.
+function applyAdvancementClamp(
+  row: CharacterWithRelations,
+  primaryClass: PrimaryClass,
+  level: number,
+  hitPoints: ReturnType<typeof normalizeHitPoints>,
+): {
+  effectiveScores: Record<string, number>;
+  hitPoints: ReturnType<typeof normalizeHitPoints>;
+  effectiveInitBonus: number;
+  clampedAdvancements: AdvancementEntry[];
+  advSlotTotal: number;
+} {
   const storedForAdv = normalizeResourcesMutable(row.resources);
-  const advSlotTotal = advancementSlotsForLevel(primaryClass?.name ?? "", progress.level);
+  const advSlotTotal = advancementSlotsForLevel(primaryClass?.name ?? "", level);
   let effectiveScores = row.abilityScores as Record<string, number>;
   let effectiveInitBonus = row.initiativeBonus;
+  let effectiveHitPoints = hitPoints;
   const clampedAdvancements = storedForAdv.advancements.slice(0, advSlotTotal);
 
   if (clampedAdvancements.length < storedForAdv.advancements.length) {
@@ -436,26 +459,91 @@ export function serializeCharacter(row: CharacterWithRelations) {
     const excess = storedForAdv.advancements.slice(advSlotTotal);
     const reversed = reverseAdvancementEffects(
       effectiveScores,
-      hitPoints,
+      effectiveHitPoints,
       effectiveInitBonus,
       excess,
     );
     effectiveScores = reversed.scores;
-    hitPoints = reversed.hitPoints;
+    effectiveHitPoints = reversed.hitPoints;
     effectiveInitBonus = reversed.initiativeBonus;
   }
 
-  // ── Feat improvement modifier layer ───────────────────────────────────────
-  // Sum structured feat improvements over the in-cap advancements. Because
-  // clampedAdvancements already excludes over-cap feats, level-down behavior
-  // is automatic — no separate reversal code needed.
-  // perLevel bonuses (e.g. Tough) scale with hitDice.total (applied level).
-  const featBonuses = deriveFeatBonuses(clampedAdvancements, hitDice.total);
-  const effectiveMaxHp = hitPoints.max + featBonuses.maxHp;
+  return { effectiveScores, hitPoints: effectiveHitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal };
+}
 
+// Feat improvement modifier layer: sum structured feat improvements over the
+// in-cap advancements. Because clampedAdvancements already excludes over-cap
+// feats, level-down behavior is automatic — no separate reversal code needed.
+// perLevel bonuses (e.g. Tough) scale with hitDiceTotal (applied level).
+function applyFeatLayer(
+  clampedAdvancements: AdvancementEntry[],
+  hitDiceTotal: number,
+  maxHp: number,
+): {
+  featBonuses: ReturnType<typeof deriveFeatBonuses>;
+  effectiveMaxHp: number;
+  featProficiencies: ReturnType<typeof deriveFeatProficiencies>;
+} {
+  const featBonuses = deriveFeatBonuses(clampedAdvancements, hitDiceTotal);
+  const effectiveMaxHp = maxHp + featBonuses.maxHp;
   // Proficiency grants from feats (skills + saving throws). Merged with stored
-  // proficiencies below using OR — existing proficiency is never removed.
+  // proficiencies by the caller using OR — existing proficiency is never removed.
   const featProficiencies = deriveFeatProficiencies(clampedAdvancements);
+  return { featBonuses, effectiveMaxHp, featProficiencies };
+}
+
+// Off-hand state is computed once for the whole inventory so versatile weapons
+// know whether to use their two-handed die. Off-hand is "busy" when any equipped
+// item is a shield OR when 2+ weapons are equipped (two-weapon fighting) — the
+// lightweight approach that avoids a full main-hand/off-hand slot model.
+function buildInventoryContext(
+  row: CharacterWithRelations,
+  effectiveScores: Record<string, number>,
+  proficiencyBonus: number,
+  weaponGrants: ReturnType<typeof buildMergedWeaponProficiencies>,
+  fightingStyle: FightingStyleKey | null,
+): InventoryItemContext {
+  const equippedItems = row.inventoryItems.filter((i) => i.equipped);
+  const equippedShieldPresent = equippedItems.some(
+    (i) => i.armorDetail?.armorCategory === "shield",
+  );
+  const equippedWeaponCount = equippedItems.filter((i) => i.category === "weapon").length;
+  const offHandBusy = equippedShieldPresent || equippedWeaponCount >= 2;
+
+  return { effectiveScores, proficiencyBonus, weaponGrants, offHandBusy, fightingStyle };
+}
+
+export function serializeCharacter(row: CharacterWithRelations) {
+  const progress = experienceProgress(row.experiencePoints);
+  const primaryClass = row.classEntries[0];
+  const normalizedHitPoints = normalizeHitPoints(row.hitPoints);
+  const hitDice = normalizeHitDice(row.hitDice);
+  const abilityScoresMap = row.abilityScores as Record<string, number>;
+
+  const spellcasting = buildSpellcastingView(
+    row,
+    primaryClass,
+    progress.level,
+    abilityScoresMap,
+    progress.proficiencyBonus,
+  );
+
+  const { resources, fightingStyle } = buildResourcesView(
+    row,
+    primaryClass,
+    progress.level,
+    abilityScoresMap,
+    progress.proficiencyBonus,
+  );
+
+  const { effectiveScores, hitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal } =
+    applyAdvancementClamp(row, primaryClass, progress.level, normalizedHitPoints);
+
+  const { featBonuses, effectiveMaxHp, featProficiencies } = applyFeatLayer(
+    clampedAdvancements,
+    hitDice.total,
+    hitPoints.max,
+  );
 
   // Pre-compute weapon proficiency grants so they can be reused both in the
   // inventory serialisation (attack-bonus derivation) and the wire response.
@@ -477,25 +565,13 @@ export function serializeCharacter(row: CharacterWithRelations) {
     improvisedProficient,
   );
 
-  // Compute off-hand state once for the whole inventory so versatile weapons
-  // know whether to use their two-handed die. Off-hand is "busy" when any
-  // equipped item is a shield OR when 2+ weapons are equipped (two-weapon
-  // fighting). This is the lightweight approach that avoids a full
-  // main-hand/off-hand slot model.
-  const equippedItems = row.inventoryItems.filter((i) => i.equipped);
-  const equippedShieldPresent = equippedItems.some(
-    (i) => i.armorDetail?.armorCategory === "shield",
-  );
-  const equippedWeaponCount = equippedItems.filter((i) => i.category === "weapon").length;
-  const offHandBusy = equippedShieldPresent || equippedWeaponCount >= 2;
-
-  const inventoryContext: InventoryItemContext = {
+  const inventoryContext = buildInventoryContext(
+    row,
     effectiveScores,
-    proficiencyBonus: progress.proficiencyBonus,
+    progress.proficiencyBonus,
     weaponGrants,
-    offHandBusy,
     fightingStyle,
-  };
+  );
 
   return {
     id: row.id,
@@ -728,52 +804,13 @@ const createCharacterSchema = z
   })
   .strict();
 
-// Resolves a list of FixedItemRef-style catalog names + quantities into
-// InventoryItem nested-create payloads. Expands pack names via PACK_CONTENTS.
-// Fetches all required catalog Items in one query (by name) and throws an
-// object with a `message` string if any name is unknown, so the caller can
-// return a 400.
-async function resolveFixedItems(
-  refs: { catalogName: string; quantity?: number }[]
-): Promise<{ inventoryCreates: ReturnType<typeof buildInventoryCreateFromCatalog>[]; error?: string }> {
-  // Expand packs via DB — fetch all Pack rows whose name matches a ref.
-  const refNames = [...new Set(refs.map((r) => r.catalogName))];
-  const packs = await prisma.pack.findMany({
-    where: { name: { in: refNames } },
-    include: { contents: { include: { item: { select: { name: true } } } } },
-  });
-  const packByName = new Map(packs.map((p) => [p.name, p]));
+// The HTTP body type — inferred from the zod contract above and consumed by
+// the createCharacter orchestrator (type-only import, no runtime edge).
+export type CreateCharacterBody = z.infer<typeof createCharacterSchema>;
 
-  const expanded: { catalogName: string; quantity: number }[] = [];
-  for (const ref of refs) {
-    const pack = packByName.get(ref.catalogName);
-    if (pack) {
-      for (const content of pack.contents) {
-        expanded.push({ catalogName: content.item.name, quantity: content.quantity * (ref.quantity ?? 1) });
-      }
-    } else {
-      expanded.push({ catalogName: ref.catalogName, quantity: ref.quantity ?? 1 });
-    }
-  }
-
-  const names = [...new Set(expanded.map((r) => r.catalogName))];
-  const items = await prisma.item.findMany({
-    where: { name: { in: names } },
-    include: catalogItemDetailInclude,
-  });
-  const itemByName = new Map(items.map((i) => [i.name, i]));
-
-  const missing = names.filter((n) => !itemByName.has(n));
-  if (missing.length > 0) {
-    return { inventoryCreates: [], error: `Unknown catalog items: ${missing.join(", ")}` };
-  }
-
-  const inventoryCreates = expanded.map((ref, idx) =>
-    buildInventoryCreateFromCatalog(itemByName.get(ref.catalogName)!, { quantity: ref.quantity, position: idx })
-  );
-  return { inventoryCreates };
-}
-
+// Thin controller: parse the HTTP contract, delegate domain work to
+// createCharacter (lib/character-create.ts), then re-fetch + serialize with the
+// same persist-then-reserialize idiom the mutation routes use.
 charactersRouter.post("/characters", async (req, res) => {
   const parseResult = createCharacterSchema.safeParse(req.body);
 
@@ -784,311 +821,18 @@ charactersRouter.post("/characters", async (req, res) => {
     return;
   }
 
-  const input = parseResult.data;
-
-  if (!ALIGNMENTS.includes(input.alignment)) {
-    res.status(400).json({ error: `Unknown alignment: ${input.alignment}` });
-    return;
-  }
-
-  const primaryClassChoice = input.classes[0];
-
-  // Sequential rather than Promise.all: the pg driver adapter's pool can
-  // warn/queue when the same PrismaClient fires concurrent queries, and
-  // these are cheap point-lookups, so there's no real cost to awaiting
-  // each in turn.
-  const race = await prisma.race.findUnique({ where: { name: input.race } });
-  const characterClass = await prisma.characterClass.findUnique({
-    where: { name: primaryClassChoice.name },
-  });
-  const background = await prisma.background.findUnique({ where: { name: input.background } });
-
-  // Validate subclass choice when provided: must belong to the chosen class
-  // and only classes that grant subclasses at level 1 can have one at creation.
-  let resolvedSubclassId: string | null = null;
-  let resolvedSubclassName: string | null = null;
-  if (primaryClassChoice.subclassId && characterClass) {
-    const subclass = await prisma.subclass.findUnique({
-      where: { id: primaryClassChoice.subclassId },
-    });
-    if (!subclass) {
-      res.status(400).json({ error: `Unknown subclass id: ${primaryClassChoice.subclassId}` });
-      return;
-    }
-    if (subclass.classId !== characterClass.id) {
-      res
-        .status(400)
-        .json({ error: `Subclass "${subclass.name}" does not belong to ${characterClass.name}` });
-      return;
-    }
-    if (characterClass.subclassLevel > 1) {
-      res.status(400).json({
-        error: `${characterClass.name} grants its subclass at level ${characterClass.subclassLevel}, not at creation (level 1)`,
-      });
-      return;
-    }
-    resolvedSubclassId = subclass.id;
-    resolvedSubclassName = subclass.name;
-  } else if (primaryClassChoice.subclass && !primaryClassChoice.subclassId) {
-    // Legacy: plain string subclass name with no id (homebrew / pre-catalog).
-    resolvedSubclassName = primaryClassChoice.subclass;
-  }
-
-  // Mechanical derivation needs a catalog anchor for race + class. The
-  // background only grants skill-proficiency choices (no mechanical
-  // fields), so — unlike race/class — it's allowed to be homebrew: an
-  // unresolved name is kept as-is with a null backgroundId rather than
-  // rejected.
-  if (!race) {
-    res.status(400).json({ error: `Unknown race: ${input.race}` });
-    return;
-  }
-  if (!characterClass) {
-    res.status(400).json({ error: `Unknown class: ${primaryClassChoice.name}` });
-    return;
-  }
-
-  const skillProficiencies = input.skillProficiencies ?? [];
-  const allowedSkills = new Set([
-    ...characterClass.skillChoices,
-    ...(background?.skillProficiencies ?? []),
-  ]);
-  const invalidSkills = skillProficiencies.filter((skill) => !allowedSkills.has(skill));
-  if (invalidSkills.length > 0) {
-    res
-      .status(400)
-      .json({ error: `Invalid skill proficiencies: ${invalidSkills.join(", ")}` });
-    return;
-  }
-
-  const maxSkillChoices = characterClass.skillChoiceCount + (background?.skillProficiencies.length ?? 0);
-  if (skillProficiencies.length > maxSkillChoices) {
-    res
-      .status(400)
-      .json({ error: `Too many skill proficiencies selected (max ${maxSkillChoices})` });
-    return;
-  }
-
-  // ── Tool proficiency validation ─────────────────────────────────────────
-  // Fixed grants come from background/class/race — applied server-side.
-  // toolChoices in the request are the player's selections from the class
-  // toolChoices pool (e.g. 3 instruments for Bard).
-  const playerToolChoices = input.toolChoices ?? [];
-  if (playerToolChoices.length > 0) {
-    const allowedToolChoices = new Set(characterClass.toolChoices);
-    const invalidToolChoices = playerToolChoices.filter((t) => !allowedToolChoices.has(t));
-    if (invalidToolChoices.length > 0) {
-      res.status(400).json({
-        error: `Invalid tool choices: ${invalidToolChoices.join(", ")}. Must be from the class's toolChoices list.`,
-      });
-      return;
-    }
-    if (!playerToolChoices.every((t) => isKnownTool(t))) {
-      res.status(400).json({ error: "Unknown tool name in toolChoices" });
-      return;
-    }
-    if (playerToolChoices.length > characterClass.toolChoiceCount) {
-      res.status(400).json({
-        error: `Too many tool choices (max ${characterClass.toolChoiceCount})`,
-      });
-      return;
-    }
-  }
-
-  // Assemble creation-fixed tool proficiencies from all three fixed sources.
-  // toolChoices (player picks) count as a "class" source.
-  const creationToolProfs = [
-    ...(background?.toolProficiencies ?? []).map((name) => ({ name, source: "background" as const })),
-    ...(characterClass.toolProficiencies ?? []).map((name) => ({ name, source: "class" as const })),
-    ...(race?.toolProficiencies ?? []).map((name) => ({ name, source: "race" as const })),
-    ...playerToolChoices.map((name) => ({ name, source: "class" as const })),
-  ];
-
-  // ── Resolve starting equipment ──────────────────────────────────────────
-  // Starting equipment is optional (omitting it creates an empty-inventory
-  // character, preserving the existing behaviour and all current tests).
-  // When provided, the backend re-resolves authoritatively against the
-  // STARTING_EQUIPMENT rules — the frontend only sends choice indices and
-  // open-pick item names; it never sends the full item list itself.
-  //
-  // We use a nested `inventoryItems: { create: [...] }` on character.create
-  // rather than calling applyInventoryOperations: the character has no id
-  // yet, and starting gear is genesis state, not an economic event — it
-  // should not generate ledger rows (same reasoning prisma/seed.ts uses).
-  let inventoryItemCreates: ReturnType<typeof buildInventoryCreateFromCatalog>[] = [];
-  let startingCurrency: { cp: number; sp: number; gp: number; pp: number } | undefined;
-
-  if (input.startingEquipment) {
-    const se = input.startingEquipment;
-
-    if (se.mode === "gold") {
-      // Validate gold is within the class's dice range
-      const classDef = STARTING_EQUIPMENT[primaryClassChoice.name];
-      if (classDef) {
-        const { diceCount, diceFaces, multiplier } = classDef.gold;
-        const min = diceCount * multiplier;
-        const max = diceCount * diceFaces * multiplier;
-        if (se.gold < min || se.gold > max) {
-          res.status(400).json({
-            error: `Starting gold must be between ${min} and ${max} for ${primaryClassChoice.name}`,
-          });
-          return;
-        }
-      }
-      startingCurrency = { cp: 0, sp: 0, gp: se.gold, pp: 0 };
-    } else {
-      // mode === "package"
-      const classDef = STARTING_EQUIPMENT[primaryClassChoice.name];
-      if (!classDef) {
-        res.status(400).json({
-          error: `No starting equipment package defined for class: ${primaryClassChoice.name}`,
-        });
-        return;
-      }
-
-      if (se.selections.length !== classDef.groups.length) {
-        res.status(400).json({
-          error: `Expected ${classDef.groups.length} equipment selections, got ${se.selections.length}`,
-        });
-        return;
-      }
-
-      // Collect all fixed items and validate all open picks
-      const allFixedRefs: { catalogName: string; quantity: number }[] = [];
-
-      for (let groupIdx = 0; groupIdx < classDef.groups.length; groupIdx++) {
-        const group = classDef.groups[groupIdx];
-        const sel = se.selections[groupIdx];
-
-        if (sel.optionIndex < 0 || sel.optionIndex >= group.options.length) {
-          res.status(400).json({
-            error: `Equipment group ${groupIdx}: optionIndex ${sel.optionIndex} out of range (0–${group.options.length - 1})`,
-          });
-          return;
-        }
-
-        const bundle = group.options[sel.optionIndex];
-
-        // Fixed items in the chosen bundle
-        for (const ref of bundle.items ?? []) {
-          // Pack names are expanded later in resolveFixedItems
-          allFixedRefs.push({ catalogName: ref.catalogName, quantity: ref.quantity ?? 1 });
-        }
-
-        // Open picks — validate each against its filter
-        const openPicks = bundle.openPicks ?? [];
-        const providedPicks = sel.openPicks ?? [];
-        if (providedPicks.length !== openPicks.length) {
-          res.status(400).json({
-            error: `Equipment group ${groupIdx}, option ${sel.optionIndex}: expected ${openPicks.length} open picks, got ${providedPicks.length}`,
-          });
-          return;
-        }
-
-        for (let pickIdx = 0; pickIdx < openPicks.length; pickIdx++) {
-          const pickFilter = openPicks[pickIdx].filter;
-          const chosenName = providedPicks[pickIdx];
-
-          // Look up the item in the catalog and validate it matches the filter
-          const catalogItem = await prisma.item.findUnique({
-            where: { name: chosenName },
-            include: { weaponDetail: true },
-          });
-
-          if (!catalogItem || catalogItem.category !== "weapon") {
-            res.status(400).json({
-              error: `Open pick "${chosenName}" is not a known weapon in the catalog`,
-            });
-            return;
-          }
-          if (
-            pickFilter.weaponClass &&
-            catalogItem.weaponDetail?.weaponClass !== pickFilter.weaponClass
-          ) {
-            res.status(400).json({
-              error: `Open pick "${chosenName}" does not satisfy filter: weaponClass must be "${pickFilter.weaponClass}"`,
-            });
-            return;
-          }
-          if (
-            pickFilter.range &&
-            catalogItem.weaponDetail?.weaponRange !== pickFilter.range
-          ) {
-            res.status(400).json({
-              error: `Open pick "${chosenName}" does not satisfy filter: range must be "${pickFilter.range}"`,
-            });
-            return;
-          }
-
-          allFixedRefs.push({ catalogName: chosenName, quantity: openPicks[pickIdx].quantity ?? 1 });
-        }
-      }
-
-      // Resolve all items (expands packs) into InventoryItem create payloads
-      const { inventoryCreates, error } = await resolveFixedItems(allFixedRefs);
-      if (error) {
-        res.status(400).json({ error });
-        return;
-      }
-      inventoryItemCreates = inventoryCreates;
-    }
-  }
-
-  // Auto-equip a new character's starting weapon/armor so the in-session
-  // Attack picker isn't empty on a freshly created sheet (issue #51). The 5e
-  // selection rule lives in lib/ (selectAutoEquip); the route just applies its
-  // decision by flipping `equipped` on the chosen create payloads.
-  for (const idx of selectAutoEquip(inventoryItemCreates)) {
-    inventoryItemCreates[idx].equipped = true;
-  }
-
-  const derived = deriveCreatedCharacter(
-    { abilityScores: input.abilityScores, skillProficiencies, toolProficiencies: creationToolProfs },
-    { race, characterClass }
-  );
-
   // The creating user owns the character (requireAuth guarantees req.user).
-  const created = await prisma.character.create({
-    data: {
-      owner: { connect: { id: req.user!.id } },
-      name: input.name,
-      alignment: input.alignment,
-      portraitUrl: input.portraitUrl ?? null,
-      experiencePoints: input.experiencePoints ?? 0,
-      abilityScores: input.abilityScores,
-      ...derived,
-      // toolProficiencies is ToolProficiencyEntry[] from srd.ts; Prisma
-      // expects InputJsonValue for Json columns — safe to cast here.
-      toolProficiencies: derived.toolProficiencies as unknown as Prisma.InputJsonValue,
-      // Override derived currency with starting gold if the gold path was chosen.
-      ...(startingCurrency ? { currency: startingCurrency } : {}),
-      // Prisma represents an explicit JSON null distinctly from "field
-      // omitted" — derived.spellcasting is the app-level `null`, swapped
-      // here for the sentinel Prisma's Json column type expects.
-      spellcasting: Prisma.JsonNull,
-      raceSelection: { create: { name: input.race, raceId: race.id } },
-      backgroundSelection: {
-        create: { name: input.background, backgroundId: background?.id ?? null },
-      },
-      classEntries: {
-        create: [
-          {
-            name: primaryClassChoice.name,
-            subclass: resolvedSubclassName,
-            subclassId: resolvedSubclassId,
-            classId: characterClass.id,
-            position: 0,
-          },
-        ],
-      },
-      ...(inventoryItemCreates.length > 0
-        ? { inventoryItems: { create: inventoryItemCreates } }
-        : {}),
-    },
+  const result = await createCharacter(parseResult.data, req.user!.id);
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
+    return;
+  }
+
+  const character = await prisma.character.findUniqueOrThrow({
+    where: { id: result.id },
     include: characterInclude,
   });
-
-  res.status(201).json(serializeCharacter(created));
+  res.status(201).json(serializeCharacter(character));
 });
 
 // race/class/subclass/background are deliberately absent here — they're now
