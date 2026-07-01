@@ -1,14 +1,9 @@
 import { ChevronDown } from "lucide-react";
 import { useReducer, useState } from "react";
 
-import { formatRollSpec } from "@/lib/dice";
+import { hasItemProse, itemDetailParts } from "@/lib/itemDetails";
 import { isEquippable } from "@/lib/items";
-import type {
-  ArmorCategory,
-  InventoryItem,
-  InventoryOperation,
-  WeaponDetail,
-} from "@/types/character";
+import type { ArmorCategory, InventoryItem, InventoryOperation } from "@/types/character";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 
 interface InventoryRowProps {
@@ -25,39 +20,6 @@ interface InventoryRowProps {
 }
 
 const ARMOR_CATEGORIES: ArmorCategory[] = ["light", "medium", "heavy", "shield"];
-
-/** "1d6 bludgeoning", plus a "versatile: 1d8" fragment if the weapon has an alt grip die. */
-function weaponDamageParts(weapon: WeaponDetail): string[] {
-  const base = `${formatRollSpec({
-    count: weapon.damageDiceCount,
-    faces: weapon.damageDiceFaces,
-    modifier: weapon.damageModifier,
-  })} ${weapon.damageType}`;
-  const parts = [base];
-  if (weapon.versatileDiceCount && weapon.versatileDiceFaces) {
-    parts.push(
-      `versatile: ${formatRollSpec({ count: weapon.versatileDiceCount, faces: weapon.versatileDiceFaces })}`
-    );
-  }
-  return parts;
-}
-
-/** Weapon properties folded into natural language rather than separate badges. */
-function weaponPropertyTags(weapon: WeaponDetail): string[] {
-  const tags = [
-    weapon.finesse && "finesse",
-    weapon.light && "light",
-    weapon.heavy && "heavy",
-    weapon.twoHanded && "two-handed",
-    weapon.reach && "reach",
-    weapon.thrown && "thrown",
-    weapon.ammunition && "ammunition",
-  ].filter((tag): tag is string => Boolean(tag));
-  if (weapon.rangeNormal && weapon.rangeLong) {
-    tags.push(`range ${weapon.rangeNormal}/${weapon.rangeLong} ft`);
-  }
-  return tags;
-}
 
 // View-mode local UI state: prose disclosure + the two-step remove confirm.
 interface RowState {
@@ -366,35 +328,8 @@ export default function InventoryRow({
     );
   }
 
-  const effectRoll =
-    consumable?.effectDiceCount && consumable?.effectDiceFaces
-      ? formatRollSpec({
-          count: consumable.effectDiceCount,
-          faces: consumable.effectDiceFaces,
-          modifier: consumable.effectModifier ?? 0,
-        })
-      : null;
-
-  const details = [
-    item.quantity > 1 ? `${item.quantity}x` : "1x",
-    item.weight ? `${item.weight * item.quantity} lb` : null,
-    ...(weapon ? weaponDamageParts(weapon) : []),
-    ...(weapon ? weaponPropertyTags(weapon) : []),
-    armor
-      ? `AC ${armor.baseArmorClass}${
-          armor.dexModifierApplies
-            ? armor.dexModifierMax != null
-              ? ` + Dex (max ${armor.dexModifierMax})`
-              : " + Dex"
-            : ""
-        }`
-      : null,
-    armor?.strengthRequirement ? `Str ${armor.strengthRequirement}` : null,
-    armor?.stealthDisadvantage ? "stealth disadvantage" : null,
-    effectRoll,
-  ].filter((part): part is string => part !== null);
-
-  const hasProse = Boolean(item.description || consumable?.effectDescription || item.notes);
+  const details = itemDetailParts(item);
+  const hasProse = hasItemProse(item);
 
   return (
     <li className="flex flex-col gap-1.5 py-2">
