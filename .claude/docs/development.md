@@ -24,9 +24,12 @@ On every container start, both dev containers run `npm install` first, then the 
 ```bash
 npm run dev       # backend (tsx watch) + frontend (vite) in parallel
 npm run lint      # ESLint in each workspace
+npm run typecheck # tsc --noEmit in each workspace — fast type-only check
 npm run test      # Vitest in each workspace
 npm run build     # production build in each workspace
 ```
+
+`typecheck` is the quick way to catch the schema/shape-drift class that `lint`/`test` miss (vitest transpiles via esbuild and does **not** type-check). Run it — root, or `-w frontend` / `-w backend` for one workspace — after touching frontend/backend code, before declaring the change done. It's the same `tsc --noEmit` the `pre-push` hook runs, just on demand mid-change.
 
 ## Guardrails (local git hooks)
 

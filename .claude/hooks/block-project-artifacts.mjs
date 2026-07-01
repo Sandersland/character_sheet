@@ -9,8 +9,12 @@
  * *inside the project* — or take a Playwright screenshot without an absolute
  * non-repo path — is blocked with an instruction to target the scratchpad/tmp.
  *
- * Wired in .claude/settings.json for Write|Edit|NotebookEdit and the Playwright
- * screenshot MCP tool. Exit 2 + stderr = block and show the message to the model.
+ * Wired in .claude/settings.json for Write|Edit|NotebookEdit, Bash, and the
+ * Playwright screenshot MCP tool. The Bash arm closes the gap the file-writing
+ * tools miss: shell redirections (`> shot.png`), copies/moves (`cp x.png
+ * frontend/`), and capture flags (`--output shot.png`, `screencapture`) that
+ * drop images into the tree without ever touching Write/Edit. Exit 2 + stderr =
+ * block and show the message to the model.
  */
 import { normalize, isAbsolute } from "node:path";
 
@@ -40,6 +44,40 @@ function inProject(path, projectDir) {
   // under the project root to count as "polluting the tree".
   if (!isAbsolute(path)) return true;
   return normalize(path).startsWith(normalize(projectDir));
+}
+
+// Pull likely image *destination* paths out of a shell command. Deliberately
+// narrow to write intents so reads (`cat foo.png`, `file logo.png`) don't trip
+// it: redirections, explicit output flags, and the trailing dest of a
+// copy/move/capture. Quoted args are unwrapped.
+function bashImageTargets(command) {
+  const targets = [];
+  const strip = (s) => s.replace(/^['"]|['"]$/g, "");
+
+  // 1) redirection into an image file:  > shot.png   >> shot.png
+  const redir = /(?:^|[^0-9&>])>>?\s*('[^']+'|"[^"]+"|[^\s;|&<>]+)/g;
+  let m;
+  while ((m = redir.exec(command)) !== null) {
+    const t = strip(m[1]);
+    if (hasImageExt(t)) targets.push(t);
+  }
+
+  // 2) explicit output flags:  --output shot.png   -o shot.png   --path shot.png
+  const flag = /(?:--output|--path|--screenshot|-o|-O)[=\s]+('[^']+'|"[^"]+"|[^\s;|&<>]+)/g;
+  while ((m = flag.exec(command)) !== null) {
+    const t = strip(m[1]);
+    if (hasImageExt(t)) targets.push(t);
+  }
+
+  // 3) copy/move/capture: the destination is the last image-ext token on the
+  // line, so an in-tree *source* copied out to /tmp is not flagged.
+  if (/\b(cp|mv|install|rsync|screencapture|convert|magick)\b/.test(command)) {
+    const toks = command.match(/('[^']+'|"[^"]+"|[^\s;|&<>]+)/g) ?? [];
+    const imgs = toks.map(strip).filter(hasImageExt);
+    if (imgs.length > 0) targets.push(imgs[imgs.length - 1]);
+  }
+
+  return targets;
 }
 
 function block(message) {
@@ -82,7 +120,26 @@ if (tool === "Write" || tool === "Edit" || tool === "NotebookEdit") {
   }
 }
 
-// 2) Playwright screenshots: require an allowed (tmp/scratchpad) destination.
+// 2) Bash: block shell commands that drop image artifacts into the repo tree.
+if (tool === "Bash") {
+  const command = ti.command ?? "";
+  // `git`/`gh` never emit an image artifact from their argv — a `.png` token in
+  // one is commit/PR prose or a path arg (e.g. a commit body describing the very
+  // patterns this hook forbids). Skip them so we don't block legit VCS calls.
+  const firstToken = command.trimStart().split(/\s+/)[0] ?? "";
+  const isVcsCommand = firstToken === "git" || firstToken === "gh";
+  for (const target of isVcsCommand ? [] : bashImageTargets(command)) {
+    if (inProject(target, projectDir) && !isAllowed(target)) {
+      block(
+        `Blocked: this command would write an image artifact ('${target}') into the project tree.\n` +
+          "Image/screenshot artifacts must go to the scratchpad or /tmp, never the repo.\n" +
+          "Re-target the output under /tmp (or the session scratchpad dir) and retry.",
+      );
+    }
+  }
+}
+
+// 3) Playwright screenshots: require an allowed (tmp/scratchpad) destination.
 // isAllowed already excludes every project-tree path, so no separate inProject
 // check is needed here.
 if (tool.endsWith("browser_take_screenshot")) {
