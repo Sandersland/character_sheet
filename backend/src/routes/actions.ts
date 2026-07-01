@@ -1,11 +1,6 @@
 /**
  * Actions routes
  *
- * GET  /api/actions
- *   Returns the full seeded action catalog ordered by cost then name.
- *   Feeds the TurnTracker's "use action" picker. Full description included
- *   so the tooltip on each button shows the 5e rules summary.
- *
  * POST /api/characters/:id/actions/transactions
  *   Phase-C orchestrator: applies a batch of action ops cross-domain in
  *   one Prisma $transaction (shared batchId → atomic, LIFO-undoable).
@@ -15,6 +10,9 @@
  *   For ops that have zero server-side effects (Dodge, Dash, etc.) the
  *   endpoint returns 200 with the current character state unchanged — the
  *   caller's economy-slot bookkeeping is purely client-ephemeral.
+ *
+ * The action catalog is consumed client-side via features/session/actionResolvers,
+ * so there is no DB-backed GET /api/actions endpoint.
  */
 
 import { randomUUID } from "node:crypto";
@@ -37,47 +35,6 @@ import {
 } from "./characters.js";
 
 export const actionsRouter = Router();
-
-// ── GET /api/actions ──────────────────────────────────────────────────────────
-
-const COST_ORDER = {
-  action: 0,
-  bonusAction: 1,
-  reaction: 2,
-  free: 3,
-  special: 4,
-} as const;
-
-actionsRouter.get("/actions", async (_req, res) => {
-  const actions = await prisma.action.findMany({
-    orderBy: [{ universal: "desc" }, { name: "asc" }],
-  });
-
-  // Sort: universal first, then by cost slot order, then alphabetically.
-  const sorted = actions.sort((a, b) => {
-    if (a.universal !== b.universal) return a.universal ? -1 : 1;
-    const costA = COST_ORDER[a.cost as keyof typeof COST_ORDER] ?? 99;
-    const costB = COST_ORDER[b.cost as keyof typeof COST_ORDER] ?? 99;
-    if (costA !== costB) return costA - costB;
-    return a.name.localeCompare(b.name);
-  });
-
-  res.json(
-    sorted.map((a) => ({
-      id: a.id,
-      key: a.key,
-      name: a.name,
-      description: a.description,
-      cost: a.cost,
-      universal: a.universal,
-      grantClass: a.grantClass,
-      grantSubclass: a.grantSubclass,
-      grantLevel: a.grantLevel,
-      resourceKey: a.resourceKey,
-      resourceAmount: a.resourceAmount,
-    }))
-  );
-});
 
 // ── POST /api/characters/:id/actions/transactions ─────────────────────────────
 

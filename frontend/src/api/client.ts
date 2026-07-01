@@ -2,7 +2,6 @@ import type {
   ActionOperation,
   AdvancementOperation,
   Campaign,
-  CatalogAction,
   CatalogFeat,
   CatalogManeuver,
   CatalogSpell,
@@ -426,15 +425,6 @@ export async function revertBatch(
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
-
-// Feeds the TurnTracker's action catalog picker. Ordered by cost then name.
-export async function fetchActions(): Promise<CatalogAction[]> {
-  const response = await apiFetch(`${API_URL}/actions`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch action catalog (${response.status})`);
-  }
-  return response.json();
-}
 
 // Applies a batch of action operations atomically via the Phase-C orchestrator:
 // each action's effect function (spend resource, consume item, heal, etc.) runs

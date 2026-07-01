@@ -8,7 +8,7 @@
  * finishes (all attacks rolled, spell cast, heal resolved), the tool calls
  * `closeResolution()` to clear the active state.
  *
- * This replaces the three show*Menu booleans in TurnTracker and the fragile
+ * This centralizes what were three separate show*Menu booleans and the fragile
  * cross-component onAttackRolled callback prop on the Attacks Card.
  */
 
