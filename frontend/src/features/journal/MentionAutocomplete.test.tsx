@@ -5,7 +5,10 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
 import MentionAutocomplete from "@/features/journal/MentionAutocomplete";
-import { primeCampaignEntities } from "@/hooks/useCampaignEntities";
+import {
+  primeCampaignEntities,
+  __resetCampaignEntitiesCacheForTests,
+} from "@/hooks/useCampaignEntities";
 import * as client from "@/api/client";
 import type { CampaignEntity } from "@/types/character";
 import { axe } from "@/test/axe";
@@ -60,6 +63,11 @@ function Harness({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Clear module-level cache/subscribers/inflight FIRST so no prior test's state
+  // (a leaked subscriber or a still-inflight fetch) bleeds into this one (#282).
+  __resetCampaignEntitiesCacheForTests();
+  // Default the fetch to a resolved value so the effect's loadCampaignEntities
+  // never calls .finally on `undefined` (vi.fn()'s default return).
   vi.mocked(client.fetchEntities).mockResolvedValue(ENTITIES);
   // Seed the module cache so entities are present synchronously at mount — keeps
   // the popover deterministic regardless of fetch timing / prior-test state.
