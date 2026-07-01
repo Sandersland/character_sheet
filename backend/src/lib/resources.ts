@@ -16,7 +16,7 @@ import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
-import { deriveResources } from "./class-features.js";
+import { deriveResources, type DerivedClassInfo } from "./class-features.js";
 import {
   isKnownTool,
   toolsByCategory,
@@ -218,6 +218,220 @@ export type ResourceOperation =
   | LearnToolProficiencyOperation
   | ForgetToolProficiencyOperation;
 
+// ── Per-op appliers ─────────────────────────────────────────────────────────
+// Each validates + mutates `state` in place (throwing on any illegal op) and
+// returns the audit payload the dispatcher writes to the event log. Kept
+// module-private so the public API (applyResourceOperations) stays byte-stable.
+
+interface ResourceOpAudit {
+  eventType: string;
+  summary: string;
+  eventData: Record<string, unknown>;
+}
+
+function applySpendResourceOp(
+  state: ResourcesMutableState,
+  op: SpendResourceOperation,
+  derivedInfo: DerivedClassInfo | null,
+): ResourceOpAudit {
+  const amount = op.amount ?? 1;
+  if (amount <= 0) {
+    throw new InvalidResourceOperationError("spendResource: amount must be positive");
+  }
+  const pool = derivedInfo?.resources.find((r) => r.key === op.key);
+  if (!pool) {
+    throw new InvalidResourceOperationError(
+      `Resource "${op.key}" not available for this character's subclass`
+    );
+  }
+  const used = state.used[op.key] ?? 0;
+  if (used + amount > pool.total) {
+    throw new InvalidResourceOperationError(
+      `Cannot spend ${amount} ${pool.label}: only ${pool.total - used} remaining`
+    );
+  }
+  state.used[op.key] = used + amount;
+  const remaining = pool.total - state.used[op.key];
+  const summary = op.roll !== undefined
+    ? `Spent ${amount} ${pool.label} (rolled ${pool.die}: ${op.roll}) — ${remaining}/${pool.total} remaining`
+    : `Spent ${amount} ${pool.label} — ${remaining}/${pool.total} remaining`;
+  return {
+    eventType: "spendResource",
+    summary,
+    eventData: { key: op.key, amount, roll: op.roll ?? null, remaining },
+  };
+}
+
+function applyRestoreResourceOp(
+  state: ResourcesMutableState,
+  op: RestoreResourceOperation,
+  derivedInfo: DerivedClassInfo | null,
+): ResourceOpAudit {
+  const amount = op.amount ?? 1;
+  if (amount <= 0) {
+    throw new InvalidResourceOperationError("restoreResource: amount must be positive");
+  }
+  const pool = derivedInfo?.resources.find((r) => r.key === op.key);
+  if (!pool) {
+    throw new InvalidResourceOperationError(
+      `Resource "${op.key}" not available for this character's subclass`
+    );
+  }
+  const used = state.used[op.key] ?? 0;
+  if (used - amount < 0) {
+    throw new InvalidResourceOperationError(
+      `Cannot restore ${amount} ${pool.label}: only ${used} are spent`
+    );
+  }
+  state.used[op.key] = used - amount;
+  const newUsed = state.used[op.key];
+  return {
+    eventType: "restoreResource",
+    summary: `Restored ${amount} ${pool.label} — ${pool.total - newUsed}/${pool.total} remaining`,
+    eventData: { key: op.key, amount },
+  };
+}
+
+async function applyLearnManeuverOp(
+  tx: Prisma.TransactionClient,
+  state: ResourcesMutableState,
+  op: LearnManeuverOperation,
+  derivedInfo: DerivedClassInfo | null,
+): Promise<ResourceOpAudit> {
+  if (Boolean(op.maneuverId) === Boolean(op.custom)) {
+    throw new InvalidResourceOperationError(
+      "learnManeuver: provide exactly one of maneuverId or custom"
+    );
+  }
+
+  // Enforce choice count limit.
+  const choiceCount = derivedInfo?.maneuverChoiceCount;
+  if (choiceCount !== undefined && state.maneuversKnown.length >= choiceCount) {
+    throw new InvalidResourceOperationError(
+      `Cannot learn more maneuvers: already know ${state.maneuversKnown.length}/${choiceCount}`
+    );
+  }
+
+  let newEntry: ManeuverEntry;
+
+  if (op.maneuverId) {
+    // Dedup check.
+    if (state.maneuversKnown.some((m) => m.maneuverId === op.maneuverId)) {
+      throw new InvalidResourceOperationError(
+        `Maneuver already known (maneuverId: ${op.maneuverId})`
+      );
+    }
+    const catalogManeuver = await tx.maneuver.findUnique({ where: { id: op.maneuverId } });
+    if (!catalogManeuver) {
+      throw new InvalidResourceOperationError(
+        `Maneuver not found in catalog: ${op.maneuverId}`
+      );
+    }
+    newEntry = {
+      id: randomUUID(),
+      maneuverId: catalogManeuver.id,
+      name: catalogManeuver.name,
+      description: catalogManeuver.description,
+    };
+  } else {
+    const custom = op.custom!;
+    newEntry = {
+      id: randomUUID(),
+      name: custom.name,
+      description: custom.description,
+    };
+  }
+
+  state.maneuversKnown.push(newEntry);
+  return {
+    eventType: "learnManeuver",
+    summary: `Learned maneuver: ${newEntry.name}`,
+    eventData: {
+      entryId: newEntry.id,
+      maneuverName: newEntry.name,
+      maneuverId: newEntry.maneuverId ?? null,
+    },
+  };
+}
+
+function applyForgetManeuverOp(
+  state: ResourcesMutableState,
+  op: ForgetManeuverOperation,
+): ResourceOpAudit {
+  const idx = state.maneuversKnown.findIndex((m) => m.id === op.entryId);
+  if (idx === -1) {
+    throw new InvalidResourceOperationError(
+      `Maneuver entry not found: ${op.entryId}`
+    );
+  }
+  const forgotten = state.maneuversKnown[idx];
+  state.maneuversKnown.splice(idx, 1);
+  return {
+    eventType: "forgetManeuver",
+    summary: `Forgot maneuver: ${forgotten.name}`,
+    eventData: { entryId: op.entryId, maneuverName: forgotten.name },
+  };
+}
+
+function applyLearnToolProficiencyOp(
+  state: ResourcesMutableState,
+  op: LearnToolProficiencyOperation,
+  derivedInfo: DerivedClassInfo | null,
+): ResourceOpAudit {
+  // Validate the name is a known artisan's tool.
+  const artisanTools = toolsByCategory("artisan");
+  if (!artisanTools.some((t) => t.name === op.name)) {
+    throw new InvalidResourceOperationError(
+      `"${op.name}" is not a known artisan's tool. Student of War only grants proficiency with artisan's tools.`
+    );
+  }
+  if (!isKnownTool(op.name)) {
+    throw new InvalidResourceOperationError(`Unknown tool: ${op.name}`);
+  }
+
+  // Enforce choice count limit (Student of War = 1).
+  const toolChoiceCount = derivedInfo?.toolProfChoiceCount;
+  if (toolChoiceCount !== undefined && state.toolProficienciesKnown.length >= toolChoiceCount) {
+    throw new InvalidResourceOperationError(
+      `Cannot learn more tool proficiencies: already know ${state.toolProficienciesKnown.length}/${toolChoiceCount} via subclass`
+    );
+  }
+
+  // Dedup check.
+  if (state.toolProficienciesKnown.some((t) => t.name === op.name)) {
+    throw new InvalidResourceOperationError(
+      `Tool proficiency already known: ${op.name}`
+    );
+  }
+
+  const newToolEntry: ToolProfEntry = { id: randomUUID(), name: op.name };
+  state.toolProficienciesKnown.push(newToolEntry);
+  return {
+    eventType: "learnToolProficiency",
+    summary: `Learned tool proficiency: ${op.name} (Student of War)`,
+    eventData: { entryId: newToolEntry.id, toolName: op.name },
+  };
+}
+
+function applyForgetToolProficiencyOp(
+  state: ResourcesMutableState,
+  op: ForgetToolProficiencyOperation,
+): ResourceOpAudit {
+  const toolIdx = state.toolProficienciesKnown.findIndex((t) => t.id === op.entryId);
+  if (toolIdx === -1) {
+    throw new InvalidResourceOperationError(
+      `Tool proficiency entry not found: ${op.entryId}`
+    );
+  }
+  const forgottenTool = state.toolProficienciesKnown[toolIdx];
+  state.toolProficienciesKnown.splice(toolIdx, 1);
+  return {
+    eventType: "forgetToolProficiency",
+    summary: `Forgot tool proficiency: ${forgottenTool.name}`,
+    eventData: { entryId: op.entryId, toolName: forgottenTool.name },
+  };
+}
+
 // ── Transaction handler ───────────────────────────────────────────────────────
 
 /**
@@ -275,183 +489,32 @@ export async function applyResourceOperations(
         },
       };
 
-      let summary = "";
-      let eventType: string;
-      let eventData: Record<string, unknown> = {};
+      let audit: ResourceOpAudit;
 
       switch (op.type) {
-        case "spendResource": {
-          const amount = op.amount ?? 1;
-          if (amount <= 0) {
-            throw new InvalidResourceOperationError("spendResource: amount must be positive");
-          }
-          const pool = derivedInfo?.resources.find((r) => r.key === op.key);
-          if (!pool) {
-            throw new InvalidResourceOperationError(
-              `Resource "${op.key}" not available for this character's subclass`
-            );
-          }
-          const used = state.used[op.key] ?? 0;
-          if (used + amount > pool.total) {
-            throw new InvalidResourceOperationError(
-              `Cannot spend ${amount} ${pool.label}: only ${pool.total - used} remaining`
-            );
-          }
-          state.used[op.key] = used + amount;
-          eventType = "spendResource";
-          const remaining = pool.total - state.used[op.key];
-          summary = op.roll !== undefined
-            ? `Spent ${amount} ${pool.label} (rolled ${pool.die}: ${op.roll}) — ${remaining}/${pool.total} remaining`
-            : `Spent ${amount} ${pool.label} — ${remaining}/${pool.total} remaining`;
-          eventData = { key: op.key, amount, roll: op.roll ?? null, remaining };
+        case "spendResource":
+          audit = applySpendResourceOp(state, op, derivedInfo);
           break;
-        }
 
-        case "restoreResource": {
-          const amount = op.amount ?? 1;
-          if (amount <= 0) {
-            throw new InvalidResourceOperationError("restoreResource: amount must be positive");
-          }
-          const pool = derivedInfo?.resources.find((r) => r.key === op.key);
-          if (!pool) {
-            throw new InvalidResourceOperationError(
-              `Resource "${op.key}" not available for this character's subclass`
-            );
-          }
-          const used = state.used[op.key] ?? 0;
-          if (used - amount < 0) {
-            throw new InvalidResourceOperationError(
-              `Cannot restore ${amount} ${pool.label}: only ${used} are spent`
-            );
-          }
-          state.used[op.key] = used - amount;
-          eventType = "restoreResource";
-          const newUsed = state.used[op.key];
-          summary = `Restored ${amount} ${pool.label} — ${pool.total - newUsed}/${pool.total} remaining`;
-          eventData = { key: op.key, amount };
+        case "restoreResource":
+          audit = applyRestoreResourceOp(state, op, derivedInfo);
           break;
-        }
 
-        case "learnManeuver": {
-          if (Boolean(op.maneuverId) === Boolean(op.custom)) {
-            throw new InvalidResourceOperationError(
-              "learnManeuver: provide exactly one of maneuverId or custom"
-            );
-          }
-
-          // Enforce choice count limit.
-          const choiceCount = derivedInfo?.maneuverChoiceCount;
-          if (choiceCount !== undefined && state.maneuversKnown.length >= choiceCount) {
-            throw new InvalidResourceOperationError(
-              `Cannot learn more maneuvers: already know ${state.maneuversKnown.length}/${choiceCount}`
-            );
-          }
-
-          let newEntry: ManeuverEntry;
-
-          if (op.maneuverId) {
-            // Dedup check.
-            if (state.maneuversKnown.some((m) => m.maneuverId === op.maneuverId)) {
-              throw new InvalidResourceOperationError(
-                `Maneuver already known (maneuverId: ${op.maneuverId})`
-              );
-            }
-            const catalogManeuver = await tx.maneuver.findUnique({ where: { id: op.maneuverId } });
-            if (!catalogManeuver) {
-              throw new InvalidResourceOperationError(
-                `Maneuver not found in catalog: ${op.maneuverId}`
-              );
-            }
-            newEntry = {
-              id: randomUUID(),
-              maneuverId: catalogManeuver.id,
-              name: catalogManeuver.name,
-              description: catalogManeuver.description,
-            };
-          } else {
-            const custom = op.custom!;
-            newEntry = {
-              id: randomUUID(),
-              name: custom.name,
-              description: custom.description,
-            };
-          }
-
-          state.maneuversKnown.push(newEntry);
-          eventType = "learnManeuver";
-          summary = `Learned maneuver: ${newEntry.name}`;
-          eventData = {
-            entryId: newEntry.id,
-            maneuverName: newEntry.name,
-            maneuverId: newEntry.maneuverId ?? null,
-          };
+        case "learnManeuver":
+          audit = await applyLearnManeuverOp(tx, state, op, derivedInfo);
           break;
-        }
 
-        case "forgetManeuver": {
-          const idx = state.maneuversKnown.findIndex((m) => m.id === op.entryId);
-          if (idx === -1) {
-            throw new InvalidResourceOperationError(
-              `Maneuver entry not found: ${op.entryId}`
-            );
-          }
-          const forgotten = state.maneuversKnown[idx];
-          state.maneuversKnown.splice(idx, 1);
-          eventType = "forgetManeuver";
-          summary = `Forgot maneuver: ${forgotten.name}`;
-          eventData = { entryId: op.entryId, maneuverName: forgotten.name };
+        case "forgetManeuver":
+          audit = applyForgetManeuverOp(state, op);
           break;
-        }
 
-        case "learnToolProficiency": {
-          // Validate the name is a known artisan's tool.
-          const artisanTools = toolsByCategory("artisan");
-          if (!artisanTools.some((t) => t.name === op.name)) {
-            throw new InvalidResourceOperationError(
-              `"${op.name}" is not a known artisan's tool. Student of War only grants proficiency with artisan's tools.`
-            );
-          }
-          if (!isKnownTool(op.name)) {
-            throw new InvalidResourceOperationError(`Unknown tool: ${op.name}`);
-          }
-
-          // Enforce choice count limit (Student of War = 1).
-          const toolChoiceCount = derivedInfo?.toolProfChoiceCount;
-          if (toolChoiceCount !== undefined && state.toolProficienciesKnown.length >= toolChoiceCount) {
-            throw new InvalidResourceOperationError(
-              `Cannot learn more tool proficiencies: already know ${state.toolProficienciesKnown.length}/${toolChoiceCount} via subclass`
-            );
-          }
-
-          // Dedup check.
-          if (state.toolProficienciesKnown.some((t) => t.name === op.name)) {
-            throw new InvalidResourceOperationError(
-              `Tool proficiency already known: ${op.name}`
-            );
-          }
-
-          const newToolEntry: ToolProfEntry = { id: randomUUID(), name: op.name };
-          state.toolProficienciesKnown.push(newToolEntry);
-          eventType = "learnToolProficiency";
-          summary = `Learned tool proficiency: ${op.name} (Student of War)`;
-          eventData = { entryId: newToolEntry.id, toolName: op.name };
+        case "learnToolProficiency":
+          audit = applyLearnToolProficiencyOp(state, op, derivedInfo);
           break;
-        }
 
-        case "forgetToolProficiency": {
-          const toolIdx = state.toolProficienciesKnown.findIndex((t) => t.id === op.entryId);
-          if (toolIdx === -1) {
-            throw new InvalidResourceOperationError(
-              `Tool proficiency entry not found: ${op.entryId}`
-            );
-          }
-          const forgottenTool = state.toolProficienciesKnown[toolIdx];
-          state.toolProficienciesKnown.splice(toolIdx, 1);
-          eventType = "forgetToolProficiency";
-          summary = `Forgot tool proficiency: ${forgottenTool.name}`;
-          eventData = { entryId: op.entryId, toolName: forgottenTool.name };
+        case "forgetToolProficiency":
+          audit = applyForgetToolProficiencyOp(state, op);
           break;
-        }
       }
 
       // Write the updated state back — always via serializeResourcesState so
@@ -474,11 +537,11 @@ export async function applyResourceOperations(
       await logEvent(tx, {
         characterId,
         category: "resources",
-        type: eventType! as Parameters<typeof logEvent>[1]["type"],
-        summary: summary!,
+        type: audit.eventType as Parameters<typeof logEvent>[1]["type"],
+        summary: audit.summary,
         before: beforeState,
         after: afterState,
-        data: eventData,
+        data: audit.eventData,
         batchId,
         sessionId,
       });
@@ -491,7 +554,7 @@ export async function applyResourceOperations(
  *
  * Exported so the actions orchestrator (routes/actions.ts) can include a
  * resource spend alongside an inventory adjust or HP heal in one atomic
- * $transaction. Keep in sync with the `case "spendResource"` branch above.
+ * $transaction. Shares applySpendResourceOp with applyResourceOperations.
  */
 export async function applySpendResourceInTx(
   tx: Prisma.TransactionClient,
@@ -533,34 +596,12 @@ export async function applySpendResourceInTx(
     },
   };
 
-  const amount = op.amount ?? 1;
-  if (amount <= 0) throw new InvalidResourceOperationError("spendResource: amount must be positive");
-
-  const pool = derivedInfo?.resources.find((r) => r.key === op.key);
-  if (!pool) {
-    throw new InvalidResourceOperationError(
-      `Resource "${op.key}" not available for this character's subclass`
-    );
-  }
-
-  const used = state.used[op.key] ?? 0;
-  if (used + amount > pool.total) {
-    throw new InvalidResourceOperationError(
-      `Cannot spend ${amount} ${pool.label}: only ${pool.total - used} remaining`
-    );
-  }
-
-  state.used[op.key] = used + amount;
+  const audit = applySpendResourceOp(state, op, derivedInfo);
 
   await tx.character.update({
     where: { id: characterId },
     data: { resources: serializeResourcesState(state) },
   });
-
-  const remaining = pool.total - state.used[op.key];
-  const summary = op.roll !== undefined
-    ? `Spent ${amount} ${pool.label} (rolled ${pool.die}: ${op.roll}) — ${remaining}/${pool.total} remaining`
-    : `Spent ${amount} ${pool.label} — ${remaining}/${pool.total} remaining`;
 
   const afterState = {
     resources: {
@@ -575,10 +616,10 @@ export async function applySpendResourceInTx(
     characterId,
     category: "resources",
     type: "spendResource",
-    summary,
+    summary: audit.summary,
     before: beforeState,
     after: afterState,
-    data: { key: op.key, amount, roll: op.roll ?? null, remaining },
+    data: audit.eventData,
     batchId,
     sessionId,
   });
