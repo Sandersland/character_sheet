@@ -6,6 +6,7 @@ import type { IconType } from "react-icons";
 
 import { applyHitPointOperations } from "@/api/client";
 import { rollDie } from "@/lib/dice";
+import { averageHitPointGain, dieFaces, hitPointGainRange } from "@/lib/hitDice";
 import type { Character, ConcentrationCheck, HitPointOperation } from "@/types/character";
 import Card from "@/components/ui/Card";
 import MeterBar from "@/components/ui/MeterBar";
@@ -65,11 +66,9 @@ function LevelUpModal({
   onConfirm: (method: "average" | "roll") => void;
   onClose: () => void;
 }) {
-  const faces = Number(hitDie.replace(/^d/i, ""));
-  // Fixed average per 5e PHB: floor(faces/2) + 1; then add Con modifier and clamp at 1.
-  const averageGain = Math.max(1, Math.floor(faces / 2) + 1 + conMod);
-  const minRoll = Math.max(1, 1 + conMod);
-  const maxRoll = Math.max(1, faces + conMod);
+  const faces = dieFaces(hitDie);
+  const averageGain = averageHitPointGain(faces, conMod);
+  const { min: minRoll, max: maxRoll } = hitPointGainRange(faces, conMod);
   const conLabel = conMod >= 0 ? `+${conMod}` : String(conMod);
 
   return (
@@ -88,7 +87,7 @@ function LevelUpModal({
             <div>
               <p className="font-semibold text-parchment-900">Take average</p>
               <p className="text-xs text-parchment-600">
-                Predictable — {Math.floor(faces / 2) + 1} ({conLabel} Con)
+                Predictable — {averageHitPointGain(faces, 0)} ({conLabel} Con)
               </p>
             </div>
             <span className="font-display text-2xl font-semibold text-arcane-800">
@@ -320,7 +319,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
   async function handleShortRest() {
     const n = parseInt(diceToSpend, 10);
     if (!n || n < 1 || n > availableDice) return;
-    const faces = Number(hitDice.die.replace(/^d/i, ""));
+    const faces = dieFaces(hitDice.die);
     const rolls = Array.from({ length: n }, () => rollDie(faces));
     await submit([{ type: "shortRest", rolls }]);
   }
@@ -339,7 +338,7 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
   }
 
   async function handleLevelUp(method: "average" | "roll") {
-    const faces = Number(hitDice.die.replace(/^d/i, ""));
+    const faces = dieFaces(hitDice.die);
     const roll = method === "roll" ? rollDie(faces) : undefined;
     const ok = await submit([{ type: "levelUp", method, roll }]);
     if (ok) setLevelUpOpen(false);
