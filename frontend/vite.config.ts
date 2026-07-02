@@ -10,10 +10,6 @@ export default defineConfig({
   },
   server: {
     host: true,
-    // Dev-only server: accept any Host so compose-DNS access (frontend:5173 from
-    // the e2e runner, in main and worktree stacks alike) isn't 403'd by Vite's
-    // host check.
-    allowedHosts: true,
     // Dev proxy: the SPA serves `/api/*` from its own origin and forwards to the
     // backend, so the browser sees a single origin (:5173). This makes the
     // session cookie same-origin (no CORS in dev) and lets Google OAuth redirect

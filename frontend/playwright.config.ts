@@ -1,8 +1,9 @@
 import { defineConfig } from "@playwright/test";
 
 // baseURL is env-driven so the same suite runs against the main stack, a
-// worktree stack, or a bare host dev server without hardcoding a port. Inside
-// the compose e2e service it's set to the frontend service DNS (frontend:5173).
+// worktree stack, or a bare host dev server without hardcoding a port. The
+// host-networked compose e2e service sets it to http://localhost:${FRONTEND_PORT}
+// (e.g. 5183 in a worktree), reaching the stack on its published host ports.
 const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:5173";
 
 export default defineConfig({
