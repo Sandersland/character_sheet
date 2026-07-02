@@ -14,9 +14,11 @@ GetWork ──found──▶ ConfirmScope ──ready──▶ SetupWorktree ─
    │empty              │not-ready            (script)          ▲                │approve
    ▼                   ▼                                       │changes         ▼
   Done            FlagIssue ─▶ ApplyFlag ─▶ Done               └──(≤3 loops)  Submit ──▶ Done
-                  (comment + needs-refinement label)                          (push + PR)
-                            any state error / budget breach ──▶ Fail ──▶ Done
+                  (comment + needs-refinement label)                          (push + PR,
+                            any state error / budget breach ──▶ Fail ──▶ Done  auto-merge)
 ```
+
+Submit arms **auto-merge** (squash) on the PR, so a green claude-review + CI lands it into the integration branch unattended. Set `"autoMerge": false` in the machine's `context` to keep PRs open for a human merge instead.
 
 - **agent states** run headless claude, constrained by `--tools`, `--allowedTools`, `--max-turns`, `--max-budget-usd`, per-state model, and `fsm-guard.mjs` (bash allow/deny regexes). `--setting-sources project` keeps local/user permission allowlists out of the child.
 - **script states** are deterministic driver functions (worktree setup via the `worktree` skill's script, health polling, `gh pr create`, labeling) — zero tokens.

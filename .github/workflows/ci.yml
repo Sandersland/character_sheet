@@ -1,9 +1,12 @@
 name: CI
 
+# push:staging matters because staging's protection is non-strict (branches
+# needn't be up to date to merge): two independently-green PRs can combine
+# badly, and this post-merge run is what surfaces that within minutes.
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, staging]
 
 # Cancel superseded runs on the same ref so redundant pushes don't queue up.
 concurrency:

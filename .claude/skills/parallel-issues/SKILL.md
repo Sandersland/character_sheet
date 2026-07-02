@@ -136,6 +136,14 @@ gh pr create --base <integration-branch> --head feat/issue-<#>-<slug> \
 <summary of chunks shipped + test/verify results>"
 ```
 
+If the integration branch is `staging` (or any protected branch), also arm auto-merge so a green claude-review + CI lands the PR unattended:
+
+```bash
+gh pr merge <pr-url> --squash --auto
+```
+
+(Skip this for ad-hoc `integration/*` branches — GitHub only allows auto-merge against branches with protection rules, so the command fails there; those PRs wait for the wave's manual merge step.)
+
 **On any failure** (tests won't pass, verification fails, the plan is ambiguous or wrong): **stop** this agent. Do **not** force a PR. Leave the worktree intact for inspection, and leave a comment on the issue explaining what happened:
 
 ```bash
