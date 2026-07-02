@@ -13,14 +13,14 @@ Every fact has a right altitude. Before writing anything, ask: **"is this at the
 | Tier | Where | Cost / drift | Put here only… |
 |---|---|---|---|
 | **Session-loaded** | `CLAUDE.md` (root) | Loaded **every session** → costs tokens every time | Broad, stable **invariants / contracts**. Ruthlessly trimmed. |
-| **On-demand** | `.claude/docs/*.md` | NOT auto-loaded; cost paid only when read | **Cross-cutting** knowledge spanning many files (architecture overview, transaction pattern, leveling reconciliation). |
+| **On-demand** | `docs/*.md` | NOT auto-loaded; cost paid only when read | **Cross-cutting** knowledge spanning many files (architecture overview, transaction pattern, leveling reconciliation). |
 | **Code-colocated** | comments, docstrings, `schema.prisma` model comments | **Lowest drift** — moves with the code, seen on every edit | Any fact about **ONE** file / function / model. |
 | **Outside the repo** | `memory/` | Not loaded for execution | Roadmap, product vision, rationale the agent doesn't need to *do* anything with. |
 
 Rules of thumb:
 
 - **`CLAUDE.md` is the most expensive page in the repo.** A line there is paid for on every single session. It earns its place only if it's a broad invariant a reader must know *before* touching anything (e.g. "derive, don't persist"; "all backend calls go through `client.ts`"). If it's about one file, it does not belong here.
-- **An on-demand doc is justified only by cross-cutting scope.** If the knowledge lives in and is about a single file, colocate it as a comment instead — a new `.claude/docs/foo.md` that just restates one module's behavior will rot independently of that module.
+- **An on-demand doc is justified only by cross-cutting scope.** If the knowledge lives in and is about a single file, colocate it as a comment instead — a new `docs/foo.md` that just restates one module's behavior will rot independently of that module.
 - **Code-colocated comments explain *why*, not *what*.** Restating the code (`// increment i`) is noise that drifts. Capturing intent (`// LIFO guard skips ended sessions — frozen history can't be undone`) is durable.
 - **`memory/` is for things the agent doesn't execute.** Vision, "why we chose X", deferred roadmap. If acting on it requires a rule, that rule belongs in code or a doc; the memory note just links context.
 

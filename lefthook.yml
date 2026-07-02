@@ -1,4 +1,4 @@
-# Local git hooks. See .claude/docs/development.md ("Guardrails").
+# Local git hooks. See docs/development.md ("Guardrails").
 #
 # Fast, infra-free gates that close the loop BEFORE CI:
 #   pre-commit  eslint --fix on staged TS/TSX

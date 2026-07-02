@@ -5,14 +5,14 @@ description: Audit documentation and code-comment drift against the actual code 
 
 # doc-sync
 
-Audit doc and comment drift against the code for a change set, fix what's safe to fix in house-style, and offer to file a `documentation` issue for anything ambiguous. The authority for *how* to write the fixes is `.claude/docs/documentation.md`; this skill summarizes its rules inline so it's self-contained.
+Audit doc and comment drift against the code for a change set, fix what's safe to fix in house-style, and offer to file a `documentation` issue for anything ambiguous. The authority for *how* to write the fixes is `docs/documentation.md`; this skill summarizes its rules inline so it's self-contained.
 
 Invocation: `/doc-sync [pr-number | --since <ref>]`
 
 > The PR review gate runs these same checks automatically on PRs into `main`. Running `/doc-sync` locally before you open the PR just gets ahead of it.
 
-**House-style rubric (from `.claude/docs/documentation.md` — apply to every fix):**
-- **Right altitude.** Session-loaded `CLAUDE.md` = broad stable invariants only. On-demand `.claude/docs/` = cross-cutting knowledge. Code comments / `schema.prisma` model comments = facts about ONE file/function/model. `memory/` = roadmap/rationale. Don't push file-local facts up into a doc, or invariants down into a comment.
+**House-style rubric (from `docs/documentation.md` — apply to every fix):**
+- **Right altitude.** Session-loaded `CLAUDE.md` = broad stable invariants only. On-demand `docs/` = cross-cutting knowledge. Code comments / `schema.prisma` model comments = facts about ONE file/function/model. `memory/` = roadmap/rationale. Don't push file-local facts up into a doc, or invariants down into a comment.
 - **Invariant over enumeration.** Prefer documenting the pattern + why over listing instances. When an enumeration earns its place (router map, lib table), **anchor it to its source-of-truth file** so it self-corrects.
 - **Canonical example.** Point recurring concepts at the one reference implementation (e.g. `lib/inventory.ts` for the transaction pattern) instead of re-describing.
 - **Concrete & testable.** Every instruction must be checkable ("never add `level` as a column"), never vague.
