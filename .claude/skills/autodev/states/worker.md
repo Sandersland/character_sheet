@@ -35,7 +35,7 @@ This worktree's `node_modules` are empty Docker-volume mountpoints — host-run 
 
 ## Work loop — per committable chunk
 
-1. Write the unit tests for the chunk FIRST (they should fail).
+1. Write the unit tests for the chunk FIRST (they should fail). **For uiSurface issues**, when the chunk alters a user-visible flow, also extend or add an e2e spec under `frontend/e2e/` first — same test-first rule as unit tests (personas come from `global-setup.ts`; assert role/name-based selectors + zero console errors).
 2. Implement until they pass.
 3. Typecheck + lint clean.
 4. Commit the green chunk: `feat(<domain>): <summary> (#{{issue}})` (or `fix`/`refactor` as appropriate).
