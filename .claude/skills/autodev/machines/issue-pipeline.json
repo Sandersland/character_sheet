@@ -4,7 +4,7 @@
   "initial": "GetWork",
   "budget": { "maxSteps": 16, "maxCostUsd": 15, "maxWallMinutes": 150 },
   "loopLimits": { "Reviewer->Worker": 3 },
-  "context": { "integrationBranch": "staging" },
+  "context": { "integrationBranch": "staging", "autoMerge": true },
   "states": {
     "GetWork": {
       "type": "agent",

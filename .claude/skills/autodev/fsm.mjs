@@ -358,7 +358,14 @@ const HANDLERS = {
     );
     const prUrl = out.trim().split("\n").pop();
     run.ctx.prUrl = prUrl;
-    return { transition: "ok", payload: { prUrl }, summary: `PR opened: ${prUrl}` };
+    // Arm auto-merge (squash, per the feature->staging convention) so the PR
+    // lands itself once checks pass. Non-fatal: an unprotected base (e.g. an
+    // integration branch) doesn't support auto-merge — the PR just stays open.
+    let armed = false;
+    if (run.ctx.autoMerge !== false) {
+      armed = spawnSync("gh", ["pr", "merge", prUrl, "--squash", "--auto"], { cwd: worktree }).status === 0;
+    }
+    return { transition: "ok", payload: { prUrl, autoMergeArmed: armed }, summary: `PR opened: ${prUrl}${armed ? " (auto-merge armed)" : ""}` };
   },
 
   async applyFlag(run) {
