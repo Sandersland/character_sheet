@@ -13,6 +13,10 @@ export default defineConfig({
   reporter: [["html", { outputFolder: "playwright-report", open: "never" }]],
   outputDir: "test-results",
   retries: process.env.CI ? 2 : 1,
+  // Serial: several specs drive the shared roster's live sessions, and one
+  // campaign allows only one active session — parallel files would contend and
+  // overload the single dev stack.
+  workers: 1,
   use: {
     baseURL,
     trace: "on-first-retry",
