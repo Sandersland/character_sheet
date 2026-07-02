@@ -26,7 +26,7 @@ const RUNS_DIR = join(ROOT, ".claude", "autodev", "runs");
 
 function parseArgs(argv) {
   const [cmd, target, ...rest] = argv;
-  const opts = { issue: null, integration: null, start: null, only: null, dryRun: false };
+  const opts = { issue: null, integration: null, start: null, only: null, dryRun: false, maxCost: null };
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (a === "--issue") opts.issue = Number(rest[++i]);
@@ -34,6 +34,7 @@ function parseArgs(argv) {
     else if (a === "--start") opts.start = rest[++i];
     else if (a === "--only") opts.only = rest[++i];
     else if (a === "--dry-run") opts.dryRun = true;
+    else if (a === "--max-cost") opts.maxCost = Number(rest[++i]);
     else die(`unknown arg '${a}'`);
   }
   if (!cmd || !target) die("usage: fsm.mjs run <machine> [flags] | fsm.mjs resume <run-dir>");
@@ -123,6 +124,7 @@ function buildArgs(def, prompt, { resumeSession } = {}) {
   if (def.permissionMode) args.push("--permission-mode", def.permissionMode);
   if (def.maxTurns && supportsFlag("--max-turns")) args.push("--max-turns", String(def.maxTurns));
   if (def.maxBudgetUsd && supportsFlag("--max-budget-usd")) args.push("--max-budget-usd", String(def.maxBudgetUsd));
+  if (def.fallbackModel && supportsFlag("--fallback-model")) args.push("--fallback-model", def.fallbackModel);
   // Children run with --setting-sources project (no user-level plugin MCP
   // servers), so a state that needs an MCP server declares it explicitly.
   if (def.mcpConfig) args.push("--mcp-config", JSON.stringify(def.mcpConfig), "--strict-mcp-config");
@@ -215,6 +217,59 @@ function validateEnvelope(def, envelope) {
   return null;
 }
 
+// Classify a nonzero-exit claude invocation so transient failures (rate limit,
+// overload) can be retried/rescheduled instead of killing the run. Shape of a
+// real rate-limit death (captured 2026-07-02, run …issue-124/raw-6-Worker-a1):
+// { type:"result", subtype:"success", is_error:true, api_error_status:429,
+//   result:"You've hit your session limit · resets 3:10am (America/New_York)",
+//   total_cost_usd:3.96, session_id:"…" } — cost and session are present even
+// on failure, so always harvest them.
+function classifyFailure(res) {
+  let out = null;
+  try {
+    out = JSON.parse(res.stdout);
+  } catch {
+    /* stdout not JSON — classify from raw text below */
+  }
+  const text = `${out?.result ?? ""}\n${res.stdout.slice(0, 2000)}\n${res.stderr.slice(0, 2000)}`;
+  const rateLimited =
+    out?.api_error_status === 429 ||
+    out?.api_error_status === 529 ||
+    /hit your session limit|rate.?limit|overloaded/i.test(text);
+  return {
+    kind: rateLimited ? "rate_limit" : "transient",
+    retryAt: rateLimited ? parseResetTime(text) : null,
+    costUsd: out?.total_cost_usd ?? 0,
+    sessionId: out?.session_id ?? null,
+    numTurns: out?.num_turns ?? null,
+    detail: (out?.result ?? res.stderr ?? "").slice(0, 300),
+  };
+}
+
+// "resets 3:10am (America/New_York)" → epoch ms of the NEXT occurrence of that
+// wall-clock time in that zone (scan forward minute-by-minute ≤24h), +2min pad.
+// Fallback: ~one hour from now.
+function parseResetTime(text) {
+  const fallback = Date.now() + 62 * 60_000;
+  const m = text.match(/resets\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i);
+  if (!m) return fallback;
+  let hour = Number(m[1]) % 12;
+  if (m[3].toLowerCase() === "pm") hour += 12;
+  const minute = Number(m[2] ?? 0);
+  const tz = text.match(/\(([A-Za-z_]+\/[A-Za-z_]+)\)/)?.[1] ?? "America/New_York";
+  try {
+    const fmt = new Intl.DateTimeFormat("en-CA", { timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false });
+    const start = Math.ceil(Date.now() / 60_000) * 60_000;
+    for (let t = start; t <= start + 24 * 3_600_000; t += 60_000) {
+      const parts = fmt.formatToParts(new Date(t)).reduce((a, p) => ((a[p.type] = p.value), a), {});
+      if (Number(parts.hour) % 24 === hour && Number(parts.minute) === minute) return t + 2 * 60_000;
+    }
+  } catch {
+    /* Intl/tz failure → fallback */
+  }
+  return fallback;
+}
+
 async function runAgentState(stateName, def, run) {
   const templatePath = join(SKILL_DIR, def.prompt);
   const resumeSession = def.resumePrompt && run.sessions[stateName] ? run.sessions[stateName] : null;
@@ -232,29 +287,72 @@ async function runAgentState(stateName, def, run) {
   let attempt = 0;
   let session = resumeSession;
   let lastError = null;
+  let lastErrorKind = null; // "envelope" (bad final message) | "crash" (nonzero exit)
   while (attempt < 2) {
     attempt++;
     // Retry resumes the failed session with just the error; if there is no
     // session to resume (stdout wasn't JSON), re-send the full prompt instead.
+    // A crashed attempt died MID-WORK (no invalid final message to correct) —
+    // its resume asks to continue, not to re-emit.
     const promptForAttempt =
       attempt === 1
         ? prompt
         : session
-          ? `Your previous final message was invalid: ${lastError}\nRe-emit ONLY the corrected fenced JSON envelope.` +
-            envelopeEpilogue(def)
+          ? lastErrorKind === "crash"
+            ? `Your previous invocation was interrupted mid-work (${lastError}). Continue from where you left off and finish the task.` +
+              envelopeEpilogue(def)
+            : `Your previous final message was invalid: ${lastError}\nRe-emit ONLY the corrected fenced JSON envelope.` +
+              envelopeEpilogue(def)
           : `${prompt}\n\nNOTE: your previous attempt failed with: ${lastError}`;
     const args = buildArgs(def, promptForAttempt, { resumeSession: attempt === 1 ? resumeSession : session });
     const started = Date.now();
     const res = await invokeClaude(stateName, def, args, cwd, run);
     writeFileSync(join(run.dir, `raw-${run.step}-${stateName}-a${attempt}.json`), res.stdout || res.stderr);
     if (res.timedOut) throw new Error(`state '${stateName}' exceeded its ${def.wallMinutes ?? 30}min wall clock`);
-    if (res.code !== 0) throw new Error(`state '${stateName}' claude exited ${res.code}: ${res.stderr.slice(0, 500)}`);
+    if (res.code !== 0) {
+      // Bill and ledger the failed attempt (a crashed child has usually spent
+      // real money — #124's 429 death burned $3.96 invisibly before this fix),
+      // then classify: rate limits reschedule the run (exit 75, resume later);
+      // other nonzero exits get ONE in-process retry via session resume.
+      const fail = classifyFailure(res);
+      run.costUsd += fail.costUsd;
+      if (fail.sessionId) session = fail.sessionId;
+      ledgerStep(run, {
+        state: stateName,
+        attempt,
+        sessionId: session,
+        model: def.model ?? "default",
+        turns: fail.numTurns,
+        costUsd: fail.costUsd,
+        durationMs: Date.now() - started,
+        transition: null,
+        exitCode: res.code,
+        error: `${fail.kind}: ${fail.detail}`,
+      });
+      if (fail.kind === "rate_limit") {
+        // Save the session so a later `fsm.mjs resume` re-enters mid-state.
+        if (session) run.sessions[stateName] = session;
+        throw Object.assign(new Error(`state '${stateName}' hit the rate limit: ${fail.detail}`), {
+          tempfail: true,
+          retryAt: fail.retryAt,
+        });
+      }
+      lastError = `claude exited ${res.code}: ${fail.detail}`;
+      lastErrorKind = "crash";
+      if (attempt < 2) {
+        log(run, `state ${stateName} attempt ${attempt} crashed (${lastError}) — retrying${session ? " via session resume" : ""} in 30s`);
+        await new Promise((r) => setTimeout(r, 30_000));
+        continue;
+      }
+      throw new Error(`state '${stateName}' claude exited ${res.code}: ${fail.detail}`);
+    }
 
     const { envelope, out, error } = parseEnvelope(res.stdout);
     if (out?.session_id) session = out.session_id;
     const costUsd = out?.total_cost_usd ?? 0;
     run.costUsd += costUsd;
     lastError = error ?? (envelope ? validateEnvelope(def, envelope) : "no envelope");
+    if (lastError) lastErrorKind = "envelope";
     ledgerStep(run, {
       state: stateName,
       attempt,
@@ -365,6 +463,14 @@ const HANDLERS = {
         : run.ctx.uiSurface
           ? "**UI:** ⚠ surface NOT visually verified — run verify-frontend before relying on it"
           : "",
+      ...(run.ctx.blockedWrites?.length
+        ? [
+            "",
+            "## ⚠ Blocked writes",
+            "The worker was permission-denied writing these files; intended content is in the run ledger payloads:",
+            ...run.ctx.blockedWrites.map((w) => `- \`${w.path}\` — ${w.reason ?? "denied"}`),
+          ]
+        : []),
       "",
       `## autodev run ${run.id}`,
       "| state | turns | cost |",
@@ -404,7 +510,34 @@ const HANDLERS = {
   },
 
   async fail(run) {
-    const { issue, failure } = run.ctx;
+    const { issue, failure, branch, worktree, integrationBranch } = run.ctx;
+    // Preserve committed work remotely: the Worker's bashDeny blocks `git push`
+    // and only Submit pushes, so without this a failed run's commits exist only
+    // in the local worktree (last night's #124/#331 each stranded a full
+    // implementation). The driver itself is unrestricted — push from here.
+    let pushedLine = "";
+    if (worktree && branch && existsSync(worktree)) {
+      const ahead = spawnSync("git", ["rev-list", "--count", `origin/${integrationBranch}..HEAD`], {
+        cwd: worktree,
+        encoding: "utf8",
+      });
+      const commits = ahead.status === 0 ? Number(ahead.stdout.trim()) : 0;
+      if (commits > 0) {
+        const push = spawnSync("git", ["push", "-u", "origin", branch], { cwd: worktree });
+        if (push.status === 0) {
+          const slugRes = spawnSync("gh", ["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"], {
+            cwd: ROOT,
+            encoding: "utf8",
+          });
+          const slug = slugRes.status === 0 ? slugRes.stdout.trim() : null;
+          const compare = slug ? ` — https://github.com/${slug}/compare/${integrationBranch}...${branch}` : "";
+          pushedLine = `**Partial work pushed:** \`${branch}\` (${commits} commit${commits === 1 ? "" : "s"})${compare}`;
+          log(run, `pushed partial work: ${branch} (${commits} commits)`);
+        } else {
+          log(run, `failed to push partial work on ${branch} (non-fatal)`);
+        }
+      }
+    }
     // ctx.claimed guards against commenting on an issue this run never owned —
     // a ClaimIssue->GetWork loop exhaust reaches Fail with ctx.issue set to the
     // last-checked (someone else's) issue.
@@ -418,6 +551,7 @@ const HANDLERS = {
           `**Why it failed:** ${failure ?? "unknown"}`,
           `**Run ledger:** \`${run.dir}\``,
           run.ctx.worktree ? `**Worktree left intact for inspection:** \`${run.ctx.worktree}\`` : "",
+          pushedLine,
         ].join("\n"),
       );
       spawnSync("gh", ["issue", "comment", String(issue), "--body-file", file], { cwd: ROOT });
@@ -453,6 +587,9 @@ function saveRun(run) {
         step: run.step,
         costUsd: run.costUsd,
         failedAt: run.failedAt ?? null,
+        retryable: run.retryable ?? false,
+        retryAt: run.retryAt ?? null,
+        maxCostUsd: run.maxCostUsd ?? null,
         loops: run.loops,
         sessions: run.sessions,
         ctx: run.ctx,
@@ -484,8 +621,8 @@ async function execute(run) {
     const breach =
       run.step >= (budget.maxSteps ?? 30)
         ? `step budget (${budget.maxSteps}) exhausted`
-        : run.costUsd >= (budget.maxCostUsd ?? Infinity)
-          ? `cost budget ($${budget.maxCostUsd}) exhausted`
+        : run.costUsd >= (run.maxCostUsd ?? budget.maxCostUsd ?? Infinity)
+          ? `cost budget ($${run.maxCostUsd ?? budget.maxCostUsd}) exhausted`
           : elapsedMin >= (budget.maxWallMinutes ?? Infinity)
             ? `wall-clock budget (${budget.maxWallMinutes}min) exhausted`
             : null;
@@ -513,6 +650,19 @@ async function execute(run) {
         log(run, `Fail handler itself errored: ${err.message}`);
         run.status = "failed";
         break;
+      }
+      // Rate limit (tempfail): don't enter Fail — the issue claim and worktree
+      // must survive. Persist retryAt + the mid-state session, exit 75
+      // (EX_TEMPFAIL) so an orchestrator can `fsm.mjs resume <run-dir>` after
+      // the window resets.
+      if (err.tempfail) {
+        run.failedAt = stateName;
+        run.retryable = true;
+        run.retryAt = err.retryAt;
+        run.status = "retry-scheduled";
+        log(run, `TEMPFAIL in ${stateName}: ${err.message} — retryable at ${new Date(err.retryAt).toISOString()} (resume this run dir)`);
+        saveRun(run);
+        return;
       }
       run.ctx.failure = err.message;
       run.failedAt = stateName; // resume re-enters here by default
@@ -589,8 +739,9 @@ if (cmd === "run") {
     only: opts.only,
   };
   if (opts.integration) run.ctx.integrationBranch = opts.integration;
+  if (opts.maxCost) run.maxCostUsd = opts.maxCost;
   await execute(run);
-  process.exit(run.status === "failed" ? 1 : 0);
+  process.exit(run.status === "retry-scheduled" ? 75 : run.status === "failed" ? 1 : 0);
 } else if (cmd === "resume") {
   const dir = resolve(target);
   const saved = JSON.parse(readFileSync(join(dir, "run.json"), "utf8"));
@@ -609,8 +760,11 @@ if (cmd === "run") {
   };
   log(run, `resuming at ${run.currentState}`);
   delete run.ctx.failure;
+  run.retryable = false;
+  run.retryAt = null;
+  if (opts.maxCost) run.maxCostUsd = opts.maxCost;
   await execute(run);
-  process.exit(run.status === "failed" ? 1 : 0);
+  process.exit(run.status === "retry-scheduled" ? 75 : run.status === "failed" ? 1 : 0);
 } else {
   die(`unknown command '${cmd}'`);
 }

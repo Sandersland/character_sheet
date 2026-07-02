@@ -34,7 +34,15 @@ Launch the driver **in the background** (a full run takes tens of minutes) from 
 node .claude/skills/autodev/fsm.mjs run issue-pipeline                      # discover a ready issue
 node .claude/skills/autodev/fsm.mjs run issue-pipeline --issue 42           # skip discovery, start at ConfirmScope
 node .claude/skills/autodev/fsm.mjs run issue-pipeline --integration my-br  # PR base (default: staging)
+node .claude/skills/autodev/fsm.mjs run issue-pipeline --max-cost 40        # override the machine's global cost cap
 ```
+
+**Exit codes:** `0` success · `1` failed · `75` (EX_TEMPFAIL) rate-limited — the run
+saved `retryable: true` + `retryAt` (epoch ms) in `run.json` and kept its issue claim
+and worktree; `resume <run-dir>` after `retryAt` re-enters the interrupted state on
+its saved session. Crashed attempts are billed and ledgered (with `exitCode`), other
+nonzero exits get one automatic in-process retry via session resume, and failed runs
+push their committed work to `origin/<branch>` (compare link in the fail comment).
 
 Debug/verification flags:
 
@@ -59,7 +67,7 @@ When the run finishes, report: the issue worked, the outcome (PR URL / flagged /
 
 ## Extending
 
-A new pipeline = a new `machines/<name>.json` + prompt files under `states/` — the driver is machine-agnostic. Per state you declare: `type` (agent/script/terminal), `prompt`/`resumePrompt` (template with `{{ctx}}` vars — `cwd` uses the same `{{…}}` syntax), `tools`, `allowedTools`, `bashAllow`/`bashDeny` regexes, `model`, `maxTurns`, `maxBudgetUsd`, `wallMinutes`, `permissionMode`, `cwd`, `required` payload keys per edge, and `transitions`. Script states name a `handler` implemented in `fsm.mjs`.
+A new pipeline = a new `machines/<name>.json` + prompt files under `states/` — the driver is machine-agnostic. Per state you declare: `type` (agent/script/terminal), `prompt`/`resumePrompt` (template with `{{ctx}}` vars — `cwd` uses the same `{{…}}` syntax), `tools`, `allowedTools`, `bashAllow`/`bashDeny` regexes, `model`, `fallbackModel` (headless overload fallback), `maxTurns`, `maxBudgetUsd`, `wallMinutes`, `permissionMode`, `cwd`, `required` payload keys per edge, and `transitions`. Script states name a `handler` implemented in `fsm.mjs`.
 
 Note the two-layer Bash contract: `allowedTools` prefix-matches the **whole** command (a piped `gh issue view … | jq` passes on its `gh` prefix), while the guard's `bashAllow`/`bashDeny` judge each **segment** — so filter commands (`head`, `jq`, …) belong in `bashAllow` even when absent from `allowedTools`; they're only reachable as pipe segments. In allowlist states the guard also blocks command substitution (`$(…)`/backticks) outright; in deny-based states substitution bodies are extracted and deny-checked.
 
@@ -79,3 +87,4 @@ When ConfirmScope marks `uiSurface: true`, the Reviewer gets a Playwright MCP se
 
 - The Reviewer verifies UI against the seeded dummy character (level-1 Human Fighter), not production-like data — surfaces gated on higher levels/classes/inventory may need a human pass.
 - The issue claim is check-then-assign (GitHub has no atomic claim); a sub-second tie between two runs can double-claim. The slot lock still prevents any port collision in that case.
+- The subscription's **weekly** compute cap has no parseable in-band reset signal — hitting it looks like a rate_limit tempfail (exit 75) that never clears on resume. An orchestrator's rate-limit retry cap bounds the damage; if resumes keep tempfailing, check `/usage` manually.
