@@ -26,5 +26,7 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     globals: false,
+    // e2e/ is Playwright's turf — keep it out of the vitest (jsdom) run.
+    exclude: ["**/node_modules/**", "**/dist/**", "e2e/**"],
   },
 });

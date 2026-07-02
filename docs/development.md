@@ -27,7 +27,10 @@ npm run lint      # ESLint in each workspace
 npm run typecheck # tsc --noEmit in each workspace — fast type-only check
 npm run test      # Vitest in each workspace
 npm run build     # production build in each workspace
+npm run e2e       # Playwright e2e via the profile-gated compose service
 ```
+
+`npm run e2e` shells out to `docker compose --profile e2e run --rm e2e` — a pinned `mcr.microsoft.com/playwright` container on host networking that seeds personas via `dev-login` and runs the specs in `frontend/e2e/`. It derives its base URL from `FRONTEND_PORT`, so the same command works against the main stack and any worktree slot; see testing.md for the full harness.
 
 `typecheck` is the quick way to catch the schema/shape-drift class that `lint`/`test` miss (vitest transpiles via esbuild and does **not** type-check). Run it — root, or `-w frontend` / `-w backend` for one workspace — after touching frontend/backend code, before declaring the change done. It's the same `tsc --noEmit` the `pre-push` hook runs, just on demand mid-change.
 
