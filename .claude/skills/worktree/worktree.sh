@@ -73,6 +73,26 @@ registry_del() {
   ' "$REGISTRY" "$1"
 }
 
+# Slot assignment is read-registry -> pick-lowest-free -> write-registry; two
+# concurrent creates (e.g. parallel autodev runs) would race that window and
+# collide on a slot. mkdir is atomic, so it serves as the mutex — no flock on
+# stock macOS.
+SLOT_LOCK=""
+lock_slots() {
+  ensure_registry
+  SLOT_LOCK="$WT_DIR/.slot.lock"
+  local waited=0
+  until mkdir "$SLOT_LOCK" 2>/dev/null; do
+    [ "$waited" -ge 30 ] && die "slot lock held for ${waited}s ($SLOT_LOCK); remove it if no create is running"
+    sleep 1; waited=$((waited + 1))
+  done
+  trap 'unlock_slots' EXIT
+}
+unlock_slots() {
+  [ -n "$SLOT_LOCK" ] && rmdir "$SLOT_LOCK" 2>/dev/null
+  SLOT_LOCK=""
+}
+
 # Echo the port for (slot, base): base + slot*10.
 port_for() { echo $(( $2 + $1 * 10 )); }
 
@@ -120,6 +140,7 @@ cmd_create() {
     [ -n "$slot" ] || die "worktree dir exists but no slot recorded; remove $path manually"
     echo "Worktree '$branch' already exists (slot $slot); refreshing .env."
   else
+    lock_slots
     slot="$(next_free_slot)"
     # Reuse the branch if it already exists, otherwise create it from HEAD.
     if git -C "$ROOT" show-ref --verify --quiet "refs/heads/$branch"; then
@@ -128,6 +149,7 @@ cmd_create() {
       git -C "$ROOT" worktree add "$path" -b "$branch"
     fi
     registry_set "$branch" "$slot"
+    unlock_slots
   fi
 
   write_env "$branch" "$slot" "$path"

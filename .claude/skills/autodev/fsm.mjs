@@ -123,6 +123,9 @@ function buildArgs(def, prompt, { resumeSession } = {}) {
   if (def.permissionMode) args.push("--permission-mode", def.permissionMode);
   if (def.maxTurns && supportsFlag("--max-turns")) args.push("--max-turns", String(def.maxTurns));
   if (def.maxBudgetUsd && supportsFlag("--max-budget-usd")) args.push("--max-budget-usd", String(def.maxBudgetUsd));
+  // Children run with --setting-sources project (no user-level plugin MCP
+  // servers), so a state that needs an MCP server declares it explicitly.
+  if (def.mcpConfig) args.push("--mcp-config", JSON.stringify(def.mcpConfig), "--strict-mcp-config");
   if (supportsFlag("--json-schema")) args.push("--json-schema", ENVELOPE_SCHEMA);
   return args;
 }
@@ -297,6 +300,18 @@ async function pollHealth(url, timeoutMs) {
 }
 
 const HANDLERS = {
+  // Claim the issue via assignee so concurrent runs can't both build it —
+  // GetWork excludes assigned issues, so 'taken' loops back for a re-pick.
+  async claimIssue(run) {
+    const { issue } = run.ctx;
+    const view = sh("gh", ["issue", "view", String(issue), "--json", "assignees"], { cwd: ROOT });
+    if (JSON.parse(view).assignees.length > 0) {
+      return { transition: "taken", payload: {}, summary: `issue #${issue} already claimed — re-picking` };
+    }
+    sh("gh", ["issue", "edit", String(issue), "--add-assignee", "@me"], { cwd: ROOT });
+    return { transition: "claimed", payload: {}, summary: `claimed issue #${issue}` };
+  },
+
   async setupWorktree(run) {
     const { issue, slug, integrationBranch } = run.ctx;
     const branch = `feat/issue-${issue}-${slug}`;
@@ -320,6 +335,10 @@ const HANDLERS = {
       backendUrl,
       frontendUrl: `http://localhost:${5173 + slot * 10}`,
     });
+    // NOTE: don't seed a test character here — auth.test.ts's fixture cleanup
+    // deletes the dev-user-local User (cascading its characters), so anything
+    // created before the Worker's full-suite run is guaranteed to be wiped.
+    // The Reviewer creates its own character AFTER its test runs instead.
     return { transition: "ok", payload: { branch, slot }, summary: `worktree ${branch} up on slot ${slot}` };
   },
 
@@ -341,6 +360,11 @@ const HANDLERS = {
       "",
       `**Tests:** ${run.ctx.testsSummary ?? "see run ledger"}`,
       `**Review:** approved after ${run.loops["Reviewer->Worker"] ?? 0} fix cycle(s)`,
+      run.ctx.uiVerified
+        ? "**UI:** visually verified by the reviewer in the worktree stack (screenshots in the run ledger)"
+        : run.ctx.uiSurface
+          ? "**UI:** ⚠ surface NOT visually verified — run verify-frontend before relying on it"
+          : "",
       "",
       `## autodev run ${run.id}`,
       "| state | turns | cost |",
@@ -375,6 +399,7 @@ const HANDLERS = {
     sh("gh", ["issue", "comment", String(issue), "--body-file", file], { cwd: ROOT });
     sh("gh", ["issue", "edit", String(issue), "--add-label", "needs-refinement"], { cwd: ROOT });
     spawnSync("gh", ["issue", "edit", String(issue), "--remove-label", "ready"], { cwd: ROOT }); // tolerate absence
+    spawnSync("gh", ["issue", "edit", String(issue), "--remove-assignee", "@me"], { cwd: ROOT }); // release the claim
     return { transition: "ok", payload: {}, summary: `issue #${issue} flagged needs-refinement` };
   },
 
@@ -395,6 +420,7 @@ const HANDLERS = {
       spawnSync("gh", ["issue", "comment", String(issue), "--body-file", file], { cwd: ROOT });
       // No relabel here: a build/infra failure is not a scope problem. Only the
       // FlagIssue path (unbuildable scope) applies needs-refinement.
+      spawnSync("gh", ["issue", "edit", String(issue), "--remove-assignee", "@me"], { cwd: ROOT }); // release the claim
     }
     return { transition: "ok", payload: {}, summary: `run failed: ${failure ?? "unknown"}` };
   },
