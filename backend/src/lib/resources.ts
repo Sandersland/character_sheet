@@ -18,7 +18,6 @@ import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
 import { deriveResources, type DerivedClassInfo } from "./class-features.js";
 import {
-  isKnownTool,
   toolsByCategory,
   isKnownFightingStyle,
   type FightingStyleKey,
@@ -384,9 +383,6 @@ function applyLearnToolProficiencyOp(
     throw new InvalidResourceOperationError(
       `"${op.name}" is not a known artisan's tool. Student of War only grants proficiency with artisan's tools.`
     );
-  }
-  if (!isKnownTool(op.name)) {
-    throw new InvalidResourceOperationError(`Unknown tool: ${op.name}`);
   }
 
   // Enforce choice count limit (Student of War = 1).
