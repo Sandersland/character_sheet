@@ -240,6 +240,7 @@ export async function applyClassOperations(
           const character = await tx.character.findUnique({
             where: { id: characterId },
             select: {
+              experiencePoints: true,
               abilityScores: true,
               hitPoints: true,
               hitDice: true,
@@ -251,6 +252,17 @@ export async function applyClassOperations(
           });
           if (!character) {
             throw new InvalidClassOperationError(`Character not found: ${characterId}`);
+          }
+
+          // Adding a class spends a pending level-up: a new entry bumps hitDice.total
+          // by 1, so require an XP-justified level to consume or the character would
+          // end up over-cap (hitDice.total > level) with the entry clamped out on read.
+          const derivedLevel = levelForExperience(character.experiencePoints);
+          const appliedLevels = normalizeHitDice(character.hitDice).total;
+          if (appliedLevels >= derivedLevel) {
+            throw new InvalidClassOperationError(
+              "No pending level-up: earn a level before adding a class",
+            );
           }
 
           const catalog = await tx.characterClass.findUnique({

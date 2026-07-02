@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import BackendStatus from "@/features/character-meta/BackendStatus";
 import CampaignIndicator from "@/features/campaign/CampaignIndicator";
 import Badge from "@/components/ui/Badge";
+import { classSummary } from "@/lib/multiclass";
 import type { useSessionButton } from "@/features/session/useSessionButton";
 import type { Character } from "@/types/character";
 
@@ -38,8 +39,11 @@ export default function CharacterSheetHeader({
           </h1>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-parchment-600">
             <span>
-              {character.race} {character.class}
-              {character.subclass ? ` (${character.subclass})` : ""}
+              {character.race}{" "}
+              {classSummary(character.classes, {
+                name: character.class,
+                subclass: character.subclass,
+              })}
             </span>
             <Badge tone="garnet">Level {character.level}</Badge>
             <span className="text-parchment-600">

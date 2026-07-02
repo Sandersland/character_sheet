@@ -167,6 +167,23 @@ describe("POST /api/characters/:id/class/transactions — addClass (#125)", () =
     expect(res.body.error).toMatch(/already has/);
   });
 
+  it("rejects the add when there is no pending level-up (would exceed level cap)", async () => {
+    // Apply the pending level so hitDice.total == derived level 5 — nothing to spend.
+    await prisma.character.update({
+      where: { id: FIXTURE_ID },
+      data: { hitDice: { total: 5, die: "d10", spent: 0 } },
+    });
+    const res = await tx({ operations: [{ type: "addClass", classId: wizardId }] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/pending level-up/i);
+
+    // No phantom entry created and hit dice untouched (no over-cap state).
+    const entries = await prisma.characterClassEntry.findMany({ where: { characterId: FIXTURE_ID } });
+    expect(entries).toHaveLength(1);
+    const char = await prisma.character.findUniqueOrThrow({ where: { id: FIXTURE_ID } });
+    expect((char.hitDice as { total: number }).total).toBe(5);
+  });
+
   // ── guards ──────────────────────────────────────────────────────────────────
 
   it("404s for an unknown character", async () => {

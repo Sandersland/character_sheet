@@ -19,6 +19,7 @@ import {
   deriveFeatBonuses,
   deriveFeatProficiencies,
   deriveSpellcasting,
+  deriveMulticlassSpellcasting,
   deriveImprovisedAttack,
   deriveUnarmedDamageDie,
   deriveUnarmedStrike,
@@ -77,7 +78,7 @@ function serializeCharacterSummary(row: {
   portraitUrl: string | null;
   experiencePoints: number;
   raceSelection: { name: string } | null;
-  classEntries: { name: string }[];
+  classEntries: { name: string; level: number }[];
 }) {
   return {
     id: row.id,
@@ -94,6 +95,9 @@ function serializeCharacterSummary(row: {
     // created via POST /characters has exactly one of each.
     race: row.raceSelection?.name ?? "",
     class: row.classEntries[0]?.name ?? "",
+    // All class entries (name + per-class level) so the card can render a
+    // multiclass line ("Wizard 5 / Cleric 3"); `class` above stays the primary.
+    classes: row.classEntries.map((e) => ({ name: e.name, level: e.level })),
     level: levelForExperience(row.experiencePoints),
     portraitUrl: row.portraitUrl ?? undefined,
   };
@@ -307,6 +311,13 @@ function buildSpellcastingView(
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
 ): object | undefined {
+  // Multiclass (2+ entries): merge caster levels into one slot pool and surface
+  // Warlock Pact Magic separately (per the #123 derivation). Single-class output
+  // is left byte-for-byte identical via the primary-class path below.
+  if (row.classEntries.length > 1) {
+    return buildMulticlassSpellcastingView(row, abilityScores, proficiencyBonus);
+  }
+
   const derivedSpell = deriveSpellcasting(
     primaryClass?.name ?? "",
     level,
@@ -360,6 +371,58 @@ function buildSpellcastingView(
     return row.spellcasting as object;
   }
   return undefined;
+}
+
+// Multiclass spellcasting view: combined slot pool + separate Pact Magic, built
+// from every class entry (not just the primary) so a caster in any slot renders.
+function buildMulticlassSpellcastingView(
+  row: CharacterWithRelations,
+  abilityScores: Record<string, number>,
+  proficiencyBonus: number,
+): object | undefined {
+  const multi = deriveMulticlassSpellcasting(
+    row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass })),
+    abilityScores,
+    proficiencyBonus,
+  );
+  if (multi.classes.length === 0) return undefined;
+
+  const stored = normalizeSpellcastingMutable(row.spellcasting);
+  const primaryCaster = multi.classes[0];
+  return {
+    ability: primaryCaster.ability,
+    spellSaveDC: primaryCaster.spellSaveDC,
+    spellAttackBonus: primaryCaster.spellAttackBonus,
+    slots: multi.slotTotals.map(({ level: slotLevel, total }) => ({
+      level: slotLevel,
+      total,
+      used: Math.min(total, stored.slotsUsed[String(slotLevel)] ?? 0),
+    })),
+    arcana: multi.arcana.map(({ level: arcanumLevel, total }) => ({
+      level: arcanumLevel,
+      total,
+      used: Math.min(total, stored.arcanumUsed[String(arcanumLevel)] ?? 0),
+    })),
+    // Warlock Pact Magic, kept out of the merged pool (PHB p. 164). Null for a
+    // multiclass character with no warlock levels.
+    pact: multi.pact
+      ? {
+          slotLevel: multi.pact.slotLevel,
+          count: multi.pact.count,
+          used: Math.min(multi.pact.count, stored.slotsUsed[String(multi.pact.slotLevel)] ?? 0),
+          spellSaveDC: multi.pact.spellSaveDC,
+          spellAttackBonus: multi.pact.spellAttackBonus,
+        }
+      : null,
+    // Per-class caster stats (ability/DC/attack) for display in a multiclass sheet.
+    classes: multi.classes,
+    spells: stored.spells,
+    concentratingOn:
+      stored.concentratingOn &&
+      stored.spells.some((s) => s.id === stored.concentratingOn!.entryId)
+        ? stored.concentratingOn
+        : null,
+  };
 }
 
 // Resources clamp-on-read: derive class/subclass pools + level-gated caps, then
@@ -712,6 +775,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     classes: (() => {
       let remaining = progress.level;
       const out: {
+        id: string;
         name: string;
         level: number;
         subclass?: string;
@@ -731,6 +795,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
         const effectiveLevel = singleClass ? progress.level : level;
         const subclassVisible = effectiveLevel >= subclassLevel;
         out.push({
+          id: entry.id,
           name: entry.name,
           level,
           subclass: subclassVisible ? (entry.subclass ?? undefined) : undefined,
@@ -756,7 +821,7 @@ charactersRouter.get("/characters", async (req, res) => {
       portraitUrl: true,
       experiencePoints: true,
       raceSelection: { select: { name: true } },
-      classEntries: { select: { name: true }, orderBy: { position: "asc" }, take: 1 },
+      classEntries: { select: { name: true, level: true }, orderBy: { position: "asc" } },
     },
     orderBy: { name: "asc" },
   });

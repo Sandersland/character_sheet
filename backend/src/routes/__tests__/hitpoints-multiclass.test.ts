@@ -139,6 +139,23 @@ describe("POST /api/characters/:id/hp — level-up class allocation (#124)", () 
     expect(res.body.classes.find((c: { name: string }) => c.name === WIZARD).level).toBe(1);
   });
 
+  it("serializes multiclass spellcasting (merged slots) and per-entry ids (#126)", async () => {
+    const res = await hp({
+      operations: [{ type: "levelUp", method: "average", target: { kind: "new", classId: wizardId } }],
+    });
+    expect(res.status).toBe(200);
+    // Fighter 4 / Wizard 1 — the sole caster derives its own table (2 L1 slots).
+    expect(res.body.spellcasting).toBeTruthy();
+    const l1 = res.body.spellcasting.slots.find((s: { level: number }) => s.level === 1);
+    expect(l1.total).toBe(2);
+    // No warlock levels → Pact Magic is absent.
+    expect(res.body.spellcasting.pact).toBeNull();
+    // Every class entry carries its row id (the level-up existing target).
+    for (const entry of res.body.classes) {
+      expect(typeof entry.id).toBe("string");
+    }
+  });
+
   it("rejects a NEW class when 5e ability prerequisites are unmet", async () => {
     await prisma.character.update({
       where: { id: CHAR_ID },

@@ -54,6 +54,7 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
     subclassLevel: 3,
     subclasses: [],
     startingEquipment: null,
+    multiclassPrerequisite: null,
     toolProficiencies: [],
     toolChoices: [],
     toolChoiceCount: 0,

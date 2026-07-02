@@ -3,7 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import { applyHitPointOperations } from "@/api/client";
 import { rollDie } from "@/lib/dice";
 import { dieFaces } from "@/lib/hitDice";
-import type { Character, ConcentrationCheck, HitPointOperation } from "@/types/character";
+import type {
+  Character,
+  ClassOption,
+  ConcentrationCheck,
+  HitPointOperation,
+  LevelUpTarget,
+} from "@/types/character";
 import Card from "@/components/ui/Card";
 import AdvancementCallout from "@/features/hitpoints/AdvancementCallout";
 import ConcentrationSaveModal from "@/features/hitpoints/ConcentrationSaveModal";
@@ -19,10 +25,16 @@ import { useAutoRollConcentrationPref } from "@/features/hitpoints/concentration
 
 interface HitPointTrackerProps {
   character: Character;
+  /** Reference class list (for the level-up new-class picker); defaults to none. */
+  referenceClasses?: ClassOption[];
   onUpdate: (character: Character) => void;
 }
 
-export default function HitPointTracker({ character, onUpdate }: HitPointTrackerProps) {
+export default function HitPointTracker({
+  character,
+  referenceClasses = [],
+  onUpdate,
+}: HitPointTrackerProps) {
   const { hitPoints, hitDice, abilityScores, pendingLevelUps } = character;
   const availableDice = hitDice.total - hitDice.spent;
   const conMod = Math.floor((abilityScores.constitution - 10) / 2);
@@ -170,10 +182,17 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
     await submit([{ type: "stabilize" }]);
   }
 
-  async function handleLevelUp(method: "average" | "roll") {
-    const faces = dieFaces(hitDice.die);
-    const roll = method === "roll" ? rollDie(faces) : undefined;
-    const ok = await submit([{ type: "levelUp", method, roll }]);
+  async function handleLevelUp(method: "average" | "roll", target: LevelUpTarget | undefined) {
+    // Roll bounds follow the ADVANCING class's hit die, which may differ from the
+    // primary (position-0) die once multiclassing is in play.
+    const advancingName =
+      target?.kind === "new"
+        ? referenceClasses.find((c) => c.id === target.classId)?.name
+        : character.classes?.find((e) => e.id === target?.classEntryId)?.name;
+    const advancingDie =
+      referenceClasses.find((c) => c.name === advancingName)?.hitDie ?? hitDice.die;
+    const roll = method === "roll" ? rollDie(dieFaces(advancingDie)) : undefined;
+    const ok = await submit([{ type: "levelUp", method, roll, target }]);
     if (ok) setLevelUpOpen(false);
     // Advancement callout is triggered by the useEffect watching advancementSlots.total.
   }
@@ -269,7 +288,8 @@ export default function HitPointTracker({ character, onUpdate }: HitPointTracker
       {/* Level-up modal */}
       {levelUpOpen && (
         <LevelUpModal
-          hitDie={hitDice.die}
+          character={character}
+          referenceClasses={referenceClasses}
           conMod={conMod}
           pending={pending}
           onConfirm={handleLevelUp}
