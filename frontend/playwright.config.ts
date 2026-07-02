@@ -17,8 +17,27 @@ export default defineConfig({
   // campaign allows only one active session — parallel files would contend and
   // overload the single dev stack.
   workers: 1,
+  // Visual baselines are checked-in source fixtures, kept in one flat dir. The
+  // {platform} suffix pins each PNG to the OS that rendered it — always the
+  // pinned Linux e2e image in CI, so committed baselines match CI renders.
+  snapshotPathTemplate: "{testDir}/__screenshots__/{arg}-{platform}{ext}",
   use: {
     baseURL,
     trace: "on-first-retry",
+    // Fixed viewport so layout-driven screenshots are deterministic run-to-run.
+    viewport: { width: 1280, height: 800 },
+  },
+  expect: {
+    // Deterministic renders: freeze CSS/web animations and the text caret, and
+    // scale by CSS pixels so DPR can't shift the raster. Per-screen diff budgets
+    // are set at each toHaveScreenshot call; this is the conservative default.
+    // Fonts come from the pinned e2e image — the visual specs block the Google
+    // Fonts network load so text falls back to the image's bundled fonts.
+    toHaveScreenshot: {
+      animations: "disabled",
+      caret: "hide",
+      scale: "css",
+      maxDiffPixelRatio: 0.02,
+    },
   },
 });

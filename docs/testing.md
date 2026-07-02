@@ -222,6 +222,20 @@ The `e2e` service uses a pinned `mcr.microsoft.com/playwright` image on host net
 
 Personas that need a live session each get their own campaign (a campaign allows only one active session), and the config runs `workers: 1` serially so session-driving specs never contend. Per-spec state (throwaway characters, learned spells, awarded XP, resource restores) is created **inside each spec** through `e2e/helpers/api.ts` against the same REST endpoints the app uses — never in globalSetup — so every spec is independently runnable and the shared personas stay unmutated. Selectors are role/name-based (no `data-testid`); specs assert zero console errors via `e2e/helpers/console.ts`. Domain specs cover HP, inventory, spellcasting, maneuvers, session, guided creation, and level-up.
 
+### Visual regression (`toHaveScreenshot`)
+
+`e2e/visual.spec.ts` captures pixel baselines for the key screens: character sheet (light + dark themes), inventory section + ledger (Activity) modal, spells section, session/turn view, and the creation-flow steps. Baselines are checked-in **source fixtures** under `frontend/e2e/__screenshots__/` (`{name}-{platform}.png`, one flat dir via `snapshotPathTemplate`) — the `block-project-artifacts` hook exempts this dir the same way it exempts `.svg`.
+
+Determinism is the whole game, so the config (`expect.toHaveScreenshot`) disables animations, hides the caret, pins a fixed viewport, and scales by CSS pixels; each spec blocks the Google Fonts network load so text falls back to the pinned e2e image's bundled fonts (identical at capture and comparison time) and awaits `document.fonts.ready`. Per-run-unique pixels (character names) are masked on full-page shots; scoped section/modal shots exclude the name entirely. Per-screen diff budgets are tuned via `maxDiffPixelRatio` at each call.
+
+Regenerate baselines **only when a visual change is intentional**, from inside the e2e container so the renders match CI's fonts:
+
+```bash
+docker compose --profile e2e run --rm e2e npm run e2e:update-snapshots
+```
+
+Review the regenerated PNGs before committing them. Running unrelated visual changes through `--update-snapshots` silently launders a regression into the baseline, so the diff is the gate.
+
 ## Lib-level unit tests
 
 Pure domain logic goes in `backend/src/lib/__tests__/`:
