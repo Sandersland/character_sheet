@@ -203,7 +203,17 @@ Unit tests mock the network, but driving the real UI in a browser hits `requireA
 2. `npm run seed:verify` — mints a session via `POST /api/auth/dev-login` and builds a representative "Verify Dummy" character through the real endpoints (idempotent). Needs `ALLOW_DEV_LOGIN=true` (dev compose default). See development.md.
 3. In Playwright, sign in with an in-page `fetch('/api/auth/dev-login', { method: 'POST' })` then reload (`cs_session` is HttpOnly, so it can't be set from `document.cookie`).
 
-The **`verify-frontend` skill** automates all of this (seed → sign in → run RTL tests + browser verification in parallel). e2e Playwright coverage of full flows is tracked in #97.
+The **`verify-frontend` skill** automates all of this (seed → sign in → run RTL tests + browser verification in parallel).
+
+## End-to-end (Playwright)
+
+Full-flow browser tests live in `frontend/e2e/` (`*.spec.ts`; vitest excludes this dir). Run them through the profile-gated compose service, which works against the main stack and any worktree slot identically:
+
+```bash
+npm run e2e            # → docker compose --profile e2e run --rm e2e
+```
+
+The `e2e` service uses a pinned `mcr.microsoft.com/playwright` image on host networking and derives its base URL from `FRONTEND_PORT`, so no ports are hardcoded (override with `E2E_BASE_URL`). `e2e/global-setup.ts` signs in via `dev-login` and idempotently (re)creates the personas — **Smoke Fighter** (L1) and **Wizard L5** (XP set through the transactions endpoint so spell slots derive) — matched by name. It recreates them every run, so a prior backend vitest pass (whose `auth.test.ts` wipes `dev-user-local`) is fine. Selectors are role/name-based (no `data-testid`); specs assert zero console errors via `e2e/helpers/console.ts`.
 
 ## Lib-level unit tests
 
