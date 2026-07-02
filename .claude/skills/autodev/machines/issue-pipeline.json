@@ -71,7 +71,7 @@
       "prompt": "states/reviewer.md",
       "mcpConfig": {
         "mcpServers": {
-          "playwright": { "command": "npx", "args": ["-y", "@playwright/mcp@latest", "--isolated"] }
+          "playwright": { "command": "npx", "args": ["-y", "@playwright/mcp@0.0.77", "--isolated"] }
         }
       },
       "allowedTools": [
@@ -81,7 +81,7 @@
         "Bash(gh issue view:*)", "Bash(curl:*)"
       ],
       "bashAllow": ["^docker compose\\b", "^git (diff|log|status)\\b", "^gh issue view\\b", "^curl\\b", "^(head|tail|grep|wc|sort|cat|jq|awk|sed -n)\\b", "^ls\\b"],
-      "required": { "approve": ["checks"], "changes": ["findings"] },
+      "required": { "approve": ["checks", "uiVerified"], "changes": ["findings"] },
       "transitions": { "approve": "Submit", "changes": "Worker" }
     },
     "Submit": {

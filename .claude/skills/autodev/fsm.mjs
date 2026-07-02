@@ -309,7 +309,7 @@ const HANDLERS = {
       return { transition: "taken", payload: {}, summary: `issue #${issue} already claimed — re-picking` };
     }
     sh("gh", ["issue", "edit", String(issue), "--add-assignee", "@me"], { cwd: ROOT });
-    return { transition: "claimed", payload: {}, summary: `claimed issue #${issue}` };
+    return { transition: "claimed", payload: { claimed: true }, summary: `claimed issue #${issue}` };
   },
 
   async setupWorktree(run) {
@@ -405,7 +405,10 @@ const HANDLERS = {
 
   async fail(run) {
     const { issue, failure } = run.ctx;
-    if (issue) {
+    // ctx.claimed guards against commenting on an issue this run never owned —
+    // a ClaimIssue->GetWork loop exhaust reaches Fail with ctx.issue set to the
+    // last-checked (someone else's) issue.
+    if (issue && run.ctx.claimed) {
       const file = join(run.dir, "fail-comment.md");
       writeFileSync(
         file,
