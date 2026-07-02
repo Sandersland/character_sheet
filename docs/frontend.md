@@ -96,6 +96,7 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 | `encumbrance.ts` | Carrying capacity (`carryingCapacity` = STR × 15), derive-on-read. |
 | `itemDetails.ts` | Pure inventory-row presentation: `itemDetailParts` (the dotted summary line), `hasItemProse`, plus `weaponDamageParts`/`weaponPropertyTags`. Shared by InventoryRow/ItemSummary. |
 | `fightingStyles.ts` | Fighting-style labels/descriptions (presentation; backend is rules source of truth). |
+| `multiclass.ts` | Multiclass display + gating helpers: `isMulticlass`, `classSummary` (single-class → name unchanged; multiclass → "Wizard 5 / Cleric 3"), `multiclassPrereqMet` (evaluates the backend-served `ClassOption.multiclassPrerequisite` thresholds against the character's scores — no rules table duplicated). Feeds `CharacterSheetHeader`/`CharacterCard`/`ClassFeaturesSection`, `AddClassPanel`, `LevelUpModal`. |
 | `maneuvers.ts` | Battle Master maneuver classification data (mechanic/slot) for ManeuverPrompt. |
 | `conditions.ts` | 5e condition labels/descriptions for the chip strip + picker. |
 | `characterSections.ts` | Sheet-section visibility predicates (`hasProficiencies`/`hasAdvancements`) — the inline card-gate expressions from CharacterSheetPage. |

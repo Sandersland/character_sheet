@@ -37,7 +37,11 @@ export default function CharacterSheetBody({
 
       {/* ── Hit points · Experience ────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <HitPointTracker character={character} onUpdate={onUpdate} />
+        <HitPointTracker
+          character={character}
+          referenceClasses={reference?.classes ?? []}
+          onUpdate={onUpdate}
+        />
         <ExperienceTracker character={character} onUpdate={onUpdate} />
       </div>
 

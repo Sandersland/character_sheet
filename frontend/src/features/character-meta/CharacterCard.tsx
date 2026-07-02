@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 
 import type { CharacterSummary } from "@/types/character";
 import Badge from "@/components/ui/Badge";
+import { classSummary } from "@/lib/multiclass";
 
 interface CharacterCardProps {
   character: CharacterSummary;
@@ -46,7 +47,7 @@ export default function CharacterCard({ character }: CharacterCardProps) {
           {character.name}
         </h2>
         <p className="text-sm text-parchment-600">
-          {character.race} {character.class}
+          {character.race} {classSummary(character.classes, { name: character.class })}
         </p>
         <div className="mt-auto pt-1">
           <Badge tone="garnet">Level {character.level}</Badge>

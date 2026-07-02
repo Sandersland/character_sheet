@@ -49,6 +49,9 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
   const spellcasting = character.spellcasting!;
   const { spellSaveDC, spellAttackBonus, slots = [], arcana = [], spells = [], ability } = spellcasting;
   const concentratingOn = spellcasting.concentratingOn ?? null;
+  // Warlock Pact Magic in a multiclass character — surfaced separately from the
+  // merged slot pool (single-class warlocks keep their pact slots in `slots`).
+  const pact = spellcasting.pact ?? null;
 
   // Warlocks use Pact Magic (single-level slots that recharge on a short rest)
   // and gain Mystic Arcanum charges at higher levels — label/render accordingly.
@@ -292,6 +295,54 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Pact Magic (multiclass warlock — kept separate from merged slots) ── */}
+      {pact && (
+        <div>
+          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
+            Pact Magic{" "}
+            <span className="font-normal normal-case tracking-normal text-parchment-600">
+              — level {pact.slotLevel}, recharges on a short rest
+            </span>
+          </h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div>
+              <div className="mb-1 flex items-baseline justify-between text-xs text-parchment-600">
+                <span className="font-medium">Level {pact.slotLevel}</span>
+                <span className="tabular-nums">
+                  {pact.count - pact.used}/{pact.count}
+                </span>
+              </div>
+              <MeterBar
+                current={pact.count - pact.used}
+                max={pact.count}
+                tone="arcane"
+                label={`Pact Magic level ${pact.slotLevel} slots remaining`}
+              />
+              <div className="mt-1.5 flex gap-1">
+                <button
+                  type="button"
+                  disabled={busy || pact.count - pact.used === 0}
+                  onClick={() => handleExpendSlot(pact.slotLevel)}
+                  className="flex-1 rounded bg-arcane-100 py-0.5 text-[11px] font-semibold text-arcane-700 hover:bg-arcane-200 disabled:opacity-30"
+                  title={`Expend a Pact Magic (level ${pact.slotLevel}) slot`}
+                >
+                  − use
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || pact.used === 0}
+                  onClick={() => handleRestoreSlot(pact.slotLevel)}
+                  className="flex-1 rounded bg-arcane-100 py-0.5 text-[11px] font-semibold text-arcane-700 hover:bg-arcane-200 disabled:opacity-30"
+                  title={`Restore a Pact Magic (level ${pact.slotLevel}) slot`}
+                >
+                  + restore
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
