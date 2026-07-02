@@ -394,6 +394,11 @@ export const FULL_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, 
   20: { 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1 },
 };
 
+// Multiclass spell-slot table (PHB p. 164). Per RAW it is byte-for-byte the
+// full-caster table, so we alias it rather than duplicate 20 rows — the shared
+// table is what keeps single-class output identical to deriveSpellcasting.
+export const MULTICLASS_SPELL_SLOTS = FULL_CASTER_SLOTS;
+
 export interface DerivedSpellcastingInfo {
   ability: string;
   spellSaveDC: number;
@@ -501,6 +506,152 @@ export const THIRD_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number,
   19: { 1: 4, 2: 3, 3: 3, 4: 1 },
   20: { 1: 4, 2: 3, 3: 3, 4: 1 },
 };
+
+// ── Caster fractions (multiclass) ─────────────────────────────────────────────
+// How much each class contributes to the combined multiclass caster level:
+// full = +level, half = +floor(level/2), third = +floor(level/3), pact = tracked
+// separately (never merged), none = non-caster. Third casters are keyed by
+// subclass (Eldritch Knight / Arcane Trickster) via THIRD_CASTER_SUBCLASSES.
+export type CasterFraction = "full" | "half" | "third" | "pact" | "none";
+
+export const CASTER_FRACTION_BY_CLASS: Readonly<Record<string, CasterFraction>> = {
+  bard: "full",
+  cleric: "full",
+  druid: "full",
+  sorcerer: "full",
+  wizard: "full",
+  paladin: "half",
+  ranger: "half",
+  warlock: "pact",
+};
+
+// Whether a caster class prepares spells from a list (Cleric/Druid/Paladin/Wizard)
+// or knows a fixed set (Bard/Sorcerer/Ranger/Warlock + third casters).
+const SPELL_PREPARATION_BY_CLASS: Readonly<Record<string, "known" | "prepared">> = {
+  bard: "known",
+  sorcerer: "known",
+  ranger: "known",
+  warlock: "known",
+  cleric: "prepared",
+  druid: "prepared",
+  paladin: "prepared",
+  wizard: "prepared",
+};
+
+/** Caster fraction for a class (third casters resolved via subclass). "none" for non-casters. */
+export function casterFractionFor(className: string, subclass?: string | null): CasterFraction {
+  if (THIRD_CASTER_SUBCLASSES[(subclass ?? "").toLowerCase()]) return "third";
+  return CASTER_FRACTION_BY_CLASS[className.toLowerCase()] ?? "none";
+}
+
+// Full spellcasting profile of one class entry, or null for a non-caster.
+function casterProfile(
+  className: string,
+  subclass?: string | null,
+): { fraction: CasterFraction; ability: string; preparation: "known" | "prepared" } | null {
+  const subKey = (subclass ?? "").toLowerCase();
+  const thirdAbility = THIRD_CASTER_SUBCLASSES[subKey];
+  if (thirdAbility) return { fraction: "third", ability: thirdAbility, preparation: "known" };
+
+  const key = className.toLowerCase();
+  const fraction = CASTER_FRACTION_BY_CLASS[key];
+  if (!fraction) return null;
+  return { fraction, ability: SPELLCASTING_ABILITY[key], preparation: SPELL_PREPARATION_BY_CLASS[key] };
+}
+
+// Levels a class entry adds to the combined multiclass caster level.
+function casterLevelContribution(fraction: CasterFraction, level: number): number {
+  if (fraction === "full") return level;
+  if (fraction === "half") return Math.floor(level / 2);
+  if (fraction === "third") return Math.floor(level / 3);
+  return 0; // pact + none never contribute to the merged pool
+}
+
+/** One caster class's derived per-class spellcasting stats in a multiclass character. */
+export interface MulticlassCasterClass {
+  className: string;
+  subclass: string | null;
+  ability: string;
+  spellSaveDC: number;
+  spellAttackBonus: number;
+  preparation: "known" | "prepared";
+  casterFraction: CasterFraction;
+}
+
+/** Merged multiclass spellcasting: combined slots + per-class stats + separate Pact Magic. */
+export interface MulticlassSpellcastingInfo {
+  combinedCasterLevel: number;
+  slotTotals: Array<{ level: number; total: number }>;
+  classes: MulticlassCasterClass[];
+  pact: { slotLevel: number; count: number; spellSaveDC: number; spellAttackBonus: number } | null;
+  arcana: Array<{ level: number; total: number }>;
+}
+
+/**
+ * Derives merged spellcasting for a full (possibly multiclass) class list per
+ * the PHB p. 164 multiclass rules: sum full levels, half of half-caster levels,
+ * a third of third-caster levels, then read the combined caster level against
+ * the multiclass slot table. Warlock Pact Magic (and Mystic Arcanum) is kept
+ * separate — never merged into the combined pool.
+ *
+ * When exactly one class contributes to the combined pool, its own class table
+ * is used (via deriveSpellcasting) so single-class output stays byte-for-byte
+ * identical — the multiclass floor math only kicks in with two+ casters.
+ *
+ * Pure function — no DB access, safe to call in serializeCharacter.
+ */
+export function deriveMulticlassSpellcasting(
+  classEntries: ReadonlyArray<{ name: string; level: number; subclass?: string | null }>,
+  abilityScores: Record<string, number>,
+  proficiencyBonus: number,
+): MulticlassSpellcastingInfo {
+  const classes: MulticlassCasterClass[] = [];
+  const combinedEntries: Array<{ name: string; level: number; subclass?: string | null; fraction: CasterFraction }> = [];
+  let combinedCasterLevel = 0;
+  let pact: MulticlassSpellcastingInfo["pact"] = null;
+  let arcana: Array<{ level: number; total: number }> = [];
+
+  for (const entry of classEntries) {
+    const profile = casterProfile(entry.name, entry.subclass);
+    if (!profile) continue;
+
+    const abilityMod = abilityModifier(abilityScores[profile.ability] ?? 10);
+    const spellSaveDC = 8 + proficiencyBonus + abilityMod;
+    const spellAttackBonus = proficiencyBonus + abilityMod;
+    classes.push({
+      className: entry.name,
+      subclass: entry.subclass ?? null,
+      ability: profile.ability,
+      spellSaveDC,
+      spellAttackBonus,
+      preparation: profile.preparation,
+      casterFraction: profile.fraction,
+    });
+
+    if (profile.fraction === "pact") {
+      const p = PACT_MAGIC_SLOTS[Math.min(20, Math.max(1, entry.level))];
+      if (p) pact = { slotLevel: p.slotLevel, count: p.count, spellSaveDC, spellAttackBonus };
+      arcana = mysticArcanumLevels(entry.level).map((level) => ({ level, total: 1 }));
+    } else {
+      combinedCasterLevel += casterLevelContribution(profile.fraction, entry.level);
+      combinedEntries.push({ ...entry, fraction: profile.fraction });
+    }
+  }
+
+  let slotTotals: Array<{ level: number; total: number }> = [];
+  if (combinedEntries.length === 1) {
+    // Single contributing caster: use its own class table (odd-level half/third
+    // rows differ from the multiclass floor math) — byte-for-byte deriveSpellcasting.
+    const only = combinedEntries[0];
+    slotTotals = deriveSpellcasting(only.name, only.level, abilityScores, proficiencyBonus, only.subclass ?? undefined)?.slotTotals ?? [];
+  } else if (combinedEntries.length > 1 && combinedCasterLevel > 0) {
+    slotTotals = Object.entries(MULTICLASS_SPELL_SLOTS[Math.min(20, combinedCasterLevel)] ?? {})
+      .map(([lvl, total]) => ({ level: Number(lvl), total }))
+      .sort((a, b) => a.level - b.level);
+  }
+
+  return { combinedCasterLevel, slotTotals, classes, pact, arcana };
+}
 
 /**
  * Derives the mechanical spellcasting stats (ability, save DC, attack bonus,
