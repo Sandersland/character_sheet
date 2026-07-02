@@ -255,6 +255,24 @@ describe("TurnHub — Battle Master maneuvers", () => {
     );
     expect(screen.getByText(/add \+\d+ to your AC/i)).toBeInTheDocument();
   });
+
+  it("clears a stale maneuver error on a later successful effect maneuver", async () => {
+    const user = userEvent.setup();
+    vi.mocked(applyResourceTransactions)
+      .mockRejectedValueOnce(new Error("Superiority die spend failed."))
+      .mockResolvedValueOnce(makeCharacter());
+    renderHub();
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: /Evasive Footwork \(d8\)/ }));
+    expect((await screen.findAllByText(/Superiority die spend failed\./i)).length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: /Evasive Footwork \(d8\)/ }));
+    await waitFor(() =>
+      expect(screen.queryAllByText(/Superiority die spend failed\./i)).toHaveLength(0),
+    );
+    expect(screen.getByText(/add \+\d+ to your AC/i)).toBeInTheDocument();
+  });
 });
 
 describe("TurnHub — accessibility", () => {
