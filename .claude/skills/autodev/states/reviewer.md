@@ -12,21 +12,37 @@ Worker's claim — chunks: {{chunks}} · tests: {{testsSummary}}
    - no multi-line comment blocks; `@/` imports only (no `../`); no raw skill/ability keys rendered; no direct `fetch` from components; frontend files in their proper `components/ui` / `features/<domain>` / `lib` homes
    - backend (if touched): nothing persisted that should be derived; rules data only in `lib/`; mutations only via `…/transactions` endpoints
    - doc-map surfaces touched → mapped doc updated in the same branch
-4. **It compiles and passes — run it yourself, in the containers:**
+4. **It compiles and passes — run it yourself, in the containers** (the backend container already has `DATABASE_URL` set — never override it):
    - `docker compose exec -T backend sh -c 'cd /app && npx tsc --noEmit'` (and frontend twin)
    - `docker compose exec -T backend sh -c 'cd /app && npm run lint'` (and frontend twin)
    - `docker compose exec -T backend sh -c 'cd /app && npx vitest run'` and `docker compose exec -T frontend sh -c 'cd /app && npx vitest run'`
-5. **UI surface** ({{uiSurface}}): if true, sanity-check the running app with `curl` against {{backendUrl}} for API shape changes, and flag in your payload that visual verification was not performed (a human should eyeball the PR's UI).
+5. **UI surface** (uiSurface = {{uiSurface}}): if true, verify it visually in this worktree's own running stack using the Playwright browser tools. Do this LAST, after all test/lint runs — the backend suite's auth fixtures delete the dev-login user (cascading its characters), so anything created earlier is wiped.
+   1. Create your test character now, via curl (the backend suite must not run again after this):
+      ```
+      curl -s -X POST {{backendUrl}}/auth/dev-login
+      ```
+      Take `token` from the response, then (one line, substituting the token):
+      ```
+      curl -s -X POST {{backendUrl}}/characters -H "Content-Type: application/json" -H "Cookie: cs_session=<token>" -d '{"name":"Verify Dummy","alignment":"Neutral Good","race":"Human","background":"Acolyte","classes":[{"name":"Fighter"}],"abilityScores":{"strength":15,"dexterity":14,"constitution":13,"intelligence":10,"wisdom":12,"charisma":8}}'
+      ```
+      Note the `id` in the response. If either call fails, skip the browser check and report `uiVerified: false` with the reason.
+   2. `browser_navigate` to {{frontendUrl}}, log in via `browser_evaluate`: `fetch('/api/auth/dev-login', {method:'POST', credentials:'include'})` — then navigate again (reload) so the app picks up the session.
+   3. Open `{{frontendUrl}}/characters/<id>` and exercise the changed surface against the acceptance criteria — click through the actual flow, don't just look at the landing state.
+   4. Check `browser_console_messages` for new errors (the known-benign `/sessions/active` 404s don't count).
+   5. Screenshot the changed surface to `/tmp/autodev-review-{{issue}}.png` — absolute `/tmp` path only, never the repo.
+   > Playwright gotcha: element refs go stale after any snapshot or reload — re-run `browser_snapshot` for fresh refs rather than reusing old ones; fall back to `browser_evaluate` DOM queries for stubborn assertions.
 
 ## Verdict
 
 - Everything holds → `approve`.
-- Anything fails → `changes`. Be specific and complete in one pass — each fix cycle is expensive, and you get at most 3.
+- Anything fails (including a UI surface that renders wrong or throws console errors) → `changes`. Be specific and complete in one pass — each fix cycle is expensive, and you get at most 3.
 
 ## Payload for `approve`
 
 - `checks` (object) — `{ typecheckBackend, typecheckFrontend, lintBackend, lintFrontend, testsBackend, testsFrontend }`, each "pass" or the failure summary
-- `reviewSummary` (string) — what you verified, plus "UI not visually verified" if uiSurface was true
+- `uiVerified` (boolean, always include) — true only if you actually exercised the surface in the browser; false for non-UI issues or when verification was impossible (say why in reviewSummary)
+- `screenshots` (string[], may be empty) — the /tmp paths you captured
+- `reviewSummary` (string) — what you verified and how
 
 ## Payload for `changes`
 

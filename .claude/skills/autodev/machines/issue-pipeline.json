@@ -3,7 +3,7 @@
   "description": "Pick one ready GitHub issue, confirm scope, build it in an isolated worktree, review, open a PR against the integration branch.",
   "initial": "GetWork",
   "budget": { "maxSteps": 16, "maxCostUsd": 15, "maxWallMinutes": 150 },
-  "loopLimits": { "Reviewer->Worker": 3 },
+  "loopLimits": { "Reviewer->Worker": 3, "ClaimIssue->GetWork": 3 },
   "context": { "integrationBranch": "staging", "autoMerge": true },
   "states": {
     "GetWork": {
@@ -17,7 +17,12 @@
       "allowedTools": ["Bash(gh issue list:*)", "Bash(gh issue view:*)"],
       "bashAllow": ["^gh issue (list|view)\\b", "^(head|tail|grep|wc|sort|cat|jq|awk|sed -n)\\b"],
       "required": { "found": ["issue", "title", "slug", "requirements", "acceptance"], "empty": [] },
-      "transitions": { "found": "ConfirmScope", "empty": "Done" }
+      "transitions": { "found": "ClaimIssue", "empty": "Done" }
+    },
+    "ClaimIssue": {
+      "type": "script",
+      "handler": "claimIssue",
+      "transitions": { "claimed": "ConfirmScope", "taken": "GetWork" }
     },
     "ConfirmScope": {
       "type": "agent",
@@ -59,20 +64,24 @@
     },
     "Reviewer": {
       "type": "agent",
-      "maxTurns": 60,
-      "maxBudgetUsd": 4,
-      "wallMinutes": 30,
+      "maxTurns": 80,
+      "maxBudgetUsd": 5,
+      "wallMinutes": 40,
       "cwd": "{{worktree}}",
       "prompt": "states/reviewer.md",
-      "tools": "Bash,Read,Glob,Grep",
+      "mcpConfig": {
+        "mcpServers": {
+          "playwright": { "command": "npx", "args": ["-y", "@playwright/mcp@0.0.77", "--isolated"] }
+        }
+      },
       "allowedTools": [
-        "Read", "Glob", "Grep",
+        "Read", "Glob", "Grep", "mcp__playwright",
         "Bash(docker compose:*)",
         "Bash(git diff:*)", "Bash(git log:*)", "Bash(git status:*)",
         "Bash(gh issue view:*)", "Bash(curl:*)"
       ],
       "bashAllow": ["^docker compose\\b", "^git (diff|log|status)\\b", "^gh issue view\\b", "^curl\\b", "^(head|tail|grep|wc|sort|cat|jq|awk|sed -n)\\b", "^ls\\b"],
-      "required": { "approve": ["checks"], "changes": ["findings"] },
+      "required": { "approve": ["checks", "uiVerified"], "changes": ["findings"] },
       "transitions": { "approve": "Submit", "changes": "Worker" }
     },
     "Submit": {

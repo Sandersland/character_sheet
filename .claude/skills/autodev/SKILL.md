@@ -10,12 +10,14 @@ A finite state machine for unattended issue→PR development. Unlike the prompt-
 ## The machine (`machines/issue-pipeline.json`)
 
 ```
-GetWork ──found──▶ ConfirmScope ──ready──▶ SetupWorktree ──▶ Worker ──done──▶ Reviewer
-   │empty              │not-ready            (script)          ▲                │approve
-   ▼                   ▼                                       │changes         ▼
-  Done            FlagIssue ─▶ ApplyFlag ─▶ Done               └──(≤3 loops)  Submit ──▶ Done
-                  (comment + needs-refinement label)                          (push + PR,
-                            any state error / budget breach ──▶ Fail ──▶ Done  auto-merge)
+GetWork ──found──▶ ClaimIssue ──claimed──▶ ConfirmScope ──ready──▶ SetupWorktree ──▶ Worker
+   │empty   ▲          │taken (≤3)             │not-ready            (script,        done│  ▲
+   ▼        └──────────┘                       ▼                      seeds UI char)     ▼  │changes
+  Done                                    FlagIssue ─▶ ApplyFlag ─▶ Done             Reviewer│(≤3)
+                                          (comment + needs-refinement                approve│──┘
+                                           label + unassign)                             ▼
+              any state error / budget breach ──▶ Fail ──▶ Done                    Submit ──▶ Done
+                                    (comment + unassign)                     (push + PR, auto-merge)
 ```
 
 Submit arms **auto-merge** (squash) on the PR, so a green claude-review + CI lands it into the integration branch unattended. Set `"autoMerge": false` in the machine's `context` to keep PRs open for a human merge instead.
@@ -61,7 +63,19 @@ A new pipeline = a new `machines/<name>.json` + prompt files under `states/` —
 
 Note the two-layer Bash contract: `allowedTools` prefix-matches the **whole** command (a piped `gh issue view … | jq` passes on its `gh` prefix), while the guard's `bashAllow`/`bashDeny` judge each **segment** — so filter commands (`head`, `jq`, …) belong in `bashAllow` even when absent from `allowedTools`; they're only reachable as pipe segments. In allowlist states the guard also blocks command substitution (`$(…)`/backticks) outright; in deny-based states substitution bodies are extracted and deny-checked.
 
-## Known limits (v1)
+## Concurrent runs
 
-- The Reviewer does not drive a browser; when the issue has a UI surface the PR body flags that visual verification is still needed (run `verify-frontend` on the PR, per the repo's UI-verification convention).
-- One run at a time is the intended mode; concurrent runs work but will race for worktree slots.
+Concurrent runs are safe: `worktree.sh create` serializes slot assignment behind an mkdir lock (`.claude/worktrees/.slot.lock` — remove it by hand only if a create crashed while holding it), and each run **claims its issue by self-assigning** right after GetWork (the `ClaimIssue` script state). GetWork excludes assigned issues, so a `taken` claim loops back for a re-pick (≤3 tries). Failure paths (`Fail`, `ApplyFlag`) release the claim; a successful PR keeps the assignee as an ownership signal until merge.
+
+## UI verification
+
+When ConfirmScope marks `uiSurface: true`, the Reviewer gets a Playwright MCP server (declared per-state via `mcpConfig` → `--mcp-config --strict-mcp-config`) and, **after** its test runs, creates a deterministic test character via dev-login + `POST /api/characters` (fresh worktree DBs have catalog only, zero characters) and exercises the changed surface in the worktree's own frontend — login, click the flow, console check, screenshot to `/tmp`. The PR body reports the outcome (`UI: visually verified` vs an explicit ⚠ when verification failed).
+
+> Ordering is load-bearing (learned from run `…issue-322`): `auth.test.ts`'s fixture cleanup deletes the `dev-user-local` User, cascading away its characters — so the character must be created after the last backend-suite run, never in SetupWorktree.
+
+> Gotcha (verified empirically): `--tools` restricts the built-in toolset and **also strips MCP tools** — a state that needs an MCP server must omit `tools` and rely on `allowedTools` (headless mode auto-denies everything unlisted, so the wall holds).
+
+## Known limits
+
+- The Reviewer verifies UI against the seeded dummy character (level-1 Human Fighter), not production-like data — surfaces gated on higher levels/classes/inventory may need a human pass.
+- The issue claim is check-then-assign (GitHub has no atomic claim); a sub-second tie between two runs can double-claim. The slot lock still prevents any port collision in that case.
