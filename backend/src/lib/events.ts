@@ -51,6 +51,7 @@ export type EventType =
   | "subclassRemoved"
   | "fightingStyleChosen"
   | "fightingStyleRemoved"
+  | "classLevelsReconciled"
   // resources
   | "spendResource"
   | "restoreResource"

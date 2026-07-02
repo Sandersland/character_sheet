@@ -701,15 +701,34 @@ export function serializeCharacter(row: CharacterWithRelations) {
       sessionId: e.sessionId ?? undefined,
     })),
 
-    // Structured, multiclass-aware view alongside the flattened
-    // class/subclass above — today always a single entry.
-    classes: row.classEntries.map((entry) => ({
-      name: entry.name,
-      level: entry.level,
-      subclass: entry.subclass ?? undefined,
-      subclassId: entry.subclassId ?? undefined,
-      classId: entry.classId ?? undefined,
-    })),
+    // Structured, multiclass-aware view alongside the flattened class/subclass
+    // above. Clamp-on-read (issue #124): cap the cumulative per-class levels at
+    // the XP-derived total so a not-yet-reconciled over-cap character still
+    // renders correctly. Position order = allocation order, so position-0 keeps
+    // its levels first and trailing (newest) classes absorb the shortfall.
+    classes: (() => {
+      let remaining = progress.level;
+      const out: {
+        name: string;
+        level: number;
+        subclass?: string;
+        subclassId?: string;
+        classId?: string;
+      }[] = [];
+      for (const entry of row.classEntries) {
+        if (remaining <= 0) break;
+        const level = Math.min(entry.level, remaining);
+        remaining -= level;
+        out.push({
+          name: entry.name,
+          level,
+          subclass: entry.subclass ?? undefined,
+          subclassId: entry.subclassId ?? undefined,
+          classId: entry.classId ?? undefined,
+        });
+      }
+      return out;
+    })(),
   };
 }
 

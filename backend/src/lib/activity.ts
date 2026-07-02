@@ -125,6 +125,14 @@ async function reverseEvent(
         data: { level: before.classEntryLevel as number },
       });
     }
+    // A multiclass "new class" level-up created a fresh CharacterClassEntry
+    // (#124). Undo must delete it, or a ghost entry survives the revert.
+    // deleteMany so a later level-down that already removed it is a no-op.
+    if (data?.createdClassEntryId) {
+      await tx.characterClassEntry.deleteMany({
+        where: { id: data.createdClassEntryId as string },
+      });
+    }
   } else if (category === "currency") {
     const beforeCurrency = before.currency as Record<string, number> | undefined;
     if (beforeCurrency) {
@@ -163,6 +171,47 @@ async function reverseEvent(
       });
     }
   } else if (category === "class") {
+    // Multiclass level-down reconcile (issue #124): restore each entry's level
+    // (recreating any that were deleted when they hit level 0).
+    if (event.type === "classLevelsReconciled") {
+      const beforeEntries = before.classEntries as
+        | {
+            id: string;
+            name: string;
+            level: number;
+            position: number;
+            classId: string | null;
+            subclass: string | null;
+            subclassId: string | null;
+          }[]
+        | undefined;
+      if (beforeEntries) {
+        for (const e of beforeEntries) {
+          await tx.characterClassEntry.upsert({
+            where: { id: e.id },
+            update: {
+              level: e.level,
+              name: e.name,
+              position: e.position,
+              classId: e.classId ?? null,
+              subclass: e.subclass ?? null,
+              subclassId: e.subclassId ?? null,
+            },
+            create: {
+              id: e.id,
+              characterId,
+              level: e.level,
+              name: e.name,
+              position: e.position,
+              classId: e.classId ?? null,
+              subclass: e.subclass ?? null,
+              subclassId: e.subclassId ?? null,
+            },
+          });
+        }
+      }
+      return;
+    }
     // Restore subclassId + subclass display name onto the class entry.
     // The before snapshot carries the class entry's data (not the whole
     // character row), so grab classEntryId from event.data.
