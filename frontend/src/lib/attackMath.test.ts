@@ -92,6 +92,11 @@ describe("unarmedDamageDisplay", () => {
     expect(unarmedDamageDisplay({ attackBonus: 0, damage: { count: 1, faces: 4, modifier: 0, damageType: "bludgeoning" } })).toBe("1d4");
     expect(unarmedDamageDisplay({ attackBonus: 0, damage: { count: 1, faces: 6, modifier: 2, damageType: "bludgeoning" } })).toBe("1d6 + 2");
   });
+
+  it("dash-separates a negative modifier using its absolute value", () => {
+    expect(unarmedDamageDisplay({ attackBonus: 0, damage: { count: 1, faces: 6, modifier: -1, damageType: "bludgeoning" } })).toBe("1d6 - 1");
+    expect(unarmedDamageDisplay({ attackBonus: 0, damage: { count: 1, faces: 4, modifier: -2, damageType: "bludgeoning" } })).toBe("1d4 - 2");
+  });
 });
 
 describe("hasSuperiorityDice", () => {

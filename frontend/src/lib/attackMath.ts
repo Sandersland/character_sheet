@@ -57,7 +57,7 @@ export function unarmedDamageDisplay(unarmed: Character["unarmedStrike"]): numbe
   const { faces, modifier } = unarmed.damage;
   return faces === 1
     ? Math.max(1, 1 + modifier)
-    : `1d${faces}${modifier !== 0 ? ` + ${modifier}` : ""}`;
+    : `1d${faces}${modifier !== 0 ? ` ${modifier < 0 ? "-" : "+"} ${Math.abs(modifier)}` : ""}`;
 }
 
 // Gate: only show maneuver affordances when the character has a Battle Master die pool.
