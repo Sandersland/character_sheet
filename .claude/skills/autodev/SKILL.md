@@ -96,14 +96,14 @@ Semantics worth knowing:
 
 ## UI verification
 
-When ConfirmScope marks `uiSurface: true`, the Reviewer gets a Playwright MCP server (declared per-state via `mcpConfig` → `--mcp-config --strict-mcp-config`) and, **after** its test runs, creates a deterministic test character via dev-login + `POST /api/characters` (fresh worktree DBs have catalog only, zero characters) and exercises the changed surface in the worktree's own frontend — login, click the flow, console check, screenshot to `/tmp`. The PR body reports the outcome (`UI: visually verified` vs an explicit ⚠ when verification failed).
+When ConfirmScope marks `uiSurface: true`, the Reviewer gets a Playwright MCP server (declared per-state via `mcpConfig` → `--mcp-config --strict-mcp-config`) and, **after** its unit-test/lint runs, verifies the UI in two passes. First it runs the full deterministic e2e suite (`docker compose --profile e2e run --rm e2e`), whose `global-setup.ts` idempotently re-seeds the personas (Smoke Fighter L1 + Wizard L5) — so the Reviewer no longer hand-rolls a test character via curl, and the suite result lands as `e2eSuite` in the approve payload. Then an exploratory Playwright-MCP pass exercises **only** the surface the issue changed (login, click the changed flow, console check, screenshot to `/tmp`) — it does not re-verify flows the suite already covers. The PR body reports the outcome (`UI: visually verified` vs an explicit ⚠ when verification failed).
 
-> Ordering is load-bearing (learned from run `…issue-322`): `auth.test.ts`'s fixture cleanup deletes the `dev-user-local` User, cascading away its characters — so the character must be created after the last backend-suite run, never in SetupWorktree.
+> Ordering is load-bearing (learned from run `…issue-322`): `auth.test.ts`'s fixture cleanup deletes the `dev-user-local` User, cascading away its characters — which is why the e2e suite (re-seeding personas via `global-setup.ts`) runs after the last backend-suite run, never before.
 
 > Gotcha (verified empirically): `--tools` restricts the built-in toolset and **also strips MCP tools** — a state that needs an MCP server must omit `tools` and rely on `allowedTools` (headless mode auto-denies everything unlisted, so the wall holds).
 
 ## Known limits
 
-- The Reviewer verifies UI against the seeded dummy character (level-1 Human Fighter), not production-like data — surfaces gated on higher levels/classes/inventory may need a human pass.
+- The Reviewer verifies UI against the e2e suite's seeded personas (Smoke Fighter L1, Wizard L5), not production-like data — surfaces gated on higher levels/other classes/inventory may need a human pass.
 - The issue claim is check-then-assign (GitHub has no atomic claim); a sub-second tie between two runs can double-claim. The slot lock still prevents any port collision in that case.
 - The subscription's **weekly** compute cap has no parseable in-band reset signal — hitting it looks like a rate_limit tempfail (exit 75) that never clears on resume. An orchestrator's rate-limit retry cap bounds the damage; if resumes keep tempfailing, check `/usage` manually.
