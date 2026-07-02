@@ -23,7 +23,7 @@
 | `routes/spellcasting.ts` | `POST /characters/:id/spellcasting/transactions` — batch spell ops |
 | `routes/resources.ts` | `POST /characters/:id/resources/transactions` — batch resource/maneuver ops (spend/restore, learn/forget) |
 | `routes/conditions.ts` | `POST /characters/:id/conditions/transactions` — apply/remove conditions, set exhaustion |
-| `routes/class.ts` | `POST /characters/:id/class/transactions` — post-creation subclass + fighting-style selection |
+| `routes/class.ts` | `POST /characters/:id/class/transactions` — post-creation subclass + fighting-style selection + multiclass add-class (`addClass`) |
 | `routes/maneuvers.ts` | `GET /maneuvers` — Battle Master maneuver catalog |
 | `routes/feats.ts` | `GET /feats` — feat catalog |
 | `routes/advancement.ts` | `POST /characters/:id/advancement/transactions` — take/remove ASIs and feats |
@@ -66,7 +66,7 @@
 | `lib/spellcasting.ts` | `SpellEntry`/`SpellcastingMutableState` shapes, `normalizeSpellcastingMutable()` (handles compact + legacy JSON formats), `applySpellcastingOperations()`. |
 | `lib/resources.ts` | `applyResourceOperations()` — spend/restore class resources and learn/forget maneuvers + tool profs; persists `used` counts and known lists in `resources` JSON. Analog to `spellcasting.ts`. |
 | `lib/conditions.ts` | `applyConditionsOperations()` — apply/remove standard 5e conditions and set exhaustion; persists the `conditions` JSON column. Pure mutable state (not level-derived). |
-| `lib/class.ts` | `applyClassOperations()` — post-creation subclass and fighting-style selection (`setSubclass`, `setFightingStyle`); fills the gap PATCH and creation don't cover. |
+| `lib/class.ts` | `applyClassOperations()` — post-creation subclass and fighting-style selection (`setSubclass`, `setFightingStyle`) plus multiclass add-class (`addClass`: creates a level-1 `CharacterClassEntry` at the next `position`, validated against the shared `multiclassPrerequisitesMet` check, and rolls the new class's first-level HP so the entry level stays coupled to `hitDice.total`); fills the gap PATCH and creation don't cover. |
 | `lib/actions.ts` | `DERIVED_ACTIONS` + `deriveActions()` (filters the action catalog for a character's class/level/subclass, called from `serializeCharacter`) and `ACTION_EFFECT_FN` dispatch table for applying an action's effects. |
 | `lib/inventory.ts` | Currency math, catalog→snapshot builders, `applyInventoryOperations()`. Reference implementation for the intent-bearing transaction pattern. Includes the `setEquipped` op (logged as `equipped`/`unequipped` events). |
 | `lib/itemDetail.ts` | `serializeWeaponDetail`/`serializeArmorDetail`/`serializeConsumableDetail` — shared by both `routes/items.ts` (catalog) and `routes/characters.ts` (inventory rows). |
@@ -176,7 +176,7 @@ The Character row carries these JSON columns: `hitPoints`, `hitDice`, `abilitySc
 - **Polymorphic soft-reference**: `entityType`/`entityId` (no FK — the entity may be deleted).
 - **before/after JSON snapshots**: the state before and after the operation, used by the revert handler to restore. The free-form `data` JSON carries op-specific extras the revert handler also reads — e.g. inventory delete ops stash a self-contained `data.deletedItem` snapshot (all scalar columns + the weapon/armor/consumable detail block) so the deleted row can be rebuilt on undo. (`data` lives outside `before`/`after` precisely so it is never fed to `diffToFields`.)
 - **Append-only**: events are flagged `reverted:true`, never deleted. A `revert` meta-event is appended on undo.
-- **`class` category** carries multiclass structural changes: `classLevelsReconciled` (level-down trims/removes `CharacterClassEntry` rows) reverts via a custom branch in `activity.ts` that **recreates** any entries deleted during reconcile; a multiclass "new class" level-up stashes `data.createdClassEntryId` so undo can delete the entry it created.
+- **`class` category** carries multiclass structural changes: `classLevelsReconciled` (level-down trims/removes `CharacterClassEntry` rows) reverts via a custom branch in `activity.ts` that **recreates** any entries deleted during reconcile; `classAdded` (the `addClass` op) and a multiclass "new class" level-up both stash `data.createdClassEntryId` so undo can delete the entry they created — `classAdded` also restores the `hitPoints`/`hitDice` bump from its `before` snapshot.
 - **Session tagging**: `sessionId String?` — events fired while a session is active get its id; between-session events (shopping, leveling between adventures) get `null`. Events stay **per-character** (`CharacterEvent.characterId` is unchanged); a campaign session aggregates them by `sessionId`. `getActiveSessionId(characterId)` (called at the top of every `apply*Operations()`) now resolves the character's `campaignId` → the campaign's active session — so a character with no campaign always tags `null`.
 
 `logEvent(tx, params)` in `lib/events.ts` writes the event + computes `CharacterEventField` diffs (via `diffToFields`) inside the caller's `$transaction`. All ops in a single request share a `randomUUID()` `batchId`.
