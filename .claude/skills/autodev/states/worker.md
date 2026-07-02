@@ -21,6 +21,7 @@ You are the **Worker** state of an autonomous development pipeline. Your goal: f
 - Docs: if your change touches a surface in the CLAUDE.md doc-map, update the mapped doc in the same commit.
 - Artifacts: screenshots/captures go to `/tmp` only — never the project tree.
 - Denied writes: if a file write/edit is permission-denied twice for the same path, STOP retrying that path (repeat denials burn the session rate limit). Finish everything else, and report it in your final payload's `blockedWrites` array with the exact content you intended to write. Only emit `blocked` if the denied write is itself a stated requirement.
+- Dependencies: if you change any `package.json`, do NOT try to sync the root `package-lock.json` — it isn't mounted in your containers. The Submit step repairs it automatically before pushing.
 
 ## Run ALL tooling inside the containers, not on the host
 
