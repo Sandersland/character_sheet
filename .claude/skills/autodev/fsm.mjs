@@ -311,7 +311,8 @@ const HANDLERS = {
     if (!slot) throw new Error(`worktree.sh did not register a slot for ${branch}`);
     const backendUrl = `http://localhost:${4000 + slot * 10}/api`;
     log(run, `worktree ${branch} on slot ${slot}; waiting for backend health…`);
-    await pollHealth(`${backendUrl}/characters`, 10 * 60_000);
+    // /api/health is the public probe — /api/characters 401s behind auth.
+    await pollHealth(`${backendUrl}/health`, 10 * 60_000);
     Object.assign(run.ctx, {
       branch,
       slot,
@@ -385,7 +386,8 @@ const HANDLERS = {
         ].join("\n"),
       );
       spawnSync("gh", ["issue", "comment", String(issue), "--body-file", file], { cwd: ROOT });
-      spawnSync("gh", ["issue", "edit", String(issue), "--add-label", "needs-refinement"], { cwd: ROOT });
+      // No relabel here: a build/infra failure is not a scope problem. Only the
+      // FlagIssue path (unbuildable scope) applies needs-refinement.
     }
     return { transition: "ok", payload: {}, summary: `run failed: ${failure ?? "unknown"}` };
   },
@@ -414,6 +416,7 @@ function saveRun(run) {
         currentState: run.currentState,
         step: run.step,
         costUsd: run.costUsd,
+        failedAt: run.failedAt ?? null,
         loops: run.loops,
         sessions: run.sessions,
         ctx: run.ctx,
@@ -476,6 +479,7 @@ async function execute(run) {
         break;
       }
       run.ctx.failure = err.message;
+      run.failedAt = stateName; // resume re-enters here by default
       run.currentState = machine.states.Fail ? "Fail" : "Done";
       log(run, `ERROR in ${stateName}: ${err.message} → ${run.currentState}`);
       saveRun(run);
@@ -554,6 +558,9 @@ if (cmd === "run") {
     dir,
     machine,
     status: "running",
+    // Re-enter at --start, else the state that failed, else wherever it stopped.
+    currentState: opts.start ?? saved.failedAt ?? saved.currentState,
+    failedAt: null,
     startedAt: Date.now(), // wall budget restarts on resume
     dryRun: false,
     only: null,

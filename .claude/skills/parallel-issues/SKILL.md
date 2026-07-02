@@ -74,7 +74,7 @@ This assigns a slot (1–9), writes a gitignored `.env` with the slot's ports + 
 - backend  `http://localhost:$((4000 + slot*10))/api`
 - postgres `localhost:$((5432 + slot*10))`
 
-First boot builds images and runs `prisma migrate deploy && prisma db seed` against the private DB. Before handing off to a build agent, wait until the backend is healthy — poll `http://localhost:$((4000 + slot*10))/api/characters` until it returns `200`.
+First boot builds images and runs `prisma migrate deploy && prisma db seed` against the private DB. Before handing off to a build agent, wait until the backend is healthy — poll `http://localhost:$((4000 + slot*10))/api/health` until it returns `200` (`/api/characters` 401s behind auth, so it never reads healthy).
 
 ### 5. Build each issue in parallel (one background agent per worktree)
 
@@ -109,7 +109,7 @@ Launch one background subagent per issue (`run_in_background: true`), so they bu
      ```bash
      docker compose exec -T backend sh -c 'cd /app && npx prisma migrate dev --name <change> && npx prisma generate'
      ```
-     Then `docker compose restart backend` so the running server picks up the regenerated client; wait for `/api/characters` → `200` again.
+     Then `docker compose restart backend` so the running server picks up the regenerated client; wait for `/api/health` → `200` again.
    - **Frontend tests** need no DB:
      ```bash
      docker compose exec -T frontend sh -c 'cd /app && npx vitest run <test-file>'

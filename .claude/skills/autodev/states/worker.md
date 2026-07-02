@@ -27,7 +27,7 @@ This worktree's `node_modules` are empty Docker-volume mountpoints — host-run 
 
 - Backend tests: `docker compose exec -T backend sh -c 'cd /app && npx vitest run <test-file>'`
 - Frontend tests: `docker compose exec -T frontend sh -c 'cd /app && npx vitest run <test-file>'`
-- Schema change: `docker compose exec -T backend sh -c 'cd /app && npx prisma migrate dev --name <change> && npx prisma generate'` then `docker compose restart backend` and wait for {{backendUrl}}/characters → 200.
+- Schema change: `docker compose exec -T backend sh -c 'cd /app && npx prisma migrate dev --name <change> && npx prisma generate'` then `docker compose restart backend` and wait for {{backendUrl}}/health → 200 (`/characters` 401s behind auth).
 - Typecheck: `docker compose exec -T backend sh -c 'cd /app && npx tsc --noEmit'` (and same for frontend).
 - Lint (CI runs it — must be clean): `docker compose exec -T backend sh -c 'cd /app && npm run lint'` and the frontend twin.
 
