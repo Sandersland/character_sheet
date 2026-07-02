@@ -268,10 +268,20 @@ const statePath = join(STATE_DIR, "batch.json");
 if (existsSync(statePath)) {
   batch = JSON.parse(readFileSync(statePath, "utf8"));
   // A process cannot survive a restart — anything "running" needs reconciling.
+  // A killed run usually left its issue CLAIMED (self-assigned), so a fresh
+  // `fsm run` would bounce ClaimIssue→taken→GetWork and grab an unrelated
+  // issue. Resume the interrupted run dir instead (retry_wait due now).
   for (const [n, entry] of Object.entries(batch.issues)) {
     if (entry.status === "running") {
-      entry.status = "pending"; // rundir survives; generic resume covers partial runs
-      log(`RECONCILE #${n} was running at shutdown — back to pending`);
+      entry.rundir = entry.rundir ?? latestRunDir(Number(n));
+      if (entry.rundir) {
+        entry.status = "retry_wait";
+        entry.retryAt = Date.now();
+        log(`RECONCILE #${n} was running at shutdown — will resume ${entry.rundir}`);
+      } else {
+        entry.status = "pending";
+        log(`RECONCILE #${n} was running at shutdown, no run dir — back to pending`);
+      }
     }
   }
   log(`RESTART batch from ${statePath}`);
