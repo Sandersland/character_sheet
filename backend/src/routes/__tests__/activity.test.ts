@@ -1099,6 +1099,123 @@ describe("POST /:id/events/:batchId/revert — level-up / level-down class-entry
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// Meta revert-event labelling (issue #320): the appended `revert` event must
+// label the PRIMARY action of the batch, not the chronologically-last member.
+// A damage-that-drops-concentration batch orders [damage, concentrationDropped]
+// (asc by createdAt); the revert entry must read as "Undid: Took N damage"
+// (hitPoints), never "Undid: Concentration on X dropped" (spellcasting).
+// ════════════════════════════════════════════════════════════════════════════
+
+const CONC_ID = "test-activity-concentration-1";
+const CONC_CATALOG_NAME = "Activity Revert Test Concentrator";
+
+const CONC_SPELLCASTING_JSON = {
+  slotsUsed: {},
+  spells: [
+    {
+      id: "fixture-conc-bless",
+      name: "Fixture Bless",
+      level: 1,
+      school: "enchantment",
+      prepared: true,
+      castingTime: "1 action",
+      range: "30 ft",
+      duration: "Concentration, up to 1 minute",
+      description: "Bless up to three creatures.",
+      concentration: true,
+    },
+  ],
+  concentratingOn: { entryId: "fixture-conc-bless", spellName: "Fixture Bless" },
+};
+
+describe("POST /:id/events/:batchId/revert — meta event labels the primary action (#320)", () => {
+  let concClassId: string;
+
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: CONC_CATALOG_NAME } });
+  });
+
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+    const cls = await prisma.characterClass.upsert({
+      where: { name: CONC_CATALOG_NAME },
+      create: {
+        name: CONC_CATALOG_NAME,
+        hitDie: "d6",
+        savingThrows: ["intelligence", "wisdom"],
+        skillChoiceCount: 2,
+        skillChoices: ["arcana", "history"],
+        isSpellcaster: true,
+      },
+      update: {},
+    });
+    concClassId = cls.id;
+
+    await prisma.character.create({
+      data: {
+        id: CONC_ID,
+        ownerId: OWNER_ID,
+        name: "Activity Test Concentrator",
+        alignment: "True Neutral",
+        experiencePoints: 300, // level 2, prof +2
+        armorClass: 12,
+        initiativeBonus: 1,
+        speed: 30,
+        // Large HP pool so 150 damage leaves HP > 0 (isolates the "damage" save path).
+        hitPoints: { current: 200, max: 200, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 2, die: "d6", spent: 0 },
+        abilityScores: {
+          strength: 8, dexterity: 12, constitution: 10, // +0 CON → save can't reach DC 75
+          intelligence: 16, wisdom: 10, charisma: 10,
+        },
+        savingThrowProficiencies: ["intelligence", "wisdom"],
+        skills: [],
+        toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 10, pp: 0 },
+        spellcasting: CONC_SPELLCASTING_JSON as Prisma.InputJsonValue,
+        classEntries: { create: [{ name: "wizard", classId: concClassId, position: 0 }] },
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: CONC_ID } });
+  });
+
+  it("labels the meta revert with the primary damage action, not the trailing concentration drop", async () => {
+    // 150 damage → DC 75, +0 save → guaranteed drop. Batch = [damage, concentrationDropped].
+    const dmg = await supertest.agent(app()).set("Cookie", COOKIE)
+      .post(`/api/characters/${CONC_ID}/hp`)
+      .send({ operations: [{ type: "damage", amount: 150 }] });
+    expect(dmg.status).toBe(200);
+    expect(dmg.body.hitPoints.current).toBe(50);
+    expect(dmg.body.concentrationChecks[0].held).toBe(false);
+
+    // Sanity: the batch really contains both events, with the drop recorded last.
+    const batchId = await latestBatchId(CONC_ID);
+    const batchEvents = await prisma.characterEvent.findMany({
+      where: { characterId: CONC_ID, batchId },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(batchEvents.map((e) => e.type)).toEqual(["damage", "concentrationDropped"]);
+
+    const res = await revert(CONC_ID, batchId);
+    expect(res.status).toBe(200);
+
+    // The appended meta event labels the PRIMARY (damage) action.
+    const meta = await prisma.characterEvent.findFirstOrThrow({
+      where: { characterId: CONC_ID, type: "revert" },
+    });
+    expect(meta.category).toBe("hitPoints");
+    expect(meta.summary).toMatch(/^Undid: Took 150 damage/);
+    // Regression guard: it must NOT label the trailing concentration drop.
+    expect(meta.category).not.toBe("spellcasting");
+    expect(meta.summary).not.toMatch(/Concentration/i);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // GET /:id/activity — ?category= filter (issue #69)
 //
 // The filter is derived from the Prisma-generated CharacterEventCategory enum.

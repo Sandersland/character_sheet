@@ -281,9 +281,9 @@ export async function revertBatch(
       await tx.characterEvent.create({
         data: {
           characterId,
-          category: reversed[0]?.category ?? "hitPoints",
+          category: reversed[reversed.length - 1]?.category ?? "hitPoints",
           type: "revert",
-          summary: `Undid: ${reversed[0]?.summary ?? "previous action"}`,
+          summary: `Undid: ${reversed[reversed.length - 1]?.summary ?? "previous action"}`,
           data: { revertedBatchId: batchId } as Prisma.InputJsonValue,
           actor: "player",
           reverted: false,
