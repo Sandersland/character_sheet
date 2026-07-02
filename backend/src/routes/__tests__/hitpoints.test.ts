@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
 import { createApp } from "../../app.js";
@@ -351,5 +351,136 @@ describe("POST /api/characters/:id/hp", () => {
     expect(res.body).toHaveProperty("pendingLevelUps");
     expect(res.body.hitPoints).toHaveProperty("deathSaves");
     expect(res.body.hitDice).toHaveProperty("spent");
+  });
+});
+
+// ── rest undo preserves resource sub-fields (issue #319) ────────────────────
+
+const FS_OWNER_ID = "owner-hitpoints-rest-undo";
+const BM_FIXTURE_ID = "test-hp-rest-undo-fighter";
+const BM_CATALOG_NAME = "HP Rest Undo Battle Master";
+
+// Level-4 Battle Master Fighter: fighting style (L1), 1 ASI (L4), 3 maneuvers
+// (L3), Student-of-War tool (L3) and a 4×d8 superiority pool all entitled, so
+// serializeCharacter's clamp-on-read keeps every stored sub-field.
+const BM_RESOURCES = {
+  used: { superiorityDice: 3 },
+  maneuversKnown: [{ id: "mv-1", name: "Trip Attack" }],
+  toolProficienciesKnown: [{ id: "tp-1", name: "Smith's Tools" }],
+  advancements: [{ id: "adv-1", level: 4, kind: "asi", abilityDeltas: { strength: 2 }, hpDelta: 0, initDelta: 0 }],
+  fightingStyle: "defense",
+};
+
+const BM_FIXTURE = {
+  id: BM_FIXTURE_ID,
+  name: "Rest Undo Battle Master",
+  alignment: "Lawful Neutral",
+  experiencePoints: 2700, // level 4
+  armorClass: 16,
+  initiativeBonus: 1,
+  speed: 30,
+  hitPoints: { current: 20, max: 36, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+  hitDice: { total: 4, die: "d10", spent: 0 },
+  abilityScores: { strength: 16, dexterity: 10, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
+  savingThrowProficiencies: ["strength", "constitution"],
+  skills: [],
+  toolProficiencies: [],
+  currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+};
+
+describe("POST /api/characters/:id/hp — rest undo preserves resource sub-fields", () => {
+  let bmCookie: string;
+
+  async function bmPost(body: object) {
+    return supertest(app).post(`/api/characters/${BM_FIXTURE_ID}/hp`).set("Cookie", bmCookie).send(body);
+  }
+
+  async function restEvent(type: string) {
+    const res = await supertest(app)
+      .get(`/api/characters/${BM_FIXTURE_ID}/activity?category=hitPoints`)
+      .set("Cookie", bmCookie);
+    return (res.body as Array<{ type: string; batchId?: string; before?: { resources?: { used?: Record<string, number> } }; after?: { resources?: { used?: Record<string, number> } } }>)
+      .find((e) => e.type === type)!;
+  }
+
+  async function revert(batchId: string) {
+    return supertest(app)
+      .post(`/api/characters/${BM_FIXTURE_ID}/events/${batchId}/revert`)
+      .set("Cookie", bmCookie);
+  }
+
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: BM_CATALOG_NAME } });
+  });
+
+  beforeEach(async () => {
+    await ensureTestOwner(FS_OWNER_ID);
+    bmCookie = await authCookie(FS_OWNER_ID);
+    const cls = await prisma.characterClass.upsert({
+      where: { name: BM_CATALOG_NAME },
+      create: {
+        name: BM_CATALOG_NAME,
+        hitDie: "d10",
+        savingThrows: ["strength", "constitution"],
+        skillChoiceCount: 2,
+        skillChoices: ["athletics", "intimidation"],
+        isSpellcaster: false,
+      },
+      update: {},
+    });
+    await prisma.character.create({
+      data: {
+        ...BM_FIXTURE,
+        ownerId: FS_OWNER_ID,
+        spellcasting: Prisma.JsonNull,
+        resources: BM_RESOURCES as unknown as Prisma.InputJsonValue,
+        classEntries: { create: [{ name: "fighter", subclass: "battle master", classId: cls.id, position: 0 }] },
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: BM_FIXTURE_ID } });
+  });
+
+  function assertSubFieldsIntact(body: { resources: { fightingStyle: string | null; maneuversKnown: Array<{ name: string }>; toolProficienciesKnown: Array<{ name: string }> }; advancements: Array<{ abilityDeltas: Record<string, number> }> }) {
+    expect(body.resources.fightingStyle).toBe("defense");
+    expect(body.resources.maneuversKnown.map((m) => m.name)).toContain("Trip Attack");
+    expect(body.resources.toolProficienciesKnown.map((t) => t.name)).toContain("Smith's Tools");
+    expect(body.advancements).toHaveLength(1);
+    expect(body.advancements[0].abilityDeltas).toEqual({ strength: 2 });
+  }
+
+  it("short rest → undo retains fightingStyle, advancements and toolProficienciesKnown", async () => {
+    const rest = await bmPost({ operations: [{ type: "shortRest", rolls: [4] }] });
+    expect(rest.status).toBe(200);
+
+    const ev = await restEvent("shortRest");
+    const undo = await revert(ev.batchId!);
+    expect(undo.status).toBe(200);
+    assertSubFieldsIntact(undo.body);
+    // The spent superiority die is re-expended by the undo.
+    expect(undo.body.resources.pools.find((p: { key: string }) => p.key === "superiorityDice").used).toBe(3);
+  });
+
+  it("long rest → undo retains fightingStyle, advancements and toolProficienciesKnown", async () => {
+    const rest = await bmPost({ operations: [{ type: "longRest" }] });
+    expect(rest.status).toBe(200);
+
+    const ev = await restEvent("longRest");
+    const undo = await revert(ev.batchId!);
+    expect(undo.status).toBe(200);
+    assertSubFieldsIntact(undo.body);
+    expect(undo.body.resources.pools.find((p: { key: string }) => p.key === "superiorityDice").used).toBe(3);
+  });
+
+  it("long-rest audit event's after.resources ≠ before.resources when pools were restored", async () => {
+    const rest = await bmPost({ operations: [{ type: "longRest" }] });
+    expect(rest.status).toBe(200);
+
+    const ev = await restEvent("longRest");
+    expect(ev.before!.resources!.used).toEqual({ superiorityDice: 3 });
+    expect(ev.after!.resources!.used).toEqual({ superiorityDice: 0 });
+    expect(ev.after!.resources).not.toEqual(ev.before!.resources);
   });
 });

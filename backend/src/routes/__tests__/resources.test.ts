@@ -409,4 +409,28 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     expect(maneuvers(char).some((m) => m.name === "Riposte")).toBe(true);
     expect(toolProfs(char).some((t) => t.name === "Smith's Tools")).toBe(true);
   });
+
+  // ── undo preserves fightingStyle (issue #319) ───────────────────────────────
+
+  it("a resource op → undo preserves a previously chosen fightingStyle", async () => {
+    // Store a fighting style directly, then spend a resource and undo it.
+    await prisma.character.update({
+      where: { id: FIXTURE_ID },
+      data: { resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], advancements: [], fightingStyle: "defense" } },
+    });
+
+    const spend = await post([{ type: "spendResource", key: "superiorityDice" }]);
+    expect(spend.status).toBe(200);
+    expect(spend.body.resources.fightingStyle).toBe("defense");
+
+    const events = await activity();
+    const ev = events.find((e) => e.type === "spendResource")!;
+    expect((ev.before!.resources as { fightingStyle: string | null }).fightingStyle).toBe("defense");
+    expect((ev.after!.resources as { fightingStyle: string | null }).fightingStyle).toBe("defense");
+
+    const undo = await agent().post(`/api/characters/${FIXTURE_ID}/events/${ev.batchId}/revert`);
+    expect(undo.status).toBe(200);
+    expect(undo.body.resources.fightingStyle).toBe("defense");
+    expect(pool(undo, "superiorityDice").used).toBe(0);
+  });
 });

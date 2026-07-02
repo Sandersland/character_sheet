@@ -781,6 +781,9 @@ async function applyShortRestOp(ctx: HpOpContext, op: ShortRestOperation): Promi
   const beforeSrResourceState = {
     used: { ...srResourceState.used },
     maneuversKnown: srResourceState.maneuversKnown.map((m) => ({ ...m })),
+    toolProficienciesKnown: srResourceState.toolProficienciesKnown.map((t) => ({ ...t })),
+    advancements: srResourceState.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
+    fightingStyle: srResourceState.fightingStyle,
   };
   let srResourcesRestored = 0;
   if (srDerivedRes) {
@@ -888,6 +891,9 @@ async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
   const beforeResourceState = {
     used: { ...resourceState.used },
     maneuversKnown: resourceState.maneuversKnown.map((m) => ({ ...m })),
+    toolProficienciesKnown: resourceState.toolProficienciesKnown.map((t) => ({ ...t })),
+    advancements: resourceState.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
+    fightingStyle: resourceState.fightingStyle,
   };
   let resourcesRestored = 0;
   if (derivedRes) {
@@ -898,6 +904,8 @@ async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
       }
     }
   }
+
+  const afterResourceState = serializeResourcesState(resourceState);
 
   const hpRestored = effMax - prevCurrent;
   const eventData: Record<string, unknown> = { recovered, hpRestored, slotsRestored, resourcesRestored };
@@ -918,13 +926,14 @@ async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
         spells: spellState.spells,
         concentratingOn: null,
       } as unknown as Prisma.InputJsonValue,
-      resources: serializeResourcesState(resourceState),
+      resources: afterResourceState,
     },
   });
 
   // Include spellcasting + resources in the before/after snapshot for undo.
   eventData.beforeSpellState = beforeSpellState;
   eventData.beforeResourceState = beforeResourceState;
+  eventData.afterResourceState = afterResourceState;
   return { summary, eventData };
 }
 
@@ -1109,8 +1118,9 @@ export async function applyHitPointOperations(
         delete data.beforeSpellState; // don't duplicate in eventData
         if (data.beforeResourceState !== undefined) {
           beforeState.resources = data.beforeResourceState;
-          afterState.resources = data.beforeResourceState; // populated by rest handler
+          afterState.resources = data.afterResourceState ?? data.beforeResourceState;
           delete data.beforeResourceState;
+          delete data.afterResourceState;
         }
       }
       if (op.type === "shortRest") {

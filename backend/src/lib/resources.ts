@@ -482,6 +482,7 @@ export async function applyResourceOperations(
           maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
           toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
           advancements: state.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
+          fightingStyle: state.fightingStyle,
         },
       };
 
@@ -527,6 +528,7 @@ export async function applyResourceOperations(
           maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
           toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
           advancements: state.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
+          fightingStyle: state.fightingStyle,
         },
       };
 
@@ -589,6 +591,7 @@ export async function applySpendResourceInTx(
       maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
       toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
       advancements: state.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
+      fightingStyle: state.fightingStyle,
     },
   };
 
@@ -605,6 +608,7 @@ export async function applySpendResourceInTx(
       maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
       toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
       advancements: state.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
+      fightingStyle: state.fightingStyle,
     },
   };
 
