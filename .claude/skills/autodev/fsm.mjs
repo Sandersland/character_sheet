@@ -397,6 +397,34 @@ async function pollHealth(url, timeoutMs) {
   throw new Error(`backend at ${url} not healthy after ${timeoutMs / 1000}s`);
 }
 
+// Workers run npm in-container where only the workspace is mounted (/app),
+// so a workspace package.json change can't update the ROOT package-lock.json —
+// npm ci then fails EUSAGE in CI while every in-worktree suite is green (bit
+// PR #343). The driver runs on the host, so repair here before pushing.
+// Non-fatal by design: on any error we log and proceed — CI stays the backstop.
+function syncRootLockfile(run, worktree, integrationBranch, issue) {
+  const changed = spawnSync("git", ["diff", "--name-only", `origin/${integrationBranch}...HEAD`], {
+    cwd: worktree,
+    encoding: "utf8",
+  });
+  if (changed.status !== 0 || !/(^|\/)package\.json$/m.test(changed.stdout)) return;
+  log(run, "package.json changed — syncing root package-lock.json (lock-only)");
+  const sync = spawnSync("npm", ["install", "--package-lock-only"], { cwd: worktree, encoding: "utf8" });
+  if (sync.status !== 0) {
+    log(run, `lockfile sync failed (non-fatal): ${(sync.stderr || "").slice(0, 300)}`);
+    return;
+  }
+  const dirty = spawnSync("git", ["diff", "--quiet", "--", "package-lock.json"], { cwd: worktree });
+  if (dirty.status !== 1) return; // lock already in sync
+  try {
+    sh("git", ["add", "package-lock.json"], { cwd: worktree });
+    sh("git", ["commit", "-m", `build: sync root package-lock with workspace dep changes (#${issue})`], { cwd: worktree });
+    log(run, "committed root package-lock sync");
+  } catch (err) {
+    log(run, `lockfile commit failed (non-fatal): ${err.message.slice(0, 300)}`);
+  }
+}
+
 const HANDLERS = {
   // Claim the issue via assignee so concurrent runs can't both build it —
   // GetWork excludes assigned issues, so 'taken' loops back for a re-pick.
@@ -442,6 +470,7 @@ const HANDLERS = {
 
   async submit(run) {
     const { branch, worktree, integrationBranch, issue, prTitle } = run.ctx;
+    syncRootLockfile(run, worktree, integrationBranch, issue);
     sh("git", ["push", "-u", "origin", branch], { cwd: worktree });
     const stepsFile = join(run.dir, "steps.jsonl");
     const steps = existsSync(stepsFile)
@@ -463,6 +492,9 @@ const HANDLERS = {
         : run.ctx.uiSurface
           ? "**UI:** ⚠ surface NOT visually verified — run verify-frontend before relying on it"
           : "",
+      run.ctx.budgetLanded
+        ? `**⚠ Budget landed:** cost cap hit before the final internal re-review — last Worker pass reported green suites; CI + claude-review adjudicate. (${run.ctx.budgetLanded})`
+        : "",
       ...(run.ctx.blockedWrites?.length
         ? [
             "",
@@ -495,6 +527,11 @@ const HANDLERS = {
     if (run.ctx.autoMerge !== false) {
       armed = spawnSync("gh", ["pr", "merge", prUrl, "--squash", "--auto"], { cwd: worktree }).status === 0;
     }
+    // ready -> in-staging: shipped issues stay open until promote-to-main
+    // ("Closes #" fires there), and stale `ready` labels let GetWork re-pick
+    // already-built work (bit #300). Tolerate either label being absent.
+    spawnSync("gh", ["issue", "edit", String(issue), "--remove-label", "ready"], { cwd: ROOT });
+    spawnSync("gh", ["issue", "edit", String(issue), "--add-label", "in-staging"], { cwd: ROOT });
     return { transition: "ok", payload: { prUrl, autoMergeArmed: armed }, summary: `PR opened: ${prUrl}${armed ? " (auto-merge armed)" : ""}` };
   },
 
@@ -626,7 +663,20 @@ async function execute(run) {
           : elapsedMin >= (budget.maxWallMinutes ?? Infinity)
             ? `wall-clock budget (${budget.maxWallMinutes}min) exhausted`
             : null;
-    if (breach && stateName !== "Fail") {
+    if (breach && stateName !== "Fail" && def.type === "agent") {
+      // Graceful landing: a breach on the way INTO Reviewer means the last
+      // Worker already reported done with green suites (ctx.prTitle set) —
+      // submit with a ⚠ instead of failing and let CI + claude-review
+      // adjudicate. (#126 died at 99%: final fix committed+green, budget
+      // breached before the third internal review; its salvage PR then passed
+      // CI review unchanged.) Script states are $0 and never budget-gated.
+      if (stateName === "Reviewer" && run.ctx.prTitle && machine.states.Submit) {
+        run.ctx.budgetLanded = breach;
+        run.currentState = "Submit";
+        log(run, `BUDGET-LAND: ${breach} — last Worker was green, skipping re-review → Submit`);
+        saveRun(run);
+        continue;
+      }
       run.ctx.failure = breach;
       run.currentState = machine.states.Fail ? "Fail" : "Done";
       log(run, `BUDGET: ${breach} → ${run.currentState}`);

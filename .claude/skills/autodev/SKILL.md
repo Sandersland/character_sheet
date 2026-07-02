@@ -20,11 +20,11 @@ GetWork ──found──▶ ClaimIssue ──claimed──▶ ConfirmScope ─�
                                     (comment + unassign)                     (push + PR, auto-merge)
 ```
 
-Submit arms **auto-merge** (squash) on the PR, so a green claude-review + CI lands it into the integration branch unattended. Set `"autoMerge": false` in the machine's `context` to keep PRs open for a human merge instead.
+Submit arms **auto-merge** (squash) on the PR, so a green claude-review + CI lands it into the integration branch unattended. Set `"autoMerge": false` in the machine's `context` to keep PRs open for a human merge instead. Submit also repairs the root `package-lock.json` when a workspace `package.json` changed (workers can't reach the root lock from their containers) and swaps the issue's `ready` label for `in-staging` so unattended discovery never re-picks shipped work.
 
 - **agent states** run headless claude, constrained by `--tools`, `--allowedTools`, `--max-turns`, `--max-budget-usd`, per-state model, and `fsm-guard.mjs` (bash allow/deny regexes). `--setting-sources project` keeps local/user permission allowlists out of the child.
-- **script states** are deterministic driver functions (worktree setup via the `worktree` skill's script, health polling, `gh pr create`, labeling) — zero tokens.
-- Budgets (steps, $, wall clock) and the Reviewer→Worker loop limit live in the machine JSON; any breach routes to `Fail`, which comments on the issue and leaves the worktree intact.
+- **script states** are deterministic driver functions (worktree setup via the `worktree` skill's script, health polling, `gh pr create`, labeling) — zero tokens; they are never budget-gated.
+- Budgets (steps, $, wall clock) and the Reviewer→Worker loop limit live in the machine JSON; a breach before an agent state routes to `Fail` (comment, worktree intact) — except a cost breach on the way into Reviewer **after** a green Worker pass, which routes to Submit with a `⚠ Budget landed` PR-body flag and lets CI + claude-review adjudicate instead of failing at 99%.
 
 ## Running it
 
