@@ -475,6 +475,104 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
   });
 }
 
+// ── reconcileClassEntryLevels ─────────────────────────────────────────────────
+// Multiclass level-down (issue #124): trims per-class CharacterClassEntry.level
+// so the sum matches the XP-derived total level. Single-class characters are
+// handled by revertLevelUps (experience-ops.ts) for backward compatibility and
+// are skipped here (length <= 1).
+//
+// LIFO by position: the highest-position (most-recently-added) class loses
+// levels first; an entry that would drop to 0 is deleted (never the base
+// position-0 class, which is floored at level 1). The full before-state is
+// snapshotted so the classLevelsReconciled revert branch (activity.ts) can
+// restore levels and recreate deleted entries.
+
+interface ClassEntrySnapshot {
+  id: string;
+  name: string;
+  level: number;
+  position: number;
+  classId: string | null;
+  subclass: string | null;
+  subclassId: string | null;
+}
+
+async function reconcileClassEntryLevels(ctx: ReconcileContext): Promise<void> {
+  const { tx, characterId, newDerivedLevel, batchId } = ctx;
+
+  const entries = (await tx.characterClassEntry.findMany({
+    where: { characterId },
+    orderBy: { position: "asc" as const },
+    select: {
+      id: true,
+      name: true,
+      level: true,
+      position: true,
+      classId: true,
+      subclass: true,
+      subclassId: true,
+    },
+  })) as ClassEntrySnapshot[];
+
+  if (entries.length <= 1) return; // single-class → handled by revertLevelUps
+
+  const sum = entries.reduce((s, e) => s + e.level, 0);
+  if (sum <= newDerivedLevel) return; // within the derived total, nothing to trim
+
+  const before = entries.map((e) => ({ ...e }));
+  let excess = sum - newDerivedLevel;
+  const removedNames: string[] = [];
+
+  for (let i = entries.length - 1; i >= 0 && excess > 0; i--) {
+    const entry = entries[i];
+    const floor = entry.position === 0 ? 1 : 0; // never delete the base class
+    const reducible = Math.min(entry.level - floor, excess);
+    if (reducible <= 0) continue;
+    const newLevel = entry.level - reducible;
+    excess -= reducible;
+    if (newLevel <= 0) {
+      await tx.characterClassEntry.delete({ where: { id: entry.id } });
+      removedNames.push(entry.name);
+    } else {
+      await tx.characterClassEntry.update({
+        where: { id: entry.id },
+        data: { level: newLevel },
+      });
+    }
+  }
+
+  const after = (await tx.characterClassEntry.findMany({
+    where: { characterId },
+    orderBy: { position: "asc" as const },
+    select: {
+      id: true,
+      name: true,
+      level: true,
+      position: true,
+      classId: true,
+      subclass: true,
+      subclassId: true,
+    },
+  })) as ClassEntrySnapshot[];
+
+  const removedCount = before.length - after.length;
+  const summary =
+    removedCount > 0
+      ? `Class levels reconciled to total ${newDerivedLevel} — removed ${removedNames.join(", ")}`
+      : `Class levels reconciled to total ${newDerivedLevel}`;
+
+  await logEvent(tx, {
+    characterId,
+    category: "class",
+    type: "classLevelsReconciled",
+    summary,
+    before: { classEntries: before },
+    after: { classEntries: after },
+    data: { newDerivedLevel, removedCount },
+    batchId,
+  });
+}
+
 // ── Registry + orchestrator ───────────────────────────────────────────────────
 
 /**
@@ -482,6 +580,7 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
  * (later reconcilers see earlier ones' results — maneuvers must follow subclass).
  */
 const LEVEL_GATED_RECONCILERS: Reconciler[] = [
+  reconcileClassEntryLevels,
   reconcileSubclass,
   reconcileManeuvers,
   reconcileToolProficiencies,

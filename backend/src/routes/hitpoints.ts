@@ -40,11 +40,18 @@ const longRestOpSchema = z.object({
 });
 
 // `roll` is optional in Zod — the lib validates it's present and in-range
-// when method === "roll".
+// when method === "roll". `target` (issue #124) chooses which class advances;
+// omitted keeps the backward-compatible position-0 self-heal.
+const levelUpTargetSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("existing"), classEntryId: z.string().min(1) }),
+  z.object({ kind: z.literal("new"), classId: z.string().min(1) }),
+]);
+
 const levelUpOpSchema = z.object({
   type: z.literal("levelUp"),
   method: z.enum(["average", "roll"]),
   roll: z.number().int().min(1).optional(),
+  target: levelUpTargetSchema.optional(),
 });
 
 const deathSaveOpSchema = z.object({

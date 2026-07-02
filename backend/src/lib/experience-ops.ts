@@ -64,7 +64,7 @@ async function revertLevelUps(
       hitPoints: true,
       hitDice: true,
       abilityScores: true,
-      classEntries: { orderBy: { position: "asc" as const }, take: 1, select: { id: true, level: true } },
+      classEntries: { orderBy: { position: "asc" as const }, select: { id: true, level: true } },
     },
   });
   if (!character) throw new InvalidExperienceOperationError(`Character not found: ${characterId}`);
@@ -74,7 +74,9 @@ async function revertLevelUps(
   const abilityScores = character.abilityScores as Record<string, number>;
   const conMod = abilityModifier(abilityScores.constitution ?? 10);
   const faces = hitDieFace(hd.die);
-  const primaryEntry = character.classEntries[0];
+  // Only single-class characters get the position-0 self-heal here; multiclass
+  // per-entry levels reconcile via reconcileClassEntryLevels (the registry).
+  const primaryEntry = character.classEntries.length === 1 ? character.classEntries[0] : undefined;
 
   const beforeHp = { ...hp };
   const beforeHd = { ...hd };

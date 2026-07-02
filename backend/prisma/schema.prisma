@@ -795,6 +795,7 @@ enum CharacterEventType {
   subclassRemoved
   fightingStyleChosen
   fightingStyleRemoved
+  classLevelsReconciled
   // resources
   spendResource
   restoreResource

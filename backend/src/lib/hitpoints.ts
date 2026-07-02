@@ -12,6 +12,7 @@ import {
   deriveFeatBonuses,
   deriveFeatProficiencies,
   hitDieFace,
+  multiclassPrerequisitesMet,
 } from "./srd.js";
 import { rollDie } from "./dice.js";
 import { deriveResources } from "./class-features.js";
@@ -177,15 +178,27 @@ export interface LongRestOperation {
 }
 
 /**
+ * Which class a level-up advances (issue #124):
+ * - omitted → position-0 self-heal, exactly as before multiclassing (BC).
+ * - existing → increment an existing CharacterClassEntry by classEntryId.
+ * - new → add a second class (multiclass); enforces 5e ability prerequisites.
+ */
+export type LevelUpTarget =
+  | { kind: "existing"; classEntryId: string }
+  | { kind: "new"; classId: string };
+
+/**
  * Level-up: adds 1 to hitDice.total, increases max and current HP.
  * Requires a pending level (derivedLevel > hitDice.total).
  * For "roll" method the client rolls via dice.ts and sends the raw die face;
  * for "average" the server computes the fixed average.
+ * `target` chooses which class advances; HP/hit-dice use THAT class's hit die.
  */
 export interface LevelUpOperation {
   type: "levelUp";
   method: "average" | "roll";
   roll?: number; // raw die value (required when method === "roll")
+  target?: LevelUpTarget;
 }
 
 /**
@@ -601,15 +614,25 @@ interface HpOpContext {
     experiencePoints: number;
     spellcasting: Prisma.JsonValue;
     resources: Prisma.JsonValue;
-    classEntries: { id: string; level: number; name: string; subclass: string | null }[];
+    classEntries: ClassEntryRow[];
   };
   hp: HitPoints;
   hd: HitDice;
   conMod: number;
   faces: number;
   effMax: number;
-  primaryEntry: { id: string; level: number; name: string; subclass: string | null } | undefined;
+  primaryEntry: ClassEntryRow | undefined;
   beforeClassLevel: number | null;
+}
+
+interface ClassEntryRow {
+  id: string;
+  level: number;
+  name: string;
+  subclass: string | null;
+  classId: string | null;
+  position: number;
+  class: { hitDie: string } | null;
 }
 
 interface HpOpResult {
@@ -700,24 +723,111 @@ function applyStabilizeOp(ctx: HpOpContext): HpOpResult {
 }
 
 async function applyLevelUpOp(ctx: HpOpContext, op: LevelUpOperation): Promise<HpOpResult> {
-  const { tx, row, hp, hd, conMod, faces, primaryEntry, beforeClassLevel } = ctx;
+  const { tx, characterId, row, hp, hd, conMod, faces, primaryEntry, beforeClassLevel } = ctx;
   const derivedLevel = levelForExperience(row.experiencePoints);
   if (hd.total >= derivedLevel) {
     throw new InvalidHitPointOperationError(
       `No pending level-up: already at level ${hd.total} (XP derives level ${derivedLevel})`
     );
   }
-  if (op.method === "roll") {
-    if (op.roll === undefined || op.roll < 1 || op.roll > faces) {
+
+  // Validate the client roll against the CHOSEN class's die (may differ from
+  // the position-0 die stored in hd.die once multiclassing is in play).
+  const requireRoll = (dieFaces: number): void => {
+    if (op.method === "roll" && (op.roll === undefined || op.roll < 1 || op.roll > dieFaces)) {
       throw new InvalidHitPointOperationError(
-        `Roll for level-up must be between 1 and ${faces} (got ${String(op.roll)})`
+        `Roll for level-up must be between 1 and ${dieFaces} (got ${String(op.roll)})`
       );
     }
+  };
+
+  // Apply the shared HP/hit-dice bump for a given die face count.
+  const bumpHp = (dieFaces: number): number => {
+    const gain = levelUpHpGain(dieFaces, conMod, op.method, op.roll);
+    hd.total += 1;
+    hp.max += gain;
+    hp.current += gain;
+    return gain;
+  };
+
+  const target = op.target;
+
+  // ── New class (multiclass) ───────────────────────────────────────────────
+  if (target?.kind === "new") {
+    const catalog = await tx.characterClass.findUnique({
+      where: { id: target.classId },
+      select: { id: true, name: true, hitDie: true },
+    });
+    if (!catalog) {
+      throw new InvalidHitPointOperationError(`Class not found: ${target.classId}`);
+    }
+    if (row.classEntries.some((e) => e.classId === catalog.id)) {
+      throw new InvalidHitPointOperationError(
+        `Character already has levels in ${catalog.name} — use an existing-class target`
+      );
+    }
+    const abilityScores = row.abilityScores as Record<string, number>;
+    const prereq = multiclassPrerequisitesMet(catalog.name, abilityScores);
+    if (!prereq.met) {
+      throw new InvalidHitPointOperationError(
+        `Cannot multiclass into ${catalog.name}: requires ${prereq.description}`
+      );
+    }
+    const newFaces = hitDieFace(catalog.hitDie);
+    requireRoll(newFaces);
+    const gain = bumpHp(newFaces);
+    const position = row.classEntries.reduce((max, e) => Math.max(max, e.position), -1) + 1;
+    const created = await tx.characterClassEntry.create({
+      data: { characterId, classId: catalog.id, name: catalog.name, level: 1, position },
+    });
+    return {
+      summary: `Multiclassed into ${catalog.name} (level 1, +${gain} HP)`,
+      eventData: {
+        method: op.method,
+        roll: op.roll ?? null,
+        conMod,
+        faces: newFaces,
+        hpGain: gain,
+        primaryEntryId: null,
+        createdClassEntryId: created.id,
+        prevEntryLevel: null,
+        newEntryLevel: 1,
+      },
+    };
   }
-  const gain = levelUpHpGain(faces, conMod, op.method, op.roll);
-  hd.total += 1;
-  hp.max += gain;
-  hp.current += gain;
+
+  // ── Existing class (chosen entry) ────────────────────────────────────────
+  if (target?.kind === "existing") {
+    const entry = row.classEntries.find((e) => e.id === target.classEntryId);
+    if (!entry) {
+      throw new InvalidHitPointOperationError(`Class entry not found: ${target.classEntryId}`);
+    }
+    const entryFaces = entry.class ? hitDieFace(entry.class.hitDie) : faces;
+    requireRoll(entryFaces);
+    const gain = bumpHp(entryFaces);
+    const newEntryLevel = entry.level + 1;
+    await tx.characterClassEntry.update({
+      where: { id: entry.id },
+      data: { level: newEntryLevel },
+    });
+    return {
+      summary: `Leveled up ${entry.name} to ${newEntryLevel} (+${gain} HP)`,
+      eventData: {
+        method: op.method,
+        roll: op.roll ?? null,
+        conMod,
+        faces: entryFaces,
+        hpGain: gain,
+        primaryEntryId: entry.id,
+        prevEntryLevel: entry.level,
+        newEntryLevel,
+      },
+    };
+  }
+
+  // ── No target — position-0 self-heal (backward-compatible path) ──────────
+  requireRoll(faces);
+  const gain = bumpHp(faces);
 
   // Repair the position-0 class entry's `level` to match the newly-applied
   // total. The seed defaults all entries to level 1 even for level-7 chars;
@@ -988,8 +1098,15 @@ export async function applyHitPointOperations(
           resources: true,
           classEntries: {
             orderBy: { position: "asc" as const },
-            take: 1,
-            select: { id: true, level: true, name: true, subclass: true },
+            select: {
+              id: true,
+              level: true,
+              name: true,
+              subclass: true,
+              classId: true,
+              position: true,
+              class: { select: { hitDie: true } },
+            },
           },
         },
       });
@@ -1106,8 +1223,10 @@ export async function applyHitPointOperations(
       const beforeState: Record<string, unknown> = { hitPoints: beforeHp, hitDice: beforeHd };
       const afterState: Record<string, unknown> = { hitPoints: { ...hp }, hitDice: { ...hd } };
       if (op.type === "levelUp") {
-        beforeState.classEntryLevel = beforeClassLevel;
-        afterState.classEntryLevel = hd.total;
+        // Pull the class-entry level diff from the op result — it points at the
+        // CHOSEN entry (or is null for a new-class add), not always position-0.
+        beforeState.classEntryLevel = (eventData.prevEntryLevel as number | null) ?? null;
+        afterState.classEntryLevel = (eventData.newEntryLevel as number | null) ?? null;
       }
       if (op.type === "longRest") {
         const data = eventData as Record<string, unknown>;
