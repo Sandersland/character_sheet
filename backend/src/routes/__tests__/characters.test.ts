@@ -154,7 +154,7 @@ describe("characters routes", () => {
   });
 
   it("GET /api/characters returns summaries with derived level", async () => {
-    // eslint-disable-next-line no-restricted-syntax -- lists every character, but asserts only on this suite's own fixture via findInList (see .claude/docs/testing.md)
+    // eslint-disable-next-line no-restricted-syntax -- lists every character, but asserts only on this suite's own fixture via findInList (see docs/testing.md)
     const response = await supertest.agent(createApp()).set("Cookie", COOKIE).get("/api/characters");
 
     expect(response.status).toBe(200);
