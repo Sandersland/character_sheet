@@ -791,6 +791,7 @@ enum CharacterEventType {
   unprepareSpell
   concentrationDropped
   // class
+  classAdded
   subclassChosen
   subclassRemoved
   fightingStyleChosen

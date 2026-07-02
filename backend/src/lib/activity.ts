@@ -171,6 +171,26 @@ async function reverseEvent(
       });
     }
   } else if (category === "class") {
+    // Multiclass add-class (issue #125): delete the created entry and restore
+    // the HP/hit-dice bump that came with the new class's first level.
+    if (event.type === "classAdded") {
+      const data = event.data as Record<string, unknown> | null;
+      if (data?.createdClassEntryId) {
+        await tx.characterClassEntry.deleteMany({
+          where: { id: data.createdClassEntryId as string },
+        });
+      }
+      const updateData: Record<string, unknown> = {};
+      if (before.hitPoints !== undefined) updateData.hitPoints = before.hitPoints;
+      if (before.hitDice !== undefined) updateData.hitDice = before.hitDice;
+      if (Object.keys(updateData).length > 0) {
+        await tx.character.update({
+          where: { id: characterId },
+          data: updateData as Prisma.CharacterUpdateInput,
+        });
+      }
+      return;
+    }
     // Multiclass level-down reconcile (issue #124): restore each entry's level
     // (recreating any that were deleted when they hit level 0).
     if (event.type === "classLevelsReconciled") {
