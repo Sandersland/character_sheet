@@ -25,7 +25,8 @@ const IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"];
 // scratchpad path. (.svg is intentionally NOT blocked — it's a legit frontend
 // source asset, not a screenshot artifact.)
 const ALLOWED_PREFIXES = ["/tmp", "/private/tmp", "/var/folders"];
-const ALLOWED_SUBSTRINGS = ["/scratchpad/"];
+// e2e visual-regression baselines are checked-in source fixtures, not artifacts.
+const ALLOWED_SUBSTRINGS = ["/scratchpad/", "/e2e/__screenshots__/"];
 
 function isAllowed(path) {
   const p = path.replace(/\\/g, "/");
