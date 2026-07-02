@@ -11,6 +11,45 @@
  * block-project-artifacts.mjs).
  */
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Self-test: `node fsm-guard.mjs --test` — spawns this file per case against
+// the issue-pipeline machine and asserts the exit code (0 allow / 2 deny).
+if (process.argv[2] === "--test") {
+  const self = fileURLToPath(import.meta.url);
+  const machine = join(dirname(self), "machines", "issue-pipeline.json");
+  const CASES = [
+    ["Worker", "git push origin main", 2],
+    ["Worker", "git add -A && git commit -m ok", 0],
+    ["Worker", 'git commit -m "$(git push origin HEAD)"', 2],
+    ["Worker", 'git commit -m "$(echo $(git push origin HEAD))"', 2],
+    ["Worker", 'git commit -m "`git push`"', 2],
+    ["Worker", 'git commit -m "done $(date)"', 0],
+    ["Worker", "docker compose exec -T backend sh -c 'cd /app && npx vitest run' && gh pr create", 2],
+    ["Reviewer", "docker compose exec -T backend sh -c 'cd /app && npx vitest run'", 0],
+    ["Reviewer", "git diff origin/staging...HEAD | head -100", 0],
+    ["Reviewer", "cat notes.txt $(git push origin HEAD)", 2],
+    ["GetWork", "gh issue list --label ready --json number", 0],
+    ["GetWork", "gh issue view 1 --json body | jq .body", 0],
+    ["GetWork", "gh pr list", 2],
+    ["GetWork", "rm -rf /", 2],
+  ];
+  let failed = 0;
+  for (const [testState, command, want] of CASES) {
+    const res = spawnSync(process.execPath, [self], {
+      input: JSON.stringify({ tool_name: "Bash", tool_input: { command } }),
+      env: { ...process.env, FSM_STATE: testState, FSM_MACHINE: machine },
+      encoding: "utf8",
+    });
+    const ok = res.status === want;
+    if (!ok) failed++;
+    console.log(`${ok ? "PASS" : "FAIL"} [${testState}] ${command} → exit ${res.status} (want ${want})`);
+  }
+  console.log(failed ? `${failed} FAILED` : "all pass");
+  process.exit(failed ? 1 : 0);
+}
 
 const state = process.env.FSM_STATE ?? "";
 const machinePath = process.env.FSM_MACHINE ?? "";
@@ -90,11 +129,13 @@ function segments(cmd) {
 // $(…)/backtick bodies and judge their contents too.
 function substitutionBodies(cmd) {
   const bodies = [];
-  const dollar = /\$\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g; // tolerates one nesting level
+  const dollar = /\$\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g;
   let m;
   while ((m = dollar.exec(cmd)) !== null) bodies.push(m[1]);
   for (const tick of cmd.matchAll(/`([^`]*)`/g)) bodies.push(tick[1]);
-  return bodies;
+  // Recurse so nested substitution can't hide a deny match; each body is
+  // strictly shorter than its parent, so this terminates.
+  return [...bodies, ...bodies.flatMap(substitutionBodies)];
 }
 
 const segs = segments(command);
