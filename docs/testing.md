@@ -213,7 +213,14 @@ Full-flow browser tests live in `frontend/e2e/` (`*.spec.ts`; vitest excludes th
 npm run e2e            # → docker compose --profile e2e run --rm e2e
 ```
 
-The `e2e` service uses a pinned `mcr.microsoft.com/playwright` image on host networking and derives its base URL from `FRONTEND_PORT`, so no ports are hardcoded (override with `E2E_BASE_URL`). `e2e/global-setup.ts` signs in via `dev-login` and idempotently (re)creates the personas — **Smoke Fighter** (L1) and **Wizard L5** (XP set through the transactions endpoint so spell slots derive) — matched by name. It recreates them every run, so a prior backend vitest pass (whose `auth.test.ts` wipes `dev-user-local`) is fine. Selectors are role/name-based (no `data-testid`); specs assert zero console errors via `e2e/helpers/console.ts`.
+The `e2e` service uses a pinned `mcr.microsoft.com/playwright` image on host networking and derives its base URL from `FRONTEND_PORT`, so no ports are hardcoded (override with `E2E_BASE_URL`). `e2e/global-setup.ts` signs in via `dev-login` and idempotently (re)creates the shared roster — matched by name, recreated every run so a prior backend vitest pass (whose `auth.test.ts` wipes `dev-user-local`) is fine:
+
+- **Smoke Fighter** (Fighter L1) — baseline sheet + HP/rest flows.
+- **Wizard L5** (6500 XP) — derived spell slots (XP set through the transactions endpoint so level/slots derive server-side).
+- **Battle Master** (Fighter L5 + subclass + Evasive Footwork maneuver, on a dedicated campaign) — in-session superiority-die spend.
+- **Session Fighter** (Fighter L1 on a dedicated campaign) — start/resume a live session in-spec.
+
+Personas that need a live session each get their own campaign (a campaign allows only one active session), and the config runs `workers: 1` serially so session-driving specs never contend. Per-spec state (throwaway characters, learned spells, awarded XP, resource restores) is created **inside each spec** through `e2e/helpers/api.ts` against the same REST endpoints the app uses — never in globalSetup — so every spec is independently runnable and the shared personas stay unmutated. Selectors are role/name-based (no `data-testid`); specs assert zero console errors via `e2e/helpers/console.ts`. Domain specs cover HP, inventory, spellcasting, maneuvers, session, guided creation, and level-up.
 
 ## Lib-level unit tests
 
