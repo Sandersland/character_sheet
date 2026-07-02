@@ -18,6 +18,7 @@ import { useState } from "react";
 import { applySpellcastingTransactions } from "@/api/client";
 import { abilityAbbr, abilityModifier, formatModifier } from "@/lib/abilities";
 import { computeCastRoll } from "@/lib/spellCast";
+import { isMulticlass } from "@/lib/multiclass";
 import type {
   AbilityName,
   Character,
@@ -53,9 +54,12 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
   // merged slot pool (single-class warlocks keep their pact slots in `slots`).
   const pact = spellcasting.pact ?? null;
 
-  // Warlocks use Pact Magic (single-level slots that recharge on a short rest)
-  // and gain Mystic Arcanum charges at higher levels — label/render accordingly.
-  const isWarlock = (character.classes?.[0]?.name ?? "").toLowerCase() === "warlock";
+  // Single-class warlocks keep their Pact Magic slots in the merged `slots` block,
+  // so it carries the "Pact Magic" label. A multiclass warlock's pact slots live
+  // in the dedicated `pact` block instead — the merged pool is neutral "Spell Slots".
+  const slotsArePactMagic =
+    (character.classes?.[0]?.name ?? "").toLowerCase() === "warlock" &&
+    !isMulticlass(character.classes);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -244,7 +248,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
       {slots.length > 0 && (
         <div>
           <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
-            {isWarlock ? (
+            {slotsArePactMagic ? (
               <>
                 Pact Magic{" "}
                 <span className="font-normal normal-case tracking-normal text-parchment-600">
