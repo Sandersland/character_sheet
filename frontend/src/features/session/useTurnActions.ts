@@ -256,6 +256,7 @@ export function useTurnActions({
 
   async function handleReactionManeuver(maneuverName: string) {
     if (dieBusy || superiorityRemaining === 0) return;
+    setError(null);
     try {
       const dieResult = await spendDie();
       consumeReaction();
@@ -280,6 +281,7 @@ export function useTurnActions({
 
   async function handleEffectManeuver(maneuverName: string) {
     if (dieBusy || superiorityRemaining === 0) return;
+    setError(null);
     try {
       const dieResult = await spendDie();
       if (maneuverName === "Evasive Footwork") {

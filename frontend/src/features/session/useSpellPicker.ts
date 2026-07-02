@@ -184,10 +184,17 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
     };
     const spellSlot = resolvedSlot(spell, row.slotLevel, slotLevels, arcanaLevels);
 
+    // Leveled spells need a slot; guard when matching slots were exhausted between render and click.
+    if (!isCantrip && spellSlot === undefined) {
+      patchRow(spell.id, { casting: false, error: "No spell slot available — all matching slots have been used." });
+      return;
+    }
+    const effectiveSlot = spellSlot ?? spell.level;
+
     patchRow(spell.id, { casting: true, error: null });
 
     // Roll damage/heal via RollContext — result surfaces in the global toast.
-    const castSpec = computeCastSpec(spell, character, spellSlot ?? spell.level);
+    const castSpec = computeCastSpec(spell, character, effectiveSlot);
     let rollTotal = 0;
     if (castSpec) {
       const kindLabel = spell.effectKind === "heal" ? "healing" : "damage";
@@ -204,7 +211,7 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
 
     const op = isCantrip
       ? { type: "castSpell" as const, entryId: spell.id, roll: rollTotal, apply: applyPayload }
-      : { type: "castSpell" as const, entryId: spell.id, slotLevel: spellSlot!, roll: rollTotal, apply: applyPayload };
+      : { type: "castSpell" as const, entryId: spell.id, slotLevel: effectiveSlot, roll: rollTotal, apply: applyPayload };
 
     try {
       const updated = await applySpellcastingTransactions(character.id, [op]);
