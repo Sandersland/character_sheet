@@ -826,6 +826,15 @@ async function applyLevelUpOp(ctx: HpOpContext, op: LevelUpOperation): Promise<H
   }
 
   // ── No target — position-0 self-heal (backward-compatible path) ──────────
+  // Only valid for single-class characters. A multiclass character has no
+  // unambiguous position-0 to self-heal: this path would set that entry's
+  // level to `hd.total` (the *total* character level), inflating it (#124).
+  // Require an explicit target instead.
+  if (row.classEntries.length > 1) {
+    throw new InvalidHitPointOperationError(
+      "Multiclass character requires an explicit level-up target (existing or new class)"
+    );
+  }
   requireRoll(faces);
   const gain = bumpHp(faces);
 

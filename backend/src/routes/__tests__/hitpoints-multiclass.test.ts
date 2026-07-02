@@ -198,4 +198,47 @@ describe("POST /api/characters/:id/hp — level-up class allocation (#124)", () 
     expect(res.body.classes.find((c: { name: string }) => c.name === WIZARD).level).toBe(1);
     expect(res.body.classes.find((c: { name: string }) => c.name === FIGHTER).level).toBe(4);
   });
+
+  it("undo of a NEW-class level-up deletes the created entry (no ghost class)", async () => {
+    const up = await hp({
+      operations: [{ type: "levelUp", method: "average", target: { kind: "new", classId: wizardId } }],
+    });
+    expect(up.status).toBe(200);
+    expect(up.body.classes).toHaveLength(2);
+
+    const activity = await supertest(app)
+      .get(`/api/characters/${CHAR_ID}/activity`)
+      .set("Cookie", COOKIE);
+    const batchId = (activity.body as { batchId: string }[])[0].batchId;
+
+    const res = await supertest(app)
+      .post(`/api/characters/${CHAR_ID}/events/${batchId}/revert`)
+      .set("Cookie", COOKIE);
+    expect(res.status).toBe(200);
+    expect(res.body.hitPoints.max).toBe(30); // Wizard's +6 HP reversed
+    expect(res.body.classes).toHaveLength(1);
+    expect(res.body.classes[0].name).toBe(FIGHTER);
+
+    // The created Wizard entry must be gone from the DB, not just clamped on read.
+    const entries = await prisma.characterClassEntry.findMany({ where: { characterId: CHAR_ID } });
+    expect(entries).toHaveLength(1);
+    expect(entries[0].name).toBe(FIGHTER);
+  });
+
+  it("rejects a no-target level-up once the character is multiclass", async () => {
+    const up = await hp({
+      operations: [{ type: "levelUp", method: "average", target: { kind: "new", classId: wizardId } }],
+    });
+    expect(up.status).toBe(200);
+    expect(up.body.classes).toHaveLength(2);
+
+    // Grant another pending level (XP 14000 = level 6) so the op reaches the
+    // level-up handler rather than being short-circuited as "no pending level".
+    const bump = await xp({ operations: [{ type: "set", value: 14000 }] });
+    expect(bump.status).toBe(200);
+
+    const res = await hp({ operations: [{ type: "levelUp", method: "average" }] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/multiclass|target/i);
+  });
 });

@@ -125,6 +125,14 @@ async function reverseEvent(
         data: { level: before.classEntryLevel as number },
       });
     }
+    // A multiclass "new class" level-up created a fresh CharacterClassEntry
+    // (#124). Undo must delete it, or a ghost entry survives the revert.
+    // deleteMany so a later level-down that already removed it is a no-op.
+    if (data?.createdClassEntryId) {
+      await tx.characterClassEntry.deleteMany({
+        where: { id: data.createdClassEntryId as string },
+      });
+    }
   } else if (category === "currency") {
     const beforeCurrency = before.currency as Record<string, number> | undefined;
     if (beforeCurrency) {
