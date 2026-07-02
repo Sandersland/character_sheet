@@ -217,7 +217,7 @@ async function runAgentState(stateName, def, run) {
   const resumeSession = def.resumePrompt && run.sessions[stateName] ? run.sessions[stateName] : null;
   const template = readFileSync(resumeSession ? join(SKILL_DIR, def.resumePrompt) : templatePath, "utf8");
   const prompt = render(template, run.ctx) + envelopeEpilogue(def);
-  const cwd = def.cwd ? render(def.cwd.replace(/\{(\w+)\}/g, "{{$1}}"), run.ctx) : ROOT;
+  const cwd = def.cwd ? render(def.cwd, run.ctx) : ROOT;
 
   if (run.dryRun) {
     console.log(`\n=== [dry-run] agent state ${stateName} (cwd: ${cwd}) ===`);
@@ -524,6 +524,12 @@ async function execute(run) {
 
 // ---------- entry ----------
 
+// With --issue given, skip discovery and start at GetWork's 'found' successor.
+function afterGetWork(machine) {
+  const getWork = machine.states[machine.initial];
+  return getWork?.transitions?.found ?? machine.initial;
+}
+
 const { cmd, target, opts } = parseArgs(process.argv.slice(2));
 
 if (cmd === "run") {
@@ -571,10 +577,4 @@ if (cmd === "run") {
   process.exit(run.status === "failed" ? 1 : 0);
 } else {
   die(`unknown command '${cmd}'`);
-}
-
-// With --issue given, skip discovery and start at GetWork's 'found' successor.
-function afterGetWork(machine) {
-  const getWork = machine.states[machine.initial];
-  return getWork?.transitions?.found ?? machine.initial;
 }

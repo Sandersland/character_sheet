@@ -85,7 +85,21 @@ function segments(cmd) {
   return segs.map((s) => s.trim().replace(/^(?:\w+=[^\s]*\s+)+/, "")).filter(Boolean);
 }
 
-for (const seg of segments(command)) {
+// Command substitution smuggles execution past the anchored segment checks
+// (`^git push` can't match inside `git commit -m "$(git push)"`), so extract
+// $(…)/backtick bodies and judge their contents too.
+function substitutionBodies(cmd) {
+  const bodies = [];
+  const dollar = /\$\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g; // tolerates one nesting level
+  let m;
+  while ((m = dollar.exec(cmd)) !== null) bodies.push(m[1]);
+  for (const tick of cmd.matchAll(/`([^`]*)`/g)) bodies.push(tick[1]);
+  return bodies;
+}
+
+const segs = segments(command);
+const denyTargets = [...segs, ...substitutionBodies(command).flatMap((b) => segments(b))];
+for (const seg of denyTargets) {
   const hit = deny.find((r) => r.test(seg));
   if (hit) {
     block(
@@ -93,7 +107,17 @@ for (const seg of segments(command)) {
         "This action is reserved for a later state of the pipeline — finish this state's goal and emit your transition instead.",
     );
   }
-  if (allow.length > 0 && !/^cd\b/.test(seg) && !allow.some((r) => r.test(seg))) {
+}
+for (const seg of allow.length > 0 ? segs : []) {
+  // Allowlist states are read-only probes — no legitimate use for substitution,
+  // so block it outright rather than trying to allowlist its contents.
+  if (/\$\(|`/.test(seg)) {
+    block(
+      `Blocked by autodev state '${state}': command substitution ($(…) or backticks) is not allowed in this state.\n` +
+        "Run the inner command directly as its own tool call instead.",
+    );
+  }
+  if (!/^cd\b/.test(seg) && !allow.some((r) => r.test(seg))) {
     block(
       `Blocked by autodev state '${state}': command segment '${seg}' is outside this state's allowlist.\n` +
         `Allowed patterns: ${(def.bashAllow ?? []).join("  ")}\n` +

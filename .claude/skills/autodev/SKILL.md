@@ -55,7 +55,9 @@ When the run finishes, report: the issue worked, the outcome (PR URL / flagged /
 
 ## Extending
 
-A new pipeline = a new `machines/<name>.json` + prompt files under `states/` — the driver is machine-agnostic. Per state you declare: `type` (agent/script/terminal), `prompt`/`resumePrompt` (template with `{{ctx}}` vars), `tools`, `allowedTools`, `bashAllow`/`bashDeny` regexes, `model`, `maxTurns`, `maxBudgetUsd`, `wallMinutes`, `permissionMode`, `cwd`, `required` payload keys per edge, and `transitions`. Script states name a `handler` implemented in `fsm.mjs`.
+A new pipeline = a new `machines/<name>.json` + prompt files under `states/` — the driver is machine-agnostic. Per state you declare: `type` (agent/script/terminal), `prompt`/`resumePrompt` (template with `{{ctx}}` vars — `cwd` uses the same `{{…}}` syntax), `tools`, `allowedTools`, `bashAllow`/`bashDeny` regexes, `model`, `maxTurns`, `maxBudgetUsd`, `wallMinutes`, `permissionMode`, `cwd`, `required` payload keys per edge, and `transitions`. Script states name a `handler` implemented in `fsm.mjs`.
+
+Note the two-layer Bash contract: `allowedTools` prefix-matches the **whole** command (a piped `gh issue view … | jq` passes on its `gh` prefix), while the guard's `bashAllow`/`bashDeny` judge each **segment** — so filter commands (`head`, `jq`, …) belong in `bashAllow` even when absent from `allowedTools`; they're only reachable as pipe segments. In allowlist states the guard also blocks command substitution (`$(…)`/backticks) outright; in deny-based states substitution bodies are extracted and deny-checked.
 
 ## Known limits (v1)
 

@@ -42,7 +42,7 @@
       "maxBudgetUsd": 8,
       "wallMinutes": 75,
       "permissionMode": "acceptEdits",
-      "cwd": "{worktree}",
+      "cwd": "{{worktree}}",
       "prompt": "states/worker.md",
       "resumePrompt": "states/worker-fix.md",
       "tools": "Bash,Edit,Read,Write,Glob,Grep",
@@ -62,7 +62,7 @@
       "maxTurns": 60,
       "maxBudgetUsd": 4,
       "wallMinutes": 30,
-      "cwd": "{worktree}",
+      "cwd": "{{worktree}}",
       "prompt": "states/reviewer.md",
       "tools": "Bash,Read,Glob,Grep",
       "allowedTools": [
