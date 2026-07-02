@@ -43,6 +43,11 @@ if (process.argv[2] === "--test") {
       env: { ...process.env, FSM_STATE: testState, FSM_MACHINE: machine },
       encoding: "utf8",
     });
+    if (res.status === null) {
+      console.log(`CRASH [${testState}] ${command}\n  ${res.stderr.trim()}`);
+      failed++;
+      continue;
+    }
     const ok = res.status === want;
     if (!ok) failed++;
     console.log(`${ok ? "PASS" : "FAIL"} [${testState}] ${command} → exit ${res.status} (want ${want})`);
@@ -129,6 +134,9 @@ function segments(cmd) {
 // $(…)/backtick bodies and judge their contents too.
 function substitutionBodies(cmd) {
   const bodies = [];
+  // Tolerates one level of inner paren nesting per pass (recursion below peels
+  // deeper $() layers); a body whose own parens nest 4+ total levels is not
+  // extracted — contrived but acknowledged; anchored denies remain the backstop.
   const dollar = /\$\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g;
   let m;
   while ((m = dollar.exec(cmd)) !== null) bodies.push(m[1]);
