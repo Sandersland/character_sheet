@@ -32,6 +32,8 @@ npm run e2e       # Playwright e2e via the profile-gated compose service
 
 `npm run e2e` shells out to `docker compose --profile e2e run --rm e2e` — a pinned `mcr.microsoft.com/playwright` container on host networking that seeds personas via `dev-login` and runs the specs in `frontend/e2e/`. It derives its base URL from `FRONTEND_PORT`, so the same command works against the main stack and any worktree slot; see testing.md for the full harness.
 
+CI runs the same suite in a dedicated `e2e` job (`.github/workflows/ci.yml`) on every PR and on `main`/`staging` pushes. Rather than the compose profile, the job reuses the `test` job's `postgres:17-alpine` service and boots the backend + Vite dev servers natively, then runs Playwright chromium-only with `--workers=100%`. On failure it uploads the HTML report + traces (`frontend/playwright-report/`, `frontend/test-results/`) as an artifact. It is **not** a required check yet — it soaks first before gating merges.
+
 `typecheck` is the quick way to catch the schema/shape-drift class that `lint`/`test` miss (vitest transpiles via esbuild and does **not** type-check). Run it — root, or `-w frontend` / `-w backend` for one workspace — after touching frontend/backend code, before declaring the change done. It's the same `tsc --noEmit` the `pre-push` hook runs, just on demand mid-change.
 
 ## Guardrails (local git hooks)
