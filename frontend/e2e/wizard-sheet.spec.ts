@@ -17,7 +17,7 @@ test("wizard sheet shows core vitals and derived spell slots", async ({ page }) 
   // Slots are derived from class+level+ability scores, so a L5 wizard must show
   // the Spell Slots panel with its level-1 slot meter.
   await expect(page.getByRole("heading", { name: "Spell Slots" })).toBeVisible();
-  await expect(page.getByText("Level 1", { exact: true })).toBeVisible();
+  await expect(page.getByText("Level 1", { exact: true }).first()).toBeVisible();
 
   expect(errors).toEqual([]);
 });
