@@ -20,6 +20,7 @@ function makeCharacter(over: Partial<Character> = {}): Character {
     id: "char-1",
     class: "Fighter",
     level: 5,
+    pendingLevelUps: 1,
     classes: [{ id: "e1", name: "Fighter", level: 5 }],
     abilityScores: {
       strength: 15,
@@ -50,6 +51,19 @@ const referenceClasses = [
 ];
 
 describe("AddClassPanel", () => {
+  it("gates behind a pending level-up (no trigger, shows a hint) when none is available", () => {
+    render(
+      <AddClassPanel
+        character={makeCharacter({ pendingLevelUps: 0 } as Partial<Character>)}
+        referenceClasses={referenceClasses}
+        busy={false}
+        onAddClass={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /add a class/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/level up to add a class/i)).toBeInTheDocument();
+  });
+
   it("collapsed: shows the add-a-class trigger", () => {
     render(
       <AddClassPanel

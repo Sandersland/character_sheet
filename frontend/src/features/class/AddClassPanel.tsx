@@ -35,12 +35,24 @@ export default function AddClassPanel({ character, referenceClasses, busy, onAdd
     ? multiclassPrereqMet(selected.multiclassPrerequisite, character.abilityScores)
     : false;
 
+  // A class level is only gained on level-up (5e): adding one spends a pending
+  // level-up, so the affordance is gated the same way the level-up modal is.
+  const canAddClass = character.pendingLevelUps > 0;
+
   function handleAdd() {
     if (!selected || !selectedMet) return;
     const roll = method === "roll" ? rollDie(dieFaces(selected.hitDie)) : undefined;
     onAddClass({ type: "addClass", classId: selected.id, method, roll });
     setOpen(false);
     setClassId("");
+  }
+
+  if (!canAddClass) {
+    return (
+      <p className="text-xs text-parchment-600">
+        Level up to add a class.
+      </p>
+    );
   }
 
   if (!open) {
