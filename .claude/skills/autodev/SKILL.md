@@ -75,6 +75,25 @@ Note the two-layer Bash contract: `allowedTools` prefix-matches the **whole** co
 
 Concurrent runs are safe: `worktree.sh create` serializes slot assignment behind an mkdir lock (`.claude/worktrees/.slot.lock` — remove it by hand only if a create crashed while holding it), and each run **claims its issue by self-assigning** right after GetWork (the `ClaimIssue` script state). GetWork excludes assigned issues, so a `taken` claim loops back for a re-pick (≤3 tries). Failure paths (`Fail`, `ApplyFlag`) release the claim; a successful PR keeps the assignee as an ownership signal until merge.
 
+## Batch mode (`batch.mjs`)
+
+To work several issues unattended (e.g. overnight), `batch.mjs` orchestrates fsm.mjs runs with a concurrency cap and a dependency DAG gated on **real merges into the base branch** (dependents fork `origin/<base>`, so a prereq's PR must land first):
+
+```bash
+node .claude/skills/autodev/batch.mjs 123 124:123 125:124 331 332:331 --cap 3   # issue[:prereq[,prereq]]
+# flags: --cap 3 (concurrent runs) --poll 60 (s) --grace 1800 (s to wait for auto-merge) --base staging --state-dir DIR
+```
+
+Run it in the background and watch the milestone log (`LAUNCH/RESUME/WAIT-MERGE/MERGED/RETRY-WAIT/SKIP/FAIL/CLEANUP/DONE/SUMMARY`): `tail -f <state-dir>/orchestrator.log`. State dir defaults to `.claude/autodev/overnight/<ts>/`; per-issue child logs live beside `batch.json`.
+
+Semantics worth knowing:
+
+- **Success = `run.json.ctx.prUrl` set**, never `status` alone — a graceful Fail/Flag exit is also `status: "completed"` but has no PR, and is marked failed immediately (no merge-grace). Merged runs' worktrees are torn down to free slots; failed runs keep theirs (their commits were already pushed by the driver's fail handler).
+- **Exit 75 (rate limit)** → the issue parks in `retry_wait` and is resumed via `fsm.mjs resume` at the `retryAt` the driver parsed from the limit message (≤3 rate-limit retries — a weekly-cap hit never clears, see Known limits). While anything is rate-limit-parked, NEW launches pause: the limit is account-wide.
+- **Other crashes** get one `resume` attempt before the issue is marked failed; a failed/skipped prereq transitively skips its dependents.
+- **Restart-idempotent**: single atomic `batch.json`; rerun with the same `--state-dir` to pick a batch back up (interrupted `running` issues re-launch).
+- State store is a plain JSON file by design — SQLite deferred until an analytics need is proven (decision 2026-07-02).
+
 ## UI verification
 
 When ConfirmScope marks `uiSurface: true`, the Reviewer gets a Playwright MCP server (declared per-state via `mcpConfig` → `--mcp-config --strict-mcp-config`) and, **after** its test runs, creates a deterministic test character via dev-login + `POST /api/characters` (fresh worktree DBs have catalog only, zero characters) and exercises the changed surface in the worktree's own frontend — login, click the flow, console check, screenshot to `/tmp`. The PR body reports the outcome (`UI: visually verified` vs an explicit ⚠ when verification failed).
