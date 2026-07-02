@@ -71,6 +71,10 @@ export async function createCharacter(
     return { ok: false, status: 400, error: `Unknown alignment: ${input.alignment}` };
   }
 
+  if (!input.classes.length) {
+    return { ok: false, status: 400, error: "At least one class is required" };
+  }
+
   const primaryClassChoice = input.classes[0];
 
   // Sequential rather than Promise.all: the pg driver adapter's pool can
