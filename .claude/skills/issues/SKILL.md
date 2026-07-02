@@ -18,6 +18,7 @@ Every open issue carries exactly one of these three labels at all times. They ar
 | `ready` | `2EA043` (green) | Refined and assignable **right now** — clear scope, acceptance criteria, no open decisions. `parallel-issues` will only build these. |
 | `needs-refinement` | `D93F0B` (orange) | Has an open decision, ambiguity, or missing scope. Must be refined before it can be worked. Also covers discovery **spikes** (their deliverable is a proposal) and items **backlogged pending a decision**. |
 | `epic` | `6F42C1` (purple) | A tracking/parent issue. You don't "work" an epic — you work its sub-issues. The epic body lists them with build order. |
+| `in-staging` | `0E8A16` (dark green) | Built and shipped to `staging` via a PR (open or merged); waiting on promote-to-main, where `Closes #` fires. autodev's Submit applies this (swapping out `ready`) so unattended discovery never re-picks shipped work. Don't hand-apply during triage. |
 
 These coexist with the topical labels (`enhancement`, `ux`, `tech-debt`, `testing`, `bug`, `question`, …) — a `ready` issue is also usually `enhancement`, etc. A `question`-labeled issue is typically also `needs-refinement`.
 
@@ -27,6 +28,7 @@ If the labels don't exist yet (fresh clone / new repo), create them:
 gh label create ready            --color 2EA043 --description "Refined and ready to assign/work — no open decisions"
 gh label create needs-refinement --color D93F0B --description "Has open decisions/ambiguity — refine before working"
 gh label create epic             --color 6F42C1 --description "Tracking/parent issue — work its sub-issues, not the epic itself"
+gh label create in-staging       --color 0E8A16 --description "Shipped to staging via PR; closes on promote to main"
 ```
 
 ## Readiness lifecycle

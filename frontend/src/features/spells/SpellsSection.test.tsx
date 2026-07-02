@@ -101,3 +101,71 @@ describe("SpellsSection concentration", () => {
     expect(screen.getByText("concentrating")).toBeInTheDocument();
   });
 });
+
+describe("SpellsSection slot labelling", () => {
+  // Single-class warlock: pact slots live in `slots` and carry the Pact Magic label.
+  function warlockOnly(): Character {
+    return {
+      id: "char-wl",
+      level: 1,
+      abilityScores: {
+        strength: 10, dexterity: 10, constitution: 10,
+        intelligence: 10, wisdom: 10, charisma: 16,
+      },
+      classes: [{ id: "e1", name: "Warlock", level: 1 }],
+      spellcasting: {
+        ability: "charisma",
+        spellSaveDC: 13,
+        spellAttackBonus: 5,
+        slots: [{ level: 1, total: 1, used: 0 }],
+        arcana: [],
+        pact: null,
+        spells: [],
+        concentratingOn: null,
+      },
+    } as unknown as Character;
+  }
+
+  // Warlock 1 / Sorcerer 1: merged full-caster L1 slots (total 2) in `slots`, plus a
+  // separate 1/1 Pact Magic slot in `pact`.
+  function warlockSorcerer(): Character {
+    return {
+      id: "char-mc",
+      level: 2,
+      abilityScores: {
+        strength: 10, dexterity: 10, constitution: 10,
+        intelligence: 10, wisdom: 10, charisma: 16,
+      },
+      classes: [
+        { id: "e1", name: "Warlock", level: 1 },
+        { id: "e2", name: "Sorcerer", level: 1 },
+      ],
+      spellcasting: {
+        ability: "charisma",
+        spellSaveDC: 13,
+        spellAttackBonus: 5,
+        slots: [{ level: 1, total: 2, used: 0 }],
+        arcana: [],
+        pact: { slotLevel: 1, count: 1, used: 0, spellSaveDC: 13, spellAttackBonus: 5 },
+        spells: [],
+        concentratingOn: null,
+      },
+    } as unknown as Character;
+  }
+
+  it("labels a single-class warlock's merged slots as Pact Magic", () => {
+    render(<SpellsSection character={warlockOnly()} onUpdate={vi.fn()} />);
+    expect(screen.getByRole("heading", { name: /Pact Magic/i })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /^Spell Slots$/i })).not.toBeInTheDocument();
+  });
+
+  it("labels a multiclass warlock's merged pool 'Spell Slots' with one dedicated Pact Magic block", () => {
+    render(<SpellsSection character={warlockSorcerer()} onUpdate={vi.fn()} />);
+    // Merged pool is neutral "Spell Slots"…
+    expect(screen.getByRole("heading", { name: /^Spell Slots$/i })).toBeInTheDocument();
+    // …and Pact Magic appears exactly once (the dedicated pact block, level 1).
+    const pactHeadings = screen.getAllByRole("heading", { name: /Pact Magic/i });
+    expect(pactHeadings).toHaveLength(1);
+    expect(pactHeadings[0]).toHaveTextContent(/level 1/i);
+  });
+});

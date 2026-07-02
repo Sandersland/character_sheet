@@ -1,11 +1,11 @@
 ---
 name: verify-frontend
-description: Run after making frontend changes to gate a PR. Runs frontend unit tests, browser verification, and a design review in parallel, then reports a combined PASS/FAIL verdict. Use when frontend changes need verification before merging, or when another skill (e.g. parallel-issues) needs a UI gate.
+description: Run after making frontend changes to gate a PR. Runs frontend unit tests, the Playwright e2e suite, browser verification, and a design review in parallel, then reports a combined PASS/FAIL verdict. Use when frontend changes need verification before merging, or when another skill (e.g. parallel-issues) needs a UI gate.
 ---
 
 # verify-frontend
 
-Run this skill after making frontend changes to gate a PR. It runs three lanes in parallel — frontend unit tests, browser verification, and a **design review** — then reports a combined verdict. The design lane is the taste gate: it keeps the UI on-system and catches the "generic AI" tells (off-token colors/spacing, weak hierarchy, inconsistent components) that unit tests and behavioural checks never see.
+Run this skill after making frontend changes to gate a PR. It runs four lanes in parallel — frontend unit tests, the end-to-end (Playwright) suite, browser verification, and a **design review** — then reports a combined verdict. The design lane is the taste gate: it keeps the UI on-system and catches the "generic AI" tells (off-token colors/spacing, weak hierarchy, inconsistent components) that unit tests and behavioural checks never see.
 
 ## Steps
 
@@ -26,15 +26,22 @@ Every `/api` route is behind `requireAuth`, so the browser surface shows the `Lo
    ```
    The SPA proxies `/api`, so the browser stores the session for the frontend origin. Reload → you land in the app as "Dev User" with the seeded character visible.
 
-### 1. Launch three lanes in parallel
+### 1. Launch the lanes in parallel
 
-Kick off the unit tests, browser verification, and design review at the same time using background agents (or by launching them as parallel tool calls):
+Kick off the unit tests, the e2e suite, browser verification, and design review at the same time using background agents (or by launching them as parallel tool calls):
 
 **Unit tests** — run in the project root:
 ```bash
 npm run test --workspace=frontend
 ```
 Capture the full output (pass/fail count, any failing test names and assertions). This includes the `jest-axe` runtime accessibility assertions in component tests.
+
+**End-to-end suite** — run the full deterministic Playwright suite through the profile-gated compose service:
+```bash
+npm run e2e            # → docker compose --profile e2e run --rm e2e
+# worktree slot N: E2E_BASE_URL=http://localhost:51<N>3 npm run e2e
+```
+`e2e/global-setup.ts` idempotently seeds the personas (Smoke Fighter L1, Wizard L5) — so no manual character creation is needed and a prior backend vitest pass (which wipes `dev-user-local`) is fine. Capture the pass/fail summary and, on red, the failing spec + assertion.
 
 **Browser verification** — invoke the `/verify` skill concurrently. It will launch the app and drive the changed UI at the browser surface. Verify **both viewports**, not desktop alone:
 
@@ -57,7 +64,7 @@ Also confirm at 375px: no content clipped or cut off, sticky/bottom controls sta
 ```bash
 git diff --name-only origin/staging...HEAD | grep -E '^frontend/src/(features|pages|components/ui)/'
 ```
-and launch the design agent against them. Try `subagent_type: "frontend-design-architect"`, falling back to a `general-purpose` agent briefed with the two design docs below if that type isn't available in the current environment. Its brief: judge the rendered UI against this app's design system, not generic taste. Point it at `.claude/agent-memory/frontend-design-architect/design_system.md` (token names + direction) and `.claude/docs/frontend.md` (conventions), and have it check for:
+and launch the design agent against them. Try `subagent_type: "frontend-design-architect"`, falling back to a `general-purpose` agent briefed with the two design docs below if that type isn't available in the current environment. Its brief: judge the rendered UI against this app's design system, not generic taste. Point it at `.claude/agent-memory/frontend-design-architect/design_system.md` (token names + direction) and `docs/frontend.md` (conventions), and have it check for:
 - **Off-system values** — arbitrary colors/radii/shadows instead of the `parchment`/`garnet`/`arcane`/`gold`/`vitality` tokens, `rounded-card`/`rounded-control`, `shadow-card`/`shadow-raised`; ad-hoc spacing that breaks the rhythm. (These are the top "AI slop" tells.)
 - **Visual hierarchy** — is the primary action obvious, is type scale used purposefully, is whitespace deliberate rather than uniform.
 - **Component reuse** — reuses `Card`/`Badge`/`MeterBar`/`Tabs`/`Modal` rather than reinventing a one-off; respects the inline-panel-vs-Modal rule.
@@ -88,6 +95,10 @@ Use this format:
 ✅/❌ `npm run test --workspace=frontend`
 <paste the full vitest output — pass/fail summary and any failure details>
 
+### End-to-end (e2e suite)
+✅/❌ `npm run e2e`
+<pass/fail summary; on red, the failing spec + assertion>
+
 ### Browser verification
 ✅/❌ Desktop (~1440) · ✅/❌ Mobile (375) — overflow assertion: <scrollWidth>/<clientWidth> per changed surface
 <paste the full verdict block from /verify, covering both viewports>
@@ -101,8 +112,8 @@ Use this format:
 ```
 
 **Verdict rules:**
-- **PASS** only if unit tests pass, browser verification passes at **both desktop and 375px mobile**, AND the design review has **no `blocking` findings**.
-- **FAIL** if any lane fails — include which one(s) and why. A design review with one or more `blocking` findings is a FAIL.
+- **PASS** only if unit tests pass, the e2e suite passes, browser verification passes at **both desktop and 375px mobile**, AND the design review has **no `blocking` findings**.
+- **FAIL** if any lane fails — include which one(s) and why. A red e2e suite is a FAIL; a design review with one or more `blocking` findings is a FAIL.
 - **Mobile severity:** at 375px, objective defects are `blocking` and FAIL the gate — horizontal overflow (the `scrollWidth > clientWidth` assertion returns true), clipped/cut-off content, controls that become unreachable, and interactive hit targets under 44px. Subjective mobile polish (tighter-than-ideal spacing, a layout that works but could reflow more elegantly) is `advisory` and does not fail the gate. When the overflow assertion fires, the gate is a FAIL regardless of how the layout looks.
 - **Design severity:** `blocking` = a design-system or convention violation that's objectively wrong here (off-token color/radius/shadow, raw skill/ability key in the UI, color-only meaning, broken hierarchy that obscures the primary action, an a11y defect). `advisory` = subjective polish (a nicer arrangement, optional spacing tweaks) — list it, but it does not fail the gate. When unsure whether a finding is taste or a real regression, mark it `advisory` and call it out, don't block on it.
 - If any lane fails, still report the others (running in parallel means you have them).

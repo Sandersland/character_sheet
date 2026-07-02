@@ -203,7 +203,38 @@ Unit tests mock the network, but driving the real UI in a browser hits `requireA
 2. `npm run seed:verify` — mints a session via `POST /api/auth/dev-login` and builds a representative "Verify Dummy" character through the real endpoints (idempotent). Needs `ALLOW_DEV_LOGIN=true` (dev compose default). See development.md.
 3. In Playwright, sign in with an in-page `fetch('/api/auth/dev-login', { method: 'POST' })` then reload (`cs_session` is HttpOnly, so it can't be set from `document.cookie`).
 
-The **`verify-frontend` skill** automates all of this (seed → sign in → run RTL tests + browser verification in parallel). e2e Playwright coverage of full flows is tracked in #97.
+The **`verify-frontend` skill** automates all of this (seed → sign in → run RTL tests + browser verification in parallel).
+
+## End-to-end (Playwright)
+
+Full-flow browser tests live in `frontend/e2e/` (`*.spec.ts`; vitest excludes this dir). Run them through the profile-gated compose service, which works against the main stack and any worktree slot identically:
+
+```bash
+npm run e2e            # → docker compose --profile e2e run --rm e2e
+```
+
+The `e2e` service uses a pinned `mcr.microsoft.com/playwright` image on host networking and derives its base URL from `FRONTEND_PORT`, so no ports are hardcoded (override with `E2E_BASE_URL`). `e2e/global-setup.ts` signs in via `dev-login` and idempotently (re)creates the shared roster — matched by name, recreated every run so a prior backend vitest pass (whose `auth.test.ts` wipes `dev-user-local`) is fine:
+
+- **Smoke Fighter** (Fighter L1) — baseline sheet + HP/rest flows.
+- **Wizard L5** (6500 XP) — derived spell slots (XP set through the transactions endpoint so level/slots derive server-side).
+- **Battle Master** (Fighter L5 + subclass + Evasive Footwork maneuver, on a dedicated campaign) — in-session superiority-die spend.
+- **Session Fighter** (Fighter L1 on a dedicated campaign) — start/resume a live session in-spec.
+
+Personas that need a live session each get their own campaign (a campaign allows only one active session), and the config runs `workers: 1` serially so session-driving specs never contend. Per-spec state (throwaway characters, learned spells, awarded XP, resource restores) is created **inside each spec** through `e2e/helpers/api.ts` against the same REST endpoints the app uses — never in globalSetup — so every spec is independently runnable and the shared personas stay unmutated. Selectors are role/name-based (no `data-testid`); specs assert zero console errors via `e2e/helpers/console.ts`. Domain specs cover HP, inventory, spellcasting, maneuvers, session, guided creation, and level-up.
+
+### Visual regression (`toHaveScreenshot`)
+
+`e2e/visual.spec.ts` captures pixel baselines for the key screens: character sheet (light + dark themes), inventory section + ledger (Activity) modal, spells section, session/turn view, and the creation-flow steps. Baselines are checked-in **source fixtures** under `frontend/e2e/__screenshots__/` (`{name}-{platform}.png`, one flat dir via `snapshotPathTemplate`) — committed source, not build artifacts, exactly like the `.svg` assets in the tree. Because these PNGs live in the repo, the `block-project-artifacts` hook allowlists the `/e2e/__screenshots__/` path (in `ALLOWED_SUBSTRINGS`, alongside `.svg`'s exemption) so writing/committing a baseline there isn't blocked while every other in-tree image write still is.
+
+Determinism is the whole game, so the config (`expect.toHaveScreenshot`) disables animations, hides the caret, pins a fixed viewport, and scales by CSS pixels; each spec blocks the Google Fonts network load so text falls back to the pinned e2e image's bundled fonts (identical at capture and comparison time) and awaits `document.fonts.ready`. Per-run-unique pixels (character names) are masked on full-page shots; scoped section/modal shots exclude the name entirely. Per-screen diff budgets are tuned via `maxDiffPixelRatio` at each call.
+
+Regenerate baselines **only when a visual change is intentional**, from inside the e2e container so the renders match CI's fonts:
+
+```bash
+docker compose --profile e2e run --rm e2e npm run e2e:update-snapshots
+```
+
+Review the regenerated PNGs before committing them. Running unrelated visual changes through `--update-snapshots` silently launders a regression into the baseline, so the diff is the gate.
 
 ## Lib-level unit tests
 

@@ -47,10 +47,12 @@ export type EventType =
   | "unprepareSpell"
   | "concentrationDropped"
   // class
+  | "classAdded"
   | "subclassChosen"
   | "subclassRemoved"
   | "fightingStyleChosen"
   | "fightingStyleRemoved"
+  | "classLevelsReconciled"
   // resources
   | "spendResource"
   | "restoreResource"

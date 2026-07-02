@@ -103,3 +103,96 @@ jobs:
           npx prisma db seed
 
       - run: npm test
+
+  e2e:
+    # Playwright smoke suite against a booted dev stack (same postgres service as
+    # `test`, plus the backend + Vite dev servers the e2e harness proxies through).
+    # NOT a required check yet (issue #333) — soaking before it gates merges.
+    # Chromium-only + all-core workers keep it well under the CI time budget.
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # Keep this in sync with the image in docker-compose.yml
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: character_sheet
+          POSTGRES_PASSWORD: character_sheet
+          POSTGRES_DB: character_sheet
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U character_sheet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://character_sheet:character_sheet@localhost:5432/character_sheet
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm install -g npm@11  # align with npm 11 that generated package-lock.json (npm/cli#4828)
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Prisma generate / migrate / seed
+        working-directory: backend
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+          npx prisma db seed
+
+      - name: Install Playwright chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Start backend
+        # ALLOW_DEV_LOGIN powers the e2e harness's passwordless session mint; PORT
+        # matches the Vite proxy target below. Backgrounded — survives to later steps.
+        env:
+          PORT: "4000"
+          ALLOW_DEV_LOGIN: "true"
+        run: nohup npm run dev --workspace backend > /tmp/backend.log 2>&1 &
+
+      - name: Start frontend
+        # VITE_API_URL=/api keeps the SPA same-origin (the harness relies on the
+        # dev proxy so the session cookie stays first-party).
+        env:
+          VITE_API_URL: /api
+          VITE_PROXY_TARGET: http://localhost:4000
+        run: nohup npm run dev --workspace frontend > /tmp/frontend.log 2>&1 &
+
+      - name: Wait for stack
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:4000/api/health >/dev/null && curl -sf http://localhost:5173 >/dev/null; then
+              echo "stack ready after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "stack failed to start"; cat /tmp/backend.log /tmp/frontend.log; exit 1
+
+      - name: Run Playwright
+        working-directory: frontend
+        env:
+          E2E_BASE_URL: http://localhost:5173
+        run: npx playwright test --workers=100%
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+            /tmp/backend.log
+            /tmp/frontend.log
+          retention-days: 7

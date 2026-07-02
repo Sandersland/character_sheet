@@ -125,6 +125,14 @@ async function reverseEvent(
         data: { level: before.classEntryLevel as number },
       });
     }
+    // A multiclass "new class" level-up created a fresh CharacterClassEntry
+    // (#124). Undo must delete it, or a ghost entry survives the revert.
+    // deleteMany so a later level-down that already removed it is a no-op.
+    if (data?.createdClassEntryId) {
+      await tx.characterClassEntry.deleteMany({
+        where: { id: data.createdClassEntryId as string },
+      });
+    }
   } else if (category === "currency") {
     const beforeCurrency = before.currency as Record<string, number> | undefined;
     if (beforeCurrency) {
@@ -163,6 +171,67 @@ async function reverseEvent(
       });
     }
   } else if (category === "class") {
+    // Multiclass add-class (issue #125): delete the created entry and restore
+    // the HP/hit-dice bump that came with the new class's first level.
+    if (event.type === "classAdded") {
+      const data = event.data as Record<string, unknown> | null;
+      if (data?.createdClassEntryId) {
+        await tx.characterClassEntry.deleteMany({
+          where: { id: data.createdClassEntryId as string },
+        });
+      }
+      const updateData: Record<string, unknown> = {};
+      if (before.hitPoints !== undefined) updateData.hitPoints = before.hitPoints;
+      if (before.hitDice !== undefined) updateData.hitDice = before.hitDice;
+      if (Object.keys(updateData).length > 0) {
+        await tx.character.update({
+          where: { id: characterId },
+          data: updateData as Prisma.CharacterUpdateInput,
+        });
+      }
+      return;
+    }
+    // Multiclass level-down reconcile (issue #124): restore each entry's level
+    // (recreating any that were deleted when they hit level 0).
+    if (event.type === "classLevelsReconciled") {
+      const beforeEntries = before.classEntries as
+        | {
+            id: string;
+            name: string;
+            level: number;
+            position: number;
+            classId: string | null;
+            subclass: string | null;
+            subclassId: string | null;
+          }[]
+        | undefined;
+      if (beforeEntries) {
+        for (const e of beforeEntries) {
+          await tx.characterClassEntry.upsert({
+            where: { id: e.id },
+            update: {
+              level: e.level,
+              name: e.name,
+              position: e.position,
+              classId: e.classId ?? null,
+              subclass: e.subclass ?? null,
+              subclassId: e.subclassId ?? null,
+            },
+            create: {
+              id: e.id,
+              characterId,
+              level: e.level,
+              name: e.name,
+              position: e.position,
+              classId: e.classId ?? null,
+              subclass: e.subclass ?? null,
+              subclassId: e.subclassId ?? null,
+            },
+          });
+        }
+      }
+      return;
+    }
     // Restore subclassId + subclass display name onto the class entry.
     // The before snapshot carries the class entry's data (not the whole
     // character row), so grab classEntryId from event.data.
@@ -281,9 +350,9 @@ export async function revertBatch(
       await tx.characterEvent.create({
         data: {
           characterId,
-          category: reversed[0]?.category ?? "hitPoints",
+          category: reversed[reversed.length - 1]?.category ?? "hitPoints",
           type: "revert",
-          summary: `Undid: ${reversed[0]?.summary ?? "previous action"}`,
+          summary: `Undid: ${reversed[reversed.length - 1]?.summary ?? "previous action"}`,
           data: { revertedBatchId: batchId } as Prisma.InputJsonValue,
           actor: "player",
           reverted: false,

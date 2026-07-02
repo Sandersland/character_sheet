@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => ({
     env: loadEnv(mode, process.cwd(), ""),
     // Closes the per-file Prisma pool after each test file (see vitest.setup.ts).
     // NOTE: do not set fileParallelism:false here — test files intentionally run
-    // in parallel; isolation is by convention (.claude/docs/testing.md), not by
+    // in parallel; isolation is by convention (docs/testing.md), not by
     // serializing the suite.
     setupFiles: ["./vitest.setup.ts"],
   },

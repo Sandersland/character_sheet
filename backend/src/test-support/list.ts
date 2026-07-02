@@ -1,6 +1,6 @@
 // Test-only helper for safely asserting against list endpoints.
 //
-// Backend tests share one Postgres and run in parallel (see .claude/docs/testing.md),
+// Backend tests share one Postgres and run in parallel (see docs/testing.md),
 // so an UNSCOPED list (e.g. GET /api/characters) returns every concurrently-running
 // suite's fixtures — a churning set. Never assert on the whole list (its length, or
 // the equality of two snapshots); scope to the row your suite created.

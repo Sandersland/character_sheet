@@ -640,6 +640,8 @@ export interface CharacterResources {
 
 /** One entry in `Character.classes` — structured multiclass-aware view. */
 export interface ClassEntry {
+  /** CharacterClassEntry row id — the levelUp "existing" target. */
+  id: string;
   name: string;
   level: number;
   subclass?: string;
@@ -740,6 +742,28 @@ export interface Character {
      * listed level (6th–9th). Empty/absent for every other caster.
      */
     arcana?: SpellSlots[];
+    /**
+     * Warlock Pact Magic in a multiclass character — kept out of the merged slot
+     * pool (PHB p. 164). Null/absent for single-class casters (whose pact slots
+     * live in `slots`) and multiclass characters with no warlock levels.
+     */
+    pact?: {
+      slotLevel: number;
+      count: number;
+      used: number;
+      spellSaveDC: number;
+      spellAttackBonus: number;
+    } | null;
+    /** Per-class caster stats — present only for multiclass characters. */
+    classes?: {
+      className: string;
+      subclass: string | null;
+      ability: AbilityName;
+      spellSaveDC: number;
+      spellAttackBonus: number;
+      preparation: "known" | "prepared";
+      casterFraction: "full" | "half" | "third" | "pact" | "none";
+    }[];
     spells: Spell[];
     /**
      * The spell the character is currently concentrating on (5e: only one at a
@@ -844,6 +868,8 @@ export interface CharacterSummary {
   name: string;
   race: string;
   class: string;
+  /** All class entries (name + per-class level) for a multiclass card line. */
+  classes?: { name: string; level: number }[];
   level: number;
   portraitUrl?: string;
   /** Shared-campaign link (#246), or undefined when the character isn't in one. */
@@ -922,6 +948,15 @@ export interface ClassOption {
   subclasses: SubclassOption[];
   /** Starting equipment definition, null if the class has no package defined. */
   startingEquipment: ClassStartingEquipment | null;
+  /**
+   * 5e multiclass ability prerequisite (PHB p. 163) — option thresholds plus a
+   * rendered description. Null for homebrew classes (no prerequisite). The picker
+   * evaluates `options` against the character's scores; ANY option satisfied = met.
+   */
+  multiclassPrerequisite: {
+    options: Record<string, number>[];
+    description: string;
+  } | null;
   /** Fixed tool proficiencies always granted by this class. */
   toolProficiencies: string[];
   /** Tool names the player may choose from at creation. */
@@ -1062,7 +1097,14 @@ export type SpellcastingOperation =
 
 export interface SetSubclassOperation { type: "setSubclass"; subclassId: string }
 export interface SetFightingStyleOperation { type: "setFightingStyle"; key: FightingStyleKey }
-export type ClassOperation = SetSubclassOperation | SetFightingStyleOperation;
+/** Multiclass into a new class by catalog id — creates a level-1 entry (prereqs enforced server-side). */
+export interface AddClassOperation {
+  type: "addClass";
+  classId: string;
+  method?: "average" | "roll";
+  roll?: number;
+}
+export type ClassOperation = SetSubclassOperation | SetFightingStyleOperation | AddClassOperation;
 
 // ── Resource operation types (mirrors backend/src/lib/resources.ts) ──────────
 // Sent as `{ operations: ResourceOperation[] }` to POST /api/characters/:id/resources/transactions.
@@ -1180,8 +1222,21 @@ export interface SetTempOperation { type: "setTemp"; amount: number }
 /** `rolls`: one raw die value per hit die spent (rolled by the client via dice.ts). */
 export interface ShortRestOperation { type: "shortRest"; rolls: number[] }
 export interface LongRestOperation { type: "longRest" }
+/**
+ * Which class the level-up advances (mirrors backend LevelUpTarget). Omitted =
+ * the primary class (single-class default). `existing` increments a class entry;
+ * `new` multiclasses into a fresh class (ability prereqs enforced server-side).
+ */
+export type LevelUpTarget =
+  | { kind: "existing"; classEntryId: string }
+  | { kind: "new"; classId: string };
 /** For "roll": client rolls via dice.ts, sends the raw die face as `roll`. */
-export interface LevelUpOperation { type: "levelUp"; method: "average" | "roll"; roll?: number }
+export interface LevelUpOperation {
+  type: "levelUp";
+  method: "average" | "roll";
+  roll?: number;
+  target?: LevelUpTarget;
+}
 /** Client rolls d20 via dice.ts, sends the raw value. Only valid at 0 HP. */
 export interface DeathSaveOperation { type: "deathSave"; roll: number }
 export interface StabilizeOperation { type: "stabilize" }

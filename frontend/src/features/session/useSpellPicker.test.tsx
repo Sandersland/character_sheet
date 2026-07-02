@@ -151,6 +151,24 @@ describe("useSpellPicker", () => {
     await waitFor(() => expect(opts.onUpdate).toHaveBeenCalledWith(updatedChar));
   });
 
+  it("guards a leveled cast when all matching slots are exhausted", async () => {
+    const exhausted = {
+      ...makeCharacter([healSpell]),
+      spellcasting: {
+        ability: "intelligence", spellSaveDC: 14, spellAttackBonus: 5,
+        slots: [{ level: 1, total: 2, used: 2 }], arcana: [], spells: [healSpell],
+      },
+    } as unknown as Character;
+    const opts = makeOpts([healSpell], { character: exhausted });
+    const { result } = render(opts);
+    await act(async () => {
+      await result.current.handleCast(healSpell);
+    });
+    expect(mockApply).not.toHaveBeenCalled();
+    expect(opts.onCommitSlot).not.toHaveBeenCalled();
+    expect(result.current.rowFor(healSpell).error).toMatch(/no spell slot available/i);
+  });
+
   it("handleAttackRoll commits the slot, logs the roll, and enables Cast", () => {
     const opts = makeOpts([attackSpell]);
     const { result } = render(opts);

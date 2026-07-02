@@ -69,7 +69,8 @@ backend/src/lib/level-reconciliation.ts
 
 | Reconciler | What it does |
 |---|---|
-| `reconcileSubclass` | Clears `subclassId`/`subclass` on the primary class entry if `newDerivedLevel < class.subclassLevel`. Emits `class/subclassRemoved`. |
+| `reconcileClassEntryLevels` | Runs **first**. Trims multiclass `CharacterClassEntry` levels (and removes entries that fall to level 0, highest `position` first) so the summed class levels never exceed `newDerivedLevel`. Snapshots the pre-reconcile entries so undo can restore/recreate them; emits `class/classLevelsReconciled`. No-op for single-class characters. |
+| `reconcileSubclass` | Per-entry (#125): clears `subclassId`/`subclass` on **any** `CharacterClassEntry` whose effective level is below that class's `subclassLevel`. Effective level is the XP-derived total for a single-class character (the per-class column is self-healed lazily by the HP level-up) and the per-class `entry.level` for a multiclass character. Emits one `class/subclassRemoved` per cleared entry. Mirrored by a clamp-on-read in `serializeCharacter`'s `classes` block. |
 | `reconcileManeuvers` | Runs after `reconcileSubclass` so it sees a cleared subclass. Calls `deriveResources(...)` for the new level; `allowed = maneuverChoiceCount ?? 0`. Trims `maneuversKnown` to the first `allowed` entries (oldest kept, LIFO). Emits `resources/maneuversReconciled`. |
 | `reconcileToolProficiencies` | Trims `toolProficienciesKnown` when the subclass no longer grants a tool choice (level dropped below 3, or subclass cleared). Also runs after `reconcileSubclass` for the same reason. Creation-fixed tool profs (in `Character.toolProficiencies`) are untouched. Uses a `resources`-category event. |
 | `reconcileFightingStyle` | Clears the persisted `fightingStyle` when `fightingStyleChoiceCount` drops to 0 at the new level (e.g. a class change away from Fighter). Uses a `resources`-category event. |

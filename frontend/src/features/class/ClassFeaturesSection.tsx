@@ -11,7 +11,9 @@ import { useState } from "react";
 
 import { applyClassTransactions, applyResourceTransactions } from "@/api/client";
 import type {
+  AddClassOperation,
   Character,
+  ClassEntry,
   ClassOperation,
   ClassOption,
   FightingStyleKey,
@@ -19,6 +21,8 @@ import type {
   ResourceOperation,
 } from "@/types/character";
 import { fightingStyleLabel, FIGHTING_STYLE_DESCRIPTIONS } from "@/lib/fightingStyles";
+import { isMulticlass } from "@/lib/multiclass";
+import AddClassPanel from "@/features/class/AddClassPanel";
 import AddManeuverPanel from "@/features/class/AddManeuverPanel";
 import FightingStylePanel from "@/features/class/FightingStylePanel";
 import ManeuverRow from "@/features/class/ManeuverRow";
@@ -40,6 +44,13 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
 
   // Find the reference definition for the character's primary class.
   const classDef = referenceClasses.find((c) => c.name === character.class);
+
+  // Class roster to render — the serialized entries, or a synthesized single
+  // entry for a freshly created character whose classes[] hasn't loaded yet.
+  const rosterEntries: ClassEntry[] =
+    character.classes && character.classes.length > 0
+      ? character.classes
+      : [{ id: "primary", name: character.class, level: character.level, subclass: character.subclass }];
 
   // Is the character eligible for a subclass but hasn't chosen one yet?
   const needsSubclass =
@@ -107,6 +118,12 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
     sendClass([{ type: "setFightingStyle", key }]);
   }
 
+  // ── Add-class (multiclass) handler ────────────────────────────────────────────
+
+  function handleAddClass(op: AddClassOperation) {
+    sendClass([op]);
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   const hasPools = resources && resources.pools.length > 0;
@@ -124,6 +141,43 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
           {error}
         </p>
       )}
+
+      {/* ── Classes (multiclass roster + add-class) ── */}
+      <div>
+        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
+          {isMulticlass(character.classes) ? "Classes" : "Class"}
+        </h3>
+        <ul className="mb-3 flex flex-col gap-1.5">
+          {rosterEntries.map((entry) => (
+            <li
+              key={`${entry.name}-${entry.classId ?? ""}`}
+              className="flex items-baseline justify-between gap-2 text-sm"
+            >
+              <span className="font-semibold text-parchment-900">
+                {entry.name}
+                {entry.subclass ? (
+                  <span className="ml-1.5 text-xs font-normal text-parchment-600">
+                    {entry.subclass}
+                  </span>
+                ) : null}
+              </span>
+              <span className="tabular-nums text-parchment-600">Level {entry.level}</span>
+            </li>
+          ))}
+        </ul>
+        {isMulticlass(character.classes) && (
+          <p className="mb-3 text-xs text-parchment-600">
+            Total character level{" "}
+            <span className="font-semibold text-parchment-900">{character.level}</span>
+          </p>
+        )}
+        <AddClassPanel
+          character={character}
+          referenceClasses={referenceClasses}
+          busy={busy}
+          onAddClass={handleAddClass}
+        />
+      </div>
 
       {/* ── Subclass header ── */}
       {(character.subclass || needsSubclass) && (

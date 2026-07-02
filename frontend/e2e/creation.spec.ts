@@ -1,0 +1,40 @@
+import { expect, test } from "@playwright/test";
+
+import { login } from "./helpers/auth";
+import { collectConsoleErrors } from "./helpers/console";
+import { uniqueName } from "./helpers/api";
+
+// Walks the guided creation form end-to-end and lands on the new sheet. Uses the
+// starting-gold path for the equipment step — a single deterministic choice that
+// completes the package regardless of catalog contents.
+test("creation: guided flow lands on the sheet with the chosen class", async ({ page }) => {
+  const name = uniqueName("Forged Hero");
+
+  await login(page);
+  const errors = collectConsoleErrors(page);
+  // Navigate via the SPA link (a fresh full-page load to /characters/new races
+  // the auth boot and can land on the sign-in page).
+  await page.getByRole("link", { name: "New Character" }).first().click();
+  await expect(page).toHaveURL(/\/characters\/new$/);
+
+  // Labels carry a trailing "*" required marker, so anchor at the start; ^Class
+  // also keeps it from matching the Subclass field.
+  await page.getByLabel(/^Name/).fill(name);
+  await page.getByLabel(/^Alignment/).selectOption({ label: "True Neutral" });
+  await page.getByLabel(/^Race/).selectOption({ label: "Human" });
+  await page.getByLabel(/^Class/).selectOption({ label: "Fighter" });
+  await page.getByLabel("Background").selectOption({ label: "Soldier" });
+
+  // Equipment: choose the starting-gold option and roll a valid amount. The gold
+  // roll label carries a ×N multiplier, distinguishing it from the ability "Roll 4d6".
+  await page.getByRole("button", { name: /Starting gold/ }).click();
+  await page.getByRole("button", { name: /^Roll.*×/ }).click();
+
+  await page.getByRole("button", { name: /Save Character/ }).click();
+
+  await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+$/);
+  await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
+  await expect(page.getByText("Fighter").first()).toBeVisible();
+
+  expect(errors).toEqual([]);
+});

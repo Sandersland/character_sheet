@@ -20,6 +20,8 @@ You are the **Worker** state of an autonomous development pipeline. Your goal: f
 - Backend (if touched): derive-don't-persist; 5e rules data only in `lib/`; mutate state only through `…/transactions` endpoints; level-gated state through `LEVEL_GATED_RECONCILERS` + a clamp-on-read.
 - Docs: if your change touches a surface in the CLAUDE.md doc-map, update the mapped doc in the same commit.
 - Artifacts: screenshots/captures go to `/tmp` only — never the project tree.
+- Denied writes: if a file write/edit is permission-denied twice for the same path, STOP retrying that path (repeat denials burn the session rate limit). Finish everything else, and report it in your final payload's `blockedWrites` array with the exact content you intended to write. Only emit `blocked` if the denied write is itself a stated requirement.
+- Dependencies: if you change any `package.json`, do NOT try to sync the root `package-lock.json` — it isn't mounted in your containers. The Submit step repairs it automatically before pushing.
 
 ## Run ALL tooling inside the containers, not on the host
 
@@ -33,7 +35,7 @@ This worktree's `node_modules` are empty Docker-volume mountpoints — host-run 
 
 ## Work loop — per committable chunk
 
-1. Write the unit tests for the chunk FIRST (they should fail).
+1. Write the unit tests for the chunk FIRST (they should fail). **For uiSurface issues**, when the chunk alters a user-visible flow, also extend or add an e2e spec under `frontend/e2e/` first — same test-first rule as unit tests (personas come from `global-setup.ts`; assert role/name-based selectors + zero console errors).
 2. Implement until they pass.
 3. Typecheck + lint clean.
 4. Commit the green chunk: `feat(<domain>): <summary> (#{{issue}})` (or `fix`/`refactor` as appropriate).
@@ -46,6 +48,7 @@ When every requirement is implemented, run the FULL test suites + typecheck + li
 - `chunks` (string[]) — one line per commit: what shipped
 - `testsSummary` (string) — suites run + pass counts for backend and frontend
 - `docsUpdated` (boolean) — whether a doc-map surface was touched and its doc updated
+- `blockedWrites` (optional array of `{path, reason, content}`) — writes that were permission-denied twice; include the full intended content so a human can apply it
 
 ## Payload for `blocked`
 

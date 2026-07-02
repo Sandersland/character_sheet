@@ -43,6 +43,7 @@ const referenceFixture: ReferenceData = {
       subclassLevel: 3,
       subclasses: [],
       startingEquipment: null,
+      multiclassPrerequisite: null,
       toolProficiencies: [],
       toolChoices: ["Lute", "Drum", "Flute"],
       toolChoiceCount: 2,

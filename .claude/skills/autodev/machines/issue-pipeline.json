@@ -2,8 +2,8 @@
   "name": "issue-pipeline",
   "description": "Pick one ready GitHub issue, confirm scope, build it in an isolated worktree, review, open a PR against the integration branch.",
   "initial": "GetWork",
-  "budget": { "maxSteps": 16, "maxCostUsd": 15, "maxWallMinutes": 150 },
-  "loopLimits": { "Reviewer->Worker": 3 },
+  "budget": { "maxSteps": 16, "maxCostUsd": 25, "maxWallMinutes": 150 },
+  "loopLimits": { "Reviewer->Worker": 3, "ClaimIssue->GetWork": 3 },
   "context": { "integrationBranch": "staging", "autoMerge": true },
   "states": {
     "GetWork": {
@@ -17,12 +17,18 @@
       "allowedTools": ["Bash(gh issue list:*)", "Bash(gh issue view:*)"],
       "bashAllow": ["^gh issue (list|view)\\b", "^(head|tail|grep|wc|sort|cat|jq|awk|sed -n)\\b"],
       "required": { "found": ["issue", "title", "slug", "requirements", "acceptance"], "empty": [] },
-      "transitions": { "found": "ConfirmScope", "empty": "Done" }
+      "transitions": { "found": "ClaimIssue", "empty": "Done" }
+    },
+    "ClaimIssue": {
+      "type": "script",
+      "handler": "claimIssue",
+      "transitions": { "claimed": "ConfirmScope", "taken": "GetWork" }
     },
     "ConfirmScope": {
       "type": "agent",
       "maxTurns": 40,
       "maxBudgetUsd": 2,
+      "fallbackModel": "sonnet",
       "wallMinutes": 15,
       "prompt": "states/confirm-scope.md",
       "tools": "Bash,Read,Glob,Grep",
@@ -39,7 +45,8 @@
     "Worker": {
       "type": "agent",
       "maxTurns": 150,
-      "maxBudgetUsd": 8,
+      "maxBudgetUsd": 10,
+      "fallbackModel": "sonnet",
       "wallMinutes": 75,
       "permissionMode": "acceptEdits",
       "cwd": "{{worktree}}",
@@ -59,20 +66,25 @@
     },
     "Reviewer": {
       "type": "agent",
-      "maxTurns": 60,
-      "maxBudgetUsd": 4,
-      "wallMinutes": 30,
+      "maxTurns": 80,
+      "maxBudgetUsd": 5,
+      "fallbackModel": "sonnet",
+      "wallMinutes": 40,
       "cwd": "{{worktree}}",
       "prompt": "states/reviewer.md",
-      "tools": "Bash,Read,Glob,Grep",
+      "mcpConfig": {
+        "mcpServers": {
+          "playwright": { "command": "npx", "args": ["-y", "@playwright/mcp@0.0.77", "--isolated"] }
+        }
+      },
       "allowedTools": [
-        "Read", "Glob", "Grep",
+        "Read", "Glob", "Grep", "mcp__playwright",
         "Bash(docker compose:*)",
         "Bash(git diff:*)", "Bash(git log:*)", "Bash(git status:*)",
         "Bash(gh issue view:*)", "Bash(curl:*)"
       ],
       "bashAllow": ["^docker compose\\b", "^git (diff|log|status)\\b", "^gh issue view\\b", "^curl\\b", "^(head|tail|grep|wc|sort|cat|jq|awk|sed -n)\\b", "^ls\\b"],
-      "required": { "approve": ["checks"], "changes": ["findings"] },
+      "required": { "approve": ["checks", "uiVerified"], "changes": ["findings"] },
       "transitions": { "approve": "Submit", "changes": "Worker" }
     },
     "Submit": {

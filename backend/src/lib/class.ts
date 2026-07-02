@@ -16,9 +16,13 @@ import { levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
+import { levelUpHpGain, normalizeHitDice, normalizeHitPoints } from "./hitpoints.js";
 import {
+  abilityModifier,
   fightingStyleChoiceCount,
+  hitDieFace,
   isKnownFightingStyle,
+  multiclassPrerequisitesMet,
   FIGHTING_STYLES,
   type FightingStyleKey,
 } from "./srd.js";
@@ -48,7 +52,18 @@ export interface SetFightingStyleOperation {
   key: FightingStyleKey;
 }
 
-export type ClassOperation = SetSubclassOperation | SetFightingStyleOperation;
+/** Multiclass into a new class by catalog id — creates a level-1 entry. */
+export interface AddClassOperation {
+  type: "addClass";
+  classId: string;
+  method?: "average" | "roll";
+  roll?: number;
+}
+
+export type ClassOperation =
+  | SetSubclassOperation
+  | SetFightingStyleOperation
+  | AddClassOperation;
 
 // ── Transaction handler ───────────────────────────────────────────────────────
 
@@ -214,6 +229,113 @@ export async function applyClassOperations(
             before: beforeFs,
             after: afterFs,
             data: { fightingStyle: op.key },
+            batchId,
+            sessionId,
+          });
+          break;
+        }
+
+        case "addClass": {
+          // Re-read per-op so a batch sees each previous op's result.
+          const character = await tx.character.findUnique({
+            where: { id: characterId },
+            select: {
+              experiencePoints: true,
+              abilityScores: true,
+              hitPoints: true,
+              hitDice: true,
+              classEntries: {
+                orderBy: { position: "asc" as const },
+                select: { id: true, name: true, level: true, position: true, classId: true },
+              },
+            },
+          });
+          if (!character) {
+            throw new InvalidClassOperationError(`Character not found: ${characterId}`);
+          }
+
+          // Adding a class spends a pending level-up: a new entry bumps hitDice.total
+          // by 1, so require an XP-justified level to consume or the character would
+          // end up over-cap (hitDice.total > level) with the entry clamped out on read.
+          const derivedLevel = levelForExperience(character.experiencePoints);
+          const appliedLevels = normalizeHitDice(character.hitDice).total;
+          if (appliedLevels >= derivedLevel) {
+            throw new InvalidClassOperationError(
+              "No pending level-up: earn a level before adding a class",
+            );
+          }
+
+          const catalog = await tx.characterClass.findUnique({
+            where: { id: op.classId },
+            select: { id: true, name: true, hitDie: true },
+          });
+          if (!catalog) {
+            throw new InvalidClassOperationError(`Class not found: ${op.classId}`);
+          }
+
+          // A class can only be taken once — additional levels go through the
+          // HP level-up (existing-class target), not a second entry.
+          if (character.classEntries.some((e) => e.classId === catalog.id)) {
+            throw new InvalidClassOperationError(
+              `Character already has levels in ${catalog.name}`,
+            );
+          }
+
+          // 5e multiclass ability prerequisite (PHB p. 163) — same validator the
+          // level-up path uses, so both flows reject identically.
+          const abilityScores = character.abilityScores as Record<string, number>;
+          const prereq = multiclassPrerequisitesMet(catalog.name, abilityScores);
+          if (!prereq.met) {
+            throw new InvalidClassOperationError(
+              `Cannot multiclass into ${catalog.name}: requires ${prereq.description}`,
+            );
+          }
+
+          // Roll HP for the new level so the class-entry level stays coupled to
+          // hitDice.total (the invariant the level-up op maintains).
+          const faces = hitDieFace(catalog.hitDie);
+          if (op.method === "roll" && (op.roll === undefined || op.roll < 1 || op.roll > faces)) {
+            throw new InvalidClassOperationError(
+              `Roll must be between 1 and ${faces} for a ${catalog.hitDie}`,
+            );
+          }
+          const conMod = abilityModifier(abilityScores.constitution ?? 10);
+          const gain = levelUpHpGain(faces, conMod, op.method ?? "average", op.roll);
+
+          const beforeHp = normalizeHitPoints(character.hitPoints);
+          const beforeHd = normalizeHitDice(character.hitDice);
+          const afterHp = {
+            ...beforeHp,
+            max: beforeHp.max + gain,
+            current: beforeHp.current + gain,
+          };
+          const afterHd = { ...beforeHd, total: beforeHd.total + 1 };
+
+          const position =
+            character.classEntries.reduce((max, e) => Math.max(max, e.position), -1) + 1;
+
+          const beforeEntries = character.classEntries.map((e) => ({ ...e }));
+          const created = await tx.characterClassEntry.create({
+            data: { characterId, classId: catalog.id, name: catalog.name, level: 1, position },
+          });
+
+          await tx.character.update({
+            where: { id: characterId },
+            data: { hitPoints: afterHp, hitDice: afterHd },
+          });
+
+          await logEvent(tx, {
+            characterId,
+            category: "class",
+            type: "classAdded",
+            summary: `Multiclassed into ${catalog.name} (level 1, +${gain} HP)`,
+            before: { classEntries: beforeEntries, hitPoints: beforeHp, hitDice: beforeHd },
+            after: {
+              classEntries: [...beforeEntries, { ...created }],
+              hitPoints: afterHp,
+              hitDice: afterHd,
+            },
+            data: { createdClassEntryId: created.id, classId: catalog.id, hpGain: gain, faces },
             batchId,
             sessionId,
           });
