@@ -52,7 +52,10 @@ export const charactersRouter = Router();
 export const characterInclude = {
   raceSelection: true,
   backgroundSelection: true,
-  classEntries: { orderBy: { position: "asc" } },
+  classEntries: {
+    orderBy: { position: "asc" },
+    include: { class: { select: { subclassLevel: true } } },
+  },
   inventoryItems: {
     orderBy: { position: "asc" },
     include: { weaponDetail: true, armorDetail: true, consumableDetail: true },
@@ -715,15 +718,23 @@ export function serializeCharacter(row: CharacterWithRelations) {
         subclassId?: string;
         classId?: string;
       }[] = [];
+      const singleClass = row.classEntries.length <= 1;
       for (const entry of row.classEntries) {
         if (remaining <= 0) break;
         const level = Math.min(entry.level, remaining);
         remaining -= level;
+        // Per-entry subclass clamp-on-read (issue #125): hide a subclass whose
+        // grant level exceeds this entry's effective level (per-class for a
+        // multiclass character, XP-derived total for a single class). Mirrors
+        // reconcileSubclass on the write side.
+        const subclassLevel = entry.class?.subclassLevel ?? 3;
+        const effectiveLevel = singleClass ? progress.level : level;
+        const subclassVisible = effectiveLevel >= subclassLevel;
         out.push({
           name: entry.name,
           level,
-          subclass: entry.subclass ?? undefined,
-          subclassId: entry.subclassId ?? undefined,
+          subclass: subclassVisible ? (entry.subclass ?? undefined) : undefined,
+          subclassId: subclassVisible ? (entry.subclassId ?? undefined) : undefined,
           classId: entry.classId ?? undefined,
         });
       }
