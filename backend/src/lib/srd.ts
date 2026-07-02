@@ -544,6 +544,62 @@ export function casterFractionFor(className: string, subclass?: string | null): 
   return CASTER_FRACTION_BY_CLASS[className.toLowerCase()] ?? "none";
 }
 
+// ── Multiclass ability-score prerequisites (PHB p. 163) ───────────────────────
+// Adding a level in a NEW class via multiclassing requires a minimum ability
+// score (13). Each class maps to a list of OPTIONS: the prerequisite is met when
+// ANY one option is fully satisfied — abilities within an option are AND-ed,
+// options are OR-ed. Fighter is the only OR class ("Str 13 or Dex 13").
+export const MULTICLASS_PREREQUISITES: Readonly<Record<string, Record<string, number>[]>> = {
+  barbarian: [{ strength: 13 }],
+  bard: [{ charisma: 13 }],
+  cleric: [{ wisdom: 13 }],
+  druid: [{ wisdom: 13 }],
+  fighter: [{ strength: 13 }, { dexterity: 13 }],
+  monk: [{ dexterity: 13, wisdom: 13 }],
+  paladin: [{ strength: 13, charisma: 13 }],
+  ranger: [{ dexterity: 13, wisdom: 13 }],
+  rogue: [{ dexterity: 13 }],
+  sorcerer: [{ charisma: 13 }],
+  warlock: [{ charisma: 13 }],
+  wizard: [{ intelligence: 13 }],
+};
+
+export interface MulticlassPrerequisiteResult {
+  met: boolean;
+  // Human-readable requirement, e.g. "Strength 13 or Dexterity 13". Empty for a
+  // homebrew/unknown class, which carries no prerequisite (always met).
+  description: string;
+}
+
+// Abilities are always single lowercase words here, so a literal capitalize is
+// safe (this is a backend error-message string, not UI key rendering).
+function capitalizeAbility(ability: string): string {
+  return ability.charAt(0).toUpperCase() + ability.slice(1);
+}
+
+/**
+ * Whether `abilityScores` satisfy the 5e multiclass ability prerequisite for
+ * `className`. Unknown/homebrew classes carry no prerequisite and are always met.
+ */
+export function multiclassPrerequisitesMet(
+  className: string,
+  abilityScores: Record<string, number>,
+): MulticlassPrerequisiteResult {
+  const options = MULTICLASS_PREREQUISITES[className.toLowerCase()];
+  if (!options) return { met: true, description: "" };
+  const met = options.some((option) =>
+    Object.entries(option).every(([ability, min]) => (abilityScores[ability] ?? 0) >= min),
+  );
+  const description = options
+    .map((option) =>
+      Object.entries(option)
+        .map(([ability, min]) => `${capitalizeAbility(ability)} ${min}`)
+        .join(" and "),
+    )
+    .join(" or ");
+  return { met, description };
+}
+
 // Full spellcasting profile of one class entry, or null for a non-caster.
 function casterProfile(
   className: string,
