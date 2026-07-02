@@ -1,0 +1,106 @@
+{
+  "name": "issue-pipeline",
+  "description": "Pick one ready GitHub issue, confirm scope, build it in an isolated worktree, review, open a PR against the integration branch.",
+  "initial": "GetWork",
+  "budget": { "maxSteps": 16, "maxCostUsd": 15, "maxWallMinutes": 150 },
+  "loopLimits": { "Reviewer->Worker": 3 },
+  "context": { "integrationBranch": "staging", "autoMerge": true },
+  "states": {
+    "GetWork": {
+      "type": "agent",
+      "model": "haiku",
+      "maxTurns": 20,
+      "maxBudgetUsd": 0.5,
+      "wallMinutes": 10,
+      "prompt": "states/get-work.md",
+      "tools": "Bash",
+      "allowedTools": ["Bash(gh issue list:*)", "Bash(gh issue view:*)"],
+      "bashAllow": ["^gh issue (list|view)\\b", "^(head|tail|grep|wc|sort|cat|jq|awk|sed -n)\\b"],
+      "required": { "found": ["issue", "title", "slug", "requirements", "acceptance"], "empty": [] },
+      "transitions": { "found": "ConfirmScope", "empty": "Done" }
+    },
+    "ConfirmScope": {
+      "type": "agent",
+      "maxTurns": 40,
+      "maxBudgetUsd": 2,
+      "wallMinutes": 15,
+      "prompt": "states/confirm-scope.md",
+      "tools": "Bash,Read,Glob,Grep",
+      "allowedTools": ["Read", "Glob", "Grep", "Bash(gh issue list:*)", "Bash(gh issue view:*)"],
+      "bashAllow": ["^gh issue (list|view)\\b", "^(head|tail|grep|wc|sort|cat|jq|awk|sed -n)\\b"],
+      "required": { "ready": ["title", "slug", "requirements", "acceptance", "uiSurface"], "not-ready": ["gaps"] },
+      "transitions": { "ready": "SetupWorktree", "not-ready": "FlagIssue" }
+    },
+    "SetupWorktree": {
+      "type": "script",
+      "handler": "setupWorktree",
+      "transitions": { "ok": "Worker" }
+    },
+    "Worker": {
+      "type": "agent",
+      "maxTurns": 150,
+      "maxBudgetUsd": 8,
+      "wallMinutes": 75,
+      "permissionMode": "acceptEdits",
+      "cwd": "{{worktree}}",
+      "prompt": "states/worker.md",
+      "resumePrompt": "states/worker-fix.md",
+      "tools": "Bash,Edit,Read,Write,Glob,Grep",
+      "allowedTools": [
+        "Read", "Edit", "Write", "Glob", "Grep",
+        "Bash(docker compose:*)",
+        "Bash(git add:*)", "Bash(git commit:*)", "Bash(git status:*)",
+        "Bash(git diff:*)", "Bash(git log:*)", "Bash(git restore:*)",
+        "Bash(npm run:*)", "Bash(ls:*)", "Bash(cat:*)", "Bash(mkdir:*)", "Bash(curl:*)"
+      ],
+      "bashDeny": ["^git push\\b", "^gh\\b", "^git checkout\\b", "^git worktree\\b", "^git reset\\b", "\\bsudo\\b"],
+      "required": { "done": ["prTitle", "chunks", "testsSummary"], "blocked": ["reason"] },
+      "transitions": { "done": "Reviewer", "blocked": "Fail" }
+    },
+    "Reviewer": {
+      "type": "agent",
+      "maxTurns": 60,
+      "maxBudgetUsd": 4,
+      "wallMinutes": 30,
+      "cwd": "{{worktree}}",
+      "prompt": "states/reviewer.md",
+      "tools": "Bash,Read,Glob,Grep",
+      "allowedTools": [
+        "Read", "Glob", "Grep",
+        "Bash(docker compose:*)",
+        "Bash(git diff:*)", "Bash(git log:*)", "Bash(git status:*)",
+        "Bash(gh issue view:*)", "Bash(curl:*)"
+      ],
+      "bashAllow": ["^docker compose\\b", "^git (diff|log|status)\\b", "^gh issue view\\b", "^curl\\b", "^(head|tail|grep|wc|sort|cat|jq|awk|sed -n)\\b", "^ls\\b"],
+      "required": { "approve": ["checks"], "changes": ["findings"] },
+      "transitions": { "approve": "Submit", "changes": "Worker" }
+    },
+    "Submit": {
+      "type": "script",
+      "handler": "submit",
+      "transitions": { "ok": "Done" }
+    },
+    "FlagIssue": {
+      "type": "agent",
+      "model": "haiku",
+      "maxTurns": 4,
+      "maxBudgetUsd": 0.3,
+      "wallMinutes": 5,
+      "prompt": "states/flag-issue.md",
+      "tools": "",
+      "required": { "flagged": ["comment"] },
+      "transitions": { "flagged": "ApplyFlag" }
+    },
+    "ApplyFlag": {
+      "type": "script",
+      "handler": "applyFlag",
+      "transitions": { "ok": "Done" }
+    },
+    "Fail": {
+      "type": "script",
+      "handler": "fail",
+      "transitions": { "ok": "Done" }
+    },
+    "Done": { "type": "terminal" }
+  }
+}

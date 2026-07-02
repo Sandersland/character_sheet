@@ -9,6 +9,9 @@ backend/src/generated/
 # Git worktrees used for parallel feature branches
 .claude/worktrees/
 
+# autodev FSM run ledgers (see .claude/skills/autodev)
+.claude/autodev/
+
 # Playwright / verify-tool artifacts
 .playwright-mcp/
 page-*.png
