@@ -79,7 +79,12 @@ describe("CampaignDetailPage (#246)", () => {
     renderDetail();
 
     await screen.findByText("The Sunless Citadel");
-    await user.selectOptions(await screen.findByLabelText(/your characters/i), "char-1");
+    const select = await screen.findByLabelText(/your characters/i);
+    // fetchCharacters resolves independently of fetchCampaign; wait for the
+    // option to populate before selecting, else selectOptions races the fetch
+    // and intermittently sees the empty "No characters to add" select.
+    await screen.findByRole("option", { name: "Thordak" });
+    await user.selectOptions(select, "char-1");
     await user.click(screen.getByRole("button", { name: /add character/i }));
 
     expect(vi.mocked(client.addCharacterToCampaign)).toHaveBeenCalledWith("char-1", "camp-1");
