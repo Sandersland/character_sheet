@@ -409,6 +409,17 @@ export function deriveUnarmoredMovement(input: {
   return 10;
 }
 
+// Barbarian Fast Movement (PHB p.48): +10 ft speed at class level 5+ while not
+// wearing heavy armor. Shields are irrelevant. Additive term — composes with
+// racial base speed, feat speed bonuses, and Monk Unarmored Movement.
+export function deriveFastMovement(input: {
+  barbarianLevel: number;
+  wearingHeavyArmor: boolean;
+}): number {
+  const { barbarianLevel, wearingHeavyArmor } = input;
+  return barbarianLevel >= 5 && !wearingHeavyArmor ? 10 : 0;
+}
+
 // ── Spellcasting ability by class ────────────────────────────────────────────
 // Maps a class name (lowercase) to the ability that governs its spellcasting.
 // Used to derive spellSaveDC and spellAttackBonus at read time.
