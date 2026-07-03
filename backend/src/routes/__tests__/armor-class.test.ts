@@ -114,6 +114,48 @@ describe("derived armorClass", () => {
     expect(res.body.armorClass).toBe(16);
   });
 
+  it("barbarian Unarmored Defense adds Con while unarmored, and shields stack", async () => {
+    // Dex 16 (+3), Con 14 (+2): 10 + 3 + 2 = 15.
+    await prisma.character.update({
+      where: { id: FIXTURE_ID },
+      data: {
+        abilityScores: { ...FIXTURE.abilityScores, constitution: 14 },
+        classEntries: { create: [{ name: "barbarian", position: 0 }] },
+      },
+    });
+    const res = await get();
+    expect(res.body.armorClass).toBe(15);
+    const withShield = await acquire(shield);
+    expect(withShield.body.armorClass).toBe(17);
+  });
+
+  it("monk Unarmored Defense adds Wis while unarmored but not with a shield", async () => {
+    // Dex 16 (+3), Wis 14 (+2): 10 + 3 + 2 = 15; shield doesn't stack on the monk formula.
+    await prisma.character.update({
+      where: { id: FIXTURE_ID },
+      data: {
+        abilityScores: { ...FIXTURE.abilityScores, wisdom: 14 },
+        classEntries: { create: [{ name: "monk", position: 0 }] },
+      },
+    });
+    const res = await get();
+    expect(res.body.armorClass).toBe(15);
+    const withShield = await acquire(shield);
+    expect(withShield.body.armorClass).toBe(15); // monk 15 ties base-with-shield 15
+  });
+
+  it("equipping body armor overrides a barbarian's Unarmored Defense", async () => {
+    await prisma.character.update({
+      where: { id: FIXTURE_ID },
+      data: {
+        abilityScores: { ...FIXTURE.abilityScores, constitution: 14 },
+        classEntries: { create: [{ name: "barbarian", position: 0 }] },
+      },
+    });
+    const res = await acquire(chainMail);
+    expect(res.body.armorClass).toBe(16); // heavy armor wins, Con ignored
+  });
+
   it("a feat armorClass improvement stacks on the derived base", async () => {
     await acquire(chainMail); // 16
     // Level 4 (2700 XP) grants one advancement slot, so the injected feat isn't clamped out.
