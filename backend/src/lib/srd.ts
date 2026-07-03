@@ -326,11 +326,12 @@ export function deriveFightingStyleBonuses(
 }
 
 // Local union (not ArmorCategoryName from inventory.ts) to avoid a srd↔inventory import cycle.
-type ArmorCategory = "light" | "medium" | "heavy" | "shield";
+// Shields are handled via hasShield, never passed as body armor, so they're excluded here.
+export type BodyArmorCategory = "light" | "medium" | "heavy";
 
 // Base AC from equipped body armor (null = unarmored) + Dex mod (capped by armor) + shield.
 export function deriveArmorClass(
-  armor: { armorCategory: ArmorCategory; baseArmorClass: number; dexModifierMax?: number | null } | null,
+  armor: { armorCategory: BodyArmorCategory; baseArmorClass: number; dexModifierMax?: number | null } | null,
   hasShield: boolean,
   dexMod: number,
 ): number {
@@ -343,8 +344,6 @@ export function deriveArmorClass(
       return armor.baseArmorClass + Math.min(dexMod, armor.dexModifierMax ?? 2) + shieldBonus;
     case "heavy":
       return armor.baseArmorClass + shieldBonus;
-    case "shield":
-      return 10 + dexMod + shieldBonus;
   }
 }
 

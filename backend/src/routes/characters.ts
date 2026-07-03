@@ -32,6 +32,7 @@ import {
   RACE_PROFICIENCY_GRANTS,
   TOOLS,
   type ArmorProficiencyCategory,
+  type BodyArmorCategory,
   type FightingStyleKey,
   type ToolProficiencyEntry,
 } from "../lib/srd.js";
@@ -649,7 +650,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
   const hasShield = equippedArmorDetails.some((a) => a.armorCategory === "shield");
   const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
   const bestArmor = equippedArmorDetails
-    .filter((a) => a.armorCategory !== "shield")
+    .filter((a): a is (typeof equippedArmorDetails)[number] & { armorCategory: BodyArmorCategory } => a.armorCategory !== "shield")
     .reduce<Parameters<typeof deriveArmorClass>[0]>((best, a) => {
       const candidate = {
         armorCategory: a.armorCategory,
