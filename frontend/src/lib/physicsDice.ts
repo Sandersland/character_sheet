@@ -22,7 +22,9 @@ const GRAVITY_Y = -50;
 // Fixed simulation timestep; cannon-es internally sub-steps real frame time
 // against this when stepped with `timeSinceLastCalled` (see useFrame call
 // site), so motion stays stable regardless of the browser's actual frame rate.
-const FIXED_DT = 1 / 60;
+// Exported so the React roller's synchronous fast-forward path advances sim
+// time by the exact same step as an animated frame — single source of truth.
+export const FIXED_DT = 1 / 60;
 const MAX_SUB_STEPS = 6;
 
 const DIE_MASS = 1;

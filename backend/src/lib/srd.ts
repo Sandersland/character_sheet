@@ -120,8 +120,9 @@ export function isKnownTool(name: string): boolean {
 // source of truth for condition rules data — the frontend resolves display text
 // through a label map derived from these keys, never by rendering raw keys.
 // Exhaustion is intentionally NOT in this list: it is a single 0–6 level handled
-// as a special case (see EXHAUSTION_MAX / exhaustionEffect below), not a boolean
-// presence in the active-conditions list.
+// as a special case (see EXHAUSTION_MAX below; per-level effect text lives in the
+// frontend's lib/conditions.ts), not a boolean presence in the active-conditions
+// list.
 
 export type ConditionKey =
   | "blinded"
