@@ -212,15 +212,28 @@ describe("CampaignCodex create flow (#367)", () => {
     expect(vi.mocked(primeCampaignEntities)).not.toHaveBeenCalled();
   });
 
-  it("closes the create panel on Escape", async () => {
+  it("closes the create panel on Escape and returns focus to the toggle", async () => {
     const user = userEvent.setup();
     renderCodex();
 
-    await user.click(screen.getByRole("button", { name: /new entity/i }));
+    const toggle = screen.getByRole("button", { name: /new entity/i });
+    await user.click(toggle);
     await user.type(screen.getByLabelText(/name/i), "Sildar");
     await user.keyboard("{Escape}");
 
     expect(screen.queryByRole("button", { name: /create entity/i })).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  it("returns focus to the toggle when the panel is cancelled", async () => {
+    const user = userEvent.setup();
+    renderCodex();
+
+    const toggle = screen.getByRole("button", { name: /new entity/i });
+    await user.click(toggle);
+    await user.click(screen.getByRole("button", { name: /cancel/i }));
+
+    expect(document.activeElement).toBe(toggle);
   });
 
   it("offers the create toggle even when the campaign has no entities", () => {

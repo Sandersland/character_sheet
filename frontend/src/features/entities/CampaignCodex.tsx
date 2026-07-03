@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import Badge from "@/components/ui/Badge";
@@ -36,6 +36,7 @@ export default function CampaignCodex({ campaignId }: CampaignCodexProps) {
   const [typeFilter, setTypeFilter] = useState<EntityType | "ALL">("ALL");
 
   const [creating, setCreating] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [type, setType] = useState<EntityType>("NPC");
@@ -68,6 +69,8 @@ export default function CampaignCodex({ campaignId }: CampaignCodexProps) {
     setName("");
     setAliases("");
     setNotes("");
+    // The panel unmounts, so return keyboard focus to the toggle (same pattern as Popover).
+    toggleRef.current?.focus();
   }
 
   async function handleCreate() {
@@ -100,6 +103,7 @@ export default function CampaignCodex({ campaignId }: CampaignCodexProps) {
       headingLevel={2}
       titleAccessory={
         <button
+          ref={toggleRef}
           type="button"
           aria-expanded={creating}
           onClick={() => (creating ? closeForm() : setCreating(true))}
