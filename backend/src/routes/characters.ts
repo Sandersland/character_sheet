@@ -624,18 +624,6 @@ export function serializeCharacter(row: CharacterWithRelations) {
     featProficiencies.weapons,
   );
 
-  // ── Unarmed strike + improvised weapon derivation ────────────────────────
-  // Derived from the same clamped advancements slice so Tavern Brawler's
-  // upgrades are automatically excluded when the character is over-cap.
-  const unarmedDie = deriveUnarmedDamageDie(clampedAdvancements);
-  const unarmedStrike = deriveUnarmedStrike(effectiveScores, progress.proficiencyBonus, unarmedDie);
-  const improvisedProficient = weaponGrants.some((g) => g.name === "Improvised Weapons");
-  const improvisedWeapon = deriveImprovisedAttack(
-    effectiveScores,
-    progress.proficiencyBonus,
-    improvisedProficient,
-  );
-
   const inventoryContext = buildInventoryContext(
     row,
     effectiveScores,
@@ -680,6 +668,24 @@ export function serializeCharacter(row: CharacterWithRelations) {
     isUnarmored: bestArmor === null,
     hasShield,
   });
+
+  // ── Unarmed strike + improvised weapon derivation ────────────────────────
+  // Derived from the same clamped advancements slice so Tavern Brawler's
+  // upgrades are automatically excluded when the character is over-cap. A Monk
+  // (unarmored & unshielded) swaps in max(Dex, Str) + the level-scaled Martial
+  // Arts die, off the monk class-entry level for multiclass correctness.
+  const unarmedDie = deriveUnarmedDamageDie(clampedAdvancements);
+  const unarmedStrike = deriveUnarmedStrike(effectiveScores, progress.proficiencyBonus, unarmedDie, {
+    level: monkLevel,
+    isUnarmored: bestArmor === null,
+    hasShield,
+  });
+  const improvisedProficient = weaponGrants.some((g) => g.name === "Improvised Weapons");
+  const improvisedWeapon = deriveImprovisedAttack(
+    effectiveScores,
+    progress.proficiencyBonus,
+    improvisedProficient,
+  );
 
   // Labeled AC addends; armorClass below is their exact sum (single source in srd.ts).
   const acParts = deriveArmorClassParts(bestArmor, hasShield, dexMod, unarmoredDefense);
