@@ -79,7 +79,9 @@ export default function SellPanel({ items, pending, onConfirm, onCancel }: SellP
     return sum + copper;
   }, 0);
 
-  const targetCopper = totalText === null ? autoTotalCopper : gpToCopper(Number(totalText));
+  // A blank box (null before first edit, or "" after the user clears it) means
+  // "use the auto total" — never a 0 gp sale (mirrors an empty override → unpinned).
+  const targetCopper = !totalText?.trim() ? autoTotalCopper : gpToCopper(Number(totalText));
   const prices = resolveSellPrices(lines, overridesCopper, targetCopper);
   const resolvedTotal = resolvedTotalObject(prices, items);
 
@@ -253,7 +255,7 @@ export default function SellPanel({ items, pending, onConfirm, onCancel }: SellP
             />
             gp
           </label>
-          {totalText !== null && (
+          {totalText?.trim() && (
             <button
               type="button"
               onClick={() => setTotalText(null)}

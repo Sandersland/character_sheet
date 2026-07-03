@@ -353,6 +353,29 @@ describe("InventoryList multi-select sell", () => {
     ]);
   });
 
+  it("treats a cleared total as auto, not a 0 gp sale", async () => {
+    const user = userEvent.setup();
+    // Longsword half = 5 gp, Shield half = 2.5 gp → auto total 7.5 gp.
+    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Sell items" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Shield" }));
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+
+    // Type a total, then clear it back to empty before confirming.
+    const total = screen.getByRole("spinbutton", { name: "Total gold received" });
+    fireEvent.change(total, { target: { value: "20" } });
+    fireEvent.change(total, { target: { value: "" } });
+    // Empty box falls back to the auto total, and the Auto reset hides.
+    expect(screen.queryByRole("button", { name: "Reset total to the automatic amount" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+    expect(applyInventoryTransactions).toHaveBeenCalledWith("char-1", [
+      { type: "sell", inventoryItemId: "w1", quantity: 1, currencyDelta: { cp: 5, sp: 7, gp: 3, pp: 0 } },
+      { type: "sell", inventoryItemId: "a1", quantity: 1, currencyDelta: { cp: 5, sp: 7, gp: 3, pp: 0 } },
+    ]);
+  });
+
   it("opens pricing help in an overlay (no layout reflow) and closes it", async () => {
     const user = userEvent.setup();
     render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
