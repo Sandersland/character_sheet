@@ -976,7 +976,7 @@ const updateCharacterSchema = z
     name: z.string().min(1),
     alignment: z.string().min(1),
     portraitUrl: z.string().nullable(),
-    armorClass: z.number().int(),
+    // armorClass is absent: it's derived at read time from equipped armor + Dex + shield.
     initiativeBonus: z.number().int(),
     speed: z.number().int().nonnegative(),
     hitPoints: z.object({

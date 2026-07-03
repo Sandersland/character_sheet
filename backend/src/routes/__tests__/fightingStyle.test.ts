@@ -31,7 +31,6 @@ const FIXTURE_BASE = {
   name: "Fighting Style Test Fighter",
   alignment: "Neutral Good",
   experiencePoints: L5_XP,
-  armorClass: 16,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 44, max: 44, temp: 0 },

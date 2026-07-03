@@ -33,7 +33,6 @@ const FIXTURE_BASE = {
   name: "Add Class Test Fighter",
   alignment: "True Neutral",
   experiencePoints: 6500, // derived level 5
-  armorClass: 16,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 30, max: 30, temp: 0, deathSaves: { successes: 0, failures: 0 } },

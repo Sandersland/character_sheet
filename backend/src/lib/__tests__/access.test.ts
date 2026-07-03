@@ -16,7 +16,6 @@ const FIXTURE = {
   id: CHARACTER_ID,
   name: "Access Test Fixture",
   alignment: "Lawful Good",
-  armorClass: 10,
   initiativeBonus: 0,
   speed: 30,
   hitPoints: { current: 10, max: 10, temp: 0 },

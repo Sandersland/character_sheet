@@ -99,7 +99,6 @@ const WIZARD_BASE = {
   name: "Activity Test Wizard",
   alignment: "Neutral Good",
   experiencePoints: 0, // level 1 → 2 L1 slots, prof +2
-  armorClass: 12,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 8, max: 8, temp: 0, deathSaves: { successes: 0, failures: 0 } },
@@ -434,7 +433,6 @@ const FIGHTER_BASE = {
   name: "Activity Test Fighter",
   alignment: "Lawful Neutral",
   experiencePoints: 6500, // level 5 → 1 ASI slot (L4), prof +3
-  armorClass: 16,
   initiativeBonus: 2,
   speed: 30,
   hitPoints: { current: 44, max: 44, temp: 0, deathSaves: { successes: 0, failures: 0 } },
@@ -621,7 +619,6 @@ describe("POST /:id/events/:batchId/revert — inventory undo", () => {
         name: "Activity Test Rogue",
         alignment: "Chaotic Good",
         experiencePoints: 0,
-        armorClass: 13,
         initiativeBonus: 2,
         speed: 30,
         hitPoints: { current: 8, max: 8, temp: 0, deathSaves: { successes: 0, failures: 0 } },
@@ -963,7 +960,6 @@ const LVL_BASE = {
   name: "Activity Test Leveler",
   alignment: "True Neutral",
   experiencePoints: XP_LEVEL_3, // derived level 3, but only 1 HP level-up applied
-  armorClass: 16,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 12, max: 12, temp: 0, deathSaves: { successes: 0, failures: 0 } },
@@ -1159,7 +1155,6 @@ describe("POST /:id/events/:batchId/revert — meta event labels the primary act
         name: "Activity Test Concentrator",
         alignment: "True Neutral",
         experiencePoints: 300, // level 2, prof +2
-        armorClass: 12,
         initiativeBonus: 1,
         speed: 30,
         // Large HP pool so 150 damage leaves HP > 0 (isolates the "damage" save path).
@@ -1259,7 +1254,6 @@ describe("GET /:id/activity — ?category= filter", () => {
         name: "Activity Filter Test Fighter",
         alignment: "Neutral Good",
         experiencePoints: 0,
-        armorClass: 16,
         initiativeBonus: 1,
         speed: 30,
         hitPoints: { current: 12, max: 12, temp: 0, deathSaves: { successes: 0, failures: 0 } },
@@ -1359,7 +1353,6 @@ describe("GET /:id/activity — ?type= and ?sessionId= filters", () => {
         name: TYPEFILTER_NAME,
         alignment: "Neutral Good",
         experiencePoints: 0,
-        armorClass: 16,
         initiativeBonus: 1,
         speed: 30,
         hitPoints: { current: 12, max: 12, temp: 0, deathSaves: { successes: 0, failures: 0 } },

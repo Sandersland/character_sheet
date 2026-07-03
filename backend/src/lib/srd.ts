@@ -1117,7 +1117,6 @@ export interface DerivedCharacterFields {
   speed: number;
   hitDice: { total: number; die: string; spent: number };
   hitPoints: { current: number; max: number; temp: number; deathSaves: { successes: number; failures: number } };
-  armorClass: number;
   initiativeBonus: number;
   savingThrowProficiencies: string[];
   skills: { name: string; ability: string; proficient: boolean }[];
@@ -1145,7 +1144,6 @@ export function deriveCreatedCharacter(
     speed: catalog.race.speed,
     hitDice: { total: 1, die: catalog.characterClass.hitDie, spent: 0 },
     hitPoints: { current: maxHitPoints, max: maxHitPoints, temp: 0, deathSaves: { successes: 0, failures: 0 } },
-    armorClass: 10 + dexterityModifier,
     initiativeBonus: dexterityModifier,
     savingThrowProficiencies: catalog.characterClass.savingThrows,
     skills: SKILLS.map(({ name, ability }) => ({

@@ -25,7 +25,6 @@ const FIXTURE = {
   name: "AC Test Fixture",
   alignment: "True Neutral",
   experiencePoints: 0,
-  armorClass: 10,
   initiativeBonus: 3,
   speed: 30,
   hitPoints: { current: 10, max: 10, temp: 0 },

@@ -66,7 +66,6 @@ const FIXTURE = {
   name: "Test Advancement Fixture",
   alignment: "True Neutral",
   experiencePoints: XP_LVL_4,  // level 4 — 1 ASI slot
-  armorClass: 12,
   initiativeBonus: 2,           // DEX 14 → +2
   speed: 30,
   hitPoints: { current: 30, max: 30, temp: 0, deathSaves: { successes: 0, failures: 0 } },

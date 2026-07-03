@@ -32,7 +32,6 @@ const FIXTURE_BASE = {
   name: "MC Subclass Fixture",
   alignment: "True Neutral",
   experiencePoints: 6500, // derived level 5
-  armorClass: 16,
   initiativeBonus: 0,
   speed: 30,
   hitPoints: { current: 40, max: 40, temp: 0, deathSaves: { successes: 0, failures: 0 } },
