@@ -177,17 +177,17 @@ export function deriveActions(
 //    range server-side rather than recomputing (same pattern as castSpell.roll).
 //  - Use ONLY existing op types (spendResource, adjustQuantity, heal).
 
-export interface ActionContext {
+interface ActionContext {
   /** Arbitrary dice roll total supplied by the client (e.g. potion healing). */
   roll?: number;
   /** ID of the inventory item to consume (e.g. healing potion). */
   inventoryItemId?: string;
 }
 
-export type SpendResourceOp = { type: "spendResource"; key: string; amount?: number };
-export type AdjustQuantityOp = { type: "adjustQuantity"; inventoryItemId: string; delta: number };
-export type HealOp = { type: "heal"; amount: number };
-export type ActionOp = SpendResourceOp | AdjustQuantityOp | HealOp;
+type SpendResourceOp = { type: "spendResource"; key: string; amount?: number };
+type AdjustQuantityOp = { type: "adjustQuantity"; inventoryItemId: string; delta: number };
+type HealOp = { type: "heal"; amount: number };
+type ActionOp = SpendResourceOp | AdjustQuantityOp | HealOp;
 
 type EffectFn = (ctx: ActionContext) => ActionOp[];
 

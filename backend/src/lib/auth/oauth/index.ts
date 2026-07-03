@@ -21,4 +21,3 @@ export {
   tokenColumns,
 } from "./flow.js";
 export { resolveUserId } from "./account.js";
-export type { AuthProvider, NormalizedProfile, ProviderDefinition } from "./types.js";
