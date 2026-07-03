@@ -10,6 +10,7 @@ import {
   type SellLine,
 } from "@/lib/bulkSell";
 import { formatCurrency, toCopper } from "@/lib/currency";
+import Modal from "@/components/ui/Modal";
 import type { Currency, InventoryItem } from "@/types/character";
 
 interface SellPanelProps {
@@ -122,10 +123,9 @@ export default function SellPanel({ items, pending, onConfirm, onCancel }: SellP
           <h4 className="text-xs font-semibold uppercase tracking-wide text-parchment-600">Confirm sale</h4>
           <button
             type="button"
-            onClick={() => setShowHelp((v) => !v)}
+            onClick={() => setShowHelp(true)}
             aria-label="How pricing works"
-            aria-expanded={showHelp}
-            aria-controls="sell-help"
+            aria-haspopup="dialog"
             className="text-parchment-400 transition-colors hover:text-parchment-700"
           >
             <HelpCircle className="h-3.5 w-3.5" aria-hidden />
@@ -137,30 +137,29 @@ export default function SellPanel({ items, pending, onConfirm, onCancel }: SellP
       </div>
 
       {showHelp && (
-        <div
-          id="sell-help"
-          className="flex flex-col gap-1.5 rounded-control border border-parchment-300 bg-parchment-50 p-2.5 text-xs text-parchment-600"
-        >
-          <p>
-            <span className="font-semibold text-parchment-700">Total received</span> is one gold amount for the
-            whole sale, split evenly across the selected items. It prefills to half each item's catalog value.
-          </p>
-          <p>
-            <span className="font-semibold text-parchment-700">Silver &amp; copper:</span> use decimals —{" "}
-            <span className="tabular-nums">0.5</span> gp = 5 sp, <span className="tabular-nums">0.05</span> gp =
-            5 cp (copper is the smallest coin, so two decimals is as fine as it goes). The{" "}
-            <span className="font-semibold">= …</span> line shows the exact coins you'll receive.
-          </p>
-          <p>
-            <span className="font-semibold text-parchment-700">Platinum:</span> amounts stay in gp/sp/cp here —
-            1 pp is just 10 gp of value. Hold or convert coins into platinum from{" "}
-            <span className="font-semibold">Edit purse</span>.
-          </p>
-          <p>
-            <span className="font-semibold text-parchment-700">Set price</span> pins one item to an exact amount;
-            the remaining total then splits across the other items.
-          </p>
-        </div>
+        <Modal title="Selling &amp; pricing" onClose={() => setShowHelp(false)}>
+          <div className="flex flex-col gap-2 text-sm text-parchment-600">
+            <p>
+              <span className="font-semibold text-parchment-700">Total received</span> is one gold amount for the
+              whole sale, split evenly across the selected items. It prefills to half each item's catalog value.
+            </p>
+            <p>
+              <span className="font-semibold text-parchment-700">Silver &amp; copper:</span> use decimals —{" "}
+              <span className="tabular-nums">0.5</span> gp = 5 sp, <span className="tabular-nums">0.05</span> gp =
+              5 cp (copper is the smallest coin, so two decimals is as fine as it goes). The{" "}
+              <span className="font-semibold">= …</span> line shows the exact coins you'll receive.
+            </p>
+            <p>
+              <span className="font-semibold text-parchment-700">Platinum:</span> amounts stay in gp/sp/cp here —
+              1 pp is just 10 gp of value. Hold or convert coins into platinum from{" "}
+              <span className="font-semibold">Edit purse</span>.
+            </p>
+            <p>
+              <span className="font-semibold text-parchment-700">Set price</span> pins one item to an exact
+              amount; the remaining total then splits across the other items.
+            </p>
+          </div>
+        </Modal>
       )}
 
       <ul className="flex flex-col divide-y divide-parchment-200">
