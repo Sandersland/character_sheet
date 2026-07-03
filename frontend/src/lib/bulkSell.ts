@@ -18,6 +18,8 @@ export interface SellLine {
   quantity: number;
 }
 
+const ZERO_CURRENCY: Currency = { cp: 0, sp: 0, gp: 0, pp: 0 };
+
 // Prefill: half the per-unit catalog value (rounded down) × quantity, kept in gp/sp/cp (no platinum roll-up) so a 15 gp default reads "15 gp".
 export function defaultSellPrice(cost: Currency | undefined, quantity: number): Currency {
   let remaining = Math.floor(toCopper(cost ?? ZERO_CURRENCY) / 2) * Math.max(0, quantity);
@@ -37,8 +39,6 @@ export function defaultSellPrice(cost: Currency | undefined, quantity: number): 
 export type BulkSellPricing =
   | { mode: "perItem"; prices: Record<string, Currency> }
   | { mode: "lumpSum"; total: Currency };
-
-const ZERO_CURRENCY: Currency = { cp: 0, sp: 0, gp: 0, pp: 0 };
 
 /**
  * Build the `sell` ops for the selected lines. Empty input returns `[]` so the

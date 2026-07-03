@@ -292,6 +292,27 @@ describe("InventoryList multi-select sell", () => {
     ]);
   });
 
+  it("keeps a hand-typed price when quantity changes afterwards (no re-prefill)", async () => {
+    const user = userEvent.setup();
+    const stack = [
+      makeItem({ id: "w1", name: "Longsword", category: "weapon", quantity: 3, cost: { cp: 0, sp: 0, gp: 10, pp: 0 } }),
+    ];
+    render(<InventoryList character={makeCharacter(15, stack)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Sell items" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+
+    // Type a custom price FIRST (sets the priceEdited flag)…
+    const gp = screen.getByRole("spinbutton", { name: "gp received for Longsword" });
+    fireEvent.change(gp, { target: { value: "8" } });
+    // …then change quantity: the typed price must stick, not re-prefill to half-catalog.
+    const qty = screen.getByRole("spinbutton", { name: "Quantity to sell of Longsword" });
+    fireEvent.change(qty, { target: { value: "1" } });
+
+    expect(gp).toHaveValue(8);
+    expect(screen.getByText("Total received: 8 gp")).toBeInTheDocument();
+  });
+
   it("Cancel exits select mode", async () => {
     const user = userEvent.setup();
     render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
