@@ -5,6 +5,7 @@ import Badge from "@/components/ui/Badge";
 import Spinner from "@/components/ui/Spinner";
 import Tabs from "@/components/ui/Tabs";
 import CampaignOverviewPanel from "@/features/campaign/CampaignOverviewPanel";
+import CampaignCodex from "@/features/entities/CampaignCodex";
 import { fetchCampaign } from "@/api/client";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import type { Campaign } from "@/types/character";
@@ -79,7 +80,7 @@ export default function CampaignDetailPage() {
         />
 
         {onCodex ? (
-          <p className="text-sm text-parchment-600">The Codex is coming soon.</p>
+          <CampaignCodex campaignId={campaign.id} />
         ) : (
           <CampaignOverviewPanel campaign={campaign} onCampaignChange={setCampaign} />
         )}
