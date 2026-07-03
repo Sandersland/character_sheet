@@ -54,7 +54,6 @@ const BASE_ABILITY_SCORES = {
 
 const BASE_CHARACTER = {
   alignment: "True Neutral",
-  armorClass: 14,
   initiativeBonus: 0,
   speed: 30,
   hitPoints: { current: 30, max: 30, temp: 0, deathSaves: { successes: 0, failures: 0 } },

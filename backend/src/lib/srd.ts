@@ -325,6 +325,28 @@ export function deriveFightingStyleBonuses(
   return { armorClass: styleKey === "defense" ? 1 : 0 };
 }
 
+// Local union (not ArmorCategoryName from inventory.ts) to avoid a srd↔inventory import cycle.
+// Shields are handled via hasShield, never passed as body armor, so they're excluded here.
+export type BodyArmorCategory = "light" | "medium" | "heavy";
+
+// Base AC from equipped body armor (null = unarmored) + Dex mod (capped by armor) + shield.
+export function deriveArmorClass(
+  armor: { armorCategory: BodyArmorCategory; baseArmorClass: number; dexModifierMax?: number | null } | null,
+  hasShield: boolean,
+  dexMod: number,
+): number {
+  const shieldBonus = hasShield ? 2 : 0;
+  if (armor === null) return 10 + dexMod + shieldBonus;
+  switch (armor.armorCategory) {
+    case "light":
+      return armor.baseArmorClass + dexMod + shieldBonus;
+    case "medium":
+      return armor.baseArmorClass + Math.min(dexMod, armor.dexModifierMax ?? 2) + shieldBonus;
+    case "heavy":
+      return armor.baseArmorClass + shieldBonus;
+  }
+}
+
 // ── Spellcasting ability by class ────────────────────────────────────────────
 // Maps a class name (lowercase) to the ability that governs its spellcasting.
 // Used to derive spellSaveDC and spellAttackBonus at read time.
@@ -1094,7 +1116,6 @@ export interface DerivedCharacterFields {
   speed: number;
   hitDice: { total: number; die: string; spent: number };
   hitPoints: { current: number; max: number; temp: number; deathSaves: { successes: number; failures: number } };
-  armorClass: number;
   initiativeBonus: number;
   savingThrowProficiencies: string[];
   skills: { name: string; ability: string; proficient: boolean }[];
@@ -1122,7 +1143,6 @@ export function deriveCreatedCharacter(
     speed: catalog.race.speed,
     hitDice: { total: 1, die: catalog.characterClass.hitDie, spent: 0 },
     hitPoints: { current: maxHitPoints, max: maxHitPoints, temp: 0, deathSaves: { successes: 0, failures: 0 } },
-    armorClass: 10 + dexterityModifier,
     initiativeBonus: dexterityModifier,
     savingThrowProficiencies: catalog.characterClass.savingThrows,
     skills: SKILLS.map(({ name, ability }) => ({

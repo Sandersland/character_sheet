@@ -30,7 +30,6 @@ const FIXTURE_BASE = {
   name: "Resources Test Battle Master",
   alignment: "Lawful Neutral",
   experiencePoints: 900,
-  armorClass: 16,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 28, max: 28, temp: 0 },

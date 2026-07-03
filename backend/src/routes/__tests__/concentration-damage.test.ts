@@ -60,7 +60,6 @@ const FIXTURE = {
   name: "Concentration Test Fixture",
   alignment: "True Neutral",
   experiencePoints: 300, // level 2 → proficiency bonus +2
-  armorClass: 12,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 200, max: 200, temp: 0, deathSaves: { successes: 0, failures: 0 } },

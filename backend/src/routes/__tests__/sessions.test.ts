@@ -30,7 +30,6 @@ const agent = (cookie: string) => supertest.agent(app).set("Cookie", cookie);
 const BASE_CHAR = {
   alignment: "True Neutral",
   experiencePoints: 900,
-  armorClass: 16,
   initiativeBonus: 2,
   speed: 30,
   hitPoints: { current: 28, max: 28, temp: 0, deathSaves: { successes: 0, failures: 0 } },

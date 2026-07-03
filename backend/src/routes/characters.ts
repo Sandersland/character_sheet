@@ -14,8 +14,10 @@ import {
 import { prisma } from "../lib/prisma.js";
 import { normalizeHitDice, normalizeHitPoints } from "../lib/hitpoints.js";
 import {
+  abilityModifier,
   advancementSlotsForLevel,
   CLASS_PROFICIENCY_GRANTS,
+  deriveArmorClass,
   deriveFeatBonuses,
   deriveFeatProficiencies,
   deriveSpellcasting,
@@ -30,6 +32,7 @@ import {
   RACE_PROFICIENCY_GRANTS,
   TOOLS,
   type ArmorProficiencyCategory,
+  type BodyArmorCategory,
   type FightingStyleKey,
   type ToolProficiencyEntry,
 } from "../lib/srd.js";
@@ -639,6 +642,27 @@ export function serializeCharacter(row: CharacterWithRelations) {
     fightingStyle,
   );
 
+  // AC is derived, not persisted: best equipped body armor + Dex (per category)
+  // + shield. No slot model exists, so the highest-AC body armor wins.
+  const equippedArmorDetails = row.inventoryItems
+    .filter((i) => i.equipped && i.armorDetail)
+    .map((i) => i.armorDetail!);
+  const hasShield = equippedArmorDetails.some((a) => a.armorCategory === "shield");
+  const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
+  const bestArmor = equippedArmorDetails
+    .filter((a): a is (typeof equippedArmorDetails)[number] & { armorCategory: BodyArmorCategory } => a.armorCategory !== "shield")
+    .reduce<Parameters<typeof deriveArmorClass>[0]>((best, a) => {
+      const candidate = {
+        armorCategory: a.armorCategory,
+        baseArmorClass: a.baseArmorClass,
+        dexModifierMax: a.dexModifierMax,
+      };
+      if (best === null) return candidate;
+      return deriveArmorClass(candidate, false, dexMod) > deriveArmorClass(best, false, dexMod)
+        ? candidate
+        : best;
+    }, null);
+
   return {
     id: row.id,
     name: row.name,
@@ -657,7 +681,10 @@ export function serializeCharacter(row: CharacterWithRelations) {
     campaignId: row.campaignId ?? undefined,
 
     armorClass:
-      row.armorClass + featBonuses.armorClass + deriveFightingStyleBonuses(fightingStyle).armorClass,
+      deriveArmorClass(bestArmor, hasShield, dexMod) +
+      featBonuses.armorClass +
+      // Defense fighting style only applies while wearing body armor (5e).
+      (bestArmor !== null ? deriveFightingStyleBonuses(fightingStyle).armorClass : 0),
     initiativeBonus: effectiveInitBonus + featBonuses.initiative,
     speed: row.speed + featBonuses.speed,
     proficiencyBonus: progress.proficiencyBonus,
@@ -951,7 +978,7 @@ const updateCharacterSchema = z
     name: z.string().min(1),
     alignment: z.string().min(1),
     portraitUrl: z.string().nullable(),
-    armorClass: z.number().int(),
+    // armorClass is absent: it's derived at read time from equipped armor + Dex + shield.
     initiativeBonus: z.number().int(),
     speed: z.number().int().nonnegative(),
     hitPoints: z.object({

@@ -34,7 +34,6 @@ const BASE = {
   name: "MC Level Fixture",
   alignment: "True Neutral",
   experiencePoints: 6500,
-  armorClass: 16,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 30, max: 30, temp: 0, deathSaves: { successes: 0, failures: 0 } },

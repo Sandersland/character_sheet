@@ -38,7 +38,6 @@ const FIXTURE = {
   alignment: "Lawful Good",
   portraitUrl: null,
   experiencePoints: 1000,
-  armorClass: 16,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 10, max: 10, temp: 0 },

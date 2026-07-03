@@ -64,7 +64,6 @@ const FIXTURE_BASE = {
   name: "Spellcasting Test Wizard",
   alignment: "Neutral Good",
   experiencePoints: 0,      // level 1 → 2 L1 slots
-  armorClass: 12,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 8, max: 8, temp: 0 },
@@ -686,7 +685,6 @@ const WARLOCK_BASE = {
   name: "Mystic Arcanum Test Warlock",
   alignment: "Chaotic Neutral",
   experiencePoints: 85000, // level 11
-  armorClass: 12,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 60, max: 60, temp: 0 },

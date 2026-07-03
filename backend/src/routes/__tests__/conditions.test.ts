@@ -25,7 +25,6 @@ const FIXTURE_BASE = {
   name: "Conditions Test Fighter",
   alignment: "Neutral Good",
   experiencePoints: 0,
-  armorClass: 16,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 12, max: 12, temp: 0 },

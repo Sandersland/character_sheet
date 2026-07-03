@@ -17,7 +17,6 @@ const FIXTURE = {
   name: "HP Test Fixture",
   alignment: "True Neutral",
   experiencePoints: 300, // level 2
-  armorClass: 12,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 20, max: 22, temp: 5, deathSaves: { successes: 0, failures: 0 } },
@@ -376,7 +375,6 @@ const BM_FIXTURE = {
   name: "Rest Undo Battle Master",
   alignment: "Lawful Neutral",
   experiencePoints: 2700, // level 4
-  armorClass: 16,
   initiativeBonus: 1,
   speed: 30,
   hitPoints: { current: 20, max: 36, temp: 0, deathSaves: { successes: 0, failures: 0 } },

@@ -29,7 +29,6 @@ const FIXTURE = {
   name: "Journal Test Rogue",
   alignment: "Chaotic Neutral",
   experiencePoints: 900,
-  armorClass: 14,
   initiativeBonus: 3,
   speed: 30,
   hitPoints: { current: 21, max: 21, temp: 0, deathSaves: { successes: 0, failures: 0 } },
