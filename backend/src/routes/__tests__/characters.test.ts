@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -214,6 +216,107 @@ describe("characters routes", () => {
     );
 
     expect(response.status).toBe(404);
+  });
+
+  describe("Barbarian Fast Movement speed derivation", () => {
+    // Creates a bare character with the given class entries and optional equipped
+    // body-armor category, then returns its serialized speed. classId is left null
+    // (nullable FK) so no catalog rows are needed — the derivation keys off name.
+    const makeAndGetSpeed = async (
+      classEntries: { name: string; level: number }[],
+      equippedArmorCategory?: "light" | "medium" | "heavy" | "shield",
+    ): Promise<number> => {
+      const id = `fast-move-${randomUUID()}`;
+      createdCharacterIds.push(id);
+      await prisma.character.create({
+        data: {
+          ...FIXTURE,
+          id,
+          name: id,
+          speed: 30,
+          experiencePoints: 14000, // well past level 5; irrelevant to class-level gating
+          owner: { connect: { id: TEST_USER.id } },
+          spellcasting: Prisma.JsonNull,
+          raceSelection: { create: { name: TEST_RACE.name } },
+          backgroundSelection: { create: { name: TEST_BACKGROUND.name } },
+          classEntries: {
+            create: classEntries.map((e, i) => ({ name: e.name, level: e.level, position: i })),
+          },
+          inventoryItems: equippedArmorCategory
+            ? {
+                create: [
+                  {
+                    name: `${equippedArmorCategory} armor`,
+                    category: "armor",
+                    quantity: 1,
+                    equipped: true,
+                    position: 0,
+                    armorDetail: {
+                      create: {
+                        armorCategory: equippedArmorCategory,
+                        baseArmorClass: equippedArmorCategory === "shield" ? 2 : 14,
+                      },
+                    },
+                  },
+                ],
+              }
+            : undefined,
+        },
+      });
+      const response = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${id}`);
+      expect(response.status).toBe(200);
+      return response.body.speed;
+    };
+
+    it("level-4 barbarian: speed unchanged", async () => {
+      expect(await makeAndGetSpeed([{ name: "Barbarian", level: 4 }])).toBe(30);
+    });
+
+    it("level-5 barbarian, no armor: base + 10", async () => {
+      expect(await makeAndGetSpeed([{ name: "Barbarian", level: 5 }])).toBe(40);
+    });
+
+    it("level-5 barbarian, light armor: base + 10", async () => {
+      expect(await makeAndGetSpeed([{ name: "Barbarian", level: 5 }], "light")).toBe(40);
+    });
+
+    it("level-5 barbarian, medium armor: base + 10", async () => {
+      expect(await makeAndGetSpeed([{ name: "Barbarian", level: 5 }], "medium")).toBe(40);
+    });
+
+    it("level-5 barbarian, heavy armor: no bonus", async () => {
+      expect(await makeAndGetSpeed([{ name: "Barbarian", level: 5 }], "heavy")).toBe(30);
+    });
+
+    it("level-5 barbarian with a shield (no body armor): base + 10", async () => {
+      expect(await makeAndGetSpeed([{ name: "Barbarian", level: 5 }], "shield")).toBe(40);
+    });
+
+    it("level-20 barbarian: no scaling beyond +10", async () => {
+      expect(await makeAndGetSpeed([{ name: "Barbarian", level: 20 }])).toBe(40);
+    });
+
+    it("non-barbarian (Fighter) of any level: no bonus", async () => {
+      expect(await makeAndGetSpeed([{ name: "Fighter", level: 20 }])).toBe(30);
+    });
+
+    it("multiclass Fighter 4 / Barbarian 5, no heavy armor: base + 10", async () => {
+      expect(
+        await makeAndGetSpeed([
+          { name: "Fighter", level: 4 },
+          { name: "Barbarian", level: 5 },
+        ]),
+      ).toBe(40);
+    });
+
+    it("multiclass Fighter 5 / Barbarian 4: no bonus", async () => {
+      expect(
+        await makeAndGetSpeed([
+          { name: "Fighter", level: 5 },
+          { name: "Barbarian", level: 4 },
+        ]),
+      ).toBe(30);
+    });
   });
 
   it("POST /api/characters/:id/experience sets XP and recomputes level", async () => {

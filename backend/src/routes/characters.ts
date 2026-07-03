@@ -19,6 +19,7 @@ import {
   CLASS_PROFICIENCY_GRANTS,
   deriveArmorClass,
   deriveArmorClassParts,
+  deriveFastMovement,
   deriveFeatBonuses,
   deriveFeatProficiencies,
   deriveSpellcasting,
@@ -681,6 +682,14 @@ export function serializeCharacter(row: CharacterWithRelations) {
     hasShield,
   });
 
+  // Barbarian Fast Movement: +10 ft at barbarian class level 5+ unless wearing
+  // heavy armor. Additive term off barbarian class level — never merged into feats.
+  const barbarianLevel = row.classEntries.find((e) => e.name.toLowerCase() === "barbarian")?.level ?? 0;
+  const fastMovementBonus = deriveFastMovement({
+    barbarianLevel,
+    wearingHeavyArmor: bestArmor?.armorCategory === "heavy",
+  });
+
   // Labeled AC addends; armorClass below is their exact sum (single source in srd.ts).
   const acParts = deriveArmorClassParts(bestArmor, hasShield, dexMod, unarmoredDefense);
   // Defense fighting style only applies while wearing body armor (5e).
@@ -708,7 +717,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     armorClass: acParts.reduce((total, p) => total + p.value, 0),
     armorClassBreakdown: acParts,
     initiativeBonus: effectiveInitBonus + featBonuses.initiative,
-    speed: row.speed + featBonuses.speed + unarmoredMovementBonus,
+    speed: row.speed + featBonuses.speed + unarmoredMovementBonus + fastMovementBonus,
     proficiencyBonus: progress.proficiencyBonus,
 
     experiencePoints: row.experiencePoints,
