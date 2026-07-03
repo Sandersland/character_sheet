@@ -18,6 +18,7 @@ import {
   advancementSlotsForLevel,
   CLASS_PROFICIENCY_GRANTS,
   deriveArmorClass,
+  deriveArmorClassParts,
   deriveFeatBonuses,
   deriveFeatProficiencies,
   deriveSpellcasting,
@@ -646,13 +647,20 @@ export function serializeCharacter(row: CharacterWithRelations) {
   // + shield. No slot model exists, so the highest-AC body armor wins.
   const equippedArmorDetails = row.inventoryItems
     .filter((i) => i.equipped && i.armorDetail)
-    .map((i) => i.armorDetail!);
+    .map((i) => ({ name: i.name, ...i.armorDetail! }));
   const hasShield = equippedArmorDetails.some((a) => a.armorCategory === "shield");
   const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
+  // Feeds Unarmored Defense (Barbarian/Monk) when no body armor is equipped.
+  const unarmoredDefense = {
+    classNames: row.classEntries.map((e) => e.name),
+    conMod: abilityModifier(effectiveScores.constitution ?? 10),
+    wisMod: abilityModifier(effectiveScores.wisdom ?? 10),
+  };
   const bestArmor = equippedArmorDetails
     .filter((a): a is (typeof equippedArmorDetails)[number] & { armorCategory: BodyArmorCategory } => a.armorCategory !== "shield")
-    .reduce<Parameters<typeof deriveArmorClass>[0]>((best, a) => {
+    .reduce<Parameters<typeof deriveArmorClassParts>[0]>((best, a) => {
       const candidate = {
+        name: a.name,
         armorCategory: a.armorCategory,
         baseArmorClass: a.baseArmorClass,
         dexModifierMax: a.dexModifierMax,
@@ -662,6 +670,13 @@ export function serializeCharacter(row: CharacterWithRelations) {
         ? candidate
         : best;
     }, null);
+
+  // Labeled AC addends; armorClass below is their exact sum (single source in srd.ts).
+  const acParts = deriveArmorClassParts(bestArmor, hasShield, dexMod, unarmoredDefense);
+  // Defense fighting style only applies while wearing body armor (5e).
+  const styleAc = bestArmor !== null ? deriveFightingStyleBonuses(fightingStyle).armorClass : 0;
+  if (styleAc !== 0) acParts.push({ label: "Defense fighting style", value: styleAc });
+  if (featBonuses.armorClass !== 0) acParts.push({ label: "Feats", value: featBonuses.armorClass });
 
   return {
     id: row.id,
@@ -680,11 +695,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // Shared-campaign link (#246), or undefined when unassigned.
     campaignId: row.campaignId ?? undefined,
 
-    armorClass:
-      deriveArmorClass(bestArmor, hasShield, dexMod) +
-      featBonuses.armorClass +
-      // Defense fighting style only applies while wearing body armor (5e).
-      (bestArmor !== null ? deriveFightingStyleBonuses(fightingStyle).armorClass : 0),
+    armorClass: acParts.reduce((total, p) => total + p.value, 0),
+    armorClassBreakdown: acParts,
     initiativeBonus: effectiveInitBonus + featBonuses.initiative,
     speed: row.speed + featBonuses.speed,
     proficiencyBonus: progress.proficiencyBonus,

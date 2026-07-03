@@ -1,34 +1,30 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useMatch, useNavigate, useParams } from "react-router-dom";
 
 import Badge from "@/components/ui/Badge";
-import Card from "@/components/ui/Card";
 import Spinner from "@/components/ui/Spinner";
-import CampaignInviteLink from "@/features/campaign/CampaignInviteLink";
-import { addCharacterToCampaign, fetchCampaign, fetchCharacters } from "@/api/client";
-import type { Campaign, CharacterSummary } from "@/types/character";
+import Tabs from "@/components/ui/Tabs";
+import CampaignOverviewPanel from "@/features/campaign/CampaignOverviewPanel";
+import CampaignCodex from "@/features/entities/CampaignCodex";
+import { fetchCampaign } from "@/api/client";
+import { useCampaignEntities } from "@/hooks/useCampaignEntities";
+import type { Campaign } from "@/types/character";
 
-// The campaign management hub: invite link, roster, and an "Add a character"
-// dropdown of the caller's characters not already in this campaign.
+// The campaign hub: routed tabs — Overview (invite/add-character/roster) at
+// /campaigns/:id, Codex (entity registry) at /campaigns/:id/codex.
 export default function CampaignDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const onCodex = useMatch("/campaigns/:id/codex") !== null;
   const [campaign, setCampaign] = useState<Campaign | null | undefined>(undefined);
-  const [characters, setCharacters] = useState<CharacterSummary[]>([]);
-  const [selected, setSelected] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  const { entities } = useCampaignEntities(id);
 
   useEffect(() => {
     if (!id) return;
     let active = true;
-    // Independent fetches: only a failed campaign load means "not found". A
-    // characters-load failure leaves the campaign visible and shows its own error.
     fetchCampaign(id)
       .then((c) => active && setCampaign(c))
       .catch(() => active && setCampaign(null));
-    fetchCharacters()
-      .then((chars) => active && setCharacters(chars))
-      .catch(() => active && setError("Failed to load your characters"));
     return () => {
       active = false;
     };
@@ -53,29 +49,6 @@ export default function CampaignDetailPage() {
     );
   }
 
-  // Characters the caller owns that can join: not already in this campaign and
-  // not committed to a different one (a cross-campaign attach would 409).
-  const attachedIds = new Set((campaign.characters ?? []).map((c) => c.id));
-  const addable = characters.filter(
-    (c) => !attachedIds.has(c.id) && (!c.campaignId || c.campaignId === id),
-  );
-
-  async function handleAdd() {
-    if (!id || !selected) return;
-    setPending(true);
-    setError(null);
-    try {
-      await addCharacterToCampaign(selected, id);
-      const refreshed = await fetchCampaign(id);
-      setCampaign(refreshed);
-      setSelected("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add character");
-    } finally {
-      setPending(false);
-    }
-  }
-
   return (
     <div className="min-h-screen bg-parchment-100">
       <div className="border-b border-parchment-200 bg-parchment-50">
@@ -95,79 +68,23 @@ export default function CampaignDetailPage() {
       </div>
 
       <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
-        {error && (
-          <p className="rounded-control bg-garnet-50 px-3 py-2 text-sm font-semibold text-garnet-700">
-            {error}
-          </p>
+        <Tabs
+          tabs={[
+            { id: "overview", label: "Overview" },
+            // Hidden at 0 so a cold cache doesn't flash "Codex 0" before the fetch resolves.
+            { id: "codex", label: "Codex", badge: entities.length > 0 ? entities.length : undefined },
+          ]}
+          active={onCodex ? "codex" : "overview"}
+          onChange={(tab) =>
+            navigate(tab === "codex" ? `/campaigns/${id}/codex` : `/campaigns/${id}`)
+          }
+        />
+
+        {onCodex ? (
+          <CampaignCodex campaignId={campaign.id} />
+        ) : (
+          <CampaignOverviewPanel campaign={campaign} onCampaignChange={setCampaign} />
         )}
-
-        <Card title="Invite" className="p-4">
-          <div className="p-4">
-            <CampaignInviteLink inviteCode={campaign.inviteCode} />
-          </div>
-        </Card>
-
-        <Card title="Add a character" className="p-4">
-          <div className="flex flex-wrap items-end gap-3 p-4">
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <label className="block text-xs font-semibold text-parchment-700" htmlFor="add-character">
-                Add one of your characters
-              </label>
-              <select
-                id="add-character"
-                value={selected}
-                onChange={(e) => setSelected(e.target.value)}
-                disabled={addable.length === 0}
-                className="w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 focus:border-garnet-500 focus:outline-none disabled:opacity-50"
-              >
-                <option value="">
-                  {addable.length === 0 ? "No characters to add" : "Select a character…"}
-                </option>
-                {addable.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              type="button"
-              onClick={handleAdd}
-              disabled={pending || !selected}
-              className="rounded-control bg-garnet-700 px-4 py-2 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-40"
-            >
-              Add character
-            </button>
-          </div>
-        </Card>
-
-        <Card title="Roster" className="p-4">
-          <ul className="flex flex-col divide-y divide-parchment-200 p-4">
-            {campaign.members.map((member) => {
-              const memberCharacters =
-                campaign.characters?.filter((c) => c.ownerId === member.userId) ?? [];
-              return (
-                <li key={member.id} className="flex flex-col gap-1 py-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-parchment-900">
-                      {member.user.name ?? member.user.email ?? "Unknown player"}
-                    </span>
-                    <Badge tone={member.role === "OWNER" ? "garnet" : "neutral"}>
-                      {member.role === "OWNER" ? "Owner" : "Player"}
-                    </Badge>
-                  </div>
-                  {memberCharacters.length > 0 ? (
-                    <span className="text-xs text-parchment-600">
-                      {memberCharacters.map((c) => c.name).join(", ")}
-                    </span>
-                  ) : (
-                    <span className="text-xs italic text-parchment-500">No character yet</span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
       </main>
     </div>
   );

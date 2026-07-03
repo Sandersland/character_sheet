@@ -683,6 +683,12 @@ export interface SubclassOption {
   description: string;
 }
 
+/** One labeled addend of the derived AC; rendered verbatim, never interpreted. */
+export interface ArmorClassPart {
+  label: string;
+  value: number;
+}
+
 export interface Character {
   id: string;
   name: string;
@@ -701,6 +707,8 @@ export interface Character {
   portraitUrl?: string;
 
   armorClass: number;
+  /** Ordered labeled parts summing exactly to armorClass (backend-derived). */
+  armorClassBreakdown: ArmorClassPart[];
   initiativeBonus: number;
   speed: number;
   proficiencyBonus: number;
