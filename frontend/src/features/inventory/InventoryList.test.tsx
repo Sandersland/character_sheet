@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import InventoryList from "@/features/inventory/InventoryList";
@@ -251,19 +251,45 @@ describe("InventoryList multi-select sell", () => {
     expect(screen.queryByRole("button", { name: /Actions for/ })).toBeNull();
   });
 
-  it("shows a running total and sells the selection atomically", async () => {
+  it("reviews a per-line quantity + amount, prefilled to half catalog value", async () => {
     const user = userEvent.setup();
-    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    const stack = [
+      makeItem({ id: "w1", name: "Longsword", category: "weapon", quantity: 3, cost: { cp: 0, sp: 0, gp: 10, pp: 0 } }),
+    ];
+    render(<InventoryList character={makeCharacter(15, stack)} onUpdate={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Sell items" }));
     await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
-    expect(screen.getByText(/1 selected · ~10 gp/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Sell" }));
-    expect(applyInventoryTransactions).toHaveBeenCalledWith(
-      "char-1",
-      expect.arrayContaining([
-        expect.objectContaining({ type: "sell", inventoryItemId: "w1", quantity: 1 }),
-      ])
-    );
+
+    // Prefill: the full stack of 3, priced at half catalog value (3 × 5 gp).
+    const qty = screen.getByRole("spinbutton", { name: "Quantity to sell of Longsword" });
+    const gp = screen.getByRole("spinbutton", { name: "gp received for Longsword" });
+    expect(qty).toHaveValue(3);
+    expect(gp).toHaveValue(15);
+    expect(screen.getByText("Total received: 15 gp")).toBeInTheDocument();
+  });
+
+  it("sells the typed partial quantity at the typed custom price", async () => {
+    const user = userEvent.setup();
+    const stack = [
+      makeItem({ id: "w1", name: "Longsword", category: "weapon", quantity: 3, cost: { cp: 0, sp: 0, gp: 10, pp: 0 } }),
+    ];
+    render(<InventoryList character={makeCharacter(15, stack)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Sell items" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+
+    // Sell only 2 of 3, for a custom 7 gp.
+    const qty = screen.getByRole("spinbutton", { name: "Quantity to sell of Longsword" });
+    fireEvent.change(qty, { target: { value: "2" } });
+    const gp = screen.getByRole("spinbutton", { name: "gp received for Longsword" });
+    fireEvent.change(gp, { target: { value: "7" } });
+    expect(screen.getByText("Total received: 7 gp")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+    expect(applyInventoryTransactions).toHaveBeenCalledWith("char-1", [
+      { type: "sell", inventoryItemId: "w1", quantity: 2, currencyDelta: { cp: 0, sp: 0, gp: 7, pp: 0 } },
+    ]);
   });
 
   it("Cancel exits select mode", async () => {
