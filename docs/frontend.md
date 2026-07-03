@@ -21,6 +21,8 @@ frontend/src/
 │   ├── character-meta/  # CharacterCard, VitalsStrip, JournalSection, JournalEntryPanel,
 │   │                    #   ActivityModal, DeleteCharacterModal, BackendStatus,
 │   │                    #   CharacterSheet{Header,Body,Modals}, CharacterLoadError (sheet-page sections)
+│   │                    #   VitalsStrip's AC tile is read-only: a Popover disclosing the
+│   │                    #   server-derived armorClassBreakdown verbatim (no client AC math)
 │   ├── class/           # ClassFeaturesSection, FightingStylePanel, AddManeuverPanel,
 │   │                    #   ManeuverRow, ResourcePoolRow
 │   ├── conditions/      # ConditionsStrip, AddConditionPanel
