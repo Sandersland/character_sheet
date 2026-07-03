@@ -1117,27 +1117,44 @@ export function deriveUnarmedDamageDie(advancements: AdvancementEntry[]): number
   return best;
 }
 
+// Monk Martial Arts die by monk class level (PHB p.78): d4 at L1, d6/d8/d10 at
+// L5/L11/L17. Returns 0 below monk level 1 (non-monk or no monk levels).
+export function deriveMartialArtsDie(monkLevel: number): number {
+  if (monkLevel < 1) return 0;
+  if (monkLevel >= 17) return 10;
+  if (monkLevel >= 11) return 8;
+  if (monkLevel >= 5) return 6;
+  return 4;
+}
+
 /**
  * Derives the unarmed-strike attack bonus and damage spec for a character.
- * Unarmed strikes are always proficient (5e PHB) and always use STR.
+ * Unarmed strikes are always proficient (5e PHB) and default to STR.
  * `unarmedDamageDie` is 1 by default (flat 1 + STR mod) and is raised to 4
- * by Tavern Brawler.
+ * by Tavern Brawler. A Monk who is unarmored & unshielded uses max(Dex, Str)
+ * for attack + damage and the larger of the feat die and the Martial Arts die.
  */
 export function deriveUnarmedStrike(
   effectiveScores: Record<string, number>,
   proficiencyBonus: number,
   unarmedDamageDie: number,
+  monk?: { level: number; isUnarmored: boolean; hasShield: boolean },
 ): {
   attackBonus: number;
   damage: { count: number; faces: number; modifier: number; damageType: string };
 } {
   const strMod = abilityModifier(effectiveScores.strength ?? 10);
+  const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
+  // Martial Arts only applies unarmored & unshielded; 0 otherwise (fall back to STR).
+  const martialArtsDie =
+    monk && monk.isUnarmored && !monk.hasShield ? deriveMartialArtsDie(monk.level) : 0;
+  const abilityMod = martialArtsDie > 0 ? Math.max(strMod, dexMod) : strMod;
   return {
-    attackBonus: strMod + proficiencyBonus,
+    attackBonus: abilityMod + proficiencyBonus,
     damage: {
       count: 1,
-      faces: unarmedDamageDie,
-      modifier: Math.max(0, strMod), // d1 baseline guarantees at least 1 total
+      faces: Math.max(unarmedDamageDie, martialArtsDie),
+      modifier: Math.max(0, abilityMod), // d1 baseline guarantees at least 1 total
       damageType: "bludgeoning",
     },
   };
