@@ -682,7 +682,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
     armorClass:
       deriveArmorClass(bestArmor, hasShield, dexMod) +
       featBonuses.armorClass +
-      deriveFightingStyleBonuses(fightingStyle).armorClass,
+      // Defense fighting style only applies while wearing body armor (5e).
+      (bestArmor !== null ? deriveFightingStyleBonuses(fightingStyle).armorClass : 0),
     initiativeBonus: effectiveInitBonus + featBonuses.initiative,
     speed: row.speed + featBonuses.speed,
     proficiencyBonus: progress.proficiencyBonus,

@@ -79,6 +79,17 @@ const MELEE_WEAPON = {
 };
 
 const url = `/api/characters/${FIXTURE_ID}/class/transactions`;
+const inventoryUrl = `/api/characters/${FIXTURE_ID}/inventory/transactions`;
+const equipLeather = () =>
+  supertest.agent(createApp()).set("Cookie", COOKIE).post(inventoryUrl).send({
+    operations: [
+      {
+        type: "acquire",
+        custom: { name: "Test Leather", category: "armor", armor: { armorCategory: "light", baseArmorClass: 11 } },
+        equipped: true,
+      },
+    ],
+  });
 
 function findWeapon(body: { inventory: Array<{ name: string; weapon?: { attackBonus: number } }> }, name: string) {
   return body.inventory.find((i) => i.name === name)?.weapon;
@@ -173,7 +184,9 @@ describe("POST /api/characters/:id/class/transactions — setFightingStyle", () 
 
   // ── defense → +1 AC ───────────────────────────────────────────────────────────
 
-  it("setFightingStyle:defense raises armorClass by 1 and persists the choice", async () => {
+  it("setFightingStyle:defense raises armorClass by 1 while wearing armor and persists the choice", async () => {
+    // Defense only applies "while you are wearing armor" (5e), so equip body armor first.
+    await equipLeather();
     const before = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     const baseAC = before.body.armorClass as number;
 
@@ -188,6 +201,19 @@ describe("POST /api/characters/:id/class/transactions — setFightingStyle", () 
     const after = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
     expect(after.body.armorClass).toBe(baseAC + 1);
     expect(after.body.resources.fightingStyle).toBe("defense");
+  });
+
+  it("setFightingStyle:defense does not raise armorClass when unarmored", async () => {
+    const before = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
+    const baseAC = before.body.armorClass as number;
+
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
+      .post(url)
+      .send({ operations: [{ type: "setFightingStyle", key: "defense" }] });
+    expect(res.status).toBe(200);
+    // Defense requires worn armor, so an unarmored Fighter gains no AC.
+    expect(res.body.armorClass).toBe(baseAC);
+    expect(res.body.resources.fightingStyle).toBe("defense");
   });
 
   // ── archery → +2 ranged attack only ──────────────────────────────────────────
