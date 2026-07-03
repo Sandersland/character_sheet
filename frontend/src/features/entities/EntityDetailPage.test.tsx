@@ -134,4 +134,10 @@ describe("EntityDetailPage (#248)", () => {
     await screen.findByRole("heading", { name: /Goblin Chief/ });
     expect(await axe(container)).toHaveNoViolations();
   });
+
+  it("links back to the campaign codex (#367)", async () => {
+    renderPage();
+    const back = await screen.findByRole("link", { name: /back to campaign/i });
+    expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/codex`);
+  });
 });
