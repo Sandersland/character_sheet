@@ -13,6 +13,8 @@
 //                     superiority-die spend.
 //   Session Fighter — Fighter L1, attached to its own solo campaign so
 //                     session.spec can start/resume a live session in-spec.
+//   Monk L6         — Monk, 14000 XP (L6), own campaign; unarmed.spec asserts
+//                     the Ki-Empowered Strikes "Magical" badge in a live session.
 //
 // Personas that need a live session each get a DEDICATED campaign: a campaign
 // allows only one active session at a time, so sharing one would make the
@@ -36,6 +38,8 @@ const ABILITY_SCORES = {
 // L5 threshold from the XP curve (backend/src/lib/experience.ts). The curve is
 // class-independent, so this is L5 for both the Wizard and the Battle Master.
 const LEVEL_5_XP = 6500;
+// L6 threshold — gates Monk Ki-Empowered Strikes (magical unarmed strikes).
+const LEVEL_6_XP = 14000;
 
 interface Persona {
   name: string;
@@ -43,6 +47,9 @@ interface Persona {
   background: string;
   className: string;
   experiencePoints?: number;
+  // Target class-entry level via HP level-ups (per-class level tracks applied
+  // HP level-ups, not XP-derived level). Requires enough XP to unlock it.
+  classLevel?: number;
   // Fighter martial archetype to set post-creation (chosen at L3, needs XP).
   subclassName?: string;
   // Battle Master maneuver to learn (by catalog name).
@@ -70,6 +77,15 @@ const ROSTER: Persona[] = [
     background: "Soldier",
     className: "Fighter",
     campaignName: "E2E Solo — Session Fighter",
+  },
+  {
+    name: "Monk L6",
+    race: "Human",
+    background: "Soldier",
+    className: "Monk",
+    experiencePoints: LEVEL_6_XP,
+    classLevel: 6,
+    campaignName: "E2E Solo — Monk L6",
   },
 ];
 
@@ -168,6 +184,21 @@ async function createPersona(cookie: string, persona: Persona): Promise<void> {
       body: JSON.stringify({ operations: [{ type: "set", value: persona.experiencePoints }] }),
     });
     if (!xpResponse.ok) throw new Error(`Failed to set XP for ${persona.name}: ${xpResponse.status}`);
+  }
+
+  // Class-entry level tracks applied HP level-ups, not XP-derived level. Drive
+  // (classLevel - 1) average level-ups so level-gated features (Ki-Empowered
+  // Strikes) derive correctly.
+  if (persona.classLevel && persona.classLevel > 1) {
+    const levelUps = Array.from({ length: persona.classLevel - 1 }, () => ({
+      type: "levelUp",
+      method: "average",
+    }));
+    const hpResponse = await api(cookie, `/api/characters/${id}/hp`, {
+      method: "POST",
+      body: JSON.stringify({ operations: levelUps }),
+    });
+    if (!hpResponse.ok) throw new Error(`Failed to level up ${persona.name}: ${hpResponse.status}`);
   }
 
   // Subclass is chosen post-creation via the class transactions endpoint (Fighter

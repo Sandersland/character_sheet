@@ -392,6 +392,34 @@ export function deriveArmorClass(
   return sumParts(deriveArmorClassParts(armor, hasShield, dexMod, unarmoredDefense));
 }
 
+// Monk Unarmored Movement speed bonus by monk level (PHB p.78): +10 at L2, rising
+// to +30 at L18. Lost while wearing armor or wielding a shield. Additive term —
+// composes with racial base speed and feat speed bonuses, never merged into them.
+export function deriveUnarmoredMovement(input: {
+  monkLevel: number;
+  isUnarmored: boolean;
+  hasShield: boolean;
+}): number {
+  const { monkLevel, isUnarmored, hasShield } = input;
+  if (!isUnarmored || hasShield || monkLevel < 2) return 0;
+  if (monkLevel >= 18) return 30;
+  if (monkLevel >= 14) return 25;
+  if (monkLevel >= 10) return 20;
+  if (monkLevel >= 6) return 15;
+  return 10;
+}
+
+// Barbarian Fast Movement (PHB p.48): +10 ft speed at class level 5+ while not
+// wearing heavy armor. Shields are irrelevant. Additive term — composes with
+// racial base speed, feat speed bonuses, and Monk Unarmored Movement.
+export function deriveFastMovement(input: {
+  barbarianLevel: number;
+  wearingHeavyArmor: boolean;
+}): number {
+  const { barbarianLevel, wearingHeavyArmor } = input;
+  return barbarianLevel >= 5 && !wearingHeavyArmor ? 10 : 0;
+}
+
 // ── Spellcasting ability by class ────────────────────────────────────────────
 // Maps a class name (lowercase) to the ability that governs its spellcasting.
 // Used to derive spellSaveDC and spellAttackBonus at read time.
@@ -1089,27 +1117,49 @@ export function deriveUnarmedDamageDie(advancements: AdvancementEntry[]): number
   return best;
 }
 
+// Monk Martial Arts die by monk class level (PHB p.78): d4 at L1, d6/d8/d10 at
+// L5/L11/L17. Returns 0 below monk level 1 (non-monk or no monk levels).
+export function deriveMartialArtsDie(monkLevel: number): number {
+  if (monkLevel < 1) return 0;
+  if (monkLevel >= 17) return 10;
+  if (monkLevel >= 11) return 8;
+  if (monkLevel >= 5) return 6;
+  return 4;
+}
+
 /**
  * Derives the unarmed-strike attack bonus and damage spec for a character.
- * Unarmed strikes are always proficient (5e PHB) and always use STR.
+ * Unarmed strikes are always proficient (5e PHB) and default to STR.
  * `unarmedDamageDie` is 1 by default (flat 1 + STR mod) and is raised to 4
- * by Tavern Brawler.
+ * by Tavern Brawler. A Monk who is unarmored & unshielded uses max(Dex, Str)
+ * for attack + damage and the larger of the feat die and the Martial Arts die.
+ * Ki-Empowered Strikes (monk L6+) marks the strike `magical`, off monk level.
  */
 export function deriveUnarmedStrike(
   effectiveScores: Record<string, number>,
   proficiencyBonus: number,
   unarmedDamageDie: number,
+  monk?: { level: number; isUnarmored: boolean; hasShield: boolean },
 ): {
   attackBonus: number;
+  magical: boolean;
   damage: { count: number; faces: number; modifier: number; damageType: string };
 } {
   const strMod = abilityModifier(effectiveScores.strength ?? 10);
+  const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
+  // Martial Arts only applies unarmored & unshielded; 0 otherwise (fall back to STR).
+  const martialArtsDie =
+    monk && monk.isUnarmored && !monk.hasShield ? deriveMartialArtsDie(monk.level) : 0;
+  const abilityMod = martialArtsDie > 0 ? Math.max(strMod, dexMod) : strMod;
+  // Ki-Empowered Strikes: monk unarmed strikes count as magical at level 6+.
+  const magical = (monk?.level ?? 0) >= 6;
   return {
-    attackBonus: strMod + proficiencyBonus,
+    attackBonus: abilityMod + proficiencyBonus,
+    magical,
     damage: {
       count: 1,
-      faces: unarmedDamageDie,
-      modifier: Math.max(0, strMod), // d1 baseline guarantees at least 1 total
+      faces: Math.max(unarmedDamageDie, martialArtsDie),
+      modifier: Math.max(0, abilityMod), // d1 baseline guarantees at least 1 total
       damageType: "bludgeoning",
     },
   };

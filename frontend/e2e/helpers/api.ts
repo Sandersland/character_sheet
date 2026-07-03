@@ -20,12 +20,16 @@ export function uniqueName(prefix: string): string {
   return `${prefix} ${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`;
 }
 
+type AbilityScores = typeof ABILITY_SCORES;
+
 interface CreateCharacterOpts {
   name: string;
   className: string;
   race?: string;
   background?: string;
   experiencePoints?: number;
+  // Override the module-level defaults, e.g. Wis 16 for a monk / Con 15 for a barbarian.
+  abilityScores?: Partial<AbilityScores>;
 }
 
 // Create a character and return its id. Sets XP through the transactions
@@ -41,7 +45,7 @@ export async function createCharacter(
       race: opts.race ?? "Human",
       background: opts.background ?? "Sage",
       classes: [{ name: opts.className }],
-      abilityScores: ABILITY_SCORES,
+      abilityScores: { ...ABILITY_SCORES, ...opts.abilityScores },
     },
   });
   expect(response.ok(), `create ${opts.name}: ${response.status()}`).toBeTruthy();

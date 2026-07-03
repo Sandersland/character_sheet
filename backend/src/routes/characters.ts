@@ -19,6 +19,7 @@ import {
   CLASS_PROFICIENCY_GRANTS,
   deriveArmorClass,
   deriveArmorClassParts,
+  deriveFastMovement,
   deriveFeatBonuses,
   deriveFeatProficiencies,
   deriveSpellcasting,
@@ -26,6 +27,7 @@ import {
   deriveImprovisedAttack,
   deriveUnarmedDamageDie,
   deriveUnarmedStrike,
+  deriveUnarmoredMovement,
   deriveWeaponAttackBonus,
   deriveWeaponDamage,
   deriveFightingStyleBonuses,
@@ -623,18 +625,6 @@ export function serializeCharacter(row: CharacterWithRelations) {
     featProficiencies.weapons,
   );
 
-  // ── Unarmed strike + improvised weapon derivation ────────────────────────
-  // Derived from the same clamped advancements slice so Tavern Brawler's
-  // upgrades are automatically excluded when the character is over-cap.
-  const unarmedDie = deriveUnarmedDamageDie(clampedAdvancements);
-  const unarmedStrike = deriveUnarmedStrike(effectiveScores, progress.proficiencyBonus, unarmedDie);
-  const improvisedProficient = weaponGrants.some((g) => g.name === "Improvised Weapons");
-  const improvisedWeapon = deriveImprovisedAttack(
-    effectiveScores,
-    progress.proficiencyBonus,
-    improvisedProficient,
-  );
-
   const inventoryContext = buildInventoryContext(
     row,
     effectiveScores,
@@ -671,6 +661,41 @@ export function serializeCharacter(row: CharacterWithRelations) {
         : best;
     }, null);
 
+  // Monk Unarmored Movement: level-scaled speed bonus while unarmored & unshielded.
+  // Additive term, off monk class level — never merged into feat/racial speed.
+  const monkLevel = row.classEntries.find((e) => e.name.toLowerCase() === "monk")?.level ?? 0;
+  const unarmoredMovementBonus = deriveUnarmoredMovement({
+    monkLevel,
+    isUnarmored: bestArmor === null,
+    hasShield,
+  });
+
+  // ── Unarmed strike + improvised weapon derivation ────────────────────────
+  // Derived from the same clamped advancements slice so Tavern Brawler's
+  // upgrades are automatically excluded when the character is over-cap. A Monk
+  // (unarmored & unshielded) swaps in max(Dex, Str) + the level-scaled Martial
+  // Arts die, off the monk class-entry level for multiclass correctness.
+  const unarmedDie = deriveUnarmedDamageDie(clampedAdvancements);
+  const unarmedStrike = deriveUnarmedStrike(effectiveScores, progress.proficiencyBonus, unarmedDie, {
+    level: monkLevel,
+    isUnarmored: bestArmor === null,
+    hasShield,
+  });
+  const improvisedProficient = weaponGrants.some((g) => g.name === "Improvised Weapons");
+  const improvisedWeapon = deriveImprovisedAttack(
+    effectiveScores,
+    progress.proficiencyBonus,
+    improvisedProficient,
+  );
+
+  // Barbarian Fast Movement: +10 ft at barbarian class level 5+ unless wearing
+  // heavy armor. Additive term off barbarian class level — never merged into feats.
+  const barbarianLevel = row.classEntries.find((e) => e.name.toLowerCase() === "barbarian")?.level ?? 0;
+  const fastMovementBonus = deriveFastMovement({
+    barbarianLevel,
+    wearingHeavyArmor: bestArmor?.armorCategory === "heavy",
+  });
+
   // Labeled AC addends; armorClass below is their exact sum (single source in srd.ts).
   const acParts = deriveArmorClassParts(bestArmor, hasShield, dexMod, unarmoredDefense);
   // Defense fighting style only applies while wearing body armor (5e).
@@ -698,7 +723,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     armorClass: acParts.reduce((total, p) => total + p.value, 0),
     armorClassBreakdown: acParts,
     initiativeBonus: effectiveInitBonus + featBonuses.initiative,
-    speed: row.speed + featBonuses.speed,
+    speed: row.speed + featBonuses.speed + unarmoredMovementBonus + fastMovementBonus,
     proficiencyBonus: progress.proficiencyBonus,
 
     experiencePoints: row.experiencePoints,

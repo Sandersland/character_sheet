@@ -180,6 +180,19 @@ describe("buildAttackEntries", () => {
     expect(unarmed.attackRollLabel).toBe("Unarmed strike attack");
     expect(unarmed.damageRollLabel).toBe("Unarmed strike damage (bludgeoning)");
     expect(unarmed.logSource).toBe("Unarmed Strike");
+    expect(unarmed.magical).toBe(false);
+  });
+
+  it("flags the unarmed row magical when the strike is magical (Ki-Empowered Strikes)", () => {
+    const character = makeCharacter({
+      unarmedStrike: {
+        attackBonus: 5,
+        magical: true,
+        damage: { count: 1, faces: 8, modifier: 3, damageType: "bludgeoning" },
+      } as unknown as Character["unarmedStrike"],
+    });
+    const unarmed = buildAttackEntries(character).find((e) => e.id === "unarmed")!;
+    expect(unarmed.magical).toBe(true);
   });
 
   it("signs the improvised attack and notes no proficiency", () => {
