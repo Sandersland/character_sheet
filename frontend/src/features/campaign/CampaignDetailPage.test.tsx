@@ -1,16 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 import CampaignDetailPage from "@/features/campaign/CampaignDetailPage";
 import * as client from "@/api/client";
+import { __resetCampaignEntitiesCacheForTests } from "@/hooks/useCampaignEntities";
 import type { Campaign, CharacterSummary } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   fetchCampaign: vi.fn(),
   fetchCharacters: vi.fn(),
   addCharacterToCampaign: vi.fn(),
+  fetchEntities: vi.fn(),
 }));
 
 function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
@@ -38,11 +40,19 @@ const CHARACTERS: CharacterSummary[] = [
   { id: "char-1", name: "Thordak", race: "Dwarf", class: "Fighter", level: 3 },
 ];
 
-function renderDetail() {
+// Surfaces the current pathname so tests can assert tab clicks update the URL.
+function LocationProbe() {
+  const location = useLocation();
+  return <span data-testid="location">{location.pathname}</span>;
+}
+
+function renderDetail(initialEntry = "/campaigns/camp-1") {
   return render(
-    <MemoryRouter initialEntries={["/campaigns/camp-1"]}>
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <LocationProbe />
       <Routes>
         <Route path="/campaigns/:id" element={<CampaignDetailPage />} />
+        <Route path="/campaigns/:id/codex" element={<CampaignDetailPage />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -50,6 +60,9 @@ function renderDetail() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The entity cache is module-level and leaks across tests without a reset.
+  __resetCampaignEntitiesCacheForTests();
+  vi.mocked(client.fetchEntities).mockResolvedValue([]);
 });
 
 describe("CampaignDetailPage (#246)", () => {
@@ -66,7 +79,7 @@ describe("CampaignDetailPage (#246)", () => {
     renderDetail();
 
     await screen.findByText("The Sunless Citadel");
-    await user.selectOptions(screen.getByLabelText(/your characters/i), "char-1");
+    await user.selectOptions(await screen.findByLabelText(/your characters/i), "char-1");
     await user.click(screen.getByRole("button", { name: /add character/i }));
 
     expect(vi.mocked(client.addCharacterToCampaign)).toHaveBeenCalledWith("char-1", "camp-1");
@@ -80,7 +93,7 @@ describe("CampaignDetailPage (#246)", () => {
     renderDetail();
 
     await screen.findByText("The Sunless Citadel");
-    expect(screen.getByDisplayValue(/\/join\/abc123$/)).toBeInTheDocument();
+    expect(await screen.findByDisplayValue(/\/join\/abc123$/)).toBeInTheDocument();
     // "Owner" appears in both the header role badge and the roster.
     expect(screen.getAllByText("Owner").length).toBeGreaterThan(0);
   });
@@ -95,10 +108,12 @@ describe("CampaignDetailPage (#246)", () => {
     renderDetail();
 
     await screen.findByText("The Sunless Citadel");
-    const select = screen.getByLabelText(/your characters/i);
-    const optionLabels = Array.from(select.querySelectorAll("option")).map((o) => o.textContent);
-    expect(optionLabels).toContain("Thordak");
-    expect(optionLabels).not.toContain("Elsewhere");
+    const select = await screen.findByLabelText(/your characters/i);
+    await waitFor(() => {
+      const optionLabels = Array.from(select.querySelectorAll("option")).map((o) => o.textContent);
+      expect(optionLabels).toContain("Thordak");
+      expect(optionLabels).not.toContain("Elsewhere");
+    });
   });
 
   it("shows 'No character yet' for a member with no character", async () => {
@@ -122,5 +137,54 @@ describe("CampaignDetailPage (#246)", () => {
     await screen.findByText("The Sunless Citadel");
     expect(screen.getByText("Thordak")).toBeInTheDocument();
     expect(screen.queryByText(/no character yet/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("CampaignDetailPage tabs (#367)", () => {
+  beforeEach(() => {
+    vi.mocked(client.fetchCampaign).mockResolvedValue(makeCampaign());
+    vi.mocked(client.fetchCharacters).mockResolvedValue([]);
+  });
+
+  it("shows the Overview tab active with the invite card by default", async () => {
+    renderDetail();
+
+    await screen.findByText("The Sunless Citadel");
+    expect(screen.getByRole("tab", { name: /overview/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("tab", { name: /codex/i })).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
+    expect(screen.getByDisplayValue(/\/join\/abc123$/)).toBeInTheDocument();
+  });
+
+  it("deep-links to the Codex tab at /campaigns/:id/codex", async () => {
+    renderDetail("/campaigns/camp-1/codex");
+
+    await screen.findByText("The Sunless Citadel");
+    expect(screen.getByRole("tab", { name: /codex/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.queryByText("Roster")).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/\/join\/abc123$/)).not.toBeInTheDocument();
+  });
+
+  it("clicking the Codex tab updates the URL and swaps panels", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await screen.findByText("The Sunless Citadel");
+    await user.click(screen.getByRole("tab", { name: /codex/i }));
+
+    expect(screen.getByTestId("location")).toHaveTextContent("/campaigns/camp-1/codex");
+    expect(screen.queryByText("Roster")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: /overview/i }));
+    expect(screen.getByTestId("location")).toHaveTextContent(/\/campaigns\/camp-1$/);
+    expect(await screen.findByText("Roster")).toBeInTheDocument();
   });
 });
