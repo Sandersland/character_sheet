@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import VitalsStrip from "@/features/character-meta/VitalsStrip";
 import { RollProvider } from "@/features/dice/RollContext";
@@ -22,6 +23,10 @@ const mockCharacter: Character = {
   background: "Outlander",
   alignment: "Neutral Good",
   armorClass: 14,
+  armorClassBreakdown: [
+    { label: "Leather", value: 11 },
+    { label: "Dex", value: 3 },
+  ],
   initiativeBonus: 3,
   speed: 35,
   proficiencyBonus: 2,
@@ -61,6 +66,34 @@ describe("VitalsStrip", () => {
   it("renders armor class", () => {
     renderWithRoll(<VitalsStrip character={mockCharacter} />);
     expect(screen.getByText("14")).toBeInTheDocument();
+  });
+
+  it("has no manual AC input — the tile is a disclosure button", () => {
+    const { container } = renderWithRoll(<VitalsStrip character={mockCharacter} />);
+    expect(container.querySelector("input")).toBeNull();
+    expect(screen.getByRole("button", { name: "Armor Class breakdown" })).toBeInTheDocument();
+  });
+
+  it("clicking the AC tile opens the breakdown with labels, values, and total", async () => {
+    const user = userEvent.setup();
+    renderWithRoll(<VitalsStrip character={mockCharacter} />);
+    await user.click(screen.getByRole("button", { name: "Armor Class breakdown" }));
+    const dialog = screen.getByRole("dialog", { name: "Armor Class breakdown" });
+    expect(dialog).toHaveTextContent("Leather");
+    expect(dialog).toHaveTextContent("11"); // base part: plain number
+    expect(dialog).toHaveTextContent("Dex");
+    expect(dialog).toHaveTextContent("+3"); // later parts: formatted modifier
+    expect(dialog).toHaveTextContent("Total");
+    expect(dialog).toHaveTextContent("14");
+  });
+
+  it("Escape closes the breakdown popover", async () => {
+    const user = userEvent.setup();
+    renderWithRoll(<VitalsStrip character={mockCharacter} />);
+    await user.click(screen.getByRole("button", { name: "Armor Class breakdown" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("renders initiative as a formatted modifier", () => {
