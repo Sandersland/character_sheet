@@ -98,3 +98,40 @@ describe("deriveUnarmedStrike — Monk Martial Arts", () => {
     expect(s.damage.modifier).toBe(0);
   });
 });
+
+describe("deriveUnarmedStrike — Ki-Empowered Strikes (magical at monk L6+)", () => {
+  const monk = (level: number, isUnarmored = true, hasShield = false) => ({
+    level,
+    isUnarmored,
+    hasShield,
+  });
+
+  it("L5 monk unarmed strike is not magical", () => {
+    expect(deriveUnarmedStrike(scores(10, 16), 2, 1, monk(5)).magical).toBe(false);
+  });
+
+  it("L6 monk unarmed strike is magical", () => {
+    expect(deriveUnarmedStrike(scores(10, 16), 2, 1, monk(6)).magical).toBe(true);
+  });
+
+  it("stays magical at higher monk levels", () => {
+    expect(deriveUnarmedStrike(scores(10, 16), 2, 1, monk(20)).magical).toBe(true);
+  });
+
+  it("non-monk of any level is never magical", () => {
+    expect(deriveUnarmedStrike(scores(16, 10), 4, 1).magical).toBe(false);
+    expect(deriveUnarmedStrike(scores(16, 10), 4, 1, monk(0)).magical).toBe(false);
+  });
+
+  it("magical is independent of armor/shield — gates only on monk level", () => {
+    expect(deriveUnarmedStrike(scores(10, 16), 2, 1, monk(6, false, false)).magical).toBe(true);
+    expect(deriveUnarmedStrike(scores(10, 16), 2, 1, monk(6, true, true)).magical).toBe(true);
+  });
+
+  it("multiclass gates off the monk class-entry level, not total level", () => {
+    // Fighter 10 / Monk 6 → magical; the caller passes only the monk level.
+    expect(deriveUnarmedStrike(scores(16, 10), 4, 1, monk(6)).magical).toBe(true);
+    // Fighter 6 / Monk 5 → not magical.
+    expect(deriveUnarmedStrike(scores(16, 10), 3, 1, monk(5)).magical).toBe(false);
+  });
+});

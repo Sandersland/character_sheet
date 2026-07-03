@@ -1133,6 +1133,7 @@ export function deriveMartialArtsDie(monkLevel: number): number {
  * `unarmedDamageDie` is 1 by default (flat 1 + STR mod) and is raised to 4
  * by Tavern Brawler. A Monk who is unarmored & unshielded uses max(Dex, Str)
  * for attack + damage and the larger of the feat die and the Martial Arts die.
+ * Ki-Empowered Strikes (monk L6+) marks the strike `magical`, off monk level.
  */
 export function deriveUnarmedStrike(
   effectiveScores: Record<string, number>,
@@ -1141,6 +1142,7 @@ export function deriveUnarmedStrike(
   monk?: { level: number; isUnarmored: boolean; hasShield: boolean },
 ): {
   attackBonus: number;
+  magical: boolean;
   damage: { count: number; faces: number; modifier: number; damageType: string };
 } {
   const strMod = abilityModifier(effectiveScores.strength ?? 10);
@@ -1149,8 +1151,11 @@ export function deriveUnarmedStrike(
   const martialArtsDie =
     monk && monk.isUnarmored && !monk.hasShield ? deriveMartialArtsDie(monk.level) : 0;
   const abilityMod = martialArtsDie > 0 ? Math.max(strMod, dexMod) : strMod;
+  // Ki-Empowered Strikes: monk unarmed strikes count as magical at level 6+.
+  const magical = (monk?.level ?? 0) >= 6;
   return {
     attackBonus: abilityMod + proficiencyBonus,
+    magical,
     damage: {
       count: 1,
       faces: Math.max(unarmedDamageDie, martialArtsDie),
