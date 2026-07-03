@@ -102,8 +102,7 @@ describe("derived armorClass", () => {
     const res = await get();
     expect(res.body.armorClass).toBe(17); // 15 + min(5, 2), unchanged by higher Dex
     // And unarmored re-derives to reflect the new Dex.
-    const acq = await get();
-    const bodyId = acq.body.inventory[0].id;
+    const bodyId = res.body.inventory[0].id;
     const unequipped = await supertest.agent(createApp()).set("Cookie", COOKIE).post(url)
       .send({ operations: [{ type: "setEquipped", inventoryItemId: bodyId, equipped: false }] });
     expect(unequipped.body.armorClass).toBe(15); // 10 + 5
