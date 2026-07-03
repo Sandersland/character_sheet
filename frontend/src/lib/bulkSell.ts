@@ -4,18 +4,28 @@
  * (`InventoryList`) posts the result through `applyInventoryTransactions`,
  * which applies the whole batch atomically.
  *
- * Each selected line always sells the FULL stack: `quantity` is set explicitly
- * to the line's quantity (never omitted) so the op is unambiguous regardless of
- * any later catalog drift.
+ * Each line carries its own `quantity` (a partial sale leaves the remainder in
+ * inventory) and `currencyDelta` (the player-typed amount received), so the op
+ * is explicit regardless of any later catalog drift.
  */
 
-import { splitLumpSum } from "@/lib/currency";
+import { splitLumpSum, toCopper } from "@/lib/currency";
 import type { Currency, InventoryOperation } from "@/types/character";
 
-/** One line the player chose to sell — the whole stack of this item. */
+/** One line the player chose to sell — `quantity` may be a partial slice of the stack. */
 export interface SellLine {
   inventoryItemId: string;
   quantity: number;
+}
+
+// Prefill: half the per-unit catalog value (rounded down) × quantity, kept in gp/sp/cp (no platinum roll-up) so a 15 gp default reads "15 gp".
+export function defaultSellPrice(cost: Currency | undefined, quantity: number): Currency {
+  let remaining = Math.floor(toCopper(cost ?? ZERO_CURRENCY) / 2) * Math.max(0, quantity);
+  const gp = Math.floor(remaining / 100);
+  remaining -= gp * 100;
+  const sp = Math.floor(remaining / 10);
+  remaining -= sp * 10;
+  return { cp: remaining, sp, gp, pp: 0 };
 }
 
 /**
