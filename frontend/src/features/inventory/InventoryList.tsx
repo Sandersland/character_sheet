@@ -12,7 +12,7 @@ import MeterBar from "@/components/ui/MeterBar";
 import SellPanel from "@/features/inventory/SellPanel";
 import { buildSellOperations, type SellLine } from "@/lib/bulkSell";
 import { formatCurrency, toCopper } from "@/lib/currency";
-import { carryingCapacity } from "@/lib/encumbrance";
+import { carryingCapacity, coinWeight } from "@/lib/encumbrance";
 import { ITEM_CATEGORY_OPTIONS, ITEM_CATEGORY_ORDER, itemCategoryLabel } from "@/lib/items";
 
 const ZERO_CURRENCY: Currency = { cp: 0, sp: 0, gp: 0, pp: 0 };
@@ -141,10 +141,12 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
       .catch(() => setCatalog([]));
   }, []);
 
-  const totalWeight = character.inventory.reduce(
+  const itemsWeight = character.inventory.reduce(
     (sum, item) => sum + (item.weight ?? 0) * item.quantity,
     0
   );
+  // Coins count toward carried weight (5e: 50 coins = 1 lb).
+  const totalWeight = itemsWeight + coinWeight(character.currency);
   // 5e carrying capacity = STR × 15, derive-on-read so it tracks STR changes.
   const capacity = carryingCapacity(character.abilityScores.strength);
   const overCapacity = totalWeight > capacity;
