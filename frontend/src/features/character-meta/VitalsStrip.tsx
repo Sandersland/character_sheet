@@ -75,6 +75,7 @@ function ArmorClassStat({ character }: { character: Character }) {
           <div key={`${part.label}-${i}`} className="flex items-center justify-between gap-4 py-0.5">
             <dt className="text-parchment-700">{part.label}</dt>
             <dd className="font-semibold tabular-nums text-parchment-900">
+              {/* deriveArmorClassParts always emits the base (armor/unarmored) part first. */}
               {i === 0 ? part.value : formatModifier(part.value)}
             </dd>
           </div>

@@ -151,6 +151,34 @@ describe("derived armorClass", () => {
     ]);
   });
 
+  it("includes a Defense fighting-style entry in the breakdown while armored", async () => {
+    // Fighter L1 so the stored style survives the read-clamp.
+    await prisma.character.update({
+      where: { id: FIXTURE_ID },
+      data: {
+        classEntries: { create: [{ name: "fighter", position: 0 }] },
+        resources: {
+          used: {},
+          maneuversKnown: [],
+          toolProficienciesKnown: [],
+          fightingStyle: "defense",
+          advancements: [],
+        },
+      },
+    });
+    const res = await acquire(chainMail);
+    expect(res.body.armorClass).toBe(17); // 16 + 1 Defense
+    expect(res.body.armorClassBreakdown).toEqual([
+      { label: "Test Chain Mail", value: 16 },
+      { label: "Defense fighting style", value: 1 },
+    ]);
+    const sum = res.body.armorClassBreakdown.reduce(
+      (t: number, p: { value: number }) => t + p.value,
+      0,
+    );
+    expect(sum).toBe(res.body.armorClass);
+  });
+
   it("returns an armorClassBreakdown that sums to armorClass", async () => {
     const res = await get();
     expect(res.body.armorClassBreakdown).toEqual([

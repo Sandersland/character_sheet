@@ -65,6 +65,7 @@ export default function Popover({
         <div
           ref={panelRef}
           role="dialog"
+          // Deliberately non-modal (no aria-modal/focus trap): anchored disclosure, background stays readable.
           aria-label={label}
           tabIndex={-1}
           className={`absolute ${align === "left" ? "left-0" : "right-0"} z-10 mt-1 min-w-[12rem] rounded-card border border-parchment-200 bg-parchment-50 shadow-raised focus:outline-none`}
