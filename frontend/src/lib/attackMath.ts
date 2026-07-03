@@ -20,6 +20,7 @@ export interface AttackEntry {
   attackLabel: string;
   damageLabel: string;
   note?: string;
+  magical?: boolean;
   attackSpec: RollSpecTriple;
   damageSpec: RollSpecTriple;
   damageType: string;
@@ -113,6 +114,7 @@ export function buildAttackEntries(character: Character): AttackEntry[] {
     name: "Unarmed Strike",
     attackLabel: `+${unarmedStrike.attackBonus}`,
     damageLabel: `${unarmedDamageDisplay(unarmedStrike)} bludgeoning`,
+    magical: unarmedStrike.magical ?? false,
     attackSpec: { count: 1, faces: 20, modifier: unarmedStrike.attackBonus },
     damageSpec: unarmedSpec,
     damageType: "bludgeoning",
