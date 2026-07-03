@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSellOperations, defaultSellPrice, type SellLine } from "@/lib/bulkSell";
+import {
+  buildSellOperations,
+  copperToGp,
+  defaultSellPrice,
+  gpToCopper,
+  resolveSellPrices,
+  type SellLine,
+} from "@/lib/bulkSell";
 import { toCopper } from "@/lib/currency";
 import type { Currency } from "@/types/character";
 
@@ -114,5 +121,60 @@ describe("buildSellOperations — lump-sum", () => {
     const ops = buildSellOperations(lines, { mode: "lumpSum", total });
     const summed = ops.reduce((acc, o) => acc + toCopper(o.currencyDelta), 0);
     expect(summed).toBe(toCopper(total));
+  });
+});
+
+describe("gpToCopper / copperToGp — single decimal-gold box", () => {
+  it("converts whole and fractional gold to copper, rounding to the nearest copper", () => {
+    expect(gpToCopper(55)).toBe(5500);
+    expect(gpToCopper(37.5)).toBe(3750);
+    expect(gpToCopper(0.25)).toBe(25); // 2 sp 5 cp
+    expect(gpToCopper(0.1)).toBe(10); // 1 sp — guards float drift (0.1*100 !== 10 exactly)
+  });
+
+  it("floors negatives and non-finite input to zero", () => {
+    expect(gpToCopper(-5)).toBe(0);
+    expect(gpToCopper(NaN)).toBe(0);
+  });
+
+  it("round-trips copper back to a gold number", () => {
+    expect(copperToGp(5500)).toBe(55);
+    expect(copperToGp(3750)).toBe(37.5);
+    expect(copperToGp(25)).toBe(0.25);
+  });
+});
+
+describe("resolveSellPrices — single total split, with per-line pins", () => {
+  it("splits the whole total evenly when nothing is pinned (sums exactly)", () => {
+    const prices = resolveSellPrices(lines, {}, 1000); // 10 gp across 3 lines
+    const summed = Object.values(prices).reduce((acc, p) => acc + toCopper(p), 0);
+    expect(summed).toBe(1000);
+    // Leftover copper goes to the earliest lines.
+    expect(toCopper(prices.a)).toBe(334);
+    expect(toCopper(prices.b)).toBe(333);
+    expect(toCopper(prices.c)).toBe(333);
+  });
+
+  it("gives a single unpinned line the entire total", () => {
+    const prices = resolveSellPrices([lines[0]], {}, 725);
+    expect(prices.a).toEqual({ cp: 5, sp: 2, gp: 7, pp: 0 }); // 725 cp = 7 gp 2 sp 5 cp
+  });
+
+  it("pins a line to its override and splits the remainder across the rest", () => {
+    // total 1000; pin "a" at 400 → remaining 600 split across b,c → 300 each.
+    const prices = resolveSellPrices(lines, { a: 400 }, 1000);
+    expect(toCopper(prices.a)).toBe(400);
+    expect(toCopper(prices.b)).toBe(300);
+    expect(toCopper(prices.c)).toBe(300);
+  });
+
+  it("never discounts pins: overrides exceeding the total starve the unpinned lines to zero", () => {
+    // total 500 but pins already sum to 900 → unpinned pool clamps to 0.
+    const prices = resolveSellPrices(lines, { a: 500, b: 400 }, 500);
+    expect(toCopper(prices.a)).toBe(500);
+    expect(toCopper(prices.b)).toBe(400);
+    expect(toCopper(prices.c)).toBe(0);
+    const summed = Object.values(prices).reduce((acc, p) => acc + toCopper(p), 0);
+    expect(summed).toBe(900); // max(total, Σ pins)
   });
 });
