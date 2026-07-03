@@ -61,8 +61,12 @@ export default function SellPanel({ items, pending, onConfirm, onCancel }: SellP
     quantity: quantities[item.id],
   }));
 
+  // An empty input means the row is open but not yet priced — it must NOT count
+  // as a pin (else `Number("") = 0` would silently sell the item for 0 gp).
   const overridesCopper: Record<string, number> = Object.fromEntries(
-    Object.entries(overrides).map(([id, text]) => [id, gpToCopper(Number(text))])
+    Object.entries(overrides)
+      .filter(([, text]) => text.trim() !== "")
+      .map(([id, text]) => [id, gpToCopper(Number(text))])
   );
 
   // Auto total: each pinned line at its override, each other at half catalog value.
@@ -161,7 +165,7 @@ export default function SellPanel({ items, pending, onConfirm, onCancel }: SellP
 
       <ul className="flex flex-col divide-y divide-parchment-200">
         {items.map((item) => {
-          const pinned = item.id in overrides;
+          const pinned = item.id in overridesCopper;
           const open = openRows.has(item.id);
           return (
             <li key={item.id} className="flex flex-col gap-1.5 py-2">

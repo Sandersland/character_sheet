@@ -9,7 +9,7 @@
  * is explicit regardless of any later catalog drift.
  */
 
-import { fromCopper, splitLumpSum, toCopper } from "@/lib/currency";
+import { splitLumpSum, toCopper } from "@/lib/currency";
 import type { Currency, InventoryOperation } from "@/types/character";
 
 /** One line the player chose to sell — `quantity` may be a partial slice of the stack. */
@@ -80,7 +80,7 @@ export function resolveSellPrices(
   if (unpinned.length > 0) {
     // splitLumpSum divides the copper pool exactly; re-decompose each share
     // without platinum roll-up to keep the recorded denominations gp/sp/cp.
-    const shares = splitLumpSum(fromCopper(pool), unpinned.length);
+    const shares = splitLumpSum(toGoldSilverCopper(pool), unpinned.length);
     unpinned.forEach((line, i) => {
       prices[line.inventoryItemId] = toGoldSilverCopper(toCopper(shares[i]));
     });

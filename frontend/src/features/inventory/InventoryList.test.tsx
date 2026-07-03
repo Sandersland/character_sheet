@@ -331,6 +331,28 @@ describe("InventoryList multi-select sell", () => {
     ]);
   });
 
+  it("treats a cleared custom price as un-pinned, not a 0 gp sale", async () => {
+    const user = userEvent.setup();
+    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Sell items" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Shield" }));
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+
+    // Open the Longsword price, type a value, then clear it back to empty.
+    await user.click(screen.getByRole("button", { name: "Set a custom price for Longsword" }));
+    const price = screen.getByRole("spinbutton", { name: "Custom price in gold for Longsword" });
+    fireEvent.change(price, { target: { value: "6" } });
+    fireEvent.change(price, { target: { value: "" } });
+
+    // Cleared → not a 0 gp pin: both lines fall back to the even split of the auto total (7.5 gp → 3.75 each).
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+    expect(applyInventoryTransactions).toHaveBeenCalledWith("char-1", [
+      { type: "sell", inventoryItemId: "w1", quantity: 1, currencyDelta: { cp: 5, sp: 7, gp: 3, pp: 0 } },
+      { type: "sell", inventoryItemId: "a1", quantity: 1, currencyDelta: { cp: 5, sp: 7, gp: 3, pp: 0 } },
+    ]);
+  });
+
   it("toggles inline pricing help explaining decimals for silver/copper", async () => {
     const user = userEvent.setup();
     render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
