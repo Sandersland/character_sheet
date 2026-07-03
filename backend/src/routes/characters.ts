@@ -26,6 +26,7 @@ import {
   deriveImprovisedAttack,
   deriveUnarmedDamageDie,
   deriveUnarmedStrike,
+  deriveUnarmoredMovement,
   deriveWeaponAttackBonus,
   deriveWeaponDamage,
   deriveFightingStyleBonuses,
@@ -671,6 +672,15 @@ export function serializeCharacter(row: CharacterWithRelations) {
         : best;
     }, null);
 
+  // Monk Unarmored Movement: level-scaled speed bonus while unarmored & unshielded.
+  // Additive term, off monk class level — never merged into feat/racial speed.
+  const monkLevel = row.classEntries.find((e) => e.name.toLowerCase() === "monk")?.level ?? 0;
+  const unarmoredMovementBonus = deriveUnarmoredMovement({
+    monkLevel,
+    isUnarmored: bestArmor === null,
+    hasShield,
+  });
+
   // Labeled AC addends; armorClass below is their exact sum (single source in srd.ts).
   const acParts = deriveArmorClassParts(bestArmor, hasShield, dexMod, unarmoredDefense);
   // Defense fighting style only applies while wearing body armor (5e).
@@ -698,7 +708,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     armorClass: acParts.reduce((total, p) => total + p.value, 0),
     armorClassBreakdown: acParts,
     initiativeBonus: effectiveInitBonus + featBonuses.initiative,
-    speed: row.speed + featBonuses.speed,
+    speed: row.speed + featBonuses.speed + unarmoredMovementBonus,
     proficiencyBonus: progress.proficiencyBonus,
 
     experiencePoints: row.experiencePoints,
