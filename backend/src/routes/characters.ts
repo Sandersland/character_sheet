@@ -650,6 +650,12 @@ export function serializeCharacter(row: CharacterWithRelations) {
     .map((i) => ({ name: i.name, ...i.armorDetail! }));
   const hasShield = equippedArmorDetails.some((a) => a.armorCategory === "shield");
   const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
+  // Feeds Unarmored Defense (Barbarian/Monk) when no body armor is equipped.
+  const unarmoredDefense = {
+    classNames: row.classEntries.map((e) => e.name),
+    conMod: abilityModifier(effectiveScores.constitution ?? 10),
+    wisMod: abilityModifier(effectiveScores.wisdom ?? 10),
+  };
   const bestArmor = equippedArmorDetails
     .filter((a): a is (typeof equippedArmorDetails)[number] & { armorCategory: BodyArmorCategory } => a.armorCategory !== "shield")
     .reduce<Parameters<typeof deriveArmorClassParts>[0]>((best, a) => {
@@ -666,7 +672,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     }, null);
 
   // Labeled AC addends; armorClass below is their exact sum (single source in srd.ts).
-  const acParts = deriveArmorClassParts(bestArmor, hasShield, dexMod);
+  const acParts = deriveArmorClassParts(bestArmor, hasShield, dexMod, unarmoredDefense);
   // Defense fighting style only applies while wearing body armor (5e).
   const styleAc = bestArmor !== null ? deriveFightingStyleBonuses(fightingStyle).armorClass : 0;
   if (styleAc !== 0) acParts.push({ label: "Defense fighting style", value: styleAc });

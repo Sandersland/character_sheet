@@ -92,7 +92,7 @@ export default function EntityDetailPage() {
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-parchment-100 px-6 text-center">
         <h1 className="font-display text-2xl font-semibold text-parchment-900">Entity not found</h1>
         <Link
-          to={campaignId ? `/campaigns/${campaignId}` : "/campaigns"}
+          to={campaignId ? `/campaigns/${campaignId}/codex` : "/campaigns"}
           className="rounded-control bg-garnet-700 px-4 py-2 text-sm font-semibold text-parchment-50 hover:bg-garnet-800"
         >
           Back to campaign
@@ -148,7 +148,7 @@ export default function EntityDetailPage() {
       <div className="border-b border-parchment-200 bg-parchment-50">
         <div className="mx-auto max-w-3xl px-6 py-5">
           <Link
-            to={`/campaigns/${campaignId}`}
+            to={`/campaigns/${campaignId}/codex`}
             className="text-xs font-semibold text-garnet-700 hover:underline"
           >
             ← Back to campaign

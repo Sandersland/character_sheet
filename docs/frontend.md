@@ -13,8 +13,9 @@ frontend/src/
 │   ├── advancement/     # AdvancementSection, AdvancementPanel (shell) → AsiFlow, FeatFlow,
 │   │                    #   CustomFeatForm; hooks useAsiDraft/useFeatCatalog/useCustomFeatDraft; featView reducer
 │   ├── auth/            # AuthProvider (useAuth), AuthGate, AppHeader, AccountMenu
-│   ├── campaign/        # CampaignsPage (list+create+join), CampaignDetailPage (mgmt hub:
-│   │                    #   invite link, roster, add-character dropdown), CampaignInviteLink,
+│   ├── campaign/        # CampaignsPage (list+create+join), CampaignDetailPage (mgmt hub with
+│   │                    #   routed Overview/Codex tabs #367), CampaignOverviewPanel (invite link,
+│   │                    #   roster, add-character dropdown), CampaignInviteLink,
 │   │                    #   CampaignIndicator (sheet badge/link), JoinCampaignRoute (#246)
 │   ├── character-create/ # IdentitySection, AbilityScoresSection, SkillSection,
 │   │                    #   ToolProficiencySection + useToolProficiencyChoices (CharacterCreatePage sections)
@@ -29,6 +30,8 @@ frontend/src/
 │   ├── dice/            # DiceRoller, PhysicsDiceRoller, DiceScene, DieMesh, DiceRollSequence,
 │   │                    #   RollButton, RollContext, RollResultToast,
 │   │                    #   diceRollerTypes.ts, useDieFaceData.ts
+│   ├── entities/        # CampaignCodex (Codex tab: browse/search/filter/create #367),
+│   │                    #   EntityDetailPage (detail/edit/delete + backlinks) (#248)
 │   ├── experience/      # ExperienceTracker
 │   ├── hitpoints/       # HitPointTracker orchestrator (inline Card; hosts LevelUpModal + ConcentrationSaveModal)
 │   │                    #   Sub-components: HpActionControl, HpMeter, RestControls,
@@ -331,9 +334,12 @@ The shared campaign wiki surface. Three pieces, all scoped to `character.campaig
 - **`features/journal/MentionAutocomplete.tsx`** — a **contenteditable** wrapper that drives the `@…` autocomplete and renders each stored `@[<uuid>]` token as an atomic `@Name` chip while editing (#248/#269). Public contract is unchanged: `value` (raw `@[<uuid>]` body) in, `onChange(rawBody)` out — the DOM is serialized back to tokens on every input via `lib/mentions.serializeMentionDom`, so hosts and entity backlinks are unaffected. Selecting a match or running "➕ Create <Type> …" inserts a chip; Backspace/Delete next to a chip removes it atomically. It intercepts Up/Down/Enter/Esc *only while the popover is open* (Enter selects a match instead of submitting; Esc `stopPropagation`s so it closes the popover, not the palette), and falls through to the composer's own `onKeyDown` otherwise. No `campaignId` → a "create or join a campaign" CTA instead of matches. Wired into `CapturePalette` (NOTE) and `JournalEntryPanel` (NOTE body).
 - **`features/journal/MentionText.tsx`** — renders a stored body with `parseMentionBody`: text verbatim, each known `@[<uuid>]` as a Badge-styled chip linking to the entity detail page (name resolved AT RENDER, so a rename reflects instantly); unknown id → literal token text. Replaces the raw `{body}` renders in `CapturePalette`, `JournalSection`, and the `SessionSummaryModal` recap journal list.
 - **`hooks/useCampaignEntities.ts`** — fetches + module-level-caches the campaign entity list once, exposing an id→entity map for chip resolution.
-- **`features/entities/EntityDetailPage.tsx`** (route `/campaigns/:id/entities/:entityId`) — name/type/aliases/notes with inline edit (any member) and OWNER-only delete (gated on the campaign `role` from `fetchCampaign`), plus a backlinks list (`fetchEntityBacklinks`) grouped by session.
+- **`features/entities/EntityDetailPage.tsx`** (route `/campaigns/:id/entities/:entityId`) — name/type/aliases/notes with inline edit (any member) and OWNER-only delete (gated on the campaign `role` from `fetchCampaign`), plus a backlinks list (`fetchEntityBacklinks`) grouped by session. Its "back" link returns to the Codex tab.
+- **`features/entities/CampaignCodex.tsx`** (the hub's Codex tab, #367) — the entity registry's browsable front door: client-side search (`matchEntities` name+alias, normalization matching the `@`-autocomplete) composed with type-filter chips over the `useCampaignEntities` cache, rows sorted by name linking to `EntityDetailPage`, and an inline expand-in-place "➕ New entity" panel (type/name/aliases/notes) that calls `createEntity` then `primeCampaignEntities` so the list, tab badge, and live journal chips update without a reload. Browse/search/filter/create only — edit and delete stay on `EntityDetailPage`.
 
 Type display/tone resolve through `lib/mentions` (`ENTITY_TYPE_LABELS` / `ENTITY_TYPE_OPTIONS` / `ENTITY_TYPE_TONE`) — never capitalize the raw enum key.
+
+`CampaignDetailPage` hosts both tabs as **routed** `Tabs` (#367): `/campaigns/:id` = Overview (`features/campaign/CampaignOverviewPanel.tsx` — invite/add-character/roster), `/campaigns/:id/codex` = Codex. The active tab derives from the URL (`useMatch`) and tab clicks `navigate` (push, not replace), so deep-links, refresh, and browser back/forward all work.
 
 ## Campaign sessions — `features/session/`
 
