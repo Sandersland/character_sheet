@@ -32,7 +32,7 @@ frontend/src/
 │   │                    #   Sub-components: HpActionControl, HpMeter, RestControls,
 │   │                    #   DeathSaveTracker, LevelUpCallout, AdvancementCallout
 │   ├── inventory/       # InventoryList, InventoryRow (→ InventoryEditForm/EquipToggle/
-│   │                    #   ItemSummary/ItemProse), AddItemPanel, StartingEquipmentEditor
+│   │                    #   ItemSummary/ItemProse), AddItemPanel, SellPanel, StartingEquipmentEditor
 │   ├── journal/         # CapturePalette (Cmd/Ctrl+J quick-capture NOTE overlay)
 │   ├── session/         # TurnHub (→ useTurnActions + TurnControls/ActionSlot/BonusActionSlot/
 │   │                    #   ReactionSlot/EffectManeuverStrip/LayOnHandsInput), useTurnState, SessionLog,
@@ -82,6 +82,7 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 | `timeline.ts` | Groups/formats audit events for the activity timeline (`groupByBatch`/`groupByDate`, generic over `{id,batchId,createdAt}`). |
 | `currency.ts` | Copper-based currency math — `toCopper`/`fromCopper`/`splitLumpSum` + `formatCurrency` (unsigned, largest-first denomination string). |
 | `sellBatch.ts` | `summarizeSellBatch` collapses a bulk-sale batch (>1 row, all `sold`) into one line summary for ActivityModal; returns `null` for non-bulk-sale batches. |
+| `bulkSell.ts` | Bulk-sell math. `buildSellOperations` (per-line `quantity` + `perItem`/`lumpSum` pricing); `defaultSellPrice` (half per-unit catalog value, rounded down, × qty); `resolveSellPrices` (single sale total + per-line pin overrides → per-line `Currency`, pinned lines exact + the rest split evenly, gp/sp/cp with **no** platinum roll-up); `gpToCopper`/`copperToGp` for the single decimal-gold input. Consumed by `SellPanel`/`InventoryList`; distinct from `sellBatch.ts` (which summarizes a completed batch). |
 | `startingEquipment.ts` | Character-creation equipment helpers (`isPackageComplete`, `isGoldValid`, `EquipmentDraft`). |
 | `characterCreationValidation.ts` | Explains *why* the creation Save button is disabled (`missingRequirements`). |
 | `abilityGen.ts` | Ability-score generation methods (point-buy / standard array / roll). |
@@ -93,7 +94,7 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 | `turnRules.ts` | 5e turn economy derived from class/level (`deriveAttacksPerAction`, action lists). |
 | `attackMath.ts` | Pure attack-row math for InlineAttackPicker: `buildAttackEntries` (equipped/unarmed/improvised rows + precomputed roll/log label strings), grip-resolved weapon damage/type/grip helpers, unarmed display, `hasSuperiorityDice`, `attacksExhausted`. |
 | `mentions.ts` | @-tagging primitives (#248/#269): `parseMentionBody` (text/mention segment split of a stored body), `normalizeForMatch` (search key, parity with backend `lib/journal-refs.ts`), `matchEntities`, `parseTrigger` (the in-progress `@…`/`@type:` autocomplete trigger). Edit-time DOM helpers (contenteditable composer): `buildMentionChip`, `mentionBodyToFragment` (body→DOM with chips), `serializeMentionDom` (DOM→body round-trip), `serializeMentionDomBeforeCaret` (pre-caret slice for trigger parsing), `placeCaretAtBodyOffset`, plus the `MentionResolved` type. Pure — no JSX. |
-| `encumbrance.ts` | Carrying capacity (`carryingCapacity` = STR × 15), derive-on-read. |
+| `encumbrance.ts` | Carrying capacity (`carryingCapacity` = STR × 15) and coin weight (`coinWeight(currency)` = total coins ÷ 50 lb, PHB p.143), both derive-on-read. |
 | `itemDetails.ts` | Pure inventory-row presentation: `itemDetailParts` (the dotted summary line), `hasItemProse`, plus `weaponDamageParts`/`weaponPropertyTags`. Shared by InventoryRow/ItemSummary. |
 | `fightingStyles.ts` | Fighting-style labels/descriptions (presentation; backend is rules source of truth). |
 | `multiclass.ts` | Multiclass display + gating helpers: `isMulticlass`, `classSummary` (single-class → name unchanged; multiclass → "Wizard 5 / Cleric 3"), `multiclassPrereqMet` (evaluates the backend-served `ClassOption.multiclassPrerequisite` thresholds against the character's scores — no rules table duplicated). Feeds `CharacterSheetHeader`/`CharacterCard`/`ClassFeaturesSection`, `AddClassPanel`, `LevelUpModal`. |
@@ -169,6 +170,7 @@ Staying on-system is what keeps the UI from reading as generic. The `verify-fron
 | `ActivityModal` — filterable audit timeline (category + session selects + inventory type chips; optional `entityId` scope) + undo — also serves as inventory history | `AddItemPanel` — add item form |
 | `DeleteCharacterModal` — confirm destructive action | `AddSpellPanel` — learn spell form |
 | `LevelUpModal` / `ConcentrationSaveModal` — hosted *inside* `HitPointTracker` | `InventoryRow` edit mode |
+| | `SellPanel` — bulk-sale confirm/review (per-line qty + one sale total that splits evenly; optional per-line price override) |
 | | `HitPointTracker` itself — inline Card (damage/heal/rest/death-save controls) |
 | | `ExperienceTracker` award/set inputs |
 | | `AbilityScoreEditor` method tabs |
@@ -310,7 +312,7 @@ Large interactive sections follow the orchestrator/row pattern:
 ```
 
 Examples:
-- `features/inventory/`: `InventoryList` (orchestrator) / `InventoryRow` (delegates to `InventoryEditForm`/`EquipToggle`/`ItemSummary`/`ItemProse`) / `AddItemPanel`
+- `features/inventory/`: `InventoryList` (orchestrator) / `InventoryRow` (delegates to `InventoryEditForm`/`EquipToggle`/`ItemSummary`/`ItemProse`) / `AddItemPanel` / `SellPanel`
 - `features/spells/`: `SpellsSection` (orchestrator) / `SpellRow` / `AddSpellPanel`
 
 The orchestrator pattern keeps async state and API batching in one place and makes rows easy to unit-test in isolation — pass mock callbacks, assert they fire with the right args. See `testing.md` for component test patterns.

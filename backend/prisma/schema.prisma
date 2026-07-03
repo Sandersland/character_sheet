@@ -47,7 +47,6 @@ model Character {
 
   experiencePoints Int @default(0)
 
-  armorClass      Int
   initiativeBonus Int
   speed           Int
 

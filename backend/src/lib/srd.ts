@@ -20,14 +20,14 @@ export const ALIGNMENTS: readonly string[] = [
   "Chaotic Evil",
 ];
 
-export interface SkillDefinition {
+interface SkillDefinition {
   name: string;
   ability: string;
 }
 
 // All 18 5e skills with their governing ability — the canonical mapping
 // implicit in prisma/seed.ts's per-character skill arrays.
-export const SKILLS: readonly SkillDefinition[] = [
+const SKILLS: readonly SkillDefinition[] = [
   { name: "acrobatics", ability: "dexterity" },
   { name: "animalHandling", ability: "wisdom" },
   { name: "arcana", ability: "intelligence" },
@@ -120,8 +120,9 @@ export function isKnownTool(name: string): boolean {
 // source of truth for condition rules data — the frontend resolves display text
 // through a label map derived from these keys, never by rendering raw keys.
 // Exhaustion is intentionally NOT in this list: it is a single 0–6 level handled
-// as a special case (see EXHAUSTION_MAX / exhaustionEffect below), not a boolean
-// presence in the active-conditions list.
+// as a special case (see EXHAUSTION_MAX below; per-level effect text lives in the
+// frontend's lib/conditions.ts), not a boolean presence in the active-conditions
+// list.
 
 export type ConditionKey =
   | "blinded"
@@ -232,30 +233,9 @@ export const CONDITIONS: readonly ConditionDefinition[] = [
 /** Maximum exhaustion level (level 6 = death). */
 export const EXHAUSTION_MAX = 6;
 
-/**
- * Cumulative effect text for each exhaustion level (1–6, PHB p. 291). Effects
- * are cumulative: a creature at level N suffers the effects of all lower levels.
- * Index 0 is the "no exhaustion" case.
- */
-export const EXHAUSTION_EFFECTS: readonly string[] = [
-  "No exhaustion.",
-  "Disadvantage on ability checks.",
-  "Speed halved.",
-  "Disadvantage on attack rolls and saving throws.",
-  "Hit point maximum halved.",
-  "Speed reduced to 0.",
-  "Death.",
-];
-
 /** Returns true if `key` is a known standard condition key. */
 export function isKnownCondition(key: string): key is ConditionKey {
   return CONDITIONS.some((c) => c.key === key);
-}
-
-/** Cumulative effect text for an exhaustion level, clamped to 0–6. */
-export function exhaustionEffect(level: number): string {
-  const clamped = Math.min(EXHAUSTION_MAX, Math.max(0, Math.trunc(level)));
-  return EXHAUSTION_EFFECTS[clamped];
 }
 
 // ── Fighting Styles ───────────────────────────────────────────────────────────
@@ -345,12 +325,34 @@ export function deriveFightingStyleBonuses(
   return { armorClass: styleKey === "defense" ? 1 : 0 };
 }
 
+// Local union (not ArmorCategoryName from inventory.ts) to avoid a srd↔inventory import cycle.
+// Shields are handled via hasShield, never passed as body armor, so they're excluded here.
+export type BodyArmorCategory = "light" | "medium" | "heavy";
+
+// Base AC from equipped body armor (null = unarmored) + Dex mod (capped by armor) + shield.
+export function deriveArmorClass(
+  armor: { armorCategory: BodyArmorCategory; baseArmorClass: number; dexModifierMax?: number | null } | null,
+  hasShield: boolean,
+  dexMod: number,
+): number {
+  const shieldBonus = hasShield ? 2 : 0;
+  if (armor === null) return 10 + dexMod + shieldBonus;
+  switch (armor.armorCategory) {
+    case "light":
+      return armor.baseArmorClass + dexMod + shieldBonus;
+    case "medium":
+      return armor.baseArmorClass + Math.min(dexMod, armor.dexModifierMax ?? 2) + shieldBonus;
+    case "heavy":
+      return armor.baseArmorClass + shieldBonus;
+  }
+}
+
 // ── Spellcasting ability by class ────────────────────────────────────────────
 // Maps a class name (lowercase) to the ability that governs its spellcasting.
 // Used to derive spellSaveDC and spellAttackBonus at read time.
 // Warlock uses Pact Magic (single-level slots, short-rest recharge) and Paladin/
 // Ranger use the half-caster table — all handled by deriveSpellcasting below.
-export const SPELLCASTING_ABILITY: Readonly<Record<string, string>> = {
+const SPELLCASTING_ABILITY: Readonly<Record<string, string>> = {
   wizard: "intelligence",
   sorcerer: "charisma",
   cleric: "wisdom",
@@ -415,7 +417,7 @@ export interface DerivedSpellcastingInfo {
 // Half-caster slot table (Paladin / Ranger). No spellcasting at level 1; slots
 // at level N match the full-caster table at ceil(N/2). PHB p. 84 / 91.
 // Outer key: character level 2–20.  Inner key: spell slot level.
-export const HALF_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number>>>> = {
+const HALF_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number>>>> = {
    2: { 1: 2 },
    3: { 1: 3 },
    4: { 1: 3 },
@@ -440,7 +442,7 @@ export const HALF_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, 
 // Warlock Pact Magic (PHB p. 106). Unlike other casters, every Pact slot is the
 // same (highest) level, and they recharge on a SHORT rest. Maps warlock level to
 // the single slot level and the number of slots at that level.
-export const PACT_MAGIC_SLOTS: Readonly<Record<number, { slotLevel: number; count: number }>> = {
+const PACT_MAGIC_SLOTS: Readonly<Record<number, { slotLevel: number; count: number }>> = {
    1: { slotLevel: 1, count: 1 },
    2: { slotLevel: 1, count: 2 },
    3: { slotLevel: 2, count: 2 },
@@ -466,7 +468,7 @@ export const PACT_MAGIC_SLOTS: Readonly<Record<number, { slotLevel: number; coun
 // Warlock Mystic Arcanum (PHB p. 108). At levels 11/13/15/17 the warlock learns
 // one spell of level 6/7/8/9 respectively, castable once per long rest without a
 // Pact slot. Returns the arcanum spell levels available at a given warlock level.
-export function mysticArcanumLevels(warlockLevel: number): number[] {
+function mysticArcanumLevels(warlockLevel: number): number[] {
   const levels: number[] = [];
   if (warlockLevel >= 11) levels.push(6);
   if (warlockLevel >= 13) levels.push(7);
@@ -486,7 +488,7 @@ const THIRD_CASTER_SUBCLASSES: Readonly<Record<string, string>> = {
 // Third-caster slot table (PHB Fighter/Rogue spell slot table).
 // Spellcasting starts at class level 3 (when the subclass is gained).
 // Outer key: character level; inner key: spell slot level.
-export const THIRD_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number>>>> = {
+const THIRD_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number>>>> = {
    3: { 1: 2 },
    4: { 1: 3 },
    5: { 1: 3 },
@@ -897,7 +899,7 @@ export const RACE_PROFICIENCY_GRANTS: Record<string, ProficiencyGrant> = {
  * Tolerates `null`/`undefined` weaponClass (no category match; falls back to
  * name matching only).
  */
-export function isProficientWithWeapon(
+function isProficientWithWeapon(
   weapon: { name: string; weaponClass?: string | null },
   grants: ReadonlyArray<{ name: string }>,
 ): boolean {
@@ -1114,7 +1116,6 @@ export interface DerivedCharacterFields {
   speed: number;
   hitDice: { total: number; die: string; spent: number };
   hitPoints: { current: number; max: number; temp: number; deathSaves: { successes: number; failures: number } };
-  armorClass: number;
   initiativeBonus: number;
   savingThrowProficiencies: string[];
   skills: { name: string; ability: string; proficient: boolean }[];
@@ -1142,7 +1143,6 @@ export function deriveCreatedCharacter(
     speed: catalog.race.speed,
     hitDice: { total: 1, die: catalog.characterClass.hitDie, spent: 0 },
     hitPoints: { current: maxHitPoints, max: maxHitPoints, temp: 0, deathSaves: { successes: 0, failures: 0 } },
-    armorClass: 10 + dexterityModifier,
     initiativeBonus: dexterityModifier,
     savingThrowProficiencies: catalog.characterClass.savingThrows,
     skills: SKILLS.map(({ name, ability }) => ({
@@ -1163,7 +1163,7 @@ export function deriveCreatedCharacter(
  * bonuses in serializeCharacter. Adding a target here + a new apply site in
  * serializeCharacter is all that's needed to support it for catalog and custom feats.
  */
-export const NUMERIC_FEAT_IMPROVEMENT_TARGETS = [
+const NUMERIC_FEAT_IMPROVEMENT_TARGETS = [
   "initiative",
   "speed",
   "armorClass",
@@ -1177,14 +1177,12 @@ export type NumericFeatImprovementTarget = (typeof NUMERIC_FEAT_IMPROVEMENT_TARG
  * skill, ability, armor category, or weapon name/category being granted).
  * Applied by deriveFeatProficiencies rather than deriveFeatBonuses.
  */
-export const PROFICIENCY_FEAT_IMPROVEMENT_TARGETS = [
+const PROFICIENCY_FEAT_IMPROVEMENT_TARGETS = [
   "skillProficiency",
   "savingThrowProficiency",
   "armorProficiency",   // key = ArmorProficiencyCategory ("light" | "medium" | "heavy" | "shield")
   "weaponProficiency",  // key = weapon category ("Simple Weapons") or specific name ("Longswords")
 ] as const;
-
-export type ProficiencyFeatImprovementTarget = (typeof PROFICIENCY_FEAT_IMPROVEMENT_TARGETS)[number];
 
 /**
  * Combat-modifier targets: not summed as flat bonuses but used to derive
@@ -1192,11 +1190,9 @@ export type ProficiencyFeatImprovementTarget = (typeof PROFICIENCY_FEAT_IMPROVEM
  * `unarmedDamageDie` stores the die face count (e.g. 4 → d4); derivation takes
  * the max across all active advancements rather than summing them.
  */
-export const COMBAT_FEAT_IMPROVEMENT_TARGETS = [
+const COMBAT_FEAT_IMPROVEMENT_TARGETS = [
   "unarmedDamageDie", // amount = die face count (e.g. 4 for d4); max across feats
 ] as const;
-
-export type CombatFeatImprovementTarget = (typeof COMBAT_FEAT_IMPROVEMENT_TARGETS)[number];
 
 /**
  * All valid FeatImprovement.target values. Used for route-level Zod validation.
@@ -1207,8 +1203,6 @@ export const FEAT_IMPROVEMENT_TARGETS = [
   ...PROFICIENCY_FEAT_IMPROVEMENT_TARGETS,
   ...COMBAT_FEAT_IMPROVEMENT_TARGETS,
 ] as const;
-
-export type FeatImprovementTarget = (typeof FEAT_IMPROVEMENT_TARGETS)[number];
 
 /**
  * Sums all numeric feat improvement bonuses across a set of advancements.

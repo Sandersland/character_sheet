@@ -111,7 +111,7 @@ export default function CampaignDetailPage() {
           <div className="flex flex-wrap items-end gap-3 p-4">
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
               <label className="block text-xs font-semibold text-parchment-700" htmlFor="add-character">
-                Your characters
+                Add one of your characters
               </label>
               <select
                 id="add-character"
@@ -156,10 +156,12 @@ export default function CampaignDetailPage() {
                       {member.role === "OWNER" ? "Owner" : "Player"}
                     </Badge>
                   </div>
-                  {memberCharacters.length > 0 && (
+                  {memberCharacters.length > 0 ? (
                     <span className="text-xs text-parchment-600">
                       {memberCharacters.map((c) => c.name).join(", ")}
                     </span>
+                  ) : (
+                    <span className="text-xs italic text-parchment-500">No character yet</span>
                   )}
                 </li>
               );

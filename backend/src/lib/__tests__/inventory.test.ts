@@ -46,7 +46,6 @@ const MINIMAL_CHARACTER = {
   name: "Test Fixture",
   alignment: "Lawful Good",
   experiencePoints: 0,
-  armorClass: 10,
   initiativeBonus: 0,
   speed: 30,
   hitPoints: { current: 10, max: 10, temp: 0 },

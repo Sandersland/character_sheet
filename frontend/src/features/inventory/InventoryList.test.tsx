@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import InventoryList from "@/features/inventory/InventoryList";
@@ -251,19 +251,146 @@ describe("InventoryList multi-select sell", () => {
     expect(screen.queryByRole("button", { name: /Actions for/ })).toBeNull();
   });
 
-  it("shows a running total and sells the selection atomically", async () => {
+  it("prefills a single sale total to the summed half-catalog value (no per-denomination boxes)", async () => {
+    const user = userEvent.setup();
+    const stack = [
+      makeItem({ id: "w1", name: "Longsword", category: "weapon", quantity: 3, cost: { cp: 0, sp: 0, gp: 10, pp: 0 } }),
+    ];
+    render(<InventoryList character={makeCharacter(15, stack)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Sell items" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+
+    // One total box, prefilled to the full stack's half value (3 × 5 gp).
+    expect(screen.getByRole("spinbutton", { name: "Total gold received" })).toHaveValue(15);
+    // Quantity is still per line…
+    expect(screen.getByRole("spinbutton", { name: "Quantity to sell of Longsword" })).toHaveValue(3);
+    // …but the old four-denomination boxes are gone.
+    expect(screen.queryByRole("spinbutton", { name: /received for Longsword/ })).toBeNull();
+  });
+
+  it("sells at the auto total, splitting a single line's whole amount", async () => {
+    const user = userEvent.setup();
+    const stack = [
+      makeItem({ id: "w1", name: "Longsword", category: "weapon", quantity: 3, cost: { cp: 0, sp: 0, gp: 10, pp: 0 } }),
+    ];
+    render(<InventoryList character={makeCharacter(15, stack)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Sell items" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+
+    expect(applyInventoryTransactions).toHaveBeenCalledWith("char-1", [
+      { type: "sell", inventoryItemId: "w1", quantity: 3, currencyDelta: { cp: 0, sp: 0, gp: 15, pp: 0 } },
+    ]);
+  });
+
+  it("splits an edited total evenly across the selected lines", async () => {
+    const user = userEvent.setup();
+    // Longsword half = 5 gp, Shield half = 2.5 gp → auto total 7.5 gp.
+    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Sell items" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Shield" }));
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+
+    const total = screen.getByRole("spinbutton", { name: "Total gold received" });
+    expect(total).toHaveValue(7.5);
+
+    // Negotiate a round 10 gp for the pair → 5 gp each.
+    fireEvent.change(total, { target: { value: "10" } });
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+
+    expect(applyInventoryTransactions).toHaveBeenCalledWith("char-1", [
+      { type: "sell", inventoryItemId: "w1", quantity: 1, currencyDelta: { cp: 0, sp: 0, gp: 5, pp: 0 } },
+      { type: "sell", inventoryItemId: "a1", quantity: 1, currencyDelta: { cp: 0, sp: 0, gp: 5, pp: 0 } },
+    ]);
+  });
+
+  it("pins a per-line price and splits the remaining total across the rest", async () => {
     const user = userEvent.setup();
     render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Sell items" }));
     await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
-    expect(screen.getByText(/1 selected · ~10 gp/)).toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: "Select Shield" }));
     await user.click(screen.getByRole("button", { name: "Sell" }));
-    expect(applyInventoryTransactions).toHaveBeenCalledWith(
-      "char-1",
-      expect.arrayContaining([
-        expect.objectContaining({ type: "sell", inventoryItemId: "w1", quantity: 1 }),
-      ])
-    );
+
+    // Set a bundle total of 10 gp, then pin the Longsword at 6 gp → Shield gets the rest (4 gp).
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Total gold received" }), { target: { value: "10" } });
+    await user.click(screen.getByRole("button", { name: "Set a custom price for Longsword" }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Custom price in gold for Longsword" }), {
+      target: { value: "6" },
+    });
+    // Resolved readout reflects the pin + the remainder: 6 gp + 4 gp = 10 gp.
+    expect(screen.getByText("= 10 gp")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+    expect(applyInventoryTransactions).toHaveBeenCalledWith("char-1", [
+      { type: "sell", inventoryItemId: "w1", quantity: 1, currencyDelta: { cp: 0, sp: 0, gp: 6, pp: 0 } },
+      { type: "sell", inventoryItemId: "a1", quantity: 1, currencyDelta: { cp: 0, sp: 0, gp: 4, pp: 0 } },
+    ]);
+  });
+
+  it("treats a cleared custom price as un-pinned, not a 0 gp sale", async () => {
+    const user = userEvent.setup();
+    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Sell items" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Shield" }));
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+
+    // Open the Longsword price, type a value, then clear it back to empty.
+    await user.click(screen.getByRole("button", { name: "Set a custom price for Longsword" }));
+    const price = screen.getByRole("spinbutton", { name: "Custom price in gold for Longsword" });
+    fireEvent.change(price, { target: { value: "6" } });
+    fireEvent.change(price, { target: { value: "" } });
+
+    // Cleared → not a 0 gp pin: both lines fall back to the even split of the auto total (7.5 gp → 3.75 each).
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+    expect(applyInventoryTransactions).toHaveBeenCalledWith("char-1", [
+      { type: "sell", inventoryItemId: "w1", quantity: 1, currencyDelta: { cp: 5, sp: 7, gp: 3, pp: 0 } },
+      { type: "sell", inventoryItemId: "a1", quantity: 1, currencyDelta: { cp: 5, sp: 7, gp: 3, pp: 0 } },
+    ]);
+  });
+
+  it("treats a cleared total as auto, not a 0 gp sale", async () => {
+    const user = userEvent.setup();
+    // Longsword half = 5 gp, Shield half = 2.5 gp → auto total 7.5 gp.
+    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Sell items" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Shield" }));
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+
+    // Type a total, then clear it back to empty before confirming.
+    const total = screen.getByRole("spinbutton", { name: "Total gold received" });
+    fireEvent.change(total, { target: { value: "20" } });
+    fireEvent.change(total, { target: { value: "" } });
+    // Empty box falls back to the auto total, and the Auto reset hides.
+    expect(screen.queryByRole("button", { name: "Reset total to the automatic amount" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+    expect(applyInventoryTransactions).toHaveBeenCalledWith("char-1", [
+      { type: "sell", inventoryItemId: "w1", quantity: 1, currencyDelta: { cp: 5, sp: 7, gp: 3, pp: 0 } },
+      { type: "sell", inventoryItemId: "a1", quantity: 1, currencyDelta: { cp: 5, sp: 7, gp: 3, pp: 0 } },
+    ]);
+  });
+
+  it("opens pricing help in an overlay (no layout reflow) and closes it", async () => {
+    const user = userEvent.setup();
+    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Sell items" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+
+    expect(screen.queryByText(/copper is the smallest coin/i)).toBeNull();
+    await user.click(screen.getByRole("button", { name: "How pricing works" }));
+    // Help renders as a modal dialog (portal overlay), not an inline block.
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText(/copper is the smallest coin/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByText(/copper is the smallest coin/i)).toBeNull();
   });
 
   it("Cancel exits select mode", async () => {
