@@ -8,6 +8,7 @@ import type { RollResult } from "@/lib/dice";
 import { D6_SIZE, DIE_GAP } from "@/lib/dieFaces";
 import type { FaceGroup } from "@/lib/dieFaces";
 import {
+  FIXED_DT,
   FLOOR_Y,
   createDiceWorld,
   createDieBody,
@@ -20,11 +21,10 @@ import type { DiceRollerProps } from "@/features/dice/diceRollerTypes";
 import DieMesh from "@/features/dice/DieMesh";
 import { useDieFaceData } from "@/features/dice/useDieFaceData";
 
-// Fixed simulated-time step used to fast-forward a roll with no animation
-// (reduced-motion, or a mid-tumble Skip) — must match physicsDice.ts's
-// FIXED_DT so each synchronous tick advances the same amount of sim time a
-// real animated frame would.
-const FIXED_DT = 1 / 60;
+// FIXED_DT (imported from physicsDice.ts) is the fixed simulated-time step used
+// to fast-forward a roll with no animation (reduced-motion, or a mid-tumble
+// Skip): each synchronous tick advances the same amount of sim time a real
+// animated frame would. Sharing the constant keeps the two paths in lockstep.
 // Safety cap on instant-resolve loop iterations. Belt-and-suspenders
 // alongside the resolver's own MAX_ROLL_MS-based cutoff — elapsedMs climbs
 // by a fixed amount every tick regardless of real time, so this should never

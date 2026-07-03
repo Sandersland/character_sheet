@@ -331,7 +331,7 @@ function computeConcentrationSave(
  * Returns the check result for the route to surface, or null when the character
  * was not concentrating.
  */
-export async function applyConcentrationCheckInTx(
+async function applyConcentrationCheckInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
   damage: number,
@@ -493,7 +493,7 @@ export async function applyConcentrationCheckInTx(
  * request, so this logs under a fresh batchId and is undone as a separate LIFO
  * entry. The spellcasting revert handler restores `concentratingOn` on undo.
  */
-export async function applyConcentrationSaveInTx(
+async function applyConcentrationSaveInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
   entryId: string,

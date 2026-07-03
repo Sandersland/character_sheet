@@ -17,22 +17,24 @@ import { D6_SIZE, DIE_GAP, UP_AXIS, type FaceGroup } from "./dieFaces";
 // matches the scale the Codrops cannon-es dice article settled on for the
 // same reason: a "physically correct" 9.8 reads as floaty in a ~2-unit-tall
 // scene that settles in a second or two.
-export const GRAVITY_Y = -50;
+const GRAVITY_Y = -50;
 
 // Fixed simulation timestep; cannon-es internally sub-steps real frame time
 // against this when stepped with `timeSinceLastCalled` (see useFrame call
 // site), so motion stays stable regardless of the browser's actual frame rate.
+// Exported so the React roller's synchronous fast-forward path advances sim
+// time by the exact same step as an animated frame — single source of truth.
 export const FIXED_DT = 1 / 60;
-export const MAX_SUB_STEPS = 6;
+const MAX_SUB_STEPS = 6;
 
-export const DIE_MASS = 1;
-export const DICE_FRICTION = 0.1;
-export const DICE_RESTITUTION = 0.3;
-export const FLOOR_FRICTION = 0.3;
-export const FLOOR_RESTITUTION = 0.3;
+const DIE_MASS = 1;
+const DICE_FRICTION = 0.1;
+const DICE_RESTITUTION = 0.3;
+const FLOOR_FRICTION = 0.3;
+const FLOOR_RESTITUTION = 0.3;
 
-export const SLEEP_SPEED_LIMIT = 0.15;
-export const SLEEP_TIME_LIMIT = 0.2;
+const SLEEP_SPEED_LIMIT = 0.15;
+const SLEEP_TIME_LIMIT = 0.2;
 // Secondary settle check (belt-and-suspenders alongside cannon's own sleep
 // state) for any body that's effectively stopped but hasn't formally slept
 // yet — e.g. dice resting close enough together that tiny mutual nudges keep
@@ -64,7 +66,7 @@ export const FLOOR_Y = -1.1;
 // DiceScene) rather than computed from the actual rendered width, which we
 // deliberately never read. X is handled separately (see trayHalfXFor below)
 // since it has to scale with how many dice are thrown side by side.
-export const TRAY_HALF_Z = 2;
+const TRAY_HALF_Z = 2;
 const TRAY_WALL_HEIGHT = 4;
 const TRAY_WALL_THICKNESS = 0.5;
 // How far a die's start x can jitter off its lane center before being
@@ -102,7 +104,7 @@ const THROW_ANGULAR_VELOCITY = 8;
 // degrees off) while tolerating the couple-degree residual tilt ordinary
 // contact softness/low friction leaves even on a die that's genuinely done
 // settling.
-export const COCK_DOT_THRESHOLD = Math.cos((20 * Math.PI) / 180);
+const COCK_DOT_THRESHOLD = Math.cos((20 * Math.PI) / 180);
 // A die resting flat on the floor has its center within this tolerance of
 // the expected single-layer rest height; anything higher is very likely
 // stacked on top of another die rather than cocked on an edge, which the
@@ -111,11 +113,11 @@ export const COCK_DOT_THRESHOLD = Math.cos((20 * Math.PI) / 180);
 // full die-height (~1.3) that true stacking would show.
 const REST_HEIGHT_TOLERANCE = 0.35;
 
-export const MAX_REROLL_ATTEMPTS = 5;
+const MAX_REROLL_ATTEMPTS = 5;
 // Safety cap so a roll can never hang if dice somehow never settle (e.g. a
 // degenerate stack) — past this, whatever's still cocked gets snapped to its
 // nearest face instead of re-thrown again.
-export const MAX_ROLL_MS = 4000;
+const MAX_ROLL_MS = 4000;
 
 /** One die's physics body plus the face data needed to read its result and
  *  the lane (resting x position) it should be re-thrown from on a retry. */
@@ -235,7 +237,7 @@ export function throwDie(body: CANNON.Body, laneX: number): void {
  *  *this* body was last (re)thrown, tracked by the caller (see
  *  createRollResolver), not overall roll time — a retried die deserves its
  *  own fresh grace period, not whatever's left over from the first throw's. */
-export function isBodySettled(body: CANNON.Body, sinceThrowMs: number): boolean {
+function isBodySettled(body: CANNON.Body, sinceThrowMs: number): boolean {
   if (body.sleepState === CANNON.Body.SLEEPING) return true;
   if (sinceThrowMs < SETTLE_FALLBACK_GRACE_MS) return false;
   return (
@@ -244,7 +246,7 @@ export function isBodySettled(body: CANNON.Body, sinceThrowMs: number): boolean 
   );
 }
 
-export interface FaceReading {
+interface FaceReading {
   value: number;
   /** How aligned the read face's normal is with "up" (dot product, 1 = dead-on). */
   confidence: number;
@@ -261,7 +263,7 @@ const scratchNormal = new THREE.Vector3();
  *  with +Y. Flags a "cocked" read — an edge/corner balance, or a die resting
  *  on top of a neighbor rather than the floor — so the caller can re-throw
  *  rather than report a value nobody would actually read off the die. */
-export function readUpFace(body: CANNON.Body, groups: FaceGroup[]): FaceReading {
+function readUpFace(body: CANNON.Body, groups: FaceGroup[]): FaceReading {
   // Die types with no per-face mapping (only d10/d100 today — see
   // dieFaces.ts's createDieGeometry fallback) can't be read at all; treat
   // them as an always-valid "1" rather than retrying forever against a
@@ -288,7 +290,7 @@ export function readUpFace(body: CANNON.Body, groups: FaceGroup[]): FaceReading 
   return { value: bestIndex + 1, confidence: best, cocked };
 }
 
-export interface RollResolverTickResult {
+interface RollResolverTickResult {
   done: boolean;
   /** Present only once `done` is true: each die's observed face value, in `dice` order. */
   values?: number[];
