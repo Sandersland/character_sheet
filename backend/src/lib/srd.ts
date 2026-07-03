@@ -325,6 +325,29 @@ export function deriveFightingStyleBonuses(
   return { armorClass: styleKey === "defense" ? 1 : 0 };
 }
 
+// Local union (not ArmorCategoryName from inventory.ts) to avoid a srd↔inventory import cycle.
+type ArmorCategory = "light" | "medium" | "heavy" | "shield";
+
+// Base AC from equipped body armor (null = unarmored) + Dex mod (capped by armor) + shield.
+export function deriveArmorClass(
+  armor: { armorCategory: ArmorCategory; baseArmorClass: number; dexModifierMax?: number | null } | null,
+  hasShield: boolean,
+  dexMod: number,
+): number {
+  const shieldBonus = hasShield ? 2 : 0;
+  if (armor === null) return 10 + dexMod + shieldBonus;
+  switch (armor.armorCategory) {
+    case "light":
+      return armor.baseArmorClass + dexMod + shieldBonus;
+    case "medium":
+      return armor.baseArmorClass + Math.min(dexMod, armor.dexModifierMax ?? 2) + shieldBonus;
+    case "heavy":
+      return armor.baseArmorClass + shieldBonus;
+    case "shield":
+      return 10 + dexMod + shieldBonus;
+  }
+}
+
 // ── Spellcasting ability by class ────────────────────────────────────────────
 // Maps a class name (lowercase) to the ability that governs its spellcasting.
 // Used to derive spellSaveDC and spellAttackBonus at read time.
