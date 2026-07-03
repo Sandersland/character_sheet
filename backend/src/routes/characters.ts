@@ -14,8 +14,10 @@ import {
 import { prisma } from "../lib/prisma.js";
 import { normalizeHitDice, normalizeHitPoints } from "../lib/hitpoints.js";
 import {
+  abilityModifier,
   advancementSlotsForLevel,
   CLASS_PROFICIENCY_GRANTS,
+  deriveArmorClass,
   deriveFeatBonuses,
   deriveFeatProficiencies,
   deriveSpellcasting,
@@ -639,6 +641,27 @@ export function serializeCharacter(row: CharacterWithRelations) {
     fightingStyle,
   );
 
+  // AC is derived, not persisted: best equipped body armor + Dex (per category)
+  // + shield. No slot model exists, so the highest-AC body armor wins.
+  const equippedArmorDetails = row.inventoryItems
+    .filter((i) => i.equipped && i.armorDetail)
+    .map((i) => i.armorDetail!);
+  const hasShield = equippedArmorDetails.some((a) => a.armorCategory === "shield");
+  const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
+  const bestArmor = equippedArmorDetails
+    .filter((a) => a.armorCategory !== "shield")
+    .reduce<Parameters<typeof deriveArmorClass>[0]>((best, a) => {
+      const candidate = {
+        armorCategory: a.armorCategory,
+        baseArmorClass: a.baseArmorClass,
+        dexModifierMax: a.dexModifierMax,
+      };
+      if (best === null) return candidate;
+      return deriveArmorClass(candidate, false, dexMod) > deriveArmorClass(best, false, dexMod)
+        ? candidate
+        : best;
+    }, null);
+
   return {
     id: row.id,
     name: row.name,
@@ -657,7 +680,9 @@ export function serializeCharacter(row: CharacterWithRelations) {
     campaignId: row.campaignId ?? undefined,
 
     armorClass:
-      row.armorClass + featBonuses.armorClass + deriveFightingStyleBonuses(fightingStyle).armorClass,
+      deriveArmorClass(bestArmor, hasShield, dexMod) +
+      featBonuses.armorClass +
+      deriveFightingStyleBonuses(fightingStyle).armorClass,
     initiativeBonus: effectiveInitBonus + featBonuses.initiative,
     speed: row.speed + featBonuses.speed,
     proficiencyBonus: progress.proficiencyBonus,

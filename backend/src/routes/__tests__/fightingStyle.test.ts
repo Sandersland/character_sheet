@@ -259,6 +259,8 @@ describe("POST /api/characters/:id/class/transactions — setFightingStyle", () 
 
   it("logs a resources/fightingStyleChosen event and undo restores before.resources", async () => {
     const app = createApp();
+    const before = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}`);
+    const baseAC = before.body.armorClass as number;
     await supertest.agent(app).set("Cookie", COOKIE).post(url).send({ operations: [{ type: "setFightingStyle", key: "defense" }] });
 
     const activity = await supertest.agent(app).set("Cookie", COOKIE).get(`/api/characters/${FIXTURE_ID}/activity`);
@@ -272,7 +274,6 @@ describe("POST /api/characters/:id/class/transactions — setFightingStyle", () 
     expect(ev).toBeDefined();
     expect(ev.category).toBe("resources");
 
-    const baseAC = FIXTURE_BASE.armorClass;
     const undo = await supertest.agent(app).set("Cookie", COOKIE).post(`/api/characters/${FIXTURE_ID}/events/${ev.batchId}/revert`);
     expect(undo.status).toBe(200);
     expect(undo.body.resources.fightingStyle).toBeNull();
