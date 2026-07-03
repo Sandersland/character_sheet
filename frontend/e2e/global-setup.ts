@@ -13,6 +13,8 @@
 //                     superiority-die spend.
 //   Session Fighter — Fighter L1, attached to its own solo campaign so
 //                     session.spec can start/resume a live session in-spec.
+//   Monk L6         — Monk, 14000 XP (L6), own campaign; unarmed.spec asserts
+//                     the Ki-Empowered Strikes "Magical" badge in a live session.
 //
 // Personas that need a live session each get a DEDICATED campaign: a campaign
 // allows only one active session at a time, so sharing one would make the
@@ -36,6 +38,8 @@ const ABILITY_SCORES = {
 // L5 threshold from the XP curve (backend/src/lib/experience.ts). The curve is
 // class-independent, so this is L5 for both the Wizard and the Battle Master.
 const LEVEL_5_XP = 6500;
+// L6 threshold — gates Monk Ki-Empowered Strikes (magical unarmed strikes).
+const LEVEL_6_XP = 14000;
 
 interface Persona {
   name: string;
@@ -70,6 +74,14 @@ const ROSTER: Persona[] = [
     background: "Soldier",
     className: "Fighter",
     campaignName: "E2E Solo — Session Fighter",
+  },
+  {
+    name: "Monk L6",
+    race: "Human",
+    background: "Soldier",
+    className: "Monk",
+    experiencePoints: LEVEL_6_XP,
+    campaignName: "E2E Solo — Monk L6",
   },
 ];
 

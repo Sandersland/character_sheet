@@ -38,7 +38,17 @@ export default function AttackRow({
     <div className="flex flex-col gap-1.5 py-3">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-parchment-900">{entry.name}</p>
+          <p className="flex items-center gap-1.5 text-sm font-medium text-parchment-900">
+            {entry.name}
+            {entry.magical && (
+              <span
+                title="Counts as magical for overcoming resistance to nonmagical damage"
+                className="rounded-control bg-gold-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold-800"
+              >
+                Magical
+              </span>
+            )}
+          </p>
           <p className="text-xs text-parchment-600">
             Attack: {entry.attackLabel} · Damage: {entry.damageLabel}
             {entry.note && (
