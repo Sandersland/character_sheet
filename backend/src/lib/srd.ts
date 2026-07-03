@@ -329,22 +329,40 @@ export function deriveFightingStyleBonuses(
 // Shields are handled via hasShield, never passed as body armor, so they're excluded here.
 export type BodyArmorCategory = "light" | "medium" | "heavy";
 
+// One labeled addend of the derived AC; the wire shape for armorClassBreakdown.
+export type ArmorClassPart = { label: string; value: number };
+
+// Labeled AC parts from body armor (null = unarmored) + Dex (per category) + shield.
+// Ordered, summing exactly to deriveArmorClass; zero-value optional parts are omitted.
+export function deriveArmorClassParts(
+  armor: { name?: string; armorCategory: BodyArmorCategory; baseArmorClass: number; dexModifierMax?: number | null } | null,
+  hasShield: boolean,
+  dexMod: number,
+): ArmorClassPart[] {
+  const parts: ArmorClassPart[] = [];
+  if (armor === null) {
+    parts.push({ label: "Unarmored", value: 10 });
+    if (dexMod !== 0) parts.push({ label: "Dex", value: dexMod });
+  } else {
+    parts.push({ label: armor.name ?? "Armor", value: armor.baseArmorClass });
+    if (armor.armorCategory !== "heavy") {
+      const cap = armor.armorCategory === "medium" ? (armor.dexModifierMax ?? 2) : null;
+      const capped = cap !== null && dexMod > cap;
+      const applied = capped ? cap : dexMod;
+      if (applied !== 0) parts.push({ label: capped ? `Dex (max +${cap})` : "Dex", value: applied });
+    }
+  }
+  if (hasShield) parts.push({ label: "Shield", value: 2 });
+  return parts;
+}
+
 // Base AC from equipped body armor (null = unarmored) + Dex mod (capped by armor) + shield.
 export function deriveArmorClass(
-  armor: { armorCategory: BodyArmorCategory; baseArmorClass: number; dexModifierMax?: number | null } | null,
+  armor: Parameters<typeof deriveArmorClassParts>[0],
   hasShield: boolean,
   dexMod: number,
 ): number {
-  const shieldBonus = hasShield ? 2 : 0;
-  if (armor === null) return 10 + dexMod + shieldBonus;
-  switch (armor.armorCategory) {
-    case "light":
-      return armor.baseArmorClass + dexMod + shieldBonus;
-    case "medium":
-      return armor.baseArmorClass + Math.min(dexMod, armor.dexModifierMax ?? 2) + shieldBonus;
-    case "heavy":
-      return armor.baseArmorClass + shieldBonus;
-  }
+  return deriveArmorClassParts(armor, hasShield, dexMod).reduce((total, p) => total + p.value, 0);
 }
 
 // ── Spellcasting ability by class ────────────────────────────────────────────

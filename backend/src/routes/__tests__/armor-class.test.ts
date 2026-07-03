@@ -145,5 +145,33 @@ describe("derived armorClass", () => {
     });
     const res = await get();
     expect(res.body.armorClass).toBe(17); // 16 + 1 feat bonus
+    expect(res.body.armorClassBreakdown).toEqual([
+      { label: "Test Chain Mail", value: 16 },
+      { label: "Feats", value: 1 },
+    ]);
+  });
+
+  it("returns an armorClassBreakdown that sums to armorClass", async () => {
+    const res = await get();
+    expect(res.body.armorClassBreakdown).toEqual([
+      { label: "Unarmored", value: 10 },
+      { label: "Dex", value: 3 },
+    ]);
+    const sum = res.body.armorClassBreakdown.reduce(
+      (t: number, p: { value: number }) => t + p.value,
+      0,
+    );
+    expect(sum).toBe(res.body.armorClass);
+  });
+
+  it("breaks down Half Plate + Shield into labeled parts", async () => {
+    await acquire(halfPlate);
+    const res = await acquire(shield);
+    expect(res.body.armorClass).toBe(19); // 15 + min(3, 2) + 2
+    expect(res.body.armorClassBreakdown).toEqual([
+      { label: "Test Half Plate", value: 15 },
+      { label: "Dex (max +2)", value: 2 },
+      { label: "Shield", value: 2 },
+    ]);
   });
 });
