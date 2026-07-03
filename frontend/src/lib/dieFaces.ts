@@ -42,16 +42,16 @@ export const LABEL_SURFACE_OFFSET = 0.11;
 // (1.3 * sqrt(3)) — the gap between die centers needs to clear that with
 // real margin or spinning corners visibly intersect the neighboring die.
 export const DIE_GAP = 2.6;
-export const NORMAL_GROUP_EPSILON = 1e-3;
+const NORMAL_GROUP_EPSILON = 1e-3;
 
 // d6 rounded-box tuning: side length matches the old sharp BoxGeometry,
 // `segments` smooths the curvature, `radius` is how deep the bevel cuts in.
 export const D6_SIZE = 1.3;
-export const D6_ROUNDING_SEGMENTS = 4;
-export const D6_ROUNDING_RADIUS = 0.12;
+const D6_ROUNDING_SEGMENTS = 4;
+const D6_ROUNDING_RADIUS = 0.12;
 
 export const UP_AXIS = new THREE.Vector3(0, 1, 0);
-export const Z_AXIS = new THREE.Vector3(0, 0, 1);
+const Z_AXIS = new THREE.Vector3(0, 0, 1);
 
 export interface FaceGroup {
   normal: THREE.Vector3;
