@@ -168,7 +168,7 @@ The Character row carries these JSON columns: `hitPoints`, `hitDice`, `abilitySc
 - `conditions Json?` — `{ active: ConditionEntry[], exhaustion: number }`. Pure mutable state, not level-derived.
 - `currency Json` — the **only** JSON column still patchable via `PATCH /characters/:id`. Every other column above mutates exclusively through its domain's `…/transactions` endpoint.
 
-`armorClass` is **not** a column: `serializeCharacter` derives it at read time via `deriveArmorClass()` from the best equipped body-armor `InventoryItem` snapshot + effective Dex (capped per armor category) + shield, then adds Defense fighting-style and feat `armorClass` bonuses. While unarmored, Unarmored Defense applies from the class entries (Barbarian 10+Dex+Con, Monk 10+Dex+Wis without shield; highest formula wins, worn armor overrides). Equip/unequip armor (or change Dex) via the inventory/ability transactions and AC re-derives; it's absent from the `PATCH /characters/:id` allowlist.
+`armorClass` is **not** a column: `serializeCharacter` derives it at read time via `deriveArmorClass()` from the best equipped body-armor `InventoryItem` snapshot + effective Dex (capped per armor category) + shield, then adds Defense fighting-style and feat `armorClass` bonuses. While unarmored, Unarmored Defense applies from the class entries (Barbarian 10+Dex+Con, shield stacks; Monk 10+Dex+Wis, unusable while wielding a shield; highest formula wins, worn armor overrides). Equip/unequip armor (or change Dex) via the inventory/ability transactions and AC re-derives; it's absent from the `PATCH /characters/:id` allowlist.
 
 ### Unified audit log
 

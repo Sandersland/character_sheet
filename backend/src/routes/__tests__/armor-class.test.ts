@@ -129,19 +129,19 @@ describe("derived armorClass", () => {
     expect(withShield.body.armorClass).toBe(17);
   });
 
-  it("monk Unarmored Defense adds Wis while unarmored but not with a shield", async () => {
-    // Dex 16 (+3), Wis 14 (+2): 10 + 3 + 2 = 15; shield doesn't stack on the monk formula.
+  it("monk Unarmored Defense adds Wis while unarmored but is lost with a shield", async () => {
+    // Dex 16 (+3), Wis 18 (+4): 10 + 3 + 4 = 17; a shield disqualifies the monk formula (PHB p.78).
     await prisma.character.update({
       where: { id: FIXTURE_ID },
       data: {
-        abilityScores: { ...FIXTURE.abilityScores, wisdom: 14 },
+        abilityScores: { ...FIXTURE.abilityScores, wisdom: 18 },
         classEntries: { create: [{ name: "monk", position: 0 }] },
       },
     });
     const res = await get();
-    expect(res.body.armorClass).toBe(15);
+    expect(res.body.armorClass).toBe(17);
     const withShield = await acquire(shield);
-    expect(withShield.body.armorClass).toBe(15); // monk 15 ties base-with-shield 15
+    expect(withShield.body.armorClass).toBe(15); // base 10 + Dex 3 + shield 2, not monk 17
   });
 
   it("equipping body armor overrides a barbarian's Unarmored Defense", async () => {

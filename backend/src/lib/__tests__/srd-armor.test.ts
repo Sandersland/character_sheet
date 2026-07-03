@@ -55,14 +55,14 @@ describe("deriveArmorClass — Unarmored Defense", () => {
     expect(deriveArmorClass(null, true, 2, ud(["barbarian"], 3, 0))).toBe(17);
   });
 
-  it("monk unarmored is 10 + Dex + Wis with no shield term", () => {
+  it("monk unarmored is 10 + Dex + Wis", () => {
     expect(deriveArmorClass(null, false, 2, ud(["monk"], 0, 3))).toBe(15);
-    // Monk 15 still beats base-with-shield 14.
-    expect(deriveArmorClass(null, true, 2, ud(["monk"], 0, 3))).toBe(15);
   });
 
-  it("low-Wis monk with a shield falls back to base + shield", () => {
-    expect(deriveArmorClass(null, true, 2, ud(["monk"], 0, 0))).toBe(14); // base 14 > monk 12
+  it("monk with a shield falls back to base + shield even with high Wis", () => {
+    // PHB p.78: a shield disqualifies Monk Unarmored Defense entirely.
+    expect(deriveArmorClass(null, true, 2, ud(["monk"], 0, 3))).toBe(14); // base+shield 14, not monk 15
+    expect(deriveArmorClass(null, true, 2, ud(["monk"], 0, 0))).toBe(14);
   });
 
   it("barbarian/monk multiclass takes the highest formula", () => {

@@ -340,10 +340,12 @@ export function deriveArmorClass(
   const shieldBonus = hasShield ? 2 : 0;
   if (armor === null) {
     let best = 10 + dexMod + shieldBonus;
-    const classes = unarmoredDefense?.classNames.map((n) => n.toLowerCase()) ?? [];
-    if (classes.includes("barbarian")) best = Math.max(best, 10 + dexMod + unarmoredDefense!.conMod + shieldBonus);
-    // Monk Unarmored Defense doesn't work with a shield, so no shield term.
-    if (classes.includes("monk")) best = Math.max(best, 10 + dexMod + unarmoredDefense!.wisMod);
+    if (unarmoredDefense) {
+      const classes = unarmoredDefense.classNames.map((n) => n.toLowerCase());
+      if (classes.includes("barbarian")) best = Math.max(best, 10 + dexMod + unarmoredDefense.conMod + shieldBonus);
+      // Monk Unarmored Defense is unusable while wielding a shield (PHB p.78).
+      if (!hasShield && classes.includes("monk")) best = Math.max(best, 10 + dexMod + unarmoredDefense.wisMod);
+    }
     return best;
   }
   switch (armor.armorCategory) {
