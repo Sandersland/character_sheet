@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import Badge from "@/components/ui/Badge";
@@ -50,6 +50,16 @@ export default function CampaignCodex({ campaignId }: CampaignCodexProps) {
         .sort((a, b) => a.name.localeCompare(b.name)),
     [entities, query, typeFilter],
   );
+
+  // Escape dismisses the open create panel (document-level, same pattern as DropdownMenu).
+  useEffect(() => {
+    if (!creating) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeForm();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [creating]);
 
   function closeForm() {
     setCreating(false);

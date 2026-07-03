@@ -71,7 +71,8 @@ export default function CampaignDetailPage() {
         <Tabs
           tabs={[
             { id: "overview", label: "Overview" },
-            { id: "codex", label: "Codex", badge: entities.length },
+            // Hidden at 0 so a cold cache doesn't flash "Codex 0" before the fetch resolves.
+            { id: "codex", label: "Codex", badge: entities.length > 0 ? entities.length : undefined },
           ]}
           active={onCodex ? "codex" : "overview"}
           onChange={(tab) =>

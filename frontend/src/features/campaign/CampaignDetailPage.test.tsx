@@ -161,6 +161,27 @@ describe("CampaignDetailPage tabs (#367)", () => {
     expect(screen.getByDisplayValue(/\/join\/abc123$/)).toBeInTheDocument();
   });
 
+  it("hides the Codex tab badge while the entity count is zero", async () => {
+    renderDetail();
+
+    await screen.findByText("The Sunless Citadel");
+    expect(screen.getByRole("tab", { name: /codex/i })).not.toHaveTextContent("0");
+  });
+
+  it("shows the entity count on the Codex tab badge once loaded", async () => {
+    vi.mocked(client.fetchEntities).mockResolvedValue([
+      { id: "e1", campaignId: "camp-1", type: "NPC", name: "Klarg", aliases: [], notes: null },
+      { id: "e2", campaignId: "camp-1", type: "LOCATION", name: "Cragmaw", aliases: [], notes: null },
+    ] as never);
+
+    renderDetail();
+
+    await screen.findByText("The Sunless Citadel");
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: /codex/i })).toHaveTextContent("2"),
+    );
+  });
+
   it("deep-links to the Codex tab at /campaigns/:id/codex", async () => {
     renderDetail("/campaigns/camp-1/codex");
 

@@ -21,6 +21,7 @@ export default function CampaignOverviewPanel({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
+  // Re-fetches on every tab switch (panel remounts); accepted — lightweight call, no module cache.
   useEffect(() => {
     let active = true;
     fetchCharacters()
