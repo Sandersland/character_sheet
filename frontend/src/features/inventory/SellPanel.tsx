@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { HelpCircle } from "lucide-react";
 
 import {
   copperToGp,
@@ -52,6 +53,8 @@ export default function SellPanel({ items, pending, onConfirm, onCancel }: SellP
   const [openRows, setOpenRows] = useState<Set<string>>(new Set());
   // The sale total as raw gold-input text; `null` means "follow the auto total".
   const [totalText, setTotalText] = useState<string | null>(null);
+  // Toggles the inline "how pricing works" help disclosure.
+  const [showHelp, setShowHelp] = useState(false);
 
   const lines: SellLine[] = items.map((item) => ({
     inventoryItemId: item.id,
@@ -111,11 +114,50 @@ export default function SellPanel({ items, pending, onConfirm, onCancel }: SellP
       className="flex flex-col gap-3 rounded-card border border-parchment-300 bg-parchment-100 p-3"
     >
       <div className="flex flex-col gap-0.5">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-parchment-600">Confirm sale</h4>
+        <div className="flex items-center gap-1.5">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-parchment-600">Confirm sale</h4>
+          <button
+            type="button"
+            onClick={() => setShowHelp((v) => !v)}
+            aria-label="How pricing works"
+            aria-expanded={showHelp}
+            aria-controls="sell-help"
+            className="text-parchment-400 transition-colors hover:text-parchment-700"
+          >
+            <HelpCircle className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        </div>
         <p className="text-xs text-parchment-500">
           Enter one total for the sale; it splits evenly across items. Set a per-item price to pin one.
         </p>
       </div>
+
+      {showHelp && (
+        <div
+          id="sell-help"
+          className="flex flex-col gap-1.5 rounded-control border border-parchment-300 bg-parchment-50 p-2.5 text-xs text-parchment-600"
+        >
+          <p>
+            <span className="font-semibold text-parchment-700">Total received</span> is one gold amount for the
+            whole sale, split evenly across the selected items. It prefills to half each item's catalog value.
+          </p>
+          <p>
+            <span className="font-semibold text-parchment-700">Silver &amp; copper:</span> use decimals —{" "}
+            <span className="tabular-nums">0.5</span> gp = 5 sp, <span className="tabular-nums">0.05</span> gp =
+            5 cp (copper is the smallest coin, so two decimals is as fine as it goes). The{" "}
+            <span className="font-semibold">= …</span> line shows the exact coins you'll receive.
+          </p>
+          <p>
+            <span className="font-semibold text-parchment-700">Platinum:</span> amounts stay in gp/sp/cp here —
+            1 pp is just 10 gp of value. Hold or convert coins into platinum from{" "}
+            <span className="font-semibold">Edit purse</span>.
+          </p>
+          <p>
+            <span className="font-semibold text-parchment-700">Set price</span> pins one item to an exact amount;
+            the remaining total then splits across the other items.
+          </p>
+        </div>
+      )}
 
       <ul className="flex flex-col divide-y divide-parchment-200">
         {items.map((item) => {
@@ -148,7 +190,7 @@ export default function SellPanel({ items, pending, onConfirm, onCancel }: SellP
                       <input
                         type="number"
                         min={0}
-                        step="any"
+                        step="0.01"
                         inputMode="decimal"
                         value={overrides[item.id] ?? ""}
                         onChange={(e) => setOverride(item.id, e.target.value)}
@@ -199,7 +241,7 @@ export default function SellPanel({ items, pending, onConfirm, onCancel }: SellP
             <input
               type="number"
               min={0}
-              step="any"
+              step="0.01"
               inputMode="decimal"
               value={totalText ?? gpString(autoTotalCopper)}
               onChange={(e) => setTotalText(e.target.value)}

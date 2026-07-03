@@ -331,6 +331,22 @@ describe("InventoryList multi-select sell", () => {
     ]);
   });
 
+  it("toggles inline pricing help explaining decimals for silver/copper", async () => {
+    const user = userEvent.setup();
+    render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Sell items" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select Longsword" }));
+    await user.click(screen.getByRole("button", { name: "Sell" }));
+
+    const help = screen.getByRole("button", { name: "How pricing works" });
+    expect(screen.queryByText(/copper is the smallest coin/i)).toBeNull();
+    await user.click(help);
+    expect(screen.getByText(/copper is the smallest coin/i)).toBeInTheDocument();
+    expect(help).toHaveAttribute("aria-expanded", "true");
+    await user.click(help);
+    expect(screen.queryByText(/copper is the smallest coin/i)).toBeNull();
+  });
+
   it("Cancel exits select mode", async () => {
     const user = userEvent.setup();
     render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
