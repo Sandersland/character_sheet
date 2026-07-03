@@ -100,4 +100,27 @@ describe("CampaignDetailPage (#246)", () => {
     expect(optionLabels).toContain("Thordak");
     expect(optionLabels).not.toContain("Elsewhere");
   });
+
+  it("shows 'No character yet' for a member with no character", async () => {
+    vi.mocked(client.fetchCampaign).mockResolvedValue(makeCampaign());
+    vi.mocked(client.fetchCharacters).mockResolvedValue([]);
+
+    renderDetail();
+
+    await screen.findByText("The Sunless Citadel");
+    expect(screen.getByText(/no character yet/i)).toBeInTheDocument();
+  });
+
+  it("shows joined character names and not the empty hint for a member with characters", async () => {
+    vi.mocked(client.fetchCampaign).mockResolvedValue(
+      makeCampaign({ characters: [{ id: "char-1", name: "Thordak", ownerId: "u1" }] }),
+    );
+    vi.mocked(client.fetchCharacters).mockResolvedValue([]);
+
+    renderDetail();
+
+    await screen.findByText("The Sunless Citadel");
+    expect(screen.getByText("Thordak")).toBeInTheDocument();
+    expect(screen.queryByText(/no character yet/i)).not.toBeInTheDocument();
+  });
 });
