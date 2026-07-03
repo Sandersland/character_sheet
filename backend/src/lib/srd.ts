@@ -329,14 +329,25 @@ export function deriveFightingStyleBonuses(
 // Shields are handled via hasShield, never passed as body armor, so they're excluded here.
 export type BodyArmorCategory = "light" | "medium" | "heavy";
 
-// Base AC from equipped body armor (null = unarmored) + Dex mod (capped by armor) + shield.
+// Base AC from equipped body armor (null = unarmored) + Dex mod (capped by armor) + shield;
+// unarmored, Unarmored Defense applies (Barbarian 10+Dex+Con, Monk 10+Dex+Wis, highest wins).
 export function deriveArmorClass(
   armor: { armorCategory: BodyArmorCategory; baseArmorClass: number; dexModifierMax?: number | null } | null,
   hasShield: boolean,
   dexMod: number,
+  unarmoredDefense?: { classNames: string[]; conMod: number; wisMod: number },
 ): number {
   const shieldBonus = hasShield ? 2 : 0;
-  if (armor === null) return 10 + dexMod + shieldBonus;
+  if (armor === null) {
+    let best = 10 + dexMod + shieldBonus;
+    if (unarmoredDefense) {
+      const classes = unarmoredDefense.classNames.map((n) => n.toLowerCase());
+      if (classes.includes("barbarian")) best = Math.max(best, 10 + dexMod + unarmoredDefense.conMod + shieldBonus);
+      // Monk Unarmored Defense is unusable while wielding a shield (PHB p.78).
+      if (!hasShield && classes.includes("monk")) best = Math.max(best, 10 + dexMod + unarmoredDefense.wisMod);
+    }
+    return best;
+  }
   switch (armor.armorCategory) {
     case "light":
       return armor.baseArmorClass + dexMod + shieldBonus;
