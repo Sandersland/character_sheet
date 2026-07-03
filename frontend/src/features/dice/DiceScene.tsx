@@ -55,8 +55,16 @@ export default function DiceScene({
               out and flatten the glossy look. */}
           <ambientLight intensity={0.3} />
           <directionalLight position={[2.5, 4, 3]} intensity={0.7} />
+          {/* The dice/physics rig renders OUTSIDE the cosmetic <Suspense> below:
+              it is the source of truth for the roll result, so a suspending
+              cosmetic (the resin Environment map, or a die's troika text) must
+              never be able to unmount it and stall the roll (#408). Its own
+              nodes (geometry + material) don't suspend; DieMesh contains its own
+              text suspension internally. */}
+          {children}
+          {/* Cosmetic-only chrome; kept in its own boundary so its async setup
+              (env map generation) can't gate the rig above. */}
           <Suspense fallback={null}>
-            {children}
             {/* frames={Infinity} re-renders the shadow map every frame so it
                 tracks the dice as they bounce and skitter; frames={1} (the
                 previous setting) bakes a single static shadow that can't

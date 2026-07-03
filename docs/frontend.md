@@ -303,6 +303,12 @@ formatRollSpec(spec): string            // "3d6 + 2", "4d6 drop lowest"
 
 **3D rollers** (`features/dice/DiceRoller.tsx` scripted, `features/dice/PhysicsDiceRoller.tsx` physics) both produce a `RollResult` shape via `summarizeRoll` — they're interchangeable via the shared `DiceRollerProps` contract in `features/dice/diceRollerTypes.ts`. Spellcasting currently uses the simple inline `rollSpec`; the 3D rollers are an easy later upgrade.
 
+The dice face numbers are drei `<Text>` (troika). Two things keep them working under the single-origin CSP (#408), which local split-origin dev never exercises:
+- **Main-thread typesetting** — `lib/troikaTextConfig.ts` (`configureDiceText()`, called once in `main.tsx` before render) sets troika `useWorker: false`. Troika's default worker rehydrates via a `blob:` `importScripts`, which the CSP `script-src` blocks (`worker-src` doesn't cover `importScripts`), so `<Text>` would otherwise suspend forever and stall the whole roller.
+- **Bundled font** — `DieMesh` passes an explicit `font` (a same-origin `@fontsource/source-sans-3` **woff**, imported so Vite hashes it into `dist`). Without it, main-thread troika fetches unicode-font-resolver data from a CDN, which the CSP `connect-src` blocks. woff, not woff2 — troika's parser can't read woff2.
+
+Defense-in-depth: `DieMesh` keeps its `<Text>` in its own `<Suspense>` and `DiceScene` renders the physics rig **outside** the cosmetic-environment `<Suspense>`, so a text/env load can never suspend away the sim that produces the result (this decoupling is what makes the roll survive even if the labels fail).
+
 ## Feature-orchestrator split convention
 
 Large interactive sections follow the orchestrator/row pattern:
