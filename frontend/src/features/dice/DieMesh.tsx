@@ -1,6 +1,11 @@
-import { forwardRef } from "react";
+import { forwardRef, Suspense } from "react";
 import { Text } from "@react-three/drei";
 import type * as THREE from "three";
+// A bundled, same-origin font so troika renders the face numbers directly
+// instead of fetching its unicode-font-resolver data from a CDN — which the
+// single-origin CSP `connect-src` blocks (#408). Vite hashes this to a
+// self-hosted asset URL. woff (not woff2) — troika's parser can't read woff2.
+import faceLabelFont from "@fontsource/source-sans-3/files/source-sans-3-latin-700-normal.woff";
 
 import {
   DEFAULT_FACE_LABEL_FONT_SIZE,
@@ -64,29 +69,37 @@ const DieMesh = forwardRef<THREE.Group, DieMeshProps>(function DieMesh(
           opacity={isResolvedDrop ? 0.55 : 1}
         />
       </mesh>
-      {showFaceLabels &&
-        groups.map((group, index) => (
-          <Text
-            key={index}
-            position={group.centroid.clone().addScaledVector(group.normal, LABEL_SURFACE_OFFSET).toArray()}
-            quaternion={group.labelQuaternion}
-            fontSize={fontSize}
-            color={labelColor}
-            outlineWidth={FACE_LABEL_OUTLINE_WIDTH}
-            outlineColor={DIE_LABEL_OUTLINE_COLOR}
-            anchorX="center"
-            anchorY="middle"
-          >
-            {`${index + 1}`}
+      {/* Face labels are purely cosmetic and load their font via troika, which
+          suspends. Contain that suspension in its own boundary so a text-load
+          failure can only blank the numbers — it must never suspend (and thus
+          unmount) the parent die body / physics rig, which is the source of the
+          roll result (#408). */}
+      <Suspense fallback={null}>
+        {showFaceLabels &&
+          groups.map((group, index) => (
+            <Text
+              key={index}
+              font={faceLabelFont}
+              position={group.centroid.clone().addScaledVector(group.normal, LABEL_SURFACE_OFFSET).toArray()}
+              quaternion={group.labelQuaternion}
+              fontSize={fontSize}
+              color={labelColor}
+              outlineWidth={FACE_LABEL_OUTLINE_WIDTH}
+              outlineColor={DIE_LABEL_OUTLINE_COLOR}
+              anchorX="center"
+              anchorY="middle"
+            >
+              {`${index + 1}`}
+            </Text>
+          ))}
+        {/* Fallback for die types with no matching geometry (e.g. d10): no
+            per-face mapping is possible, so just surface the settled value. */}
+        {!showFaceLabels && !rolling && value !== null && (
+          <Text font={faceLabelFont} position={[0, 1.1, 0]} fontSize={0.4} color={labelColor} anchorX="center" anchorY="middle">
+            {`${value}`}
           </Text>
-        ))}
-      {/* Fallback for die types with no matching geometry (e.g. d10): no
-          per-face mapping is possible, so just surface the settled value. */}
-      {!showFaceLabels && !rolling && value !== null && (
-        <Text position={[0, 1.1, 0]} fontSize={0.4} color={labelColor} anchorX="center" anchorY="middle">
-          {`${value}`}
-        </Text>
-      )}
+        )}
+      </Suspense>
     </group>
   );
 });
