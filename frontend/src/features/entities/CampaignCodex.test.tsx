@@ -4,7 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
 import CampaignCodex from "@/features/entities/CampaignCodex";
-import { useCampaignEntities } from "@/hooks/useCampaignEntities";
+import * as client from "@/api/client";
+import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
 import type { CampaignEntity } from "@/types/character";
 import { axe } from "@/test/axe";
 
@@ -143,5 +144,77 @@ describe("CampaignCodex (#367)", () => {
   it("has no axe violations", async () => {
     const { container } = renderCodex();
     expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+describe("CampaignCodex create flow (#367)", () => {
+  it("creates an entity and primes the shared cache", async () => {
+    const user = userEvent.setup();
+    const created = entity({ id: "ent-new", type: "NPC", name: "Sildar Hallwinter" });
+    vi.mocked(client.createEntity).mockResolvedValue(created);
+    renderCodex();
+
+    await user.click(screen.getByRole("button", { name: /new entity/i }));
+    await user.selectOptions(screen.getByLabelText("Type"), "NPC");
+    await user.type(screen.getByLabelText(/name/i), "  Sildar Hallwinter  ");
+    await user.type(screen.getByLabelText(/aliases/i), "Sil, the Knight");
+    await user.type(screen.getByLabelText(/notes/i), "Rescued near Phandalin.");
+    await user.click(screen.getByRole("button", { name: /create entity/i }));
+
+    expect(vi.mocked(client.createEntity)).toHaveBeenCalledWith(CAMPAIGN_ID, {
+      type: "NPC",
+      name: "Sildar Hallwinter",
+      aliases: ["Sil", "the Knight"],
+      notes: "Rescued near Phandalin.",
+    });
+    expect(vi.mocked(primeCampaignEntities)).toHaveBeenCalledWith(
+      CAMPAIGN_ID,
+      expect.arrayContaining([expect.objectContaining({ id: "ent-new" })]),
+    );
+    // Panel collapses back to the toggle after a successful create.
+    expect(screen.queryByRole("button", { name: /create entity/i })).not.toBeInTheDocument();
+  });
+
+  it("omits notes when the field is blank", async () => {
+    const user = userEvent.setup();
+    vi.mocked(client.createEntity).mockResolvedValue(entity({ id: "ent-new", name: "Sildar" }));
+    renderCodex();
+
+    await user.click(screen.getByRole("button", { name: /new entity/i }));
+    await user.type(screen.getByLabelText(/name/i), "Sildar");
+    await user.click(screen.getByRole("button", { name: /create entity/i }));
+
+    expect(vi.mocked(client.createEntity)).toHaveBeenCalledWith(CAMPAIGN_ID, {
+      type: "NPC",
+      name: "Sildar",
+      aliases: [],
+      notes: undefined,
+    });
+  });
+
+  it("disables submit while the name is blank", async () => {
+    const user = userEvent.setup();
+    renderCodex();
+    await user.click(screen.getByRole("button", { name: /new entity/i }));
+    expect(screen.getByRole("button", { name: /create entity/i })).toBeDisabled();
+  });
+
+  it("shows an in-panel error when the create fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(client.createEntity).mockRejectedValue(new Error("Entity already exists"));
+    renderCodex();
+
+    await user.click(screen.getByRole("button", { name: /new entity/i }));
+    await user.type(screen.getByLabelText(/name/i), "Sildar");
+    await user.click(screen.getByRole("button", { name: /create entity/i }));
+
+    expect(await screen.findByText("Entity already exists")).toBeInTheDocument();
+    expect(vi.mocked(primeCampaignEntities)).not.toHaveBeenCalled();
+  });
+
+  it("offers the create toggle even when the campaign has no entities", () => {
+    mockEntities([]);
+    renderCodex();
+    expect(screen.getByRole("button", { name: /new entity/i })).toBeInTheDocument();
   });
 });
