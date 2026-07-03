@@ -82,7 +82,7 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 | `timeline.ts` | Groups/formats audit events for the activity timeline (`groupByBatch`/`groupByDate`, generic over `{id,batchId,createdAt}`). |
 | `currency.ts` | Copper-based currency math — `toCopper`/`fromCopper`/`splitLumpSum` + `formatCurrency` (unsigned, largest-first denomination string). |
 | `sellBatch.ts` | `summarizeSellBatch` collapses a bulk-sale batch (>1 row, all `sold`) into one line summary for ActivityModal; returns `null` for non-bulk-sale batches. |
-| `bulkSell.ts` | Builds the `sell` op array for the bulk-sell flow — `buildSellOperations` (per-line `quantity` + `perItem`/`lumpSum` pricing) and `defaultSellPrice` (half per-unit catalog value, rounded down, × qty). Consumed by `SellPanel`/`InventoryList`; distinct from `sellBatch.ts` (which summarizes a completed batch). |
+| `bulkSell.ts` | Bulk-sell math. `buildSellOperations` (per-line `quantity` + `perItem`/`lumpSum` pricing); `defaultSellPrice` (half per-unit catalog value, rounded down, × qty); `resolveSellPrices` (single sale total + per-line pin overrides → per-line `Currency`, pinned lines exact + the rest split evenly, gp/sp/cp with **no** platinum roll-up); `gpToCopper`/`copperToGp` for the single decimal-gold input. Consumed by `SellPanel`/`InventoryList`; distinct from `sellBatch.ts` (which summarizes a completed batch). |
 | `startingEquipment.ts` | Character-creation equipment helpers (`isPackageComplete`, `isGoldValid`, `EquipmentDraft`). |
 | `characterCreationValidation.ts` | Explains *why* the creation Save button is disabled (`missingRequirements`). |
 | `abilityGen.ts` | Ability-score generation methods (point-buy / standard array / roll). |
@@ -170,7 +170,7 @@ Staying on-system is what keeps the UI from reading as generic. The `verify-fron
 | `ActivityModal` — filterable audit timeline (category + session selects + inventory type chips; optional `entityId` scope) + undo — also serves as inventory history | `AddItemPanel` — add item form |
 | `DeleteCharacterModal` — confirm destructive action | `AddSpellPanel` — learn spell form |
 | `LevelUpModal` / `ConcentrationSaveModal` — hosted *inside* `HitPointTracker` | `InventoryRow` edit mode |
-| | `SellPanel` — bulk-sale confirm/review (editable per-line qty + amount received) |
+| | `SellPanel` — bulk-sale confirm/review (per-line qty + one sale total that splits evenly; optional per-line price override) |
 | | `HitPointTracker` itself — inline Card (damage/heal/rest/death-save controls) |
 | | `ExperienceTracker` award/set inputs |
 | | `AbilityScoreEditor` method tabs |

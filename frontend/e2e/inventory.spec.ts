@@ -61,8 +61,8 @@ test("inventory: add catalog item shows weight/qty; equip/unequip drives the att
 });
 
 // Partial sell: a stack of 3 gems (10 gp each) — the player sells one at the
-// half-value prefill and keeps the other two.
-test("inventory: sell lets you pick quantity + amount received; remainder stays", async ({
+// single-total half-value prefill and keeps the other two.
+test("inventory: sell lets you pick quantity + a single total; remainder stays", async ({
   page,
 }) => {
   await login(page);
@@ -95,16 +95,16 @@ test("inventory: sell lets you pick quantity + amount received; remainder stays"
   await page.getByRole("checkbox", { name: "Select Ruby" }).check();
   await page.getByRole("button", { name: "Sell", exact: true }).click();
 
-  // Prefill: quantity is the full stack; amount received is half catalog value.
+  // Prefill: quantity is the full stack; the single sale total is half catalog value.
   const qty = page.getByRole("spinbutton", { name: "Quantity to sell of Ruby" });
-  const gp = page.getByRole("spinbutton", { name: "gp received for Ruby" });
+  const total = page.getByRole("spinbutton", { name: "Total gold received" });
   await expect(qty).toHaveValue("3");
-  await expect(gp).toHaveValue("15");
+  await expect(total).toHaveValue("15");
 
-  // Sell only one — the price re-prefills to the single-unit half value.
+  // Sell only one — the auto total follows the quantity down to the single-unit half value.
   await qty.fill("1");
-  await expect(gp).toHaveValue("5");
-  await expect(page.getByText("Total received: 5 gp")).toBeVisible();
+  await expect(total).toHaveValue("5");
+  await expect(page.getByText("= 5 gp")).toBeVisible();
 
   await page.getByRole("button", { name: "Sell", exact: true }).click();
 
