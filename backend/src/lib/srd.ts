@@ -392,6 +392,23 @@ export function deriveArmorClass(
   return sumParts(deriveArmorClassParts(armor, hasShield, dexMod, unarmoredDefense));
 }
 
+// Monk Unarmored Movement speed bonus by monk level (PHB p.78): +10 at L2, rising
+// to +30 at L18. Lost while wearing armor or wielding a shield. Additive term —
+// composes with racial base speed and feat speed bonuses, never merged into them.
+export function deriveUnarmoredMovement(input: {
+  monkLevel: number;
+  isUnarmored: boolean;
+  hasShield: boolean;
+}): number {
+  const { monkLevel, isUnarmored, hasShield } = input;
+  if (!isUnarmored || hasShield || monkLevel < 2) return 0;
+  if (monkLevel >= 18) return 30;
+  if (monkLevel >= 14) return 25;
+  if (monkLevel >= 10) return 20;
+  if (monkLevel >= 6) return 15;
+  return 10;
+}
+
 // ── Spellcasting ability by class ────────────────────────────────────────────
 // Maps a class name (lowercase) to the ability that governs its spellcasting.
 // Used to derive spellSaveDC and spellAttackBonus at read time.
