@@ -9,18 +9,13 @@ import EmptyState from "@/components/ui/EmptyState";
 import { GiKnapsack, ITEM_CATEGORY_ICONS } from "@/components/ui/icons";
 import InventoryRow from "@/features/inventory/InventoryRow";
 import MeterBar from "@/components/ui/MeterBar";
-import { buildSellOperations } from "@/lib/bulkSell";
+import SellPanel from "@/features/inventory/SellPanel";
+import { buildSellOperations, type SellLine } from "@/lib/bulkSell";
 import { formatCurrency, toCopper } from "@/lib/currency";
 import { carryingCapacity } from "@/lib/encumbrance";
 import { ITEM_CATEGORY_OPTIONS, ITEM_CATEGORY_ORDER, itemCategoryLabel } from "@/lib/items";
 
 const ZERO_CURRENCY: Currency = { cp: 0, sp: 0, gp: 0, pp: 0 };
-
-// Default sale price of a stack — catalog cost × quantity, per denomination (keeps the item's own denominations, no platinum roll-up).
-function stackValue(cost: Currency | undefined, quantity: number): Currency {
-  const c = cost ?? ZERO_CURRENCY;
-  return { cp: c.cp * quantity, sp: c.sp * quantity, gp: c.gp * quantity, pp: c.pp * quantity };
-}
 
 interface InventoryListProps {
   character: Character;
@@ -138,6 +133,7 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
   const [filter, setFilter] = useState<FilterKey>("all");
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [configuringSell, setConfiguringSell] = useState(false);
 
   useEffect(() => {
     fetchItems()
@@ -193,6 +189,7 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
   function exitSelectMode() {
     setSelectMode(false);
     setSelectedIds(new Set());
+    setConfiguringSell(false);
   }
 
   async function applyOps(operations: InventoryOperation[]): Promise<boolean> {
@@ -216,12 +213,8 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
     await applyOps(operations);
   }
 
-  async function sellSelected() {
-    if (selectedItems.length === 0) return;
-    const lines = selectedItems.map((item) => ({ inventoryItemId: item.id, quantity: item.quantity }));
-    const prices = Object.fromEntries(
-      selectedItems.map((item) => [item.id, stackValue(item.cost, item.quantity)])
-    );
+  async function confirmSell(lines: SellLine[], prices: Record<string, Currency>) {
+    if (lines.length === 0) return;
     const ok = await applyOps(buildSellOperations(lines, { mode: "perItem", prices }));
     if (ok) exitSelectMode();
   }
@@ -231,26 +224,32 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
       title="Inventory"
       titleAccessory={
         selectMode ? (
-          <div className="flex items-center gap-3 text-xs">
-            <span className="text-parchment-600">
-              {selectedIds.size} selected · ~{selectedGp} gp
+          configuringSell ? (
+            <span className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
+              Review sale
             </span>
-            <button
-              type="button"
-              disabled={pending || selectedIds.size === 0}
-              onClick={sellSelected}
-              className="font-semibold text-garnet-700 hover:underline disabled:opacity-40"
-            >
-              Sell
-            </button>
-            <button
-              type="button"
-              onClick={exitSelectMode}
-              className="font-semibold text-parchment-600 hover:underline"
-            >
-              Cancel
-            </button>
-          </div>
+          ) : (
+            <div className="flex items-center gap-3 text-xs">
+              <span className="text-parchment-600">
+                {selectedIds.size} selected · ~{selectedGp} gp
+              </span>
+              <button
+                type="button"
+                disabled={pending || selectedIds.size === 0}
+                onClick={() => setConfiguringSell(true)}
+                className="font-semibold text-garnet-700 hover:underline disabled:opacity-40"
+              >
+                Sell
+              </button>
+              <button
+                type="button"
+                onClick={exitSelectMode}
+                className="font-semibold text-parchment-600 hover:underline"
+              >
+                Cancel
+              </button>
+            </div>
+          )
         ) : (
           <div className="flex items-center gap-2">
             {hasItems && (
@@ -307,7 +306,7 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
           </div>
         )}
 
-        {hasItems && (
+        {hasItems && !configuringSell && (
           <div className="flex flex-col gap-2">
             <div className="relative">
               <Search
@@ -356,7 +355,14 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
           <p className="text-xs font-semibold text-garnet-700">{error}</p>
         )}
 
-        {!hasItems ? (
+        {configuringSell ? (
+          <SellPanel
+            items={selectedItems}
+            pending={pending}
+            onConfirm={confirmSell}
+            onCancel={() => setConfiguringSell(false)}
+          />
+        ) : !hasItems ? (
           <EmptyState
             icon={<GiKnapsack />}
             title="Your pack is empty"
