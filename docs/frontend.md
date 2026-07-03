@@ -7,26 +7,31 @@ Source of truth: `ls frontend/src/features` — regenerate if stale.
 ```
 frontend/src/
 ├── components/
-│   └── ui/              # domain-agnostic primitives (Card, Badge, MeterBar, Modal, Tabs, OverflowMenu, DropdownMenu, Avatar, ErrorBoundary, EmptyState, Spinner)
+│   └── ui/              # domain-agnostic primitives (Card, Badge, MeterBar, Modal, Tabs, OverflowMenu, DropdownMenu, Popover, Avatar, ErrorBoundary, EmptyState, Spinner)
 ├── features/
 │   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable, ProficienciesCard, AbilityScoresPanel
 │   ├── advancement/     # AdvancementSection, AdvancementPanel (shell) → AsiFlow, FeatFlow,
 │   │                    #   CustomFeatForm; hooks useAsiDraft/useFeatCatalog/useCustomFeatDraft; featView reducer
 │   ├── auth/            # AuthProvider (useAuth), AuthGate, AppHeader, AccountMenu
-│   ├── campaign/        # CampaignsPage (list+create+join), CampaignDetailPage (mgmt hub:
-│   │                    #   invite link, roster, add-character dropdown), CampaignInviteLink,
+│   ├── campaign/        # CampaignsPage (list+create+join), CampaignDetailPage (mgmt hub with
+│   │                    #   routed Overview/Codex tabs #367), CampaignOverviewPanel (invite link,
+│   │                    #   roster, add-character dropdown), CampaignInviteLink,
 │   │                    #   CampaignIndicator (sheet badge/link), JoinCampaignRoute (#246)
 │   ├── character-create/ # IdentitySection, AbilityScoresSection, SkillSection,
 │   │                    #   ToolProficiencySection + useToolProficiencyChoices (CharacterCreatePage sections)
 │   ├── character-meta/  # CharacterCard, VitalsStrip, JournalSection, JournalEntryPanel,
 │   │                    #   ActivityModal, DeleteCharacterModal, BackendStatus,
 │   │                    #   CharacterSheet{Header,Body,Modals}, CharacterLoadError (sheet-page sections)
+│   │                    #   VitalsStrip's AC tile is read-only: a Popover disclosing the
+│   │                    #   server-derived armorClassBreakdown verbatim (no client AC math)
 │   ├── class/           # ClassFeaturesSection, FightingStylePanel, AddManeuverPanel,
 │   │                    #   ManeuverRow, ResourcePoolRow
 │   ├── conditions/      # ConditionsStrip, AddConditionPanel
 │   ├── dice/            # DiceRoller, PhysicsDiceRoller, DiceScene, DieMesh, DiceRollSequence,
 │   │                    #   RollButton, RollContext, RollResultToast,
 │   │                    #   diceRollerTypes.ts, useDieFaceData.ts
+│   ├── entities/        # CampaignCodex (Codex tab: browse/search/filter/create #367),
+│   │                    #   EntityDetailPage (detail/edit/delete + backlinks) (#248)
 │   ├── experience/      # ExperienceTracker
 │   ├── hitpoints/       # HitPointTracker orchestrator (inline Card; hosts LevelUpModal + ConcentrationSaveModal)
 │   │                    #   Sub-components: HpActionControl, HpMeter, RestControls,
@@ -190,6 +195,7 @@ These eleven live in `src/components/ui/` and are intentionally domain-agnostic 
 | `Tabs` | Controlled segmented-control tab switcher (WAI-ARIA tablist, arrow-key nav, optional per-tab `badge`). Renders only the switcher; the caller renders the active panel below it. Props: `tabs`, `active`, `onChange`. |
 | `OverflowMenu` | Icon-only kebab (`MoreVertical`) menu-button (WAI-ARIA menu-button: `aria-haspopup`, roving tabindex, Arrow/Home/End/Esc nav, click-outside to close, focus returns to trigger). No portal — `relative`-anchored popup. Per-item `danger?` (garnet) / `separatorBefore?` (divider). Props: `items`, `label?` (trigger accessible name, default "More actions"), `className?`. |
 | `DropdownMenu` | Owned-trigger popup menu for **arbitrary** content (vs `OverflowMenu`'s fixed item array). Owns the `<button>` and takes the trigger as `trigger` content; `children` is a render-prop `(close) => ReactNode`. Keyboard nav (Arrow/Home/End + roving tabindex) is driven by a **live** `[role^="menuitem"]` DOM query (covers `menuitemradio`/`menuitemcheckbox`), so presentational rows carry no role and are skipped for free. `aria-haspopup`/`aria-expanded`, ArrowDown/Enter/Space opens, Esc + click-outside close, focus returns to trigger. No portal — `relative`-anchored. Props: `trigger`, `label` (trigger accessible name), `children`, `align?` (`right`\|`left`, default `right`), `className?`. |
+| `Popover` | Owned-trigger **disclosure** popover for read-only detail panels (vs `DropdownMenu`'s menu semantics — no menuitems, no roving focus). Trigger gets `aria-haspopup="dialog"`/`aria-expanded`; panel is `role="dialog"` (focused on open), Esc closes and refocuses the trigger, click-outside and re-click close. No portal — `relative`-anchored. Props: `trigger`, `label` (trigger + dialog accessible name), `children`, `align?` (`left`\|`right`, default `left`), `className?`, `triggerClassName?` (style the owned button, e.g. as a stat tile). |
 | `Avatar` | Circular identity badge. Renders `<img alt="">` when `imageUrl` is set, else initials (up to two from `name`, then the `email` initial, then `?`). Decorative — the accessible label lives on the trigger. Props: `name`, `email`, `imageUrl` (all primitive, nullable), `className?` (default `h-8 w-8`). |
 | `ErrorBoundary` | Class error boundary wrapping the route tree in `App.tsx`. Catches render-time crashes and shows a parchment "something went wrong" fallback (Reload / Back to characters) instead of a blank page. Optional `fallback?: (error, reset) => ReactNode` for custom recovery UI. |
 | `EmptyState` | Warm zero-state: decorative hero icon (pass a game-icon from `icons.ts`) + `font-display` title + optional `description` and `action` CTA. Prop `size`: `md` (card-body, default) / `sm` (in-card strip). Used for empty journal / inventory / spellbook / conditions. |
@@ -328,9 +334,12 @@ The shared campaign wiki surface. Three pieces, all scoped to `character.campaig
 - **`features/journal/MentionAutocomplete.tsx`** — a **contenteditable** wrapper that drives the `@…` autocomplete and renders each stored `@[<uuid>]` token as an atomic `@Name` chip while editing (#248/#269). Public contract is unchanged: `value` (raw `@[<uuid>]` body) in, `onChange(rawBody)` out — the DOM is serialized back to tokens on every input via `lib/mentions.serializeMentionDom`, so hosts and entity backlinks are unaffected. Selecting a match or running "➕ Create <Type> …" inserts a chip; Backspace/Delete next to a chip removes it atomically. It intercepts Up/Down/Enter/Esc *only while the popover is open* (Enter selects a match instead of submitting; Esc `stopPropagation`s so it closes the popover, not the palette), and falls through to the composer's own `onKeyDown` otherwise. No `campaignId` → a "create or join a campaign" CTA instead of matches. Wired into `CapturePalette` (NOTE) and `JournalEntryPanel` (NOTE body).
 - **`features/journal/MentionText.tsx`** — renders a stored body with `parseMentionBody`: text verbatim, each known `@[<uuid>]` as a Badge-styled chip linking to the entity detail page (name resolved AT RENDER, so a rename reflects instantly); unknown id → literal token text. Replaces the raw `{body}` renders in `CapturePalette`, `JournalSection`, and the `SessionSummaryModal` recap journal list.
 - **`hooks/useCampaignEntities.ts`** — fetches + module-level-caches the campaign entity list once, exposing an id→entity map for chip resolution.
-- **`features/entities/EntityDetailPage.tsx`** (route `/campaigns/:id/entities/:entityId`) — name/type/aliases/notes with inline edit (any member) and OWNER-only delete (gated on the campaign `role` from `fetchCampaign`), plus a backlinks list (`fetchEntityBacklinks`) grouped by session.
+- **`features/entities/EntityDetailPage.tsx`** (route `/campaigns/:id/entities/:entityId`) — name/type/aliases/notes with inline edit (any member) and OWNER-only delete (gated on the campaign `role` from `fetchCampaign`), plus a backlinks list (`fetchEntityBacklinks`) grouped by session. Its "back" link returns to the Codex tab.
+- **`features/entities/CampaignCodex.tsx`** (the hub's Codex tab, #367) — the entity registry's browsable front door: client-side search (`matchEntities` name+alias, normalization matching the `@`-autocomplete) composed with type-filter chips over the `useCampaignEntities` cache, rows sorted by name linking to `EntityDetailPage`, and an inline expand-in-place "➕ New entity" panel (type/name/aliases/notes) that calls `createEntity` then `primeCampaignEntities` so the list, tab badge, and live journal chips update without a reload. Browse/search/filter/create only — edit and delete stay on `EntityDetailPage`.
 
 Type display/tone resolve through `lib/mentions` (`ENTITY_TYPE_LABELS` / `ENTITY_TYPE_OPTIONS` / `ENTITY_TYPE_TONE`) — never capitalize the raw enum key.
+
+`CampaignDetailPage` hosts both tabs as **routed** `Tabs` (#367): `/campaigns/:id` = Overview (`features/campaign/CampaignOverviewPanel.tsx` — invite/add-character/roster), `/campaigns/:id/codex` = Codex. The active tab derives from the URL (`useMatch`) and tab clicks `navigate` (push, not replace), so deep-links, refresh, and browser back/forward all work.
 
 ## Campaign sessions — `features/session/`
 
