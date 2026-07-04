@@ -288,6 +288,9 @@ export function computeSessionSummary(
         damageRolls += 1;
         break;
 
+      // checkRoll / saveRoll / initiativeRoll are logged (roll category) but not
+      // yet surfaced in session-summary stats — intentional scope limit (#128).
+
       case "abilityScoreImprovement":
       case "featTaken": {
         const data = asRecord(event.data);

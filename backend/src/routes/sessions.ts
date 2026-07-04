@@ -337,8 +337,9 @@ sessionsRouter.post("/characters/:id/sessions/:sessionId/roll", async (req, res)
     res.status(400).json({ error: "source must be a non-empty string" });
     return;
   }
-  if (typeof total !== "number") {
-    res.status(400).json({ error: "total must be a number" });
+  const trimmedSource = source.trim();
+  if (typeof total !== "number" || !Number.isFinite(total)) {
+    res.status(400).json({ error: "total must be a finite number" });
     return;
   }
   if (
@@ -362,7 +363,7 @@ sessionsRouter.post("/characters/:id/sessions/:sessionId/roll", async (req, res)
   try {
     await logRollEvent(req.params.id, req.params.sessionId, {
       kind: kind as RollKind,
-      source,
+      source: trimmedSource,
       total,
       specLabel: typeof specLabel === "string" ? specLabel : undefined,
       damageType: typeof damageType === "string" ? damageType : undefined,
