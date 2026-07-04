@@ -9,21 +9,27 @@
 
 import { useState } from "react";
 
-import { applyClassTransactions, applyResourceTransactions } from "@/api/client";
+import { applyClassTransactions, applyDisciplineTransactions, applyResourceTransactions } from "@/api/client";
 import type {
   AddClassOperation,
+  CastDisciplineOperation,
   Character,
   ClassEntry,
   ClassOperation,
   ClassOption,
+  DisciplineOperation,
   FightingStyleKey,
+  ForgetDisciplineOperation,
+  LearnDisciplineOperation,
   LearnManeuverOperation,
   ResourceOperation,
+  SwapDisciplineOperation,
 } from "@/types/character";
 import { fightingStyleLabel, FIGHTING_STYLE_DESCRIPTIONS } from "@/lib/fightingStyles";
 import { isMulticlass } from "@/lib/multiclass";
 import AddClassPanel from "@/features/class/AddClassPanel";
 import AddManeuverPanel from "@/features/class/AddManeuverPanel";
+import DisciplinesSection from "@/features/class/DisciplinesSection";
 import FightingStylePanel from "@/features/class/FightingStylePanel";
 import ManeuverRow from "@/features/class/ManeuverRow";
 import ResourcePoolRow from "@/features/class/ResourcePoolRow";
@@ -77,6 +83,19 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
     }
   }
 
+  async function sendDiscipline(ops: DisciplineOperation[]) {
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await applyDisciplineTransactions(character.id, ops);
+      onUpdate(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function sendClass(ops: ClassOperation[]) {
     setBusy(true);
     setError(null);
@@ -112,6 +131,24 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
     sendResource([{ type: "forgetManeuver", entryId }]);
   }
 
+  // ── Discipline handlers ───────────────────────────────────────────────────────
+
+  function handleCastDiscipline(op: CastDisciplineOperation) {
+    sendDiscipline([op]);
+  }
+
+  function handleLearnDiscipline(op: LearnDisciplineOperation) {
+    sendResource([op]);
+  }
+
+  function handleForgetDiscipline(op: ForgetDisciplineOperation) {
+    sendResource([op]);
+  }
+
+  function handleSwapDiscipline(op: SwapDisciplineOperation) {
+    sendResource([op]);
+  }
+
   // ── Fighting style handler ─────────────────────────────────────────────────────
 
   function handleChooseFightingStyle(key: FightingStyleKey) {
@@ -128,6 +165,7 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
 
   const hasPools = resources && resources.pools.length > 0;
   const hasManeuvers = resources?.maneuverChoiceCount !== undefined;
+  const hasDisciplines = resources?.disciplineChoiceCount !== undefined;
   const hasFeatures = resources && resources.features.length > 0;
   const hasFightingStyle = (resources?.fightingStyleChoiceCount ?? 0) > 0;
   const fightingStyle = resources?.fightingStyle ?? null;
@@ -284,6 +322,21 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
         </div>
       )}
 
+      {/* ── Elemental Disciplines (Way of the Four Elements) ── */}
+      {hasDisciplines && (
+        <DisciplinesSection
+          character={character}
+          choiceCount={resources!.disciplineChoiceCount!}
+          saveDC={resources!.disciplineSaveDC}
+          disciplinesKnown={resources!.disciplinesKnown ?? []}
+          busy={busy}
+          onCast={handleCastDiscipline}
+          onLearn={handleLearnDiscipline}
+          onForget={handleForgetDiscipline}
+          onSwap={handleSwapDiscipline}
+        />
+      )}
+
       {/* ── Fighting Style (selectable L1 Fighter feature) ── */}
       {hasFightingStyle && (
         <div>
@@ -344,7 +397,7 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
       )}
 
       {/* Empty state — no class resource data at all */}
-      {!hasPools && !hasManeuvers && !hasFeatures && !hasFightingStyle && !character.subclass && !needsSubclass && (
+      {!hasPools && !hasManeuvers && !hasDisciplines && !hasFeatures && !hasFightingStyle && !character.subclass && !needsSubclass && (
         <p className="py-4 text-center text-sm text-parchment-600">
           No class features available at this level.
         </p>

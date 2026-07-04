@@ -511,6 +511,14 @@ export interface CatalogManeuver {
   description: string;
 }
 
+/** A known elemental discipline entry on a character (Way of the Four Elements). */
+export interface DisciplineEntry {
+  id: string;
+  disciplineId?: string;  // catalog Discipline.id provenance — undefined for custom
+  name: string;
+  description: string;
+}
+
 /**
  * A derived attack row — unarmed strike or improvised weapon — computed
  * server-side and surfaced on the character so `AttacksPanel` can render them
@@ -647,10 +655,16 @@ export interface CharacterResources {
   features: ClassFeature[];
   maneuverChoiceCount?: number;
   maneuverSaveDC?: number;
+  /** Way of the Four Elements: elemental disciplines known at this level. */
+  disciplineChoiceCount?: number;
+  /** Way of the Four Elements: ki save DC for discipline effects (8 + prof + Wis mod). */
+  disciplineSaveDC?: number;
   /** Number of artisan's-tool proficiency choices from a subclass feature. */
   toolProfChoiceCount?: number;
   pools: ResourcePool[];
   maneuversKnown: ManeuverEntry[];
+  /** Level-gated elemental disciplines learned (Way of the Four Elements). */
+  disciplinesKnown: DisciplineEntry[];
   /** Level-gated tool proficiency choices (e.g. Student of War). */
   toolProficienciesKnown: ToolProfEntry[];
   /** Number of Fighting Style choices the character is entitled to (Fighter L1 -> 1). */
@@ -1145,6 +1159,12 @@ export interface SpendResourceOperation { type: "spendResource"; key: string; am
 export interface RestoreResourceOperation { type: "restoreResource"; key: string; amount?: number }
 export interface LearnManeuverOperation { type: "learnManeuver"; maneuverId?: string; custom?: { name: string; description: string } }
 export interface ForgetManeuverOperation { type: "forgetManeuver"; entryId: string }
+/** Learn an elemental discipline from catalog (Way of the Four Elements). */
+export interface LearnDisciplineOperation { type: "learnDiscipline"; disciplineId?: string; custom?: { name: string; description: string; minLevel?: number } }
+/** Forget a known elemental discipline by its per-character entry id. */
+export interface ForgetDisciplineOperation { type: "forgetDiscipline"; entryId: string }
+/** Retrain one known discipline for another within the cap. */
+export interface SwapDisciplineOperation { type: "swapDiscipline"; entryId: string; disciplineId?: string; custom?: { name: string; description: string; minLevel?: number } }
 /** Choose an artisan's-tool proficiency from the Student of War feature. */
 export interface LearnToolProficiencyOperation { type: "learnToolProficiency"; name: string }
 /** Undo a subclass-granted tool proficiency choice. */
@@ -1154,6 +1174,9 @@ export type ResourceOperation =
   | RestoreResourceOperation
   | LearnManeuverOperation
   | ForgetManeuverOperation
+  | LearnDisciplineOperation
+  | ForgetDisciplineOperation
+  | SwapDisciplineOperation
   | LearnToolProficiencyOperation
   | ForgetToolProficiencyOperation;
 

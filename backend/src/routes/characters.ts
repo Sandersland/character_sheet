@@ -484,6 +484,7 @@ function buildResourcesView(
       maneuverSaveDC: derivedRes.maneuverSaveDC,
       toolProfChoiceCount: derivedRes.toolProfChoiceCount,
       disciplineChoiceCount: derivedRes.disciplineChoiceCount,
+      disciplineSaveDC: derivedRes.disciplineSaveDC,
       pools: derivedRes.resources.map((pool) => ({
         key: pool.key,
         label: pool.label,
