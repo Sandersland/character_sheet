@@ -26,7 +26,8 @@ frontend/src/
 │   │                    #   server-derived armorClassBreakdown verbatim (no client AC math)
 │   ├── class/           # ClassFeaturesSection, FightingStylePanel, AddManeuverPanel,
 │   │                    #   ManeuverRow, ResourcePoolRow, DisciplinesSection,
-│   │                    #   DisciplineRow, AddDisciplinePanel (Four Elements monk)
+│   │                    #   DisciplineRow, AddDisciplinePanel (Four Elements monk),
+│   │                    #   ShadowArtsSection, ShadowArtRow (Way of Shadow ki-cast)
 │   ├── conditions/      # ConditionsStrip, AddConditionPanel
 │   ├── dice/            # DiceRoller, PhysicsDiceRoller, DiceScene, DieMesh, DiceRollSequence,
 │   │                    #   RollButton, RollContext, RollResultToast,

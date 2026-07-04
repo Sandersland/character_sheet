@@ -50,6 +50,7 @@ import { reverseAdvancementEffects } from "../lib/advancement.js";
 import { normalizeSpellcastingMutable } from "../lib/spellcasting.js";
 import type { SpellEntry } from "../lib/spell-state.js";
 import { deriveGrantedSpells } from "../lib/granted-spells.js";
+import { SHADOW_ART_CONCENTRATION_PREFIX } from "../lib/shadow-arts.js";
 import { assertCharacterAccess } from "../lib/auth/access.js";
 
 export const charactersRouter = Router();
@@ -323,6 +324,23 @@ function collectGrantedSpells(entries: CharacterWithRelations["classEntries"]): 
   return entries.flatMap((e) => deriveGrantedSpells(e.name, e.subclass ?? undefined, e.level));
 }
 
+// Clamp-on-read for concentration: surface the stored entry when it's a current
+// spellbook spell OR a Shadow Art (its entryId carries the shadow-art: prefix, a
+// disjoint id space); drop stale entries (e.g. a forgotten spellbook spell).
+function resolveConcentration(
+  concentratingOn: { entryId: string; spellName: string } | null,
+  spells: { id: string }[],
+): { entryId: string; spellName: string } | null {
+  if (!concentratingOn) return null;
+  if (
+    concentratingOn.entryId.startsWith(SHADOW_ART_CONCENTRATION_PREFIX) ||
+    spells.some((s) => s.id === concentratingOn.entryId)
+  ) {
+    return concentratingOn;
+  }
+  return null;
+}
+
 // Spellcasting clamp-on-read: derive stats (ability/DC/attack/slot totals) from
 // class+level+scores, then layer the stored mutable state (slotsUsed, spells,
 // concentration) clamped to the derived caps. Same derive-don't-persist pattern
@@ -379,13 +397,9 @@ function buildSpellcastingView(
         used: Math.min(total, stored.arcanumUsed[String(arcanumLevel)] ?? 0),
       })),
       spells,
-      // Active concentration spell, or null. Clamp-on-read: if the concentrated
-      // entry is no longer in the spellbook, treat it as not concentrating.
-      concentratingOn:
-        stored.concentratingOn &&
-        spells.some((s) => s.id === stored.concentratingOn!.entryId)
-          ? stored.concentratingOn
-          : null,
+      // Active concentration spell, or null. Clamp-on-read drops a stale entry
+      // (spellbook spell forgotten / Shadow Arts no longer available).
+      concentratingOn: resolveConcentration(stored.concentratingOn, spells),
     };
   }
   // Non-caster class that nonetheless gets a subclass-granted spell (e.g. a Way
@@ -394,14 +408,17 @@ function buildSpellcastingView(
   if (granted.length > 0) {
     const stored = normalizeSpellcastingMutable(row.spellcasting);
     const wisMod = abilityModifier(abilityScores.wisdom ?? 10);
+    const grantedSpells = mergeGrantedSpells(stored.spells, granted);
     return {
       ability: "wisdom",
       spellSaveDC: 8 + proficiencyBonus + wisMod,
       spellAttackBonus: proficiencyBonus + wisMod,
       slots: [],
       arcana: [],
-      spells: mergeGrantedSpells(stored.spells, granted),
-      concentratingOn: null,
+      spells: grantedSpells,
+      // A cast concentration Shadow Art (catalog-id entry) surfaces here so the
+      // ShadowArtsSection handoff banner + concentrating badge can render.
+      concentratingOn: resolveConcentration(stored.concentratingOn, grantedSpells),
     };
   }
   if (
@@ -443,14 +460,15 @@ function buildMulticlassSpellcastingView(
   if (multi.classes.length === 0) {
     if (granted.length === 0) return undefined;
     const wisMod = abilityModifier(abilityScores.wisdom ?? 10);
+    const grantedSpells = mergeGrantedSpells(stored.spells, granted);
     return {
       ability: "wisdom",
       spellSaveDC: 8 + proficiencyBonus + wisMod,
       spellAttackBonus: proficiencyBonus + wisMod,
       slots: [],
       arcana: [],
-      spells: mergeGrantedSpells(stored.spells, granted),
-      concentratingOn: null,
+      spells: grantedSpells,
+      concentratingOn: resolveConcentration(stored.concentratingOn, grantedSpells),
     };
   }
 
@@ -484,11 +502,7 @@ function buildMulticlassSpellcastingView(
     // Per-class caster stats (ability/DC/attack) for display in a multiclass sheet.
     classes: multi.classes,
     spells: mergedSpells,
-    concentratingOn:
-      stored.concentratingOn &&
-      mergedSpells.some((s) => s.id === stored.concentratingOn!.entryId)
-        ? stored.concentratingOn
-        : null,
+    concentratingOn: resolveConcentration(stored.concentratingOn, mergedSpells),
   };
 }
 
@@ -545,6 +559,7 @@ function buildResourcesView(
       toolProfChoiceCount: derivedRes.toolProfChoiceCount,
       disciplineChoiceCount: derivedRes.disciplineChoiceCount,
       disciplineSaveDC: derivedRes.disciplineSaveDC,
+      shadowArtsAvailable: derivedRes.shadowArtsAvailable,
       pools: derivedRes.resources.map((pool) => ({
         key: pool.key,
         label: pool.label,

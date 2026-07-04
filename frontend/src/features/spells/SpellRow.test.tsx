@@ -147,6 +147,39 @@ describe("SpellRow", () => {
     });
   });
 
+  describe("subclass-granted spell", () => {
+    const grantedCantrip: Spell = {
+      ...mockCantrip,
+      id: "granted:way-of-shadow:minor-illusion",
+      name: "Minor Illusion",
+      source: "subclass",
+    };
+
+    it("shows a 'subclass' badge", () => {
+      render(<ul><SpellRow {...defaultProps(grantedCantrip, { availableSlots: [] })} /></ul>);
+      expect(screen.getByText("subclass")).toBeInTheDocument();
+    });
+
+    it("hides the Remove ✕ button", () => {
+      render(<ul><SpellRow {...defaultProps(grantedCantrip, { availableSlots: [] })} /></ul>);
+      expect(screen.queryByRole("button", { name: /Remove Minor Illusion/ })).not.toBeInTheDocument();
+    });
+
+    it("keeps Cast working", async () => {
+      const user = userEvent.setup();
+      const onCast = vi.fn();
+      render(<ul><SpellRow {...defaultProps(grantedCantrip, { onCast, availableSlots: [] })} /></ul>);
+      await user.click(screen.getByRole("button", { name: "Cast" }));
+      expect(onCast).toHaveBeenCalledWith(grantedCantrip);
+    });
+
+    it("still shows the Remove ✕ for a normal (non-granted) spell", () => {
+      render(<ul><SpellRow {...defaultProps(mockSpell)} /></ul>);
+      expect(screen.getByRole("button", { name: /Remove Fireball/ })).toBeInTheDocument();
+      expect(screen.queryByText("subclass")).not.toBeInTheDocument();
+    });
+  });
+
   describe("upcast slot picker", () => {
     it("opens a slot button for each available level when multiple slots exist", async () => {
       const user = userEvent.setup();

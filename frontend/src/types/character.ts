@@ -382,6 +382,8 @@ export interface SpellComponents {
 export interface Spell {
   id: string;
   spellId?: string;   // catalog Spell.id provenance — undefined for custom spells
+  /** Provenance; "subclass" marks a derived, non-persisted grant (no Remove ✕). */
+  source?: "subclass";
   name: string;
   level: number; // 0 = cantrip
   school: SpellSchool;
@@ -450,6 +452,16 @@ export interface CatalogDiscipline {
   minLevel: number;
   alwaysKnown: boolean;
   saveAbility?: string | null;
+  cost: AbilityCost;
+  effect: EffectSpec;
+}
+
+/** A Way of Shadow Shadow Art from GET /api/shadow-arts (flat 2-ki ki-cast spell). */
+export interface CatalogShadowArt {
+  id: string;
+  name: string;
+  description: string;
+  minLevel: number;
   cost: AbilityCost;
   effect: EffectSpec;
 }
@@ -663,6 +675,8 @@ export interface CharacterResources {
   disciplineChoiceCount?: number;
   /** Way of the Four Elements: ki save DC for discipline effects (8 + prof + Wis mod). */
   disciplineSaveDC?: number;
+  /** Way of Shadow: whether the L3+ Shadow Arts ki-cast spells are available. */
+  shadowArtsAvailable?: boolean;
   /** Number of artisan's-tool proficiency choices from a subclass feature. */
   toolProfChoiceCount?: number;
   pools: ResourcePool[];
@@ -1201,6 +1215,17 @@ export interface CastDisciplineOperation {
   roll: number;
 }
 export type DisciplineOperation = CastDisciplineOperation;
+
+// ── Shadow Arts operation types (mirrors backend/src/lib/shadow-arts.ts) ──────
+// Sent as `{ operations: ShadowArtOperation[] }` to
+// POST /api/characters/:id/shadow-arts/transactions.
+
+/** Cast a Shadow Art (Way of Shadow): spend a flat 2 ki, apply concentration/buff. */
+export interface CastShadowArtOperation {
+  type: "castShadowArt";
+  shadowArtId: string;
+}
+export type ShadowArtOperation = CastShadowArtOperation;
 
 // ── Conditions state + operation types (mirrors backend/src/lib/conditions.ts)
 // Sent as `{ operations: ConditionOperation[] }` to

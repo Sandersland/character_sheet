@@ -9,10 +9,11 @@
 
 import { useState } from "react";
 
-import { applyClassTransactions, applyDisciplineTransactions, applyResourceTransactions } from "@/api/client";
+import { applyClassTransactions, applyDisciplineTransactions, applyResourceTransactions, applyShadowArtsTransactions } from "@/api/client";
 import type {
   AddClassOperation,
   CastDisciplineOperation,
+  CastShadowArtOperation,
   Character,
   ClassEntry,
   ClassOperation,
@@ -23,6 +24,7 @@ import type {
   LearnDisciplineOperation,
   LearnManeuverOperation,
   ResourceOperation,
+  ShadowArtOperation,
   SwapDisciplineOperation,
 } from "@/types/character";
 import { fightingStyleLabel, FIGHTING_STYLE_DESCRIPTIONS } from "@/lib/fightingStyles";
@@ -30,6 +32,7 @@ import { isMulticlass } from "@/lib/multiclass";
 import AddClassPanel from "@/features/class/AddClassPanel";
 import AddManeuverPanel from "@/features/class/AddManeuverPanel";
 import DisciplinesSection from "@/features/class/DisciplinesSection";
+import ShadowArtsSection from "@/features/class/ShadowArtsSection";
 import FightingStylePanel from "@/features/class/FightingStylePanel";
 import ManeuverRow from "@/features/class/ManeuverRow";
 import ResourcePoolRow from "@/features/class/ResourcePoolRow";
@@ -96,6 +99,19 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
     }
   }
 
+  async function sendShadowArt(ops: ShadowArtOperation[]) {
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await applyShadowArtsTransactions(character.id, ops);
+      onUpdate(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function sendClass(ops: ClassOperation[]) {
     setBusy(true);
     setError(null);
@@ -149,6 +165,12 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
     sendResource([op]);
   }
 
+  // ── Shadow Arts handler (Way of Shadow) ────────────────────────────────────────
+
+  function handleCastShadowArt(op: CastShadowArtOperation) {
+    sendShadowArt([op]);
+  }
+
   // ── Fighting style handler ─────────────────────────────────────────────────────
 
   function handleChooseFightingStyle(key: FightingStyleKey) {
@@ -166,6 +188,7 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
   const hasPools = resources && resources.pools.length > 0;
   const hasManeuvers = resources?.maneuverChoiceCount !== undefined;
   const hasDisciplines = resources?.disciplineChoiceCount !== undefined;
+  const hasShadowArts = resources?.shadowArtsAvailable === true;
   const hasFeatures = resources && resources.features.length > 0;
   const hasFightingStyle = (resources?.fightingStyleChoiceCount ?? 0) > 0;
   const fightingStyle = resources?.fightingStyle ?? null;
@@ -337,6 +360,15 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
         />
       )}
 
+      {/* ── Shadow Arts (Way of Shadow) ── */}
+      {hasShadowArts && (
+        <ShadowArtsSection
+          character={character}
+          busy={busy}
+          onCast={handleCastShadowArt}
+        />
+      )}
+
       {/* ── Fighting Style (selectable L1 Fighter feature) ── */}
       {hasFightingStyle && (
         <div>
@@ -397,7 +429,7 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
       )}
 
       {/* Empty state — no class resource data at all */}
-      {!hasPools && !hasManeuvers && !hasDisciplines && !hasFeatures && !hasFightingStyle && !character.subclass && !needsSubclass && (
+      {!hasPools && !hasManeuvers && !hasDisciplines && !hasShadowArts && !hasFeatures && !hasFightingStyle && !character.subclass && !needsSubclass && (
         <p className="py-4 text-center text-sm text-parchment-600">
           No class features available at this level.
         </p>

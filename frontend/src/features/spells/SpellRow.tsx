@@ -45,6 +45,8 @@ export default function SpellRow({
   const [slotPickerOpen, setSlotPickerOpen] = useState(false);
 
   const isCantrip = spell.level === 0;
+  // Subclass-granted spells are derived, not persisted — they can't be removed.
+  const isGranted = spell.source === "subclass";
   const schoolTone = SCHOOL_TONE[spell.school as keyof typeof SCHOOL_TONE] ?? "neutral";
 
   // Castability: leveled spells with no remaining slots are shown but dimmed.
@@ -93,6 +95,7 @@ export default function SpellRow({
                   <Badge tone="arcane">conc</Badge>
                 ))}
               {spell.ritual && <Badge tone="gold">ritual</Badge>}
+              {isGranted && <Badge tone="arcane">subclass</Badge>}
               {noBudget && <Badge tone="neutral">no slots</Badge>}
             </div>
           </div>
@@ -134,17 +137,19 @@ export default function SpellRow({
             Cast
           </button>
 
-          {/* Remove button */}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onForget(spell)}
-            className="text-parchment-600 hover:text-garnet-600 disabled:opacity-40"
-            title={`Remove ${spell.name} from spellbook`}
-            aria-label={`Remove ${spell.name}`}
-          >
-            ✕
-          </button>
+          {/* Remove button — hidden for subclass grants (derived, non-removable) */}
+          {!isGranted && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onForget(spell)}
+              className="text-parchment-600 hover:text-garnet-600 disabled:opacity-40"
+              title={`Remove ${spell.name} from spellbook`}
+              aria-label={`Remove ${spell.name}`}
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 
