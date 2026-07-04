@@ -1775,6 +1775,7 @@ async function main() {
   for (const discipline of DISCIPLINES) {
     const data = {
       name: discipline.name,
+      source: "discipline",
       description: discipline.description,
       minLevel: discipline.minLevel,
       alwaysKnown: discipline.alwaysKnown ?? false,
@@ -1790,7 +1791,7 @@ async function main() {
       attackType: discipline.attackType ?? null,
       saveEffect: discipline.saveEffect ?? null,
     };
-    await prisma.discipline.upsert({
+    await prisma.grantedAbility.upsert({
       where: { name: discipline.name },
       create: data,
       update: data,
