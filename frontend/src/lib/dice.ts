@@ -7,6 +7,9 @@
  * per-die detail instead of just a final sum.
  */
 
+/** Roll mode for d20 checks/saves/attacks/initiative. */
+export type RollMode = "normal" | "advantage" | "disadvantage";
+
 /** A single die roll spec: e.g. `{ count: 4, faces: 6, dropLowest: 1 }` is "4d6 drop lowest". */
 export interface RollSpec {
   /** How many dice to roll. */
@@ -17,6 +20,8 @@ export interface RollSpec {
   modifier?: number;
   /** How many of the lowest-rolled dice to exclude from the total (e.g. 1 for 4d6-drop-lowest). */
   dropLowest?: number;
+  /** Advantage/disadvantage — honored only for a single d20 (see `usesAdvantage`). */
+  mode?: RollMode;
 }
 
 /** One rolled die, in original roll order, flagged if it was dropped from the total. */
@@ -41,6 +46,19 @@ export function rollDie(faces: number): number {
 }
 
 /**
+ * Whether a spec's advantage/disadvantage mode actually applies. Guard:
+ * only a single d20 (checks, saves, attacks, initiative) — multi-die damage
+ * specs and non-d20 dice ignore `mode` and roll normally.
+ */
+export function usesAdvantage(spec: RollSpec): boolean {
+  return (
+    (spec.mode === "advantage" || spec.mode === "disadvantage") &&
+    spec.faces === 20 &&
+    spec.count === 1
+  );
+}
+
+/**
  * Turns already-rolled face values into a full `RollResult`: flags the
  * lowest `spec.dropLowest` values as dropped (without disturbing roll
  * order, so the UI can animate dice in the order they were rolled while
@@ -52,10 +70,22 @@ export function rollDie(faces: number): number {
 export function summarizeRoll(values: number[], spec: RollSpec): RollResult {
   const { modifier = 0, dropLowest = 0 } = spec;
 
-  const ascendingByValue = values
-    .map((value, index) => ({ value, index }))
-    .sort((a, b) => a.value - b.value);
-  const droppedIndices = new Set(ascendingByValue.slice(0, dropLowest).map((entry) => entry.index));
+  let droppedIndices: Set<number>;
+  if (usesAdvantage(spec)) {
+    // Keep the higher (advantage) or lower (disadvantage) die; drop the rest.
+    // Ties keep the first index, so exactly one die is ever kept.
+    const keepHigher = spec.mode === "advantage";
+    let keepIndex = 0;
+    for (let i = 1; i < values.length; i++) {
+      if (keepHigher ? values[i] > values[keepIndex] : values[i] < values[keepIndex]) keepIndex = i;
+    }
+    droppedIndices = new Set(values.map((_, index) => index).filter((index) => index !== keepIndex));
+  } else {
+    const ascendingByValue = values
+      .map((value, index) => ({ value, index }))
+      .sort((a, b) => a.value - b.value);
+    droppedIndices = new Set(ascendingByValue.slice(0, dropLowest).map((entry) => entry.index));
+  }
 
   const dice: DieRoll[] = values.map((value, index) => ({
     value,
@@ -67,9 +97,10 @@ export function summarizeRoll(values: number[], spec: RollSpec): RollResult {
   return { dice, modifier, total, spec };
 }
 
-/** Rolls a full `RollSpec`, dropping the lowest `dropLowest` dice from the total. */
+/** Rolls a full `RollSpec`, dropping the lowest `dropLowest` dice (or the un-taken advantage die). */
 export function rollSpec(spec: RollSpec): RollResult {
-  const values = Array.from({ length: spec.count }, () => rollDie(spec.faces));
+  const count = usesAdvantage(spec) ? 2 : spec.count;
+  const values = Array.from({ length: count }, () => rollDie(spec.faces));
   return summarizeRoll(values, spec);
 }
 
@@ -85,12 +116,15 @@ export function formatRollSpec(spec: RollSpec): string {
   } else if (modifier < 0) {
     label += ` - ${Math.abs(modifier)}`;
   }
+  if (usesAdvantage(spec)) {
+    label += ` (${spec.mode})`;
+  }
   return label;
 }
 
 /**
  * Injects raw kept die faces into a spec label for the Session Log, matching
- * `RollResultToast`'s `buildBreakdown` formatting: the leading `NdM` token is
+ * `RollResultToast`'s inline breakdown rendering: the leading `NdM` token is
  * suffixed with `(face, face, …)`, and any trailing modifier from `specLabel`
  * is preserved as-is (so a Unicode-minus modifier from `formatRollSpec` carries
  * through unchanged). e.g. `formatRollBreakdown("1d20 + 5", [12])` → "1d20 (12) + 5".

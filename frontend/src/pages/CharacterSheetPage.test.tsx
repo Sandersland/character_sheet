@@ -29,6 +29,7 @@ vi.mock("@/hooks/useGlobalKeyboard", () => ({ useGlobalKeyboard: () => {} }));
 
 vi.mock("@/features/abilities/AbilityScoreBox", () => ({ default: () => null }));
 vi.mock("@/features/dice/RollResultToast", () => ({ default: () => null }));
+vi.mock("@/features/dice/RollModeToggle", () => ({ default: () => null }));
 vi.mock("@/features/dice/RollContext", () => ({ RollProvider: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock("@/features/character-meta/ActivityModal", () => ({ default: () => null }));
 vi.mock("@/features/advancement/AdvancementSection", () => ({ default: () => null }));

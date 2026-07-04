@@ -300,10 +300,15 @@ defaulting to `system`.
 rollDie(faces: number): number          // the sole Math.random call
 rollSpec(spec: RollSpec): RollResult    // rolls all dice + sums + applies modifier
 summarizeRoll(values, spec): RollResult // for when values come from outside (physics roller)
-formatRollSpec(spec): string            // "3d6 + 2", "4d6 drop lowest"
+formatRollSpec(spec): string            // "3d6 + 2", "4d6 drop lowest", "1d20 + 5 (advantage)"
+usesAdvantage(spec): boolean            // the advantage/disadvantage guard (below)
 ```
 
-`RollSpec`: `{ count, faces, modifier?, dropLowest? }`.
+`RollSpec`: `{ count, faces, modifier?, dropLowest?, mode? }`.
+
+**Advantage / disadvantage** (`mode?: "normal" | "advantage" | "disadvantage"`, #459). `rollSpec` honors `mode` **only for a single d20** — the `usesAdvantage` guard requires `faces === 20 && count === 1`, so multi-die damage specs (`2d6`) and non-d20 dice ignore `mode` and roll normally. An advantage roll rolls **2d20** and keeps the higher (disadvantage: the lower); the un-taken die stays in `RollResult.dice` flagged `dropped: true` (same mechanism as `dropLowest`) so toast + 3D can show both dice. Ties keep exactly one die.
+
+The manual toggle is `features/dice/RollModeToggle.tsx` — a sticky Normal/ADV/DIS control (mounted alongside `RollResultToast` in `CharacterSheetPage`/`SessionPage`) that sets `mode` in `RollContext`; `roll()` merges that mode into every eligible spec (a caller-pinned `spec.mode` wins). `RollResultToast` shows both dice (dropped one struck through), an Advantage/Disadvantage label, and keeps natural-20/1 highlighting on the **taken** die; `DiceRoller` renders both d20s.
 
 **3D rollers** (`features/dice/DiceRoller.tsx` scripted, `features/dice/PhysicsDiceRoller.tsx` physics) both produce a `RollResult` shape via `summarizeRoll` — they're interchangeable via the shared `DiceRollerProps` contract in `features/dice/diceRollerTypes.ts`. Spellcasting currently uses the simple inline `rollSpec`; the 3D rollers are an easy later upgrade.
 

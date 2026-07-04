@@ -17,6 +17,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { RollProvider } from "@/features/dice/RollContext";
 import RollResultToast from "@/features/dice/RollResultToast";
+import RollModeToggle from "@/features/dice/RollModeToggle";
 import CompactHpBar from "@/features/hitpoints/CompactHpBar";
 import ConditionsStrip from "@/features/conditions/ConditionsStrip";
 import HitPointTracker from "@/features/hitpoints/HitPointTracker";
@@ -48,6 +49,7 @@ export default function SessionPage() {
   return (
     <RollProvider>
       <SessionPageInner />
+      <RollModeToggle />
       <RollResultToast />
     </RollProvider>
   );

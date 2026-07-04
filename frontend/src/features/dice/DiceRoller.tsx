@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
-import { formatRollSpec, rollSpec } from "@/lib/dice";
+import { formatRollSpec, rollSpec, usesAdvantage } from "@/lib/dice";
 import type { RollResult } from "@/lib/dice";
 import { DIE_GAP, UP_AXIS, quaternionForUpFace } from "@/lib/dieFaces";
 import type { FaceGroup } from "@/lib/dieFaces";
@@ -268,6 +268,9 @@ export default function DiceRoller({
 
   const { visualGeometry, groups, rounded } = useDieFaceData(spec.faces);
 
+  // Advantage/disadvantage rolls two d20s; render both so the taken + un-taken die both show.
+  const dieCount = usesAdvantage(spec) ? 2 : spec.count;
+
   const specRef = useRef(spec);
   specRef.current = spec;
   const onResultRef = useRef(onResult);
@@ -396,7 +399,7 @@ export default function DiceRoller({
       settledTotal={settled?.total ?? null}
       className={className}
     >
-      {Array.from({ length: spec.count }, (_, index) => (
+      {Array.from({ length: dieCount }, (_, index) => (
         <ScriptedDie
           key={index}
           geometry={visualGeometry}
@@ -407,7 +410,7 @@ export default function DiceRoller({
           rolling={rolling}
           rollId={rollId}
           reducedMotion={reducedMotionRef.current}
-          position={[(index - (spec.count - 1) / 2) * DIE_GAP, 0, 0]}
+          position={[(index - (dieCount - 1) / 2) * DIE_GAP, 0, 0]}
         />
       ))}
     </DiceScene>
