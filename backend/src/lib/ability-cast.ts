@@ -126,10 +126,8 @@ export async function castAbilityInTx(ctx: CastAbilityContext, input: CastAbilit
   if (input.concentrates) {
     await handleConcentrationOnCast(ctx, { entryId: input.entryId, spellName: input.name });
   }
-  // A buff effect appends a tracked passive modifier tagged with the casting
-  // entry id, so it clears when this ability's concentration ends. Generic:
-  // any activated ability whose effect resolves to a buff seeds activeEffects.
-  const buff = resolveBuffSpec(input.effect);
+  // Buffs ride concentration (no duration engine), so only seed one when the cast concentrates.
+  const buff = input.concentrates ? resolveBuffSpec(input.effect) : null;
   if (buff) {
     await appendActiveBuffInTx(
       ctx.tx,

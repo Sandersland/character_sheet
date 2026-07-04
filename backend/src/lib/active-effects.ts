@@ -109,8 +109,8 @@ function snapshot(state: ActiveEffectsMutableState): { activeEffects: ActiveEffe
 
 /**
  * Append a buff, replacing any existing buff with the same `key` (re-casting the
- * same buff replaces, never stacks). No-op if nothing changes. Logs a
- * `buffApplied` event under the "effects" category.
+ * same buff replaces, never stacks). Always writes + logs a `buffApplied` event
+ * under the "effects" category.
  */
 export async function appendActiveBuffInTx(
   tx: Prisma.TransactionClient,
