@@ -41,6 +41,8 @@ import { advancementSlotsForLevel, fightingStyleChoiceCount, FIGHTING_STYLES } f
 import { deriveResources } from "./class-features.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeHitPoints } from "./hitpoints.js";
+import { normalizeSpellcastingMutable } from "./spell-state.js";
+import { deriveGrantedSpells } from "./granted-spells.js";
 
 // ── Reconcile context ─────────────────────────────────────────────────────────
 
@@ -104,6 +106,90 @@ async function reconcileSubclass(ctx: ReconcileContext): Promise<void> {
       batchId,
     });
   }
+}
+
+// ── reconcileGrantedSpells ────────────────────────────────────────────────────
+// Defense-in-depth: subclass-granted spells are pure-derived at read time and
+// never persisted in the happy path, so this only fires if a source:"subclass"
+// entry ever leaks into the stored spells[]. It strips any leaked grant no longer
+// valid at the new level (re-derived on read anyway). Runs AFTER reconcileSubclass
+// so a cleared subclass yields an empty valid set. Reuses the spellcasting undo
+// branch in activity.ts (restores before.spellcasting) — no new EventType.
+
+async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
+  const { tx, characterId, newDerivedLevel, batchId } = ctx;
+
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: {
+      spellcasting: true,
+      classEntries: {
+        orderBy: { position: "asc" as const },
+        take: 1,
+        select: { name: true, subclass: true },
+      },
+    },
+  });
+  if (!row) return;
+
+  const state = normalizeSpellcastingMutable(row.spellcasting);
+  if (!state.spells.some((s) => s.source === "subclass")) return; // normal case
+
+  const primaryEntry = row.classEntries[0];
+  const validIds = new Set(
+    deriveGrantedSpells(
+      primaryEntry?.name ?? "",
+      primaryEntry?.subclass ?? undefined,
+      newDerivedLevel,
+    ).map((s) => s.id),
+  );
+
+  const kept = state.spells.filter((s) => s.source !== "subclass" || validIds.has(s.id));
+  if (kept.length === state.spells.length) return; // all leaked grants still valid
+
+  const before = {
+    spellcasting: {
+      slotsUsed: { ...state.slotsUsed },
+      arcanumUsed: { ...state.arcanumUsed },
+      spells: [...state.spells],
+      concentratingOn: state.concentratingOn ? { ...state.concentratingOn } : null,
+    },
+  };
+
+  const removedCount = state.spells.length - kept.length;
+  state.spells = kept;
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: {
+      spellcasting: {
+        slotsUsed: state.slotsUsed,
+        arcanumUsed: state.arcanumUsed,
+        spells: state.spells,
+        concentratingOn: state.concentratingOn,
+      } as unknown as Prisma.InputJsonValue,
+    },
+  });
+
+  const after = {
+    spellcasting: {
+      slotsUsed: { ...state.slotsUsed },
+      arcanumUsed: { ...state.arcanumUsed },
+      spells: [...state.spells],
+      concentratingOn: state.concentratingOn ? { ...state.concentratingOn } : null,
+    },
+  };
+
+  await logEvent(tx, {
+    characterId,
+    category: "spellcasting",
+    type: "forgetSpell",
+    summary: `${removedCount} subclass-granted spell${removedCount > 1 ? "s" : ""} removed — no longer granted at this level`,
+    before,
+    after,
+    data: { removedCount },
+    batchId,
+  });
 }
 
 // ── reconcileManeuvers ────────────────────────────────────────────────────────
@@ -663,6 +749,7 @@ async function reconcileClassEntryLevels(ctx: ReconcileContext): Promise<void> {
 const LEVEL_GATED_RECONCILERS: Reconciler[] = [
   reconcileClassEntryLevels,
   reconcileSubclass,
+  reconcileGrantedSpells,
   reconcileManeuvers,
   reconcileDisciplines,
   reconcileToolProficiencies,
