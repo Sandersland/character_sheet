@@ -1,60 +1,15 @@
 /**
  * Pure 5e turn-economy rules — no JSX, no side effects.
  *
- * Extra Attack counts and per-class action lists are derived from class/level
- * rather than persisted (derive-don't-persist pattern, same as level/profBonus).
+ * Per-class action lists are derived from class/level rather than persisted
+ * (derive-don't-persist pattern, same as level/profBonus). Extra Attack counts
+ * are derived server-side and read off `character.attacksPerAction`.
  *
  * ⚑ MOVEMENT is intentionally excluded from this module. Speed / difficult-terrain
  * tracking is flagged for a future phase.
  */
 
 import type { ActionCost } from "@/types/character";
-
-// ── Extra Attack ─────────────────────────────────────────────────────────────
-
-/**
- * Number of weapon attacks a character can make when they take the Attack
- * action. Accounts for class-specific Extra Attack progression.
- *
- * Sources:
- *  - PHB "Extra Attack" feature text for each class
- *  - College of Valor Bard L6 (subclass Extra Attack, not in base bard)
- */
-export function deriveAttacksPerAction(
-  className: string,
-  subclass: string | undefined,
-  level: number,
-): number {
-  const cls = className.toLowerCase();
-
-  if (cls === "fighter") {
-    if (level >= 20) return 4;
-    if (level >= 11) return 3;
-    if (level >= 5) return 2;
-    return 1;
-  }
-
-  if (
-    cls === "barbarian" ||
-    cls === "monk" ||
-    cls === "paladin" ||
-    cls === "ranger"
-  ) {
-    return level >= 5 ? 2 : 1;
-  }
-
-  if (cls === "bard") {
-    // Only College of Valor gets Extra Attack, at bard level 6.
-    const sub = (subclass ?? "").toLowerCase();
-    if ((sub.includes("valor") || sub === "college of valor") && level >= 6) {
-      return 2;
-    }
-    return 1;
-  }
-
-  // Cleric, Druid, Rogue, Sorcerer, Warlock, Wizard — no Extra Attack.
-  return 1;
-}
 
 // ── Two-Weapon Fighting eligibility ──────────────────────────────────────────
 

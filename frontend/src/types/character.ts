@@ -806,6 +806,9 @@ export interface Character {
    *  (e.g. via Tavern Brawler), which adds proficiency bonus to attackBonus. */
   improvisedWeapon: DerivedImprovisedAttack;
 
+  /** Weapon attacks per Attack action (Extra Attack), max across multiclass. */
+  attacksPerAction: number;
+
   /** Taken ASI / feat entries, in the order chosen (clamped to advancementSlots.total). */
   advancements: AdvancementEntry[];
   /** How many advancement slots this character has earned at their level. */
