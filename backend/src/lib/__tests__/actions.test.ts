@@ -213,6 +213,26 @@ describe("ACTION_EFFECT_FN — monk ki actions", () => {
   });
 });
 
+describe("Monk Stunning Strike — combat feature wiring (#392)", () => {
+  it("is granted at monk L5 via deriveActions", () => {
+    expect(keys(deriveActions("monk", undefined, 5, []))).toContain("stunningStrike");
+  });
+
+  it("is absent at monk L4 (level 5 gate)", () => {
+    expect(keys(deriveActions("monk", undefined, 4, []))).not.toContain("stunningStrike");
+  });
+
+  it("spends 1 ki when invoked", () => {
+    const ops = ACTION_EFFECT_FN.stunningStrike({});
+    expect(ops).toHaveLength(1);
+    const [op] = ops as Array<{ type: string; key: string; amount?: number }>;
+    expect(op.type).toBe("spendResource");
+    expect(op.key).toBe("ki");
+    // amount omitted defaults to 1 in the spendResource handler.
+    expect(op.amount ?? 1).toBe(1);
+  });
+});
+
 describe("ACTION_EFFECT_FN — secondWind", () => {
   it("with roll: spends resource + heals", () => {
     expect(ACTION_EFFECT_FN.secondWind({ roll: 7 })).toEqual([
