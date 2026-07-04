@@ -772,6 +772,14 @@ describe("subclass-granted spells", () => {
     expect(matches).toHaveLength(1);
     expect(matches[0].source).toBeUndefined(); // the learned entry, not the grant
   });
+
+  it("400s when trying to forget a subclass-granted spell", async () => {
+    await createMonk({ xp: 900, subclass: "Way of Shadow" });
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
+      .post(`/api/characters/${MONK_ID}/spellcasting/transactions`)
+      .send({ operations: [{ type: "forgetSpell", entryId: "granted:way-of-shadow:minor-illusion" }] });
+    expect(res.status).toBe(400);
+  });
 });
 
 // ── Warlock Pact Magic + Mystic Arcanum ───────────────────────────────────────

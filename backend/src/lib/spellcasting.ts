@@ -279,7 +279,11 @@ async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): 
 
 function applyForgetSpellOp(ctx: SpellOpContext, op: ForgetSpellOperation): OpOutcome {
   const { state } = ctx;
+  // Subclass-granted spells are derived, not persisted — they cannot be forgotten.
   const idx = state.spells.findIndex((s) => s.id === op.entryId);
+  if (op.entryId.startsWith("granted:") || state.spells[idx]?.source === "subclass") {
+    throw new InvalidSpellcastingOperationError("Cannot forget a subclass-granted spell.");
+  }
   if (idx === -1) {
     throw new InvalidSpellcastingOperationError(`Spell entry not found: ${op.entryId}`);
   }
