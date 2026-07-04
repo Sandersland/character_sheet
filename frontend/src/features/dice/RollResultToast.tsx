@@ -99,7 +99,7 @@ export default function RollResultToast() {
           {total}
         </p>
         <p className="text-[11px] tabular-nums text-parchment-600">
-          {dice.length}d{spec.faces} (
+          {spec.count}d{spec.faces} (
           {dice.map((die, index) => (
             <span key={index}>
               {index > 0 && ", "}

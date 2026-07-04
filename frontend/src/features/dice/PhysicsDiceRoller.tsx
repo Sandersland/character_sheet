@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import type * as CANNON from "cannon-es";
 import type * as THREE from "three";
 
-import { formatRollSpec, summarizeRoll } from "@/lib/dice";
+import { formatRollSpec, summarizeRoll, usesAdvantage } from "@/lib/dice";
 import type { RollResult } from "@/lib/dice";
 import { D6_SIZE, DIE_GAP } from "@/lib/dieFaces";
 import type { FaceGroup } from "@/lib/dieFaces";
@@ -156,9 +156,13 @@ export default function PhysicsDiceRoller({
     resolver: ReturnType<typeof createRollResolver>;
   } | null>(null);
   if (physicsRef.current === null) {
-    const { world, diceMaterial } = createDiceWorld(spec.count);
-    const dice: PhysicsDie[] = Array.from({ length: spec.count }, (_, index) => {
-      const laneX = (index - (spec.count - 1) / 2) * DIE_GAP;
+    // Advantage/disadvantage rolls two d20s and keeps one — mirror DiceRoller's
+    // dieCount guard so the physics world spawns both dice (spec.count alone
+    // would silently drop advantage; see usesAdvantage in dice.ts).
+    const dieCount = usesAdvantage(spec) ? 2 : spec.count;
+    const { world, diceMaterial } = createDiceWorld(dieCount);
+    const dice: PhysicsDie[] = Array.from({ length: dieCount }, (_, index) => {
+      const laneX = (index - (dieCount - 1) / 2) * DIE_GAP;
       const body = createDieBody(diceMaterial);
       // Rest in its tidy lane from the very first paint, same as the
       // scripted roller's idle pose, rather than at the cannon body default
