@@ -677,6 +677,8 @@ export interface CharacterResources {
   disciplineSaveDC?: number;
   /** Way of Shadow: whether the L3+ Shadow Arts ki-cast spells are available. */
   shadowArtsAvailable?: boolean;
+  /** Way of Shadow: whether the L11+ Cloak of Shadows self-invisible toggle is available. */
+  cloakOfShadowsAvailable?: boolean;
   /** Number of artisan's-tool proficiency choices from a subclass feature. */
   toolProfChoiceCount?: number;
   pools: ResourcePool[];

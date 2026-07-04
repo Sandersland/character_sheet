@@ -11,6 +11,7 @@ vi.mock("@/api/client", () => ({
   applyClassTransactions: vi.fn(),
   applyResourceTransactions: vi.fn(),
   applyDisciplineTransactions: vi.fn(),
+  applyConditionTransactions: vi.fn(),
   fetchDisciplines: vi.fn(),
 }));
 
@@ -92,6 +93,49 @@ describe("ClassFeaturesSection — Fighting Style", () => {
     await user.click(within(archeryRow).getByRole("button", { name: "Choose" }));
 
     expect(mockApply).toHaveBeenCalledWith("char-1", [{ type: "setFightingStyle", key: "archery" }]);
+  });
+});
+
+describe("ClassFeaturesSection — Cloak of Shadows", () => {
+  function makeShadowMonk(cloakOfShadowsAvailable: boolean): Character {
+    return {
+      id: "char-1",
+      class: "Monk",
+      level: cloakOfShadowsAvailable ? 11 : 6,
+      subclass: "Way of Shadow",
+      conditions: { active: [], exhaustion: 0 },
+      resources: {
+        features: [],
+        pools: [],
+        maneuversKnown: [],
+        toolProficienciesKnown: [],
+        cloakOfShadowsAvailable: cloakOfShadowsAvailable || undefined,
+      },
+    } as unknown as Character;
+  }
+
+  it("offers the Cloak of Shadows control at L11 and applies invisible via applyConditionTransactions", async () => {
+    const user = userEvent.setup();
+    vi.mocked(client.applyConditionTransactions).mockResolvedValue(makeShadowMonk(true));
+
+    render(
+      <ClassFeaturesSection character={makeShadowMonk(true)} referenceClasses={[]} onUpdate={vi.fn()} />,
+    );
+
+    expect(screen.getByText("Cloak of Shadows")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Become Invisible" }));
+
+    expect(client.applyConditionTransactions).toHaveBeenCalledWith("char-1", [
+      { type: "applyCondition", key: "invisible", source: "Cloak of Shadows" },
+    ]);
+  });
+
+  it("does NOT offer Cloak of Shadows below L11 (flag absent)", () => {
+    render(
+      <ClassFeaturesSection character={makeShadowMonk(false)} referenceClasses={[]} onUpdate={vi.fn()} />,
+    );
+    expect(screen.queryByText("Cloak of Shadows")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Become Invisible" })).not.toBeInTheDocument();
   });
 });
 
