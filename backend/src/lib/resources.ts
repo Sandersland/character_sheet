@@ -610,6 +610,7 @@ export async function applySpendResourceInTx(
     resources: {
       used: { ...state.used },
       maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
+      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
       toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
       advancements: state.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
       fightingStyle: state.fightingStyle,
@@ -627,6 +628,7 @@ export async function applySpendResourceInTx(
     resources: {
       used: { ...state.used },
       maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
+      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
       toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
       advancements: state.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
       fightingStyle: state.fightingStyle,
