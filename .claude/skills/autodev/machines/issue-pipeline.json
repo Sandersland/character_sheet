@@ -2,7 +2,7 @@
   "name": "issue-pipeline",
   "description": "Pick one ready GitHub issue, confirm scope, build it in an isolated worktree, review, open a PR against the integration branch.",
   "initial": "GetWork",
-  "budget": { "maxSteps": 16, "maxCostUsd": 25, "maxWallMinutes": 150 },
+  "budget": { "maxSteps": 16, "maxCostUsd": 26, "maxWallMinutes": 150 },
   "loopLimits": { "Reviewer->Worker": 3, "ClaimIssue->GetWork": 3 },
   "context": { "integrationBranch": "staging", "autoMerge": true },
   "states": {
@@ -66,8 +66,8 @@
     },
     "Reviewer": {
       "type": "agent",
-      "maxTurns": 80,
-      "maxBudgetUsd": 5,
+      "maxTurns": 100,
+      "maxBudgetUsd": 6,
       "fallbackModel": "sonnet",
       "wallMinutes": 40,
       "cwd": "{{worktree}}",

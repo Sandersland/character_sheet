@@ -35,14 +35,14 @@ This worktree's `node_modules` are empty Docker-volume mountpoints — host-run 
 
 ## Work loop — per committable chunk
 
-1. Write the unit tests for the chunk FIRST (they should fail). **For uiSurface issues**, when the chunk alters a user-visible flow, also extend or add an e2e spec under `frontend/e2e/` first — same test-first rule as unit tests (personas come from `global-setup.ts`; assert role/name-based selectors + zero console errors).
+1. Write the unit tests for the chunk FIRST (they should fail). Cover the **edges, not just the happy path**: for each new function/branch add tests for the non-happy inputs (null/empty, `false` flags, the early-return path) — especially **create/cleanup symmetry** (a resource applied must be cleared on every ending path; assert it's gone). Acceptance criteria describe the happy path; the bugs that reach review live in the paths *not* named there. **For uiSurface issues**, when the chunk alters a user-visible flow, also extend or add an e2e spec under `frontend/e2e/` first — same test-first rule as unit tests (personas come from `global-setup.ts`; assert role/name-based selectors + zero console errors).
 2. Implement until they pass.
 3. Typecheck + lint clean.
 4. Commit the green chunk: `feat(<domain>): <summary> (#{{issue}})` (or `fix`/`refactor` as appropriate).
 
 **Commit discipline — non-negotiable.** Commit after **every** green chunk (step 4), and never let more than one chunk sit uncommitted. If your run is interrupted (crash, budget, rate limit), only **committed** work survives — the resume/fail path pushes committed commits, but uncommitted edits are lost. A long stretch of edits with zero commits is a bug: a Worker that ran 100 turns / 6 files / **0 commits** lost everything on its crash (#332). When in doubt, commit — small, green, frequent.
 
-When every requirement is implemented, run the FULL test suites + typecheck + lint for both workspaces one final time. All green → emit `done`. If you are genuinely stuck (a requirement is impossible, contradicts the code, or tests cannot pass), do NOT force it — emit `blocked` with the exact failing output.
+When every requirement is implemented, run the FULL test suites + typecheck + lint for both workspaces one final time — the green suite must include the edge-case tests from step 1, not just happy-path. All green → emit `done`. If you are genuinely stuck (a requirement is impossible, contradicts the code, or tests cannot pass), do NOT force it — emit `blocked` with the exact failing output.
 
 ## Payload for `done`
 
