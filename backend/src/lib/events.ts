@@ -59,6 +59,7 @@ export type EventType =
   | "learnManeuver"
   | "forgetManeuver"
   | "maneuversReconciled"
+  | "disciplinesReconciled"
   | "learnToolProficiency"
   | "forgetToolProficiency"
   | "toolProficienciesReconciled"

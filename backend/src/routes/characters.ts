@@ -474,11 +474,16 @@ function buildResourcesView(
       derivedRes.toolProfChoiceCount !== undefined
         ? stored.toolProficienciesKnown.slice(0, derivedRes.toolProfChoiceCount)
         : stored.toolProficienciesKnown;
+    const clampedDisciplinesKnown =
+      derivedRes.disciplineChoiceCount !== undefined
+        ? stored.disciplinesKnown.slice(0, derivedRes.disciplineChoiceCount)
+        : stored.disciplinesKnown;
     resources = {
       features: derivedRes.features,
       maneuverChoiceCount: derivedRes.maneuverChoiceCount,
       maneuverSaveDC: derivedRes.maneuverSaveDC,
       toolProfChoiceCount: derivedRes.toolProfChoiceCount,
+      disciplineChoiceCount: derivedRes.disciplineChoiceCount,
       pools: derivedRes.resources.map((pool) => ({
         key: pool.key,
         label: pool.label,
@@ -490,6 +495,7 @@ function buildResourcesView(
         remaining: pool.total - Math.min(pool.total, stored.used[pool.key] ?? 0),
       })),
       maneuversKnown: clampedManeuversKnown,
+      disciplinesKnown: clampedDisciplinesKnown,
       toolProficienciesKnown: clampedToolProfsKnown,
       // Fighting Style choice surface for the frontend picker. Choice count is
       // level-gated (Fighter L1 -> 1); fightingStyle is already clamped to null

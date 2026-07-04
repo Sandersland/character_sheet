@@ -246,6 +246,40 @@ describe("deriveResources — Monk Ki", () => {
   });
 });
 
+// ── Monk — Way of the Four Elements ───────────────────────────────────────────
+
+describe("deriveResources — Way of the Four Elements", () => {
+  it("does not set disciplineChoiceCount below grant level 3", () => {
+    const result = deriveResources("monk", "way of the four elements", 2, ABILITY_SCORES, PROF_2);
+    expect(result!.disciplineChoiceCount).toBeUndefined();
+  });
+
+  it("disciplineChoiceCount is 1/2/3/4 at levels 3/6/11/17", () => {
+    const expected: [number, number][] = [[3, 1], [6, 2], [11, 3], [17, 4]];
+    for (const [level, count] of expected) {
+      const result = deriveResources("monk", "way of the four elements", level, ABILITY_SCORES, PROF_2);
+      expect(result!.disciplineChoiceCount).toBe(count);
+    }
+  });
+
+  it("surfaces Disciple of the Elements at level 3", () => {
+    const result = deriveResources("monk", "way of the four elements", 3, ABILITY_SCORES, PROF_2);
+    expect(result!.features.some((f) => f.name === "Disciple of the Elements")).toBe(true);
+  });
+
+  it("does not surface subclass features below grant level 3", () => {
+    const result = deriveResources("monk", "way of the four elements", 2, ABILITY_SCORES, PROF_2);
+    expect(result!.features.some((f) => f.source === "subclass")).toBe(false);
+  });
+
+  it("leaves other monks unaffected (no disciplineChoiceCount)", () => {
+    const openHand = deriveResources("monk", "way of the open hand", 6, ABILITY_SCORES, PROF_3);
+    expect(openHand!.disciplineChoiceCount).toBeUndefined();
+    const noSub = deriveResources("monk", undefined, 6, ABILITY_SCORES, PROF_3);
+    expect(noSub!.disciplineChoiceCount).toBeUndefined();
+  });
+});
+
 // ── Paladin — multi-pool ───────────────────────────────────────────────────────
 
 describe("deriveResources — Paladin base pools", () => {

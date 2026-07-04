@@ -198,6 +198,7 @@ export async function applyClassOperations(
             resources: {
               used: { ...s.used },
               maneuversKnown: s.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+              disciplinesKnown: s.disciplinesKnown.map((d) => ({ ...d })),
               toolProficienciesKnown: s.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
               advancements: s.advancements.map((a: AdvancementEntry) => ({
                 ...a,
