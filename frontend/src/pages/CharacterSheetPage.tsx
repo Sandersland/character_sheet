@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 
 import RollResultToast from "@/features/dice/RollResultToast";
+import RollModeToggle from "@/features/dice/RollModeToggle";
 import { RollProvider } from "@/features/dice/RollContext";
 import CharacterSheetHeader from "@/features/character-meta/CharacterSheetHeader";
 import CharacterSheetBody from "@/features/character-meta/CharacterSheetBody";
@@ -68,6 +69,7 @@ export default function CharacterSheetPage() {
           onUpdate={setCharacter}
           journalSessionId={session.inActiveSession ? session.activeSessionId : undefined}
         />
+        <RollModeToggle />
         <RollResultToast />
       </div>
     </RollProvider>

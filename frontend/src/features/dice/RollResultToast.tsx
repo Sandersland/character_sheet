@@ -9,18 +9,13 @@
 
 import { useEffect, useState } from "react";
 
+import { usesAdvantage } from "@/lib/dice";
 import { useRoll, type RollEntry } from "@/features/dice/RollContext";
 
 const DISMISS_MS = 3500;
 
-function buildBreakdown(entry: RollEntry): string {
-  const { result } = entry;
-  const { spec, dice, modifier } = result;
-  const keptValues = dice.filter((d) => !d.dropped).map((d) => d.value);
-  const diceStr = `${spec.count}d${spec.faces} (${keptValues.join(", ")})`;
-  const modStr =
-    modifier > 0 ? ` + ${modifier}` : modifier < 0 ? ` − ${Math.abs(modifier)}` : "";
-  return `${diceStr}${modStr}`;
+function modifierSuffix(modifier: number): string {
+  return modifier > 0 ? ` + ${modifier}` : modifier < 0 ? ` − ${Math.abs(modifier)}` : "";
 }
 
 export default function RollResultToast() {
@@ -40,11 +35,14 @@ export default function RollResultToast() {
   if (!displayed) return null;
 
   const { label, result } = displayed;
-  const { total, dice, spec } = result;
+  const { total, dice, spec, modifier } = result;
 
   // Crit/fumble only applies to a single d20 roll (checks, saves, attacks, initiative).
   const isD20Single = spec.faces === 20 && spec.count === 1;
-  const naturalRoll = isD20Single ? (dice[0]?.value ?? 0) : 0;
+  const advantage = usesAdvantage(spec);
+  // The taken die under advantage/disadvantage is the kept (non-dropped) one.
+  const takenDie = dice.find((d) => !d.dropped) ?? dice[0];
+  const naturalRoll = isD20Single ? (takenDie?.value ?? 0) : 0;
   const isCrit = naturalRoll === 20;
   const isFumble = naturalRoll === 1;
 
@@ -81,6 +79,11 @@ export default function RollResultToast() {
             Natural 1 — Fumble
           </p>
         )}
+        {advantage && (
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-garnet-700">
+            {spec.mode === "advantage" ? "Advantage" : "Disadvantage"}
+          </p>
+        )}
         <p className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
           {label}
         </p>
@@ -96,7 +99,16 @@ export default function RollResultToast() {
           {total}
         </p>
         <p className="text-[11px] tabular-nums text-parchment-600">
-          {buildBreakdown(displayed)}
+          {dice.length}d{spec.faces} (
+          {dice.map((die, index) => (
+            <span key={index}>
+              {index > 0 && ", "}
+              <span className={die.dropped ? "text-parchment-400 line-through" : ""}>
+                {die.value}
+              </span>
+            </span>
+          ))}
+          ){modifierSuffix(modifier)}
         </p>
       </div>
     </div>
