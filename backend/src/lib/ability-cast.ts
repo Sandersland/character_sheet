@@ -41,7 +41,6 @@ export interface CastAbilityInput {
   roll: number;
   eventType: EventType;
   concentrates: boolean;
-  dcSource?: unknown;
   apply?: { target: "self"; kind: "heal" | "damage"; amount: number };
 }
 

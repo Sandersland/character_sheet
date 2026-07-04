@@ -2,8 +2,8 @@
 // can describe any activated ability, not just spells. Hand-mirrored on the
 // frontend in frontend/src/lib/effects.ts — keep the two in sync.
 
-// Kind of thing an effect does. "buff"/"utility" carry no roll today.
-export type EffectType = "damage" | "heal" | "buff" | "utility";
+// Kind of thing an effect does. "utility" carries no roll today.
+export type EffectType = "damage" | "heal" | "utility";
 
 // How the dice count grows: cantrips scale by character level, leveled spells by
 // slot upcast steps, ki-fuelled abilities by ki spent above the base cost.

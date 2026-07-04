@@ -112,5 +112,5 @@ async function payPoolCost(
   // perStep is reserved for F3 (per-step effect scaling); unused here.
   const op: SpendResourceOperation = { type: "spendResource", key: cost.key, amount: requested };
   const audit = await applySpendResourceInTx(ctx.tx, ctx.characterId, op, ctx.batchId, ctx.sessionId);
-  return { label: audit.summary, effectiveStep: (requested ?? 1) - cost.base };
+  return { label: audit.summary, effectiveStep: (requested ?? cost.base) - cost.base };
 }

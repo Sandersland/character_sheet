@@ -40,6 +40,7 @@ function bareHost(concentratingOn: SpellcastingMutableState["concentratingOn"] =
   return { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn };
 }
 
+// tx is `undefined as never` — slot/none paths never touch it. A write-path test must override tx.
 function slotCostCtx(overrides: Partial<PayCostContext> = {}): PayCostContext {
   return {
     tx: undefined as never,
