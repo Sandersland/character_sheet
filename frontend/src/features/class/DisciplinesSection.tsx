@@ -5,7 +5,7 @@
  * up to the ClassFeaturesSection orchestrator. Mirrors the Maneuvers block.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { fetchDisciplines } from "@/api/client";
 import { kiRemaining } from "@/lib/disciplines";
@@ -47,11 +47,11 @@ export default function DisciplinesSection({
   const [catalog, setCatalog] = useState<CatalogDiscipline[] | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [swapEntryId, setSwapEntryId] = useState<string | null>(null);
-  const hasFetched = useRef(false);
 
+  // No hasFetched ref: under StrictMode the ref would suppress the second mount's
+  // fetch while the first's cleanup has already nulled `mounted`, dropping the
+  // result. The mounted flag alone is the StrictMode-safe pattern.
   useEffect(() => {
-    if (hasFetched.current) return;
-    hasFetched.current = true;
     let mounted = true;
     fetchDisciplines()
       .then((rows) => { if (mounted) setCatalog(rows); })

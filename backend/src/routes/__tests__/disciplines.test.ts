@@ -210,6 +210,9 @@ describe("Elemental disciplines", () => {
     const res = await post([{ type: "learnDiscipline", disciplineId: idL3b }]);
     expect(res.status).toBe(200);
     expect(disciplines(res)).toHaveLength(2);
+    // The picker reads these derived, serialized fields (issue #399).
+    expect(res.body.resources.disciplineChoiceCount).toBe(2);
+    expect(res.body.resources.disciplineSaveDC).toBeGreaterThan(0);
   });
 
   it("a level-11 discipline cannot be learned at level 6", async () => {
