@@ -18,6 +18,7 @@ import { randomUUID } from "node:crypto";
 
 
 import { Prisma } from "../generated/prisma/client.js";
+import { payAbilityCostInTx, InvalidSpellcastingOperationError, type PayCostContext } from "./ability-cost.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { applyHealInTx, applyDamageInTx } from "./hitpoints.js";
@@ -33,8 +34,9 @@ import type {
 import { deriveSpellcasting } from "./srd.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
-
-export class InvalidSpellcastingOperationError extends Error {}
+// Defined in ability-cost.ts (one-directional dep graph); re-exported so
+// existing importers (routes/spellcasting.ts) keep resolving it here unchanged.
+export { InvalidSpellcastingOperationError };
 
 // Persisted spell state shape + normalizer live in the leaf module spell-state.ts
 // (extracted to break the hitpoints ↔ spellcasting import cycle). Re-exported
@@ -362,8 +364,23 @@ async function dropConcentrationOnCastInTx(ctx: SpellOpContext, entry: SpellEntr
   });
 }
 
+// Adapt a SpellOpContext to the ability-cost payer's context. The slot maps are
+// the same references as state.slotsUsed/arcanumUsed, so in-place spends persist.
+function costCtx(ctx: SpellOpContext): PayCostContext {
+  return {
+    tx: ctx.tx,
+    characterId: ctx.characterId,
+    batchId: ctx.batchId,
+    sessionId: ctx.sessionId,
+    slotsUsed: ctx.state.slotsUsed,
+    arcanumUsed: ctx.state.arcanumUsed,
+    slotTotals: ctx.slotTotals,
+    arcanaTotals: ctx.arcanaTotals,
+  };
+}
+
 async function applyCastSpellOp(ctx: SpellOpContext, op: CastSpellOperation): Promise<OpOutcome> {
-  const { characterId, batchId, sessionId, state, slotTotals, arcanaTotals } = ctx;
+  const { characterId, batchId, sessionId, state } = ctx;
   const entry = state.spells.find((s) => s.id === op.entryId);
   if (!entry) {
     throw new InvalidSpellcastingOperationError(`Spell entry not found: ${op.entryId}`);
@@ -373,7 +390,8 @@ async function applyCastSpellOp(ctx: SpellOpContext, op: CastSpellOperation): Pr
   let eventData: Record<string, unknown>;
 
   if (entry.level === 0) {
-    // Cantrip — no slot needed.
+    // Cantrip — no cost.
+    await payAbilityCostInTx(costCtx(ctx), { kind: "none" });
     if (entry.effectKind && op.roll > 0) {
       summary = `Cast ${entry.name}: ${op.roll}${entry.damageType ? " " + entry.damageType : ""} ${entry.effectKind === "heal" ? "healing" : "damage"}`;
     } else {
@@ -381,43 +399,14 @@ async function applyCastSpellOp(ctx: SpellOpContext, op: CastSpellOperation): Pr
     }
     eventData = { entryId: op.entryId, spellName: entry.name, roll: op.roll, slotLevel: null };
   } else {
-    // Leveled spell — expend a slot, or a Mystic Arcanum charge.
+    // Leveled spell — pay a slot (or a Mystic Arcanum charge) via the payer.
     const slotLevel = op.slotLevel ?? entry.level;
-    if (slotLevel < entry.level) {
-      throw new InvalidSpellcastingOperationError(
-        `Cannot cast ${entry.name} (L${entry.level}) in a level-${slotLevel} slot`
-      );
-    }
-    const slotTotal = slotTotals[slotLevel] ?? 0;
-    const arcanumTotal = arcanaTotals[slotLevel] ?? 0;
-    const upcasting = slotLevel > entry.level;
-
-    // Real slots take priority; Mystic Arcanum (Warlock 6th–9th) has no
-    // overlapping slot level, so the two paths are mutually exclusive.
-    let slotLabel: string;
-    if (slotTotal > 0) {
-      const used = state.slotsUsed[String(slotLevel)] ?? 0;
-      if (used >= slotTotal) {
-        throw new InvalidSpellcastingOperationError(
-          `No level-${slotLevel} spell slots remaining`
-        );
-      }
-      state.slotsUsed[String(slotLevel)] = used + 1;
-      slotLabel = `L${slotLevel} slot${upcasting ? ` (upcast from L${entry.level})` : ""}`;
-    } else if (arcanumTotal > 0) {
-      const used = state.arcanumUsed[String(slotLevel)] ?? 0;
-      if (used >= arcanumTotal) {
-        throw new InvalidSpellcastingOperationError(
-          `Mystic Arcanum (level ${slotLevel}) already used — recharges on a long rest`
-        );
-      }
-      state.arcanumUsed[String(slotLevel)] = used + 1;
-      slotLabel = `L${slotLevel} Mystic Arcanum`;
-    } else {
-      throw new InvalidSpellcastingOperationError(
-        `No level-${slotLevel} spell slots remaining`
-      );
-    }
+    const paid = await payAbilityCostInTx(
+      costCtx(ctx),
+      { kind: "slot", minLevel: entry.level },
+      op.slotLevel
+    );
+    const slotLabel = paid.label;
 
     if (entry.effectKind && op.roll > 0) {
       summary = `Cast ${entry.name} (${slotLabel}): ${op.roll}${entry.damageType ? " " + entry.damageType : ""} ${entry.effectKind === "heal" ? "healing" : "damage"}`;
