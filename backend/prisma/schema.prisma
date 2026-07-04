@@ -837,6 +837,7 @@ enum CharacterEventType {
   forgetDiscipline
   swapDiscipline
   disciplinesReconciled
+  castDiscipline
   learnToolProficiency
   forgetToolProficiency
   toolProficienciesReconciled
