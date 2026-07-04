@@ -58,7 +58,12 @@ test("shadow arts: a granted Minor Illusion shows a subclass badge, no Remove, a
   await expect(page.getByRole("heading", { name: /Shadow Monk/, level: 1 })).toBeVisible();
 
   // The granted Minor Illusion appears in the spellbook with a subclass badge.
-  const illusionRow = page.getByRole("listitem").filter({ hasText: "Minor Illusion" });
+  // Scope to the spellbook row (has a Cast button) — the Shadow Arts class-feature
+  // description row also names Minor Illusion but has no Cast button.
+  const illusionRow = page
+    .getByRole("listitem")
+    .filter({ hasText: "Minor Illusion" })
+    .filter({ has: page.getByRole("button", { name: "Cast" }) });
   await expect(illusionRow).toBeVisible();
   await expect(illusionRow.getByText("subclass")).toBeVisible();
   // No Remove ✕ for a derived grant.

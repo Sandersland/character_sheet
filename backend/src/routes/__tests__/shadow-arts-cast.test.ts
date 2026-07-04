@@ -139,9 +139,13 @@ describe("Shadow Arts cast endpoint", () => {
   it("occupies the concentration slot for Darkness/Silence/Pass without Trace but not Darkvision", async () => {
     // Concentration Shadow Art → concentratingOn set.
     await createMonk(XP_L3, "way of shadow");
-    await cast([{ type: "castShadowArt", shadowArtId: darknessId }]);
+    const concRes = await cast([{ type: "castShadowArt", shadowArtId: darknessId }]);
     let row = await prisma.character.findUnique({ where: { id: FIXTURE_ID }, select: { spellcasting: true } });
     expect((row!.spellcasting as { concentratingOn: { entryId: string } | null }).concentratingOn)
+      .toMatchObject({ entryId: darknessId, spellName: "Shadow Arts: Darkness" });
+    // The serialized character must ALSO surface it — a Shadow Art's catalog-id
+    // concentration entry isn't a spellbook spell, so the clamp must not drop it.
+    expect(concRes.body.spellcasting.concentratingOn)
       .toMatchObject({ entryId: darknessId, spellName: "Shadow Arts: Darkness" });
     await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
 
