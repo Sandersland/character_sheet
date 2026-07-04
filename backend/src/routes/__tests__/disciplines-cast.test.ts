@@ -345,3 +345,62 @@ describe("Discipline cast endpoint", () => {
     });
   }
 });
+
+// Source discriminator: a non-discipline GrantedAbility row must not leak into
+// the discipline picker or drive the discipline cast path.
+describe("GrantedAbility source discriminator", () => {
+  const SHADOW_NAME = "Test Shadow Arts Ability #437";
+  const SHADOW_CLASS = "Disc Source Test Monk";
+  const SHADOW_FIXTURE_ID = "test-disc-source-monk-1";
+  let shadowId: string;
+  let sourceClassId: string;
+
+  beforeAll(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+    const cls = await prisma.characterClass.upsert({
+      where: { name: SHADOW_CLASS },
+      create: { name: SHADOW_CLASS, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics", "stealth"], isSpellcaster: false },
+      update: {},
+    });
+    sourceClassId = cls.id;
+    const row = await prisma.grantedAbility.upsert({
+      where: { name: SHADOW_NAME },
+      create: { name: SHADOW_NAME, description: "A future shadow-arts ability.", source: "shadowArts", minLevel: 3 },
+      update: { source: "shadowArts", minLevel: 3 },
+    });
+    shadowId = row.id;
+  });
+
+  afterAll(async () => {
+    await prisma.character.deleteMany({ where: { id: SHADOW_FIXTURE_ID } });
+    await prisma.grantedAbility.deleteMany({ where: { name: SHADOW_NAME } });
+    await prisma.characterClass.deleteMany({ where: { name: SHADOW_CLASS } });
+  });
+
+  it("excludes non-discipline rows from GET /api/disciplines", async () => {
+    const res = await agent().get("/api/disciplines");
+    expect(res.status).toBe(200);
+    expect((res.body as { id: string }[]).some((d) => d.id === shadowId)).toBe(false);
+  });
+
+  it("rejects castDiscipline against a non-discipline id", async () => {
+    await prisma.character.create({
+      data: {
+        ...FIXTURE_BASE,
+        id: SHADOW_FIXTURE_ID,
+        experiencePoints: XP_L3,
+        ownerId: OWNER_ID,
+        resources: Prisma.JsonNull,
+        classEntries: {
+          create: [{ name: "monk", subclass: "way of the four elements", classId: sourceClassId, position: 0 }],
+        },
+      },
+    });
+    const res = await agent()
+      .post(`/api/characters/${SHADOW_FIXTURE_ID}/disciplines/transactions`)
+      .send({ operations: [{ type: "castDiscipline", disciplineId: shadowId, kiSpent: 2, roll: 10 }] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/not found in catalog/);
+  });
+});

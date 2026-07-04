@@ -1764,6 +1764,7 @@ async function main() {
   for (const discipline of DISCIPLINES) {
     const data = {
       name: discipline.name,
+      source: "discipline",
       description: discipline.description,
       minLevel: discipline.minLevel,
       alwaysKnown: discipline.alwaysKnown ?? false,
