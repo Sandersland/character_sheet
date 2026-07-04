@@ -25,7 +25,7 @@
 | `routes/conditions.ts` | `POST /characters/:id/conditions/transactions` — apply/remove conditions, set exhaustion |
 | `routes/class.ts` | `POST /characters/:id/class/transactions` — post-creation subclass + fighting-style selection + multiclass add-class (`addClass`) |
 | `routes/maneuvers.ts` | `GET /maneuvers` — Battle Master maneuver catalog |
-| `routes/disciplines.ts` | `GET /disciplines` — Way of the Four Elements discipline catalog (min level + embedded `AbilityCost` + `EffectSpec`) |
+| `routes/disciplines.ts` | `GET /disciplines` — Way of the Four Elements discipline catalog (min level + embedded `AbilityCost` + ki-scaled `EffectSpec`); `POST /characters/:id/disciplines/transactions` — `castDiscipline` (spend ki via the shared pool payer, roll the EffectSpec, ki DC save) |
 | `routes/feats.ts` | `GET /feats` — feat catalog |
 | `routes/advancement.ts` | `POST /characters/:id/advancement/transactions` — take/remove ASIs and feats |
 | `routes/actions.ts` | `POST /characters/:id/actions/transactions` — apply an action's resource/quantity/heal effects (the action catalog is consumed client-side via `features/session/actionResolvers`) |

@@ -5,6 +5,8 @@
  * src/lib/experience.ts) and never set directly by the client.
  */
 
+import type { EffectSpec } from "@/lib/effects";
+
 export type AbilityName =
   | "strength"
   | "dexterity"
@@ -429,6 +431,23 @@ export interface CatalogSpell {
   saveAbility?: string;
   upcastDicePerLevel?: number;
   cantripScaling: boolean;
+}
+
+/** Ki (or other pool) cost of an activated ability. Mirror of backend AbilityCost. */
+export type AbilityCost =
+  | { kind: "pool"; key: string; base: number; perStep?: number }
+  | { kind: "none" };
+
+/** A Way of the Four Elements discipline from GET /api/disciplines. */
+export interface CatalogDiscipline {
+  id: string;
+  name: string;
+  description: string;
+  minLevel: number;
+  alwaysKnown: boolean;
+  saveAbility?: string | null;
+  cost: AbilityCost;
+  effect: EffectSpec;
 }
 
 export interface SpellSlots {
@@ -1137,6 +1156,19 @@ export type ResourceOperation =
   | ForgetManeuverOperation
   | LearnToolProficiencyOperation
   | ForgetToolProficiencyOperation;
+
+// ── Discipline operation types (mirrors backend/src/lib/disciplines.ts) ──────
+// Sent as `{ operations: DisciplineOperation[] }` to
+// POST /api/characters/:id/disciplines/transactions.
+
+/** Cast a known elemental discipline: spend ki, send the client-computed roll total (0 for utility). */
+export interface CastDisciplineOperation {
+  type: "castDiscipline";
+  disciplineId: string;
+  kiSpent: number;
+  roll: number;
+}
+export type DisciplineOperation = CastDisciplineOperation;
 
 // ── Conditions state + operation types (mirrors backend/src/lib/conditions.ts)
 // Sent as `{ operations: ConditionOperation[] }` to

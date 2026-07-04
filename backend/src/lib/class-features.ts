@@ -54,6 +54,8 @@ export interface DerivedClassInfo {
   toolProfChoiceCount?: number;
   /** Way of the Four Elements only: number of elemental disciplines known at this level. */
   disciplineChoiceCount?: number;
+  /** Way of the Four Elements only: ki save DC for discipline effects (8 + prof + Wis mod). */
+  disciplineSaveDC?: number;
 }
 
 // ── Battle Master rules data ──────────────────────────────────────────────────
@@ -96,6 +98,11 @@ export function fourElementsDisciplineCount(level: number): number {
   if (level >= 11) return 3;
   if (level >= 6) return 2;
   return 1;
+}
+
+/** Ki save DC (Monk) — used by Stunning Strike, ki features, and elemental disciplines. */
+export function kiSaveDC(abilityScores: Record<string, number>, profBonus: number): number {
+  return 8 + profBonus + abilityModifier(abilityScores.wisdom ?? 10);
 }
 
 // ── Base class feature lists ──────────────────────────────────────────────────
@@ -967,8 +974,7 @@ const CLASS_RESOURCE_FN: Record<
 
   monk: (level, abilityScores, profBonus) => {
     if (level < 2) return [];
-    const wisMod = abilityModifier(abilityScores.wisdom ?? 10);
-    const kiDC = 8 + profBonus + wisMod;
+    const kiDC = kiSaveDC(abilityScores, profBonus);
     return [
       {
         key: "ki",
@@ -2360,6 +2366,7 @@ export function deriveResources(
   // Way of the Four Elements — disciplines known scale with monk level
   if (subclassKey === "way of the four elements" && level >= 3) {
     result.disciplineChoiceCount = fourElementsDisciplineCount(level);
+    result.disciplineSaveDC = kiSaveDC(abilityScores, profBonus);
   }
 
   return result;
