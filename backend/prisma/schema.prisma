@@ -802,6 +802,7 @@ enum CharacterEventType {
   learnManeuver
   forgetManeuver
   maneuversReconciled
+  disciplinesReconciled
   learnToolProficiency
   forgetToolProficiency
   toolProficienciesReconciled
