@@ -780,6 +780,28 @@ describe("subclass-granted spells", () => {
       .send({ operations: [{ type: "forgetSpell", entryId: "granted:way-of-shadow:minor-illusion" }] });
     expect(res.status).toBe(400);
   });
+
+  it("casting a granted cantrip logs the cast but persists no granted entry", async () => {
+    await createMonk({ xp: 900, subclass: "Way of Shadow" });
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
+      .post(`/api/characters/${MONK_ID}/spellcasting/transactions`)
+      .send({ operations: [{ type: "castSpell", entryId: "granted:way-of-shadow:minor-illusion", roll: 0 }] });
+    expect(res.status).toBe(200);
+
+    // The response view still surfaces the re-derived grant.
+    const minor = getSpells(res.body).find((s) => s.name === "Minor Illusion");
+    expect(minor!.source).toBe("subclass");
+
+    // Nothing with a granted id / subclass source was persisted.
+    const row = await prisma.character.findUnique({ where: { id: MONK_ID }, select: { spellcasting: true } });
+    const stored = row?.spellcasting as { spells: Array<{ id: string; source?: string }> } | null;
+    expect(stored?.spells.some((s) => s.source === "subclass" || s.id.startsWith("granted:"))).toBe(false);
+
+    // A castSpell event was logged.
+    const activity = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}/activity`);
+    const castEv = (activity.body as Array<{ type: string }>).find((e) => e.type === "castSpell");
+    expect(castEv).toBeDefined();
+  });
 });
 
 // ── Warlock Pact Magic + Mystic Arcanum ───────────────────────────────────────

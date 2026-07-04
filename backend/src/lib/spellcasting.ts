@@ -26,6 +26,7 @@ import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
+import { deriveGrantedSpells } from "./granted-spells.js";
 import type {
   SpellEntry,
   SpellComponents,
@@ -416,7 +417,7 @@ export async function applySpellcastingOperations(
           classEntries: {
             orderBy: { position: "asc" as const },
             take: 1,
-            select: { name: true },
+            select: { name: true, subclass: true },
           },
         },
       });
@@ -456,6 +457,15 @@ export async function applySpellcastingOperations(
         },
       };
 
+      // Inject derived subclass-granted spells into the working state so ops that
+      // target them (e.g. casting a Way of Shadow monk's Minor Illusion) resolve.
+      // These are stripped again before persist — they live only in the read view.
+      const granted = deriveGrantedSpells(className, row.classEntries[0]?.subclass ?? undefined, level);
+      if (granted.length > 0) {
+        const names = new Set(state.spells.map((s) => s.name.toLowerCase()));
+        for (const g of granted) if (!names.has(g.name.toLowerCase())) state.spells.push(g);
+      }
+
       const ctx: SpellOpContext = {
         tx,
         characterId,
@@ -480,6 +490,10 @@ export async function applySpellcastingOperations(
         case "dropConcentration": outcome = applyDropConcentrationOp(ctx); break;
       }
       if (outcome === null) continue;
+
+      // Strip derived grants before persisting — they are never stored (they are
+      // re-derived on read; reconcileGrantedSpells is the safety net for leaks).
+      state.spells = state.spells.filter((s) => s.source !== "subclass");
 
       // Write the updated state back as a compact object.
       await tx.character.update({
