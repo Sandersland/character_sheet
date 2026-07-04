@@ -45,6 +45,7 @@ import { deriveActions, type AvailableAction } from "../lib/actions.js";
 import { createCharacter } from "../lib/character-create.js";
 import { normalizeResourcesMutable, type AdvancementEntry, type ToolProfEntry } from "../lib/resources.js";
 import { normalizeConditionsMutable } from "../lib/conditions.js";
+import { buffsByTarget, normalizeActiveEffectsMutable, type ActiveBuff } from "../lib/active-effects.js";
 import { reverseAdvancementEffects } from "../lib/advancement.js";
 import { normalizeSpellcastingMutable } from "../lib/spellcasting.js";
 import type { SpellEntry } from "../lib/spell-state.js";
@@ -763,6 +764,11 @@ export function serializeCharacter(row: CharacterWithRelations) {
     wearingHeavyArmor: bestArmor?.armorCategory === "heavy",
   });
 
+  // Active cast-granted buffs (#438): summed per target into the affected
+  // skill/stat's tempModifier below, following the base + additive-terms pattern.
+  const activeEffects = normalizeActiveEffectsMutable(row.activeEffects);
+  const buffTargets = buffsByTarget(activeEffects);
+
   // Labeled AC addends; armorClass below is their exact sum (single source in srd.ts).
   const acParts = deriveArmorClassParts(bestArmor, hasShield, dexMod, unarmoredDefense);
   // Defense fighting style only applies while wearing body armor (5e).
@@ -815,14 +821,23 @@ export function serializeCharacter(row: CharacterWithRelations) {
     savingThrowProficiencies: featProficiencies.savingThrows.size > 0
       ? [...new Set([...row.savingThrowProficiencies, ...featProficiencies.savingThrows])]
       : row.savingThrowProficiencies,
-    // Merge feat-granted skill proficiencies: proficient stays true if already true;
-    // feat grants can only add proficiency, never remove it.
-    skills: featProficiencies.skills.size > 0
-      ? (row.skills as { name: string; ability: string; proficient: boolean }[]).map((s) => ({
-          ...s,
-          proficient: s.proficient || featProficiencies.skills.has(s.name),
-        }))
-      : row.skills,
+    // Merge feat-granted skill proficiencies (proficient stays true if already
+    // true; feats only add) and overlay any active buff as an optional
+    // tempModifier + labeled breakdown (#438). Additive term, derived on read.
+    skills: (row.skills as { name: string; ability: string; proficient: boolean }[]).map((s) => {
+      const buffs = buffTargets[s.name] ?? [];
+      const tempModifier = buffs.reduce((sum, b) => sum + b.modifier, 0);
+      return {
+        ...s,
+        proficient: s.proficient || featProficiencies.skills.has(s.name),
+        ...(tempModifier !== 0
+          ? {
+              tempModifier,
+              tempModifierSources: buffs.map((b: ActiveBuff) => ({ label: b.source, value: b.modifier })),
+            }
+          : {}),
+      };
+    }),
     // Merged tool proficiency list — creation-fixed entries (stored in
     // Character.toolProficiencies) + level-gated subclass choices (from
     // resources.toolProficienciesKnown, already clamped above).
@@ -852,6 +867,9 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // keys dropped, deduped by key, exhaustion clamped 0–6) — mutate via
     // POST /characters/:id/conditions/transactions, never PATCH.
     conditions: normalizeConditionsMutable(row.conditions),
+    // Active cast-granted passive modifiers (buffs). Normalized on read; each is
+    // also summed into its target skill/stat's tempModifier above.
+    activeEffects,
 
     // Advancements (ASI + feats) — top-level so every class sees them,
     // independent of whether deriveResources returns a non-null value.

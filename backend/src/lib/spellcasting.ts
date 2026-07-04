@@ -19,6 +19,7 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma } from "../generated/prisma/client.js";
 import { castAbilityInTx, type OpOutcome } from "./ability-cast.js";
+import { clearBuffsForSourceInTx } from "./active-effects.js";
 import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";
 import { readEffectSpec } from "./effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
@@ -278,7 +279,7 @@ async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): 
   };
 }
 
-function applyForgetSpellOp(ctx: SpellOpContext, op: ForgetSpellOperation): OpOutcome {
+async function applyForgetSpellOp(ctx: SpellOpContext, op: ForgetSpellOperation): Promise<OpOutcome> {
   const { state } = ctx;
   // Subclass-granted spells are derived, not persisted — they cannot be forgotten.
   const idx = state.spells.findIndex((s) => s.id === op.entryId);
@@ -290,9 +291,11 @@ function applyForgetSpellOp(ctx: SpellOpContext, op: ForgetSpellOperation): OpOu
   }
   const forgotten = state.spells[idx];
   state.spells.splice(idx, 1);
-  // Forgetting the spell you're concentrating on ends that concentration.
+  // Forgetting the spell you're concentrating on ends that concentration and
+  // drops any buffs it maintained (#438).
   if (state.concentratingOn?.entryId === op.entryId) {
     state.concentratingOn = null;
+    await clearBuffsForSourceInTx(ctx.tx, ctx.characterId, op.entryId, ctx.batchId, ctx.sessionId, "removal");
   }
   return {
     eventType: "forgetSpell",
@@ -373,12 +376,14 @@ async function applyCastSpellOp(ctx: SpellOpContext, op: CastSpellOperation): Pr
   );
 }
 
-function applyDropConcentrationOp(ctx: SpellOpContext): OpOutcome | null {
+async function applyDropConcentrationOp(ctx: SpellOpContext): Promise<OpOutcome | null> {
   const { state } = ctx;
   const prior = state.concentratingOn;
   // Nothing to drop — idempotent no-op (skip write + log).
   if (!prior) return null;
   state.concentratingOn = null;
+  // Ending concentration drops any buffs it was maintaining (#438).
+  await clearBuffsForSourceInTx(ctx.tx, ctx.characterId, prior.entryId, ctx.batchId, ctx.sessionId, "removal");
   return {
     eventType: "concentrationDropped",
     summary: `Stopped concentrating on ${prior.spellName}`,
@@ -484,10 +489,10 @@ export async function applySpellcastingOperations(
         case "expendSlot": outcome = applyExpendSlotOp(ctx, op); break;
         case "restoreSlot": outcome = applyRestoreSlotOp(ctx, op); break;
         case "learnSpell": outcome = await applyLearnSpellOp(ctx, op); break;
-        case "forgetSpell": outcome = applyForgetSpellOp(ctx, op); break;
+        case "forgetSpell": outcome = await applyForgetSpellOp(ctx, op); break;
         case "prepareSpell":
         case "unprepareSpell": outcome = applyPrepareSpellOp(ctx, op); break;
-        case "dropConcentration": outcome = applyDropConcentrationOp(ctx); break;
+        case "dropConcentration": outcome = await applyDropConcentrationOp(ctx); break;
       }
       if (outcome === null) continue;
 

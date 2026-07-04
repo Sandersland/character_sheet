@@ -11,7 +11,8 @@
 
 import { Prisma } from "../generated/prisma/client.js";
 import { payAbilityCostInTx, type AbilityCost, type PayCostContext } from "./ability-cost.js";
-import type { EffectSpec } from "./effects.js";
+import { appendActiveBuffInTx, clearBuffsForSourceInTx } from "./active-effects.js";
+import { resolveBuffSpec, type EffectSpec } from "./effects.js";
 import { logEvent, type EventType } from "./events.js";
 import { applyHealInTx, applyDamageInTx } from "./hitpoints.js";
 import type { ConcentrationState, SpellcastingMutableState } from "./spell-state.js";
@@ -74,6 +75,8 @@ async function handleConcentrationOnCast(ctx: CastAbilityContext, next: Concentr
     // state (with the new concentration spell), so clearing the in-memory flag is
     // enough for this drop event's before/after payloads.
     host.concentratingOn = null;
+    // The displaced concentration also drops any buffs it was maintaining.
+    await clearBuffsForSourceInTx(ctx.tx, ctx.characterId, prior.entryId, ctx.batchId, ctx.sessionId, "newCast");
     await logEvent(ctx.tx, {
       characterId: ctx.characterId,
       category: "spellcasting",
@@ -122,6 +125,19 @@ export async function castAbilityInTx(ctx: CastAbilityContext, input: CastAbilit
 
   if (input.concentrates) {
     await handleConcentrationOnCast(ctx, { entryId: input.entryId, spellName: input.name });
+  }
+  // A buff effect appends a tracked passive modifier tagged with the casting
+  // entry id, so it clears when this ability's concentration ends. Generic:
+  // any activated ability whose effect resolves to a buff seeds activeEffects.
+  const buff = resolveBuffSpec(input.effect);
+  if (buff) {
+    await appendActiveBuffInTx(
+      ctx.tx,
+      ctx.characterId,
+      { key: input.entryId, target: buff.target, modifier: buff.modifier, source: input.name, sourceEntryId: input.entryId },
+      ctx.batchId,
+      ctx.sessionId,
+    );
   }
   if (input.apply?.target === "self" && input.apply.amount > 0) {
     await applySelfEffectInTx(ctx, input.apply);

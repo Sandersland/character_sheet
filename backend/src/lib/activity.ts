@@ -170,6 +170,16 @@ async function reverseEvent(
         data: { conditions: beforeConditions as Prisma.InputJsonValue },
       });
     }
+  } else if (category === "effects") {
+    // Restore the full activeEffects JSON (buff list) from the before snapshot
+    // — identical pattern to the conditions revert.
+    const beforeEffects = before.activeEffects as Record<string, unknown> | undefined;
+    if (beforeEffects !== undefined) {
+      await tx.character.update({
+        where: { id: characterId },
+        data: { activeEffects: beforeEffects as Prisma.InputJsonValue },
+      });
+    }
   } else if (category === "class") {
     // Multiclass add-class (issue #125): delete the created entry and restore
     // the HP/hit-dice bump that came with the new class's first level.
