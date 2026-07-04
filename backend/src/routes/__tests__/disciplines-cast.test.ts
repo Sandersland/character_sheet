@@ -208,6 +208,25 @@ describe("Discipline cast endpoint", () => {
     expect((spellEvents.body as ActivityEvent[]).some((e) => e.type === "concentrationDropped")).toBe(true);
   });
 
+  it("reverting a fresh concentration discipline cast clears the phantom concentration", async () => {
+    await createMonk(XP_L3);
+    await learn(galeSpiritsId);
+
+    // No prior concentration — a fresh one is established by the cast.
+    const res = await cast([{ type: "castDiscipline", disciplineId: galeSpiritsId, kiSpent: 2, roll: 0 }]);
+    expect(res.status).toBe(200);
+    const afterCast = await prisma.character.findUnique({ where: { id: FIXTURE_ID }, select: { spellcasting: true } });
+    expect((afterCast!.spellcasting as { concentratingOn: unknown }).concentratingOn).toMatchObject({ entryId: galeSpiritsId });
+
+    // Undo the batch — concentratingOn must return to null (not a phantom).
+    const events = await activity();
+    const batchId = events.find((e) => e.type === "castDiscipline")!.batchId!;
+    const undo = await agent().post(`/api/characters/${FIXTURE_ID}/events/${batchId}/revert`);
+    expect(undo.status).toBe(200);
+    const reverted = await prisma.character.findUnique({ where: { id: FIXTURE_ID }, select: { spellcasting: true } });
+    expect((reverted!.spellcasting as { concentratingOn: unknown }).concentratingOn).toBeNull();
+  });
+
   it("logs an undoable castDiscipline batch (revert restores the spent ki)", async () => {
     await createMonk(XP_L3);
     await learn(waterWhipId);

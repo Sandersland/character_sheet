@@ -116,8 +116,10 @@ function snapshotSpellcasting(state: SpellcastingMutableState) {
 /**
  * Applies a batch of discipline operations atomically. Mirrors
  * applySpellcastingOperations: one batchId, LIFO-undoable events, state re-read
- * per op. The ki spend logs its own spendResource event via the pool payer; this
- * handler logs the castDiscipline event (concentration snapshot + roll/DC data).
+ * per op. Per cast: the pool payer logs its own spendResource event (refunds ki
+ * on revert); a concentration discipline logs a spellcasting-category event
+ * (restores concentratingOn on revert); the resources-category castDiscipline
+ * event carries the roll/DC data.
  */
 export async function applyDisciplineOperations(
   characterId: string,
@@ -187,7 +189,7 @@ export async function applyDisciplineOperations(
       const concentrates = effect.concentration ?? false;
 
       const spellState = normalizeSpellcastingMutable(row.spellcasting);
-      const before = snapshotSpellcasting(spellState);
+      const beforeSpell = snapshotSpellcasting(spellState);
 
       const costCtx: PayCostContext = { tx, characterId, batchId, sessionId };
       const outcome = await castAbilityInTx(
@@ -204,8 +206,11 @@ export async function applyDisciplineOperations(
         },
       );
 
-      // Persist the concentration change (castAbilityInTx leaves the write-back
-      // to the caller). Non-concentration disciplines leave spellcasting untouched.
+      // Persist + audit the concentration change under the spellcasting category
+      // so batch revert restores concentratingOn (whether it was null or a prior
+      // spell). castAbilityInTx leaves the write-back to the caller; a fresh
+      // concentration emits no concentrationDropped event, so this event is what
+      // makes it undoable. Non-concentration disciplines leave spellcasting alone.
       if (concentrates) {
         await tx.character.update({
           where: { id: characterId },
@@ -218,16 +223,28 @@ export async function applyDisciplineOperations(
             } as unknown as Prisma.InputJsonValue,
           },
         });
+        await logEvent(tx, {
+          characterId,
+          category: "spellcasting",
+          type: "castDiscipline",
+          summary: `Concentrating on ${catalog.name}`,
+          before: beforeSpell,
+          after: snapshotSpellcasting(spellState),
+          data: { disciplineId: catalog.id, disciplineName: catalog.name },
+          batchId,
+          sessionId,
+        });
       }
 
+      // The cast record itself restores nothing (ki is refunded by the pool
+      // payer's own spendResource event, concentration by the event above), so
+      // it carries no before/after snapshot — just the roll/DC data.
       const summary = effect.saveAbility ? `${outcome.summary} (save DC ${saveDc})` : outcome.summary;
       await logEvent(tx, {
         characterId,
         category: "resources",
         type: "castDiscipline",
         summary,
-        before,
-        after: snapshotSpellcasting(spellState),
         data: { disciplineId: catalog.id, kiSpent: op.kiSpent, roll: op.roll, saveDc },
         batchId,
         sessionId,
