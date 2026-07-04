@@ -13,6 +13,8 @@ import {
   logRollEvent,
   SessionError,
   CombatError,
+  type RollKind,
+  type RollMode,
 } from "../lib/sessions.js";
 import { serializeCharacter, characterInclude } from "./characters.js";
 
@@ -312,17 +314,23 @@ sessionsRouter.post("/characters/:id/sessions/:sessionId/combat/round", async (r
 sessionsRouter.post("/characters/:id/sessions/:sessionId/roll", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
-  const { kind, source, total, specLabel, damageType, faces } = req.body as {
-    kind?: unknown;
-    source?: unknown;
-    total?: unknown;
-    specLabel?: unknown;
-    damageType?: unknown;
-    faces?: unknown;
-  };
+  const { kind, source, total, specLabel, damageType, faces, ability, skill, dc, rollMode } =
+    req.body as {
+      kind?: unknown;
+      source?: unknown;
+      total?: unknown;
+      specLabel?: unknown;
+      damageType?: unknown;
+      faces?: unknown;
+      ability?: unknown;
+      skill?: unknown;
+      dc?: unknown;
+      rollMode?: unknown;
+    };
 
-  if (kind !== "attack" && kind !== "damage") {
-    res.status(400).json({ error: "kind must be 'attack' or 'damage'" });
+  const VALID_KINDS: RollKind[] = ["attack", "damage", "check", "save", "initiative"];
+  if (typeof kind !== "string" || !VALID_KINDS.includes(kind as RollKind)) {
+    res.status(400).json({ error: `kind must be one of ${VALID_KINDS.join(", ")}` });
     return;
   }
   if (typeof source !== "string" || source.trim() === "") {
@@ -341,15 +349,28 @@ sessionsRouter.post("/characters/:id/sessions/:sessionId/roll", async (req, res)
     res.status(400).json({ error: "faces must be an array of positive integers" });
     return;
   }
+  if (dc !== undefined && typeof dc !== "number") {
+    res.status(400).json({ error: "dc must be a number" });
+    return;
+  }
+  const VALID_MODES: RollMode[] = ["normal", "advantage", "disadvantage"];
+  if (rollMode !== undefined && !VALID_MODES.includes(rollMode as RollMode)) {
+    res.status(400).json({ error: `rollMode must be one of ${VALID_MODES.join(", ")}` });
+    return;
+  }
 
   try {
     await logRollEvent(req.params.id, req.params.sessionId, {
-      kind,
+      kind: kind as RollKind,
       source,
       total,
       specLabel: typeof specLabel === "string" ? specLabel : undefined,
       damageType: typeof damageType === "string" ? damageType : undefined,
       faces: faces as number[] | undefined,
+      ability: typeof ability === "string" ? ability : undefined,
+      skill: typeof skill === "string" ? skill : undefined,
+      dc: typeof dc === "number" ? dc : undefined,
+      rollMode: rollMode as RollMode | undefined,
     });
     res.status(201).json({ ok: true });
   } catch (err) {

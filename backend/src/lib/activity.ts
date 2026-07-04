@@ -304,6 +304,9 @@ export async function revertBatch(
       characterId,
       reverted: false,
       type: { not: "revert" },
+      // Roll events (attack/damage/check/save/initiative) are non-undoable log
+      // entries — skip them so they neither undo themselves nor block a real undo.
+      category: { not: "roll" },
       // Don't look through events whose session has been ended.
       OR: [
         { sessionId: null },

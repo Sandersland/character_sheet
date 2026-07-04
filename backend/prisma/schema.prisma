@@ -795,7 +795,8 @@ enum CharacterEventCategory {
   combat       // combat lifecycle: started / ended / round advanced
   conditions   // status conditions (prone, poisoned, etc.) + exhaustion level
   effects      // active cast-granted stat modifiers (buffs)
-  // future: journal, roll
+  roll         // dice rolls logged from the session UI (attack/damage/check/save/initiative)
+  // future: journal
 }
 
 enum CharacterEventType {
@@ -873,9 +874,12 @@ enum CharacterEventType {
   // effects (active buffs)
   buffApplied
   buffCleared
-  // roll events (attack/damage logged from session UI)
+  // roll events (rolls logged from session UI — non-undoable)
   attackRoll
   damageRoll
+  checkRoll
+  saveRoll
+  initiativeRoll
   // meta
   revert
 }

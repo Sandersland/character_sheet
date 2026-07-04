@@ -327,39 +327,65 @@ const COMBAT_SUMMARIES: Record<CombatEventType, (round?: number) => string> = {
   combatRoundAdvanced: (round) => `Round ${round ?? 2} began`,
 };
 
+export type RollKind = "attack" | "damage" | "check" | "save" | "initiative";
+export type RollMode = "normal" | "advantage" | "disadvantage";
+
+const ROLL_EVENT_TYPES: Record<RollKind, EventType> = {
+  attack: "attackRoll",
+  damage: "damageRoll",
+  check: "checkRoll",
+  save: "saveRoll",
+  initiative: "initiativeRoll",
+};
+
+interface LogRollParams {
+  kind: RollKind;
+  source: string;
+  total: number;
+  specLabel?: string;
+  damageType?: string;
+  /** Raw kept die faces (non-dropped), e.g. [12] for 1d20 or [3, 5] for 2d6. */
+  faces?: number[];
+  /** Ability key for check/save/initiative rolls (already a display-resolved source). */
+  ability?: string;
+  /** Skill key for check rolls. */
+  skill?: string;
+  /** Target difficulty class, when the roll is made against one. */
+  dc?: number;
+  /** Advantage state the d20 was rolled with. */
+  rollMode?: RollMode;
+}
+
+function buildRollSummary(params: LogRollParams): string {
+  const { kind, source, total, specLabel, damageType, dc } = params;
+  if (kind === "damage") {
+    return `${source}: ${total}${damageType ? ` ${damageType}` : ""}${specLabel ? ` (${specLabel})` : ""}`;
+  }
+  const dcSuffix = dc !== undefined ? ` vs DC ${dc}` : "";
+  return `${source}: ${total}${dcSuffix}${specLabel ? ` (${specLabel})` : ""}`;
+}
+
 /**
- * Logs a single attack or damage roll from the session UI. The caller must be an
- * active participant of an active session. Pure log entry — no state mutation.
+ * Logs a single roll (attack / damage / check / save / initiative) from the
+ * session UI. The caller must be an active participant of an active session.
+ * Pure log entry — no state mutation, and non-undoable (before/after null).
  */
 export async function logRollEvent(
   characterId: string,
   sessionId: string,
-  params: {
-    kind: "attack" | "damage";
-    source: string;
-    total: number;
-    specLabel?: string;
-    damageType?: string;
-    /** Raw kept die faces (non-dropped), e.g. [12] for 1d20 or [3, 5] for 2d6. */
-    faces?: number[];
-  },
+  params: LogRollParams,
 ) {
   await assertActiveParticipant(sessionId, characterId);
 
-  const { kind, source, total, specLabel, damageType, faces } = params;
+  const { kind, source, total, specLabel, damageType, faces, ability, skill, dc, rollMode } = params;
   const batchId = randomUUID();
-
-  const summary =
-    kind === "attack"
-      ? `${source}: ${total}${specLabel ? ` (${specLabel})` : ""}`
-      : `${source}: ${total}${damageType ? ` ${damageType}` : ""}${specLabel ? ` (${specLabel})` : ""}`;
 
   return prisma.$transaction(async (tx) => {
     await logEvent(tx, {
       characterId,
-      category: "combat",
-      type: kind === "attack" ? "attackRoll" : "damageRoll",
-      summary,
+      category: "roll",
+      type: ROLL_EVENT_TYPES[kind],
+      summary: buildRollSummary(params),
       batchId,
       sessionId,
       data: {
@@ -369,6 +395,10 @@ export async function logRollEvent(
         specLabel: specLabel ?? null,
         damageType: damageType ?? null,
         faces: faces ?? null,
+        ability: ability ?? null,
+        skill: skill ?? null,
+        dc: dc ?? null,
+        rollMode: rollMode ?? null,
       },
     });
   });
