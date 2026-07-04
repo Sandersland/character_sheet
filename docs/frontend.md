@@ -25,7 +25,8 @@ frontend/src/
 │   │                    #   VitalsStrip's AC tile is read-only: a Popover disclosing the
 │   │                    #   server-derived armorClassBreakdown verbatim (no client AC math)
 │   ├── class/           # ClassFeaturesSection, FightingStylePanel, AddManeuverPanel,
-│   │                    #   ManeuverRow, ResourcePoolRow
+│   │                    #   ManeuverRow, ResourcePoolRow, DisciplinesSection,
+│   │                    #   DisciplineRow, AddDisciplinePanel (Four Elements monk)
 │   ├── conditions/      # ConditionsStrip, AddConditionPanel
 │   ├── dice/            # DiceRoller, PhysicsDiceRoller, DiceScene, DieMesh, DiceRollSequence,
 │   │                    #   RollButton, RollContext, RollResultToast,
@@ -105,6 +106,7 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 | `fightingStyles.ts` | Fighting-style labels/descriptions (presentation; backend is rules source of truth). |
 | `multiclass.ts` | Multiclass display + gating helpers: `isMulticlass`, `classSummary` (single-class → name unchanged; multiclass → "Wizard 5 / Cleric 3"), `multiclassPrereqMet` (evaluates the backend-served `ClassOption.multiclassPrerequisite` thresholds against the character's scores — no rules table duplicated). Feeds `CharacterSheetHeader`/`CharacterCard`/`ClassFeaturesSection`, `AddClassPanel`, `LevelUpModal`. |
 | `maneuvers.ts` | Battle Master maneuver classification data (mechanic/slot) for ManeuverPrompt. |
+| `disciplines.ts` | Four Elements ki rules (mirror of backend): `maxKiPerDiscipline` cap, base-cost/scaling reads, `disciplineKiOptions` selector range, and `disciplineRollSpec` (ki-scaled effect roll). Feeds `DisciplineRow`/`DisciplinesSection`. |
 | `conditions.ts` | 5e condition labels/descriptions for the chip strip + picker. |
 | `characterSections.ts` | Sheet-section visibility predicates (`hasProficiencies`/`hasAdvancements`) — the inline card-gate expressions from CharacterSheetPage. |
 | `formatJournalDate.ts` | Formats ISO journal dates in UTC ("Jun 22, 2026"). |
