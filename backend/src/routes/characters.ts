@@ -47,6 +47,8 @@ import { normalizeResourcesMutable, type AdvancementEntry, type ToolProfEntry } 
 import { normalizeConditionsMutable } from "../lib/conditions.js";
 import { reverseAdvancementEffects } from "../lib/advancement.js";
 import { normalizeSpellcastingMutable } from "../lib/spellcasting.js";
+import type { SpellEntry } from "../lib/spell-state.js";
+import { deriveGrantedSpells } from "../lib/granted-spells.js";
 import { assertCharacterAccess } from "../lib/auth/access.js";
 
 export const charactersRouter = Router();
@@ -307,6 +309,19 @@ function buildMergedWeaponProficiencies(
 
 type PrimaryClass = CharacterWithRelations["classEntries"][number] | undefined;
 
+// Merge derived subclass-granted spells after the stored spells, dropping any
+// grant whose name matches a stored entry (the player's learned copy wins).
+function mergeGrantedSpells(stored: SpellEntry[], granted: SpellEntry[]): SpellEntry[] {
+  if (granted.length === 0) return stored;
+  const storedNames = new Set(stored.map((s) => s.name.toLowerCase()));
+  return [...stored, ...granted.filter((g) => !storedNames.has(g.name.toLowerCase()))];
+}
+
+// Subclass-granted spells across every class entry (each gated by its own level).
+function collectGrantedSpells(entries: CharacterWithRelations["classEntries"]): SpellEntry[] {
+  return entries.flatMap((e) => deriveGrantedSpells(e.name, e.subclass ?? undefined, e.level));
+}
+
 // Spellcasting clamp-on-read: derive stats (ability/DC/attack/slot totals) from
 // class+level+scores, then layer the stored mutable state (slotsUsed, spells,
 // concentration) clamped to the derived caps. Same derive-don't-persist pattern
@@ -333,8 +348,17 @@ function buildSpellcastingView(
     primaryClass?.subclass ?? undefined,
   );
 
+  // Subclass-granted spells (derived, never persisted). Single-class uses the
+  // XP-derived level since the per-class column can be stale.
+  const granted = deriveGrantedSpells(
+    primaryClass?.name ?? "",
+    primaryClass?.subclass ?? undefined,
+    level,
+  );
+
   if (derivedSpell) {
     const stored = normalizeSpellcastingMutable(row.spellcasting);
+    const spells = mergeGrantedSpells(stored.spells, granted);
     return {
       ability: derivedSpell.ability,
       spellSaveDC: derivedSpell.spellSaveDC,
@@ -353,14 +377,30 @@ function buildSpellcastingView(
         total,
         used: Math.min(total, stored.arcanumUsed[String(arcanumLevel)] ?? 0),
       })),
-      spells: stored.spells,
+      spells,
       // Active concentration spell, or null. Clamp-on-read: if the concentrated
       // entry is no longer in the spellbook, treat it as not concentrating.
       concentratingOn:
         stored.concentratingOn &&
-        stored.spells.some((s) => s.id === stored.concentratingOn!.entryId)
+        spells.some((s) => s.id === stored.concentratingOn!.entryId)
           ? stored.concentratingOn
           : null,
+    };
+  }
+  // Non-caster class that nonetheless gets a subclass-granted spell (e.g. a Way
+  // of Shadow monk's Minor Illusion). Surface a slotless view so the grant
+  // renders; monk subclass grants use Wisdom as the casting ability.
+  if (granted.length > 0) {
+    const stored = normalizeSpellcastingMutable(row.spellcasting);
+    const wisMod = abilityModifier(abilityScores.wisdom ?? 10);
+    return {
+      ability: "wisdom",
+      spellSaveDC: 8 + proficiencyBonus + wisMod,
+      spellAttackBonus: proficiencyBonus + wisMod,
+      slots: [],
+      arcana: [],
+      spells: mergeGrantedSpells(stored.spells, granted),
+      concentratingOn: null,
     };
   }
   if (
@@ -392,10 +432,29 @@ function buildMulticlassSpellcastingView(
     abilityScores,
     proficiencyBonus,
   );
-  if (multi.classes.length === 0) return undefined;
 
+  // Subclass-granted spells across every class entry (each gated by its own level).
+  const granted = collectGrantedSpells(row.classEntries);
   const stored = normalizeSpellcastingMutable(row.spellcasting);
+
+  // No caster class in the mix, but a subclass still grants a spell — surface a
+  // slotless Wisdom view (mirrors the single-class non-caster branch).
+  if (multi.classes.length === 0) {
+    if (granted.length === 0) return undefined;
+    const wisMod = abilityModifier(abilityScores.wisdom ?? 10);
+    return {
+      ability: "wisdom",
+      spellSaveDC: 8 + proficiencyBonus + wisMod,
+      spellAttackBonus: proficiencyBonus + wisMod,
+      slots: [],
+      arcana: [],
+      spells: mergeGrantedSpells(stored.spells, granted),
+      concentratingOn: null,
+    };
+  }
+
   const primaryCaster = multi.classes[0];
+  const mergedSpells = mergeGrantedSpells(stored.spells, granted);
   return {
     ability: primaryCaster.ability,
     spellSaveDC: primaryCaster.spellSaveDC,
@@ -423,10 +482,10 @@ function buildMulticlassSpellcastingView(
       : null,
     // Per-class caster stats (ability/DC/attack) for display in a multiclass sheet.
     classes: multi.classes,
-    spells: stored.spells,
+    spells: mergedSpells,
     concentratingOn:
       stored.concentratingOn &&
-      stored.spells.some((s) => s.id === stored.concentratingOn!.entryId)
+      mergedSpells.some((s) => s.id === stored.concentratingOn!.entryId)
         ? stored.concentratingOn
         : null,
   };

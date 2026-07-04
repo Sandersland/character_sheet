@@ -769,6 +769,104 @@ describe("POST /api/characters/:id/experience — disciplines reconciled on leve
   });
 });
 
+// ── Subclass-granted spell reconciliation suite ───────────────────────────────
+// Defense-in-depth: subclass grants are derived and never persisted in the happy
+// path. This exercises reconcileGrantedSpells stripping a *leaked* persisted
+// source:"subclass" entry when a Way of Shadow monk drops below the grant level.
+
+describe("POST /api/characters/:id/experience — granted spells reconciled on level-down", () => {
+  let gsMonkClassId: string;
+  const GS_MONK_NAME = "Test Monk (Granted Spell Suite)";
+
+  const leakedSpellcasting = () => ({
+    slotsUsed: {},
+    spells: [{
+      id: "granted:way-of-shadow:minor-illusion",
+      name: "Minor Illusion",
+      level: 0, school: "illusion", prepared: true, source: "subclass",
+      castingTime: "1 action", range: "30 ft", duration: "1 minute",
+      description: "Leaked persisted grant.",
+    }],
+  });
+
+  beforeAll(async () => {
+    const mc = await prisma.characterClass.upsert({
+      where: { name: GS_MONK_NAME },
+      create: {
+        name: GS_MONK_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"],
+        skillChoiceCount: 2, skillChoices: ["stealth"], isSpellcaster: false, subclassLevel: 3,
+      },
+      update: { subclassLevel: 3 },
+    });
+    gsMonkClassId = mc.id;
+  });
+
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: GS_MONK_NAME } });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { name: { startsWith: "GrantedSpell" } } });
+  });
+
+  async function createLvl3ShadowMonk(id: string) {
+    await ensureTestOwner(OWNER_ID);
+    return prisma.character.create({
+      data: {
+        ...BASE_CHARACTER,
+        ownerId: OWNER_ID,
+        id,
+        name: `GrantedSpell ${id}`,
+        experiencePoints: XP_LVL_3,
+        hitDice: { total: 3, die: "d8", spent: 0 },
+        spellcasting: leakedSpellcasting() as Prisma.InputJsonValue,
+        classEntries: {
+          create: [{ name: GS_MONK_NAME, classId: gsMonkClassId, position: 0, level: 3, subclass: "Way of Shadow" }],
+        },
+      },
+    });
+  }
+
+  it("strips a leaked persisted granted spell when XP drops below level 3", async () => {
+    await createLvl3ShadowMonk("test-gs-strip");
+    const res = await postXp("test-gs-strip", { operations: [{ type: "set", value: XP_LVL_1 }] });
+    expect(res.status).toBe(200);
+
+    const row = await prisma.character.findUnique({ where: { id: "test-gs-strip" }, select: { spellcasting: true } });
+    const stored = row?.spellcasting as { spells: unknown[] } | null;
+    expect(stored?.spells).toHaveLength(0);
+  });
+
+  it("emits a spellcasting event for the stripped grant", async () => {
+    await createLvl3ShadowMonk("test-gs-event");
+    await postXp("test-gs-event", { operations: [{ type: "set", value: XP_LVL_1 }] });
+
+    const actRes = await getActivity("test-gs-event");
+    const ev = actRes.body.find(
+      (e: { category: string; summary: string }) => e.category === "spellcasting" && e.summary.includes("subclass-granted"),
+    );
+    expect(ev).toBeDefined();
+  });
+
+  it("undo restores the leaked granted spell entry", async () => {
+    await createLvl3ShadowMonk("test-gs-undo");
+    const resetRes = await postXp("test-gs-undo", { operations: [{ type: "set", value: XP_LVL_1 }] });
+    expect(resetRes.status).toBe(200);
+
+    const activityRes = await getActivity("test-gs-undo");
+    const batchId: string = activityRes.body[0]?.batchId;
+    expect(batchId).toBeTruthy();
+
+    const undoRes = await postUndo("test-gs-undo", batchId);
+    expect(undoRes.status).toBe(200);
+
+    const row = await prisma.character.findUnique({ where: { id: "test-gs-undo" }, select: { spellcasting: true } });
+    const stored = row?.spellcasting as { spells: Array<{ source?: string }> } | null;
+    expect(stored?.spells).toHaveLength(1);
+    expect(stored?.spells[0].source).toBe("subclass");
+  });
+});
+
 // ── Fighting Style reconciliation suite ───────────────────────────────────────
 // Tests reconcileFightingStyle in level-reconciliation.ts and the read-clamp in
 // serializeCharacter. A pure Fighter keeps its style at every level >= 1, so the

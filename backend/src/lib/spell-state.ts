@@ -36,6 +36,8 @@ export interface SpellEntry {
   saveAbility?: string | null;
   upcastDicePerLevel?: number | null;
   cantripScaling?: boolean;
+  // Provenance of the entry; "subclass" marks a derived, non-persisted grant.
+  source?: string;
 }
 
 /** Spell verbal/somatic/material component flags + optional material text. */
