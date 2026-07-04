@@ -545,6 +545,7 @@ function buildResourcesView(
       toolProfChoiceCount: derivedRes.toolProfChoiceCount,
       disciplineChoiceCount: derivedRes.disciplineChoiceCount,
       disciplineSaveDC: derivedRes.disciplineSaveDC,
+      shadowArtsAvailable: derivedRes.shadowArtsAvailable,
       pools: derivedRes.resources.map((pool) => ({
         key: pool.key,
         label: pool.label,

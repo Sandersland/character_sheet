@@ -121,6 +121,8 @@ describe("Shadow Arts cast endpoint", () => {
       await createMonk(XP_L3, "way of shadow");
       const res = await cast([{ type: "castShadowArt", shadowArtId: id }]);
       expect(res.status).toBe(200);
+      // The serialized character surfaces the Shadow Arts gate flag for the FE panel.
+      expect(res.body.resources.shadowArtsAvailable).toBe(true);
       const ki = res.body.resources.pools.find((p: { key: string }) => p.key === "ki");
       expect(ki.used).toBe(2);
 

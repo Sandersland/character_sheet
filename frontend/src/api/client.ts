@@ -5,9 +5,11 @@ import type {
   CatalogFeat,
   CatalogDiscipline,
   CatalogManeuver,
+  CatalogShadowArt,
   CatalogSpell,
   Character,
   DisciplineOperation,
+  ShadowArtOperation,
   CharacterEvent,
   ConcentrationCheck,
   CharacterSummary,
@@ -208,6 +210,24 @@ export async function applyDisciplineTransactions(
   operations: DisciplineOperation[]
 ): Promise<Character> {
   return postTransactions(characterId, "disciplines", operations, "Failed to apply discipline operations");
+}
+
+// Feeds the Way of Shadow monk's Shadow Arts picker — 4 flat 2-ki ki-cast spells.
+export async function fetchShadowArts(): Promise<CatalogShadowArt[]> {
+  const response = await apiFetch(`${API_URL}/shadow-arts`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch shadow arts catalog (${response.status})`);
+  }
+  return response.json();
+}
+
+// Applies a batch of Shadow Arts operations atomically: castShadowArt (spend a
+// flat 2 ki, apply concentration/buff). Full updated Character returned on success.
+export async function applyShadowArtsTransactions(
+  characterId: string,
+  operations: ShadowArtOperation[]
+): Promise<Character> {
+  return postTransactions(characterId, "shadow-arts", operations, "Failed to apply shadow arts operations");
 }
 
 // One inline edit is a batch of one operation; a bulk action (e.g. selling
