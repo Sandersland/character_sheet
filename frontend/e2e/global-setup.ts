@@ -100,6 +100,16 @@ const ROSTER: Persona[] = [
     disciplineName: "Fangs of the Fire Snake",
     campaignName: "E2E Solo — Four Elements Monk",
   },
+  {
+    name: "Shadow Monk",
+    race: "Human",
+    background: "Soldier",
+    className: "Monk",
+    experiencePoints: LEVEL_6_XP,
+    classLevel: 6,
+    subclassName: "Way of Shadow",
+    campaignName: "E2E Solo — Shadow Monk",
+  },
 ];
 
 // Node fetch doesn't persist cookies, so we thread the session cookie manually.
