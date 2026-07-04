@@ -30,6 +30,7 @@ import { inventoryRouter } from "./routes/inventory.js";
 import { itemsRouter } from "./routes/items.js";
 import { journalRouter } from "./routes/journal.js";
 import { disciplinesRouter } from "./routes/disciplines.js";
+import { shadowArtsRouter } from "./routes/shadow-arts.js";
 import { maneuversRouter } from "./routes/maneuvers.js";
 import { referenceRouter } from "./routes/reference.js";
 import { resourcesRouter } from "./routes/resources.js";
@@ -95,6 +96,7 @@ export function createApp() {
   app.use("/api", classRouter);
   app.use("/api", maneuversRouter);
   app.use("/api", disciplinesRouter);
+  app.use("/api", shadowArtsRouter);
   app.use("/api", featsRouter);
   app.use("/api", advancementRouter);
   app.use("/api", sessionsRouter);

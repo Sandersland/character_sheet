@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "../generated/prisma/client.js";
+import { clearBuffsForSourceInTx } from "./active-effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
@@ -476,6 +477,9 @@ async function applyConcentrationCheckInTx(
     sessionId,
   });
 
+  // Ending concentration drops any buffs it was maintaining (#438).
+  await clearBuffsForSourceInTx(tx, characterId, prior.entryId, batchId, sessionId, result.reason);
+
   return result;
 }
 
@@ -594,6 +598,9 @@ async function applyConcentrationSaveInTx(
     batchId,
     sessionId,
   });
+
+  // Ending concentration drops any buffs it was maintaining (#438).
+  await clearBuffsForSourceInTx(tx, characterId, prior.entryId, batchId, sessionId, "damage");
 
   return result;
 }

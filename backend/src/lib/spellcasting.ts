@@ -19,6 +19,7 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma } from "../generated/prisma/client.js";
 import { castAbilityInTx, type OpOutcome } from "./ability-cast.js";
+import { clearBuffsForSourceInTx } from "./active-effects.js";
 import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";
 import { readEffectSpec } from "./effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
@@ -26,6 +27,7 @@ import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
+import { deriveGrantedSpells } from "./granted-spells.js";
 import type {
   SpellEntry,
   SpellComponents,
@@ -277,17 +279,23 @@ async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): 
   };
 }
 
-function applyForgetSpellOp(ctx: SpellOpContext, op: ForgetSpellOperation): OpOutcome {
+async function applyForgetSpellOp(ctx: SpellOpContext, op: ForgetSpellOperation): Promise<OpOutcome> {
   const { state } = ctx;
+  // Subclass-granted spells are derived, not persisted — they cannot be forgotten.
   const idx = state.spells.findIndex((s) => s.id === op.entryId);
+  if (op.entryId.startsWith("granted:") || state.spells[idx]?.source === "subclass") {
+    throw new InvalidSpellcastingOperationError("Cannot forget a subclass-granted spell.");
+  }
   if (idx === -1) {
     throw new InvalidSpellcastingOperationError(`Spell entry not found: ${op.entryId}`);
   }
   const forgotten = state.spells[idx];
   state.spells.splice(idx, 1);
-  // Forgetting the spell you're concentrating on ends that concentration.
+  // Forgetting the spell you're concentrating on ends that concentration and
+  // drops any buffs it maintained (#438).
   if (state.concentratingOn?.entryId === op.entryId) {
     state.concentratingOn = null;
+    await clearBuffsForSourceInTx(ctx.tx, ctx.characterId, op.entryId, ctx.batchId, ctx.sessionId, "removal");
   }
   return {
     eventType: "forgetSpell",
@@ -368,12 +376,14 @@ async function applyCastSpellOp(ctx: SpellOpContext, op: CastSpellOperation): Pr
   );
 }
 
-function applyDropConcentrationOp(ctx: SpellOpContext): OpOutcome | null {
+async function applyDropConcentrationOp(ctx: SpellOpContext): Promise<OpOutcome | null> {
   const { state } = ctx;
   const prior = state.concentratingOn;
   // Nothing to drop — idempotent no-op (skip write + log).
   if (!prior) return null;
   state.concentratingOn = null;
+  // Ending concentration drops any buffs it was maintaining (#438).
+  await clearBuffsForSourceInTx(ctx.tx, ctx.characterId, prior.entryId, ctx.batchId, ctx.sessionId, "removal");
   return {
     eventType: "concentrationDropped",
     summary: `Stopped concentrating on ${prior.spellName}`,
@@ -412,7 +422,7 @@ export async function applySpellcastingOperations(
           classEntries: {
             orderBy: { position: "asc" as const },
             take: 1,
-            select: { name: true },
+            select: { name: true, subclass: true },
           },
         },
       });
@@ -452,6 +462,15 @@ export async function applySpellcastingOperations(
         },
       };
 
+      // Inject derived subclass-granted spells into the working state so ops that
+      // target them (e.g. casting a Way of Shadow monk's Minor Illusion) resolve.
+      // These are stripped again before persist — they live only in the read view.
+      const granted = deriveGrantedSpells(className, row.classEntries[0]?.subclass ?? undefined, level);
+      if (granted.length > 0) {
+        const names = new Set(state.spells.map((s) => s.name.toLowerCase()));
+        for (const g of granted) if (!names.has(g.name.toLowerCase())) state.spells.push(g);
+      }
+
       const ctx: SpellOpContext = {
         tx,
         characterId,
@@ -470,12 +489,16 @@ export async function applySpellcastingOperations(
         case "expendSlot": outcome = applyExpendSlotOp(ctx, op); break;
         case "restoreSlot": outcome = applyRestoreSlotOp(ctx, op); break;
         case "learnSpell": outcome = await applyLearnSpellOp(ctx, op); break;
-        case "forgetSpell": outcome = applyForgetSpellOp(ctx, op); break;
+        case "forgetSpell": outcome = await applyForgetSpellOp(ctx, op); break;
         case "prepareSpell":
         case "unprepareSpell": outcome = applyPrepareSpellOp(ctx, op); break;
-        case "dropConcentration": outcome = applyDropConcentrationOp(ctx); break;
+        case "dropConcentration": outcome = await applyDropConcentrationOp(ctx); break;
       }
       if (outcome === null) continue;
+
+      // Strip derived grants before persisting — they are never stored (they are
+      // re-derived on read; reconcileGrantedSpells is the safety net for leaks).
+      state.spells = state.spells.filter((s) => s.source !== "subclass");
 
       // Write the updated state back as a compact object.
       await tx.character.update({

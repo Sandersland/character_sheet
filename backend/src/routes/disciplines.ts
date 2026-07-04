@@ -17,7 +17,8 @@ export const disciplinesRouter = Router();
 // GET /api/maneuvers. Each row carries its min monk level, embedded ki cost
 // (AbilityCost), and roll (EffectSpec, ki-scaled). Ordered by min level then name.
 disciplinesRouter.get("/disciplines", async (_req, res) => {
-  const disciplines = await prisma.discipline.findMany({
+  const disciplines = await prisma.grantedAbility.findMany({
+    where: { source: "discipline" },
     orderBy: [{ minLevel: "asc" }, { name: "asc" }],
   });
 

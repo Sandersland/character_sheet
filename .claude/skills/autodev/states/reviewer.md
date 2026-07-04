@@ -4,19 +4,23 @@ Worker's claim — chunks: {{chunks}} · tests: {{testsSummary}}
 
 ## Verify (do not trust, check)
 
+> Anti-false-positive: before claiming any file, symbol, or doc row is missing, Read it at HEAD to confirm — never infer absence from the diff alone.
+
 1. **The diff is the work.** Read every change: `git log --oneline origin/{{integrationBranch}}..HEAD` and `git diff origin/{{integrationBranch}}...HEAD`. Then Read the touched files for context.
 2. **Requirements met.** Re-read the source of truth: `gh issue view {{issue}} --json title,body,comments`. Map every requirement and acceptance criterion to concrete code in the diff. Acceptance criteria to check:
 {{acceptance}}
-3. **Quality is flawless:**
+3. **Adversarial correctness — hunt the bug the tests miss.** Green tests only cover what someone thought to write. For every function and conditional branch in the diff, enumerate the inputs/paths the tests do *not* exercise (null/empty, `false` flags, early returns, the non-happy branch) and trace them. Pay special attention to **create/cleanup symmetry**: state, a resource, or a record applied on one path must be cleared on every path that ends it — a value seeded unconditionally but cleared only under one condition is a leak. Each gap is a `changes` finding naming the function, the unhandled input, and the consequence; if the gap is a missing test rather than a code bug, require the test.
+4. **Quality is flawless:**
    - no dead code, debug leftovers, commented-out blocks, unused exports/imports
    - no multi-line comment blocks; `@/` imports only (no `../`); no raw skill/ability keys rendered; no direct `fetch` from components; frontend files in their proper `components/ui` / `features/<domain>` / `lib` homes
    - backend (if touched): nothing persisted that should be derived; rules data only in `lib/`; mutations only via `…/transactions` endpoints
-   - doc-map surfaces touched → mapped doc updated in the same branch
-4. **It compiles and passes — run it yourself, in the containers** (the backend container already has `DATABASE_URL` set — never override it):
+   - **Doc-map walk:** list the changed paths (`git diff --name-only origin/{{integrationBranch}}...HEAD`) and map EACH through the CLAUDE.md doc-ownership table — `backend/src/routes/*`/`app.ts`→architecture.md router map; `backend/src/lib/*`→architecture.md lib table (+ leveling.md for `level-reconciliation`/`experience*`; CLAUDE.md for `srd.ts` rules); `schema.prisma` models/JSON cols/`CharacterEventType` & `lib/events.ts` `EventCategory`→architecture.md; `frontend/src/{features,pages,components/ui,lib}/*`→frontend.md; new mutable `…/transactions` domain→CLAUDE.md + architecture.md; `Dockerfile*`/compose/env→deployment.md; `package.json`/Prisma→development.md. Confirm the SPECIFIC mapped doc + section was updated — a touched `lib/` file with no matching architecture.md lib-table row is a `changes` finding.
+   - **Comment-drift:** flag any code comment, docstring, or `schema.prisma` model comment the change now contradicts or strands (behavior changed but the nearby comment's claim is stale)
+5. **It compiles and passes — run it yourself, in the containers** (the backend container already has `DATABASE_URL` set — never override it):
    - `docker compose exec -T backend sh -c 'cd /app && npx tsc --noEmit'` (and frontend twin)
    - `docker compose exec -T backend sh -c 'cd /app && npm run lint'` (and frontend twin)
    - `docker compose exec -T backend sh -c 'cd /app && npx vitest run'` and `docker compose exec -T frontend sh -c 'cd /app && npx vitest run'`
-5. **UI surface** (uiSurface = {{uiSurface}}): if true, verify it in this worktree's own running stack. Do this LAST, after all test/lint runs — the backend suite's auth fixtures delete the dev-login user (cascading its characters), so anything created earlier is wiped; the e2e suite's `global-setup.ts` re-seeds the personas after that wipe, which is exactly why it runs here.
+6. **UI surface** (uiSurface = {{uiSurface}}): if true, verify it in this worktree's own running stack. Do this LAST, after all test/lint runs — the backend suite's auth fixtures delete the dev-login user (cascading its characters), so anything created earlier is wiped; the e2e suite's `global-setup.ts` re-seeds the personas after that wipe, which is exactly why it runs here.
    1. **Run the full deterministic e2e suite** — one command; `frontend/e2e/global-setup.ts` owns persona seeding (it idempotently re-creates **Smoke Fighter** L1 + **Wizard L5** after the backend suite wiped `dev-user-local`), so you never hand-roll character-creation curls:
       ```
       docker compose --profile e2e run --rm e2e

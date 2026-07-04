@@ -146,10 +146,10 @@ export function skillBonus(
   abilityScore: number,
   proficiencyBonus: number,
   proficient: boolean,
-  expertise = false
+  expertise = false,
+  tempModifier = 0
 ): number {
   const base = abilityModifier(abilityScore);
-  if (expertise) return base + proficiencyBonus * 2;
-  if (proficient) return base + proficiencyBonus;
-  return base;
+  const profTerm = expertise ? proficiencyBonus * 2 : proficient ? proficiencyBonus : 0;
+  return base + profTerm + tempModifier;
 }

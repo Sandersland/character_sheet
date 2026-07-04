@@ -72,6 +72,11 @@ model Character {
   // boolean presence; `exhaustion` is a single 0–6 level (special case). The
   // canonical condition rules data lives in src/lib/srd.ts (CONDITIONS).
   conditions   Json?
+  // Mutable active-effects state: { buffs: ActiveBuff[] }. Cast-granted stat
+  // modifiers (e.g. a concentration buff spell), each tagged with the casting
+  // entry id so they clear when that concentration ends. Normalized on read;
+  // mutate via the cast path, never PATCH.
+  activeEffects Json?
 
   raceSelection       CharacterRace?
   backgroundSelection CharacterBackground?
@@ -460,13 +465,11 @@ model Maneuver {
   description String
 }
 
-// Elemental Discipline catalog — Way of the Four Elements (Monk). Mirrors
-// Maneuver, plus a min monk level, save ability, and an embedded EffectSpec
-// (lib/effects.ts) + AbilityCost (lib/ability-cost.ts) so a discipline fully
-// describes its ki cost and roll. Provenance pointer in DisciplineEntry.disciplineId.
-model Discipline {
+// Generic granted-ability catalog — source discriminates (e.g. "discipline" for Four Elements); embeds min level, save ability, EffectSpec + AbilityCost. Provenance pointer in DisciplineEntry.disciplineId.
+model GrantedAbility {
   id          String  @id @default(uuid())
   name        String  @unique
+  source      String  @default("discipline")
   description String
   minLevel    Int     @default(3) // minimum monk level to learn
   alwaysKnown Boolean @default(false) // Elemental Attunement — free, uncapped
@@ -489,6 +492,11 @@ model Discipline {
   saveEffect         String?
   upcastDicePerLevel Int?
   cantripScaling     Boolean @default(false)
+
+  // Passive-modifier (buff) effect: applies a flat modifier to a skill/stat
+  // target while the granting concentration holds. null = not a buff.
+  buffTarget         String?
+  buffModifier       Int?
 }
 
 // Feat catalog — seeded from a curated SRD subset. Provenance pointer in
@@ -786,6 +794,7 @@ enum CharacterEventCategory {
   session      // session lifecycle: started / ended
   combat       // combat lifecycle: started / ended / round advanced
   conditions   // status conditions (prone, poisoned, etc.) + exhaustion level
+  effects      // active cast-granted stat modifiers (buffs)
   // future: journal, roll
 }
 
@@ -838,6 +847,7 @@ enum CharacterEventType {
   swapDiscipline
   disciplinesReconciled
   castDiscipline
+  castShadowArt
   learnToolProficiency
   forgetToolProficiency
   toolProficienciesReconciled
@@ -860,6 +870,9 @@ enum CharacterEventType {
   conditionApplied
   conditionRemoved
   exhaustionSet
+  // effects (active buffs)
+  buffApplied
+  buffCleared
   // roll events (attack/damage logged from session UI)
   attackRoll
   damageRoll

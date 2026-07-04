@@ -674,6 +674,136 @@ describe("POST /api/characters/:id/spellcasting/transactions", () => {
   });
 });
 
+// ── Subclass-granted spells (derived, non-persisted) ──────────────────────────
+// A Way of Shadow monk gains Minor Illusion at level 3 as a pure-derived grant.
+// The monk is a non-caster, so the whole spellcasting view exists only because
+// of the grant (slotless Wisdom view).
+
+const MONK_ID = "test-monk-shadow-1";
+
+describe("subclass-granted spells", () => {
+  const MONK_CATALOG_NAME = "Spellcasting Route Test Monk";
+  let monkClassId: string;
+
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: MONK_CATALOG_NAME } });
+  });
+
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+    const cls = await prisma.characterClass.upsert({
+      where: { name: MONK_CATALOG_NAME },
+      create: {
+        name: MONK_CATALOG_NAME, hitDie: "d8",
+        savingThrows: ["strength", "dexterity"], skillChoiceCount: 2,
+        skillChoices: ["acrobatics", "stealth"], isSpellcaster: false, subclassLevel: 3,
+      },
+      update: {},
+    });
+    monkClassId = cls.id;
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: MONK_ID } });
+  });
+
+  const createMonk = async (opts: { xp: number; subclass: string | null; spells?: unknown[] }) => {
+    await prisma.character.create({
+      data: {
+        id: MONK_ID,
+        name: "Shadow Monk",
+        alignment: "Lawful Neutral",
+        experiencePoints: opts.xp,
+        initiativeBonus: 2,
+        speed: 30,
+        hitPoints: { current: 20, max: 20, temp: 0 },
+        hitDice: { total: 3, die: "d8" },
+        abilityScores: {
+          strength: 10, dexterity: 16, constitution: 12,
+          intelligence: 10, wisdom: 15, charisma: 8,
+        },
+        savingThrowProficiencies: ["strength", "dexterity"],
+        skills: [], toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+        ownerId: OWNER_ID,
+        spellcasting: { slotsUsed: {}, spells: opts.spells ?? [] } as Prisma.InputJsonValue,
+        classEntries: { create: [{ name: "monk", classId: monkClassId, position: 0, subclass: opts.subclass ?? undefined }] },
+      },
+    });
+  };
+
+  const getSpells = (body: { spellcasting?: { spells?: Array<{ name: string; source?: string }> } }) =>
+    body.spellcasting?.spells ?? [];
+
+  it("grants Minor Illusion to a Way of Shadow monk at level 3", async () => {
+    await createMonk({ xp: 900, subclass: "Way of Shadow" }); // L3
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}`);
+    expect(res.status).toBe(200);
+    const minor = getSpells(res.body).find((s) => s.name === "Minor Illusion");
+    expect(minor).toBeDefined();
+    expect(minor!.source).toBe("subclass");
+  });
+
+  it("does NOT grant Minor Illusion below level 3", async () => {
+    await createMonk({ xp: 300, subclass: "Way of Shadow" }); // L2
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}`);
+    expect(getSpells(res.body).find((s) => s.name === "Minor Illusion")).toBeUndefined();
+  });
+
+  it("does NOT grant Minor Illusion to a different subclass", async () => {
+    await createMonk({ xp: 900, subclass: "Way of the Open Hand" }); // L3
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}`);
+    expect(getSpells(res.body).find((s) => s.name === "Minor Illusion")).toBeUndefined();
+  });
+
+  it("does not duplicate Minor Illusion when the player also learned it (learned copy wins)", async () => {
+    await createMonk({
+      xp: 900,
+      subclass: "Way of Shadow",
+      spells: [{
+        id: "learned-minor-illusion", name: "Minor Illusion", level: 0, school: "illusion",
+        prepared: true, castingTime: "1 action", range: "30 ft", duration: "1 minute",
+        description: "Learned copy.",
+      }],
+    });
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}`);
+    const matches = getSpells(res.body).filter((s) => s.name === "Minor Illusion");
+    expect(matches).toHaveLength(1);
+    expect(matches[0].source).toBeUndefined(); // the learned entry, not the grant
+  });
+
+  it("400s when trying to forget a subclass-granted spell", async () => {
+    await createMonk({ xp: 900, subclass: "Way of Shadow" });
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
+      .post(`/api/characters/${MONK_ID}/spellcasting/transactions`)
+      .send({ operations: [{ type: "forgetSpell", entryId: "granted:way-of-shadow:minor-illusion" }] });
+    expect(res.status).toBe(400);
+  });
+
+  it("casting a granted cantrip logs the cast but persists no granted entry", async () => {
+    await createMonk({ xp: 900, subclass: "Way of Shadow" });
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE)
+      .post(`/api/characters/${MONK_ID}/spellcasting/transactions`)
+      .send({ operations: [{ type: "castSpell", entryId: "granted:way-of-shadow:minor-illusion", roll: 0 }] });
+    expect(res.status).toBe(200);
+
+    // The response view still surfaces the re-derived grant.
+    const minor = getSpells(res.body).find((s) => s.name === "Minor Illusion");
+    expect(minor!.source).toBe("subclass");
+
+    // Nothing with a granted id / subclass source was persisted.
+    const row = await prisma.character.findUnique({ where: { id: MONK_ID }, select: { spellcasting: true } });
+    const stored = row?.spellcasting as { spells: Array<{ id: string; source?: string }> } | null;
+    expect(stored?.spells.some((s) => s.source === "subclass" || s.id.startsWith("granted:"))).toBe(false);
+
+    // A castSpell event was logged.
+    const activity = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}/activity`);
+    const castEv = (activity.body as Array<{ type: string }>).find((e) => e.type === "castSpell");
+    expect(castEv).toBeDefined();
+  });
+});
+
 // ── Warlock Pact Magic + Mystic Arcanum ───────────────────────────────────────
 // Level-11 Warlock: 3 Pact slots at level 5, plus a 6th-level Mystic Arcanum
 // charge (1/long rest). Exercises arcanum cast routing and rest recharge.

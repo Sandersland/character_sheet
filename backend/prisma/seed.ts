@@ -855,6 +855,42 @@ const DISCIPLINES: DisciplineSeed[] = [
   },
 ];
 
+// ── Shadow Arts catalog (Way of Shadow, #441) ───────────────────────────────
+// The 4 L3 Shadow Arts spells, GrantedAbility rows with source "shadowArts".
+// Flat 2-ki, no scaling (no costPerStep). Concentration is derived in code
+// (shadow-arts.ts CONCENTRATION_SHADOW_ARTS), not a column. Pass without Trace
+// is a buff (+10 Stealth via #438); the rest are utility. Minor Illusion (the
+// other Shadow Arts option) is a granted cantrip, seeded in granted-spells.ts.
+interface ShadowArtSeed {
+  name: string;
+  description: string;
+  effectKind?: "buff";
+  buffTarget?: string;
+  buffModifier?: number;
+}
+
+const SHADOW_ARTS: ShadowArtSeed[] = [
+  {
+    name: "Shadow Arts: Darkness",
+    description: "Spend 2 ki to cast Darkness without material components (a 15-ft sphere of magical darkness). Requires concentration.",
+  },
+  {
+    name: "Shadow Arts: Silence",
+    description: "Spend 2 ki to cast Silence without material components (a 20-ft sphere where no sound can be created or pass). Requires concentration.",
+  },
+  {
+    name: "Shadow Arts: Pass without Trace",
+    description: "Spend 2 ki to cast Pass without Trace without material components — you and nearby allies gain +10 to Stealth checks. Requires concentration.",
+    effectKind: "buff",
+    buffTarget: "stealth",
+    buffModifier: 10,
+  },
+  {
+    name: "Shadow Arts: Darkvision",
+    description: "Spend 2 ki to cast Darkvision without material components, granting 60 ft of darkvision for 8 hours. No concentration.",
+  },
+];
+
 // ── Feat catalog ──────────────────────────────────────────────────────────────
 // Curated SRD subset. abilityOptions/abilityIncrease drive the half-feat bump;
 // empty abilityOptions = not a half-feat. Descriptions are concise summaries.
@@ -1346,6 +1382,17 @@ const SPELLS: CatalogSpell[] = [
     classes: ["cleric", "bard", "wizard", "sorcerer"],
     components: { verbal: true, somatic: false, material: true, materialDescription: "a firefly or phosphorescent moss" },
   },
+  {
+    name: "Minor Illusion",
+    level: 0,
+    school: "illusion",
+    castingTime: "1 action",
+    range: "30 ft",
+    duration: "1 minute",
+    description: "Create a sound or an image of an object within range that lasts for the duration. The illusion ends if you dismiss it or cast this spell again. A creature that uses its action to examine the illusion can determine it is illusory with a successful Investigation check against your spell save DC.",
+    classes: ["bard", "sorcerer", "warlock", "wizard"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a bit of fleece" },
+  },
   // ── Level 1 ───────────────────────────────────────────────────────────────
   {
     name: "Magic Missile",
@@ -1764,6 +1811,7 @@ async function main() {
   for (const discipline of DISCIPLINES) {
     const data = {
       name: discipline.name,
+      source: "discipline",
       description: discipline.description,
       minLevel: discipline.minLevel,
       alwaysKnown: discipline.alwaysKnown ?? false,
@@ -1779,8 +1827,31 @@ async function main() {
       attackType: discipline.attackType ?? null,
       saveEffect: discipline.saveEffect ?? null,
     };
-    await prisma.discipline.upsert({
+    await prisma.grantedAbility.upsert({
       where: { name: discipline.name },
+      create: data,
+      update: data,
+    });
+  }
+
+  // Seed Shadow Arts catalog — upsert by unique name. Flat 2-ki, no scaling.
+  for (const art of SHADOW_ARTS) {
+    const data = {
+      name: art.name,
+      source: "shadowArts",
+      description: art.description,
+      minLevel: 3,
+      alwaysKnown: true,
+      costKind: "pool",
+      costPoolKey: "ki",
+      costBase: 2,
+      costPerStep: null,
+      effectKind: art.effectKind ?? null,
+      buffTarget: art.buffTarget ?? null,
+      buffModifier: art.buffModifier ?? null,
+    };
+    await prisma.grantedAbility.upsert({
+      where: { name: art.name },
       create: data,
       update: data,
     });

@@ -5,8 +5,9 @@
 
 import type { RollSpec } from "@/lib/dice";
 
-// Kind of thing an effect does. "utility" carries no roll today.
-export type EffectType = "damage" | "heal" | "utility";
+// Kind of thing an effect does. "utility" carries no roll today; "buff" applies
+// a passive stat modifier (no roll) while the granting concentration holds.
+export type EffectType = "damage" | "heal" | "utility" | "buff";
 
 // How the dice count grows: cantrips scale by character level, leveled spells by
 // slot upcast steps, ki-fuelled abilities by ki spent above the base cost.
@@ -26,9 +27,12 @@ export interface EffectSpec {
   scaling: EffectScaling;
   concentration?: boolean;
   addAbilityModToHeal?: boolean;
+  // Passive-modifier ("buff") payload — present only for effectType "buff".
+  buffTarget?: string | null;
+  buffModifier?: number | null;
 }
 
-// The 10 flat effect columns snapshotted from the catalog.
+// The flat effect columns snapshotted from the catalog.
 export interface EffectColumns {
   effectKind?: string | null;
   effectDiceCount?: number | null;
@@ -40,6 +44,8 @@ export interface EffectColumns {
   saveEffect?: string | null;
   upcastDicePerLevel?: number | null;
   cantripScaling?: boolean;
+  buffTarget?: string | null;
+  buffModifier?: number | null;
 }
 
 // A row carrying effect columns plus the level that decides the scaling axis.
@@ -67,7 +73,13 @@ export function readEffectSpec(row: EffectRow): EffectSpec {
   }
 
   const effectType: EffectType =
-    row.effectKind === "heal" ? "heal" : row.effectKind === "damage" ? "damage" : "utility";
+    row.effectKind === "heal"
+      ? "heal"
+      : row.effectKind === "damage"
+        ? "damage"
+        : row.effectKind === "buff"
+          ? "buff"
+          : "utility";
 
   return {
     effectType,
@@ -79,6 +91,8 @@ export function readEffectSpec(row: EffectRow): EffectSpec {
     scaling,
     concentration: row.concentration,
     addAbilityModToHeal: row.effectKind === "heal",
+    buffTarget: row.buffTarget ?? null,
+    buffModifier: row.buffModifier ?? null,
   };
 }
 

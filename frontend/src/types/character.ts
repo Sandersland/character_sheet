@@ -49,6 +49,10 @@ export interface Skill {
   ability: AbilityName;
   proficient: boolean;
   expertise?: boolean;
+  /** Active cast-granted buff total (#438). Absent when no buff targets this skill. */
+  tempModifier?: number;
+  /** Per-source breakdown of tempModifier, for display. */
+  tempModifierSources?: { label: string; value: number }[];
 }
 
 export interface Currency {
@@ -378,6 +382,8 @@ export interface SpellComponents {
 export interface Spell {
   id: string;
   spellId?: string;   // catalog Spell.id provenance — undefined for custom spells
+  /** Provenance; "subclass" marks a derived, non-persisted grant (no Remove ✕). */
+  source?: "subclass";
   name: string;
   level: number; // 0 = cantrip
   school: SpellSchool;
@@ -446,6 +452,16 @@ export interface CatalogDiscipline {
   minLevel: number;
   alwaysKnown: boolean;
   saveAbility?: string | null;
+  cost: AbilityCost;
+  effect: EffectSpec;
+}
+
+/** A Way of Shadow Shadow Art from GET /api/shadow-arts (flat 2-ki ki-cast spell). */
+export interface CatalogShadowArt {
+  id: string;
+  name: string;
+  description: string;
+  minLevel: number;
   cost: AbilityCost;
   effect: EffectSpec;
 }
@@ -659,6 +675,8 @@ export interface CharacterResources {
   disciplineChoiceCount?: number;
   /** Way of the Four Elements: ki save DC for discipline effects (8 + prof + Wis mod). */
   disciplineSaveDC?: number;
+  /** Way of Shadow: whether the L3+ Shadow Arts ki-cast spells are available. */
+  shadowArtsAvailable?: boolean;
   /** Number of artisan's-tool proficiency choices from a subclass feature. */
   toolProfChoiceCount?: number;
   pools: ResourcePool[];
@@ -822,6 +840,11 @@ export interface Character {
    * read server-side). Mutate via applyConditionTransactions, never PATCH.
    */
   conditions: ConditionsState;
+  /**
+   * Active cast-granted passive modifiers (buffs). Always present (normalized on
+   * read). Each is also summed into its target skill/stat's tempModifier.
+   */
+  activeEffects: ActiveEffectsState;
 
   /**
    * Derived available actions for the current turn — filtered by class/level/
@@ -1193,6 +1216,17 @@ export interface CastDisciplineOperation {
 }
 export type DisciplineOperation = CastDisciplineOperation;
 
+// ── Shadow Arts operation types (mirrors backend/src/lib/shadow-arts.ts) ──────
+// Sent as `{ operations: ShadowArtOperation[] }` to
+// POST /api/characters/:id/shadow-arts/transactions.
+
+/** Cast a Shadow Art (Way of Shadow): spend a flat 2 ki, apply concentration/buff. */
+export interface CastShadowArtOperation {
+  type: "castShadowArt";
+  shadowArtId: string;
+}
+export type ShadowArtOperation = CastShadowArtOperation;
+
 // ── Conditions state + operation types (mirrors backend/src/lib/conditions.ts)
 // Sent as `{ operations: ConditionOperation[] }` to
 // POST /api/characters/:id/conditions/transactions.
@@ -1225,6 +1259,21 @@ export interface ConditionsState {
   active: ConditionEntry[];
   /** Exhaustion level, 0–6 (6 = death). Special case, not part of `active`. */
   exhaustion: number;
+}
+
+// ── Active effects (buffs) — mirrors backend/src/lib/active-effects.ts ─────────
+
+export interface ActiveBuff {
+  id: string;
+  key: string;
+  target: string;
+  modifier: number;
+  source: string;
+  sourceEntryId?: string;
+}
+
+export interface ActiveEffectsState {
+  buffs: ActiveBuff[];
 }
 
 export interface ApplyConditionOperation { type: "applyCondition"; key: ConditionKey; source?: string }

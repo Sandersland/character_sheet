@@ -2,8 +2,9 @@
 // can describe any activated ability, not just spells. Hand-mirrored on the
 // frontend in frontend/src/lib/effects.ts — keep the two in sync.
 
-// Kind of thing an effect does. "utility" carries no roll today.
-export type EffectType = "damage" | "heal" | "utility";
+// Kind of thing an effect does. "utility" carries no roll today; "buff" applies
+// a passive stat modifier (no roll) while the granting concentration holds.
+export type EffectType = "damage" | "heal" | "utility" | "buff";
 
 // How the dice count grows: cantrips scale by character level, leveled spells by
 // slot upcast steps, ki-fuelled abilities by ki spent above the base cost.
@@ -23,6 +24,10 @@ export interface EffectSpec {
   scaling: EffectScaling;
   concentration?: boolean;
   addAbilityModToHeal?: boolean;
+  // Passive-modifier ("buff") payload — the skill/stat target and flat modifier
+  // applied while the granting concentration holds. Present only for effectType "buff".
+  buffTarget?: string | null;
+  buffModifier?: number | null;
 }
 
 // The 10 flat effect columns snapshotted from the catalog, shared by every
@@ -38,6 +43,8 @@ export interface EffectColumns {
   saveEffect?: string | null;
   upcastDicePerLevel?: number | null;
   cantripScaling?: boolean;
+  buffTarget?: string | null;
+  buffModifier?: number | null;
 }
 
 // A row carrying effect columns plus the level that decides the scaling axis.
@@ -65,7 +72,13 @@ export function readEffectSpec(row: EffectRow): EffectSpec {
   }
 
   const effectType: EffectType =
-    row.effectKind === "heal" ? "heal" : row.effectKind === "damage" ? "damage" : "utility";
+    row.effectKind === "heal"
+      ? "heal"
+      : row.effectKind === "damage"
+        ? "damage"
+        : row.effectKind === "buff"
+          ? "buff"
+          : "utility";
 
   return {
     effectType,
@@ -77,7 +90,24 @@ export function readEffectSpec(row: EffectRow): EffectSpec {
     scaling,
     concentration: row.concentration,
     addAbilityModToHeal: row.effectKind === "heal",
+    buffTarget: row.buffTarget ?? null,
+    buffModifier: row.buffModifier ?? null,
   };
+}
+
+/** A concrete passive-modifier descriptor resolved from a buff EffectSpec. */
+export interface BuffDescriptor {
+  target: string;
+  modifier: number;
+}
+
+// Resolve a buff spec to a concrete { target, modifier }, or null when the spec
+// is not a buff (or lacks a target). The cast path appends this to activeEffects
+// instead of coercing the effect to a roll-less "utility".
+export function resolveBuffSpec(spec: EffectSpec): BuffDescriptor | null {
+  if (spec.effectType !== "buff") return null;
+  if (!spec.buffTarget) return null;
+  return { target: spec.buffTarget, modifier: spec.buffModifier ?? 0 };
 }
 
 // Resolve a spec to a concrete dice roll. `effectiveStep` is the scaling step

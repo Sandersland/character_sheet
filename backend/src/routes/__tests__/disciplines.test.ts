@@ -110,7 +110,7 @@ async function createMonk(experiencePoints: number) {
 
 describe("Elemental disciplines", () => {
   afterAll(async () => {
-    await prisma.discipline.deleteMany({
+    await prisma.grantedAbility.deleteMany({
       where: { name: { in: [NAME_L3_A, NAME_L3_B, NAME_L11, NAME_FREE] } },
     });
     await prisma.characterClass.deleteMany({ where: { name: MONK_CATALOG_NAME } });
@@ -135,22 +135,22 @@ describe("Elemental disciplines", () => {
     classId = cls.id;
 
     const [l3a, l3b, l11, free] = await Promise.all([
-      prisma.discipline.upsert({
+      prisma.grantedAbility.upsert({
         where: { name: NAME_L3_A },
         create: { name: NAME_L3_A, description: "L3 test discipline A.", minLevel: 3 },
         update: { minLevel: 3, alwaysKnown: false },
       }),
-      prisma.discipline.upsert({
+      prisma.grantedAbility.upsert({
         where: { name: NAME_L3_B },
         create: { name: NAME_L3_B, description: "L3 test discipline B.", minLevel: 3 },
         update: { minLevel: 3, alwaysKnown: false },
       }),
-      prisma.discipline.upsert({
+      prisma.grantedAbility.upsert({
         where: { name: NAME_L11 },
         create: { name: NAME_L11, description: "L11 test discipline.", minLevel: 11 },
         update: { minLevel: 11, alwaysKnown: false },
       }),
-      prisma.discipline.upsert({
+      prisma.grantedAbility.upsert({
         where: { name: NAME_FREE },
         create: { name: NAME_FREE, description: "Always-known test discipline.", minLevel: 3, alwaysKnown: true },
         update: { minLevel: 3, alwaysKnown: true },
