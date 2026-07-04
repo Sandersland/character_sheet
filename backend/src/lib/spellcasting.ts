@@ -18,10 +18,11 @@ import { randomUUID } from "node:crypto";
 
 
 import { Prisma } from "../generated/prisma/client.js";
-import { payAbilityCostInTx, InvalidSpellcastingOperationError, type PayCostContext } from "./ability-cost.js";
+import { castAbilityInTx, type OpOutcome } from "./ability-cast.js";
+import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";
+import { readEffectSpec } from "./effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
-import { applyHealInTx, applyDamageInTx } from "./hitpoints.js";
 import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
@@ -153,12 +154,6 @@ interface SpellOpContext {
   state: SpellcastingMutableState;
   slotTotals: Record<number, number>;
   arcanaTotals: Record<number, number>;
-}
-
-interface OpOutcome {
-  eventType: string;
-  summary: string;
-  eventData: Record<string, unknown>;
 }
 
 function applyExpendSlotOp(ctx: SpellOpContext, op: ExpendSlotOperation): OpOutcome {
@@ -326,44 +321,6 @@ function applyPrepareSpellOp(
   };
 }
 
-// Log + clear the prior concentration when a new concentration spell displaces it.
-async function dropConcentrationOnCastInTx(ctx: SpellOpContext, entry: SpellEntry): Promise<void> {
-  const { tx, characterId, batchId, sessionId, state } = ctx;
-  const prior = state.concentratingOn;
-  if (!prior || prior.entryId === entry.id) return;
-  const dropBefore = {
-    spellcasting: {
-      slotsUsed: { ...state.slotsUsed },
-      arcanumUsed: { ...state.arcanumUsed },
-      spells: [...state.spells],
-      concentratingOn: { ...prior },
-    },
-  };
-  // No intermediate DB write here: the common write-back below persists the final
-  // state (with the newly-cast concentration spell), so writing `concentratingOn:
-  // null` first would just be overwritten. Clearing the in-memory flag is enough
-  // for this drop event's `before`/`after` payloads.
-  state.concentratingOn = null;
-  await logEvent(tx, {
-    characterId,
-    category: "spellcasting",
-    type: "concentrationDropped",
-    summary: `Concentration on ${prior.spellName} dropped (cast ${entry.name})`,
-    before: dropBefore,
-    after: {
-      spellcasting: {
-        slotsUsed: { ...state.slotsUsed },
-        arcanumUsed: { ...state.arcanumUsed },
-        spells: [...state.spells],
-        concentratingOn: null,
-      },
-    },
-    data: { droppedEntryId: prior.entryId, droppedSpellName: prior.spellName, reason: "newCast", castEntryId: entry.id },
-    batchId,
-    sessionId,
-  });
-}
-
 // Adapt a SpellOpContext to the ability-cost payer's context. The slot maps are
 // the same references as state.slotsUsed/arcanumUsed, so in-place spends persist.
 function costCtx(ctx: SpellOpContext): PayCostContext {
@@ -379,61 +336,36 @@ function costCtx(ctx: SpellOpContext): PayCostContext {
   };
 }
 
+// Thin wrapper over the shared castAbilityInTx: cantrips cost nothing, leveled
+// spells cost a slot (with Mystic Arcanum fallback in the payer). The shared
+// caster formats the summary, drops/sets concentration, and self-applies.
 async function applyCastSpellOp(ctx: SpellOpContext, op: CastSpellOperation): Promise<OpOutcome> {
-  const { characterId, batchId, sessionId, state } = ctx;
-  const entry = state.spells.find((s) => s.id === op.entryId);
+  const entry = ctx.state.spells.find((s) => s.id === op.entryId);
   if (!entry) {
     throw new InvalidSpellcastingOperationError(`Spell entry not found: ${op.entryId}`);
   }
-
-  let summary: string;
-  let eventData: Record<string, unknown>;
-
-  if (entry.level === 0) {
-    // Cantrip — no cost.
-    await payAbilityCostInTx(costCtx(ctx), { kind: "none" });
-    if (entry.effectKind && op.roll > 0) {
-      summary = `Cast ${entry.name}: ${op.roll}${entry.damageType ? " " + entry.damageType : ""} ${entry.effectKind === "heal" ? "healing" : "damage"}`;
-    } else {
-      summary = `Cast ${entry.name}`;
-    }
-    eventData = { entryId: op.entryId, spellName: entry.name, roll: op.roll, slotLevel: null };
-  } else {
-    // Leveled spell — pay a slot (or a Mystic Arcanum charge) via the payer.
-    const slotLevel = op.slotLevel ?? entry.level;
-    const paid = await payAbilityCostInTx(
-      costCtx(ctx),
-      { kind: "slot", minLevel: entry.level },
-      op.slotLevel
-    );
-    const slotLabel = paid.label;
-
-    if (entry.effectKind && op.roll > 0) {
-      summary = `Cast ${entry.name} (${slotLabel}): ${op.roll}${entry.damageType ? " " + entry.damageType : ""} ${entry.effectKind === "heal" ? "healing" : "damage"}`;
-    } else {
-      summary = `Cast ${entry.name} (${slotLabel})`;
-    }
-    eventData = { entryId: op.entryId, spellName: entry.name, roll: op.roll, slotLevel };
-  }
-
-  // Concentration: a character maintains at most one concentration spell. Casting
-  // a new one auto-drops the prior (logged separately). Re-casting the same refreshes.
-  if (entry.concentration) {
-    await dropConcentrationOnCastInTx(ctx, entry);
-    state.concentratingOn = { entryId: entry.id, spellName: entry.name };
-  }
-
-  // Self-targeted effect: apply to the caster's own HP in this same batch so the
-  // slot-spend and HP-change revert together as one undo step.
-  if (op.apply && op.apply.target === "self" && op.apply.amount > 0) {
-    if (op.apply.kind === "heal") {
-      await applyHealInTx(ctx.tx, characterId, op.apply.amount, batchId, sessionId);
-    } else {
-      await applyDamageInTx(ctx.tx, characterId, op.apply.amount, batchId, sessionId);
-    }
-  }
-
-  return { eventType: "castSpell", summary, eventData };
+  const cost: AbilityCost = entry.level === 0 ? { kind: "none" } : { kind: "slot", minLevel: entry.level };
+  return castAbilityInTx(
+    {
+      tx: ctx.tx,
+      characterId: ctx.characterId,
+      batchId: ctx.batchId,
+      sessionId: ctx.sessionId,
+      cost: costCtx(ctx),
+      concentrationHost: ctx.state,
+    },
+    {
+      name: entry.name,
+      entryId: op.entryId,
+      cost,
+      effect: readEffectSpec(entry),
+      requested: op.slotLevel,
+      roll: op.roll,
+      eventType: "castSpell",
+      concentrates: Boolean(entry.concentration),
+      apply: op.apply,
+    },
+  );
 }
 
 function applyDropConcentrationOp(ctx: SpellOpContext): OpOutcome | null {
