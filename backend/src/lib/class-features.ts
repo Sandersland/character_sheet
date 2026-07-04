@@ -56,6 +56,8 @@ export interface DerivedClassInfo {
   disciplineChoiceCount?: number;
   /** Way of the Four Elements only: ki save DC for discipline effects (8 + prof + Wis mod). */
   disciplineSaveDC?: number;
+  /** Way of Shadow only: whether the L3+ Shadow Arts ki-cast spells are available. */
+  shadowArtsAvailable?: boolean;
 }
 
 // ── Battle Master rules data ──────────────────────────────────────────────────
@@ -2367,6 +2369,11 @@ export function deriveResources(
   if (subclassKey === "way of the four elements" && level >= 3) {
     result.disciplineChoiceCount = fourElementsDisciplineCount(level);
     result.disciplineSaveDC = kiSaveDC(abilityScores, profBonus);
+  }
+
+  // Way of Shadow — Shadow Arts ki-cast spells unlock at monk level 3
+  if (subclassKey === "way of shadow" && level >= 3) {
+    result.shadowArtsAvailable = true;
   }
 
   return result;

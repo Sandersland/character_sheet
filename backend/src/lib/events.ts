@@ -65,6 +65,7 @@ export type EventType =
   | "swapDiscipline"
   | "disciplinesReconciled"
   | "castDiscipline"
+  | "castShadowArt"
   | "learnToolProficiency"
   | "forgetToolProficiency"
   | "toolProficienciesReconciled"
