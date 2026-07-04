@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { formatRollBreakdown, formatRollSpec, rollDie, rollSpec, summarizeRoll } from "./dice";
+import {
+  formatRollBreakdown,
+  formatRollSpec,
+  rollDie,
+  rollSpec,
+  summarizeRoll,
+  usesAdvantage,
+} from "./dice";
 
 describe("rollDie", () => {
   afterEach(() => {
@@ -130,6 +137,101 @@ describe("summarizeRoll", () => {
     expect(fromObservedValues).toEqual(fromEngine);
 
     vi.restoreAllMocks();
+  });
+});
+
+describe("advantage / disadvantage", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("advantage rolls two d20s and keeps the higher, flagging the lower dropped", () => {
+    // dice rolled in order: 7, 18 — advantage keeps 18.
+    const sequence = [(7 - 1) / 20, (18 - 1) / 20];
+    let call = 0;
+    vi.spyOn(Math, "random").mockImplementation(() => sequence[call++]);
+
+    const result = rollSpec({ count: 1, faces: 20, modifier: 5, mode: "advantage" });
+
+    expect(result.dice).toEqual([
+      { value: 7, dropped: true },
+      { value: 18, dropped: false },
+    ]);
+    expect(result.total).toBe(23); // 18 + 5
+  });
+
+  it("disadvantage rolls two d20s and keeps the lower, flagging the higher dropped", () => {
+    const sequence = [(7 - 1) / 20, (18 - 1) / 20];
+    let call = 0;
+    vi.spyOn(Math, "random").mockImplementation(() => sequence[call++]);
+
+    const result = rollSpec({ count: 1, faces: 20, modifier: 5, mode: "disadvantage" });
+
+    expect(result.dice).toEqual([
+      { value: 7, dropped: false },
+      { value: 18, dropped: true },
+    ]);
+    expect(result.total).toBe(12); // 7 + 5
+  });
+
+  it("keeps exactly one die on a tie (both natural values equal)", () => {
+    const sequence = [(11 - 1) / 20, (11 - 1) / 20];
+    let call = 0;
+    vi.spyOn(Math, "random").mockImplementation(() => sequence[call++]);
+
+    const result = rollSpec({ count: 1, faces: 20, mode: "advantage" });
+
+    expect(result.dice.filter((d) => !d.dropped)).toHaveLength(1);
+    expect(result.dice.filter((d) => d.dropped)).toHaveLength(1);
+    expect(result.total).toBe(11);
+  });
+
+  it("mode: normal is unchanged — a single d20", () => {
+    vi.spyOn(Math, "random").mockReturnValue((14 - 1) / 20);
+
+    const result = rollSpec({ count: 1, faces: 20, modifier: 2, mode: "normal" });
+
+    expect(result.dice).toEqual([{ value: 14, dropped: false }]);
+    expect(result.total).toBe(16);
+  });
+
+  it("no-ops advantage on a multi-die damage spec (2d6 stays two dice)", () => {
+    const result = rollSpec({ count: 2, faces: 6, mode: "advantage" });
+    expect(result.dice).toHaveLength(2);
+    expect(result.dice.filter((d) => d.dropped)).toHaveLength(0);
+  });
+
+  it("no-ops advantage on a non-d20 single die (1d8 stays one die)", () => {
+    const result = rollSpec({ count: 1, faces: 8, mode: "advantage" });
+    expect(result.dice).toHaveLength(1);
+    expect(result.dice[0].dropped).toBe(false);
+  });
+
+  it("summarizeRoll applies advantage drop logic to externally-observed values", () => {
+    const result = summarizeRoll([12, 3], { count: 1, faces: 20, mode: "disadvantage" });
+    expect(result.dice).toEqual([
+      { value: 12, dropped: true },
+      { value: 3, dropped: false },
+    ]);
+    expect(result.total).toBe(3);
+  });
+
+  it("usesAdvantage guards on mode + single d20 only", () => {
+    expect(usesAdvantage({ count: 1, faces: 20, mode: "advantage" })).toBe(true);
+    expect(usesAdvantage({ count: 1, faces: 20, mode: "disadvantage" })).toBe(true);
+    expect(usesAdvantage({ count: 1, faces: 20, mode: "normal" })).toBe(false);
+    expect(usesAdvantage({ count: 1, faces: 20 })).toBe(false);
+    expect(usesAdvantage({ count: 2, faces: 20, mode: "advantage" })).toBe(false);
+    expect(usesAdvantage({ count: 1, faces: 6, mode: "advantage" })).toBe(false);
+  });
+
+  it("formats a mode suffix on the spec label", () => {
+    expect(formatRollSpec({ count: 1, faces: 20, modifier: 5, mode: "advantage" })).toBe(
+      "1d20 + 5 (advantage)",
+    );
+    expect(formatRollSpec({ count: 1, faces: 20, mode: "disadvantage" })).toBe(
+      "1d20 (disadvantage)",
+    );
   });
 });
 
