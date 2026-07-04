@@ -10,6 +10,7 @@ import supertest from "supertest";
 
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
+import { disciplineEffectSpec, maxKiPerDiscipline } from "../../lib/disciplines.js";
 import { prisma } from "../../lib/prisma.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
 import { authCookie } from "../../test-support/auth.js";
@@ -20,9 +21,12 @@ let COOKIE: string;
 const FIXTURE_ID = "test-disc-cast-monk-1";
 const CLASS_NAME = "Disc Cast Test Monk";
 
-// XP thresholds → monk level: L3=900, L5=6500.
+// XP thresholds → monk level: L3=900, L5=6500, L6=14000, L11=85000, L17=225000.
 const XP_L3 = 900;
 const XP_L5 = 6500;
+const XP_L6 = 14000;
+const XP_L11 = 85000;
+const XP_L17 = 225000;
 
 const url = `/api/characters/${FIXTURE_ID}/disciplines/transactions`;
 const resourcesUrl = `/api/characters/${FIXTURE_ID}/resources/transactions`;
@@ -256,4 +260,88 @@ describe("Discipline cast endpoint", () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/Four Elements/i);
   });
+
+  // ── L6 / L11 / L17 disciplines (issue #425) ──────────────────────────────────
+
+  interface HighLevelCase {
+    name: string;
+    xp: number;
+    level: number;
+    base: number;
+    cap: number;
+    dc?: number; // only save-bearing disciplines log a DC
+  }
+
+  // dc = 8 + prof + Wis mod(+2); cap = maxKiPerDiscipline(level).
+  const HIGH_LEVEL: HighLevelCase[] = [
+    { name: "Clench of the North Wind", xp: XP_L6, level: 6, base: 3, cap: 3, dc: 13 },
+    { name: "Gong of the Summit", xp: XP_L6, level: 6, base: 3, cap: 3, dc: 13 },
+    { name: "Flames of the Phoenix", xp: XP_L11, level: 11, base: 4, cap: 4, dc: 14 },
+    { name: "Mist Stance", xp: XP_L11, level: 11, base: 4, cap: 4 },
+    { name: "Ride the Wind", xp: XP_L11, level: 11, base: 4, cap: 4 },
+    { name: "Breath of Winter", xp: XP_L17, level: 17, base: 6, cap: 6, dc: 16 },
+    { name: "Eternal Mountain Defense", xp: XP_L17, level: 17, base: 5, cap: 6 },
+    { name: "River of Hungry Flame", xp: XP_L17, level: 17, base: 5, cap: 6, dc: 16 },
+    { name: "Wave of Rolling Earth", xp: XP_L17, level: 17, base: 6, cap: 6 },
+  ];
+
+  for (const c of HIGH_LEVEL) {
+    it(`casts ${c.name} at its base ki cost with the right cap and DC`, async () => {
+      await createMonk(c.xp);
+      const disc = await prisma.discipline.findUnique({ where: { name: c.name } });
+      expect(disc).not.toBeNull();
+      await learn(disc!.id);
+
+      expect(maxKiPerDiscipline(c.level)).toBe(c.cap);
+      const res = await cast([{ type: "castDiscipline", disciplineId: disc!.id, kiSpent: c.base, roll: c.dc ? 20 : 0 }]);
+      expect(res.status).toBe(200);
+      const ki = res.body.resources.pools.find((p: { key: string }) => p.key === "ki");
+      expect(ki.used).toBe(c.base);
+
+      const events = await activity();
+      const castEvent = events.find(
+        (e) => e.type === "castDiscipline" && (e.data as { disciplineId?: string })?.disciplineId === disc!.id,
+      )!;
+      expect(castEvent).toBeDefined();
+      expect(castEvent.data).toMatchObject({ disciplineId: disc!.id, kiSpent: c.base });
+      if (c.dc !== undefined) {
+        expect(castEvent.data).toMatchObject({ saveDc: c.dc });
+        expect(castEvent.summary).toMatch(new RegExp(`save DC ${c.dc}`));
+      }
+    });
+  }
+
+  it("rejects ki above the per-cast cap for a high-level discipline", async () => {
+    await createMonk(XP_L6); // per-cast cap is 3 ki at L6
+    const gong = await prisma.discipline.findUnique({ where: { name: "Gong of the Summit" } });
+    await learn(gong!.id);
+    const res = await cast([{ type: "castDiscipline", disciplineId: gong!.id, kiSpent: 4, roll: 20 }]);
+    expect(res.status).toBe(400);
+  });
+
+  // ── spell-mapped damage disciplines roll identical dice to their spell ────────
+
+  const SPELL_MAPPED = [
+    { discipline: "Gong of the Summit", spell: "Shatter" },
+    { discipline: "Flames of the Phoenix", spell: "Fireball" },
+    { discipline: "Breath of Winter", spell: "Cone of Cold" },
+    { discipline: "River of Hungry Flame", spell: "Wall of Fire" },
+  ];
+
+  for (const m of SPELL_MAPPED) {
+    it(`${m.discipline} rolls identical dice to ${m.spell} via a ki-scaled EffectSpec`, async () => {
+      const [disc, spell] = await Promise.all([
+        prisma.discipline.findUnique({ where: { name: m.discipline } }),
+        prisma.spell.findUnique({ where: { name: m.spell } }),
+      ]);
+      expect(disc).not.toBeNull();
+      expect(spell).not.toBeNull();
+
+      const effect = disciplineEffectSpec(disc!);
+      expect(effect.effectType).toBe("damage");
+      expect(effect.dice).toMatchObject({ count: spell!.effectDiceCount, faces: spell!.effectDiceFaces });
+      expect(effect.damageType).toBe(spell!.damageType);
+      expect(effect.scaling).toMatchObject({ mode: "ki" });
+    });
+  }
 });
