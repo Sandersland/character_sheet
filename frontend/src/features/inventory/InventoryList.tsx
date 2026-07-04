@@ -284,7 +284,7 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
       className="p-4"
     >
       <div className="flex flex-col gap-3">
-        {hasItems && (
+        {totalWeight > 0 && (
           <div className="flex flex-col gap-1">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold uppercase tracking-wide text-parchment-600">
