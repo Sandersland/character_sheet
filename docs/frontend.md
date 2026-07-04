@@ -27,7 +27,8 @@ frontend/src/
 │   ├── class/           # ClassFeaturesSection, FightingStylePanel, AddManeuverPanel,
 │   │                    #   ManeuverRow, ResourcePoolRow, DisciplinesSection,
 │   │                    #   DisciplineRow, AddDisciplinePanel (Four Elements monk),
-│   │                    #   ShadowArtsSection, ShadowArtRow (Way of Shadow ki-cast)
+│   │                    #   ShadowArtsSection, ShadowArtRow (Way of Shadow ki-cast),
+│   │                    #   CloakOfShadowsSection (Way of Shadow L11 self-invisible toggle)
 │   ├── conditions/      # ConditionsStrip, AddConditionPanel
 │   ├── dice/            # DiceRoller, PhysicsDiceRoller, DiceScene, DieMesh, DiceRollSequence,
 │   │                    #   RollButton, RollContext, RollResultToast,
