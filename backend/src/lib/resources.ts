@@ -432,8 +432,8 @@ async function resolveDiscipline(
     );
   }
   if (op.disciplineId) {
-    const catalog = await tx.discipline.findUnique({ where: { id: op.disciplineId } });
-    if (!catalog) {
+    const catalog = await tx.grantedAbility.findUnique({ where: { id: op.disciplineId } });
+    if (!catalog || catalog.source !== "discipline") {
       throw new InvalidResourceOperationError(`Discipline not found in catalog: ${op.disciplineId}`);
     }
     if (catalog.alwaysKnown) {

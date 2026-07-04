@@ -101,9 +101,9 @@ describe("Discipline cast endpoint", () => {
     classId = cls.id;
 
     const [ww, att, gale] = await Promise.all([
-      prisma.discipline.findUnique({ where: { name: "Water Whip" } }),
-      prisma.discipline.findUnique({ where: { name: "Elemental Attunement" } }),
-      prisma.discipline.findUnique({ where: { name: "Rush of the Gale Spirits" } }),
+      prisma.grantedAbility.findUnique({ where: { name: "Water Whip" } }),
+      prisma.grantedAbility.findUnique({ where: { name: "Elemental Attunement" } }),
+      prisma.grantedAbility.findUnique({ where: { name: "Rush of the Gale Spirits" } }),
     ]);
     waterWhipId = ww!.id;
     attunementId = att!.id;
@@ -288,7 +288,7 @@ describe("Discipline cast endpoint", () => {
   for (const c of HIGH_LEVEL) {
     it(`casts ${c.name} at its base ki cost with the right cap and DC`, async () => {
       await createMonk(c.xp);
-      const disc = await prisma.discipline.findUnique({ where: { name: c.name } });
+      const disc = await prisma.grantedAbility.findUnique({ where: { name: c.name } });
       expect(disc).not.toBeNull();
       await learn(disc!.id);
 
@@ -313,7 +313,7 @@ describe("Discipline cast endpoint", () => {
 
   it("rejects ki above the per-cast cap for a high-level discipline", async () => {
     await createMonk(XP_L6); // per-cast cap is 3 ki at L6
-    const gong = await prisma.discipline.findUnique({ where: { name: "Gong of the Summit" } });
+    const gong = await prisma.grantedAbility.findUnique({ where: { name: "Gong of the Summit" } });
     await learn(gong!.id);
     const res = await cast([{ type: "castDiscipline", disciplineId: gong!.id, kiSpent: 4, roll: 20 }]);
     expect(res.status).toBe(400);
@@ -331,7 +331,7 @@ describe("Discipline cast endpoint", () => {
   for (const m of SPELL_MAPPED) {
     it(`${m.discipline} rolls identical dice to ${m.spell} via a ki-scaled EffectSpec`, async () => {
       const [disc, spell] = await Promise.all([
-        prisma.discipline.findUnique({ where: { name: m.discipline } }),
+        prisma.grantedAbility.findUnique({ where: { name: m.discipline } }),
         prisma.spell.findUnique({ where: { name: m.spell } }),
       ]);
       expect(disc).not.toBeNull();
@@ -344,4 +344,63 @@ describe("Discipline cast endpoint", () => {
       expect(effect.scaling).toMatchObject({ mode: "ki" });
     });
   }
+});
+
+// Source discriminator: a non-discipline GrantedAbility row must not leak into
+// the discipline picker or drive the discipline cast path.
+describe("GrantedAbility source discriminator", () => {
+  const SHADOW_NAME = "Test Shadow Arts Ability #437";
+  const SHADOW_CLASS = "Disc Source Test Monk";
+  const SHADOW_FIXTURE_ID = "test-disc-source-monk-1";
+  let shadowId: string;
+  let sourceClassId: string;
+
+  beforeAll(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+    const cls = await prisma.characterClass.upsert({
+      where: { name: SHADOW_CLASS },
+      create: { name: SHADOW_CLASS, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics", "stealth"], isSpellcaster: false },
+      update: {},
+    });
+    sourceClassId = cls.id;
+    const row = await prisma.grantedAbility.upsert({
+      where: { name: SHADOW_NAME },
+      create: { name: SHADOW_NAME, description: "A future shadow-arts ability.", source: "shadowArts", minLevel: 3 },
+      update: { source: "shadowArts", minLevel: 3 },
+    });
+    shadowId = row.id;
+  });
+
+  afterAll(async () => {
+    await prisma.character.deleteMany({ where: { id: SHADOW_FIXTURE_ID } });
+    await prisma.grantedAbility.deleteMany({ where: { name: SHADOW_NAME } });
+    await prisma.characterClass.deleteMany({ where: { name: SHADOW_CLASS } });
+  });
+
+  it("excludes non-discipline rows from GET /api/disciplines", async () => {
+    const res = await agent().get("/api/disciplines");
+    expect(res.status).toBe(200);
+    expect((res.body as { id: string }[]).some((d) => d.id === shadowId)).toBe(false);
+  });
+
+  it("rejects castDiscipline against a non-discipline id", async () => {
+    await prisma.character.create({
+      data: {
+        ...FIXTURE_BASE,
+        id: SHADOW_FIXTURE_ID,
+        experiencePoints: XP_L3,
+        ownerId: OWNER_ID,
+        resources: Prisma.JsonNull,
+        classEntries: {
+          create: [{ name: "monk", subclass: "way of the four elements", classId: sourceClassId, position: 0 }],
+        },
+      },
+    });
+    const res = await agent()
+      .post(`/api/characters/${SHADOW_FIXTURE_ID}/disciplines/transactions`)
+      .send({ operations: [{ type: "castDiscipline", disciplineId: shadowId, kiSpent: 2, roll: 10 }] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/not found in catalog/);
+  });
 });

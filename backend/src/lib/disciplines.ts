@@ -162,8 +162,8 @@ export async function applyDisciplineOperations(
         );
       }
 
-      const catalog = await tx.discipline.findUnique({ where: { id: op.disciplineId } });
-      if (!catalog) {
+      const catalog = await tx.grantedAbility.findUnique({ where: { id: op.disciplineId } });
+      if (!catalog || catalog.source !== "discipline") {
         throw new InvalidDisciplineOperationError(`Discipline not found in catalog: ${op.disciplineId}`);
       }
 

@@ -1346,6 +1346,17 @@ const SPELLS: CatalogSpell[] = [
     classes: ["cleric", "bard", "wizard", "sorcerer"],
     components: { verbal: true, somatic: false, material: true, materialDescription: "a firefly or phosphorescent moss" },
   },
+  {
+    name: "Minor Illusion",
+    level: 0,
+    school: "illusion",
+    castingTime: "1 action",
+    range: "30 ft",
+    duration: "1 minute",
+    description: "Create a sound or an image of an object within range that lasts for the duration. The illusion ends if you dismiss it or cast this spell again. A creature that uses its action to examine the illusion can determine it is illusory with a successful Investigation check against your spell save DC.",
+    classes: ["bard", "sorcerer", "warlock", "wizard"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a bit of fleece" },
+  },
   // ── Level 1 ───────────────────────────────────────────────────────────────
   {
     name: "Magic Missile",
@@ -1764,6 +1775,7 @@ async function main() {
   for (const discipline of DISCIPLINES) {
     const data = {
       name: discipline.name,
+      source: "discipline",
       description: discipline.description,
       minLevel: discipline.minLevel,
       alwaysKnown: discipline.alwaysKnown ?? false,
@@ -1779,7 +1791,7 @@ async function main() {
       attackType: discipline.attackType ?? null,
       saveEffect: discipline.saveEffect ?? null,
     };
-    await prisma.discipline.upsert({
+    await prisma.grantedAbility.upsert({
       where: { name: discipline.name },
       create: data,
       update: data,
