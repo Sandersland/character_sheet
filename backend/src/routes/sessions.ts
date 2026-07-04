@@ -350,8 +350,8 @@ sessionsRouter.post("/characters/:id/sessions/:sessionId/roll", async (req, res)
     res.status(400).json({ error: "faces must be an array of positive integers" });
     return;
   }
-  if (dc !== undefined && typeof dc !== "number") {
-    res.status(400).json({ error: "dc must be a number" });
+  if (dc !== undefined && (typeof dc !== "number" || !Number.isFinite(dc))) {
+    res.status(400).json({ error: "dc must be a finite number" });
     return;
   }
   const VALID_MODES: RollMode[] = ["normal", "advantage", "disadvantage"];
