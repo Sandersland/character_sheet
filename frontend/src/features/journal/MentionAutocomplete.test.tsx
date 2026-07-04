@@ -194,3 +194,93 @@ describe("MentionAutocomplete (#248)", () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 });
+
+describe("MentionAutocomplete combobox ARIA (#273)", () => {
+  it("wires aria-controls to the listbox and aria-activedescendant to the active option", async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<Harness campaignId="camp-1" />);
+    const editor = screen.getByLabelText("Note body");
+
+    expect(editor).not.toHaveAttribute("aria-controls");
+    expect(editor).not.toHaveAttribute("aria-activedescendant");
+
+    await user.type(editor, "@");
+
+    const listbox = await screen.findByRole("listbox");
+    expect(editor).toHaveAttribute("aria-controls", listbox.id);
+
+    const options = screen.getAllByRole("option");
+    expect(options.length).toBeGreaterThan(1);
+    expect(editor).toHaveAttribute("aria-activedescendant", options[0].id);
+  });
+
+  it("gives every option a stable, unique id matching aria-activedescendant as the user arrows", async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<Harness campaignId="camp-1" />);
+    const editor = screen.getByLabelText("Note body");
+    await user.type(editor, "@");
+
+    await screen.findByRole("listbox");
+    const options = screen.getAllByRole("option");
+    const ids = options.map((o) => o.id);
+    expect(ids.every(Boolean)).toBe(true);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    expect(editor).toHaveAttribute("aria-activedescendant", ids[0]);
+    await user.keyboard("{ArrowDown}");
+    expect(editor).toHaveAttribute("aria-activedescendant", ids[1]);
+    await user.keyboard("{ArrowUp}");
+    expect(editor).toHaveAttribute("aria-activedescendant", ids[0]);
+  });
+});
+
+describe("MentionAutocomplete caret-after-delete (#273)", () => {
+  function caretOffset() {
+    const sel = window.getSelection()!;
+    return { node: sel.anchorNode, offset: sel.anchorOffset };
+  }
+
+  it("places the caret at the chip-start body offset after Backspace", async () => {
+    render(<Harness campaignId="camp-1" initialValue={`Hi @[${GOBLIN}]`} />);
+    const editor = await screen.findByLabelText("Note body");
+    const chip = await screen.findByText("@Goblin Chief");
+
+    editor.focus();
+    const range = document.createRange();
+    range.setStartAfter(chip);
+    range.collapse(true);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+    fireEvent.keyDown(editor, { key: "Backspace" });
+
+    await waitFor(() => expect(screen.getByTestId("value")).not.toHaveTextContent(GOBLIN));
+    await waitFor(() => {
+      const { node, offset } = caretOffset();
+      expect(node?.textContent).toBe("Hi ");
+      expect(offset).toBe(3);
+    });
+  });
+
+  it("places the caret at the chip-start body offset after forward Delete", async () => {
+    render(<Harness campaignId="camp-1" initialValue={`@[${GOBLIN}] hi`} />);
+    const editor = await screen.findByLabelText("Note body");
+    const chip = await screen.findByText("@Goblin Chief");
+
+    editor.focus();
+    const range = document.createRange();
+    range.setStartBefore(chip);
+    range.collapse(true);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+    fireEvent.keyDown(editor, { key: "Delete" });
+
+    await waitFor(() => expect(screen.getByTestId("value")).not.toHaveTextContent(GOBLIN));
+    await waitFor(() => {
+      const { node, offset } = caretOffset();
+      expect(node?.textContent).toBe(" hi");
+      expect(offset).toBe(0);
+    });
+  });
+});
