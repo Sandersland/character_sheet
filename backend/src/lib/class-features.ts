@@ -52,6 +52,8 @@ export interface DerivedClassInfo {
    * Undefined when no subclass feature grants a tool choice.
    */
   toolProfChoiceCount?: number;
+  /** Way of the Four Elements only: number of elemental disciplines known at this level. */
+  disciplineChoiceCount?: number;
 }
 
 // ── Battle Master rules data ──────────────────────────────────────────────────
@@ -86,6 +88,14 @@ function battleMasterManeuverCount(level: number): number {
   if (level >= 10) return 7;
   if (level >= 7) return 5;
   return 3;
+}
+
+/** Elemental discipline count by Monk level (Way of the Four Elements). */
+export function fourElementsDisciplineCount(level: number): number {
+  if (level >= 17) return 4;
+  if (level >= 11) return 3;
+  if (level >= 6) return 2;
+  return 1;
 }
 
 // ── Base class feature lists ──────────────────────────────────────────────────
@@ -1686,6 +1696,34 @@ const WAY_OF_SHADOW_FEATURES: DerivedFeature[] = [
   },
 ];
 
+const FOUR_ELEMENTS_FEATURES: DerivedFeature[] = [
+  {
+    name: "Disciple of the Elements",
+    level: 3,
+    source: "subclass",
+    description:
+      "You learn magical elemental disciplines fueled by ki. You know the Elemental Attunement discipline plus one elemental discipline of your choice, and learn one additional discipline at levels 6, 11, and 17. Casting an elemental discipline that is a spell costs ki equal to the spell's level; the save DC equals your ki save DC.",
+  },
+  {
+    name: "Additional Elemental Discipline",
+    level: 6,
+    source: "subclass",
+    description: "You learn one additional elemental discipline of your choice.",
+  },
+  {
+    name: "Additional Elemental Discipline",
+    level: 11,
+    source: "subclass",
+    description: "You learn one additional elemental discipline of your choice.",
+  },
+  {
+    name: "Additional Elemental Discipline",
+    level: 17,
+    source: "subclass",
+    description: "You learn one additional elemental discipline of your choice.",
+  },
+];
+
 const OATH_OF_DEVOTION_FEATURES: DerivedFeature[] = [
   {
     name: "Oath Spells",
@@ -2082,6 +2120,7 @@ const THE_GREAT_OLD_ONE_FEATURES: DerivedFeature[] = [
 // Set lower when the SRD grants subclass features before level 3.
 const SUBCLASS_GRANT_LEVEL: Record<string, number> = {
   "battle master": 3,
+  "way of the four elements": 3,
   // Wizard traditions — features start at level 2
   "school of evocation": 2,
   "school of abjuration": 2,
@@ -2253,6 +2292,7 @@ const SUBCLASS_FEATURE_LIST: Record<string, DerivedFeature[]> = {
   "circle of the moon": CIRCLE_OF_THE_MOON_FEATURES,
   "way of the open hand": WAY_OF_THE_OPEN_HAND_FEATURES,
   "way of shadow": WAY_OF_SHADOW_FEATURES,
+  "way of the four elements": FOUR_ELEMENTS_FEATURES,
   "oath of devotion": OATH_OF_DEVOTION_FEATURES,
   "oath of the ancients": OATH_OF_THE_ANCIENTS_FEATURES,
   "oath of vengeance": OATH_OF_VENGEANCE_FEATURES,
@@ -2315,6 +2355,11 @@ export function deriveResources(
     const dexMod = abilityModifier(abilityScores.dexterity ?? 10);
     result.maneuverSaveDC = 8 + profBonus + Math.max(strMod, dexMod);
     result.toolProfChoiceCount = studentOfWarToolCount(level);
+  }
+
+  // Way of the Four Elements — disciplines known scale with monk level
+  if (subclassKey === "way of the four elements" && level >= 3) {
+    result.disciplineChoiceCount = fourElementsDisciplineCount(level);
   }
 
   return result;
