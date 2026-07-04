@@ -298,7 +298,8 @@ export type CharacterEventCategory =
   | "advancement"
   | "session"
   | "combat"
-  | "conditions";
+  | "conditions"
+  | "roll";
 
 export type CharacterEventType =
   | "acquired" | "consumed" | "sold" | "bought" | "removed"  // inventory
@@ -320,7 +321,8 @@ export type CharacterEventType =
   | "sessionStarted" | "sessionEnded"                          // session lifecycle
   | "combatStarted" | "combatEnded" | "combatRoundAdvanced"   // combat lifecycle
   | "conditionApplied" | "conditionRemoved" | "exhaustionSet" // conditions
-  | "attackRoll" | "damageRoll"                               // combat rolls
+  | "attackRoll" | "damageRoll"                               // roll (attack/damage)
+  | "checkRoll" | "saveRoll" | "initiativeRoll"               // roll (check/save/initiative)
   | "revert";                                                  // meta
 
 export interface CharacterEventField {

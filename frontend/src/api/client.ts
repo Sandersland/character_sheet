@@ -783,18 +783,26 @@ export async function advanceCombatRound(
   }
 }
 
-/** Log a single attack or damage roll from the session UI. Best-effort — callers catch and console.error. */
+/** Log a single roll from the session UI. Best-effort — callers catch and console.error. */
 export async function logRoll(
   characterId: string,
   sessionId: string,
   payload: {
-    kind: "attack" | "damage";
+    kind: "attack" | "damage" | "check" | "save" | "initiative";
     source: string;
     total: number;
     specLabel?: string;
     damageType?: string;
     /** Raw kept die faces (non-dropped) so the Session Log can show the breakdown. */
     faces?: number[];
+    /** Ability key for check/save rolls — source carries the display text. */
+    ability?: string;
+    /** Skill key for check rolls. */
+    skill?: string;
+    /** Target difficulty class, when the roll is made against one. */
+    dc?: number;
+    /** Advantage state the d20 was rolled with. */
+    rollMode?: "normal" | "advantage" | "disadvantage";
   },
 ): Promise<void> {
   const response = await apiFetch(
