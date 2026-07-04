@@ -19,6 +19,7 @@ import {
   CLASS_PROFICIENCY_GRANTS,
   deriveArmorClass,
   deriveArmorClassParts,
+  deriveAttacksPerAction,
   deriveFastMovement,
   deriveFeatBonuses,
   deriveFeatProficiencies,
@@ -816,6 +817,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // rather than recomputing attack math on the client.
     unarmedStrike,
     improvisedWeapon,
+    // Weapon attacks per Attack action (Extra Attack), max across multiclass.
+    attacksPerAction: deriveAttacksPerAction(row.classEntries),
 
     // Journal entries — relational JournalEntry rows (no longer a Json column),
     // already ordered newest-first by the user-entered `date` via the include.
