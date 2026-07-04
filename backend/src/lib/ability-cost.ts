@@ -26,6 +26,27 @@ export type AbilityCost =
   | { kind: "pool"; key: string; base: number; perStep?: number }
   | { kind: "none" };
 
+// Flat cost columns snapshotted from a catalog row (Discipline today).
+export interface AbilityCostColumns {
+  costKind?: string | null;
+  costPoolKey?: string | null;
+  costBase?: number | null;
+  costPerStep?: number | null;
+}
+
+// Adapter over the flat cost columns — mirrors readEffectSpec in effects.ts.
+export function readAbilityCost(row: AbilityCostColumns): AbilityCost {
+  if (row.costKind === "pool" && row.costPoolKey) {
+    return {
+      kind: "pool",
+      key: row.costPoolKey,
+      base: row.costBase ?? 0,
+      perStep: row.costPerStep ?? undefined,
+    };
+  }
+  return { kind: "none" };
+}
+
 export interface PayCostContext {
   tx: Prisma.TransactionClient;
   characterId: string;
