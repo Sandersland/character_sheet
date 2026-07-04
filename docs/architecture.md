@@ -26,6 +26,7 @@
 | `routes/class.ts` | `POST /characters/:id/class/transactions` — post-creation subclass + fighting-style selection + multiclass add-class (`addClass`) |
 | `routes/maneuvers.ts` | `GET /maneuvers` — Battle Master maneuver catalog |
 | `routes/disciplines.ts` | `GET /disciplines` — GrantedAbility catalog (`source` discriminator) filtered to `source: "discipline"` (Way of the Four Elements: min level + embedded `AbilityCost` + ki-scaled `EffectSpec`); `POST /characters/:id/disciplines/transactions` — `castDiscipline` (spend ki via the shared pool payer, roll the EffectSpec, ki DC save) |
+| `routes/shadow-arts.ts` | `GET /shadow-arts` — GrantedAbility catalog filtered to `source: "shadowArts"` (Way of Shadow: the 4 L3 Shadow Arts spells, embedded flat 2-ki `AbilityCost` + non-scaling `EffectSpec`); `POST /characters/:id/shadow-arts/transactions` — `castShadowArt` (spend a flat 2 ki via the shared pool payer, apply concentration + Pass without Trace's +10 Stealth buff) |
 | `routes/feats.ts` | `GET /feats` — feat catalog |
 | `routes/advancement.ts` | `POST /characters/:id/advancement/transactions` — take/remove ASIs and feats |
 | `routes/actions.ts` | `POST /characters/:id/actions/transactions` — apply an action's resource/quantity/heal effects (the action catalog is consumed client-side via `features/session/actionResolvers`) |
