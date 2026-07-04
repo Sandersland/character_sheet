@@ -460,13 +460,11 @@ model Maneuver {
   description String
 }
 
-// Elemental Discipline catalog — Way of the Four Elements (Monk). Mirrors
-// Maneuver, plus a min monk level, save ability, and an embedded EffectSpec
-// (lib/effects.ts) + AbilityCost (lib/ability-cost.ts) so a discipline fully
-// describes its ki cost and roll. Provenance pointer in DisciplineEntry.disciplineId.
-model Discipline {
+// Generic granted-ability catalog — source discriminates (e.g. "discipline" for Four Elements); embeds min level, save ability, EffectSpec + AbilityCost. Provenance pointer in DisciplineEntry.disciplineId.
+model GrantedAbility {
   id          String  @id @default(uuid())
   name        String  @unique
+  source      String  @default("discipline")
   description String
   minLevel    Int     @default(3) // minimum monk level to learn
   alwaysKnown Boolean @default(false) // Elemental Attunement — free, uncapped
