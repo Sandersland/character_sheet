@@ -34,7 +34,6 @@ import {
   normalizeResourcesMutable,
   serializeResourcesState,
   type AdvancementEntry,
-  type DisciplineEntry,
   type ManeuverEntry,
   type ToolProfEntry,
 } from "./resources.js";
@@ -239,14 +238,7 @@ async function reconcileDisciplines(ctx: ReconcileContext): Promise<void> {
 
   if (state.disciplinesKnown.length <= allowed) return; // within cap
 
-  const before = {
-    resources: {
-      used: { ...state.used },
-      maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
-      disciplinesKnown: state.disciplinesKnown.map((d: DisciplineEntry) => ({ ...d })),
-      toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
-    },
-  };
+  const before = { resources: serializeResourcesState(state) };
 
   const trimmed = state.disciplinesKnown.slice(0, allowed);
   const removedCount = state.disciplinesKnown.length - allowed;
@@ -257,14 +249,7 @@ async function reconcileDisciplines(ctx: ReconcileContext): Promise<void> {
     data: { resources: serializeResourcesState(state) },
   });
 
-  const after = {
-    resources: {
-      used: { ...state.used },
-      maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
-      disciplinesKnown: trimmed.map((d: DisciplineEntry) => ({ ...d })),
-      toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
-    },
-  };
+  const after = { resources: serializeResourcesState(state) };
 
   await logEvent(tx, {
     characterId,

@@ -168,7 +168,7 @@ All three auth children cascade-delete with their `User`. **Ownership is enforce
 The Character row carries these JSON columns: `hitPoints`, `hitDice`, `abilityScores`, `skills`, `toolProficiencies`, `currency`, `spellcasting?`, `resources?`, `conditions?`. Notable ones:
 
 - `spellcasting Json?` — mutable state only: `{ slotsUsed, arcanumUsed, spells: SpellEntry[], concentratingOn }`. Slot totals/DC/attack/ability are derived at read time by `deriveSpellcasting()` in `serializeCharacter` (single class); a multiclass character (2+ entries) instead derives via `deriveMulticlassSpellcasting()`, which merges caster levels into one slot pool and surfaces Warlock Pact Magic in a separate `spellcasting.pact` field (single-class output is unchanged). `normalizeSpellcastingMutable()` handles legacy blobs.
-- `resources Json?` — mutable state only: `{ used, maneuversKnown, toolProficienciesKnown, advancements, fightingStyle }`. Pool totals/die/recharge and all level-gated caps are derived at read time via `deriveResources()`; the persisted lists are clamped-on-read.
+- `resources Json?` — mutable state only: `{ used, maneuversKnown, disciplinesKnown, toolProficienciesKnown, advancements, fightingStyle }`. Pool totals/die/recharge and all level-gated caps are derived at read time via `deriveResources()`; the persisted lists are clamped-on-read.
 - `conditions Json?` — `{ active: ConditionEntry[], exhaustion: number }`. Pure mutable state, not level-derived.
 - `currency Json` — the **only** JSON column still patchable via `PATCH /characters/:id`. Every other column above mutates exclusively through its domain's `…/transactions` endpoint.
 
