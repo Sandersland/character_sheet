@@ -114,7 +114,7 @@ const ENVELOPE_SCHEMA = JSON.stringify({
   required: ["transition", "payload", "summary"],
 });
 
-function buildArgs(def, prompt, { resumeSession } = {}) {
+function buildArgs(def, prompt, { resumeSession, maxBudgetUsd } = {}) {
   const args = ["-p", prompt, "--output-format", "json", "--setting-sources", "project"];
   if (resumeSession) args.push("--resume", resumeSession);
   if (def.model) args.push("--model", def.model);
@@ -123,7 +123,9 @@ function buildArgs(def, prompt, { resumeSession } = {}) {
   if (def.disallowedTools?.length) args.push("--disallowedTools", ...def.disallowedTools);
   if (def.permissionMode) args.push("--permission-mode", def.permissionMode);
   if (def.maxTurns && supportsFlag("--max-turns")) args.push("--max-turns", String(def.maxTurns));
-  if (def.maxBudgetUsd && supportsFlag("--max-budget-usd")) args.push("--max-budget-usd", String(def.maxBudgetUsd));
+  // A retry may cap below the state's default to stay within remaining global budget.
+  const budgetCap = maxBudgetUsd ?? def.maxBudgetUsd;
+  if (budgetCap && supportsFlag("--max-budget-usd")) args.push("--max-budget-usd", String(budgetCap));
   if (def.fallbackModel && supportsFlag("--fallback-model")) args.push("--fallback-model", def.fallbackModel);
   // Children run with --setting-sources project (no user-level plugin MCP
   // servers), so a state that needs an MCP server declares it explicitly.
@@ -236,8 +238,12 @@ function classifyFailure(res) {
     out?.api_error_status === 429 ||
     out?.api_error_status === 529 ||
     /hit your session limit|rate.?limit|overloaded/i.test(text);
+  // A per-invocation --max-budget-usd cap hit mid-work: retry-with-resume-able like a
+  // crash, but the retry MUST re-slice from the global budget, not a fresh state cap
+  // (#332 double-sliced $10+$10 inside one state). Rate limit takes precedence.
+  const stateBudget = !rateLimited && out?.subtype === "error_max_budget_usd";
   return {
-    kind: rateLimited ? "rate_limit" : "transient",
+    kind: rateLimited ? "rate_limit" : stateBudget ? "state_budget" : "transient",
     retryAt: rateLimited ? parseResetTime(text) : null,
     costUsd: out?.total_cost_usd ?? 0,
     sessionId: out?.session_id ?? null,
@@ -268,6 +274,14 @@ function parseResetTime(text) {
     /* Intl/tz failure → fallback */
   }
   return fallback;
+}
+
+// Global budget headroom left for this run (the machine's cost cap minus spend so
+// far). Used to cap a retry's per-invocation budget so an in-process retry can't
+// re-slice a full fresh state cap past the global ceiling (#332).
+function globalRemaining(run) {
+  const cap = run.maxCostUsd ?? run.machine?.budget?.maxCostUsd ?? Infinity;
+  return cap - run.costUsd;
 }
 
 async function runAgentState(stateName, def, run) {
@@ -304,7 +318,14 @@ async function runAgentState(stateName, def, run) {
             : `Your previous final message was invalid: ${lastError}\nRe-emit ONLY the corrected fenced JSON envelope.` +
               envelopeEpilogue(def)
           : `${prompt}\n\nNOTE: your previous attempt failed with: ${lastError}`;
-    const args = buildArgs(def, promptForAttempt, { resumeSession: attempt === 1 ? resumeSession : session });
+    // A retry (attempt ≥ 2) caps its --max-budget-usd to what's left of the global
+    // budget, so it never re-grants a full fresh state cap (the #332 double-slice).
+    const retryBudget =
+      attempt >= 2 && def.maxBudgetUsd ? Math.min(def.maxBudgetUsd, Math.max(0, globalRemaining(run))) : undefined;
+    const args = buildArgs(def, promptForAttempt, {
+      resumeSession: attempt === 1 ? resumeSession : session,
+      maxBudgetUsd: retryBudget,
+    });
     const started = Date.now();
     const res = await invokeClaude(stateName, def, args, cwd, run);
     writeFileSync(join(run.dir, `raw-${run.step}-${stateName}-a${attempt}.json`), res.stdout || res.stderr);
@@ -340,7 +361,16 @@ async function runAgentState(stateName, def, run) {
       lastError = `claude exited ${res.code}: ${fail.detail}`;
       lastErrorKind = "crash";
       if (attempt < 2) {
-        log(run, `state ${stateName} attempt ${attempt} crashed (${lastError}) — retrying${session ? " via session resume" : ""} in 30s`);
+        // No point retrying with < ~$1 of global budget left — throw to the normal
+        // breach/Fail path instead of spending the tail on a doomed attempt.
+        const remaining = globalRemaining(run);
+        if (remaining < 1) {
+          throw new Error(
+            `state '${stateName}' ${fail.kind} with only $${remaining.toFixed(2)} global budget left — not retrying: ${fail.detail}`,
+          );
+        }
+        const budgetNote = def.maxBudgetUsd ? ` (retry capped at $${Math.min(def.maxBudgetUsd, remaining).toFixed(2)})` : "";
+        log(run, `state ${stateName} attempt ${attempt} ${fail.kind === "state_budget" ? "hit its state budget cap" : "crashed"} (${lastError}) — retrying${session ? " via session resume" : ""}${budgetNote} in 30s`);
         await new Promise((r) => setTimeout(r, 30_000));
         continue;
       }
@@ -536,14 +566,20 @@ const HANDLERS = {
   },
 
   async applyFlag(run) {
-    const { issue, comment } = run.ctx;
+    const { issue, comment, interactiveOnly } = run.ctx;
     const file = join(run.dir, "flag-comment.md");
     writeFileSync(file, comment);
     sh("gh", ["issue", "comment", String(issue), "--body-file", file], { cwd: ROOT });
-    sh("gh", ["issue", "edit", String(issue), "--add-label", "needs-refinement"], { cwd: ROOT });
-    spawnSync("gh", ["issue", "edit", String(issue), "--remove-label", "ready"], { cwd: ROOT }); // tolerate absence
+    // A `.claude/`-deliverable issue (interactiveOnly) is refined + correct — just not
+    // headless-buildable — so tag `needs-interactive` and KEEP `ready` (a human can
+    // build it). Everything else is a real scope gap: `needs-refinement`, drop `ready`.
+    const label = interactiveOnly ? "needs-interactive" : "needs-refinement";
+    sh("gh", ["issue", "edit", String(issue), "--add-label", label], { cwd: ROOT });
+    if (!interactiveOnly) {
+      spawnSync("gh", ["issue", "edit", String(issue), "--remove-label", "ready"], { cwd: ROOT }); // tolerate absence
+    }
     spawnSync("gh", ["issue", "edit", String(issue), "--remove-assignee", "@me"], { cwd: ROOT }); // release the claim
-    return { transition: "ok", payload: {}, summary: `issue #${issue} flagged needs-refinement` };
+    return { transition: "ok", payload: {}, summary: `issue #${issue} flagged ${label}` };
   },
 
   async fail(run) {
