@@ -107,9 +107,11 @@ jobs:
   e2e:
     # Playwright smoke suite against a booted dev stack (same postgres service as
     # `test`, plus the backend + Vite dev servers the e2e harness proxies through).
-    # NOT a required check yet (issue #333) — soaking before it gates merges.
-    # Chromium-only + all-core workers keep it well under the CI time budget.
+    # A required check. Runs SERIALLY (playwright.config.ts sets workers: 1) — the
+    # specs share one dev stack and a campaign allows only one active session, so
+    # parallel workers overload the stack; don't reintroduce --workers here.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     services:
       postgres:
@@ -161,13 +163,22 @@ jobs:
           ALLOW_DEV_LOGIN: "true"
         run: nohup npm run dev --workspace backend > /tmp/backend.log 2>&1 &
 
-      - name: Start frontend
-        # VITE_API_URL=/api keeps the SPA same-origin (the harness relies on the
-        # dev proxy so the session cookie stays first-party).
+      - name: Build frontend
+        # e2e runs against the production build (served by `vite preview`), NOT the
+        # dev server — pre-compiled assets render fast + deterministically, so no
+        # on-demand compilation slows first renders and times out specs.
+        # VITE_API_URL is inlined at build time and keeps the SPA same-origin.
+        working-directory: frontend
         env:
           VITE_API_URL: /api
+        run: npm run build
+
+      - name: Start frontend (preview)
+        # `vite preview` serves the built dist/ on :5173 with the same /api proxy
+        # (vite.config.ts `preview.proxy`), so the session cookie stays first-party.
+        env:
           VITE_PROXY_TARGET: http://localhost:4000
-        run: nohup npm run dev --workspace frontend > /tmp/frontend.log 2>&1 &
+        run: nohup npm run preview --workspace frontend -- --port 5173 > /tmp/frontend.log 2>&1 &
 
       - name: Wait for stack
         run: |
@@ -183,7 +194,7 @@ jobs:
         working-directory: frontend
         env:
           E2E_BASE_URL: http://localhost:5173
-        run: npx playwright test --workers=100%
+        run: npx playwright test
 
       - name: Upload Playwright report
         if: failure()
