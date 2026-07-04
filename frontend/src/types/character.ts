@@ -49,6 +49,10 @@ export interface Skill {
   ability: AbilityName;
   proficient: boolean;
   expertise?: boolean;
+  /** Active cast-granted buff total (#438). Absent when no buff targets this skill. */
+  tempModifier?: number;
+  /** Per-source breakdown of tempModifier, for display. */
+  tempModifierSources?: { label: string; value: number }[];
 }
 
 export interface Currency {
@@ -822,6 +826,11 @@ export interface Character {
    * read server-side). Mutate via applyConditionTransactions, never PATCH.
    */
   conditions: ConditionsState;
+  /**
+   * Active cast-granted passive modifiers (buffs). Always present (normalized on
+   * read). Each is also summed into its target skill/stat's tempModifier.
+   */
+  activeEffects: ActiveEffectsState;
 
   /**
    * Derived available actions for the current turn — filtered by class/level/
@@ -1225,6 +1234,21 @@ export interface ConditionsState {
   active: ConditionEntry[];
   /** Exhaustion level, 0–6 (6 = death). Special case, not part of `active`. */
   exhaustion: number;
+}
+
+// ── Active effects (buffs) — mirrors backend/src/lib/active-effects.ts ─────────
+
+export interface ActiveBuff {
+  id: string;
+  key: string;
+  target: string;
+  modifier: number;
+  source: string;
+  sourceEntryId?: string;
+}
+
+export interface ActiveEffectsState {
+  buffs: ActiveBuff[];
 }
 
 export interface ApplyConditionOperation { type: "applyCondition"; key: ConditionKey; source?: string }
