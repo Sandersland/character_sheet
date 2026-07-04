@@ -5,6 +5,8 @@
  * src/lib/experience.ts) and never set directly by the client.
  */
 
+import type { EffectSpec } from "@/lib/effects";
+
 export type AbilityName =
   | "strength"
   | "dexterity"
@@ -431,6 +433,23 @@ export interface CatalogSpell {
   cantripScaling: boolean;
 }
 
+/** Ki (or other pool) cost of an activated ability. Mirror of backend AbilityCost. */
+export type AbilityCost =
+  | { kind: "pool"; key: string; base: number; perStep?: number }
+  | { kind: "none" };
+
+/** A Way of the Four Elements discipline from GET /api/disciplines. */
+export interface CatalogDiscipline {
+  id: string;
+  name: string;
+  description: string;
+  minLevel: number;
+  alwaysKnown: boolean;
+  saveAbility?: string | null;
+  cost: AbilityCost;
+  effect: EffectSpec;
+}
+
 export interface SpellSlots {
   level: number;
   total: number;
@@ -488,6 +507,14 @@ export interface ManeuverEntry {
 /** Catalog maneuver served by GET /api/maneuvers. */
 export interface CatalogManeuver {
   id: string;
+  name: string;
+  description: string;
+}
+
+/** A known elemental discipline entry on a character (Way of the Four Elements). */
+export interface DisciplineEntry {
+  id: string;
+  disciplineId?: string;  // catalog Discipline.id provenance — undefined for custom
   name: string;
   description: string;
 }
@@ -628,10 +655,16 @@ export interface CharacterResources {
   features: ClassFeature[];
   maneuverChoiceCount?: number;
   maneuverSaveDC?: number;
+  /** Way of the Four Elements: elemental disciplines known at this level. */
+  disciplineChoiceCount?: number;
+  /** Way of the Four Elements: ki save DC for discipline effects (8 + prof + Wis mod). */
+  disciplineSaveDC?: number;
   /** Number of artisan's-tool proficiency choices from a subclass feature. */
   toolProfChoiceCount?: number;
   pools: ResourcePool[];
   maneuversKnown: ManeuverEntry[];
+  /** Level-gated elemental disciplines learned (Way of the Four Elements). */
+  disciplinesKnown: DisciplineEntry[];
   /** Level-gated tool proficiency choices (e.g. Student of War). */
   toolProficienciesKnown: ToolProfEntry[];
   /** Number of Fighting Style choices the character is entitled to (Fighter L1 -> 1). */
@@ -805,6 +838,9 @@ export interface Character {
    *  is true only when "Improvised Weapons" appears in weaponProficiencies
    *  (e.g. via Tavern Brawler), which adds proficiency bonus to attackBonus. */
   improvisedWeapon: DerivedImprovisedAttack;
+
+  /** Weapon attacks per Attack action (Extra Attack), max across multiclass. */
+  attacksPerAction: number;
 
   /** Taken ASI / feat entries, in the order chosen (clamped to advancementSlots.total). */
   advancements: AdvancementEntry[];
@@ -1123,6 +1159,12 @@ export interface SpendResourceOperation { type: "spendResource"; key: string; am
 export interface RestoreResourceOperation { type: "restoreResource"; key: string; amount?: number }
 export interface LearnManeuverOperation { type: "learnManeuver"; maneuverId?: string; custom?: { name: string; description: string } }
 export interface ForgetManeuverOperation { type: "forgetManeuver"; entryId: string }
+/** Learn an elemental discipline from catalog (Way of the Four Elements). */
+export interface LearnDisciplineOperation { type: "learnDiscipline"; disciplineId?: string; custom?: { name: string; description: string; minLevel?: number } }
+/** Forget a known elemental discipline by its per-character entry id. */
+export interface ForgetDisciplineOperation { type: "forgetDiscipline"; entryId: string }
+/** Retrain one known discipline for another within the cap. */
+export interface SwapDisciplineOperation { type: "swapDiscipline"; entryId: string; disciplineId?: string; custom?: { name: string; description: string; minLevel?: number } }
 /** Choose an artisan's-tool proficiency from the Student of War feature. */
 export interface LearnToolProficiencyOperation { type: "learnToolProficiency"; name: string }
 /** Undo a subclass-granted tool proficiency choice. */
@@ -1132,8 +1174,24 @@ export type ResourceOperation =
   | RestoreResourceOperation
   | LearnManeuverOperation
   | ForgetManeuverOperation
+  | LearnDisciplineOperation
+  | ForgetDisciplineOperation
+  | SwapDisciplineOperation
   | LearnToolProficiencyOperation
   | ForgetToolProficiencyOperation;
+
+// ── Discipline operation types (mirrors backend/src/lib/disciplines.ts) ──────
+// Sent as `{ operations: DisciplineOperation[] }` to
+// POST /api/characters/:id/disciplines/transactions.
+
+/** Cast a known elemental discipline: spend ki, send the client-computed roll total (0 for utility). */
+export interface CastDisciplineOperation {
+  type: "castDiscipline";
+  disciplineId: string;
+  kiSpent: number;
+  roll: number;
+}
+export type DisciplineOperation = CastDisciplineOperation;
 
 // ── Conditions state + operation types (mirrors backend/src/lib/conditions.ts)
 // Sent as `{ operations: ConditionOperation[] }` to

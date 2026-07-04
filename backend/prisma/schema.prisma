@@ -460,6 +460,37 @@ model Maneuver {
   description String
 }
 
+// Elemental Discipline catalog — Way of the Four Elements (Monk). Mirrors
+// Maneuver, plus a min monk level, save ability, and an embedded EffectSpec
+// (lib/effects.ts) + AbilityCost (lib/ability-cost.ts) so a discipline fully
+// describes its ki cost and roll. Provenance pointer in DisciplineEntry.disciplineId.
+model Discipline {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String
+  minLevel    Int     @default(3) // minimum monk level to learn
+  alwaysKnown Boolean @default(false) // Elemental Attunement — free, uncapped
+
+  // Embedded AbilityCost (F2) — ki-pool spend. kind "none" = free.
+  costKind    String? // "none" | "pool"
+  costPoolKey String? // e.g. "ki"
+  costBase    Int?    // base ki cost
+  costPerStep Int?    // additional ki per scaling step
+
+  // Embedded EffectSpec (F1) — same flat columns as Spell. saveAbility doubles
+  // as the discipline's DC save ability.
+  effectKind         String?
+  effectDiceCount    Int?
+  effectDiceFaces    Int?
+  effectModifier     Int?
+  damageType         String?
+  attackType         String?
+  saveAbility        String?
+  saveEffect         String?
+  upcastDicePerLevel Int?
+  cantripScaling     Boolean @default(false)
+}
+
 // Feat catalog — seeded from a curated SRD subset. Provenance pointer in
 // AdvancementEntry.featId (nullable so custom feats have no catalog row).
 // abilityOptions/abilityIncrease drive the half-feat ability bump (e.g.
@@ -802,6 +833,11 @@ enum CharacterEventType {
   learnManeuver
   forgetManeuver
   maneuversReconciled
+  learnDiscipline
+  forgetDiscipline
+  swapDiscipline
+  disciplinesReconciled
+  castDiscipline
   learnToolProficiency
   forgetToolProficiency
   toolProficienciesReconciled

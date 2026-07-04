@@ -89,6 +89,31 @@ describe("InventoryList carrying capacity", () => {
     render(<InventoryList character={makeCharacter(10, [makeItem()])} onUpdate={vi.fn()} />);
     expect(screen.getByRole("meter")).toBeInTheDocument();
   });
+
+  it("shows the meter for coin weight alone when over capacity (no items)", () => {
+    // STR 10 → capacity 150; 10,000 gp = 200 lb of coins, no items.
+    render(
+      <InventoryList
+        character={makeCharacter(10, [], { cp: 0, sp: 0, gp: 10000, pp: 0 })}
+        onUpdate={vi.fn()}
+      />
+    );
+    expect(screen.getByRole("meter")).toBeInTheDocument();
+    expect(screen.getByText(/200\.0 \/ 150 lb/)).toBeInTheDocument();
+    expect(screen.getByText(/over capacity/i)).toBeInTheDocument();
+  });
+
+  it("shows the meter for coin weight alone even when under capacity (no items)", () => {
+    // STR 10 → capacity 150; 500 gp = 10 lb of coins, no items.
+    render(
+      <InventoryList
+        character={makeCharacter(10, [], { cp: 0, sp: 0, gp: 500, pp: 0 })}
+        onUpdate={vi.fn()}
+      />
+    );
+    expect(screen.getByRole("meter")).toBeInTheDocument();
+    expect(screen.getByText(/10\.0 \/ 150 lb/)).toBeInTheDocument();
+  });
 });
 
 describe("InventoryList sectioning", () => {

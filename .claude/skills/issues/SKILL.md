@@ -19,6 +19,7 @@ Every open issue carries exactly one of these three labels at all times. They ar
 | `needs-refinement` | `D93F0B` (orange) | Has an open decision, ambiguity, or missing scope. Must be refined before it can be worked. Also covers discovery **spikes** (their deliverable is a proposal) and items **backlogged pending a decision**. |
 | `epic` | `6F42C1` (purple) | A tracking/parent issue. You don't "work" an epic — you work its sub-issues. The epic body lists them with build order. |
 | `in-staging` | `0E8A16` (dark green) | Built and shipped to `staging` via a PR (open or merged); waiting on promote-to-main, where `Closes #` fires. autodev's Submit applies this (swapping out `ready`) so unattended discovery never re-picks shipped work. Don't hand-apply during triage. |
+| `needs-interactive` | `8250DF` (violet) | Refined + correct, but its deliverables live under `.claude/` (skills, hooks, machines, prompts) — a **headless** worker can't write there, so autodev can't build it. Build it in an **interactive** session. Coexists with `ready` (it *is* ready, just not for autodev); autodev's ConfirmScope applies it instead of `needs-refinement` when it detects a `.claude/` deliverable. |
 
 These coexist with the topical labels (`enhancement`, `ux`, `tech-debt`, `testing`, `bug`, `question`, …) — a `ready` issue is also usually `enhancement`, etc. A `question`-labeled issue is typically also `needs-refinement`.
 
@@ -29,6 +30,7 @@ gh label create ready            --color 2EA043 --description "Refined and ready
 gh label create needs-refinement --color D93F0B --description "Has open decisions/ambiguity — refine before working"
 gh label create epic             --color 6F42C1 --description "Tracking/parent issue — work its sub-issues, not the epic itself"
 gh label create in-staging       --color 0E8A16 --description "Shipped to staging via PR; closes on promote to main"
+gh label create needs-interactive --color 8250DF --description "Refined but deliverables are under .claude/ — build in an interactive session, not autodev"
 ```
 
 ## Readiness lifecycle

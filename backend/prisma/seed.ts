@@ -457,6 +457,12 @@ const SUBCLASSES: SubclassSeed[] = [
     description:
       "You follow a tradition that values stealth and subtlety. You can cast certain spells by spending ki points, teleport between areas of shadow, and silence a zone around yourself. At higher levels you become one with the darkness, striking from the unseen.",
   },
+  {
+    className: "Monk",
+    name: "Way of the Four Elements",
+    description:
+      "You channel the elements through your ki, learning elemental disciplines that let you wield fire, water, air, and earth. Disciple of the Elements grants Elemental Attunement plus one discipline of your choice at level 3, with additional disciplines learned at levels 6, 11, and 17. Disciplines that mimic spells cost ki equal to the spell's level, using your ki save DC.",
+  },
   // ── Paladin ───────────────────────────────────────────────────────────────
   {
     className: "Paladin",
@@ -612,6 +618,240 @@ const MANEUVERS: ManeuverSeed[] = [
     name: "Trip Attack",
     description:
       "When you hit a creature with a weapon attack, expend a superiority die and add it to the damage roll. If the target is Large or smaller, it must make a Strength saving throw or be knocked prone.",
+  },
+];
+
+// ── Elemental Discipline catalog ────────────────────────────────────────────
+// The ~17 PHB Way of the Four Elements disciplines. Seeded by unique name; the
+// GET /api/disciplines picker fetches these. Each carries its min monk level, an
+// embedded ki AbilityCost (costKind "pool"/"none"), and an EffectSpec (flat
+// columns mirroring Spell). saveAbility doubles as the discipline's DC ability.
+// Elemental Attunement is alwaysKnown (free, uncapped).
+interface DisciplineSeed {
+  name: string;
+  description: string;
+  minLevel: number;
+  alwaysKnown?: boolean;
+  saveAbility?: string;
+  costKind?: "none" | "pool";
+  costPoolKey?: string;
+  costBase?: number;
+  costPerStep?: number;
+  effectKind?: "damage" | "heal";
+  effectDiceCount?: number;
+  effectDiceFaces?: number;
+  damageType?: string;
+  attackType?: "attack" | "save";
+  saveEffect?: "half" | "none";
+}
+
+const DISCIPLINES: DisciplineSeed[] = [
+  {
+    name: "Elemental Attunement",
+    minLevel: 3,
+    alwaysKnown: true,
+    costKind: "none",
+    description:
+      "As an action, briefly control elemental forces nearby: create a harmless sensory effect, light or snuff a small flame, chill or warm up to 1 pound of nonliving material, or shape an earth/fire/water/mist object no larger than 1 foot. Every Four Elements monk knows this discipline for free.",
+  },
+  {
+    name: "Fangs of the Fire Snake",
+    minLevel: 3,
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 1,
+    costPerStep: 1,
+    effectKind: "damage",
+    effectDiceCount: 1,
+    effectDiceFaces: 10,
+    damageType: "fire",
+    attackType: "attack",
+    description:
+      "When you use the Attack action, spend 1 ki to extend your reach by 10 ft this turn; a hit deals fire damage instead and an extra 1d10 fire (plus 1d10 per additional ki spent).",
+  },
+  {
+    name: "Fist of Four Thunders",
+    minLevel: 3,
+    saveAbility: "constitution",
+    saveEffect: "half",
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 2,
+    effectKind: "damage",
+    effectDiceCount: 3,
+    effectDiceFaces: 8,
+    damageType: "thunder",
+    attackType: "save",
+    description: "Spend 2 ki to cast Thunderwave (3d8 thunder, Con save for half and no push).",
+  },
+  {
+    name: "Fist of Unbroken Air",
+    minLevel: 3,
+    saveAbility: "strength",
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 2,
+    costPerStep: 1,
+    effectKind: "damage",
+    effectDiceCount: 3,
+    effectDiceFaces: 10,
+    damageType: "bludgeoning",
+    attackType: "save",
+    description:
+      "Spend 2 ki: a creature within 30 ft makes a Str save or takes 3d10 bludgeoning (plus 1d10 per extra ki), is pushed 20 ft, and knocked prone.",
+  },
+  {
+    name: "Rush of the Gale Spirits",
+    minLevel: 3,
+    saveAbility: "strength",
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 2,
+    description: "Spend 2 ki to cast Gust of Wind (a 60-ft line of strong wind, Str save to resist).",
+  },
+  {
+    name: "Shape the Flowing River",
+    minLevel: 3,
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 1,
+    description:
+      "Spend 1 ki to freeze, melt, or reshape an area of water or ice up to 30 ft on a side within 120 ft, and optionally move it up to 5 ft.",
+  },
+  {
+    name: "Sweeping Cinder Strike",
+    minLevel: 3,
+    saveAbility: "dexterity",
+    saveEffect: "half",
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 2,
+    costPerStep: 1,
+    effectKind: "damage",
+    effectDiceCount: 3,
+    effectDiceFaces: 6,
+    damageType: "fire",
+    attackType: "save",
+    description: "Spend 2 ki to cast Burning Hands (3d6 fire in a 15-ft cone, Dex save for half; +1d6 per extra ki).",
+  },
+  {
+    name: "Water Whip",
+    minLevel: 3,
+    saveAbility: "dexterity",
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 2,
+    costPerStep: 1,
+    effectKind: "damage",
+    effectDiceCount: 3,
+    effectDiceFaces: 10,
+    damageType: "bludgeoning",
+    attackType: "save",
+    description:
+      "Spend 2 ki: a creature within 30 ft makes a Dex save or takes 3d10 bludgeoning (plus 1d10 per extra ki) and is pulled 25 ft toward you or knocked prone.",
+  },
+  {
+    name: "Clench of the North Wind",
+    minLevel: 6,
+    saveAbility: "wisdom",
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 3,
+    description: "Spend 3 ki to cast Hold Person (paralyze a humanoid, Wis save).",
+  },
+  {
+    name: "Gong of the Summit",
+    minLevel: 6,
+    saveAbility: "constitution",
+    saveEffect: "half",
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 3,
+    costPerStep: 1,
+    effectKind: "damage",
+    effectDiceCount: 3,
+    effectDiceFaces: 8,
+    damageType: "thunder",
+    attackType: "save",
+    description: "Spend 3 ki to cast Shatter (3d8 thunder, Con save for half; +1d8 per extra ki).",
+  },
+  {
+    name: "Flames of the Phoenix",
+    minLevel: 11,
+    saveAbility: "dexterity",
+    saveEffect: "half",
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 4,
+    costPerStep: 1,
+    effectKind: "damage",
+    effectDiceCount: 8,
+    effectDiceFaces: 6,
+    damageType: "fire",
+    attackType: "save",
+    description: "Spend 4 ki to cast Fireball (8d6 fire, Dex save for half; +1d6 per extra ki).",
+  },
+  {
+    name: "Mist Stance",
+    minLevel: 11,
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 4,
+    description: "Spend 4 ki to cast Gaseous Form on yourself.",
+  },
+  {
+    name: "Ride the Wind",
+    minLevel: 11,
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 4,
+    description: "Spend 4 ki to cast Fly on yourself.",
+  },
+  {
+    name: "Breath of Winter",
+    minLevel: 17,
+    saveAbility: "constitution",
+    saveEffect: "half",
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 6,
+    effectKind: "damage",
+    effectDiceCount: 8,
+    effectDiceFaces: 8,
+    damageType: "cold",
+    attackType: "save",
+    description: "Spend 6 ki to cast Cone of Cold (8d8 cold in a 60-ft cone, Con save for half).",
+  },
+  {
+    name: "Eternal Mountain Defense",
+    minLevel: 17,
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 5,
+    description: "Spend 5 ki to cast Stoneskin on yourself.",
+  },
+  {
+    name: "River of Hungry Flame",
+    minLevel: 17,
+    saveAbility: "dexterity",
+    saveEffect: "half",
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 5,
+    effectKind: "damage",
+    effectDiceCount: 5,
+    effectDiceFaces: 8,
+    damageType: "fire",
+    attackType: "save",
+    description: "Spend 5 ki to cast Wall of Fire (5d8 fire, Dex save for half).",
+  },
+  {
+    name: "Wave of Rolling Earth",
+    minLevel: 17,
+    costKind: "pool",
+    costPoolKey: "ki",
+    costBase: 6,
+    description: "Spend 6 ki to cast Wall of Stone.",
   },
 ];
 
@@ -1196,6 +1436,25 @@ const SPELLS: CatalogSpell[] = [
     upcastDicePerLevel: 1,
   },
   {
+    name: "Burning Hands",
+    level: 1,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "Self (15-ft cone)",
+    duration: "Instantaneous",
+    description: "A thin sheet of flames shoots from your fingertips. Each creature in a 15-ft cone must make a Dexterity save, taking 3d6 fire damage on a failure, half as much on a success. At higher levels: +1d6 per slot level above 1st.",
+    classes: ["wizard", "sorcerer"],
+    components: { verbal: true, somatic: true, material: false },
+    effectKind: "damage",
+    effectDiceCount: 3,
+    effectDiceFaces: 6,
+    damageType: "fire",
+    attackType: "save",
+    saveAbility: "dexterity",
+    saveEffect: "half",
+    upcastDicePerLevel: 1,
+  },
+  {
     name: "Detect Magic",
     level: 1,
     school: "divination",
@@ -1225,6 +1484,20 @@ const SPELLS: CatalogSpell[] = [
     damageType: "fire",
     attackType: "attack",
     upcastDicePerLevel: 2,   // +1 ray (+2d6) per slot level above 2nd
+  },
+  {
+    name: "Gust of Wind",
+    level: 2,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "Self (60-ft line)",
+    duration: "Concentration, up to 1 minute",
+    description: "A line of strong wind 60 ft long and 10 ft wide blasts from you. Each creature in the line must succeed on a Strength save or be pushed 15 ft away. The wind disperses gas and vapor and extinguishes small flames.",
+    classes: ["druid", "ranger", "sorcerer", "wizard"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a legume seed" },
+    concentration: true,
+    attackType: "save",
+    saveAbility: "strength",
   },
   {
     name: "Misty Step",
@@ -1335,6 +1608,95 @@ const SPELLS: CatalogSpell[] = [
     effectDiceFaces: 4,
     upcastDicePerLevel: 1,
   },
+  {
+    name: "Gaseous Form",
+    level: 3,
+    school: "transmutation",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "Concentration, up to 1 hour",
+    description: "A willing creature you touch, along with everything it's wearing and carrying, becomes a misty cloud for the duration. It has a flying speed of 10 ft, can pass through small holes, and has resistance to nonmagical damage, but can't attack or cast spells.",
+    classes: ["wizard", "sorcerer"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a bit of gauze and a wisp of smoke" },
+    concentration: true,
+  },
+  {
+    name: "Fly",
+    level: 3,
+    school: "transmutation",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "Concentration, up to 10 minutes",
+    description: "A willing creature you touch gains a flying speed of 60 ft for the duration. At higher levels, target one additional creature per slot level above 3rd.",
+    classes: ["wizard", "sorcerer", "warlock"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a wing feather from any bird" },
+    concentration: true,
+  },
+  // ── Level 4 ───────────────────────────────────────────────────────────────
+  {
+    name: "Stoneskin",
+    level: 4,
+    school: "abjuration",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "Concentration, up to 1 hour",
+    description: "One willing creature you touch gains resistance to nonmagical bludgeoning, piercing, and slashing damage for the duration.",
+    classes: ["druid", "ranger", "sorcerer", "wizard"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "diamond dust worth 100 gp, consumed" },
+    concentration: true,
+  },
+  {
+    name: "Wall of Fire",
+    level: 4,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "120 ft",
+    duration: "Concentration, up to 1 minute",
+    description: "Create a wall of fire up to 60 ft long, 20 ft high, and 1 ft thick. Each creature within 10 ft of one side takes 5d8 fire damage on a failed Dexterity save, half on a success. At higher levels: +1d8 per slot above 4th.",
+    classes: ["druid", "sorcerer", "wizard"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a small piece of phosphorus" },
+    effectKind: "damage",
+    effectDiceCount: 5,
+    effectDiceFaces: 8,
+    damageType: "fire",
+    attackType: "save",
+    saveAbility: "dexterity",
+    saveEffect: "half",
+    concentration: true,
+    upcastDicePerLevel: 1,
+  },
+  // ── Level 5 ───────────────────────────────────────────────────────────────
+  {
+    name: "Wall of Stone",
+    level: 5,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "120 ft",
+    duration: "Concentration, up to 10 minutes",
+    description: "A nonmagical wall of solid stone springs into existence — up to ten 10-ft-by-10-ft panels, each 6 inches thick. If you concentrate for the full duration, the wall becomes permanent.",
+    classes: ["druid", "sorcerer", "wizard"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a small block of granite" },
+    concentration: true,
+  },
+  {
+    name: "Cone of Cold",
+    level: 5,
+    school: "evocation",
+    castingTime: "1 action",
+    range: "Self (60-ft cone)",
+    duration: "Instantaneous",
+    description: "A blast of cold air erupts from your hands. Each creature in a 60-ft cone takes 8d8 cold damage on a failed Constitution save, half on a success. At higher levels: +1d8 per slot above 5th.",
+    classes: ["sorcerer", "wizard"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a small crystal or glass cone" },
+    effectKind: "damage",
+    effectDiceCount: 8,
+    effectDiceFaces: 8,
+    damageType: "cold",
+    attackType: "save",
+    saveAbility: "constitution",
+    saveEffect: "half",
+    upcastDicePerLevel: 1,
+  },
 ];
 
 async function main() {
@@ -1395,6 +1757,32 @@ async function main() {
       where: { name: maneuver.name },
       create: maneuver,
       update: { description: maneuver.description },
+    });
+  }
+
+  // Seed elemental discipline catalog — upsert by unique name.
+  for (const discipline of DISCIPLINES) {
+    const data = {
+      name: discipline.name,
+      description: discipline.description,
+      minLevel: discipline.minLevel,
+      alwaysKnown: discipline.alwaysKnown ?? false,
+      saveAbility: discipline.saveAbility ?? null,
+      costKind: discipline.costKind ?? null,
+      costPoolKey: discipline.costPoolKey ?? null,
+      costBase: discipline.costBase ?? null,
+      costPerStep: discipline.costPerStep ?? null,
+      effectKind: discipline.effectKind ?? null,
+      effectDiceCount: discipline.effectDiceCount ?? null,
+      effectDiceFaces: discipline.effectDiceFaces ?? null,
+      damageType: discipline.damageType ?? null,
+      attackType: discipline.attackType ?? null,
+      saveEffect: discipline.saveEffect ?? null,
+    };
+    await prisma.discipline.upsert({
+      where: { name: discipline.name },
+      create: data,
+      update: data,
     });
   }
 

@@ -9,6 +9,7 @@
  */
 
 import { abilityLabel, abilityModifier } from "@/lib/abilities";
+import { readEffectSpec, resolveEffectSpec } from "@/lib/effects";
 import type { AbilityName, Character, Spell } from "@/types/character";
 
 /**
@@ -63,32 +64,12 @@ export function effectPreview(
   characterLevel: number,
   chosenSlotLevel?: number,
 ): string | null {
-  if (!spell.effectKind || !spell.effectDiceCount || !spell.effectDiceFaces) return null;
+  const effectiveStep =
+    spell.level !== 0 && chosenSlotLevel ? Math.max(0, chosenSlotLevel - spell.level) : 0;
+  const roll = resolveEffectSpec(readEffectSpec(spell), effectiveStep, { characterLevel });
+  if (!roll) return null;
 
-  const isCantrip = spell.level === 0;
-  let count = spell.effectDiceCount;
-
-  if (spell.cantripScaling && isCantrip) {
-    if (characterLevel >= 17) count *= 4;
-    else if (characterLevel >= 11) count *= 3;
-    else if (characterLevel >= 5) count *= 2;
-  }
-
-  if (!isCantrip && chosenSlotLevel && spell.upcastDicePerLevel) {
-    const extraLevels = Math.max(0, chosenSlotLevel - spell.level);
-    count += extraLevels * spell.upcastDicePerLevel;
-  }
-
-  const mod = spell.effectModifier
-    ? spell.effectModifier > 0
-      ? ` + ${spell.effectModifier}`
-      : ` − ${Math.abs(spell.effectModifier)}`
-    : "";
-
-  const kind =
-    spell.effectKind === "heal" ? "healing" : (spell.damageType ?? "damage");
-
-  return `${count}d${spell.effectDiceFaces}${mod} ${kind}`;
+  return `${roll.count}d${roll.faces}${modifierLabel(roll.modifier ?? 0)} ${effectKindLabel(spell)}`;
 }
 
 /**
@@ -100,42 +81,33 @@ export function effectPreviewWithMod(
   character: Character,
   chosenSlotLevel?: number,
 ): string | null {
-  if (!spell.effectKind || !spell.effectDiceCount || !spell.effectDiceFaces) return null;
-
-  const isCantrip = spell.level === 0;
-  let count = spell.effectDiceCount;
-
-  if (spell.cantripScaling && isCantrip) {
-    const lvl = character.level;
-    if (lvl >= 17) count *= 4;
-    else if (lvl >= 11) count *= 3;
-    else if (lvl >= 5) count *= 2;
-  }
-
-  if (!isCantrip && chosenSlotLevel && spell.upcastDicePerLevel) {
-    const extraLevels = Math.max(0, chosenSlotLevel - spell.level);
-    count += extraLevels * spell.upcastDicePerLevel;
-  }
-
   const ability = character.spellcasting?.ability;
   const abilityScore = ability
     ? (character.abilityScores[ability as AbilityName] ?? 10)
     : 10;
   const abilityMod = abilityModifier(abilityScore);
 
-  let modifier = spell.effectModifier ?? 0;
-  if (spell.effectKind === "heal") modifier += abilityMod;
+  const effectiveStep =
+    spell.level !== 0 && chosenSlotLevel ? Math.max(0, chosenSlotLevel - spell.level) : 0;
+  const roll = resolveEffectSpec(readEffectSpec(spell), effectiveStep, {
+    characterLevel: character.level,
+    abilityMod,
+  });
+  if (!roll) return null;
 
-  const modStr = modifier > 0
-    ? ` + ${modifier}`
-    : modifier < 0
-      ? ` − ${Math.abs(modifier)}`
-      : "";
+  return `${roll.count}d${roll.faces}${modifierLabel(roll.modifier ?? 0)} ${effectKindLabel(spell)}`;
+}
 
-  const kind =
-    spell.effectKind === "heal" ? "healing" : (spell.damageType ?? "damage");
+/** Signed modifier suffix (Unicode minus for negatives, empty for zero). */
+function modifierLabel(modifier: number): string {
+  if (modifier > 0) return ` + ${modifier}`;
+  if (modifier < 0) return ` − ${Math.abs(modifier)}`;
+  return "";
+}
 
-  return `${count}d${spell.effectDiceFaces}${modStr} ${kind}`;
+/** Effect noun for the preview: "healing" for heals, else the damage type. */
+function effectKindLabel(spell: Spell): string {
+  return spell.effectKind === "heal" ? "healing" : (spell.damageType ?? "damage");
 }
 
 /**

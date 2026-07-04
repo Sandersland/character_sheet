@@ -34,6 +34,7 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
     id: "char-1",
     name: "Tester",
     inventory: [],
+    attacksPerAction: 1,
     unarmedStrike: {
       attackBonus: 2,
       damage: { count: 1, faces: 1, modifier: 0, damageType: "bludgeoning" },
@@ -115,5 +116,10 @@ describe("InlineAttackPicker — inline equip affordance", () => {
   it("does not show the equip affordance when there are no unequipped weapons", () => {
     renderPicker(makeCharacter({ inventory: [] }));
     expect(screen.queryByText("Equip a weapon")).not.toBeInTheDocument();
+  });
+
+  it("shows the attacks-per-Attack-action count", () => {
+    renderPicker(makeCharacter({ attacksPerAction: 3 }));
+    expect(screen.getByText(/Attacks:\s*3/)).toBeInTheDocument();
   });
 });

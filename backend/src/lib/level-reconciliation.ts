@@ -158,6 +158,7 @@ async function reconcileManeuvers(ctx: ReconcileContext): Promise<void> {
     resources: {
       used: { ...state.used },
       maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
       toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
     },
   };
@@ -176,6 +177,7 @@ async function reconcileManeuvers(ctx: ReconcileContext): Promise<void> {
     resources: {
       used: { ...state.used },
       maneuversKnown: trimmed.map((m: ManeuverEntry) => ({ ...m })),
+      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
       toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
     },
   };
@@ -188,6 +190,77 @@ async function reconcileManeuvers(ctx: ReconcileContext): Promise<void> {
       allowed === 0
         ? `All ${removedCount} maneuver${removedCount > 1 ? "s" : ""} removed — subclass no longer available`
         : `${removedCount} maneuver${removedCount > 1 ? "s" : ""} removed — level cap reduced to ${allowed}`,
+    before,
+    after,
+    data: { removedCount, allowed },
+    batchId,
+  });
+}
+
+// ── reconcileDisciplines ──────────────────────────────────────────────────────
+// Trims persisted disciplinesKnown (Way of the Four Elements) when the level-
+// derived choice count decreases. Mirrors reconcileManeuvers: runs AFTER
+// reconcileSubclass so a cleared subclass yields allowed=0 (deriveResources
+// returns null → disciplineChoiceCount undefined → all disciplines removed).
+// LIFO trim (drop most-recently-learned) matches the read-clamp's slice(0, n).
+
+async function reconcileDisciplines(ctx: ReconcileContext): Promise<void> {
+  const { tx, characterId, newDerivedLevel, batchId } = ctx;
+
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: {
+      resources: true,
+      abilityScores: true,
+      classEntries: {
+        orderBy: { position: "asc" as const },
+        take: 1,
+        select: { name: true, subclass: true },
+      },
+    },
+  });
+  if (!row) return;
+
+  const state = normalizeResourcesMutable(row.resources);
+  if (state.disciplinesKnown.length === 0) return; // nothing to trim
+
+  const abilityScores = row.abilityScores as Record<string, number>;
+  const profBonus = proficiencyBonusForLevel(newDerivedLevel);
+  const primaryEntry = row.classEntries[0];
+  const derived = deriveResources(
+    primaryEntry?.name ?? "",
+    primaryEntry?.subclass ?? undefined,
+    newDerivedLevel,
+    abilityScores,
+    profBonus,
+  );
+
+  // allowed = 0 when subclass is cleared (derived is null) or below grant level.
+  const allowed = derived?.disciplineChoiceCount ?? 0;
+
+  if (state.disciplinesKnown.length <= allowed) return; // within cap
+
+  const before = { resources: serializeResourcesState(state) };
+
+  const trimmed = state.disciplinesKnown.slice(0, allowed);
+  const removedCount = state.disciplinesKnown.length - allowed;
+
+  state.disciplinesKnown = trimmed;
+  await tx.character.update({
+    where: { id: characterId },
+    data: { resources: serializeResourcesState(state) },
+  });
+
+  const after = { resources: serializeResourcesState(state) };
+
+  await logEvent(tx, {
+    characterId,
+    category: "resources",
+    type: "disciplinesReconciled",
+    summary:
+      allowed === 0
+        ? `All ${removedCount} elemental discipline${removedCount > 1 ? "s" : ""} removed — subclass no longer available`
+        : `${removedCount} elemental discipline${removedCount > 1 ? "s" : ""} removed — level cap reduced to ${allowed}`,
     before,
     after,
     data: { removedCount, allowed },
@@ -245,6 +318,7 @@ async function reconcileToolProficiencies(ctx: ReconcileContext): Promise<void> 
     resources: {
       used: { ...state.used },
       maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
       toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
     },
   };
@@ -262,6 +336,7 @@ async function reconcileToolProficiencies(ctx: ReconcileContext): Promise<void> 
     resources: {
       used: { ...state.used },
       maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
       toolProficienciesKnown: trimmed.map((t: ToolProfEntry) => ({ ...t })),
     },
   };
@@ -318,6 +393,7 @@ async function reconcileFightingStyle(ctx: ReconcileContext): Promise<void> {
     resources: {
       used: { ...state.used },
       maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
       toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
       fightingStyle: state.fightingStyle,
     },
@@ -336,6 +412,7 @@ async function reconcileFightingStyle(ctx: ReconcileContext): Promise<void> {
     resources: {
       used: { ...state.used },
       maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
       toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
       fightingStyle: null,
     },
@@ -407,6 +484,7 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
     resources: {
       used: { ...state.used },
       maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
       toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
       advancements: state.advancements.map((a: AdvancementEntry) => ({
         ...a,
@@ -444,6 +522,7 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
     resources: {
       used: { ...state.used },
       maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
       toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
       advancements: state.advancements.map((a: AdvancementEntry) => ({
         ...a,
@@ -585,6 +664,7 @@ const LEVEL_GATED_RECONCILERS: Reconciler[] = [
   reconcileClassEntryLevels,
   reconcileSubclass,
   reconcileManeuvers,
+  reconcileDisciplines,
   reconcileToolProficiencies,
   reconcileFightingStyle,
   reconcileAdvancements,

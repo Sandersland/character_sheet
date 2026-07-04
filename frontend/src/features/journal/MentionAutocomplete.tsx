@@ -52,6 +52,10 @@ type ActiveTrigger = MentionTrigger & { caretOffset: number };
 
 const MAX_MATCHES = 6;
 
+// Keys handled on keydown for popover nav — keyup must not resync (which resets
+// the active option), or aria-activedescendant can't track arrowing.
+const NAV_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"]);
+
 const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>(
   function MentionAutocomplete(
     { value, onChange, campaignId, rows = 2, className = "", placeholder, id, required, onKeyDown, ...rest },
@@ -144,6 +148,9 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
     const createType: EntityType = trigger?.typeFilter ?? "NPC";
     const totalItems = matches.length + (showCreate ? 1 : 0);
     const popoverOpen = Boolean(trigger) && (campaignId ? totalItems > 0 : true);
+    const listboxOpen = popoverOpen && Boolean(campaignId);
+    const optionId = (index: number) => `${listboxId}-opt-${index}`;
+    const activeOptionId = listboxOpen ? optionId(activeIndex) : undefined;
 
     function insertToken(entityId: string, overlay?: MentionResolved) {
       const el = innerRef.current;
@@ -205,9 +212,23 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
       if (!chip || chip.nodeType !== Node.ELEMENT_NODE || !(chip as HTMLElement).dataset.mentionId) {
         return false;
       }
+      // Measure the chip's body offset, then pin the caret there after removal so
+      // it lands deterministically across browsers instead of browser-default.
+      const anchor = document.createRange();
+      anchor.setStartBefore(chip);
+      anchor.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(anchor);
+      const chipStart = serializeMentionDomBeforeCaret(el).length;
       (chip as HTMLElement).remove();
       onChange(serializeMentionDom(el));
       syncTrigger();
+      // Defer past the value-driven re-render (which replaces the editor DOM) so
+      // the caret pins to the chip-start offset instead of the browser default.
+      requestAnimationFrame(() => {
+        el.focus();
+        placeCaretAtBodyOffset(el, chipStart);
+      });
       return true;
     }
 
@@ -267,12 +288,17 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
           aria-required={required}
           aria-label={ariaLabel}
           aria-labelledby={ariaLabelledBy}
+          aria-controls={listboxOpen ? listboxId : undefined}
+          aria-activedescendant={activeOptionId}
           contentEditable
           suppressContentEditableWarning
           className={`whitespace-pre-wrap break-words ${className}`}
           style={{ minHeight: `${Math.max(rows, 1) * 1.6}em` }}
           onInput={handleInput}
-          onKeyUp={syncTrigger}
+          onKeyUp={(e) => {
+            if (popoverOpen && NAV_KEYS.has(e.key)) return;
+            syncTrigger();
+          }}
           onClick={syncTrigger}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
@@ -310,6 +336,7 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
             {matches.map((entity, index) => (
               <li
                 key={entity.id}
+                id={optionId(index)}
                 role="option"
                 aria-selected={index === activeIndex}
                 className={`flex cursor-pointer items-center justify-between gap-2 px-3 py-1.5 text-sm ${
@@ -327,6 +354,7 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
             ))}
             {showCreate && (
               <li
+                id={optionId(matches.length)}
                 role="option"
                 aria-selected={activeIndex === matches.length}
                 className={`flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm ${

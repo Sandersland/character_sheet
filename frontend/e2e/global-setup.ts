@@ -54,6 +54,8 @@ interface Persona {
   subclassName?: string;
   // Battle Master maneuver to learn (by catalog name).
   maneuverName?: string;
+  // Four Elements discipline to learn (by catalog name).
+  disciplineName?: string;
   // A dedicated solo campaign to attach to (name); enables live sessions.
   campaignName?: string;
 }
@@ -86,6 +88,17 @@ const ROSTER: Persona[] = [
     experiencePoints: LEVEL_6_XP,
     classLevel: 6,
     campaignName: "E2E Solo — Monk L6",
+  },
+  {
+    name: "Four Elements Monk",
+    race: "Human",
+    background: "Soldier",
+    className: "Monk",
+    experiencePoints: LEVEL_6_XP,
+    classLevel: 6,
+    subclassName: "Way of the Four Elements",
+    disciplineName: "Fangs of the Fire Snake",
+    campaignName: "E2E Solo — Four Elements Monk",
   },
 ];
 
@@ -220,6 +233,20 @@ async function createPersona(cookie: string, persona: Persona): Promise<void> {
       body: JSON.stringify({ operations: [{ type: "learnManeuver", maneuverId: mid }] }),
     });
     if (!manResponse.ok) throw new Error(`Failed to learn maneuver for ${persona.name}: ${manResponse.status}`);
+  }
+
+  // Elemental disciplines are learned via the resource transactions endpoint.
+  if (persona.disciplineName) {
+    const dResponse = await api(cookie, "/api/disciplines");
+    if (!dResponse.ok) throw new Error(`Failed to load disciplines: ${dResponse.status}`);
+    const catalog = (await dResponse.json()) as { id: string; name: string }[];
+    const match = catalog.find((d) => d.name === persona.disciplineName);
+    if (!match) throw new Error(`Discipline not found: ${persona.disciplineName}`);
+    const learnResponse = await api(cookie, `/api/characters/${id}/resources/transactions`, {
+      method: "POST",
+      body: JSON.stringify({ operations: [{ type: "learnDiscipline", disciplineId: match.id }] }),
+    });
+    if (!learnResponse.ok) throw new Error(`Failed to learn discipline for ${persona.name}: ${learnResponse.status}`);
   }
 
   // Attach to a dedicated campaign so the persona can start a live session.

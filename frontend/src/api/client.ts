@@ -3,9 +3,11 @@ import type {
   AdvancementOperation,
   Campaign,
   CatalogFeat,
+  CatalogDiscipline,
   CatalogManeuver,
   CatalogSpell,
   Character,
+  DisciplineOperation,
   CharacterEvent,
   ConcentrationCheck,
   CharacterSummary,
@@ -188,6 +190,24 @@ export async function applySpellcastingTransactions(
   operations: SpellcastingOperation[]
 ): Promise<Character> {
   return postTransactions(characterId, "spellcasting", operations, "Failed to apply spellcasting operations");
+}
+
+// Feeds the Four Elements monk's discipline picker (min level + ki cost + ki-scaled effect).
+export async function fetchDisciplines(): Promise<CatalogDiscipline[]> {
+  const response = await apiFetch(`${API_URL}/disciplines`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch discipline catalog (${response.status})`);
+  }
+  return response.json();
+}
+
+// Applies a batch of discipline operations atomically: castDiscipline (spend ki,
+// roll the discipline's EffectSpec). Full updated Character returned on success.
+export async function applyDisciplineTransactions(
+  characterId: string,
+  operations: DisciplineOperation[]
+): Promise<Character> {
+  return postTransactions(characterId, "disciplines", operations, "Failed to apply discipline operations");
 }
 
 // One inline edit is a batch of one operation; a bulk action (e.g. selling
