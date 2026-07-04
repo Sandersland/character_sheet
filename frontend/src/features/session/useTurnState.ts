@@ -24,7 +24,7 @@
  */
 
 import { useState, useCallback, useEffect } from "react";
-import { deriveAttacksPerAction, canTwoWeaponFight } from "@/lib/turnRules";
+import { canTwoWeaponFight } from "@/lib/turnRules";
 import { loadTurnState, saveTurnState } from "@/features/session/turnStatePersistence";
 import type { Character } from "@/types/character";
 
@@ -149,11 +149,8 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     return loadTurnState(sessionId) ?? initialState();
   });
 
-  const attacksPerAction = deriveAttacksPerAction(
-    character.class,
-    character.subclass,
-    character.level,
-  );
+  // Server-derived, multiclass-correct (max across classes); see srd.ts.
+  const attacksPerAction = character.attacksPerAction;
 
   // Persist state to localStorage whenever it changes.
   useEffect(() => {

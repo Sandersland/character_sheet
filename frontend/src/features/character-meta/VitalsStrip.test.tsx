@@ -57,6 +57,7 @@ const mockCharacter: Character = {
     proficient: false,
     damage: { count: 1, faces: 4, modifier: 1, damageType: "bludgeoning" },
   },
+  attacksPerAction: 1,
   advancements: [],
   advancementSlots: { total: 1, used: 0 },
   journal: [],

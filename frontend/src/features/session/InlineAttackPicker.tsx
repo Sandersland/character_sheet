@@ -215,6 +215,11 @@ export default function InlineAttackPicker({
 
   return (
     <div className="flex flex-col divide-y divide-parchment-200">
+      {/* Extra Attack count for this Attack action (server-derived). */}
+      <p className="pb-2 text-xs font-semibold uppercase tracking-wide text-parchment-600">
+        Attacks: {character.attacksPerAction}
+      </p>
+
       {equippedWeapons.length === 0 && attackOptionManeuvers.length === 0 && (
         <p className="pb-3 text-sm text-parchment-600">
           {unequippedWeapons.length > 0

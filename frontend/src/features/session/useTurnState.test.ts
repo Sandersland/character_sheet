@@ -15,16 +15,14 @@ import { useTurnState } from "@/features/session/useTurnState";
 import type { Character, InventoryItem } from "@/types/character";
 
 // ── Minimal character fixture ─────────────────────────────────────────────────
-// useTurnState reads only class / subclass / level / inventory.
+// useTurnState reads only inventory + the server-derived attacksPerAction.
 // Cast to avoid satisfying the full ~50-field Character interface.
 
 function makeCharacter(
-  overrides: Partial<Pick<Character, "class" | "subclass" | "level" | "inventory">> = {},
+  overrides: Partial<Pick<Character, "attacksPerAction" | "inventory">> = {},
 ): Character {
   return {
-    class: "fighter",
-    subclass: undefined,
-    level: 1,
+    attacksPerAction: 1,
     inventory: [],
     ...overrides,
   } as unknown as Character;
@@ -176,8 +174,8 @@ describe("action slot consumption", () => {
 // ── Attack flow ───────────────────────────────────────────────────────────────
 
 describe("attack mode flow", () => {
-  it("enterAttackMode spends an action and sets attack state (Fighter L5 → total 2)", () => {
-    const character = makeCharacter({ class: "fighter", level: 5 });
+  it("enterAttackMode spends an action and sets attack state (attacksPerAction 2 → total 2)", () => {
+    const character = makeCharacter({ attacksPerAction: 2 });
     const { result } = renderHook(() => useTurnState(character, SESSION_ID));
 
     act(() => { result.current.startCombat(); });
@@ -189,7 +187,7 @@ describe("attack mode flow", () => {
   });
 
   it("enterAttackMode is a no-op when actionsRemaining is 0", () => {
-    const character = makeCharacter({ class: "fighter", level: 5 });
+    const character = makeCharacter({ attacksPerAction: 2 });
     const { result } = renderHook(() => useTurnState(character, SESSION_ID));
 
     act(() => { result.current.startCombat(); });
@@ -201,7 +199,7 @@ describe("attack mode flow", () => {
   });
 
   it("recordAttack increments used, clamps at total", () => {
-    const character = makeCharacter({ class: "fighter", level: 5 }); // total 2
+    const character = makeCharacter({ attacksPerAction: 2 }); // total 2
     const { result } = renderHook(() => useTurnState(character, SESSION_ID));
 
     act(() => { result.current.startCombat(); });

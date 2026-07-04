@@ -6,76 +6,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  deriveAttacksPerAction,
   canTwoWeaponFight,
   universalActionsForCost,
   UNIVERSAL_ACTIONS,
 } from "@/lib/turnRules";
 
-// ── deriveAttacksPerAction ────────────────────────────────────────────────────
-
-describe("deriveAttacksPerAction — fighter thresholds", () => {
-  it("L1–4 → 1 attack", () => {
-    expect(deriveAttacksPerAction("fighter", undefined, 1)).toBe(1);
-    expect(deriveAttacksPerAction("fighter", undefined, 4)).toBe(1);
-  });
-
-  it("L5–10 → 2 attacks (Extra Attack)", () => {
-    expect(deriveAttacksPerAction("fighter", undefined, 5)).toBe(2);
-    expect(deriveAttacksPerAction("fighter", undefined, 10)).toBe(2);
-  });
-
-  it("L11–19 → 3 attacks", () => {
-    expect(deriveAttacksPerAction("fighter", undefined, 11)).toBe(3);
-    expect(deriveAttacksPerAction("fighter", undefined, 19)).toBe(3);
-  });
-
-  it("L20 → 4 attacks", () => {
-    expect(deriveAttacksPerAction("fighter", undefined, 20)).toBe(4);
-  });
-
-  it("is case-insensitive", () => {
-    expect(deriveAttacksPerAction("FIGHTER", undefined, 5)).toBe(2);
-    expect(deriveAttacksPerAction("Fighter", undefined, 11)).toBe(3);
-  });
-});
-
-describe("deriveAttacksPerAction — barbarian / monk / paladin / ranger", () => {
-  const classes = ["barbarian", "monk", "paladin", "ranger"] as const;
-
-  for (const cls of classes) {
-    it(`${cls}: L4 → 1, L5 → 2`, () => {
-      expect(deriveAttacksPerAction(cls, undefined, 4)).toBe(1);
-      expect(deriveAttacksPerAction(cls, undefined, 5)).toBe(2);
-    });
-  }
-});
-
-describe("deriveAttacksPerAction — bard", () => {
-  it("non-valor bard never gets Extra Attack", () => {
-    expect(deriveAttacksPerAction("bard", undefined, 10)).toBe(1);
-    expect(deriveAttacksPerAction("bard", "College of Lore", 10)).toBe(1);
-  });
-
-  it("College of Valor bard L5 → still 1 (granted at L6)", () => {
-    expect(deriveAttacksPerAction("bard", "College of Valor", 5)).toBe(1);
-  });
-
-  it("College of Valor bard L6 → 2 attacks", () => {
-    expect(deriveAttacksPerAction("bard", "College of Valor", 6)).toBe(2);
-    expect(deriveAttacksPerAction("bard", "college of valor", 6)).toBe(2);
-  });
-});
-
-describe("deriveAttacksPerAction — no Extra Attack classes", () => {
-  const classes = ["wizard", "cleric", "rogue", "sorcerer", "warlock", "druid"] as const;
-
-  for (const cls of classes) {
-    it(`${cls} → always 1`, () => {
-      expect(deriveAttacksPerAction(cls, undefined, 20)).toBe(1);
-    });
-  }
-});
+// deriveAttacksPerAction moved to the backend (srd.ts); Extra Attack counts now
+// arrive on the serialized character as `attacksPerAction`.
 
 // ── canTwoWeaponFight ─────────────────────────────────────────────────────────
 
