@@ -560,7 +560,7 @@ export async function applySpendResourceInTx(
   op: SpendResourceOperation,
   batchId: string,
   sessionId: string | null,
-): Promise<void> {
+): Promise<ResourceOpAudit> {
   const row = await tx.character.findUnique({
     where: { id: characterId },
     select: {
@@ -623,4 +623,6 @@ export async function applySpendResourceInTx(
     batchId,
     sessionId,
   });
+
+  return audit;
 }

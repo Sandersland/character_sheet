@@ -93,8 +93,9 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 | `abilityGen.ts` | Ability-score generation methods (point-buy / standard array / roll). |
 | `dieFaces.ts` | Static die-face geometry data for the 3D rollers. |
 | `physicsDice.ts` | Physics-roller setup (cannon/three glue) for `PhysicsDiceRoller`. |
-| `spellCast.ts` | Pure cast-roll math (cantrip scaling, upcast dice, heal modifier) shared by SpellsSection + InlineSpellPicker. |
-| `spellMeta.ts` | Pure spell display helpers (school tone, metadata, `defaultTarget`/`targetLocked`) shared across spell surfaces. |
+| `effects.ts` | Mirror of backend `lib/effects.ts` (keep in sync) — the 5e effect model (dice + save + scaling). `readEffectSpec(row)` adapts the flat effect columns into an `EffectSpec`; `resolveEffectSpec(spec, effectiveStep, ctx)` returns a concrete `RollSpec`, generalizing the scaling axis (`cantripLevel`/`slotUpcast`/`ki`). `spellCast.ts` + `spellMeta.ts` both delegate here — never re-copy the scaling math. |
+| `spellCast.ts` | Pure cast-roll math shared by SpellsSection + InlineSpellPicker. `computeCastSpec` derives the spellcasting ability mod then delegates the scaling/heal math to `resolveEffectSpec` (`lib/effects.ts`). |
+| `spellMeta.ts` | Pure spell display helpers (school tone, metadata, `defaultTarget`/`targetLocked`, `effectPreview`/`effectPreviewWithMod`) shared across spell surfaces. The effect-preview count/modifier come from `resolveEffectSpec` (`lib/effects.ts`); this file only formats the label. |
 | `spellPicker.ts` | Pure InlineSpellPicker selection/slot predicates (`availableSlotLevels`, `availableSlotsForSpell`, `resolvedSlot`, `filterCastableSpells`, `sortSpells`, `spellRestrictionFlags`, `slotRestrictionHint`). |
 | `turnRules.ts` | 5e turn economy — universal action lists + `canTwoWeaponFight`. (Extra Attack counts are server-derived; read `character.attacksPerAction`.) |
 | `attackMath.ts` | Pure attack-row math for InlineAttackPicker: `buildAttackEntries` (equipped/unarmed/improvised rows + precomputed roll/log label strings), grip-resolved weapon damage/type/grip helpers, unarmed display, `hasSuperiorityDice`, `attacksExhausted`. |

@@ -10,6 +10,7 @@
 
 import { rollSpec } from "@/lib/dice";
 import { abilityModifier } from "@/lib/abilities";
+import { readEffectSpec, resolveEffectSpec } from "@/lib/effects";
 import type { AbilityName, Character, Spell } from "@/types/character";
 import type { RollSpec, RollResult } from "@/lib/dice";
 
@@ -27,40 +28,16 @@ export function computeCastSpec(
   character: Character,
   slotLevel: number,
 ): RollSpec | null {
-  // No dice = no roll.
-  if (!spell.effectKind || !spell.effectDiceCount || !spell.effectDiceFaces) {
-    return null;
-  }
-
-  const isCantrip = spell.level === 0;
-
-  // Cantrip scaling.
-  let diceCount = spell.effectDiceCount;
-  if (spell.cantripScaling && isCantrip) {
-    if (character.level >= 17) diceCount *= 4;
-    else if (character.level >= 11) diceCount *= 3;
-    else if (character.level >= 5) diceCount *= 2;
-  }
-
-  // Upcast bonus.
-  if (!isCantrip && slotLevel && spell.upcastDicePerLevel) {
-    const extraLevels = Math.max(0, slotLevel - spell.level);
-    diceCount += extraLevels * spell.upcastDicePerLevel;
-  }
-
-  // Flat modifier: heal spells add the spellcasting ability modifier.
+  // Heal spells add the spellcasting ability modifier as a flat bonus.
   const ability = character.spellcasting?.ability;
   const abilityScore = ability
     ? (character.abilityScores[ability as AbilityName] ?? 10)
     : 10;
   const abilityMod = abilityModifier(abilityScore);
 
-  let modifier = spell.effectModifier ?? 0;
-  if (spell.effectKind === "heal") {
-    modifier += abilityMod;
-  }
-
-  return { count: diceCount, faces: spell.effectDiceFaces, modifier };
+  const spec = readEffectSpec(spell);
+  const effectiveStep = spell.level === 0 ? 0 : Math.max(0, slotLevel - spell.level);
+  return resolveEffectSpec(spec, effectiveStep, { characterLevel: character.level, abilityMod });
 }
 
 /**
