@@ -1779,7 +1779,7 @@ async function main() {
       attackType: discipline.attackType ?? null,
       saveEffect: discipline.saveEffect ?? null,
     };
-    await prisma.discipline.upsert({
+    await prisma.grantedAbility.upsert({
       where: { name: discipline.name },
       create: data,
       update: data,

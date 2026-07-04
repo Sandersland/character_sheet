@@ -101,9 +101,9 @@ describe("Discipline cast endpoint", () => {
     classId = cls.id;
 
     const [ww, att, gale] = await Promise.all([
-      prisma.discipline.findUnique({ where: { name: "Water Whip" } }),
-      prisma.discipline.findUnique({ where: { name: "Elemental Attunement" } }),
-      prisma.discipline.findUnique({ where: { name: "Rush of the Gale Spirits" } }),
+      prisma.grantedAbility.findUnique({ where: { name: "Water Whip" } }),
+      prisma.grantedAbility.findUnique({ where: { name: "Elemental Attunement" } }),
+      prisma.grantedAbility.findUnique({ where: { name: "Rush of the Gale Spirits" } }),
     ]);
     waterWhipId = ww!.id;
     attunementId = att!.id;
@@ -288,7 +288,7 @@ describe("Discipline cast endpoint", () => {
   for (const c of HIGH_LEVEL) {
     it(`casts ${c.name} at its base ki cost with the right cap and DC`, async () => {
       await createMonk(c.xp);
-      const disc = await prisma.discipline.findUnique({ where: { name: c.name } });
+      const disc = await prisma.grantedAbility.findUnique({ where: { name: c.name } });
       expect(disc).not.toBeNull();
       await learn(disc!.id);
 
@@ -313,7 +313,7 @@ describe("Discipline cast endpoint", () => {
 
   it("rejects ki above the per-cast cap for a high-level discipline", async () => {
     await createMonk(XP_L6); // per-cast cap is 3 ki at L6
-    const gong = await prisma.discipline.findUnique({ where: { name: "Gong of the Summit" } });
+    const gong = await prisma.grantedAbility.findUnique({ where: { name: "Gong of the Summit" } });
     await learn(gong!.id);
     const res = await cast([{ type: "castDiscipline", disciplineId: gong!.id, kiSpent: 4, roll: 20 }]);
     expect(res.status).toBe(400);
@@ -331,7 +331,7 @@ describe("Discipline cast endpoint", () => {
   for (const m of SPELL_MAPPED) {
     it(`${m.discipline} rolls identical dice to ${m.spell} via a ki-scaled EffectSpec`, async () => {
       const [disc, spell] = await Promise.all([
-        prisma.discipline.findUnique({ where: { name: m.discipline } }),
+        prisma.grantedAbility.findUnique({ where: { name: m.discipline } }),
         prisma.spell.findUnique({ where: { name: m.spell } }),
       ]);
       expect(disc).not.toBeNull();
