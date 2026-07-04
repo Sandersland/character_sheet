@@ -38,6 +38,10 @@ export default function ShadowArtsSection({ character, busy, onCast }: Props) {
 
   const kiAvailable = kiRemaining(character.resources);
   const concentratingOn = character.spellcasting?.concentratingOn ?? null;
+  // A cast Shadow Art's concentration entryId is prefixed (disjoint from Spell.id) on the backend.
+  const concentratingArtId = concentratingOn?.entryId?.startsWith("shadow-art:")
+    ? concentratingOn.entryId.slice("shadow-art:".length)
+    : null;
 
   return (
     <div>
@@ -73,7 +77,7 @@ export default function ShadowArtsSection({ character, busy, onCast }: Props) {
               art={art}
               kiAvailable={kiAvailable}
               busy={busy}
-              isConcentrating={concentratingOn?.entryId === art.id}
+              isConcentrating={concentratingArtId === art.id}
               concentratingOnName={concentratingOn?.spellName ?? null}
               onCast={onCast}
             />

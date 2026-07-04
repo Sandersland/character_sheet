@@ -118,7 +118,8 @@ describe("ShadowArtsSection", () => {
   });
 
   it("marks concentration Shadow Arts and surfaces the current concentration handoff", async () => {
-    renderSection(makeCharacter(3, { entryId: "darkness", spellName: "Shadow Arts: Darkness" }));
+    // The backend stamps a Shadow Art's concentration entryId with the shadow-art: prefix.
+    renderSection(makeCharacter(3, { entryId: "shadow-art:darkness", spellName: "Shadow Arts: Darkness" }));
     await waitFor(() => expect(screen.getByText("Darkness")).toBeInTheDocument());
 
     // The active-concentration art shows the 'concentrating' badge.
@@ -128,13 +129,15 @@ describe("ShadowArtsSection", () => {
     // Non-active concentration arts show the static 'conc' badge.
     const silenceRow = screen.getByText("Silence").closest("li")!;
     expect(within(silenceRow).getByText("conc")).toBeInTheDocument();
+    // …and warn (before expand) that casting replaces the current concentration.
+    expect(within(silenceRow).getByText(/Casting replaces concentration on/)).toBeInTheDocument();
 
     // Darkvision (no concentration) shows neither badge.
     const dvRow = screen.getByText("Darkvision").closest("li")!;
     expect(within(dvRow).queryByText(/^conc/)).not.toBeInTheDocument();
 
     // Handoff banner names the current concentration.
-    expect(screen.getByText(/Shadow Arts: Darkness/)).toBeInTheDocument();
+    expect(screen.getByText(/Concentrating on/)).toBeInTheDocument();
   });
 
   it("surfaces a catalog load error", async () => {

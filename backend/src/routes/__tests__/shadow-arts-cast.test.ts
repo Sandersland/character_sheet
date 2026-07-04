@@ -9,7 +9,7 @@ import supertest from "supertest";
 
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
-import { shadowArtEffectSpec } from "../../lib/shadow-arts.js";
+import { shadowArtEffectSpec, SHADOW_ART_CONCENTRATION_PREFIX } from "../../lib/shadow-arts.js";
 import { prisma } from "../../lib/prisma.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
 import { authCookie } from "../../test-support/auth.js";
@@ -140,13 +140,15 @@ describe("Shadow Arts cast endpoint", () => {
     // Concentration Shadow Art → concentratingOn set.
     await createMonk(XP_L3, "way of shadow");
     const concRes = await cast([{ type: "castShadowArt", shadowArtId: darknessId }]);
+    // A Shadow Art's concentration entryId is prefixed so its id space stays disjoint from Spell.id.
+    const prefixedDarkness = `${SHADOW_ART_CONCENTRATION_PREFIX}${darknessId}`;
     let row = await prisma.character.findUnique({ where: { id: FIXTURE_ID }, select: { spellcasting: true } });
     expect((row!.spellcasting as { concentratingOn: { entryId: string } | null }).concentratingOn)
-      .toMatchObject({ entryId: darknessId, spellName: "Shadow Arts: Darkness" });
-    // The serialized character must ALSO surface it — a Shadow Art's catalog-id
-    // concentration entry isn't a spellbook spell, so the clamp must not drop it.
+      .toMatchObject({ entryId: prefixedDarkness, spellName: "Shadow Arts: Darkness" });
+    // The serialized character must ALSO surface it — the prefixed entry isn't a
+    // spellbook spell, so the clamp keeps it via the prefix check (not shadowArtsAvailable).
     expect(concRes.body.spellcasting.concentratingOn)
-      .toMatchObject({ entryId: darknessId, spellName: "Shadow Arts: Darkness" });
+      .toMatchObject({ entryId: prefixedDarkness, spellName: "Shadow Arts: Darkness" });
     await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
 
     // Non-concentration Shadow Art (Darkvision) never touches spellcasting — the
@@ -163,19 +165,20 @@ describe("Shadow Arts cast endpoint", () => {
     const res = await cast([{ type: "castShadowArt", shadowArtId: passWithoutTraceId }]);
     expect(res.status).toBe(200);
 
-    // Buff applied via #438 engine.
+    // Buff applied via #438 engine, keyed by the prefixed concentration entryId.
+    const prefixedPwt = `${SHADOW_ART_CONCENTRATION_PREFIX}${passWithoutTraceId}`;
     const withBuff = await prisma.character.findUnique({ where: { id: FIXTURE_ID }, select: { activeEffects: true } });
     const buffs = (withBuff!.activeEffects as { buffs: { target: string; modifier: number; sourceEntryId?: string }[] }).buffs;
-    expect(buffs).toContainEqual(expect.objectContaining({ target: "stealth", modifier: 10, sourceEntryId: passWithoutTraceId }));
+    expect(buffs).toContainEqual(expect.objectContaining({ target: "stealth", modifier: 10, sourceEntryId: prefixedPwt }));
 
     // Break concentration → buff clears (create/cleanup symmetry).
     const drop = await agent()
       .post(`/api/characters/${FIXTURE_ID}/spellcasting/transactions`)
-      .send({ operations: [{ type: "dropConcentration", entryId: passWithoutTraceId }] });
+      .send({ operations: [{ type: "dropConcentration", entryId: prefixedPwt }] });
     expect(drop.status).toBe(200);
     const cleared = await prisma.character.findUnique({ where: { id: FIXTURE_ID }, select: { activeEffects: true } });
     const remaining = (cleared!.activeEffects as { buffs: { sourceEntryId?: string }[] }).buffs;
-    expect(remaining.some((b) => b.sourceEntryId === passWithoutTraceId)).toBe(false);
+    expect(remaining.some((b) => b.sourceEntryId === prefixedPwt)).toBe(false);
   });
 
   it("logs an undoable cast: revert refunds ki and restores concentration to null", async () => {
@@ -207,6 +210,81 @@ describe("Shadow Arts cast endpoint", () => {
     const res = await cast([{ type: "castShadowArt", shadowArtId: darknessId }]);
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/level 3/i);
+  });
+});
+
+// Concentration clamp-on-read: the shadow-art: prefix is what keeps a Shadow Art's
+// concentration alive, NOT a blanket "shadowArtsAvailable" pass. A multiclass Way of
+// Shadow monk who forgets the spellbook spell they were concentrating on must drop it.
+describe("resolveConcentration clamp for multiclass Way of Shadow", () => {
+  const MC_ID = "test-shadow-mc-stale-1";
+  const MC_CLASS_NAME = "Shadow MC Test Class";
+  let mcClassId: string;
+  let mcDarknessId: string;
+
+  beforeAll(async () => {
+    await ensureTestOwner(OWNER_ID);
+    const cls = await prisma.characterClass.upsert({
+      where: { name: MC_CLASS_NAME },
+      create: { name: MC_CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["acrobatics", "stealth"], isSpellcaster: false },
+      update: {},
+    });
+    mcClassId = cls.id;
+    mcDarknessId = (await prisma.grantedAbility.findUnique({ where: { name: "Shadow Arts: Darkness" } }))!.id;
+  });
+
+  afterAll(async () => {
+    await prisma.character.deleteMany({ where: { id: MC_ID } });
+    await prisma.characterClass.deleteMany({ where: { name: MC_CLASS_NAME } });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: MC_ID } });
+  });
+
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+  });
+
+  async function createMulticlass(spellcasting: unknown) {
+    await prisma.character.create({
+      data: {
+        ...FIXTURE_BASE,
+        id: MC_ID,
+        experiencePoints: XP_L3,
+        ownerId: OWNER_ID,
+        resources: Prisma.JsonNull,
+        spellcasting: spellcasting as Prisma.InputJsonValue,
+        classEntries: {
+          create: [
+            { name: "monk", subclass: "way of shadow", classId: mcClassId, level: 3, position: 0 },
+            { name: "wizard", subclass: null, classId: mcClassId, level: 3, position: 1 },
+          ],
+        },
+      },
+    });
+  }
+
+  it("keeps a cast Shadow Art's prefixed concentration through serialization", async () => {
+    await createMulticlass({
+      slotsUsed: {}, arcanumUsed: {}, spells: [],
+      concentratingOn: { entryId: `${SHADOW_ART_CONCENTRATION_PREFIX}${mcDarknessId}`, spellName: "Shadow Arts: Darkness" },
+    });
+    const res = await agent().get(`/api/characters/${MC_ID}`);
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.concentratingOn)
+      .toMatchObject({ entryId: `${SHADOW_ART_CONCENTRATION_PREFIX}${mcDarknessId}`, spellName: "Shadow Arts: Darkness" });
+  });
+
+  it("drops a stale forgotten-spellbook-spell concentration (no blanket shadow-arts pass)", async () => {
+    await createMulticlass({
+      slotsUsed: {}, arcanumUsed: {}, spells: [],
+      concentratingOn: { entryId: "stale-forgotten-spellbook-spell-id", spellName: "Hold Person" },
+    });
+    const res = await agent().get(`/api/characters/${MC_ID}`);
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.concentratingOn).toBeNull();
   });
 });
 

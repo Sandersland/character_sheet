@@ -50,6 +50,7 @@ import { reverseAdvancementEffects } from "../lib/advancement.js";
 import { normalizeSpellcastingMutable } from "../lib/spellcasting.js";
 import type { SpellEntry } from "../lib/spell-state.js";
 import { deriveGrantedSpells } from "../lib/granted-spells.js";
+import { SHADOW_ART_CONCENTRATION_PREFIX } from "../lib/shadow-arts.js";
 import { assertCharacterAccess } from "../lib/auth/access.js";
 
 export const charactersRouter = Router();
@@ -323,38 +324,27 @@ function collectGrantedSpells(entries: CharacterWithRelations["classEntries"]): 
   return entries.flatMap((e) => deriveGrantedSpells(e.name, e.subclass ?? undefined, e.level));
 }
 
-// Spellcasting clamp-on-read: derive stats (ability/DC/attack/slot totals) from
-// class+level+scores, then layer the stored mutable state (slotsUsed, spells,
-// concentration) clamped to the derived caps. Same derive-don't-persist pattern
-// as level/proficiencyBonus. Returns undefined for non-casters.
-// True when any class entry is a Way of Shadow monk (L3+) able to concentrate on
-// a Shadow Art — whose concentration entryId is a catalog id, not a spellbook spell.
-function hasShadowArtsGrant(
-  entries: { name: string; subclass: string | null; level: number }[],
-  abilityScores: Record<string, number>,
-  proficiencyBonus: number,
-): boolean {
-  return entries.some(
-    (e) =>
-      deriveResources(e.name, e.subclass ?? undefined, e.level, abilityScores, proficiencyBonus)
-        ?.shadowArtsAvailable === true,
-  );
-}
-
 // Clamp-on-read for concentration: surface the stored entry when it's a current
-// spellbook spell OR a Shadow Art held by a Way of Shadow monk; drop stale entries.
+// spellbook spell OR a Shadow Art (its entryId carries the shadow-art: prefix, a
+// disjoint id space); drop stale entries (e.g. a forgotten spellbook spell).
 function resolveConcentration(
   concentratingOn: { entryId: string; spellName: string } | null,
   spells: { id: string }[],
-  shadowArtsAvailable: boolean,
 ): { entryId: string; spellName: string } | null {
   if (!concentratingOn) return null;
-  if (spells.some((s) => s.id === concentratingOn.entryId) || shadowArtsAvailable) {
+  if (
+    concentratingOn.entryId.startsWith(SHADOW_ART_CONCENTRATION_PREFIX) ||
+    spells.some((s) => s.id === concentratingOn.entryId)
+  ) {
     return concentratingOn;
   }
   return null;
 }
 
+// Spellcasting clamp-on-read: derive stats (ability/DC/attack/slot totals) from
+// class+level+scores, then layer the stored mutable state (slotsUsed, spells,
+// concentration) clamped to the derived caps. Same derive-don't-persist pattern
+// as level/proficiencyBonus. Returns undefined for non-casters.
 function buildSpellcastingView(
   row: CharacterWithRelations,
   primaryClass: PrimaryClass,
@@ -368,14 +358,6 @@ function buildSpellcastingView(
   if (row.classEntries.length > 1) {
     return buildMulticlassSpellcastingView(row, abilityScores, proficiencyBonus);
   }
-
-  // A Way of Shadow monk concentrates via Shadow Arts (catalog-id entries, never
-  // spellbook spells) — used to keep the concentration clamp from dropping them.
-  const shadowArtsAvailable = hasShadowArtsGrant(
-    [{ name: primaryClass?.name ?? "", subclass: primaryClass?.subclass ?? null, level }],
-    abilityScores,
-    proficiencyBonus,
-  );
 
   const derivedSpell = deriveSpellcasting(
     primaryClass?.name ?? "",
@@ -417,7 +399,7 @@ function buildSpellcastingView(
       spells,
       // Active concentration spell, or null. Clamp-on-read drops a stale entry
       // (spellbook spell forgotten / Shadow Arts no longer available).
-      concentratingOn: resolveConcentration(stored.concentratingOn, spells, shadowArtsAvailable),
+      concentratingOn: resolveConcentration(stored.concentratingOn, spells),
     };
   }
   // Non-caster class that nonetheless gets a subclass-granted spell (e.g. a Way
@@ -436,7 +418,7 @@ function buildSpellcastingView(
       spells: grantedSpells,
       // A cast concentration Shadow Art (catalog-id entry) surfaces here so the
       // ShadowArtsSection handoff banner + concentrating badge can render.
-      concentratingOn: resolveConcentration(stored.concentratingOn, grantedSpells, shadowArtsAvailable),
+      concentratingOn: resolveConcentration(stored.concentratingOn, grantedSpells),
     };
   }
   if (
@@ -472,11 +454,6 @@ function buildMulticlassSpellcastingView(
   // Subclass-granted spells across every class entry (each gated by its own level).
   const granted = collectGrantedSpells(row.classEntries);
   const stored = normalizeSpellcastingMutable(row.spellcasting);
-  const shadowArtsAvailable = hasShadowArtsGrant(
-    row.classEntries.map((e) => ({ name: e.name, subclass: e.subclass, level: e.level })),
-    abilityScores,
-    proficiencyBonus,
-  );
 
   // No caster class in the mix, but a subclass still grants a spell — surface a
   // slotless Wisdom view (mirrors the single-class non-caster branch).
@@ -491,7 +468,7 @@ function buildMulticlassSpellcastingView(
       slots: [],
       arcana: [],
       spells: grantedSpells,
-      concentratingOn: resolveConcentration(stored.concentratingOn, grantedSpells, shadowArtsAvailable),
+      concentratingOn: resolveConcentration(stored.concentratingOn, grantedSpells),
     };
   }
 
@@ -525,7 +502,7 @@ function buildMulticlassSpellcastingView(
     // Per-class caster stats (ability/DC/attack) for display in a multiclass sheet.
     classes: multi.classes,
     spells: mergedSpells,
-    concentratingOn: resolveConcentration(stored.concentratingOn, mergedSpells, shadowArtsAvailable),
+    concentratingOn: resolveConcentration(stored.concentratingOn, mergedSpells),
   };
 }
 

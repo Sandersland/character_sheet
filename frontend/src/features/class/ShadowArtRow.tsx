@@ -101,14 +101,15 @@ export default function ShadowArtRow({
         </button>
       </div>
 
+      {willReplace && (
+        <p className="mt-1 text-[11px] text-arcane-800" role="status">
+          Casting replaces concentration on {concentratingOnName}.
+        </p>
+      )}
+
       {expanded && (
         <div className="mt-1.5 pr-2">
           <p className="text-xs leading-relaxed text-parchment-600">{art.description}</p>
-          {willReplace && (
-            <p className="mt-1 text-[11px] text-arcane-800">
-              Replaces concentration on {concentratingOnName}.
-            </p>
-          )}
         </div>
       )}
     </li>

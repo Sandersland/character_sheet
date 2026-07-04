@@ -40,6 +40,9 @@ export type ShadowArtOperation = CastShadowArtOperation;
 
 // ── 5e rules ──────────────────────────────────────────────────────────────────
 
+// Prefix stamped on a Shadow Art's concentration entryId so its id space never overlaps a spellbook Spell.id.
+export const SHADOW_ART_CONCENTRATION_PREFIX = "shadow-art:";
+
 /** Shadow Arts spells that mimic a concentration spell — routed through the shared slot. */
 const CONCENTRATION_SHADOW_ARTS = new Set<string>([
   "Shadow Arts: Darkness",
@@ -158,7 +161,7 @@ export async function applyShadowArtsOperations(
         { tx, characterId, batchId, sessionId, cost: costCtx, concentrationHost: spellState },
         {
           name: catalog.name,
-          entryId: catalog.id,
+          entryId: `${SHADOW_ART_CONCENTRATION_PREFIX}${catalog.id}`,
           cost,
           effect,
           requested: cost.base, // flat 2 ki, no scaling
