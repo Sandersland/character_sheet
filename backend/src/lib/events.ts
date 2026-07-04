@@ -14,7 +14,8 @@ export type EventCategory =
   | "session"
   | "combat"
   | "conditions"
-  | "effects";
+  | "effects"
+  | "roll";
 
 export type EventType =
   // inventory
@@ -91,9 +92,12 @@ export type EventType =
   // effects (active buffs)
   | "buffApplied"
   | "buffCleared"
-  // roll events (attack/damage logged from session UI)
+  // roll events (rolls logged from session UI — non-undoable)
   | "attackRoll"
   | "damageRoll"
+  | "checkRoll"
+  | "saveRoll"
+  | "initiativeRoll"
   // meta
   | "revert";
 

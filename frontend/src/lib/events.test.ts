@@ -25,6 +25,13 @@ describe("eventTypeLabel", () => {
     expect(eventTypeLabel("sessionStarted")).toBe("Session started");
   });
 
+  it("maps the roll types to clean labels (#128)", () => {
+    expect(eventTypeLabel("attackRoll")).toBe("Attack roll");
+    expect(eventTypeLabel("checkRoll")).toBe("Ability check");
+    expect(eventTypeLabel("saveRoll")).toBe("Saving throw");
+    expect(eventTypeLabel("initiativeRoll")).toBe("Initiative");
+  });
+
   it("degrades an unknown type to the raw key (no crash, no inline-capitalize)", () => {
     expect(eventTypeLabel("someFutureType")).toBe("someFutureType");
   });
@@ -39,6 +46,7 @@ describe("categoryLabel", () => {
     expect(categoryLabel("advancement")).toBe("Advancement");
     expect(categoryLabel("session")).toBe("Session");
     expect(categoryLabel("conditions")).toBe("Conditions");
+    expect(categoryLabel("roll")).toBe("Rolls");
   });
 
   it("degrades an unknown category to the raw key", () => {
@@ -49,6 +57,7 @@ describe("categoryLabel", () => {
 describe("categoryTone", () => {
   it("maps a known category to its badge tone", () => {
     expect(categoryTone("inventory")).toBe("gold");
+    expect(categoryTone("roll")).toBe("garnet");
   });
 
   it("falls back to neutral for an unknown category", () => {
