@@ -107,9 +107,11 @@ jobs:
   e2e:
     # Playwright smoke suite against a booted dev stack (same postgres service as
     # `test`, plus the backend + Vite dev servers the e2e harness proxies through).
-    # NOT a required check yet (issue #333) — soaking before it gates merges.
-    # Chromium-only + all-core workers keep it well under the CI time budget.
+    # A required check. Runs SERIALLY (playwright.config.ts sets workers: 1) — the
+    # specs share one dev stack and a campaign allows only one active session, so
+    # parallel workers overload the stack; don't reintroduce --workers here.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     services:
       postgres:
@@ -183,7 +185,7 @@ jobs:
         working-directory: frontend
         env:
           E2E_BASE_URL: http://localhost:5173
-        run: npx playwright test --workers=100%
+        run: npx playwright test
 
       - name: Upload Playwright report
         if: failure()
