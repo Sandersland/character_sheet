@@ -50,9 +50,14 @@ export default function SkillsTable({
             score,
             proficiencyBonus,
             skill.proficient,
-            skill.expertise
+            skill.expertise,
+            skill.tempModifier ?? 0
           );
           const isEmphasized = skill.proficient || skill.expertise;
+          // Active cast-granted buff (#438): free-text source label, safe to render.
+          const buffSource = skill.tempModifier
+            ? (skill.tempModifierSources?.map((s) => s.label).join(", ") ?? "")
+            : "";
 
           return (
             <tr
@@ -84,6 +89,14 @@ export default function SkillsTable({
                     Expertise
                   </span>
                 )}
+                {skill.tempModifier ? (
+                  <span
+                    className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700"
+                    title={buffSource}
+                  >
+                    {`${skill.tempModifier > 0 ? "+" : ""}${skill.tempModifier} ${buffSource}`}
+                  </span>
+                ) : null}
               </td>
               <td className="py-1.5 text-xs text-parchment-600">
                 {abilityAbbr(skill.ability)}{" "}

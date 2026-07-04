@@ -13,7 +13,8 @@ export type EventCategory =
   | "advancement"
   | "session"
   | "combat"
-  | "conditions";
+  | "conditions"
+  | "effects";
 
 export type EventType =
   // inventory
@@ -86,6 +87,9 @@ export type EventType =
   | "conditionApplied"
   | "conditionRemoved"
   | "exhaustionSet"
+  // effects (active buffs)
+  | "buffApplied"
+  | "buffCleared"
   // roll events (attack/damage logged from session UI)
   | "attackRoll"
   | "damageRoll"
