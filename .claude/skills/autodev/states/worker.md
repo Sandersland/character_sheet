@@ -40,6 +40,8 @@ This worktree's `node_modules` are empty Docker-volume mountpoints — host-run 
 3. Typecheck + lint clean.
 4. Commit the green chunk: `feat(<domain>): <summary> (#{{issue}})` (or `fix`/`refactor` as appropriate).
 
+**Commit discipline — non-negotiable.** Commit after **every** green chunk (step 4), and never let more than one chunk sit uncommitted. If your run is interrupted (crash, budget, rate limit), only **committed** work survives — the resume/fail path pushes committed commits, but uncommitted edits are lost. A long stretch of edits with zero commits is a bug: a Worker that ran 100 turns / 6 files / **0 commits** lost everything on its crash (#332). When in doubt, commit — small, green, frequent.
+
 When every requirement is implemented, run the FULL test suites + typecheck + lint for both workspaces one final time. All green → emit `done`. If you are genuinely stuck (a requirement is impossible, contradicts the code, or tests cannot pass), do NOT force it — emit `blocked` with the exact failing output.
 
 ## Payload for `done`

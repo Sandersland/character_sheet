@@ -90,6 +90,27 @@ function sh(cmd, args, opts = {}) {
   return spawnSync(cmd, args, { encoding: "utf8", cwd: ROOT, ...opts });
 }
 
+// Make ROOT reflect the tip of origin/<base> before launching a node. ConfirmScope
+// runs in ROOT (before SetupWorktree) and verifies the issue's code refs against the
+// working tree — so a dependent launched seconds after its prereq's PR merged would
+// otherwise read a stale checkout and false-flag "prereq code absent from <base>"
+// (bit #398 + #425). Fetch + fast-forward; best-effort (SetupWorktree re-fetches for
+// the actual fork, so a failure here only risks the ConfirmScope read, never the build).
+function refreshBase() {
+  const base = batch.base;
+  const f = sh("git", ["fetch", "origin", base]);
+  if (f.status !== 0) return log(`BASE-SYNC fetch failed (non-fatal): ${(f.stderr || "").trim().slice(0, 120)}`);
+  const co = sh("git", ["checkout", base]);
+  if (co.status !== 0) return log(`BASE-SYNC checkout ${base} failed (non-fatal): ${(co.stderr || "").trim().slice(0, 120)}`);
+  const ff = sh("git", ["merge", "--ff-only", `origin/${base}`]);
+  const sha = (sh("git", ["rev-parse", "--short", "HEAD"]).stdout || "").trim();
+  log(
+    ff.status === 0
+      ? `BASE-SYNC ${base}@${sha} (fast-forwarded to origin/${base})`
+      : `BASE-SYNC ${base}@${sha} ff-only failed (non-fatal): ${(ff.stderr || "").trim().slice(0, 120)}`,
+  );
+}
+
 // A PR titled "... (#N)" merged into base? Client-side re-check kills the
 // (#123)-vs-(#1234) substring false positive in GitHub's search.
 function isMerged(n, base) {
@@ -132,6 +153,8 @@ const children = new Map(); // issue -> ChildProcess
 
 function launch(n, { resumeDir } = {}) {
   const entry = batch.issues[n];
+  // Fresh-base guarantee for a new run (a resume already has its worktree).
+  if (!resumeDir) refreshBase();
   const args = resumeDir ? [FSM, "resume", resumeDir] : [FSM, "run", "issue-pipeline", "--issue", String(n), "--integration", batch.base];
   const logPath = join(STATE_DIR, `issue-${n}.log`);
   const child = spawn("node", args, { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"], env: process.env });
