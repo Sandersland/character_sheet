@@ -58,6 +58,8 @@ export interface DerivedClassInfo {
   disciplineSaveDC?: number;
   /** Way of Shadow only: whether the L3+ Shadow Arts ki-cast spells are available. */
   shadowArtsAvailable?: boolean;
+  /** Way of Shadow only: whether the L11+ Cloak of Shadows self-invisible toggle is available. */
+  cloakOfShadowsAvailable?: boolean;
 }
 
 // ── Battle Master rules data ──────────────────────────────────────────────────
@@ -2374,6 +2376,11 @@ export function deriveResources(
   // Way of Shadow — Shadow Arts ki-cast spells unlock at monk level 3
   if (subclassKey === "way of shadow" && level >= 3) {
     result.shadowArtsAvailable = true;
+  }
+
+  // Way of Shadow — Cloak of Shadows self-invisible toggle unlocks at monk level 11
+  if (subclassKey === "way of shadow" && level >= 11) {
+    result.cloakOfShadowsAvailable = true;
   }
 
   return result;

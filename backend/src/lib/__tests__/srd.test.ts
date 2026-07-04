@@ -280,6 +280,46 @@ describe("deriveResources — Way of the Four Elements", () => {
   });
 });
 
+// ── Monk — Way of Shadow ──────────────────────────────────────────────────────
+
+describe("deriveResources — Way of Shadow", () => {
+  it("does not set shadowArtsAvailable below grant level 3", () => {
+    const result = deriveResources("monk", "way of shadow", 2, ABILITY_SCORES, PROF_2);
+    expect(result!.shadowArtsAvailable).toBeUndefined();
+  });
+
+  it("sets shadowArtsAvailable at level 3", () => {
+    const result = deriveResources("monk", "way of shadow", 3, ABILITY_SCORES, PROF_2);
+    expect(result!.shadowArtsAvailable).toBe(true);
+  });
+
+  it("does not set cloakOfShadowsAvailable below level 11", () => {
+    for (const level of [3, 6, 10]) {
+      const result = deriveResources("monk", "way of shadow", level, ABILITY_SCORES, PROF_4);
+      expect(result!.cloakOfShadowsAvailable).toBeUndefined();
+    }
+  });
+
+  it("sets cloakOfShadowsAvailable at level 11 and above", () => {
+    for (const level of [11, 17, 20]) {
+      const result = deriveResources("monk", "way of shadow", level, ABILITY_SCORES, PROF_4);
+      expect(result!.cloakOfShadowsAvailable).toBe(true);
+    }
+  });
+
+  it("surfaces the Cloak of Shadows feature at level 11", () => {
+    const result = deriveResources("monk", "way of shadow", 11, ABILITY_SCORES, PROF_4);
+    expect(result!.features.some((f) => f.name === "Cloak of Shadows")).toBe(true);
+  });
+
+  it("leaves other monks unaffected (no cloakOfShadowsAvailable)", () => {
+    const openHand = deriveResources("monk", "way of the open hand", 11, ABILITY_SCORES, PROF_4);
+    expect(openHand!.cloakOfShadowsAvailable).toBeUndefined();
+    const noSub = deriveResources("monk", undefined, 11, ABILITY_SCORES, PROF_4);
+    expect(noSub!.cloakOfShadowsAvailable).toBeUndefined();
+  });
+});
+
 // ── Paladin — multi-pool ───────────────────────────────────────────────────────
 
 describe("deriveResources — Paladin base pools", () => {
