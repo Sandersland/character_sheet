@@ -158,6 +158,7 @@ async function reconcileManeuvers(ctx: ReconcileContext): Promise<void> {
     resources: {
       used: { ...state.used },
       maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
       toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
     },
   };
@@ -176,6 +177,7 @@ async function reconcileManeuvers(ctx: ReconcileContext): Promise<void> {
     resources: {
       used: { ...state.used },
       maneuversKnown: trimmed.map((m: ManeuverEntry) => ({ ...m })),
+      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
       toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
     },
   };
@@ -316,6 +318,7 @@ async function reconcileToolProficiencies(ctx: ReconcileContext): Promise<void> 
     resources: {
       used: { ...state.used },
       maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
       toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
     },
   };
@@ -333,6 +336,7 @@ async function reconcileToolProficiencies(ctx: ReconcileContext): Promise<void> 
     resources: {
       used: { ...state.used },
       maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
       toolProficienciesKnown: trimmed.map((t: ToolProfEntry) => ({ ...t })),
     },
   };
@@ -389,6 +393,7 @@ async function reconcileFightingStyle(ctx: ReconcileContext): Promise<void> {
     resources: {
       used: { ...state.used },
       maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
       toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
       fightingStyle: state.fightingStyle,
     },
@@ -407,6 +412,7 @@ async function reconcileFightingStyle(ctx: ReconcileContext): Promise<void> {
     resources: {
       used: { ...state.used },
       maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
       toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
       fightingStyle: null,
     },
@@ -478,6 +484,7 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
     resources: {
       used: { ...state.used },
       maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
       toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
       advancements: state.advancements.map((a: AdvancementEntry) => ({
         ...a,
@@ -515,6 +522,7 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
     resources: {
       used: { ...state.used },
       maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
       toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
       advancements: state.advancements.map((a: AdvancementEntry) => ({
         ...a,

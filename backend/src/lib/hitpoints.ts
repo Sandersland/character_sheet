@@ -900,6 +900,7 @@ async function applyShortRestOp(ctx: HpOpContext, op: ShortRestOperation): Promi
   const beforeSrResourceState = {
     used: { ...srResourceState.used },
     maneuversKnown: srResourceState.maneuversKnown.map((m) => ({ ...m })),
+    disciplinesKnown: srResourceState.disciplinesKnown.map((d) => ({ ...d })),
     toolProficienciesKnown: srResourceState.toolProficienciesKnown.map((t) => ({ ...t })),
     advancements: srResourceState.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
     fightingStyle: srResourceState.fightingStyle,
@@ -1010,6 +1011,7 @@ async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
   const beforeResourceState = {
     used: { ...resourceState.used },
     maneuversKnown: resourceState.maneuversKnown.map((m) => ({ ...m })),
+    disciplinesKnown: resourceState.disciplinesKnown.map((d) => ({ ...d })),
     toolProficienciesKnown: resourceState.toolProficienciesKnown.map((t) => ({ ...t })),
     advancements: resourceState.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
     fightingStyle: resourceState.fightingStyle,

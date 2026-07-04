@@ -204,6 +204,7 @@ export async function applyAdvancementOperations(
         resources: {
           used: { ...state.used },
           maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
+          disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
           toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
           advancements: state.advancements.map((a) => ({
             ...a,
@@ -479,6 +480,7 @@ export async function applyAdvancementOperations(
         resources: {
           used: { ...state.used },
           maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
+          disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
           toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
           advancements: state.advancements.map((a) => ({
             ...a,
