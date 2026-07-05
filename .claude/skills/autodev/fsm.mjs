@@ -27,11 +27,14 @@ const RUNS_DIR = join(ROOT, ".claude", "autodev", "runs");
 
 function parseArgs(argv) {
   const [cmd, target, ...rest] = argv;
-  const opts = { issue: null, integration: null, start: null, only: null, dryRun: false, maxCost: null };
+  const opts = { issue: null, integration: null, start: null, only: null, dryRun: false, maxCost: null, pr: null, prHead: null, prCycle: null };
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (a === "--issue") opts.issue = Number(rest[++i]);
     else if (a === "--integration") opts.integration = rest[++i];
+    else if (a === "--pr") opts.pr = Number(rest[++i]);
+    else if (a === "--pr-head") opts.prHead = rest[++i];
+    else if (a === "--pr-cycle") opts.prCycle = Number(rest[++i]);
     else if (a === "--start") opts.start = rest[++i];
     else if (a === "--only") opts.only = rest[++i];
     else if (a === "--dry-run") opts.dryRun = true;
@@ -456,6 +459,47 @@ function syncRootLockfile(run, worktree, integrationBranch, issue) {
   }
 }
 
+// Attach `branch` as an isolated worktree stack and seed ctx with its coords.
+// Self-heal on "no free slots": a leaked slot (reaped run that never freed its
+// worktree) must not brick a fresh run — reconcile and retry once. No `protect`
+// list is needed here (deliberate): this run has a live pid and a fresh
+// heartbeat, so runState classifies it live; protect only exists for the
+// batch-adoption race where a resumed child hasn't overwritten a stale
+// pid in run.json yet.
+async function attachWorktreeStack(run, branch) {
+  try {
+    sh(join(SKILL_DIR, "..", "worktree", "worktree.sh"), ["create", branch, "--up"], { cwd: ROOT });
+  } catch (err) {
+    if (!/no free slots/i.test(err.message)) throw err;
+    log(run, "no free worktree slots — running janitor reconcile, then retrying once");
+    const { reapedRuns, freedSlots } = janitorReconcile({ log: (m) => log(run, m) });
+    log(run, `janitor: reaped ${reapedRuns.length} run(s), freed ${freedSlots.length} slot(s)`);
+    sh(join(SKILL_DIR, "..", "worktree", "worktree.sh"), ["create", branch, "--up"], { cwd: ROOT });
+  }
+  const registry = JSON.parse(readFileSync(join(ROOT, ".claude", "worktrees", "registry.json"), "utf8"));
+  const slot = registry[branch];
+  if (!slot) throw new Error(`worktree.sh did not register a slot for ${branch}`);
+  const backendUrl = `http://localhost:${4000 + slot * 10}/api`;
+  log(run, `worktree ${branch} on slot ${slot}; waiting for backend health…`);
+  // /api/health is the public probe — /api/characters 401s behind auth.
+  await pollHealth(`${backendUrl}/health`, 10 * 60_000);
+  Object.assign(run.ctx, {
+    branch,
+    slot,
+    worktree: join(ROOT, ".claude", "worktrees", branch),
+    backendUrl,
+    frontendUrl: `http://localhost:${5173 + slot * 10}`,
+  });
+  return slot;
+}
+
+// The responder's fix/pr* worktree is single-cycle by design — tear it down on
+// both success paths (non-fatal; the janitor sweeps it once the run is terminal).
+function teardownFixWorktree(run, branch) {
+  const res = spawnSync(join(SKILL_DIR, "..", "worktree", "worktree.sh"), ["rm", branch], { cwd: ROOT });
+  log(run, res.status === 0 ? `responder worktree ${branch} torn down` : `responder worktree ${branch} teardown failed (non-fatal; janitor will sweep)`);
+}
+
 const HANDLERS = {
   // Claim the issue via assignee so concurrent runs can't both build it —
   // GetWork excludes assigned issues, so 'taken' loops back for a re-pick.
@@ -477,40 +521,57 @@ const HANDLERS = {
     sh("git", ["fetch", "origin", integrationBranch], { cwd: ROOT });
     const exists = spawnSync("git", ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], { cwd: ROOT });
     if (exists.status !== 0) sh("git", ["branch", branch, `origin/${integrationBranch}`], { cwd: ROOT });
-    try {
-      sh(join(SKILL_DIR, "..", "worktree", "worktree.sh"), ["create", branch, "--up"], { cwd: ROOT });
-    } catch (err) {
-      // Self-heal: a leaked slot (reaped run that never freed its worktree)
-      // must not brick a fresh run — reconcile and retry once. No `protect`
-      // list is needed here (deliberate): this run has a live pid and a fresh
-      // heartbeat, so runState classifies it live; protect only exists for the
-      // batch-adoption race where a resumed child hasn't overwritten a stale
-      // pid in run.json yet.
-      if (!/no free slots/i.test(err.message)) throw err;
-      log(run, "no free worktree slots — running janitor reconcile, then retrying once");
-      const { reapedRuns, freedSlots } = janitorReconcile({ log: (m) => log(run, m) });
-      log(run, `janitor: reaped ${reapedRuns.length} run(s), freed ${freedSlots.length} slot(s)`);
-      sh(join(SKILL_DIR, "..", "worktree", "worktree.sh"), ["create", branch, "--up"], { cwd: ROOT });
-    }
-    const registry = JSON.parse(readFileSync(join(ROOT, ".claude", "worktrees", "registry.json"), "utf8"));
-    const slot = registry[branch];
-    if (!slot) throw new Error(`worktree.sh did not register a slot for ${branch}`);
-    const backendUrl = `http://localhost:${4000 + slot * 10}/api`;
-    log(run, `worktree ${branch} on slot ${slot}; waiting for backend health…`);
-    // /api/health is the public probe — /api/characters 401s behind auth.
-    await pollHealth(`${backendUrl}/health`, 10 * 60_000);
-    Object.assign(run.ctx, {
-      branch,
-      slot,
-      worktree: join(ROOT, ".claude", "worktrees", branch),
-      backendUrl,
-      frontendUrl: `http://localhost:${5173 + slot * 10}`,
-    });
+    const slot = await attachWorktreeStack(run, branch);
     // NOTE: don't seed a test character here — auth.test.ts's fixture cleanup
     // deletes the dev-user-local User (cascading its characters), so anything
     // created before the Worker's full-suite run is guaranteed to be wiped.
     // The Reviewer creates its own character AFTER its test runs instead.
     return { transition: "ok", payload: { branch, slot }, summary: `worktree ${branch} up on slot ${slot}` };
+  },
+
+  async setupPrWorktree(run) {
+    const { prNumber, prHead, prCycle } = run.ctx;
+    if (!prNumber || !prHead) throw new Error("pr-response machine needs --pr and --pr-head");
+    // A FRESH fix/pr<N>-c<cycle> branch off the PR head — never the PR's own
+    // feat/issue-* branch (the janitor reaps worktrees whose owning run is
+    // terminal, and the original issue run is). The cycle number keeps relaunch
+    // names unique; -f resets any stale local branch to the pushed head.
+    const branch = `fix/pr${prNumber}-c${prCycle ?? 1}`;
+    sh("git", ["fetch", "origin", prHead], { cwd: ROOT });
+    sh("git", ["branch", "-f", branch, `origin/${prHead}`], { cwd: ROOT });
+    const slot = await attachWorktreeStack(run, branch);
+    return { transition: "ok", payload: { branch, slot }, summary: `responder worktree ${branch} up on slot ${slot} (PR #${prNumber}, head ${prHead})` };
+  },
+
+  async pushFix(run) {
+    const { worktree, branch, prNumber, prHead } = run.ctx;
+    // Deterministic push to the PR's own head — re-triggers claude-review; the
+    // original Submit already armed auto-merge, so a green re-run lands the PR.
+    sh("git", ["push", "origin", `HEAD:${prHead}`], { cwd: worktree });
+    run.ctx.pushed = true;
+    teardownFixWorktree(run, branch);
+    return { transition: "ok", payload: { pushed: true }, summary: `pushed fixes to ${prHead} (PR #${prNumber}); review re-running` };
+  },
+
+  async flagNeedsHuman(run) {
+    const { prNumber, branch } = run.ctx;
+    const file = join(run.dir, "needs-human.md");
+    writeFileSync(
+      file,
+      [
+        "## ⚠ autodev responder: needs human review-response",
+        "",
+        `**Why:** ${run.ctx.reason ?? "responder cycles exhausted without convergence"}`,
+        "",
+        "No push will re-trigger the required `claude-review` check, so a human must adjudicate: fix a finding, or dismiss/override the review. Dependent batch issues stay queued (not skipped) and unblock when this PR merges.",
+        "",
+        `_autodev run ${run.id} (responder cycle ${run.ctx.prCycle ?? 1})_`,
+      ].join("\n"),
+    );
+    sh("gh", ["pr", "comment", String(prNumber), "--body-file", file], { cwd: ROOT });
+    run.ctx.needsHuman = true;
+    teardownFixWorktree(run, branch);
+    return { transition: "ok", payload: { needsHuman: true }, summary: `PR #${prNumber} flagged for human review-response` };
   },
 
   async submit(run) {
@@ -854,6 +915,7 @@ if (cmd === "run") {
     only: opts.only,
   };
   if (opts.integration) run.ctx.integrationBranch = opts.integration;
+  if (opts.pr) Object.assign(run.ctx, { prNumber: opts.pr, prHead: opts.prHead, prCycle: opts.prCycle ?? 1 });
   if (opts.maxCost) run.maxCostUsd = opts.maxCost;
   await execute(run);
   process.exit(run.status === "retry-scheduled" ? 75 : run.status === "failed" ? 1 : 0);

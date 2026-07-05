@@ -19,10 +19,19 @@
 #      socket left by SIGKILL is reclaimed on relaunch
 #   H  report rollup: per-issue outcome/cost/cycles both over the socket and
 #      via --state-dir with no daemon (post-mortem mode)
-#   I  review-blocked PR keeps waiting_merge; dependent not skipped; classifyPrBlock
-#      base-scoped (open lookup only matches when --base is passed)
+#   I  review-blocked PR → responder launched (pr-response machine), pushes,
+#      review greens, PR merges, dependent launches — zero-touch convergence;
+#      classifyPrBlock base-scoped (open lookup only matches when --base is passed)
 #   J  merge-lagging PR (all green, unmerged) classifies unknown → WAIT-MERGE log,
-#      never the NEEDS-REVIEW-RESPONSE /pr-response prompt
+#      never a responder launch
+#   K  non-converging review-block: responder runs exactly RESPOND_MAX (2) cycles,
+#      then NEEDS-HUMAN flags the PR; entry stays waiting_merge, dependent stays
+#      pending (never skipped), no FAIL
+#   L  crashing responder (exit 1): RESPOND-FAIL burns the cycle, entry stays
+#      waiting_merge, dependent stays pending, NEEDS-HUMAN after the cycle cap
+#   M  rate-limited responder (perpetual exit 75): retry exhaustion BURNS the
+#      cycle (per-cycle rateRetries) — exactly 2 launches then NEEDS-HUMAN,
+#      never an unbounded relaunch spin
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -57,11 +66,15 @@ for a in "\$@"; do
 done
 if [ -n "\$n" ] && [ "\$n" = "\${GH_STUB_REVIEW_BLOCKED:-}" ]; then
   # Designated review-blocked issue: mergeable open PR whose claude-review check
-  # is FAILURE, never merged (classifyPrBlock reads the open search; isMerged the
-  # merged one). The open lookup is base-scoped on purpose: classifyPrBlock must
-  # pass --base like isMerged, else it won't match here — guards the --base finding.
+  # is FAILURE (classifyPrBlock reads the open search; isMerged the merged one).
+  # The open lookup is base-scoped on purpose: classifyPrBlock must pass --base
+  # like isMerged, else it won't match here — guards the --base finding.
+  # Once the responder stub has dropped its marker, the merged search succeeds
+  # (the pushed fix greened the review and auto-merge fired).
   if [ "\$state" = "open" ] && [ "\$base" = "staging" ]; then
-    echo "[{\"title\":\"stub pr (#\$n)\",\"mergeable\":\"MERGEABLE\",\"statusCheckRollup\":[{\"name\":\"claude-review\",\"status\":\"COMPLETED\",\"conclusion\":\"FAILURE\"},{\"name\":\"test\",\"status\":\"COMPLETED\",\"conclusion\":\"SUCCESS\"}]}]"
+    echo "[{\"number\":\$n,\"headRefName\":\"feat/issue-\$n-stub\",\"title\":\"stub pr (#\$n)\",\"mergeable\":\"MERGEABLE\",\"statusCheckRollup\":[{\"name\":\"claude-review\",\"status\":\"COMPLETED\",\"conclusion\":\"FAILURE\"},{\"name\":\"test\",\"status\":\"COMPLETED\",\"conclusion\":\"SUCCESS\"}]}]"
+  elif [ "\$state" = "merged" ] && [ -f "$T/runs/responded-\$n" ]; then
+    echo "[{\"title\":\"stub pr (#\$n)\"}]"
   else
     echo "[]"
   fi
@@ -324,23 +337,29 @@ node "$CTL" shutdown > /dev/null
 wait_for 10 "daemon H stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
 pass "report: correct rollup post-mortem and over the socket"
 
-# ---------- I: review-blocked PR keeps polling, doesn't fail or skip dependents ----------
-echo "I: review-block keeps waiting_merge; dependent not skipped"
+# ---------- I: review-blocked PR → responder → green → merge → dependent launches ----------
+echo "I: review-block spawns responder; push greens review; merge unblocks dependent"
 I="$T/state-i"
 export GH_STUB_REVIEW_BLOCKED=9910
 node "$SKILL_DIR/autodevd.mjs" 9910 9911:9910 --poll 1 --grace 2 --state-dir "$I" > "$T/i.out" 2>&1 &
 disown
-wait_for 25 "I: NEEDS-REVIEW-RESPONSE logged" grep -qs "NEEDS-REVIEW-RESPONSE #9910" "$I/orchestrator.log"
-status_is "$I/batch.json" 9910 waiting_merge || fail "I: 9910 should stay waiting_merge (not failed) when blocked on claude-review"
-status_is "$I/batch.json" 9911 pending || fail "I: dependent 9911 must NOT be skipped while prereq is review-blocked"
+wait_for 25 "I: responder launched" grep -qs "RESPOND #9910 blocked on claude-review (all CI green) — launching responder (cycle 1/2) on PR #9910" "$I/orchestrator.log"
+wait_for 25 "I: responder pushed" grep -qs "RESPOND-OK #9910 fixes pushed (cycle 1/2)" "$I/orchestrator.log"
+wait_for 25 "I: 9910 merged after responder" status_is "$I/batch.json" 9910 merged
+wait_for 25 "I: dependent 9911 merged" status_is "$I/batch.json" 9911 merged
 grep -qs "FAIL #9910" "$I/orchestrator.log" && fail "I: review-blocked PR must not be marked FAIL"
+grep -qs "NEEDS-HUMAN #9910" "$I/orchestrator.log" && fail "I: converged responder must not flag for a human"
+node -e "
+  const b = JSON.parse(require('fs').readFileSync('$I/batch.json','utf8'));
+  process.exit(b.issues['9910'].respondCycles === 1 && !b.issues['9910'].responder ? 0 : 1);
+" || fail "I: 9910 should record exactly 1 responder cycle and clear the responder flag"
 node "$SKILL_DIR/autodevd.mjs" stop > "$T/i-stop.out" 2>&1
 wait_for 10 "I: daemon stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
 unset GH_STUB_REVIEW_BLOCKED
-pass "review-blocked PR kept open (grace paused), dependent not skipped, no FAIL"
+pass "responder converged: RESPOND → push → merged → dependent launched and merged"
 
-# ---------- J: merge-lagging PR (all green, not merged) → unknown → WAIT-MERGE, never NEEDS-REVIEW-RESPONSE ----------
-echo "J: green-but-lagging merge classifies unknown → WAIT-MERGE, no false /pr-response prompt"
+# ---------- J: merge-lagging PR (all green, not merged) → unknown → WAIT-MERGE, never a responder ----------
+echo "J: green-but-lagging merge classifies unknown → WAIT-MERGE, no false responder launch"
 J="$T/state-j"
 export GH_STUB_MERGE_LAGGING=9920
 node "$SKILL_DIR/autodevd.mjs" 9920 --poll 1 --grace 2 --state-dir "$J" > "$T/j.out" 2>&1 &
@@ -350,10 +369,69 @@ disown
 # grace window — classifyPrBlock has demonstrably run once this matches.
 wait_for 25 "J: unclear-merge logged" grep -qs "#9920 merge status unclear (unknown)" "$J/orchestrator.log"
 status_is "$J/batch.json" 9920 waiting_merge || fail "J: 9920 should stay waiting_merge while merge lags"
-grep -qs "NEEDS-REVIEW-RESPONSE #9920" "$J/orchestrator.log" && fail "J: unknown/lagging merge must NOT prompt /pr-response"
+grep -qs "RESPOND #9920" "$J/orchestrator.log" && fail "J: unknown/lagging merge must NOT launch a responder"
 node "$SKILL_DIR/autodevd.mjs" stop > "$T/j-stop.out" 2>&1
 wait_for 10 "J: daemon stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
 unset GH_STUB_MERGE_LAGGING
-pass "green-but-lagging merge kept waiting as WAIT-MERGE, no NEEDS-REVIEW-RESPONSE"
+pass "green-but-lagging merge kept waiting as WAIT-MERGE, no responder launch"
+
+# ---------- K: non-converging responder → 2 cycles → NEEDS-HUMAN, dependent kept ----------
+echo "K: stuck review-block burns both responder cycles then flags for a human"
+K="$T/state-k"
+export GH_STUB_REVIEW_BLOCKED=9930
+export GH_STUB_REVIEW_STUCK=9930
+node "$SKILL_DIR/autodevd.mjs" 9930 9931:9930 --poll 1 --grace 2 --state-dir "$K" > "$T/k.out" 2>&1 &
+disown
+wait_for 25 "K: responder cycle 1" grep -qs "launching responder (cycle 1/2) on PR #9930" "$K/orchestrator.log"
+wait_for 25 "K: responder cycle 2" grep -qs "launching responder (cycle 2/2) on PR #9930" "$K/orchestrator.log"
+wait_for 25 "K: NEEDS-HUMAN flagged" grep -qs "NEEDS-HUMAN #9930 responder cycles exhausted (2)" "$K/orchestrator.log"
+sleep 3   # > one more grace window: cycles must NOT keep spawning past the cap
+[ "$(grep -c "launching responder" "$K/orchestrator.log")" = "2" ] || fail "K: responder must run exactly 2 cycles, no more"
+status_is "$K/batch.json" 9930 waiting_merge || fail "K: 9930 should stay waiting_merge after NEEDS-HUMAN (a manual fix can still merge)"
+status_is "$K/batch.json" 9931 pending || fail "K: dependent 9931 must NOT be skipped on a review block"
+grep -qs "FAIL #9930" "$K/orchestrator.log" && fail "K: review-blocked PR must never FAIL"
+node -e "
+  const b = JSON.parse(require('fs').readFileSync('$K/batch.json','utf8'));
+  const e = b.issues['9930'];
+  process.exit(e.respondCycles === 2 && e.humanFlagged === true && !e.responder ? 0 : 1);
+" || fail "K: 9930 should record 2 cycles + humanFlagged"
+node "$SKILL_DIR/autodevd.mjs" stop > "$T/k-stop.out" 2>&1
+wait_for 10 "K: daemon stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
+unset GH_STUB_REVIEW_BLOCKED GH_STUB_REVIEW_STUCK
+pass "stuck responder bounded at 2 cycles, PR flagged NEEDS-HUMAN, dependent kept pending, no FAIL"
+
+# ---------- L: crashing responder → RESPOND-FAIL burns the cycle, never fails the entry ----------
+echo "L: crashing responder burns cycles, entry survives, dependent kept"
+L="$T/state-l"
+export GH_STUB_REVIEW_BLOCKED=9940
+export STUB_RESPOND_CRASH=9940
+node "$SKILL_DIR/autodevd.mjs" 9940 9941:9940 --poll 1 --grace 2 --state-dir "$L" > "$T/l.out" 2>&1 &
+disown
+wait_for 25 "L: responder crash cycle 1" grep -qs "RESPOND-FAIL #9940" "$L/orchestrator.log"
+wait_for 25 "L: NEEDS-HUMAN after crashes" grep -qs "NEEDS-HUMAN #9940 responder cycles exhausted (2)" "$L/orchestrator.log"
+[ "$(grep -c "RESPOND-FAIL #9940" "$L/orchestrator.log")" = "2" ] || fail "L: both cycles should end in RESPOND-FAIL"
+status_is "$L/batch.json" 9940 waiting_merge || fail "L: 9940 should stay waiting_merge after responder crashes"
+status_is "$L/batch.json" 9941 pending || fail "L: dependent 9941 must NOT be skipped on responder crashes"
+grep -qs "| FAIL #9940" "$L/orchestrator.log" && fail "L: a responder crash must never FAIL the entry"
+node "$SKILL_DIR/autodevd.mjs" stop > "$T/l-stop.out" 2>&1
+wait_for 10 "L: daemon stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
+unset GH_STUB_REVIEW_BLOCKED STUB_RESPOND_CRASH
+pass "responder crashes burned both cycles, entry kept waiting_merge, dependent kept pending"
+
+# ---------- M: rate-limited responder → exhaustion burns the cycle; bounded, no spin ----------
+echo "M: rate-limit exhaustion burns the cycle — exactly 2 launches, then NEEDS-HUMAN"
+M="$T/state-m"
+export GH_STUB_REVIEW_BLOCKED=9950
+export STUB_RESPOND_RATE=9950
+node "$SKILL_DIR/autodevd.mjs" 9950 --poll 1 --grace 2 --state-dir "$M" > "$T/m.out" 2>&1 &
+disown
+wait_for 90 "M: NEEDS-HUMAN after rate exhaustion" grep -qs "NEEDS-HUMAN #9950 responder cycles exhausted (2)" "$M/orchestrator.log"
+[ "$(grep -c "launching responder" "$M/orchestrator.log")" = "2" ] || fail "M: rate exhaustion must BURN the cycle — expected exactly 2 responder launches, got $(grep -c "launching responder" "$M/orchestrator.log")"
+status_is "$M/batch.json" 9950 waiting_merge || fail "M: 9950 should stay waiting_merge after rate exhaustion"
+grep -qs "| FAIL #9950" "$M/orchestrator.log" && fail "M: rate exhaustion must never FAIL the entry"
+node "$SKILL_DIR/autodevd.mjs" stop > "$T/m-stop.out" 2>&1
+wait_for 10 "M: daemon stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
+unset GH_STUB_REVIEW_BLOCKED STUB_RESPOND_RATE
+pass "rate-limited responder bounded at 2 cycles (per-cycle rateRetries), no relaunch spin"
 
 echo "SMOKE PASS (all scenarios)"

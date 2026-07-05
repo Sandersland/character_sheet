@@ -18,6 +18,8 @@
  *                     ↘ retry_wait (fsm exit 75) → running
  *                     ↘ failed                             (terminal)
  *   pending → skipped (a prereq failed/skipped)            (terminal)
+ *   waiting_merge ⇄ responding (review-blocked PR → pr-response responder,
+ *                               ≤ RESPOND_MAX cycles, then flagged for a human)
  */
 import { spawn, spawnSync } from "node:child_process";
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -35,6 +37,7 @@ const WORKTREE = process.env.AUTODEV_WORKTREE_BIN ?? join(SKILL_DIR, "..", "work
 const SKIP_GIT_SYNC = !!process.env.AUTODEV_SKIP_GIT_SYNC;
 
 const MAX_RATE_RETRIES = 3; // bounds a weekly-cap tempfail that never clears
+const RESPOND_MAX = 2; // responder cycles per PR — each push re-triggers the review; the triage gate must converge by then
 
 // ---------- issue-spec parsing (shared by batch.mjs and autodevd.mjs) ----------
 
@@ -134,32 +137,34 @@ export function createEngine({ stateDir, cfg = null }) {
   // gate posts CHANGES_REQUESTED on its first pass, so a perfectly good PR sits
   // BLOCKED with all CI green — that's recoverable via /pr-response and must NOT
   // be treated like a real conflict/failure (which would wrongly skip dependents).
-  //   "review-blocked" — mergeable, only claude-review is red → keep waiting
+  //   "review-blocked" — mergeable, only claude-review is red → responder-recoverable
   //   "conflict"       — CONFLICTING → real, fail
   //   "other-red"      — a non-review required check failed → real, fail
   //   "unknown"        — transient gh failure, checks still running, or green +
   //                      auto-merge just lagging → conservatively keep waiting
+  // Returns { cls, prNumber?, prHead? } — the PR coords feed the responder launch.
   const RED = (c) => c.status === "COMPLETED" && !["SUCCESS", "SKIPPED", "NEUTRAL"].includes(c.conclusion);
   function classifyPrBlock(n, base) {
     // --base scopes the open lookup to this batch's target branch, mirroring
     // isMerged — else a stray open PR for #n against another branch could be
     // classified instead of ours (the .title.includes guard only dedups substrings).
-    const res = sh(GH, ["pr", "list", "--state", "open", "--base", base, "--search", `(#${n}) in:title`, "--json", "number,mergeable,statusCheckRollup,title"]);
-    if (res.status !== 0) return "unknown";
+    const res = sh(GH, ["pr", "list", "--state", "open", "--base", base, "--search", `(#${n}) in:title`, "--json", "number,mergeable,statusCheckRollup,title,headRefName"]);
+    if (res.status !== 0) return { cls: "unknown" };
     let pr;
     try {
       pr = JSON.parse(res.stdout).find((p) => p.title.includes(`(#${n})`));
     } catch {
-      return "unknown";
+      return { cls: "unknown" };
     }
-    if (!pr) return "unknown";
-    if (pr.mergeable === "CONFLICTING") return "conflict";
+    if (!pr) return { cls: "unknown" };
+    const info = { prNumber: pr.number, prHead: pr.headRefName };
+    if (pr.mergeable === "CONFLICTING") return { cls: "conflict", ...info };
     const checks = pr.statusCheckRollup ?? [];
     const name = (c) => c.name ?? c.context;
-    if (checks.some((c) => name(c) !== "claude-review" && RED(c))) return "other-red";
+    if (checks.some((c) => name(c) !== "claude-review" && RED(c))) return { cls: "other-red", ...info };
     const review = checks.find((c) => name(c) === "claude-review");
-    if (review && RED(review)) return "review-blocked";
-    return "unknown";
+    if (review && RED(review)) return { cls: "review-blocked", ...info };
+    return { cls: "unknown", ...info };
   }
 
   function readRunJson(entry) {
@@ -199,7 +204,8 @@ export function createEngine({ stateDir, cfg = null }) {
   }
 
   function runningCount() {
-    return Object.values(batch.issues).filter((e) => e.status === "running").length;
+    // A responder is a live claude child too — it occupies a cap slot.
+    return Object.values(batch.issues).filter((e) => ["running", "responding"].includes(e.status)).length;
   }
 
   function rateLimitPause() {
@@ -213,11 +219,11 @@ export function createEngine({ stateDir, cfg = null }) {
 
   // ---------- child process management ----------
 
-  function launch(n, { resumeDir } = {}) {
+  function launch(n, { resumeDir, machine = "issue-pipeline", extraArgs = [] } = {}) {
     const entry = batch.issues[n];
     // Fresh-base guarantee for a new run (a resume already has its worktree).
     if (!resumeDir) refreshBase();
-    const args = resumeDir ? [FSM, "resume", resumeDir] : [FSM, "run", "issue-pipeline", "--issue", String(n), "--integration", batch.base];
+    const args = resumeDir ? [FSM, "resume", resumeDir] : [FSM, "run", machine, "--issue", String(n), "--integration", batch.base, ...extraArgs];
     const logPath = join(stateDir, `issue-${n}.log`);
     // Detached + fd stdio: the child owns its process group and its log fd, so
     // it survives this orchestrator being killed/reaped. No unref() — while we
@@ -225,7 +231,9 @@ export function createEngine({ stateDir, cfg = null }) {
     const out = openSync(logPath, "a");
     const child = spawn("node", args, { cwd: ROOT, detached: true, stdio: ["ignore", out, out], env: process.env });
     closeSync(out);
-    entry.status = "running";
+    // entry.responder marks a pr-response child (set by the pollMerges trigger);
+    // it survives a rate-limit park so a resume re-enters "responding".
+    entry.status = entry.responder ? "responding" : "running";
     entry.pid = child.pid;
     children.set(n, child);
     child.on("close", (code) => {
@@ -240,6 +248,11 @@ export function createEngine({ stateDir, cfg = null }) {
     const entry = batch.issues[n];
     entry.rundir = entry.rundir ?? latestRunDir(n);
     const run = readRunJson(entry);
+
+    if (entry.responder) {
+      onResponderExit(n, entry, run, code);
+      return;
+    }
 
     if (entry.stopping) {
       // Killed via the control channel: terminal, no resume attempt, and the
@@ -303,6 +316,59 @@ export function createEngine({ stateDir, cfg = null }) {
     if (draining) wakeFn();
   }
 
+  // A responder (pr-response) exit is never terminal for the entry — every
+  // outcome returns to waiting_merge except a rate-limit/drain park, which
+  // keeps entry.responder so launchRetries resumes back into "responding".
+  function onResponderExit(n, entry, run, code) {
+    const backToWaiting = () => {
+      delete entry.responder;
+      entry.status = "waiting_merge";
+      entry.doneAt = Date.now();
+    };
+    if (entry.stopping) {
+      // ctl `stop` on a responder abandons the CYCLE, not the PR wait.
+      delete entry.stopping;
+      entry.stoppedBy = "ctl";
+      backToWaiting();
+      teardownWorktree(n, entry); // responder rundir → its fix/pr* branch
+      log(`STOP #${n} responder killed via control channel (rc=${code}); back to waiting_merge`);
+    } else if (code === 75) {
+      entry.rateRetries = (entry.rateRetries ?? 0) + 1;
+      if (entry.rateRetries > MAX_RATE_RETRIES) {
+        // Burn the cycle, do NOT return it: a weekly cap won't clear for days,
+        // and a returned cycle would relaunch every grace window forever.
+        backToWaiting();
+        log(`RESPOND-PARK #${n} rate-limit retries exhausted — cycle burned; re-checking after grace`);
+      } else {
+        entry.retryAt = run?.retryAt ?? Date.now() + 62 * 60_000;
+        entry.status = "retry_wait"; // entry.responder kept for the resume
+        log(`RESPOND-PARK #${n} rate-limited (attempt ${entry.rateRetries}/${MAX_RATE_RETRIES}) — resume at ${new Date(entry.retryAt).toISOString()}`);
+      }
+    } else if (draining && code !== 0) {
+      // Drained mid-cycle: park for the next daemon launch (worktree intact).
+      entry.retryAt = Date.now();
+      entry.status = "retry_wait"; // entry.responder kept for the resume
+      stampRunParked(n, entry);
+      log(`RESPOND-PARK #${n} rc=${code} during drain — will resume ${entry.rundir} on next launch`);
+    } else if (code === 0 && run?.ctx?.needsHuman) {
+      // All findings declined: no push can re-run the required check.
+      entry.humanFlagged = true;
+      backToWaiting();
+      log(`NEEDS-HUMAN #${n} responder declined all findings — PR flagged; dependents stay queued`);
+    } else if (code === 0 && run?.ctx?.pushed) {
+      backToWaiting();
+      delete entry.reviewBlockedLogged; // a fresh block on the re-review reports anew
+      log(`RESPOND-OK #${n} fixes pushed (cycle ${entry.respondCycles}/${RESPOND_MAX}); waiting for re-review + auto-merge`);
+    } else {
+      // Crash or graceful Fail: the cycle stays burned; keep waiting (the
+      // janitor sweeps the fix/pr* worktree once the run is terminal).
+      backToWaiting();
+      log(`RESPOND-FAIL #${n} responder rc=${code} (${run?.ctx?.failure ?? "exited without a push"}); still waiting_merge`);
+    }
+    saveBatch();
+    if (draining) wakeFn();
+  }
+
   // ---------- control loop phases ----------
 
   function pollMerges() {
@@ -312,24 +378,40 @@ export function createEngine({ stateDir, cfg = null }) {
         entry.status = "merged";
         log(`MERGED #${n} (PR landed on ${batch.base})`);
       } else if (Date.now() - entry.doneAt >= batch.grace * 1000) {
-        const cls = classifyPrBlock(n, batch.base);
+        const { cls, prNumber, prHead } = classifyPrBlock(n, batch.base);
         if (cls === "conflict" || cls === "other-red") {
           entry.status = "failed";
           log(`FAIL #${n} auto-merge did not fire within ${batch.grace}s (${cls}); dependents will be skipped`);
+        } else if (cls === "review-blocked") {
+          // Recoverable: spawn the pr-response responder (≤ RESPOND_MAX cycles)
+          // instead of waiting for a human. Never fail / skip dependents on a
+          // review block — after the cycle cap, flag the PR for a human and keep
+          // polling so a manual fix still merges and unblocks dependents.
+          const cycles = entry.respondCycles ?? 0;
+          if (entry.humanFlagged) {
+            entry.doneAt = Date.now(); // already handed to a human — poll quietly
+          } else if (cycles >= RESPOND_MAX) {
+            sh(GH, ["pr", "comment", String(prNumber), "--body",
+              `⚠ **autodev responder: needs human review-response** — ${RESPOND_MAX} responder cycles did not converge on a green \`claude-review\`. A human must adjudicate the remaining findings. Dependent batch issues stay queued (not skipped) and unblock when this PR merges.`]);
+            entry.humanFlagged = true;
+            entry.doneAt = Date.now();
+            log(`NEEDS-HUMAN #${n} responder cycles exhausted (${RESPOND_MAX}) — PR flagged; dependents stay queued`);
+          } else if (runningCount() >= batch.cap || draining || batch.paused || entry.paused || rateLimitPause()) {
+            entry.doneAt = Date.now(); // no capacity now — retry at next grace expiry
+          } else {
+            entry.respondCycles = cycles + 1;
+            entry.rateRetries = 0; // per-cycle rate accounting — stale exhaustion from a prior cycle must not insta-burn this one
+            entry.responder = true;
+            entry.rundir = null; // onChildExit must resolve the RESPONDER's run.json, not the issue run's
+            log(`RESPOND #${n} blocked on claude-review (all CI green) — launching responder (cycle ${entry.respondCycles}/${RESPOND_MAX}) on PR #${prNumber}`);
+            launch(Number(n), { machine: "pr-response", extraArgs: ["--pr", String(prNumber), "--pr-head", prHead, "--pr-cycle", String(entry.respondCycles)] });
+          }
         } else {
-          // review-blocked or unknown: recoverable/transient. Keep polling for the
-          // merge instead of failing — do NOT skip dependents. Reset the grace
-          // window so we re-check periodically without hammering gh. Split the log
-          // by classification: only review-blocked warrants a /pr-response prompt;
-          // unknown (transient gh failure, checks pending, or green + auto-merge
-          // just lagging) is neutral and must not send an operator chasing a
-          // non-issue. reviewBlockedLogged stays a once-guard across both.
+          // unknown: transient gh failure, checks pending, or green + auto-merge
+          // just lagging — neutral, must not send an operator chasing a non-issue.
+          // Keep polling; reset the grace window so we re-check without hammering gh.
           if (!entry.reviewBlockedLogged) {
-            if (cls === "review-blocked") {
-              log(`NEEDS-REVIEW-RESPONSE #${n} blocked on claude-review (all CI green) — run /pr-response to unblock; keeping open`);
-            } else {
-              log(`WAIT-MERGE #${n} merge status unclear (${cls}); re-checking after grace — no action needed`);
-            }
+            log(`WAIT-MERGE #${n} merge status unclear (${cls}); re-checking after grace — no action needed`);
             entry.reviewBlockedLogged = true;
           }
           entry.doneAt = Date.now();
@@ -361,7 +443,7 @@ export function createEngine({ stateDir, cfg = null }) {
   // run.json is a crash.
   function pollAdopted() {
     for (const [n, entry] of Object.entries(batch.issues)) {
-      if (entry.status !== "running" || children.has(Number(n))) continue;
+      if (!["running", "responding"].includes(entry.status) || children.has(Number(n))) continue;
       entry.rundir = entry.rundir ?? latestRunDir(Number(n));
       const run = readRunJson(entry);
       if (run?.status === "completed") {
@@ -413,7 +495,7 @@ export function createEngine({ stateDir, cfg = null }) {
   // not have overwritten run.json's stale pid yet.
   function runJanitor() {
     const protect = Object.values(batch.issues)
-      .filter((e) => ["running", "retry_wait"].includes(e.status) && e.rundir)
+      .filter((e) => ["running", "responding", "retry_wait"].includes(e.status) && e.rundir)
       .map((e) => e.rundir);
     try {
       return janitorReconcile({ log, protect });
@@ -457,17 +539,23 @@ export function createEngine({ stateDir, cfg = null }) {
       // `fsm run` would bounce ClaimIssue→taken→GetWork and grab an
       // unrelated issue — resume, never relaunch).
       for (const [n, entry] of Object.entries(batch.issues)) {
-        if (entry.status !== "running") continue;
+        if (!["running", "responding"].includes(entry.status)) continue;
         if (pidAlive(entry.pid)) {
-          log(`RECONCILE #${n} still running (pid ${entry.pid} alive) — adopting`);
+          log(`RECONCILE #${n} still ${entry.status} (pid ${entry.pid} alive) — adopting`);
           continue;
         }
         entry.rundir = entry.rundir ?? latestRunDir(Number(n));
         if (entry.rundir) {
-          entry.status = "retry_wait";
+          entry.status = "retry_wait"; // entry.responder (if set) survives → resumes into "responding"
           entry.retryAt = Date.now();
           stampRunParked(n, entry);
-          log(`RECONCILE #${n} was running at shutdown — will resume ${entry.rundir}`);
+          log(`RECONCILE #${n} was ${entry.responder ? "responding" : "running"} at shutdown — will resume ${entry.rundir}`);
+        } else if (entry.responder) {
+          delete entry.responder;
+          entry.respondCycles -= 1; // cycle never ran — return it
+          entry.status = "waiting_merge";
+          entry.doneAt = Date.now();
+          log(`RECONCILE #${n} responder gone with no run dir — back to waiting_merge`);
         } else {
           entry.status = "pending";
           log(`RECONCILE #${n} was running at shutdown, no run dir — back to pending`);
@@ -541,6 +629,8 @@ export function createEngine({ stateDir, cfg = null }) {
         pid: e.pid ?? null,
         retryAt: e.retryAt ?? null,
         rateRetries: e.rateRetries ?? 0,
+        respondCycles: e.respondCycles ?? 0,
+        humanFlagged: e.humanFlagged ?? false,
         stoppedBy: e.stoppedBy ?? null,
         rundir: e.rundir ?? null,
         prUrl: run?.ctx?.prUrl ?? null,
@@ -581,7 +671,7 @@ export function createEngine({ stateDir, cfg = null }) {
   function stopIssue(issue) {
     const entry = batch.issues[issue];
     if (!entry) throw new Error(`issue #${issue} is not in the batch`);
-    if (entry.status !== "running") throw new Error(`issue #${issue} is ${entry.status}, not running`);
+    if (!["running", "responding"].includes(entry.status)) throw new Error(`issue #${issue} is ${entry.status}, not running/responding`);
     entry.stopping = true;
     saveBatch();
     try {
@@ -626,7 +716,7 @@ export function createEngine({ stateDir, cfg = null }) {
     log(`DRAIN ${mode} (${runningCount()} running)`);
     if (mode !== "park") return;
     for (const [n, entry] of Object.entries(batch.issues)) {
-      if (entry.status !== "running" || !entry.pid) continue;
+      if (!["running", "responding"].includes(entry.status) || !entry.pid) continue;
       try {
         process.kill(-entry.pid, "SIGTERM"); // detached child = pgroup leader
       } catch {
