@@ -4,7 +4,15 @@ import type { LucideIcon } from "lucide-react";
 import { GiBleedingWound, GiHealthPotion } from "react-icons/gi";
 import type { IconType } from "react-icons";
 
+import { DAMAGE_TYPE_OPTIONS, damageTypeLabel } from "@/lib/damageTypes";
+
 export type HpMode = "damage" | "heal" | "temp";
+
+/** Optional per-apply damage details (#456). */
+export interface HpApplyOptions {
+  damageType?: string;
+  resist?: boolean;
+}
 
 // Per-mode segment icon, verb, button tone, and field aria-label.
 const HP_MODES: {
@@ -44,15 +52,28 @@ const HP_MODES: {
 export default function HpActionControl({
   pending,
   onApply,
+  resistedDamageTypes = [],
 }: {
   pending: boolean;
-  onApply: (mode: HpMode, value: number) => Promise<boolean>;
+  onApply: (mode: HpMode, value: number, opts?: HpApplyOptions) => Promise<boolean>;
+  /** Lowercase damage types the character currently resists (#456). */
+  resistedDamageTypes?: string[];
 }) {
   const [mode, setMode] = useState<HpMode>("damage");
   const [amount, setAmount] = useState("");
+  const [damageType, setDamageType] = useState("");
+  // Manual override — default halve on, player can decline (#456).
+  const [halve, setHalve] = useState(true);
+
+  const isResisted = damageType !== "" && resistedDamageTypes.includes(damageType);
+  const parsedAmount = parseInt(amount, 10) || 0;
 
   async function apply() {
-    const ok = await onApply(mode, parseInt(amount, 10));
+    const opts: HpApplyOptions =
+      mode === "damage"
+        ? { damageType: damageType || undefined, resist: isResisted ? halve : undefined }
+        : {};
+    const ok = await onApply(mode, parseInt(amount, 10), opts);
     if (ok) setAmount("");
   }
 
@@ -69,6 +90,7 @@ export default function HpActionControl({
     pending || (mode === "temp" ? amount === "" : !amount || parseInt(amount, 10) <= 0);
 
   return (
+    <div className="flex flex-col gap-2">
     <div className="flex flex-wrap items-center gap-3">
       {/* Mode picker */}
       <div
@@ -143,6 +165,49 @@ export default function HpActionControl({
         <ApplyIcon aria-hidden="true" className="h-4 w-4" />
         {activeMode.verb}
       </button>
+    </div>
+
+      {/* Damage type + resistance override (#456) */}
+      {mode === "damage" && (
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <label className="flex items-center gap-1.5 text-parchment-600">
+            Type
+            <select
+              value={damageType}
+              onChange={(e) => setDamageType(e.target.value)}
+              disabled={pending}
+              aria-label="Damage type"
+              className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-parchment-900 disabled:opacity-50"
+            >
+              <option value="">Untyped</option>
+              {DAMAGE_TYPE_OPTIONS.map(({ value, label }) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {isResisted && (
+            <label className="flex items-center gap-1.5 font-semibold text-vitality-800">
+              <input
+                type="checkbox"
+                checked={halve}
+                onChange={(e) => setHalve(e.target.checked)}
+                disabled={pending}
+                className="h-3.5 w-3.5 rounded border-parchment-400 text-vitality-700 focus:ring-vitality-600"
+              />
+              <Shield aria-hidden="true" className="h-3.5 w-3.5" />
+              Resistant to {damageTypeLabel(damageType)} — halve
+              {halve && parsedAmount > 0 && (
+                <span className="tabular-nums text-vitality-700">
+                  ({parsedAmount} → {Math.floor(parsedAmount / 2)})
+                </span>
+              )}
+            </label>
+          )}
+        </div>
+      )}
     </div>
   );
 }

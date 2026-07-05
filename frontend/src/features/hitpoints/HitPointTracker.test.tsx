@@ -67,6 +67,19 @@ function makeCharacter(): Character {
       ability: "intelligence", spellSaveDC: 13, spellAttackBonus: 5,
       slots: [], spells: [], concentratingOn: null,
     },
+    activeEffects: { buffs: [], resistances: [] },
+  } as unknown as Character;
+}
+
+/** A character with an active resistance to the given damage types (#456). */
+function makeResistantCharacter(...types: string[]): Character {
+  const base = makeCharacter();
+  return {
+    ...base,
+    activeEffects: {
+      buffs: [],
+      resistances: types.map((damageType, i) => ({ id: `r${i}`, damageType, source: "Rage" })),
+    },
   } as unknown as Character;
 }
 
@@ -106,6 +119,57 @@ function check(partial: Partial<ConcentrationCheck>): ConcentrationCheck {
     ...partial,
   };
 }
+
+describe("HitPointTracker damage-type resistance (#456)", () => {
+  async function applyTypedDamage(type: string, amount = "12") {
+    const user = userEvent.setup();
+    await user.type(screen.getByRole("spinbutton", { name: /damage amount/i }), amount);
+    await user.selectOptions(screen.getByRole("combobox", { name: /damage type/i }), type);
+    return user;
+  }
+
+  it("has no damage type selected by default and sends a typeless damage op", async () => {
+    mockResolve([]);
+    render(<HitPointTracker character={makeResistantCharacter("slashing")} onUpdate={vi.fn()} />);
+    await applyDamage();
+    const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
+    expect(ops[0]).toMatchObject({ type: "damage", amount: 8 });
+    expect((ops[0] as { damageType?: string }).damageType).toBeUndefined();
+  });
+
+  it("shows the halve override and sends resist=true when a resisted type is chosen", async () => {
+    mockResolve([]);
+    render(<HitPointTracker character={makeResistantCharacter("slashing")} onUpdate={vi.fn()} />);
+    const user = await applyTypedDamage("slashing");
+    // Resistance affordance appears with a halved preview.
+    expect(screen.getByText(/resistant to slashing/i)).toBeInTheDocument();
+    expect(screen.getByText(/12 → 6/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /apply damage/i }));
+    const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
+    expect(ops[0]).toMatchObject({ type: "damage", amount: 12, damageType: "slashing", resist: true });
+  });
+
+  it("lets the player decline the halve (override) — sends resist=false", async () => {
+    mockResolve([]);
+    render(<HitPointTracker character={makeResistantCharacter("slashing")} onUpdate={vi.fn()} />);
+    const user = await applyTypedDamage("slashing");
+    await user.click(screen.getByRole("checkbox", { name: /halve/i }));
+    await user.click(screen.getByRole("button", { name: /apply damage/i }));
+    const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
+    expect(ops[0]).toMatchObject({ type: "damage", damageType: "slashing", resist: false });
+  });
+
+  it("does not show the override for a non-resisted type", async () => {
+    mockResolve([]);
+    render(<HitPointTracker character={makeResistantCharacter("slashing")} onUpdate={vi.fn()} />);
+    const user = await applyTypedDamage("fire");
+    expect(screen.queryByText(/resistant to/i)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /apply damage/i }));
+    const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
+    expect(ops[0]).toMatchObject({ type: "damage", damageType: "fire" });
+    expect((ops[0] as { resist?: boolean }).resist).toBeUndefined();
+  });
+});
 
 describe("HitPointTracker segmented action control (issue #225)", () => {
   it("damage is the default mode and fires a damage op", async () => {

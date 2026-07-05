@@ -17,7 +17,7 @@ import DeathSaveTracker from "@/features/hitpoints/DeathSaveTracker";
 import LevelUpCallout from "@/features/hitpoints/LevelUpCallout";
 import HpActionControl from "@/features/hitpoints/HpActionControl";
 import HpMeter from "@/features/hitpoints/HpMeter";
-import type { HpMode } from "@/features/hitpoints/HpActionControl";
+import type { HpApplyOptions, HpMode } from "@/features/hitpoints/HpActionControl";
 import LevelUpModal from "@/features/hitpoints/LevelUpModal";
 import RestControls from "@/features/hitpoints/RestControls";
 import type { PendingConcentrationSave } from "@/features/hitpoints/ConcentrationSaveModal";
@@ -128,12 +128,21 @@ export default function HitPointTracker({
   }
 
   // Apply the active HP mode; returns true on success so the child clears its field.
-  async function handleApply(mode: HpMode, value: number): Promise<boolean> {
+  async function handleApply(mode: HpMode, value: number, opts?: HpApplyOptions): Promise<boolean> {
     if (mode === "damage") {
       if (!value || value <= 0) return false;
       // When auto-roll is off (issue #76), the server defers the concentration
       // save and returns a pending check; the player rolls it via the 3D die.
-      return submit([{ type: "damage", amount: value, autoRollConcentration }]);
+      // damageType + resist drive resistance auto-halve/override (#456).
+      return submit([
+        {
+          type: "damage",
+          amount: value,
+          damageType: opts?.damageType,
+          resist: opts?.resist,
+          autoRollConcentration,
+        },
+      ]);
     }
     if (mode === "heal") {
       if (!value || value <= 0) return false;
@@ -221,7 +230,11 @@ export default function HitPointTracker({
         )}
 
         {/* ── HP action control (segmented mode + stepper + verb) ── */}
-        <HpActionControl pending={pending} onApply={handleApply} />
+        <HpActionControl
+          pending={pending}
+          onApply={handleApply}
+          resistedDamageTypes={character.activeEffects.resistances.map((r) => r.damageType)}
+        />
 
         {/* ── Concentration save preference (spellcasters only, issue #76) ── */}
         {isSpellcaster && (

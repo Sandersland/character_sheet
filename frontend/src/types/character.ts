@@ -1276,8 +1276,18 @@ export interface ActiveBuff {
   sourceEntryId?: string;
 }
 
+/** One active damage resistance (#456). Populated by buffs/effects; a matching
+ *  typed damage instance is auto-halved on the damage-taken flow. */
+export interface ActiveResistance {
+  id: string;
+  damageType: string;
+  source: string;
+  sourceEntryId?: string;
+}
+
 export interface ActiveEffectsState {
   buffs: ActiveBuff[];
+  resistances: ActiveResistance[];
 }
 
 export interface ApplyConditionOperation { type: "applyCondition"; key: ConditionKey; source?: string }
@@ -1337,7 +1347,18 @@ export type ExperienceOperation = XpAwardOperation | XpSetOperation;
  * save to the client — the response carries a `status: "pending"` check and the
  * client follows up with a `ConcentrationSaveOperation`. Omitted = auto-roll.
  */
-export interface DamageOperation { type: "damage"; amount: number; autoRollConcentration?: boolean }
+/**
+ * `damageType` (optional, 5e type) drives resistance auto-halve (#456). `resist`
+ * is the manual override: omitted = auto (halve iff the type matches an active
+ * resistance), `true` forces the halve, `false` declines it.
+ */
+export interface DamageOperation {
+  type: "damage";
+  amount: number;
+  damageType?: string;
+  resist?: boolean;
+  autoRollConcentration?: boolean;
+}
 export interface HealOperation { type: "heal"; amount: number }
 export interface SetTempOperation { type: "setTemp"; amount: number }
 /** `rolls`: one raw die value per hit die spent (rolled by the client via dice.ts). */

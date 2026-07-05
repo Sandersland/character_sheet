@@ -54,3 +54,26 @@ test("HP: damage drops, heal restores, short rest spends a hit die", async ({ pa
 
   expect(errors).toEqual([]);
 });
+
+test("HP: typed damage entry applies the full amount when no resistance is active (#456)", async ({ page }) => {
+  await login(page);
+  await page.getByRole("link", { name: /Smoke Fighter/ }).click();
+  await expect(page.getByRole("heading", { name: "Hit Points" })).toBeVisible();
+
+  const errors = collectConsoleErrors(page);
+
+  await page.getByRole("button", { name: "Full rest" }).click();
+  await expect
+    .poll(async () => Number(await hpMeter(page).getAttribute("aria-valuenow")))
+    .toBe(Number(await hpMeter(page).getAttribute("aria-valuemax")));
+  const max = Number(await hpMeter(page).getAttribute("aria-valuemax"));
+
+  // Choosing a damage type but with no active resistance applies the full amount.
+  await page.getByRole("radio", { name: "Damage" }).click();
+  await page.getByRole("spinbutton", { name: "Damage amount" }).fill("6");
+  await page.getByRole("combobox", { name: "Damage type" }).selectOption("slashing");
+  await page.getByRole("button", { name: "Apply damage" }).click();
+  await expect.poll(() => hpNow(page)).toBe(max - 6);
+
+  expect(errors).toEqual([]);
+});
