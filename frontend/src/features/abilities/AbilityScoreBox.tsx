@@ -44,6 +44,7 @@ export default function AbilityScoreBox({
       <RollButton
         spec={checkSpec}
         label={`${label} check`}
+        log={{ kind: "check", source: `${label} check`, ability }}
         className="-mx-1 mt-1 px-1"
       >
         <span className="font-display text-2xl font-semibold leading-none text-garnet-800">
@@ -63,6 +64,7 @@ export default function AbilityScoreBox({
         <RollButton
           spec={saveSpec}
           label={`${label} save`}
+          log={{ kind: "save", source: `${label} save`, ability }}
           className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-parchment-600 hover:text-garnet-700"
         >
           Save

@@ -31,7 +31,7 @@ frontend/src/
 │   │                    #   CloakOfShadowsSection (Way of Shadow L11 self-invisible toggle)
 │   ├── conditions/      # ConditionsStrip, AddConditionPanel
 │   ├── dice/            # DiceRoller, PhysicsDiceRoller, DiceScene, DieMesh, DiceRollSequence,
-│   │                    #   RollButton, RollContext, RollResultToast,
+│   │                    #   DiceRollModal, RollButton, RollContext, RollResultToast, RollModeToggle,
 │   │                    #   diceRollerTypes.ts, useDieFaceData.ts
 │   ├── entities/        # CampaignCodex (Codex tab: browse/search/filter/create #367),
 │   │                    #   EntityDetailPage (detail/edit/delete + backlinks) (#248)
@@ -180,6 +180,7 @@ Staying on-system is what keeps the UI from reading as generic. The `verify-fron
 | `ActivityModal` — filterable audit timeline (category + session selects + inventory type chips; optional `entityId` scope) + undo — also serves as inventory history | `AddItemPanel` — add item form |
 | `DeleteCharacterModal` — confirm destructive action | `AddSpellPanel` — learn spell form |
 | `LevelUpModal` / `ConcentrationSaveModal` — hosted *inside* `HitPointTracker` | `InventoryRow` edit mode |
+| `DiceRollModal` — read-only 3D roll result, hosted *inside* `RollProvider` (skill/ability/save/initiative rolls) | |
 | | `SellPanel` — bulk-sale confirm/review (per-line qty + one sale total that splits evenly; optional per-line price override) |
 | | `HitPointTracker` itself — inline Card (damage/heal/rest/death-save controls) |
 | | `ExperienceTracker` award/set inputs |
@@ -311,7 +312,13 @@ usesAdvantage(spec): boolean            // the advantage/disadvantage guard (bel
 
 The manual toggle is `features/dice/RollModeToggle.tsx` — a sticky Normal/ADV/DIS control (mounted alongside `RollResultToast` in `CharacterSheetPage`/`SessionPage`) that sets `mode` in `RollContext`; `roll()` merges that mode into every eligible spec (a caller-pinned `spec.mode` wins). `RollResultToast` shows both dice (dropped one struck through), an Advantage/Disadvantage label, and keeps natural-20/1 highlighting on the **taken** die; `DiceRoller` renders both d20s.
 
-**3D rollers** (`features/dice/DiceRoller.tsx` scripted, `features/dice/PhysicsDiceRoller.tsx` physics) both produce a `RollResult` shape via `summarizeRoll` — they're interchangeable via the shared `DiceRollerProps` contract in `features/dice/diceRollerTypes.ts`. Spellcasting currently uses the simple inline `rollSpec`; the 3D rollers are an easy later upgrade.
+**Roll affordances → `RollContext`.** `RollProvider` (mounted once per page in `CharacterSheetPage`/`SessionPage`) exposes two roll paths that share the sticky `mode`:
+- `roll(spec, label)` — instant fast-roll (no 3D). Used by the in-combat attack/damage/spell pickers, which run their own `logRoll` calls.
+- `rollAnimated(spec, label, log?)` — plays the 3D `DiceRollModal` overlay, publishes to `RollResultToast`, and (when `log` is set) emits the roll's category event. This is what `RollButton` uses, so the sheet's **skill checks** (`SkillsTable`), **ability checks + saving throws** (`AbilityScoreBox`), and **initiative** (`VitalsStrip`) all animate and log via the `log={{ kind, source, ability?, skill?, dc? }}` prop (#460).
+
+`logSessionRoll` is the shared **best-effort** logging path (a no-op unless `RollProvider` was given both `characterId` and an active `sessionId` — rolls only log inside a session, like attack/damage). `ConcentrationSaveModal` calls it directly so a manual concentration CON save reaches the Session Log as a `saveRoll` too. `RollProvider`'s `onRollLogged` bumps the session-log refresh key.
+
+**3D rollers** (`features/dice/DiceRoller.tsx` scripted, `features/dice/PhysicsDiceRoller.tsx` physics) both produce a `RollResult` shape via `summarizeRoll` — they're interchangeable via the shared `DiceRollerProps` contract in `features/dice/diceRollerTypes.ts`. In tests, stub `@/features/dice/DiceRoller` (it mounts a Three.js Canvas that won't render in jsdom) to fire `onResult` on mount — see `RollContext.test.tsx` / `ConcentrationSaveModal.test.tsx`.
 
 The dice face numbers are drei `<Text>` (troika). Two things keep them working under the single-origin CSP (#408), which local split-origin dev never exercises:
 - **Main-thread typesetting** — `lib/troikaTextConfig.ts` (`configureDiceText()`, called once in `main.tsx` before render) sets troika `useWorker: false`. Troika's default worker rehydrates via a `blob:` `importScripts`, which the CSP `script-src` blocks (`worker-src` doesn't cover `importScripts`), so `<Text>` would otherwise suspend forever and stall the whole roller.

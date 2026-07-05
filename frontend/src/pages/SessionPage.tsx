@@ -46,13 +46,7 @@ import type { Character, Session, ReferenceData } from "@/types/character";
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function SessionPage() {
-  return (
-    <RollProvider>
-      <SessionPageInner />
-      <RollModeToggle />
-      <RollResultToast />
-    </RollProvider>
-  );
+  return <SessionPageInner />;
 }
 
 function SessionPageInner() {
@@ -213,7 +207,12 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
   }
 
   return (
-    <div className="min-h-screen bg-parchment-100">
+    <RollProvider
+      characterId={character.id}
+      sessionId={session.id}
+      onRollLogged={() => setLogRefresh((n) => n + 1)}
+    >
+      <div className="min-h-screen bg-parchment-100">
       {/* ── Page title bar ──────────────────────────────────────────────── */}
       <div className="border-b border-parchment-200 bg-parchment-50">
         <div className="mx-auto flex max-w-4xl flex-wrap items-start justify-between gap-4 px-6 py-4">
@@ -405,6 +404,9 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
           onUpdate={handleCharacterUpdate}
         />
       )}
-    </div>
+      </div>
+      <RollModeToggle />
+      <RollResultToast />
+    </RollProvider>
   );
 }

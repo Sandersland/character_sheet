@@ -38,7 +38,10 @@ export default function CharacterSheetPage() {
   if (character === null) return <CharacterLoadError variant="not-found" characterId={id} />;
 
   return (
-    <RollProvider>
+    <RollProvider
+      characterId={character.id}
+      sessionId={session.inActiveSession ? session.activeSessionId : null}
+    >
       <div className="min-h-screen bg-parchment-100">
         <CharacterSheetHeader
           character={character}
