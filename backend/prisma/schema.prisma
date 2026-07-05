@@ -853,6 +853,7 @@ enum CharacterEventType {
   castDiscipline
   castManeuver
   castShadowArt
+  castChannelDivinity
   learnToolProficiency
   forgetToolProficiency
   toolProficienciesReconciled

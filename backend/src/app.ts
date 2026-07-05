@@ -32,6 +32,7 @@ import { journalRouter } from "./routes/journal.js";
 import { disciplinesRouter } from "./routes/disciplines.js";
 import { shadowArtsRouter } from "./routes/shadow-arts.js";
 import { maneuversRouter } from "./routes/maneuvers.js";
+import { channelDivinityRouter } from "./routes/channel-divinity.js";
 import { referenceRouter } from "./routes/reference.js";
 import { resourcesRouter } from "./routes/resources.js";
 import { spellsRouter } from "./routes/spells.js";
@@ -97,6 +98,7 @@ export function createApp() {
   app.use("/api", maneuversRouter);
   app.use("/api", disciplinesRouter);
   app.use("/api", shadowArtsRouter);
+  app.use("/api", channelDivinityRouter);
   app.use("/api", featsRouter);
   app.use("/api", advancementRouter);
   app.use("/api", sessionsRouter);
