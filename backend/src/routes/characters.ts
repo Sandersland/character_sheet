@@ -417,7 +417,7 @@ function buildSpellcastingView(
   }
   // Non-caster class that nonetheless gets a subclass-granted spell (e.g. a Way
   // of Shadow monk's Minor Illusion). Surface a slotless view so the grant
-  // renders; monk subclass grants use Wisdom as the casting ability.
+  // renders; the casting ability is derived per rule (Wisdom is the default).
   if (granted.length > 0) {
     const stored = normalizeSpellcastingMutable(row.spellcasting);
     const castingAbility = deriveGrantedCastingAbility(primaryClass?.subclass ?? undefined);
@@ -470,7 +470,7 @@ function buildMulticlassSpellcastingView(
   const stored = normalizeSpellcastingMutable(row.spellcasting);
 
   // No caster class in the mix, but a subclass still grants a spell — surface a
-  // slotless Wisdom view (mirrors the single-class non-caster branch).
+  // slotless granted view (ability derived per rule; mirrors the single-class branch).
   if (multi.classes.length === 0) {
     if (granted.length === 0) return undefined;
     const castingAbility = collectGrantedCastingAbility(row.classEntries);
