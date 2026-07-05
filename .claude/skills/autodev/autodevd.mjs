@@ -4,8 +4,9 @@
  *
  * Same DAG semantics as the one-shot batch.mjs (both drive batch-core.mjs),
  * but stays resident: at all-terminal it idles instead of exiting, so state
- * survives, `status`/`add` keep working (control channel), and a relaunch
- * after a kill/reap adopts still-running detached children losslessly.
+ * survives (ready for a status/add control channel to attach later), and a
+ * relaunch after a kill/reap adopts still-running detached children
+ * losslessly. Today, adding work = relaunching with new issue specs.
  *
  * Launch (detached — Claude Code reaps background task groups, nohup escapes):
  *   nohup node .claude/skills/autodev/autodevd.mjs 123 124:123 --cap 3 \
@@ -25,10 +26,10 @@
  *   <state-dir>/orchestrator.log   — the daemon's log (same vocabulary as batch.mjs)
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createEngine, parseIssueSpecs } from "./batch-core.mjs";
+import { createEngine, parseIssueSpecs, pidAlive } from "./batch-core.mjs";
 
 const SKILL_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(SKILL_DIR, "../../..");
@@ -36,16 +37,6 @@ const RUNTIME_DIR = process.env.AUTODEV_RUNTIME_DIR ?? join(ROOT, ".claude", "au
 const PID_FILE = join(RUNTIME_DIR, "autodevd.pid");
 const DAEMON_JSON = join(RUNTIME_DIR, "daemon.json");
 const SELF = join(SKILL_DIR, "autodevd.mjs");
-
-function pidAlive(pid) {
-  if (!pid) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 function readJson(path) {
   try {
@@ -113,6 +104,7 @@ function resolveStateDir(cfg) {
 }
 
 function acquirePidFile() {
+  mkdirSync(RUNTIME_DIR, { recursive: true }); // absent on a fresh checkout (gitignored)
   const pid = livePid();
   if (pid) {
     console.error(`autodevd: already running (pid ${pid}) — stop it with: node ${SELF} stop`);
@@ -163,6 +155,7 @@ async function cmdLaunch(argv) {
   // Signals: first SIGTERM/SIGINT drains gently (running children finish);
   // a second one — or SIGUSR1 directly — escalates to park (SIGTERM children).
   let wake = () => {};
+  engine.setWake(() => wake()); // child exits during a drain end the sleep early
   let stops = 0;
   const onStop = (sig) => {
     stops++;

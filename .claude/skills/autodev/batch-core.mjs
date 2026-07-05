@@ -57,7 +57,7 @@ export function validatePrereqs(issues, known) {
   }
 }
 
-function pidAlive(pid) {
+export function pidAlive(pid) {
   if (!pid) return false;
   try {
     process.kill(pid, 0);
@@ -75,6 +75,7 @@ export function createEngine({ stateDir, cfg = null }) {
   let batch; // { base, cap, grace, order, completedAt?, issues: { [n]: {prereqs, status, pid, rundir, retryAt, rateRetries, resumed, doneAt} } }
   const children = new Map(); // issue -> ChildProcess (this process's own spawns only)
   let draining = null; // null | "wait" | "park"
+  let wakeFn = () => {}; // daemon's sleep-interrupt; fired when a drain may have completed
 
   function saveBatch() {
     const tmp = join(stateDir, "batch.json.tmp");
@@ -235,6 +236,9 @@ export function createEngine({ stateDir, cfg = null }) {
       log(`FAIL #${n} rc=${code} after resume attempt (${run?.ctx?.failure ?? "unknown"}); worktree kept`);
     }
     saveBatch();
+    // A draining daemon is asleep between ticks — wake it so the last child's
+    // exit ends the drain immediately instead of after up to a full poll.
+    if (draining) wakeFn();
   }
 
   // ---------- control loop phases ----------
@@ -450,6 +454,9 @@ export function createEngine({ stateDir, cfg = null }) {
     },
     get draining() {
       return draining;
+    },
+    setWake(fn) {
+      wakeFn = fn;
     },
     log,
     saveBatch,
