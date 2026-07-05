@@ -108,6 +108,12 @@ export default function SkillsTable({
                 <RollButton
                   spec={{ count: 1, faces: 20, modifier: bonus }}
                   label={`${skillLabel(skill.name)} check`}
+                  log={{
+                    kind: "check",
+                    source: `${skillLabel(skill.name)} check`,
+                    ability: skill.ability,
+                    skill: skill.name,
+                  }}
                   className="-m-0.5 inline-flex p-0.5"
                 >
                   {formatModifier(bonus)}

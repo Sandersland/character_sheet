@@ -1,6 +1,7 @@
 import { formatModifier } from "@/lib/abilities";
 import Popover from "@/components/ui/Popover";
 import RollButton from "@/features/dice/RollButton";
+import type { RollLog } from "@/features/dice/RollContext";
 import type { Character } from "@/types/character";
 import type { RollSpec } from "@/lib/dice";
 
@@ -12,10 +13,12 @@ function VitalStat({
   label,
   value,
   rollSpec,
+  log,
 }: {
   label: string;
   value: string;
   rollSpec?: RollSpec;
+  log?: RollLog;
 }) {
   const content = (
     <>
@@ -33,6 +36,7 @@ function VitalStat({
       <RollButton
         spec={rollSpec}
         label={label}
+        log={log}
         className="flex flex-col items-center justify-center rounded-card border border-parchment-200 bg-parchment-50 px-3 py-3 shadow-card"
       >
         {content}
@@ -97,6 +101,7 @@ export default function VitalsStrip({ character }: VitalsStripProps) {
         label="Initiative"
         value={formatModifier(character.initiativeBonus)}
         rollSpec={{ count: 1, faces: 20, modifier: character.initiativeBonus }}
+        log={{ kind: "initiative", source: "Initiative" }}
       />
       <VitalStat label="Speed" value={`${character.speed} ft`} />
       <VitalStat
