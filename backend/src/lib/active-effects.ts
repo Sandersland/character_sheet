@@ -37,8 +37,25 @@ export interface ActiveBuff {
   sourceEntryId?: string;
 }
 
+/**
+ * One active damage resistance (#456). Self-scoped registry that active
+ * buffs/effects populate (e.g. Rage, fed later by #455/#458) — nothing here
+ * hardcodes any source. A matching typed damage instance is auto-halved.
+ */
+export interface ActiveResistance {
+  /** Per-resistance instance id. */
+  id: string;
+  /** Standard 5e damage type resisted (lowercase, e.g. "slashing"). */
+  damageType: string;
+  /** Human-readable provenance, e.g. "Rage". */
+  source: string;
+  /** Concentration/effect entry id that granted this; clears when it ends. */
+  sourceEntryId?: string;
+}
+
 export interface ActiveEffectsMutableState {
   buffs: ActiveBuff[];
+  resistances: ActiveResistance[];
 }
 
 // ── Normalizer ────────────────────────────────────────────────────────────────
@@ -47,7 +64,7 @@ export interface ActiveEffectsMutableState {
 
 export function normalizeActiveEffectsMutable(json: Prisma.JsonValue): ActiveEffectsMutableState {
   if (!json || typeof json !== "object" || Array.isArray(json)) {
-    return { buffs: [] };
+    return { buffs: [], resistances: [] };
   }
   const obj = json as Record<string, unknown>;
   const rawBuffs = Array.isArray(obj.buffs) ? (obj.buffs as unknown[]) : [];
@@ -69,7 +86,21 @@ export function normalizeActiveEffectsMutable(json: Prisma.JsonValue): ActiveEff
     });
   }
 
-  return { buffs };
+  const rawResistances = Array.isArray(obj.resistances) ? (obj.resistances as unknown[]) : [];
+  const resistances: ActiveResistance[] = [];
+  for (const raw of rawResistances) {
+    if (!raw || typeof raw !== "object") continue;
+    const entry = raw as Record<string, unknown>;
+    if (typeof entry.damageType !== "string") continue;
+    resistances.push({
+      id: typeof entry.id === "string" ? entry.id : randomUUID(),
+      damageType: entry.damageType.toLowerCase(),
+      source: typeof entry.source === "string" ? entry.source : entry.damageType,
+      sourceEntryId: typeof entry.sourceEntryId === "string" ? entry.sourceEntryId : undefined,
+    });
+  }
+
+  return { buffs, resistances };
 }
 
 /** Serialize to the shape written to Character.activeEffects. */
@@ -83,7 +114,18 @@ export function serializeActiveEffectsState(state: ActiveEffectsMutableState): P
       source: b.source,
       sourceEntryId: b.sourceEntryId ?? null,
     })),
+    resistances: state.resistances.map((r) => ({
+      id: r.id,
+      damageType: r.damageType,
+      source: r.source,
+      sourceEntryId: r.sourceEntryId ?? null,
+    })),
   } as unknown as Prisma.InputJsonValue;
+}
+
+/** Lowercase set of currently-resisted damage types (#456). */
+export function resistedDamageTypes(state: ActiveEffectsMutableState): Set<string> {
+  return new Set(state.resistances.map((r) => r.damageType));
 }
 
 // ── Pure summarizers ──────────────────────────────────────────────────────────
@@ -99,7 +141,12 @@ export function buffsByTarget(state: ActiveEffectsMutableState): Record<string, 
 
 /** Snapshot of the state under the `activeEffects` key, for event before/after. */
 function snapshot(state: ActiveEffectsMutableState): { activeEffects: ActiveEffectsMutableState } {
-  return { activeEffects: { buffs: state.buffs.map((b) => ({ ...b })) } };
+  return {
+    activeEffects: {
+      buffs: state.buffs.map((b) => ({ ...b })),
+      resistances: state.resistances.map((r) => ({ ...r })),
+    },
+  };
 }
 
 // ── Transaction helpers ─────────────────────────────────────────────────────
@@ -150,9 +197,56 @@ export async function appendActiveBuffInTx(
 }
 
 /**
- * Clear every buff granted by `sourceEntryId` (the concentration that just
- * ended). No-op + no event when none match. Logs a `buffCleared` event under
- * the "effects" category so batch revert restores the dropped buffs.
+ * Append a damage resistance, replacing any existing resistance for the same
+ * `damageType` + `sourceEntryId` (re-applying never stacks). The registry an
+ * active buff/effect populates so the damage-taken flow can auto-halve (#456);
+ * nothing here hardcodes a source. Logs a `buffApplied` event under "effects".
+ */
+export async function appendResistanceInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  resistance: Omit<ActiveResistance, "id">,
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: { activeEffects: true },
+  });
+  if (!row) return;
+
+  const state = normalizeActiveEffectsMutable(row.activeEffects);
+  const damageType = resistance.damageType.toLowerCase();
+  const before = snapshot(state);
+  // Dedupe by damageType + source — re-applying replaces the prior instance.
+  state.resistances = state.resistances.filter(
+    (r) => !(r.damageType === damageType && r.sourceEntryId === resistance.sourceEntryId),
+  );
+  state.resistances.push({ id: randomUUID(), ...resistance, damageType });
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: { activeEffects: serializeActiveEffectsState(state) },
+  });
+
+  await logEvent(tx, {
+    characterId,
+    category: "effects",
+    type: "buffApplied",
+    summary: `${resistance.source}: resistance to ${damageType}`,
+    before,
+    after: snapshot(state),
+    data: { damageType, sourceEntryId: resistance.sourceEntryId ?? null },
+    batchId,
+    sessionId,
+  });
+}
+
+/**
+ * Clear every buff AND resistance granted by `sourceEntryId` (the concentration
+ * or effect that just ended). No-op + no event when none match. Logs a
+ * `buffCleared` event under the "effects" category so batch revert restores the
+ * dropped buffs and resistances together.
  */
 export async function clearBuffsForSourceInTx(
   tx: Prisma.TransactionClient,
@@ -169,24 +263,32 @@ export async function clearBuffsForSourceInTx(
   if (!row) return;
 
   const state = normalizeActiveEffectsMutable(row.activeEffects);
-  const dropped = state.buffs.filter((b) => b.sourceEntryId === sourceEntryId);
-  if (dropped.length === 0) return;
+  const droppedBuffs = state.buffs.filter((b) => b.sourceEntryId === sourceEntryId);
+  const droppedResistances = state.resistances.filter((r) => r.sourceEntryId === sourceEntryId);
+  if (droppedBuffs.length === 0 && droppedResistances.length === 0) return;
   const before = snapshot(state);
   state.buffs = state.buffs.filter((b) => b.sourceEntryId !== sourceEntryId);
+  state.resistances = state.resistances.filter((r) => r.sourceEntryId !== sourceEntryId);
 
   await tx.character.update({
     where: { id: characterId },
     data: { activeEffects: serializeActiveEffectsState(state) },
   });
 
+  const droppedCount = droppedBuffs.length + droppedResistances.length;
   await logEvent(tx, {
     characterId,
     category: "effects",
     type: "buffCleared",
-    summary: `Cleared ${dropped.length} buff${dropped.length !== 1 ? "s" : ""} (${reason})`,
+    summary: `Cleared ${droppedCount} effect${droppedCount !== 1 ? "s" : ""} (${reason})`,
     before,
     after: snapshot(state),
-    data: { sourceEntryId, reason, clearedKeys: dropped.map((b) => b.key) },
+    data: {
+      sourceEntryId,
+      reason,
+      clearedKeys: droppedBuffs.map((b) => b.key),
+      clearedResistances: droppedResistances.map((r) => r.damageType),
+    },
     batchId,
     sessionId,
   });

@@ -20,6 +20,28 @@ export const ALIGNMENTS: readonly string[] = [
   "Chaotic Evil",
 ];
 
+// The 13 standard 5e damage types. Lowercase keys — matches weapon damageType
+// and the effect model's damageType. Used by the resistance registry (#456).
+export const DAMAGE_TYPES: readonly string[] = [
+  "acid",
+  "bludgeoning",
+  "cold",
+  "fire",
+  "force",
+  "lightning",
+  "necrotic",
+  "piercing",
+  "poison",
+  "psychic",
+  "radiant",
+  "slashing",
+  "thunder",
+];
+
+export function isDamageType(value: string): boolean {
+  return DAMAGE_TYPES.includes(value);
+}
+
 interface SkillDefinition {
   name: string;
   ability: string;
