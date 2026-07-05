@@ -3,6 +3,7 @@ import type {
   AdvancementOperation,
   Campaign,
   CampaignItem,
+  CampaignItemHolder,
   CampaignItemInput,
   CatalogFeat,
   CatalogDiscipline,
@@ -740,6 +741,43 @@ export async function deleteCampaignItem(campaignId: string, itemId: string): Pr
     const body = await response.json().catch(() => null);
     throw new Error(body?.error ?? `Failed to delete campaign item (${response.status})`);
   }
+}
+
+// Award/revoke (#381): owner-only. Grants a campaign item into a member
+// character's inventory (reveals the entity, audits on the target) or removes
+// the provenance-matched row. Both return the item's updated holder list.
+export async function awardCampaignItem(
+  campaignId: string,
+  itemId: string,
+  body: { characterId: string; quantity?: number },
+): Promise<{ holders: CampaignItemHolder[] }> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/items/${itemId}/award`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.error ?? `Failed to award campaign item (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function revokeCampaignItem(
+  campaignId: string,
+  itemId: string,
+  body: { characterId: string },
+): Promise<{ holders: CampaignItemHolder[] }> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/items/${itemId}/revoke`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.error ?? `Failed to revoke campaign item (${response.status})`);
+  }
+  return response.json();
 }
 
 // ── Sessions ──────────────────────────────────────────────────────────────────

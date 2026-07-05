@@ -981,6 +981,13 @@ export interface CampaignEntity {
  * `dmNotes` is present only in owner-facing payloads — it's scrubbed server-side
  * from every player response.
  */
+/** One current holder of an awarded campaign item (#381). */
+export interface CampaignItemHolder {
+  characterId: string;
+  characterName: string;
+  quantity: number;
+}
+
 export interface CampaignItem {
   id: string;
   campaignId: string;
@@ -998,6 +1005,8 @@ export interface CampaignItem {
   consumable?: ConsumableDetail;
   /** The fronting ITEM CampaignEntity — its `visibility` drives player reveal. */
   entity?: { id: string; name: string; visibility: EntityVisibility };
+  /** Current holders derived from live inventory rows (#381). */
+  holders?: CampaignItemHolder[];
   createdAt: string;
   updatedAt: string;
 }

@@ -6,10 +6,12 @@ import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import { GiKnapsack } from "@/components/ui/icons";
 import {
+  awardCampaignItem,
   createCampaignItem,
   deleteCampaignItem,
   fetchCampaignItems,
   fetchItems,
+  revokeCampaignItem,
   updateEntity,
 } from "@/api/client";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
@@ -24,6 +26,8 @@ import type {
 
 interface CampaignItemsPanelProps {
   campaignId: string;
+  /** Member characters, so the DM can pick an award target. */
+  characters: { id: string; name: string; ownerId: string }[];
 }
 
 const inputCls =
@@ -146,7 +150,7 @@ function buildInput(f: FormState): CampaignItemInput {
 // clone-from-SRD-catalog (pre-fills the form from a chosen Item) and from-scratch
 // with category-conditional detail fields. Each create auto-registers a HIDDEN
 // ITEM entity; reveal/delete here keep the shared Codex cache in sync.
-export default function CampaignItemsPanel({ campaignId }: CampaignItemsPanelProps) {
+export default function CampaignItemsPanel({ campaignId, characters }: CampaignItemsPanelProps) {
   const { entities } = useCampaignEntities(campaignId);
   const [items, setItems] = useState<CampaignItem[]>([]);
   const [catalog, setCatalog] = useState<Item[]>([]);
@@ -154,6 +158,8 @@ export default function CampaignItemsPanel({ campaignId }: CampaignItemsPanelPro
   const [form, setForm] = useState<FormState>(emptyForm);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Per-item chosen award target (character id).
+  const [awardTarget, setAwardTarget] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let active = true;
@@ -230,6 +236,42 @@ export default function CampaignItemsPanel({ campaignId }: CampaignItemsPanelPro
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete item.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleAward(item: CampaignItem) {
+    const characterId = awardTarget[item.id] ?? characters[0]?.id;
+    if (!characterId) return;
+    setBusyId(item.id);
+    setError(null);
+    try {
+      const { holders } = await awardCampaignItem(campaignId, item.id, { characterId });
+      // Award reveals the fronting entity — reflect it locally + in the cache.
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === item.id
+            ? { ...i, holders, entity: i.entity ? { ...i.entity, visibility: "REVEALED" } : i.entity }
+            : i,
+        ),
+      );
+      if (item.entity) revealInCache(item.entity.id, "REVEALED");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to award item.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleRevoke(item: CampaignItem, characterId: string) {
+    setBusyId(item.id);
+    setError(null);
+    try {
+      const { holders } = await revokeCampaignItem(campaignId, item.id, { characterId });
+      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, holders } : i)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to revoke item.");
     } finally {
       setBusyId(null);
     }
@@ -553,39 +595,96 @@ export default function CampaignItemsPanel({ campaignId }: CampaignItemsPanelPro
           <ul className="flex flex-col divide-y divide-parchment-200">
             {items.map((item) => {
               const hidden = item.entity?.visibility === "HIDDEN";
+              const holders = item.holders ?? [];
+              const held = item.isUnique && holders.length > 0;
               return (
-                <li key={item.id} className="flex flex-wrap items-center gap-2 py-2">
-                  {item.entity ? (
-                    <Link
-                      to={`/campaigns/${campaignId}/entities/${item.entity.id}`}
-                      className="text-sm font-semibold text-parchment-900 hover:underline"
-                    >
-                      {item.name}
-                    </Link>
-                  ) : (
-                    <span className="text-sm font-semibold text-parchment-900">{item.name}</span>
+                <li key={item.id} className="flex flex-col gap-2 py-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {item.entity ? (
+                      <Link
+                        to={`/campaigns/${campaignId}/entities/${item.entity.id}`}
+                        className="text-sm font-semibold text-parchment-900 hover:underline"
+                      >
+                        {item.name}
+                      </Link>
+                    ) : (
+                      <span className="text-sm font-semibold text-parchment-900">{item.name}</span>
+                    )}
+                    <Badge tone="gold">{itemCategoryLabel(item.category)}</Badge>
+                    {item.rarity && <Badge tone="arcane">{item.rarity}</Badge>}
+                    {item.isUnique && <Badge tone="arcane">Unique</Badge>}
+                    {hidden && <Badge tone="neutral">🔒 Hidden</Badge>}
+                    <span className="ml-auto flex items-center gap-3">
+                      <button
+                        type="button"
+                        disabled={busyId === item.id || !item.entity}
+                        onClick={() => toggleReveal(item)}
+                        className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
+                      >
+                        {hidden ? "Reveal" : "Hide"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyId === item.id}
+                        onClick={() => handleDelete(item)}
+                        className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
+                      >
+                        Delete
+                      </button>
+                    </span>
+                  </div>
+
+                  {holders.length > 0 && (
+                    <ul className="flex flex-col gap-1 pl-1 text-xs text-parchment-700">
+                      {holders.map((h) => (
+                        <li key={h.characterId} className="flex items-center gap-2">
+                          <span>
+                            Held by <span className="font-semibold">{h.characterName}</span>
+                            {h.quantity > 1 ? ` ×${h.quantity}` : ""}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={busyId === item.id}
+                            onClick={() => handleRevoke(item, h.characterId)}
+                            className="font-semibold text-garnet-700 hover:underline disabled:opacity-40"
+                          >
+                            Revoke
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                  <Badge tone="gold">{itemCategoryLabel(item.category)}</Badge>
-                  {item.rarity && <Badge tone="arcane">{item.rarity}</Badge>}
-                  {hidden && <Badge tone="neutral">🔒 Hidden</Badge>}
-                  <span className="ml-auto flex items-center gap-3">
-                    <button
-                      type="button"
-                      disabled={busyId === item.id || !item.entity}
-                      onClick={() => toggleReveal(item)}
-                      className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
-                    >
-                      {hidden ? "Reveal" : "Hide"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busyId === item.id}
-                      onClick={() => handleDelete(item)}
-                      className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
-                    >
-                      Delete
-                    </button>
-                  </span>
+
+                  {characters.length > 0 && !held && (
+                    <div className="flex items-center gap-2 pl-1">
+                      <label htmlFor={`award-${item.id}`} className="text-xs text-parchment-600">
+                        Award to
+                      </label>
+                      <select
+                        id={`award-${item.id}`}
+                        className="rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-xs text-parchment-900"
+                        value={awardTarget[item.id] ?? ""}
+                        onChange={(e) =>
+                          setAwardTarget((prev) => ({ ...prev, [item.id]: e.target.value }))
+                        }
+                      >
+                        <option value="">Choose character…</option>
+                        {characters.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={busyId === item.id || !(awardTarget[item.id] ?? "")}
+                        onClick={() => handleAward(item)}
+                        className="rounded-control bg-garnet-600 px-2 py-1 text-xs font-semibold text-parchment-50 hover:bg-garnet-700 disabled:opacity-40"
+                      >
+                        Award
+                      </button>
+                    </div>
+                  )}
                 </li>
               );
             })}
