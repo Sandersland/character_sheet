@@ -1278,7 +1278,10 @@ export interface ActiveBuff {
   modifier: number;
   source: string;
   sourceEntryId?: string;
-  duration?: BuffDuration;
+  // Always present on the API response — the backend normalizer defaults absent
+  // wire values to "concentration" before serializing, so the frontend never
+  // sees an undefined duration.
+  duration: BuffDuration;
   restType?: "short" | "long";
 }
 

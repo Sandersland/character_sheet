@@ -112,4 +112,26 @@ describe("durable buffs (#455)", () => {
     await applyHitPointOperations(FIXTURE_ID, [{ type: "shortRest", rolls: [] }]);
     expect((await readBuffs()).map((b) => b.key)).toEqual(["longBuff"]); // short cleared, long survives a short rest
   });
+
+  it("appendActiveBuffInTx rejects an until-rest buff with no restType (no silent long-rest default)", async () => {
+    await expect(
+      applyBuff({ key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "until-rest" }),
+    ).rejects.toThrow(/restType/);
+    expect(await readBuffs()).toEqual([]); // rejected before any write
+  });
+
+  it("clearBuffByKeyInTx leaves a concentration buff of the same key untouched (durable-only contract)", async () => {
+    // Seed a concentration buff directly — append dedups by key, so bypass it to
+    // simulate a future relaxed-dedup state where a key could carry either duration.
+    await prisma.character.update({
+      where: { id: FIXTURE_ID },
+      data: {
+        activeEffects: {
+          buffs: [{ id: randomUUID(), key: "rage", target: "athletics", modifier: 1, source: "Bless", sourceEntryId: "e1", duration: "concentration" }],
+        },
+      },
+    });
+    await prisma.$transaction((tx) => clearBuffByKeyInTx(tx, FIXTURE_ID, "rage", randomUUID(), null, "endRage"));
+    expect((await readBuffs()).map((b) => b.key)).toEqual(["rage"]); // durable-only clear must not drop a concentration buff
+  });
 });

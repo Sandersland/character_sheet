@@ -141,6 +141,13 @@ export async function appendActiveBuffInTx(
   batchId: string,
   sessionId: string | null,
 ): Promise<void> {
+  // An "until-rest" buff must declare which rest clears it; without a restType
+  // clearBuffsForRestInTx would silently treat it as long-rest-only. Fail loudly
+  // rather than defaulting a caller's intent.
+  if (buff.duration === "until-rest" && !buff.restType) {
+    throw new Error(`appendActiveBuffInTx: "until-rest" buff "${buff.key}" requires an explicit restType ("short" | "long")`);
+  }
+
   const row = await tx.character.findUnique({
     where: { id: characterId },
     select: { activeEffects: true },
@@ -237,10 +244,14 @@ export async function clearBuffByKeyInTx(
   if (!row) return;
 
   const state = normalizeActiveEffectsMutable(row.activeEffects);
-  const dropped = state.buffs.filter((b) => b.key === key);
+  // Durable-only toggle: never clear a concentration buff (those end via
+  // clearBuffsForSourceInTx). Dedup-by-key keeps one buff per key today, but the
+  // guard makes the "durable only" contract machine-readable if that ever relaxes.
+  const matches = (b: ActiveBuff) => b.key === key && b.duration !== "concentration";
+  const dropped = state.buffs.filter(matches);
   if (dropped.length === 0) return;
   const before = snapshot(state);
-  state.buffs = state.buffs.filter((b) => b.key !== key);
+  state.buffs = state.buffs.filter((b) => !matches(b));
 
   await tx.character.update({
     where: { id: characterId },
