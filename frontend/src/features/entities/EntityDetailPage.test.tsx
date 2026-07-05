@@ -63,15 +63,21 @@ function campaign(role: "OWNER" | "PLAYER"): Campaign {
   };
 }
 
-function renderPage() {
+function renderPage(
+  entry:
+    | string
+    | { pathname: string; search?: string; state?: unknown } = `/campaigns/${CAMPAIGN_ID}/entities/${ENTITY_ID}`,
+) {
   return render(
-    <MemoryRouter initialEntries={[`/campaigns/${CAMPAIGN_ID}/entities/${ENTITY_ID}`]}>
+    <MemoryRouter initialEntries={[entry]}>
       <Routes>
         <Route path="/campaigns/:id/entities/:entityId" element={<EntityDetailPage />} />
       </Routes>
     </MemoryRouter>,
   );
 }
+
+const ENTITY_PATH = `/campaigns/${CAMPAIGN_ID}/entities/${ENTITY_ID}`;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -136,9 +142,28 @@ describe("EntityDetailPage (#248)", () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 
-  it("links back to the campaign codex (#367)", async () => {
+  it("links back to the campaign codex by default (#367)", async () => {
     renderPage();
     const back = await screen.findByRole("link", { name: /back to campaign/i });
     expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/codex`);
+  });
+
+  it("links back to Manage when navigated from Manage via location.state (#489)", async () => {
+    renderPage({ pathname: ENTITY_PATH, state: { from: `/campaigns/${CAMPAIGN_ID}/manage` } });
+    const back = await screen.findByRole("link", { name: /back to campaign/i });
+    expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/manage`);
+  });
+
+  it("links back to Manage when ?from=manage is present (#489)", async () => {
+    renderPage({ pathname: ENTITY_PATH, search: "?from=manage" });
+    const back = await screen.findByRole("link", { name: /back to campaign/i });
+    expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/manage`);
+  });
+
+  it("honors the Manage origin on the not-found back affordance (#489)", async () => {
+    vi.mocked(client.fetchEntities).mockResolvedValue([]);
+    renderPage({ pathname: ENTITY_PATH, state: { from: `/campaigns/${CAMPAIGN_ID}/manage` } });
+    const back = await screen.findByRole("link", { name: /back to campaign/i });
+    expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/manage`);
   });
 });

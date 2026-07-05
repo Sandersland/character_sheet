@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
@@ -44,7 +44,19 @@ function groupBySession(backlinks: EntityBacklink[]): { key: string; items: Enti
 export default function EntityDetailPage() {
   const { id: campaignId, entityId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { entities, byId } = useCampaignEntities(campaignId);
+
+  // Return to wherever the user came from: Manage when the origin was the Manage
+  // tab (carried via location.state.from or ?from=manage), else the Codex (#489).
+  const backTo = useMemo(() => {
+    const fromState = (location.state as { from?: string } | null)?.from;
+    if (typeof fromState === "string" && fromState) return fromState;
+    if (campaignId && new URLSearchParams(location.search).get("from") === "manage") {
+      return `/campaigns/${campaignId}/manage`;
+    }
+    return campaignId ? `/campaigns/${campaignId}/codex` : "/campaigns";
+  }, [location.state, location.search, campaignId]);
 
   const [entity, setEntity] = useState<CampaignEntity | null | undefined>(undefined);
   const [role, setRole] = useState<CampaignRole | undefined>(undefined);
@@ -92,7 +104,7 @@ export default function EntityDetailPage() {
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-parchment-100 px-6 text-center">
         <h1 className="font-display text-2xl font-semibold text-parchment-900">Entity not found</h1>
         <Link
-          to={campaignId ? `/campaigns/${campaignId}/codex` : "/campaigns"}
+          to={backTo}
           className="rounded-control bg-garnet-700 px-4 py-2 text-sm font-semibold text-parchment-50 hover:bg-garnet-800"
         >
           Back to campaign
@@ -148,7 +160,7 @@ export default function EntityDetailPage() {
       <div className="border-b border-parchment-200 bg-parchment-50">
         <div className="mx-auto max-w-3xl px-6 py-5">
           <Link
-            to={`/campaigns/${campaignId}/codex`}
+            to={backTo}
             className="text-xs font-semibold text-garnet-700 hover:underline"
           >
             ← Back to campaign
