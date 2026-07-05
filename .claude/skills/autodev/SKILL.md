@@ -96,7 +96,7 @@ node .claude/skills/autodev/autodevd.mjs stop --park   # SIGTERM children; they 
 - **fsm children are spawned detached** (own process group, own log fd), so killing/reaping the orchestrator never kills an in-flight (expensive) Claude run.
 - **PID file** (`.claude/autodev/autodevd.pid`): a second launch while a daemon is live is refused; a stale pidfile (dead or recycled pid) is reclaimed automatically.
 - **Relaunch is the recovery path** — nothing auto-restarts a dead daemon. Re-running the launch command re-attaches to the previous non-terminal batch (recorded in `.claude/autodev/daemon.json`; `--state-dir` overrides) and **adopts** entries whose child pid is still alive instead of re-launching them — zero lost or duplicated runs. Dead children resume their run dir, as before.
-- At all-terminal the daemon logs `DONE` + `SUMMARY`, stamps `batch.completedAt`, and idles resident; launching it again with new issue specs (or, later, the control channel) merges them into the same batch as `pending`.
+- At all-terminal the daemon logs `DONE` + `SUMMARY`, stamps `batch.completedAt`, and idles resident; `autodevctl add` (or relaunching with new issue specs) merges new work into the same batch as `pending`.
 
 Watch the milestone log (`LAUNCH/RESUME/ADOPT/WAIT-MERGE/MERGED/RETRY-WAIT/PARK/SKIP/FAIL/CLEANUP/DRAIN/DONE/SUMMARY`): `tail -f <state-dir>/orchestrator.log`. State dir defaults to `.claude/autodev/overnight/<ts>/`; per-issue child logs live beside `batch.json`.
 
@@ -120,6 +120,31 @@ Every fsm run writes `pid` + `lastHeartbeat` into `run.json` (30s timer + every 
 Parked runs are protected by status: exit-75 tempfails are already `retry-scheduled`, and batch-core stamps drain-parked/interrupted runs to `retry-scheduled` too — a parked run legitimately has no live process and must not be reaped. The batch additionally passes its own non-terminal rundirs as `protect` (a just-resumed child hasn't overwritten the stale pid in `run.json` yet).
 
 SetupWorktree **self-heals** on "no free slots": reconcile, then retry the create once — a leaked slot no longer bricks a fresh run after burning ConfirmScope spend.
+
+## Control channel (`autodevctl.mjs`)
+
+Interact with a live daemon over its Unix socket (`.claude/autodev/autodevd.sock` — NDJSON `{id, verb, args}` → `{id, ok, data|error}`, one request per connection; protocol details in `control.mjs`):
+
+```bash
+node .claude/skills/autodev/autodevctl.mjs <verb> [args] [--json]
+```
+
+| Verb | Effect |
+|---|---|
+| `status` | daemon + per-issue state (status, FSM state, cost, PR url); `--json` for the raw snapshot |
+| `report` | per-issue rollup (ships with #471) |
+| `logs <issue> [--lines N]` | tail the issue's batch log; prints the run-dir log path for `tail -f` |
+| `add <issue[:prereqs]>…` | enqueue into the running DAG (launches next tick, cap/DAG permitting) |
+| `pause [issue]` / `resume [issue]` | gate future launches, globally or per-issue — a running child is **not** killed |
+| `stop <issue>` | SIGTERM the child's process group, mark failed (`stoppedBy: "ctl"`), tear down its worktree |
+| `retry <issue>` | force a failed/skipped/parked issue back into the queue (resumes its run dir when one exists) |
+| `reconcile` | run the janitor pass now; returns `{reapedRuns, freedSlots}` |
+| `ping` | liveness (`pong pid=… uptime=…`) |
+| `shutdown [--park]` | graceful daemon stop over the socket (same drain semantics as `autodevd stop`) |
+
+Exit codes: `0` ok · `1` daemon-side error (bad verb/args, unknown issue) · `2` **daemon not running** — prints the exact relaunch command (recovered from `daemon.json`'s recorded argv) instead of hanging. A stale socket left by a SIGKILL'd daemon is probed and reclaimed on the next launch; graceful shutdown removes it.
+
+Handlers share the daemon's event loop with the tick, so a response can lag a few seconds behind a `spawnSync` gh merge poll — accepted; mutations are still race-free (single thread, synchronous tick body).
 
 ## UI verification
 

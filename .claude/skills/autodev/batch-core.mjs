@@ -209,7 +209,15 @@ export function createEngine({ stateDir, cfg = null }) {
     entry.rundir = entry.rundir ?? latestRunDir(n);
     const run = readRunJson(entry);
 
-    if (code === 75) {
+    if (entry.stopping) {
+      // Killed via the control channel: terminal, no resume attempt, and the
+      // worktree goes too (`stop` means "abandon this run").
+      delete entry.stopping;
+      entry.status = "failed";
+      entry.stoppedBy = "ctl";
+      teardownWorktree(n, entry);
+      log(`STOP #${n} killed via control channel (rc=${code}); worktree torn down`);
+    } else if (code === 75) {
       // fsm tempfail contract: rate-limited, claim + worktree intact, resume at retryAt.
       entry.rateRetries = (entry.rateRetries ?? 0) + 1;
       if (entry.rateRetries > MAX_RATE_RETRIES) {
@@ -325,8 +333,9 @@ export function createEngine({ stateDir, cfg = null }) {
   }
 
   function launchRetries() {
-    if (draining) return;
+    if (draining || batch.paused) return;
     for (const [n, entry] of Object.entries(batch.issues)) {
+      if (entry.paused) continue;
       if (entry.status !== "retry_wait" || Date.now() < entry.retryAt) continue;
       if (runningCount() >= batch.cap) return;
       launch(Number(n), { resumeDir: entry.rundir });
@@ -334,11 +343,12 @@ export function createEngine({ stateDir, cfg = null }) {
   }
 
   function launchEligible() {
-    if (draining) return;
+    if (draining || batch.paused) return;
     if (rateLimitPause()) return; // account-wide limit: don't pile on new sessions
     for (const { issue } of batch.order) {
       if (runningCount() >= batch.cap) return;
       const entry = batch.issues[issue];
+      if (entry.paused) continue;
       if (entry.status !== "pending") continue;
       if (!entry.prereqs.every((p) => batch.issues[p].status === "merged")) continue;
       launch(issue);
@@ -462,6 +472,94 @@ export function createEngine({ stateDir, cfg = null }) {
     saveBatch();
   }
 
+  // ---------- control-channel operations ----------
+
+  /** Full machine-readable state for `autodevctl status`. */
+  function statusSnapshot() {
+    const issues = {};
+    for (const { issue } of batch.order) {
+      const e = batch.issues[issue];
+      const run = e.rundir ? readRunJson(e) : null;
+      issues[issue] = {
+        status: e.status,
+        paused: e.paused ?? false,
+        prereqs: e.prereqs,
+        pid: e.pid ?? null,
+        retryAt: e.retryAt ?? null,
+        rateRetries: e.rateRetries ?? 0,
+        stoppedBy: e.stoppedBy ?? null,
+        rundir: e.rundir ?? null,
+        prUrl: run?.ctx?.prUrl ?? null,
+        currentState: run?.currentState ?? null,
+        costUsd: run?.costUsd ?? null,
+        failure: run?.ctx?.failure ?? null,
+      };
+    }
+    return {
+      base: batch.base,
+      cap: batch.cap,
+      paused: batch.paused ?? false,
+      completedAt: batch.completedAt ?? null,
+      draining,
+      order: batch.order.map((o) => o.issue),
+      issues,
+    };
+  }
+
+  /** Pause launches — global (no issue) or per-issue. Running children are not touched. */
+  function pause(issue) {
+    if (issue == null) batch.paused = true;
+    else if (batch.issues[issue]) batch.issues[issue].paused = true;
+    else throw new Error(`issue #${issue} is not in the batch`);
+    log(`PAUSE ${issue == null ? "batch" : `#${issue}`} (via control channel)`);
+    saveBatch();
+  }
+
+  function resumeWork(issue) {
+    if (issue == null) delete batch.paused;
+    else if (batch.issues[issue]) delete batch.issues[issue].paused;
+    else throw new Error(`issue #${issue} is not in the batch`);
+    log(`RESUME-WORK ${issue == null ? "batch" : `#${issue}`} (via control channel)`);
+    saveBatch();
+  }
+
+  /** Kill a running child (pgroup) and mark its issue failed; worktree torn down in onChildExit. */
+  function stopIssue(issue) {
+    const entry = batch.issues[issue];
+    if (!entry) throw new Error(`issue #${issue} is not in the batch`);
+    if (entry.status !== "running") throw new Error(`issue #${issue} is ${entry.status}, not running`);
+    entry.stopping = true;
+    saveBatch();
+    try {
+      process.kill(-entry.pid, "SIGTERM");
+    } catch {
+      try {
+        process.kill(entry.pid, "SIGTERM");
+      } catch {
+        /* already gone — pollAdopted routes it through the stopping branch */
+      }
+    }
+    log(`STOP #${issue} SIGTERM sent (pid ${entry.pid})`);
+  }
+
+  /** Force a parked/failed/skipped issue back into the launch queue. */
+  function retryIssue(issue) {
+    const entry = batch.issues[issue];
+    if (!entry) throw new Error(`issue #${issue} is not in the batch`);
+    if (!["failed", "skipped", "retry_wait"].includes(entry.status)) {
+      throw new Error(`issue #${issue} is ${entry.status} — retry applies to failed/skipped/retry_wait`);
+    }
+    entry.rundir = entry.rundir ?? latestRunDir(Number(issue));
+    entry.status = entry.rundir ? "retry_wait" : "pending";
+    entry.retryAt = Date.now();
+    entry.resumed = false;
+    entry.rateRetries = 0;
+    delete entry.stoppedBy;
+    delete batch.completedAt; // live work again
+    log(`RETRY #${issue} forced (${entry.rundir ? `will resume ${entry.rundir}` : "no run dir — fresh launch"})`);
+    saveBatch();
+  }
+
   /**
    * Stop accepting/launching work. mode "wait": let running children finish.
    * mode "park": SIGTERM every running child's process group so onChildExit /
@@ -504,6 +602,11 @@ export function createEngine({ stateDir, cfg = null }) {
     addIssues,
     tick,
     runJanitor,
+    statusSnapshot,
+    pause,
+    resumeWork,
+    stopIssue,
+    retryIssue,
     drain,
     allTerminal,
     runningCount,
