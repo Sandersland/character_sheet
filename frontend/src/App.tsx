@@ -41,6 +41,9 @@ export default function App() {
                 {/* Codex tab (#367) — explicit route, not an optional :tab param,
                     so it can't swallow the /entities/:entityId path below. */}
                 <Route path="/campaigns/:id/codex" element={<CampaignDetailPage />} />
+                {/* Owner-only Manage tab (#379) — route access is guarded inside
+                    the page, which redirects a non-owner back to Overview. */}
+                <Route path="/campaigns/:id/manage" element={<CampaignDetailPage />} />
                 {/* Entity registry detail + backlinks (#248) */}
                 <Route
                   path="/campaigns/:id/entities/:entityId"

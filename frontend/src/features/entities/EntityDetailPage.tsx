@@ -156,6 +156,9 @@ export default function EntityDetailPage() {
           <h1 className="mt-1 flex flex-wrap items-center gap-2 font-display text-2xl font-semibold text-parchment-900">
             {entity.name}
             <Badge tone={ENTITY_TYPE_TONE[entity.type]}>{ENTITY_TYPE_LABELS[entity.type]}</Badge>
+            {role === "OWNER" && entity.visibility === "HIDDEN" && (
+              <Badge tone="neutral">🔒 Hidden</Badge>
+            )}
           </h1>
         </div>
       </div>

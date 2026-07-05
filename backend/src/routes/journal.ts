@@ -92,6 +92,7 @@ async function syncEntryRefs(
   characterId: string,
   entryId: string,
   body: string,
+  userId: string,
 ) {
   const character = await tx.character.findUnique({
     where: { id: characterId },
@@ -108,8 +109,20 @@ async function syncEntryRefs(
     return;
   }
 
+  // A non-owner can only tag revealed entities (#379): a UUID guess at a hidden
+  // entity is dropped here so it never materializes a backlink that reveals it.
+  const membership = await tx.campaignMembership.findUnique({
+    where: { campaignId_userId: { campaignId: character.campaignId, userId } },
+    select: { role: true },
+  });
+  const isOwner = membership?.role === "OWNER";
+
   const valid = await tx.campaignEntity.findMany({
-    where: { id: { in: ids }, campaignId: character.campaignId },
+    where: {
+      id: { in: ids },
+      campaignId: character.campaignId,
+      ...(isOwner ? {} : { visibility: "REVEALED" }),
+    },
     select: { id: true },
   });
   await reconcileEntryRefs(tx, entryId, valid.map((e) => e.id));
@@ -158,7 +171,7 @@ journalRouter.post("/characters/:id/journal", async (req, res) => {
         sessionId,
       },
     });
-    await syncEntryRefs(tx, req.params.id, entry.id, data.body);
+    await syncEntryRefs(tx, req.params.id, entry.id, data.body, req.user!.id);
   });
 
   res.status(201).json(await serializeForCharacter(req.params.id));
@@ -194,7 +207,7 @@ journalRouter.patch("/characters/:id/journal/:entryId", async (req, res) => {
     });
     // Re-derive refs only when the body changed.
     if (parseResult.data.body !== undefined) {
-      await syncEntryRefs(tx, req.params.id, entry.id, parseResult.data.body);
+      await syncEntryRefs(tx, req.params.id, entry.id, parseResult.data.body, req.user!.id);
     }
   });
 
