@@ -22,12 +22,15 @@ import { z } from "zod";
 
 import { assertCharacterAccess } from "../lib/auth/access.js";
 import { prisma } from "../lib/prisma.js";
-import { ACTION_EFFECT_FN } from "../lib/actions.js";
+import { ACTION_EFFECT_FN, ACTION_CAST_FN } from "../lib/actions.js";
+import { castAbilityInTx } from "../lib/ability-cast.js";
+import type { PayCostContext } from "../lib/ability-cost.js";
 import type { SpendResourceOperation } from "../lib/resources.js";
 import type { AdjustQuantityOperation } from "../lib/inventory.js";
 import { applyAdjustQuantity } from "../lib/inventory.js";
 import { applyHealInTx } from "../lib/hitpoints.js";
 import { applySpendResourceInTx } from "../lib/resources.js";
+import { normalizeSpellcastingMutable } from "../lib/spell-state.js";
 import { getActiveSessionId } from "../lib/sessions.js";
 import {
   characterInclude,
@@ -68,48 +71,78 @@ actionsRouter.post(
     const { operations } = parsed.data;
 
     try {
-      // Resolve all ops to their effect lists BEFORE opening a transaction so
-      // unknown action keys fail with a 400, not a 500 mid-transaction.
-      const resolvedOps = operations.flatMap((op) => {
-        const effectFn = ACTION_EFFECT_FN[op.actionKey];
-        if (!effectFn) {
+      // Fail fast on unknown keys BEFORE opening a transaction (400, not 500).
+      for (const op of operations) {
+        if (!ACTION_CAST_FN[op.actionKey] && !ACTION_EFFECT_FN[op.actionKey]) {
           throw new Error(`Unknown action key: ${op.actionKey}`);
         }
-        return effectFn({ roll: op.roll, inventoryItemId: op.inventoryItemId });
-      });
+      }
       const batchId = randomUUID();
       const sessionId = await getActiveSessionId(characterId);
 
-      // Cross-domain atomic transaction — all three op types (spendResource,
-      // adjustQuantity, heal) share the same batchId so they appear as one
+      // Cross-domain atomic transaction — every op (cast-core, spendResource,
+      // adjustQuantity, heal) shares the same batchId so they appear as one
       // batch on the activity timeline and a single revertBatch undoes them all.
       await prisma.$transaction(async (tx) => {
-        for (const op of resolvedOps) {
-          switch (op.type) {
-            case "spendResource":
-              // Cast: SpendResourceOp is a structural subset of SpendResourceOperation
-              // (omits optional `roll`). Safe because applySpendResourceInTx treats
-              // roll as optional and defaults to undefined.
-              await applySpendResourceInTx(
-                tx, characterId, op as SpendResourceOperation, batchId, sessionId
-              );
-              break;
+        for (const op of operations) {
+          const ctx = { roll: op.roll, inventoryItemId: op.inventoryItemId };
 
-            case "adjustQuantity":
-              // Cast: AdjustQuantityOp is structurally identical to AdjustQuantityOperation.
-              await applyAdjustQuantity(
-                tx, characterId, op as AdjustQuantityOperation, batchId, sessionId
-              );
-              break;
+          // Cast-core actions (Second Wind #420): pay the pool cost + self-apply
+          // the heal through the shared caster. The OpOutcome is intentionally
+          // not logged — byte-parity keeps only the spend + heal events.
+          const castFn = ACTION_CAST_FN[op.actionKey];
+          if (castFn) {
+            const spec = castFn(ctx);
+            const cRow = await tx.character.findUnique({
+              where: { id: characterId },
+              select: { spellcasting: true },
+            });
+            if (!cRow) throw new Error(`Character not found: ${characterId}`);
+            const costCtx: PayCostContext = { tx, characterId, batchId, sessionId };
+            await castAbilityInTx(
+              { tx, characterId, batchId, sessionId, cost: costCtx, concentrationHost: normalizeSpellcastingMutable(cRow.spellcasting) },
+              {
+                name: spec.name,
+                entryId: op.actionKey,
+                cost: spec.cost,
+                effect: spec.effect,
+                roll: spec.apply?.amount ?? 0,
+                eventType: "castSpell", // discarded — see comment above
+                concentrates: false,
+                apply: spec.apply,
+              },
+            );
+            continue;
+          }
 
-            case "heal":
-              await applyHealInTx(tx, characterId, op.amount, batchId, sessionId);
-              break;
+          const ops = ACTION_EFFECT_FN[op.actionKey](ctx);
+          for (const effect of ops) {
+            switch (effect.type) {
+              case "spendResource":
+                // Cast: SpendResourceOp is a structural subset of SpendResourceOperation
+                // (omits optional `roll`). Safe because applySpendResourceInTx treats
+                // roll as optional and defaults to undefined.
+                await applySpendResourceInTx(
+                  tx, characterId, effect as SpendResourceOperation, batchId, sessionId
+                );
+                break;
 
-            default: {
-              // Exhaustive — ACTION_EFFECT_FN only returns the three types above.
-              const _never: never = op;
-              throw new Error(`Unexpected op type in action effect: ${JSON.stringify(_never)}`);
+              case "adjustQuantity":
+                // Cast: AdjustQuantityOp is structurally identical to AdjustQuantityOperation.
+                await applyAdjustQuantity(
+                  tx, characterId, effect as AdjustQuantityOperation, batchId, sessionId
+                );
+                break;
+
+              case "heal":
+                await applyHealInTx(tx, characterId, effect.amount, batchId, sessionId);
+                break;
+
+              default: {
+                // Exhaustive — ACTION_EFFECT_FN only returns the three types above.
+                const _never: never = effect;
+                throw new Error(`Unexpected op type in action effect: ${JSON.stringify(_never)}`);
+              }
             }
           }
         }
