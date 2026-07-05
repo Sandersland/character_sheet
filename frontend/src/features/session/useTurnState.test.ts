@@ -429,16 +429,6 @@ describe("turn-hook activity window (#457)", () => {
     expect(result.current.attackedThisTurn).toBe(true);
   });
 
-  it("markAttacked / markDamageTaken set their flags", () => {
-    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
-    act(() => { result.current.startCombat(); });
-    act(() => { result.current.startTurn(); });
-    act(() => { result.current.markAttacked(); });
-    act(() => { result.current.markDamageTaken(); });
-    expect(result.current.attackedThisTurn).toBe(true);
-    expect(result.current.tookDamageThisTurn).toBe(true);
-  });
-
   it("a current-HP drop during an active turn marks tookDamageThisTurn", () => {
     const { result, rerender } = renderHook((c: Character) => useTurnState(c, SESSION_ID), {
       initialProps: withHp(20),

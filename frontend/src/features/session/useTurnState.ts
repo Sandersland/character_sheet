@@ -128,10 +128,6 @@ export interface TurnStateActions {
    * Commit the reaction slot for a spell cast. Call on successful cast.
    */
   commitReactionSpell: () => void;
-  /** Record that an attack was made this turn (feeds the turn-hook). */
-  markAttacked: () => void;
-  /** Record that damage was taken this turn (feeds the turn-hook). */
-  markDamageTaken: () => void;
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -335,14 +331,6 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     setState((s) => ({ ...s, reactionUsed: true }));
   }, []);
 
-  const markAttacked = useCallback(() => {
-    setState((s) => (s.attackedThisTurn ? s : { ...s, attackedThisTurn: true }));
-  }, []);
-
-  const markDamageTaken = useCallback(() => {
-    setState((s) => (s.tookDamageThisTurn ? s : { ...s, tookDamageThisTurn: true }));
-  }, []);
-
   return {
     ...state,
     startCombat,
@@ -362,7 +350,5 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     commitActionSpell,
     commitBonusActionSpell,
     commitReactionSpell,
-    markAttacked,
-    markDamageTaken,
   };
 }
