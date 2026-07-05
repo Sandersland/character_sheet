@@ -456,16 +456,10 @@ enum ActionCost {
   special
 }
 
-// Maneuver catalog — seeded from the 5e Basic Rules Battle Master maneuver
-// list. Provenance pointer in ResourcesMutableState.ManeuverEntry.maneuverId.
-// Nullable FK so homebrew/custom maneuvers have no catalog row.
-model Maneuver {
-  id          String @id @default(uuid())
-  name        String @unique
-  description String
-}
-
-// Generic granted-ability catalog — source discriminates (e.g. "discipline" for Four Elements); embeds min level, save ability, EffectSpec + AbilityCost. Provenance pointer in DisciplineEntry.disciplineId.
+// Generic granted-ability catalog — source discriminates ("discipline" for Four
+// Elements, "shadowArts" for Way of Shadow, "maneuver" for Battle Master).
+// Embeds min level, save ability, EffectSpec + AbilityCost. Provenance pointer in
+// DisciplineEntry.disciplineId / ManeuverEntry.maneuverId.
 model GrantedAbility {
   id          String  @id @default(uuid())
   name        String  @unique
@@ -473,6 +467,14 @@ model GrantedAbility {
   description String
   minLevel    Int     @default(3) // minimum monk level to learn
   alwaysKnown Boolean @default(false) // Elemental Attunement — free, uncapped
+
+  // Battle Master maneuver placement/action metadata (source "maneuver" only).
+  // placement routes the session UI: attackRoll | damageRoll | reaction | effect
+  // | attackOption. actionSlot is the economy slot consumed (bonusAction/reaction),
+  // null when none. selfTempHp = Rally (die + Cha mod as self temp HP).
+  placement   String?
+  actionSlot  String?
+  selfTempHp  Boolean @default(false)
 
   // Embedded AbilityCost (F2) — ki-pool spend. kind "none" = free.
   costKind    String? // "none" | "pool"
@@ -849,6 +851,7 @@ enum CharacterEventType {
   swapDiscipline
   disciplinesReconciled
   castDiscipline
+  castManeuver
   castShadowArt
   learnToolProficiency
   forgetToolProficiency

@@ -12,7 +12,7 @@ export default function EffectManeuverStrip({
   superiorityRemaining: number;
   dieLabel: string;
   dieBusy: boolean;
-  handleEffectManeuver: (name: string) => Promise<void>;
+  handleEffectManeuver: (entryId: string, name: string) => Promise<void>;
 }) {
   if (effectManeuvers.length === 0 || superiorityRemaining <= 0) return null;
   return (
@@ -26,7 +26,7 @@ export default function EffectManeuverStrip({
             key={m.id}
             tone="gold"
             disabled={dieBusy}
-            onClick={() => handleEffectManeuver(m.name)}
+            onClick={() => handleEffectManeuver(m.id, m.name)}
             title={`Spend ${dieLabel} — ${m.name}`}
           >
             {m.name} ({dieLabel})

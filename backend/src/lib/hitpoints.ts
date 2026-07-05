@@ -1463,3 +1463,50 @@ export async function applyDamageInTx(
   // `case "damage"` branch of applyHitPointOperations.
   return applyConcentrationCheckInTx(tx, characterId, amount, hp.current, batchId, sessionId);
 }
+
+/**
+ * Grant self temporary HP inside an existing transaction (Rally maneuver).
+ * Mirrors applySetTempOp: 5e temp HP doesn't stack — take the higher value.
+ */
+export async function applyTempHpInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  amount: number,
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  if (amount <= 0) {
+    throw new InvalidHitPointOperationError("temp HP amount must be positive");
+  }
+
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: { hitPoints: true, hitDice: true },
+  });
+  if (!row) {
+    throw new InvalidHitPointOperationError(`Character not found: ${characterId}`);
+  }
+
+  const hp = normalizeHitPoints(row.hitPoints);
+  const hd = normalizeHitDice(row.hitDice);
+  const beforeHp = { ...hp };
+
+  hp.temp = Math.max(hp.temp, amount);
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: { hitPoints: hp as unknown as Prisma.InputJsonValue },
+  });
+
+  await logEvent(tx, {
+    characterId,
+    category: "hitPoints",
+    type: "setTemp",
+    summary: `Set temporary HP to ${hp.temp}`,
+    before: { hitPoints: beforeHp, hitDice: { ...hd } },
+    after: { hitPoints: { ...hp }, hitDice: { ...hd } },
+    data: { amount },
+    batchId,
+    sessionId,
+  });
+}

@@ -32,14 +32,13 @@ import {
   buildAttackEntries,
   hasSuperiorityDice,
 } from "@/lib/attackMath";
-import { maneuverPlacement, mechanicsFor } from "@/lib/maneuvers";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
 import AttackRow from "@/features/session/AttackRow";
 import AttackOptionRow from "@/features/session/AttackOptionRow";
 import EquipWeaponPanel from "@/features/session/EquipWeaponPanel";
 import type { AttackEntry } from "@/lib/attackMath";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
-import type { Character } from "@/types/character";
+import type { Character, ManeuverEntry } from "@/types/character";
 import type { RollResult } from "@/lib/dice";
 
 interface InlineAttackPickerProps {
@@ -146,7 +145,7 @@ export default function InlineAttackPicker({
   // "attackOption" maneuvers (Commander's Strike, etc.) — shown when in attack context.
   const attackOptionManeuvers = showManeuvers && turnState.attack !== null
     ? (character.resources?.maneuversKnown ?? []).filter(
-        (m) => maneuverPlacement(m.name) === "attackOption",
+        (m) => (m.placement ?? "damageRoll") === "attackOption",
       )
     : [];
 
@@ -179,35 +178,33 @@ export default function InlineAttackPicker({
     };
   }
 
-  // Handler for "attackOption" maneuver rows (e.g. Commander's Strike).
-  async function handleAttackOption(maneuverName: string) {
+  // Handler for "attackOption" maneuver rows (e.g. Commander's Strike). The
+  // action slot the maneuver consumes travels on the entry (catalog snapshot).
+  async function handleAttackOption(m: ManeuverEntry) {
     if (dieBusy || attacksExhausted || !pool || pool.remaining === 0) return;
-    const mech = mechanicsFor(maneuverName);
-    const dieResult = await spend();
-    // Consume the slot specified by the maneuver (Commander's Strike → bonus action).
-    if (mech.slot === "bonusAction" && !turnState.bonusActionUsed) {
+    const dieResult = await spend(m.id);
+    if (m.actionSlot === "bonusAction" && !turnState.bonusActionUsed) {
       turnState.consumeBonusAction();
-    } else if (mech.slot === "reaction" && !turnState.reactionUsed) {
+    } else if (m.actionSlot === "reaction" && !turnState.reactionUsed) {
       turnState.consumeReaction();
     }
     // Forfeit one of the Attack action's attacks.
     turnState.recordAttack();
     setManeuverMessages((prev) => ({
       ...prev,
-      [maneuverName]: `${maneuverName} — tell an ally to use their reaction to make an attack, adding +${dieResult} (${dieLabel}) to the damage roll.`,
+      [m.name]: `${m.name} — tell an ally to use their reaction to make an attack, adding +${dieResult} (${dieLabel}) to the damage roll.`,
     }));
   }
 
   // Determine whether a given attackOption row's "Use" button is enabled.
-  function attackOptionEnabled(maneuverName: string): { enabled: boolean; reason?: string } {
+  function attackOptionEnabled(m: ManeuverEntry): { enabled: boolean; reason?: string } {
     if (!pool || pool.remaining === 0) {
       return { enabled: false, reason: "No superiority dice remaining." };
     }
     if (attacksExhausted) {
       return { enabled: false, reason: "No attacks remaining to forfeit." };
     }
-    const mech = mechanicsFor(maneuverName);
-    if (mech.slot === "bonusAction" && turnState.bonusActionUsed) {
+    if (m.actionSlot === "bonusAction" && turnState.bonusActionUsed) {
       return { enabled: false, reason: "Bonus action already used." };
     }
     return { enabled: true };
@@ -251,7 +248,7 @@ export default function InlineAttackPicker({
 
       {/* ── Attack-option maneuvers (e.g. Commander's Strike) ────────────────── */}
       {attackOptionManeuvers.map((m) => {
-        const { enabled, reason } = attackOptionEnabled(m.name);
+        const { enabled, reason } = attackOptionEnabled(m);
         return (
           <AttackOptionRow
             key={m.id}
@@ -261,7 +258,7 @@ export default function InlineAttackPicker({
             message={maneuverMessages[m.name]}
             dieLabel={dieLabel}
             dieBusy={dieBusy}
-            onUse={handleAttackOption}
+            onUse={() => handleAttackOption(m)}
           />
         );
       })}

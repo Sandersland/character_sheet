@@ -37,9 +37,13 @@ export class InvalidResourceOperationError extends Error {}
 
 export interface ManeuverEntry {
   id: string;           // per-character entry UUID (operation target)
-  maneuverId?: string;  // catalog Maneuver.id provenance — undefined for custom
+  maneuverId?: string;  // catalog GrantedAbility.id provenance — undefined for custom
   name: string;
   description: string;
+  // Session-UI routing snapshot from the catalog at learn time (undefined for
+  // custom maneuvers → frontend defaults to "damageRoll").
+  placement?: string;
+  actionSlot?: string | null;
 }
 
 /**
@@ -366,8 +370,8 @@ async function applyLearnManeuverOp(
         `Maneuver already known (maneuverId: ${op.maneuverId})`
       );
     }
-    const catalogManeuver = await tx.maneuver.findUnique({ where: { id: op.maneuverId } });
-    if (!catalogManeuver) {
+    const catalogManeuver = await tx.grantedAbility.findUnique({ where: { id: op.maneuverId } });
+    if (!catalogManeuver || catalogManeuver.source !== "maneuver") {
       throw new InvalidResourceOperationError(
         `Maneuver not found in catalog: ${op.maneuverId}`
       );
@@ -377,6 +381,8 @@ async function applyLearnManeuverOp(
       maneuverId: catalogManeuver.id,
       name: catalogManeuver.name,
       description: catalogManeuver.description,
+      placement: catalogManeuver.placement ?? undefined,
+      actionSlot: catalogManeuver.actionSlot,
     };
   } else {
     const custom = op.custom!;

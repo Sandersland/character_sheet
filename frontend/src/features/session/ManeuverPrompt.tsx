@@ -17,9 +17,8 @@
 
 import { useState } from "react";
 
-import { maneuverPlacement } from "@/lib/maneuvers";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
-import type { Character } from "@/types/character";
+import type { Character, ManeuverEntry } from "@/types/character";
 import type { RollResult } from "@/lib/dice";
 
 interface ManeuverPromptProps {
@@ -58,12 +57,13 @@ export default function ManeuverPrompt({
     return null;
   }
 
-  // Show only maneuvers that belong in the weapon row.
+  // Show only maneuvers that belong in the weapon row. Placement travels on the
+  // known-maneuver entry (catalog snapshot); custom/legacy default to damageRoll.
   const attackRollManeuvers = maneuversKnown.filter(
-    (m) => maneuverPlacement(m.name) === "attackRoll",
+    (m) => (m.placement ?? "damageRoll") === "attackRoll",
   );
   const damageRollManeuvers = maneuversKnown.filter(
-    (m) => maneuverPlacement(m.name) === "damageRoll",
+    (m) => (m.placement ?? "damageRoll") === "damageRoll",
   );
 
   // Show sections only when the relevant roll has been made.
@@ -82,17 +82,17 @@ export default function ManeuverPrompt({
 
   // ── Spend handlers ────────────────────────────────────────────────────────
 
-  async function handlePrecision(maneuverName: string) {
+  async function handlePrecision(m: ManeuverEntry) {
     if (busy || !lastAttackRoll) return;
-    const dieResult = await spend();
-    setSpentFor(maneuverName);
+    const dieResult = await spend(m.id);
+    setSpentFor(m.name);
     onRollsUpdated(lastAttackRoll.total + dieResult, null);
   }
 
-  async function handleDamage(maneuverName: string) {
+  async function handleDamage(m: ManeuverEntry) {
     if (busy || !lastDamageRoll) return;
-    const dieResult = await spend();
-    setSpentFor(maneuverName);
+    const dieResult = await spend(m.id);
+    setSpentFor(m.name);
     onRollsUpdated(null, lastDamageRoll.total + dieResult);
   }
 
@@ -111,7 +111,7 @@ export default function ManeuverPrompt({
               key={m.id}
               type="button"
               disabled={busy || spentFor === m.name}
-              onClick={() => handlePrecision(m.name)}
+              onClick={() => handlePrecision(m)}
               className="rounded-control border border-gold-300 bg-gold-100 px-2 py-0.5 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-200 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {m.name} +{dieLabel}
@@ -128,7 +128,7 @@ export default function ManeuverPrompt({
             <button
               type="button"
               disabled={busy || spentFor === damageRollManeuvers[0].name}
-              onClick={() => handleDamage(damageRollManeuvers[0].name)}
+              onClick={() => handleDamage(damageRollManeuvers[0])}
               className="rounded-control border border-gold-300 bg-gold-100 px-2 py-0.5 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-200 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {damageRollManeuvers[0].name} +{dieLabel}
@@ -151,7 +151,10 @@ export default function ManeuverPrompt({
               <button
                 type="button"
                 disabled={busy || !activeDamageManeuver || spentFor === activeDamageManeuver}
-                onClick={() => handleDamage(activeDamageManeuver)}
+                onClick={() => {
+                  const m = damageRollManeuvers.find((d) => d.name === activeDamageManeuver);
+                  if (m) void handleDamage(m);
+                }}
                 className="rounded-control border border-gold-300 bg-gold-100 px-2 py-0.5 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-200 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Spend {dieLabel}

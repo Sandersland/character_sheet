@@ -1,24 +1,25 @@
 /**
  * useManeuverDie — shared Battle Master superiority-die spend hook.
  *
- * Encapsulates the "roll 1dX from the pool, POST spendResource, call onUpdate"
- * pattern so it doesn't need to be duplicated in ManeuverPrompt, InlineAttackPicker,
- * and TurnHub.
+ * Encapsulates the "cast a known maneuver, let the server roll the die, call
+ * onUpdate" pattern so it isn't duplicated in ManeuverPrompt, InlineAttackPicker,
+ * and TurnHub. The server owns the roll (#418): spend posts the castManeuver op
+ * and returns the die value it rolled, which the caller folds into the relevant
+ * attack/damage total (or shows in reminder text).
  *
  * Returns:
  *   pool       — the superiorityDice ResourcePool (undefined if character has none).
  *   diceFaces  — the numeric face count parsed from pool.die (defaults to 8).
  *   dieLabel   — e.g. "d8", "d10".
  *   busy       — true while a spend is in flight.
- *   spend(maneuverName) — rolls the die, calls applyResourceTransactions, calls
- *                         onUpdate with the updated character, and returns the die
- *                         result. Throws (or rejects) on API error.
+ *   spend(entryId) — casts the maneuver by its known-entry id, calls onUpdate with
+ *                    the updated character, and returns the server-rolled die
+ *                    result. Throws (or rejects) on API error.
  */
 
 import { useState, useCallback } from "react";
 
-import { rollSpec } from "@/lib/dice";
-import { applyResourceTransactions } from "@/api/client";
+import { castManeuverTransaction } from "@/api/client";
 import type { Character } from "@/types/character";
 
 export interface UseManeuverDieReturn {
@@ -26,7 +27,7 @@ export interface UseManeuverDieReturn {
   diceFaces: number;
   dieLabel: string;
   busy: boolean;
-  spend: () => Promise<number>;
+  spend: (entryId: string) => Promise<number>;
 }
 
 export function useManeuverDie(
@@ -40,20 +41,19 @@ export function useManeuverDie(
   const dieLabel = pool?.die ?? "d8";
 
   const spend = useCallback(
-    async (): Promise<number> => {
-      const dieResult = rollSpec({ count: 1, faces: diceFaces }).total;
+    async (entryId: string): Promise<number> => {
       setBusy(true);
       try {
-        const updated = await applyResourceTransactions(character.id, [
-          { type: "spendResource", key: "superiorityDice", amount: 1, roll: dieResult },
+        const { character: updated, results } = await castManeuverTransaction(character.id, [
+          { type: "castManeuver", entryId },
         ]);
         onUpdate(updated);
+        return results[0]?.roll ?? 0;
       } finally {
         setBusy(false);
       }
-      return dieResult;
     },
-    [character.id, diceFaces, onUpdate],
+    [character.id, onUpdate],
   );
 
   return { pool, diceFaces, dieLabel, busy, spend };
