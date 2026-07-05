@@ -62,6 +62,15 @@ export interface DerivedClassInfo {
   cloakOfShadowsAvailable?: boolean;
 }
 
+// Resolve a class-die reference (e.g. "superiorityDice") to its die-face count
+// from derived info; null when the pool is absent or carries no die.
+export function resolveClassDie(source: string, info: DerivedClassInfo): number | null {
+  const die = info.resources.find((r) => r.key === source)?.die;
+  if (!die) return null;
+  const faces = Number(die.replace(/^d/i, ""));
+  return Number.isFinite(faces) && faces > 0 ? faces : null;
+}
+
 // ── Battle Master rules data ──────────────────────────────────────────────────
 
 /** Superiority dice count by Fighter level (Battle Master). */

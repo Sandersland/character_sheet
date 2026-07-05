@@ -485,6 +485,7 @@ model GrantedAbility {
   effectKind         String?
   effectDiceCount    Int?
   effectDiceFaces    Int?
+  effectDieSource    String? // e.g. "superiorityDice" — resolves faces from DerivedClassInfo, supersedes effectDiceFaces
   effectModifier     Int?
   damageType         String?
   attackType         String?
