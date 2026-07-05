@@ -87,24 +87,26 @@ export async function visibleEntries(
 // character outside any campaign stores its body verbatim with no refs; inside
 // one, only tokens that resolve to a CampaignEntity in the SAME campaign survive
 // (unknown/foreign ids are dropped). Runs inside the caller's transaction.
-async function syncEntryRefs(
+export async function syncEntryRefs(
   tx: Prisma.TransactionClient,
   characterId: string,
   entryId: string,
   body: string,
   userId: string,
 ) {
+  // Fast path: a body with no @[uuid] tokens can only clear refs, so skip both
+  // the character and membership lookups entirely (#489).
+  const ids = extractEntityIds(body);
+  if (ids.length === 0) {
+    await reconcileEntryRefs(tx, entryId, []);
+    return;
+  }
+
   const character = await tx.character.findUnique({
     where: { id: characterId },
     select: { campaignId: true },
   });
   if (!character?.campaignId) {
-    await reconcileEntryRefs(tx, entryId, []);
-    return;
-  }
-
-  const ids = extractEntityIds(body);
-  if (ids.length === 0) {
     await reconcileEntryRefs(tx, entryId, []);
     return;
   }

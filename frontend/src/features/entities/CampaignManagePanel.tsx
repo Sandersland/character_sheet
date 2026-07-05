@@ -195,6 +195,7 @@ export default function CampaignManagePanel({ campaignId }: CampaignManagePanelP
                   <li key={e.id} className="flex flex-wrap items-center gap-2 py-2">
                     <Link
                       to={`/campaigns/${campaignId}/entities/${e.id}`}
+                      state={{ from: `/campaigns/${campaignId}/manage` }}
                       className="text-sm font-semibold text-parchment-900 hover:underline"
                     >
                       {e.name}
