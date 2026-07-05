@@ -10,13 +10,13 @@
 
 import { randomUUID } from "node:crypto";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import supertest from "supertest";
 
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
-import { visibleEntries } from "../journal.js";
+import { syncEntryRefs, visibleEntries } from "../journal.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
 import { authCookie } from "../../test-support/auth.js";
 
@@ -421,6 +421,53 @@ describe("JournalEntryRef derivation from @[uuid] tokens", () => {
 
     await prisma.character.deleteMany({ where: { id: PLAYER_CHAR } });
     await prisma.user.deleteMany({ where: { id: PLAYER_ID } });
+  });
+});
+
+// ── syncEntryRefs fast path (#489) ────────────────────────────────────────────
+
+describe("syncEntryRefs — mention-less fast path", () => {
+  // A tx double: reconcileEntryRefs still runs (findMany → []), but the fast
+  // path must never touch character or campaignMembership when there are no tokens.
+  function fakeTx() {
+    return {
+      character: { findUnique: vi.fn() },
+      campaignMembership: { findUnique: vi.fn() },
+      campaignEntity: { findMany: vi.fn() },
+      journalEntryRef: {
+        findMany: vi.fn().mockResolvedValue([]),
+        deleteMany: vi.fn(),
+        createMany: vi.fn(),
+      },
+    };
+  }
+
+  it("skips the character and membership lookups when the body has no @[uuid] tokens", async () => {
+    const tx = fakeTx();
+    await syncEntryRefs(tx as never, "char-1", "entry-1", "just plain prose, no tags", "user-1");
+
+    expect(tx.character.findUnique).not.toHaveBeenCalled();
+    expect(tx.campaignMembership.findUnique).not.toHaveBeenCalled();
+    expect(tx.campaignEntity.findMany).not.toHaveBeenCalled();
+    // It still reconciles to an empty set (clears any stale refs).
+    expect(tx.journalEntryRef.findMany).toHaveBeenCalledWith({
+      where: { entryId: "entry-1" },
+      select: { entityId: true },
+    });
+  });
+
+  it("still looks up the character when the body carries a token", async () => {
+    const tx = fakeTx();
+    tx.character.findUnique.mockResolvedValue({ campaignId: null });
+    await syncEntryRefs(
+      tx as never,
+      "char-1",
+      "entry-1",
+      "Met @[12345678-1234-1234-1234-123456789012]",
+      "user-1",
+    );
+
+    expect(tx.character.findUnique).toHaveBeenCalledOnce();
   });
 });
 
