@@ -403,3 +403,73 @@ describe("localStorage persistence", () => {
     expect(second.result.current.round).toBe(0);
   });
 });
+
+// ── Durable-buff turn-hook window (#457) ──────────────────────────────────────
+
+/** Character with a current-HP value, for the damage watcher. */
+function withHp(current: number): Character {
+  return { attacksPerAction: 1, inventory: [], hitPoints: { current, max: 20, temp: 0 } } as unknown as Character;
+}
+
+describe("turn-hook activity window (#457)", () => {
+  it("starts a turn with attackedThisTurn/tookDamageThisTurn false", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    expect(result.current.attackedThisTurn).toBe(false);
+    expect(result.current.tookDamageThisTurn).toBe(false);
+  });
+
+  it("recordAttack marks attackedThisTurn", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    act(() => { result.current.enterAttackMode(); });
+    act(() => { result.current.recordAttack(); });
+    expect(result.current.attackedThisTurn).toBe(true);
+  });
+
+  it("markAttacked / markDamageTaken set their flags", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    act(() => { result.current.markAttacked(); });
+    act(() => { result.current.markDamageTaken(); });
+    expect(result.current.attackedThisTurn).toBe(true);
+    expect(result.current.tookDamageThisTurn).toBe(true);
+  });
+
+  it("a current-HP drop during an active turn marks tookDamageThisTurn", () => {
+    const { result, rerender } = renderHook((c: Character) => useTurnState(c, SESSION_ID), {
+      initialProps: withHp(20),
+    });
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    rerender(withHp(14)); // took 6 damage
+    expect(result.current.tookDamageThisTurn).toBe(true);
+  });
+
+  it("a heal (HP rise) does NOT mark tookDamageThisTurn", () => {
+    const { result, rerender } = renderHook((c: Character) => useTurnState(c, SESSION_ID), {
+      initialProps: withHp(10),
+    });
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    rerender(withHp(18)); // healed
+    expect(result.current.tookDamageThisTurn).toBe(false);
+  });
+
+  it("startTurn re-baselines the window: a prior turn's damage does not leak forward", () => {
+    const { result, rerender } = renderHook((c: Character) => useTurnState(c, SESSION_ID), {
+      initialProps: withHp(20),
+    });
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    rerender(withHp(14)); // damage this turn
+    expect(result.current.tookDamageThisTurn).toBe(true);
+    act(() => { result.current.endTurn(); });
+    act(() => { result.current.startTurn(); });
+    expect(result.current.tookDamageThisTurn).toBe(false);
+    expect(result.current.attackedThisTurn).toBe(false);
+  });
+});
