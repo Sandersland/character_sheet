@@ -32,6 +32,7 @@ const ENTITY: CampaignEntity = {
   name: "Goblin Chief",
   aliases: ["Grik"],
   notes: "Leads the warren.",
+  visibility: "REVEALED",
   createdAt: "",
   updatedAt: "",
 };

@@ -28,6 +28,7 @@ function entity(overrides: Partial<CampaignEntity>): CampaignEntity {
     name: "Unnamed",
     aliases: [],
     notes: null,
+    visibility: "REVEALED",
     createdAt: "",
     updatedAt: "",
     ...overrides,

@@ -30,9 +30,10 @@ describe("MentionText (#248)", () => {
     expect(link).toHaveAttribute("href", `/campaigns/camp-1/entities/${A}`);
   });
 
-  it("renders an unknown id as literal token text", () => {
+  it("renders an unresolved (hidden/deleted) id as a redacted chip, never the raw token", () => {
     renderText(`Saw @[${B}]`, map([]));
-    expect(screen.getByText(`@[${B}]`, { exact: false })).toBeInTheDocument();
+    expect(screen.queryByText(`@[${B}]`, { exact: false })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Hidden entity")).toBeInTheDocument();
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 

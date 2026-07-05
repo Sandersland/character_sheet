@@ -19,6 +19,7 @@ import type {
   CreateCharacterInput,
   EntityBacklink,
   EntityType,
+  EntityVisibility,
   ExperienceOperation,
   HitPointOperation,
   JournalEntryKind,
@@ -583,7 +584,13 @@ export async function fetchEntities(
 
 export async function createEntity(
   campaignId: string,
-  input: { type: EntityType; name: string; aliases?: string[]; notes?: string },
+  input: {
+    type: EntityType;
+    name: string;
+    aliases?: string[];
+    notes?: string;
+    visibility?: EntityVisibility;
+  },
 ): Promise<CampaignEntity> {
   const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities`, {
     method: "POST",
@@ -600,7 +607,13 @@ export async function createEntity(
 export async function updateEntity(
   campaignId: string,
   entityId: string,
-  patch: { type?: EntityType; name?: string; aliases?: string[]; notes?: string | null },
+  patch: {
+    type?: EntityType;
+    name?: string;
+    aliases?: string[];
+    notes?: string | null;
+    visibility?: EntityVisibility;
+  },
 ): Promise<CampaignEntity> {
   const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities/${entityId}`, {
     method: "PATCH",

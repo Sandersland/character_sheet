@@ -945,6 +945,9 @@ export interface Campaign {
 
 export type EntityType = "NPC" | "LOCATION" | "FACTION" | "ITEM" | "PC" | "OTHER";
 
+// DM reveal state (#379): non-owner members only ever see REVEALED entities.
+export type EntityVisibility = "HIDDEN" | "REVEALED";
+
 export interface CampaignEntity {
   id: string;
   campaignId: string;
@@ -952,6 +955,7 @@ export interface CampaignEntity {
   name: string;
   aliases: string[];
   notes: string | null;
+  visibility: EntityVisibility;
   createdAt: string;
   updatedAt: string;
 }

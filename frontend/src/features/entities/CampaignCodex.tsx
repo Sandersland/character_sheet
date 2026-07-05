@@ -13,10 +13,11 @@ import {
   ENTITY_TYPE_TONE,
   matchEntities,
 } from "@/lib/mentions";
-import type { EntityType } from "@/types/character";
+import type { CampaignRole, EntityType } from "@/types/character";
 
 interface CampaignCodexProps {
   campaignId: string;
+  role?: CampaignRole;
 }
 
 const chipBase =
@@ -29,8 +30,10 @@ const inputCls =
 const labelCls = "block text-xs font-semibold text-parchment-700";
 
 // Codex tab: browse/search/filter/create for the campaign's entity registry.
-// Rows link to EntityDetailPage, which owns edit/delete.
-export default function CampaignCodex({ campaignId }: CampaignCodexProps) {
+// Rows link to EntityDetailPage, which owns edit/delete. Members see only
+// revealed entities (server-filtered); the owner also sees HIDDEN ones with a
+// Hidden badge, but reveal/hide administration lives on the Manage tab (#379).
+export default function CampaignCodex({ campaignId, role }: CampaignCodexProps) {
   const { entities } = useCampaignEntities(campaignId);
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<EntityType | "ALL">("ALL");
@@ -243,6 +246,9 @@ export default function CampaignCodex({ campaignId }: CampaignCodexProps) {
                     >
                       <span className="text-sm font-semibold text-parchment-900">{e.name}</span>
                       <Badge tone={ENTITY_TYPE_TONE[e.type]}>{ENTITY_TYPE_LABELS[e.type]}</Badge>
+                      {role === "OWNER" && e.visibility === "HIDDEN" && (
+                        <Badge tone="neutral">🔒 Hidden</Badge>
+                      )}
                       {e.aliases.length > 0 && (
                         <span className="min-w-0 truncate text-xs text-parchment-500">
                           {e.aliases.join(", ")}
