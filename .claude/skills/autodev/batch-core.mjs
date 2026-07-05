@@ -335,9 +335,10 @@ export function createEngine({ stateDir, cfg = null }) {
     } else if (code === 75) {
       entry.rateRetries = (entry.rateRetries ?? 0) + 1;
       if (entry.rateRetries > MAX_RATE_RETRIES) {
-        entry.respondCycles -= 1; // this cycle never ran — return it
+        // Burn the cycle, do NOT return it: a weekly cap won't clear for days,
+        // and a returned cycle would relaunch every grace window forever.
         backToWaiting();
-        log(`RESPOND-PARK #${n} rate-limit retries exhausted — cycle returned; re-checking after grace`);
+        log(`RESPOND-PARK #${n} rate-limit retries exhausted — cycle burned; re-checking after grace`);
       } else {
         entry.retryAt = run?.retryAt ?? Date.now() + 62 * 60_000;
         entry.status = "retry_wait"; // entry.responder kept for the resume
@@ -399,6 +400,7 @@ export function createEngine({ stateDir, cfg = null }) {
             entry.doneAt = Date.now(); // no capacity now — retry at next grace expiry
           } else {
             entry.respondCycles = cycles + 1;
+            entry.rateRetries = 0; // per-cycle rate accounting — stale exhaustion from a prior cycle must not insta-burn this one
             entry.responder = true;
             entry.rundir = null; // onChildExit must resolve the RESPONDER's run.json, not the issue run's
             log(`RESPOND #${n} blocked on claude-review (all CI green) — launching responder (cycle ${entry.respondCycles}/${RESPOND_MAX}) on PR #${prNumber}`);

@@ -27,6 +27,11 @@
 #   K  non-converging review-block: responder runs exactly RESPOND_MAX (2) cycles,
 #      then NEEDS-HUMAN flags the PR; entry stays waiting_merge, dependent stays
 #      pending (never skipped), no FAIL
+#   L  crashing responder (exit 1): RESPOND-FAIL burns the cycle, entry stays
+#      waiting_merge, dependent stays pending, NEEDS-HUMAN after the cycle cap
+#   M  rate-limited responder (perpetual exit 75): retry exhaustion BURNS the
+#      cycle (per-cycle rateRetries) — exactly 2 launches then NEEDS-HUMAN,
+#      never an unbounded relaunch spin
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -394,5 +399,39 @@ node "$SKILL_DIR/autodevd.mjs" stop > "$T/k-stop.out" 2>&1
 wait_for 10 "K: daemon stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
 unset GH_STUB_REVIEW_BLOCKED GH_STUB_REVIEW_STUCK
 pass "stuck responder bounded at 2 cycles, PR flagged NEEDS-HUMAN, dependent kept pending, no FAIL"
+
+# ---------- L: crashing responder → RESPOND-FAIL burns the cycle, never fails the entry ----------
+echo "L: crashing responder burns cycles, entry survives, dependent kept"
+L="$T/state-l"
+export GH_STUB_REVIEW_BLOCKED=9940
+export STUB_RESPOND_CRASH=9940
+node "$SKILL_DIR/autodevd.mjs" 9940 9941:9940 --poll 1 --grace 2 --state-dir "$L" > "$T/l.out" 2>&1 &
+disown
+wait_for 25 "L: responder crash cycle 1" grep -qs "RESPOND-FAIL #9940" "$L/orchestrator.log"
+wait_for 25 "L: NEEDS-HUMAN after crashes" grep -qs "NEEDS-HUMAN #9940 responder cycles exhausted (2)" "$L/orchestrator.log"
+[ "$(grep -c "RESPOND-FAIL #9940" "$L/orchestrator.log")" = "2" ] || fail "L: both cycles should end in RESPOND-FAIL"
+status_is "$L/batch.json" 9940 waiting_merge || fail "L: 9940 should stay waiting_merge after responder crashes"
+status_is "$L/batch.json" 9941 pending || fail "L: dependent 9941 must NOT be skipped on responder crashes"
+grep -qs "| FAIL #9940" "$L/orchestrator.log" && fail "L: a responder crash must never FAIL the entry"
+node "$SKILL_DIR/autodevd.mjs" stop > "$T/l-stop.out" 2>&1
+wait_for 10 "L: daemon stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
+unset GH_STUB_REVIEW_BLOCKED STUB_RESPOND_CRASH
+pass "responder crashes burned both cycles, entry kept waiting_merge, dependent kept pending"
+
+# ---------- M: rate-limited responder → exhaustion burns the cycle; bounded, no spin ----------
+echo "M: rate-limit exhaustion burns the cycle — exactly 2 launches, then NEEDS-HUMAN"
+M="$T/state-m"
+export GH_STUB_REVIEW_BLOCKED=9950
+export STUB_RESPOND_RATE=9950
+node "$SKILL_DIR/autodevd.mjs" 9950 --poll 1 --grace 2 --state-dir "$M" > "$T/m.out" 2>&1 &
+disown
+wait_for 90 "M: NEEDS-HUMAN after rate exhaustion" grep -qs "NEEDS-HUMAN #9950 responder cycles exhausted (2)" "$M/orchestrator.log"
+[ "$(grep -c "launching responder" "$M/orchestrator.log")" = "2" ] || fail "M: rate exhaustion must BURN the cycle — expected exactly 2 responder launches, got $(grep -c "launching responder" "$M/orchestrator.log")"
+status_is "$M/batch.json" 9950 waiting_merge || fail "M: 9950 should stay waiting_merge after rate exhaustion"
+grep -qs "| FAIL #9950" "$M/orchestrator.log" && fail "M: rate exhaustion must never FAIL the entry"
+node "$SKILL_DIR/autodevd.mjs" stop > "$T/m-stop.out" 2>&1
+wait_for 10 "M: daemon stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
+unset GH_STUB_REVIEW_BLOCKED STUB_RESPOND_RATE
+pass "rate-limited responder bounded at 2 cycles (per-cycle rateRetries), no relaunch spin"
 
 echo "SMOKE PASS (all scenarios)"
