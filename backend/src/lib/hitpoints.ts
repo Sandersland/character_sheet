@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "../generated/prisma/client.js";
-import { clearBuffsForSourceInTx, clearBuffsForRestInTx } from "./active-effects.js";
+import { clearBuffsForSourceInTx, clearBuffsForRestInTx, clearWhileActiveBuffsInTx } from "./active-effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
@@ -1301,6 +1301,18 @@ export async function applyHitPointOperations(
           op.type === "longRest" ? "long" : "short",
           batchId,
           sessionId,
+        );
+      }
+
+      // A long rest or falling unconscious (0 HP) ends all "while-active" durable
+      // self-buffs (e.g. Rage) — the turn-hook covers the "no attack/no damage" case.
+      if (op.type === "longRest" || (op.type === "damage" && hp.current === 0)) {
+        await clearWhileActiveBuffsInTx(
+          tx,
+          characterId,
+          batchId,
+          sessionId,
+          op.type === "longRest" ? "long rest" : "unconscious",
         );
       }
 

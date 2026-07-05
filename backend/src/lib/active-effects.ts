@@ -272,6 +272,49 @@ export async function clearBuffByKeyInTx(
 }
 
 /**
+ * Clear every "while-active" durable buff (e.g. Rage). Called when a blanket
+ * event ends all combat self-buffs — falling unconscious (0 HP) or a long rest.
+ * No-op + no event when none match. Logs a `buffCleared` event under "effects".
+ */
+export async function clearWhileActiveBuffsInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  batchId: string,
+  sessionId: string | null,
+  reason: string,
+): Promise<void> {
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: { activeEffects: true },
+  });
+  if (!row) return;
+
+  const state = normalizeActiveEffectsMutable(row.activeEffects);
+  const clears = (b: ActiveBuff) => b.duration === "while-active";
+  const dropped = state.buffs.filter(clears);
+  if (dropped.length === 0) return;
+  const before = snapshot(state);
+  state.buffs = state.buffs.filter((b) => !clears(b));
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: { activeEffects: serializeActiveEffectsState(state) },
+  });
+
+  await logEvent(tx, {
+    characterId,
+    category: "effects",
+    type: "buffCleared",
+    summary: `Cleared ${dropped.length} buff${dropped.length !== 1 ? "s" : ""} (${reason})`,
+    before,
+    after: snapshot(state),
+    data: { reason, clearedKeys: dropped.map((b) => b.key) },
+    batchId,
+    sessionId,
+  });
+}
+
+/**
  * Clear every "until-rest" buff the given rest ends. A long rest clears both
  * "short" and "long" restType buffs; a short rest clears only "short". No-op +
  * no event when none match. Logs a `buffCleared` event under "effects".
