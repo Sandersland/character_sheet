@@ -32,6 +32,9 @@
 #   M  rate-limited responder (perpetual exit 75): retry exhaustion BURNS the
 #      cycle (per-cycle rateRetries) — exactly 2 launches then NEEDS-HUMAN,
 #      never an unbounded relaunch spin
+#   N  responder ADOPTED after a daemon kill -9 then failing gracefully: the
+#      failure routes through onResponderExit (RESPOND-FAIL → waiting_merge),
+#      never the pollAdopted terminal-fail shortcut — dependent not skipped
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -433,5 +436,29 @@ node "$SKILL_DIR/autodevd.mjs" stop > "$T/m-stop.out" 2>&1
 wait_for 10 "M: daemon stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
 unset GH_STUB_REVIEW_BLOCKED STUB_RESPOND_RATE
 pass "rate-limited responder bounded at 2 cycles (per-cycle rateRetries), no relaunch spin"
+
+# ---------- N: adopted responder that fails gracefully → RESPOND-FAIL, never terminal-fail ----------
+echo "N: failure of an ADOPTED responder routes through onResponderExit, dependent kept"
+N="$T/state-n"
+export GH_STUB_REVIEW_BLOCKED=9960
+export STUB_RESPOND_ADOPTFAIL=9960
+node "$SKILL_DIR/autodevd.mjs" 9960 9961:9960 --poll 1 --grace 2 --state-dir "$N" > "$T/n1.out" 2>&1 &
+disown
+wait_for 25 "N: responder running" status_is "$N/batch.json" 9960 responding
+kill -9 "$(cat "$T/runtime/autodevd.pid")"   # daemon dies; detached responder child survives
+sleep 0.5
+node "$SKILL_DIR/autodevd.mjs" --poll 1 --state-dir "$N" > "$T/n2.out" 2>&1 &
+disown
+wait_for 15 "N: responder adopted" grep -qs "RECONCILE #9960 still responding" "$N/orchestrator.log"
+# The stub child finalizes run.json "failed" + exits ~8s in, unwatched — the
+# relaunched daemon must route that through onResponderExit, not terminal-fail it.
+wait_for 25 "N: adopted failure returns to waiting_merge" status_is "$N/batch.json" 9960 waiting_merge
+grep -qs "RESPOND-FAIL #9960" "$N/orchestrator.log" || fail "N: adopted responder failure should log RESPOND-FAIL"
+status_is "$N/batch.json" 9961 pending || fail "N: dependent 9961 must NOT be skipped when an adopted responder fails"
+grep -qs "SKIP #9961" "$N/orchestrator.log" && fail "N: dependent must never be skipped on a responder failure"
+node "$SKILL_DIR/autodevd.mjs" stop --park > "$T/n-stop.out" 2>&1
+wait_for 15 "N: daemon stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
+unset GH_STUB_REVIEW_BLOCKED STUB_RESPOND_ADOPTFAIL
+pass "adopted responder failure → RESPOND-FAIL → waiting_merge; dependent kept pending"
 
 echo "SMOKE PASS (all scenarios)"

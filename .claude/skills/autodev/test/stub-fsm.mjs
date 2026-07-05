@@ -31,6 +31,10 @@
  * responder run is recognized by ctx.prNumber in its run.json. Behavior by env:
  *   STUB_RESPOND_CRASH=<issue>  exit 1 (crash; run.json left "running")
  *   STUB_RESPOND_RATE=<issue>   exit 75 every time (perpetual rate limit)
+ *   STUB_RESPOND_ADOPTFAIL=<issue>  run ~8s with heartbeats, then finalize
+ *                               run.json "failed" + exit 1 — long enough for a
+ *                               daemon kill+relaunch to ADOPT it first, so the
+ *                               failure is routed by pollAdopted, not a close event
  *   GH_STUB_REVIEW_STUCK=<issue> push but drop no marker (review never greens)
  *   default                      push + drop a `responded-<issue>` marker in
  *                                RUNS_DIR that the gh stub reads to flip the
@@ -100,6 +104,16 @@ if (machine === "pr-response" || (resumed && runCtx?.prNumber)) {
     save("retry-scheduled", { prNumber: issue, prCycle: cycle, branch }, { retryable: true, retryAt: Date.now() + 2000 });
     process.exit(75);
   }
+  if (process.env.STUB_RESPOND_ADOPTFAIL === String(issue)) {
+    save("running", { prNumber: issue, prCycle: cycle, branch });
+    const hb = setInterval(() => save("running", { prNumber: issue, prCycle: cycle, branch }), 1000);
+    setTimeout(() => {
+      clearInterval(hb);
+      save("failed", { prNumber: issue, prCycle: cycle, branch, failure: "stub graceful fail after adoption" });
+      process.exit(1);
+    }, 8000);
+    await new Promise(() => {}); // park until the timers exit the process
+  }
   // Default: pretend we triaged, fixed, committed, pushed. The marker flips the
   // gh stub's blocked PR to merged; GH_STUB_REVIEW_STUCK suppresses it so the
   // review never greens (non-convergence scenario).
@@ -120,6 +134,8 @@ switch (issue) {
   case 9940: // crashing-responder scenario (STUB_RESPOND_CRASH)
   case 9941: // dependent of 9940 (stays pending — prereq never merges)
   case 9950: // rate-limited-responder scenario (STUB_RESPOND_RATE)
+  case 9960: // adopted-then-failing-responder scenario (STUB_RESPOND_ADOPTFAIL)
+  case 9961: // dependent of 9960 (must stay pending, never skipped)
     save("completed", { prUrl: `https://example.test/pr/${issue}` });
     process.exit(0);
   case 9901:

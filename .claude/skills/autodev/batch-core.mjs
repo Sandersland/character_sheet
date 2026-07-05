@@ -454,7 +454,14 @@ export function createEngine({ stateDir, cfg = null }) {
         onChildExit(Number(n), 75);
       } else if (run?.status === "failed") {
         // fsm already ran its Fail handler and finalized the run — don't burn
-        // the one-resume-attempt re-driving a completed failure.
+        // the one-resume-attempt re-driving a completed failure. A responder
+        // must NOT take this terminal shortcut: its failure only burns a cycle
+        // (onResponderExit → waiting_merge), never fails the entry / skips dependents.
+        if (entry.responder) {
+          log(`ADOPT #${n} responder finished while unwatched (failed: ${run?.ctx?.failure ?? "unknown"})`);
+          onResponderExit(Number(n), entry, run, 1);
+          continue;
+        }
         entry.status = "failed";
         log(`ADOPT #${n} finished while unwatched (failed: ${run?.ctx?.failure ?? "unknown"}); worktree kept`);
         saveBatch();
