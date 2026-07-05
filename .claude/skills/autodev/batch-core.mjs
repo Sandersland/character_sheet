@@ -130,6 +130,35 @@ export function createEngine({ stateDir, cfg = null }) {
     }
   }
 
+  // Why the open PR for issue #n isn't merging. The required `claude-review`
+  // gate posts CHANGES_REQUESTED on its first pass, so a perfectly good PR sits
+  // BLOCKED with all CI green — that's recoverable via /pr-response and must NOT
+  // be treated like a real conflict/failure (which would wrongly skip dependents).
+  //   "review-blocked" — mergeable, only claude-review is red → keep waiting
+  //   "conflict"       — CONFLICTING → real, fail
+  //   "other-red"      — a non-review required check failed → real, fail
+  //   "unknown"        — transient gh failure, checks still running, or green +
+  //                      auto-merge just lagging → conservatively keep waiting
+  const RED = (c) => c.status === "COMPLETED" && !["SUCCESS", "SKIPPED", "NEUTRAL"].includes(c.conclusion);
+  function classifyPrBlock(n) {
+    const res = sh(GH, ["pr", "list", "--state", "open", "--search", `(#${n}) in:title`, "--json", "number,mergeable,statusCheckRollup,title"]);
+    if (res.status !== 0) return "unknown";
+    let pr;
+    try {
+      pr = JSON.parse(res.stdout).find((p) => p.title.includes(`(#${n})`));
+    } catch {
+      return "unknown";
+    }
+    if (!pr) return "unknown";
+    if (pr.mergeable === "CONFLICTING") return "conflict";
+    const checks = pr.statusCheckRollup ?? [];
+    const name = (c) => c.name ?? c.context;
+    if (checks.some((c) => name(c) !== "claude-review" && RED(c))) return "other-red";
+    const review = checks.find((c) => name(c) === "claude-review");
+    if (review && RED(review)) return "review-blocked";
+    return "unknown";
+  }
+
   function readRunJson(entry) {
     try {
       return JSON.parse(readFileSync(join(entry.rundir, "run.json"), "utf8"));
@@ -280,8 +309,20 @@ export function createEngine({ stateDir, cfg = null }) {
         entry.status = "merged";
         log(`MERGED #${n} (PR landed on ${batch.base})`);
       } else if (Date.now() - entry.doneAt >= batch.grace * 1000) {
-        entry.status = "failed";
-        log(`FAIL #${n} auto-merge did not fire within ${batch.grace}s (checks red or conflict); dependents will be skipped`);
+        const cls = classifyPrBlock(n);
+        if (cls === "conflict" || cls === "other-red") {
+          entry.status = "failed";
+          log(`FAIL #${n} auto-merge did not fire within ${batch.grace}s (${cls}); dependents will be skipped`);
+        } else {
+          // review-blocked or unknown: recoverable via /pr-response. Keep polling
+          // for the merge instead of failing — do NOT skip dependents. Reset the
+          // grace window so we re-check periodically without hammering gh.
+          if (!entry.reviewBlockedLogged) {
+            log(`NEEDS-REVIEW-RESPONSE #${n} blocked on claude-review (all CI green) — run /pr-response to unblock; keeping open`);
+            entry.reviewBlockedLogged = true;
+          }
+          entry.doneAt = Date.now();
+        }
       }
     }
   }

@@ -11,6 +11,10 @@
  *   9902  exit 1 always                          (crash; resume also crashes)
  *   9903  write run.json then sleep 300s,        (long-runner, killable)
  *         heartbeating every 2s like the real fsm
+ *   9910  exit 0 with ctx.prUrl                  (review-block scenario: the gh
+ *   9911  exit 0 with ctx.prUrl                   stub marks 9910's PR blocked on
+ *                                                 claude-review; 9911 is its
+ *                                                 dependent — never launches)
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -63,6 +67,8 @@ function save(status, extraCtx = {}, extra = {}) {
 
 switch (issue) {
   case 9900:
+  case 9910: // review-block scenario: succeeds → waiting_merge; gh stub makes its PR review-blocked
+  case 9911: // dependent of 9910 (never launches — prereq never merges)
     save("completed", { prUrl: `https://example.test/pr/${issue}` });
     process.exit(0);
   case 9901:

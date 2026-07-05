@@ -44,11 +44,21 @@ echo '{}' > "$T/worktrees/registry.json"   # isolated slot registry — daemon-t
 # keeps loadOrInit's pre-merged detection from short-circuiting fresh issues.
 cat > "$T/bin/gh" <<EOF
 #!/usr/bin/env bash
-n=""
+n=""; state=""; prev=""
 for a in "\$@"; do
   if [[ "\$a" =~ \(#([0-9]+)\) ]]; then n="\${BASH_REMATCH[1]}"; fi
+  if [ "\$prev" = "--state" ]; then state="\$a"; fi
+  prev="\$a"
 done
-if [ -n "\$n" ] && grep -ql prUrl "$T/runs"/*-issue-"\$n"/run.json 2>/dev/null; then
+if [ -n "\$n" ] && [ "\$n" = "\${GH_STUB_REVIEW_BLOCKED:-}" ]; then
+  # Designated review-blocked issue: mergeable open PR whose claude-review check
+  # is FAILURE, never merged. (classifyPrBlock reads the open search; isMerged the merged one.)
+  if [ "\$state" = "open" ]; then
+    echo "[{\"title\":\"stub pr (#\$n)\",\"mergeable\":\"MERGEABLE\",\"statusCheckRollup\":[{\"name\":\"claude-review\",\"status\":\"COMPLETED\",\"conclusion\":\"FAILURE\"},{\"name\":\"test\",\"status\":\"COMPLETED\",\"conclusion\":\"SUCCESS\"}]}]"
+  else
+    echo "[]"
+  fi
+elif [ -n "\$n" ] && grep -ql prUrl "$T/runs"/*-issue-"\$n"/run.json 2>/dev/null; then
   echo "[{\"title\":\"stub pr (#\$n)\"}]"
 else
   echo "[]"
@@ -298,5 +308,20 @@ node "$CTL" report > "$T/h-live.out" || fail "H: report verb over the socket fai
 node "$CTL" shutdown > /dev/null
 wait_for 10 "daemon H stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
 pass "report: correct rollup post-mortem and over the socket"
+
+# ---------- I: review-blocked PR keeps polling, doesn't fail or skip dependents ----------
+echo "I: review-block keeps waiting_merge; dependent not skipped"
+I="$T/state-i"
+export GH_STUB_REVIEW_BLOCKED=9910
+node "$SKILL_DIR/autodevd.mjs" 9910 9911:9910 --poll 1 --grace 2 --state-dir "$I" > "$T/i.out" 2>&1 &
+disown
+wait_for 25 "I: NEEDS-REVIEW-RESPONSE logged" grep -qs "NEEDS-REVIEW-RESPONSE #9910" "$I/orchestrator.log"
+status_is "$I/batch.json" 9910 waiting_merge || fail "I: 9910 should stay waiting_merge (not failed) when blocked on claude-review"
+status_is "$I/batch.json" 9911 pending || fail "I: dependent 9911 must NOT be skipped while prereq is review-blocked"
+grep -qs "FAIL #9910" "$I/orchestrator.log" && fail "I: review-blocked PR must not be marked FAIL"
+node "$SKILL_DIR/autodevd.mjs" stop > "$T/i-stop.out" 2>&1
+wait_for 10 "I: daemon stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
+unset GH_STUB_REVIEW_BLOCKED
+pass "review-blocked PR kept open (grace paused), dependent not skipped, no FAIL"
 
 echo "SMOKE PASS (all scenarios)"
