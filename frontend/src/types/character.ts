@@ -974,13 +974,6 @@ export interface CampaignEntity {
   updatedAt: string;
 }
 
-/**
- * DM-authored campaign item (#380): loot/magic-item prep that lives in a
- * campaign, not on any sheet. Mirrors `Item` plus DM-only fields (rarity,
- * attunement, isUnique, dmNotes) and a reference to the fronting ITEM entity.
- * `dmNotes` is present only in owner-facing payloads — it's scrubbed server-side
- * from every player response.
- */
 /** One current holder of an awarded campaign item (#381). */
 export interface CampaignItemHolder {
   characterId: string;
@@ -988,6 +981,13 @@ export interface CampaignItemHolder {
   quantity: number;
 }
 
+/**
+ * DM-authored campaign item (#380): loot/magic-item prep that lives in a
+ * campaign, not on any sheet. Mirrors `Item` plus DM-only fields (rarity,
+ * attunement, isUnique, dmNotes) and a reference to the fronting ITEM entity.
+ * `dmNotes` is present only in owner-facing payloads — it's scrubbed server-side
+ * from every player response.
+ */
 export interface CampaignItem {
   id: string;
   campaignId: string;

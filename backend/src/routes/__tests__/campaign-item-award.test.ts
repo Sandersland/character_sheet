@@ -122,7 +122,8 @@ describe("campaign item award/revoke (#381)", () => {
   });
 
   it("revokes a player-modified (renamed + equipped) snapshot, undoably", async () => {
-    const { id } = await createItem({ ...weaponItem, name: "Sunblade" });
+    // Unique so we can also assert the unique guard still fires after undo.
+    const { id } = await createItem({ ...weaponItem, name: "Sunblade", isUnique: true });
     await agent(cookieOwner)
       .post(`/api/campaigns/${campaignId}/items/${id}/award`)
       .send({ characterId: CHAR });
@@ -154,6 +155,27 @@ describe("campaign item award/revoke (#381)", () => {
     expect(revert.status).toBe(200);
     const restored = await prisma.inventoryItem.findFirst({ where: { id: row.id } });
     expect(restored?.name).toBe("My Sword");
+    // The provenance FK must survive undo, or the row falls out of holder /
+    // unique-guard queries (create/cleanup asymmetry).
+    expect(restored?.campaignItemId).toBe(id);
+
+    // Holders + Codex card still see the restored row.
+    const list = await agent(cookieOwner).get(`/api/campaigns/${campaignId}/items`);
+    const listed = list.body.find((i: { id: string }) => i.id === id);
+    expect(listed.holders).toEqual([{ characterId: CHAR, characterName: "Bruenor", quantity: 1 }]);
+
+    // Unique guard still fires — a second award stays blocked, naming the holder.
+    const secondAward = await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/award`)
+      .send({ characterId: CHAR });
+    expect(secondAward.status).toBe(409);
+    expect(secondAward.body.error).toContain("Bruenor");
+
+    // And the restored row is still revocable (not orphaned).
+    const reRevoke = await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/revoke`)
+      .send({ characterId: CHAR });
+    expect(reRevoke.status).toBe(200);
 
     // Cleanup for the next tests.
     await prisma.inventoryItem.deleteMany({ where: { campaignItemId: id } });

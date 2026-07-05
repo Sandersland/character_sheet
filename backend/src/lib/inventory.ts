@@ -356,6 +356,7 @@ function snapshotItemDetail(item: CatalogItemWithDetails) {
 export interface DeletedInventoryItemSnapshot {
   id: string;
   itemId: string | null;
+  campaignItemId: string | null;
   name: string;
   category: ItemCategoryName;
   weight: number | null;
@@ -378,6 +379,7 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
   return {
     id: item.id,
     itemId: item.itemId,
+    campaignItemId: item.campaignItemId,
     name: item.name,
     category: item.category,
     weight: item.weight,
@@ -864,11 +866,20 @@ export async function revertInventoryEvent(
       const catalogItem = await tx.item.findUnique({ where: { id: itemId }, select: { id: true } });
       if (!catalogItem) itemId = null; // catalog row gone → snapshot is self-contained
     }
+    // Restore the campaign-item provenance FK too (#381) — without it, undo of a
+    // revoke would drop the row from holder/unique-guard queries. Null when the
+    // snapshot predates the FK, or the CampaignItem was since deleted (SetNull).
+    let campaignItemId = deletedItem.campaignItemId ?? null;
+    if (campaignItemId) {
+      const campaignItem = await tx.campaignItem.findUnique({ where: { id: campaignItemId }, select: { id: true } });
+      if (!campaignItem) campaignItemId = null;
+    }
     await tx.inventoryItem.create({
       data: {
         id: event.entityId,
         characterId,
         itemId,
+        campaignItemId,
         name: deletedItem.name,
         category: deletedItem.category,
         weight: deletedItem.weight ?? undefined,
