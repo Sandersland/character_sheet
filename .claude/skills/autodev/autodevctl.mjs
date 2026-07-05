@@ -111,6 +111,10 @@ if (!verb) {
 // report --state-dir DIR: pure file read, no daemon required (post-mortem mode).
 if (verb === "report" && argv.includes("--state-dir")) {
   const dir = argv[argv.indexOf("--state-dir") + 1];
+  if (!dir || dir.startsWith("--")) {
+    console.error("autodevctl: --state-dir requires a directory argument");
+    process.exit(1);
+  }
   try {
     const report = buildReport(resolve(ROOT, dir));
     console.log(json ? JSON.stringify(report, null, 2) : renderReport(report));

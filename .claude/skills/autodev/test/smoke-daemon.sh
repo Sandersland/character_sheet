@@ -178,9 +178,10 @@ RA=$(mkrun 8801 stub/bA running none)               # legacy frozen (no pid/hb) 
 RB=$(mkrun 8802 stub/bB running "$LIVE_PID")        # live (pid alive, fresh hb) → untouched
 RC=$(mkrun 8803 stub/bC retry-scheduled none)       # parked → untouched
 RD=$(mkrun 8804 stub/bD completed none)             # terminal → slot freed, no reap
-mkdir -p "$FW/stub/bA" "$FW/stub/bB" "$FW/stub/bC" "$FW/stub/bD" "$FW/stub/bF"
+RG=$(mkrun 8805 stub/bG running "$LIVE_PID" 999999999)  # pid ALIVE but heartbeat ancient (> stale bound) → reap (zombie guard)
+mkdir -p "$FW/stub/bA" "$FW/stub/bB" "$FW/stub/bC" "$FW/stub/bD" "$FW/stub/bF" "$FW/stub/bG"
 node -e "require('fs').writeFileSync('$FW/registry.json', JSON.stringify({
-  'stub/bA': 1, 'stub/bB': 2, 'stub/bC': 3, 'stub/bD': 4, 'stub/bE': 5, 'stub/bF': 6,
+  'stub/bA': 1, 'stub/bB': 2, 'stub/bC': 3, 'stub/bD': 4, 'stub/bE': 5, 'stub/bF': 6, 'stub/bG': 7,
 }))"   # bE: no dir (stale reservation) → freed; bF: dir but no run (manual) → untouched
 
 AUTODEV_RUNS_DIR="$FR" AUTODEV_WORKTREES_DIR="$FW" node -e "
@@ -197,17 +198,19 @@ node -e "
   const runA = JSON.parse(fs.readFileSync('$RA/run.json','utf8'));
   const runB = JSON.parse(fs.readFileSync('$RB/run.json','utf8'));
   const runC = JSON.parse(fs.readFileSync('$RC/run.json','utf8'));
+  const runG = JSON.parse(fs.readFileSync('$RG/run.json','utf8'));
   const assert = (c, m) => { if (!c) { console.error('F assert failed: ' + m); process.exit(1); } };
   assert(runA.status === 'failed' && runA.ctx.failure.includes('reaped'), 'dead run A finalized failed');
   assert(fs.readFileSync('$RA/steps.jsonl','utf8').includes('reaped'), 'run A steps.jsonl reap line');
   assert(runB.status === 'running', 'live run B untouched');
   assert(runC.status === 'retry-scheduled', 'parked run C untouched');
-  for (const b of ['stub/bA','stub/bD','stub/bE']) assert(calls.includes('rm ' + b), b + ' slot freed');
+  assert(runG.status === 'failed', 'stale-heartbeat run G reaped despite live pid');
+  for (const b of ['stub/bA','stub/bD','stub/bE','stub/bG']) assert(calls.includes('rm ' + b), b + ' slot freed');
   for (const b of ['stub/bB','stub/bC','stub/bF']) assert(!calls.includes('rm ' + b), b + ' NOT touched');
-  assert(res.reapedRuns.length === 1 && res.freedSlots.length === 3, 'result counts (1 reaped, 3 freed)');
+  assert(res.reapedRuns.length === 2 && res.freedSlots.length === 4, 'result counts (2 reaped, 4 freed)');
 " || fail "F: janitor assertions failed (see above)"
 kill "$LIVE_PID" 2>/dev/null || true
-pass "janitor: reaped dead run, freed stale+terminal slots, protected live/parked/manual"
+pass "janitor: reaped dead+stale-heartbeat runs, freed stale+terminal slots, protected live/parked/manual"
 
 # ---------- G: control channel ----------
 echo "G: control channel over the Unix socket"

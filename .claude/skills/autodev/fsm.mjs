@@ -481,7 +481,11 @@ const HANDLERS = {
       sh(join(SKILL_DIR, "..", "worktree", "worktree.sh"), ["create", branch, "--up"], { cwd: ROOT });
     } catch (err) {
       // Self-heal: a leaked slot (reaped run that never freed its worktree)
-      // must not brick a fresh run — reconcile and retry once.
+      // must not brick a fresh run — reconcile and retry once. No `protect`
+      // list is needed here (deliberate): this run has a live pid and a fresh
+      // heartbeat, so runState classifies it live; protect only exists for the
+      // batch-adoption race where a resumed child hasn't overwritten a stale
+      // pid in run.json yet.
       if (!/no free slots/i.test(err.message)) throw err;
       log(run, "no free worktree slots — running janitor reconcile, then retrying once");
       const { reapedRuns, freedSlots } = janitorReconcile({ log: (m) => log(run, m) });
