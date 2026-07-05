@@ -103,6 +103,11 @@ export function RollProvider({ children, characterId, sessionId, onRollLogged }:
   modeRef.current = mode;
   const sessionRef = useRef({ characterId, sessionId, onRollLogged });
   sessionRef.current = { characterId, sessionId, onRollLogged };
+  // Mirror `pending` in a ref so handleResult's side effects stay OUT of the
+  // setPending updater — updaters must be pure, and StrictMode double-invokes
+  // them, which would otherwise double-fire logSessionRoll (#473 review).
+  const pendingRef = useRef(pending);
+  pendingRef.current = pending;
 
   // Best-effort session log — no-op unless both a character and active session exist.
   const logSessionRoll = useCallback((input: RollLogInput) => {
@@ -129,20 +134,18 @@ export function RollProvider({ children, characterId, sessionId, onRollLogged }:
 
   // Fired when the overlay's die settles: toast it, then log it if requested.
   const handleResult = useCallback((result: RollResult) => {
-    setPending((current) => {
-      if (!current) return null;
-      setLastRoll({ id: current.id, label: current.label, result });
-      if (current.log) {
-        logSessionRoll({
-          ...current.log,
-          total: result.total,
-          faces: result.dice.filter((d) => !d.dropped).map((d) => d.value),
-          specLabel: formatRollSpec(current.spec),
-          rollMode: current.spec.mode,
-        });
-      }
-      return current;
-    });
+    const current = pendingRef.current;
+    if (!current) return;
+    setLastRoll({ id: current.id, label: current.label, result });
+    if (current.log) {
+      logSessionRoll({
+        ...current.log,
+        total: result.total,
+        faces: result.dice.filter((d) => !d.dropped).map((d) => d.value),
+        specLabel: formatRollSpec(current.spec),
+        rollMode: current.spec.mode,
+      });
+    }
   }, [logSessionRoll]);
 
   return (
