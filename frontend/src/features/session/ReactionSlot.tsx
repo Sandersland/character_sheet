@@ -33,7 +33,7 @@ export default function ReactionSlot({
   reactionMessage: string | null;
   error: string | null;
   handleActionClick: (key: string, cost: "action" | "bonusAction" | "reaction") => void;
-  handleReactionManeuver: (name: string) => Promise<void>;
+  handleReactionManeuver: (entryId: string, name: string) => Promise<void>;
 }) {
   return (
     <div className="rounded-card border border-parchment-200 bg-parchment-50 p-3">
@@ -90,7 +90,7 @@ export default function ReactionSlot({
               key={m.id}
               tone={superiorityRemaining > 0 ? "gold" : "neutral"}
               disabled={superiorityRemaining === 0 || dieBusy}
-              onClick={() => handleReactionManeuver(m.name)}
+              onClick={() => handleReactionManeuver(m.id, m.name)}
               title={
                 superiorityRemaining === 0
                   ? "No superiority dice remaining."

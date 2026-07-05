@@ -1,18 +1,27 @@
-import { useEffect } from "react";
+import { useEffect, type ReactElement } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render as rtlRender, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import HitPointTracker from "@/features/hitpoints/HitPointTracker";
+import { RollProvider } from "@/features/dice/RollContext";
 import * as client from "@/api/client";
 import type { RollResult } from "@/lib/dice";
 import type { Character, ConcentrationCheck } from "@/types/character";
 
 // Mock the API client — HitPointTracker batches HP ops and swaps the returned
 // character via onUpdate, then toasts any concentration check (issue #41).
+// logRoll backs the concentration save's session-log emit (issue #460).
 vi.mock("@/api/client", () => ({
   applyHitPointOperations: vi.fn(),
+  logRoll: vi.fn().mockResolvedValue(undefined),
 }));
+
+// The concentration-save modal reads useRoll(); every render is wrapped so it
+// resolves (matching the app, where HitPointTracker always sits in a RollProvider).
+function render(ui: ReactElement) {
+  return rtlRender(<RollProvider>{ui}</RollProvider>);
+}
 
 // Mock the 3D DiceRoller (issue #76): the real one mounts a Three.js Canvas that
 // doesn't render in jsdom. The stub fires onResult once on mount with a fixed

@@ -1,0 +1,150 @@
+import { useEffect } from "react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+
+import { logRoll } from "@/api/client";
+import { RollProvider, useRoll, type RollLog } from "@/features/dice/RollContext";
+import RollResultToast from "@/features/dice/RollResultToast";
+import type { RollResult, RollSpec } from "@/lib/dice";
+
+vi.mock("@/api/client", () => ({
+  logRoll: vi.fn().mockResolvedValue(undefined),
+}));
+
+// Stub the 3D DiceRoller (mounts a Three.js Canvas that doesn't render in jsdom):
+// fire onResult once on mount with a fixed natural d20 (17) plus the spec modifier.
+const NATURAL = 17;
+vi.mock("@/features/dice/DiceRoller", () => ({
+  default: function MockDiceRoller({
+    onResult,
+    spec,
+  }: {
+    onResult?: (r: RollResult) => void;
+    spec?: RollSpec;
+  }) {
+    useEffect(() => {
+      const modifier = spec?.modifier ?? 0;
+      onResult?.({
+        dice: [{ value: NATURAL, dropped: false }],
+        modifier,
+        total: NATURAL + modifier,
+        spec: { count: 1, faces: 20, modifier, mode: spec?.mode },
+      });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    return <div data-testid="dice-roller" />;
+  },
+}));
+
+const mockLogRoll = vi.mocked(logRoll);
+
+function AnimatedRollOnMount({ spec, label, log }: { spec: RollSpec; label: string; log?: RollLog }) {
+  const { rollAnimated } = useRoll();
+  useEffect(() => {
+    rollAnimated(spec, label, log);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+}
+
+describe("RollProvider — rollAnimated + logging", () => {
+  beforeEach(() => {
+    mockLogRoll.mockClear();
+  });
+
+  it("plays the 3D dice, toasts the result, and logs the roll inside a session", async () => {
+    render(
+      <RollProvider characterId="char-1" sessionId="sess-1">
+        <AnimatedRollOnMount
+          spec={{ count: 1, faces: 20, modifier: 5 }}
+          label="Perception check"
+          log={{ kind: "check", source: "Perception check", ability: "wisdom", skill: "perception" }}
+        />
+        <RollResultToast />
+      </RollProvider>,
+    );
+
+    // 3D roller mounted in an overlay dialog.
+    expect(screen.getByTestId("dice-roller")).toBeInTheDocument();
+
+    // Toast shows the total (17 + 5).
+    await waitFor(() => expect(screen.getAllByText("22").length).toBeGreaterThan(0));
+
+    await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
+    const [cid, sid, payload] = mockLogRoll.mock.calls[0];
+    expect(cid).toBe("char-1");
+    expect(sid).toBe("sess-1");
+    expect(payload).toMatchObject({
+      kind: "check",
+      source: "Perception check",
+      ability: "wisdom",
+      skill: "perception",
+      total: 22,
+      faces: [NATURAL],
+    });
+  });
+
+  it("does not log when no session is active (still animates)", async () => {
+    render(
+      <RollProvider characterId="char-1" sessionId={null}>
+        <AnimatedRollOnMount
+          spec={{ count: 1, faces: 20, modifier: 2 }}
+          label="Strength save"
+          log={{ kind: "save", source: "Strength save", ability: "strength" }}
+        />
+      </RollProvider>,
+    );
+
+    expect(screen.getByTestId("dice-roller")).toBeInTheDocument();
+    // Give any async logging a chance to (not) fire.
+    await Promise.resolve();
+    expect(mockLogRoll).not.toHaveBeenCalled();
+  });
+
+  it("does not log a roll without a log payload, even in a session", async () => {
+    render(
+      <RollProvider characterId="char-1" sessionId="sess-1">
+        <AnimatedRollOnMount spec={{ count: 1, faces: 20 }} label="Bare roll" />
+      </RollProvider>,
+    );
+
+    expect(screen.getByTestId("dice-roller")).toBeInTheDocument();
+    await Promise.resolve();
+    expect(mockLogRoll).not.toHaveBeenCalled();
+  });
+
+  it("carries the sticky roll mode onto the logged event", async () => {
+    function AdvantageRoll() {
+      const { rollAnimated, setMode } = useRoll();
+      useEffect(() => {
+        setMode("advantage");
+      }, [setMode]);
+      useEffect(() => {
+        // Fire after the mode is applied.
+        const t = setTimeout(
+          () =>
+            rollAnimated({ count: 1, faces: 20, modifier: 1 }, "Initiative", {
+              kind: "initiative",
+              source: "Initiative",
+            }),
+          0,
+        );
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+      return null;
+    }
+
+    render(
+      <RollProvider characterId="char-1" sessionId="sess-1">
+        <AdvantageRoll />
+      </RollProvider>,
+    );
+
+    await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
+    expect(mockLogRoll.mock.calls[0][2]).toMatchObject({
+      kind: "initiative",
+      rollMode: "advantage",
+    });
+  });
+});

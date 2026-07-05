@@ -70,9 +70,12 @@ export const EVENT_TYPE_LABELS: Partial<Record<string, string>> = {
   conditionApplied: "Condition applied",
   conditionRemoved: "Condition removed",
   exhaustionSet: "Exhaustion set",
-  // combat rolls
+  // rolls
   attackRoll: "Attack roll",
   damageRoll: "Damage roll",
+  checkRoll: "Ability check",
+  saveRoll: "Saving throw",
+  initiativeRoll: "Initiative",
   // meta
   revert: "undo",
 };
@@ -97,6 +100,7 @@ export const CATEGORY_TONE: Partial<
   session: "neutral",
   combat: "garnet",
   conditions: "garnet",
+  roll: "garnet",
 };
 
 /** Resolve an event category to its badge tone, defaulting to neutral. */
@@ -119,6 +123,7 @@ export const CATEGORY_LABELS: Partial<Record<CharacterEventCategory, string>> = 
   session: "Session",
   combat: "Combat",
   conditions: "Conditions",
+  roll: "Rolls",
 };
 
 /** Resolve a category to its display label, falling back to the raw key. */

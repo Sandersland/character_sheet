@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "../generated/prisma/client.js";
-import { clearBuffsForSourceInTx } from "./active-effects.js";
+import { clearBuffsForSourceInTx, clearBuffsForRestInTx } from "./active-effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
@@ -1292,6 +1292,18 @@ export async function applyHitPointOperations(
         sessionId,
       });
 
+      // A rest clears its matching "until-rest" durable buffs (#455). Long rest
+      // clears both short- and long-rest buffs; short rest only short.
+      if (op.type === "shortRest" || op.type === "longRest") {
+        await clearBuffsForRestInTx(
+          tx,
+          characterId,
+          op.type === "longRest" ? "long" : "short",
+          batchId,
+          sessionId,
+        );
+      }
+
       // After the damage event is logged, resolve concentration (issue #41).
       // Logged as a separate "spellcasting" event sharing this batchId so the
       // CON save shows on the timeline and LIFO undo reverses HP + concentration
@@ -1450,4 +1462,51 @@ export async function applyDamageInTx(
   // Resolve concentration on this damage instance (issue #41), mirroring the
   // `case "damage"` branch of applyHitPointOperations.
   return applyConcentrationCheckInTx(tx, characterId, amount, hp.current, batchId, sessionId);
+}
+
+/**
+ * Grant self temporary HP inside an existing transaction (Rally maneuver).
+ * Mirrors applySetTempOp: 5e temp HP doesn't stack — take the higher value.
+ */
+export async function applyTempHpInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  amount: number,
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  if (amount <= 0) {
+    throw new InvalidHitPointOperationError("temp HP amount must be positive");
+  }
+
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: { hitPoints: true, hitDice: true },
+  });
+  if (!row) {
+    throw new InvalidHitPointOperationError(`Character not found: ${characterId}`);
+  }
+
+  const hp = normalizeHitPoints(row.hitPoints);
+  const hd = normalizeHitDice(row.hitDice);
+  const beforeHp = { ...hp };
+
+  hp.temp = Math.max(hp.temp, amount);
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: { hitPoints: hp as unknown as Prisma.InputJsonValue },
+  });
+
+  await logEvent(tx, {
+    characterId,
+    category: "hitPoints",
+    type: "setTemp",
+    summary: `Set temporary HP to ${hp.temp}`,
+    before: { hitPoints: beforeHp, hitDice: { ...hd } },
+    after: { hitPoints: { ...hp }, hitDice: { ...hd } },
+    data: { amount },
+    batchId,
+    sessionId,
+  });
 }

@@ -11,7 +11,6 @@ import { useState } from "react";
 
 import { applyActionTransactions, startCombat, endCombat, advanceCombatRound } from "@/api/client";
 import { rollSpec } from "@/lib/dice";
-import { maneuverPlacement } from "@/lib/maneuvers";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { resolverFor } from "@/features/session/actionResolvers";
 import { useActiveResolution } from "@/features/session/useActiveResolution";
@@ -75,10 +74,10 @@ export function useTurnActions({
   // Partition known maneuvers by placement for the Reaction slot and effect strip.
   const maneuversKnown = character.resources?.maneuversKnown ?? [];
   const reactionManeuvers = maneuversKnown.filter(
-    (m) => maneuverPlacement(m.name) === "reaction",
+    (m) => (m.placement ?? "damageRoll") === "reaction",
   );
   const effectManeuvers = maneuversKnown.filter(
-    (m) => maneuverPlacement(m.name) === "effect",
+    (m) => (m.placement ?? "damageRoll") === "effect",
   );
   const superiorityRemaining = superiorityPool?.remaining ?? 0;
 
@@ -254,11 +253,11 @@ export function useTurnActions({
     }
   }
 
-  async function handleReactionManeuver(maneuverName: string) {
+  async function handleReactionManeuver(entryId: string, maneuverName: string) {
     if (dieBusy || superiorityRemaining === 0) return;
     setError(null);
     try {
-      const dieResult = await spendDie();
+      const dieResult = await spendDie(entryId);
       consumeReaction();
       setShowReactionMenu(false);
       if (maneuverName === "Parry") {
@@ -279,14 +278,18 @@ export function useTurnActions({
     }
   }
 
-  async function handleEffectManeuver(maneuverName: string) {
+  async function handleEffectManeuver(entryId: string, maneuverName: string) {
     if (dieBusy || superiorityRemaining === 0) return;
     setError(null);
     try {
-      const dieResult = await spendDie();
+      const dieResult = await spendDie(entryId);
       if (maneuverName === "Evasive Footwork") {
         setEffectMessage(
           `Evasive Footwork — add +${dieResult} to your AC until the end of your turn (${dieLabel} rolled ${dieResult}).`,
+        );
+      } else if (maneuverName === "Rally") {
+        setEffectMessage(
+          `Rally — gained temporary HP (${dieLabel} rolled ${dieResult} + your CHA modifier).`,
         );
       } else {
         setEffectMessage(

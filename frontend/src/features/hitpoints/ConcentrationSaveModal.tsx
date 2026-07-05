@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import Modal from "@/components/ui/Modal";
 import DiceRoller from "@/features/dice/DiceRoller";
+import { useRoll } from "@/features/dice/RollContext";
 import type { RollResult } from "@/lib/dice";
 
 /** The deferred concentration save awaiting a manual roll (issue #76). */
@@ -32,6 +33,7 @@ export default function ConcentrationSaveModal({
   onResolve,
   onClose,
 }: ConcentrationSaveModalProps) {
+  const { logSessionRoll } = useRoll();
   const [phase, setPhase] = useState<"prompt" | "rolling" | "result">("prompt");
   const [outcome, setOutcome] = useState<{ natural: number; total: number; held: boolean } | null>(
     null,
@@ -47,6 +49,15 @@ export default function ConcentrationSaveModal({
     const total = natural + save.saveBonus;
     setOutcome({ natural, total, held: total >= save.dc });
     setPhase("result");
+    // Emit a saveRoll to the Session Log (no-op outside an active session).
+    logSessionRoll({
+      kind: "save",
+      source: `Concentration save (${save.spellName})`,
+      ability: "constitution",
+      total,
+      faces: [natural],
+      dc: save.dc,
+    });
     void onResolve(natural);
   }
 

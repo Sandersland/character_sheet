@@ -14,7 +14,7 @@ import { payAbilityCostInTx, type AbilityCost, type PayCostContext } from "./abi
 import { appendActiveBuffInTx, clearBuffsForSourceInTx } from "./active-effects.js";
 import { resolveBuffSpec, type EffectSpec } from "./effects.js";
 import { logEvent, type EventType } from "./events.js";
-import { applyHealInTx, applyDamageInTx } from "./hitpoints.js";
+import { applyHealInTx, applyDamageInTx, applyTempHpInTx } from "./hitpoints.js";
 import type { ConcentrationState, SpellcastingMutableState } from "./spell-state.js";
 
 // The per-op result the dispatcher logs (before/after snapshots + logEvent).
@@ -42,7 +42,7 @@ export interface CastAbilityInput {
   roll: number;
   eventType: EventType;
   concentrates: boolean;
-  apply?: { target: "self"; kind: "heal" | "damage"; amount: number };
+  apply?: { target: "self"; kind: "heal" | "damage" | "tempHp"; amount: number };
 }
 
 // Byte-load-bearing: reproduces the current castSpell summary exactly.
@@ -102,10 +102,12 @@ async function handleConcentrationOnCast(ctx: CastAbilityContext, next: Concentr
 // Apply a self-targeted rolled effect to the caster's own HP in the same batch.
 async function applySelfEffectInTx(
   ctx: CastAbilityContext,
-  apply: { kind: "heal" | "damage"; amount: number },
+  apply: { kind: "heal" | "damage" | "tempHp"; amount: number },
 ): Promise<void> {
   if (apply.kind === "heal") {
     await applyHealInTx(ctx.tx, ctx.characterId, apply.amount, ctx.batchId, ctx.sessionId);
+  } else if (apply.kind === "tempHp") {
+    await applyTempHpInTx(ctx.tx, ctx.characterId, apply.amount, ctx.batchId, ctx.sessionId);
   } else {
     await applyDamageInTx(ctx.tx, ctx.characterId, apply.amount, ctx.batchId, ctx.sessionId);
   }
@@ -132,7 +134,7 @@ export async function castAbilityInTx(ctx: CastAbilityContext, input: CastAbilit
     await appendActiveBuffInTx(
       ctx.tx,
       ctx.characterId,
-      { key: input.entryId, target: buff.target, modifier: buff.modifier, source: input.name, sourceEntryId: input.entryId },
+      { key: input.entryId, target: buff.target, modifier: buff.modifier, source: input.name, sourceEntryId: input.entryId, duration: "concentration" },
       ctx.batchId,
       ctx.sessionId,
     );

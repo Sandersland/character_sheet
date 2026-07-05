@@ -848,6 +848,35 @@ describe("POST /api/characters/:id/experience — granted spells reconciled on l
     expect(ev).toBeDefined();
   });
 
+  it("nulls concentration when the concentrated spell was the stripped grant", async () => {
+    await ensureTestOwner(OWNER_ID);
+    await prisma.character.create({
+      data: {
+        ...BASE_CHARACTER,
+        ownerId: OWNER_ID,
+        id: "test-gs-conc",
+        name: "GrantedSpell test-gs-conc",
+        experiencePoints: XP_LVL_3,
+        hitDice: { total: 3, die: "d8", spent: 0 },
+        spellcasting: {
+          ...leakedSpellcasting(),
+          concentratingOn: { entryId: "granted:way-of-shadow:minor-illusion", spellName: "Minor Illusion" },
+        } as Prisma.InputJsonValue,
+        classEntries: {
+          create: [{ name: GS_MONK_NAME, classId: gsMonkClassId, position: 0, level: 3, subclass: "Way of Shadow" }],
+        },
+      },
+    });
+
+    const res = await postXp("test-gs-conc", { operations: [{ type: "set", value: XP_LVL_1 }] });
+    expect(res.status).toBe(200);
+
+    const row = await prisma.character.findUnique({ where: { id: "test-gs-conc" }, select: { spellcasting: true } });
+    const stored = row?.spellcasting as { spells: unknown[]; concentratingOn: unknown } | null;
+    expect(stored?.spells).toHaveLength(0);
+    expect(stored?.concentratingOn).toBeNull();
+  });
+
   it("undo restores the leaked granted spell entry", async () => {
     await createLvl3ShadowMonk("test-gs-undo");
     const resetRes = await postXp("test-gs-undo", { operations: [{ type: "set", value: XP_LVL_1 }] });

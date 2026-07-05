@@ -90,7 +90,7 @@ describe("POST /api/characters/:id/resources/transactions", () => {
   let catalogManeuverId: string;
 
   afterAll(async () => {
-    await prisma.maneuver.deleteMany({ where: { name: MANEUVER_CATALOG_NAME } });
+    await prisma.grantedAbility.deleteMany({ where: { name: MANEUVER_CATALOG_NAME } });
     await prisma.characterClass.deleteMany({ where: { name: FIGHTER_CATALOG_NAME } });
   });
 
@@ -111,9 +111,19 @@ describe("POST /api/characters/:id/resources/transactions", () => {
       update: {},
     });
 
-    const maneuver = await prisma.maneuver.upsert({
+    const maneuver = await prisma.grantedAbility.upsert({
       where: { name: MANEUVER_CATALOG_NAME },
-      create: { name: MANEUVER_CATALOG_NAME, description: "Knock a target prone on a hit." },
+      create: {
+        name: MANEUVER_CATALOG_NAME,
+        source: "maneuver",
+        description: "Knock a target prone on a hit.",
+        placement: "damageRoll",
+        saveAbility: "strength",
+        costKind: "pool",
+        costPoolKey: "superiorityDice",
+        costBase: 1,
+        effectDieSource: "superiorityDice",
+      },
       update: {},
     });
     catalogManeuverId = maneuver.id;

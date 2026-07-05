@@ -298,7 +298,8 @@ export type CharacterEventCategory =
   | "advancement"
   | "session"
   | "combat"
-  | "conditions";
+  | "conditions"
+  | "roll";
 
 export type CharacterEventType =
   | "acquired" | "consumed" | "sold" | "bought" | "removed"  // inventory
@@ -320,7 +321,8 @@ export type CharacterEventType =
   | "sessionStarted" | "sessionEnded"                          // session lifecycle
   | "combatStarted" | "combatEnded" | "combatRoundAdvanced"   // combat lifecycle
   | "conditionApplied" | "conditionRemoved" | "exhaustionSet" // conditions
-  | "attackRoll" | "damageRoll"                               // combat rolls
+  | "attackRoll" | "damageRoll"                               // roll (attack/damage)
+  | "checkRoll" | "saveRoll" | "initiativeRoll"               // roll (check/save/initiative)
   | "revert";                                                  // meta
 
 export interface CharacterEventField {
@@ -512,12 +514,29 @@ export interface ClassFeature {
   source: "class" | "subclass";
 }
 
+/**
+ * Where a maneuver's session UI lives — resolved from catalog data (no longer a
+ * hardcoded frontend table). "attackRoll"/"damageRoll" fold the die into that
+ * roll; "reaction"/"attackOption" consume a slot with reminder text; "effect" is
+ * a gold strip (Evasive Footwork, Rally).
+ */
+export type ManeuverPlacement =
+  | "attackRoll"
+  | "damageRoll"
+  | "reaction"
+  | "effect"
+  | "attackOption";
+
 /** A known maneuver entry on a character — per-character entry with catalog provenance. */
 export interface ManeuverEntry {
   id: string;
-  maneuverId?: string;   // catalog Maneuver.id provenance — undefined for custom
+  maneuverId?: string;   // catalog GrantedAbility.id provenance — undefined for custom
   name: string;
   description: string;
+  // Session-UI routing snapshot from the catalog (undefined for custom/legacy
+  // → session components treat as "damageRoll").
+  placement?: ManeuverPlacement;
+  actionSlot?: "bonusAction" | "reaction" | null;
 }
 
 /** Catalog maneuver served by GET /api/maneuvers. */
@@ -525,6 +544,24 @@ export interface CatalogManeuver {
   id: string;
   name: string;
   description: string;
+  placement?: ManeuverPlacement;
+  actionSlot?: "bonusAction" | "reaction" | null;
+  saveAbility?: string | null;
+}
+
+/** Cast a known maneuver: spend one superiority die (the server rolls it). */
+export interface CastManeuverOperation {
+  type: "castManeuver";
+  entryId: string;
+}
+
+export type ManeuverOperation = CastManeuverOperation;
+
+/** Per-op result from POST …/maneuvers/transactions — die + announced save DC. */
+export interface ManeuverCastResult {
+  roll: number;
+  saveDc: number | null;
+  summary: string;
 }
 
 /** A known elemental discipline entry on a character (Way of the Four Elements). */
@@ -677,6 +714,8 @@ export interface CharacterResources {
   disciplineSaveDC?: number;
   /** Way of Shadow: whether the L3+ Shadow Arts ki-cast spells are available. */
   shadowArtsAvailable?: boolean;
+  /** Way of Shadow: whether the L11+ Cloak of Shadows self-invisible toggle is available. */
+  cloakOfShadowsAvailable?: boolean;
   /** Number of artisan's-tool proficiency choices from a subclass feature. */
   toolProfChoiceCount?: number;
   pools: ResourcePool[];
@@ -1263,13 +1302,22 @@ export interface ConditionsState {
 
 // ── Active effects (buffs) — mirrors backend/src/lib/active-effects.ts ─────────
 
+// Duration axis (#455). Absent on the wire means "concentration" (byte-parity
+// with #438). while-active / until-rest are durable self-buffs (e.g. Rage).
+export type BuffDuration = "concentration" | "while-active" | "until-rest";
+
 export interface ActiveBuff {
   id: string;
   key: string;
-  target: string;
+  target: string; // skill/ability/stat key, or "meleeDamage"
   modifier: number;
   source: string;
   sourceEntryId?: string;
+  // Always present on the API response — the backend normalizer defaults absent
+  // wire values to "concentration" before serializing, so the frontend never
+  // sees an undefined duration.
+  duration: BuffDuration;
+  restType?: "short" | "long";
 }
 
 export interface ActiveEffectsState {

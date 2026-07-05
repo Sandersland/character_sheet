@@ -4,11 +4,11 @@ import userEvent from "@testing-library/user-event";
 
 import TurnHub from "@/features/session/TurnHub";
 import { useTurnState } from "@/features/session/useTurnState";
-import { maneuverPlacement } from "@/lib/maneuvers";
 import { RollProvider } from "@/features/dice/RollContext";
 import {
   applyActionTransactions,
   applyResourceTransactions,
+  castManeuverTransaction,
   startCombat,
   endCombat,
   advanceCombatRound,
@@ -21,6 +21,7 @@ import type { Character } from "@/types/character";
 vi.mock("@/api/client", () => ({
   applyActionTransactions: vi.fn(),
   applyResourceTransactions: vi.fn(),
+  castManeuverTransaction: vi.fn(),
   startCombat: vi.fn(),
   endCombat: vi.fn(),
   advanceCombatRound: vi.fn(),
@@ -59,8 +60,8 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
         { key: "superiorityDice", label: "Superiority Dice", die: "d8", total: 4, recharge: "shortRest", used: 0, remaining: 4 },
       ],
       maneuversKnown: [
-        { id: "m1", name: "Parry", description: "Reduce incoming damage." },
-        { id: "m2", name: "Evasive Footwork", description: "Add the die to your AC." },
+        { id: "m1", name: "Parry", description: "Reduce incoming damage.", placement: "reaction", actionSlot: "reaction" },
+        { id: "m2", name: "Evasive Footwork", description: "Add the die to your AC.", placement: "effect" },
       ],
       toolProficienciesKnown: [],
     },
@@ -112,6 +113,10 @@ beforeEach(() => {
   const updated = makeCharacter();
   vi.mocked(applyActionTransactions).mockResolvedValue(updated);
   vi.mocked(applyResourceTransactions).mockResolvedValue(updated);
+  vi.mocked(castManeuverTransaction).mockResolvedValue({
+    character: updated,
+    results: [{ roll: 5, saveDc: null, summary: "used maneuver" }],
+  });
   vi.mocked(applyInventoryTransactions).mockResolvedValue(updated);
   vi.mocked(startCombat).mockResolvedValue(undefined);
   vi.mocked(endCombat).mockResolvedValue(undefined);
@@ -220,12 +225,7 @@ describe("TurnHub — action economy", () => {
 });
 
 describe("TurnHub — Battle Master maneuvers", () => {
-  it("classifies Parry as a reaction maneuver", () => {
-    expect(maneuverPlacement("Parry")).toBe("reaction");
-    expect(maneuverPlacement("Evasive Footwork")).toBe("effect");
-  });
-
-  it("spends a superiority die and consumes the reaction for a reaction maneuver", async () => {
+  it("routes a reaction maneuver by its entry placement and casts via the server", async () => {
     const user = userEvent.setup();
     renderHub();
     await startTurn(user);
@@ -234,14 +234,14 @@ describe("TurnHub — Battle Master maneuvers", () => {
     await user.click(screen.getByRole("button", { name: /Parry \(d8\)/ }));
 
     await waitFor(() =>
-      expect(applyResourceTransactions).toHaveBeenCalledWith("char-1", [
-        { type: "spendResource", key: "superiorityDice", amount: 1, roll: expect.any(Number) },
+      expect(castManeuverTransaction).toHaveBeenCalledWith("char-1", [
+        { type: "castManeuver", entryId: "m1" },
       ]),
     );
     expect(screen.getByText(/Reaction used/i)).toBeInTheDocument();
   });
 
-  it("spends a superiority die for an effect maneuver and shows the gold strip", async () => {
+  it("casts an effect maneuver by its entry id and shows the gold strip", async () => {
     const user = userEvent.setup();
     renderHub();
     await startTurn(user);
@@ -249,8 +249,8 @@ describe("TurnHub — Battle Master maneuvers", () => {
     await user.click(screen.getByRole("button", { name: /Evasive Footwork \(d8\)/ }));
 
     await waitFor(() =>
-      expect(applyResourceTransactions).toHaveBeenCalledWith("char-1", [
-        { type: "spendResource", key: "superiorityDice", amount: 1, roll: expect.any(Number) },
+      expect(castManeuverTransaction).toHaveBeenCalledWith("char-1", [
+        { type: "castManeuver", entryId: "m2" },
       ]),
     );
     expect(screen.getByText(/add \+\d+ to your AC/i)).toBeInTheDocument();
@@ -258,9 +258,12 @@ describe("TurnHub — Battle Master maneuvers", () => {
 
   it("clears a stale maneuver error on a later successful effect maneuver", async () => {
     const user = userEvent.setup();
-    vi.mocked(applyResourceTransactions)
+    vi.mocked(castManeuverTransaction)
       .mockRejectedValueOnce(new Error("Superiority die spend failed."))
-      .mockResolvedValueOnce(makeCharacter());
+      .mockResolvedValueOnce({
+        character: makeCharacter(),
+        results: [{ roll: 5, saveDc: null, summary: "used maneuver" }],
+      });
     renderHub();
     await startTurn(user);
 

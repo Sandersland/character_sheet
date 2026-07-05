@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 
 import RollResultToast from "@/features/dice/RollResultToast";
+import RollModeToggle from "@/features/dice/RollModeToggle";
 import { RollProvider } from "@/features/dice/RollContext";
 import CharacterSheetHeader from "@/features/character-meta/CharacterSheetHeader";
 import CharacterSheetBody from "@/features/character-meta/CharacterSheetBody";
@@ -37,7 +38,10 @@ export default function CharacterSheetPage() {
   if (character === null) return <CharacterLoadError variant="not-found" characterId={id} />;
 
   return (
-    <RollProvider>
+    <RollProvider
+      characterId={character.id}
+      sessionId={session.inActiveSession ? session.activeSessionId : null}
+    >
       <div className="min-h-screen bg-parchment-100">
         <CharacterSheetHeader
           character={character}
@@ -68,6 +72,7 @@ export default function CharacterSheetPage() {
           onUpdate={setCharacter}
           journalSessionId={session.inActiveSession ? session.activeSessionId : undefined}
         />
+        <RollModeToggle />
         <RollResultToast />
       </div>
     </RollProvider>

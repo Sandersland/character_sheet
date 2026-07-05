@@ -187,7 +187,11 @@ cmd_rm() {
   local path; path="$(worktree_path "$branch")"
   if [ -d "$path" ]; then
     ( cd "$path" && docker compose down -v ) || true
-    git -C "$ROOT" worktree remove "$path" --force
+    # A half-torn-down dir (git worktree metadata already pruned) makes
+    # `worktree remove` die with "not a working tree" — fall back to removing
+    # the dir + pruning so the slot is still freed (the janitor relies on rm
+    # never leaving a registry entry behind).
+    git -C "$ROOT" worktree remove "$path" --force || { rm -rf "$path"; git -C "$ROOT" worktree prune; }
   fi
   registry_del "$branch"
   echo "Removed worktree '$branch' (containers, volumes, and slot freed)."

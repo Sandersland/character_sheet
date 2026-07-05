@@ -1,6 +1,6 @@
 ---
 name: autodev
-description: Run the deterministic autonomous-development state machine — pick a ready GitHub issue (or take a given issue number), confirm its scope, build it test-first in an isolated worktree, review it, and open a PR, fully unattended with per-state tool permissions and turn/cost budgets. Use when the user says "/autodev", "run autodev", "autonomously pick up an issue", "work the backlog unattended", or wants a hands-off issue→PR run. Not for interactive multi-issue building with a human approval gate — that's parallel-issues.
+description: Run and operate the deterministic autonomous-development pipeline — pick a ready GitHub issue (or take a given issue number), confirm its scope, build it test-first in an isolated worktree, review it, and open a PR, fully unattended with per-state tool permissions and turn/cost budgets; batches run under a resident daemon (autodevd) driven via autodevctl. Use when the user says "/autodev", "run autodev", "autonomously pick up an issue", "work the backlog unattended", wants a hands-off issue→PR run — or asks about a running/finished batch ("how's the overnight batch doing?", "why did #N fail?", "add #N to the batch", "pause/stop the batch"). Not for interactive multi-issue building with a human approval gate — that's parallel-issues.
 ---
 
 # autodev
@@ -63,7 +63,7 @@ Each run writes `.claude/autodev/runs/<run-id>/` (gitignored):
 - `payloads/` — every validated state output; `raw-*.json` — full claude stdout per attempt
 - `pr-body.md` / `flag-comment.md` / `fail-comment.md` — what was published
 
-When the run finishes, report: the issue worked, the outcome (PR URL / flagged / failed + why), fix cycles used, total cost, and the run dir. On failure the worktree is left intact — inspect it, then tear down with `./.claude/skills/worktree/worktree.sh rm <branch>`.
+When the run finishes, report: the issue worked, the outcome (PR URL / flagged / failed + why), fix cycles used, total cost, and the run dir. On failure the worktree is left intact — inspect it, then tear down with `./.claude/skills/worktree/worktree.sh rm <branch>` (or let the janitor reclaim it). For batches, `autodevctl report` produces exactly this rollup per issue — see "Reading `report`" below.
 
 ## Extending
 
@@ -75,24 +75,95 @@ Note the two-layer Bash contract: `allowedTools` prefix-matches the **whole** co
 
 Concurrent runs are safe: `worktree.sh create` serializes slot assignment behind an mkdir lock (`.claude/worktrees/.slot.lock` — remove it by hand only if a create crashed while holding it), and each run **claims its issue by self-assigning** right after GetWork (the `ClaimIssue` script state). GetWork excludes assigned issues, so a `taken` claim loops back for a re-pick (≤3 tries). Failure paths (`Fail`, `ApplyFlag`) release the claim; a successful PR keeps the assignee as an ownership signal until merge.
 
-## Batch mode (`batch.mjs`)
+## Batch mode (`batch.mjs` one-shot · `autodevd.mjs` daemon)
 
-To work several issues unattended (e.g. overnight), `batch.mjs` orchestrates fsm.mjs runs with a concurrency cap and a dependency DAG gated on **real merges into the base branch** (dependents fork `origin/<base>`, so a prereq's PR must land first):
+To work several issues unattended (e.g. overnight), the batch engine (`batch-core.mjs`) orchestrates fsm.mjs runs with a concurrency cap and a dependency DAG gated on **real merges into the base branch** (dependents fork `origin/<base>`, so a prereq's PR must land first). It has two frontends sharing the same flags, log vocabulary, and `batch.json`:
 
 ```bash
+# One-shot: runs to all-terminal, then exits (the original form).
 node .claude/skills/autodev/batch.mjs 123 124:123 125:124 331 332:331 --cap 3   # issue[:prereq[,prereq]]
 # flags: --cap 3 (concurrent runs) --poll 60 (s) --grace 1800 (s to wait for auto-merge) --base staging --state-dir DIR
+
+# Daemon: resident + supervised — survives Claude Code reaping its launcher,
+# idles at all-terminal so more work can be added, adopts children on relaunch.
+nohup node .claude/skills/autodev/autodevd.mjs 123 124:123 --cap 3 >/dev/null 2>&1 & disown
+node .claude/skills/autodev/autodevd.mjs stop          # graceful: stop launching, let running children finish
+node .claude/skills/autodev/autodevd.mjs stop --park   # SIGTERM children; they park as retry_wait for the next launch
 ```
 
-Run it in the background and watch the milestone log (`LAUNCH/RESUME/WAIT-MERGE/MERGED/RETRY-WAIT/SKIP/FAIL/CLEANUP/DONE/SUMMARY`): `tail -f <state-dir>/orchestrator.log`. State dir defaults to `.claude/autodev/overnight/<ts>/`; per-issue child logs live beside `batch.json`.
+**Prefer the daemon for anything long-running.** Claude Code reaps background task process groups — a reaped one-shot orchestrator used to freeze its runs at `status: "running"` and leak their worktree slots. The daemon model fixes this structurally:
 
-Semantics worth knowing:
+- **fsm children are spawned detached** (own process group, own log fd), so killing/reaping the orchestrator never kills an in-flight (expensive) Claude run.
+- **PID file** (`.claude/autodev/autodevd.pid`): a second launch while a daemon is live is refused; a stale pidfile (dead or recycled pid) is reclaimed automatically.
+- **Relaunch is the recovery path** — nothing auto-restarts a dead daemon. Re-running the launch command re-attaches to the previous non-terminal batch (recorded in `.claude/autodev/daemon.json`; `--state-dir` overrides) and **adopts** entries whose child pid is still alive instead of re-launching them — zero lost or duplicated runs. Dead children resume their run dir, as before.
+- At all-terminal the daemon logs `DONE` + `SUMMARY`, stamps `batch.completedAt`, and idles resident; `autodevctl add` (or relaunching with new issue specs) merges new work into the same batch as `pending`.
+
+Watch the milestone log (`LAUNCH/RESUME/ADOPT/WAIT-MERGE/MERGED/NEEDS-REVIEW-RESPONSE/RETRY-WAIT/PARK/SKIP/FAIL/CLEANUP/DRAIN/DONE/SUMMARY`): `tail -f <state-dir>/orchestrator.log`. State dir defaults to `.claude/autodev/overnight/<ts>/`; per-issue child logs live beside `batch.json`.
+
+Semantics worth knowing (both frontends):
 
 - **Success = `run.json.ctx.prUrl` set**, never `status` alone — a graceful Fail/Flag exit is also `status: "completed"` but has no PR, and is marked failed immediately (no merge-grace). Merged runs' worktrees are torn down to free slots; failed runs keep theirs (their commits were already pushed by the driver's fail handler).
 - **Exit 75 (rate limit)** → the issue parks in `retry_wait` and is resumed via `fsm.mjs resume` at the `retryAt` the driver parsed from the limit message (≤3 rate-limit retries — a weekly-cap hit never clears, see Known limits). While anything is rate-limit-parked, NEW launches pause: the limit is account-wide.
-- **Other crashes** get one `resume` attempt before the issue is marked failed; a failed/skipped prereq transitively skips its dependents.
-- **Restart-idempotent**: single atomic `batch.json`; rerun with the same `--state-dir` to pick a batch back up (interrupted `running` issues re-launch).
+- **Other crashes** get one `resume` attempt before the issue is marked failed — except during a drain, where a nonzero exit parks as `retry_wait` instead (a `stop --park` SIGTERM must not burn the resume attempt). A failed/skipped prereq transitively skips its dependents.
+- **A PR blocked only on the required `claude-review` gate is NOT a failure.** At grace expiry the merge poll classifies the open PR (`classifyPrBlock`, scoped to the batch's `--base`): a real `conflict`/`other-red` check still FAILs (dependents skipped), but a `review-blocked` PR (mergeable, only `claude-review` red — the gate posts CHANGES_REQUESTED on its first pass) keeps polling as `waiting_merge`, logs `NEEDS-REVIEW-RESPONSE` once, and does **not** skip dependents. Recover with `/pr-response` on the PR; when it merges, dependents unblock. (Auto-driving the response is the follow-up in #480.) An `unknown` classification (transient gh failure, checks still pending, or green + auto-merge just lagging) also keeps polling but logs a neutral `WAIT-MERGE … merge status unclear` once instead — it is not a review block and needs no operator action.
+- **Restart-idempotent**: single atomic `batch.json`; rerun with the same `--state-dir` to pick a batch back up (`running` entries with a live pid are adopted; with a dead pid, resumed).
 - State store is a plain JSON file by design — SQLite deferred until an analytics need is proven (decision 2026-07-02).
+
+Structural changes to the engine are covered by a zero-spend smoke test (`bash .claude/skills/autodev/test/smoke-daemon.sh` — stub fsm/gh/worktree via the `AUTODEV_*` env seams in `batch-core.mjs`/`janitor.mjs`); run it before merging engine changes.
+
+## Heartbeats + janitor (`janitor.mjs`)
+
+Every fsm run writes `pid` + `lastHeartbeat` into `run.json` (30s timer + every transition; atomic tmp+rename), so liveness is observable. `janitor.reconcile()` — run on every batch tick, by SetupWorktree's self-heal, and callable standalone — repairs the two things a reaped run used to leak:
+
+- **Dead runs are finalized**: a non-terminal `run.json` whose pid is gone or whose heartbeat is older than 15 min (`AUTODEV_HEARTBEAT_STALE_MS`; generous because synchronous script states — `docker compose up` — starve the timer) is rewritten to `failed` with a `steps.jsonl` reap line. Its already-ledgered `costUsd` is the harvested spend; whatever the in-flight invocation burned after its last ledger write is unrecoverable. Legacy run.jsons with no pid/heartbeat fields are treated as dead.
+- **Leaked slots are freed**: for each `registry.json` branch — worktree dir gone → stale reservation cleared; dir present with a terminal/dead owning run → full `worktree.sh rm`. A branch with a **live or parked owning run, or with no autodev run at all** (manual worktrees — parallel-issues, interactive — share the registry) is never touched.
+
+Parked runs are protected by status: exit-75 tempfails are already `retry-scheduled`, and batch-core stamps drain-parked/interrupted runs to `retry-scheduled` too — a parked run legitimately has no live process and must not be reaped. The batch additionally passes its own non-terminal rundirs as `protect` (a just-resumed child hasn't overwritten the stale pid in `run.json` yet).
+
+SetupWorktree **self-heals** on "no free slots": reconcile, then retry the create once — a leaked slot no longer bricks a fresh run after burning ConfirmScope spend.
+
+## Control channel (`autodevctl.mjs`)
+
+Interact with a live daemon over its Unix socket (`.claude/autodev/autodevd.sock` — NDJSON `{id, verb, args}` → `{id, ok, data|error}`, one request per connection; protocol details in `control.mjs`):
+
+```bash
+node .claude/skills/autodev/autodevctl.mjs <verb> [args] [--json]
+```
+
+| Verb | Effect |
+|---|---|
+| `status` | daemon + per-issue state (status, FSM state, cost, PR url); `--json` for the raw snapshot |
+| `report [--state-dir DIR]` | per-issue rollup: outcome, cost, fix cycles, active time (see below); `--state-dir` reads the ledger directly with **no daemon** (post-mortem) |
+| `logs <issue> [--lines N]` | tail the issue's batch log; prints the run-dir log path for `tail -f` |
+| `add <issue[:prereqs]>…` | enqueue into the running DAG (launches next tick, cap/DAG permitting) |
+| `pause [issue]` / `resume [issue]` | gate future launches, globally or per-issue — a running child is **not** killed |
+| `stop <issue>` | SIGTERM the child's process group, mark failed (`stoppedBy: "ctl"`), tear down its worktree |
+| `retry <issue>` | force a failed/skipped/parked issue back into the queue (resumes its run dir when one exists) |
+| `reconcile` | run the janitor pass now; returns `{reapedRuns, freedSlots}` |
+| `ping` | liveness (`pong pid=… uptime=…`) |
+| `shutdown [--park]` | graceful daemon stop over the socket (same drain semantics as `autodevd stop`) |
+
+Exit codes: `0` ok · `1` daemon-side error (bad verb/args, unknown issue) · `2` **daemon not running** — prints the exact relaunch command (recovered from `daemon.json`'s recorded argv) instead of hanging. A stale socket left by a SIGKILL'd daemon is probed and reclaimed on the next launch; graceful shutdown removes it.
+
+Handlers share the daemon's event loop with the tick, so a response can lag a few seconds behind a `spawnSync` gh merge poll — accepted; mutations are still race-free (single thread, synchronous tick body).
+
+### Reading `report`
+
+`report` (`report.mjs`) joins `batch.json` + `run.json` + `steps.jsonl` per issue — no new state store; the plain-JSON ledger stays the source of truth. One row per issue:
+
+```
+issue   outcome        cost  cycles  active  detail
+#392    pr             $1.57    0      4m    https://github.com/…/pull/413
+#446    failed        $11.01    2     38m    reaped: stale heartbeat (janitor)
+```
+
+- **outcome** precedence: `pr` (the only real success) → `skipped` (poisoned prereq) → `failed` + `ctx.failure` → `flagged` (graceful FlagIssue: needs-interactive/needs-refinement) → `parked` (retry_wait, will resume) → `in-flight @ State`.
+- **cycles** = `loops["Reviewer->Worker"]` (review fix loops used); **cost** = `run.costUsd` (billed failures included; a reaped run's cost is a floor — see Known limits).
+- **active** = Σ `steps.jsonl` `durationMs` — deliberately NOT wall-clock: `startedAt` resets on every resume, so wall time across rate-limit parks would lie.
+
+### Driving it as an agent
+
+Answer operational questions with verbs, not jq forensics: "how's the batch doing?" → `status` (or `report` once it's done) · "why did #N fail?" → `report` for the reason, then `logs N` / the row's run dir for depth · "add #N" → `add N[:prereqs]` · "pause/stop things" → `pause` / `stop N` / `shutdown` · "is it even alive?" → `ping`, and on exit 2 relaunch with the printed command (relaunch is the recovery path — nothing auto-restarts the daemon). For a batch whose daemon is gone, `report --state-dir <dir>` still answers the outcome question.
 
 ## UI verification
 
@@ -106,4 +177,5 @@ When ConfirmScope marks `uiSurface: true`, the Reviewer gets a Playwright MCP se
 
 - The Reviewer verifies UI against the e2e suite's seeded personas (Smoke Fighter L1, Wizard L5), not production-like data — surfaces gated on higher levels/other classes/inventory may need a human pass.
 - The issue claim is check-then-assign (GitHub has no atomic claim); a sub-second tie between two runs can double-claim. The slot lock still prevents any port collision in that case.
+- A run failed by the janitor or batch keeps `run.json` as the source of truth, but a reaped child's **post-last-ledger spend is invisible** — the claude invocation's cost report died with its stdout. Treat reaped runs' `costUsd` as a floor.
 - The subscription's **weekly** compute cap has no parseable in-band reset signal — hitting it looks like a rate_limit tempfail (exit 75) that never clears on resume. An orchestrator's rate-limit retry cap bounds the damage; if resumes keep tempfailing, check `/usage` manually.

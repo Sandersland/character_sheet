@@ -343,6 +343,90 @@ describe("combat/roll require an active participant", () => {
   });
 });
 
+// ── Roll kinds under the `roll` category (#128) ───────────────────────────────
+
+describe("roll kinds log under the `roll` category", () => {
+  async function activeSession(): Promise<string> {
+    const campaignId = await setupCampaign();
+    const start = await agent(cookieOwner).post(startUrl(campaignId)).send({ characterId: CHAR_OWNER });
+    return start.body.session.id as string;
+  }
+
+  const rollUrl = (sessionId: string) =>
+    `/api/characters/${CHAR_OWNER}/sessions/${sessionId}/roll`;
+
+  it("logs a check roll as type checkRoll under the roll category, with data + null before/after", async () => {
+    const sessionId = await activeSession();
+    const res = await agent(cookieOwner).post(rollUrl(sessionId)).send({
+      kind: "check", source: "Athletics", total: 18,
+      ability: "strength", skill: "athletics", dc: 15, rollMode: "advantage", faces: [17],
+    });
+    expect(res.status).toBe(201);
+
+    const ev = await prisma.characterEvent.findFirst({
+      where: { characterId: CHAR_OWNER, type: "checkRoll" },
+    });
+    expect(ev).not.toBeNull();
+    expect(ev!.category).toBe("roll");
+    expect(ev!.before).toBeNull();
+    expect(ev!.after).toBeNull();
+    expect(ev!.summary).toBe("Athletics: 18 vs DC 15");
+    expect(ev!.data).toMatchObject({
+      kind: "check", ability: "strength", skill: "athletics", dc: 15, rollMode: "advantage", faces: [17],
+    });
+  });
+
+  it("logs save + initiative rolls under the roll category", async () => {
+    const sessionId = await activeSession();
+    await agent(cookieOwner).post(rollUrl(sessionId)).send({
+      kind: "save", source: "Dexterity save", total: 12, ability: "dexterity", dc: 13,
+    });
+    await agent(cookieOwner).post(rollUrl(sessionId)).send({
+      kind: "initiative", source: "Initiative", total: 19, rollMode: "normal",
+    });
+
+    const save = await prisma.characterEvent.findFirst({ where: { characterId: CHAR_OWNER, type: "saveRoll" } });
+    const init = await prisma.characterEvent.findFirst({ where: { characterId: CHAR_OWNER, type: "initiativeRoll" } });
+    expect(save!.category).toBe("roll");
+    expect(init!.category).toBe("roll");
+    expect(save!.summary).toBe("Dexterity save: 12 vs DC 13");
+    expect(init!.summary).toBe("Initiative: 19"); // no DC suffix
+  });
+
+  it("re-homes attack/damage rolls under the roll category", async () => {
+    const sessionId = await activeSession();
+    await agent(cookieOwner).post(rollUrl(sessionId)).send({ kind: "attack", source: "Longsword", total: 17 });
+    await agent(cookieOwner).post(rollUrl(sessionId)).send({ kind: "damage", source: "Longsword", total: 9, damageType: "slashing" });
+
+    const attack = await prisma.characterEvent.findFirst({ where: { characterId: CHAR_OWNER, type: "attackRoll" } });
+    const dmg = await prisma.characterEvent.findFirst({ where: { characterId: CHAR_OWNER, type: "damageRoll" } });
+    expect(attack!.category).toBe("roll");
+    expect(dmg!.category).toBe("roll");
+    expect(dmg!.summary).toBe("Longsword: 9 slashing");
+  });
+
+  it("rejects an invalid kind, rollMode, or dc with 400", async () => {
+    const sessionId = await activeSession();
+    const badKind = await agent(cookieOwner).post(rollUrl(sessionId)).send({ kind: "perception", source: "x", total: 1 });
+    expect(badKind.status).toBe(400);
+    const badMode = await agent(cookieOwner).post(rollUrl(sessionId)).send({ kind: "check", source: "x", total: 1, rollMode: "super" });
+    expect(badMode.status).toBe(400);
+    const badDc = await agent(cookieOwner).post(rollUrl(sessionId)).send({ kind: "save", source: "x", total: 1, dc: "high" });
+    expect(badDc.status).toBe(400);
+  });
+
+  it("keeps roll events non-undoable — reverting a roll batch 409s", async () => {
+    const sessionId = await activeSession();
+    await agent(cookieOwner).post(rollUrl(sessionId)).send({ kind: "check", source: "Athletics", total: 18 });
+    const ev = await prisma.characterEvent.findFirst({
+      where: { characterId: CHAR_OWNER, type: "checkRoll" }, select: { batchId: true },
+    });
+    const res = await agent(cookieOwner)
+      .post(`/api/characters/${CHAR_OWNER}/events/${ev!.batchId}/revert`).send({});
+    expect(res.status).toBe(409);
+  });
+});
+
 // ── Active-session contract (200 null, never 404 for no campaign/session) ──────
 
 describe("GET /api/characters/:id/sessions/active", () => {

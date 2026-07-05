@@ -20,9 +20,10 @@ let COOKIE: string;
 const FIXTURE_ID = "test-shadow-cast-monk-1";
 const CLASS_NAME = "Shadow Cast Test Monk";
 
-// XP thresholds → monk level: L2=300, L3=900.
+// XP thresholds → monk level: L2=300, L3=900, L11=85000.
 const XP_L2 = 300;
 const XP_L3 = 900;
+const XP_L11 = 85000;
 
 const url = `/api/characters/${FIXTURE_ID}/shadow-arts/transactions`;
 const activityUrl = `/api/characters/${FIXTURE_ID}/activity?category=resources`;
@@ -210,6 +211,17 @@ describe("Shadow Arts cast endpoint", () => {
     const res = await cast([{ type: "castShadowArt", shadowArtId: darknessId }]);
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/level 3/i);
+  });
+
+  it("surfaces cloakOfShadowsAvailable only for an L11+ Way of Shadow monk", async () => {
+    await createMonk(XP_L11, "way of shadow");
+    const l11 = await agent().get(`/api/characters/${FIXTURE_ID}`);
+    expect(l11.body.resources.cloakOfShadowsAvailable).toBe(true);
+    await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
+
+    await createMonk(XP_L3, "way of shadow");
+    const l3 = await agent().get(`/api/characters/${FIXTURE_ID}`);
+    expect(l3.body.resources.cloakOfShadowsAvailable).toBeUndefined();
   });
 });
 
