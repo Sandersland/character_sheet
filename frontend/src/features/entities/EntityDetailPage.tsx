@@ -51,7 +51,9 @@ export default function EntityDetailPage() {
   // tab (carried via location.state.from or ?from=manage), else the Codex (#489).
   const backTo = useMemo(() => {
     const fromState = (location.state as { from?: string } | null)?.from;
-    if (typeof fromState === "string" && fromState) return fromState;
+    // Only honor an in-app relative path (defense-in-depth: the value is only
+    // ever set by CampaignManagePanel, but never route to a non-"/" target).
+    if (typeof fromState === "string" && fromState.startsWith("/")) return fromState;
     if (campaignId && new URLSearchParams(location.search).get("from") === "manage") {
       return `/campaigns/${campaignId}/manage`;
     }

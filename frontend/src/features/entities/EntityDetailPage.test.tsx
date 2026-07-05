@@ -154,6 +154,12 @@ describe("EntityDetailPage (#248)", () => {
     expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/manage`);
   });
 
+  it("ignores a non-relative location.state origin and falls back to Codex (#489)", async () => {
+    renderPage({ pathname: ENTITY_PATH, state: { from: "https://evil.example/phish" } });
+    const back = await screen.findByRole("link", { name: /back to campaign/i });
+    expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/codex`);
+  });
+
   it("links back to Manage when ?from=manage is present (#489)", async () => {
     renderPage({ pathname: ENTITY_PATH, search: "?from=manage" });
     const back = await screen.findByRole("link", { name: /back to campaign/i });
