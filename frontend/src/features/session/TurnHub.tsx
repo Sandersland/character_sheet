@@ -73,6 +73,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     classActions,
     classBonusActions,
     classReactions,
+    durableReminders,
     reactionManeuvers,
     effectManeuvers,
     actionSurgePool,
@@ -356,6 +357,16 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
             {effectMessage}
           </p>
         )}
+
+        {/* Durable-buff end reminders (e.g. Rage) — when/why the buff will end. */}
+        {durableReminders.map((r) => (
+          <p
+            key={r.key}
+            className="rounded-control border border-garnet-200 bg-garnet-50 px-3 py-2 text-xs font-semibold text-garnet-800"
+          >
+            🔥 {r.reminder}
+          </p>
+        ))}
 
         {/* Note about movement */}
         <p className="text-[11px] text-parchment-600 italic">

@@ -161,6 +161,7 @@ export function useTurnState(character: Character, sessionId: string): TurnState
 
   // Server-derived, multiclass-correct (max across classes); see srd.ts.
   const attacksPerAction = character.attacksPerAction;
+  const currentHp = character.hitPoints?.current ?? 0;
 
   // Persist state to localStorage whenever it changes.
   useEffect(() => {
@@ -169,14 +170,13 @@ export function useTurnState(character: Character, sessionId: string): TurnState
 
   // Watch current HP: a drop during an active turn marks damage taken (feeds the
   // durable-buff turn-hook). Heals and non-HP updates are ignored.
-  const prevHpRef = useRef(character.hitPoints?.current ?? 0);
+  const prevHpRef = useRef(currentHp);
   useEffect(() => {
-    const current = character.hitPoints?.current ?? prevHpRef.current;
-    if (current < prevHpRef.current) {
+    if (currentHp < prevHpRef.current) {
       setState((s) => (s.phase === "active" && !s.tookDamageThisTurn ? { ...s, tookDamageThisTurn: true } : s));
     }
-    prevHpRef.current = current;
-  }, [character.hitPoints?.current]);
+    prevHpRef.current = currentHp;
+  }, [currentHp]);
 
   const startCombat = useCallback(() => {
     setState({
@@ -201,7 +201,7 @@ export function useTurnState(character: Character, sessionId: string): TurnState
 
   const startTurn = useCallback(() => {
     // Re-baseline the HP watcher so only damage taken during this turn counts.
-    prevHpRef.current = character.hitPoints?.current ?? prevHpRef.current;
+    prevHpRef.current = currentHp;
     setState((s) => ({
       ...s,
       phase: "active",
@@ -215,7 +215,7 @@ export function useTurnState(character: Character, sessionId: string): TurnState
       attackedThisTurn: false,
       tookDamageThisTurn: false,
     }));
-  }, [character.inventory, character.hitPoints?.current]);
+  }, [character.inventory, currentHp]);
 
   const endTurn = useCallback(() => {
     setState((s) => {

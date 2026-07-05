@@ -19,6 +19,8 @@ export interface TurnActivityWindow {
 /** End-condition for one durable (while-active) buff, keyed by its buff `key`. */
 export interface DurableBuffEndCondition {
   key: string;
+  /** Action key the turn tracker invokes to clear this buff server-side. */
+  endActionKey: string;
   /** Human-readable "when/why it ends" note surfaced in the turn UI. */
   reminder: string;
   endsWhen: (window: TurnActivityWindow) => boolean;
@@ -27,10 +29,16 @@ export interface DurableBuffEndCondition {
 export const DURABLE_BUFF_END_CONDITIONS: DurableBuffEndCondition[] = [
   {
     key: "rage",
+    endActionKey: "endRage",
     reminder: "Rage ends at the end of your turn unless you attacked or took damage this turn.",
     endsWhen: (w) => !w.attacked && !w.tookDamage,
   },
 ];
+
+/** The action key that clears the given buff, or undefined if it has no end-condition. */
+export function endActionKeyFor(buffKey: string): string | undefined {
+  return DURABLE_BUFF_END_CONDITIONS.find((c) => c.key === buffKey)?.endActionKey;
+}
 
 /** Buff keys whose end-condition fires for this turn window. */
 export function buffsToAutoEnd(activeBuffKeys: string[], window: TurnActivityWindow): string[] {

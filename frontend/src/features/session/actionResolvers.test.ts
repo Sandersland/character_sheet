@@ -15,7 +15,7 @@ const BACKEND_ACTION_EFFECT_KEYS = new Set([
   "attack", "castSpell", "dodge", "dash", "disengage", "help", "hide",
   "search", "ready", "grapple", "opportunityAttack", "castSpellReaction",
   "useObject",
-  "rage", "recklessAttack",
+  "rage", "endRage", "recklessAttack",
   "bardicInspiration",
   "channelDivinityCleric",
   "wildShape",

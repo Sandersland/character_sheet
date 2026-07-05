@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buffsToAutoEnd, endReminders } from "@/lib/turnHooks";
+import { buffsToAutoEnd, endReminders, endActionKeyFor } from "@/lib/turnHooks";
 
 describe("buffsToAutoEnd — Rage end-condition (#457)", () => {
   it("ends Rage when no attack was made and no damage was taken this turn", () => {
@@ -34,5 +34,15 @@ describe("endReminders — surfaced while a durable buff is active (#457)", () =
 
   it("returns nothing when no durable buff with a reminder is active", () => {
     expect(endReminders(["bless"])).toEqual([]);
+  });
+});
+
+describe("endActionKeyFor (#457)", () => {
+  it("maps the rage buff to the endRage action", () => {
+    expect(endActionKeyFor("rage")).toBe("endRage");
+  });
+
+  it("returns undefined for a buff with no end-condition", () => {
+    expect(endActionKeyFor("bless")).toBeUndefined();
   });
 });
