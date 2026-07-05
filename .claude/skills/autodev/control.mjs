@@ -120,7 +120,7 @@ export async function attachControl({ engine, daemon, sockPath, log }) {
       const nl = buf.indexOf("\n");
       if (nl === -1) return;
       const line = buf.slice(0, nl);
-      buf = "";
+      buf = buf.slice(nl + 1); // keep any bytes after the newline (correct NDJSON framing)
       let res;
       let id = null;
       try {

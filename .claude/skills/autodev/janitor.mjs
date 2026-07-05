@@ -134,6 +134,10 @@ export function reconcile({ log = () => {}, protect = [] } = {}) {
     }
     const branch = run.ctx?.branch;
     if (branch && !runsByBranch.has(branch)) {
+      // runState is intentionally RE-evaluated here: for a run reapRun just
+      // finalized, run.status is now "failed" so this returns "terminal" —
+      // which is what lets the registry sweep below free its slot in the
+      // same pass instead of waiting for the next one.
       runsByBranch.set(branch, { dir, run, state: protectSet.has(resolve(dir)) ? "live" : runState(run) });
     }
   }

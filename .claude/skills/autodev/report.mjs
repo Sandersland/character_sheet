@@ -49,8 +49,11 @@ function readJsonl(path) {
 
 function outcomeOf(entry, run) {
   if (run?.ctx?.prUrl) return { kind: "pr", detail: run.ctx.prUrl };
-  if (entry.status === "skipped") return { kind: "skipped", detail: `prereq failed/skipped (${entry.prereqs.join(",")})` };
+  if (entry.status === "skipped") return { kind: "skipped", detail: `prereq failed/skipped (${(entry.prereqs ?? []).join(",")})` };
   if (run?.ctx?.failure) return { kind: "failed", detail: run.ctx.failure };
+  // Ledger invariant: FlagIssue is the only path that completes with ctx.comment
+  // set (fsm.mjs applyFlag) — a future run type that sets ctx.comment on real
+  // success would be misclassified here; give it a dedicated ctx flag instead.
   if (run?.status === "completed" && run?.ctx?.comment) {
     return { kind: "flagged", detail: run.ctx.interactiveOnly ? "needs-interactive" : "needs-refinement" };
   }

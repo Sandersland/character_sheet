@@ -481,7 +481,9 @@ export function createEngine({ stateDir, cfg = null }) {
       const e = batch.issues[issue];
       const run = e.rundir ? readRunJson(e) : null;
       issues[issue] = {
-        status: e.status,
+        // Surface an in-flight stop: entry.status stays "running" until the
+        // SIGTERM'd child actually exits, but the user should see it took.
+        status: e.stopping ? "stopping" : e.status,
         paused: e.paused ?? false,
         prereqs: e.prereqs,
         pid: e.pid ?? null,
@@ -555,6 +557,7 @@ export function createEngine({ stateDir, cfg = null }) {
     entry.resumed = false;
     entry.rateRetries = 0;
     delete entry.stoppedBy;
+    delete entry.stopping; // hygiene — unreachable today (stopping implies running), cheap insurance if the guard relaxes
     delete batch.completedAt; // live work again
     log(`RETRY #${issue} forced (${entry.rundir ? `will resume ${entry.rundir}` : "no run dir — fresh launch"})`);
     saveBatch();
