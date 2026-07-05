@@ -468,6 +468,20 @@ export interface CatalogShadowArt {
   effect: EffectSpec;
 }
 
+/** How a Channel Divinity option expresses through the declarative core (#419). */
+export type ChannelDivinityKind = "announce" | "buff" | "advantage" | "invisible" | "reminder";
+
+/** An entitled Channel Divinity option from GET /api/characters/:id/channel-divinity (#419). */
+export interface CatalogChannelDivinity {
+  id: string;
+  name: string;
+  description: string;
+  kind: ChannelDivinityKind;
+  saveDc: number | null;
+  saveAbility: string | null;
+  reminder: string;
+}
+
 export interface SpellSlots {
   level: number;
   total: number;
@@ -1269,6 +1283,17 @@ export interface CastShadowArtOperation {
   shadowArtId: string;
 }
 export type ShadowArtOperation = CastShadowArtOperation;
+
+// ── Channel Divinity operation types (mirrors backend/src/lib/channel-divinity.ts) ──
+// Sent as `{ operations: ChannelDivinityOperation[] }` to
+// POST /api/characters/:id/channel-divinity/transactions.
+
+/** Use a Channel Divinity option (Cleric/Paladin): spend 1 CD charge. */
+export interface CastChannelDivinityOperation {
+  type: "castChannelDivinity";
+  abilityId: string;
+}
+export type ChannelDivinityOperation = CastChannelDivinityOperation;
 
 // ── Conditions state + operation types (mirrors backend/src/lib/conditions.ts)
 // Sent as `{ operations: ConditionOperation[] }` to

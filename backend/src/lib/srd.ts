@@ -1057,12 +1057,14 @@ export function deriveWeaponAttackBonus(
    * attack rolls with ranged weapons; all other styles are no-ops here.
    */
   fightingStyle?: FightingStyleKey | null,
+  /** Flat bonus from active "attackRoll" buffs (e.g. Sacred Weapon); #419. */
+  attackRollBonus = 0,
 ): number {
   const abilityMod = weaponAbilityMod(weapon, effectiveScores);
   const proficient = isProficientWithWeapon(weapon, weaponGrants);
   const archeryBonus =
     fightingStyle === "archery" && weapon.weaponRange === "ranged" ? 2 : 0;
-  return abilityMod + (proficient ? proficiencyBonus : 0) + archeryBonus;
+  return abilityMod + (proficient ? proficiencyBonus : 0) + archeryBonus + attackRollBonus;
 }
 
 export type WeaponGrip = "one-handed" | "two-handed" | "versatile-two-handed";

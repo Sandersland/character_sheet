@@ -6,10 +6,12 @@ import type {
   CatalogDiscipline,
   CatalogManeuver,
   CatalogShadowArt,
+  CatalogChannelDivinity,
   CatalogSpell,
   Character,
   DisciplineOperation,
   ShadowArtOperation,
+  ChannelDivinityOperation,
   CharacterEvent,
   ConcentrationCheck,
   CharacterSummary,
@@ -231,6 +233,25 @@ export async function applyShadowArtsTransactions(
   operations: ShadowArtOperation[]
 ): Promise<Character> {
   return postTransactions(characterId, "shadow-arts", operations, "Failed to apply shadow arts operations");
+}
+
+// Feeds the Cleric/Paladin Channel Divinity picker — the entitled options for
+// this character (gated per class/subclass/level), each with its save DC + reminder.
+export async function fetchChannelDivinity(characterId: string): Promise<CatalogChannelDivinity[]> {
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/channel-divinity`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Channel Divinity options (${response.status})`);
+  }
+  return response.json();
+}
+
+// Applies a batch of Channel Divinity operations atomically: castChannelDivinity
+// (spend 1 CD charge, apply the option's real side effect). Full updated Character.
+export async function applyChannelDivinityTransactions(
+  characterId: string,
+  operations: ChannelDivinityOperation[]
+): Promise<Character> {
+  return postTransactions(characterId, "channel-divinity", operations, "Failed to apply Channel Divinity operations");
 }
 
 // One inline edit is a batch of one operation; a bulk action (e.g. selling

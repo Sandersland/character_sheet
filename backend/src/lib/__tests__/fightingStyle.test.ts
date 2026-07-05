@@ -101,6 +101,20 @@ describe("deriveWeaponAttackBonus with archery fighting style", () => {
     const withDefense = deriveWeaponAttackBonus(rangedWeapon, scores, 2, noGrants, "defense");
     expect(withDefense).toBe(without);
   });
+
+  it("attackRollBonus (e.g. Sacred Weapon) adds to any weapon's attack bonus (#419)", () => {
+    const meleeWeapon = { name: "Longsword", finesse: false, weaponRange: "melee" };
+    const without = deriveWeaponAttackBonus(meleeWeapon, scores, 2, noGrants, null);
+    const withBuff = deriveWeaponAttackBonus(meleeWeapon, scores, 2, noGrants, null, 4);
+    expect(withBuff).toBe(without + 4);
+  });
+
+  it("attackRollBonus defaults to 0 (no buff) — byte-parity with the pre-#419 signature", () => {
+    const meleeWeapon = { name: "Longsword", finesse: false, weaponRange: "melee" };
+    expect(deriveWeaponAttackBonus(meleeWeapon, scores, 2, noGrants, null)).toBe(
+      deriveWeaponAttackBonus(meleeWeapon, scores, 2, noGrants, null, 0),
+    );
+  });
 });
 
 describe("resources normalize/serialize round-trip for fightingStyle", () => {

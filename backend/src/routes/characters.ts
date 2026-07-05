@@ -153,6 +153,8 @@ interface InventoryItemContext {
   fightingStyle: FightingStyleKey | null;
   /** Sum of active "meleeDamage" buffs (#455); added to melee weapon damage. */
   meleeDamageBonus: number;
+  /** Sum of active "attackRoll" buffs (#419, e.g. Sacred Weapon); added to weapon attack bonus. */
+  attackRollBonus: number;
 }
 
 function serializeInventoryItem(
@@ -179,6 +181,7 @@ function serializeInventoryItem(
         context.proficiencyBonus,
         context.weaponGrants,
         context.fightingStyle,
+        context.attackRollBonus,
       ),
       damage: deriveWeaponDamage(
         {
@@ -686,10 +689,12 @@ function buildInventoryContext(
 
   // Sum active "meleeDamage" buffs (e.g. Rage) — added to melee weapon damage
   // in deriveWeaponDamage, the same derive-on-read path skills use (#455).
-  const meleeDamageBonus = (buffsByTarget(normalizeActiveEffectsMutable(row.activeEffects)).meleeDamage ?? [])
-    .reduce((sum, b) => sum + b.modifier, 0);
+  const targetedBuffs = buffsByTarget(normalizeActiveEffectsMutable(row.activeEffects));
+  const meleeDamageBonus = (targetedBuffs.meleeDamage ?? []).reduce((sum, b) => sum + b.modifier, 0);
+  // Sum active "attackRoll" buffs (e.g. Sacred Weapon) — added to weapon attack bonus (#419).
+  const attackRollBonus = (targetedBuffs.attackRoll ?? []).reduce((sum, b) => sum + b.modifier, 0);
 
-  return { effectiveScores, proficiencyBonus, weaponGrants, offHandBusy, fightingStyle, meleeDamageBonus };
+  return { effectiveScores, proficiencyBonus, weaponGrants, offHandBusy, fightingStyle, meleeDamageBonus, attackRollBonus };
 }
 
 export function serializeCharacter(row: CharacterWithRelations) {
