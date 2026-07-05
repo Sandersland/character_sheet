@@ -1,6 +1,6 @@
 ---
 name: autodev
-description: Run the deterministic autonomous-development state machine — pick a ready GitHub issue (or take a given issue number), confirm its scope, build it test-first in an isolated worktree, review it, and open a PR, fully unattended with per-state tool permissions and turn/cost budgets. Use when the user says "/autodev", "run autodev", "autonomously pick up an issue", "work the backlog unattended", or wants a hands-off issue→PR run. Not for interactive multi-issue building with a human approval gate — that's parallel-issues.
+description: Run and operate the deterministic autonomous-development pipeline — pick a ready GitHub issue (or take a given issue number), confirm its scope, build it test-first in an isolated worktree, review it, and open a PR, fully unattended with per-state tool permissions and turn/cost budgets; batches run under a resident daemon (autodevd) driven via autodevctl. Use when the user says "/autodev", "run autodev", "autonomously pick up an issue", "work the backlog unattended", wants a hands-off issue→PR run — or asks about a running/finished batch ("how's the overnight batch doing?", "why did #N fail?", "add #N to the batch", "pause/stop the batch"). Not for interactive multi-issue building with a human approval gate — that's parallel-issues.
 ---
 
 # autodev
@@ -63,7 +63,7 @@ Each run writes `.claude/autodev/runs/<run-id>/` (gitignored):
 - `payloads/` — every validated state output; `raw-*.json` — full claude stdout per attempt
 - `pr-body.md` / `flag-comment.md` / `fail-comment.md` — what was published
 
-When the run finishes, report: the issue worked, the outcome (PR URL / flagged / failed + why), fix cycles used, total cost, and the run dir. On failure the worktree is left intact — inspect it, then tear down with `./.claude/skills/worktree/worktree.sh rm <branch>`.
+When the run finishes, report: the issue worked, the outcome (PR URL / flagged / failed + why), fix cycles used, total cost, and the run dir. On failure the worktree is left intact — inspect it, then tear down with `./.claude/skills/worktree/worktree.sh rm <branch>` (or let the janitor reclaim it). For batches, `autodevctl report` produces exactly this rollup per issue — see "Reading `report`" below.
 
 ## Extending
 
@@ -132,7 +132,7 @@ node .claude/skills/autodev/autodevctl.mjs <verb> [args] [--json]
 | Verb | Effect |
 |---|---|
 | `status` | daemon + per-issue state (status, FSM state, cost, PR url); `--json` for the raw snapshot |
-| `report` | per-issue rollup (ships with #471) |
+| `report [--state-dir DIR]` | per-issue rollup: outcome, cost, fix cycles, active time (see below); `--state-dir` reads the ledger directly with **no daemon** (post-mortem) |
 | `logs <issue> [--lines N]` | tail the issue's batch log; prints the run-dir log path for `tail -f` |
 | `add <issue[:prereqs]>…` | enqueue into the running DAG (launches next tick, cap/DAG permitting) |
 | `pause [issue]` / `resume [issue]` | gate future launches, globally or per-issue — a running child is **not** killed |
@@ -145,6 +145,24 @@ node .claude/skills/autodev/autodevctl.mjs <verb> [args] [--json]
 Exit codes: `0` ok · `1` daemon-side error (bad verb/args, unknown issue) · `2` **daemon not running** — prints the exact relaunch command (recovered from `daemon.json`'s recorded argv) instead of hanging. A stale socket left by a SIGKILL'd daemon is probed and reclaimed on the next launch; graceful shutdown removes it.
 
 Handlers share the daemon's event loop with the tick, so a response can lag a few seconds behind a `spawnSync` gh merge poll — accepted; mutations are still race-free (single thread, synchronous tick body).
+
+### Reading `report`
+
+`report` (`report.mjs`) joins `batch.json` + `run.json` + `steps.jsonl` per issue — no new state store; the plain-JSON ledger stays the source of truth. One row per issue:
+
+```
+issue   outcome        cost  cycles  active  detail
+#392    pr             $1.57    0      4m    https://github.com/…/pull/413
+#446    failed        $11.01    2     38m    reaped: stale heartbeat (janitor)
+```
+
+- **outcome** precedence: `pr` (the only real success) → `skipped` (poisoned prereq) → `failed` + `ctx.failure` → `flagged` (graceful FlagIssue: needs-interactive/needs-refinement) → `parked` (retry_wait, will resume) → `in-flight @ State`.
+- **cycles** = `loops["Reviewer->Worker"]` (review fix loops used); **cost** = `run.costUsd` (billed failures included; a reaped run's cost is a floor — see Known limits).
+- **active** = Σ `steps.jsonl` `durationMs` — deliberately NOT wall-clock: `startedAt` resets on every resume, so wall time across rate-limit parks would lie.
+
+### Driving it as an agent
+
+Answer operational questions with verbs, not jq forensics: "how's the batch doing?" → `status` (or `report` once it's done) · "why did #N fail?" → `report` for the reason, then `logs N` / the row's run dir for depth · "add #N" → `add N[:prereqs]` · "pause/stop things" → `pause` / `stop N` / `shutdown` · "is it even alive?" → `ping`, and on exit 2 relaunch with the printed command (relaunch is the recovery path — nothing auto-restarts the daemon). For a batch whose daemon is gone, `report --state-dir <dir>` still answers the outcome question.
 
 ## UI verification
 

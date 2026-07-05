@@ -6,7 +6,9 @@
  *   node .claude/skills/autodev/autodevctl.mjs <verb> [args] [--json]
  *
  *   status                      batch + per-issue state (state, cost, PR urls)
- *   report                      per-issue rollup (ships with #471)
+ *   report [--state-dir DIR]    per-issue rollup (outcome, cost, fix cycles,
+ *                               active time); --state-dir reads the ledger
+ *                               directly — works with no daemon (post-mortem)
  *   logs <issue> [--lines N]    tail a run's batch log
  *   add <issue[:prereqs]>...    enqueue into the running DAG
  *   pause [issue]               pause launches (global or per-issue)
@@ -23,6 +25,7 @@ import { connect } from "node:net";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildReport, renderReport } from "./report.mjs";
 
 const SKILL_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(SKILL_DIR, "../../..");
@@ -105,6 +108,19 @@ if (!verb) {
   process.exit(1);
 }
 
+// report --state-dir DIR: pure file read, no daemon required (post-mortem mode).
+if (verb === "report" && argv.includes("--state-dir")) {
+  const dir = argv[argv.indexOf("--state-dir") + 1];
+  try {
+    const report = buildReport(resolve(ROOT, dir));
+    console.log(json ? JSON.stringify(report, null, 2) : renderReport(report));
+    process.exit(0);
+  } catch (err) {
+    console.error(`autodevctl: ${err.message}`);
+    process.exit(1);
+  }
+}
+
 const args = {};
 if (verb === "add") args.specs = rest;
 else if (["pause", "resume"].includes(verb) && rest[0]) args.issue = Number(rest[0]);
@@ -131,6 +147,8 @@ if (json) {
   console.log(JSON.stringify(res.data, null, 2));
 } else if (verb === "status") {
   renderStatus(res.data);
+} else if (verb === "report") {
+  console.log(renderReport(res.data));
 } else if (verb === "logs") {
   console.log(res.data.tail);
   console.log(`\n(batch log: ${res.data.batchLog}${res.data.runLog ? ` · run log: tail -f ${res.data.runLog}` : ""})`);
