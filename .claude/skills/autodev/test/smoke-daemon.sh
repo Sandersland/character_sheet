@@ -19,6 +19,10 @@
 #      socket left by SIGKILL is reclaimed on relaunch
 #   H  report rollup: per-issue outcome/cost/cycles both over the socket and
 #      via --state-dir with no daemon (post-mortem mode)
+#   I  review-blocked PR keeps waiting_merge; dependent not skipped; classifyPrBlock
+#      base-scoped (open lookup only matches when --base is passed)
+#   J  merge-lagging PR (all green, unmerged) classifies unknown → WAIT-MERGE log,
+#      never the NEEDS-REVIEW-RESPONSE /pr-response prompt
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -44,17 +48,28 @@ echo '{}' > "$T/worktrees/registry.json"   # isolated slot registry — daemon-t
 # keeps loadOrInit's pre-merged detection from short-circuiting fresh issues.
 cat > "$T/bin/gh" <<EOF
 #!/usr/bin/env bash
-n=""; state=""; prev=""
+n=""; state=""; base=""; prev=""
 for a in "\$@"; do
   if [[ "\$a" =~ \(#([0-9]+)\) ]]; then n="\${BASH_REMATCH[1]}"; fi
   if [ "\$prev" = "--state" ]; then state="\$a"; fi
+  if [ "\$prev" = "--base" ]; then base="\$a"; fi
   prev="\$a"
 done
 if [ -n "\$n" ] && [ "\$n" = "\${GH_STUB_REVIEW_BLOCKED:-}" ]; then
   # Designated review-blocked issue: mergeable open PR whose claude-review check
-  # is FAILURE, never merged. (classifyPrBlock reads the open search; isMerged the merged one.)
-  if [ "\$state" = "open" ]; then
+  # is FAILURE, never merged (classifyPrBlock reads the open search; isMerged the
+  # merged one). The open lookup is base-scoped on purpose: classifyPrBlock must
+  # pass --base like isMerged, else it won't match here — guards the --base finding.
+  if [ "\$state" = "open" ] && [ "\$base" = "staging" ]; then
     echo "[{\"title\":\"stub pr (#\$n)\",\"mergeable\":\"MERGEABLE\",\"statusCheckRollup\":[{\"name\":\"claude-review\",\"status\":\"COMPLETED\",\"conclusion\":\"FAILURE\"},{\"name\":\"test\",\"status\":\"COMPLETED\",\"conclusion\":\"SUCCESS\"}]}]"
+  else
+    echo "[]"
+  fi
+elif [ -n "\$n" ] && [ "\$n" = "\${GH_STUB_MERGE_LAGGING:-}" ]; then
+  # Designated merge-lagging issue: mergeable open PR, all checks green, never
+  # merged → classifyPrBlock returns "unknown" (green + auto-merge just lagging).
+  if [ "\$state" = "open" ]; then
+    echo "[{\"title\":\"stub pr (#\$n)\",\"mergeable\":\"MERGEABLE\",\"statusCheckRollup\":[{\"name\":\"claude-review\",\"status\":\"COMPLETED\",\"conclusion\":\"SUCCESS\"},{\"name\":\"test\",\"status\":\"COMPLETED\",\"conclusion\":\"SUCCESS\"}]}]"
   else
     echo "[]"
   fi
@@ -323,5 +338,22 @@ node "$SKILL_DIR/autodevd.mjs" stop > "$T/i-stop.out" 2>&1
 wait_for 10 "I: daemon stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
 unset GH_STUB_REVIEW_BLOCKED
 pass "review-blocked PR kept open (grace paused), dependent not skipped, no FAIL"
+
+# ---------- J: merge-lagging PR (all green, not merged) → unknown → WAIT-MERGE, never NEEDS-REVIEW-RESPONSE ----------
+echo "J: green-but-lagging merge classifies unknown → WAIT-MERGE, no false /pr-response prompt"
+J="$T/state-j"
+export GH_STUB_MERGE_LAGGING=9920
+node "$SKILL_DIR/autodevd.mjs" 9920 --poll 1 --grace 2 --state-dir "$J" > "$T/j.out" 2>&1 &
+disown
+# Key off the post-grace "merge status unclear" text (distinct from the on-entry
+# "WAIT-MERGE #N (...) polling" line) so the negative check below can't race the
+# grace window — classifyPrBlock has demonstrably run once this matches.
+wait_for 25 "J: unclear-merge logged" grep -qs "#9920 merge status unclear (unknown)" "$J/orchestrator.log"
+status_is "$J/batch.json" 9920 waiting_merge || fail "J: 9920 should stay waiting_merge while merge lags"
+grep -qs "NEEDS-REVIEW-RESPONSE #9920" "$J/orchestrator.log" && fail "J: unknown/lagging merge must NOT prompt /pr-response"
+node "$SKILL_DIR/autodevd.mjs" stop > "$T/j-stop.out" 2>&1
+wait_for 10 "J: daemon stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
+unset GH_STUB_MERGE_LAGGING
+pass "green-but-lagging merge kept waiting as WAIT-MERGE, no NEEDS-REVIEW-RESPONSE"
 
 echo "SMOKE PASS (all scenarios)"

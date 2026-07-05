@@ -140,8 +140,11 @@ export function createEngine({ stateDir, cfg = null }) {
   //   "unknown"        — transient gh failure, checks still running, or green +
   //                      auto-merge just lagging → conservatively keep waiting
   const RED = (c) => c.status === "COMPLETED" && !["SUCCESS", "SKIPPED", "NEUTRAL"].includes(c.conclusion);
-  function classifyPrBlock(n) {
-    const res = sh(GH, ["pr", "list", "--state", "open", "--search", `(#${n}) in:title`, "--json", "number,mergeable,statusCheckRollup,title"]);
+  function classifyPrBlock(n, base) {
+    // --base scopes the open lookup to this batch's target branch, mirroring
+    // isMerged — else a stray open PR for #n against another branch could be
+    // classified instead of ours (the .title.includes guard only dedups substrings).
+    const res = sh(GH, ["pr", "list", "--state", "open", "--base", base, "--search", `(#${n}) in:title`, "--json", "number,mergeable,statusCheckRollup,title"]);
     if (res.status !== 0) return "unknown";
     let pr;
     try {
@@ -309,16 +312,24 @@ export function createEngine({ stateDir, cfg = null }) {
         entry.status = "merged";
         log(`MERGED #${n} (PR landed on ${batch.base})`);
       } else if (Date.now() - entry.doneAt >= batch.grace * 1000) {
-        const cls = classifyPrBlock(n);
+        const cls = classifyPrBlock(n, batch.base);
         if (cls === "conflict" || cls === "other-red") {
           entry.status = "failed";
           log(`FAIL #${n} auto-merge did not fire within ${batch.grace}s (${cls}); dependents will be skipped`);
         } else {
-          // review-blocked or unknown: recoverable via /pr-response. Keep polling
-          // for the merge instead of failing — do NOT skip dependents. Reset the
-          // grace window so we re-check periodically without hammering gh.
+          // review-blocked or unknown: recoverable/transient. Keep polling for the
+          // merge instead of failing — do NOT skip dependents. Reset the grace
+          // window so we re-check periodically without hammering gh. Split the log
+          // by classification: only review-blocked warrants a /pr-response prompt;
+          // unknown (transient gh failure, checks pending, or green + auto-merge
+          // just lagging) is neutral and must not send an operator chasing a
+          // non-issue. reviewBlockedLogged stays a once-guard across both.
           if (!entry.reviewBlockedLogged) {
-            log(`NEEDS-REVIEW-RESPONSE #${n} blocked on claude-review (all CI green) — run /pr-response to unblock; keeping open`);
+            if (cls === "review-blocked") {
+              log(`NEEDS-REVIEW-RESPONSE #${n} blocked on claude-review (all CI green) — run /pr-response to unblock; keeping open`);
+            } else {
+              log(`WAIT-MERGE #${n} merge status unclear (${cls}); re-checking after grace — no action needed`);
+            }
             entry.reviewBlockedLogged = true;
           }
           entry.doneAt = Date.now();
