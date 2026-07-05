@@ -1267,13 +1267,19 @@ export interface ConditionsState {
 
 // ── Active effects (buffs) — mirrors backend/src/lib/active-effects.ts ─────────
 
+// Duration axis (#455). Absent on the wire means "concentration" (byte-parity
+// with #438). while-active / until-rest are durable self-buffs (e.g. Rage).
+export type BuffDuration = "concentration" | "while-active" | "until-rest";
+
 export interface ActiveBuff {
   id: string;
   key: string;
-  target: string;
+  target: string; // skill/ability/stat key, or "meleeDamage"
   modifier: number;
   source: string;
   sourceEntryId?: string;
+  duration?: BuffDuration;
+  restType?: "short" | "long";
 }
 
 export interface ActiveEffectsState {
