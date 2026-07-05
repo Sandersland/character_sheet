@@ -514,12 +514,29 @@ export interface ClassFeature {
   source: "class" | "subclass";
 }
 
+/**
+ * Where a maneuver's session UI lives — resolved from catalog data (no longer a
+ * hardcoded frontend table). "attackRoll"/"damageRoll" fold the die into that
+ * roll; "reaction"/"attackOption" consume a slot with reminder text; "effect" is
+ * a gold strip (Evasive Footwork, Rally).
+ */
+export type ManeuverPlacement =
+  | "attackRoll"
+  | "damageRoll"
+  | "reaction"
+  | "effect"
+  | "attackOption";
+
 /** A known maneuver entry on a character — per-character entry with catalog provenance. */
 export interface ManeuverEntry {
   id: string;
-  maneuverId?: string;   // catalog Maneuver.id provenance — undefined for custom
+  maneuverId?: string;   // catalog GrantedAbility.id provenance — undefined for custom
   name: string;
   description: string;
+  // Session-UI routing snapshot from the catalog (undefined for custom/legacy
+  // → treated as "damageRoll"). See maneuverPlacementOf in @/features/session.
+  placement?: ManeuverPlacement;
+  actionSlot?: "bonusAction" | "reaction" | null;
 }
 
 /** Catalog maneuver served by GET /api/maneuvers. */
@@ -527,6 +544,9 @@ export interface CatalogManeuver {
   id: string;
   name: string;
   description: string;
+  placement?: ManeuverPlacement;
+  actionSlot?: "bonusAction" | "reaction" | null;
+  saveAbility?: string | null;
 }
 
 /** A known elemental discipline entry on a character (Way of the Four Elements). */
