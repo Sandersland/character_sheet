@@ -205,7 +205,7 @@ export const inventoryItemDetailInclude = {
   consumableDetail: true,
 } satisfies Prisma.InventoryItemInclude;
 
-type InventoryItemWithDetails = Prisma.InventoryItemGetPayload<{ include: typeof inventoryItemDetailInclude }>;
+export type InventoryItemWithDetails = Prisma.InventoryItemGetPayload<{ include: typeof inventoryItemDetailInclude }>;
 
 // The Item catalog include used when fetching a catalog Item's detail rows
 // for snapshot — same shape as inventoryItemDetailInclude above but typed
@@ -374,7 +374,7 @@ export interface DeletedInventoryItemSnapshot {
 // `data.deletedItem` snapshot. Mirror of snapshotItemDetail's field-by-field
 // style, but reads from an InventoryItem (live row) rather than a catalog Item
 // and keeps the scalar item columns alongside the detail blocks.
-function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): DeletedInventoryItemSnapshot {
+export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): DeletedInventoryItemSnapshot {
   return {
     id: item.id,
     itemId: item.itemId,

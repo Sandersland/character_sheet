@@ -24,6 +24,9 @@ export type EventType =
   | "sold"
   | "bought"
   | "removed"
+  // DM campaign-item award/revoke (#381) — inventory-category, undoable
+  | "awarded"
+  | "revoked"
   // hitPoints
   | "damage"
   | "heal"

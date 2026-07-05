@@ -1,0 +1,262 @@
+/**
+ * DM item award/revoke (#381). Real Postgres, supertest against createApp().
+ * Fixtures: a campaign owned by OWNER with PLAYER joined; PLAYER owns a
+ * character attached to the campaign, plus an OUTSIDER character in no campaign.
+ */
+
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import supertest from "supertest";
+
+import { createApp } from "../../app.js";
+import { Prisma } from "../../generated/prisma/client.js";
+import { prisma } from "../../lib/prisma.js";
+import { authCookie } from "../../test-support/auth.js";
+import { ensureTestOwner } from "../../test-support/owner.js";
+
+const OWNER = "owner-award-owner";
+const PLAYER = "owner-award-player";
+const CHAR = "test-award-char";
+const OUTSIDER_CHAR = "test-award-outsider-char";
+
+const app = createApp();
+const agent = (cookie: string) => supertest.agent(app).set("Cookie", cookie);
+
+const BASE_CHAR = {
+  alignment: "True Neutral",
+  experiencePoints: 900,
+  initiativeBonus: 2,
+  speed: 30,
+  hitPoints: { current: 28, max: 28, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+  hitDice: { total: 3, die: "d10", spent: 0 },
+  abilityScores: {
+    strength: 16, dexterity: 14, constitution: 14,
+    intelligence: 10, wisdom: 10, charisma: 8,
+  },
+  savingThrowProficiencies: ["strength", "constitution"],
+  skills: [],
+  toolProficiencies: [],
+  currency: { cp: 0, sp: 0, gp: 50, pp: 0 },
+};
+
+const weaponItem = {
+  name: "Flametongue",
+  category: "weapon" as const,
+  rarity: "rare",
+  weight: 3,
+  cost: { gp: 5000 },
+  weapon: { damageDiceCount: 2, damageDiceFaces: 6, damageType: "slashing" },
+};
+
+let cookieOwner: string;
+let cookiePlayer: string;
+let campaignId: string;
+
+async function createItem(body: Record<string, unknown>): Promise<{ id: string; entityId: string }> {
+  const res = await agent(cookieOwner).post(`/api/campaigns/${campaignId}/items`).send(body);
+  expect(res.status).toBe(201);
+  return { id: res.body.id, entityId: res.body.entity.id };
+}
+
+describe("campaign item award/revoke (#381)", () => {
+  beforeAll(async () => {
+    await ensureTestOwner(OWNER);
+    await ensureTestOwner(PLAYER);
+    cookieOwner = await authCookie(OWNER);
+    cookiePlayer = await authCookie(PLAYER);
+
+    await prisma.character.create({
+      data: { ...BASE_CHAR, id: CHAR, name: "Bruenor", ownerId: PLAYER, spellcasting: Prisma.JsonNull },
+    });
+    await prisma.character.create({
+      data: { ...BASE_CHAR, id: OUTSIDER_CHAR, name: "Nowhere", ownerId: PLAYER, spellcasting: Prisma.JsonNull },
+    });
+
+    const created = await agent(cookieOwner).post("/api/campaigns").send({ name: "Loot" });
+    campaignId = created.body.id;
+    await agent(cookiePlayer).post("/api/campaigns/join").send({ inviteCode: created.body.inviteCode });
+    await agent(cookiePlayer).post(`/api/campaigns/${campaignId}/characters`).send({ characterId: CHAR });
+  });
+
+  afterAll(async () => {
+    await prisma.campaign.deleteMany({ where: { id: campaignId } });
+    await prisma.character.deleteMany({ where: { id: { in: [CHAR, OUTSIDER_CHAR] } } });
+    await prisma.user.deleteMany({ where: { id: { in: [OWNER, PLAYER] } } });
+  });
+
+  it("awards into the target inventory with snapshot + detail, reveals entity, audits + undoes", async () => {
+    const { id, entityId } = await createItem(weaponItem);
+
+    const award = await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/award`)
+      .send({ characterId: CHAR, quantity: 2 });
+    expect(award.status).toBe(200);
+    expect(award.body.holders).toEqual([
+      { characterId: CHAR, characterName: "Bruenor", quantity: 2 },
+    ]);
+
+    // Snapshot + detail landed on the sheet with provenance FK.
+    const row = await prisma.inventoryItem.findFirst({
+      where: { characterId: CHAR, campaignItemId: id },
+      include: { weaponDetail: true },
+    });
+    expect(row?.name).toBe("Flametongue");
+    expect(row?.quantity).toBe(2);
+    expect(row?.weaponDetail?.damageDiceCount).toBe(2);
+
+    // Award auto-revealed the fronting entity.
+    const entity = await prisma.campaignEntity.findUnique({ where: { id: entityId } });
+    expect(entity?.visibility).toBe("REVEALED");
+
+    // Audit event on the TARGET character.
+    const activity = await agent(cookiePlayer).get(`/api/characters/${CHAR}/activity?category=inventory`);
+    const awarded = activity.body.find((e: { type: string }) => e.type === "awarded");
+    expect(awarded).toBeDefined();
+    expect(awarded.summary).toContain("Flametongue");
+
+    // Undo removes it cleanly.
+    const revert = await agent(cookiePlayer).post(
+      `/api/characters/${CHAR}/events/${awarded.batchId}/revert`,
+    );
+    expect(revert.status).toBe(200);
+    expect(await prisma.inventoryItem.findFirst({ where: { id: row!.id } })).toBeNull();
+  });
+
+  it("revokes a player-modified (renamed + equipped) snapshot, undoably", async () => {
+    const { id } = await createItem({ ...weaponItem, name: "Sunblade" });
+    await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/award`)
+      .send({ characterId: CHAR });
+
+    const row = await prisma.inventoryItem.findFirstOrThrow({
+      where: { characterId: CHAR, campaignItemId: id },
+    });
+    // Player renames + equips the snapshot.
+    await agent(cookiePlayer)
+      .post(`/api/characters/${CHAR}/inventory/transactions`)
+      .send({ operations: [
+        { type: "update", inventoryItemId: row.id, name: "My Sword" },
+        { type: "setEquipped", inventoryItemId: row.id, equipped: true },
+      ] });
+
+    const revoke = await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/revoke`)
+      .send({ characterId: CHAR });
+    expect(revoke.status).toBe(200);
+    expect(revoke.body.holders).toEqual([]);
+    expect(await prisma.inventoryItem.findFirst({ where: { id: row.id } })).toBeNull();
+
+    // Revoke is undoable — the row comes back.
+    const activity = await agent(cookiePlayer).get(`/api/characters/${CHAR}/activity?category=inventory`);
+    const revoked = activity.body.find((e: { type: string }) => e.type === "revoked");
+    const revert = await agent(cookiePlayer).post(
+      `/api/characters/${CHAR}/events/${revoked.batchId}/revert`,
+    );
+    expect(revert.status).toBe(200);
+    const restored = await prisma.inventoryItem.findFirst({ where: { id: row.id } });
+    expect(restored?.name).toBe("My Sword");
+
+    // Cleanup for the next tests.
+    await prisma.inventoryItem.deleteMany({ where: { campaignItemId: id } });
+  });
+
+  it("404s revoke when the character does not hold the item", async () => {
+    const { id } = await createItem({ ...weaponItem, name: "Unheld" });
+    const res = await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/revoke`)
+      .send({ characterId: CHAR });
+    expect(res.status).toBe(404);
+  });
+
+  it("blocks a second award of a held unique item, naming the holder; succeeds after revoke", async () => {
+    const { id } = await createItem({ ...weaponItem, name: "The One Ring", isUnique: true });
+
+    const first = await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/award`)
+      .send({ characterId: CHAR });
+    expect(first.status).toBe(200);
+
+    const second = await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/award`)
+      .send({ characterId: CHAR });
+    expect(second.status).toBe(409);
+    expect(second.body.error).toContain("Bruenor");
+
+    await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/revoke`)
+      .send({ characterId: CHAR });
+    const retry = await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/award`)
+      .send({ characterId: CHAR });
+    expect(retry.status).toBe(200);
+    await prisma.inventoryItem.deleteMany({ where: { campaignItemId: id } });
+  });
+
+  it("editing the item after award changes future awards only; existing rows untouched", async () => {
+    const { id } = await createItem({ ...weaponItem, name: "Original" });
+    await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/award`)
+      .send({ characterId: CHAR });
+
+    await agent(cookieOwner)
+      .patch(`/api/campaigns/${campaignId}/items/${id}`)
+      .send({ name: "Renamed" });
+
+    const existing = await prisma.inventoryItem.findFirstOrThrow({
+      where: { characterId: CHAR, campaignItemId: id },
+    });
+    expect(existing.name).toBe("Original");
+    await prisma.inventoryItem.deleteMany({ where: { campaignItemId: id } });
+  });
+
+  it("deleting the item leaves awarded rows intact with campaignItemId = NULL (SetNull)", async () => {
+    const { id } = await createItem({ ...weaponItem, name: "Doomed" });
+    await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/award`)
+      .send({ characterId: CHAR });
+    const row = await prisma.inventoryItem.findFirstOrThrow({
+      where: { characterId: CHAR, campaignItemId: id },
+    });
+
+    await agent(cookieOwner).delete(`/api/campaigns/${campaignId}/items/${id}`);
+
+    const after = await prisma.inventoryItem.findUnique({ where: { id: row.id } });
+    expect(after).not.toBeNull();
+    expect(after?.campaignItemId).toBeNull();
+    expect(after?.name).toBe("Doomed");
+    await prisma.inventoryItem.deleteMany({ where: { id: row.id } });
+  });
+
+  it("403s a non-owner; rejects awarding to a character outside the campaign", async () => {
+    const { id } = await createItem({ ...weaponItem, name: "Guarded" });
+
+    const denied = await agent(cookiePlayer)
+      .post(`/api/campaigns/${campaignId}/items/${id}/award`)
+      .send({ characterId: CHAR });
+    expect(denied.status).toBe(403);
+
+    const outside = await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/award`)
+      .send({ characterId: OUTSIDER_CHAR });
+    expect(outside.status).toBe(400);
+    await prisma.inventoryItem.deleteMany({ where: { campaignItemId: id } });
+  });
+
+  it("surfaces holders in the owner list and the revealed by-entity Codex card", async () => {
+    const { id, entityId } = await createItem({ ...weaponItem, name: "Tracked" });
+    await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/award`)
+      .send({ characterId: CHAR, quantity: 3 });
+
+    const list = await agent(cookieOwner).get(`/api/campaigns/${campaignId}/items`);
+    const listed = list.body.find((i: { id: string }) => i.id === id);
+    expect(listed.holders).toEqual([{ characterId: CHAR, characterName: "Bruenor", quantity: 3 }]);
+
+    // Award already revealed the entity, so the player can read the card + holders.
+    const card = await agent(cookiePlayer).get(
+      `/api/campaigns/${campaignId}/items/by-entity/${entityId}`,
+    );
+    expect(card.status).toBe(200);
+    expect(card.body.holders).toEqual([{ characterId: CHAR, characterName: "Bruenor", quantity: 3 }]);
+    await prisma.inventoryItem.deleteMany({ where: { campaignItemId: id } });
+  });
+});
