@@ -75,24 +75,40 @@ Note the two-layer Bash contract: `allowedTools` prefix-matches the **whole** co
 
 Concurrent runs are safe: `worktree.sh create` serializes slot assignment behind an mkdir lock (`.claude/worktrees/.slot.lock` — remove it by hand only if a create crashed while holding it), and each run **claims its issue by self-assigning** right after GetWork (the `ClaimIssue` script state). GetWork excludes assigned issues, so a `taken` claim loops back for a re-pick (≤3 tries). Failure paths (`Fail`, `ApplyFlag`) release the claim; a successful PR keeps the assignee as an ownership signal until merge.
 
-## Batch mode (`batch.mjs`)
+## Batch mode (`batch.mjs` one-shot · `autodevd.mjs` daemon)
 
-To work several issues unattended (e.g. overnight), `batch.mjs` orchestrates fsm.mjs runs with a concurrency cap and a dependency DAG gated on **real merges into the base branch** (dependents fork `origin/<base>`, so a prereq's PR must land first):
+To work several issues unattended (e.g. overnight), the batch engine (`batch-core.mjs`) orchestrates fsm.mjs runs with a concurrency cap and a dependency DAG gated on **real merges into the base branch** (dependents fork `origin/<base>`, so a prereq's PR must land first). It has two frontends sharing the same flags, log vocabulary, and `batch.json`:
 
 ```bash
+# One-shot: runs to all-terminal, then exits (the original form).
 node .claude/skills/autodev/batch.mjs 123 124:123 125:124 331 332:331 --cap 3   # issue[:prereq[,prereq]]
 # flags: --cap 3 (concurrent runs) --poll 60 (s) --grace 1800 (s to wait for auto-merge) --base staging --state-dir DIR
+
+# Daemon: resident + supervised — survives Claude Code reaping its launcher,
+# idles at all-terminal so more work can be added, adopts children on relaunch.
+nohup node .claude/skills/autodev/autodevd.mjs 123 124:123 --cap 3 >/dev/null 2>&1 & disown
+node .claude/skills/autodev/autodevd.mjs stop          # graceful: stop launching, let running children finish
+node .claude/skills/autodev/autodevd.mjs stop --park   # SIGTERM children; they park as retry_wait for the next launch
 ```
 
-Run it in the background and watch the milestone log (`LAUNCH/RESUME/WAIT-MERGE/MERGED/RETRY-WAIT/SKIP/FAIL/CLEANUP/DONE/SUMMARY`): `tail -f <state-dir>/orchestrator.log`. State dir defaults to `.claude/autodev/overnight/<ts>/`; per-issue child logs live beside `batch.json`.
+**Prefer the daemon for anything long-running.** Claude Code reaps background task process groups — a reaped one-shot orchestrator used to freeze its runs at `status: "running"` and leak their worktree slots. The daemon model fixes this structurally:
 
-Semantics worth knowing:
+- **fsm children are spawned detached** (own process group, own log fd), so killing/reaping the orchestrator never kills an in-flight (expensive) Claude run.
+- **PID file** (`.claude/autodev/autodevd.pid`): a second launch while a daemon is live is refused; a stale pidfile (dead or recycled pid) is reclaimed automatically.
+- **Relaunch is the recovery path** — nothing auto-restarts a dead daemon. Re-running the launch command re-attaches to the previous non-terminal batch (recorded in `.claude/autodev/daemon.json`; `--state-dir` overrides) and **adopts** entries whose child pid is still alive instead of re-launching them — zero lost or duplicated runs. Dead children resume their run dir, as before.
+- At all-terminal the daemon logs `DONE` + `SUMMARY`, stamps `batch.completedAt`, and idles resident; launching it again with new issue specs (or, later, the control channel) merges them into the same batch as `pending`.
+
+Watch the milestone log (`LAUNCH/RESUME/ADOPT/WAIT-MERGE/MERGED/RETRY-WAIT/PARK/SKIP/FAIL/CLEANUP/DRAIN/DONE/SUMMARY`): `tail -f <state-dir>/orchestrator.log`. State dir defaults to `.claude/autodev/overnight/<ts>/`; per-issue child logs live beside `batch.json`.
+
+Semantics worth knowing (both frontends):
 
 - **Success = `run.json.ctx.prUrl` set**, never `status` alone — a graceful Fail/Flag exit is also `status: "completed"` but has no PR, and is marked failed immediately (no merge-grace). Merged runs' worktrees are torn down to free slots; failed runs keep theirs (their commits were already pushed by the driver's fail handler).
 - **Exit 75 (rate limit)** → the issue parks in `retry_wait` and is resumed via `fsm.mjs resume` at the `retryAt` the driver parsed from the limit message (≤3 rate-limit retries — a weekly-cap hit never clears, see Known limits). While anything is rate-limit-parked, NEW launches pause: the limit is account-wide.
-- **Other crashes** get one `resume` attempt before the issue is marked failed; a failed/skipped prereq transitively skips its dependents.
-- **Restart-idempotent**: single atomic `batch.json`; rerun with the same `--state-dir` to pick a batch back up (interrupted `running` issues re-launch).
+- **Other crashes** get one `resume` attempt before the issue is marked failed — except during a drain, where a nonzero exit parks as `retry_wait` instead (a `stop --park` SIGTERM must not burn the resume attempt). A failed/skipped prereq transitively skips its dependents.
+- **Restart-idempotent**: single atomic `batch.json`; rerun with the same `--state-dir` to pick a batch back up (`running` entries with a live pid are adopted; with a dead pid, resumed).
 - State store is a plain JSON file by design — SQLite deferred until an analytics need is proven (decision 2026-07-02).
+
+Structural changes to the engine are covered by a zero-spend smoke test (`bash .claude/skills/autodev/test/smoke-daemon.sh` — stub fsm/gh/worktree via the `AUTODEV_*` env seams in `batch-core.mjs`); run it before merging engine changes.
 
 ## UI verification
 
