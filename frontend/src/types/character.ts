@@ -534,7 +534,7 @@ export interface ManeuverEntry {
   name: string;
   description: string;
   // Session-UI routing snapshot from the catalog (undefined for custom/legacy
-  // → treated as "damageRoll"). See maneuverPlacementOf in @/features/session.
+  // → session components treat as "damageRoll").
   placement?: ManeuverPlacement;
   actionSlot?: "bonusAction" | "reaction" | null;
 }
@@ -547,6 +547,21 @@ export interface CatalogManeuver {
   placement?: ManeuverPlacement;
   actionSlot?: "bonusAction" | "reaction" | null;
   saveAbility?: string | null;
+}
+
+/** Cast a known maneuver: spend one superiority die (the server rolls it). */
+export interface CastManeuverOperation {
+  type: "castManeuver";
+  entryId: string;
+}
+
+export type ManeuverOperation = CastManeuverOperation;
+
+/** Per-op result from POST …/maneuvers/transactions — die + announced save DC. */
+export interface ManeuverCastResult {
+  roll: number;
+  saveDc: number | null;
+  summary: string;
 }
 
 /** A known elemental discipline entry on a character (Way of the Four Elements). */

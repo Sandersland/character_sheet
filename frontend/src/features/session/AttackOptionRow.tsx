@@ -7,7 +7,7 @@ interface AttackOptionRowProps {
   message?: string;
   dieLabel: string;
   dieBusy: boolean;
-  onUse: (name: string) => void;
+  onUse: () => void;
 }
 
 export default function AttackOptionRow({
@@ -32,7 +32,7 @@ export default function AttackOptionRow({
         <button
           type="button"
           disabled={!enabled || dieBusy}
-          onClick={() => onUse(name)}
+          onClick={() => onUse()}
           title={reason}
           className="rounded-control border border-gold-300 bg-gold-50 px-2.5 py-1 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-100 disabled:cursor-not-allowed disabled:opacity-40"
         >

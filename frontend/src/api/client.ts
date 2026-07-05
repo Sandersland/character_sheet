@@ -24,6 +24,8 @@ import type {
   JournalEntryKind,
   InventoryOperation,
   Item,
+  ManeuverOperation,
+  ManeuverCastResult,
   ReferenceData,
   ResourceOperation,
   Session,
@@ -397,6 +399,25 @@ export async function fetchManeuvers(): Promise<CatalogManeuver[]> {
   const response = await apiFetch(`${API_URL}/maneuvers`);
   if (!response.ok) {
     throw new Error(`Failed to fetch maneuver catalog (${response.status})`);
+  }
+  return response.json();
+}
+
+// Casts a known maneuver: the server spends one superiority die, rolls it, and
+// returns the updated Character plus per-op { roll, saveDc } so the caller folds
+// the die into the attack/damage total (or reads the announced DC).
+export async function castManeuverTransaction(
+  characterId: string,
+  operations: ManeuverOperation[],
+): Promise<{ character: Character; results: ManeuverCastResult[] }> {
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/maneuvers/transactions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ operations }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to cast maneuver (${response.status})`);
   }
   return response.json();
 }
