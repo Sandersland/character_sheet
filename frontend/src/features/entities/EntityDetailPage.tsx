@@ -9,10 +9,12 @@ import { GiQuillInk } from "@/components/ui/icons";
 import {
   deleteEntity,
   fetchCampaign,
+  fetchCampaignItemByEntity,
   fetchEntities,
   fetchEntityBacklinks,
   updateEntity,
 } from "@/api/client";
+import CampaignItemCard from "@/features/entities/CampaignItemCard";
 import MentionText from "@/features/journal/MentionText";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { formatJournalDate } from "@/lib/formatJournalDate";
@@ -23,6 +25,7 @@ import {
 } from "@/lib/mentions";
 import type {
   CampaignEntity,
+  CampaignItem,
   CampaignRole,
   EntityBacklink,
   EntityType,
@@ -48,6 +51,7 @@ export default function EntityDetailPage() {
 
   const [entity, setEntity] = useState<CampaignEntity | null | undefined>(undefined);
   const [role, setRole] = useState<CampaignRole | undefined>(undefined);
+  const [item, setItem] = useState<CampaignItem | null>(null);
   const [backlinks, setBacklinks] = useState<EntityBacklink[]>([]);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -84,6 +88,19 @@ export default function EntityDetailPage() {
       active = false;
     };
   }, [campaignId, entityId]);
+
+  // ITEM entities front a DM-authored CampaignItem — load its card data. The
+  // by-entity read 404s for a non-owner while the entity is hidden (setItem null).
+  useEffect(() => {
+    if (!campaignId || !entityId || entity?.type !== "ITEM") return;
+    let active = true;
+    fetchCampaignItemByEntity(campaignId, entityId)
+      .then((i) => active && setItem(i))
+      .catch(() => active && setItem(null));
+    return () => {
+      active = false;
+    };
+  }, [campaignId, entityId, entity?.type]);
 
   if (entity === undefined) return <Spinner variant="page" />;
 
@@ -168,6 +185,10 @@ export default function EntityDetailPage() {
           <p className="rounded-control bg-garnet-50 px-3 py-2 text-sm font-semibold text-garnet-700">
             {error}
           </p>
+        )}
+
+        {entity.type === "ITEM" && item && (
+          <CampaignItemCard item={item} isOwner={role === "OWNER"} />
         )}
 
         <Card

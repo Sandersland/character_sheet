@@ -6,6 +6,7 @@ import Spinner from "@/components/ui/Spinner";
 import Tabs from "@/components/ui/Tabs";
 import CampaignOverviewPanel from "@/features/campaign/CampaignOverviewPanel";
 import CampaignCodex from "@/features/entities/CampaignCodex";
+import CampaignItemsPanel from "@/features/entities/CampaignItemsPanel";
 import CampaignManagePanel from "@/features/entities/CampaignManagePanel";
 import { fetchCampaign } from "@/api/client";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
@@ -101,7 +102,10 @@ export default function CampaignDetailPage() {
         />
 
         {onManage && isOwner ? (
-          <CampaignManagePanel campaignId={campaign.id} />
+          <>
+            <CampaignManagePanel campaignId={campaign.id} />
+            <CampaignItemsPanel campaignId={campaign.id} />
+          </>
         ) : onCodex ? (
           <CampaignCodex campaignId={campaign.id} role={campaign.role} />
         ) : (

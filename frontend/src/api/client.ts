@@ -2,6 +2,8 @@ import type {
   ActionOperation,
   AdvancementOperation,
   Campaign,
+  CampaignItem,
+  CampaignItemInput,
   CatalogFeat,
   CatalogDiscipline,
   CatalogManeuver,
@@ -669,6 +671,75 @@ export async function fetchEntityBacklinks(
     throw new Error(`Failed to fetch entity backlinks (${response.status})`);
   }
   return response.json();
+}
+
+// ── Campaign items (#380) ───────────────────────────────────────────────────────
+// Owner-only CRUD (list/create/update/delete). fetchCampaignItemByEntity is the
+// member-readable Codex read, keyed by the fronting entity — non-owners get it
+// only when that entity is revealed, and never see dmNotes (scrubbed server-side).
+
+export async function fetchCampaignItems(campaignId: string): Promise<CampaignItem[]> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/items`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch campaign items (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function fetchCampaignItemByEntity(
+  campaignId: string,
+  entityId: string,
+): Promise<CampaignItem> {
+  const response = await apiFetch(
+    `${API_URL}/campaigns/${campaignId}/items/by-entity/${entityId}`,
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to fetch campaign item (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function createCampaignItem(
+  campaignId: string,
+  input: CampaignItemInput,
+): Promise<CampaignItem> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/items`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to create campaign item (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function updateCampaignItem(
+  campaignId: string,
+  itemId: string,
+  patch: Partial<CampaignItemInput>,
+): Promise<CampaignItem> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/items/${itemId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to update campaign item (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function deleteCampaignItem(campaignId: string, itemId: string): Promise<void> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/items/${itemId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to delete campaign item (${response.status})`);
+  }
 }
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
