@@ -22,12 +22,13 @@ import { z } from "zod";
 
 import { assertCharacterAccess } from "../lib/auth/access.js";
 import { prisma } from "../lib/prisma.js";
-import { ACTION_EFFECT_FN } from "../lib/actions.js";
+import { ACTION_EFFECT_FN, rageMeleeDamageBonus } from "../lib/actions.js";
 import type { SpendResourceOperation } from "../lib/resources.js";
 import type { AdjustQuantityOperation } from "../lib/inventory.js";
 import { applyAdjustQuantity } from "../lib/inventory.js";
 import { applyHealInTx } from "../lib/hitpoints.js";
 import { applySpendResourceInTx } from "../lib/resources.js";
+import { appendActiveBuffInTx, clearBuffByKeyInTx } from "../lib/active-effects.js";
 import { getActiveSessionId } from "../lib/sessions.js";
 import {
   characterInclude,
@@ -68,6 +69,14 @@ actionsRouter.post(
     const { operations } = parsed.data;
 
     try {
+      // Level-derived Rage bonus, so the rage effect fn stays pure (no DB).
+      const classRow = await prisma.character.findUnique({
+        where: { id: characterId },
+        select: { classEntries: { select: { name: true, level: true } } },
+      });
+      const barbarianLevel = classRow?.classEntries.find((e) => e.name.toLowerCase() === "barbarian")?.level ?? 0;
+      const rageDamageBonus = rageMeleeDamageBonus(barbarianLevel);
+
       // Resolve all ops to their effect lists BEFORE opening a transaction so
       // unknown action keys fail with a 400, not a 500 mid-transaction.
       const resolvedOps = operations.flatMap((op) => {
@@ -75,7 +84,7 @@ actionsRouter.post(
         if (!effectFn) {
           throw new Error(`Unknown action key: ${op.actionKey}`);
         }
-        return effectFn({ roll: op.roll, inventoryItemId: op.inventoryItemId });
+        return effectFn({ roll: op.roll, inventoryItemId: op.inventoryItemId, rageDamageBonus });
       });
       const batchId = randomUUID();
       const sessionId = await getActiveSessionId(characterId);
@@ -104,6 +113,14 @@ actionsRouter.post(
 
             case "heal":
               await applyHealInTx(tx, characterId, op.amount, batchId, sessionId);
+              break;
+
+            case "applyBuff":
+              await appendActiveBuffInTx(tx, characterId, op.buff, batchId, sessionId);
+              break;
+
+            case "clearBuff":
+              await clearBuffByKeyInTx(tx, characterId, op.key, batchId, sessionId, op.reason);
               break;
 
             default: {

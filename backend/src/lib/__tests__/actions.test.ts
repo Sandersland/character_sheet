@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
   deriveActions,
   ACTION_EFFECT_FN,
+  rageMeleeDamageBonus,
   type AvailableAction,
 } from "../actions.js";
 
@@ -170,7 +171,6 @@ describe("ACTION_EFFECT_FN — no-op keys return []", () => {
 
 describe("ACTION_EFFECT_FN — single spendResource keys", () => {
   const singleResource: Array<[string, string]> = [
-    ["rage", "rage"],
     ["bardicInspiration", "bardicInspiration"],
     ["channelDivinityCleric", "channelDivinity"],
     ["channelDivinityPaladin", "channelDivinity"],
@@ -185,6 +185,43 @@ describe("ACTION_EFFECT_FN — single spendResource keys", () => {
       expect(ops).toEqual([{ type: "spendResource", key: resourceKey }]);
     });
   }
+});
+
+describe("ACTION_EFFECT_FN — Rage durable buff (#457)", () => {
+  it("rage applies a while-active meleeDamage buff (level bonus) and spends a rage", () => {
+    expect(ACTION_EFFECT_FN.rage({ rageDamageBonus: 3 })).toEqual([
+      {
+        type: "applyBuff",
+        buff: { key: "rage", target: "meleeDamage", modifier: 3, source: "Rage", duration: "while-active" },
+      },
+      { type: "spendResource", key: "rage" },
+    ]);
+  });
+
+  it("rage defaults the buff modifier to +2 when no bonus is supplied", () => {
+    const ops = ACTION_EFFECT_FN.rage({}) as Array<{ type: string; buff?: { modifier: number } }>;
+    expect(ops[0].buff?.modifier).toBe(2);
+  });
+
+  it("endRage clears the rage buff by key (manual + auto both route here)", () => {
+    expect(ACTION_EFFECT_FN.endRage({})).toEqual([
+      { type: "clearBuff", key: "rage", reason: "Rage ended" },
+    ]);
+  });
+
+  it("rageMeleeDamageBonus scales +2 / +3 / +4 by barbarian level", () => {
+    expect(rageMeleeDamageBonus(1)).toBe(2);
+    expect(rageMeleeDamageBonus(8)).toBe(2);
+    expect(rageMeleeDamageBonus(9)).toBe(3);
+    expect(rageMeleeDamageBonus(15)).toBe(3);
+    expect(rageMeleeDamageBonus(16)).toBe(4);
+    expect(rageMeleeDamageBonus(20)).toBe(4);
+  });
+
+  it("endRage is a barbarian bonus action from L1", () => {
+    expect(keys(deriveActions("barbarian", undefined, 1, []))).toContain("endRage");
+    expect(keys(deriveActions("fighter", undefined, 20, []))).not.toContain("endRage");
+  });
 });
 
 describe("ACTION_EFFECT_FN — monk ki actions", () => {

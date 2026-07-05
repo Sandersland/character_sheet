@@ -23,9 +23,16 @@
  *   No migration needed for new actions; only new *columns* need one.
  */
 
+import type { ActiveBuff } from "./active-effects.js";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "special";
+
+/** Rage's melee-damage bonus by barbarian level (+2 / +3 / +4). */
+export function rageMeleeDamageBonus(barbarianLevel: number): number {
+  return barbarianLevel >= 16 ? 4 : barbarianLevel >= 9 ? 3 : 2;
+}
 
 /** Record in the DERIVED_ACTIONS table — mirrors the Prisma Action model but is pure TS. */
 interface DerivedActionRecord {
@@ -69,6 +76,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
 
   // ── Barbarian ─────────────────────────────────────────────────────────────
   { key: "rage", name: "Rage", cost: "bonusAction", grantClass: "barbarian", grantLevel: 1, resourceKey: "rage", resourceAmount: 1 },
+  { key: "endRage", name: "End Rage", cost: "bonusAction", grantClass: "barbarian", grantLevel: 1 },
   { key: "recklessAttack", name: "Reckless Attack", cost: "free", grantClass: "barbarian", grantLevel: 2 },
 
   // ── Bard ──────────────────────────────────────────────────────────────────
@@ -182,12 +190,16 @@ interface ActionContext {
   roll?: number;
   /** ID of the inventory item to consume (e.g. healing potion). */
   inventoryItemId?: string;
+  /** Level-derived Rage melee-damage bonus, computed by the route from barbarian level. */
+  rageDamageBonus?: number;
 }
 
 type SpendResourceOp = { type: "spendResource"; key: string; amount?: number };
 type AdjustQuantityOp = { type: "adjustQuantity"; inventoryItemId: string; delta: number };
 type HealOp = { type: "heal"; amount: number };
-type ActionOp = SpendResourceOp | AdjustQuantityOp | HealOp;
+type ApplyBuffOp = { type: "applyBuff"; buff: Omit<ActiveBuff, "id"> };
+type ClearBuffOp = { type: "clearBuff"; key: string; reason: string };
+type ActionOp = SpendResourceOp | AdjustQuantityOp | HealOp | ApplyBuffOp | ClearBuffOp;
 
 type EffectFn = (ctx: ActionContext) => ActionOp[];
 
@@ -219,7 +231,23 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   },
 
   // ── Barbarian ─────────────────────────────────────────────────────────────
-  rage: () => [{ type: "spendResource", key: "rage" }],
+  // Rage applies a durable while-active meleeDamage buff (auto-ends via the
+  // session turn-hook / long rest / 0 HP) and spends a rage use.
+  rage: (ctx) => [
+    {
+      type: "applyBuff",
+      buff: {
+        key: "rage",
+        target: "meleeDamage",
+        modifier: ctx.rageDamageBonus ?? 2,
+        source: "Rage",
+        duration: "while-active",
+      },
+    },
+    { type: "spendResource", key: "rage" },
+  ],
+  // Manual end (bonus action) — the same clear the turn-hook fires automatically.
+  endRage: () => [{ type: "clearBuff", key: "rage", reason: "Rage ended" }],
   recklessAttack: () => [], // ephemeral — advantage/disadvantage is tracked by the table
 
   // ── Bard ──────────────────────────────────────────────────────────────────
