@@ -1096,6 +1096,8 @@ export function deriveWeaponDamage(
   /** True if any other equipped item occupies the off-hand (shield or weapon). */
   offHandOccupied: boolean,
   effectiveScores: Record<string, number>,
+  /** Flat bonus from active "meleeDamage" buffs (e.g. Rage); melee weapons only. */
+  meleeDamageBonus = 0,
 ): {
   damageDiceCount: number;
   damageDiceFaces: number;
@@ -1103,7 +1105,8 @@ export function deriveWeaponDamage(
   damageType: string;
   grip: WeaponGrip;
 } {
-  const damageModifier = weaponAbilityMod(weapon, effectiveScores);
+  const isMelee = weapon.weaponRange === "melee";
+  const damageModifier = weaponAbilityMod(weapon, effectiveScores) + (isMelee ? meleeDamageBonus : 0);
 
   // Resolve grip and choose dice.
   const isVersatile =
