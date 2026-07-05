@@ -132,7 +132,7 @@ export async function castAbilityInTx(ctx: CastAbilityContext, input: CastAbilit
     await appendActiveBuffInTx(
       ctx.tx,
       ctx.characterId,
-      { key: input.entryId, target: buff.target, modifier: buff.modifier, source: input.name, sourceEntryId: input.entryId },
+      { key: input.entryId, target: buff.target, modifier: buff.modifier, source: input.name, sourceEntryId: input.entryId, duration: "concentration" },
       ctx.batchId,
       ctx.sessionId,
     );

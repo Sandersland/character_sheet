@@ -21,13 +21,21 @@ import { logEvent } from "./events.js";
 
 // ── Canonical mutable state shape ─────────────────────────────────────────────
 
+// How long a buff rides the character. "concentration" clears when its granting
+// concentration ends (the #438 default). "while-active" persists until explicitly
+// toggled off; "until-rest" clears on the matching rest. The latter two survive
+// concentration changes — they power durable self-buffs like Rage (#458).
+export type BuffDuration = "concentration" | "while-active" | "until-rest";
+
+const BUFF_DURATIONS: BuffDuration[] = ["concentration", "while-active", "until-rest"];
+
 /** One active cast-granted passive modifier. Deduped by `key` on apply. */
 export interface ActiveBuff {
   /** Per-buff instance id. */
   id: string;
   /** Buff identity — re-applying the same key replaces (never stacks). */
   key: string;
-  /** Skill/ability/stat key the modifier applies to (e.g. "athletics"). */
+  /** Skill/ability/stat key the modifier applies to (e.g. "athletics", "meleeDamage"). */
   target: string;
   /** Flat modifier added to the target. */
   modifier: number;
@@ -35,6 +43,10 @@ export interface ActiveBuff {
   source: string;
   /** Concentration entry id that granted this buff; clears when it ends. */
   sourceEntryId?: string;
+  /** Duration axis; missing on the wire means "concentration" (byte-parity with #438). */
+  duration: BuffDuration;
+  /** Which rest clears an "until-rest" buff. Long rest also clears "short". */
+  restType?: "short" | "long";
 }
 
 export interface ActiveEffectsMutableState {
@@ -59,6 +71,10 @@ export function normalizeActiveEffectsMutable(json: Prisma.JsonValue): ActiveEff
     if (typeof entry.key !== "string" || typeof entry.target !== "string") continue;
     const modifier = Number(entry.modifier);
     if (!Number.isFinite(modifier)) continue;
+    const duration = BUFF_DURATIONS.includes(entry.duration as BuffDuration)
+      ? (entry.duration as BuffDuration)
+      : "concentration";
+    const restType = entry.restType === "short" || entry.restType === "long" ? entry.restType : undefined;
     buffs.push({
       id: typeof entry.id === "string" ? entry.id : randomUUID(),
       key: entry.key,
@@ -66,6 +82,8 @@ export function normalizeActiveEffectsMutable(json: Prisma.JsonValue): ActiveEff
       modifier: Math.trunc(modifier),
       source: typeof entry.source === "string" ? entry.source : entry.key,
       sourceEntryId: typeof entry.sourceEntryId === "string" ? entry.sourceEntryId : undefined,
+      duration,
+      ...(restType ? { restType } : {}),
     });
   }
 
@@ -74,6 +92,8 @@ export function normalizeActiveEffectsMutable(json: Prisma.JsonValue): ActiveEff
 
 /** Serialize to the shape written to Character.activeEffects. */
 export function serializeActiveEffectsState(state: ActiveEffectsMutableState): Prisma.InputJsonValue {
+  // "concentration" duration + absent restType are omitted so #438 buffs keep
+  // byte-parity with their pre-duration serialization.
   return {
     buffs: state.buffs.map((b) => ({
       id: b.id,
@@ -82,6 +102,8 @@ export function serializeActiveEffectsState(state: ActiveEffectsMutableState): P
       modifier: b.modifier,
       source: b.source,
       sourceEntryId: b.sourceEntryId ?? null,
+      ...(b.duration !== "concentration" ? { duration: b.duration } : {}),
+      ...(b.restType ? { restType: b.restType } : {}),
     })),
   } as unknown as Prisma.InputJsonValue;
 }
@@ -169,10 +191,13 @@ export async function clearBuffsForSourceInTx(
   if (!row) return;
 
   const state = normalizeActiveEffectsMutable(row.activeEffects);
-  const dropped = state.buffs.filter((b) => b.sourceEntryId === sourceEntryId);
+  // Only concentration-duration buffs clear when a concentration ends; durable
+  // (while-active / until-rest) buffs survive concentration changes (#455).
+  const matches = (b: ActiveBuff) => b.sourceEntryId === sourceEntryId && b.duration === "concentration";
+  const dropped = state.buffs.filter(matches);
   if (dropped.length === 0) return;
   const before = snapshot(state);
-  state.buffs = state.buffs.filter((b) => b.sourceEntryId !== sourceEntryId);
+  state.buffs = state.buffs.filter((b) => !matches(b));
 
   await tx.character.update({
     where: { id: characterId },
@@ -187,6 +212,93 @@ export async function clearBuffsForSourceInTx(
     before,
     after: snapshot(state),
     data: { sourceEntryId, reason, clearedKeys: dropped.map((b) => b.key) },
+    batchId,
+    sessionId,
+  });
+}
+
+/**
+ * Clear the buff with the given `key` (toggle off a durable self-buff, e.g. end
+ * Rage). No-op + no event when none match. Logs a `buffCleared` event under the
+ * "effects" category so batch revert restores it.
+ */
+export async function clearBuffByKeyInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  key: string,
+  batchId: string,
+  sessionId: string | null,
+  reason: string,
+): Promise<void> {
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: { activeEffects: true },
+  });
+  if (!row) return;
+
+  const state = normalizeActiveEffectsMutable(row.activeEffects);
+  const dropped = state.buffs.filter((b) => b.key === key);
+  if (dropped.length === 0) return;
+  const before = snapshot(state);
+  state.buffs = state.buffs.filter((b) => b.key !== key);
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: { activeEffects: serializeActiveEffectsState(state) },
+  });
+
+  await logEvent(tx, {
+    characterId,
+    category: "effects",
+    type: "buffCleared",
+    summary: `Cleared ${dropped[0].source} (${reason})`,
+    before,
+    after: snapshot(state),
+    data: { key, reason, clearedKeys: dropped.map((b) => b.key) },
+    batchId,
+    sessionId,
+  });
+}
+
+/**
+ * Clear every "until-rest" buff the given rest ends. A long rest clears both
+ * "short" and "long" restType buffs; a short rest clears only "short". No-op +
+ * no event when none match. Logs a `buffCleared` event under "effects".
+ */
+export async function clearBuffsForRestInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  restType: "short" | "long",
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: { activeEffects: true },
+  });
+  if (!row) return;
+
+  const state = normalizeActiveEffectsMutable(row.activeEffects);
+  const clears = (b: ActiveBuff) =>
+    b.duration === "until-rest" && (restType === "long" || b.restType === "short");
+  const dropped = state.buffs.filter(clears);
+  if (dropped.length === 0) return;
+  const before = snapshot(state);
+  state.buffs = state.buffs.filter((b) => !clears(b));
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: { activeEffects: serializeActiveEffectsState(state) },
+  });
+
+  await logEvent(tx, {
+    characterId,
+    category: "effects",
+    type: "buffCleared",
+    summary: `Cleared ${dropped.length} buff${dropped.length !== 1 ? "s" : ""} (${restType} rest)`,
+    before,
+    after: snapshot(state),
+    data: { restType, reason: `${restType}Rest`, clearedKeys: dropped.map((b) => b.key) },
     batchId,
     sessionId,
   });
