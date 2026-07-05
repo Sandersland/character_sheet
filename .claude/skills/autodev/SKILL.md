@@ -108,7 +108,18 @@ Semantics worth knowing (both frontends):
 - **Restart-idempotent**: single atomic `batch.json`; rerun with the same `--state-dir` to pick a batch back up (`running` entries with a live pid are adopted; with a dead pid, resumed).
 - State store is a plain JSON file by design — SQLite deferred until an analytics need is proven (decision 2026-07-02).
 
-Structural changes to the engine are covered by a zero-spend smoke test (`bash .claude/skills/autodev/test/smoke-daemon.sh` — stub fsm/gh/worktree via the `AUTODEV_*` env seams in `batch-core.mjs`); run it before merging engine changes.
+Structural changes to the engine are covered by a zero-spend smoke test (`bash .claude/skills/autodev/test/smoke-daemon.sh` — stub fsm/gh/worktree via the `AUTODEV_*` env seams in `batch-core.mjs`/`janitor.mjs`); run it before merging engine changes.
+
+## Heartbeats + janitor (`janitor.mjs`)
+
+Every fsm run writes `pid` + `lastHeartbeat` into `run.json` (30s timer + every transition; atomic tmp+rename), so liveness is observable. `janitor.reconcile()` — run on every batch tick, by SetupWorktree's self-heal, and callable standalone — repairs the two things a reaped run used to leak:
+
+- **Dead runs are finalized**: a non-terminal `run.json` whose pid is gone or whose heartbeat is older than 15 min (`AUTODEV_HEARTBEAT_STALE_MS`; generous because synchronous script states — `docker compose up` — starve the timer) is rewritten to `failed` with a `steps.jsonl` reap line. Its already-ledgered `costUsd` is the harvested spend; whatever the in-flight invocation burned after its last ledger write is unrecoverable. Legacy run.jsons with no pid/heartbeat fields are treated as dead.
+- **Leaked slots are freed**: for each `registry.json` branch — worktree dir gone → stale reservation cleared; dir present with a terminal/dead owning run → full `worktree.sh rm`. A branch with a **live or parked owning run, or with no autodev run at all** (manual worktrees — parallel-issues, interactive — share the registry) is never touched.
+
+Parked runs are protected by status: exit-75 tempfails are already `retry-scheduled`, and batch-core stamps drain-parked/interrupted runs to `retry-scheduled` too — a parked run legitimately has no live process and must not be reaped. The batch additionally passes its own non-terminal rundirs as `protect` (a just-resumed child hasn't overwritten the stale pid in `run.json` yet).
+
+SetupWorktree **self-heals** on "no free slots": reconcile, then retry the create once — a leaked slot no longer bricks a fresh run after burning ConfirmScope spend.
 
 ## UI verification
 
@@ -122,4 +133,5 @@ When ConfirmScope marks `uiSurface: true`, the Reviewer gets a Playwright MCP se
 
 - The Reviewer verifies UI against the e2e suite's seeded personas (Smoke Fighter L1, Wizard L5), not production-like data — surfaces gated on higher levels/other classes/inventory may need a human pass.
 - The issue claim is check-then-assign (GitHub has no atomic claim); a sub-second tie between two runs can double-claim. The slot lock still prevents any port collision in that case.
+- A run failed by the janitor or batch keeps `run.json` as the source of truth, but a reaped child's **post-last-ledger spend is invisible** — the claude invocation's cost report died with its stdout. Treat reaped runs' `costUsd` as a floor.
 - The subscription's **weekly** compute cap has no parseable in-band reset signal — hitting it looks like a rate_limit tempfail (exit 75) that never clears on resume. An orchestrator's rate-limit retry cap bounds the damage; if resumes keep tempfailing, check `/usage` manually.

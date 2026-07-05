@@ -23,6 +23,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { reconcile as janitorReconcile } from "./janitor.mjs";
 
 const SKILL_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(SKILL_DIR, "../../..");
@@ -137,6 +138,26 @@ export function createEngine({ stateDir, cfg = null }) {
     }
   }
 
+  // Stamp a parked entry's run.json to "retry-scheduled" so the janitor
+  // classifies it as parked (protected), not as a dead orphan — a SIGTERM'd
+  // or crashed child leaves status "running" with a dead pid, which is
+  // otherwise indistinguishable from a reaped run.
+  function stampRunParked(n, entry) {
+    if (!entry.rundir) return;
+    const run = readRunJson(entry);
+    if (!run || ["completed", "failed", "retry-scheduled"].includes(run.status)) return;
+    run.status = "retry-scheduled";
+    run.retryable = true;
+    run.retryAt = run.retryAt ?? Date.now();
+    try {
+      const tmp = join(entry.rundir, "run.json.tmp");
+      writeFileSync(tmp, JSON.stringify(run, null, 2));
+      renameSync(tmp, join(entry.rundir, "run.json"));
+    } catch (err) {
+      log(`PARK #${n} could not stamp run.json (${err.message}) — janitor may reap it`);
+    }
+  }
+
   function teardownWorktree(n, entry) {
     const run = readRunJson(entry);
     const branch = run?.ctx?.branch;
@@ -216,6 +237,7 @@ export function createEngine({ stateDir, cfg = null }) {
       if (entry.rundir) {
         entry.status = "retry_wait";
         entry.retryAt = Date.now();
+        stampRunParked(n, entry);
         log(`PARK #${n} rc=${code} during drain — will resume ${entry.rundir} on next launch`);
       } else {
         entry.status = "pending";
@@ -323,10 +345,27 @@ export function createEngine({ stateDir, cfg = null }) {
     }
   }
 
+  // Janitor pass: reap dead orphan runs + free leaked worktree slots. Runs
+  // AFTER pollAdopted (adoption settles this batch's own entries first) and
+  // additionally protects our non-terminal rundirs — a just-resumed child may
+  // not have overwritten run.json's stale pid yet.
+  function runJanitor() {
+    const protect = Object.values(batch.issues)
+      .filter((e) => ["running", "retry_wait"].includes(e.status) && e.rundir)
+      .map((e) => e.rundir);
+    try {
+      return janitorReconcile({ log, protect });
+    } catch (err) {
+      log(`JANITOR pass failed (non-fatal): ${err.message}`);
+      return { reapedRuns: [], freedSlots: [] };
+    }
+  }
+
   function tick() {
     pollMerges();
     propagateSkips();
     pollAdopted();
+    runJanitor();
     launchRetries();
     launchEligible();
     saveBatch();
@@ -365,6 +404,7 @@ export function createEngine({ stateDir, cfg = null }) {
         if (entry.rundir) {
           entry.status = "retry_wait";
           entry.retryAt = Date.now();
+          stampRunParked(n, entry);
           log(`RECONCILE #${n} was running at shutdown — will resume ${entry.rundir}`);
         } else {
           entry.status = "pending";
@@ -463,6 +503,7 @@ export function createEngine({ stateDir, cfg = null }) {
     loadOrInit,
     addIssues,
     tick,
+    runJanitor,
     drain,
     allTerminal,
     runningCount,
