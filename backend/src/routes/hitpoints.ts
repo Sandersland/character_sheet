@@ -4,6 +4,7 @@ import { z } from "zod";
 import { assertCharacterAccess } from "../lib/auth/access.js";
 import { applyHitPointOperations, InvalidHitPointOperationError } from "../lib/hitpoints.js";
 import { prisma } from "../lib/prisma.js";
+import { isDamageType } from "../lib/srd.js";
 import { characterInclude, serializeCharacter } from "./characters.js";
 
 export const hitPointsRouter = Router();
@@ -13,6 +14,9 @@ export const hitPointsRouter = Router();
 const damageOpSchema = z.object({
   type: z.literal("damage"),
   amount: z.number().int().positive(),
+  // Optional 5e damage type driving resistance auto-halve; `resist` overrides it (#456).
+  damageType: z.string().refine(isDamageType, "Unknown damage type").optional(),
+  resist: z.boolean().optional(),
   // Issue #76: defer the concentration save to the client when false. Omitted
   // or true keeps the server-side auto-roll.
   autoRollConcentration: z.boolean().optional(),

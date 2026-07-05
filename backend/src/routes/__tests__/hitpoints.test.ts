@@ -109,6 +109,53 @@ describe("POST /api/characters/:id/hp", () => {
     expect(res.status).toBe(400);
   });
 
+  // ── typed damage + resistance (#456) — through the real route + Zod schema ──
+
+  async function makeResistant(damageType: string) {
+    await prisma.character.update({
+      where: { id: FIXTURE.id },
+      data: { activeEffects: { buffs: [], resistances: [{ id: "r0", damageType, source: "Rage" }] } },
+    });
+  }
+
+  it("damage: auto-halves a resisted typed instance (12 slashing → 6)", async () => {
+    // start: temp 5, current 20. 12 slashing halved to 6 → 5 temp + 1 current: 20 - 1 = 19.
+    await makeResistant("slashing");
+    const res = await post(FIXTURE.id, {
+      operations: [{ type: "damage", amount: 12, damageType: "slashing" }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.hitPoints.temp).toBe(0);
+    expect(res.body.hitPoints.current).toBe(19);
+  });
+
+  it("damage: a non-matching damage type is unaffected", async () => {
+    await makeResistant("slashing");
+    // 12 fire, full: 5 temp + 7 current → 20 - 7 = 13.
+    const res = await post(FIXTURE.id, {
+      operations: [{ type: "damage", amount: 12, damageType: "fire" }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.hitPoints.current).toBe(13);
+  });
+
+  it("damage: resist=false override declines an otherwise-matching halve", async () => {
+    await makeResistant("slashing");
+    // full 12 despite the match: 5 temp + 7 current → 13.
+    const res = await post(FIXTURE.id, {
+      operations: [{ type: "damage", amount: 12, damageType: "slashing", resist: false }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.hitPoints.current).toBe(13);
+  });
+
+  it("damage: 400s on an unknown damage type", async () => {
+    const res = await post(FIXTURE.id, {
+      operations: [{ type: "damage", amount: 5, damageType: "sonic" }],
+    });
+    expect(res.status).toBe(400);
+  });
+
   // ── heal ─────────────────────────────────────────────────────────────────
 
   it("heal: adds to current, caps at max", async () => {
