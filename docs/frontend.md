@@ -37,7 +37,9 @@ frontend/src/
 │   │                    #   EntityDetailPage (detail/edit/delete + backlinks) (#248)
 │   ├── experience/      # ExperienceTracker
 │   ├── hitpoints/       # HitPointTracker orchestrator (inline Card; hosts LevelUpModal + ConcentrationSaveModal)
-│   │                    #   Sub-components: HpActionControl, HpMeter, RestControls,
+│   │                    #   Sub-components: HpActionControl (damage mode has an optional
+│   │                    #   damage-type select + resistance halve-override, #456; types from
+│   │                    #   @/lib/damageTypes), HpMeter, RestControls,
 │   │                    #   DeathSaveTracker, LevelUpCallout, AdvancementCallout
 │   ├── inventory/       # InventoryList, InventoryRow (→ InventoryEditForm/EquipToggle/
 │   │                    #   ItemSummary/ItemProse), AddItemPanel, SellPanel, StartingEquipmentEditor
