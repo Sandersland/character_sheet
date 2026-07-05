@@ -960,6 +960,50 @@ export interface CampaignEntity {
   updatedAt: string;
 }
 
+/**
+ * DM-authored campaign item (#380): loot/magic-item prep that lives in a
+ * campaign, not on any sheet. Mirrors `Item` plus DM-only fields (rarity,
+ * attunement, isUnique, dmNotes) and a reference to the fronting ITEM entity.
+ * `dmNotes` is present only in owner-facing payloads — it's scrubbed server-side
+ * from every player response.
+ */
+export interface CampaignItem {
+  id: string;
+  campaignId: string;
+  name: string;
+  description?: string;
+  category: ItemCategory;
+  rarity?: string;
+  requiresAttunement: boolean;
+  isUnique: boolean;
+  weight?: number;
+  cost?: Currency;
+  dmNotes?: string;
+  weapon?: WeaponDetail;
+  armor?: ArmorDetail;
+  consumable?: ConsumableDetail;
+  /** The fronting ITEM CampaignEntity — its `visibility` drives player reveal. */
+  entity?: { id: string; name: string; visibility: EntityVisibility };
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Create/update body for a campaign item; detail block matches `category`. */
+export interface CampaignItemInput {
+  name: string;
+  description?: string;
+  category: ItemCategory;
+  rarity?: string;
+  requiresAttunement?: boolean;
+  isUnique?: boolean;
+  weight?: number;
+  cost?: Currency;
+  dmNotes?: string;
+  weapon?: WeaponDetailInput;
+  armor?: ArmorDetailInput;
+  consumable?: ConsumableDetail;
+}
+
 /** One note that @-tags an entity, surfaced on the entity detail page. */
 export interface EntityBacklink {
   entry: {
