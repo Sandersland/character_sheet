@@ -17,6 +17,8 @@
 #   G  control channel: ping/status/pause/add/resume/stop/retry/shutdown over
 #      the Unix socket; daemon-down ping exits 2 with relaunch hint; a stale
 #      socket left by SIGKILL is reclaimed on relaunch
+#   H  report rollup: per-issue outcome/cost/cycles both over the socket and
+#      via --state-dir with no daemon (post-mortem mode)
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -269,5 +271,29 @@ node "$CTL" ping > /dev/null || fail "G: ping should work after stale-socket rec
 node "$CTL" shutdown --park > /dev/null
 wait_for 10 "daemon G3 stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
 pass "stale socket reclaimed on relaunch; ping works; park-shutdown clean"
+
+# ---------- H: report rollup ----------
+echo "H: report rollup (socket + post-mortem --state-dir)"
+# Post-mortem: no daemon is running; read scenario A's finished ledger directly.
+node "$CTL" report --state-dir "$A" --json > "$T/h-report.json" || fail "H: report --state-dir should work with no daemon"
+node -e "
+  const r = JSON.parse(require('fs').readFileSync('$T/h-report.json','utf8'));
+  const by = Object.fromEntries(r.rows.map((x) => [x.issue, x]));
+  const assert = (c, m) => { if (!c) { console.error('H assert failed: ' + m); process.exit(1); } };
+  assert(r.rows.length === 3, '3 rows');
+  assert(by[9900].outcome === 'pr' && by[9900].detail.includes('example.test'), '9900 outcome pr + url');
+  assert(by[9901].outcome === 'pr' && by[9901].rateRetries === 1, '9901 pr after 1 rate retry');
+  assert(by[9902].outcome === 'failed', '9902 failed');
+  assert(r.totalCostUsd > 0, 'total cost accumulated');
+" || fail "H: post-mortem report assertions failed"
+# Live: idle daemon on the same state dir serves the same rollup over the socket.
+node "$SKILL_DIR/autodevd.mjs" --poll 1 --state-dir "$A" > "$T/h.out" 2>&1 &
+disown
+wait_for 15 "daemon H up" bash -c "[ -S '$T/runtime/autodevd.sock' ]"
+node "$CTL" report > "$T/h-live.out" || fail "H: report verb over the socket failed"
+{ grep -q "#9900" "$T/h-live.out" && grep -qF 'total: $' "$T/h-live.out"; } || fail "H: live report table malformed"
+node "$CTL" shutdown > /dev/null
+wait_for 10 "daemon H stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
+pass "report: correct rollup post-mortem and over the socket"
 
 echo "SMOKE PASS (all scenarios)"

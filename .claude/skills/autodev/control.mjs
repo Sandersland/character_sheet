@@ -23,6 +23,7 @@ import { createServer, connect } from "node:net";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { parseIssueSpecs } from "./batch-core.mjs";
+import { buildReport } from "./report.mjs";
 
 /** Probe an existing socket file: resolves "live" | "stale". */
 function probeSocket(sockPath) {
@@ -104,9 +105,7 @@ export async function attachControl({ engine, daemon, sockPath, log }) {
         tail: tailFile(batchLog, lines) ?? "(no log yet)",
       };
     },
-    report: () => {
-      throw new Error("report ships with the next PR (#471)");
-    },
+    report: () => buildReport(daemon.stateDir),
     shutdown: (args) => {
       // Respond first, then drain — the caller sees the ack before we go away.
       setTimeout(() => daemon.requestStop(args.park ? "park" : "wait"), 50).unref();
