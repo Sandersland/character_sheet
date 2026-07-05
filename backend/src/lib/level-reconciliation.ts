@@ -125,8 +125,7 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
       spellcasting: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        take: 1,
-        select: { name: true, subclass: true },
+        select: { name: true, subclass: true, level: true },
       },
     },
   });
@@ -135,13 +134,16 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
   const state = normalizeSpellcastingMutable(row.spellcasting);
   if (!state.spells.some((s) => s.source === "subclass")) return; // normal case
 
-  const primaryEntry = row.classEntries[0];
+  // Grants across every class entry, symmetric with collectGrantedSpells. Single-
+  // class uses the XP-derived level (the per-class column can be stale); a
+  // multiclass entry uses its own per-class level.
+  const singleClass = row.classEntries.length <= 1;
   const validIds = new Set(
-    deriveGrantedSpells(
-      primaryEntry?.name ?? "",
-      primaryEntry?.subclass ?? undefined,
-      newDerivedLevel,
-    ).map((s) => s.id),
+    row.classEntries
+      .flatMap((e) =>
+        deriveGrantedSpells(e.name, e.subclass ?? undefined, singleClass ? newDerivedLevel : e.level),
+      )
+      .map((s) => s.id),
   );
 
   const kept = state.spells.filter((s) => s.source !== "subclass" || validIds.has(s.id));
@@ -157,6 +159,16 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
   };
 
   const removedCount = state.spells.length - kept.length;
+
+  // Drop concentration if it pointed at a stripped grant (leave Shadow Arts and
+  // still-kept spells untouched).
+  const removedIds = new Set(
+    state.spells.filter((s) => s.source === "subclass" && !validIds.has(s.id)).map((s) => s.id),
+  );
+  if (state.concentratingOn && removedIds.has(state.concentratingOn.entryId)) {
+    state.concentratingOn = null;
+  }
+
   state.spells = kept;
 
   await tx.character.update({

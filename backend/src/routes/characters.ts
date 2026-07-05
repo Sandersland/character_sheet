@@ -49,7 +49,11 @@ import { buffsByTarget, normalizeActiveEffectsMutable, type ActiveBuff } from ".
 import { reverseAdvancementEffects } from "../lib/advancement.js";
 import { normalizeSpellcastingMutable } from "../lib/spellcasting.js";
 import type { SpellEntry } from "../lib/spell-state.js";
-import { deriveGrantedSpells } from "../lib/granted-spells.js";
+import {
+  deriveGrantedSpells,
+  deriveGrantedCastingAbility,
+  type AbilityScores,
+} from "../lib/granted-spells.js";
 import { SHADOW_ART_CONCENTRATION_PREFIX } from "../lib/shadow-arts.js";
 import { assertCharacterAccess } from "../lib/auth/access.js";
 
@@ -324,6 +328,15 @@ function collectGrantedSpells(entries: CharacterWithRelations["classEntries"]): 
   return entries.flatMap((e) => deriveGrantedSpells(e.name, e.subclass ?? undefined, e.level));
 }
 
+// Casting ability for the slotless multiclass view — from the first entry that
+// actually grants a spell (defaults to Wisdom when none do).
+function collectGrantedCastingAbility(entries: CharacterWithRelations["classEntries"]): keyof AbilityScores {
+  const granting = entries.find(
+    (e) => deriveGrantedSpells(e.name, e.subclass ?? undefined, e.level).length > 0,
+  );
+  return deriveGrantedCastingAbility(granting?.subclass ?? undefined);
+}
+
 // Clamp-on-read for concentration: surface the stored entry when it's a current
 // spellbook spell OR a Shadow Art (its entryId carries the shadow-art: prefix, a
 // disjoint id space); drop stale entries (e.g. a forgotten spellbook spell).
@@ -404,15 +417,16 @@ function buildSpellcastingView(
   }
   // Non-caster class that nonetheless gets a subclass-granted spell (e.g. a Way
   // of Shadow monk's Minor Illusion). Surface a slotless view so the grant
-  // renders; monk subclass grants use Wisdom as the casting ability.
+  // renders; the casting ability is derived per rule (Wisdom is the default).
   if (granted.length > 0) {
     const stored = normalizeSpellcastingMutable(row.spellcasting);
-    const wisMod = abilityModifier(abilityScores.wisdom ?? 10);
+    const castingAbility = deriveGrantedCastingAbility(primaryClass?.subclass ?? undefined);
+    const abilMod = abilityModifier(abilityScores[castingAbility] ?? 10);
     const grantedSpells = mergeGrantedSpells(stored.spells, granted);
     return {
-      ability: "wisdom",
-      spellSaveDC: 8 + proficiencyBonus + wisMod,
-      spellAttackBonus: proficiencyBonus + wisMod,
+      ability: castingAbility,
+      spellSaveDC: 8 + proficiencyBonus + abilMod,
+      spellAttackBonus: proficiencyBonus + abilMod,
       slots: [],
       arcana: [],
       spells: grantedSpells,
@@ -456,15 +470,16 @@ function buildMulticlassSpellcastingView(
   const stored = normalizeSpellcastingMutable(row.spellcasting);
 
   // No caster class in the mix, but a subclass still grants a spell — surface a
-  // slotless Wisdom view (mirrors the single-class non-caster branch).
+  // slotless granted view (ability derived per rule; mirrors the single-class branch).
   if (multi.classes.length === 0) {
     if (granted.length === 0) return undefined;
-    const wisMod = abilityModifier(abilityScores.wisdom ?? 10);
+    const castingAbility = collectGrantedCastingAbility(row.classEntries);
+    const abilMod = abilityModifier(abilityScores[castingAbility] ?? 10);
     const grantedSpells = mergeGrantedSpells(stored.spells, granted);
     return {
-      ability: "wisdom",
-      spellSaveDC: 8 + proficiencyBonus + wisMod,
-      spellAttackBonus: proficiencyBonus + wisMod,
+      ability: castingAbility,
+      spellSaveDC: 8 + proficiencyBonus + abilMod,
+      spellAttackBonus: proficiencyBonus + abilMod,
       slots: [],
       arcana: [],
       spells: grantedSpells,

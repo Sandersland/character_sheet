@@ -745,6 +745,15 @@ describe("subclass-granted spells", () => {
     expect(minor!.source).toBe("subclass");
   });
 
+  it("surfaces the granted view's casting ability + derived DC from that ability", async () => {
+    await createMonk({ xp: 900, subclass: "Way of Shadow" }); // L3, WIS 15 (+2), prof +2
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}`);
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.ability).toBe("wisdom");
+    expect(res.body.spellcasting.spellSaveDC).toBe(12);
+    expect(res.body.spellcasting.spellAttackBonus).toBe(4);
+  });
+
   it("does NOT grant Minor Illusion below level 3", async () => {
     await createMonk({ xp: 300, subclass: "Way of Shadow" }); // L2
     const res = await supertest.agent(createApp()).set("Cookie", COOKIE).get(`/api/characters/${MONK_ID}`);

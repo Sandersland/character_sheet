@@ -37,7 +37,7 @@ export interface SpellEntry {
   upcastDicePerLevel?: number | null;
   cantripScaling?: boolean;
   // Provenance of the entry; "subclass" marks a derived, non-persisted grant.
-  source?: string;
+  source?: "subclass";
 }
 
 /** Spell verbal/somatic/material component flags + optional material text. */
