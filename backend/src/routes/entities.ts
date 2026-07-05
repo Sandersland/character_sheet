@@ -8,11 +8,15 @@ import { prisma } from "../lib/prisma.js";
 // Campaign entity registry (#248): the shared wiki of NPCs/locations/factions/
 // items/PCs a table tags from journal notes. Plain-REST (like campaigns.ts):
 // no audit log, no transaction-op pattern. Every route gates on
-// assertCampaignMembership; DELETE additionally requires the OWNER role.
+// assertCampaignMembership; DELETE and visibility changes require the OWNER role.
+// Visibility (#379): non-owners only ever see REVEALED entities (list, detail via
+// list, backlinks); HIDDEN entities are the owner's private prep.
 
 export const entitiesRouter = Router();
 
 const ENTITY_TYPES = ["NPC", "LOCATION", "FACTION", "ITEM", "PC", "OTHER"] as const;
+
+const VISIBILITIES = ["HIDDEN", "REVEALED"] as const;
 
 const createEntitySchema = z
   .object({
@@ -20,6 +24,8 @@ const createEntitySchema = z
     name: z.string().min(1),
     aliases: z.array(z.string()).optional(),
     notes: z.string().optional(),
+    // Owner-only (#379): a non-owner supplying this is rejected at the route.
+    visibility: z.enum(VISIBILITIES).optional(),
   })
   .strict();
 
@@ -29,6 +35,8 @@ const updateEntitySchema = z
     name: z.string().min(1),
     aliases: z.array(z.string()),
     notes: z.string().nullable(),
+    // Owner-only (#379); presence in a non-owner PATCH is rejected at the route.
+    visibility: z.enum(VISIBILITIES),
   })
   .partial()
   .strict();
@@ -39,7 +47,7 @@ const updateEntitySchema = z
 // same normalized key on both name and aliases. An invalid type is ignored.
 
 entitiesRouter.get("/campaigns/:id/entities", async (req, res) => {
-  await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
+  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
 
   const typeParam = typeof req.query.type === "string" ? req.query.type : undefined;
   const type = (ENTITY_TYPES as readonly string[]).includes(typeParam ?? "")
@@ -47,7 +55,12 @@ entitiesRouter.get("/campaigns/:id/entities", async (req, res) => {
     : undefined;
 
   const entities = await prisma.campaignEntity.findMany({
-    where: { campaignId: req.params.id, ...(type ? { type } : {}) },
+    where: {
+      campaignId: req.params.id,
+      ...(type ? { type } : {}),
+      // Non-owners see only revealed entities (#379); the owner sees all.
+      ...(role === "OWNER" ? {} : { visibility: "REVEALED" }),
+    },
     orderBy: { name: "asc" },
   });
 
@@ -65,7 +78,7 @@ entitiesRouter.get("/campaigns/:id/entities", async (req, res) => {
 // Create an entity. Any member may create.
 
 entitiesRouter.post("/campaigns/:id/entities", async (req, res) => {
-  await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
+  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
 
   const parseResult = createEntitySchema.safeParse(req.body);
   if (!parseResult.success) {
@@ -76,6 +89,12 @@ entitiesRouter.post("/campaigns/:id/entities", async (req, res) => {
   }
 
   const data = parseResult.data;
+  // Setting visibility is an owner-only act (#379); a player creates REVEALED.
+  if (data.visibility !== undefined && role !== "OWNER") {
+    res.status(403).json({ error: "Only the campaign owner may set entity visibility" });
+    return;
+  }
+
   const entity = await prisma.campaignEntity.create({
     data: {
       campaignId: req.params.id,
@@ -83,6 +102,7 @@ entitiesRouter.post("/campaigns/:id/entities", async (req, res) => {
       name: data.name,
       aliases: data.aliases ?? [],
       notes: data.notes ?? null,
+      visibility: data.visibility ?? "REVEALED",
     },
   });
 
@@ -93,7 +113,7 @@ entitiesRouter.post("/campaigns/:id/entities", async (req, res) => {
 // Edit an entity. Any member; 404 if the entity isn't in this campaign.
 
 entitiesRouter.patch("/campaigns/:id/entities/:entityId", async (req, res) => {
-  await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
+  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
 
   const parseResult = updateEntitySchema.safeParse(req.body);
   if (!parseResult.success) {
@@ -103,11 +123,22 @@ entitiesRouter.patch("/campaigns/:id/entities/:entityId", async (req, res) => {
     return;
   }
 
+  // Changing visibility is owner-only (#379); basic-field edits stay member-level.
+  if (parseResult.data.visibility !== undefined && role !== "OWNER") {
+    res.status(403).json({ error: "Only the campaign owner may change entity visibility" });
+    return;
+  }
+
   const existing = await prisma.campaignEntity.findUnique({
     where: { id: req.params.entityId },
-    select: { id: true, campaignId: true },
+    select: { id: true, campaignId: true, visibility: true },
   });
-  if (!existing || existing.campaignId !== req.params.id) {
+  // A hidden entity is invisible to non-owners: 404 as if it weren't there.
+  if (
+    !existing ||
+    existing.campaignId !== req.params.id ||
+    (existing.visibility === "HIDDEN" && role !== "OWNER")
+  ) {
     res.status(404).json({ error: "Entity not found" });
     return;
   }
@@ -154,13 +185,18 @@ entitiesRouter.delete("/campaigns/:id/entities/:entityId", async (req, res) => {
 // own entries, so another member's PRIVATE notes never leak here.
 
 entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, res) => {
-  await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
+  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
 
   const entity = await prisma.campaignEntity.findUnique({
     where: { id: req.params.entityId },
-    select: { id: true, campaignId: true },
+    select: { id: true, campaignId: true, visibility: true },
   });
-  if (!entity || entity.campaignId !== req.params.id) {
+  // Hidden entities are invisible to non-owners: 404 rather than leak existence.
+  if (
+    !entity ||
+    entity.campaignId !== req.params.id ||
+    (entity.visibility === "HIDDEN" && role !== "OWNER")
+  ) {
     res.status(404).json({ error: "Entity not found" });
     return;
   }

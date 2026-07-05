@@ -371,6 +371,57 @@ describe("JournalEntryRef derivation from @[uuid] tokens", () => {
     expect(res.body.journal[0].body).toBe(`Tag @[${entityish}] outside a campaign`);
     expect(await prisma.journalEntryRef.count({ where: { entryId } })).toBe(0);
   });
+
+  it("lets the OWNER mention a HIDDEN entity (ref created)", async () => {
+    const campaignId = await attachToFreshCampaign();
+    const created = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(`/api/campaigns/${campaignId}/entities`)
+      .send({ type: "NPC", name: "Hidden Villain", visibility: "HIDDEN" });
+    const entityId = created.body.id as string;
+
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ kind: "NOTE", body: `The @[${entityId}] schemes` });
+    const entryId = res.body.journal[0].id as string;
+    expect(await prisma.journalEntryRef.count({ where: { entryId } })).toBe(1);
+  });
+
+  it("drops a non-owner's mention of a HIDDEN entity (no reveal via UUID guess)", async () => {
+    const PLAYER_ID = "player-journal-hidden";
+    const PLAYER_CHAR = "player-journal-hidden-char";
+    await ensureTestOwner(PLAYER_ID);
+    const playerCookie = await authCookie(PLAYER_ID);
+
+    const campaign = await supertest.agent(app).set("Cookie", COOKIE)
+      .post("/api/campaigns")
+      .send({ name: "Ref Campaign" });
+    const campaignId = campaign.body.id as string;
+    const code = campaign.body.inviteCode as string;
+    await supertest.agent(app).set("Cookie", playerCookie)
+      .post("/api/campaigns/join")
+      .send({ inviteCode: code });
+
+    const hidden = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(`/api/campaigns/${campaignId}/entities`)
+      .send({ type: "NPC", name: "DM Secret", visibility: "HIDDEN" });
+    const hiddenId = hidden.body.id as string;
+
+    await prisma.character.create({
+      data: { ...FIXTURE, id: PLAYER_CHAR, name: "Player Char", ownerId: PLAYER_ID, spellcasting: Prisma.JsonNull },
+    });
+    await supertest.agent(app).set("Cookie", playerCookie)
+      .post(`/api/campaigns/${campaignId}/characters`)
+      .send({ characterId: PLAYER_CHAR });
+
+    const res = await supertest.agent(app).set("Cookie", playerCookie)
+      .post(`/api/characters/${PLAYER_CHAR}/journal`)
+      .send({ kind: "NOTE", body: `Guessed @[${hiddenId}]` });
+    const entryId = res.body.journal[0].id as string;
+    expect(await prisma.journalEntryRef.count({ where: { entryId } })).toBe(0);
+
+    await prisma.character.deleteMany({ where: { id: PLAYER_CHAR } });
+    await prisma.user.deleteMany({ where: { id: PLAYER_ID } });
+  });
 });
 
 // ── Ordering ─────────────────────────────────────────────────────────────────
