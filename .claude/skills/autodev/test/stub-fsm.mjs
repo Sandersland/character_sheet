@@ -13,12 +13,20 @@
  *         heartbeating every 2s like the real fsm
  *   9910  exit 0 with ctx.prUrl                  (review-block scenario: the gh
  *   9911  exit 0 with ctx.prUrl                   stub marks 9910's PR blocked on
- *                                                 claude-review; 9911 is its
- *                                                 dependent — never launches)
+ *                                                 claude-review until the responder
+ *                                                 marker flips it; 9911 is its dependent)
  *   9920  exit 0 with ctx.prUrl                  (merge-lagging scenario: the gh
  *                                                 stub reports 9920's PR all-green
  *                                                 but never merged → classifyPrBlock
  *                                                 returns "unknown")
+ *   9930  exit 0 with ctx.prUrl                  (non-converging review-block: the
+ *   9931  exit 0 with ctx.prUrl                   responder runs but GH_STUB_REVIEW_STUCK
+ *                                                 keeps the review red; 9931 is the dependent)
+ *
+ * A `run pr-response …` invocation (any issue) plays the responder: writes a
+ * run.json with ctx.pushed and — unless GH_STUB_REVIEW_STUCK matches the issue —
+ * drops a `responded-<issue>` marker in RUNS_DIR that the gh stub reads to flip
+ * the blocked PR to merged.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -31,6 +39,7 @@ if (!RUNS_DIR) {
 
 const [mode, ...rest] = process.argv.slice(2);
 let dir, issue, resumed;
+const machine = mode === "run" ? rest[0] : null;
 
 if (mode === "run") {
   issue = Number(rest[rest.indexOf("--issue") + 1]);
@@ -69,11 +78,25 @@ function save(status, extraCtx = {}, extra = {}) {
   );
 }
 
+if (machine === "pr-response") {
+  // Responder stub: pretend we triaged, fixed, committed, pushed. The marker
+  // flips the gh stub's blocked PR to merged; GH_STUB_REVIEW_STUCK suppresses
+  // it so the review never greens (non-convergence scenario).
+  const cycle = rest.includes("--pr-cycle") ? rest[rest.indexOf("--pr-cycle") + 1] : "1";
+  save("completed", { pushed: true, prNumber: issue, branch: `fix/pr${issue}-c${cycle}` });
+  if (process.env.GH_STUB_REVIEW_STUCK !== String(issue)) {
+    writeFileSync(join(RUNS_DIR, `responded-${issue}`), "1");
+  }
+  process.exit(0);
+}
+
 switch (issue) {
   case 9900:
   case 9910: // review-block scenario: succeeds → waiting_merge; gh stub makes its PR review-blocked
-  case 9911: // dependent of 9910 (never launches — prereq never merges)
+  case 9911: // dependent of 9910 (launches once the responder marker merges 9910)
   case 9920: // merge-lagging scenario: succeeds → waiting_merge; gh stub reports all-green but unmerged
+  case 9930: // non-converging review-block (GH_STUB_REVIEW_STUCK)
+  case 9931: // dependent of 9930 (stays pending — prereq never merges)
     save("completed", { prUrl: `https://example.test/pr/${issue}` });
     process.exit(0);
   case 9901:
