@@ -179,16 +179,25 @@ enum EntityType {
   OTHER
 }
 
+// DM-controlled reveal state (#379): HIDDEN entities are invisible to non-owner
+// members (list/detail/backlinks/mentions); the owner always sees all. New rows
+// default REVEALED so auto-created PC entities and the pre-#379 backfill are open.
+enum EntityVisibility {
+  HIDDEN
+  REVEALED
+}
+
 model CampaignEntity {
-  id         String     @id @default(uuid())
+  id         String           @id @default(uuid())
   campaignId String
-  campaign   Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaign   Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   type       EntityType
   name       String
-  aliases    String[]   @default([])
+  aliases    String[]         @default([])
   notes      String?
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  visibility EntityVisibility @default(REVEALED)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 
   refs          JournalEntryRef[]
   characterLink CampaignCharacterLink?
