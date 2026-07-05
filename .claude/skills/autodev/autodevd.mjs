@@ -30,12 +30,14 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createEngine, parseIssueSpecs, pidAlive } from "./batch-core.mjs";
+import { attachControl, closeControl } from "./control.mjs";
 
 const SKILL_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(SKILL_DIR, "../../..");
 const RUNTIME_DIR = process.env.AUTODEV_RUNTIME_DIR ?? join(ROOT, ".claude", "autodev");
 const PID_FILE = join(RUNTIME_DIR, "autodevd.pid");
 const DAEMON_JSON = join(RUNTIME_DIR, "daemon.json");
+const SOCK = join(RUNTIME_DIR, "autodevd.sock");
 const SELF = join(SKILL_DIR, "autodevd.mjs");
 
 function readJson(path) {
@@ -166,6 +168,30 @@ async function cmdLaunch(argv) {
   process.on("SIGINT", () => onStop("SIGINT"));
   process.on("SIGUSR1", () => onStop("SIGUSR1"));
 
+  // Control channel (Unix socket + autodevctl). The pidfile check already ran,
+  // so a live listener here means something is deeply wrong — bail.
+  const startedAt = Date.now();
+  let control = null;
+  try {
+    control = await attachControl({
+      engine,
+      daemon: {
+        pid: process.pid,
+        startedAt,
+        stateDir,
+        requestStop: (mode) => {
+          engine.drain(mode);
+          wake();
+        },
+      },
+      sockPath: SOCK,
+      log: engine.log,
+    });
+  } catch (err) {
+    console.error(`autodevd: control socket unavailable: ${err.message}`);
+    process.exit(1);
+  }
+
   engine.log(`DAEMON start pid=${process.pid} state=${stateDir} cap=${engine.batch.cap} poll=${cfg.poll}s grace=${engine.batch.grace}s base=${engine.batch.base}`);
 
   let tick = 0;
@@ -198,6 +224,7 @@ async function cmdLaunch(argv) {
   engine.saveBatch();
   engine.log(`DAEMON stopped (drain=${engine.draining}) pid=${process.pid}`);
   engine.summary();
+  closeControl(control, SOCK);
   try {
     unlinkSync(PID_FILE);
   } catch {

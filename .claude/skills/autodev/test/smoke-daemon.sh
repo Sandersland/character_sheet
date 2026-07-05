@@ -14,6 +14,9 @@
 #   E  idle daemon: batch completes → DONE+idle; plain stop drains immediately
 #   F  janitor reconcile: reaps dead runs, frees terminal/stale slots, never
 #      touches live, parked, or manual (no-run) worktrees
+#   G  control channel: ping/status/pause/add/resume/stop/retry/shutdown over
+#      the Unix socket; daemon-down ping exits 2 with relaunch hint; a stale
+#      socket left by SIGKILL is reclaimed on relaunch
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -203,5 +206,68 @@ node -e "
 " || fail "F: janitor assertions failed (see above)"
 kill "$LIVE_PID" 2>/dev/null || true
 pass "janitor: reaped dead run, freed stale+terminal slots, protected live/parked/manual"
+
+# ---------- G: control channel ----------
+echo "G: control channel over the Unix socket"
+G="$T/state-g"
+CTL="$SKILL_DIR/autodevctl.mjs"
+node "$SKILL_DIR/autodevd.mjs" 9903 --poll 1 --grace 30 --state-dir "$G" > "$T/g.out" 2>&1 &
+disown
+wait_for 15 "9903 running (G)" status_is "$G/batch.json" 9903 running
+
+node "$CTL" ping > "$T/g-ping.out" || fail "G: ping should succeed against live daemon"
+grep -q "pong pid=" "$T/g-ping.out" || fail "G: ping output malformed"
+node "$CTL" status --json | node -e "
+  let s=''; process.stdin.on('data',d=>s+=d).on('end',()=>{
+    const d=JSON.parse(s);
+    process.exit(d.issues['9903'].status==='running' && d.daemon.pid>0 ? 0 : 1);
+  });" || fail "G: status should show 9903 running"
+pass "ping + status over the socket"
+
+node "$CTL" pause > /dev/null
+node -e "process.exit(JSON.parse(require('fs').readFileSync('$G/batch.json','utf8')).paused===true?0:1)" || fail "G: pause flag not set"
+node "$CTL" add 9902 > /dev/null
+status_is "$G/batch.json" 9902 pending || fail "G: added 9902 should be pending"
+sleep 2.5   # >2 ticks: a paused batch must NOT launch the new issue
+status_is "$G/batch.json" 9902 pending || fail "G: paused batch launched 9902 anyway"
+node "$CTL" resume > /dev/null
+wait_for 20 "9902 runs then fails after resume" status_is "$G/batch.json" 9902 failed
+pass "pause gates launches; add enqueues; resume releases"
+
+node "$CTL" stop 9903 > /dev/null
+wait_for 10 "9903 stopped" status_is "$G/batch.json" 9903 failed
+node -e "process.exit(JSON.parse(require('fs').readFileSync('$G/batch.json','utf8')).issues['9903'].stoppedBy==='ctl'?0:1)" || fail "G: 9903 should be stoppedBy ctl"
+grep -q "rm stub/issue-9903" "$T/worktree-calls.txt" || fail "G: stop should tear down 9903's worktree"
+pass "stop killed the child, marked failed (stoppedBy=ctl), tore down worktree"
+
+node "$CTL" pause > /dev/null   # freeze launches so retry_wait is observable
+node "$CTL" retry 9902 > /dev/null
+status_is "$G/batch.json" 9902 retry_wait || fail "G: retry should park 9902 as retry_wait"
+node "$CTL" reconcile > /dev/null || fail "G: reconcile verb should succeed"
+node "$CTL" shutdown > /dev/null
+wait_for 10 "daemon shut down via socket" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
+[ -S "$T/runtime/autodevd.sock" ] && fail "G: socket file should be removed on graceful shutdown"
+pass "retry + reconcile verbs; shutdown removed pidfile and socket"
+
+rc=0
+node "$CTL" ping > "$T/g-down.out" 2>&1 || rc=$?
+[ "$rc" -eq 2 ] || fail "G: daemon-down ping should exit 2 (got $rc)"
+grep -q "relaunch with" "$T/g-down.out" || fail "G: daemon-down ping should print relaunch hint"
+pass "daemon-down ping exits 2 with relaunch hint"
+
+# Stale socket reclaim: SIGKILL leaves the sock file behind; relaunch reclaims it.
+node "$SKILL_DIR/autodevd.mjs" --poll 1 --state-dir "$G" > "$T/g2.out" 2>&1 &
+disown
+wait_for 15 "daemon G2 up" bash -c "[ -f '$T/runtime/autodevd.pid' ]"
+kill -9 "$(cat "$T/runtime/autodevd.pid")"
+sleep 0.5
+[ -S "$T/runtime/autodevd.sock" ] || fail "G: SIGKILL should leave a stale socket for this test"
+node "$SKILL_DIR/autodevd.mjs" --poll 1 --state-dir "$G" > "$T/g3.out" 2>&1 &
+disown
+wait_for 15 "stale socket reclaimed" grep -qs "CONTROL reclaimed stale socket" "$G/orchestrator.log"
+node "$CTL" ping > /dev/null || fail "G: ping should work after stale-socket reclaim"
+node "$CTL" shutdown --park > /dev/null
+wait_for 10 "daemon G3 stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
+pass "stale socket reclaimed on relaunch; ping works; park-shutdown clean"
 
 echo "SMOKE PASS (all scenarios)"
