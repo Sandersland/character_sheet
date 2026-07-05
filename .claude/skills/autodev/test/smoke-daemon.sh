@@ -9,8 +9,11 @@
 #   A  one-shot batch.mjs semantics unchanged (success / exit-75 park+resume / crash+resume→failed)
 #   B  daemon: detached child survives kill -9 of the daemon; relaunch adopts it (no dup run)
 #   C  second daemon launch while one is live is refused
-#   D  stop --park: child SIGTERMed, entry parked as retry_wait, pidfile removed
+#   D  stop --park: child SIGTERMed, entry parked as retry_wait (+ run.json
+#      stamped retry-scheduled so the janitor treats it as parked), pidfile removed
 #   E  idle daemon: batch completes → DONE+idle; plain stop drains immediately
+#   F  janitor reconcile: reaps dead runs, frees terminal/stale slots, never
+#      touches live, parked, or manual (no-run) worktrees
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -28,7 +31,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "$T/bin" "$T/runs" "$T/runtime"
+mkdir -p "$T/bin" "$T/runs" "$T/runtime" "$T/worktrees"
+echo '{}' > "$T/worktrees/registry.json"   # isolated slot registry — daemon-tick janitor must never see the real one
 
 # gh stub: `pr list --search "(#N) in:title"` → merged iff a run of issue N has
 # produced a PR (run.json with prUrl) — merged-only-after-PR mirrors reality and
@@ -55,6 +59,7 @@ chmod +x "$T/bin/gh" "$T/bin/worktree"
 export AUTODEV_FSM_BIN="$SKILL_DIR/test/stub-fsm.mjs"
 export AUTODEV_RUNS_DIR="$T/runs"
 export AUTODEV_RUNTIME_DIR="$T/runtime"
+export AUTODEV_WORKTREES_DIR="$T/worktrees"
 export AUTODEV_GH_BIN="$T/bin/gh"
 export AUTODEV_WORKTREE_BIN="$T/bin/worktree"
 export AUTODEV_SKIP_GIT_SYNC=1
@@ -121,7 +126,13 @@ node "$SKILL_DIR/autodevd.mjs" stop --park > "$T/d.out" 2>&1
 [ -f "$T/runtime/autodevd.pid" ] && fail "D: pidfile still present after stop"
 kill -0 "$SPID" 2>/dev/null && fail "D: stub child still alive after park"
 status_is "$B/batch.json" 9903 retry_wait || fail "D: 9903 should be parked as retry_wait"
-pass "park: child SIGTERMed, entry retry_wait, pidfile removed"
+node -e "
+  const fs = require('fs');
+  const b = JSON.parse(fs.readFileSync('$B/batch.json','utf8'));
+  const run = JSON.parse(fs.readFileSync(b.issues['9903'].rundir + '/run.json','utf8'));
+  process.exit(run.status === 'retry-scheduled' ? 0 : 1);
+" || fail "D: parked run.json should be stamped retry-scheduled (janitor protection)"
+pass "park: child SIGTERMed, entry retry_wait (run.json stamped parked), pidfile removed"
 
 # ---------- E: idle daemon + plain stop ----------
 echo "E: completed batch idles; plain stop drains immediately"
@@ -135,5 +146,62 @@ node -e "process.exit(JSON.parse(require('fs').readFileSync('$E/batch.json','utf
 node "$SKILL_DIR/autodevd.mjs" stop > "$T/e-stop.out" 2>&1
 [ -f "$T/runtime/autodevd.pid" ] && fail "E: pidfile still present after stop"
 pass "idle daemon stayed resident and stopped cleanly"
+
+# ---------- F: janitor reconcile (unit, direct call) ----------
+echo "F: janitor reconcile — reap dead, free stale/terminal, protect live/parked/manual"
+FR="$T/janitor-runs"; FW="$T/janitor-worktrees"
+mkdir -p "$FR" "$FW"
+: > "$T/worktree-calls.txt"
+sleep 300 & LIVE_PID=$!   # stands in for a live fsm child
+disown
+
+mkrun() { # mkrun <name> <branch> <status> <pid> <hbAgeMs>
+  local d="$FR/2026-01-01T00-00-0$RANDOM-issue-$1"
+  mkdir -p "$d"
+  node -e "
+    const [dir, branch, status, pid, hbAge] = process.argv.slice(1);
+    require('fs').writeFileSync(dir + '/run.json', JSON.stringify({
+      id: dir.split('/').pop(), status, costUsd: 1.23, currentState: 'Worker',
+      ctx: { issue: 1, branch },
+      ...(pid !== 'none' ? { pid: Number(pid), lastHeartbeat: Date.now() - Number(hbAge) } : {}),
+    }, null, 2));
+  " "$d" "$2" "$3" "$4" "${5:-0}"
+  echo "$d"
+}
+
+RA=$(mkrun 8801 stub/bA running none)               # legacy frozen (no pid/hb) → reap + free slot
+RB=$(mkrun 8802 stub/bB running "$LIVE_PID")        # live (pid alive, fresh hb) → untouched
+RC=$(mkrun 8803 stub/bC retry-scheduled none)       # parked → untouched
+RD=$(mkrun 8804 stub/bD completed none)             # terminal → slot freed, no reap
+mkdir -p "$FW/stub/bA" "$FW/stub/bB" "$FW/stub/bC" "$FW/stub/bD" "$FW/stub/bF"
+node -e "require('fs').writeFileSync('$FW/registry.json', JSON.stringify({
+  'stub/bA': 1, 'stub/bB': 2, 'stub/bC': 3, 'stub/bD': 4, 'stub/bE': 5, 'stub/bF': 6,
+}))"   # bE: no dir (stale reservation) → freed; bF: dir but no run (manual) → untouched
+
+AUTODEV_RUNS_DIR="$FR" AUTODEV_WORKTREES_DIR="$FW" node -e "
+  import('$SKILL_DIR/janitor.mjs').then(async (j) => {
+    const res = j.reconcile({ log: console.error });
+    console.log(JSON.stringify(res));
+  });
+" > "$T/f-result.json"
+
+node -e "
+  const fs = require('fs');
+  const res = JSON.parse(fs.readFileSync('$T/f-result.json','utf8'));
+  const calls = fs.readFileSync('$T/worktree-calls.txt','utf8');
+  const runA = JSON.parse(fs.readFileSync('$RA/run.json','utf8'));
+  const runB = JSON.parse(fs.readFileSync('$RB/run.json','utf8'));
+  const runC = JSON.parse(fs.readFileSync('$RC/run.json','utf8'));
+  const assert = (c, m) => { if (!c) { console.error('F assert failed: ' + m); process.exit(1); } };
+  assert(runA.status === 'failed' && runA.ctx.failure.includes('reaped'), 'dead run A finalized failed');
+  assert(fs.readFileSync('$RA/steps.jsonl','utf8').includes('reaped'), 'run A steps.jsonl reap line');
+  assert(runB.status === 'running', 'live run B untouched');
+  assert(runC.status === 'retry-scheduled', 'parked run C untouched');
+  for (const b of ['stub/bA','stub/bD','stub/bE']) assert(calls.includes('rm ' + b), b + ' slot freed');
+  for (const b of ['stub/bB','stub/bC','stub/bF']) assert(!calls.includes('rm ' + b), b + ' NOT touched');
+  assert(res.reapedRuns.length === 1 && res.freedSlots.length === 3, 'result counts (1 reaped, 3 freed)');
+" || fail "F: janitor assertions failed (see above)"
+kill "$LIVE_PID" 2>/dev/null || true
+pass "janitor: reaped dead run, freed stale+terminal slots, protected live/parked/manual"
 
 echo "SMOKE PASS (all scenarios)"

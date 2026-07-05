@@ -14,9 +14,10 @@
  *   node fsm.mjs resume <run-dir>
  */
 import { spawn, spawnSync, execSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync, appendFileSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, appendFileSync, existsSync, renameSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { reconcile as janitorReconcile } from "./janitor.mjs";
 
 const SKILL_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(SKILL_DIR, "../../..");
@@ -476,7 +477,17 @@ const HANDLERS = {
     sh("git", ["fetch", "origin", integrationBranch], { cwd: ROOT });
     const exists = spawnSync("git", ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], { cwd: ROOT });
     if (exists.status !== 0) sh("git", ["branch", branch, `origin/${integrationBranch}`], { cwd: ROOT });
-    sh(join(SKILL_DIR, "..", "worktree", "worktree.sh"), ["create", branch, "--up"], { cwd: ROOT });
+    try {
+      sh(join(SKILL_DIR, "..", "worktree", "worktree.sh"), ["create", branch, "--up"], { cwd: ROOT });
+    } catch (err) {
+      // Self-heal: a leaked slot (reaped run that never freed its worktree)
+      // must not brick a fresh run — reconcile and retry once.
+      if (!/no free slots/i.test(err.message)) throw err;
+      log(run, "no free worktree slots — running janitor reconcile, then retrying once");
+      const { reapedRuns, freedSlots } = janitorReconcile({ log: (m) => log(run, m) });
+      log(run, `janitor: reaped ${reapedRuns.length} run(s), freed ${freedSlots.length} slot(s)`);
+      sh(join(SKILL_DIR, "..", "worktree", "worktree.sh"), ["create", branch, "--up"], { cwd: ROOT });
+    }
     const registry = JSON.parse(readFileSync(join(ROOT, ".claude", "worktrees", "registry.json"), "utf8"));
     const slot = registry[branch];
     if (!slot) throw new Error(`worktree.sh did not register a slot for ${branch}`);
@@ -649,8 +660,11 @@ function ledgerStep(run, record) {
 }
 
 function saveRun(run) {
+  // Atomic (tmp+rename): the janitor and batch orchestrator read run.json
+  // concurrently — a torn read must never look like a corrupt/dead run.
+  const tmp = join(run.dir, "run.json.tmp");
   writeFileSync(
-    join(run.dir, "run.json"),
+    tmp,
     JSON.stringify(
       {
         id: run.id,
@@ -667,11 +681,16 @@ function saveRun(run) {
         sessions: run.sessions,
         ctx: run.ctx,
         startedAt: run.startedAt,
+        // Liveness signal for the janitor: pid + a heartbeat refreshed every
+        // 30s by the timer in execute() (and on every state transition).
+        pid: process.pid,
+        lastHeartbeat: Date.now(),
       },
       null,
       2,
     ),
   );
+  renameSync(tmp, join(run.dir, "run.json"));
 }
 
 // ---------- main loop ----------
@@ -680,6 +699,12 @@ async function execute(run) {
   const { machine } = run;
   const budget = machine.budget ?? {};
   saveRun(run);
+  // Heartbeat: agent states legitimately run for up to wallMinutes (~30 min)
+  // between transitions, so liveness needs its own timer — it keeps beating
+  // while invokeClaude awaits. unref() lets the process exit without teardown
+  // on every exit path. Synchronous script work (spawnSync) can starve it for
+  // minutes; the janitor's stale threshold (15 min) is sized for that.
+  setInterval(() => saveRun(run), 30_000).unref();
 
   while (true) {
     const stateName = run.currentState;

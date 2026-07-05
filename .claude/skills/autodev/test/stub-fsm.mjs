@@ -9,7 +9,8 @@
  *   9901  exit 75 first run (retry-scheduled),   (rate-limit park → resume succeeds)
  *         exit 0 + prUrl on resume
  *   9902  exit 1 always                          (crash; resume also crashes)
- *   9903  write run.json then sleep 300s         (long-runner, killable)
+ *   9903  write run.json then sleep 300s,        (long-runner, killable)
+ *         heartbeating every 2s like the real fsm
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -47,6 +48,11 @@ function save(status, extraCtx = {}, extra = {}) {
         costUsd: 0.01,
         ctx: { issue, branch: `stub/issue-${issue}`, ...extraCtx },
         startedAt: Date.now(),
+        // Liveness fields (like the real fsm's saveRun) — without them a
+        // batch-tick janitor pass would classify a live stub as a legacy
+        // dead run and reap it mid-scenario.
+        pid: process.pid,
+        lastHeartbeat: Date.now(),
         ...extra,
       },
       null,
@@ -71,6 +77,7 @@ switch (issue) {
     process.exit(1);
   case 9903:
     save("running");
+    setInterval(() => save("running"), 2000); // heartbeat like the real fsm
     setTimeout(() => process.exit(0), 300_000); // long-runner; killed by tests
     break;
   default:
