@@ -36,6 +36,8 @@ export interface EffectColumns {
   effectKind?: string | null;
   effectDiceCount?: number | null;
   effectDiceFaces?: number | null;
+  // Class-die reference (e.g. "superiorityDice") — supersedes effectDiceFaces when it resolves.
+  effectDieSource?: string | null;
   effectModifier?: number | null;
   damageType?: string | null;
   attackType?: string | null;
@@ -50,14 +52,21 @@ export interface EffectColumns {
 // A row carrying effect columns plus the level that decides the scaling axis.
 export type EffectRow = EffectColumns & { level: number; concentration?: boolean };
 
+// Resolves a class-die source key (e.g. "superiorityDice") to its die-face count.
+export type ClassDieResolver = (source: string) => number | null;
+
 // Adapter over the existing flat columns — no schema migration. Reproduces the
-// null-guard and scaling-mode selection from the old computeCastSpec.
-export function readEffectSpec(row: EffectRow): EffectSpec {
-  const hasDice = Boolean(row.effectKind && row.effectDiceCount && row.effectDiceFaces);
+// null-guard and scaling-mode selection from the old computeCastSpec. When a row
+// carries effectDieSource, `resolveDie` supplies the faces (superseding the fixed
+// effectDiceFaces); fixed-dice rows are unaffected.
+export function readEffectSpec(row: EffectRow, resolveDie?: ClassDieResolver): EffectSpec {
+  const referencedFaces = row.effectDieSource ? resolveDie?.(row.effectDieSource) ?? null : null;
+  const faces = referencedFaces ?? row.effectDiceFaces ?? null;
+  const hasDice = Boolean(row.effectKind && row.effectDiceCount && faces);
   const dice = hasDice
     ? {
         count: row.effectDiceCount as number,
-        faces: row.effectDiceFaces as number,
+        faces: faces as number,
         modifier: row.effectModifier ?? 0,
       }
     : undefined;
