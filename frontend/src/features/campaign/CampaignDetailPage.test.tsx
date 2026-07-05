@@ -16,6 +16,8 @@ vi.mock("@/api/client", () => ({
   createEntity: vi.fn(),
   updateEntity: vi.fn(),
   deleteEntity: vi.fn(),
+  fetchCampaignItems: vi.fn(),
+  fetchItems: vi.fn(),
 }));
 
 function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
@@ -67,6 +69,8 @@ beforeEach(() => {
   // The entity cache is module-level and leaks across tests without a reset.
   __resetCampaignEntitiesCacheForTests();
   vi.mocked(client.fetchEntities).mockResolvedValue([]);
+  vi.mocked(client.fetchCampaignItems).mockResolvedValue([]);
+  vi.mocked(client.fetchItems).mockResolvedValue([]);
 });
 
 describe("CampaignDetailPage (#246)", () => {
