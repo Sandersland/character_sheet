@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "../generated/prisma/client.js";
-import { clearBuffsForSourceInTx } from "./active-effects.js";
+import { clearBuffsForSourceInTx, clearBuffsForRestInTx } from "./active-effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
@@ -1291,6 +1291,18 @@ export async function applyHitPointOperations(
         batchId,
         sessionId,
       });
+
+      // A rest clears its matching "until-rest" durable buffs (#455). Long rest
+      // clears both short- and long-rest buffs; short rest only short.
+      if (op.type === "shortRest" || op.type === "longRest") {
+        await clearBuffsForRestInTx(
+          tx,
+          characterId,
+          op.type === "longRest" ? "long" : "short",
+          batchId,
+          sessionId,
+        );
+      }
 
       // After the damage event is logged, resolve concentration (issue #41).
       // Logged as a separate "spellcasting" event sharing this batchId so the

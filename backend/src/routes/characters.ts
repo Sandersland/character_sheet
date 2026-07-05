@@ -151,6 +151,8 @@ interface InventoryItemContext {
    * adds +2 to ranged weapon attacks.
    */
   fightingStyle: FightingStyleKey | null;
+  /** Sum of active "meleeDamage" buffs (#455); added to melee weapon damage. */
+  meleeDamageBonus: number;
 }
 
 function serializeInventoryItem(
@@ -192,6 +194,7 @@ function serializeInventoryItem(
         },
         context.offHandBusy,
         context.effectiveScores,
+        context.meleeDamageBonus,
       ),
     };
   }
@@ -681,7 +684,12 @@ function buildInventoryContext(
   const equippedWeaponCount = equippedItems.filter((i) => i.category === "weapon").length;
   const offHandBusy = equippedShieldPresent || equippedWeaponCount >= 2;
 
-  return { effectiveScores, proficiencyBonus, weaponGrants, offHandBusy, fightingStyle };
+  // Sum active "meleeDamage" buffs (e.g. Rage) — added to melee weapon damage
+  // in deriveWeaponDamage, the same derive-on-read path skills use (#455).
+  const meleeDamageBonus = (buffsByTarget(normalizeActiveEffectsMutable(row.activeEffects)).meleeDamage ?? [])
+    .reduce((sum, b) => sum + b.modifier, 0);
+
+  return { effectiveScores, proficiencyBonus, weaponGrants, offHandBusy, fightingStyle, meleeDamageBonus };
 }
 
 export function serializeCharacter(row: CharacterWithRelations) {
