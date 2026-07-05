@@ -7,7 +7,38 @@ import {
   levelUpHpGain,
   normalizeHitDice,
   normalizeHitPoints,
+  resolveDamageResistance,
 } from "../hitpoints.js";
+
+describe("resolveDamageResistance", () => {
+  const resisted = new Set(["slashing", "piercing", "bludgeoning"]);
+
+  it("halves (round-down) when the damage type matches an active resistance", () => {
+    expect(resolveDamageResistance(12, "slashing", resisted)).toEqual({ applied: 6, resisted: true });
+    expect(resolveDamageResistance(13, "slashing", resisted)).toEqual({ applied: 6, resisted: true });
+  });
+
+  it("leaves a non-matching damage type unaffected", () => {
+    expect(resolveDamageResistance(12, "fire", resisted)).toEqual({ applied: 12, resisted: false });
+  });
+
+  it("never auto-halves typeless damage", () => {
+    expect(resolveDamageResistance(12, undefined, resisted)).toEqual({ applied: 12, resisted: false });
+  });
+
+  it("is case-insensitive on the damage type", () => {
+    expect(resolveDamageResistance(10, "Slashing", resisted)).toEqual({ applied: 5, resisted: true });
+  });
+
+  it("honors the manual override: resist=false declines an otherwise-matching halve", () => {
+    expect(resolveDamageResistance(12, "slashing", resisted, false)).toEqual({ applied: 12, resisted: false });
+  });
+
+  it("honors the manual override: resist=true forces a halve even without a match", () => {
+    expect(resolveDamageResistance(9, "fire", resisted, true)).toEqual({ applied: 4, resisted: true });
+    expect(resolveDamageResistance(9, undefined, new Set(), true)).toEqual({ applied: 4, resisted: true });
+  });
+});
 
 describe("normalizeHitPoints", () => {
   it("round-trips a fully-formed value unchanged", () => {

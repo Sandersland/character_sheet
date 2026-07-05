@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "../generated/prisma/client.js";
-import { clearBuffsForSourceInTx } from "./active-effects.js";
+import {
+  clearBuffsForSourceInTx,
+  normalizeActiveEffectsMutable,
+  resistedDamageTypes,
+} from "./active-effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
@@ -100,6 +104,28 @@ export function hitDieHeal(roll: number, conMod: number): number {
   return Math.max(0, roll + conMod);
 }
 
+export interface DamageResistanceResult {
+  applied: number;
+  resisted: boolean;
+}
+
+/**
+ * Resolve resistance halving for one typed damage instance (#456). Auto-halves
+ * (5e round-down) when the damage type matches an active resistance; `resist`
+ * overrides that decision (true forces the halve, false declines it — the
+ * manual override). Typeless damage never auto-halves.
+ */
+export function resolveDamageResistance(
+  amount: number,
+  damageType: string | undefined,
+  resistedTypes: Set<string>,
+  resist?: boolean,
+): DamageResistanceResult {
+  const typeMatches = damageType !== undefined && resistedTypes.has(damageType.toLowerCase());
+  const halve = resist ?? typeMatches;
+  return { applied: halve ? Math.floor(amount / 2) : amount, resisted: halve };
+}
+
 /**
  * Apply a d20 death save roll, returning the new deathSaves state and
  * updated current HP.
@@ -142,6 +168,13 @@ export function applyDeathSaveRoll(
 export interface DamageOperation {
   type: "damage";
   amount: number; // must be > 0
+  /** Optional 5e damage type (e.g. "slashing"). Drives resistance auto-halve (#456). */
+  damageType?: string;
+  /**
+   * Manual resistance override (#456): omitted → auto (halve iff `damageType`
+   * matches an active resistance); `true` forces the halve; `false` declines it.
+   */
+  resist?: boolean;
   /**
    * Whether a triggered concentration CON save is auto-rolled server-side
    * (default) or deferred for the client to roll (issue #76). Treated as
@@ -630,6 +663,8 @@ interface HpOpContext {
   effMax: number;
   primaryEntry: ClassEntryRow | undefined;
   beforeClassLevel: number | null;
+  /** Lowercase set of currently-resisted damage types (#456). */
+  resistedTypes: Set<string>;
 }
 
 interface ClassEntryRow {
@@ -649,20 +684,28 @@ interface HpOpResult {
 }
 
 function applyDamageOp(ctx: HpOpContext, op: DamageOperation): HpOpResult {
-  const { hp } = ctx;
+  const { hp, resistedTypes } = ctx;
   if (op.amount <= 0) {
     throw new InvalidHitPointOperationError("damage amount must be positive");
   }
   const beforeCurrent = hp.current;
+  // Resistance auto-halves (5e round-down) when the type matches; op.resist overrides (#456).
+  const { applied, resisted } = resolveDamageResistance(op.amount, op.damageType, resistedTypes, op.resist);
   // Temp HP absorbs first, then current. Both floor at 0.
-  const absorbed = Math.min(hp.temp, op.amount);
+  const absorbed = Math.min(hp.temp, applied);
   hp.temp -= absorbed;
-  hp.current = Math.max(0, hp.current - (op.amount - absorbed));
-  // The 5e concentration save uses the full damage of the instance.
+  hp.current = Math.max(0, hp.current - (applied - absorbed));
+
+  const typeLabel = op.damageType ? ` ${op.damageType}` : "";
+  const summary = resisted
+    ? `Took ${op.amount}${typeLabel} → ${applied} (resistance) damage (${beforeCurrent} → ${hp.current} HP)`
+    : `Took ${op.amount}${typeLabel} damage (${beforeCurrent} → ${hp.current} HP)`;
+
+  // The 5e concentration save DC is based on the damage actually taken (post-resistance).
   return {
-    summary: `Took ${op.amount} damage (${beforeCurrent} → ${hp.current} HP)`,
-    eventData: { amount: op.amount },
-    damageForConcentration: op.amount,
+    summary,
+    eventData: { amount: op.amount, appliedAmount: applied, damageType: op.damageType ?? null, resisted },
+    damageForConcentration: applied,
   };
 }
 
@@ -1114,6 +1157,7 @@ export async function applyHitPointOperations(
           experiencePoints: true,
           spellcasting: true,
           resources: true,
+          activeEffects: true,
           classEntries: {
             orderBy: { position: "asc" as const },
             select: {
@@ -1166,6 +1210,8 @@ export async function applyHitPointOperations(
       // common HP write-back below (needs the post-damage current HP).
       let damageForConcentration: number | null = null;
 
+      const resistedTypes = resistedDamageTypes(normalizeActiveEffectsMutable(row.activeEffects));
+
       const ctx: HpOpContext = {
         tx,
         characterId,
@@ -1177,6 +1223,7 @@ export async function applyHitPointOperations(
         effMax,
         primaryEntry,
         beforeClassLevel,
+        resistedTypes,
       };
       let result: HpOpResult | null = null;
 
