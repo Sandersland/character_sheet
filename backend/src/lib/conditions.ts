@@ -13,12 +13,9 @@
  * Concentration is intentionally separate (tracked in spellcasting).
  */
 
-import { randomUUID } from "node:crypto";
-
 import { Prisma } from "../generated/prisma/client.js";
+import { runCharacterTransaction } from "./character-transaction.js";
 import { logEvent } from "./events.js";
-import { prisma } from "./prisma.js";
-import { getActiveSessionId } from "./sessions.js";
 import {
   CONDITIONS,
   EXHAUSTION_MAX,
@@ -199,20 +196,10 @@ export async function applyConditionsOperations(
   characterId: string,
   operations: ConditionOperation[],
 ): Promise<void> {
-  const batchId = randomUUID();
-  const sessionId = await getActiveSessionId(characterId);
-
-  await prisma.$transaction(async (tx) => {
-    for (const op of operations) {
-      // Re-read per-op so a batch sees each previous op's result.
-      const row = await tx.character.findUnique({
-        where: { id: characterId },
-        select: { conditions: true },
-      });
-      if (!row) {
-        throw new InvalidConditionOperationError(`Character not found: ${characterId}`);
-      }
-
+  await runCharacterTransaction<{ conditions: true }, ConditionOperation>(characterId, operations, {
+    select: { conditions: true },
+    notFound: (id) => new InvalidConditionOperationError(`Character not found: ${id}`),
+    applyOp: async ({ tx, row, op, batchId, sessionId }) => {
       const state = normalizeConditionsMutable(row.conditions);
       const beforeState = deepCopy(state);
 
@@ -294,6 +281,6 @@ export async function applyConditionsOperations(
         batchId,
         sessionId,
       });
-    }
+    },
   });
 }

@@ -21,10 +21,9 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "../generated/prisma/client.js";
+import { runCharacterTransaction } from "./character-transaction.js";
 import { levelForExperience, proficiencyBonusForLevel } from "./experience.js";
 import { logEvent } from "./events.js";
-import { getActiveSessionId } from "./sessions.js";
-import { prisma } from "./prisma.js";
 import { normalizeResourcesMutable, serializeResourcesState, type AdvancementEntry } from "./resources.js";
 import { advancementSlotsForLevel, abilityModifier } from "./srd.js";
 import { normalizeHitPoints, normalizeHitDice } from "./hitpoints.js";
@@ -159,32 +158,22 @@ export async function applyAdvancementOperations(
   characterId: string,
   operations: AdvancementOperation[],
 ): Promise<void> {
-  const batchId = randomUUID();
-  const sessionId = await getActiveSessionId(characterId);
-
-  await prisma.$transaction(async (tx) => {
-    for (const op of operations) {
-      // Re-read per-op so a batch sees each previous op's result.
-      const row = await tx.character.findUnique({
-        where: { id: characterId },
-        select: {
-          resources: true,
-          abilityScores: true,
-          hitPoints: true,
-          hitDice: true,
-          initiativeBonus: true,
-          experiencePoints: true,
-          classEntries: {
-            orderBy: { position: "asc" as const },
-            take: 1,
-            select: { name: true },
-          },
-        },
-      });
-      if (!row) {
-        throw new InvalidAdvancementOperationError(`Character not found: ${characterId}`);
-      }
-
+  await runCharacterTransaction(characterId, operations, {
+    select: {
+      resources: true,
+      abilityScores: true,
+      hitPoints: true,
+      hitDice: true,
+      initiativeBonus: true,
+      experiencePoints: true,
+      classEntries: {
+        orderBy: { position: "asc" as const },
+        take: 1,
+        select: { name: true },
+      },
+    },
+    notFound: (id) => new InvalidAdvancementOperationError(`Character not found: ${id}`),
+    applyOp: async ({ tx, row, op, batchId, sessionId }) => {
       const level = levelForExperience(row.experiencePoints);
       proficiencyBonusForLevel(level); // validate level is reachable (side-effect-free)
       const className = row.classEntries[0]?.name ?? "";
@@ -500,6 +489,6 @@ export async function applyAdvancementOperations(
         batchId,
         sessionId,
       });
-    }
+    },
   });
 }
