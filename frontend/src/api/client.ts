@@ -21,6 +21,7 @@ import type {
   ClassOperation,
   ConditionOperation,
   CampaignEntity,
+  CampaignEntityMerge,
   CreateCharacterInput,
   EntityBacklink,
   EntityType,
@@ -672,6 +673,60 @@ export async function fetchEntityBacklinks(
     throw new Error(`Failed to fetch entity backlinks (${response.status})`);
   }
   return response.json();
+}
+
+// ── Entity identity merges (#387) ─────────────────────────────────────────────
+// Owner-only writes (prepare/execute/unmerge). The list is scrubbed server-side:
+// a non-owner only ever receives EXECUTED merges between revealed identities.
+
+export async function fetchEntityMerges(campaignId: string): Promise<CampaignEntityMerge[]> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities/merges`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch entity merges (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function prepareEntityMerge(
+  campaignId: string,
+  input: { mergedEntityId: string; survivorEntityId: string; note?: string },
+): Promise<CampaignEntityMerge> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities/merges`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to prepare merge (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function executeEntityMerge(
+  campaignId: string,
+  mergeId: string,
+): Promise<CampaignEntityMerge> {
+  const response = await apiFetch(
+    `${API_URL}/campaigns/${campaignId}/entities/merges/${mergeId}/execute`,
+    { method: "POST" },
+  );
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to execute merge (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function unmergeEntityMerge(campaignId: string, mergeId: string): Promise<void> {
+  const response = await apiFetch(
+    `${API_URL}/campaigns/${campaignId}/entities/merges/${mergeId}`,
+    { method: "DELETE" },
+  );
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to unmerge (${response.status})`);
+  }
 }
 
 // ── Campaign items (#380) ───────────────────────────────────────────────────────

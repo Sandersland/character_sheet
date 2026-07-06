@@ -126,25 +126,27 @@ export async function awardCampaignItem(params: {
     params.characterId,
   );
 
-  // Unique guard: a unique item may exist on only one sheet in the campaign.
-  if (item.isUnique) {
-    const held = await prisma.inventoryItem.findFirst({
-      where: { campaignItemId: item.id },
-      select: { character: { select: { name: true } } },
-    });
-    if (held) {
-      throw new CampaignItemAwardError(
-        409,
-        `${item.name} is unique and already held by ${held.character.name}`,
-      );
-    }
-  }
-
   const quantity = params.quantity;
   const batchId = randomUUID();
   const sessionId = await getActiveSessionId(character.id);
 
   await prisma.$transaction(async (tx) => {
+    // Unique guard: a unique item may exist on only one sheet in the campaign.
+    // Read the holder inside the transaction (alongside the create below) so a
+    // concurrent award can't slip between an outside-the-tx check and the write.
+    if (item.isUnique) {
+      const held = await tx.inventoryItem.findFirst({
+        where: { campaignItemId: item.id },
+        select: { character: { select: { name: true } } },
+      });
+      if (held) {
+        throw new CampaignItemAwardError(
+          409,
+          `${item.name} is unique and already held by ${held.character.name}`,
+        );
+      }
+    }
+
     const position = await tx.inventoryItem.count({ where: { characterId: character.id } });
     const created = await tx.inventoryItem.create({
       data: {

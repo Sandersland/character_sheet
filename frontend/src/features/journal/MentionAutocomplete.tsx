@@ -19,6 +19,8 @@ import { Link } from "react-router-dom";
 import { createEntity } from "@/api/client";
 import Badge from "@/components/ui/Badge";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
+import { useCampaignMerges } from "@/hooks/useCampaignMerges";
+import { ultimateSurvivorName } from "@/lib/merges";
 import {
   ENTITY_TYPE_LABELS,
   ENTITY_TYPE_TONE,
@@ -64,6 +66,7 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
     const innerRef = useRef<HTMLDivElement | null>(null);
     const listboxId = useId();
     const { entities, byId } = useCampaignEntities(campaignId);
+    const { merges } = useCampaignMerges(campaignId);
     const [trigger, setTrigger] = useState<ActiveTrigger | null>(null);
     const [activeIndex, setActiveIndex] = useState(0);
     const [creating, setCreating] = useState(false);
@@ -348,7 +351,17 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
                 }}
                 onMouseEnter={() => setActiveIndex(index)}
               >
-                <span className="min-w-0 truncate">{entity.name}</span>
+                <span className="min-w-0 truncate">
+                  {entity.name}
+                  {(() => {
+                    const survivor = ultimateSurvivorName(merges, byId, entity.id);
+                    return survivor ? (
+                      <span className="ml-1 text-xs font-normal text-parchment-500">
+                        → {survivor}
+                      </span>
+                    ) : null;
+                  })()}
+                </span>
                 <Badge tone={ENTITY_TYPE_TONE[entity.type]}>{ENTITY_TYPE_LABELS[entity.type]}</Badge>
               </li>
             ))}

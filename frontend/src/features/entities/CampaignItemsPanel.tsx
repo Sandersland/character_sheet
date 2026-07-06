@@ -242,7 +242,9 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
   }
 
   async function handleAward(item: CampaignItem) {
-    const characterId = awardTarget[item.id] ?? characters[0]?.id;
+    // The Award button is disabled until a recipient is picked, so awardTarget
+    // is always set here; the guard is a defensive backstop, not a fallback.
+    const characterId = awardTarget[item.id];
     if (!characterId) return;
     setBusyId(item.id);
     setError(null);

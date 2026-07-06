@@ -6,7 +6,12 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import EntityDetailPage from "@/features/entities/EntityDetailPage";
 import * as client from "@/api/client";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
-import type { Campaign, CampaignEntity, EntityBacklink } from "@/types/character";
+import type {
+  Campaign,
+  CampaignEntity,
+  CampaignEntityMerge,
+  EntityBacklink,
+} from "@/types/character";
 import { axe } from "@/test/axe";
 
 vi.mock("@/api/client", () => ({
@@ -20,6 +25,12 @@ vi.mock("@/api/client", () => ({
 vi.mock("@/hooks/useCampaignEntities", () => ({
   useCampaignEntities: vi.fn(),
   primeCampaignEntities: vi.fn(),
+}));
+
+const mergeState = vi.hoisted(() => ({ merges: [] as CampaignEntityMerge[] }));
+vi.mock("@/hooks/useCampaignMerges", () => ({
+  useCampaignMerges: () => ({ merges: mergeState.merges }),
+  primeCampaignMerges: vi.fn(),
 }));
 
 const ENTITY_ID = "ent-1";
@@ -49,6 +60,7 @@ const BACKLINK: EntityBacklink = {
     body: "We fought the goblin chief at the bridge.",
   },
   characterName: "Thorne",
+  identity: { id: ENTITY_ID, name: "Goblin Chief" },
 };
 
 function campaign(role: "OWNER" | "PLAYER"): Campaign {
@@ -63,9 +75,13 @@ function campaign(role: "OWNER" | "PLAYER"): Campaign {
   };
 }
 
-function renderPage() {
+function renderPage(
+  entry:
+    | string
+    | { pathname: string; search?: string; state?: unknown } = `/campaigns/${CAMPAIGN_ID}/entities/${ENTITY_ID}`,
+) {
   return render(
-    <MemoryRouter initialEntries={[`/campaigns/${CAMPAIGN_ID}/entities/${ENTITY_ID}`]}>
+    <MemoryRouter initialEntries={[entry]}>
       <Routes>
         <Route path="/campaigns/:id/entities/:entityId" element={<EntityDetailPage />} />
       </Routes>
@@ -73,8 +89,11 @@ function renderPage() {
   );
 }
 
+const ENTITY_PATH = `/campaigns/${CAMPAIGN_ID}/entities/${ENTITY_ID}`;
+
 beforeEach(() => {
   vi.clearAllMocks();
+  mergeState.merges = [];
   vi.mocked(client.fetchEntities).mockResolvedValue([ENTITY]);
   vi.mocked(client.fetchEntityBacklinks).mockResolvedValue([BACKLINK]);
   vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("PLAYER"));
@@ -112,6 +131,35 @@ describe("EntityDetailPage (#248)", () => {
     expect(await screen.findByText(/fought the goblin chief/)).toBeInTheDocument();
   });
 
+  it("shows a 'Revealed to be' banner on an executed merged identity (#387)", async () => {
+    const survivor: CampaignEntity = { ...ENTITY, id: "ent-2", name: "Vecna" };
+    vi.mocked(useCampaignEntities).mockReturnValue({
+      entities: [ENTITY, survivor],
+      byId: new Map([
+        [ENTITY_ID, ENTITY],
+        ["ent-2", survivor],
+      ]),
+    });
+    mergeState.merges = [
+      {
+        id: "m1",
+        campaignId: CAMPAIGN_ID,
+        mergedEntityId: ENTITY_ID,
+        survivorEntityId: "ent-2",
+        status: "EXECUTED",
+        note: null,
+        preparedAt: "2026-01-01T00:00:00.000Z",
+        executedAt: "2026-01-02T00:00:00.000Z",
+      },
+    ];
+    renderPage();
+    expect(await screen.findByText(/Revealed to be/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "@Vecna" })).toHaveAttribute(
+      "href",
+      `/campaigns/${CAMPAIGN_ID}/entities/ent-2`,
+    );
+  });
+
   it("shows the delete control to an OWNER", async () => {
     vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("OWNER"));
     renderPage();
@@ -136,9 +184,34 @@ describe("EntityDetailPage (#248)", () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 
-  it("links back to the campaign codex (#367)", async () => {
+  it("links back to the campaign codex by default (#367)", async () => {
     renderPage();
     const back = await screen.findByRole("link", { name: /back to campaign/i });
     expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/codex`);
+  });
+
+  it("links back to Manage when navigated from Manage via location.state (#489)", async () => {
+    renderPage({ pathname: ENTITY_PATH, state: { from: `/campaigns/${CAMPAIGN_ID}/manage` } });
+    const back = await screen.findByRole("link", { name: /back to campaign/i });
+    expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/manage`);
+  });
+
+  it("ignores a non-relative location.state origin and falls back to Codex (#489)", async () => {
+    renderPage({ pathname: ENTITY_PATH, state: { from: "https://evil.example/phish" } });
+    const back = await screen.findByRole("link", { name: /back to campaign/i });
+    expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/codex`);
+  });
+
+  it("links back to Manage when ?from=manage is present (#489)", async () => {
+    renderPage({ pathname: ENTITY_PATH, search: "?from=manage" });
+    const back = await screen.findByRole("link", { name: /back to campaign/i });
+    expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/manage`);
+  });
+
+  it("honors the Manage origin on the not-found back affordance (#489)", async () => {
+    vi.mocked(client.fetchEntities).mockResolvedValue([]);
+    renderPage({ pathname: ENTITY_PATH, state: { from: `/campaigns/${CAMPAIGN_ID}/manage` } });
+    const back = await screen.findByRole("link", { name: /back to campaign/i });
+    expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/manage`);
   });
 });

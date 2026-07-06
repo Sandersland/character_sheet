@@ -1040,6 +1040,29 @@ export interface EntityBacklink {
     body: string;
   };
   characterName: string;
+  /** Which identity was tagged — a survivor unions its merged-in ids (#387). */
+  identity: { id: string; name: string };
+}
+
+// ── Entity identity merges (#387) ─────────────────────────────────────────────
+
+export type MergeStatus = "PREPARED" | "EXECUTED";
+
+/**
+ * A non-destructive "revealed to be" link: `mergedEntity` (old identity) is the
+ * same being as `survivorEntity` (true identity). PREPARED is the DM's secret
+ * prep (never in a player payload); EXECUTED is the public reveal. Chains resolve
+ * transitively (Jenkins→Vecna→Whispered One).
+ */
+export interface CampaignEntityMerge {
+  id: string;
+  campaignId: string;
+  mergedEntityId: string;
+  survivorEntityId: string;
+  status: MergeStatus;
+  note: string | null;
+  preparedAt: string;
+  executedAt: string | null;
 }
 
 export interface CharacterSummary {
