@@ -93,7 +93,7 @@ function battleMasterDieFace(level: number): string {
  * granted), 0 below. Modeled as a count (not a boolean) to stay parallel
  * with battleMasterManeuverCount for the level-reconciliation registry.
  */
-export function studentOfWarToolCount(level: number): number {
+function studentOfWarToolCount(level: number): number {
   return level >= 3 ? 1 : 0;
 }
 
@@ -106,7 +106,7 @@ function battleMasterManeuverCount(level: number): number {
 }
 
 /** Elemental discipline count by Monk level (Way of the Four Elements). */
-export function fourElementsDisciplineCount(level: number): number {
+function fourElementsDisciplineCount(level: number): number {
   if (level >= 17) return 4;
   if (level >= 11) return 3;
   if (level >= 6) return 2;
@@ -114,7 +114,7 @@ export function fourElementsDisciplineCount(level: number): number {
 }
 
 /** Ki save DC (Monk) — used by Stunning Strike, ki features, and elemental disciplines. */
-export function kiSaveDC(abilityScores: Record<string, number>, profBonus: number): number {
+function kiSaveDC(abilityScores: Record<string, number>, profBonus: number): number {
   return 8 + profBonus + abilityModifier(abilityScores.wisdom ?? 10);
 }
 

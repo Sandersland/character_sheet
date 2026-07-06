@@ -9,7 +9,7 @@ export const ABILITY_LABELS: Record<AbilityName, string> = {
   charisma: "Charisma",
 };
 
-export const SKILL_LABELS: Record<SkillName, string> = {
+const SKILL_LABELS: Record<SkillName, string> = {
   acrobatics: "Acrobatics",
   animalHandling: "Animal Handling",
   arcana: "Arcana",

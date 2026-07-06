@@ -44,7 +44,7 @@ export const CONDITION_DESCRIPTIONS: Record<ConditionKey, string> = {
 };
 
 /** Canonical alphabetical order for iterating conditions in pickers/strips. */
-export const CONDITION_ORDER: readonly ConditionKey[] = (
+const CONDITION_ORDER: readonly ConditionKey[] = (
   Object.keys(CONDITION_LABELS) as ConditionKey[]
 ).sort((a, b) => CONDITION_LABELS[a].localeCompare(CONDITION_LABELS[b]));
 
@@ -67,7 +67,7 @@ export function conditionLabel(key: string): string {
 export const EXHAUSTION_MAX = 6;
 
 /** Cumulative effect text per exhaustion level (index 0 = no exhaustion). */
-export const EXHAUSTION_EFFECTS: readonly string[] = [
+const EXHAUSTION_EFFECTS: readonly string[] = [
   "No exhaustion.",
   "Disadvantage on ability checks.",
   "Speed halved.",

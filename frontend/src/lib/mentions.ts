@@ -148,7 +148,7 @@ const MENTION_CHIP_TONE_CLASS: Record<EntityType, string> = {
 };
 
 // An atomic, non-editable @Name chip carrying its uuid in data-mention-id.
-export function buildMentionChip(id: string, name: string, type: EntityType): HTMLElement {
+function buildMentionChip(id: string, name: string, type: EntityType): HTMLElement {
   const span = document.createElement("span");
   span.dataset.mentionId = id;
   span.setAttribute("contenteditable", "false");
