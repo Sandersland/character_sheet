@@ -292,3 +292,77 @@ describe("HitPointTracker interactive concentration save (issue #76)", () => {
     expect(within(dialog).getByRole("button", { name: /done/i })).toBeInTheDocument();
   });
 });
+
+describe("HitPointTracker damage type + resistance (#456)", () => {
+  function rageCharacter(): Character {
+    return {
+      ...makeCharacter(),
+      activeEffects: {
+        buffs: [
+          {
+            id: "r",
+            key: "rage",
+            target: "meleeDamage",
+            modifier: 2,
+            source: "Rage",
+            duration: "while-active",
+            resistDamageTypes: ["bludgeoning", "piercing", "slashing"],
+          },
+        ],
+      },
+    } as unknown as Character;
+  }
+
+  it("sends an optional damage type with the damage op", async () => {
+    const user = userEvent.setup();
+    mockResolve([]);
+    render(<HitPointTracker character={makeCharacter()} onUpdate={vi.fn()} />);
+
+    await user.type(screen.getByRole("spinbutton", { name: /damage amount/i }), "8");
+    await user.selectOptions(screen.getByRole("combobox", { name: /damage type/i }), "fire");
+    await user.click(screen.getByRole("button", { name: /apply damage/i }));
+
+    const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
+    expect(ops[0]).toMatchObject({ type: "damage", amount: 8, damageType: "fire", applyResistance: true });
+  });
+
+  it("shows the auto-halve preview for a resisted type and applies resistance by default", async () => {
+    const user = userEvent.setup();
+    mockResolve([]);
+    render(<HitPointTracker character={rageCharacter()} onUpdate={vi.fn()} />);
+
+    await user.type(screen.getByRole("spinbutton", { name: /damage amount/i }), "12");
+    await user.selectOptions(screen.getByRole("combobox", { name: /damage type/i }), "slashing");
+
+    expect(screen.getByRole("status")).toHaveTextContent(/halves to 6/i);
+
+    await user.click(screen.getByRole("button", { name: /apply damage/i }));
+    const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
+    expect(ops[0]).toMatchObject({ type: "damage", amount: 12, damageType: "slashing", applyResistance: true });
+  });
+
+  it("lets the player decline the auto-halve (manual override)", async () => {
+    const user = userEvent.setup();
+    mockResolve([]);
+    render(<HitPointTracker character={rageCharacter()} onUpdate={vi.fn()} />);
+
+    await user.type(screen.getByRole("spinbutton", { name: /damage amount/i }), "12");
+    await user.selectOptions(screen.getByRole("combobox", { name: /damage type/i }), "slashing");
+    // Uncheck the "apply resistance" toggle to take the full amount.
+    await user.click(screen.getByRole("checkbox", { name: /resistant to slashing/i }));
+    await user.click(screen.getByRole("button", { name: /apply damage/i }));
+
+    const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
+    expect(ops[0]).toMatchObject({ type: "damage", amount: 12, damageType: "slashing", applyResistance: false });
+  });
+
+  it("does not show a resistance preview for a non-matching type", async () => {
+    const user = userEvent.setup();
+    mockResolve([]);
+    render(<HitPointTracker character={rageCharacter()} onUpdate={vi.fn()} />);
+
+    await user.type(screen.getByRole("spinbutton", { name: /damage amount/i }), "12");
+    await user.selectOptions(screen.getByRole("combobox", { name: /damage type/i }), "fire");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+});

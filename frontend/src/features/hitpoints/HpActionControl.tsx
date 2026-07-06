@@ -4,7 +4,15 @@ import type { LucideIcon } from "lucide-react";
 import { GiBleedingWound, GiHealthPotion } from "react-icons/gi";
 import type { IconType } from "react-icons";
 
+import { DAMAGE_TYPES, damageTypeLabel } from "@/lib/damageTypes";
+
 export type HpMode = "damage" | "heal" | "temp";
+
+/** Optional metadata for a damage apply — the type and whether to auto-halve (#456). */
+export interface DamageMeta {
+  damageType?: string;
+  applyResistance?: boolean;
+}
 
 // Per-mode segment icon, verb, button tone, and field aria-label.
 const HP_MODES: {
@@ -44,15 +52,29 @@ const HP_MODES: {
 export default function HpActionControl({
   pending,
   onApply,
+  resistedTypes = [],
 }: {
   pending: boolean;
-  onApply: (mode: HpMode, value: number) => Promise<boolean>;
+  onApply: (mode: HpMode, value: number, damage?: DamageMeta) => Promise<boolean>;
+  /** Damage types the character currently resists (drives the auto-halve preview) (#456). */
+  resistedTypes?: string[];
 }) {
   const [mode, setMode] = useState<HpMode>("damage");
   const [amount, setAmount] = useState("");
+  const [damageType, setDamageType] = useState("");
+  const [applyResistance, setApplyResistance] = useState(true);
+
+  const numericAmount = parseInt(amount, 10) || 0;
+  // A halve preview shows only when the chosen type is actively resisted (#456).
+  const isResisted = mode === "damage" && damageType !== "" && resistedTypes.includes(damageType);
+  const halved = Math.floor(numericAmount / 2);
 
   async function apply() {
-    const ok = await onApply(mode, parseInt(amount, 10));
+    const damageMeta: DamageMeta | undefined =
+      mode === "damage"
+        ? { damageType: damageType || undefined, applyResistance }
+        : undefined;
+    const ok = await onApply(mode, parseInt(amount, 10), damageMeta);
     if (ok) setAmount("");
   }
 
@@ -69,7 +91,8 @@ export default function HpActionControl({
     pending || (mode === "temp" ? amount === "" : !amount || parseInt(amount, 10) <= 0);
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-3">
       {/* Mode picker */}
       <div
         role="radiogroup"
@@ -143,6 +166,43 @@ export default function HpActionControl({
         <ApplyIcon aria-hidden="true" className="h-4 w-4" />
         {activeMode.verb}
       </button>
+
+      {/* Damage-type picker (damage mode only, optional) (#456) */}
+      {mode === "damage" && (
+        <select
+          value={damageType}
+          onChange={(e) => setDamageType(e.target.value)}
+          disabled={pending}
+          aria-label="Damage type"
+          className="h-8 rounded-control border border-parchment-300 bg-parchment-50 px-2 text-sm text-parchment-900 disabled:opacity-50"
+        >
+          <option value="">Typeless</option>
+          {DAMAGE_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {damageTypeLabel(t)}
+            </option>
+          ))}
+        </select>
+      )}
+      </div>
+
+      {/* Resistance auto-halve preview + decline override (#456) */}
+      {isResisted && (
+        <label className="flex items-center gap-2 text-xs text-parchment-600">
+          <input
+            type="checkbox"
+            checked={applyResistance}
+            onChange={(e) => setApplyResistance(e.target.checked)}
+            disabled={pending}
+            className="h-3.5 w-3.5 rounded border-parchment-400 text-arcane-700 focus:ring-arcane-600"
+          />
+          <span role="status" aria-live="polite">
+            {applyResistance
+              ? `Resistant to ${damageTypeLabel(damageType)} — ${numericAmount} halves to ${halved}`
+              : `Resistance to ${damageTypeLabel(damageType)} declined — taking full ${numericAmount}`}
+          </span>
+        </label>
+      )}
     </div>
   );
 }
