@@ -32,6 +32,7 @@ describe("computeSessionSummary", () => {
     expect(s.levelsGained).toBe(0);
     expect(s.itemsAcquired).toEqual([]);
     expect(s.itemsSold).toEqual([]);
+    expect(s.loot).toEqual([]);
     expect(s.slotsSpent).toEqual({});
     expect(s.spellsCast).toBe(0);
     expect(s.combatRounds).toBe(0);
@@ -89,6 +90,32 @@ describe("computeSessionSummary", () => {
       { name: "Alms Box", qty: 3 },
       { name: "Shield", qty: 1 },
     ]);
+  });
+
+  it("aggregates DM-awarded loot separately from itemsAcquired, netting revokes", () => {
+    const s = summarize([
+      { type: "awarded", data: { itemName: "Flametongue", quantityDelta: 2 } },
+      { type: "awarded", data: { itemName: "Healing Potion", quantityDelta: 3 } },
+      { type: "revoked", data: { itemName: "Healing Potion", quantityDelta: -1 } },
+      // Awarded then fully revoked → nets to 0, dropped.
+      { type: "awarded", data: { itemName: "Cursed Ring", quantityDelta: 1 } },
+      { type: "revoked", data: { itemName: "Cursed Ring", quantityDelta: -1 } },
+    ]);
+    // Loot lives in its own line-up, alphabetical, zero-net dropped.
+    expect(s.loot).toEqual([
+      { name: "Flametongue", qty: 2 },
+      { name: "Healing Potion", qty: 2 },
+    ]);
+    // Awards never leak into itemsAcquired.
+    expect(s.itemsAcquired).toEqual([]);
+  });
+
+  it("skips reverted award events in the loot tally", () => {
+    const s = summarize([
+      { type: "awarded", reverted: true, data: { itemName: "Flametongue", quantityDelta: 1 } },
+      { type: "awarded", data: { itemName: "Rope", quantityDelta: 1 } },
+    ]);
+    expect(s.loot).toEqual([{ name: "Rope", qty: 1 }]);
   });
 
   it("counts spell slots spent from castSpell (slotLevel) and expendSlot (level)", () => {
@@ -289,6 +316,7 @@ function participant(overrides: Partial<ParticipantSummary>): ParticipantSummary
     levelsGained: 0,
     itemsAcquired: [],
     itemsSold: [],
+    loot: [],
     slotsSpent: {},
     spellsCast: 0,
     combatRounds: 0,
@@ -383,6 +411,20 @@ describe("computeCampaignRecap", () => {
     expect(recap.startedAt).toBe("2026-06-22T18:00:00.000Z");
     // b never left → falls back to its endedAt for the window's upper bound.
     expect(recap.endedAt).toBe("2026-06-22T20:30:00.000Z");
+  });
+
+  it("unions DM-awarded loot across participants by name", () => {
+    const recap = computeCampaignRecap([
+      participant({ characterId: "a", loot: [{ name: "Flametongue", qty: 1 }] }),
+      participant({
+        characterId: "b",
+        loot: [{ name: "Flametongue", qty: 1 }, { name: "Rope", qty: 2 }],
+      }),
+    ]);
+    expect(recap.loot).toEqual([
+      { name: "Flametongue", qty: 2 },
+      { name: "Rope", qty: 2 },
+    ]);
   });
 
   it("aggregates sold items, slots spent, and feats/ASIs across participants", () => {

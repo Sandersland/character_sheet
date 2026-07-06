@@ -1608,6 +1608,8 @@ export interface SessionSummary {
   itemsAcquired: SessionSummaryItem[];
   /** Items sold this session (positive counts) — kept separate from acquired. */
   itemsSold: SessionSummaryItem[];
+  /** DM-awarded loot this session (awarded net of revoked) — its own line (#382). */
+  loot: SessionSummaryItem[];
   slotsSpent: Record<string, number>;
   spellsCast: number;
   combatRounds: number;
@@ -1654,6 +1656,8 @@ export interface CampaignRecap {
   itemsAcquired: SessionSummaryItem[];
   /** Items sold across the party this session (positive counts). */
   itemsSold: SessionSummaryItem[];
+  /** DM-awarded loot across the party this session (awarded net of revoked) (#382). */
+  loot: SessionSummaryItem[];
   /** Spell slots spent, keyed by slot level → count, summed across participants. */
   slotsSpent: Record<string, number>;
   /** ASIs + feats taken across all participants (level-ups counted separately). */
