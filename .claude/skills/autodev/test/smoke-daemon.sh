@@ -35,6 +35,11 @@
 #   N  responder ADOPTED after a daemon kill -9 then failing gracefully: the
 #      failure routes through onResponderExit (RESPOND-FAIL → waiting_merge),
 #      never the pollAdopted terminal-fail shortcut — dependent not skipped
+#   O  conflicted PR at grace expiry: NEEDS-HUMAN comment posted once, entry
+#      stays waiting_merge, dependent stays pending; a human fix later merges
+#      it and the dependent launches — never a FAIL/SKIP
+#   P  PR closed WITHOUT merging: the deliberate abandon signal — entry fails,
+#      dependent is skipped
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -60,6 +65,7 @@ echo '{}' > "$T/worktrees/registry.json"   # isolated slot registry — daemon-t
 # keeps loadOrInit's pre-merged detection from short-circuiting fresh issues.
 cat > "$T/bin/gh" <<EOF
 #!/usr/bin/env bash
+echo "\$@" >> "$T/gh-calls.txt"
 n=""; state=""; base=""; prev=""
 for a in "\$@"; do
   if [[ "\$a" =~ \(#([0-9]+)\) ]]; then n="\${BASH_REMATCH[1]}"; fi
@@ -67,7 +73,28 @@ for a in "\$@"; do
   if [ "\$prev" = "--base" ]; then base="\$a"; fi
   prev="\$a"
 done
-if [ -n "\$n" ] && [ "\$n" = "\${GH_STUB_REVIEW_BLOCKED:-}" ]; then
+if [ "\$1" = "pr" ] && [ "\$2" = "comment" ]; then
+  exit 0
+elif [ -n "\$n" ] && [ "\$n" = "\${GH_STUB_CONFLICT:-}" ]; then
+  # Designated conflicted issue: open PR is CONFLICTING (no checks matter) until
+  # the human-fixed marker appears, then the merged search succeeds — mirrors a
+  # human rebase/push landing while the batch keeps polling.
+  if [ -f "$T/runs/human-fixed-\$n" ]; then
+    if [ "\$state" = "merged" ]; then echo "[{\"title\":\"stub pr (#\$n)\"}]"; else echo "[]"; fi
+  elif [ "\$state" = "open" ] && [ "\$base" = "staging" ]; then
+    echo "[{\"number\":\$n,\"headRefName\":\"feat/issue-\$n-stub\",\"title\":\"stub pr (#\$n)\",\"mergeable\":\"CONFLICTING\",\"statusCheckRollup\":[]}]"
+  else
+    echo "[]"
+  fi
+elif [ -n "\$n" ] && [ "\$n" = "\${GH_STUB_CLOSED:-}" ]; then
+  # Designated closed-without-merge issue: never open, never merged; the closed
+  # search returns the PR with mergedAt null (the operator abandon signal).
+  if [ "\$state" = "closed" ]; then
+    echo "[{\"number\":\$n,\"title\":\"stub pr (#\$n)\",\"mergedAt\":null}]"
+  else
+    echo "[]"
+  fi
+elif [ -n "\$n" ] && [ "\$n" = "\${GH_STUB_REVIEW_BLOCKED:-}" ]; then
   # Designated review-blocked issue: mergeable open PR whose claude-review check
   # is FAILURE (classifyPrBlock reads the open search; isMerged the merged one).
   # The open lookup is base-scoped on purpose: classifyPrBlock must pass --base
@@ -220,9 +247,29 @@ RB=$(mkrun 8802 stub/bB running "$LIVE_PID")        # live (pid alive, fresh hb)
 RC=$(mkrun 8803 stub/bC retry-scheduled none)       # parked → untouched
 RD=$(mkrun 8804 stub/bD completed none)             # terminal → slot freed, no reap
 RG=$(mkrun 8805 stub/bG running "$LIVE_PID" 999999999)  # pid ALIVE but heartbeat ancient (> stale bound) → reap (zombie guard)
-mkdir -p "$FW/stub/bA" "$FW/stub/bB" "$FW/stub/bC" "$FW/stub/bD" "$FW/stub/bF" "$FW/stub/bG"
+
+# Relaunch race (the #456/#457 killer): an OLDER failed run and a NEWER live run
+# share a branch — a relaunch of the same issue reuses the branch name, and the
+# live run stamps ctx.branch before `worktree.sh create` (fsm fix). Newest-wins
+# ownership must resolve to the live run → worktree untouched. Explicit dir
+# names (not mkrun's \$RANDOM) pin the old<new lexical ordering.
+mkfixed() { # mkfixed <dir> <branch> <status> <pid>
+  mkdir -p "$1"
+  node -e "
+    const [dir, branch, status, pid] = process.argv.slice(1);
+    require('fs').writeFileSync(dir + '/run.json', JSON.stringify({
+      id: dir.split('/').pop(), status, costUsd: 1.23, currentState: 'Worker',
+      ctx: { issue: 1, branch },
+      ...(pid !== 'none' ? { pid: Number(pid), lastHeartbeat: Date.now() } : {}),
+    }, null, 2));
+  " "$1" "$2" "$3" "$4"
+}
+mkfixed "$FR/2026-01-01T00-00-00-000Z-issue-8806" stub/bH failed none         # old attempt, terminal
+mkfixed "$FR/2026-01-02T00-00-00-000Z-issue-8806" stub/bH running "$LIVE_PID" # relaunch, mid-SetupWorktree
+
+mkdir -p "$FW/stub/bA" "$FW/stub/bB" "$FW/stub/bC" "$FW/stub/bD" "$FW/stub/bF" "$FW/stub/bG" "$FW/stub/bH"
 node -e "require('fs').writeFileSync('$FW/registry.json', JSON.stringify({
-  'stub/bA': 1, 'stub/bB': 2, 'stub/bC': 3, 'stub/bD': 4, 'stub/bE': 5, 'stub/bF': 6, 'stub/bG': 7,
+  'stub/bA': 1, 'stub/bB': 2, 'stub/bC': 3, 'stub/bD': 4, 'stub/bE': 5, 'stub/bF': 6, 'stub/bG': 7, 'stub/bH': 8,
 }))"   # bE: no dir (stale reservation) → freed; bF: dir but no run (manual) → untouched
 
 AUTODEV_RUNS_DIR="$FR" AUTODEV_WORKTREES_DIR="$FW" node -e "
@@ -246,12 +293,14 @@ node -e "
   assert(runB.status === 'running', 'live run B untouched');
   assert(runC.status === 'retry-scheduled', 'parked run C untouched');
   assert(runG.status === 'failed', 'stale-heartbeat run G reaped despite live pid');
+  const runH = JSON.parse(fs.readFileSync('$FR/2026-01-02T00-00-00-000Z-issue-8806/run.json','utf8'));
+  assert(runH.status === 'running', 'relaunched run H untouched');
   for (const b of ['stub/bA','stub/bD','stub/bE','stub/bG']) assert(calls.includes('rm ' + b), b + ' slot freed');
-  for (const b of ['stub/bB','stub/bC','stub/bF']) assert(!calls.includes('rm ' + b), b + ' NOT touched');
+  for (const b of ['stub/bB','stub/bC','stub/bF','stub/bH']) assert(!calls.includes('rm ' + b), b + ' NOT touched');
   assert(res.reapedRuns.length === 2 && res.freedSlots.length === 4, 'result counts (2 reaped, 4 freed)');
 " || fail "F: janitor assertions failed (see above)"
 kill "$LIVE_PID" 2>/dev/null || true
-pass "janitor: reaped dead+stale-heartbeat runs, freed stale+terminal slots, protected live/parked/manual"
+pass "janitor: reaped dead+stale-heartbeat runs, freed stale+terminal slots, protected live/parked/manual/relaunched-branch"
 
 # ---------- G: control channel ----------
 echo "G: control channel over the Unix socket"
@@ -460,5 +509,40 @@ node "$SKILL_DIR/autodevd.mjs" stop --park > "$T/n-stop.out" 2>&1
 wait_for 15 "N: daemon stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
 unset GH_STUB_REVIEW_BLOCKED STUB_RESPOND_ADOPTFAIL
 pass "adopted responder failure → RESPOND-FAIL → waiting_merge; dependent kept pending"
+
+# ---------- O: conflicted PR → NEEDS-HUMAN once, kept waiting; human fix merges it ----------
+echo "O: conflicted PR flags a human and keeps polling — merges once fixed, dependent launches"
+O="$T/state-o"
+export GH_STUB_CONFLICT=9970
+node "$SKILL_DIR/autodevd.mjs" 9970 9971:9970 --poll 1 --grace 2 --state-dir "$O" > "$T/o.out" 2>&1 &
+disown
+wait_for 25 "O: NEEDS-HUMAN flagged" grep -qs "NEEDS-HUMAN #9970 auto-merge blocked (conflict)" "$O/orchestrator.log"
+sleep 3   # > one more grace window: the flag/comment must not repeat per expiry
+[ "$(grep -c "NEEDS-HUMAN #9970" "$O/orchestrator.log")" = "1" ] || fail "O: NEEDS-HUMAN must be logged exactly once"
+[ "$(grep -c "^pr comment 9970 " "$T/gh-calls.txt")" = "1" ] || fail "O: exactly one PR comment should be posted"
+status_is "$O/batch.json" 9970 waiting_merge || fail "O: 9970 should stay waiting_merge while conflicted"
+status_is "$O/batch.json" 9971 pending || fail "O: dependent 9971 must NOT be skipped on a conflict"
+grep -qs "| FAIL #9970" "$O/orchestrator.log" && fail "O: a conflicted open PR must never FAIL"
+touch "$T/runs/human-fixed-9970"   # the human rebases + pushes; auto-merge fires
+wait_for 25 "O: 9970 merged after human fix" status_is "$O/batch.json" 9970 merged
+wait_for 25 "O: dependent 9971 merged" status_is "$O/batch.json" 9971 merged
+node "$SKILL_DIR/autodevd.mjs" stop > "$T/o-stop.out" 2>&1
+wait_for 10 "O: daemon stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
+unset GH_STUB_CONFLICT
+pass "conflicted PR: one NEEDS-HUMAN flag, kept waiting_merge, merged after fix, dependent launched"
+
+# ---------- P: PR closed without merging → terminal fail, dependent skipped ----------
+echo "P: closed-unmerged PR is the abandon signal — entry fails, dependent skipped"
+P="$T/state-p"
+export GH_STUB_CLOSED=9980
+node "$SKILL_DIR/autodevd.mjs" 9980 9981:9980 --poll 1 --grace 2 --state-dir "$P" > "$T/p.out" 2>&1 &
+disown
+wait_for 25 "P: 9980 failed on closed PR" status_is "$P/batch.json" 9980 failed
+grep -qs "FAIL #9980 PR closed without merging" "$P/orchestrator.log" || fail "P: missing closed-PR FAIL log"
+wait_for 15 "P: dependent 9981 skipped" status_is "$P/batch.json" 9981 skipped
+node "$SKILL_DIR/autodevd.mjs" stop > "$T/p-stop.out" 2>&1
+wait_for 10 "P: daemon stopped" bash -c "! [ -f '$T/runtime/autodevd.pid' ]"
+unset GH_STUB_CLOSED
+pass "closed-unmerged PR failed the entry and skipped the dependent"
 
 echo "SMOKE PASS (all scenarios)"

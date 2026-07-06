@@ -26,6 +26,14 @@
  *   9941  exit 0 with ctx.prUrl                   STUB_RESPOND_CRASH; 9941 is the dependent)
  *   9950  exit 0 with ctx.prUrl                  (rate-limited-responder scenario via
  *                                                 STUB_RESPOND_RATE)
+ *   9970  exit 0 with ctx.prUrl                  (conflicted-PR scenario: the gh stub
+ *   9971  exit 0 with ctx.prUrl                   reports 9970's PR CONFLICTING until
+ *                                                 the human-fixed marker flips it to
+ *                                                 merged; 9971 is its dependent)
+ *   9980  exit 0 with ctx.prUrl                  (closed-without-merge scenario: the
+ *   9981  exit 0 with ctx.prUrl                   gh stub reports 9980's PR closed
+ *                                                 with mergedAt null; 9981 is its
+ *                                                 dependent and must be skipped)
  *
  * A `run pr-response …` invocation (any issue) plays the responder — a resumed
  * responder run is recognized by ctx.prNumber in its run.json. Behavior by env:
@@ -136,6 +144,10 @@ switch (issue) {
   case 9950: // rate-limited-responder scenario (STUB_RESPOND_RATE)
   case 9960: // adopted-then-failing-responder scenario (STUB_RESPOND_ADOPTFAIL)
   case 9961: // dependent of 9960 (must stay pending, never skipped)
+  case 9970: // conflicted-PR scenario (GH_STUB_CONFLICT): flag human, keep waiting
+  case 9971: // dependent of 9970 (launches once the human-fixed marker merges 9970)
+  case 9980: // closed-without-merge scenario (GH_STUB_CLOSED): terminal fail
+  case 9981: // dependent of 9980 (must be skipped — prereq deliberately abandoned)
     save("completed", { prUrl: `https://example.test/pr/${issue}` });
     process.exit(0);
   case 9901:
