@@ -60,6 +60,35 @@ async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   return response;
 }
 
+// New endpoint? return request<T>(path, init, "Failed to …") for a JSON reply, or send(path, init, "Failed to …") for a void/204 one.
+
+// Shared non-ok handling: surface the server's { error } message, else a labeled fallback.
+async function throwIfNotOk(response: Response, errorLabel: string): Promise<void> {
+  if (response.ok) return;
+  const body = await response.json().catch(() => null);
+  throw new Error(body?.error ?? `${errorLabel} (${response.status})`);
+}
+
+// apiFetch → ok-check → parsed JSON. The one flow every JSON-returning helper funnels through.
+async function request<T>(path: string, init: RequestInit | undefined, errorLabel: string): Promise<T> {
+  const response = await apiFetch(`${API_URL}${path}`, init);
+  await throwIfNotOk(response, errorLabel);
+  return response.json() as Promise<T>;
+}
+
+// apiFetch → ok-check for endpoints with no body to parse (deletes, 204s, best-effort logs).
+async function send(path: string, init: RequestInit | undefined, errorLabel: string): Promise<void> {
+  const response = await apiFetch(`${API_URL}${path}`, init);
+  await throwIfNotOk(response, errorLabel);
+}
+
+// JSON headers for a POST/PATCH body — shared by every write helper below.
+const jsonBody = (body: unknown, method = "POST"): RequestInit => ({
+  method,
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
+
 // Shared POST-check-throw-json flow for the intent-bearing transaction endpoints:
 // POST …/characters/:id/<domain>/transactions with { operations }, returning the
 // full updated Character. Every uniform domain funnels through here — the only
@@ -72,16 +101,11 @@ async function postTransactions<TOp>(
   operations: TOp[],
   errorLabel: string,
 ): Promise<Character> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/${domain}/transactions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ operations }),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `${errorLabel} (${response.status})`);
-  }
-  return response.json();
+  return request<Character>(
+    `/characters/${characterId}/${domain}/transactions`,
+    jsonBody({ operations }),
+    errorLabel,
+  );
 }
 
 // ── Auth ────────────────────────────────────────────────────────────────────
@@ -89,11 +113,11 @@ async function postTransactions<TOp>(
 // The enabled sign-in providers — drives the login screen's buttons (data-driven
 // so adding a provider server-side needs no frontend change). Public endpoint.
 export async function fetchAuthProviders(): Promise<AuthProviderInfo[]> {
-  const response = await apiFetch(`${API_URL}/auth/providers`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch auth providers (${response.status})`);
-  }
-  const data = (await response.json()) as { providers: AuthProviderInfo[] };
+  const data = await request<{ providers: AuthProviderInfo[] }>(
+    "/auth/providers",
+    undefined,
+    "Failed to fetch auth providers",
+  );
   return data.providers;
 }
 
@@ -112,10 +136,7 @@ export async function fetchMe(): Promise<AuthUser | null> {
 
 // End the session server-side and clear the cookie.
 export async function logout(): Promise<void> {
-  const response = await apiFetch(`${API_URL}/auth/logout`, { method: "POST" });
-  if (!response.ok) {
-    throw new Error(`Failed to log out (${response.status})`);
-  }
+  await send("/auth/logout", { method: "POST" }, "Failed to log out");
 }
 
 export async function checkHealth(): Promise<boolean> {
@@ -130,11 +151,7 @@ export async function checkHealth(): Promise<boolean> {
 }
 
 export async function fetchCharacters(): Promise<CharacterSummary[]> {
-  const response = await apiFetch(`${API_URL}/characters`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch characters (${response.status})`);
-  }
-  return response.json();
+  return request<CharacterSummary[]>("/characters", undefined, "Failed to fetch characters");
 }
 
 export async function fetchCharacter(id: string): Promise<Character | null> {
@@ -155,42 +172,22 @@ export async function updateCharacter(
   // instead so XP changes are logged and trigger HP auto-reverse on level-down.
   patch: Partial<Pick<Character, "currency">>
 ): Promise<Character> {
-  const response = await apiFetch(`${API_URL}/characters/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to update character ${id} (${response.status})`);
-  }
-  return response.json();
+  return request<Character>(`/characters/${id}`, jsonBody(patch, "PATCH"), `Failed to update character ${id}`);
 }
 
 export async function fetchReference(): Promise<ReferenceData> {
-  const response = await apiFetch(`${API_URL}/reference`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch reference data (${response.status})`);
-  }
-  return response.json();
+  return request<ReferenceData>("/reference", undefined, "Failed to fetch reference data");
 }
 
 // Feeds the inventory editor's "add from catalog" picker (Phase B).
 export async function fetchItems(): Promise<Item[]> {
-  const response = await apiFetch(`${API_URL}/items`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch items (${response.status})`);
-  }
-  return response.json();
+  return request<Item[]>("/items", undefined, "Failed to fetch items");
 }
 
 // Feeds the spellcasting section's "learn from catalog" picker.
 // Ordered by level then name server-side; no client-side re-sort needed.
 export async function fetchSpells(): Promise<CatalogSpell[]> {
-  const response = await apiFetch(`${API_URL}/spells`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch spell catalog (${response.status})`);
-  }
-  return response.json();
+  return request<CatalogSpell[]>("/spells", undefined, "Failed to fetch spell catalog");
 }
 
 // Applies a batch of spellcasting operations atomically: cast, expend/restore
@@ -205,11 +202,7 @@ export async function applySpellcastingTransactions(
 
 // Feeds the Four Elements monk's discipline picker (min level + ki cost + ki-scaled effect).
 export async function fetchDisciplines(): Promise<CatalogDiscipline[]> {
-  const response = await apiFetch(`${API_URL}/disciplines`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch discipline catalog (${response.status})`);
-  }
-  return response.json();
+  return request<CatalogDiscipline[]>("/disciplines", undefined, "Failed to fetch discipline catalog");
 }
 
 // Applies a batch of discipline operations atomically: castDiscipline (spend ki,
@@ -223,11 +216,7 @@ export async function applyDisciplineTransactions(
 
 // Feeds the Way of Shadow monk's Shadow Arts picker — 4 flat 2-ki ki-cast spells.
 export async function fetchShadowArts(): Promise<CatalogShadowArt[]> {
-  const response = await apiFetch(`${API_URL}/shadow-arts`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch shadow arts catalog (${response.status})`);
-  }
-  return response.json();
+  return request<CatalogShadowArt[]>("/shadow-arts", undefined, "Failed to fetch shadow arts catalog");
 }
 
 // Applies a batch of Shadow Arts operations atomically: castShadowArt (spend a
@@ -242,11 +231,11 @@ export async function applyShadowArtsTransactions(
 // Feeds the Cleric/Paladin Channel Divinity picker — the entitled options for
 // this character (gated per class/subclass/level), each with its save DC + reminder.
 export async function fetchChannelDivinity(characterId: string): Promise<CatalogChannelDivinity[]> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/channel-divinity`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch Channel Divinity options (${response.status})`);
-  }
-  return response.json();
+  return request<CatalogChannelDivinity[]>(
+    `/characters/${characterId}/channel-divinity`,
+    undefined,
+    "Failed to fetch Channel Divinity options",
+  );
 }
 
 // Applies a batch of Channel Divinity operations atomically: castChannelDivinity
@@ -281,26 +270,14 @@ export async function applyHitPointOperations(
   characterId: string,
   operations: HitPointOperation[]
 ): Promise<{ character: Character; concentrationChecks: ConcentrationCheck[] }> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/hp`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ operations }),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to apply HP operations (${response.status})`);
-  }
-  const { concentrationChecks = [], ...character } = (await response.json()) as Character & {
-    concentrationChecks?: ConcentrationCheck[];
-  };
+  const { concentrationChecks = [], ...character } = await request<
+    Character & { concentrationChecks?: ConcentrationCheck[] }
+  >(`/characters/${characterId}/hp`, jsonBody({ operations }), "Failed to apply HP operations");
   return { character: character as Character, concentrationChecks };
 }
 
 export async function deleteCharacter(id: string): Promise<void> {
-  const response = await apiFetch(`${API_URL}/characters/${id}`, { method: "DELETE" });
-  if (!response.ok) {
-    throw new Error(`Failed to delete character ${id} (${response.status})`);
-  }
+  await send(`/characters/${id}`, { method: "DELETE" }, `Failed to delete character ${id}`);
 }
 
 // ── Journal CRUD ─────────────────────────────────────────────────────────────
@@ -313,16 +290,11 @@ export async function createJournalEntry(
   characterId: string,
   entry: { kind?: JournalEntryKind; date?: string; body: string; sessionId?: string }
 ): Promise<Character> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/journal`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(entry),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to create journal entry (${response.status})`);
-  }
-  return response.json();
+  return request<Character>(
+    `/characters/${characterId}/journal`,
+    jsonBody(entry),
+    "Failed to create journal entry",
+  );
 }
 
 export async function updateJournalEntry(
@@ -330,42 +302,26 @@ export async function updateJournalEntry(
   entryId: string,
   patch: { date?: string; body?: string }
 ): Promise<Character> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/journal/${entryId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to update journal entry (${response.status})`);
-  }
-  return response.json();
+  return request<Character>(
+    `/characters/${characterId}/journal/${entryId}`,
+    jsonBody(patch, "PATCH"),
+    "Failed to update journal entry",
+  );
 }
 
 export async function deleteJournalEntry(
   characterId: string,
   entryId: string
 ): Promise<Character> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/journal/${entryId}`, {
-    method: "DELETE",
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to delete journal entry (${response.status})`);
-  }
-  return response.json();
+  return request<Character>(
+    `/characters/${characterId}/journal/${entryId}`,
+    { method: "DELETE" },
+    "Failed to delete journal entry",
+  );
 }
 
 export async function createCharacter(input: CreateCharacterInput): Promise<Character> {
-  const response = await apiFetch(`${API_URL}/characters`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to create character (${response.status})`);
-  }
-  return response.json();
+  return request<Character>("/characters", jsonBody(input), "Failed to create character");
 }
 
 // Applies a batch of XP operations (award/set) via the intent-bearing
@@ -380,16 +336,11 @@ export async function applyExperienceOperations(
   operations: ExperienceOperation[],
   sessionId?: string,
 ): Promise<Character> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/experience`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(sessionId ? { operations, sessionId } : { operations }),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to apply XP operations (${response.status})`);
-  }
-  return response.json();
+  return request<Character>(
+    `/characters/${characterId}/experience`,
+    jsonBody(sessionId ? { operations, sessionId } : { operations }),
+    "Failed to apply XP operations",
+  );
 }
 
 // Fetches the unified activity timeline — all events across all domains in
@@ -412,21 +363,17 @@ export async function fetchActivity(
   if (opts?.entityId) params.set("entityId", opts.entityId);
   if (opts?.includeFields) params.set("includeFields", "1");
   const query = params.toString() ? `?${params.toString()}` : "";
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/activity${query}`, { signal });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch activity (${response.status})`);
-  }
-  return response.json();
+  return request<CharacterEvent[]>(
+    `/characters/${characterId}/activity${query}`,
+    { signal },
+    "Failed to fetch activity",
+  );
 }
 
 // Feeds the class-features section's "learn a maneuver" picker. Ordered
 // alphabetically server-side; no client-side re-sort needed.
 export async function fetchManeuvers(): Promise<CatalogManeuver[]> {
-  const response = await apiFetch(`${API_URL}/maneuvers`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch maneuver catalog (${response.status})`);
-  }
-  return response.json();
+  return request<CatalogManeuver[]>("/maneuvers", undefined, "Failed to fetch maneuver catalog");
 }
 
 // Casts a known maneuver: the server spends one superiority die, rolls it, and
@@ -436,16 +383,11 @@ export async function castManeuverTransaction(
   characterId: string,
   operations: ManeuverOperation[],
 ): Promise<{ character: Character; results: ManeuverCastResult[] }> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/maneuvers/transactions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ operations }),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to cast maneuver (${response.status})`);
-  }
-  return response.json();
+  return request<{ character: Character; results: ManeuverCastResult[] }>(
+    `/characters/${characterId}/maneuvers/transactions`,
+    jsonBody({ operations }),
+    "Failed to cast maneuver",
+  );
 }
 
 // Applies a batch of resource operations atomically (spend/restore resource
@@ -477,11 +419,7 @@ export async function applyClassTransactions(
 // Feeds the advancement section's feat picker — same role as fetchManeuvers.
 // Ordered alphabetically server-side.
 export async function fetchFeats(): Promise<CatalogFeat[]> {
-  const response = await apiFetch(`${API_URL}/feats`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch feat catalog (${response.status})`);
-  }
-  return response.json();
+  return request<CatalogFeat[]>("/feats", undefined, "Failed to fetch feat catalog");
 }
 
 // Applies advancement operations (takeAsi / takeFeat / removeAdvancement).
@@ -500,15 +438,11 @@ export async function revertBatch(
   characterId: string,
   batchId: string
 ): Promise<Character> {
-  const response = await apiFetch(
-    `${API_URL}/characters/${characterId}/events/${encodeURIComponent(batchId)}/revert`,
-    { method: "POST" }
+  return request<Character>(
+    `/characters/${characterId}/events/${encodeURIComponent(batchId)}/revert`,
+    { method: "POST" },
+    "Failed to revert batch",
   );
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to revert batch (${response.status})`);
-  }
-  return response.json();
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
@@ -530,61 +464,30 @@ export async function applyActionTransactions(
 // Character (same shape as every character-mutating endpoint).
 
 export async function fetchCampaigns(): Promise<Campaign[]> {
-  const response = await apiFetch(`${API_URL}/campaigns`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch campaigns (${response.status})`);
-  }
-  return response.json();
+  return request<Campaign[]>("/campaigns", undefined, "Failed to fetch campaigns");
 }
 
 export async function createCampaign(name: string): Promise<Campaign> {
-  const response = await apiFetch(`${API_URL}/campaigns`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to create campaign (${response.status})`);
-  }
-  return response.json();
+  return request<Campaign>("/campaigns", jsonBody({ name }), "Failed to create campaign");
 }
 
 export async function fetchCampaign(id: string): Promise<Campaign> {
-  const response = await apiFetch(`${API_URL}/campaigns/${id}`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch campaign ${id} (${response.status})`);
-  }
-  return response.json();
+  return request<Campaign>(`/campaigns/${id}`, undefined, `Failed to fetch campaign ${id}`);
 }
 
 export async function joinCampaign(inviteCode: string): Promise<Campaign> {
-  const response = await apiFetch(`${API_URL}/campaigns/join`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ inviteCode }),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to join campaign (${response.status})`);
-  }
-  return response.json();
+  return request<Campaign>("/campaigns/join", jsonBody({ inviteCode }), "Failed to join campaign");
 }
 
 export async function addCharacterToCampaign(
   characterId: string,
   campaignId: string,
 ): Promise<Character> {
-  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/characters`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ characterId }),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to add character to campaign (${response.status})`);
-  }
-  return response.json();
+  return request<Character>(
+    `/campaigns/${campaignId}/characters`,
+    jsonBody({ characterId }),
+    "Failed to add character to campaign",
+  );
 }
 
 // ── Campaign entities & @-tagging (#248) ───────────────────────────────────────
@@ -600,11 +503,11 @@ export async function fetchEntities(
   if (opts?.q) params.set("q", opts.q);
   if (opts?.type) params.set("type", opts.type);
   const query = params.toString() ? `?${params.toString()}` : "";
-  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities${query}`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch entities (${response.status})`);
-  }
-  return response.json();
+  return request<CampaignEntity[]>(
+    `/campaigns/${campaignId}/entities${query}`,
+    undefined,
+    "Failed to fetch entities",
+  );
 }
 
 export async function createEntity(
@@ -617,16 +520,11 @@ export async function createEntity(
     visibility?: EntityVisibility;
   },
 ): Promise<CampaignEntity> {
-  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to create entity (${response.status})`);
-  }
-  return response.json();
+  return request<CampaignEntity>(
+    `/campaigns/${campaignId}/entities`,
+    jsonBody(input),
+    "Failed to create entity",
+  );
 }
 
 export async function updateEntity(
@@ -640,39 +538,30 @@ export async function updateEntity(
     visibility?: EntityVisibility;
   },
 ): Promise<CampaignEntity> {
-  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities/${entityId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to update entity (${response.status})`);
-  }
-  return response.json();
+  return request<CampaignEntity>(
+    `/campaigns/${campaignId}/entities/${entityId}`,
+    jsonBody(patch, "PATCH"),
+    "Failed to update entity",
+  );
 }
 
 export async function deleteEntity(campaignId: string, entityId: string): Promise<void> {
-  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities/${entityId}`, {
-    method: "DELETE",
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to delete entity (${response.status})`);
-  }
+  await send(
+    `/campaigns/${campaignId}/entities/${entityId}`,
+    { method: "DELETE" },
+    "Failed to delete entity",
+  );
 }
 
 export async function fetchEntityBacklinks(
   campaignId: string,
   entityId: string,
 ): Promise<EntityBacklink[]> {
-  const response = await apiFetch(
-    `${API_URL}/campaigns/${campaignId}/entities/${entityId}/backlinks`,
+  return request<EntityBacklink[]>(
+    `/campaigns/${campaignId}/entities/${entityId}/backlinks`,
+    undefined,
+    "Failed to fetch entity backlinks",
   );
-  if (!response.ok) {
-    throw new Error(`Failed to fetch entity backlinks (${response.status})`);
-  }
-  return response.json();
 }
 
 // ── Entity identity merges (#387) ─────────────────────────────────────────────
@@ -680,53 +569,41 @@ export async function fetchEntityBacklinks(
 // a non-owner only ever receives EXECUTED merges between revealed identities.
 
 export async function fetchEntityMerges(campaignId: string): Promise<CampaignEntityMerge[]> {
-  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities/merges`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch entity merges (${response.status})`);
-  }
-  return response.json();
+  return request<CampaignEntityMerge[]>(
+    `/campaigns/${campaignId}/entities/merges`,
+    undefined,
+    "Failed to fetch entity merges",
+  );
 }
 
 export async function prepareEntityMerge(
   campaignId: string,
   input: { mergedEntityId: string; survivorEntityId: string; note?: string },
 ): Promise<CampaignEntityMerge> {
-  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities/merges`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to prepare merge (${response.status})`);
-  }
-  return response.json();
+  return request<CampaignEntityMerge>(
+    `/campaigns/${campaignId}/entities/merges`,
+    jsonBody(input),
+    "Failed to prepare merge",
+  );
 }
 
 export async function executeEntityMerge(
   campaignId: string,
   mergeId: string,
 ): Promise<CampaignEntityMerge> {
-  const response = await apiFetch(
-    `${API_URL}/campaigns/${campaignId}/entities/merges/${mergeId}/execute`,
+  return request<CampaignEntityMerge>(
+    `/campaigns/${campaignId}/entities/merges/${mergeId}/execute`,
     { method: "POST" },
+    "Failed to execute merge",
   );
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to execute merge (${response.status})`);
-  }
-  return response.json();
 }
 
 export async function unmergeEntityMerge(campaignId: string, mergeId: string): Promise<void> {
-  const response = await apiFetch(
-    `${API_URL}/campaigns/${campaignId}/entities/merges/${mergeId}`,
+  await send(
+    `/campaigns/${campaignId}/entities/merges/${mergeId}`,
     { method: "DELETE" },
+    "Failed to unmerge",
   );
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to unmerge (${response.status})`);
-  }
 }
 
 // ── Campaign items (#380) ───────────────────────────────────────────────────────
@@ -735,40 +612,29 @@ export async function unmergeEntityMerge(campaignId: string, mergeId: string): P
 // only when that entity is revealed, and never see dmNotes (scrubbed server-side).
 
 export async function fetchCampaignItems(campaignId: string): Promise<CampaignItem[]> {
-  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/items`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch campaign items (${response.status})`);
-  }
-  return response.json();
+  return request<CampaignItem[]>(`/campaigns/${campaignId}/items`, undefined, "Failed to fetch campaign items");
 }
 
 export async function fetchCampaignItemByEntity(
   campaignId: string,
   entityId: string,
 ): Promise<CampaignItem> {
-  const response = await apiFetch(
-    `${API_URL}/campaigns/${campaignId}/items/by-entity/${entityId}`,
+  return request<CampaignItem>(
+    `/campaigns/${campaignId}/items/by-entity/${entityId}`,
+    undefined,
+    "Failed to fetch campaign item",
   );
-  if (!response.ok) {
-    throw new Error(`Failed to fetch campaign item (${response.status})`);
-  }
-  return response.json();
 }
 
 export async function createCampaignItem(
   campaignId: string,
   input: CampaignItemInput,
 ): Promise<CampaignItem> {
-  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/items`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to create campaign item (${response.status})`);
-  }
-  return response.json();
+  return request<CampaignItem>(
+    `/campaigns/${campaignId}/items`,
+    jsonBody(input),
+    "Failed to create campaign item",
+  );
 }
 
 export async function updateCampaignItem(
@@ -776,26 +642,15 @@ export async function updateCampaignItem(
   itemId: string,
   patch: Partial<CampaignItemInput>,
 ): Promise<CampaignItem> {
-  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/items/${itemId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to update campaign item (${response.status})`);
-  }
-  return response.json();
+  return request<CampaignItem>(
+    `/campaigns/${campaignId}/items/${itemId}`,
+    jsonBody(patch, "PATCH"),
+    "Failed to update campaign item",
+  );
 }
 
 export async function deleteCampaignItem(campaignId: string, itemId: string): Promise<void> {
-  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/items/${itemId}`, {
-    method: "DELETE",
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to delete campaign item (${response.status})`);
-  }
+  await send(`/campaigns/${campaignId}/items/${itemId}`, { method: "DELETE" }, "Failed to delete campaign item");
 }
 
 // Award/revoke (#381): owner-only. Grants a campaign item into a member
@@ -806,16 +661,11 @@ export async function awardCampaignItem(
   itemId: string,
   body: { characterId: string; quantity?: number; sessionId?: string },
 ): Promise<{ holders: CampaignItemHolder[] }> {
-  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/items/${itemId}/award`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.error ?? `Failed to award campaign item (${response.status})`);
-  }
-  return response.json();
+  return request<{ holders: CampaignItemHolder[] }>(
+    `/campaigns/${campaignId}/items/${itemId}/award`,
+    jsonBody(body),
+    "Failed to award campaign item",
+  );
 }
 
 export async function revokeCampaignItem(
@@ -823,16 +673,11 @@ export async function revokeCampaignItem(
   itemId: string,
   body: { characterId: string },
 ): Promise<{ holders: CampaignItemHolder[] }> {
-  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/items/${itemId}/revoke`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.error ?? `Failed to revoke campaign item (${response.status})`);
-  }
-  return response.json();
+  return request<{ holders: CampaignItemHolder[] }>(
+    `/campaigns/${campaignId}/items/${itemId}/revoke`,
+    jsonBody(body),
+    "Failed to revoke campaign item",
+  );
 }
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
@@ -843,16 +688,11 @@ export async function startCampaignSession(
   characterId: string,
   title?: string,
 ): Promise<{ session: Session; character: Character }> {
-  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/sessions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ characterId, title }),
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to start session (${response.status})`);
-  }
-  return response.json();
+  return request<{ session: Session; character: Character }>(
+    `/campaigns/${campaignId}/sessions`,
+    jsonBody({ characterId, title }),
+    "Failed to start session",
+  );
 }
 
 /** Add (or re-add) a character to an active campaign session. */
@@ -861,18 +701,11 @@ export async function joinSession(
   sessionId: string,
   characterId: string,
 ): Promise<void> {
-  const response = await apiFetch(
-    `${API_URL}/campaigns/${campaignId}/sessions/${sessionId}/join`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ characterId }),
-    },
+  await send(
+    `/campaigns/${campaignId}/sessions/${sessionId}/join`,
+    jsonBody({ characterId }),
+    "Failed to join session",
   );
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to join session (${response.status})`);
-  }
 }
 
 /** Record that a character left a session; it stays open for the rest of the party. */
@@ -881,18 +714,11 @@ export async function leaveSession(
   sessionId: string,
   characterId: string,
 ): Promise<void> {
-  const response = await apiFetch(
-    `${API_URL}/campaigns/${campaignId}/sessions/${sessionId}/leave`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ characterId }),
-    },
+  await send(
+    `/campaigns/${campaignId}/sessions/${sessionId}/leave`,
+    jsonBody({ characterId }),
+    "Failed to leave session",
   );
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to leave session (${response.status})`);
-  }
 }
 
 /** End a shared campaign session by id. */
@@ -900,22 +726,16 @@ export async function endSession(
   campaignId: string,
   sessionId: string,
 ): Promise<{ session: Session }> {
-  const response = await apiFetch(
-    `${API_URL}/campaigns/${campaignId}/sessions/${sessionId}/end`,
+  return request<{ session: Session }>(
+    `/campaigns/${campaignId}/sessions/${sessionId}/end`,
     { method: "POST" },
+    "Failed to end session",
   );
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to end session (${response.status})`);
-  }
-  return response.json();
 }
 
 /** List a campaign's sessions (newest first), with participants. */
 export async function fetchCampaignSessions(campaignId: string): Promise<Session[]> {
-  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/sessions`);
-  if (!response.ok) throw new Error(`Failed to fetch sessions (${response.status})`);
-  return response.json();
+  return request<Session[]>(`/campaigns/${campaignId}/sessions`, undefined, "Failed to fetch sessions");
 }
 
 /** Get one campaign session with its participants, events, and journals. */
@@ -923,23 +743,26 @@ export async function fetchCampaignSession(
   campaignId: string,
   sessionId: string,
 ): Promise<Session & { events: CharacterEvent[] }> {
-  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/sessions/${sessionId}`);
-  if (!response.ok) throw new Error(`Failed to fetch session (${response.status})`);
-  return response.json();
+  return request<Session & { events: CharacterEvent[] }>(
+    `/campaigns/${campaignId}/sessions/${sessionId}`,
+    undefined,
+    "Failed to fetch session",
+  );
 }
 
 /** List sessions a character participated in (newest first) — activity filter. */
 export async function fetchSessions(characterId: string): Promise<Session[]> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/sessions`);
-  if (!response.ok) throw new Error(`Failed to fetch sessions (${response.status})`);
-  return response.json();
+  return request<Session[]>(`/characters/${characterId}/sessions`, undefined, "Failed to fetch sessions");
 }
 
 /** Get the currently-active session, or null if none is active. */
 export async function fetchActiveSession(characterId: string): Promise<Session | null> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/sessions/active`);
-  if (!response.ok) throw new Error(`Failed to fetch active session (${response.status})`);
-  return response.json(); // 200 with null body when no session is active
+  // 200 with null body when no session is active.
+  return request<Session | null>(
+    `/characters/${characterId}/sessions/active`,
+    undefined,
+    "Failed to fetch active session",
+  );
 }
 
 /** Get one session with its events. */
@@ -947,9 +770,11 @@ export async function fetchSession(
   characterId: string,
   sessionId: string,
 ): Promise<Session & { events: CharacterEvent[] }> {
-  const response = await apiFetch(`${API_URL}/characters/${characterId}/sessions/${sessionId}`);
-  if (!response.ok) throw new Error(`Failed to fetch session (${response.status})`);
-  return response.json();
+  return request<Session & { events: CharacterEvent[] }>(
+    `/characters/${characterId}/sessions/${sessionId}`,
+    undefined,
+    "Failed to fetch session",
+  );
 }
 
 /** Log a "combat started" event against the active session. */
@@ -957,14 +782,11 @@ export async function startCombat(
   characterId: string,
   sessionId: string,
 ): Promise<void> {
-  const response = await apiFetch(
-    `${API_URL}/characters/${characterId}/sessions/${sessionId}/combat/start`,
+  await send(
+    `/characters/${characterId}/sessions/${sessionId}/combat/start`,
     { method: "POST" },
+    "Failed to start combat",
   );
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to start combat (${response.status})`);
-  }
 }
 
 /** Log a "combat ended" event against the active session. */
@@ -972,14 +794,11 @@ export async function endCombat(
   characterId: string,
   sessionId: string,
 ): Promise<void> {
-  const response = await apiFetch(
-    `${API_URL}/characters/${characterId}/sessions/${sessionId}/combat/end`,
+  await send(
+    `/characters/${characterId}/sessions/${sessionId}/combat/end`,
     { method: "POST" },
+    "Failed to end combat",
   );
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to end combat (${response.status})`);
-  }
 }
 
 /** Log a "combat round advanced" event against the active session. */
@@ -988,18 +807,11 @@ export async function advanceCombatRound(
   sessionId: string,
   round: number,
 ): Promise<void> {
-  const response = await apiFetch(
-    `${API_URL}/characters/${characterId}/sessions/${sessionId}/combat/round`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ round }),
-    },
+  await send(
+    `/characters/${characterId}/sessions/${sessionId}/combat/round`,
+    jsonBody({ round }),
+    "Failed to advance combat round",
   );
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to advance combat round (${response.status})`);
-  }
 }
 
 /** Log a single roll from the session UI. Best-effort — callers catch and console.error. */
@@ -1024,16 +836,9 @@ export async function logRoll(
     rollMode?: "normal" | "advantage" | "disadvantage";
   },
 ): Promise<void> {
-  const response = await apiFetch(
-    `${API_URL}/characters/${characterId}/sessions/${sessionId}/roll`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    },
+  await send(
+    `/characters/${characterId}/sessions/${sessionId}/roll`,
+    jsonBody(payload),
+    "Failed to log roll",
   );
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error ?? `Failed to log roll (${response.status})`);
-  }
 }

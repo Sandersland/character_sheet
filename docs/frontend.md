@@ -238,7 +238,7 @@ panel/modal. **Never** render bare `Loading…` text as a stand-in for a spinner
 All `fetch` calls go through `frontend/src/api/client.ts`. **Never call `fetch` directly from a component.**
 
 When adding a new backend endpoint:
-1. Add the function to `client.ts`
+1. Add the function to `client.ts` — delegate to the generic `request<T>(path, init, "Failed to …")` (JSON reply) or `send(path, init, "Failed to …")` (void/204), so you inherit the shared ok-check/error-parse/throw flow instead of re-hand-rolling it. Intent-bearing `…/transactions` endpoints go through `postTransactions`.
 2. Import it in the component
 
 This keeps all URL construction, error handling, and type casting in one place.
