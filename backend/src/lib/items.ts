@@ -4,7 +4,7 @@ import type { ItemCategoryName } from "./inventory.js";
 // (the "equipped" flag). Consumables and gear are carried, never equipped.
 // This is the single source of truth for the rule — mirrored on the frontend
 // in frontend/src/lib/items.ts. No schema column derives from it.
-export const EQUIPPABLE_CATEGORIES: ReadonlySet<ItemCategoryName> = new Set([
+const EQUIPPABLE_CATEGORIES: ReadonlySet<ItemCategoryName> = new Set([
   "weapon",
   "armor",
 ]);

@@ -8,6 +8,7 @@ import type { CharacterSummary } from "@/types/character";
 
 const base: CharacterSummary = {
   id: "char-1",
+  ownerId: "user-1",
   name: "Gandalf the Grey",
   race: "Istari",
   class: "Wizard",

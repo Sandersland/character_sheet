@@ -8,7 +8,11 @@ import { prisma } from "../../lib/prisma.js";
 import { createCharacter } from "../../lib/character-create.js";
 import { characterInclude } from "../../lib/character-include.js";
 import { serializeCharacter, serializeCharacterSummary } from "../../lib/character-serialize.js";
-import { createCharacterSchema, updateCharacterSchema } from "../../lib/character-schemas.js";
+import {
+  campaignPreferencesSchema,
+  createCharacterSchema,
+  updateCharacterSchema,
+} from "../../lib/character-schemas.js";
 import { assertCharacterAccess } from "../../lib/auth/access.js";
 
 export const charactersRouter = Router();
@@ -131,6 +135,44 @@ charactersRouter.patch("/characters/:id", async (req, res) => {
   }
 
   res.json(serializeCharacter(updated as Parameters<typeof serializeCharacter>[0]));
+});
+
+// Campaign-scoped play preferences (#537). Thin owner-only upsert of the prefs
+// row for (character, its current campaignId). No audit event / EventCategory —
+// these are cosmetic play settings, not a domain mutation. 400 when the
+// character isn't attached to a campaign (there's no scope to write to).
+charactersRouter.patch("/characters/:id/campaign-preferences", async (req, res) => {
+  const parseResult = campaignPreferencesSchema.safeParse(req.body);
+  if (!parseResult.success) {
+    res.status(400).json({ error: "Invalid request body", details: parseResult.error.flatten() });
+    return;
+  }
+
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
+
+  const existing = await prisma.character.findUniqueOrThrow({
+    where: { id: req.params.id },
+    select: { campaignId: true },
+  });
+  if (existing.campaignId == null) {
+    res.status(400).json({ error: "Character is not attached to a campaign" });
+    return;
+  }
+
+  const patch = parseResult.data;
+  await prisma.campaignCharacterPreference.upsert({
+    where: {
+      campaignId_characterId: { campaignId: existing.campaignId, characterId: req.params.id },
+    },
+    create: { campaignId: existing.campaignId, characterId: req.params.id, ...patch },
+    update: patch,
+  });
+
+  const character = await prisma.character.findUniqueOrThrow({
+    where: { id: req.params.id },
+    include: characterInclude,
+  });
+  res.json(serializeCharacter(character));
 });
 
 charactersRouter.delete("/characters/:id", async (req, res) => {

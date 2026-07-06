@@ -798,8 +798,22 @@ export interface ArmorClassPart {
   value: number;
 }
 
+/**
+ * A character's play preferences for its current campaign (#537). Always present
+ * on the wire (defaulting both flags to false) when the character is attached to
+ * a campaign; absent otherwise. Toggles land with #116 / #462.
+ */
+export interface CampaignPreferences {
+  /** Let the DM read this character's sheet. */
+  shareWithDm: boolean;
+  /** Auto-roll healing when this character targets a friendly. */
+  autoFriendlyHealing: boolean;
+}
+
 export interface Character {
   id: string;
+  /** Owning user id (backend-emitted). */
+  ownerId: string;
   name: string;
   race: string;
   class: string;
@@ -932,6 +946,8 @@ export interface Character {
 
   /** Shared-campaign link (#246), or undefined when the character isn't in one. */
   campaignId?: string;
+  /** Per-campaign play preferences (#537); absent when not in a campaign. */
+  campaignPreferences?: CampaignPreferences;
 }
 
 // ── Shared campaigns (#246) ───────────────────────────────────────────────────
@@ -1073,6 +1089,8 @@ export interface CampaignEntityMerge {
 
 export interface CharacterSummary {
   id: string;
+  /** Owning user id (backend-emitted). */
+  ownerId: string;
   name: string;
   race: string;
   class: string;
@@ -1264,7 +1282,8 @@ export interface CastSpellOperation {
   entryId: string;
   slotLevel?: number;
   roll: number;
-  apply?: { target: "self"; kind: "heal" | "damage"; amount: number };
+  // "self" hits the caster; { characterId } heals a consenting ally's sheet (#462).
+  apply?: { target: "self" | { characterId: string }; kind: "heal" | "damage"; amount: number };
 }
 /** Bare slot expenditure (no specific spell). */
 export interface ExpendSlotOperation { type: "expendSlot"; level: number }
@@ -1638,7 +1657,13 @@ export interface SessionParticipant {
   joinedAt: string; // ISO 8601
   leftAt?: string | null;
   summary?: ParticipantSummary | null;
-  character?: { id: string; name: string };
+  character?: {
+    id: string;
+    name: string;
+    // Per-campaign play prefs (#462) — used to offer party-target healing only
+    // to allies who opted in. One row per campaign this character set prefs in.
+    campaignPreferences?: { campaignId: string; autoFriendlyHealing: boolean }[];
+  };
 }
 
 /**

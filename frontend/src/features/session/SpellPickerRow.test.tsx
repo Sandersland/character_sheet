@@ -26,6 +26,8 @@ const baseView: SpellRowView = {
   spellAttackBonus: 5,
   castDisabled: true,
   attackDisabled: false,
+  isHeal: false,
+  allies: [],
 };
 
 const baseRow: SpellRowState = {

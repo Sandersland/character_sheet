@@ -127,6 +127,7 @@ function renderPicker(
         slotAvailable={opts.slotAvailable ?? true}
         onCommitSlot={spies.onCommitSlot}
         spellCastThisTurn={{}}
+        allies={[]}
         castingTimeFilter={opts.castingTimeFilter ?? "1 action"}
       />
     </RollProvider>,

@@ -5,6 +5,7 @@ import type {
   CampaignItem,
   CampaignItemHolder,
   CampaignItemInput,
+  CampaignPreferences,
   CatalogFeat,
   CatalogDiscipline,
   CatalogManeuver,
@@ -173,6 +174,20 @@ export async function updateCharacter(
   patch: Partial<Pick<Character, "currency">>
 ): Promise<Character> {
   return request<Character>(`/characters/${id}`, jsonBody(patch, "PATCH"), `Failed to update character ${id}`);
+}
+
+// Updates the character's campaign-scoped play preferences (#537) — a thin
+// owner-only PATCH that upserts the row for the character's current campaign.
+// Partial: only the sent flags change. Returns the full updated Character.
+export async function updateCampaignPreferences(
+  id: string,
+  patch: Partial<CampaignPreferences>,
+): Promise<Character> {
+  return request<Character>(
+    `/characters/${id}/campaign-preferences`,
+    jsonBody(patch, "PATCH"),
+    "Failed to update campaign preferences",
+  );
 }
 
 export async function fetchReference(): Promise<ReferenceData> {

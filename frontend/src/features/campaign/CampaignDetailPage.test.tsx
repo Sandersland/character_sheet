@@ -47,7 +47,7 @@ function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
 }
 
 const CHARACTERS: CharacterSummary[] = [
-  { id: "char-1", name: "Thordak", race: "Dwarf", class: "Fighter", level: 3 },
+  { id: "char-1", ownerId: "user-1", name: "Thordak", race: "Dwarf", class: "Fighter", level: 3 },
 ];
 
 // Surfaces the current pathname so tests can assert tab clicks update the URL.
@@ -121,8 +121,8 @@ describe("CampaignDetailPage (#246)", () => {
   it("excludes a character already in a different campaign from the dropdown", async () => {
     vi.mocked(client.fetchCampaign).mockResolvedValue(makeCampaign());
     vi.mocked(client.fetchCharacters).mockResolvedValue([
-      { id: "char-1", name: "Thordak", race: "Dwarf", class: "Fighter", level: 3 },
-      { id: "char-2", name: "Elsewhere", race: "Elf", class: "Wizard", level: 2, campaignId: "other-camp" },
+      { id: "char-1", ownerId: "user-1", name: "Thordak", race: "Dwarf", class: "Fighter", level: 3 },
+      { id: "char-2", ownerId: "user-1", name: "Elsewhere", race: "Elf", class: "Wizard", level: 2, campaignId: "other-camp" },
     ]);
 
     renderDetail();

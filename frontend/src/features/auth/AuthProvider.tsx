@@ -7,7 +7,7 @@ import type { AuthUser } from "@/types/auth";
 
 // "loading" until the initial fetchMe resolves; then "authenticated" (user set)
 // or "anonymous". Route gating keys off this (see App.tsx).
-export type AuthStatus = "loading" | "authenticated" | "anonymous";
+type AuthStatus = "loading" | "authenticated" | "anonymous";
 
 interface AuthContextValue {
   status: AuthStatus;

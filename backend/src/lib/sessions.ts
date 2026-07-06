@@ -16,8 +16,20 @@ export class CombatError extends Error {}
 const SESSION_GRACE_MS = 60 * 60 * 1000;
 
 // Standard include for reads that need participant presence + character names.
+// campaignPreferences rides along so the session UI can offer party-target
+// healing only to allies who opted in (#462); resolved per session.campaignId.
 const sessionWithParticipants = {
-  participants: { include: { character: { select: { id: true, name: true } } } },
+  participants: {
+    include: {
+      character: {
+        select: {
+          id: true,
+          name: true,
+          campaignPreferences: { select: { campaignId: true, autoFriendlyHealing: true } },
+        },
+      },
+    },
+  },
 } as const;
 
 type SessionWithParticipants = Prisma.SessionGetPayload<{

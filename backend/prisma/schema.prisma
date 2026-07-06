@@ -87,6 +87,9 @@ model Character {
   journalEntries      JournalEntry[]
   // Back-relation to the PC CampaignEntity auto-created on attach (#248).
   campaignLink        CampaignCharacterLink?
+  // Per-campaign play preferences (#537) — one row per campaign this character
+  // has ever set prefs in; the current campaign's row is surfaced on read.
+  campaignPreferences CampaignCharacterPreference[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -146,6 +149,8 @@ model Campaign {
   // Non-destructive "revealed to be" identity links between entities (#387).
   entityMerges CampaignEntityMerge[]
   sessions   Session[]
+  // Per-character play preferences scoped to this campaign (#537).
+  characterPreferences CampaignCharacterPreference[]
 }
 
 enum CampaignRole {
@@ -369,6 +374,31 @@ model CampaignItemLink {
   campaignEntity   CampaignEntity @relation(fields: [campaignEntityId], references: [id], onDelete: Cascade)
   campaignItemId   String         @unique
   campaignItem     CampaignItem   @relation(fields: [campaignItemId], references: [id], onDelete: Cascade)
+}
+
+// --- Campaign-scoped character preferences (#537) ---------------------------
+// A player's per-campaign play settings for one of their characters (e.g. share
+// sheet with the DM, auto-roll friendly healing). Scoped to (campaign,
+// character) so the same character can carry different settings across
+// campaigns. Owner-only writes via assertCharacterAccess; both FKs cascade so a
+// deleted campaign or character removes its preference rows.
+model CampaignCharacterPreference {
+  id         String   @id @default(uuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  // Let the DM read this character's sheet (lands with #116 sharing).
+  shareWithDm         Boolean @default(false)
+  // Auto-roll healing when this character targets a friendly (lands with #462).
+  autoFriendlyHealing Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([campaignId, characterId])
+  @@index([characterId])
 }
 
 // One row per linked sign-in method (OAuth provider account or, later, a

@@ -88,7 +88,7 @@ describe("makeTransactionsEndpoint", () => {
     await handler(req({ operations: [{ type: "go" }] }), res);
 
     expect(access).toHaveBeenCalledWith(prisma, "u1", "c1", "edit");
-    expect(apply).toHaveBeenCalledWith("c1", { operations: [{ type: "go" }] });
+    expect(apply).toHaveBeenCalledWith("c1", { operations: [{ type: "go" }] }, "u1");
     expect(findUnique).toHaveBeenCalledWith({
       where: { id: "c1" },
       include: { marker: true },

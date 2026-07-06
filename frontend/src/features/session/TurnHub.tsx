@@ -23,6 +23,7 @@ import LayOnHandsInput from "@/features/session/LayOnHandsInput";
 import InlineAttackPicker from "@/features/session/InlineAttackPicker";
 import InlineItemPicker from "@/features/session/InlineItemPicker";
 import InlineSpellPicker from "@/features/session/InlineSpellPicker";
+import type { AllyOption } from "@/lib/spellMeta";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
 
@@ -33,9 +34,11 @@ interface TurnHubProps {
   onUpdate: (c: Character) => void;
   /** Called after a combat log event so the Log tab refreshes. */
   onLogChanged: () => void;
+  /** Opted-in party members a healing cast can target on their sheet (#462). */
+  allies: AllyOption[];
 }
 
-export default function TurnHub({ character, sessionId, turnState, onUpdate, onLogChanged }: TurnHubProps) {
+export default function TurnHub({ character, sessionId, turnState, onUpdate, onLogChanged, allies }: TurnHubProps) {
   const {
     inCombat,
     round,
@@ -326,6 +329,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
                 slotAvailable={slotAvailable}
                 onCommitSlot={onCommitSlot}
                 spellCastThisTurn={spellCastThisTurn}
+                allies={allies}
                 castingTimeFilter={
                   spellSlot === "bonusAction"
                     ? "1 bonus action"

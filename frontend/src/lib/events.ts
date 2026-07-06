@@ -86,7 +86,7 @@ export function eventTypeLabel(type: string): string {
 }
 
 // Badge tone per event category — reuses the existing design tokens.
-export const CATEGORY_TONE: Partial<
+const CATEGORY_TONE: Partial<
   Record<CharacterEventCategory, "vitality" | "gold" | "garnet" | "neutral" | "arcane">
 > = {
   inventory: "gold",

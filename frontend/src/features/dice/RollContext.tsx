@@ -63,7 +63,7 @@ export interface RollLog {
 }
 
 /** Full best-effort session-log payload — the result-derived fields on top of `RollLog`. */
-export interface RollLogInput extends RollLog {
+interface RollLogInput extends RollLog {
   total: number;
   /** Raw kept die faces (non-dropped) for the Session Log breakdown. */
   faces?: number[];

@@ -123,3 +123,13 @@ export const updateCharacterSchema = z
   })
   .partial()
   .strict();
+
+// Campaign-scoped play preferences (#537). PATCH-style partial: only the sent
+// flags are updated; omitted ones keep their current (or default) value.
+export const campaignPreferencesSchema = z
+  .object({
+    shareWithDm: z.boolean(),
+    autoFriendlyHealing: z.boolean(),
+  })
+  .partial()
+  .strict();
