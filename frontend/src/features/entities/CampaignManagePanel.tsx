@@ -346,6 +346,7 @@ export default function CampaignManagePanel({ campaignId }: CampaignManagePanelP
             <h3 className="text-sm font-semibold text-parchment-900">Identity merges</h3>
             <button
               type="button"
+              aria-label="Open prepare merge form"
               aria-expanded={mergingOpen}
               disabled={entities.length < 2}
               onClick={() => setMergingOpen((o) => !o)}
