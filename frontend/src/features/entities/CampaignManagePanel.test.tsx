@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 
 import CampaignManagePanel from "@/features/entities/CampaignManagePanel";
 import * as client from "@/api/client";
@@ -10,9 +10,6 @@ import type { CampaignEntity } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   fetchEntities: vi.fn(),
-  createEntity: vi.fn(),
-  updateEntity: vi.fn(),
-  deleteEntity: vi.fn(),
   prepareEntityMerge: vi.fn(),
   executeEntityMerge: vi.fn(),
   unmergeEntityMerge: vi.fn(),
@@ -53,98 +50,22 @@ beforeEach(() => {
   __resetCampaignEntitiesCacheForTests();
 });
 
-describe("CampaignManagePanel (#379)", () => {
-  it("shows a Hidden badge and a Reveal action for a hidden entity", async () => {
+describe("CampaignManagePanel (#379/#523)", () => {
+  it("no longer renders the entity list or a create form (moved to Codex, #523)", async () => {
     vi.mocked(client.fetchEntities).mockResolvedValue([
       entity({ id: "e1", name: "Secret Cult", visibility: "HIDDEN" }),
     ]);
 
     renderPanel();
 
-    expect(await screen.findByText("Secret Cult")).toBeInTheDocument();
-    expect(screen.getByText(/Hidden/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
-  });
-
-  it("toggles visibility via updateEntity", async () => {
-    const user = userEvent.setup();
-    vi.mocked(client.fetchEntities).mockResolvedValue([
-      entity({ id: "e1", name: "Klarg", visibility: "REVEALED" }),
-    ]);
-    vi.mocked(client.updateEntity).mockResolvedValue(
-      entity({ id: "e1", name: "Klarg", visibility: "HIDDEN" }),
-    );
-
-    renderPanel();
-
-    await screen.findByText("Klarg");
-    await user.click(screen.getByRole("button", { name: /hide/i }));
-
-    expect(vi.mocked(client.updateEntity)).toHaveBeenCalledWith(CAMPAIGN_ID, "e1", {
-      visibility: "HIDDEN",
-    });
-  });
-
-  it("deletes an entity via deleteEntity and drops it from the list", async () => {
-    const user = userEvent.setup();
-    vi.mocked(client.fetchEntities).mockResolvedValue([
-      entity({ id: "e1", name: "Disposable" }),
-    ]);
-    vi.mocked(client.deleteEntity).mockResolvedValue(undefined);
-
-    renderPanel();
-
-    await screen.findByText("Disposable");
-    await user.click(screen.getByRole("button", { name: /delete/i }));
-
-    expect(vi.mocked(client.deleteEntity)).toHaveBeenCalledWith(CAMPAIGN_ID, "e1");
-    await waitFor(() => expect(screen.queryByText("Disposable")).not.toBeInTheDocument());
-  });
-
-  it("opens the entity detail page carrying the Manage origin (#489)", async () => {
-    const user = userEvent.setup();
-    vi.mocked(client.fetchEntities).mockResolvedValue([entity({ id: "e1", name: "Klarg" })]);
-
-    function OriginProbe() {
-      const location = useLocation();
-      return <div data-testid="from">{(location.state as { from?: string } | null)?.from ?? ""}</div>;
-    }
-
-    render(
-      <MemoryRouter initialEntries={[`/campaigns/${CAMPAIGN_ID}/manage`]}>
-        <Routes>
-          <Route
-            path="/campaigns/:id/manage"
-            element={<CampaignManagePanel campaignId={CAMPAIGN_ID} />}
-          />
-          <Route path="/campaigns/:id/entities/:entityId" element={<OriginProbe />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-
-    await user.click(await screen.findByRole("link", { name: "Klarg" }));
-    expect(screen.getByTestId("from")).toHaveTextContent(`/campaigns/${CAMPAIGN_ID}/manage`);
-  });
-
-  it("creates a hidden entity from the new-entity form by default", async () => {
-    const user = userEvent.setup();
-    vi.mocked(client.fetchEntities).mockResolvedValue([]);
-    vi.mocked(client.createEntity).mockResolvedValue(
-      entity({ id: "new", name: "Big Bad", visibility: "HIDDEN" }),
-    );
-
-    renderPanel();
-
-    await screen.findByText(/No entities yet/i);
-    await user.click(screen.getByRole("button", { name: /new entity/i }));
-    await user.type(screen.getByLabelText(/Name/i), "Big Bad");
-    await user.click(screen.getByRole("button", { name: /create entity/i }));
-
-    expect(vi.mocked(client.createEntity)).toHaveBeenCalledWith(CAMPAIGN_ID, {
-      type: "NPC",
-      name: "Big Bad",
-      visibility: "HIDDEN",
-    });
+    // The Identity-merges section still renders...
+    expect(await screen.findByRole("heading", { name: /identity merges/i })).toBeInTheDocument();
+    // ...but the entity row, its reveal/delete actions, and the new-entity form are gone.
+    expect(screen.queryByText("Secret Cult")).not.toBeInTheDocument();
+    expect(screen.queryByRole("searchbox", { name: /search entities/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /new entity/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^reveal$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^delete$/i })).not.toBeInTheDocument();
   });
 
   it("prepares a merge from the two-entity form (#387)", async () => {
@@ -166,8 +87,7 @@ describe("CampaignManagePanel (#379)", () => {
 
     renderPanel();
 
-    await screen.findByText("Jenkins");
-    await user.click(screen.getByRole("button", { name: /open prepare merge form/i }));
+    await user.click(await screen.findByRole("button", { name: /open prepare merge form/i }));
     await user.selectOptions(screen.getByLabelText(/Old identity/i), "jenkins");
     await user.selectOptions(screen.getByLabelText(/Revealed to be/i), "vecna");
     await user.click(screen.getByRole("button", { name: /^Prepare merge$/i }));
@@ -179,7 +99,13 @@ describe("CampaignManagePanel (#379)", () => {
     });
   });
 
-  it("shows a 'Secretly linked' badge on entities in a PREPARED merge (#387)", async () => {
+  it("disables the prepare-merge toggle when fewer than two entities exist", async () => {
+    vi.mocked(client.fetchEntities).mockResolvedValue([entity({ id: "solo", name: "Solo" })]);
+    renderPanel();
+    expect(await screen.findByRole("button", { name: /open prepare merge form/i })).toBeDisabled();
+  });
+
+  it("renders a prepared merge with Execute-reveal and Cancel (#387)", async () => {
     vi.mocked(client.fetchEntities).mockResolvedValue([
       entity({ id: "jenkins", name: "Jenkins" }),
       entity({ id: "vecna", name: "Vecna", visibility: "HIDDEN" }),
@@ -199,7 +125,8 @@ describe("CampaignManagePanel (#379)", () => {
 
     renderPanel();
 
-    await screen.findByText("Jenkins");
-    expect(screen.getAllByText(/Secretly linked/).length).toBeGreaterThan(0);
+    expect(await screen.findByText(/Jenkins/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /execute reveal/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
   });
 });

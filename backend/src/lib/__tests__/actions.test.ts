@@ -193,7 +193,7 @@ describe("ACTION_EFFECT_FN — Rage durable buff (#457)", () => {
     expect(ACTION_EFFECT_FN.rage({ rageDamageBonus: 3 })).toEqual([
       {
         type: "applyBuff",
-        buff: { key: "rage", target: "meleeDamage", modifier: 3, source: "Rage", duration: "while-active" },
+        buff: { key: "rage", target: "meleeDamage", modifier: 3, source: "Rage", duration: "while-active", resistDamageTypes: ["bludgeoning", "piercing", "slashing"] },
       },
       { type: "spendResource", key: "rage" },
     ]);

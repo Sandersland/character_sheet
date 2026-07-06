@@ -1,27 +1,12 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
-import EmptyState from "@/components/ui/EmptyState";
-import { GiSpellBook, Lock, Plus, VenetianMask } from "@/components/ui/icons";
-import {
-  createEntity,
-  deleteEntity,
-  executeEntityMerge,
-  prepareEntityMerge,
-  unmergeEntityMerge,
-  updateEntity,
-} from "@/api/client";
+import { VenetianMask } from "@/components/ui/icons";
+import { executeEntityMerge, prepareEntityMerge, unmergeEntityMerge } from "@/api/client";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { primeCampaignMerges, useCampaignMerges } from "@/hooks/useCampaignMerges";
-import {
-  ENTITY_TYPE_LABELS,
-  ENTITY_TYPE_OPTIONS,
-  ENTITY_TYPE_TONE,
-  matchEntities,
-} from "@/lib/mentions";
-import type { CampaignEntity, CampaignEntityMerge, EntityType } from "@/types/character";
+import type { CampaignEntity, CampaignEntityMerge } from "@/types/character";
 
 interface CampaignManagePanelProps {
   campaignId: string;
@@ -31,19 +16,13 @@ const inputCls =
   "w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
 const labelCls = "block text-xs font-semibold text-parchment-700";
 
-// Owner-only Manage tab (#379): the DM's entity administration surface. Lists
-// every entity — including HIDDEN ones the backend keeps from players — with a
-// reveal/hide toggle, delete, and a create form. Edit lives on the detail page.
+// Owner-only Manage tab (#379): the DM's identity-merge administration. The
+// entity list + create/reveal/hide/delete now live solely in the Codex (#523);
+// this panel keeps only the secret identity-merge workflow.
 export default function CampaignManagePanel({ campaignId }: CampaignManagePanelProps) {
   const { entities } = useCampaignEntities(campaignId);
-  const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const [creating, setCreating] = useState(false);
-  const [type, setType] = useState<EntityType>("NPC");
-  const [name, setName] = useState("");
-  const [startHidden, setStartHidden] = useState(true);
 
   const { merges } = useCampaignMerges(campaignId);
   const [mergingOpen, setMergingOpen] = useState(false);
@@ -52,23 +31,9 @@ export default function CampaignManagePanel({ campaignId }: CampaignManagePanelP
   const [mergeNote, setMergeNote] = useState("");
 
   const nameById = useMemo(() => new Map(entities.map((e) => [e.id, e.name])), [entities]);
-  const preparedIds = useMemo(() => {
-    const s = new Set<string>();
-    for (const m of merges) {
-      if (m.status !== "PREPARED") continue;
-      s.add(m.mergedEntityId);
-      s.add(m.survivorEntityId);
-    }
-    return s;
-  }, [merges]);
   const sortedMerges = useMemo(
     () => [...merges].sort((a, b) => a.preparedAt.localeCompare(b.preparedAt)),
     [merges],
-  );
-
-  const visible = useMemo(
-    () => matchEntities(entities, query).sort((a, b) => a.name.localeCompare(b.name)),
-    [entities, query],
   );
 
   function replaceEntity(updated: CampaignEntity) {
@@ -76,55 +41,6 @@ export default function CampaignManagePanel({ campaignId }: CampaignManagePanelP
       campaignId,
       entities.map((e) => (e.id === updated.id ? updated : e)),
     );
-  }
-
-  async function toggleVisibility(entity: CampaignEntity) {
-    setBusyId(entity.id);
-    setError(null);
-    try {
-      const next = entity.visibility === "HIDDEN" ? "REVEALED" : "HIDDEN";
-      replaceEntity(await updateEntity(campaignId, entity.id, { visibility: next }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to change visibility.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function handleDelete(entity: CampaignEntity) {
-    setBusyId(entity.id);
-    setError(null);
-    try {
-      await deleteEntity(campaignId, entity.id);
-      primeCampaignEntities(
-        campaignId,
-        entities.filter((e) => e.id !== entity.id),
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete entity.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function handleCreate() {
-    if (name.trim() === "") return;
-    setBusyId("new");
-    setError(null);
-    try {
-      const created = await createEntity(campaignId, {
-        type,
-        name: name.trim(),
-        visibility: startHidden ? "HIDDEN" : "REVEALED",
-      });
-      primeCampaignEntities(campaignId, [...entities, created]);
-      setName("");
-      setCreating(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create entity.");
-    } finally {
-      setBusyId(null);
-    }
   }
 
   async function handlePrepareMerge() {
@@ -202,17 +118,19 @@ export default function CampaignManagePanel({ campaignId }: CampaignManagePanelP
 
   return (
     <Card
-      title="Manage entities"
+      title="Identity merges"
       headingLevel={2}
       titleAccessory={
         <button
           type="button"
-          aria-expanded={creating}
-          onClick={() => setCreating((c) => !c)}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-garnet-700 hover:underline"
+          aria-label="Open prepare merge form"
+          aria-expanded={mergingOpen}
+          disabled={entities.length < 2}
+          onClick={() => setMergingOpen((o) => !o)}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
         >
-          <Plus aria-hidden="true" className="h-3.5 w-3.5" />
-          New entity
+          <VenetianMask aria-hidden="true" className="h-3.5 w-3.5" />
+          Prepare merge
         </button>
       }
       className="p-4"
@@ -224,253 +142,120 @@ export default function CampaignManagePanel({ campaignId }: CampaignManagePanelP
           </p>
         )}
 
-        {creating && (
-          <div className="flex flex-col gap-3 rounded-control border border-parchment-200 bg-parchment-100 p-3">
+        <p className="text-xs text-parchment-600">
+          Secretly link an old identity to its true self, then reveal it when the time is right.
+        </p>
+
+        {mergingOpen && (
+          <div className="flex flex-col gap-2 rounded-control border border-parchment-200 bg-parchment-100 p-3">
             <div>
-              <label className={labelCls} htmlFor="manage-entity-name">
-                Name *
-              </label>
-              <input
-                id="manage-entity-name"
-                className={inputCls}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className={labelCls} htmlFor="manage-entity-type">
-                Type
+              <label className={labelCls} htmlFor="merge-old">
+                Old identity *
               </label>
               <select
-                id="manage-entity-type"
+                id="merge-old"
                 className={inputCls}
-                value={type}
-                onChange={(e) => setType(e.target.value as EntityType)}
+                value={mergedId}
+                onChange={(e) => setMergedId(e.target.value)}
               >
-                {ENTITY_TYPE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
+                <option value="">Select…</option>
+                {entities.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name}
                   </option>
                 ))}
               </select>
             </div>
-            <label className="flex items-center gap-2 text-xs font-semibold text-parchment-700">
+            <div>
+              <label className={labelCls} htmlFor="merge-survivor">
+                Revealed to be *
+              </label>
+              <select
+                id="merge-survivor"
+                className={inputCls}
+                value={survivorId}
+                onChange={(e) => setSurvivorId(e.target.value)}
+              >
+                <option value="">Select…</option>
+                {entities
+                  .filter((e) => e.id !== mergedId)
+                  .map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls} htmlFor="merge-note">
+                Note
+              </label>
               <input
-                type="checkbox"
-                checked={startHidden}
-                onChange={(e) => setStartHidden(e.target.checked)}
+                id="merge-note"
+                className={inputCls}
+                value={mergeNote}
+                onChange={(e) => setMergeNote(e.target.value)}
               />
-              Start hidden from players
-            </label>
+            </div>
             <div className="flex justify-end">
               <button
                 type="button"
-                disabled={busyId === "new" || name.trim() === ""}
-                onClick={handleCreate}
+                disabled={busyId === "merge-new" || !mergedId || !survivorId || mergedId === survivorId}
+                onClick={handlePrepareMerge}
                 className="rounded-control bg-garnet-600 px-3 py-1.5 text-xs font-semibold text-parchment-50 hover:bg-garnet-700 disabled:opacity-40"
               >
-                {busyId === "new" ? "Creating…" : "Create entity"}
+                {busyId === "merge-new" ? "Preparing…" : "Prepare merge"}
               </button>
             </div>
           </div>
         )}
 
-        {entities.length === 0 ? (
-          <EmptyState
-            icon={<GiSpellBook />}
-            title="No entities yet"
-            description="Create NPCs, locations and secrets here, then reveal them to your players when the time is right."
-          />
-        ) : (
-          <>
-            <input
-              type="search"
-              aria-label="Search entities"
-              placeholder="Search by name or alias…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className={inputCls}
-            />
-            <ul className="flex flex-col divide-y divide-parchment-200">
-              {visible.map((e) => {
-                const hidden = e.visibility === "HIDDEN";
-                return (
-                  <li key={e.id} className="flex flex-wrap items-center gap-2 py-2">
-                    <Link
-                      to={`/campaigns/${campaignId}/entities/${e.id}`}
-                      state={{ from: `/campaigns/${campaignId}/manage` }}
-                      className="text-sm font-semibold text-parchment-900 hover:underline"
-                    >
-                      {e.name}
-                    </Link>
-                    <Badge tone={ENTITY_TYPE_TONE[e.type]}>{ENTITY_TYPE_LABELS[e.type]}</Badge>
-                    {hidden && (
-                      <Badge tone="neutral">
-                        <Lock aria-hidden="true" className="h-3 w-3" />
-                        Hidden
-                      </Badge>
-                    )}
-                    {preparedIds.has(e.id) && (
-                      <Badge tone="neutral">
+        {sortedMerges.length > 0 && (
+          <ul className="flex flex-col divide-y divide-parchment-200">
+            {sortedMerges.map((m) => {
+              const prepared = m.status === "PREPARED";
+              return (
+                <li key={m.id} className="flex flex-wrap items-center gap-2 py-2">
+                  <span className="text-sm text-parchment-900">
+                    {nameById.get(m.mergedEntityId) ?? "Unknown"}{" "}
+                    <span className="text-parchment-500">→</span>{" "}
+                    {nameById.get(m.survivorEntityId) ?? "Unknown"}
+                  </span>
+                  <Badge tone="neutral">
+                    {prepared ? (
+                      <>
                         <VenetianMask aria-hidden="true" className="h-3 w-3" />
-                        Secretly linked
-                      </Badge>
+                        Secret
+                      </>
+                    ) : (
+                      "✓ Revealed"
                     )}
-                    <span className="ml-auto flex items-center gap-3">
-                      <button
-                        type="button"
-                        disabled={busyId === e.id}
-                        onClick={() => toggleVisibility(e)}
-                        className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
-                      >
-                        {hidden ? "Reveal" : "Hide"}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busyId === e.id}
-                        onClick={() => handleDelete(e)}
-                        className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
-                      >
-                        Delete
-                      </button>
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )}
-
-        <div className="mt-2 border-t border-parchment-200 pt-3">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-parchment-900">Identity merges</h3>
-            <button
-              type="button"
-              aria-label="Open prepare merge form"
-              aria-expanded={mergingOpen}
-              disabled={entities.length < 2}
-              onClick={() => setMergingOpen((o) => !o)}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
-            >
-              <VenetianMask aria-hidden="true" className="h-3.5 w-3.5" />
-              Prepare merge
-            </button>
-          </div>
-          <p className="mt-1 text-xs text-parchment-600">
-            Secretly link an old identity to its true self, then reveal it when the time is right.
-          </p>
-
-          {mergingOpen && (
-            <div className="mt-2 flex flex-col gap-2 rounded-control border border-parchment-200 bg-parchment-100 p-3">
-              <div>
-                <label className={labelCls} htmlFor="merge-old">
-                  Old identity *
-                </label>
-                <select
-                  id="merge-old"
-                  className={inputCls}
-                  value={mergedId}
-                  onChange={(e) => setMergedId(e.target.value)}
-                >
-                  <option value="">Select…</option>
-                  {entities.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className={labelCls} htmlFor="merge-survivor">
-                  Revealed to be *
-                </label>
-                <select
-                  id="merge-survivor"
-                  className={inputCls}
-                  value={survivorId}
-                  onChange={(e) => setSurvivorId(e.target.value)}
-                >
-                  <option value="">Select…</option>
-                  {entities
-                    .filter((e) => e.id !== mergedId)
-                    .map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <div>
-                <label className={labelCls} htmlFor="merge-note">
-                  Note
-                </label>
-                <input
-                  id="merge-note"
-                  className={inputCls}
-                  value={mergeNote}
-                  onChange={(e) => setMergeNote(e.target.value)}
-                />
-              </div>
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  disabled={busyId === "merge-new" || !mergedId || !survivorId || mergedId === survivorId}
-                  onClick={handlePrepareMerge}
-                  className="rounded-control bg-garnet-600 px-3 py-1.5 text-xs font-semibold text-parchment-50 hover:bg-garnet-700 disabled:opacity-40"
-                >
-                  {busyId === "merge-new" ? "Preparing…" : "Prepare merge"}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {sortedMerges.length > 0 && (
-            <ul className="mt-2 flex flex-col divide-y divide-parchment-200">
-              {sortedMerges.map((m) => {
-                const prepared = m.status === "PREPARED";
-                return (
-                  <li key={m.id} className="flex flex-wrap items-center gap-2 py-2">
-                    <span className="text-sm text-parchment-900">
-                      {nameById.get(m.mergedEntityId) ?? "Unknown"}{" "}
-                      <span className="text-parchment-500">→</span>{" "}
-                      {nameById.get(m.survivorEntityId) ?? "Unknown"}
-                    </span>
-                    <Badge tone="neutral">
-                      {prepared ? (
-                        <>
-                          <VenetianMask aria-hidden="true" className="h-3 w-3" />
-                          Secret
-                        </>
-                      ) : (
-                        "✓ Revealed"
-                      )}
-                    </Badge>
-                    <span className="ml-auto flex items-center gap-3">
-                      {prepared && (
-                        <button
-                          type="button"
-                          disabled={busyId === m.id}
-                          onClick={() => handleExecuteMerge(m)}
-                          className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
-                        >
-                          Execute reveal
-                        </button>
-                      )}
+                  </Badge>
+                  <span className="ml-auto flex items-center gap-3">
+                    {prepared && (
                       <button
                         type="button"
                         disabled={busyId === m.id}
-                        onClick={() => handleUnmerge(m)}
+                        onClick={() => handleExecuteMerge(m)}
                         className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
                       >
-                        {prepared ? "Cancel" : "Unmerge"}
+                        Execute reveal
                       </button>
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
+                    )}
+                    <button
+                      type="button"
+                      disabled={busyId === m.id}
+                      onClick={() => handleUnmerge(m)}
+                      className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
+                    >
+                      {prepared ? "Cancel" : "Unmerge"}
+                    </button>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </Card>
   );

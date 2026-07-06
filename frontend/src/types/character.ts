@@ -1420,6 +1420,8 @@ export interface ActiveBuff {
   // sees an undefined duration.
   duration: BuffDuration;
   restType?: "short" | "long";
+  // Damage types this buff makes the character resistant to (halved on take) (#456).
+  resistDamageTypes?: string[];
 }
 
 export interface ActiveEffectsState {
@@ -1483,7 +1485,11 @@ export type ExperienceOperation = XpAwardOperation | XpSetOperation;
  * save to the client — the response carries a `status: "pending"` check and the
  * client follows up with a `ConcentrationSaveOperation`. Omitted = auto-roll.
  */
-export interface DamageOperation { type: "damage"; amount: number; autoRollConcentration?: boolean }
+/**
+ * `damageType` (optional, #456) drives resistance auto-halving server-side;
+ * `applyResistance: false` declines the auto-halve (take the full amount).
+ */
+export interface DamageOperation { type: "damage"; amount: number; damageType?: string; applyResistance?: boolean; autoRollConcentration?: boolean }
 export interface HealOperation { type: "heal"; amount: number }
 export interface SetTempOperation { type: "setTemp"; amount: number }
 /** `rolls`: one raw die value per hit die spent (rolled by the client via dice.ts). */

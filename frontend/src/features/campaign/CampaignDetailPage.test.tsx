@@ -261,7 +261,7 @@ describe("CampaignDetailPage Manage tab (#379)", () => {
     await waitFor(() =>
       expect(screen.getByTestId("location")).toHaveTextContent(/\/campaigns\/camp-1$/),
     );
-    expect(screen.queryByText("Manage entities")).not.toBeInTheDocument();
+    expect(screen.queryByText("Identity merges")).not.toBeInTheDocument();
   });
 
   it("renders the Manage panel for the owner at /manage", async () => {
@@ -270,6 +270,6 @@ describe("CampaignDetailPage Manage tab (#379)", () => {
 
     renderDetail("/campaigns/camp-1/manage");
 
-    expect(await screen.findByText("Manage entities")).toBeInTheDocument();
+    expect(await screen.findByText("Identity merges")).toBeInTheDocument();
   });
 });

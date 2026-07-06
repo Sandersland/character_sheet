@@ -172,6 +172,51 @@ describe("EntityDetailPage (#248)", () => {
     expect(screen.queryByRole("button", { name: /delete entity/i })).not.toBeInTheDocument();
   });
 
+  it("lets an OWNER hide a revealed entity via updateEntity (#523)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("OWNER"));
+    vi.mocked(client.updateEntity).mockResolvedValue({ ...ENTITY, visibility: "HIDDEN" });
+
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: /hide from players/i }));
+
+    expect(vi.mocked(client.updateEntity)).toHaveBeenCalledWith(CAMPAIGN_ID, ENTITY_ID, {
+      visibility: "HIDDEN",
+    });
+    // After the flip the control offers Reveal and the Hidden badge shows.
+    expect(await screen.findByRole("button", { name: /reveal to players/i })).toBeInTheDocument();
+    expect(await screen.findAllByText(/Hidden/)).not.toHaveLength(0);
+  });
+
+  it("lets an OWNER reveal a hidden entity via updateEntity (#523)", async () => {
+    const user = userEvent.setup();
+    const hidden: CampaignEntity = { ...ENTITY, visibility: "HIDDEN" };
+    vi.mocked(client.fetchEntities).mockResolvedValue([hidden]);
+    vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("OWNER"));
+    vi.mocked(useCampaignEntities).mockReturnValue({
+      entities: [hidden],
+      byId: new Map([[ENTITY_ID, hidden]]),
+    });
+    vi.mocked(client.updateEntity).mockResolvedValue({ ...ENTITY, visibility: "REVEALED" });
+
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: /reveal to players/i }));
+
+    expect(vi.mocked(client.updateEntity)).toHaveBeenCalledWith(CAMPAIGN_ID, ENTITY_ID, {
+      visibility: "REVEALED",
+    });
+    expect(vi.mocked(primeCampaignEntities)).toHaveBeenCalledWith(
+      CAMPAIGN_ID,
+      expect.arrayContaining([expect.objectContaining({ id: ENTITY_ID, visibility: "REVEALED" })]),
+    );
+  });
+
+  it("hides the reveal/hide control from a PLAYER (#523)", async () => {
+    renderPage();
+    await screen.findByRole("heading", { name: /Goblin Chief/ });
+    expect(screen.queryByRole("button", { name: /reveal to players|hide from players/i })).not.toBeInTheDocument();
+  });
+
   it("shows a zero-state when there are no backlinks", async () => {
     vi.mocked(client.fetchEntityBacklinks).mockResolvedValue([]);
     renderPage();
