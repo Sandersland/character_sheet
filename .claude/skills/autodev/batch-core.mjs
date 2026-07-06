@@ -138,8 +138,9 @@ export function createEngine({ stateDir, cfg = null }) {
   // BLOCKED with all CI green — that's recoverable via /pr-response and must NOT
   // be treated like a real conflict/failure (which would wrongly skip dependents).
   //   "review-blocked" — mergeable, only claude-review is red → responder-recoverable
-  //   "conflict"       — CONFLICTING → real, fail
-  //   "other-red"      — a non-review required check failed → real, fail
+  //   "conflict"       — CONFLICTING → flag a human, keep waiting (recoverable by a push)
+  //   "other-red"      — a non-review required check failed → flag a human, keep waiting
+  //   "closed"         — PR closed WITHOUT merging → real, fail (operator abandoned it)
   //   "unknown"        — transient gh failure, checks still running, or green +
   //                      auto-merge just lagging → conservatively keep waiting
   // Returns { cls, prNumber?, prHead? } — the PR coords feed the responder launch.
@@ -156,7 +157,7 @@ export function createEngine({ stateDir, cfg = null }) {
     } catch {
       return { cls: "unknown" };
     }
-    if (!pr) return { cls: "unknown" };
+    if (!pr) return classifyClosed(n, base);
     const info = { prNumber: pr.number, prHead: pr.headRefName };
     if (pr.mergeable === "CONFLICTING") return { cls: "conflict", ...info };
     const checks = pr.statusCheckRollup ?? [];
@@ -165,6 +166,20 @@ export function createEngine({ stateDir, cfg = null }) {
     const review = checks.find((c) => name(c) === "claude-review");
     if (review && RED(review)) return { cls: "review-blocked", ...info };
     return { cls: "unknown", ...info };
+  }
+
+  // No open PR: closed-without-merge is the operator's deliberate abandon signal
+  // (merged PRs never reach here — isMerged runs first each tick). Anything else
+  // stays "unknown" (search lag, transient gh failure).
+  function classifyClosed(n, base) {
+    const res = sh(GH, ["pr", "list", "--state", "closed", "--base", base, "--search", `(#${n}) in:title`, "--json", "number,title,mergedAt"]);
+    if (res.status !== 0) return { cls: "unknown" };
+    try {
+      const pr = JSON.parse(res.stdout).find((p) => p.title.includes(`(#${n})`) && !p.mergedAt);
+      return pr ? { cls: "closed", prNumber: pr.number } : { cls: "unknown" };
+    } catch {
+      return { cls: "unknown" };
+    }
   }
 
   function readRunJson(entry) {
@@ -380,8 +395,20 @@ export function createEngine({ stateDir, cfg = null }) {
       } else if (Date.now() - entry.doneAt >= batch.grace * 1000) {
         const { cls, prNumber, prHead } = classifyPrBlock(n, batch.base);
         if (cls === "conflict" || cls === "other-red") {
+          // An open PR is recoverable — a human rebase/fix re-arms auto-merge —
+          // so never terminal-fail it (#381's PR merged 11 min after the old
+          // code declared it failed and skipped its dependents). Flag a human
+          // once, keep polling; closing the PR unmerged is the way to fail it.
+          if (!entry.humanFlagged) {
+            sh(GH, ["pr", "comment", String(prNumber), "--body",
+              `⚠ **autodev: auto-merge blocked (${cls})** — needs a human rebase/fix push. Dependent batch issues stay queued (not skipped) and unblock when this PR merges. Closing the PR without merging marks the issue failed (relaunch later via \`autodevctl retry\`).`]);
+            entry.humanFlagged = true;
+            log(`NEEDS-HUMAN #${n} auto-merge blocked (${cls}) — PR flagged; dependents stay queued`);
+          }
+          entry.doneAt = Date.now(); // re-check per grace window without hammering gh
+        } else if (cls === "closed") {
           entry.status = "failed";
-          log(`FAIL #${n} auto-merge did not fire within ${batch.grace}s (${cls}); dependents will be skipped`);
+          log(`FAIL #${n} PR closed without merging; dependents will be skipped`);
         } else if (cls === "review-blocked") {
           // Recoverable: spawn the pr-response responder (≤ RESPOND_MAX cycles)
           // instead of waiting for a human. Never fail / skip dependents on a
