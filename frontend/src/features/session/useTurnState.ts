@@ -164,11 +164,13 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     saveTurnState(sessionId, state);
   }, [sessionId, state]);
 
-  // Watch current HP: any drop since this turn started marks damage taken (feeds
-  // the durable-buff turn-hook). The window is scoped by the `startTurn`
-  // re-baseline below — NOT by phase — so damage taken out of turn (opportunity
-  // attacks, reactions during another creature's turn) counts too, matching the
-  // 5e rule "took damage since your last turn". Heals and non-HP updates ignored.
+  // Watch current HP: any drop marks damage taken (feeds the durable-buff
+  // turn-hook). NOT gated by phase — so damage taken out of turn (opportunity
+  // attacks, reactions during another creature's turn) counts too. The activity
+  // window is bounded by the flag reset in `endTurn` (which runs AFTER the
+  // auto-end evaluation), so damage between your turns survives into the next
+  // turn's check — matching the 5e rule "took damage since your last turn".
+  // Heals and non-HP updates are ignored.
   const prevHpRef = useRef(currentHp);
   useEffect(() => {
     if (currentHp < prevHpRef.current) {
@@ -199,7 +201,10 @@ export function useTurnState(character: Character, sessionId: string): TurnState
   }, []);
 
   const startTurn = useCallback(() => {
-    // Re-baseline the HP watcher so only damage taken during this turn counts.
+    // Keep the HP-drop baseline current (the watcher also syncs it on every HP
+    // change). Deliberately does NOT reset attackedThisTurn/tookDamageThisTurn —
+    // those are cleared in endTurn so damage/attacks between your turns carry
+    // into this turn's auto-end check.
     prevHpRef.current = currentHp;
     setState((s) => ({
       ...s,
@@ -211,8 +216,6 @@ export function useTurnState(character: Character, sessionId: string): TurnState
       bonusAttack: null,
       twfAvailable: canTwoWeaponFight(character.inventory),
       spellCastThisTurn: {},
-      attackedThisTurn: false,
-      tookDamageThisTurn: false,
     }));
   }, [character.inventory, currentHp]);
 
@@ -221,6 +224,10 @@ export function useTurnState(character: Character, sessionId: string): TurnState
       if (s.inCombat) {
         // Stay in combat — return to idle within the same encounter,
         // advancing the round counter. The round log event is fired by TurnHub.
+        // Reset the activity window HERE (not in startTurn): handleEndTurn has
+        // already evaluated the durable-buff auto-end against these flags, so
+        // clearing them now opens a fresh window that still captures damage/
+        // attacks taken before the next startTurn (out-of-turn / enemy turns).
         return {
           ...s,
           phase: "idle",
@@ -230,6 +237,8 @@ export function useTurnState(character: Character, sessionId: string): TurnState
           bonusAttack: null,
           spellCastThisTurn: {},
           round: s.round + 1,
+          attackedThisTurn: false,
+          tookDamageThisTurn: false,
         };
       }
       // Out-of-combat (shouldn't normally happen now, but safe fallback).
