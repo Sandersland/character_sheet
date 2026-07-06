@@ -291,12 +291,15 @@ function currencyFromForm(f: FormState): Currency | undefined {
 }
 
 function buildInput(f: FormState): CampaignItemInput {
+  // Attunement/unique only apply to a magic item — gate them like versatile/range
+  // so a mundane item can't carry stale flags the hidden chips can't clear.
+  const magic = f.rarity !== "";
   const base: CampaignItemInput = {
     name: f.name.trim(),
     category: f.category,
     rarity: f.rarity || undefined,
-    requiresAttunement: f.requiresAttunement,
-    isUnique: f.isUnique,
+    requiresAttunement: magic && f.requiresAttunement,
+    isUnique: magic && f.isUnique,
     weight: num(f.weight),
     cost: currencyFromForm(f),
     description: f.description.trim() || undefined,

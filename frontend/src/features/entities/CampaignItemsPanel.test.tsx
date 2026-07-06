@@ -497,6 +497,29 @@ describe("CampaignItemsPanel rarity (#497/#542)", () => {
     expect(screen.queryByText("Standard value: 4,000 gp")).not.toBeInTheDocument();
   });
 
+  it("clears attunement/unique when rarity is switched back to Mundane", async () => {
+    vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "new-5", name: "Plain Ring" });
+    renderPanel();
+    await screen.findByText("Flametongue");
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
+
+    await userEvent.type(screen.getByLabelText("Name *"), "Plain Ring");
+    await userEvent.selectOptions(screen.getByLabelText("Rarity"), "RARE");
+    await userEvent.click(screen.getByRole("button", { name: "Requires attunement" }));
+    await userEvent.click(screen.getByRole("button", { name: "Unique" }));
+    // Demote to mundane — the flags are hidden and must not persist.
+    await userEvent.selectOptions(screen.getByLabelText("Rarity"), "");
+
+    await userEvent.click(screen.getByRole("button", { name: "Create item" }));
+
+    await waitFor(() =>
+      expect(createCampaignItem).toHaveBeenCalledWith(
+        "camp-1",
+        expect.objectContaining({ requiresAttunement: false, isUnique: false }),
+      ),
+    );
+  });
+
   it("halves the value hint for a consumable and sends the enum on create", async () => {
     vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "new-1", name: "Potion" });
     renderPanel();
