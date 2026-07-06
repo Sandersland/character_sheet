@@ -18,6 +18,8 @@
 
 import {
   createContext,
+  lazy,
+  Suspense,
   useCallback,
   useContext,
   useRef,
@@ -33,7 +35,10 @@ import {
   type RollResult,
   type RollSpec,
 } from "@/lib/dice";
-import DiceRollModal from "@/features/dice/DiceRollModal";
+
+// Lazy so the 3D dice stack (three/@react-three/cannon-es) stays out of the
+// initial chunk — it loads only when a roll actually animates.
+const DiceRollModal = lazy(() => import("@/features/dice/DiceRollModal"));
 
 export interface RollEntry {
   /** Monotonically-increasing id so useEffect can detect a re-roll of the
@@ -152,13 +157,15 @@ export function RollProvider({ children, characterId, sessionId, onRollLogged }:
     <RollContext.Provider value={{ lastRoll, roll, rollAnimated, logSessionRoll, mode, setMode }}>
       {children}
       {pending && (
-        <DiceRollModal
-          key={pending.id}
-          spec={pending.spec}
-          label={pending.label}
-          onResult={handleResult}
-          onClose={() => setPending(null)}
-        />
+        <Suspense fallback={null}>
+          <DiceRollModal
+            key={pending.id}
+            spec={pending.spec}
+            label={pending.label}
+            onResult={handleResult}
+            onClose={() => setPending(null)}
+          />
+        </Suspense>
       )}
     </RollContext.Provider>
   );
