@@ -15,6 +15,7 @@
 
 import { useSpellPicker } from "@/features/session/useSpellPicker";
 import SpellPickerRow from "@/features/session/SpellPickerRow";
+import type { AllyOption } from "@/lib/spellMeta";
 import type { Character } from "@/types/character";
 import type { SpellCastKind } from "@/features/session/useTurnState";
 
@@ -38,6 +39,8 @@ interface InlineSpellPickerProps {
   onCommitSlot: (spellLevel: number) => void;
   /** From useTurnState — used to enforce the 5e bonus-action spell restriction. */
   spellCastThisTurn: { action?: SpellCastKind; bonus?: SpellCastKind };
+  /** Opted-in party members a healing cast can target on their sheet (#462). */
+  allies: AllyOption[];
   /**
    * Optional filter on casting time. When provided, only spells whose
    * castingTime starts with this prefix are shown (e.g. "1 action",
@@ -57,6 +60,7 @@ export default function InlineSpellPicker({
   onCommitSlot,
   spellCastThisTurn,
   castingTimeFilter,
+  allies,
 }: InlineSpellPickerProps) {
   const picker = useSpellPicker({
     character,
@@ -68,6 +72,7 @@ export default function InlineSpellPicker({
     onCommitSlot,
     spellCastThisTurn,
     castingTimeFilter,
+    allies,
   });
 
   if (picker.isEmpty) {

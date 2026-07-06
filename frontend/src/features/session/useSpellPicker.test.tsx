@@ -138,6 +138,31 @@ describe("useSpellPicker", () => {
     ]);
   });
 
+  it("applies a heal to a picked ally's sheet via apply.target.characterId (#462)", async () => {
+    const opts = makeOpts([healSpell], { allies: [{ characterId: "ally-9", name: "Grog" }] });
+    const { result } = render(opts);
+    act(() => result.current.patchRow("sp-heal", { target: { characterId: "ally-9", name: "Grog" } }));
+    await act(async () => {
+      await result.current.handleCast(healSpell);
+    });
+    expect(mockApply).toHaveBeenCalledWith("char-1", [
+      expect.objectContaining({
+        type: "castSpell",
+        entryId: "sp-heal",
+        apply: expect.objectContaining({ target: { characterId: "ally-9" }, kind: "heal" }),
+      }),
+    ]);
+  });
+
+  it("exposes opted-in allies + isHeal on a heal spell's view, and none on a damage spell", () => {
+    const allies = [{ characterId: "ally-9", name: "Grog" }];
+    const { result } = render(makeOpts([healSpell, attackSpell], { allies }));
+    const healView = result.current.viewFor(healSpell);
+    expect(healView.isHeal).toBe(true);
+    expect(healView.allies).toEqual(allies);
+    expect(result.current.viewFor(attackSpell).isHeal).toBe(false);
+  });
+
   it("handleCast fires the op, commits the slot, and refreshes", async () => {
     const opts = makeOpts([cantrip]);
     const { result } = render(opts);

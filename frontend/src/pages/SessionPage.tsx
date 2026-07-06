@@ -25,6 +25,7 @@ import InventoryList from "@/features/inventory/InventoryList";
 import ClassFeaturesSection from "@/features/class/ClassFeaturesSection";
 import SpellsSection from "@/features/spells/SpellsSection";
 import TurnHub from "@/features/session/TurnHub";
+import { partyHealAllies } from "@/lib/spellMeta";
 import BackendStatus from "@/features/character-meta/BackendStatus";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
@@ -308,6 +309,7 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
           turnState={turnState}
           onUpdate={handleCharacterUpdate}
           onLogChanged={() => setLogRefresh((n) => n + 1)}
+          allies={partyHealAllies(session, character.id)}
         />
 
         {/* ── Reference tabs — secondary content ───────────────────────── */}

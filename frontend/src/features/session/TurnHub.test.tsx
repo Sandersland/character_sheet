@@ -86,6 +86,7 @@ function Harness({
       turnState={turnState}
       onUpdate={onUpdate}
       onLogChanged={onLogChanged}
+      allies={[]}
     />
   );
 }

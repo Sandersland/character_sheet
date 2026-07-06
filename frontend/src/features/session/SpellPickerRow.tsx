@@ -65,6 +65,8 @@ export default function SpellPickerRow({ spell, view, row, onPatch, onCast, onAt
               target={row.target}
               locked={view.locked}
               disabled={row.casting}
+              healing={view.isHeal}
+              allies={view.allies}
               onSelect={(target) => onPatch({ target })}
             />
           )}
