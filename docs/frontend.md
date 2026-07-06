@@ -38,8 +38,9 @@ frontend/src/
 │   │                    #   EntityDetailPage (detail/edit/delete + backlinks) (#248)
 │   ├── experience/      # ExperienceTracker
 │   ├── hitpoints/       # HitPointTracker orchestrator (inline Card; hosts LevelUpModal + ConcentrationSaveModal)
-│   │                    #   Sub-components: HpActionControl, HpMeter, RestControls,
-│   │                    #   DeathSaveTracker, LevelUpCallout, AdvancementCallout
+│   │                    #   Sub-components: HpActionControl (damage/heal/temp + optional
+│   │                    #   damage-type picker + resistance auto-halve toggle, #456),
+│   │                    #   HpMeter, RestControls, DeathSaveTracker, LevelUpCallout, AdvancementCallout
 │   ├── inventory/       # InventoryList, InventoryRow (→ InventoryEditForm/EquipToggle/
 │   │                    #   ItemSummary/ItemProse), AddItemPanel, SellPanel, StartingEquipmentEditor
 │   ├── journal/         # CapturePalette (Cmd/Ctrl+J quick-capture NOTE overlay)
@@ -107,6 +108,7 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 | `encumbrance.ts` | Carrying capacity (`carryingCapacity` = STR × 15) and coin weight (`coinWeight(currency)` = total coins ÷ 50 lb, PHB p.143), both derive-on-read. |
 | `itemDetails.ts` | Pure inventory-row presentation: `itemDetailParts` (the dotted summary line), `hasItemProse`, plus `weaponDamageParts`/`weaponPropertyTags`. Shared by InventoryRow/ItemSummary. |
 | `fightingStyles.ts` | Fighting-style labels/descriptions (presentation; backend is rules source of truth). |
+| `damageTypes.ts` | The standard 5e `DAMAGE_TYPES` list + `damageTypeLabel` (populate the HP damage-type picker) and `activeResistedDamageTypes(buffs)` — the self-scoped resistance registry that drives the auto-halve preview (#456). Mirrors the backend helper of the same name. |
 | `multiclass.ts` | Multiclass display + gating helpers: `isMulticlass`, `classSummary` (single-class → name unchanged; multiclass → "Wizard 5 / Cleric 3"), `multiclassPrereqMet` (evaluates the backend-served `ClassOption.multiclassPrerequisite` thresholds against the character's scores — no rules table duplicated). Feeds `CharacterSheetHeader`/`CharacterCard`/`ClassFeaturesSection`, `AddClassPanel`, `LevelUpModal`. |
 | `disciplines.ts` | Four Elements ki rules (mirror of backend): `maxKiPerDiscipline` cap, base-cost/scaling reads, `disciplineKiOptions` selector range, and `disciplineRollSpec` (ki-scaled effect roll). Feeds `DisciplineRow`/`DisciplinesSection`. |
 | `conditions.ts` | 5e condition labels/descriptions for the chip strip + picker. |
