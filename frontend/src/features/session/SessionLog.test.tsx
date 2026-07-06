@@ -65,6 +65,21 @@ describe("SessionLog roll breakdown", () => {
     expect(await screen.findByText("Longsword: 8 slashing (2d6 (3, 5))")).toBeInTheDocument();
   });
 
+  it("names the recipient on a DM loot award event (#382)", async () => {
+    renderWith([
+      makeEvent({
+        id: "evt-loot",
+        category: "inventory",
+        type: "awarded",
+        summary: "Awarded Flametongue ×2",
+        data: { itemName: "Flametongue", quantityDelta: 2, recipientName: "Bruenor" },
+      }),
+    ]);
+
+    expect(await screen.findByText("Awarded Flametongue ×2 → Bruenor")).toBeInTheDocument();
+    expect(screen.getByText("loot")).toBeInTheDocument();
+  });
+
   it("falls back to the stored summary for old events without faces", async () => {
     renderWith([
       makeEvent({

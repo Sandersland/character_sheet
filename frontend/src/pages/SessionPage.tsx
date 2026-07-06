@@ -36,11 +36,12 @@ import { useReferenceData } from "@/hooks/useReferenceData";
 import { useTurnState } from "@/features/session/useTurnState";
 import { clearTurnState } from "@/features/session/turnStatePersistence";
 import SessionLog from "@/features/session/SessionLog";
+import SessionLootPanel from "@/features/session/SessionLootPanel";
 import SessionSummaryModal from "@/features/session/SessionSummaryModal";
 import EndSessionPrompt from "@/features/session/EndSessionPrompt";
 import CapturePalette from "@/features/journal/CapturePalette";
 import { useGlobalKeyboard } from "@/hooks/useGlobalKeyboard";
-import { applyExperienceOperations, endSession, fetchActiveSession, leaveSession } from "@/api/client";
+import { applyExperienceOperations, endSession, fetchActiveSession, fetchCampaign, leaveSession } from "@/api/client";
 import type { Character, Session, ReferenceData } from "@/types/character";
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -142,6 +143,22 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
   const [leavePending, setLeavePending] = useState(false);
   // Error from the most recent leave-session attempt (shown by the Leave button).
   const [leaveError, setLeaveError] = useState<string | null>(null);
+  // Whether the viewer owns this campaign — gates the DM quick-award Loot tab (#382).
+  const [isOwner, setIsOwner] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCampaign(session.campaignId)
+      .then((c) => {
+        if (!cancelled) setIsOwner(c.role === "OWNER");
+      })
+      .catch(() => {
+        /* non-owners simply never see the Loot tab */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session.campaignId]);
 
   // Cmd/Ctrl+J opens the quick-capture palette during live play.
   useGlobalKeyboard(() => setCaptureOpen(true));
@@ -324,6 +341,8 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
             ...(hasClass ? [{ id: "class", label: "Class" }] : []),
             { id: "rest", label: "Rest & HP" },
             { id: "log", label: "Log" },
+            // DM-only quick-award surface (#382).
+            ...(isOwner ? [{ id: "loot", label: "Loot" }] : []),
           ];
 
           // If the currently active tab was gated away (e.g. spells tab
@@ -366,6 +385,20 @@ function SessionContent({ character, session, reference, setCharacter, navigate 
                     characterId={character.id}
                     sessionId={session.id}
                     refreshKey={logRefresh}
+                  />
+                </Card>
+              )}
+
+              {effectiveTab === "loot" && isOwner && (
+                <Card title="Award Loot" className="p-4">
+                  <SessionLootPanel
+                    campaignId={session.campaignId}
+                    sessionId={session.id}
+                    recipients={(session.participants ?? []).map((p) => ({
+                      id: p.characterId,
+                      name: p.character?.name ?? "Unknown",
+                    }))}
+                    onAwarded={() => setLogRefresh((n) => n + 1)}
                   />
                 </Card>
               )}

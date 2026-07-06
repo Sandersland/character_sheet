@@ -50,6 +50,7 @@ const recap: CampaignRecap = {
     { name: "Longsword", qty: 1 },
   ],
   itemsSold: [],
+  loot: [],
   slotsSpent: {},
   featsOrAsis: [],
   totalPresentMs: 6 * 60 * 60 * 1000,
@@ -64,6 +65,7 @@ function participantSummary(overrides: Partial<ParticipantSummary>): Participant
     levelsGained: 0,
     itemsAcquired: [],
     itemsSold: [],
+    loot: [],
     slotsSpent: {},
     spellsCast: 1,
     combatRounds: 4,
@@ -200,6 +202,17 @@ describe("SessionSummaryModal", () => {
     expect(screen.getByText("×2")).toBeInTheDocument();
     // The mislabel bug: a sold item must never appear as a negative acquisition.
     expect(screen.queryByText("×-2")).not.toBeInTheDocument();
+  });
+
+  it("shows DM-awarded loot in its own party-wide section (#382)", () => {
+    const session: Session = {
+      ...baseSession,
+      summary: { ...recap, loot: [{ name: "Flametongue", qty: 1 }] },
+    };
+    render(<SessionSummaryModal characterId="c1" session={session} onClose={() => {}} />);
+
+    expect(screen.getByText("Loot")).toBeInTheDocument();
+    expect(screen.getByText("Flametongue")).toBeInTheDocument();
   });
 
   it("drops the redundant participant card for a solo session (aggregate only)", () => {

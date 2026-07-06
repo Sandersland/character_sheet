@@ -303,6 +303,7 @@ export type CharacterEventCategory =
 
 export type CharacterEventType =
   | "acquired" | "consumed" | "sold" | "bought" | "removed"  // inventory
+  | "awarded" | "revoked"                                     // inventory (DM award/revoke)
   | "damage" | "heal" | "setTemp" | "shortRest" | "longRest" // hitPoints
   | "levelUp" | "levelDown" | "deathSave" | "stabilize"      // hitPoints (cont.)
   | "xpAward" | "xpSet"                                       // experience

@@ -804,7 +804,7 @@ export async function deleteCampaignItem(campaignId: string, itemId: string): Pr
 export async function awardCampaignItem(
   campaignId: string,
   itemId: string,
-  body: { characterId: string; quantity?: number },
+  body: { characterId: string; quantity?: number; sessionId?: string },
 ): Promise<{ holders: CampaignItemHolder[] }> {
   const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/items/${itemId}/award`, {
     method: "POST",
