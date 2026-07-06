@@ -12,12 +12,12 @@ import { readAbilityCost } from "../lib/ability-cost.js";
 import { characterInclude } from "../lib/character-include.js";
 import { serializeCharacter } from "../lib/character-serialize.js";
 
-export const disciplinesRouter = Router();
+export const disciplinesRouter = Router({ mergeParams: true });
 
 // Feeds the Four Elements monk's "learn a discipline" picker — same role as
 // GET /api/maneuvers. Each row carries its min monk level, embedded ki cost
 // (AbilityCost), and roll (EffectSpec, ki-scaled). Ordered by min level then name.
-disciplinesRouter.get("/disciplines", async (_req, res) => {
+disciplinesRouter.get("/", async (_req, res) => {
   const disciplines = await prisma.grantedAbility.findMany({
     where: { source: "discipline" },
     orderBy: [{ minLevel: "asc" }, { name: "asc" }],
@@ -56,7 +56,7 @@ const transactionsRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),
 });
 
-disciplinesRouter.post("/characters/:id/disciplines/transactions", async (req, res) => {
+disciplinesRouter.post<{ id: string }>("/transactions", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const parseResult = transactionsRequestSchema.safeParse(req.body);

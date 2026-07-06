@@ -15,7 +15,7 @@ import { CONDITIONS, EXHAUSTION_MAX, type ConditionKey } from "../lib/srd.js";
 import { characterInclude } from "../lib/character-include.js";
 import { serializeCharacter } from "../lib/character-serialize.js";
 
-export const conditionsRouter = Router();
+export const conditionsRouter = Router({ mergeParams: true });
 
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 
@@ -59,7 +59,7 @@ const transactionsRequestSchema = z.object({
 //
 // Returns the full updated character on success.
 
-conditionsRouter.post("/characters/:id/conditions/transactions", async (req, res) => {
+conditionsRouter.post<{ id: string }>("/transactions", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const parseResult = transactionsRequestSchema.safeParse(req.body);

@@ -7,7 +7,7 @@ import { prisma } from "../lib/prisma.js";
 import { characterInclude } from "../lib/character-include.js";
 import { serializeCharacter } from "../lib/character-serialize.js";
 
-export const experienceRouter = Router();
+export const experienceRouter = Router({ mergeParams: true });
 
 // ── Per-op Zod schemas ── (discriminated on `type`) ─────────────────────────
 
@@ -44,7 +44,7 @@ const experienceRequestSchema = z.object({
 //
 // The `experiencePoints` field has been removed from PATCH /api/characters/:id
 // so all XP changes must go through here.
-experienceRouter.post("/characters/:id/experience", async (req, res) => {
+experienceRouter.post<{ id: string }>("/", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const parseResult = experienceRequestSchema.safeParse(req.body);

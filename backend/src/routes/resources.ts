@@ -15,7 +15,7 @@ import { prisma } from "../lib/prisma.js";
 import { characterInclude } from "../lib/character-include.js";
 import { serializeCharacter } from "../lib/character-serialize.js";
 
-export const resourcesRouter = Router();
+export const resourcesRouter = Router({ mergeParams: true });
 
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 
@@ -123,7 +123,7 @@ const transactionsRequestSchema = z.object({
 //
 // Returns the full updated character on success.
 
-resourcesRouter.post("/characters/:id/resources/transactions", async (req, res) => {
+resourcesRouter.post<{ id: string }>("/transactions", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const parseResult = transactionsRequestSchema.safeParse(req.body);

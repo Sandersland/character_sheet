@@ -8,7 +8,7 @@ import {
 import { assertCharacterAccess } from "../lib/auth/access.js";
 import { prisma } from "../lib/prisma.js";
 
-export const activityRouter = Router();
+export const activityRouter = Router({ mergeParams: true });
 
 // ── GET /api/characters/:id/activity ─────────────────────────────────────────
 //
@@ -29,7 +29,7 @@ export const activityRouter = Router();
 //   ?includeFields=1  — include the per-field diff rows alongside each event
 //   ?reverted=0|1     — include (1) or exclude (0) reverted events (default: include all)
 
-activityRouter.get("/characters/:id/activity", async (req, res) => {
+activityRouter.get<{ id: string }>("/activity", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
 
   const events = await prisma.characterEvent.findMany(
@@ -51,7 +51,7 @@ activityRouter.get("/characters/:id/activity", async (req, res) => {
 // are reconstructed from `data.deletedItem` and currency is reversed from
 // `data.currencyDelta` (see revertInventoryEvent in lib/inventory.ts).
 
-activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) => {
+activityRouter.post<{ id: string; batchId: string }>("/events/:batchId/revert", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const result = await revertBatch(prisma, req.params.id, req.params.batchId);
