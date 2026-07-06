@@ -203,7 +203,7 @@ Mirror `routes/__tests__/inventory.test.ts` for the route; add lib-level unit te
 
 ### Catalog-table decision checklist
 Ask: does this feature need a **baseline list for players to pick from** (vs. hand-authoring every entry)?
-- Yes → add a catalog table (like `Spell`, `Item`, `Race`, `CharacterClass`). Seed it in `prisma/seed.ts` with upserts. Expose it via `GET /api/<domain-plural>`.
+- Yes → add a catalog table (like `Spell`, `Item`, `Race`, `CharacterClass`). Put the seed rows in a pure data-only module under `prisma/seed/*.ts` (no Prisma import — see `prisma/seed/spells.ts`, `catalog-data.ts`) and upsert them from `prisma/seed.ts`, which stays at that path (required by `prisma.config.ts`) as the upsert entrypoint. Expose it via `GET /api/<domain-plural>`.
 - No → skip the catalog table (like `JournalEntry`).
 
 Spells needed a catalog (picker UX); journal entries didn't (no baseline list). When in doubt: compare to `Spell` (flat, no detail table because spells aren't category-polymorphic) vs `Item` (category-polymorphic → needs `*WeaponDetail`/etc.).
