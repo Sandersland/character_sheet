@@ -354,6 +354,10 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
     }
   }
 
+  const rarityHint = rarityValueHint(form.rarity || undefined, {
+    isConsumable: form.category === "consumable",
+  });
+
   return (
     <Card
       title="Campaign items"
@@ -477,15 +481,7 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
                   value={form.costGp}
                   onChange={(e) => set("costGp", e.target.value)}
                 />
-                {rarityValueHint(form.rarity || undefined, {
-                  isConsumable: form.category === "consumable",
-                }) && (
-                  <p className="mt-1 text-xs text-parchment-500">
-                    {rarityValueHint(form.rarity || undefined, {
-                      isConsumable: form.category === "consumable",
-                    })}
-                  </p>
-                )}
+                {rarityHint && <p className="mt-1 text-xs text-parchment-500">{rarityHint}</p>}
               </div>
             </div>
 
