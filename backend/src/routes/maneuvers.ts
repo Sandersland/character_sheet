@@ -9,7 +9,8 @@ import {
 import { InvalidResourceOperationError } from "../lib/resources.js";
 import { InvalidSpellcastingOperationError } from "../lib/ability-cost.js";
 import { prisma } from "../lib/prisma.js";
-import { characterInclude, serializeCharacter } from "./characters.js";
+import { characterInclude } from "../lib/character-include.js";
+import { serializeCharacter } from "../lib/character-serialize.js";
 
 export const maneuversRouter = Router();
 

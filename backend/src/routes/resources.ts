@@ -12,7 +12,8 @@ import {
 } from "../lib/resources.js";
 import { assertCharacterAccess } from "../lib/auth/access.js";
 import { prisma } from "../lib/prisma.js";
-import { characterInclude, serializeCharacter } from "./characters.js";
+import { characterInclude } from "../lib/character-include.js";
+import { serializeCharacter } from "../lib/character-serialize.js";
 
 export const resourcesRouter = Router();
 

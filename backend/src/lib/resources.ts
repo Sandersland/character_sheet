@@ -4,7 +4,7 @@
  * known-maneuver lists.
  *
  * What is persisted: `used` counts per resource key and the `maneuversKnown`
- * snapshot array. What is derived at read time (in routes/characters.ts
+ * snapshot array. What is derived at read time (in lib/character-serialize.ts
  * serializeCharacter): pool totals, die size, recharge timing, maneuver
  * choice count — all via deriveResources() in src/lib/class-features.ts.
  */

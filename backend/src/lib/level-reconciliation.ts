@@ -11,7 +11,7 @@
  *      level-derived limit, trims/clears any excess, and logs an auditable
  *      event so the change is visible on the timeline and undoable.
  *
- *   2. **Clamp-on-read** (serializeCharacter in routes/characters.ts): non-
+ *   2. **Clamp-on-read** (serializeCharacter in lib/character-serialize.ts): non-
  *      destructive fallback that caps displayed values to the derived limit so
  *      characters already in an invalid state render correctly before their
  *      next XP op triggers the write-side reconciliation.

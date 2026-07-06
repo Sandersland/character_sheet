@@ -61,7 +61,8 @@ activityRouter.post("/characters/:id/events/:batchId/revert", async (req, res) =
   }
 
   // Re-fetch the character with full relations and return.
-  const { characterInclude, serializeCharacter } = await import("./characters.js");
+  const { characterInclude } = await import("../lib/character-include.js");
+  const { serializeCharacter } = await import("../lib/character-serialize.js");
   const updated = await prisma.character.findUnique({
     where: { id: req.params.id },
     include: characterInclude,
