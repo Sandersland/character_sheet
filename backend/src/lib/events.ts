@@ -83,6 +83,9 @@ export type EventType =
   // inventory (equip/unequip logged for timeline + undo)
   | "equipped"
   | "unequipped"
+  // inventory attunement (#545)
+  | "attuned"
+  | "unattuned"
   // session lifecycle
   | "sessionStarted"
   | "sessionEnded"
