@@ -16,7 +16,8 @@ frontend/src/
 │   ├── campaign/        # CampaignsPage (list+create; join is URL-only via /join/:code #520), CampaignDetailPage (mgmt hub with
 │   │                    #   routed Overview/Codex + owner-only Manage tabs #367/#379), CampaignOverviewPanel (invite link,
 │   │                    #   roster, add-character dropdown), CampaignInviteLink,
-│   │                    #   CampaignIndicator (sheet badge/link), JoinCampaignRoute (#246)
+│   │                    #   CampaignIndicator (sheet badge/link), JoinCampaignRoute (#246),
+│   │                    #   CampaignPreferencesPanel (per-campaign play prefs, sheet-only when attached #537)
 │   ├── character-create/ # IdentitySection, AbilityScoresSection, SkillSection,
 │   │                    #   ToolProficiencySection + useToolProficiencyChoices (CharacterCreatePage sections)
 │   ├── character-meta/  # CharacterCard, VitalsStrip, JournalSection, JournalEntryPanel,

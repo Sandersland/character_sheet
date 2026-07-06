@@ -4,6 +4,7 @@ import ClassFeaturesSection from "@/features/class/ClassFeaturesSection";
 import ExperienceTracker from "@/features/experience/ExperienceTracker";
 import HitPointTracker from "@/features/hitpoints/HitPointTracker";
 import InventoryList from "@/features/inventory/InventoryList";
+import CampaignPreferencesPanel from "@/features/campaign/CampaignPreferencesPanel";
 import JournalSection from "@/features/character-meta/JournalSection";
 import SpellsSection from "@/features/spells/SpellsSection";
 import ProficienciesCard from "@/features/abilities/ProficienciesCard";
@@ -104,6 +105,12 @@ export default function CharacterSheetBody({
           onUpdate={onUpdate}
           sessionId={journalSessionId}
         />
+      )}
+
+      {/* ── Campaign preferences ────────────────────────────────────── */}
+      {/* Campaign-attached characters only (#537). */}
+      {character.campaignId && (
+        <CampaignPreferencesPanel character={character} onUpdate={onUpdate} />
       )}
     </main>
   );

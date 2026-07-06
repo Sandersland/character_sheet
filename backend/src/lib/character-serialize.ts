@@ -800,6 +800,16 @@ export function serializeCharacter(row: CharacterWithRelations) {
     portraitUrl: row.portraitUrl ?? undefined,
     // Shared-campaign link (#246), or undefined when unassigned.
     campaignId: row.campaignId ?? undefined,
+    // Campaign-scoped play prefs (#537) for the current campaign; undefined when
+    // the character isn't attached to a campaign (campaignId null).
+    campaignPreferences: (() => {
+      if (row.campaignId == null) return undefined;
+      const pref = row.campaignPreferences.find((p) => p.campaignId === row.campaignId);
+      return {
+        shareWithDm: pref?.shareWithDm ?? false,
+        autoFriendlyHealing: pref?.autoFriendlyHealing ?? false,
+      };
+    })(),
 
     armorClass: acParts.reduce((total, p) => total + p.value, 0),
     armorClassBreakdown: acParts,

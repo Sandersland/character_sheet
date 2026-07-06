@@ -798,8 +798,22 @@ export interface ArmorClassPart {
   value: number;
 }
 
+/**
+ * A character's play preferences for its current campaign (#537). Always present
+ * on the wire (defaulting both flags to false) when the character is attached to
+ * a campaign; absent otherwise. Toggles land with #116 / #462.
+ */
+export interface CampaignPreferences {
+  /** Let the DM read this character's sheet. */
+  shareWithDm: boolean;
+  /** Auto-roll healing when this character targets a friendly. */
+  autoFriendlyHealing: boolean;
+}
+
 export interface Character {
   id: string;
+  /** Owning user id (backend-emitted). */
+  ownerId: string;
   name: string;
   race: string;
   class: string;
@@ -932,6 +946,8 @@ export interface Character {
 
   /** Shared-campaign link (#246), or undefined when the character isn't in one. */
   campaignId?: string;
+  /** Per-campaign play preferences (#537); absent when not in a campaign. */
+  campaignPreferences?: CampaignPreferences;
 }
 
 // ── Shared campaigns (#246) ───────────────────────────────────────────────────
@@ -1073,6 +1089,8 @@ export interface CampaignEntityMerge {
 
 export interface CharacterSummary {
   id: string;
+  /** Owning user id (backend-emitted). */
+  ownerId: string;
   name: string;
   race: string;
   class: string;
