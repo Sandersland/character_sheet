@@ -16,7 +16,8 @@ import {
   type RollKind,
   type RollMode,
 } from "../lib/sessions.js";
-import { serializeCharacter, characterInclude } from "./characters.js";
+import { characterInclude } from "../lib/character-include.js";
+import { serializeCharacter } from "../lib/character-serialize.js";
 
 export const sessionsRouter = Router();
 

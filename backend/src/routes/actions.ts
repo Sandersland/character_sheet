@@ -33,10 +33,8 @@ import { applySpendResourceInTx } from "../lib/resources.js";
 import { appendActiveBuffInTx, clearBuffByKeyInTx } from "../lib/active-effects.js";
 import { normalizeSpellcastingMutable } from "../lib/spell-state.js";
 import { getActiveSessionId } from "../lib/sessions.js";
-import {
-  characterInclude,
-  serializeCharacter,
-} from "./characters.js";
+import { characterInclude } from "../lib/character-include.js";
+import { serializeCharacter } from "../lib/character-serialize.js";
 
 export const actionsRouter = Router();
 

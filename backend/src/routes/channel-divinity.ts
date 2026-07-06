@@ -14,7 +14,8 @@ import {
 } from "../lib/channel-divinity.js";
 import { proficiencyBonusForLevel, levelForExperience } from "../lib/experience.js";
 import { prisma } from "../lib/prisma.js";
-import { characterInclude, serializeCharacter } from "./characters.js";
+import { characterInclude } from "../lib/character-include.js";
+import { serializeCharacter } from "../lib/character-serialize.js";
 
 export const channelDivinityRouter = Router();
 

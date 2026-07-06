@@ -9,7 +9,8 @@ import {
 } from "../lib/disciplines.js";
 import { prisma } from "../lib/prisma.js";
 import { readAbilityCost } from "../lib/ability-cost.js";
-import { characterInclude, serializeCharacter } from "./characters.js";
+import { characterInclude } from "../lib/character-include.js";
+import { serializeCharacter } from "../lib/character-serialize.js";
 
 export const disciplinesRouter = Router();
 

@@ -7,7 +7,7 @@ import {
 } from "./inventory.js";
 import { ALIGNMENTS, deriveCreatedCharacter, isKnownTool } from "./srd.js";
 import { STARTING_EQUIPMENT } from "./starting-equipment.js";
-import type { CreateCharacterBody } from "../routes/characters.js";
+import type { CreateCharacterBody } from "./character-schemas.js";
 
 // Discriminated result: the caller persists then re-fetches by id (keeps
 // characterInclude/serializeCharacter in the route, avoiding a lib→routes edge).
