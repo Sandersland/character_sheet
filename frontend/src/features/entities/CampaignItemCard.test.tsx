@@ -10,7 +10,7 @@ function item(overrides: Partial<CampaignItem> = {}): CampaignItem {
     campaignId: "camp-1",
     name: "Flametongue",
     category: "weapon",
-    rarity: "rare",
+    rarity: "RARE",
     requiresAttunement: true,
     isUnique: false,
     weight: 3,
@@ -28,7 +28,8 @@ function item(overrides: Partial<CampaignItem> = {}): CampaignItem {
 describe("CampaignItemCard (#380)", () => {
   it("renders the full card: rarity, attunement, damage, and description", () => {
     render(<CampaignItemCard item={item()} isOwner={false} />);
-    expect(screen.getByText("rare")).toBeInTheDocument();
+    expect(screen.getByText("Rare")).toBeInTheDocument();
+    expect(screen.queryByText("RARE")).not.toBeInTheDocument();
     expect(screen.getByText("Requires attunement")).toBeInTheDocument();
     expect(screen.getByText(/1d8 slashing/)).toBeInTheDocument();
     expect(screen.getByText("A blade wreathed in fire.")).toBeInTheDocument();

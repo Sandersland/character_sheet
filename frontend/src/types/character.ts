@@ -989,13 +989,16 @@ export interface CampaignItemHolder {
  * `dmNotes` is present only in owner-facing payloads — it's scrubbed server-side
  * from every player response.
  */
+/** The six 5e magic-item rarity tiers; labels/values live in `@/lib/rarity`. */
+export type ItemRarity = "COMMON" | "UNCOMMON" | "RARE" | "VERY_RARE" | "LEGENDARY" | "ARTIFACT";
+
 export interface CampaignItem {
   id: string;
   campaignId: string;
   name: string;
   description?: string;
   category: ItemCategory;
-  rarity?: string;
+  rarity?: ItemRarity;
   requiresAttunement: boolean;
   isUnique: boolean;
   weight?: number;
@@ -1017,7 +1020,7 @@ export interface CampaignItemInput {
   name: string;
   description?: string;
   category: ItemCategory;
-  rarity?: string;
+  rarity?: ItemRarity;
   requiresAttunement?: boolean;
   isUnique?: boolean;
   weight?: number;

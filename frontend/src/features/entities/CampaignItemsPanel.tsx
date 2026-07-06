@@ -17,12 +17,14 @@ import {
 } from "@/api/client";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { ITEM_CATEGORY_OPTIONS, itemCategoryLabel } from "@/lib/items";
+import { RARITY_OPTIONS, rarityLabel, rarityTone, rarityValueHint } from "@/lib/rarity";
 import type {
   ArmorCategory,
   CampaignItem,
   CampaignItemInput,
   Item,
   ItemCategory,
+  ItemRarity,
 } from "@/types/character";
 
 interface CampaignItemsPanelProps {
@@ -38,7 +40,7 @@ const labelCls = "block text-xs font-semibold text-parchment-700";
 interface FormState {
   name: string;
   category: ItemCategory;
-  rarity: string;
+  rarity: ItemRarity | "";
   requiresAttunement: boolean;
   isUnique: boolean;
   weight: string;
@@ -142,7 +144,7 @@ function buildInput(f: FormState): CampaignItemInput {
   const base: CampaignItemInput = {
     name: f.name.trim(),
     category: f.category,
-    rarity: f.rarity.trim() || undefined,
+    rarity: f.rarity || undefined,
     requiresAttunement: f.requiresAttunement,
     isUnique: f.isUnique,
     weight: num(f.weight),
@@ -435,13 +437,19 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
                 <label className={labelCls} htmlFor="item-rarity">
                   Rarity
                 </label>
-                <input
+                <select
                   id="item-rarity"
                   className={inputCls}
-                  placeholder="e.g. rare"
                   value={form.rarity}
-                  onChange={(e) => set("rarity", e.target.value)}
-                />
+                  onChange={(e) => set("rarity", e.target.value as ItemRarity | "")}
+                >
+                  <option value="">Mundane (none)</option>
+                  {RARITY_OPTIONS.map((o) => (
+                    <option key={o.key} value={o.key}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -469,6 +477,15 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
                   value={form.costGp}
                   onChange={(e) => set("costGp", e.target.value)}
                 />
+                {rarityValueHint(form.rarity || undefined, {
+                  isConsumable: form.category === "consumable",
+                }) && (
+                  <p className="mt-1 text-xs text-parchment-500">
+                    {rarityValueHint(form.rarity || undefined, {
+                      isConsumable: form.category === "consumable",
+                    })}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -701,7 +718,7 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
                       <span className="text-sm font-semibold text-parchment-900">{item.name}</span>
                     )}
                     <Badge tone="gold">{itemCategoryLabel(item.category)}</Badge>
-                    {item.rarity && <Badge tone="arcane">{item.rarity}</Badge>}
+                    {item.rarity && <Badge tone={rarityTone(item.rarity)}>{rarityLabel(item.rarity)}</Badge>}
                     {item.isUnique && <Badge tone="arcane">Unique</Badge>}
                     {hidden && <Badge tone="neutral">🔒 Hidden</Badge>}
                     <span className="ml-auto flex items-center gap-3">

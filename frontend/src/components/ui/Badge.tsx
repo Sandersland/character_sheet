@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-type BadgeTone = "garnet" | "arcane" | "gold" | "vitality" | "neutral";
+export type BadgeTone = "garnet" | "arcane" | "gold" | "vitality" | "neutral";
 
 interface BadgeProps {
   children: ReactNode;

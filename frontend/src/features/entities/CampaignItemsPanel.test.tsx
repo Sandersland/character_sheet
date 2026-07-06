@@ -25,6 +25,7 @@ vi.mock("@/api/client", () => ({
 
 import {
   awardCampaignItem,
+  createCampaignItem,
   fetchCampaignItems,
   revokeCampaignItem,
   updateCampaignItem,
@@ -181,5 +182,56 @@ describe("CampaignItemsPanel edit (#505)", () => {
 
     expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
     expect(updateCampaignItem).not.toHaveBeenCalled();
+  });
+});
+
+describe("CampaignItemsPanel rarity (#497)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockEntities = [];
+    vi.mocked(fetchCampaignItems).mockResolvedValue([{ ...baseItem, rarity: "VERY_RARE" }]);
+  });
+
+  it("renders the rarity badge via a human label, never the raw enum key", async () => {
+    renderPanel();
+    await screen.findByText("Flametongue");
+    expect(screen.getByText("Very Rare")).toBeInTheDocument();
+    expect(screen.queryByText("VERY_RARE")).not.toBeInTheDocument();
+  });
+
+  it("offers rarity as a dropdown with a mundane option and shows the value hint", async () => {
+    renderPanel();
+    await screen.findByText("Flametongue");
+    await userEvent.click(screen.getByRole("button", { name: "➕ New item" }));
+
+    const rarity = screen.getByLabelText("Rarity") as HTMLSelectElement;
+    expect(rarity.tagName).toBe("SELECT");
+    // Mundane empty option + the six tiers.
+    expect(rarity.querySelectorAll("option")).toHaveLength(7);
+    expect(screen.queryByText("Standard value:")).not.toBeInTheDocument();
+
+    await userEvent.selectOptions(rarity, "RARE");
+    expect(screen.getByText("Standard value: 4,000 gp")).toBeInTheDocument();
+  });
+
+  it("halves the value hint for a consumable and sends the enum on create", async () => {
+    vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "new-1", name: "Potion" });
+    renderPanel();
+    await screen.findByText("Flametongue");
+    await userEvent.click(screen.getByRole("button", { name: "➕ New item" }));
+
+    await userEvent.selectOptions(screen.getByLabelText("Category"), "consumable");
+    await userEvent.selectOptions(screen.getByLabelText("Rarity"), "RARE");
+    expect(screen.getByText("Standard value: 2,000 gp")).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText("Name *"), "Potion");
+    await userEvent.click(screen.getByRole("button", { name: "Create item" }));
+
+    await waitFor(() =>
+      expect(createCampaignItem).toHaveBeenCalledWith(
+        "camp-1",
+        expect.objectContaining({ rarity: "RARE" }),
+      ),
+    );
   });
 });
