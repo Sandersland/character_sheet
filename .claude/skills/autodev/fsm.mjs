@@ -467,14 +467,31 @@ function syncRootLockfile(run, worktree, integrationBranch, issue) {
 // batch-adoption race where a resumed child hasn't overwritten a stale
 // pid in run.json yet.
 async function attachWorktreeStack(run, branch) {
+  // Stamp branch ownership BEFORE creating the worktree: the janitor resolves a
+  // worktree's owning run by ctx.branch (newest run dir wins). Stamping after
+  // create+health (up to 10 min) left a window where the branch's owner resolved
+  // to a previous failed run for the same issue and the sweep rm'd the worktree
+  // this run had just created (killed #456/#457 on 2026-07-05).
+  run.ctx.branch = branch;
+  saveRun(run);
+  const create = () => sh(join(SKILL_DIR, "..", "worktree", "worktree.sh"), ["create", branch, "--up"], { cwd: ROOT });
   try {
-    sh(join(SKILL_DIR, "..", "worktree", "worktree.sh"), ["create", branch, "--up"], { cwd: ROOT });
+    create();
   } catch (err) {
-    if (!/no free slots/i.test(err.message)) throw err;
-    log(run, "no free worktree slots — running janitor reconcile, then retrying once");
-    const { reapedRuns, freedSlots } = janitorReconcile({ log: (m) => log(run, m) });
-    log(run, `janitor: reaped ${reapedRuns.length} run(s), freed ${freedSlots.length} slot(s)`);
-    sh(join(SKILL_DIR, "..", "worktree", "worktree.sh"), ["create", branch, "--up"], { cwd: ROOT });
+    if (/no slot recorded/i.test(err.message)) {
+      // Wedged half-created worktree (dir exists, registry entry missing) — a
+      // prior create raced a teardown. rm handles the unregistered-dir state.
+      log(run, `wedged worktree for ${branch} (dir without slot) — removing and retrying once`);
+      sh(join(SKILL_DIR, "..", "worktree", "worktree.sh"), ["rm", branch], { cwd: ROOT });
+      create();
+    } else if (/no free slots/i.test(err.message)) {
+      log(run, "no free worktree slots — running janitor reconcile, then retrying once");
+      const { reapedRuns, freedSlots } = janitorReconcile({ log: (m) => log(run, m) });
+      log(run, `janitor: reaped ${reapedRuns.length} run(s), freed ${freedSlots.length} slot(s)`);
+      create();
+    } else {
+      throw err;
+    }
   }
   const registry = JSON.parse(readFileSync(join(ROOT, ".claude", "worktrees", "registry.json"), "utf8"));
   const slot = registry[branch];
