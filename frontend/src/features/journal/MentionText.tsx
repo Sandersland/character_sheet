@@ -1,12 +1,14 @@
 // Renders a stored note body with @[<uuid>] tokens as entity chips (#248).
 // Plain text is verbatim; a known id becomes a Badge-styled chip linking to the
-// entity detail page (name resolved AT RENDER so a rename reflects instantly);
-// an unknown id falls back to its literal token text.
+// entity detail page (name resolved AT RENDER so a rename reflects instantly).
+// An unresolved id — a now-hidden entity a non-owner can't see (#379), or a
+// deleted one — renders as a neutral redacted chip, never the raw token.
 
 import { Fragment } from "react";
 import { Link } from "react-router-dom";
 
 import Badge from "@/components/ui/Badge";
+import { Lock } from "@/components/ui/icons";
 import { ENTITY_TYPE_TONE, parseMentionBody } from "@/lib/mentions";
 import type { CampaignEntity } from "@/types/character";
 
@@ -29,7 +31,14 @@ export default function MentionText({ body, entities, campaignId, className }: M
         }
         const entity = entities.get(segment.id);
         if (!entity) {
-          return <Fragment key={index}>{`@[${segment.id}]`}</Fragment>;
+          return (
+            <Badge key={index} tone="neutral">
+              <span aria-label="Hidden entity" className="inline-flex items-center gap-1">
+                <Lock aria-hidden="true" className="h-3 w-3" />
+                Hidden
+              </span>
+            </Badge>
+          );
         }
         const chip = <Badge tone={ENTITY_TYPE_TONE[entity.type]}>@{entity.name}</Badge>;
         return campaignId ? (

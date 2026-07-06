@@ -206,6 +206,8 @@ export interface WeaponDetailInput {
   ammunition?: boolean;
   rangeNormal?: number;
   rangeLong?: number;
+  weaponClass?: WeaponClass;
+  weaponRange?: WeaponRange;
 }
 
 export interface ArmorDetailInput {
@@ -303,6 +305,7 @@ export type CharacterEventCategory =
 
 export type CharacterEventType =
   | "acquired" | "consumed" | "sold" | "bought" | "removed"  // inventory
+  | "awarded" | "revoked"                                     // inventory (DM award/revoke)
   | "damage" | "heal" | "setTemp" | "shortRest" | "longRest" // hitPoints
   | "levelUp" | "levelDown" | "deathSave" | "stabilize"      // hitPoints (cont.)
   | "xpAward" | "xpSet"                                       // experience
@@ -466,6 +469,20 @@ export interface CatalogShadowArt {
   minLevel: number;
   cost: AbilityCost;
   effect: EffectSpec;
+}
+
+/** How a Channel Divinity option expresses through the declarative core (#419). */
+export type ChannelDivinityKind = "announce" | "buff" | "advantage" | "invisible" | "reminder";
+
+/** An entitled Channel Divinity option from GET /api/characters/:id/channel-divinity (#419). */
+export interface CatalogChannelDivinity {
+  id: string;
+  name: string;
+  description: string;
+  kind: ChannelDivinityKind;
+  saveDc: number | null;
+  saveAbility: string | null;
+  reminder: string;
 }
 
 export interface SpellSlots {
@@ -945,6 +962,9 @@ export interface Campaign {
 
 export type EntityType = "NPC" | "LOCATION" | "FACTION" | "ITEM" | "PC" | "OTHER";
 
+// DM reveal state (#379): non-owner members only ever see REVEALED entities.
+export type EntityVisibility = "HIDDEN" | "REVEALED";
+
 export interface CampaignEntity {
   id: string;
   campaignId: string;
@@ -952,8 +972,65 @@ export interface CampaignEntity {
   name: string;
   aliases: string[];
   notes: string | null;
+  visibility: EntityVisibility;
   createdAt: string;
   updatedAt: string;
+}
+
+/** One current holder of an awarded campaign item (#381). */
+export interface CampaignItemHolder {
+  characterId: string;
+  characterName: string;
+  quantity: number;
+}
+
+/**
+ * DM-authored campaign item (#380): loot/magic-item prep that lives in a
+ * campaign, not on any sheet. Mirrors `Item` plus DM-only fields (rarity,
+ * attunement, isUnique, dmNotes) and a reference to the fronting ITEM entity.
+ * `dmNotes` is present only in owner-facing payloads — it's scrubbed server-side
+ * from every player response.
+ */
+/** The six 5e magic-item rarity tiers; labels/values live in `@/lib/rarity`. */
+export type ItemRarity = "COMMON" | "UNCOMMON" | "RARE" | "VERY_RARE" | "LEGENDARY" | "ARTIFACT";
+
+export interface CampaignItem {
+  id: string;
+  campaignId: string;
+  name: string;
+  description?: string;
+  category: ItemCategory;
+  rarity?: ItemRarity;
+  requiresAttunement: boolean;
+  isUnique: boolean;
+  weight?: number;
+  cost?: Currency;
+  dmNotes?: string;
+  weapon?: WeaponDetail;
+  armor?: ArmorDetail;
+  consumable?: ConsumableDetail;
+  /** The fronting ITEM CampaignEntity — its `visibility` drives player reveal. */
+  entity?: { id: string; name: string; visibility: EntityVisibility };
+  /** Current holders derived from live inventory rows (#381). */
+  holders?: CampaignItemHolder[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Create/update body for a campaign item; detail block matches `category`. */
+export interface CampaignItemInput {
+  name: string;
+  description?: string;
+  category: ItemCategory;
+  rarity?: ItemRarity;
+  requiresAttunement?: boolean;
+  isUnique?: boolean;
+  weight?: number;
+  cost?: Currency;
+  dmNotes?: string;
+  weapon?: WeaponDetailInput;
+  armor?: ArmorDetailInput;
+  consumable?: ConsumableDetail;
 }
 
 /** One note that @-tags an entity, surfaced on the entity detail page. */
@@ -969,6 +1046,29 @@ export interface EntityBacklink {
     body: string;
   };
   characterName: string;
+  /** Which identity was tagged — a survivor unions its merged-in ids (#387). */
+  identity: { id: string; name: string };
+}
+
+// ── Entity identity merges (#387) ─────────────────────────────────────────────
+
+export type MergeStatus = "PREPARED" | "EXECUTED";
+
+/**
+ * A non-destructive "revealed to be" link: `mergedEntity` (old identity) is the
+ * same being as `survivorEntity` (true identity). PREPARED is the DM's secret
+ * prep (never in a player payload); EXECUTED is the public reveal. Chains resolve
+ * transitively (Jenkins→Vecna→Whispered One).
+ */
+export interface CampaignEntityMerge {
+  id: string;
+  campaignId: string;
+  mergedEntityId: string;
+  survivorEntityId: string;
+  status: MergeStatus;
+  note: string | null;
+  preparedAt: string;
+  executedAt: string | null;
 }
 
 export interface CharacterSummary {
@@ -1088,22 +1188,13 @@ export interface ToolOption {
   weight?: number;
 }
 
-export interface ReferenceTools {
-  all: ToolOption[];
-  byCategory: {
-    artisan: ToolOption[];
-    gamingSet: ToolOption[];
-    musicalInstrument: ToolOption[];
-    other: ToolOption[];
-  };
-}
-
 export interface ReferenceData {
   races: RaceOption[];
   classes: ClassOption[];
   backgrounds: BackgroundOption[];
   alignments: string[];
-  tools: ReferenceTools;
+  /** Artisan's tools for the sheet's Proficiencies-card dropdown. */
+  artisanTools: ToolOption[];
 }
 
 /** Body for `POST /api/characters`. The backend derives AC/HP/saves/skills
@@ -1266,6 +1357,17 @@ export interface CastShadowArtOperation {
 }
 export type ShadowArtOperation = CastShadowArtOperation;
 
+// ── Channel Divinity operation types (mirrors backend/src/lib/channel-divinity.ts) ──
+// Sent as `{ operations: ChannelDivinityOperation[] }` to
+// POST /api/characters/:id/channel-divinity/transactions.
+
+/** Use a Channel Divinity option (Cleric/Paladin): spend 1 CD charge. */
+export interface CastChannelDivinityOperation {
+  type: "castChannelDivinity";
+  abilityId: string;
+}
+export type ChannelDivinityOperation = CastChannelDivinityOperation;
+
 // ── Conditions state + operation types (mirrors backend/src/lib/conditions.ts)
 // Sent as `{ operations: ConditionOperation[] }` to
 // POST /api/characters/:id/conditions/transactions.
@@ -1318,6 +1420,8 @@ export interface ActiveBuff {
   // sees an undefined duration.
   duration: BuffDuration;
   restType?: "short" | "long";
+  // Damage types this buff makes the character resistant to (halved on take) (#456).
+  resistDamageTypes?: string[];
 }
 
 export interface ActiveEffectsState {
@@ -1381,7 +1485,11 @@ export type ExperienceOperation = XpAwardOperation | XpSetOperation;
  * save to the client — the response carries a `status: "pending"` check and the
  * client follows up with a `ConcentrationSaveOperation`. Omitted = auto-roll.
  */
-export interface DamageOperation { type: "damage"; amount: number; autoRollConcentration?: boolean }
+/**
+ * `damageType` (optional, #456) drives resistance auto-halving server-side;
+ * `applyResistance: false` declines the auto-halve (take the full amount).
+ */
+export interface DamageOperation { type: "damage"; amount: number; damageType?: string; applyResistance?: boolean; autoRollConcentration?: boolean }
 export interface HealOperation { type: "heal"; amount: number }
 export interface SetTempOperation { type: "setTemp"; amount: number }
 /** `rolls`: one raw die value per hit die spent (rolled by the client via dice.ts). */
@@ -1503,6 +1611,8 @@ export interface SessionSummary {
   itemsAcquired: SessionSummaryItem[];
   /** Items sold this session (positive counts) — kept separate from acquired. */
   itemsSold: SessionSummaryItem[];
+  /** DM-awarded loot this session (awarded net of revoked) — its own line (#382). */
+  loot: SessionSummaryItem[];
   slotsSpent: Record<string, number>;
   spellsCast: number;
   combatRounds: number;
@@ -1549,6 +1659,8 @@ export interface CampaignRecap {
   itemsAcquired: SessionSummaryItem[];
   /** Items sold across the party this session (positive counts). */
   itemsSold: SessionSummaryItem[];
+  /** DM-awarded loot across the party this session (awarded net of revoked) (#382). */
+  loot: SessionSummaryItem[];
   /** Spell slots spent, keyed by slot level → count, summed across participants. */
   slotsSpent: Record<string, number>;
   /** ASIs + feats taken across all participants (level-ups counted separately). */

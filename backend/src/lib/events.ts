@@ -24,6 +24,9 @@ export type EventType =
   | "sold"
   | "bought"
   | "removed"
+  // DM campaign-item award/revoke (#381) — inventory-category, undoable
+  | "awarded"
+  | "revoked"
   // hitPoints
   | "damage"
   | "heal"
@@ -68,6 +71,7 @@ export type EventType =
   | "castDiscipline"
   | "castManeuver"
   | "castShadowArt"
+  | "castChannelDivinity"
   | "learnToolProficiency"
   | "forgetToolProficiency"
   | "toolProficienciesReconciled"

@@ -113,6 +113,73 @@ describe("durable buffs (#455)", () => {
     expect((await readBuffs()).map((b) => b.key)).toEqual(["longBuff"]); // short cleared, long survives a short rest
   });
 
+  it("a while-active Rage buff clears on a long rest (#457)", async () => {
+    await applyBuff({ key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active" });
+    await applyHitPointOperations(FIXTURE_ID, [{ type: "longRest" }]);
+    expect(await readBuffs()).toEqual([]);
+  });
+
+  it("a while-active Rage buff clears when damage drops the character to 0 HP (#457)", async () => {
+    await applyBuff({ key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active" });
+    await applyHitPointOperations(FIXTURE_ID, [{ type: "damage", amount: 999 }]);
+    expect(await readBuffs()).toEqual([]);
+  });
+
+  it("a while-active Rage buff survives non-lethal damage (#457)", async () => {
+    await applyBuff({ key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active" });
+    await applyHitPointOperations(FIXTURE_ID, [{ type: "damage", amount: 3 }]);
+    expect((await readBuffs()).map((b) => b.key)).toEqual(["rage"]);
+  });
+
+  async function currentHp(): Promise<number> {
+    const row = await prisma.character.findUniqueOrThrow({ where: { id: FIXTURE_ID }, select: { hitPoints: true } });
+    return (row.hitPoints as { current: number }).current;
+  }
+
+  async function lastDamageSummary(): Promise<string> {
+    const ev = await prisma.characterEvent.findFirstOrThrow({
+      where: { characterId: FIXTURE_ID, type: "damage" },
+      orderBy: { createdAt: "desc" },
+    });
+    return ev.summary;
+  }
+
+  describe("resistance auto-halving (#456)", () => {
+    async function applyRage() {
+      await applyBuff({ key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active", resistDamageTypes: ["bludgeoning", "piercing", "slashing"] });
+    }
+
+    it("halves matching (b/p/s) damage while a resistance is active and records it in history", async () => {
+      await applyRage();
+      await applyHitPointOperations(FIXTURE_ID, [{ type: "damage", amount: 12, damageType: "slashing" }]);
+      expect(await currentHp()).toBe(14); // 20 - 6
+      expect(await lastDamageSummary()).toContain("resisted from 12");
+    });
+
+    it("does not halve a non-matching damage type (fire)", async () => {
+      await applyRage();
+      await applyHitPointOperations(FIXTURE_ID, [{ type: "damage", amount: 12, damageType: "fire" }]);
+      expect(await currentHp()).toBe(8); // 20 - 12, full
+    });
+
+    it("takes full damage when the player declines resistance (manual override)", async () => {
+      await applyRage();
+      await applyHitPointOperations(FIXTURE_ID, [{ type: "damage", amount: 12, damageType: "slashing", applyResistance: false }]);
+      expect(await currentHp()).toBe(8); // 20 - 12, override declined the halve
+    });
+
+    it("applies full typeless damage with no resistance (no regression)", async () => {
+      await applyRage();
+      await applyHitPointOperations(FIXTURE_ID, [{ type: "damage", amount: 12 }]);
+      expect(await currentHp()).toBe(8);
+    });
+
+    it("does not halve when no resistance is active", async () => {
+      await applyHitPointOperations(FIXTURE_ID, [{ type: "damage", amount: 12, damageType: "slashing" }]);
+      expect(await currentHp()).toBe(8);
+    });
+  });
+
   it("appendActiveBuffInTx rejects an until-rest buff with no restType (no silent long-rest default)", async () => {
     await expect(
       applyBuff({ key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "until-rest" }),

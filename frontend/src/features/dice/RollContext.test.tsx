@@ -64,8 +64,8 @@ describe("RollProvider — rollAnimated + logging", () => {
       </RollProvider>,
     );
 
-    // 3D roller mounted in an overlay dialog.
-    expect(screen.getByTestId("dice-roller")).toBeInTheDocument();
+    // 3D roller mounted in an overlay dialog (lazy-loaded behind Suspense).
+    expect(await screen.findByTestId("dice-roller")).toBeInTheDocument();
 
     // Toast shows the total (17 + 5).
     await waitFor(() => expect(screen.getAllByText("22").length).toBeGreaterThan(0));
@@ -95,7 +95,7 @@ describe("RollProvider — rollAnimated + logging", () => {
       </RollProvider>,
     );
 
-    expect(screen.getByTestId("dice-roller")).toBeInTheDocument();
+    expect(await screen.findByTestId("dice-roller")).toBeInTheDocument();
     // Give any async logging a chance to (not) fire.
     await Promise.resolve();
     expect(mockLogRoll).not.toHaveBeenCalled();
@@ -108,7 +108,7 @@ describe("RollProvider — rollAnimated + logging", () => {
       </RollProvider>,
     );
 
-    expect(screen.getByTestId("dice-roller")).toBeInTheDocument();
+    expect(await screen.findByTestId("dice-roller")).toBeInTheDocument();
     await Promise.resolve();
     expect(mockLogRoll).not.toHaveBeenCalled();
   });

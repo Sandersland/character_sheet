@@ -18,9 +18,15 @@ vi.mock("@/api/client", () => ({
   createEntity: vi.fn(),
 }));
 
+vi.mock("@/hooks/useCampaignMerges", () => ({
+  useCampaignMerges: () => ({ merges: [] }),
+  primeCampaignMerges: vi.fn(),
+}));
+
 const GOBLIN = "11111111-1111-1111-1111-111111111111";
 const SWORD = "22222222-2222-2222-2222-222222222222";
 const GATE = "33333333-3333-3333-3333-333333333333";
+const SECRET = "55555555-5555-5555-5555-555555555555";
 
 function entity(partial: Partial<CampaignEntity> & { id: string; name: string }): CampaignEntity {
   return {
@@ -28,6 +34,7 @@ function entity(partial: Partial<CampaignEntity> & { id: string; name: string })
     type: "NPC",
     aliases: [],
     notes: null,
+    visibility: "REVEALED",
     createdAt: "",
     updatedAt: "",
     ...partial,
@@ -38,6 +45,7 @@ const ENTITIES: CampaignEntity[] = [
   entity({ id: GOBLIN, name: "Goblin Chief", type: "NPC", aliases: ["Grik"] }),
   entity({ id: SWORD, name: "Sword of Truth", type: "ITEM" }),
   entity({ id: GATE, name: "Baldur's Gate", type: "LOCATION" }),
+  entity({ id: SECRET, name: "Goblin Traitor", type: "NPC", visibility: "HIDDEN" }),
 ];
 
 function Harness({
@@ -83,6 +91,15 @@ describe("MentionAutocomplete (#248)", () => {
 
     expect(await screen.findByRole("option", { name: /Goblin Chief/ })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /Sword of Truth/ })).not.toBeInTheDocument();
+  });
+
+  it("excludes a hidden entity from mention suggestions (#534)", async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<Harness campaignId="camp-1" />);
+    await user.type(screen.getByLabelText("Note body"), "@gob");
+
+    expect(await screen.findByRole("option", { name: /Goblin Chief/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Goblin Traitor/ })).not.toBeInTheDocument();
   });
 
   it("filters by a reserved type prefix (@item:)", async () => {

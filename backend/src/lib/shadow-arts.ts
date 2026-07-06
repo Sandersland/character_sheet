@@ -11,17 +11,14 @@
  * deriveResources() (class-features.ts).
  */
 
-import { randomUUID } from "node:crypto";
-
 import { Prisma } from "../generated/prisma/client.js";
 import { castAbilityInTx } from "./ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "./ability-cost.js";
+import { runCharacterTransaction } from "./character-transaction.js";
 import { deriveResources } from "./class-features.js";
 import type { EffectSpec } from "./effects.js";
 import { logEvent } from "./events.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
-import { prisma } from "./prisma.js";
-import { getActiveSessionId } from "./sessions.js";
 import { normalizeSpellcastingMutable, type SpellcastingMutableState } from "./spell-state.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
@@ -104,29 +101,20 @@ export async function applyShadowArtsOperations(
   characterId: string,
   operations: ShadowArtOperation[],
 ): Promise<void> {
-  const batchId = randomUUID();
-  const sessionId = await getActiveSessionId(characterId);
-
-  await prisma.$transaction(async (tx) => {
-    for (const op of operations) {
-      const row = await tx.character.findUnique({
-        where: { id: characterId },
-        select: {
-          spellcasting: true,
-          resources: true,
-          experiencePoints: true,
-          abilityScores: true,
-          classEntries: {
-            orderBy: { position: "asc" as const },
-            take: 1,
-            select: { name: true, subclass: true },
-          },
-        },
-      });
-      if (!row) {
-        throw new InvalidShadowArtOperationError(`Character not found: ${characterId}`);
-      }
-
+  await runCharacterTransaction(characterId, operations, {
+    select: {
+      spellcasting: true,
+      resources: true,
+      experiencePoints: true,
+      abilityScores: true,
+      classEntries: {
+        orderBy: { position: "asc" as const },
+        take: 1,
+        select: { name: true, subclass: true },
+      },
+    },
+    notFound: (id) => new InvalidShadowArtOperationError(`Character not found: ${id}`),
+    applyOp: async ({ tx, row, op, batchId, sessionId }) => {
       const level = levelForExperience(row.experiencePoints);
       const profBonus = proficiencyBonusForLevel(level);
       const primaryEntry = row.classEntries[0];
@@ -211,6 +199,6 @@ export async function applyShadowArtsOperations(
         batchId,
         sessionId,
       });
-    }
+    },
   });
 }

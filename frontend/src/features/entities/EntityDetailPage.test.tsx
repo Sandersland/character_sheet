@@ -6,7 +6,12 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import EntityDetailPage from "@/features/entities/EntityDetailPage";
 import * as client from "@/api/client";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
-import type { Campaign, CampaignEntity, EntityBacklink } from "@/types/character";
+import type {
+  Campaign,
+  CampaignEntity,
+  CampaignEntityMerge,
+  EntityBacklink,
+} from "@/types/character";
 import { axe } from "@/test/axe";
 
 vi.mock("@/api/client", () => ({
@@ -22,6 +27,12 @@ vi.mock("@/hooks/useCampaignEntities", () => ({
   primeCampaignEntities: vi.fn(),
 }));
 
+const mergeState = vi.hoisted(() => ({ merges: [] as CampaignEntityMerge[] }));
+vi.mock("@/hooks/useCampaignMerges", () => ({
+  useCampaignMerges: () => ({ merges: mergeState.merges }),
+  primeCampaignMerges: vi.fn(),
+}));
+
 const ENTITY_ID = "ent-1";
 const CAMPAIGN_ID = "camp-1";
 
@@ -32,6 +43,7 @@ const ENTITY: CampaignEntity = {
   name: "Goblin Chief",
   aliases: ["Grik"],
   notes: "Leads the warren.",
+  visibility: "REVEALED",
   createdAt: "",
   updatedAt: "",
 };
@@ -48,6 +60,7 @@ const BACKLINK: EntityBacklink = {
     body: "We fought the goblin chief at the bridge.",
   },
   characterName: "Thorne",
+  identity: { id: ENTITY_ID, name: "Goblin Chief" },
 };
 
 function campaign(role: "OWNER" | "PLAYER"): Campaign {
@@ -62,9 +75,13 @@ function campaign(role: "OWNER" | "PLAYER"): Campaign {
   };
 }
 
-function renderPage() {
+function renderPage(
+  entry:
+    | string
+    | { pathname: string; search?: string; state?: unknown } = `/campaigns/${CAMPAIGN_ID}/entities/${ENTITY_ID}`,
+) {
   return render(
-    <MemoryRouter initialEntries={[`/campaigns/${CAMPAIGN_ID}/entities/${ENTITY_ID}`]}>
+    <MemoryRouter initialEntries={[entry]}>
       <Routes>
         <Route path="/campaigns/:id/entities/:entityId" element={<EntityDetailPage />} />
       </Routes>
@@ -72,8 +89,11 @@ function renderPage() {
   );
 }
 
+const ENTITY_PATH = `/campaigns/${CAMPAIGN_ID}/entities/${ENTITY_ID}`;
+
 beforeEach(() => {
   vi.clearAllMocks();
+  mergeState.merges = [];
   vi.mocked(client.fetchEntities).mockResolvedValue([ENTITY]);
   vi.mocked(client.fetchEntityBacklinks).mockResolvedValue([BACKLINK]);
   vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("PLAYER"));
@@ -111,6 +131,35 @@ describe("EntityDetailPage (#248)", () => {
     expect(await screen.findByText(/fought the goblin chief/)).toBeInTheDocument();
   });
 
+  it("shows a 'Revealed to be' banner on an executed merged identity (#387)", async () => {
+    const survivor: CampaignEntity = { ...ENTITY, id: "ent-2", name: "Vecna" };
+    vi.mocked(useCampaignEntities).mockReturnValue({
+      entities: [ENTITY, survivor],
+      byId: new Map([
+        [ENTITY_ID, ENTITY],
+        ["ent-2", survivor],
+      ]),
+    });
+    mergeState.merges = [
+      {
+        id: "m1",
+        campaignId: CAMPAIGN_ID,
+        mergedEntityId: ENTITY_ID,
+        survivorEntityId: "ent-2",
+        status: "EXECUTED",
+        note: null,
+        preparedAt: "2026-01-01T00:00:00.000Z",
+        executedAt: "2026-01-02T00:00:00.000Z",
+      },
+    ];
+    renderPage();
+    expect(await screen.findByText(/Revealed to be/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "@Vecna" })).toHaveAttribute(
+      "href",
+      `/campaigns/${CAMPAIGN_ID}/entities/ent-2`,
+    );
+  });
+
   it("shows the delete control to an OWNER", async () => {
     vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("OWNER"));
     renderPage();
@@ -121,6 +170,51 @@ describe("EntityDetailPage (#248)", () => {
     renderPage();
     await screen.findByRole("heading", { name: /Goblin Chief/ });
     expect(screen.queryByRole("button", { name: /delete entity/i })).not.toBeInTheDocument();
+  });
+
+  it("lets an OWNER hide a revealed entity via updateEntity (#523)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("OWNER"));
+    vi.mocked(client.updateEntity).mockResolvedValue({ ...ENTITY, visibility: "HIDDEN" });
+
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: /hide from players/i }));
+
+    expect(vi.mocked(client.updateEntity)).toHaveBeenCalledWith(CAMPAIGN_ID, ENTITY_ID, {
+      visibility: "HIDDEN",
+    });
+    // After the flip the control offers Reveal and the Hidden badge shows.
+    expect(await screen.findByRole("button", { name: /reveal to players/i })).toBeInTheDocument();
+    expect(await screen.findAllByText(/Hidden/)).not.toHaveLength(0);
+  });
+
+  it("lets an OWNER reveal a hidden entity via updateEntity (#523)", async () => {
+    const user = userEvent.setup();
+    const hidden: CampaignEntity = { ...ENTITY, visibility: "HIDDEN" };
+    vi.mocked(client.fetchEntities).mockResolvedValue([hidden]);
+    vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("OWNER"));
+    vi.mocked(useCampaignEntities).mockReturnValue({
+      entities: [hidden],
+      byId: new Map([[ENTITY_ID, hidden]]),
+    });
+    vi.mocked(client.updateEntity).mockResolvedValue({ ...ENTITY, visibility: "REVEALED" });
+
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: /reveal to players/i }));
+
+    expect(vi.mocked(client.updateEntity)).toHaveBeenCalledWith(CAMPAIGN_ID, ENTITY_ID, {
+      visibility: "REVEALED",
+    });
+    expect(vi.mocked(primeCampaignEntities)).toHaveBeenCalledWith(
+      CAMPAIGN_ID,
+      expect.arrayContaining([expect.objectContaining({ id: ENTITY_ID, visibility: "REVEALED" })]),
+    );
+  });
+
+  it("hides the reveal/hide control from a PLAYER (#523)", async () => {
+    renderPage();
+    await screen.findByRole("heading", { name: /Goblin Chief/ });
+    expect(screen.queryByRole("button", { name: /reveal to players|hide from players/i })).not.toBeInTheDocument();
   });
 
   it("shows a zero-state when there are no backlinks", async () => {
@@ -135,9 +229,34 @@ describe("EntityDetailPage (#248)", () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 
-  it("links back to the campaign codex (#367)", async () => {
+  it("links back to the campaign codex by default (#367)", async () => {
     renderPage();
     const back = await screen.findByRole("link", { name: /back to campaign/i });
     expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/codex`);
+  });
+
+  it("links back to Manage when navigated from Manage via location.state (#489)", async () => {
+    renderPage({ pathname: ENTITY_PATH, state: { from: `/campaigns/${CAMPAIGN_ID}/manage` } });
+    const back = await screen.findByRole("link", { name: /back to campaign/i });
+    expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/manage`);
+  });
+
+  it("ignores a non-relative location.state origin and falls back to Codex (#489)", async () => {
+    renderPage({ pathname: ENTITY_PATH, state: { from: "https://evil.example/phish" } });
+    const back = await screen.findByRole("link", { name: /back to campaign/i });
+    expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/codex`);
+  });
+
+  it("links back to Manage when ?from=manage is present (#489)", async () => {
+    renderPage({ pathname: ENTITY_PATH, search: "?from=manage" });
+    const back = await screen.findByRole("link", { name: /back to campaign/i });
+    expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/manage`);
+  });
+
+  it("honors the Manage origin on the not-found back affordance (#489)", async () => {
+    vi.mocked(client.fetchEntities).mockResolvedValue([]);
+    renderPage({ pathname: ENTITY_PATH, state: { from: `/campaigns/${CAMPAIGN_ID}/manage` } });
+    const back = await screen.findByRole("link", { name: /back to campaign/i });
+    expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/manage`);
   });
 });

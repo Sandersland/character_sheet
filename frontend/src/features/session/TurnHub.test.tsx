@@ -287,3 +287,49 @@ describe("TurnHub — accessibility", () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 });
+
+describe("TurnHub — Rage turn-hook (#457)", () => {
+  function ragingBarbarian(): Character {
+    return makeCharacter({
+      class: "Barbarian",
+      availableActions: [
+        { key: "rage", name: "Rage", cost: "bonusAction", enabled: true },
+        { key: "endRage", name: "End Rage", cost: "bonusAction", enabled: true },
+      ],
+      activeEffects: {
+        buffs: [
+          { id: "b1", key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active" },
+        ],
+      },
+    } as unknown as Partial<Character>);
+  }
+
+  it("surfaces the Rage end reminder while raging", async () => {
+    const user = userEvent.setup();
+    renderHub(ragingBarbarian());
+    await startTurn(user);
+    expect(screen.getByText(/Rage ends at the end of your turn/i)).toBeInTheDocument();
+  });
+
+  it("auto-ends Rage when the turn passes with no attack or damage taken", async () => {
+    const user = userEvent.setup();
+    renderHub(ragingBarbarian());
+    await startTurn(user);
+    await user.click(screen.getByRole("button", { name: "End Turn" }));
+    await waitFor(() => {
+      expect(applyActionTransactions).toHaveBeenCalledWith("char-1", [
+        { type: "executeAction", actionKey: "endRage" },
+      ]);
+    });
+  });
+
+  it("does not fire endRage for a non-raging character", async () => {
+    const user = userEvent.setup();
+    renderHub(makeCharacter({ class: "Barbarian" }));
+    await startTurn(user);
+    await user.click(screen.getByRole("button", { name: "End Turn" }));
+    expect(applyActionTransactions).not.toHaveBeenCalledWith("char-1", [
+      { type: "executeAction", actionKey: "endRage" },
+    ]);
+  });
+});

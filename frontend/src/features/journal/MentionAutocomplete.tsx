@@ -18,7 +18,10 @@ import { Link } from "react-router-dom";
 
 import { createEntity } from "@/api/client";
 import Badge from "@/components/ui/Badge";
+import { Plus } from "@/components/ui/icons";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
+import { useCampaignMerges } from "@/hooks/useCampaignMerges";
+import { ultimateSurvivorName } from "@/lib/merges";
 import {
   ENTITY_TYPE_LABELS,
   ENTITY_TYPE_TONE,
@@ -64,6 +67,7 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
     const innerRef = useRef<HTMLDivElement | null>(null);
     const listboxId = useId();
     const { entities, byId } = useCampaignEntities(campaignId);
+    const { merges } = useCampaignMerges(campaignId);
     const [trigger, setTrigger] = useState<ActiveTrigger | null>(null);
     const [activeIndex, setActiveIndex] = useState(0);
     const [creating, setCreating] = useState(false);
@@ -137,9 +141,11 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
 
     const matches = (() => {
       if (!trigger || !campaignId) return [] as CampaignEntity[];
+      // Never surface hidden entities in the tag picker, even to the owner (#534).
+      const visible = entities.filter((e) => e.visibility !== "HIDDEN");
       const scoped = trigger.typeFilter
-        ? entities.filter((e) => e.type === trigger.typeFilter)
-        : entities;
+        ? visible.filter((e) => e.type === trigger.typeFilter)
+        : visible;
       return matchEntities(scoped, trigger.query).slice(0, MAX_MATCHES);
     })();
 
@@ -348,7 +354,17 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
                 }}
                 onMouseEnter={() => setActiveIndex(index)}
               >
-                <span className="min-w-0 truncate">{entity.name}</span>
+                <span className="min-w-0 truncate">
+                  {entity.name}
+                  {(() => {
+                    const survivor = ultimateSurvivorName(merges, byId, entity.id);
+                    return survivor ? (
+                      <span className="ml-1 text-xs font-normal text-parchment-500">
+                        → {survivor}
+                      </span>
+                    ) : null;
+                  })()}
+                </span>
                 <Badge tone={ENTITY_TYPE_TONE[entity.type]}>{ENTITY_TYPE_LABELS[entity.type]}</Badge>
               </li>
             ))}
@@ -366,7 +382,14 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
                 }}
                 onMouseEnter={() => setActiveIndex(matches.length)}
               >
-                {creating ? "Creating…" : `➕ Create ${ENTITY_TYPE_LABELS[createType]} “${createName}”`}
+                {creating ? (
+                  "Creating…"
+                ) : (
+                  <>
+                    <Plus aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                    {`Create ${ENTITY_TYPE_LABELS[createType]} “${createName}”`}
+                  </>
+                )}
               </li>
             )}
           </ul>

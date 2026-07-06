@@ -65,6 +65,8 @@ function outcomeOf(entry, run) {
     return { kind: "parked", detail: `retry at ${entry.retryAt ? new Date(entry.retryAt).toISOString() : "?"}` };
   }
   if (entry.status === "running") return { kind: "in-flight", detail: run?.currentState ?? "?" };
+  if (entry.status === "responding") return { kind: "responding", detail: `review-response cycle ${entry.respondCycles ?? "?"} · ${run?.currentState ?? "?"}` };
+  if (entry.status === "waiting_merge" && entry.humanFlagged) return { kind: "needs-human", detail: "responder cycles exhausted — adjudicate the PR review" };
   if (entry.status === "waiting_merge") return { kind: "waiting-merge", detail: run?.ctx?.prUrl ?? "" };
   return { kind: entry.status, detail: "" };
 }

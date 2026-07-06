@@ -13,6 +13,7 @@
  */
 
 import Card from "@/components/ui/Card";
+import { Zap } from "@/components/ui/icons";
 import { useTurnActions } from "@/features/session/useTurnActions";
 import ActionSlot from "@/features/session/ActionSlot";
 import BonusActionSlot from "@/features/session/BonusActionSlot";
@@ -73,6 +74,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     classActions,
     classBonusActions,
     classReactions,
+    durableReminders,
     reactionManeuvers,
     effectManeuvers,
     actionSurgePool,
@@ -240,7 +242,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
             onClick={handleActionSurge}
             className="flex items-center justify-center gap-1.5 rounded-control border border-gold-300 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800 shadow-sm transition-colors hover:bg-gold-100 disabled:opacity-50"
           >
-            <span>⚡</span>
+            <Zap aria-hidden="true" className="h-3.5 w-3.5" />
             <span>Action Surge</span>
             {actionSurgePool && actionSurgePool.remaining > 1 && (
               <span className="text-gold-800">({actionSurgePool.remaining} left)</span>
@@ -356,6 +358,16 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
             {effectMessage}
           </p>
         )}
+
+        {/* Durable-buff end reminders (e.g. Rage) — when/why the buff will end. */}
+        {durableReminders.map((r) => (
+          <p
+            key={r.key}
+            className="rounded-control border border-garnet-200 bg-garnet-50 px-3 py-2 text-xs font-semibold text-garnet-800"
+          >
+            {r.reminder}
+          </p>
+        ))}
 
         {/* Note about movement */}
         <p className="text-[11px] text-parchment-600 italic">

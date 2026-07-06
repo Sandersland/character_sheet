@@ -27,6 +27,11 @@
  *                                              (parallel-issues, interactive) share
  *                                              the registry and are not autodev's
  *
+ * Ownership resolves by ctx.branch, newest run dir wins — sound only because
+ * fsm's attachWorktreeStack stamps ctx.branch BEFORE `worktree.sh create`, so a
+ * relaunch of the same issue owns its branch from the first moment the worktree
+ * exists (stamping after create let this sweep rm a mid-setup worktree).
+ *
  * Spend note: a reaped run's already-ledgered costUsd (run.json/steps.jsonl) is
  * the harvested spend; whatever the in-flight claude invocation burned after its
  * last ledger write died with its stdout and is unrecoverable.

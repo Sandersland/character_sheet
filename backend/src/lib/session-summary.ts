@@ -36,6 +36,9 @@ export interface SessionSummary {
   /** Quantity sold per item (positive counts), alphabetical. Kept separate from
    * acquired so a sale never shows as a negative "acquired" line. */
   itemsSold: SummaryItem[];
+  /** DM-awarded loot this session (awarded net of revoked), alphabetical. Kept
+   * separate from itemsAcquired so campaign grants read as their own line. */
+  loot: SummaryItem[];
   /** Spell slots spent this session, keyed by slot level → count (net of restores). */
   slotsSpent: Record<string, number>;
   /** Number of castSpell events (includes cantrips). */
@@ -73,6 +76,8 @@ export interface CampaignRecap {
   damageRolls: number;
   itemsAcquired: SummaryItem[];
   itemsSold: SummaryItem[];
+  /** DM-awarded loot across participants (awarded net of revoked). */
+  loot: SummaryItem[];
   /** Spell slots spent, keyed by slot level → count, summed across participants. */
   slotsSpent: Record<string, number>;
   /** ASIs + feats taken across all participants (level-ups counted separately). */
@@ -183,6 +188,7 @@ export function computeSessionSummary(
 
   const itemNet = new Map<string, number>();
   const soldNet = new Map<string, number>();
+  const lootNet = new Map<string, number>();
   const slotsSpent: Record<string, number> = {};
   const featsOrAsis: SummaryAdvancement[] = [];
 
@@ -229,6 +235,20 @@ export function computeSessionSummary(
         const delta = numField(event.data, "quantityDelta");
         if (name && delta !== undefined) {
           soldNet.set(name, (soldNet.get(name) ?? 0) + Math.abs(delta));
+        }
+        break;
+      }
+
+      case "awarded":
+      case "revoked": {
+        // DM campaign-item grants (#382). awarded carries a positive
+        // quantityDelta, revoked a negative one, so netting matches a grant then
+        // its undo/revoke to zero — dropped by itemsFromMap.
+        const data = asRecord(event.data);
+        const name = typeof data.itemName === "string" ? data.itemName : null;
+        const delta = numField(event.data, "quantityDelta");
+        if (name && delta !== undefined) {
+          lootNet.set(name, (lootNet.get(name) ?? 0) + delta);
         }
         break;
       }
@@ -311,6 +331,7 @@ export function computeSessionSummary(
 
   const itemsAcquired = itemsFromMap(itemNet);
   const itemsSold = itemsFromMap(soldNet);
+  const loot = itemsFromMap(lootNet);
 
   return {
     startedAt: window.startedAt.toISOString(),
@@ -320,6 +341,7 @@ export function computeSessionSummary(
     levelsGained,
     itemsAcquired,
     itemsSold,
+    loot,
     slotsSpent,
     spellsCast,
     combatRounds,
@@ -346,6 +368,7 @@ function itemsFromMap(map: Map<string, number>): SummaryItem[] {
 export function computeCampaignRecap(participants: ParticipantSummary[]): CampaignRecap {
   const itemNet = new Map<string, number>();
   const soldNet = new Map<string, number>();
+  const lootNet = new Map<string, number>();
   const slotsSpent: Record<string, number> = {};
   const featsOrAsis: SummaryAdvancement[] = [];
   let xpGained = 0;
@@ -374,6 +397,10 @@ export function computeCampaignRecap(participants: ParticipantSummary[]): Campai
     for (const item of p.itemsSold) {
       soldNet.set(item.name, (soldNet.get(item.name) ?? 0) + item.qty);
     }
+    // Coalesce: participant summaries stored before #382 lack loot.
+    for (const item of p.loot ?? []) {
+      lootNet.set(item.name, (lootNet.get(item.name) ?? 0) + item.qty);
+    }
     for (const [level, count] of Object.entries(p.slotsSpent)) {
       slotsSpent[level] = (slotsSpent[level] ?? 0) + count;
     }
@@ -394,6 +421,7 @@ export function computeCampaignRecap(participants: ParticipantSummary[]): Campai
     damageRolls,
     itemsAcquired: itemsFromMap(itemNet),
     itemsSold: itemsFromMap(soldNet),
+    loot: itemsFromMap(lootNet),
     slotsSpent,
     featsOrAsis,
     totalPresentMs,

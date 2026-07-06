@@ -141,6 +141,10 @@ model Campaign {
   characters Character[]
   // Shared campaign wiki: NPCs/locations/factions/etc. tagged in notes (#248).
   entities   CampaignEntity[]
+  // DM-authored campaign items, each auto-linked to an ITEM entity (#380).
+  items      CampaignItem[]
+  // Non-destructive "revealed to be" identity links between entities (#387).
+  entityMerges CampaignEntityMerge[]
   sessions   Session[]
 }
 
@@ -179,19 +183,34 @@ enum EntityType {
   OTHER
 }
 
+// DM-controlled reveal state (#379): HIDDEN entities are invisible to non-owner
+// members (list/detail/backlinks/mentions); the owner always sees all. New rows
+// default REVEALED so auto-created PC entities and the pre-#379 backfill are open.
+enum EntityVisibility {
+  HIDDEN
+  REVEALED
+}
+
 model CampaignEntity {
-  id         String     @id @default(uuid())
+  id         String           @id @default(uuid())
   campaignId String
-  campaign   Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaign   Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   type       EntityType
   name       String
-  aliases    String[]   @default([])
+  aliases    String[]         @default([])
   notes      String?
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  visibility EntityVisibility @default(REVEALED)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 
   refs          JournalEntryRef[]
   characterLink CampaignCharacterLink?
+  // Back-relation to the DM-authored item this entity fronts (#380).
+  itemLink      CampaignItemLink?
+  // Identity-merge back-relations (#387): the (single) merge where this entity
+  // is the old identity, and the merges where it is the surviving true identity.
+  mergedInto    CampaignEntityMerge?  @relation("MergedIdentity")
+  survivorOf    CampaignEntityMerge[] @relation("SurvivorIdentity")
 
   @@index([campaignId, type])
 }
@@ -216,6 +235,140 @@ model CampaignCharacterLink {
   campaignEntity   CampaignEntity @relation(fields: [campaignEntityId], references: [id], onDelete: Cascade)
   characterId      String         @unique
   character        Character      @relation(fields: [characterId], references: [id], onDelete: Cascade)
+}
+
+// --- Entity identity merges (#387) ------------------------------------------
+// A non-destructive "revealed to be" link: `mergedEntity` (the old identity,
+// e.g. Jenkins) is the same being as `survivorEntity` (the true identity, e.g.
+// Vecna). Neither row is destroyed and no journal ref is rewritten — a chip that
+// tagged the old id keeps resolving to the old id. PREPARED is the DM's secret
+// prep (scrubbed from every non-owner payload, like a HIDDEN entity #379);
+// EXECUTED is the public reveal. Chains resolve transitively (Jenkins→Vecna→
+// Whispered One). Cascades from either entity so the record dies with either side.
+enum MergeStatus {
+  PREPARED
+  EXECUTED
+}
+
+model CampaignEntityMerge {
+  id               String         @id @default(uuid())
+  campaignId       String
+  campaign         Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  // The old identity; at most one merge per merged entity.
+  mergedEntityId   String         @unique
+  mergedEntity     CampaignEntity @relation("MergedIdentity", fields: [mergedEntityId], references: [id], onDelete: Cascade)
+  // The surviving true identity (may itself be merged further up the chain).
+  survivorEntityId String
+  survivorEntity   CampaignEntity @relation("SurvivorIdentity", fields: [survivorEntityId], references: [id], onDelete: Cascade)
+  status           MergeStatus    @default(PREPARED)
+  note             String?
+  preparedAt       DateTime       @default(now())
+  executedAt       DateTime?
+
+  @@index([campaignId])
+  @@index([survivorEntityId])
+}
+
+// --- DM-authored campaign items (#380) --------------------------------------
+// A DM-authored magic item / loot entry that lives in a campaign (NOT on any
+// character sheet). Mirrors the catalog Item shape — per-category mechanical
+// fields live on the optional 1:1 *Detail tables below, not as nullable
+// columns — plus DM-only fields (rarity, attunement, isUnique, dmNotes). On
+// create it auto-registers a HIDDEN ITEM CampaignEntity via CampaignItemLink
+// (same pattern as CampaignCharacterLink), so it is @-mentionable and gets
+// reveal/hide + backlinks for free from the #248/#379 machinery. dmNotes is
+// DM-private and is scrubbed from every player-facing payload in routes/items.ts.
+model CampaignItem {
+  id                 String       @id @default(uuid())
+  campaignId         String
+  campaign           Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name               String
+  description        String?
+  category           ItemCategory
+  rarity             ItemRarity?
+  requiresAttunement Boolean      @default(false)
+  isUnique           Boolean      @default(false)
+  weight             Float?
+  cost               Json? // {cp,sp,gp,pp} — same shape as Item.cost
+  // DM-private prep notes — never serialized into a player-facing response.
+  dmNotes            String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  weaponDetail     CampaignItemWeaponDetail?
+  armorDetail      CampaignItemArmorDetail?
+  consumableDetail CampaignItemConsumableDetail?
+  link             CampaignItemLink?
+  // Awarded snapshots on player sheets (#381) — holder derivation reads these.
+  awards           InventoryItem[]           @relation("CampaignItemAwards")
+
+  @@index([campaignId])
+}
+
+// Same shape as ItemWeaponDetail, owned by CampaignItem.
+model CampaignItemWeaponDetail {
+  id             String       @id @default(uuid())
+  campaignItemId String       @unique
+  campaignItem   CampaignItem @relation(fields: [campaignItemId], references: [id], onDelete: Cascade)
+
+  damageDiceCount Int
+  damageDiceFaces Int
+  damageModifier  Int    @default(0)
+  damageType      String
+
+  versatileDiceCount Int?
+  versatileDiceFaces Int?
+
+  finesse     Boolean @default(false)
+  light       Boolean @default(false)
+  heavy       Boolean @default(false)
+  twoHanded   Boolean @default(false)
+  reach       Boolean @default(false)
+  thrown      Boolean @default(false)
+  ammunition  Boolean @default(false)
+  rangeNormal Int?
+  rangeLong   Int?
+
+  weaponClass WeaponClass?
+  weaponRange WeaponRange?
+}
+
+// Same shape as ItemArmorDetail, owned by CampaignItem.
+model CampaignItemArmorDetail {
+  id             String       @id @default(uuid())
+  campaignItemId String       @unique
+  campaignItem   CampaignItem @relation(fields: [campaignItemId], references: [id], onDelete: Cascade)
+
+  armorCategory       ArmorCategory
+  baseArmorClass      Int
+  dexModifierApplies  Boolean       @default(false)
+  dexModifierMax      Int?
+  stealthDisadvantage Boolean       @default(false)
+  strengthRequirement Int?
+}
+
+// Same shape as ItemConsumableDetail, owned by CampaignItem.
+model CampaignItemConsumableDetail {
+  id             String       @id @default(uuid())
+  campaignItemId String       @unique
+  campaignItem   CampaignItem @relation(fields: [campaignItemId], references: [id], onDelete: Cascade)
+
+  effectDiceCount   Int?
+  effectDiceFaces   Int?
+  effectModifier    Int?
+  effectDescription String?
+}
+
+// Links a CampaignItem to its auto-created ITEM entity (1:1 both ways), same
+// pattern as CampaignCharacterLink. DELETE cleanup rule (routes/items.ts):
+// deleting the item deletes BOTH this link (cascade) AND the fronting entity
+// (explicit, in the same transaction) — the entity has no life without its item.
+model CampaignItemLink {
+  id               String         @id @default(uuid())
+  campaignEntityId String         @unique
+  campaignEntity   CampaignEntity @relation(fields: [campaignEntityId], references: [id], onDelete: Cascade)
+  campaignItemId   String         @unique
+  campaignItem     CampaignItem   @relation(fields: [campaignItemId], references: [id], onDelete: Cascade)
 }
 
 // One row per linked sign-in method (OAuth provider account or, later, a
@@ -371,6 +524,17 @@ enum ItemCategory {
   armor
   consumable
   gear
+}
+
+// The six 5e magic-item rarity tiers (DMG p. 135). Rules data + gp values live
+// in lib/srd.ts (ITEM_RARITIES); this is only the persisted column domain.
+enum ItemRarity {
+  COMMON
+  UNCOMMON
+  RARE
+  VERY_RARE
+  LEGENDARY
+  ARTIFACT
 }
 
 enum ArmorCategory {
@@ -693,6 +857,11 @@ model InventoryItem {
   character   Character    @relation(fields: [characterId], references: [id], onDelete: Cascade)
   itemId      String?
   item        Item?        @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  // Provenance of a DM-awarded campaign item (#381) — mirrors the itemId
+  // provenance pattern above. Null for player-acquired rows; SetNull so
+  // deleting the CampaignItem leaves the awarded snapshot intact.
+  campaignItemId String?
+  campaignItem   CampaignItem? @relation("CampaignItemAwards", fields: [campaignItemId], references: [id], onDelete: SetNull)
   name        String
   category    ItemCategory
   weight      Float?
@@ -809,6 +978,9 @@ enum CharacterEventType {
   sold
   bought
   removed
+  // DM campaign-item award/revoke (#381)
+  awarded
+  revoked
   // hitPoints
   damage
   heal
@@ -853,6 +1025,7 @@ enum CharacterEventType {
   castDiscipline
   castManeuver
   castShadowArt
+  castChannelDivinity
   learnToolProficiency
   forgetToolProficiency
   toolProficienciesReconciled

@@ -1,7 +1,13 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "../generated/prisma/client.js";
-import { clearBuffsForSourceInTx, clearBuffsForRestInTx } from "./active-effects.js";
+import {
+  activeResistedDamageTypes,
+  clearBuffsForSourceInTx,
+  clearBuffsForRestInTx,
+  clearWhileActiveBuffsInTx,
+  normalizeActiveEffectsMutable,
+} from "./active-effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
@@ -38,7 +44,7 @@ export interface HitDice {
 }
 
 // ---- Normalizers ----
-// These are applied in serializeCharacter (routes/characters.ts) so every
+// These are applied in serializeCharacter (lib/character-serialize.ts) so every
 // GET response carries the new fields even for rows that predate the
 // `deathSaves` / `spent` additions — no data migration needed.
 
@@ -101,6 +107,23 @@ export function hitDieHeal(roll: number, conMod: number): number {
 }
 
 /**
+ * Resolve an incoming damage instance against active resistances (#456). When
+ * the (optional) damage type matches an active resistance and the player has not
+ * declined, the applied amount is halved (round down, 5e resistance). Returns the
+ * amount actually applied plus whether a halving occurred (for history/UI).
+ */
+export function resolveDamageAmount(
+  rawAmount: number,
+  damageType: string | undefined,
+  resistedTypes: Set<string>,
+  applyResistance: boolean,
+): { applied: number; resisted: boolean } {
+  const matches = applyResistance && damageType !== undefined && resistedTypes.has(damageType);
+  if (!matches) return { applied: rawAmount, resisted: false };
+  return { applied: Math.floor(rawAmount / 2), resisted: true };
+}
+
+/**
  * Apply a d20 death save roll, returning the new deathSaves state and
  * updated current HP.
  *
@@ -141,7 +164,14 @@ export function applyDeathSaveRoll(
 /** HP damage: temp absorbs first, then current. Floors at 0. */
 export interface DamageOperation {
   type: "damage";
-  amount: number; // must be > 0
+  amount: number; // raw damage; must be > 0
+  /** Optional 5e damage type (e.g. "slashing"); drives resistance auto-halving (#456). */
+  damageType?: string;
+  /**
+   * Manual override for resistance auto-halving (#456). Omitted/true auto-halves
+   * when a matching resistance is active; false declines (take the full amount).
+   */
+  applyResistance?: boolean;
   /**
    * Whether a triggered concentration CON save is auto-rolled server-side
    * (default) or deferred for the client to roll (issue #76). Treated as
@@ -621,6 +651,7 @@ interface HpOpContext {
     experiencePoints: number;
     spellcasting: Prisma.JsonValue;
     resources: Prisma.JsonValue;
+    activeEffects: Prisma.JsonValue;
     classEntries: ClassEntryRow[];
   };
   hp: HitPoints;
@@ -649,20 +680,37 @@ interface HpOpResult {
 }
 
 function applyDamageOp(ctx: HpOpContext, op: DamageOperation): HpOpResult {
-  const { hp } = ctx;
+  const { hp, row } = ctx;
   if (op.amount <= 0) {
     throw new InvalidHitPointOperationError("damage amount must be positive");
   }
+  // Auto-halve against active resistances (#456) unless the player declined.
+  const resisted = activeResistedDamageTypes(normalizeActiveEffectsMutable(row.activeEffects));
+  const { applied, resisted: wasResisted } = resolveDamageAmount(
+    op.amount,
+    op.damageType,
+    resisted,
+    op.applyResistance !== false,
+  );
+
   const beforeCurrent = hp.current;
   // Temp HP absorbs first, then current. Both floor at 0.
-  const absorbed = Math.min(hp.temp, op.amount);
+  const absorbed = Math.min(hp.temp, applied);
   hp.temp -= absorbed;
-  hp.current = Math.max(0, hp.current - (op.amount - absorbed));
-  // The 5e concentration save uses the full damage of the instance.
+  hp.current = Math.max(0, hp.current - (applied - absorbed));
+
+  const typeLabel = op.damageType ? ` ${op.damageType}` : "";
+  const resistNote = wasResisted ? ` (resisted from ${op.amount})` : "";
+  // The 5e concentration save uses the damage actually taken (post-resistance).
   return {
-    summary: `Took ${op.amount} damage (${beforeCurrent} → ${hp.current} HP)`,
-    eventData: { amount: op.amount },
-    damageForConcentration: op.amount,
+    summary: `Took ${applied}${typeLabel} damage${resistNote} (${beforeCurrent} → ${hp.current} HP)`,
+    eventData: {
+      amount: applied,
+      rawAmount: op.amount,
+      damageType: op.damageType ?? null,
+      resisted: wasResisted,
+    },
+    damageForConcentration: applied,
   };
 }
 
@@ -1114,6 +1162,7 @@ export async function applyHitPointOperations(
           experiencePoints: true,
           spellcasting: true,
           resources: true,
+          activeEffects: true,
           classEntries: {
             orderBy: { position: "asc" as const },
             select: {
@@ -1301,6 +1350,18 @@ export async function applyHitPointOperations(
           op.type === "longRest" ? "long" : "short",
           batchId,
           sessionId,
+        );
+      }
+
+      // A long rest or falling unconscious (0 HP) ends all "while-active" durable
+      // self-buffs (e.g. Rage) — the turn-hook covers the "no attack/no damage" case.
+      if (op.type === "longRest" || (op.type === "damage" && hp.current === 0)) {
+        await clearWhileActiveBuffsInTx(
+          tx,
+          characterId,
+          batchId,
+          sessionId,
+          op.type === "longRest" ? "long rest" : "unconscious",
         );
       }
 

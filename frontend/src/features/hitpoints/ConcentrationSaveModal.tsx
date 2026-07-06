@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 
 import Modal from "@/components/ui/Modal";
-import DiceRoller from "@/features/dice/DiceRoller";
 import { useRoll } from "@/features/dice/RollContext";
 import type { RollResult } from "@/lib/dice";
+
+// Lazy so the 3D dice stack loads only when the player actually rolls the save.
+const DiceRoller = lazy(() => import("@/features/dice/DiceRoller"));
 
 /** The deferred concentration save awaiting a manual roll (issue #76). */
 export interface PendingConcentrationSave {
@@ -88,14 +90,16 @@ export default function ConcentrationSaveModal({
             Roll save
           </button>
         ) : (
-          <DiceRoller
-            spec={{ count: 1, faces: 20 }}
-            label={`Concentration save — DC ${save.dc}`}
-            onResult={handleResult}
-            autoRollOnMount
-            showTotal={false}
-            className="w-full"
-          />
+          <Suspense fallback={null}>
+            <DiceRoller
+              spec={{ count: 1, faces: 20 }}
+              label={`Concentration save — DC ${save.dc}`}
+              onResult={handleResult}
+              autoRollOnMount
+              showTotal={false}
+              className="w-full"
+            />
+          </Suspense>
         )}
 
         {phase === "result" && outcome && (

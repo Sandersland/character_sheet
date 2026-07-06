@@ -11,6 +11,7 @@ import { useState } from "react";
 
 import { applyActionTransactions, startCombat, endCombat, advanceCombatRound } from "@/api/client";
 import { rollSpec } from "@/lib/dice";
+import { buffsToAutoEnd, endActionKeyFor, endReminders } from "@/lib/turnHooks";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { resolverFor } from "@/features/session/actionResolvers";
 import { useActiveResolution } from "@/features/session/useActiveResolution";
@@ -33,6 +34,8 @@ export function useTurnActions({
   const {
     inCombat,
     round,
+    attackedThisTurn,
+    tookDamageThisTurn,
     startCombat: startCombatState,
     endCombat: endCombatState,
     startTurn,
@@ -44,6 +47,12 @@ export function useTurnActions({
     consumeReaction,
     grantExtraAction,
   } = turnState;
+
+  // Active durable (while-active) self-buffs — drive the turn-hook + End-buff UI.
+  const activeDurableBuffKeys = (character.activeEffects?.buffs ?? [])
+    .filter((b) => b.duration === "while-active")
+    .map((b) => b.key);
+  const durableReminders = endReminders(activeDurableBuffKeys);
 
   const { activeResolution, openResolution, closeResolution } = useActiveResolution();
 
@@ -63,8 +72,12 @@ export function useTurnActions({
 
   // Derive available class actions from character data.
   const availableActions: AvailableAction[] = character.availableActions ?? [];
+  const raging = activeDurableBuffKeys.includes("rage");
   const classActions = availableActions.filter((a) => a.cost === "action");
-  const classBonusActions = availableActions.filter((a) => a.cost === "bonusAction");
+  // While raging, swap the Rage affordance for End Rage (both are bonus actions).
+  const classBonusActions = availableActions.filter(
+    (a) => a.cost === "bonusAction" && a.key !== (raging ? "rage" : "endRage"),
+  );
   const classReactions = availableActions.filter((a) => a.cost === "reaction");
 
   // Action Surge pool — Fighter-only resource.
@@ -238,10 +251,20 @@ export function useTurnActions({
     setReactionMessage(null);
     setEffectMessage(null);
     setError(null);
+    // Evaluate durable-buff end-conditions against this turn's window BEFORE
+    // endTurn() resets it. Each expiring buff clears server-side (auto-end).
+    const expiring = buffsToAutoEnd(activeDurableBuffKeys, {
+      attacked: attackedThisTurn,
+      tookDamage: tookDamageThisTurn,
+    });
     // endTurn() increments round when inCombat — capture the new round number.
     const nextRound = inCombat ? round + 1 : undefined;
     endTurn();
     closeResolution();
+    for (const buffKey of expiring) {
+      const actionKey = endActionKeyFor(buffKey);
+      if (actionKey) await send(actionKey);
+    }
     // Log the new round beginning (round 1 is logged by combatStarted).
     if (inCombat && nextRound !== undefined && nextRound >= 2) {
       try {
@@ -320,6 +343,7 @@ export function useTurnActions({
     classActions,
     classBonusActions,
     classReactions,
+    durableReminders,
     reactionManeuvers,
     effectManeuvers,
     actionSurgePool,

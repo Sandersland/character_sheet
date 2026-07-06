@@ -6,18 +6,23 @@ import Spinner from "@/components/ui/Spinner";
 import Tabs from "@/components/ui/Tabs";
 import CampaignOverviewPanel from "@/features/campaign/CampaignOverviewPanel";
 import CampaignCodex from "@/features/entities/CampaignCodex";
+import CampaignItemsPanel from "@/features/entities/CampaignItemsPanel";
+import CampaignManagePanel from "@/features/entities/CampaignManagePanel";
 import { fetchCampaign } from "@/api/client";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import type { Campaign } from "@/types/character";
 
 // The campaign hub: routed tabs — Overview (invite/add-character/roster) at
-// /campaigns/:id, Codex (entity registry) at /campaigns/:id/codex.
+// /campaigns/:id, Codex (entity registry) at /campaigns/:id/codex, and an
+// owner-only Manage tab (#379) at /campaigns/:id/manage.
 export default function CampaignDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const onCodex = useMatch("/campaigns/:id/codex") !== null;
+  const onManage = useMatch("/campaigns/:id/manage") !== null;
   const [campaign, setCampaign] = useState<Campaign | null | undefined>(undefined);
   const { entities } = useCampaignEntities(id);
+  const isOwner = campaign?.role === "OWNER";
 
   useEffect(() => {
     if (!id) return;
@@ -29,6 +34,14 @@ export default function CampaignDetailPage() {
       active = false;
     };
   }, [id]);
+
+  // Guard the owner-only Manage route: a player deep-linking to /manage is
+  // redirected back to Overview once we know their role.
+  useEffect(() => {
+    if (onManage && campaign && campaign.role !== "OWNER") {
+      navigate(`/campaigns/${id}`, { replace: true });
+    }
+  }, [onManage, campaign, id, navigate]);
 
   if (campaign === undefined) return <Spinner variant="page" />;
 
@@ -73,15 +86,28 @@ export default function CampaignDetailPage() {
             { id: "overview", label: "Overview" },
             // Hidden at 0 so a cold cache doesn't flash "Codex 0" before the fetch resolves.
             { id: "codex", label: "Codex", badge: entities.length > 0 ? entities.length : undefined },
+            // Manage is the DM's private admin surface — owners only.
+            ...(isOwner ? [{ id: "manage", label: "Manage" }] : []),
           ]}
-          active={onCodex ? "codex" : "overview"}
+          active={onManage && isOwner ? "manage" : onCodex ? "codex" : "overview"}
           onChange={(tab) =>
-            navigate(tab === "codex" ? `/campaigns/${id}/codex` : `/campaigns/${id}`)
+            navigate(
+              tab === "codex"
+                ? `/campaigns/${id}/codex`
+                : tab === "manage"
+                  ? `/campaigns/${id}/manage`
+                  : `/campaigns/${id}`,
+            )
           }
         />
 
-        {onCodex ? (
-          <CampaignCodex campaignId={campaign.id} />
+        {onManage && isOwner ? (
+          <>
+            <CampaignManagePanel campaignId={campaign.id} />
+            <CampaignItemsPanel campaignId={campaign.id} characters={campaign.characters ?? []} />
+          </>
+        ) : onCodex ? (
+          <CampaignCodex campaignId={campaign.id} role={campaign.role} />
         ) : (
           <CampaignOverviewPanel campaign={campaign} onCampaignChange={setCampaign} />
         )}

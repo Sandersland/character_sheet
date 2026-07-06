@@ -47,6 +47,8 @@ export interface ActiveBuff {
   duration: BuffDuration;
   /** Which rest clears an "until-rest" buff. Long rest also clears "short". */
   restType?: "short" | "long";
+  /** Damage types this buff makes the character resistant to (halved on take), e.g. Rage's b/p/s (#456). */
+  resistDamageTypes?: string[];
 }
 
 export interface ActiveEffectsMutableState {
@@ -75,6 +77,9 @@ export function normalizeActiveEffectsMutable(json: Prisma.JsonValue): ActiveEff
       ? (entry.duration as BuffDuration)
       : "concentration";
     const restType = entry.restType === "short" || entry.restType === "long" ? entry.restType : undefined;
+    const resistDamageTypes = Array.isArray(entry.resistDamageTypes)
+      ? (entry.resistDamageTypes as unknown[]).filter((t): t is string => typeof t === "string")
+      : undefined;
     buffs.push({
       id: typeof entry.id === "string" ? entry.id : randomUUID(),
       key: entry.key,
@@ -84,6 +89,7 @@ export function normalizeActiveEffectsMutable(json: Prisma.JsonValue): ActiveEff
       sourceEntryId: typeof entry.sourceEntryId === "string" ? entry.sourceEntryId : undefined,
       duration,
       ...(restType ? { restType } : {}),
+      ...(resistDamageTypes && resistDamageTypes.length > 0 ? { resistDamageTypes } : {}),
     });
   }
 
@@ -104,6 +110,7 @@ export function serializeActiveEffectsState(state: ActiveEffectsMutableState): P
       sourceEntryId: b.sourceEntryId ?? null,
       ...(b.duration !== "concentration" ? { duration: b.duration } : {}),
       ...(b.restType ? { restType: b.restType } : {}),
+      ...(b.resistDamageTypes && b.resistDamageTypes.length > 0 ? { resistDamageTypes: b.resistDamageTypes } : {}),
     })),
   } as unknown as Prisma.InputJsonValue;
 }
@@ -115,6 +122,19 @@ export function buffsByTarget(state: ActiveEffectsMutableState): Record<string, 
   const out: Record<string, ActiveBuff[]> = {};
   for (const b of state.buffs) {
     (out[b.target] ??= []).push(b);
+  }
+  return out;
+}
+
+/**
+ * Self-scoped resistance registry: the set of damage types the character's
+ * active buffs currently resist (#456). Fed purely by buff data — no hardcoded
+ * class rules — so any effect declaring `resistDamageTypes` contributes.
+ */
+export function activeResistedDamageTypes(state: ActiveEffectsMutableState): Set<string> {
+  const out = new Set<string>();
+  for (const b of state.buffs) {
+    for (const t of b.resistDamageTypes ?? []) out.add(t);
   }
   return out;
 }
@@ -266,6 +286,49 @@ export async function clearBuffByKeyInTx(
     before,
     after: snapshot(state),
     data: { key, reason, clearedKeys: dropped.map((b) => b.key) },
+    batchId,
+    sessionId,
+  });
+}
+
+/**
+ * Clear every "while-active" durable buff (e.g. Rage). Called when a blanket
+ * event ends all combat self-buffs — falling unconscious (0 HP) or a long rest.
+ * No-op + no event when none match. Logs a `buffCleared` event under "effects".
+ */
+export async function clearWhileActiveBuffsInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  batchId: string,
+  sessionId: string | null,
+  reason: string,
+): Promise<void> {
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: { activeEffects: true },
+  });
+  if (!row) return;
+
+  const state = normalizeActiveEffectsMutable(row.activeEffects);
+  const clears = (b: ActiveBuff) => b.duration === "while-active";
+  const dropped = state.buffs.filter(clears);
+  if (dropped.length === 0) return;
+  const before = snapshot(state);
+  state.buffs = state.buffs.filter((b) => !clears(b));
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: { activeEffects: serializeActiveEffectsState(state) },
+  });
+
+  await logEvent(tx, {
+    characterId,
+    category: "effects",
+    type: "buffCleared",
+    summary: `Cleared ${dropped.length} buff${dropped.length !== 1 ? "s" : ""} (${reason})`,
+    before,
+    after: snapshot(state),
+    data: { reason, clearedKeys: dropped.map((b) => b.key) },
     batchId,
     sessionId,
   });

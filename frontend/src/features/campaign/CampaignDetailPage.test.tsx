@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import CampaignDetailPage from "@/features/campaign/CampaignDetailPage";
 import * as client from "@/api/client";
 import { __resetCampaignEntitiesCacheForTests } from "@/hooks/useCampaignEntities";
+import { __resetCampaignMergesCacheForTests } from "@/hooks/useCampaignMerges";
 import type { Campaign, CharacterSummary } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
@@ -13,6 +14,15 @@ vi.mock("@/api/client", () => ({
   fetchCharacters: vi.fn(),
   addCharacterToCampaign: vi.fn(),
   fetchEntities: vi.fn(),
+  createEntity: vi.fn(),
+  updateEntity: vi.fn(),
+  deleteEntity: vi.fn(),
+  fetchEntityMerges: vi.fn(),
+  prepareEntityMerge: vi.fn(),
+  executeEntityMerge: vi.fn(),
+  unmergeEntityMerge: vi.fn(),
+  fetchCampaignItems: vi.fn(),
+  fetchItems: vi.fn(),
 }));
 
 function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
@@ -53,6 +63,7 @@ function renderDetail(initialEntry = "/campaigns/camp-1") {
       <Routes>
         <Route path="/campaigns/:id" element={<CampaignDetailPage />} />
         <Route path="/campaigns/:id/codex" element={<CampaignDetailPage />} />
+        <Route path="/campaigns/:id/manage" element={<CampaignDetailPage />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -60,9 +71,13 @@ function renderDetail(initialEntry = "/campaigns/camp-1") {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // The entity cache is module-level and leaks across tests without a reset.
+  // The entity + merge caches are module-level and leak across tests without a reset.
   __resetCampaignEntitiesCacheForTests();
+  __resetCampaignMergesCacheForTests();
   vi.mocked(client.fetchEntities).mockResolvedValue([]);
+  vi.mocked(client.fetchEntityMerges).mockResolvedValue([]);
+  vi.mocked(client.fetchCampaignItems).mockResolvedValue([]);
+  vi.mocked(client.fetchItems).mockResolvedValue([]);
 });
 
 describe("CampaignDetailPage (#246)", () => {
@@ -212,5 +227,49 @@ describe("CampaignDetailPage tabs (#367)", () => {
     await user.click(screen.getByRole("tab", { name: /overview/i }));
     expect(screen.getByTestId("location")).toHaveTextContent(/\/campaigns\/camp-1$/);
     expect(await screen.findByText("Roster")).toBeInTheDocument();
+  });
+});
+
+describe("CampaignDetailPage Manage tab (#379)", () => {
+  it("shows the owner-only Manage tab to the owner", async () => {
+    vi.mocked(client.fetchCampaign).mockResolvedValue(makeCampaign({ role: "OWNER" }));
+    vi.mocked(client.fetchCharacters).mockResolvedValue([]);
+
+    renderDetail();
+
+    await screen.findByText("The Sunless Citadel");
+    expect(screen.getByRole("tab", { name: /manage/i })).toBeInTheDocument();
+  });
+
+  it("hides the Manage tab from a player", async () => {
+    vi.mocked(client.fetchCampaign).mockResolvedValue(makeCampaign({ role: "PLAYER" }));
+    vi.mocked(client.fetchCharacters).mockResolvedValue([]);
+
+    renderDetail();
+
+    await screen.findByText("The Sunless Citadel");
+    expect(screen.queryByRole("tab", { name: /manage/i })).not.toBeInTheDocument();
+  });
+
+  it("redirects a player deep-linking to /manage back to Overview", async () => {
+    vi.mocked(client.fetchCampaign).mockResolvedValue(makeCampaign({ role: "PLAYER" }));
+    vi.mocked(client.fetchCharacters).mockResolvedValue([]);
+
+    renderDetail("/campaigns/camp-1/manage");
+
+    await screen.findByText("The Sunless Citadel");
+    await waitFor(() =>
+      expect(screen.getByTestId("location")).toHaveTextContent(/\/campaigns\/camp-1$/),
+    );
+    expect(screen.queryByText("Identity merges")).not.toBeInTheDocument();
+  });
+
+  it("renders the Manage panel for the owner at /manage", async () => {
+    vi.mocked(client.fetchCampaign).mockResolvedValue(makeCampaign({ role: "OWNER" }));
+    vi.mocked(client.fetchCharacters).mockResolvedValue([]);
+
+    renderDetail("/campaigns/camp-1/manage");
+
+    expect(await screen.findByText("Identity merges")).toBeInTheDocument();
   });
 });

@@ -7,6 +7,10 @@ import {
   GiKnapsack,
   GiSpellBook,
   GiHealthNormal,
+  Lock,
+  Plus,
+  Zap,
+  VenetianMask,
 } from "@/components/ui/icons";
 import { ABILITY_ORDER } from "@/lib/abilities";
 import { ITEM_CATEGORY_ORDER } from "@/lib/items";
@@ -29,5 +33,12 @@ describe("icon maps", () => {
     expect(GiKnapsack).toBeDefined();
     expect(GiSpellBook).toBeDefined();
     expect(GiHealthNormal).toBeDefined();
+  });
+
+  it("re-exports the lucide UI-chrome icons", () => {
+    expect(Lock).toBeDefined();
+    expect(Plus).toBeDefined();
+    expect(Zap).toBeDefined();
+    expect(VenetianMask).toBeDefined();
   });
 });

@@ -11,6 +11,8 @@ import { describe, expect, it } from "vitest";
 import {
   deriveActions,
   ACTION_EFFECT_FN,
+  ACTION_CAST_FN,
+  rageMeleeDamageBonus,
   type AvailableAction,
 } from "../actions.js";
 
@@ -170,7 +172,6 @@ describe("ACTION_EFFECT_FN — no-op keys return []", () => {
 
 describe("ACTION_EFFECT_FN — single spendResource keys", () => {
   const singleResource: Array<[string, string]> = [
-    ["rage", "rage"],
     ["bardicInspiration", "bardicInspiration"],
     ["channelDivinityCleric", "channelDivinity"],
     ["channelDivinityPaladin", "channelDivinity"],
@@ -185,6 +186,43 @@ describe("ACTION_EFFECT_FN — single spendResource keys", () => {
       expect(ops).toEqual([{ type: "spendResource", key: resourceKey }]);
     });
   }
+});
+
+describe("ACTION_EFFECT_FN — Rage durable buff (#457)", () => {
+  it("rage applies a while-active meleeDamage buff (level bonus) and spends a rage", () => {
+    expect(ACTION_EFFECT_FN.rage({ rageDamageBonus: 3 })).toEqual([
+      {
+        type: "applyBuff",
+        buff: { key: "rage", target: "meleeDamage", modifier: 3, source: "Rage", duration: "while-active", resistDamageTypes: ["bludgeoning", "piercing", "slashing"] },
+      },
+      { type: "spendResource", key: "rage" },
+    ]);
+  });
+
+  it("rage defaults the buff modifier to +2 when no bonus is supplied", () => {
+    const ops = ACTION_EFFECT_FN.rage({}) as Array<{ type: string; buff?: { modifier: number } }>;
+    expect(ops[0].buff?.modifier).toBe(2);
+  });
+
+  it("endRage clears the rage buff by key (manual + auto both route here)", () => {
+    expect(ACTION_EFFECT_FN.endRage({})).toEqual([
+      { type: "clearBuff", key: "rage", reason: "Rage ended" },
+    ]);
+  });
+
+  it("rageMeleeDamageBonus scales +2 / +3 / +4 by barbarian level", () => {
+    expect(rageMeleeDamageBonus(1)).toBe(2);
+    expect(rageMeleeDamageBonus(8)).toBe(2);
+    expect(rageMeleeDamageBonus(9)).toBe(3);
+    expect(rageMeleeDamageBonus(15)).toBe(3);
+    expect(rageMeleeDamageBonus(16)).toBe(4);
+    expect(rageMeleeDamageBonus(20)).toBe(4);
+  });
+
+  it("endRage is a barbarian bonus action from L1", () => {
+    expect(keys(deriveActions("barbarian", undefined, 1, []))).toContain("endRage");
+    expect(keys(deriveActions("fighter", undefined, 20, []))).not.toContain("endRage");
+  });
 });
 
 describe("ACTION_EFFECT_FN — monk ki actions", () => {
@@ -233,24 +271,41 @@ describe("Monk Stunning Strike — combat feature wiring (#392)", () => {
   });
 });
 
-describe("ACTION_EFFECT_FN — secondWind", () => {
-  it("with roll: spends resource + heals", () => {
-    expect(ACTION_EFFECT_FN.secondWind({ roll: 7 })).toEqual([
-      { type: "spendResource", key: "secondWind" },
-      { type: "heal", amount: 7 },
-    ]);
+describe("ACTION_CAST_FN — secondWind (#420)", () => {
+  it("is a cast-core action, not an op-list action", () => {
+    // The migration moved Second Wind off ACTION_EFFECT_FN onto the cast core.
+    expect(ACTION_CAST_FN.secondWind).toBeDefined();
+    expect(ACTION_EFFECT_FN.secondWind).toBeUndefined();
   });
 
-  it("without roll: spends resource only", () => {
-    expect(ACTION_EFFECT_FN.secondWind({})).toEqual([
-      { type: "spendResource", key: "secondWind" },
-    ]);
+  it("spends the secondWind pool (base 1) and self-heals 1d10 with the client roll", () => {
+    const spec = ACTION_CAST_FN.secondWind({ roll: 7 });
+    expect(spec.name).toBe("Second Wind");
+    expect(spec.cost).toEqual({ kind: "pool", key: "secondWind", base: 1 });
+    expect(spec.effect.effectType).toBe("heal");
+    expect(spec.effect.dice).toEqual({ count: 1, faces: 10 });
+    expect(spec.apply).toEqual({ target: "self", kind: "heal", amount: 7 });
   });
 
-  it("with roll=0: spends resource only (no heal at 0)", () => {
-    expect(ACTION_EFFECT_FN.secondWind({ roll: 0 })).toEqual([
-      { type: "spendResource", key: "secondWind" },
+  it("without a roll: spends the pool but applies no heal", () => {
+    const spec = ACTION_CAST_FN.secondWind({});
+    expect(spec.cost).toEqual({ kind: "pool", key: "secondWind", base: 1 });
+    expect(spec.apply).toBeUndefined();
+  });
+
+  it("with roll=0: applies no heal (self-apply is guarded on amount > 0)", () => {
+    const spec = ACTION_CAST_FN.secondWind({ roll: 0 });
+    expect(spec.apply).toBeUndefined();
+  });
+});
+
+describe("ACTION_EFFECT_FN — actionSurge stays a counter (#420)", () => {
+  it("spends the actionSurge resource with no heal/extra-action server effect", () => {
+    // The extra-action grant is client-side (grantExtraAction) — nothing to apply.
+    expect(ACTION_EFFECT_FN.actionSurge({})).toEqual([
+      { type: "spendResource", key: "actionSurge" },
     ]);
+    expect(ACTION_CAST_FN.actionSurge).toBeUndefined();
   });
 });
 

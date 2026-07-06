@@ -160,6 +160,12 @@ function ParticipantCard({ summary }: { summary: ParticipantSummary }) {
           <ItemBadgeList items={summary.itemsSold} />
         </RecapGroup>
       )}
+      {/* DM-awarded loot (#382); coalesce for pre-#382 stored summaries. */}
+      {(summary.loot ?? []).length > 0 && (
+        <RecapGroup label="Loot">
+          <ItemBadgeList items={summary.loot} />
+        </RecapGroup>
+      )}
       {Object.keys(summary.slotsSpent).length > 0 && (
         <RecapGroup label="Slots spent">
           <SlotsSpentRow slotsSpent={summary.slotsSpent} />
@@ -448,6 +454,13 @@ export default function SessionSummaryModal({
             {(recap.itemsSold ?? []).length > 0 && (
               <RecapGroup label="Items sold">
                 <ItemBadgeList items={recap.itemsSold} />
+              </RecapGroup>
+            )}
+
+            {/* ── DM-awarded loot (party-wide) (#382) ─────────────────────── */}
+            {(recap.loot ?? []).length > 0 && (
+              <RecapGroup label="Loot">
+                <ItemBadgeList items={recap.loot} />
               </RecapGroup>
             )}
 

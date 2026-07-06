@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
@@ -9,10 +10,13 @@ import CampaignDetailPage from "@/features/campaign/CampaignDetailPage";
 import CampaignsPage from "@/features/campaign/CampaignsPage";
 import JoinCampaignRoute from "@/features/campaign/JoinCampaignRoute";
 import EntityDetailPage from "@/features/entities/EntityDetailPage";
-import CharacterCreatePage from "@/pages/CharacterCreatePage";
 import CharacterListPage from "@/pages/CharacterListPage";
 import CharacterSheetPage from "@/pages/CharacterSheetPage";
-import SessionPage from "@/pages/SessionPage";
+
+// Route-lazy the heavy non-initial surfaces: character creation and live-play
+// session (the latter drags in the whole session/turn-tracking cluster).
+const CharacterCreatePage = lazy(() => import("@/pages/CharacterCreatePage"));
+const SessionPage = lazy(() => import("@/pages/SessionPage"));
 
 export default function App() {
   return (
@@ -27,6 +31,8 @@ export default function App() {
           <AuthProvider>
             <AuthGate>
               <AppHeader />
+              {/* Suspense catches the lazy route chunks while they load. */}
+              <Suspense fallback={null}>
               <Routes>
                 <Route path="/" element={<CharacterListPage />} />
                 {/* Static path registered before the :id param route so "new"
@@ -41,6 +47,9 @@ export default function App() {
                 {/* Codex tab (#367) — explicit route, not an optional :tab param,
                     so it can't swallow the /entities/:entityId path below. */}
                 <Route path="/campaigns/:id/codex" element={<CampaignDetailPage />} />
+                {/* Owner-only Manage tab (#379) — route access is guarded inside
+                    the page, which redirects a non-owner back to Overview. */}
+                <Route path="/campaigns/:id/manage" element={<CampaignDetailPage />} />
                 {/* Entity registry detail + backlinks (#248) */}
                 <Route
                   path="/campaigns/:id/entities/:entityId"
@@ -48,6 +57,7 @@ export default function App() {
                 />
                 <Route path="/join/:code" element={<JoinCampaignRoute />} />
               </Routes>
+              </Suspense>
             </AuthGate>
           </AuthProvider>
         </ThemeProvider>

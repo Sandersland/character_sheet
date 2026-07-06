@@ -28,6 +28,7 @@ function entity(overrides: Partial<CampaignEntity>): CampaignEntity {
     name: "Unnamed",
     aliases: [],
     notes: null,
+    visibility: "REVEALED",
     createdAt: "",
     updatedAt: "",
     ...overrides,
@@ -46,10 +47,10 @@ function mockEntities(list: CampaignEntity[]) {
   });
 }
 
-function renderCodex() {
+function renderCodex(role?: "OWNER" | "PLAYER") {
   return render(
     <MemoryRouter>
-      <CampaignCodex campaignId={CAMPAIGN_ID} />
+      <CampaignCodex campaignId={CAMPAIGN_ID} role={role} />
     </MemoryRouter>,
   );
 }
@@ -240,5 +241,52 @@ describe("CampaignCodex create flow (#367)", () => {
     mockEntities([]);
     renderCodex();
     expect(screen.getByRole("button", { name: /new entity/i })).toBeInTheDocument();
+  });
+});
+
+describe("CampaignCodex owner start-hidden (#523)", () => {
+  it("creates a hidden entity when the owner checks 'Start hidden'", async () => {
+    const user = userEvent.setup();
+    vi.mocked(client.createEntity).mockResolvedValue(
+      entity({ id: "ent-new", name: "Big Bad", visibility: "HIDDEN" }),
+    );
+    renderCodex("OWNER");
+
+    await user.click(screen.getByRole("button", { name: /new entity/i }));
+    await user.type(screen.getByLabelText(/name/i), "Big Bad");
+    await user.click(screen.getByLabelText(/start hidden/i));
+    await user.click(screen.getByRole("button", { name: /create entity/i }));
+
+    expect(vi.mocked(client.createEntity)).toHaveBeenCalledWith(CAMPAIGN_ID, {
+      type: "NPC",
+      name: "Big Bad",
+      aliases: [],
+      notes: undefined,
+      visibility: "HIDDEN",
+    });
+  });
+
+  it("omits visibility when the owner leaves 'Start hidden' unchecked", async () => {
+    const user = userEvent.setup();
+    vi.mocked(client.createEntity).mockResolvedValue(entity({ id: "ent-new", name: "Barkeep" }));
+    renderCodex("OWNER");
+
+    await user.click(screen.getByRole("button", { name: /new entity/i }));
+    await user.type(screen.getByLabelText(/name/i), "Barkeep");
+    await user.click(screen.getByRole("button", { name: /create entity/i }));
+
+    expect(vi.mocked(client.createEntity)).toHaveBeenCalledWith(CAMPAIGN_ID, {
+      type: "NPC",
+      name: "Barkeep",
+      aliases: [],
+      notes: undefined,
+    });
+  });
+
+  it("hides the 'Start hidden' option from a player", async () => {
+    const user = userEvent.setup();
+    renderCodex("PLAYER");
+    await user.click(screen.getByRole("button", { name: /new entity/i }));
+    expect(screen.queryByLabelText(/start hidden/i)).not.toBeInTheDocument();
   });
 });

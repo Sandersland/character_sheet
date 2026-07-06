@@ -1,0 +1,61 @@
+{
+  "name": "pr-response",
+  "description": "Unattended review responder: for a PR blocked only on the required claude-review check, triage the findings with the decline gate, post the verdict on the PR, fix accepted findings test-first in a throwaway worktree, and push to the PR head so the review re-runs and auto-merge can fire.",
+  "initial": "SetupPrWorktree",
+  "budget": { "maxSteps": 8, "maxCostUsd": 10, "maxWallMinutes": 60 },
+  "context": { "integrationBranch": "staging" },
+  "states": {
+    "SetupPrWorktree": {
+      "type": "script",
+      "handler": "setupPrWorktree",
+      "transitions": { "ok": "Respond" }
+    },
+    "Respond": {
+      "type": "agent",
+      "maxTurns": 120,
+      "maxBudgetUsd": 8,
+      "fallbackModel": "sonnet",
+      "wallMinutes": 45,
+      "permissionMode": "acceptEdits",
+      "cwd": "{{worktree}}",
+      "prompt": "states/respond-to-review.md",
+      "tools": "Bash,Edit,Read,Write,Glob,Grep",
+      "allowedTools": [
+        "Read", "Edit", "Write", "Glob", "Grep",
+        "Bash(docker compose:*)",
+        "Bash(git add:*)", "Bash(git commit:*)", "Bash(git status:*)",
+        "Bash(git diff:*)", "Bash(git log:*)", "Bash(git restore:*)",
+        "Bash(npm run:*)", "Bash(ls:*)", "Bash(cat:*)", "Bash(mkdir:*)", "Bash(curl:*)",
+        "Bash(gh pr view:*)", "Bash(gh pr diff:*)", "Bash(gh pr checks:*)",
+        "Bash(gh pr comment:*)", "Bash(gh api:*)", "Bash(gh repo view:*)", "Bash(gh issue view:*)"
+      ],
+      "bashDeny": [
+        "^git push\\b", "^git checkout\\b", "^git worktree\\b", "^git reset\\b",
+        "^gh pr (create|merge|close|edit|ready|review)\\b", "^gh issue (edit|close)\\b",
+        "\\bsudo\\b"
+      ],
+      "required": {
+        "fixed": ["triage", "commits"],
+        "no-fix": ["triage", "reason"],
+        "blocked": ["reason"]
+      },
+      "transitions": { "fixed": "PushFix", "no-fix": "FlagHuman", "blocked": "Fail" }
+    },
+    "PushFix": {
+      "type": "script",
+      "handler": "pushFix",
+      "transitions": { "ok": "Done" }
+    },
+    "FlagHuman": {
+      "type": "script",
+      "handler": "flagNeedsHuman",
+      "transitions": { "ok": "Done" }
+    },
+    "Fail": {
+      "type": "script",
+      "handler": "fail",
+      "transitions": { "ok": "Done" }
+    },
+    "Done": { "type": "terminal" }
+  }
+}
