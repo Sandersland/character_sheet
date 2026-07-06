@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
-import { GiSpellBook } from "@/components/ui/icons";
+import { GiSpellBook, Lock, Plus, VenetianMask } from "@/components/ui/icons";
 import {
   createEntity,
   deleteEntity,
@@ -209,9 +209,10 @@ export default function CampaignManagePanel({ campaignId }: CampaignManagePanelP
           type="button"
           aria-expanded={creating}
           onClick={() => setCreating((c) => !c)}
-          className="text-xs font-semibold text-garnet-700 hover:underline"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-garnet-700 hover:underline"
         >
-          ➕ New entity
+          <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+          New entity
         </button>
       }
       className="p-4"
@@ -303,8 +304,18 @@ export default function CampaignManagePanel({ campaignId }: CampaignManagePanelP
                       {e.name}
                     </Link>
                     <Badge tone={ENTITY_TYPE_TONE[e.type]}>{ENTITY_TYPE_LABELS[e.type]}</Badge>
-                    {hidden && <Badge tone="neutral">🔒 Hidden</Badge>}
-                    {preparedIds.has(e.id) && <Badge tone="neutral">🎭 Secretly linked</Badge>}
+                    {hidden && (
+                      <Badge tone="neutral">
+                        <Lock aria-hidden="true" className="h-3 w-3" />
+                        Hidden
+                      </Badge>
+                    )}
+                    {preparedIds.has(e.id) && (
+                      <Badge tone="neutral">
+                        <VenetianMask aria-hidden="true" className="h-3 w-3" />
+                        Secretly linked
+                      </Badge>
+                    )}
                     <span className="ml-auto flex items-center gap-3">
                       <button
                         type="button"
@@ -335,12 +346,14 @@ export default function CampaignManagePanel({ campaignId }: CampaignManagePanelP
             <h3 className="text-sm font-semibold text-parchment-900">Identity merges</h3>
             <button
               type="button"
+              aria-label="Open prepare merge form"
               aria-expanded={mergingOpen}
               disabled={entities.length < 2}
               onClick={() => setMergingOpen((o) => !o)}
-              className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
             >
-              🎭 Prepare merge
+              <VenetianMask aria-hidden="true" className="h-3.5 w-3.5" />
+              Prepare merge
             </button>
           </div>
           <p className="mt-1 text-xs text-parchment-600">
@@ -422,7 +435,16 @@ export default function CampaignManagePanel({ campaignId }: CampaignManagePanelP
                       <span className="text-parchment-500">→</span>{" "}
                       {nameById.get(m.survivorEntityId) ?? "Unknown"}
                     </span>
-                    <Badge tone="neutral">{prepared ? "🎭 Secret" : "✓ Revealed"}</Badge>
+                    <Badge tone="neutral">
+                      {prepared ? (
+                        <>
+                          <VenetianMask aria-hidden="true" className="h-3 w-3" />
+                          Secret
+                        </>
+                      ) : (
+                        "✓ Revealed"
+                      )}
+                    </Badge>
                     <span className="ml-auto flex items-center gap-3">
                       {prepared && (
                         <button

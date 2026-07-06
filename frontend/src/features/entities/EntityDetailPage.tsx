@@ -5,7 +5,7 @@ import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import Spinner from "@/components/ui/Spinner";
-import { GiQuillInk } from "@/components/ui/icons";
+import { GiQuillInk, Lock } from "@/components/ui/icons";
 import {
   deleteEntity,
   fetchCampaign,
@@ -255,7 +255,10 @@ export default function EntityDetailPage() {
             {entity.name}
             <Badge tone={ENTITY_TYPE_TONE[entity.type]}>{ENTITY_TYPE_LABELS[entity.type]}</Badge>
             {role === "OWNER" && entity.visibility === "HIDDEN" && (
-              <Badge tone="neutral">🔒 Hidden</Badge>
+              <Badge tone="neutral">
+                <Lock aria-hidden="true" className="h-3 w-3" />
+                Hidden
+              </Badge>
             )}
           </h1>
         </div>

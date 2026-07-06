@@ -167,7 +167,7 @@ describe("CampaignManagePanel (#379)", () => {
     renderPanel();
 
     await screen.findByText("Jenkins");
-    await user.click(screen.getByRole("button", { name: /prepare merge/i }));
+    await user.click(screen.getByRole("button", { name: /open prepare merge form/i }));
     await user.selectOptions(screen.getByLabelText(/Old identity/i), "jenkins");
     await user.selectOptions(screen.getByLabelText(/Revealed to be/i), "vecna");
     await user.click(screen.getByRole("button", { name: /^Prepare merge$/i }));

@@ -1,5 +1,6 @@
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
+import { Lock } from "@/components/ui/icons";
 import { itemCategoryLabel } from "@/lib/items";
 import { rarityLabel, rarityTone } from "@/lib/rarity";
 import type { CampaignItem } from "@/types/character";
@@ -103,7 +104,10 @@ export default function CampaignItemCard({ item, isOwner }: CampaignItemCardProp
 
         {isOwner && item.dmNotes && (
           <div className="rounded-control border border-garnet-200 bg-garnet-50 p-3">
-            <p className="text-xs font-semibold text-garnet-700">🔒 DM notes (hidden from players)</p>
+            <p className="flex items-center gap-1 text-xs font-semibold text-garnet-700">
+              <Lock aria-hidden="true" className="h-3 w-3" />
+              DM notes (hidden from players)
+            </p>
             <p className="mt-1 whitespace-pre-wrap text-sm text-garnet-900">{item.dmNotes}</p>
           </div>
         )}

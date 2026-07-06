@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
-import { GiSpellBook } from "@/components/ui/icons";
+import { GiSpellBook, Lock, Plus } from "@/components/ui/icons";
 import { createEntity } from "@/api/client";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
 import {
@@ -110,9 +110,10 @@ export default function CampaignCodex({ campaignId, role }: CampaignCodexProps) 
           type="button"
           aria-expanded={creating}
           onClick={() => (creating ? closeForm() : setCreating(true))}
-          className="text-xs font-semibold text-garnet-700 hover:underline"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-garnet-700 hover:underline"
         >
-          ➕ New entity
+          <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+          New entity
         </button>
       }
       className="p-4"
@@ -247,7 +248,10 @@ export default function CampaignCodex({ campaignId, role }: CampaignCodexProps) 
                       <span className="text-sm font-semibold text-parchment-900">{e.name}</span>
                       <Badge tone={ENTITY_TYPE_TONE[e.type]}>{ENTITY_TYPE_LABELS[e.type]}</Badge>
                       {role === "OWNER" && e.visibility === "HIDDEN" && (
-                        <Badge tone="neutral">🔒 Hidden</Badge>
+                        <Badge tone="neutral">
+                          <Lock aria-hidden="true" className="h-3 w-3" />
+                          Hidden
+                        </Badge>
                       )}
                       {e.aliases.length > 0 && (
                         <span className="min-w-0 truncate text-xs text-parchment-500">
