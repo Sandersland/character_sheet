@@ -10,7 +10,7 @@
 
 import { abilityLabel, abilityModifier } from "@/lib/abilities";
 import { readEffectSpec, resolveEffectSpec } from "@/lib/effects";
-import type { AbilityName, Character, Spell } from "@/types/character";
+import type { AbilityName, Character, Session, Spell } from "@/types/character";
 
 /**
  * Human-readable school-tone mapping (mirrors SpellRow.tsx SCHOOL_TONE but
@@ -29,14 +29,45 @@ export const SCHOOL_TONE = {
 
 export type SchoolTone = (typeof SCHOOL_TONE)[keyof typeof SCHOOL_TONE];
 
-/** Whether a spell is applied to the caster or an external target. */
-export type Target = "self" | "other";
+/** A consenting party member a heal can be applied to (#462). */
+export interface AllyOption {
+  characterId: string;
+  name: string;
+}
+
+/**
+ * Where a cast's effect lands: the caster ("self"), an off-sheet target relayed
+ * to the DM ("other"), or a consenting ally's sheet (party-target heal, #462).
+ */
+export type Target = "self" | "other" | AllyOption;
+
+/** Narrow a Target to a party ally. */
+export function isAllyTarget(target: Target): target is AllyOption {
+  return typeof target === "object";
+}
 
 /** Default target: heal spells or "Self" range → self; everything else → other. */
 export function defaultTarget(spell: Spell): Target {
   if (spell.range?.toLowerCase() === "self") return "self";
   if (spell.effectKind === "heal") return "self";
   return "other";
+}
+
+/**
+ * Opted-in allies a healing cast can target from the live session: present
+ * participants (not left) that share the campaign, have autoFriendlyHealing on
+ * for this campaign, and aren't the caster. Sorted by name for a stable picker.
+ */
+export function partyHealAllies(session: Session, selfCharacterId: string): AllyOption[] {
+  return (session.participants ?? [])
+    .filter((p) => p.characterId !== selfCharacterId && !p.leftAt && p.character)
+    .filter((p) =>
+      (p.character!.campaignPreferences ?? []).some(
+        (pref) => pref.campaignId === session.campaignId && pref.autoFriendlyHealing,
+      ),
+    )
+    .map((p) => ({ characterId: p.characterId, name: p.character!.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** True when the target is locked to "self" (range is exactly "Self"). */

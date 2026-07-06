@@ -32,7 +32,7 @@ describe("CampaignPreferencesPanel", () => {
     );
     expect(screen.getByRole("checkbox", { name: /share sheet with dm/i })).toBeChecked();
     expect(
-      screen.getByRole("checkbox", { name: /auto-roll friendly healing/i }),
+      screen.getByRole("checkbox", { name: /allow party members to heal my sheet/i }),
     ).not.toBeChecked();
   });
 
@@ -76,7 +76,7 @@ describe("CampaignPreferencesPanel", () => {
       />,
     );
 
-    await user.click(screen.getByRole("checkbox", { name: /auto-roll friendly healing/i }));
+    await user.click(screen.getByRole("checkbox", { name: /allow party members to heal my sheet/i }));
 
     expect(await screen.findByText("nope")).toBeInTheDocument();
   });

@@ -18,7 +18,7 @@ import { randomUUID } from "node:crypto";
 
 
 import { Prisma } from "../generated/prisma/client.js";
-import { castAbilityInTx, type OpOutcome } from "./ability-cast.js";
+import { castAbilityInTx, type CastTarget, type OpOutcome } from "./ability-cast.js";
 import { clearBuffsForSourceInTx } from "./active-effects.js";
 import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";
 import { runCharacterTransaction } from "./character-transaction.js";
@@ -82,11 +82,12 @@ export interface CastSpellOperation {
   slotLevel?: number; // required for leveled spells, omit/ignore for cantrips
   roll: number;       // client-rolled total (0 for utility)
   /**
-   * Optionally apply the rolled effect to the caster's own HP in the same atomic
-   * batch — used when the player targets themselves. Omitted when targeting
-   * others (no enemy entities exist; the player relays damage to the DM).
+   * Optionally apply the rolled effect in the same atomic batch. `target: "self"`
+   * hits the caster's own HP; `target: { characterId }` heals a consenting ally's
+   * sheet (#462, healing only). Omitted when targeting an enemy (no enemy entities
+   * exist; the player relays damage to the DM).
    */
-  apply?: { target: "self"; kind: "heal" | "damage"; amount: number };
+  apply?: { target: CastTarget; kind: "heal" | "damage"; amount: number };
 }
 
 /** Expend one slot of a given level without associating it with a specific spell. */
@@ -153,6 +154,10 @@ interface SpellOpContext {
   state: SpellcastingMutableState;
   slotTotals: Record<number, number>;
   arcanaTotals: Record<number, number>;
+  // Caster identity — threaded to castAbilityInTx for party-target heals (#462).
+  casterUserId: string;
+  casterName: string;
+  casterCampaignId: string | null;
 }
 
 function applyExpendSlotOp(ctx: SpellOpContext, op: ExpendSlotOperation): OpOutcome {
@@ -358,6 +363,9 @@ async function applyCastSpellOp(ctx: SpellOpContext, op: CastSpellOperation): Pr
       sessionId: ctx.sessionId,
       cost: costCtx(ctx),
       concentrationHost: ctx.state,
+      casterUserId: ctx.casterUserId,
+      casterName: ctx.casterName,
+      casterCampaignId: ctx.casterCampaignId,
     },
     {
       name: entry.name,
@@ -402,10 +410,13 @@ async function applyDropConcentrationOp(ctx: SpellOpContext): Promise<OpOutcome 
  */
 export async function applySpellcastingOperations(
   characterId: string,
-  operations: SpellcastingOperation[]
+  operations: SpellcastingOperation[],
+  casterUserId: string,
 ): Promise<void> {
   await runCharacterTransaction(characterId, operations, {
     select: {
+      name: true,
+      campaignId: true,
       spellcasting: true,
       experiencePoints: true,
       abilityScores: true,
@@ -466,6 +477,9 @@ export async function applySpellcastingOperations(
         state,
         slotTotals,
         arcanaTotals,
+        casterUserId,
+        casterName: row.name,
+        casterCampaignId: row.campaignId,
       };
 
       // Route to the per-op helper. A null outcome means no-op — skip both the

@@ -19,6 +19,8 @@ import {
   saveDcLabel,
   defaultTarget,
   targetLocked,
+  isAllyTarget,
+  type AllyOption,
   type Target,
   type SchoolTone,
 } from "@/lib/spellMeta";
@@ -62,6 +64,8 @@ export interface SpellRowView {
   spellAttackBonus: number;
   castDisabled: boolean;
   attackDisabled: boolean;
+  isHeal: boolean;
+  allies: AllyOption[];
 }
 
 export interface UseSpellPickerOptions {
@@ -74,6 +78,8 @@ export interface UseSpellPickerOptions {
   onCommitSlot: (spellLevel: number) => void;
   spellCastThisTurn: SpellCastThisTurn;
   castingTimeFilter?: string;
+  /** Opted-in party members a healing cast can target on their sheet (#462). */
+  allies?: AllyOption[];
 }
 
 export interface UseSpellPicker {
@@ -100,6 +106,7 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
     onCommitSlot,
     spellCastThisTurn,
     castingTimeFilter,
+    allies = [],
   } = opts;
 
   const { roll } = useRoll();
@@ -173,6 +180,8 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
       spellAttackBonus: spellAttackBonus ?? 0,
       castDisabled: row.casting || (isAttack ? !row.attackRolled : !slotAvailable),
       attackDisabled: row.casting || !slotAvailable,
+      isHeal: spell.effectKind === "heal",
+      allies,
     };
   }
 
@@ -193,21 +202,29 @@ export function useSpellPicker(opts: UseSpellPickerOptions): UseSpellPicker {
 
     patchRow(spell.id, { casting: true, error: null });
 
+    // Resolve where the effect lands so we can label the roll + build the apply.
+    const ally = isAllyTarget(row.target) ? row.target : null;
+    const targetNote = row.target === "self" ? " → your HP" : ally ? ` → ${ally.name}'s HP` : "";
+
     // Roll damage/heal via RollContext — result surfaces in the global toast.
     const castSpec = computeCastSpec(spell, character, effectiveSlot);
     let rollTotal = 0;
     if (castSpec) {
       const kindLabel = spell.effectKind === "heal" ? "healing" : "damage";
-      const targetNote = row.target === "self" ? " → your HP" : "";
       const result = roll(castSpec, `${spell.name} — ${kindLabel}${targetNote}`);
       rollTotal = result.total;
     }
 
-    // Self-targeted effect: pass to the backend so HP is adjusted in the same transaction.
-    const applyPayload =
-      row.target === "self" && castSpec && spell.effectKind
-        ? { target: "self" as const, kind: spell.effectKind as "heal" | "damage", amount: rollTotal }
-        : undefined;
+    // Apply the rolled effect in the same transaction: self → own HP, an ally →
+    // that party member's sheet (heal only). "other" relays to the DM (no apply).
+    let applyPayload;
+    if (castSpec && spell.effectKind) {
+      if (row.target === "self") {
+        applyPayload = { target: "self" as const, kind: spell.effectKind as "heal" | "damage", amount: rollTotal };
+      } else if (ally) {
+        applyPayload = { target: { characterId: ally.characterId }, kind: "heal" as const, amount: rollTotal };
+      }
+    }
 
     const op = isCantrip
       ? { type: "castSpell" as const, entryId: spell.id, roll: rollTotal, apply: applyPayload }

@@ -1405,6 +1405,7 @@ export async function applyHealInTx(
   amount: number,
   batchId: string,
   sessionId: string | null,
+  attribution?: { source?: string },
 ): Promise<void> {
   if (amount <= 0) {
     throw new InvalidHitPointOperationError("heal amount must be positive");
@@ -1453,14 +1454,17 @@ export async function applyHealInTx(
     data: { hitPoints: hp as unknown as Prisma.InputJsonValue },
   });
 
+  const source = attribution?.source;
   await logEvent(tx, {
     characterId,
     category: "hitPoints",
     type: "heal",
-    summary: `Healed ${amount} HP (${beforeHp.current} → ${hp.current} HP)`,
+    summary: source
+      ? `${source} healed ${amount} HP (${beforeHp.current} → ${hp.current} HP)`
+      : `Healed ${amount} HP (${beforeHp.current} → ${hp.current} HP)`,
     before: { hitPoints: beforeHp, hitDice: { ...hd } },
     after: { hitPoints: { ...hp }, hitDice: { ...hd } },
-    data: { amount },
+    data: source ? { amount, source } : { amount },
     batchId,
     sessionId,
   });

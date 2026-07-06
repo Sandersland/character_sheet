@@ -10,7 +10,7 @@ interface CampaignPreferencesPanelProps {
 }
 
 // One labeled toggle row. Container + read/write wiring only — the underlying
-// behaviors (DM sharing #116, auto friendly healing #462) land with those issues.
+// behaviors (DM sharing #116; party-target healing consent #462) live elsewhere.
 interface ToggleRowProps {
   label: string;
   hint: string;
@@ -76,8 +76,8 @@ export default function CampaignPreferencesPanel({
           onChange={(next) => save({ shareWithDm: next })}
         />
         <ToggleRow
-          label="Auto-roll friendly healing"
-          hint="Automatically roll healing when you target an ally."
+          label="Allow party members to heal my sheet"
+          hint="Let allies in this campaign apply healing spells to your sheet during a session."
           checked={prefs.autoFriendlyHealing}
           disabled={saving}
           onChange={(next) => save({ autoFriendlyHealing: next })}

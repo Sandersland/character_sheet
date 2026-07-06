@@ -1282,7 +1282,8 @@ export interface CastSpellOperation {
   entryId: string;
   slotLevel?: number;
   roll: number;
-  apply?: { target: "self"; kind: "heal" | "damage"; amount: number };
+  // "self" hits the caster; { characterId } heals a consenting ally's sheet (#462).
+  apply?: { target: "self" | { characterId: string }; kind: "heal" | "damage"; amount: number };
 }
 /** Bare slot expenditure (no specific spell). */
 export interface ExpendSlotOperation { type: "expendSlot"; level: number }
@@ -1656,7 +1657,13 @@ export interface SessionParticipant {
   joinedAt: string; // ISO 8601
   leftAt?: string | null;
   summary?: ParticipantSummary | null;
-  character?: { id: string; name: string };
+  character?: {
+    id: string;
+    name: string;
+    // Per-campaign play prefs (#462) — used to offer party-target healing only
+    // to allies who opted in. One row per campaign this character set prefs in.
+    campaignPreferences?: { campaignId: string; autoFriendlyHealing: boolean }[];
+  };
 }
 
 /**
