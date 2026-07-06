@@ -97,7 +97,12 @@ const createItemSchema = z.object(baseFields).strict();
 const updateItemSchema = z.object(baseFields).partial().strict();
 
 const awardSchema = z
-  .object({ characterId: z.string().min(1), quantity: z.number().int().positive().optional() })
+  .object({
+    characterId: z.string().min(1),
+    quantity: z.number().int().positive().optional(),
+    // Thread the loot event onto a live session (#382); validated in the lib.
+    sessionId: z.string().min(1).optional(),
+  })
   .strict();
 const revokeSchema = z.object({ characterId: z.string().min(1) }).strict();
 
@@ -356,6 +361,7 @@ campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/award", async (re
       campaignItemId: req.params.campaignItemId,
       characterId: parseResult.data.characterId,
       quantity: parseResult.data.quantity ?? 1,
+      sessionId: parseResult.data.sessionId,
     });
   } catch (err) {
     if (err instanceof CampaignItemAwardError) {

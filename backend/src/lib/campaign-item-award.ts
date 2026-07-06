@@ -93,6 +93,31 @@ function snapshotCampaignItemDetail(item: CampaignItemWithDetails) {
   };
 }
 
+// Resolves the sessionId a loot event threads onto (#382). With no explicit
+// request, keeps #381 behaviour: auto-thread the campaign's active session (null
+// out of session). An explicit id must belong to this campaign (else 400) and be
+// active (else 400) before it can carry the event.
+async function resolveAwardSessionId(
+  campaignId: string,
+  characterId: string,
+  requestedSessionId: string | null | undefined,
+): Promise<string | null> {
+  if (!requestedSessionId) {
+    return getActiveSessionId(characterId);
+  }
+  const session = await prisma.session.findUnique({
+    where: { id: requestedSessionId },
+    select: { campaignId: true, status: true },
+  });
+  if (!session || session.campaignId !== campaignId) {
+    throw new CampaignItemAwardError(400, "Session does not belong to this campaign");
+  }
+  if (session.status !== "active") {
+    throw new CampaignItemAwardError(400, "Session is not active");
+  }
+  return requestedSessionId;
+}
+
 // Loads the item + target character and enforces the shared guards: item lives
 // in this campaign (404), character is a member of it (400).
 async function loadAwardContext(campaignId: string, campaignItemId: string, characterId: string) {
@@ -119,6 +144,7 @@ export async function awardCampaignItem(params: {
   campaignItemId: string;
   characterId: string;
   quantity: number;
+  sessionId?: string | null;
 }): Promise<void> {
   const { item, character } = await loadAwardContext(
     params.campaignId,
@@ -128,7 +154,7 @@ export async function awardCampaignItem(params: {
 
   const quantity = params.quantity;
   const batchId = randomUUID();
-  const sessionId = await getActiveSessionId(character.id);
+  const sessionId = await resolveAwardSessionId(params.campaignId, character.id, params.sessionId);
 
   await prisma.$transaction(async (tx) => {
     // Unique guard: a unique item may exist on only one sheet in the campaign.
@@ -182,7 +208,12 @@ export async function awardCampaignItem(params: {
       entityId: created.id,
       before: null,
       after: { id: created.id, name: created.name, quantity, category: created.category },
-      data: { itemName: created.name, quantityDelta: quantity, campaignItemId: item.id },
+      data: {
+        itemName: created.name,
+        quantityDelta: quantity,
+        campaignItemId: item.id,
+        recipientName: character.name,
+      },
       actor: "dm",
       batchId,
       sessionId,
@@ -227,6 +258,7 @@ export async function revokeCampaignItem(params: {
       data: {
         itemName: row.name,
         quantityDelta: -row.quantity,
+        recipientName: character.name,
         deletedItem: snapshotInventoryItemForUndo(row),
       },
       actor: "dm",
