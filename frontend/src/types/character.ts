@@ -206,6 +206,8 @@ export interface WeaponDetailInput {
   ammunition?: boolean;
   rangeNormal?: number;
   rangeLong?: number;
+  weaponClass?: WeaponClass;
+  weaponRange?: WeaponRange;
 }
 
 export interface ArmorDetailInput {
