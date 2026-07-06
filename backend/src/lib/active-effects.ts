@@ -47,6 +47,8 @@ export interface ActiveBuff {
   duration: BuffDuration;
   /** Which rest clears an "until-rest" buff. Long rest also clears "short". */
   restType?: "short" | "long";
+  /** Damage types this buff makes the character resistant to (halved on take), e.g. Rage's b/p/s (#456). */
+  resistDamageTypes?: string[];
 }
 
 export interface ActiveEffectsMutableState {
@@ -75,6 +77,9 @@ export function normalizeActiveEffectsMutable(json: Prisma.JsonValue): ActiveEff
       ? (entry.duration as BuffDuration)
       : "concentration";
     const restType = entry.restType === "short" || entry.restType === "long" ? entry.restType : undefined;
+    const resistDamageTypes = Array.isArray(entry.resistDamageTypes)
+      ? (entry.resistDamageTypes as unknown[]).filter((t): t is string => typeof t === "string")
+      : undefined;
     buffs.push({
       id: typeof entry.id === "string" ? entry.id : randomUUID(),
       key: entry.key,
@@ -84,6 +89,7 @@ export function normalizeActiveEffectsMutable(json: Prisma.JsonValue): ActiveEff
       sourceEntryId: typeof entry.sourceEntryId === "string" ? entry.sourceEntryId : undefined,
       duration,
       ...(restType ? { restType } : {}),
+      ...(resistDamageTypes && resistDamageTypes.length > 0 ? { resistDamageTypes } : {}),
     });
   }
 
@@ -104,6 +110,7 @@ export function serializeActiveEffectsState(state: ActiveEffectsMutableState): P
       sourceEntryId: b.sourceEntryId ?? null,
       ...(b.duration !== "concentration" ? { duration: b.duration } : {}),
       ...(b.restType ? { restType: b.restType } : {}),
+      ...(b.resistDamageTypes && b.resistDamageTypes.length > 0 ? { resistDamageTypes: b.resistDamageTypes } : {}),
     })),
   } as unknown as Prisma.InputJsonValue;
 }
@@ -115,6 +122,19 @@ export function buffsByTarget(state: ActiveEffectsMutableState): Record<string, 
   const out: Record<string, ActiveBuff[]> = {};
   for (const b of state.buffs) {
     (out[b.target] ??= []).push(b);
+  }
+  return out;
+}
+
+/**
+ * Self-scoped resistance registry: the set of damage types the character's
+ * active buffs currently resist (#456). Fed purely by buff data — no hardcoded
+ * class rules — so any effect declaring `resistDamageTypes` contributes.
+ */
+export function activeResistedDamageTypes(state: ActiveEffectsMutableState): Set<string> {
+  const out = new Set<string>();
+  for (const b of state.buffs) {
+    for (const t of b.resistDamageTypes ?? []) out.add(t);
   }
   return out;
 }

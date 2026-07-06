@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { applyHitPointOperations } from "@/api/client";
 import { rollDie } from "@/lib/dice";
 import { dieFaces } from "@/lib/hitDice";
+import { activeResistedDamageTypes } from "@/lib/damageTypes";
 import type {
   Character,
   ClassOption,
@@ -128,12 +129,25 @@ export default function HitPointTracker({
   }
 
   // Apply the active HP mode; returns true on success so the child clears its field.
-  async function handleApply(mode: HpMode, value: number): Promise<boolean> {
+  async function handleApply(
+    mode: HpMode,
+    value: number,
+    damage?: { damageType?: string; applyResistance?: boolean },
+  ): Promise<boolean> {
     if (mode === "damage") {
       if (!value || value <= 0) return false;
       // When auto-roll is off (issue #76), the server defers the concentration
       // save and returns a pending check; the player rolls it via the 3D die.
-      return submit([{ type: "damage", amount: value, autoRollConcentration }]);
+      // damageType + applyResistance (#456) drive server-side resistance halving.
+      return submit([
+        {
+          type: "damage",
+          amount: value,
+          damageType: damage?.damageType,
+          applyResistance: damage?.applyResistance,
+          autoRollConcentration,
+        },
+      ]);
     }
     if (mode === "heal") {
       if (!value || value <= 0) return false;
@@ -221,7 +235,11 @@ export default function HitPointTracker({
         )}
 
         {/* ── HP action control (segmented mode + stepper + verb) ── */}
-        <HpActionControl pending={pending} onApply={handleApply} />
+        <HpActionControl
+          pending={pending}
+          onApply={handleApply}
+          resistedTypes={[...activeResistedDamageTypes(character.activeEffects?.buffs ?? [])]}
+        />
 
         {/* ── Concentration save preference (spellcasters only, issue #76) ── */}
         {isSpellcaster && (

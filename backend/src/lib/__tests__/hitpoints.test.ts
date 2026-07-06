@@ -7,7 +7,33 @@ import {
   levelUpHpGain,
   normalizeHitDice,
   normalizeHitPoints,
+  resolveDamageAmount,
 } from "../hitpoints.js";
+
+describe("resolveDamageAmount (#456)", () => {
+  const bps = new Set(["bludgeoning", "piercing", "slashing"]);
+
+  it("halves (round down) when the damage type matches an active resistance", () => {
+    expect(resolveDamageAmount(12, "slashing", bps, true)).toEqual({ applied: 6, resisted: true });
+    expect(resolveDamageAmount(13, "piercing", bps, true)).toEqual({ applied: 6, resisted: true });
+  });
+
+  it("leaves non-matching damage types unaffected", () => {
+    expect(resolveDamageAmount(12, "fire", bps, true)).toEqual({ applied: 12, resisted: false });
+  });
+
+  it("leaves typeless damage unaffected (no regression)", () => {
+    expect(resolveDamageAmount(12, undefined, bps, true)).toEqual({ applied: 12, resisted: false });
+  });
+
+  it("takes the full amount when the player declines resistance (manual override)", () => {
+    expect(resolveDamageAmount(12, "slashing", bps, false)).toEqual({ applied: 12, resisted: false });
+  });
+
+  it("does not halve when no resistances are active", () => {
+    expect(resolveDamageAmount(12, "slashing", new Set(), true)).toEqual({ applied: 12, resisted: false });
+  });
+});
 
 describe("normalizeHitPoints", () => {
   it("round-trips a fully-formed value unchanged", () => {

@@ -251,6 +251,7 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
         modifier: ctx.rageDamageBonus ?? 2,
         source: "Rage",
         duration: "while-active",
+        resistDamageTypes: ["bludgeoning", "piercing", "slashing"],
       },
     },
     { type: "spendResource", key: "rage" },

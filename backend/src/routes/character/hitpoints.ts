@@ -14,6 +14,10 @@ export const hitPointsRouter = Router({ mergeParams: true });
 const damageOpSchema = z.object({
   type: z.literal("damage"),
   amount: z.number().int().positive(),
+  // Optional 5e damage type; drives resistance auto-halving (#456).
+  damageType: z.string().min(1).optional(),
+  // Manual override for resistance halving (#456): false declines the auto-halve.
+  applyResistance: z.boolean().optional(),
   // Issue #76: defer the concentration save to the client when false. Omitted
   // or true keeps the server-side auto-roll.
   autoRollConcentration: z.boolean().optional(),
