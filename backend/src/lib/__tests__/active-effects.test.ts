@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  activeResistedDamageTypes,
   buffsByTarget,
   normalizeActiveEffectsMutable,
   serializeActiveEffectsState,
@@ -75,6 +76,37 @@ describe("normalizeActiveEffectsMutable", () => {
     };
     const serialized = JSON.parse(JSON.stringify(serializeActiveEffectsState(state))) as { buffs: Record<string, unknown>[] };
     expect(serialized.buffs[0]).toMatchObject({ duration: "until-rest", restType: "long" });
+  });
+
+  it("round-trips resistDamageTypes and drops an empty/malformed list (#456)", () => {
+    const state: ActiveEffectsMutableState = {
+      buffs: [{ id: "r", key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active", resistDamageTypes: ["bludgeoning", "piercing", "slashing"] }],
+    };
+    const serialized = JSON.parse(JSON.stringify(serializeActiveEffectsState(state)));
+    expect(normalizeActiveEffectsMutable(serialized)).toEqual(state);
+    // Malformed entries are filtered; an empty list is omitted entirely.
+    const cleaned = normalizeActiveEffectsMutable({
+      buffs: [{ id: "r", key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active", resistDamageTypes: ["fire", 5, null] }],
+    });
+    expect(cleaned.buffs[0].resistDamageTypes).toEqual(["fire"]);
+    const noneLeft = normalizeActiveEffectsMutable({
+      buffs: [{ id: "r", key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active", resistDamageTypes: [] }],
+    });
+    expect(noneLeft.buffs[0].resistDamageTypes).toBeUndefined();
+  });
+});
+
+describe("activeResistedDamageTypes (#456)", () => {
+  it("unions resistDamageTypes across active buffs; empty when none declare any", () => {
+    expect(activeResistedDamageTypes({ buffs: [] })).toEqual(new Set());
+    const state: ActiveEffectsMutableState = {
+      buffs: [
+        { id: "1", key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active", resistDamageTypes: ["bludgeoning", "piercing", "slashing"] },
+        { id: "2", key: "stoneskin", target: "athletics", modifier: 0, source: "Stoneskin", duration: "concentration", resistDamageTypes: ["piercing"] },
+        { id: "3", key: "bless", target: "athletics", modifier: 1, source: "Bless", duration: "concentration" },
+      ],
+    };
+    expect(activeResistedDamageTypes(state)).toEqual(new Set(["bludgeoning", "piercing", "slashing"]));
   });
 });
 
