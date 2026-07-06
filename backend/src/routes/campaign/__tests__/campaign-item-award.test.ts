@@ -41,7 +41,7 @@ const BASE_CHAR = {
 const weaponItem = {
   name: "Flametongue",
   category: "weapon" as const,
-  rarity: "rare",
+  rarity: "RARE" as const,
   weight: 3,
   cost: { gp: 5000 },
   weapon: { damageDiceCount: 2, damageDiceFaces: 6, damageType: "slashing" },

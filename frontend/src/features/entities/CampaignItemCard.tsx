@@ -1,6 +1,7 @@
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import { itemCategoryLabel } from "@/lib/items";
+import { rarityLabel, rarityTone } from "@/lib/rarity";
 import type { CampaignItem } from "@/types/character";
 
 interface CampaignItemCardProps {
@@ -41,7 +42,7 @@ export default function CampaignItemCard({ item, isOwner }: CampaignItemCardProp
       <div className="flex flex-col gap-3 p-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="gold">{itemCategoryLabel(item.category)}</Badge>
-          {item.rarity && <Badge tone="arcane">{item.rarity}</Badge>}
+          {item.rarity && <Badge tone={rarityTone(item.rarity)}>{rarityLabel(item.rarity)}</Badge>}
           {item.requiresAttunement && <Badge tone="garnet">Requires attunement</Badge>}
           {item.isUnique && <Badge tone="neutral">Unique</Badge>}
         </div>

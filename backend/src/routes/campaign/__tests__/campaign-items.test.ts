@@ -16,7 +16,7 @@ const weaponItem = {
   name: "Flametongue",
   description: "A blade wreathed in fire.",
   category: "weapon" as const,
-  rarity: "rare",
+  rarity: "RARE" as const,
   requiresAttunement: true,
   isUnique: false,
   weight: 3,
@@ -98,7 +98,7 @@ describe("campaign items (#380)", () => {
       .send({
         name: "Dragon Plate",
         category: "armor",
-        rarity: "legendary",
+        rarity: "LEGENDARY",
         requiresAttunement: false,
         weight: 65,
         cost: { gp: 10000 },
@@ -107,7 +107,31 @@ describe("campaign items (#380)", () => {
     expect(res.status).toBe(201);
     expect(res.body.armor.baseArmorClass).toBe(20);
     expect(res.body.armor.armorCategory).toBe("heavy");
-    expect(res.body.rarity).toBe("legendary");
+    expect(res.body.rarity).toBe("LEGENDARY");
+  });
+
+  it("rejects a non-enum rarity with 400", async () => {
+    const res = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({ name: "Bad Rarity", category: "gear", rarity: "rare" });
+    expect(res.status).toBe(400);
+  });
+
+  it("accepts null/omitted rarity as a mundane item", async () => {
+    const omitted = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({ name: "Mundane Rope", category: "gear" });
+    expect(omitted.status).toBe(201);
+    expect(omitted.body.rarity).toBeUndefined();
+
+    const explicitNull = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({ name: "Mundane Torch", category: "gear", rarity: null });
+    expect(explicitNull.status).toBe(201);
+    expect(explicitNull.body.rarity).toBeUndefined();
   });
 
   it("renames the linked entity when the item is renamed", async () => {

@@ -285,7 +285,7 @@ model CampaignItem {
   name               String
   description        String?
   category           ItemCategory
-  rarity             String?
+  rarity             ItemRarity?
   requiresAttunement Boolean      @default(false)
   isUnique           Boolean      @default(false)
   weight             Float?
@@ -524,6 +524,17 @@ enum ItemCategory {
   armor
   consumable
   gear
+}
+
+// The six 5e magic-item rarity tiers (DMG p. 135). Rules data + gp values live
+// in lib/srd.ts (ITEM_RARITIES); this is only the persisted column domain.
+enum ItemRarity {
+  COMMON
+  UNCOMMON
+  RARE
+  VERY_RARE
+  LEGENDARY
+  ARTIFACT
 }
 
 enum ArmorCategory {
