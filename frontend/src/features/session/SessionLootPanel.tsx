@@ -13,6 +13,7 @@ import { awardCampaignItem, fetchCampaignItems } from "@/api/client";
 import Badge from "@/components/ui/Badge";
 import Spinner from "@/components/ui/Spinner";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
+import { rarityLabel, rarityTone } from "@/lib/rarity";
 import type { CampaignItem } from "@/types/character";
 
 interface Recipient {
@@ -118,7 +119,7 @@ export default function SessionLootPanel({
           <li key={item.id} className="flex items-center justify-between gap-3 py-2">
             <span className="flex min-w-0 items-center gap-2">
               <span className="truncate text-sm text-parchment-900">{item.name}</span>
-              {item.rarity && <Badge tone="gold">{item.rarity}</Badge>}
+              {item.rarity && <Badge tone={rarityTone(item.rarity)}>{rarityLabel(item.rarity)}</Badge>}
               {item.isUnique && <Badge tone="arcane">unique</Badge>}
             </span>
             <button

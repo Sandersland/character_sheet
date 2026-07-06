@@ -90,6 +90,20 @@ describe("SessionLootPanel (#382)", () => {
     expect(onAwarded).not.toHaveBeenCalled();
   });
 
+  it("renders the rarity label, not the raw enum key", async () => {
+    mockFetchItems.mockResolvedValue([item({ name: "Flametongue", rarity: "VERY_RARE" })]);
+    render(
+      <SessionLootPanel
+        campaignId="camp-1"
+        sessionId="sess-1"
+        recipients={recipients}
+        onAwarded={() => {}}
+      />,
+    );
+    expect(await screen.findByText("Very Rare")).toBeInTheDocument();
+    expect(screen.queryByText("VERY_RARE")).not.toBeInTheDocument();
+  });
+
   it("shows an empty-state when the campaign has no items", async () => {
     mockFetchItems.mockResolvedValue([]);
     render(
