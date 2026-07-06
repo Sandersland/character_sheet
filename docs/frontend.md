@@ -13,7 +13,7 @@ frontend/src/
 │   ├── advancement/     # AdvancementSection, AdvancementPanel (shell) → AsiFlow, FeatFlow,
 │   │                    #   CustomFeatForm; hooks useAsiDraft/useFeatCatalog/useCustomFeatDraft; featView reducer
 │   ├── auth/            # AuthProvider (useAuth), AuthGate, AppHeader, AccountMenu
-│   ├── campaign/        # CampaignsPage (list+create+join), CampaignDetailPage (mgmt hub with
+│   ├── campaign/        # CampaignsPage (list+create; join is URL-only via /join/:code #520), CampaignDetailPage (mgmt hub with
 │   │                    #   routed Overview/Codex + owner-only Manage tabs #367/#379), CampaignOverviewPanel (invite link,
 │   │                    #   roster, add-character dropdown), CampaignInviteLink,
 │   │                    #   CampaignIndicator (sheet badge/link), JoinCampaignRoute (#246)
