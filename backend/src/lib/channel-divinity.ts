@@ -11,17 +11,14 @@
  * from the catalog row.
  */
 
-import { randomUUID } from "node:crypto";
-
 import { castAbilityInTx } from "./ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "./ability-cost.js";
 import { appendActiveBuffInTx } from "./active-effects.js";
+import { runCharacterTransaction } from "./character-transaction.js";
 import { applyConditionInTx } from "./conditions.js";
 import type { EffectSpec } from "./effects.js";
 import { logEvent } from "./events.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
-import { prisma } from "./prisma.js";
-import { getActiveSessionId } from "./sessions.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
 import { abilityModifier } from "./srd.js";
 
@@ -199,28 +196,19 @@ export async function applyChannelDivinityOperations(
   characterId: string,
   operations: ChannelDivinityOperation[],
 ): Promise<void> {
-  const batchId = randomUUID();
-  const sessionId = await getActiveSessionId(characterId);
-
-  await prisma.$transaction(async (tx) => {
-    for (const op of operations) {
-      const row = await tx.character.findUnique({
-        where: { id: characterId },
-        select: {
-          spellcasting: true,
-          resources: true,
-          experiencePoints: true,
-          abilityScores: true,
-          classEntries: {
-            orderBy: { position: "asc" as const },
-            select: { name: true, subclass: true, level: true },
-          },
-        },
-      });
-      if (!row) {
-        throw new InvalidChannelDivinityOperationError(`Character not found: ${characterId}`);
-      }
-
+  await runCharacterTransaction(characterId, operations, {
+    select: {
+      spellcasting: true,
+      resources: true,
+      experiencePoints: true,
+      abilityScores: true,
+      classEntries: {
+        orderBy: { position: "asc" as const },
+        select: { name: true, subclass: true, level: true },
+      },
+    },
+    notFound: (id) => new InvalidChannelDivinityOperationError(`Character not found: ${id}`),
+    applyOp: async ({ tx, row, op, batchId, sessionId }) => {
       const level = levelForExperience(row.experiencePoints);
       const profBonus = proficiencyBonusForLevel(level);
       const abilityScores = row.abilityScores as Record<string, number>;
@@ -309,6 +297,6 @@ export async function applyChannelDivinityOperations(
         batchId,
         sessionId,
       });
-    }
+    },
   });
 }

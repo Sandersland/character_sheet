@@ -21,11 +21,10 @@ import { Prisma } from "../generated/prisma/client.js";
 import { castAbilityInTx, type OpOutcome } from "./ability-cast.js";
 import { clearBuffsForSourceInTx } from "./active-effects.js";
 import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";
+import { runCharacterTransaction } from "./character-transaction.js";
 import { readEffectSpec } from "./effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
-import { prisma } from "./prisma.js";
-import { getActiveSessionId } from "./sessions.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
 import { deriveGrantedSpells } from "./granted-spells.js";
 import type {
@@ -407,29 +406,19 @@ export async function applySpellcastingOperations(
   characterId: string,
   operations: SpellcastingOperation[]
 ): Promise<void> {
-  const batchId = randomUUID();
-  const sessionId = await getActiveSessionId(characterId);
-
-  await prisma.$transaction(async (tx) => {
-    for (const op of operations) {
-      // Re-read per-op so a batch of multiple ops sees each previous result.
-      const row = await tx.character.findUnique({
-        where: { id: characterId },
-        select: {
-          spellcasting: true,
-          experiencePoints: true,
-          abilityScores: true,
-          classEntries: {
-            orderBy: { position: "asc" as const },
-            take: 1,
-            select: { name: true, subclass: true },
-          },
-        },
-      });
-      if (!row) {
-        throw new InvalidSpellcastingOperationError(`Character not found: ${characterId}`);
-      }
-
+  await runCharacterTransaction(characterId, operations, {
+    select: {
+      spellcasting: true,
+      experiencePoints: true,
+      abilityScores: true,
+      classEntries: {
+        orderBy: { position: "asc" as const },
+        take: 1,
+        select: { name: true, subclass: true },
+      },
+    },
+    notFound: (id) => new InvalidSpellcastingOperationError(`Character not found: ${id}`),
+    applyOp: async ({ tx, row, op, batchId, sessionId }) => {
       // Derived stats needed for slot-bounds checks.
       const level = levelForExperience(row.experiencePoints);
       const profBonus = proficiencyBonusForLevel(level);
@@ -494,7 +483,7 @@ export async function applySpellcastingOperations(
         case "unprepareSpell": outcome = applyPrepareSpellOp(ctx, op); break;
         case "dropConcentration": outcome = await applyDropConcentrationOp(ctx); break;
       }
-      if (outcome === null) continue;
+      if (outcome === null) return;
 
       // Strip derived grants before persisting — they are never stored (they are
       // re-derived on read; reconcileGrantedSpells is the safety net for leaks).
@@ -533,6 +522,6 @@ export async function applySpellcastingOperations(
         batchId,
         sessionId,
       });
-    }
+    },
   });
 }
