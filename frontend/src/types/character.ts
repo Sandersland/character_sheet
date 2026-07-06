@@ -1183,22 +1183,13 @@ export interface ToolOption {
   weight?: number;
 }
 
-export interface ReferenceTools {
-  all: ToolOption[];
-  byCategory: {
-    artisan: ToolOption[];
-    gamingSet: ToolOption[];
-    musicalInstrument: ToolOption[];
-    other: ToolOption[];
-  };
-}
-
 export interface ReferenceData {
   races: RaceOption[];
   classes: ClassOption[];
   backgrounds: BackgroundOption[];
   alignments: string[];
-  tools: ReferenceTools;
+  /** Artisan's tools for the sheet's Proficiencies-card dropdown. */
+  artisanTools: ToolOption[];
 }
 
 /** Body for `POST /api/characters`. The backend derives AC/HP/saves/skills

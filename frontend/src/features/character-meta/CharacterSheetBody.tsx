@@ -54,7 +54,7 @@ export default function CharacterSheetBody({
         <Card title="Proficiencies" className="p-4">
           <ProficienciesCard
             character={character}
-            artisanTools={reference?.tools.byCategory.artisan ?? []}
+            artisanTools={reference?.artisanTools ?? []}
             onUpdate={onUpdate}
           />
         </Card>

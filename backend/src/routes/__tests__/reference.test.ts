@@ -28,21 +28,17 @@ describe("GET /api/reference", () => {
       expect.arrayContaining(["Lawful Good", "True Neutral", "Chaotic Evil"])
     );
 
-    // Tool proficiency data — grouped by category, used by creation and sheet.
-    expect(response.body).toHaveProperty("tools");
-    expect(Array.isArray(response.body.tools.all)).toBe(true);
-    expect(response.body.tools.all.length).toBeGreaterThan(0);
-    expect(response.body.tools.byCategory).toMatchObject({
-      artisan: expect.arrayContaining([
+    // Artisan tools — the flat list feeding the sheet's Proficiencies-card dropdown.
+    expect(response.body).toHaveProperty("artisanTools");
+    expect(Array.isArray(response.body.artisanTools)).toBe(true);
+    expect(response.body.artisanTools).toEqual(
+      expect.arrayContaining([
         expect.objectContaining({ name: "Smith's Tools", category: "artisan" }),
-      ]),
-      musicalInstrument: expect.arrayContaining([
-        expect.objectContaining({ name: "Lute", category: "musicalInstrument" }),
-      ]),
-      other: expect.arrayContaining([
-        expect.objectContaining({ name: "Thieves' Tools", category: "other" }),
-      ]),
-    });
+      ])
+    );
+    // Only artisan tools ship — the duplicate all/byCategory payload is gone.
+    expect(response.body).not.toHaveProperty("tools");
+    expect(response.body.artisanTools.every((t: { category: string }) => t.category === "artisan")).toBe(true);
 
     // Classes expose tool proficiency fields.
     const fighter = response.body.classes.find((c: { name: string }) => c.name === "Fighter");

@@ -13,7 +13,7 @@
 | `routes/health.ts` | `GET /health` — **public** |
 | `routes/auth.ts` | `GET /auth/providers`, `GET /auth/:provider/start`, `GET /auth/:provider/callback`, `POST /auth/logout`, `GET /auth/me`, `POST /auth/dev-login` — hand-rolled Google OAuth + PKCE sign-in and opaque session. **Public** (mounted before `requireAuth`). A provider is listed/usable only when its id+secret env pair is set. The provider `startUrl` + post-callback redirect are **origin-relative** (derived from the request host, falling back to `APP_BASE_URL`) so sign-in returns to the right port; the OAuth `redirect_uri` stays `APP_BASE_URL`-based (it must match the registered URI). `POST /auth/dev-login` mints a session for a fixed dev user **without** OAuth — guarded by `ALLOW_DEV_LOGIN`, hard-disabled in production; the headless/worktree path for UI verification (see `seed:verify` in development.md). |
 | `routes/characters.ts` | `GET /characters`, `GET /characters/:id`, `POST /characters`, `PATCH /characters/:id`, `DELETE /characters/:id` |
-| `routes/reference.ts` | `GET /reference` — race/class/background catalog + alignments + per-class starting equipment options |
+| `routes/reference.ts` | `GET /reference` — race/class/background catalog + alignments + per-class starting equipment options + `artisanTools` (the artisan-tool list for the sheet's Proficiencies-card dropdown; creation tool pickers derive from per-class `toolChoices`) |
 | `routes/items.ts` | `GET /items` — item catalog with weapon/armor/consumable detail |
 | `routes/hitpoints.ts` | `POST /characters/:id/hp` — batch HP ops |
 | `routes/inventory.ts` | `POST /characters/:id/inventory/transactions` (inventory history reads via the unified activity log, `?category=inventory`) |
