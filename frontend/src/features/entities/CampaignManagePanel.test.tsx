@@ -170,7 +170,8 @@ describe("CampaignManagePanel (#379)", () => {
     await user.click(screen.getByRole("button", { name: /prepare merge/i }));
     await user.selectOptions(screen.getByLabelText(/Old identity/i), "jenkins");
     await user.selectOptions(screen.getByLabelText(/Revealed to be/i), "vecna");
-    await user.click(screen.getByRole("button", { name: /^Prepare merge$/i }));
+    const prepareButtons = screen.getAllByRole("button", { name: /^Prepare merge$/i });
+    await user.click(prepareButtons[prepareButtons.length - 1]);
 
     expect(vi.mocked(client.prepareEntityMerge)).toHaveBeenCalledWith(CAMPAIGN_ID, {
       mergedEntityId: "jenkins",

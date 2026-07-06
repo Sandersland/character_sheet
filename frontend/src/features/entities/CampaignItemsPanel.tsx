@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
-import { GiKnapsack } from "@/components/ui/icons";
+import { GiKnapsack, Lock, Plus } from "@/components/ui/icons";
 import {
   awardCampaignItem,
   createCampaignItem,
@@ -367,9 +367,10 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
           type="button"
           aria-expanded={creating}
           onClick={startCreate}
-          className="text-xs font-semibold text-garnet-700 hover:underline"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-garnet-700 hover:underline"
         >
-          ➕ New item
+          <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+          New item
         </button>
       }
       className="p-4"
@@ -716,7 +717,12 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
                     <Badge tone="gold">{itemCategoryLabel(item.category)}</Badge>
                     {item.rarity && <Badge tone={rarityTone(item.rarity)}>{rarityLabel(item.rarity)}</Badge>}
                     {item.isUnique && <Badge tone="arcane">Unique</Badge>}
-                    {hidden && <Badge tone="neutral">🔒 Hidden</Badge>}
+                    {hidden && (
+                      <Badge tone="neutral">
+                        <Lock aria-hidden="true" className="h-3 w-3" />
+                        Hidden
+                      </Badge>
+                    )}
                     <span className="ml-auto flex items-center gap-3">
                       <button
                         type="button"

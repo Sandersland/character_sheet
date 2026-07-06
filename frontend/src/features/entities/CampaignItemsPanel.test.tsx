@@ -202,7 +202,7 @@ describe("CampaignItemsPanel rarity (#497)", () => {
   it("offers rarity as a dropdown with a mundane option and shows the value hint", async () => {
     renderPanel();
     await screen.findByText("Flametongue");
-    await userEvent.click(screen.getByRole("button", { name: "➕ New item" }));
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
 
     const rarity = screen.getByLabelText("Rarity") as HTMLSelectElement;
     expect(rarity.tagName).toBe("SELECT");
@@ -218,7 +218,7 @@ describe("CampaignItemsPanel rarity (#497)", () => {
     vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "new-1", name: "Potion" });
     renderPanel();
     await screen.findByText("Flametongue");
-    await userEvent.click(screen.getByRole("button", { name: "➕ New item" }));
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
 
     await userEvent.selectOptions(screen.getByLabelText("Category"), "consumable");
     await userEvent.selectOptions(screen.getByLabelText("Rarity"), "RARE");

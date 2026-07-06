@@ -18,6 +18,7 @@ import { Link } from "react-router-dom";
 
 import { createEntity } from "@/api/client";
 import Badge from "@/components/ui/Badge";
+import { Plus } from "@/components/ui/icons";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { useCampaignMerges } from "@/hooks/useCampaignMerges";
 import { ultimateSurvivorName } from "@/lib/merges";
@@ -379,7 +380,14 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
                 }}
                 onMouseEnter={() => setActiveIndex(matches.length)}
               >
-                {creating ? "Creating…" : `➕ Create ${ENTITY_TYPE_LABELS[createType]} “${createName}”`}
+                {creating ? (
+                  "Creating…"
+                ) : (
+                  <>
+                    <Plus aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                    {`Create ${ENTITY_TYPE_LABELS[createType]} “${createName}”`}
+                  </>
+                )}
               </li>
             )}
           </ul>
