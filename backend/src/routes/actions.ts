@@ -22,7 +22,7 @@ import { z } from "zod";
 
 import { assertCharacterAccess } from "../lib/auth/access.js";
 import { prisma } from "../lib/prisma.js";
-import { ACTION_EFFECT_FN, ACTION_CAST_FN } from "../lib/actions.js";
+import { ACTION_EFFECT_FN, ACTION_CAST_FN, rageMeleeDamageBonus } from "../lib/actions.js";
 import { castAbilityInTx } from "../lib/ability-cast.js";
 import type { PayCostContext } from "../lib/ability-cost.js";
 import type { SpendResourceOperation } from "../lib/resources.js";
@@ -30,6 +30,7 @@ import type { AdjustQuantityOperation } from "../lib/inventory.js";
 import { applyAdjustQuantity } from "../lib/inventory.js";
 import { applyHealInTx } from "../lib/hitpoints.js";
 import { applySpendResourceInTx } from "../lib/resources.js";
+import { appendActiveBuffInTx, clearBuffByKeyInTx } from "../lib/active-effects.js";
 import { normalizeSpellcastingMutable } from "../lib/spell-state.js";
 import { getActiveSessionId } from "../lib/sessions.js";
 import {
@@ -71,11 +72,23 @@ actionsRouter.post(
     const { operations } = parsed.data;
 
     try {
-      // Fail fast on unknown keys BEFORE opening a transaction (400, not 500).
+      // Fail fast on unknown keys BEFORE any DB work (400, not 500).
       for (const op of operations) {
         if (!ACTION_CAST_FN[op.actionKey] && !ACTION_EFFECT_FN[op.actionKey]) {
           throw new Error(`Unknown action key: ${op.actionKey}`);
         }
+      }
+
+      // Level-derived Rage bonus, so the rage effect fn stays pure (no DB).
+      // Only fires when a rage op is actually present — other batches skip the round-trip.
+      let rageDamageBonus = 0;
+      if (operations.some((op) => op.actionKey === "rage")) {
+        const classRow = await prisma.character.findUnique({
+          where: { id: characterId },
+          select: { classEntries: { select: { name: true, level: true } } },
+        });
+        const barbarianLevel = classRow?.classEntries.find((e) => e.name.toLowerCase() === "barbarian")?.level ?? 0;
+        rageDamageBonus = rageMeleeDamageBonus(barbarianLevel);
       }
       const batchId = randomUUID();
       const sessionId = await getActiveSessionId(characterId);
@@ -85,7 +98,7 @@ actionsRouter.post(
       // batch on the activity timeline and a single revertBatch undoes them all.
       await prisma.$transaction(async (tx) => {
         for (const op of operations) {
-          const ctx = { roll: op.roll, inventoryItemId: op.inventoryItemId };
+          const ctx = { roll: op.roll, inventoryItemId: op.inventoryItemId, rageDamageBonus };
 
           // Cast-core actions (Second Wind #420): pay the pool cost + self-apply
           // the heal through the shared caster. The OpOutcome is intentionally
@@ -138,8 +151,16 @@ actionsRouter.post(
                 await applyHealInTx(tx, characterId, effect.amount, batchId, sessionId);
                 break;
 
+              case "applyBuff":
+                await appendActiveBuffInTx(tx, characterId, effect.buff, batchId, sessionId);
+                break;
+
+              case "clearBuff":
+                await clearBuffByKeyInTx(tx, characterId, effect.key, batchId, sessionId, effect.reason);
+                break;
+
               default: {
-                // Exhaustive — ACTION_EFFECT_FN only returns the three types above.
+                // Exhaustive — ACTION_EFFECT_FN returns the five op types above.
                 const _never: never = effect;
                 throw new Error(`Unexpected op type in action effect: ${JSON.stringify(_never)}`);
               }

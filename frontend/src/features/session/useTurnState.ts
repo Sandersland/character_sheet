@@ -23,7 +23,7 @@
  *   - `consumeReaction()` can be called at any time (during your turn or between turns).
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { canTwoWeaponFight } from "@/lib/turnRules";
 import { loadTurnState, saveTurnState } from "@/features/session/turnStatePersistence";
 import type { Character } from "@/types/character";
@@ -68,6 +68,10 @@ export interface TurnState {
    * actions; casting a leveled spell as an action → no bonus-action spells.
    */
   spellCastThisTurn: { action?: SpellCastKind; bonus?: SpellCastKind };
+  /** Made an attack this turn — feeds the durable-buff turn-hook (#457). */
+  attackedThisTurn: boolean;
+  /** Took damage this turn — feeds the durable-buff turn-hook (#457). */
+  tookDamageThisTurn: boolean;
 }
 
 export interface TurnStateActions {
@@ -140,6 +144,8 @@ function initialState(): TurnState {
     bonusAttack: null,
     twfAvailable: false,
     spellCastThisTurn: {},
+    attackedThisTurn: false,
+    tookDamageThisTurn: false,
   };
 }
 
@@ -151,11 +157,27 @@ export function useTurnState(character: Character, sessionId: string): TurnState
 
   // Server-derived, multiclass-correct (max across classes); see srd.ts.
   const attacksPerAction = character.attacksPerAction;
+  const currentHp = character.hitPoints?.current ?? 0;
 
   // Persist state to localStorage whenever it changes.
   useEffect(() => {
     saveTurnState(sessionId, state);
   }, [sessionId, state]);
+
+  // Watch current HP: any drop marks damage taken (feeds the durable-buff
+  // turn-hook). NOT gated by phase — so damage taken out of turn (opportunity
+  // attacks, reactions during another creature's turn) counts too. The activity
+  // window is bounded by the flag reset in `endTurn` (which runs AFTER the
+  // auto-end evaluation), so damage between your turns survives into the next
+  // turn's check — matching the 5e rule "took damage since your last turn".
+  // Heals and non-HP updates are ignored.
+  const prevHpRef = useRef(currentHp);
+  useEffect(() => {
+    if (currentHp < prevHpRef.current) {
+      setState((s) => (s.tookDamageThisTurn ? s : { ...s, tookDamageThisTurn: true }));
+    }
+    prevHpRef.current = currentHp;
+  }, [currentHp]);
 
   const startCombat = useCallback(() => {
     setState({
@@ -169,6 +191,8 @@ export function useTurnState(character: Character, sessionId: string): TurnState
       bonusAttack: null,
       twfAvailable: false,
       spellCastThisTurn: {},
+      attackedThisTurn: false,
+      tookDamageThisTurn: false,
     });
   }, []);
 
@@ -177,6 +201,11 @@ export function useTurnState(character: Character, sessionId: string): TurnState
   }, []);
 
   const startTurn = useCallback(() => {
+    // Keep the HP-drop baseline current (the watcher also syncs it on every HP
+    // change). Deliberately does NOT reset attackedThisTurn/tookDamageThisTurn —
+    // those are cleared in endTurn so damage/attacks between your turns carry
+    // into this turn's auto-end check.
+    prevHpRef.current = currentHp;
     setState((s) => ({
       ...s,
       phase: "active",
@@ -188,13 +217,17 @@ export function useTurnState(character: Character, sessionId: string): TurnState
       twfAvailable: canTwoWeaponFight(character.inventory),
       spellCastThisTurn: {},
     }));
-  }, [character.inventory]);
+  }, [character.inventory, currentHp]);
 
   const endTurn = useCallback(() => {
     setState((s) => {
       if (s.inCombat) {
         // Stay in combat — return to idle within the same encounter,
         // advancing the round counter. The round log event is fired by TurnHub.
+        // Reset the activity window HERE (not in startTurn): handleEndTurn has
+        // already evaluated the durable-buff auto-end against these flags, so
+        // clearing them now opens a fresh window that still captures damage/
+        // attacks taken before the next startTurn (out-of-turn / enemy turns).
         return {
           ...s,
           phase: "idle",
@@ -204,6 +237,8 @@ export function useTurnState(character: Character, sessionId: string): TurnState
           bonusAttack: null,
           spellCastThisTurn: {},
           round: s.round + 1,
+          attackedThisTurn: false,
+          tookDamageThisTurn: false,
         };
       }
       // Out-of-combat (shouldn't normally happen now, but safe fallback).
@@ -235,7 +270,7 @@ export function useTurnState(character: Character, sessionId: string): TurnState
       // Clamp at total — keep attack non-null so the picker stays open for damage rolls.
       // The picker is closed explicitly by the player via the "Done" button.
       const used = Math.min(s.attack.used + 1, s.attack.total);
-      return { ...s, attack: { ...s.attack, used } };
+      return { ...s, attack: { ...s.attack, used }, attackedThisTurn: true };
     });
   }, []);
 
@@ -272,7 +307,7 @@ export function useTurnState(character: Character, sessionId: string): TurnState
   const recordTwfAttack = useCallback(() => {
     setState((s) => {
       if (!s.bonusAttack) return s;
-      return { ...s, bonusAttack: null }; // only 1 off-hand attack in TWF
+      return { ...s, bonusAttack: null, attackedThisTurn: true }; // only 1 off-hand attack in TWF
     });
   }, []);
 

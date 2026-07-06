@@ -82,6 +82,7 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
 
   // ── Barbarian ──────────────────────────────────────────────────────────────
   rage:              { key: "rage",              kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "rage" },
+  endRage:           { key: "endRage",           kind: "simple-confirm", slot: "bonusAction", serverEffect: true  },
   recklessAttack:    { key: "recklessAttack",    kind: "simple-confirm", slot: "free",        serverEffect: false },
 
   // ── Bard ───────────────────────────────────────────────────────────────────

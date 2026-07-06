@@ -113,6 +113,24 @@ describe("durable buffs (#455)", () => {
     expect((await readBuffs()).map((b) => b.key)).toEqual(["longBuff"]); // short cleared, long survives a short rest
   });
 
+  it("a while-active Rage buff clears on a long rest (#457)", async () => {
+    await applyBuff({ key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active" });
+    await applyHitPointOperations(FIXTURE_ID, [{ type: "longRest" }]);
+    expect(await readBuffs()).toEqual([]);
+  });
+
+  it("a while-active Rage buff clears when damage drops the character to 0 HP (#457)", async () => {
+    await applyBuff({ key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active" });
+    await applyHitPointOperations(FIXTURE_ID, [{ type: "damage", amount: 999 }]);
+    expect(await readBuffs()).toEqual([]);
+  });
+
+  it("a while-active Rage buff survives non-lethal damage (#457)", async () => {
+    await applyBuff({ key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "while-active" });
+    await applyHitPointOperations(FIXTURE_ID, [{ type: "damage", amount: 3 }]);
+    expect((await readBuffs()).map((b) => b.key)).toEqual(["rage"]);
+  });
+
   it("appendActiveBuffInTx rejects an until-rest buff with no restType (no silent long-rest default)", async () => {
     await expect(
       applyBuff({ key: "rage", target: "meleeDamage", modifier: 2, source: "Rage", duration: "until-rest" }),
