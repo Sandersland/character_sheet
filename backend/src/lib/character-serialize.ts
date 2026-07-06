@@ -38,6 +38,7 @@ import { deriveActions, type AvailableAction } from "./actions.js";
 import { normalizeResourcesMutable, type AdvancementEntry, type ToolProfEntry } from "./resources.js";
 import { normalizeConditionsMutable } from "./conditions.js";
 import { buffsByTarget, normalizeActiveEffectsMutable, type ActiveBuff } from "./active-effects.js";
+import { deriveItemPassiveBonuses, type ItemPassiveContribution } from "./capabilities.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeSpellcastingMutable } from "./spellcasting.js";
 import type { SpellEntry } from "./spell-state.js";
@@ -176,6 +177,7 @@ function serializeInventoryItem(
     cost: row.cost ?? undefined,
     description: row.description ?? undefined,
     equipped: row.equipped,
+    attuned: row.attuned,
     notes: row.notes ?? undefined,
     weapon,
     armor: row.armorDetail ? serializeArmorDetail(row.armorDetail) : undefined,
@@ -643,6 +645,7 @@ function buildInventoryContext(
   proficiencyBonus: number,
   weaponGrants: ReturnType<typeof buildMergedWeaponProficiencies>,
   fightingStyle: FightingStyleKey | null,
+  buffTargets: TargetModifierMap,
 ): InventoryItemContext {
   const equippedItems = row.inventoryItems.filter((i) => i.equipped);
   const equippedShieldPresent = equippedItems.some(
@@ -651,14 +654,34 @@ function buildInventoryContext(
   const equippedWeaponCount = equippedItems.filter((i) => i.category === "weapon").length;
   const offHandBusy = equippedShieldPresent || equippedWeaponCount >= 2;
 
-  // Sum active "meleeDamage" buffs (e.g. Rage) — added to melee weapon damage
-  // in deriveWeaponDamage, the same derive-on-read path skills use (#455).
-  const targetedBuffs = buffsByTarget(normalizeActiveEffectsMutable(row.activeEffects));
-  const meleeDamageBonus = (targetedBuffs.meleeDamage ?? []).reduce((sum, b) => sum + b.modifier, 0);
-  // Sum active "attackRoll" buffs (e.g. Sacred Weapon) — added to weapon attack bonus (#419).
-  const attackRollBonus = (targetedBuffs.attackRoll ?? []).reduce((sum, b) => sum + b.modifier, 0);
+  // Sum "meleeDamage" contributions (Rage buff + item passiveBonus) — added to
+  // melee weapon damage in deriveWeaponDamage, the same read path skills use (#455/#545).
+  const meleeDamageBonus = (buffTargets.meleeDamage ?? []).reduce((sum, b) => sum + b.modifier, 0);
+  // Sum "attackRoll" contributions (Sacred Weapon buff + item passiveBonus) — added
+  // to weapon attack bonus (#419/#545).
+  const attackRollBonus = (buffTargets.attackRoll ?? []).reduce((sum, b) => sum + b.modifier, 0);
 
   return { effectiveScores, proficiencyBonus, weaponGrants, offHandBusy, fightingStyle, meleeDamageBonus, attackRollBonus };
+}
+
+// The per-target modifier channel both skills and weapon math read: active cast
+// buffs (buffsByTarget) merged with active-item scalar passiveBonus contributions
+// (#545). Keyed the same way (skill name / meleeDamage / attackRoll) so item
+// bonuses and buffs sum together.
+type TargetModifierMap = Record<string, Array<{ modifier: number; source: string }>>;
+
+function mergeTargetModifiers(
+  buffTargets: Record<string, ActiveBuff[]>,
+  contributions: ItemPassiveContribution[],
+): TargetModifierMap {
+  const out: TargetModifierMap = {};
+  for (const [key, buffs] of Object.entries(buffTargets)) {
+    out[key] = buffs.map((b) => ({ modifier: b.modifier, source: b.source }));
+  }
+  for (const c of contributions) {
+    (out[c.target] ??= []).push({ modifier: c.modifier, source: c.source });
+  }
+  return out;
 }
 
 export function serializeCharacter(row: CharacterWithRelations) {
@@ -701,12 +724,28 @@ export function serializeCharacter(row: CharacterWithRelations) {
     featProficiencies.weapons,
   );
 
+  // Active cast-granted buffs (#438) merged with active-item scalar passiveBonus
+  // contributions (#545), summed per target into the affected skill/stat's
+  // tempModifier below (and into melee/attack weapon math). Both follow the
+  // base + additive-terms pattern; item bonuses apply only while equipped/attuned.
+  const activeEffects = normalizeActiveEffectsMutable(row.activeEffects);
+  const itemPassiveBonuses = deriveItemPassiveBonuses(
+    row.inventoryItems.map((i) => ({
+      name: i.name,
+      equipped: i.equipped,
+      attuned: i.attuned,
+      capabilities: i.capabilities,
+    })),
+  );
+  const buffTargets = mergeTargetModifiers(buffsByTarget(activeEffects), itemPassiveBonuses);
+
   const inventoryContext = buildInventoryContext(
     row,
     effectiveScores,
     progress.proficiencyBonus,
     weaponGrants,
     fightingStyle,
+    buffTargets,
   );
 
   // AC is derived, not persisted: best equipped body armor + Dex (per category)
@@ -771,11 +810,6 @@ export function serializeCharacter(row: CharacterWithRelations) {
     barbarianLevel,
     wearingHeavyArmor: bestArmor?.armorCategory === "heavy",
   });
-
-  // Active cast-granted buffs (#438): summed per target into the affected
-  // skill/stat's tempModifier below, following the base + additive-terms pattern.
-  const activeEffects = normalizeActiveEffectsMutable(row.activeEffects);
-  const buffTargets = buffsByTarget(activeEffects);
 
   // Labeled AC addends; armorClass below is their exact sum (single source in srd.ts).
   const acParts = deriveArmorClassParts(bestArmor, hasShield, dexMod, unarmoredDefense);
@@ -851,7 +885,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
         ...(tempModifier !== 0
           ? {
               tempModifier,
-              tempModifierSources: buffs.map((b: ActiveBuff) => ({ label: b.source, value: b.modifier })),
+              tempModifierSources: buffs.map((b) => ({ label: b.source, value: b.modifier })),
             }
           : {}),
       };
