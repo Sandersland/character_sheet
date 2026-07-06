@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import CampaignDetailPage from "@/features/campaign/CampaignDetailPage";
 import * as client from "@/api/client";
 import { __resetCampaignEntitiesCacheForTests } from "@/hooks/useCampaignEntities";
+import { __resetCampaignMergesCacheForTests } from "@/hooks/useCampaignMerges";
 import type { Campaign, CharacterSummary } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
@@ -16,6 +17,10 @@ vi.mock("@/api/client", () => ({
   createEntity: vi.fn(),
   updateEntity: vi.fn(),
   deleteEntity: vi.fn(),
+  fetchEntityMerges: vi.fn(),
+  prepareEntityMerge: vi.fn(),
+  executeEntityMerge: vi.fn(),
+  unmergeEntityMerge: vi.fn(),
   fetchCampaignItems: vi.fn(),
   fetchItems: vi.fn(),
 }));
@@ -66,9 +71,11 @@ function renderDetail(initialEntry = "/campaigns/camp-1") {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // The entity cache is module-level and leaks across tests without a reset.
+  // The entity + merge caches are module-level and leak across tests without a reset.
   __resetCampaignEntitiesCacheForTests();
+  __resetCampaignMergesCacheForTests();
   vi.mocked(client.fetchEntities).mockResolvedValue([]);
+  vi.mocked(client.fetchEntityMerges).mockResolvedValue([]);
   vi.mocked(client.fetchCampaignItems).mockResolvedValue([]);
   vi.mocked(client.fetchItems).mockResolvedValue([]);
 });
