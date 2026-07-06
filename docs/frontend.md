@@ -194,7 +194,7 @@ When adding a new editing surface: **default to inline**. Reach for `Modal` only
 
 ## Primitive components
 
-These eleven live in `src/components/ui/` and are intentionally domain-agnostic — they must not import from `@/features`, `@/api`, or `@/types/character`. They know nothing about D&D.
+These live in `src/components/ui/` and are intentionally domain-agnostic — they must not import from `@/features`, `@/api`, or `@/types/character`. They know nothing about D&D.
 
 | Component | Usage |
 |---|---|
@@ -210,6 +210,21 @@ These eleven live in `src/components/ui/` and are intentionally domain-agnostic 
 | `ErrorBoundary` | Class error boundary wrapping the route tree in `App.tsx`. Catches render-time crashes and shows a parchment "something went wrong" fallback (Reload / Back to characters) instead of a blank page. Optional `fallback?: (error, reset) => ReactNode` for custom recovery UI. |
 | `EmptyState` | Warm zero-state: decorative hero icon (pass a game-icon from `icons.ts`) + `font-display` title + optional `description` and `action` CTA. Prop `size`: `md` (card-body, default) / `sm` (in-card strip). Used for empty journal / inventory / spellbook / conditions. |
 | `Spinner` | Loading indicator (`role="status"` + visually-hidden "Loading…"). Prop `variant`: `page` (larger, centered in a full-screen `min-h-screen` container) / `inline` (small, centered in its block, default). **Always gate it with `useDelayedFlag`** (see Loading pattern below) so it only appears for genuinely slow loads — fast loads must render nothing, never a flashing spinner or text. |
+
+### Form primitives (#542)
+
+Token-styled, controlled building blocks for authoring forms. `Input`/`Textarea`/`Select` share `controlClass` (exported from `Input`) so every control surface matches; numeric inputs keep an explicit `text-parchment-900` for dark-mode legibility.
+
+| Component | Usage |
+|---|---|
+| `Field` | Label + control + hint/error wrapper. Props: `label`, `htmlFor?`, `hint?`, `error?` (error takes precedence over hint), `required?`. Wrap any control to get consistent label + helper-text layout. |
+| `Input` / `Textarea` / `Select` | `forwardRef` wrappers over the native element, pre-styled with the shared `controlClass` (Textarea adds `resize-y`). Spread all native attributes. Reach for these instead of hand-rolling `className={inputCls}`. |
+| `Segmented` | Single-select segmented control (WAI-ARIA `radiogroup`, roving tabindex, Arrow/Home/End nav), styled like `Tabs`. Generic over the value union. Props: `options` (`{value,label}[]`), `value`, `onChange`, `label`. Use for a small, mutually-exclusive choice (category, weapon class) instead of a `Select`. |
+| `ChipToggle` / `ChipGroup` | `aria-pressed` pill toggle + a labelled wrapping `role="group"` row. Use for a set of independent booleans (weapon/armor property flags) instead of a stack of checkboxes. |
+| `Disclosure` | Collapsible section: a disclosure button (`aria-expanded`/`aria-controls`) revealing a region. Use to tuck advanced/rarely-touched fields (e.g. the coin breakdown) behind progressive disclosure. |
+| `DiceInput` | Compound `NdF (+M) [type]` dice control (own `DiceValue` type). Props: `value`, `onChange`, `label`, `idPrefix`, `showModifier?`, `showType?`. Numeric segments force `text-parchment-900`. Use anywhere a form edits a decomposed roll spec. |
+
+The campaign item form (`features/entities/CampaignItemsPanel.tsx`) is the reference consumer: it recomposes into five labelled fieldsets (Identity, Category details, Magic, Value & weight, Description + DM notes) with progressive disclosure — the versatile die and range appear only when relevant, the coin breakdown lives behind a `Disclosure`, and attunement/unique + the rarity value hint show only for a non-Mundane rarity.
 
 ## Iconography — `components/ui/icons.ts`
 
