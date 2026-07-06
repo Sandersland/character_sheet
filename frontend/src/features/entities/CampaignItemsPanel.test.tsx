@@ -185,6 +185,179 @@ describe("CampaignItemsPanel edit (#505)", () => {
   });
 });
 
+describe("CampaignItemsPanel field parity (#527)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockEntities = [];
+    vi.mocked(fetchCampaignItems).mockResolvedValue([]);
+  });
+
+  it("sends the full weapon field set on create", async () => {
+    vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "new-1", name: "Spear" });
+    renderPanel();
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
+
+    await userEvent.type(screen.getByLabelText("Name *"), "Spear");
+    await userEvent.clear(screen.getByLabelText("Damage bonus"));
+    await userEvent.type(screen.getByLabelText("Damage bonus"), "1");
+    await userEvent.type(screen.getByLabelText("Versatile count"), "1");
+    await userEvent.type(screen.getByLabelText("Versatile faces"), "8");
+    await userEvent.type(screen.getByLabelText("Range (normal)"), "20");
+    await userEvent.type(screen.getByLabelText("Range (long)"), "60");
+    await userEvent.selectOptions(screen.getByLabelText("Weapon class"), "martial");
+    await userEvent.selectOptions(screen.getByLabelText("Weapon range"), "melee");
+    await userEvent.click(screen.getByRole("checkbox", { name: "thrown" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "reach" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Create item" }));
+
+    await waitFor(() =>
+      expect(createCampaignItem).toHaveBeenCalledWith(
+        "camp-1",
+        expect.objectContaining({
+          weapon: expect.objectContaining({
+            damageModifier: 1,
+            versatileDiceCount: 1,
+            versatileDiceFaces: 8,
+            rangeNormal: 20,
+            rangeLong: 60,
+            weaponClass: "martial",
+            weaponRange: "melee",
+            thrown: true,
+            reach: true,
+            finesse: false,
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("sends the full armor field set on create", async () => {
+    vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "new-2", name: "Half Plate", category: "armor" });
+    renderPanel();
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
+
+    await userEvent.type(screen.getByLabelText("Name *"), "Half Plate");
+    await userEvent.selectOptions(screen.getByLabelText("Category"), "armor");
+    await userEvent.type(screen.getByLabelText("Base AC"), "15");
+    await userEvent.type(screen.getByLabelText("Max Dex bonus"), "2");
+    await userEvent.type(screen.getByLabelText("Strength requirement"), "13");
+    await userEvent.click(screen.getByLabelText("Dex applies"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Create item" }));
+
+    await waitFor(() =>
+      expect(createCampaignItem).toHaveBeenCalledWith(
+        "camp-1",
+        expect.objectContaining({
+          armor: expect.objectContaining({
+            baseArmorClass: 15,
+            dexModifierMax: 2,
+            strengthRequirement: 13,
+            dexModifierApplies: false,
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("sends the full currency cost, not gp-only", async () => {
+    vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "new-3", name: "Trinket" });
+    renderPanel();
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
+
+    await userEvent.type(screen.getByLabelText("Name *"), "Trinket");
+    await userEvent.type(screen.getByLabelText("Value (cp)"), "5");
+    await userEvent.type(screen.getByLabelText("Value (sp)"), "3");
+    await userEvent.type(screen.getByLabelText("Value (gp)"), "2");
+    await userEvent.type(screen.getByLabelText("Value (pp)"), "1");
+
+    await userEvent.click(screen.getByRole("button", { name: "Create item" }));
+
+    await waitFor(() =>
+      expect(createCampaignItem).toHaveBeenCalledWith(
+        "camp-1",
+        expect.objectContaining({ cost: { cp: 5, sp: 3, gp: 2, pp: 1 } }),
+      ),
+    );
+  });
+
+  it("omits cost entirely when no currency field is filled", async () => {
+    vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "new-4", name: "Free" });
+    renderPanel();
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
+
+    await userEvent.type(screen.getByLabelText("Name *"), "Free");
+    await userEvent.click(screen.getByRole("button", { name: "Create item" }));
+
+    await waitFor(() => expect(createCampaignItem).toHaveBeenCalled());
+    const sent = vi.mocked(createCampaignItem).mock.calls[0][1];
+    expect(sent.cost).toBeUndefined();
+  });
+
+  it("pre-fills the new weapon fields when editing an existing item", async () => {
+    vi.mocked(fetchCampaignItems).mockResolvedValue([
+      {
+        ...baseItem,
+        weapon: {
+          damageDiceCount: 1,
+          damageDiceFaces: 6,
+          damageModifier: 2,
+          damageType: "piercing",
+          versatileDiceCount: 1,
+          versatileDiceFaces: 8,
+          finesse: true,
+          light: false,
+          heavy: false,
+          twoHanded: false,
+          reach: false,
+          thrown: true,
+          ammunition: false,
+          rangeNormal: 20,
+          rangeLong: 60,
+          weaponClass: "martial",
+          weaponRange: "melee",
+        },
+      },
+    ]);
+    renderPanel();
+    await screen.findByText("Flametongue");
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect((screen.getByLabelText("Damage bonus") as HTMLInputElement).value).toBe("2");
+    expect((screen.getByLabelText("Versatile faces") as HTMLInputElement).value).toBe("8");
+    expect((screen.getByLabelText("Range (normal)") as HTMLInputElement).value).toBe("20");
+    expect((screen.getByLabelText("Weapon class") as HTMLSelectElement).value).toBe("martial");
+    expect((screen.getByRole("checkbox", { name: "finesse" }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("checkbox", { name: "thrown" }) as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("pre-fills the new armor fields when editing an existing item", async () => {
+    vi.mocked(fetchCampaignItems).mockResolvedValue([
+      {
+        ...baseItem,
+        name: "Half Plate",
+        category: "armor",
+        armor: {
+          armorCategory: "medium",
+          baseArmorClass: 15,
+          dexModifierApplies: false,
+          dexModifierMax: 2,
+          stealthDisadvantage: true,
+          strengthRequirement: 13,
+        },
+      },
+    ]);
+    renderPanel();
+    await screen.findByText("Half Plate");
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect((screen.getByLabelText("Max Dex bonus") as HTMLInputElement).value).toBe("2");
+    expect((screen.getByLabelText("Strength requirement") as HTMLInputElement).value).toBe("13");
+    expect((screen.getByLabelText("Dex applies") as HTMLInputElement).checked).toBe(false);
+  });
+});
+
 describe("CampaignItemsPanel rarity (#497)", () => {
   beforeEach(() => {
     vi.clearAllMocks();

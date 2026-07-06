@@ -20,11 +20,16 @@ import { ITEM_CATEGORY_OPTIONS, itemCategoryLabel } from "@/lib/items";
 import { RARITY_OPTIONS, rarityLabel, rarityTone, rarityValueHint } from "@/lib/rarity";
 import type {
   ArmorCategory,
+  ArmorDetail,
   CampaignItem,
   CampaignItemInput,
+  Currency,
   Item,
   ItemCategory,
   ItemRarity,
+  WeaponClass,
+  WeaponDetail,
+  WeaponRange,
 } from "@/types/character";
 
 interface CampaignItemsPanelProps {
@@ -37,6 +42,10 @@ const inputCls =
   "w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
 const labelCls = "block text-xs font-semibold text-parchment-700";
 
+const WEAPON_FLAGS = ["finesse", "light", "heavy", "twoHanded", "reach", "thrown", "ammunition"] as const;
+type WeaponFlag = (typeof WEAPON_FLAGS)[number];
+const flagLabel = (flag: WeaponFlag) => (flag === "twoHanded" ? "two-handed" : flag);
+
 interface FormState {
   name: string;
   category: ItemCategory;
@@ -44,17 +53,37 @@ interface FormState {
   requiresAttunement: boolean;
   isUnique: boolean;
   weight: string;
+  costCp: string;
+  costSp: string;
   costGp: string;
+  costPp: string;
   description: string;
   dmNotes: string;
   // weapon
   damageDiceCount: string;
   damageDiceFaces: string;
+  damageModifier: string;
   damageType: string;
+  versatileDiceCount: string;
+  versatileDiceFaces: string;
+  finesse: boolean;
+  light: boolean;
+  heavy: boolean;
+  twoHanded: boolean;
+  reach: boolean;
+  thrown: boolean;
+  ammunition: boolean;
+  rangeNormal: string;
+  rangeLong: string;
+  weaponClass: WeaponClass | "";
+  weaponRange: WeaponRange | "";
   // armor
   armorCategory: string;
   baseArmorClass: string;
+  dexModifierApplies: boolean;
+  dexModifierMax: string;
   stealthDisadvantage: boolean;
+  strengthRequirement: string;
   // consumable
   effectDiceCount: string;
   effectDiceFaces: string;
@@ -69,15 +98,35 @@ const emptyForm: FormState = {
   requiresAttunement: false,
   isUnique: false,
   weight: "",
+  costCp: "",
+  costSp: "",
   costGp: "",
+  costPp: "",
   description: "",
   dmNotes: "",
   damageDiceCount: "1",
   damageDiceFaces: "6",
+  damageModifier: "0",
   damageType: "bludgeoning",
+  versatileDiceCount: "",
+  versatileDiceFaces: "",
+  finesse: false,
+  light: false,
+  heavy: false,
+  twoHanded: false,
+  reach: false,
+  thrown: false,
+  ammunition: false,
+  rangeNormal: "",
+  rangeLong: "",
+  weaponClass: "",
+  weaponRange: "",
   armorCategory: "light",
   baseArmorClass: "",
+  dexModifierApplies: true,
+  dexModifierMax: "",
   stealthDisadvantage: false,
+  strengthRequirement: "",
   effectDiceCount: "",
   effectDiceFaces: "",
   effectModifier: "",
@@ -89,6 +138,51 @@ const num = (s: string): number | undefined => {
   return s.trim() === "" || Number.isNaN(n) ? undefined : n;
 };
 
+const str = (n: number | undefined): string => (n === undefined ? "" : n.toString());
+
+// Map a persisted detail block back onto the string/boolean FormState slice.
+function currencyFields(cost: Currency | undefined) {
+  return {
+    costCp: str(cost?.cp),
+    costSp: str(cost?.sp),
+    costGp: str(cost?.gp),
+    costPp: str(cost?.pp),
+  };
+}
+
+function weaponFields(w: WeaponDetail | undefined) {
+  return {
+    damageDiceCount: str(w?.damageDiceCount) || emptyForm.damageDiceCount,
+    damageDiceFaces: str(w?.damageDiceFaces) || emptyForm.damageDiceFaces,
+    damageModifier: str(w?.damageModifier) || emptyForm.damageModifier,
+    damageType: w?.damageType ?? emptyForm.damageType,
+    versatileDiceCount: str(w?.versatileDiceCount),
+    versatileDiceFaces: str(w?.versatileDiceFaces),
+    finesse: w?.finesse ?? false,
+    light: w?.light ?? false,
+    heavy: w?.heavy ?? false,
+    twoHanded: w?.twoHanded ?? false,
+    reach: w?.reach ?? false,
+    thrown: w?.thrown ?? false,
+    ammunition: w?.ammunition ?? false,
+    rangeNormal: str(w?.rangeNormal),
+    rangeLong: str(w?.rangeLong),
+    weaponClass: (w?.weaponClass ?? "") as WeaponClass | "",
+    weaponRange: (w?.weaponRange ?? "") as WeaponRange | "",
+  };
+}
+
+function armorFields(a: ArmorDetail | undefined) {
+  return {
+    armorCategory: a?.armorCategory ?? emptyForm.armorCategory,
+    baseArmorClass: str(a?.baseArmorClass),
+    dexModifierApplies: a?.dexModifierApplies ?? true,
+    dexModifierMax: str(a?.dexModifierMax),
+    stealthDisadvantage: a?.stealthDisadvantage ?? false,
+    strengthRequirement: str(a?.strengthRequirement),
+  };
+}
+
 // Prefill the from-scratch form from a chosen catalog Item (clone path):
 // category/weight/cost/description + the matching detail block.
 function formFromCatalog(item: Item): FormState {
@@ -97,14 +191,10 @@ function formFromCatalog(item: Item): FormState {
     name: item.name,
     category: item.category,
     weight: item.weight?.toString() ?? "",
-    costGp: item.cost?.gp?.toString() ?? "",
+    ...currencyFields(item.cost),
     description: item.description ?? "",
-    damageDiceCount: item.weapon?.damageDiceCount?.toString() ?? emptyForm.damageDiceCount,
-    damageDiceFaces: item.weapon?.damageDiceFaces?.toString() ?? emptyForm.damageDiceFaces,
-    damageType: item.weapon?.damageType ?? emptyForm.damageType,
-    armorCategory: item.armor?.armorCategory ?? emptyForm.armorCategory,
-    baseArmorClass: item.armor?.baseArmorClass?.toString() ?? "",
-    stealthDisadvantage: item.armor?.stealthDisadvantage ?? false,
+    ...weaponFields(item.weapon),
+    ...armorFields(item.armor),
     effectDiceCount: item.consumable?.effectDiceCount?.toString() ?? "",
     effectDiceFaces: item.consumable?.effectDiceFaces?.toString() ?? "",
     effectModifier: item.consumable?.effectModifier?.toString() ?? "",
@@ -123,15 +213,11 @@ function formFromItem(item: CampaignItem): FormState {
     requiresAttunement: item.requiresAttunement,
     isUnique: item.isUnique,
     weight: item.weight?.toString() ?? "",
-    costGp: item.cost?.gp?.toString() ?? "",
+    ...currencyFields(item.cost),
     description: item.description ?? "",
     dmNotes: item.dmNotes ?? "",
-    damageDiceCount: item.weapon?.damageDiceCount?.toString() ?? emptyForm.damageDiceCount,
-    damageDiceFaces: item.weapon?.damageDiceFaces?.toString() ?? emptyForm.damageDiceFaces,
-    damageType: item.weapon?.damageType ?? emptyForm.damageType,
-    armorCategory: item.armor?.armorCategory ?? emptyForm.armorCategory,
-    baseArmorClass: item.armor?.baseArmorClass?.toString() ?? "",
-    stealthDisadvantage: item.armor?.stealthDisadvantage ?? false,
+    ...weaponFields(item.weapon),
+    ...armorFields(item.armor),
     effectDiceCount: item.consumable?.effectDiceCount?.toString() ?? "",
     effectDiceFaces: item.consumable?.effectDiceFaces?.toString() ?? "",
     effectModifier: item.consumable?.effectModifier?.toString() ?? "",
@@ -140,7 +226,11 @@ function formFromItem(item: CampaignItem): FormState {
 }
 
 function buildInput(f: FormState): CampaignItemInput {
+  const cp = num(f.costCp);
+  const sp = num(f.costSp);
   const gp = num(f.costGp);
+  const pp = num(f.costPp);
+  const hasCost = [cp, sp, gp, pp].some((v) => v !== undefined);
   const base: CampaignItemInput = {
     name: f.name.trim(),
     category: f.category,
@@ -148,7 +238,7 @@ function buildInput(f: FormState): CampaignItemInput {
     requiresAttunement: f.requiresAttunement,
     isUnique: f.isUnique,
     weight: num(f.weight),
-    cost: gp !== undefined ? { cp: 0, sp: 0, gp, pp: 0 } : undefined,
+    cost: hasCost ? { cp: cp ?? 0, sp: sp ?? 0, gp: gp ?? 0, pp: pp ?? 0 } : undefined,
     description: f.description.trim() || undefined,
     dmNotes: f.dmNotes.trim() || undefined,
   };
@@ -156,13 +246,30 @@ function buildInput(f: FormState): CampaignItemInput {
     base.weapon = {
       damageDiceCount: num(f.damageDiceCount) ?? 1,
       damageDiceFaces: num(f.damageDiceFaces) ?? 6,
+      damageModifier: num(f.damageModifier),
       damageType: f.damageType.trim() || "bludgeoning",
+      versatileDiceCount: num(f.versatileDiceCount),
+      versatileDiceFaces: num(f.versatileDiceFaces),
+      finesse: f.finesse,
+      light: f.light,
+      heavy: f.heavy,
+      twoHanded: f.twoHanded,
+      reach: f.reach,
+      thrown: f.thrown,
+      ammunition: f.ammunition,
+      rangeNormal: num(f.rangeNormal),
+      rangeLong: num(f.rangeLong),
+      weaponClass: f.weaponClass || undefined,
+      weaponRange: f.weaponRange || undefined,
     };
   } else if (f.category === "armor") {
     base.armor = {
       armorCategory: f.armorCategory as ArmorCategory,
       baseArmorClass: num(f.baseArmorClass) ?? 10,
+      dexModifierApplies: f.dexModifierApplies,
+      dexModifierMax: num(f.dexModifierMax),
       stealthDisadvantage: f.stealthDisadvantage,
+      strengthRequirement: num(f.strengthRequirement),
     };
   } else if (f.category === "consumable") {
     const effect = {
@@ -458,33 +565,43 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls} htmlFor="item-weight">
-                  Weight (lb)
-                </label>
-                <input
-                  id="item-weight"
-                  type="number"
-                  className={inputCls}
-                  value={form.weight}
-                  onChange={(e) => set("weight", e.target.value)}
-                />
-              </div>
-              <div>
-                <label className={labelCls} htmlFor="item-cost">
-                  Value (gp)
-                </label>
-                <input
-                  id="item-cost"
-                  type="number"
-                  className={inputCls}
-                  value={form.costGp}
-                  onChange={(e) => set("costGp", e.target.value)}
-                />
-                {rarityHint && <p className="mt-1 text-xs text-parchment-500">{rarityHint}</p>}
-              </div>
+            <div>
+              <label className={labelCls} htmlFor="item-weight">
+                Weight (lb)
+              </label>
+              <input
+                id="item-weight"
+                type="number"
+                className={inputCls}
+                value={form.weight}
+                onChange={(e) => set("weight", e.target.value)}
+              />
             </div>
+
+            <div className="grid grid-cols-4 gap-3">
+              {(
+                [
+                  ["costCp", "Value (cp)"],
+                  ["costSp", "Value (sp)"],
+                  ["costGp", "Value (gp)"],
+                  ["costPp", "Value (pp)"],
+                ] as const
+              ).map(([key, label]) => (
+                <div key={key}>
+                  <label className={labelCls} htmlFor={`item-${key}`}>
+                    {label}
+                  </label>
+                  <input
+                    id={`item-${key}`}
+                    type="number"
+                    className={inputCls}
+                    value={form[key]}
+                    onChange={(e) => set(key, e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+            {rarityHint && <p className="-mt-1 text-xs text-parchment-500">{rarityHint}</p>}
 
             <div className="flex flex-wrap gap-4">
               <label className="flex items-center gap-2 text-xs font-semibold text-parchment-700">
@@ -506,41 +623,159 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
             </div>
 
             {form.category === "weapon" && (
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className={labelCls} htmlFor="item-dice-count">
-                    Dice count
-                  </label>
-                  <input
-                    id="item-dice-count"
-                    type="number"
-                    className={inputCls}
-                    value={form.damageDiceCount}
-                    onChange={(e) => set("damageDiceCount", e.target.value)}
-                  />
+              <div className="flex flex-col gap-3">
+                <div className="grid grid-cols-4 gap-3">
+                  <div>
+                    <label className={labelCls} htmlFor="item-dice-count">
+                      Dice count
+                    </label>
+                    <input
+                      id="item-dice-count"
+                      type="number"
+                      className={inputCls}
+                      value={form.damageDiceCount}
+                      onChange={(e) => set("damageDiceCount", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls} htmlFor="item-dice-faces">
+                      Dice faces
+                    </label>
+                    <input
+                      id="item-dice-faces"
+                      type="number"
+                      className={inputCls}
+                      value={form.damageDiceFaces}
+                      onChange={(e) => set("damageDiceFaces", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls} htmlFor="item-damage-mod">
+                      Damage bonus
+                    </label>
+                    <input
+                      id="item-damage-mod"
+                      type="number"
+                      className={inputCls}
+                      value={form.damageModifier}
+                      onChange={(e) => set("damageModifier", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls} htmlFor="item-damage-type">
+                      Damage type
+                    </label>
+                    <input
+                      id="item-damage-type"
+                      className={inputCls}
+                      value={form.damageType}
+                      onChange={(e) => set("damageType", e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className={labelCls} htmlFor="item-dice-faces">
-                    Dice faces
-                  </label>
-                  <input
-                    id="item-dice-faces"
-                    type="number"
-                    className={inputCls}
-                    value={form.damageDiceFaces}
-                    onChange={(e) => set("damageDiceFaces", e.target.value)}
-                  />
+
+                <div className="grid grid-cols-4 gap-3">
+                  <div>
+                    <label className={labelCls} htmlFor="item-versatile-count">
+                      Versatile count
+                    </label>
+                    <input
+                      id="item-versatile-count"
+                      type="number"
+                      className={inputCls}
+                      placeholder="—"
+                      value={form.versatileDiceCount}
+                      onChange={(e) => set("versatileDiceCount", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls} htmlFor="item-versatile-faces">
+                      Versatile faces
+                    </label>
+                    <input
+                      id="item-versatile-faces"
+                      type="number"
+                      className={inputCls}
+                      placeholder="—"
+                      value={form.versatileDiceFaces}
+                      onChange={(e) => set("versatileDiceFaces", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls} htmlFor="item-range-normal">
+                      Range (normal)
+                    </label>
+                    <input
+                      id="item-range-normal"
+                      type="number"
+                      className={inputCls}
+                      placeholder="—"
+                      value={form.rangeNormal}
+                      onChange={(e) => set("rangeNormal", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls} htmlFor="item-range-long">
+                      Range (long)
+                    </label>
+                    <input
+                      id="item-range-long"
+                      type="number"
+                      className={inputCls}
+                      placeholder="—"
+                      value={form.rangeLong}
+                      onChange={(e) => set("rangeLong", e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className={labelCls} htmlFor="item-damage-type">
-                    Damage type
-                  </label>
-                  <input
-                    id="item-damage-type"
-                    className={inputCls}
-                    value={form.damageType}
-                    onChange={(e) => set("damageType", e.target.value)}
-                  />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls} htmlFor="item-weapon-class">
+                      Weapon class
+                    </label>
+                    <select
+                      id="item-weapon-class"
+                      className={inputCls}
+                      value={form.weaponClass}
+                      onChange={(e) => set("weaponClass", e.target.value as WeaponClass | "")}
+                    >
+                      <option value="">Unclassified</option>
+                      <option value="simple">Simple</option>
+                      <option value="martial">Martial</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls} htmlFor="item-weapon-range">
+                      Weapon range
+                    </label>
+                    <select
+                      id="item-weapon-range"
+                      className={inputCls}
+                      value={form.weaponRange}
+                      onChange={(e) => set("weaponRange", e.target.value as WeaponRange | "")}
+                    >
+                      <option value="">Unclassified</option>
+                      <option value="melee">Melee</option>
+                      <option value="ranged">Ranged</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-4">
+                  {WEAPON_FLAGS.map((flag) => (
+                    <label
+                      key={flag}
+                      className="flex items-center gap-2 text-xs font-semibold text-parchment-700"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form[flag]}
+                        onChange={(e) => set(flag, e.target.checked)}
+                      />
+                      {flagLabel(flag)}
+                    </label>
+                  ))}
                 </div>
               </div>
             )}
@@ -575,6 +810,40 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
                     onChange={(e) => set("baseArmorClass", e.target.value)}
                   />
                 </div>
+                <div>
+                  <label className={labelCls} htmlFor="item-dex-max">
+                    Max Dex bonus
+                  </label>
+                  <input
+                    id="item-dex-max"
+                    type="number"
+                    className={inputCls}
+                    placeholder="—"
+                    value={form.dexModifierMax}
+                    onChange={(e) => set("dexModifierMax", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls} htmlFor="item-str-req">
+                    Strength requirement
+                  </label>
+                  <input
+                    id="item-str-req"
+                    type="number"
+                    className={inputCls}
+                    placeholder="—"
+                    value={form.strengthRequirement}
+                    onChange={(e) => set("strengthRequirement", e.target.value)}
+                  />
+                </div>
+                <label className="col-span-2 flex items-center gap-2 text-xs font-semibold text-parchment-700">
+                  <input
+                    type="checkbox"
+                    checked={form.dexModifierApplies}
+                    onChange={(e) => set("dexModifierApplies", e.target.checked)}
+                  />
+                  Dex applies
+                </label>
                 <label className="col-span-2 flex items-center gap-2 text-xs font-semibold text-parchment-700">
                   <input
                     type="checkbox"
