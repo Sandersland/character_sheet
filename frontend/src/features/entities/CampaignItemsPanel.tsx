@@ -3,7 +3,16 @@ import { Link } from "react-router-dom";
 
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
+import ChipGroup from "@/components/ui/ChipGroup";
+import ChipToggle from "@/components/ui/ChipToggle";
+import DiceInput, { type DiceValue } from "@/components/ui/DiceInput";
+import Disclosure from "@/components/ui/Disclosure";
 import EmptyState from "@/components/ui/EmptyState";
+import Field from "@/components/ui/Field";
+import Input from "@/components/ui/Input";
+import Segmented from "@/components/ui/Segmented";
+import Select from "@/components/ui/Select";
+import Textarea from "@/components/ui/Textarea";
 import { GiKnapsack, Lock, Plus } from "@/components/ui/icons";
 import {
   awardCampaignItem,
@@ -16,6 +25,7 @@ import {
   updateEntity,
 } from "@/api/client";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
+import { formatCurrency, fromCopper, toCopper } from "@/lib/currency";
 import { ITEM_CATEGORY_OPTIONS, itemCategoryLabel } from "@/lib/items";
 import { RARITY_OPTIONS, rarityLabel, rarityTone, rarityValueHint } from "@/lib/rarity";
 import type {
@@ -38,13 +48,40 @@ interface CampaignItemsPanelProps {
   characters: { id: string; name: string; ownerId: string }[];
 }
 
-const inputCls =
-  "w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
-const labelCls = "block text-xs font-semibold text-parchment-700";
+const legendCls = "text-sm font-semibold text-parchment-800";
+const fieldsetCls = "flex min-w-0 flex-col gap-3 border-t border-parchment-200 pt-3 first:border-t-0 first:pt-0";
+const pairGridCls = "grid grid-cols-1 gap-3 sm:grid-cols-2";
 
 const WEAPON_FLAGS = ["finesse", "light", "heavy", "twoHanded", "reach", "thrown", "ammunition"] as const;
 type WeaponFlag = (typeof WEAPON_FLAGS)[number];
 const flagLabel = (flag: WeaponFlag) => (flag === "twoHanded" ? "two-handed" : flag);
+
+const CATEGORY_OPTIONS = ITEM_CATEGORY_OPTIONS.map((o) => ({ value: o.key, label: o.label }));
+const WEAPON_CLASS_OPTIONS: readonly { value: WeaponClass | ""; label: string }[] = [
+  { value: "", label: "Unclassified" },
+  { value: "simple", label: "Simple" },
+  { value: "martial", label: "Martial" },
+];
+const WEAPON_RANGE_OPTIONS: readonly { value: WeaponRange | ""; label: string }[] = [
+  { value: "", label: "Unclassified" },
+  { value: "melee", label: "Melee" },
+  { value: "ranged", label: "Ranged" },
+];
+const ARMOR_CATEGORY_OPTIONS: readonly { value: ArmorCategory; label: string }[] = [
+  { value: "light", label: "Light" },
+  { value: "medium", label: "Medium" },
+  { value: "heavy", label: "Heavy" },
+  { value: "shield", label: "Shield" },
+];
+
+type CurrencyUnit = "cp" | "sp" | "gp" | "pp";
+const CURRENCY_UNITS: readonly CurrencyUnit[] = ["cp", "sp", "gp", "pp"];
+const COST_KEYS: Record<CurrencyUnit, "costCp" | "costSp" | "costGp" | "costPp"> = {
+  cp: "costCp",
+  sp: "costSp",
+  gp: "costGp",
+  pp: "costPp",
+};
 
 interface FormState {
   name: string;
@@ -57,6 +94,7 @@ interface FormState {
   costSp: string;
   costGp: string;
   costPp: string;
+  valueUnit: CurrencyUnit;
   description: string;
   dmNotes: string;
   // weapon
@@ -64,6 +102,7 @@ interface FormState {
   damageDiceFaces: string;
   damageModifier: string;
   damageType: string;
+  versatile: boolean;
   versatileDiceCount: string;
   versatileDiceFaces: string;
   finesse: boolean;
@@ -102,12 +141,14 @@ const emptyForm: FormState = {
   costSp: "",
   costGp: "",
   costPp: "",
+  valueUnit: "gp",
   description: "",
   dmNotes: "",
   damageDiceCount: "1",
   damageDiceFaces: "6",
   damageModifier: "0",
   damageType: "bludgeoning",
+  versatile: false,
   versatileDiceCount: "",
   versatileDiceFaces: "",
   finesse: false,
@@ -156,6 +197,7 @@ function weaponFields(w: WeaponDetail | undefined) {
     damageDiceFaces: str(w?.damageDiceFaces) || emptyForm.damageDiceFaces,
     damageModifier: str(w?.damageModifier) || emptyForm.damageModifier,
     damageType: w?.damageType ?? emptyForm.damageType,
+    versatile: Boolean(w?.versatileDiceCount || w?.versatileDiceFaces),
     versatileDiceCount: str(w?.versatileDiceCount),
     versatileDiceFaces: str(w?.versatileDiceFaces),
     finesse: w?.finesse ?? false,
@@ -192,6 +234,7 @@ function formFromCatalog(item: Item): FormState {
     category: item.category,
     weight: item.weight?.toString() ?? "",
     ...currencyFields(item.cost),
+    valueUnit: unitForCost(item.cost),
     description: item.description ?? "",
     ...weaponFields(item.weapon),
     ...armorFields(item.armor),
@@ -214,6 +257,7 @@ function formFromItem(item: CampaignItem): FormState {
     isUnique: item.isUnique,
     weight: item.weight?.toString() ?? "",
     ...currencyFields(item.cost),
+    valueUnit: unitForCost(item.cost),
     description: item.description ?? "",
     dmNotes: item.dmNotes ?? "",
     ...weaponFields(item.weapon),
@@ -225,20 +269,39 @@ function formFromItem(item: CampaignItem): FormState {
   };
 }
 
-function buildInput(f: FormState): CampaignItemInput {
+// Range is shown/sent only for a ranged or thrown weapon.
+const hasRange = (f: FormState): boolean => f.weaponRange === "ranged" || f.thrown;
+
+// Highest populated denomination, so the single Value field faithfully shows an
+// existing cost on edit (e.g. {sp:50} → "sp"). Defaults to gp for a blank cost.
+const UNIT_ORDER: readonly CurrencyUnit[] = ["pp", "gp", "sp", "cp"];
+function unitForCost(cost: Currency | undefined): CurrencyUnit {
+  if (!cost) return "gp";
+  return UNIT_ORDER.find((u) => (cost[u] ?? 0) > 0) ?? "gp";
+}
+
+// The four-denomination cost, or undefined when every field is blank.
+function currencyFromForm(f: FormState): Currency | undefined {
   const cp = num(f.costCp);
   const sp = num(f.costSp);
   const gp = num(f.costGp);
   const pp = num(f.costPp);
-  const hasCost = [cp, sp, gp, pp].some((v) => v !== undefined);
+  if (![cp, sp, gp, pp].some((v) => v !== undefined)) return undefined;
+  return { cp: cp ?? 0, sp: sp ?? 0, gp: gp ?? 0, pp: pp ?? 0 };
+}
+
+function buildInput(f: FormState): CampaignItemInput {
+  // Attunement/unique only apply to a magic item — gate them like versatile/range
+  // so a mundane item can't carry stale flags the hidden chips can't clear.
+  const magic = f.rarity !== "";
   const base: CampaignItemInput = {
     name: f.name.trim(),
     category: f.category,
     rarity: f.rarity || undefined,
-    requiresAttunement: f.requiresAttunement,
-    isUnique: f.isUnique,
+    requiresAttunement: magic && f.requiresAttunement,
+    isUnique: magic && f.isUnique,
     weight: num(f.weight),
-    cost: hasCost ? { cp: cp ?? 0, sp: sp ?? 0, gp: gp ?? 0, pp: pp ?? 0 } : undefined,
+    cost: currencyFromForm(f),
     description: f.description.trim() || undefined,
     dmNotes: f.dmNotes.trim() || undefined,
   };
@@ -248,8 +311,8 @@ function buildInput(f: FormState): CampaignItemInput {
       damageDiceFaces: num(f.damageDiceFaces) ?? 6,
       damageModifier: num(f.damageModifier),
       damageType: f.damageType.trim() || "bludgeoning",
-      versatileDiceCount: num(f.versatileDiceCount),
-      versatileDiceFaces: num(f.versatileDiceFaces),
+      versatileDiceCount: f.versatile ? num(f.versatileDiceCount) : undefined,
+      versatileDiceFaces: f.versatile ? num(f.versatileDiceFaces) : undefined,
       finesse: f.finesse,
       light: f.light,
       heavy: f.heavy,
@@ -257,8 +320,10 @@ function buildInput(f: FormState): CampaignItemInput {
       reach: f.reach,
       thrown: f.thrown,
       ammunition: f.ammunition,
-      rangeNormal: num(f.rangeNormal),
-      rangeLong: num(f.rangeLong),
+      // Range only applies (and is only editable) when ranged or thrown — mirror
+      // the versatile gate so a melee weapon can't keep phantom hidden range.
+      rangeNormal: hasRange(f) ? num(f.rangeNormal) : undefined,
+      rangeLong: hasRange(f) ? num(f.rangeLong) : undefined,
       weaponClass: f.weaponClass || undefined,
       weaponRange: f.weaponRange || undefined,
     };
@@ -285,9 +350,9 @@ function buildInput(f: FormState): CampaignItemInput {
 
 // Owner-only Manage-tab panel (#380): authors DM campaign items via two paths —
 // clone-from-SRD-catalog (pre-fills the form from a chosen Item) and from-scratch
-// with category-conditional detail fields. The same form re-opens pre-filled to
-// edit an existing item (#505). Each create auto-registers a HIDDEN ITEM entity;
-// reveal/edit/delete here keep the shared Codex cache in sync.
+// with category-conditional detail fields. The shared form is recomposed (#542)
+// into labelled fieldsets with progressive disclosure. Each create auto-registers
+// a HIDDEN ITEM entity; reveal/edit/delete here keep the shared Codex cache in sync.
 export default function CampaignItemsPanel({ campaignId, characters }: CampaignItemsPanelProps) {
   const { entities } = useCampaignEntities(campaignId);
   const [items, setItems] = useState<CampaignItem[]>([]);
@@ -316,6 +381,63 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  // Single "Value" field writes one denomination and clears the rest.
+  function setSingleValue(amount: string) {
+    setForm((f) => ({
+      ...f,
+      costCp: "",
+      costSp: "",
+      costGp: "",
+      costPp: "",
+      [COST_KEYS[f.valueUnit]]: amount,
+    }));
+  }
+
+  // Switching the unit carries the current amount to the new denomination.
+  function setValueUnit(unit: CurrencyUnit) {
+    setForm((f) => ({
+      ...f,
+      costCp: "",
+      costSp: "",
+      costGp: "",
+      costPp: "",
+      valueUnit: unit,
+      [COST_KEYS[unit]]: f[COST_KEYS[f.valueUnit]],
+    }));
+  }
+
+  function setDamage(v: DiceValue) {
+    setForm((f) => ({
+      ...f,
+      damageDiceCount: v.count,
+      damageDiceFaces: v.faces,
+      damageModifier: v.modifier ?? "",
+      damageType: v.type ?? "",
+    }));
+  }
+
+  function setVersatileDie(v: DiceValue) {
+    setForm((f) => ({ ...f, versatileDiceCount: v.count, versatileDiceFaces: v.faces }));
+  }
+
+  function toggleVersatile(on: boolean) {
+    setForm((f) => ({
+      ...f,
+      versatile: on,
+      versatileDiceCount: on ? f.versatileDiceCount || "1" : "",
+      versatileDiceFaces: on ? f.versatileDiceFaces || "10" : "",
+    }));
+  }
+
+  function setEffect(v: DiceValue) {
+    setForm((f) => ({
+      ...f,
+      effectDiceCount: v.count,
+      effectDiceFaces: v.faces,
+      effectModifier: v.modifier ?? "",
+    }));
   }
 
   function revealInCache(entityId: string, visibility: "HIDDEN" | "REVEALED") {
@@ -461,9 +583,12 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
     }
   }
 
+  const isMagic = form.rarity !== "";
   const rarityHint = rarityValueHint(form.rarity || undefined, {
     isConsumable: form.category === "consumable",
   });
+  const cost = currencyFromForm(form);
+  const showRange = hasRange(form);
 
   return (
     <Card
@@ -490,15 +615,11 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
         )}
 
         {(creating || editingId !== null) && (
-          <div className="flex flex-col gap-3 rounded-control border border-parchment-200 bg-parchment-100 p-3">
+          <div className="flex flex-col gap-4 rounded-control border border-parchment-200 bg-parchment-100 p-3">
             {editingId === null && (
-              <div>
-                <label className={labelCls} htmlFor="item-clone">
-                  Clone from catalog (optional)
-                </label>
-                <select
+              <Field label="Clone from catalog (optional)" htmlFor="item-clone">
+                <Select
                   id="item-clone"
-                  className={inputCls}
                   value=""
                   onChange={(e) => {
                     const chosen = catalog.find((c) => c.id === e.target.value);
@@ -511,47 +632,196 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
                       {c.name}
                     </option>
                   ))}
-                </select>
-              </div>
+                </Select>
+              </Field>
             )}
 
-            <div>
-              <label className={labelCls} htmlFor="item-name">
-                Name *
-              </label>
-              <input
-                id="item-name"
-                className={inputCls}
-                value={form.name}
-                onChange={(e) => set("name", e.target.value)}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls} htmlFor="item-category">
-                  Category
-                </label>
-                <select
-                  id="item-category"
-                  className={inputCls}
+            <fieldset className={fieldsetCls}>
+              <legend className={legendCls}>Identity</legend>
+              <Field label="Name" htmlFor="item-name" required>
+                <Input id="item-name" value={form.name} onChange={(e) => set("name", e.target.value)} />
+              </Field>
+              <Field label="Category">
+                <Segmented
+                  label="Category"
+                  options={CATEGORY_OPTIONS}
                   value={form.category}
-                  onChange={(e) => set("category", e.target.value as ItemCategory)}
-                >
-                  {ITEM_CATEGORY_OPTIONS.map((o) => (
-                    <option key={o.key} value={o.key}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className={labelCls} htmlFor="item-rarity">
-                  Rarity
-                </label>
-                <select
+                  onChange={(v) => set("category", v)}
+                />
+              </Field>
+            </fieldset>
+
+            <fieldset className={fieldsetCls}>
+              <legend className={legendCls}>Category details</legend>
+
+              {form.category === "gear" && (
+                <p className="text-xs text-parchment-500">Gear has no extra mechanics.</p>
+              )}
+
+              {form.category === "weapon" && (
+                <div className="flex flex-col gap-3">
+                  <DiceInput
+                    label="Damage"
+                    idPrefix="item-damage"
+                    showModifier
+                    showType
+                    value={{
+                      count: form.damageDiceCount,
+                      faces: form.damageDiceFaces,
+                      modifier: form.damageModifier,
+                      type: form.damageType,
+                    }}
+                    onChange={setDamage}
+                  />
+
+                  <div className={pairGridCls}>
+                    <Field label="Weapon class">
+                      <Segmented
+                        label="Weapon class"
+                        options={WEAPON_CLASS_OPTIONS}
+                        value={form.weaponClass}
+                        onChange={(v) => set("weaponClass", v)}
+                      />
+                    </Field>
+                    <Field label="Weapon range">
+                      <Segmented
+                        label="Weapon range"
+                        options={WEAPON_RANGE_OPTIONS}
+                        value={form.weaponRange}
+                        onChange={(v) => set("weaponRange", v)}
+                      />
+                    </Field>
+                  </div>
+
+                  <ChipGroup label="Weapon properties">
+                    {WEAPON_FLAGS.map((flag) => (
+                      <ChipToggle key={flag} pressed={form[flag]} onChange={(v) => set(flag, v)}>
+                        {flagLabel(flag)}
+                      </ChipToggle>
+                    ))}
+                    <ChipToggle pressed={form.versatile} onChange={toggleVersatile}>
+                      versatile
+                    </ChipToggle>
+                  </ChipGroup>
+
+                  {form.versatile && (
+                    <DiceInput
+                      label="Versatile damage"
+                      idPrefix="item-versatile"
+                      value={{ count: form.versatileDiceCount, faces: form.versatileDiceFaces }}
+                      onChange={setVersatileDie}
+                    />
+                  )}
+
+                  {showRange && (
+                    <div className={pairGridCls}>
+                      <Field label="Range (normal)" htmlFor="item-range-normal">
+                        <Input
+                          id="item-range-normal"
+                          type="number"
+                          placeholder="—"
+                          value={form.rangeNormal}
+                          onChange={(e) => set("rangeNormal", e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Range (long)" htmlFor="item-range-long">
+                        <Input
+                          id="item-range-long"
+                          type="number"
+                          placeholder="—"
+                          value={form.rangeLong}
+                          onChange={(e) => set("rangeLong", e.target.value)}
+                        />
+                      </Field>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {form.category === "armor" && (
+                <div className="flex flex-col gap-3">
+                  <Field label="Armor type">
+                    <Segmented
+                      label="Armor type"
+                      options={ARMOR_CATEGORY_OPTIONS}
+                      value={form.armorCategory as ArmorCategory}
+                      onChange={(v) => set("armorCategory", v)}
+                    />
+                  </Field>
+                  <div className={pairGridCls}>
+                    <Field label="Base AC" htmlFor="item-base-ac">
+                      <Input
+                        id="item-base-ac"
+                        type="number"
+                        value={form.baseArmorClass}
+                        onChange={(e) => set("baseArmorClass", e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Max Dex bonus" htmlFor="item-dex-max">
+                      <Input
+                        id="item-dex-max"
+                        type="number"
+                        placeholder="—"
+                        value={form.dexModifierMax}
+                        onChange={(e) => set("dexModifierMax", e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Strength requirement" htmlFor="item-str-req">
+                      <Input
+                        id="item-str-req"
+                        type="number"
+                        placeholder="—"
+                        value={form.strengthRequirement}
+                        onChange={(e) => set("strengthRequirement", e.target.value)}
+                      />
+                    </Field>
+                  </div>
+                  <ChipGroup label="Armor properties">
+                    <ChipToggle
+                      pressed={form.dexModifierApplies}
+                      onChange={(v) => set("dexModifierApplies", v)}
+                    >
+                      Dex applies
+                    </ChipToggle>
+                    <ChipToggle
+                      pressed={form.stealthDisadvantage}
+                      onChange={(v) => set("stealthDisadvantage", v)}
+                    >
+                      Stealth disadvantage
+                    </ChipToggle>
+                  </ChipGroup>
+                </div>
+              )}
+
+              {form.category === "consumable" && (
+                <div className="flex flex-col gap-3">
+                  <DiceInput
+                    label="Effect"
+                    idPrefix="item-effect"
+                    showModifier
+                    value={{
+                      count: form.effectDiceCount,
+                      faces: form.effectDiceFaces,
+                      modifier: form.effectModifier,
+                    }}
+                    onChange={setEffect}
+                  />
+                  <Field label="Effect description" htmlFor="item-effect-desc">
+                    <Input
+                      id="item-effect-desc"
+                      value={form.effectDescription}
+                      onChange={(e) => set("effectDescription", e.target.value)}
+                    />
+                  </Field>
+                </div>
+              )}
+            </fieldset>
+
+            <fieldset className={fieldsetCls}>
+              <legend className={legendCls}>Magic</legend>
+              <Field label="Rarity" htmlFor="item-rarity" hint={isMagic ? rarityHint : undefined}>
+                <Select
                   id="item-rarity"
-                  className={inputCls}
                   value={form.rarity}
                   onChange={(e) => set("rarity", e.target.value as ItemRarity | "")}
                 >
@@ -561,376 +831,107 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
                       {o.label}
                     </option>
                   ))}
-                </select>
-              </div>
-            </div>
+                </Select>
+              </Field>
+              {isMagic && (
+                <ChipGroup label="Magic properties">
+                  <ChipToggle
+                    pressed={form.requiresAttunement}
+                    onChange={(v) => set("requiresAttunement", v)}
+                  >
+                    Requires attunement
+                  </ChipToggle>
+                  <ChipToggle pressed={form.isUnique} onChange={(v) => set("isUnique", v)}>
+                    Unique
+                  </ChipToggle>
+                </ChipGroup>
+              )}
+              {/* Structural slot for the #526 magic-item capabilities editor. */}
+            </fieldset>
 
-            <div>
-              <label className={labelCls} htmlFor="item-weight">
-                Weight (lb)
-              </label>
-              <input
-                id="item-weight"
-                type="number"
-                className={inputCls}
-                value={form.weight}
-                onChange={(e) => set("weight", e.target.value)}
-              />
-            </div>
-
-            <div className="grid grid-cols-4 gap-3">
-              {(
-                [
-                  ["costCp", "Value (cp)"],
-                  ["costSp", "Value (sp)"],
-                  ["costGp", "Value (gp)"],
-                  ["costPp", "Value (pp)"],
-                ] as const
-              ).map(([key, label]) => (
-                <div key={key}>
-                  <label className={labelCls} htmlFor={`item-${key}`}>
-                    {label}
-                  </label>
-                  <input
-                    id={`item-${key}`}
+            <fieldset className={fieldsetCls}>
+              <legend className={legendCls}>Value &amp; weight</legend>
+              <div className={pairGridCls}>
+                <Field label="Value" htmlFor="item-value" hint={cost ? formatCurrency(cost) : undefined}>
+                  <div className="flex min-w-0 gap-1.5">
+                    <Input
+                      id="item-value"
+                      type="number"
+                      className="text-parchment-900"
+                      value={form[COST_KEYS[form.valueUnit]]}
+                      onChange={(e) => setSingleValue(e.target.value)}
+                    />
+                    <Select
+                      aria-label="Value unit"
+                      className="w-20"
+                      value={form.valueUnit}
+                      onChange={(e) => setValueUnit(e.target.value as CurrencyUnit)}
+                    >
+                      {CURRENCY_UNITS.map((u) => (
+                        <option key={u} value={u}>
+                          {u}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                </Field>
+                <Field label="Weight (lb)" htmlFor="item-weight">
+                  <Input
+                    id="item-weight"
                     type="number"
-                    className={inputCls}
-                    value={form[key]}
-                    onChange={(e) => set(key, e.target.value)}
+                    value={form.weight}
+                    onChange={(e) => set("weight", e.target.value)}
                   />
-                </div>
-              ))}
-            </div>
-            {rarityHint && <p className="-mt-1 text-xs text-parchment-500">{rarityHint}</p>}
-
-            <div className="flex flex-wrap gap-4">
-              <label className="flex items-center gap-2 text-xs font-semibold text-parchment-700">
-                <input
-                  type="checkbox"
-                  checked={form.requiresAttunement}
-                  onChange={(e) => set("requiresAttunement", e.target.checked)}
-                />
-                Requires attunement
-              </label>
-              <label className="flex items-center gap-2 text-xs font-semibold text-parchment-700">
-                <input
-                  type="checkbox"
-                  checked={form.isUnique}
-                  onChange={(e) => set("isUnique", e.target.checked)}
-                />
-                Unique
-              </label>
-            </div>
-
-            {form.category === "weapon" && (
-              <div className="flex flex-col gap-3">
-                <div className="grid grid-cols-4 gap-3">
-                  <div>
-                    <label className={labelCls} htmlFor="item-dice-count">
-                      Dice count
-                    </label>
-                    <input
-                      id="item-dice-count"
-                      type="number"
-                      className={inputCls}
-                      value={form.damageDiceCount}
-                      onChange={(e) => set("damageDiceCount", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls} htmlFor="item-dice-faces">
-                      Dice faces
-                    </label>
-                    <input
-                      id="item-dice-faces"
-                      type="number"
-                      className={inputCls}
-                      value={form.damageDiceFaces}
-                      onChange={(e) => set("damageDiceFaces", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls} htmlFor="item-damage-mod">
-                      Damage bonus
-                    </label>
-                    <input
-                      id="item-damage-mod"
-                      type="number"
-                      className={inputCls}
-                      value={form.damageModifier}
-                      onChange={(e) => set("damageModifier", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls} htmlFor="item-damage-type">
-                      Damage type
-                    </label>
-                    <input
-                      id="item-damage-type"
-                      className={inputCls}
-                      value={form.damageType}
-                      onChange={(e) => set("damageType", e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-4 gap-3">
-                  <div>
-                    <label className={labelCls} htmlFor="item-versatile-count">
-                      Versatile count
-                    </label>
-                    <input
-                      id="item-versatile-count"
-                      type="number"
-                      className={inputCls}
-                      placeholder="—"
-                      value={form.versatileDiceCount}
-                      onChange={(e) => set("versatileDiceCount", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls} htmlFor="item-versatile-faces">
-                      Versatile faces
-                    </label>
-                    <input
-                      id="item-versatile-faces"
-                      type="number"
-                      className={inputCls}
-                      placeholder="—"
-                      value={form.versatileDiceFaces}
-                      onChange={(e) => set("versatileDiceFaces", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls} htmlFor="item-range-normal">
-                      Range (normal)
-                    </label>
-                    <input
-                      id="item-range-normal"
-                      type="number"
-                      className={inputCls}
-                      placeholder="—"
-                      value={form.rangeNormal}
-                      onChange={(e) => set("rangeNormal", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls} htmlFor="item-range-long">
-                      Range (long)
-                    </label>
-                    <input
-                      id="item-range-long"
-                      type="number"
-                      className={inputCls}
-                      placeholder="—"
-                      value={form.rangeLong}
-                      onChange={(e) => set("rangeLong", e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={labelCls} htmlFor="item-weapon-class">
-                      Weapon class
-                    </label>
-                    <select
-                      id="item-weapon-class"
-                      className={inputCls}
-                      value={form.weaponClass}
-                      onChange={(e) => set("weaponClass", e.target.value as WeaponClass | "")}
-                    >
-                      <option value="">Unclassified</option>
-                      <option value="simple">Simple</option>
-                      <option value="martial">Martial</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelCls} htmlFor="item-weapon-range">
-                      Weapon range
-                    </label>
-                    <select
-                      id="item-weapon-range"
-                      className={inputCls}
-                      value={form.weaponRange}
-                      onChange={(e) => set("weaponRange", e.target.value as WeaponRange | "")}
-                    >
-                      <option value="">Unclassified</option>
-                      <option value="melee">Melee</option>
-                      <option value="ranged">Ranged</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-4">
-                  {WEAPON_FLAGS.map((flag) => (
-                    <label
-                      key={flag}
-                      className="flex items-center gap-2 text-xs font-semibold text-parchment-700"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={form[flag]}
-                        onChange={(e) => set(flag, e.target.checked)}
+                </Field>
+              </div>
+              <Disclosure summary="Coin breakdown">
+                <div className={pairGridCls}>
+                  {(
+                    [
+                      ["costCp", "Value (cp)"],
+                      ["costSp", "Value (sp)"],
+                      ["costGp", "Value (gp)"],
+                      ["costPp", "Value (pp)"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <Field key={key} label={label} htmlFor={`item-${key}`}>
+                      <Input
+                        id={`item-${key}`}
+                        type="number"
+                        className="text-parchment-900"
+                        value={form[key]}
+                        onChange={(e) => set(key, e.target.value)}
                       />
-                      {flagLabel(flag)}
-                    </label>
+                    </Field>
                   ))}
                 </div>
-              </div>
-            )}
+                {cost && (
+                  <p className="mt-2 text-xs text-parchment-500">
+                    Total: {formatCurrency(fromCopper(toCopper(cost)))}
+                  </p>
+                )}
+              </Disclosure>
+            </fieldset>
 
-            {form.category === "armor" && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelCls} htmlFor="item-armor-category">
-                    Armor type
-                  </label>
-                  <select
-                    id="item-armor-category"
-                    className={inputCls}
-                    value={form.armorCategory}
-                    onChange={(e) => set("armorCategory", e.target.value)}
-                  >
-                    <option value="light">Light</option>
-                    <option value="medium">Medium</option>
-                    <option value="heavy">Heavy</option>
-                    <option value="shield">Shield</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={labelCls} htmlFor="item-base-ac">
-                    Base AC
-                  </label>
-                  <input
-                    id="item-base-ac"
-                    type="number"
-                    className={inputCls}
-                    value={form.baseArmorClass}
-                    onChange={(e) => set("baseArmorClass", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className={labelCls} htmlFor="item-dex-max">
-                    Max Dex bonus
-                  </label>
-                  <input
-                    id="item-dex-max"
-                    type="number"
-                    className={inputCls}
-                    placeholder="—"
-                    value={form.dexModifierMax}
-                    onChange={(e) => set("dexModifierMax", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className={labelCls} htmlFor="item-str-req">
-                    Strength requirement
-                  </label>
-                  <input
-                    id="item-str-req"
-                    type="number"
-                    className={inputCls}
-                    placeholder="—"
-                    value={form.strengthRequirement}
-                    onChange={(e) => set("strengthRequirement", e.target.value)}
-                  />
-                </div>
-                <label className="col-span-2 flex items-center gap-2 text-xs font-semibold text-parchment-700">
-                  <input
-                    type="checkbox"
-                    checked={form.dexModifierApplies}
-                    onChange={(e) => set("dexModifierApplies", e.target.checked)}
-                  />
-                  Dex applies
-                </label>
-                <label className="col-span-2 flex items-center gap-2 text-xs font-semibold text-parchment-700">
-                  <input
-                    type="checkbox"
-                    checked={form.stealthDisadvantage}
-                    onChange={(e) => set("stealthDisadvantage", e.target.checked)}
-                  />
-                  Stealth disadvantage
-                </label>
-              </div>
-            )}
-
-            {form.category === "consumable" && (
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className={labelCls} htmlFor="item-effect-count">
-                    Effect dice
-                  </label>
-                  <input
-                    id="item-effect-count"
-                    type="number"
-                    className={inputCls}
-                    value={form.effectDiceCount}
-                    onChange={(e) => set("effectDiceCount", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className={labelCls} htmlFor="item-effect-faces">
-                    Effect faces
-                  </label>
-                  <input
-                    id="item-effect-faces"
-                    type="number"
-                    className={inputCls}
-                    value={form.effectDiceFaces}
-                    onChange={(e) => set("effectDiceFaces", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className={labelCls} htmlFor="item-effect-mod">
-                    Modifier
-                  </label>
-                  <input
-                    id="item-effect-mod"
-                    type="number"
-                    className={inputCls}
-                    value={form.effectModifier}
-                    onChange={(e) => set("effectModifier", e.target.value)}
-                  />
-                </div>
-                <div className="col-span-3">
-                  <label className={labelCls} htmlFor="item-effect-desc">
-                    Effect description
-                  </label>
-                  <input
-                    id="item-effect-desc"
-                    className={inputCls}
-                    value={form.effectDescription}
-                    onChange={(e) => set("effectDescription", e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className={labelCls} htmlFor="item-description">
-                Description
-              </label>
-              <textarea
-                id="item-description"
-                rows={2}
-                className={`${inputCls} resize-y`}
-                value={form.description}
-                onChange={(e) => set("description", e.target.value)}
-              />
-            </div>
-            <div>
-              <label className={labelCls} htmlFor="item-dmnotes">
-                DM notes (hidden from players)
-              </label>
-              <textarea
-                id="item-dmnotes"
-                rows={2}
-                className={`${inputCls} resize-y`}
-                value={form.dmNotes}
-                onChange={(e) => set("dmNotes", e.target.value)}
-              />
-            </div>
+            <fieldset className={fieldsetCls}>
+              <legend className={legendCls}>Description &amp; DM notes</legend>
+              <Field label="Description" htmlFor="item-description">
+                <Textarea
+                  id="item-description"
+                  rows={2}
+                  value={form.description}
+                  onChange={(e) => set("description", e.target.value)}
+                />
+              </Field>
+              <Field label="DM notes (hidden from players)" htmlFor="item-dmnotes">
+                <Textarea
+                  id="item-dmnotes"
+                  rows={2}
+                  value={form.dmNotes}
+                  onChange={(e) => set("dmNotes", e.target.value)}
+                />
+              </Field>
+            </fieldset>
 
             <div className="flex justify-end gap-2">
               <button
