@@ -4,7 +4,7 @@
 // connection (seed.ts calls main() at module load, which connects to
 // Postgres). seed.ts imports everything here; the data is identical, just
 // relocated. Rules-correctness invariants are guarded by
-// prisma/__tests__/catalog-data.test.ts.
+// prisma/seed/__tests__/catalog-data.test.ts.
 //
 // NOTE: 5e *rules math* still lives in src/lib (srd.ts, experience.ts,
 // starting-equipment.ts). This file is catalog seed rows only.
