@@ -237,6 +237,22 @@ export default function EntityDetailPage() {
     }
   }
 
+  async function handleToggleVisibility() {
+    if (!campaignId || !entityId || !entity) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const next = entity.visibility === "HIDDEN" ? "REVEALED" : "HIDDEN";
+      const updated = await updateEntity(campaignId, entityId, { visibility: next });
+      setEntity(updated);
+      primeCampaignEntities(campaignId, entities.map((e) => (e.id === entityId ? updated : e)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to change visibility.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const inputCls =
     "w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
   const labelCls = "block text-xs font-semibold text-parchment-700";
@@ -396,7 +412,15 @@ export default function EntityDetailPage() {
                 </p>
               </div>
               {role === "OWNER" && (
-                <div className="border-t border-parchment-200 pt-3">
+                <div className="flex items-center gap-4 border-t border-parchment-200 pt-3">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={handleToggleVisibility}
+                    className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
+                  >
+                    {entity.visibility === "HIDDEN" ? "Reveal to players" : "Hide from players"}
+                  </button>
                   <button
                     type="button"
                     disabled={busy}
