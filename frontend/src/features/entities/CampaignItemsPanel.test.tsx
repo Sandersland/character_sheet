@@ -331,6 +331,31 @@ describe("CampaignItemsPanel field parity (#527)", () => {
     expect((screen.getByRole("checkbox", { name: "finesse" }) as HTMLInputElement).checked).toBe(true);
     expect((screen.getByRole("checkbox", { name: "thrown" }) as HTMLInputElement).checked).toBe(true);
   });
+
+  it("pre-fills the new armor fields when editing an existing item", async () => {
+    vi.mocked(fetchCampaignItems).mockResolvedValue([
+      {
+        ...baseItem,
+        name: "Half Plate",
+        category: "armor",
+        armor: {
+          armorCategory: "medium",
+          baseArmorClass: 15,
+          dexModifierApplies: false,
+          dexModifierMax: 2,
+          stealthDisadvantage: true,
+          strengthRequirement: 13,
+        },
+      },
+    ]);
+    renderPanel();
+    await screen.findByText("Half Plate");
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect((screen.getByLabelText("Max Dex bonus") as HTMLInputElement).value).toBe("2");
+    expect((screen.getByLabelText("Strength requirement") as HTMLInputElement).value).toBe("13");
+    expect((screen.getByLabelText("Dex applies") as HTMLInputElement).checked).toBe(false);
+  });
 });
 
 describe("CampaignItemsPanel rarity (#497)", () => {
