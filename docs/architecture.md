@@ -2,9 +2,11 @@
 
 ## Backend (`backend/src`)
 
-### Router map — all mounted under `/api` in `app.ts`
+### Router map
 
 *Source of truth: `backend/src/app.ts` mounts — regenerate this table from there if it looks stale.*
+
+**Mount strategy (#501).** Catalog/reference + plain-REST routers mount at `/api` (`characters`, `reference`, `items`, `spells`, `feats`, `sessions`, `journal`, `campaigns`, `entities`, `campaign-items`). Character-scoped mutation routers instead mount on their **owned sub-path** under `/api/characters/:id` and read `:id` via `Router({ mergeParams: true })` — so their handlers declare only the leaf (`/`, `/transactions`, `/events/:batchId/revert`), not the full prefix. Mounts: `hp`→hitpoints, `inventory`, `experience`, `spellcasting`, `resources`, `conditions`, `class`, `channel-divinity`, `advancement`, `actions`, and the character root itself→activity (it owns two leaves). The three hybrid routers (`maneuvers`, `disciplines`, `shadow-arts`) each serve a top-level catalog (`GET /api/<name>`) plus a character transaction, so they mount on **both** `/api/<name>` and `/api/characters/:id/<name>`. The `Endpoints` column below lists the unchanged **external** URLs clients call.
 
 **Request pipeline & auth gate (#101).** `app.ts` mounts, in order: security headers → CORS → JSON body → request logger → rate limiters → `healthRouter` → `authRouter` → **`requireAuth`** → every other router → SPA static (optional) → JSON 404 → terminal error handler. The **public allowlist** is exactly `health` + `/api/auth/*` (mounted before `requireAuth`); every router below the gate requires a valid session (401 otherwise — including unknown `/api/*` paths, so existence isn't leaked). Character-scoped routes additionally call `assertCharacterAccess` (see Identity & ownership) for per-owner 403.
 

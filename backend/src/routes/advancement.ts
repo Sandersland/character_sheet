@@ -14,7 +14,7 @@ import { FEAT_IMPROVEMENT_TARGETS } from "../lib/srd.js";
 import { characterInclude } from "../lib/character-include.js";
 import { serializeCharacter } from "../lib/character-serialize.js";
 
-export const advancementRouter = Router();
+export const advancementRouter = Router({ mergeParams: true });
 
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 
@@ -94,8 +94,8 @@ const transactionsRequestSchema = z.object({
 //
 // Returns the full updated character on success.
 
-advancementRouter.post(
-  "/characters/:id/advancement/transactions",
+advancementRouter.post<{ id: string }>(
+  "/transactions",
   async (req, res) => {
     await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 

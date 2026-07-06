@@ -12,12 +12,12 @@ import { prisma } from "../lib/prisma.js";
 import { characterInclude } from "../lib/character-include.js";
 import { serializeCharacter } from "../lib/character-serialize.js";
 
-export const maneuversRouter = Router();
+export const maneuversRouter = Router({ mergeParams: true });
 
 // Feeds the resources section's "learn a maneuver" picker — same role as
 // GET /api/spells for the spellbook. GrantedAbility rows (source "maneuver"),
 // carrying the placement/action metadata the session UI routes on. Alphabetical.
-maneuversRouter.get("/maneuvers", async (_req, res) => {
+maneuversRouter.get("/", async (_req, res) => {
   const maneuvers = await prisma.grantedAbility.findMany({
     where: { source: "maneuver" },
     orderBy: { name: "asc" },
@@ -54,7 +54,7 @@ const transactionsRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),
 });
 
-maneuversRouter.post("/characters/:id/maneuvers/transactions", async (req, res) => {
+maneuversRouter.post<{ id: string }>("/transactions", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const parseResult = transactionsRequestSchema.safeParse(req.body);

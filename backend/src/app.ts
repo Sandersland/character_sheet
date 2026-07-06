@@ -85,25 +85,36 @@ export function createApp() {
   app.use("/api", requireAuth);
 
   app.use("/api", charactersRouter);
+
+  // Catalog / reference routers own top-level collection paths.
   app.use("/api", referenceRouter);
   app.use("/api", itemsRouter);
-  app.use("/api", hitPointsRouter);
-  app.use("/api", inventoryRouter);
-  app.use("/api", experienceRouter);
-  app.use("/api", activityRouter);
   app.use("/api", spellsRouter);
-  app.use("/api", spellcastingRouter);
-  app.use("/api", resourcesRouter);
-  app.use("/api", conditionsRouter);
-  app.use("/api", classRouter);
-  app.use("/api", maneuversRouter);
-  app.use("/api", disciplinesRouter);
-  app.use("/api", shadowArtsRouter);
-  app.use("/api", channelDivinityRouter);
   app.use("/api", featsRouter);
-  app.use("/api", advancementRouter);
+
+  // Character-scoped routers own their sub-path under /characters/:id and read
+  // :id via mergeParams (see each Router({ mergeParams: true })).
+  app.use("/api/characters/:id/hp", hitPointsRouter);
+  app.use("/api/characters/:id/inventory", inventoryRouter);
+  app.use("/api/characters/:id/experience", experienceRouter);
+  app.use("/api/characters/:id/spellcasting", spellcastingRouter);
+  app.use("/api/characters/:id/resources", resourcesRouter);
+  app.use("/api/characters/:id/conditions", conditionsRouter);
+  app.use("/api/characters/:id/class", classRouter);
+  app.use("/api/characters/:id/channel-divinity", channelDivinityRouter);
+  app.use("/api/characters/:id/advancement", advancementRouter);
+  app.use("/api/characters/:id/actions", actionsRouter);
+  // activity owns two sub-paths (/activity, /events/:batchId/revert), so it
+  // mounts on the character root rather than a single leaf.
+  app.use("/api/characters/:id", activityRouter);
+
+  // Hybrid routers serve a top-level catalog (GET /) plus a character-scoped
+  // transaction (POST /transactions), so they mount on both owned paths.
+  app.use(["/api/maneuvers", "/api/characters/:id/maneuvers"], maneuversRouter);
+  app.use(["/api/disciplines", "/api/characters/:id/disciplines"], disciplinesRouter);
+  app.use(["/api/shadow-arts", "/api/characters/:id/shadow-arts"], shadowArtsRouter);
+
   app.use("/api", sessionsRouter);
-  app.use("/api", actionsRouter);
   app.use("/api", journalRouter);
   app.use("/api", campaignsRouter);
   app.use("/api", entitiesRouter);

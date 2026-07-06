@@ -17,12 +17,12 @@ import { prisma } from "../lib/prisma.js";
 import { characterInclude } from "../lib/character-include.js";
 import { serializeCharacter } from "../lib/character-serialize.js";
 
-export const channelDivinityRouter = Router();
+export const channelDivinityRouter = Router({ mergeParams: true });
 
 // Character-scoped picker: the Channel Divinity options this cleric/paladin is
 // entitled to, each with its cost, save DC (announce options), and reminder.
 // Unlike GET /maneuvers, the list is subclass-specific so it is gated per-id.
-channelDivinityRouter.get("/characters/:id/channel-divinity", async (req, res) => {
+channelDivinityRouter.get<{ id: string }>("/", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
 
   const character = await prisma.character.findUnique({
@@ -73,7 +73,7 @@ const transactionsRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),
 });
 
-channelDivinityRouter.post("/characters/:id/channel-divinity/transactions", async (req, res) => {
+channelDivinityRouter.post<{ id: string }>("/transactions", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const parseResult = transactionsRequestSchema.safeParse(req.body);

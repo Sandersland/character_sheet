@@ -7,7 +7,7 @@ import { prisma } from "../lib/prisma.js";
 import { characterInclude } from "../lib/character-include.js";
 import { serializeCharacter } from "../lib/character-serialize.js";
 
-export const hitPointsRouter = Router();
+export const hitPointsRouter = Router({ mergeParams: true });
 
 // ---- Per-op Zod schemas ---- (discriminated on `type`) --------------------
 
@@ -92,7 +92,7 @@ const hpRequestSchema = z.object({
 
 // ---- Route ----------------------------------------------------------------
 
-hitPointsRouter.post("/characters/:id/hp", async (req, res) => {
+hitPointsRouter.post<{ id: string }>("/", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const parseResult = hpRequestSchema.safeParse(req.body);

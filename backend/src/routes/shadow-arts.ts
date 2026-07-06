@@ -12,11 +12,11 @@ import { prisma } from "../lib/prisma.js";
 import { characterInclude } from "../lib/character-include.js";
 import { serializeCharacter } from "../lib/character-serialize.js";
 
-export const shadowArtsRouter = Router();
+export const shadowArtsRouter = Router({ mergeParams: true });
 
 // Feeds the Way of Shadow monk's Shadow Arts picker — mirrors GET /api/disciplines.
 // Each row carries its embedded ki cost (AbilityCost) and flat EffectSpec.
-shadowArtsRouter.get("/shadow-arts", async (_req, res) => {
+shadowArtsRouter.get("/", async (_req, res) => {
   const arts = await prisma.grantedAbility.findMany({
     where: { source: "shadowArts" },
     orderBy: [{ name: "asc" }],
@@ -51,7 +51,7 @@ const transactionsRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),
 });
 
-shadowArtsRouter.post("/characters/:id/shadow-arts/transactions", async (req, res) => {
+shadowArtsRouter.post<{ id: string }>("/transactions", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const parseResult = transactionsRequestSchema.safeParse(req.body);

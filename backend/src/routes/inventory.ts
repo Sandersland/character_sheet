@@ -11,7 +11,7 @@ import { prisma } from "../lib/prisma.js";
 import { characterInclude } from "../lib/character-include.js";
 import { serializeCharacter } from "../lib/character-serialize.js";
 
-export const inventoryRouter = Router();
+export const inventoryRouter = Router({ mergeParams: true });
 
 const currencySchema = z.object({
   cp: z.number().int(),
@@ -157,7 +157,7 @@ const transactionsRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),
 });
 
-inventoryRouter.post("/characters/:id/inventory/transactions", async (req, res) => {
+inventoryRouter.post<{ id: string }>("/transactions", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const parseResult = transactionsRequestSchema.safeParse(req.body);

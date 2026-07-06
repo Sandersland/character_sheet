@@ -36,7 +36,7 @@ import { getActiveSessionId } from "../lib/sessions.js";
 import { characterInclude } from "../lib/character-include.js";
 import { serializeCharacter } from "../lib/character-serialize.js";
 
-export const actionsRouter = Router();
+export const actionsRouter = Router({ mergeParams: true });
 
 // ── POST /api/characters/:id/actions/transactions ─────────────────────────────
 
@@ -53,8 +53,8 @@ const actionTransactionsSchema = z.object({
   operations: z.array(executeActionSchema).min(1),
 });
 
-actionsRouter.post(
-  "/characters/:id/actions/transactions",
+actionsRouter.post<{ id: string }>(
+  "/transactions",
   async (req, res) => {
     const { id: characterId } = req.params;
 

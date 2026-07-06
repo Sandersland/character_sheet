@@ -10,7 +10,7 @@ import { prisma } from "../lib/prisma.js";
 import { characterInclude } from "../lib/character-include.js";
 import { serializeCharacter } from "../lib/character-serialize.js";
 
-export const spellcastingRouter = Router();
+export const spellcastingRouter = Router({ mergeParams: true });
 
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 
@@ -130,7 +130,7 @@ const transactionsRequestSchema = z.object({
 // endpoints — re-fetched with characterInclude so derived spellcasting fields
 // reflect the new state).
 
-spellcastingRouter.post("/characters/:id/spellcasting/transactions", async (req, res) => {
+spellcastingRouter.post<{ id: string }>("/transactions", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
   const parseResult = transactionsRequestSchema.safeParse(req.body);
