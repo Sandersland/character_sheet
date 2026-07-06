@@ -12,10 +12,9 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "../generated/prisma/client.js";
+import { runCharacterTransaction } from "./character-transaction.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
-import { prisma } from "./prisma.js";
-import { getActiveSessionId } from "./sessions.js";
 import { deriveResources, type DerivedClassInfo } from "./class-features.js";
 import {
   toolsByCategory,
@@ -639,29 +638,19 @@ export async function applyResourceOperations(
   characterId: string,
   operations: ResourceOperation[]
 ): Promise<void> {
-  const batchId = randomUUID();
-  const sessionId = await getActiveSessionId(characterId);
-
-  await prisma.$transaction(async (tx) => {
-    for (const op of operations) {
-      // Re-read per-op so a batch sees each previous op's result.
-      const row = await tx.character.findUnique({
-        where: { id: characterId },
-        select: {
-          resources: true,
-          experiencePoints: true,
-          abilityScores: true,
-          classEntries: {
-            orderBy: { position: "asc" as const },
-            take: 1,
-            select: { name: true, subclass: true },
-          },
-        },
-      });
-      if (!row) {
-        throw new InvalidResourceOperationError(`Character not found: ${characterId}`);
-      }
-
+  await runCharacterTransaction(characterId, operations, {
+    select: {
+      resources: true,
+      experiencePoints: true,
+      abilityScores: true,
+      classEntries: {
+        orderBy: { position: "asc" as const },
+        take: 1,
+        select: { name: true, subclass: true },
+      },
+    },
+    notFound: (id) => new InvalidResourceOperationError(`Character not found: ${id}`),
+    applyOp: async ({ tx, row, op, batchId, sessionId }) => {
       const level = levelForExperience(row.experiencePoints);
       const profBonus = proficiencyBonusForLevel(level);
       const primaryEntry = row.classEntries[0];
@@ -753,7 +742,7 @@ export async function applyResourceOperations(
         batchId,
         sessionId,
       });
-    }
+    },
   });
 }
 

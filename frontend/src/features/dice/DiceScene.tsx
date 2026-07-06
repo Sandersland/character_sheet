@@ -3,6 +3,13 @@ import { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import { ContactShadows, Environment, Lightformer } from "@react-three/drei";
 
+import { configureDiceText } from "@/lib/troikaTextConfig";
+
+// Runs when the lazy dice chunk evaluates — before any DieMesh <Text> renders —
+// so troika stays on the main thread (#408) without pinning it into the initial
+// bundle (#432).
+configureDiceText();
+
 interface DiceSceneProps {
   /** Full aria-live summary for the roll (idle / rolling / settled wording is the caller's call). */
   ariaLabel: string;

@@ -12,32 +12,32 @@ import { requireAuth } from "./lib/auth/middleware.js";
 import { errorHandler } from "./lib/error-handler.js";
 import { httpLogger } from "./lib/logger.js";
 import { creationRateLimiter, globalRateLimiter, securityHeaders } from "./lib/security.js";
-import { actionsRouter } from "./routes/actions.js";
-import { activityRouter } from "./routes/activity.js";
-import { authRouter } from "./routes/auth.js";
-import { advancementRouter } from "./routes/advancement.js";
-import { campaignItemsRouter } from "./routes/campaign-items.js";
-import { campaignsRouter } from "./routes/campaigns.js";
-import { classRouter } from "./routes/class.js";
-import { charactersRouter } from "./routes/characters.js";
-import { conditionsRouter } from "./routes/conditions.js";
-import { entitiesRouter } from "./routes/entities.js";
-import { sessionsRouter } from "./routes/sessions.js";
-import { experienceRouter } from "./routes/experience.js";
-import { featsRouter } from "./routes/feats.js";
-import { healthRouter } from "./routes/health.js";
-import { hitPointsRouter } from "./routes/hitpoints.js";
-import { inventoryRouter } from "./routes/inventory.js";
-import { itemsRouter } from "./routes/items.js";
-import { journalRouter } from "./routes/journal.js";
-import { disciplinesRouter } from "./routes/disciplines.js";
-import { shadowArtsRouter } from "./routes/shadow-arts.js";
-import { maneuversRouter } from "./routes/maneuvers.js";
-import { channelDivinityRouter } from "./routes/channel-divinity.js";
-import { referenceRouter } from "./routes/reference.js";
-import { resourcesRouter } from "./routes/resources.js";
-import { spellsRouter } from "./routes/spells.js";
-import { spellcastingRouter } from "./routes/spellcasting.js";
+import { actionsRouter } from "./routes/character/actions.js";
+import { activityRouter } from "./routes/character/activity.js";
+import { authRouter } from "./routes/platform/auth.js";
+import { advancementRouter } from "./routes/character/advancement.js";
+import { campaignItemsRouter } from "./routes/campaign/campaign-items.js";
+import { campaignsRouter } from "./routes/campaign/campaigns.js";
+import { classRouter } from "./routes/character/class.js";
+import { charactersRouter } from "./routes/character/characters.js";
+import { conditionsRouter } from "./routes/character/conditions.js";
+import { entitiesRouter } from "./routes/campaign/entities.js";
+import { sessionsRouter } from "./routes/session/sessions.js";
+import { experienceRouter } from "./routes/character/experience.js";
+import { featsRouter } from "./routes/catalog/feats.js";
+import { healthRouter } from "./routes/platform/health.js";
+import { hitPointsRouter } from "./routes/character/hitpoints.js";
+import { inventoryRouter } from "./routes/character/inventory.js";
+import { itemsRouter } from "./routes/catalog/items.js";
+import { journalRouter } from "./routes/session/journal.js";
+import { disciplinesRouter } from "./routes/character/disciplines.js";
+import { shadowArtsRouter } from "./routes/character/shadow-arts.js";
+import { maneuversRouter } from "./routes/character/maneuvers.js";
+import { channelDivinityRouter } from "./routes/character/channel-divinity.js";
+import { referenceRouter } from "./routes/catalog/reference.js";
+import { resourcesRouter } from "./routes/character/resources.js";
+import { spellsRouter } from "./routes/catalog/spells.js";
+import { spellcastingRouter } from "./routes/character/spellcasting.js";
 
 // CORS origins are env-driven so the API can be deployed anywhere without a
 // code change. `CORS_ORIGIN` is a comma-separated allowlist
@@ -85,25 +85,36 @@ export function createApp() {
   app.use("/api", requireAuth);
 
   app.use("/api", charactersRouter);
+
+  // Catalog / reference routers own top-level collection paths.
   app.use("/api", referenceRouter);
   app.use("/api", itemsRouter);
-  app.use("/api", hitPointsRouter);
-  app.use("/api", inventoryRouter);
-  app.use("/api", experienceRouter);
-  app.use("/api", activityRouter);
   app.use("/api", spellsRouter);
-  app.use("/api", spellcastingRouter);
-  app.use("/api", resourcesRouter);
-  app.use("/api", conditionsRouter);
-  app.use("/api", classRouter);
-  app.use("/api", maneuversRouter);
-  app.use("/api", disciplinesRouter);
-  app.use("/api", shadowArtsRouter);
-  app.use("/api", channelDivinityRouter);
   app.use("/api", featsRouter);
-  app.use("/api", advancementRouter);
+
+  // Character-scoped routers own their sub-path under /characters/:id and read
+  // :id via mergeParams (see each Router({ mergeParams: true })).
+  app.use("/api/characters/:id/hp", hitPointsRouter);
+  app.use("/api/characters/:id/inventory", inventoryRouter);
+  app.use("/api/characters/:id/experience", experienceRouter);
+  app.use("/api/characters/:id/spellcasting", spellcastingRouter);
+  app.use("/api/characters/:id/resources", resourcesRouter);
+  app.use("/api/characters/:id/conditions", conditionsRouter);
+  app.use("/api/characters/:id/class", classRouter);
+  app.use("/api/characters/:id/channel-divinity", channelDivinityRouter);
+  app.use("/api/characters/:id/advancement", advancementRouter);
+  app.use("/api/characters/:id/actions", actionsRouter);
+  // activity owns two sub-paths (/activity, /events/:batchId/revert), so it
+  // mounts on the character root rather than a single leaf.
+  app.use("/api/characters/:id", activityRouter);
+
+  // Hybrid routers serve a top-level catalog (GET /) plus a character-scoped
+  // transaction (POST /transactions), so they mount on both owned paths.
+  app.use(["/api/maneuvers", "/api/characters/:id/maneuvers"], maneuversRouter);
+  app.use(["/api/disciplines", "/api/characters/:id/disciplines"], disciplinesRouter);
+  app.use(["/api/shadow-arts", "/api/characters/:id/shadow-arts"], shadowArtsRouter);
+
   app.use("/api", sessionsRouter);
-  app.use("/api", actionsRouter);
   app.use("/api", journalRouter);
   app.use("/api", campaignsRouter);
   app.use("/api", entitiesRouter);

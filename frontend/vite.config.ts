@@ -30,6 +30,39 @@ export default defineConfig({
     host: true,
     proxy: apiProxy,
   },
+  build: {
+    // The only remaining >500 kB chunk is `dice-vendor` (the three.js 3D stack),
+    // and it is deliberately async-only — the lazy dice seams keep it out of the
+    // initial load, so its size never gates first paint. Raised past that chunk
+    // so the warning stays meaningful for the initial bundle we do care about.
+    chunkSizeWarningLimit: 1400,
+    rollupOptions: {
+      output: {
+        // Isolate the heavy 3D dice stack (three/@react-three/cannon-es/troika)
+        // into its own vendor chunk. Combined with the React.lazy dice seams
+        // (RollContext/ConcentrationSaveModal) this chunk is only fetched when a
+        // roll animates — it stays out of the initial load. Kept to two vendor
+        // chunks on purpose so the split doesn't fan into a waterfall.
+        manualChunks(id) {
+          // Vite's shared preload helper is pulled in by every React.lazy site;
+          // pin it to the eager react-vendor chunk so Rollup can't park it in
+          // dice-vendor and drag the 3D stack into the entry's static preload.
+          if (id.includes("preload-helper")) return "react-vendor";
+          if (!id.includes("node_modules")) return undefined;
+          if (/[/\\](three|troika[^/\\]*|@react-three[/\\][^/\\]+|cannon-es)[/\\]/.test(id)) {
+            return "dice-vendor";
+          }
+          // Pin React into its own eager chunk so Rollup can't fold it into
+          // dice-vendor — otherwise the entry static-imports React from that
+          // chunk and drags the whole 3D stack back into the initial preload.
+          if (/[/\\](react|react-dom|scheduler|react-router|react-router-dom)[/\\]/.test(id)) {
+            return "react-vendor";
+          }
+          return undefined;
+        },
+      },
+    },
+  },
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],

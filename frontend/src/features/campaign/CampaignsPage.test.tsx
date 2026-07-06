@@ -10,7 +10,6 @@ import type { Campaign } from "@/types/character";
 vi.mock("@/api/client", () => ({
   fetchCampaigns: vi.fn(),
   createCampaign: vi.fn(),
-  joinCampaign: vi.fn(),
 }));
 
 function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
@@ -75,10 +74,8 @@ describe("CampaignsPage (#246)", () => {
     expect(await screen.findByRole("link", { name: /new campaign/i })).toBeInTheDocument();
   });
 
-  it("extracts the code when a full invite URL is pasted into the join form", async () => {
-    const user = userEvent.setup();
+  it("does not render a join-by-code form", async () => {
     vi.mocked(client.fetchCampaigns).mockResolvedValue([]);
-    vi.mocked(client.joinCampaign).mockResolvedValue(makeCampaign());
 
     render(
       <MemoryRouter>
@@ -87,12 +84,7 @@ describe("CampaignsPage (#246)", () => {
     );
 
     await screen.findByText(/no campaigns yet/i);
-    await user.type(
-      screen.getByLabelText(/invite code/i),
-      "https://example.com/join/abc123",
-    );
-    await user.click(screen.getByRole("button", { name: /join campaign/i }));
-
-    expect(vi.mocked(client.joinCampaign)).toHaveBeenCalledWith("abc123");
+    expect(screen.queryByRole("button", { name: /join campaign/i })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/invite code/i)).not.toBeInTheDocument();
   });
 });
