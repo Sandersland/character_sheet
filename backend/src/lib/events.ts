@@ -68,6 +68,7 @@ export type EventType =
   | "castDiscipline"
   | "castManeuver"
   | "castShadowArt"
+  | "castChannelDivinity"
   | "learnToolProficiency"
   | "forgetToolProficiency"
   | "toolProficienciesReconciled"

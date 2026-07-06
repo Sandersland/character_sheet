@@ -9,11 +9,13 @@
 
 import { useState } from "react";
 
-import { applyClassTransactions, applyConditionTransactions, applyDisciplineTransactions, applyResourceTransactions, applyShadowArtsTransactions } from "@/api/client";
+import { applyChannelDivinityTransactions, applyClassTransactions, applyConditionTransactions, applyDisciplineTransactions, applyResourceTransactions, applyShadowArtsTransactions } from "@/api/client";
 import type {
   AddClassOperation,
+  CastChannelDivinityOperation,
   CastDisciplineOperation,
   CastShadowArtOperation,
+  ChannelDivinityOperation,
   Character,
   ClassEntry,
   ClassOperation,
@@ -32,6 +34,7 @@ import { fightingStyleLabel, FIGHTING_STYLE_DESCRIPTIONS } from "@/lib/fightingS
 import { isMulticlass } from "@/lib/multiclass";
 import AddClassPanel from "@/features/class/AddClassPanel";
 import AddManeuverPanel from "@/features/class/AddManeuverPanel";
+import ChannelDivinitySection from "@/features/class/ChannelDivinitySection";
 import CloakOfShadowsSection from "@/features/class/CloakOfShadowsSection";
 import DisciplinesSection from "@/features/class/DisciplinesSection";
 import ShadowArtsSection from "@/features/class/ShadowArtsSection";
@@ -114,6 +117,19 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
     }
   }
 
+  async function sendChannelDivinity(ops: ChannelDivinityOperation[]) {
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await applyChannelDivinityTransactions(character.id, ops);
+      onUpdate(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function sendCondition(ops: ConditionOperation[]) {
     setBusy(true);
     setError(null);
@@ -186,6 +202,12 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
     sendShadowArt([op]);
   }
 
+  // ── Channel Divinity handler (Cleric / Paladin) ────────────────────────────────
+
+  function handleCastChannelDivinity(op: CastChannelDivinityOperation) {
+    sendChannelDivinity([op]);
+  }
+
   // ── Cloak of Shadows handler (Way of Shadow L11) ───────────────────────────────
 
   function handleActivateCloakOfShadows() {
@@ -210,6 +232,7 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
   const hasManeuvers = resources?.maneuverChoiceCount !== undefined;
   const hasDisciplines = resources?.disciplineChoiceCount !== undefined;
   const hasShadowArts = resources?.shadowArtsAvailable === true;
+  const hasChannelDivinity = resources?.pools.some((p) => p.key === "channelDivinity") ?? false;
   const hasCloakOfShadows = resources?.cloakOfShadowsAvailable === true;
   const hasFeatures = resources && resources.features.length > 0;
   const hasFightingStyle = (resources?.fightingStyleChoiceCount ?? 0) > 0;
@@ -388,6 +411,15 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
           character={character}
           busy={busy}
           onCast={handleCastShadowArt}
+        />
+      )}
+
+      {/* ── Channel Divinity (Cleric / Paladin) ── */}
+      {hasChannelDivinity && (
+        <ChannelDivinitySection
+          character={character}
+          busy={busy}
+          onCast={handleCastChannelDivinity}
         />
       )}
 

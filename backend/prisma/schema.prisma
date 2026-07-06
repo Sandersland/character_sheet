@@ -141,6 +141,8 @@ model Campaign {
   characters Character[]
   // Shared campaign wiki: NPCs/locations/factions/etc. tagged in notes (#248).
   entities   CampaignEntity[]
+  // DM-authored campaign items, each auto-linked to an ITEM entity (#380).
+  items      CampaignItem[]
   sessions   Session[]
 }
 
@@ -179,19 +181,30 @@ enum EntityType {
   OTHER
 }
 
+// DM-controlled reveal state (#379): HIDDEN entities are invisible to non-owner
+// members (list/detail/backlinks/mentions); the owner always sees all. New rows
+// default REVEALED so auto-created PC entities and the pre-#379 backfill are open.
+enum EntityVisibility {
+  HIDDEN
+  REVEALED
+}
+
 model CampaignEntity {
-  id         String     @id @default(uuid())
+  id         String           @id @default(uuid())
   campaignId String
-  campaign   Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaign   Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   type       EntityType
   name       String
-  aliases    String[]   @default([])
+  aliases    String[]         @default([])
   notes      String?
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  visibility EntityVisibility @default(REVEALED)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 
   refs          JournalEntryRef[]
   characterLink CampaignCharacterLink?
+  // Back-relation to the DM-authored item this entity fronts (#380).
+  itemLink      CampaignItemLink?
 
   @@index([campaignId, type])
 }
@@ -216,6 +229,106 @@ model CampaignCharacterLink {
   campaignEntity   CampaignEntity @relation(fields: [campaignEntityId], references: [id], onDelete: Cascade)
   characterId      String         @unique
   character        Character      @relation(fields: [characterId], references: [id], onDelete: Cascade)
+}
+
+// --- DM-authored campaign items (#380) --------------------------------------
+// A DM-authored magic item / loot entry that lives in a campaign (NOT on any
+// character sheet). Mirrors the catalog Item shape — per-category mechanical
+// fields live on the optional 1:1 *Detail tables below, not as nullable
+// columns — plus DM-only fields (rarity, attunement, isUnique, dmNotes). On
+// create it auto-registers a HIDDEN ITEM CampaignEntity via CampaignItemLink
+// (same pattern as CampaignCharacterLink), so it is @-mentionable and gets
+// reveal/hide + backlinks for free from the #248/#379 machinery. dmNotes is
+// DM-private and is scrubbed from every player-facing payload in routes/items.ts.
+model CampaignItem {
+  id                 String       @id @default(uuid())
+  campaignId         String
+  campaign           Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name               String
+  description        String?
+  category           ItemCategory
+  rarity             String?
+  requiresAttunement Boolean      @default(false)
+  isUnique           Boolean      @default(false)
+  weight             Float?
+  cost               Json? // {cp,sp,gp,pp} — same shape as Item.cost
+  // DM-private prep notes — never serialized into a player-facing response.
+  dmNotes            String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  weaponDetail     CampaignItemWeaponDetail?
+  armorDetail      CampaignItemArmorDetail?
+  consumableDetail CampaignItemConsumableDetail?
+  link             CampaignItemLink?
+
+  @@index([campaignId])
+}
+
+// Same shape as ItemWeaponDetail, owned by CampaignItem.
+model CampaignItemWeaponDetail {
+  id             String       @id @default(uuid())
+  campaignItemId String       @unique
+  campaignItem   CampaignItem @relation(fields: [campaignItemId], references: [id], onDelete: Cascade)
+
+  damageDiceCount Int
+  damageDiceFaces Int
+  damageModifier  Int    @default(0)
+  damageType      String
+
+  versatileDiceCount Int?
+  versatileDiceFaces Int?
+
+  finesse     Boolean @default(false)
+  light       Boolean @default(false)
+  heavy       Boolean @default(false)
+  twoHanded   Boolean @default(false)
+  reach       Boolean @default(false)
+  thrown      Boolean @default(false)
+  ammunition  Boolean @default(false)
+  rangeNormal Int?
+  rangeLong   Int?
+
+  weaponClass WeaponClass?
+  weaponRange WeaponRange?
+}
+
+// Same shape as ItemArmorDetail, owned by CampaignItem.
+model CampaignItemArmorDetail {
+  id             String       @id @default(uuid())
+  campaignItemId String       @unique
+  campaignItem   CampaignItem @relation(fields: [campaignItemId], references: [id], onDelete: Cascade)
+
+  armorCategory       ArmorCategory
+  baseArmorClass      Int
+  dexModifierApplies  Boolean       @default(false)
+  dexModifierMax      Int?
+  stealthDisadvantage Boolean       @default(false)
+  strengthRequirement Int?
+}
+
+// Same shape as ItemConsumableDetail, owned by CampaignItem.
+model CampaignItemConsumableDetail {
+  id             String       @id @default(uuid())
+  campaignItemId String       @unique
+  campaignItem   CampaignItem @relation(fields: [campaignItemId], references: [id], onDelete: Cascade)
+
+  effectDiceCount   Int?
+  effectDiceFaces   Int?
+  effectModifier    Int?
+  effectDescription String?
+}
+
+// Links a CampaignItem to its auto-created ITEM entity (1:1 both ways), same
+// pattern as CampaignCharacterLink. DELETE cleanup rule (routes/items.ts):
+// deleting the item deletes BOTH this link (cascade) AND the fronting entity
+// (explicit, in the same transaction) — the entity has no life without its item.
+model CampaignItemLink {
+  id               String         @id @default(uuid())
+  campaignEntityId String         @unique
+  campaignEntity   CampaignEntity @relation(fields: [campaignEntityId], references: [id], onDelete: Cascade)
+  campaignItemId   String         @unique
+  campaignItem     CampaignItem   @relation(fields: [campaignItemId], references: [id], onDelete: Cascade)
 }
 
 // One row per linked sign-in method (OAuth provider account or, later, a
@@ -853,6 +966,7 @@ enum CharacterEventType {
   castDiscipline
   castManeuver
   castShadowArt
+  castChannelDivinity
   learnToolProficiency
   forgetToolProficiency
   toolProficienciesReconciled

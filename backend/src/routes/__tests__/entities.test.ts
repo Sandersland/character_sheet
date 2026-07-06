@@ -173,6 +173,81 @@ describe("campaign entities (#248)", () => {
     expect(ok.status).toBe(204);
   });
 
+  it("hides HIDDEN entities from a non-owner list but shows them to the owner", async () => {
+    const created = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities`)
+      .set("Cookie", cookieOwner)
+      .send({ type: "NPC", name: "Secret Cult", visibility: "HIDDEN" });
+    expect(created.status).toBe(201);
+    expect(created.body.visibility).toBe("HIDDEN");
+    const hiddenId = created.body.id as string;
+
+    const playerList = await supertest(app)
+      .get(`/api/campaigns/${campaignId}/entities`)
+      .set("Cookie", cookiePlayer);
+    expect((playerList.body as { id: string }[]).some((e) => e.id === hiddenId)).toBe(false);
+
+    const ownerList = await supertest(app)
+      .get(`/api/campaigns/${campaignId}/entities`)
+      .set("Cookie", cookieOwner);
+    expect((ownerList.body as { id: string }[]).some((e) => e.id === hiddenId)).toBe(true);
+  });
+
+  it("rejects a PLAYER creating a HIDDEN entity (visibility is owner-only)", async () => {
+    const res = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities`)
+      .set("Cookie", cookiePlayer)
+      .send({ type: "NPC", name: "Player Secret", visibility: "HIDDEN" });
+    expect(res.status).toBe(403);
+  });
+
+  it("lets the OWNER toggle visibility but 403s a PLAYER", async () => {
+    const created = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities`)
+      .set("Cookie", cookieOwner)
+      .send({ type: "NPC", name: "Toggle Target" });
+    const id = created.body.id as string;
+    expect(created.body.visibility).toBe("REVEALED");
+
+    const denied = await supertest(app)
+      .patch(`/api/campaigns/${campaignId}/entities/${id}`)
+      .set("Cookie", cookiePlayer)
+      .send({ visibility: "HIDDEN" });
+    expect(denied.status).toBe(403);
+
+    const ok = await supertest(app)
+      .patch(`/api/campaigns/${campaignId}/entities/${id}`)
+      .set("Cookie", cookieOwner)
+      .send({ visibility: "HIDDEN" });
+    expect(ok.status).toBe(200);
+    expect(ok.body.visibility).toBe("HIDDEN");
+
+    // A player editing a basic field on the now-hidden entity 404s (invisible).
+    const basicEdit = await supertest(app)
+      .patch(`/api/campaigns/${campaignId}/entities/${id}`)
+      .set("Cookie", cookiePlayer)
+      .send({ notes: "sneaky" });
+    expect(basicEdit.status).toBe(404);
+  });
+
+  it("404s a non-owner reading backlinks of a HIDDEN entity", async () => {
+    const created = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities`)
+      .set("Cookie", cookieOwner)
+      .send({ type: "NPC", name: "Hidden Backlink", visibility: "HIDDEN" });
+    const id = created.body.id as string;
+
+    const player = await supertest(app)
+      .get(`/api/campaigns/${campaignId}/entities/${id}/backlinks`)
+      .set("Cookie", cookiePlayer);
+    expect(player.status).toBe(404);
+
+    const owner = await supertest(app)
+      .get(`/api/campaigns/${campaignId}/entities/${id}/backlinks`)
+      .set("Cookie", cookieOwner);
+    expect(owner.status).toBe(200);
+  });
+
   it("returns backlinks but excludes another member's PRIVATE notes", async () => {
     // Both characters belong to this campaign so their notes can tag entities.
     await prisma.character.update({ where: { id: CHAR_OWNER }, data: { campaignId } });

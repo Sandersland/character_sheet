@@ -28,6 +28,7 @@ function entity(partial: Partial<CampaignEntity> & { id: string; name: string })
     type: "NPC",
     aliases: [],
     notes: null,
+    visibility: "REVEALED",
     createdAt: "",
     updatedAt: "",
     ...partial,

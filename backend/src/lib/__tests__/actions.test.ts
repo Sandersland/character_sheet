@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
   deriveActions,
   ACTION_EFFECT_FN,
+  ACTION_CAST_FN,
   rageMeleeDamageBonus,
   type AvailableAction,
 } from "../actions.js";
@@ -270,24 +271,41 @@ describe("Monk Stunning Strike — combat feature wiring (#392)", () => {
   });
 });
 
-describe("ACTION_EFFECT_FN — secondWind", () => {
-  it("with roll: spends resource + heals", () => {
-    expect(ACTION_EFFECT_FN.secondWind({ roll: 7 })).toEqual([
-      { type: "spendResource", key: "secondWind" },
-      { type: "heal", amount: 7 },
-    ]);
+describe("ACTION_CAST_FN — secondWind (#420)", () => {
+  it("is a cast-core action, not an op-list action", () => {
+    // The migration moved Second Wind off ACTION_EFFECT_FN onto the cast core.
+    expect(ACTION_CAST_FN.secondWind).toBeDefined();
+    expect(ACTION_EFFECT_FN.secondWind).toBeUndefined();
   });
 
-  it("without roll: spends resource only", () => {
-    expect(ACTION_EFFECT_FN.secondWind({})).toEqual([
-      { type: "spendResource", key: "secondWind" },
-    ]);
+  it("spends the secondWind pool (base 1) and self-heals 1d10 with the client roll", () => {
+    const spec = ACTION_CAST_FN.secondWind({ roll: 7 });
+    expect(spec.name).toBe("Second Wind");
+    expect(spec.cost).toEqual({ kind: "pool", key: "secondWind", base: 1 });
+    expect(spec.effect.effectType).toBe("heal");
+    expect(spec.effect.dice).toEqual({ count: 1, faces: 10 });
+    expect(spec.apply).toEqual({ target: "self", kind: "heal", amount: 7 });
   });
 
-  it("with roll=0: spends resource only (no heal at 0)", () => {
-    expect(ACTION_EFFECT_FN.secondWind({ roll: 0 })).toEqual([
-      { type: "spendResource", key: "secondWind" },
+  it("without a roll: spends the pool but applies no heal", () => {
+    const spec = ACTION_CAST_FN.secondWind({});
+    expect(spec.cost).toEqual({ kind: "pool", key: "secondWind", base: 1 });
+    expect(spec.apply).toBeUndefined();
+  });
+
+  it("with roll=0: applies no heal (self-apply is guarded on amount > 0)", () => {
+    const spec = ACTION_CAST_FN.secondWind({ roll: 0 });
+    expect(spec.apply).toBeUndefined();
+  });
+});
+
+describe("ACTION_EFFECT_FN — actionSurge stays a counter (#420)", () => {
+  it("spends the actionSurge resource with no heal/extra-action server effect", () => {
+    // The extra-action grant is client-side (grantExtraAction) — nothing to apply.
+    expect(ACTION_EFFECT_FN.actionSurge({})).toEqual([
+      { type: "spendResource", key: "actionSurge" },
     ]);
+    expect(ACTION_CAST_FN.actionSurge).toBeUndefined();
   });
 });
 

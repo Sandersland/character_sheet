@@ -139,6 +139,51 @@ function conditionLabel(key: ConditionKey): string {
   return CONDITIONS.find((c) => c.key === key)?.label ?? key;
 }
 
+// ── In-transaction helper ─────────────────────────────────────────────────────
+
+/**
+ * Apply a condition inside a caller-supplied transaction, sharing its batchId so
+ * batch revert restores conditions. Idempotent: a no-op (no event) when already
+ * present. Lets an activated ability (e.g. Channel Divinity: Cloak of Shadows)
+ * self-apply a condition without opening its own transaction.
+ */
+export async function applyConditionInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  key: ConditionKey,
+  source: string,
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: { conditions: true },
+  });
+  if (!row) return;
+
+  const state = normalizeConditionsMutable(row.conditions);
+  if (state.active.some((e) => e.key === key)) return;
+  const before = deepCopy(state);
+  state.active.push({ key, source, appliedAt: new Date().toISOString() });
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: { conditions: serializeConditionsState(state) },
+  });
+
+  await logEvent(tx, {
+    characterId,
+    category: "conditions",
+    type: "conditionApplied",
+    summary: `Applied condition: ${conditionLabel(key)} (${source})`,
+    before,
+    after: deepCopy(state),
+    data: { key, source },
+    batchId,
+    sessionId,
+  });
+}
+
 // ── Transaction handler ───────────────────────────────────────────────────────
 
 /**

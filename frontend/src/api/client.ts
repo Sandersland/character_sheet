@@ -2,14 +2,18 @@ import type {
   ActionOperation,
   AdvancementOperation,
   Campaign,
+  CampaignItem,
+  CampaignItemInput,
   CatalogFeat,
   CatalogDiscipline,
   CatalogManeuver,
   CatalogShadowArt,
+  CatalogChannelDivinity,
   CatalogSpell,
   Character,
   DisciplineOperation,
   ShadowArtOperation,
+  ChannelDivinityOperation,
   CharacterEvent,
   ConcentrationCheck,
   CharacterSummary,
@@ -19,6 +23,7 @@ import type {
   CreateCharacterInput,
   EntityBacklink,
   EntityType,
+  EntityVisibility,
   ExperienceOperation,
   HitPointOperation,
   JournalEntryKind,
@@ -230,6 +235,25 @@ export async function applyShadowArtsTransactions(
   operations: ShadowArtOperation[]
 ): Promise<Character> {
   return postTransactions(characterId, "shadow-arts", operations, "Failed to apply shadow arts operations");
+}
+
+// Feeds the Cleric/Paladin Channel Divinity picker — the entitled options for
+// this character (gated per class/subclass/level), each with its save DC + reminder.
+export async function fetchChannelDivinity(characterId: string): Promise<CatalogChannelDivinity[]> {
+  const response = await apiFetch(`${API_URL}/characters/${characterId}/channel-divinity`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Channel Divinity options (${response.status})`);
+  }
+  return response.json();
+}
+
+// Applies a batch of Channel Divinity operations atomically: castChannelDivinity
+// (spend 1 CD charge, apply the option's real side effect). Full updated Character.
+export async function applyChannelDivinityTransactions(
+  characterId: string,
+  operations: ChannelDivinityOperation[]
+): Promise<Character> {
+  return postTransactions(characterId, "channel-divinity", operations, "Failed to apply Channel Divinity operations");
 }
 
 // One inline edit is a batch of one operation; a bulk action (e.g. selling
@@ -583,7 +607,13 @@ export async function fetchEntities(
 
 export async function createEntity(
   campaignId: string,
-  input: { type: EntityType; name: string; aliases?: string[]; notes?: string },
+  input: {
+    type: EntityType;
+    name: string;
+    aliases?: string[];
+    notes?: string;
+    visibility?: EntityVisibility;
+  },
 ): Promise<CampaignEntity> {
   const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities`, {
     method: "POST",
@@ -600,7 +630,13 @@ export async function createEntity(
 export async function updateEntity(
   campaignId: string,
   entityId: string,
-  patch: { type?: EntityType; name?: string; aliases?: string[]; notes?: string | null },
+  patch: {
+    type?: EntityType;
+    name?: string;
+    aliases?: string[];
+    notes?: string | null;
+    visibility?: EntityVisibility;
+  },
 ): Promise<CampaignEntity> {
   const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/entities/${entityId}`, {
     method: "PATCH",
@@ -635,6 +671,75 @@ export async function fetchEntityBacklinks(
     throw new Error(`Failed to fetch entity backlinks (${response.status})`);
   }
   return response.json();
+}
+
+// ── Campaign items (#380) ───────────────────────────────────────────────────────
+// Owner-only CRUD (list/create/update/delete). fetchCampaignItemByEntity is the
+// member-readable Codex read, keyed by the fronting entity — non-owners get it
+// only when that entity is revealed, and never see dmNotes (scrubbed server-side).
+
+export async function fetchCampaignItems(campaignId: string): Promise<CampaignItem[]> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/items`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch campaign items (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function fetchCampaignItemByEntity(
+  campaignId: string,
+  entityId: string,
+): Promise<CampaignItem> {
+  const response = await apiFetch(
+    `${API_URL}/campaigns/${campaignId}/items/by-entity/${entityId}`,
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to fetch campaign item (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function createCampaignItem(
+  campaignId: string,
+  input: CampaignItemInput,
+): Promise<CampaignItem> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/items`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to create campaign item (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function updateCampaignItem(
+  campaignId: string,
+  itemId: string,
+  patch: Partial<CampaignItemInput>,
+): Promise<CampaignItem> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/items/${itemId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to update campaign item (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function deleteCampaignItem(campaignId: string, itemId: string): Promise<void> {
+  const response = await apiFetch(`${API_URL}/campaigns/${campaignId}/items/${itemId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `Failed to delete campaign item (${response.status})`);
+  }
 }
 
 // ── Sessions ──────────────────────────────────────────────────────────────────

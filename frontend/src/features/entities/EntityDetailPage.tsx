@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
@@ -9,10 +9,12 @@ import { GiQuillInk } from "@/components/ui/icons";
 import {
   deleteEntity,
   fetchCampaign,
+  fetchCampaignItemByEntity,
   fetchEntities,
   fetchEntityBacklinks,
   updateEntity,
 } from "@/api/client";
+import CampaignItemCard from "@/features/entities/CampaignItemCard";
 import MentionText from "@/features/journal/MentionText";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { formatJournalDate } from "@/lib/formatJournalDate";
@@ -23,6 +25,7 @@ import {
 } from "@/lib/mentions";
 import type {
   CampaignEntity,
+  CampaignItem,
   CampaignRole,
   EntityBacklink,
   EntityType,
@@ -44,10 +47,25 @@ function groupBySession(backlinks: EntityBacklink[]): { key: string; items: Enti
 export default function EntityDetailPage() {
   const { id: campaignId, entityId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { entities, byId } = useCampaignEntities(campaignId);
+
+  // Return to wherever the user came from: Manage when the origin was the Manage
+  // tab (carried via location.state.from or ?from=manage), else the Codex (#489).
+  const backTo = useMemo(() => {
+    const fromState = (location.state as { from?: string } | null)?.from;
+    // Only honor an in-app relative path (defense-in-depth: the value is only
+    // ever set by CampaignManagePanel, but never route to a non-"/" target).
+    if (typeof fromState === "string" && fromState.startsWith("/")) return fromState;
+    if (campaignId && new URLSearchParams(location.search).get("from") === "manage") {
+      return `/campaigns/${campaignId}/manage`;
+    }
+    return campaignId ? `/campaigns/${campaignId}/codex` : "/campaigns";
+  }, [location.state, location.search, campaignId]);
 
   const [entity, setEntity] = useState<CampaignEntity | null | undefined>(undefined);
   const [role, setRole] = useState<CampaignRole | undefined>(undefined);
+  const [item, setItem] = useState<CampaignItem | null>(null);
   const [backlinks, setBacklinks] = useState<EntityBacklink[]>([]);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -85,6 +103,19 @@ export default function EntityDetailPage() {
     };
   }, [campaignId, entityId]);
 
+  // ITEM entities front a DM-authored CampaignItem — load its card data. The
+  // by-entity read 404s for a non-owner while the entity is hidden (setItem null).
+  useEffect(() => {
+    if (!campaignId || !entityId || entity?.type !== "ITEM") return;
+    let active = true;
+    fetchCampaignItemByEntity(campaignId, entityId)
+      .then((i) => active && setItem(i))
+      .catch(() => active && setItem(null));
+    return () => {
+      active = false;
+    };
+  }, [campaignId, entityId, entity?.type]);
+
   if (entity === undefined) return <Spinner variant="page" />;
 
   if (entity === null) {
@@ -92,7 +123,7 @@ export default function EntityDetailPage() {
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-parchment-100 px-6 text-center">
         <h1 className="font-display text-2xl font-semibold text-parchment-900">Entity not found</h1>
         <Link
-          to={campaignId ? `/campaigns/${campaignId}/codex` : "/campaigns"}
+          to={backTo}
           className="rounded-control bg-garnet-700 px-4 py-2 text-sm font-semibold text-parchment-50 hover:bg-garnet-800"
         >
           Back to campaign
@@ -148,7 +179,7 @@ export default function EntityDetailPage() {
       <div className="border-b border-parchment-200 bg-parchment-50">
         <div className="mx-auto max-w-3xl px-6 py-5">
           <Link
-            to={`/campaigns/${campaignId}/codex`}
+            to={backTo}
             className="text-xs font-semibold text-garnet-700 hover:underline"
           >
             ← Back to campaign
@@ -156,6 +187,9 @@ export default function EntityDetailPage() {
           <h1 className="mt-1 flex flex-wrap items-center gap-2 font-display text-2xl font-semibold text-parchment-900">
             {entity.name}
             <Badge tone={ENTITY_TYPE_TONE[entity.type]}>{ENTITY_TYPE_LABELS[entity.type]}</Badge>
+            {role === "OWNER" && entity.visibility === "HIDDEN" && (
+              <Badge tone="neutral">🔒 Hidden</Badge>
+            )}
           </h1>
         </div>
       </div>
@@ -165,6 +199,10 @@ export default function EntityDetailPage() {
           <p className="rounded-control bg-garnet-50 px-3 py-2 text-sm font-semibold text-garnet-700">
             {error}
           </p>
+        )}
+
+        {entity.type === "ITEM" && item && (
+          <CampaignItemCard item={item} isOwner={role === "OWNER"} />
         )}
 
         <Card

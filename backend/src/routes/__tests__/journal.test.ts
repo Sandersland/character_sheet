@@ -10,13 +10,13 @@
 
 import { randomUUID } from "node:crypto";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import supertest from "supertest";
 
 import { createApp } from "../../app.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
-import { visibleEntries } from "../journal.js";
+import { syncEntryRefs, visibleEntries } from "../journal.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
 import { authCookie } from "../../test-support/auth.js";
 
@@ -370,6 +370,104 @@ describe("JournalEntryRef derivation from @[uuid] tokens", () => {
     const entryId = res.body.journal[0].id as string;
     expect(res.body.journal[0].body).toBe(`Tag @[${entityish}] outside a campaign`);
     expect(await prisma.journalEntryRef.count({ where: { entryId } })).toBe(0);
+  });
+
+  it("lets the OWNER mention a HIDDEN entity (ref created)", async () => {
+    const campaignId = await attachToFreshCampaign();
+    const created = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(`/api/campaigns/${campaignId}/entities`)
+      .send({ type: "NPC", name: "Hidden Villain", visibility: "HIDDEN" });
+    const entityId = created.body.id as string;
+
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ kind: "NOTE", body: `The @[${entityId}] schemes` });
+    const entryId = res.body.journal[0].id as string;
+    expect(await prisma.journalEntryRef.count({ where: { entryId } })).toBe(1);
+  });
+
+  it("drops a non-owner's mention of a HIDDEN entity (no reveal via UUID guess)", async () => {
+    const PLAYER_ID = "player-journal-hidden";
+    const PLAYER_CHAR = "player-journal-hidden-char";
+    await ensureTestOwner(PLAYER_ID);
+    const playerCookie = await authCookie(PLAYER_ID);
+
+    const campaign = await supertest.agent(app).set("Cookie", COOKIE)
+      .post("/api/campaigns")
+      .send({ name: "Ref Campaign" });
+    const campaignId = campaign.body.id as string;
+    const code = campaign.body.inviteCode as string;
+    await supertest.agent(app).set("Cookie", playerCookie)
+      .post("/api/campaigns/join")
+      .send({ inviteCode: code });
+
+    const hidden = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(`/api/campaigns/${campaignId}/entities`)
+      .send({ type: "NPC", name: "DM Secret", visibility: "HIDDEN" });
+    const hiddenId = hidden.body.id as string;
+
+    await prisma.character.create({
+      data: { ...FIXTURE, id: PLAYER_CHAR, name: "Player Char", ownerId: PLAYER_ID, spellcasting: Prisma.JsonNull },
+    });
+    await supertest.agent(app).set("Cookie", playerCookie)
+      .post(`/api/campaigns/${campaignId}/characters`)
+      .send({ characterId: PLAYER_CHAR });
+
+    const res = await supertest.agent(app).set("Cookie", playerCookie)
+      .post(`/api/characters/${PLAYER_CHAR}/journal`)
+      .send({ kind: "NOTE", body: `Guessed @[${hiddenId}]` });
+    const entryId = res.body.journal[0].id as string;
+    expect(await prisma.journalEntryRef.count({ where: { entryId } })).toBe(0);
+
+    await prisma.character.deleteMany({ where: { id: PLAYER_CHAR } });
+    await prisma.user.deleteMany({ where: { id: PLAYER_ID } });
+  });
+});
+
+// ── syncEntryRefs fast path (#489) ────────────────────────────────────────────
+
+describe("syncEntryRefs — mention-less fast path", () => {
+  // A tx double: reconcileEntryRefs still runs (findMany → []), but the fast
+  // path must never touch character or campaignMembership when there are no tokens.
+  function fakeTx() {
+    return {
+      character: { findUnique: vi.fn() },
+      campaignMembership: { findUnique: vi.fn() },
+      campaignEntity: { findMany: vi.fn() },
+      journalEntryRef: {
+        findMany: vi.fn().mockResolvedValue([]),
+        deleteMany: vi.fn(),
+        createMany: vi.fn(),
+      },
+    };
+  }
+
+  it("skips the character and membership lookups when the body has no @[uuid] tokens", async () => {
+    const tx = fakeTx();
+    await syncEntryRefs(tx as never, "char-1", "entry-1", "just plain prose, no tags", "user-1");
+
+    expect(tx.character.findUnique).not.toHaveBeenCalled();
+    expect(tx.campaignMembership.findUnique).not.toHaveBeenCalled();
+    expect(tx.campaignEntity.findMany).not.toHaveBeenCalled();
+    // It still reconciles to an empty set (clears any stale refs).
+    expect(tx.journalEntryRef.findMany).toHaveBeenCalledWith({
+      where: { entryId: "entry-1" },
+      select: { entityId: true },
+    });
+  });
+
+  it("still looks up the character when the body carries a token", async () => {
+    const tx = fakeTx();
+    tx.character.findUnique.mockResolvedValue({ campaignId: null });
+    await syncEntryRefs(
+      tx as never,
+      "char-1",
+      "entry-1",
+      "Met @[12345678-1234-1234-1234-123456789012]",
+      "user-1",
+    );
+
+    expect(tx.character.findUnique).toHaveBeenCalledOnce();
   });
 });
 

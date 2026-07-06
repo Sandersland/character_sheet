@@ -468,6 +468,20 @@ export interface CatalogShadowArt {
   effect: EffectSpec;
 }
 
+/** How a Channel Divinity option expresses through the declarative core (#419). */
+export type ChannelDivinityKind = "announce" | "buff" | "advantage" | "invisible" | "reminder";
+
+/** An entitled Channel Divinity option from GET /api/characters/:id/channel-divinity (#419). */
+export interface CatalogChannelDivinity {
+  id: string;
+  name: string;
+  description: string;
+  kind: ChannelDivinityKind;
+  saveDc: number | null;
+  saveAbility: string | null;
+  reminder: string;
+}
+
 export interface SpellSlots {
   level: number;
   total: number;
@@ -945,6 +959,9 @@ export interface Campaign {
 
 export type EntityType = "NPC" | "LOCATION" | "FACTION" | "ITEM" | "PC" | "OTHER";
 
+// DM reveal state (#379): non-owner members only ever see REVEALED entities.
+export type EntityVisibility = "HIDDEN" | "REVEALED";
+
 export interface CampaignEntity {
   id: string;
   campaignId: string;
@@ -952,8 +969,53 @@ export interface CampaignEntity {
   name: string;
   aliases: string[];
   notes: string | null;
+  visibility: EntityVisibility;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * DM-authored campaign item (#380): loot/magic-item prep that lives in a
+ * campaign, not on any sheet. Mirrors `Item` plus DM-only fields (rarity,
+ * attunement, isUnique, dmNotes) and a reference to the fronting ITEM entity.
+ * `dmNotes` is present only in owner-facing payloads — it's scrubbed server-side
+ * from every player response.
+ */
+export interface CampaignItem {
+  id: string;
+  campaignId: string;
+  name: string;
+  description?: string;
+  category: ItemCategory;
+  rarity?: string;
+  requiresAttunement: boolean;
+  isUnique: boolean;
+  weight?: number;
+  cost?: Currency;
+  dmNotes?: string;
+  weapon?: WeaponDetail;
+  armor?: ArmorDetail;
+  consumable?: ConsumableDetail;
+  /** The fronting ITEM CampaignEntity — its `visibility` drives player reveal. */
+  entity?: { id: string; name: string; visibility: EntityVisibility };
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Create/update body for a campaign item; detail block matches `category`. */
+export interface CampaignItemInput {
+  name: string;
+  description?: string;
+  category: ItemCategory;
+  rarity?: string;
+  requiresAttunement?: boolean;
+  isUnique?: boolean;
+  weight?: number;
+  cost?: Currency;
+  dmNotes?: string;
+  weapon?: WeaponDetailInput;
+  armor?: ArmorDetailInput;
+  consumable?: ConsumableDetail;
 }
 
 /** One note that @-tags an entity, surfaced on the entity detail page. */
@@ -1265,6 +1327,17 @@ export interface CastShadowArtOperation {
   shadowArtId: string;
 }
 export type ShadowArtOperation = CastShadowArtOperation;
+
+// ── Channel Divinity operation types (mirrors backend/src/lib/channel-divinity.ts) ──
+// Sent as `{ operations: ChannelDivinityOperation[] }` to
+// POST /api/characters/:id/channel-divinity/transactions.
+
+/** Use a Channel Divinity option (Cleric/Paladin): spend 1 CD charge. */
+export interface CastChannelDivinityOperation {
+  type: "castChannelDivinity";
+  abilityId: string;
+}
+export type ChannelDivinityOperation = CastChannelDivinityOperation;
 
 // ── Conditions state + operation types (mirrors backend/src/lib/conditions.ts)
 // Sent as `{ operations: ConditionOperation[] }` to

@@ -16,6 +16,7 @@ import { actionsRouter } from "./routes/actions.js";
 import { activityRouter } from "./routes/activity.js";
 import { authRouter } from "./routes/auth.js";
 import { advancementRouter } from "./routes/advancement.js";
+import { campaignItemsRouter } from "./routes/campaign-items.js";
 import { campaignsRouter } from "./routes/campaigns.js";
 import { classRouter } from "./routes/class.js";
 import { charactersRouter } from "./routes/characters.js";
@@ -32,6 +33,7 @@ import { journalRouter } from "./routes/journal.js";
 import { disciplinesRouter } from "./routes/disciplines.js";
 import { shadowArtsRouter } from "./routes/shadow-arts.js";
 import { maneuversRouter } from "./routes/maneuvers.js";
+import { channelDivinityRouter } from "./routes/channel-divinity.js";
 import { referenceRouter } from "./routes/reference.js";
 import { resourcesRouter } from "./routes/resources.js";
 import { spellsRouter } from "./routes/spells.js";
@@ -97,6 +99,7 @@ export function createApp() {
   app.use("/api", maneuversRouter);
   app.use("/api", disciplinesRouter);
   app.use("/api", shadowArtsRouter);
+  app.use("/api", channelDivinityRouter);
   app.use("/api", featsRouter);
   app.use("/api", advancementRouter);
   app.use("/api", sessionsRouter);
@@ -104,6 +107,7 @@ export function createApp() {
   app.use("/api", journalRouter);
   app.use("/api", campaignsRouter);
   app.use("/api", entitiesRouter);
+  app.use("/api", campaignItemsRouter);
 
   // Optional single-origin mode: when SERVE_STATIC_DIR points at a built SPA,
   // serve it from this same server so the frontend and API share one origin
