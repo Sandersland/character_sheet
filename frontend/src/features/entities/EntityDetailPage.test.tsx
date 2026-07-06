@@ -6,7 +6,12 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import EntityDetailPage from "@/features/entities/EntityDetailPage";
 import * as client from "@/api/client";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
-import type { Campaign, CampaignEntity, EntityBacklink } from "@/types/character";
+import type {
+  Campaign,
+  CampaignEntity,
+  CampaignEntityMerge,
+  EntityBacklink,
+} from "@/types/character";
 import { axe } from "@/test/axe";
 
 vi.mock("@/api/client", () => ({
@@ -20,6 +25,12 @@ vi.mock("@/api/client", () => ({
 vi.mock("@/hooks/useCampaignEntities", () => ({
   useCampaignEntities: vi.fn(),
   primeCampaignEntities: vi.fn(),
+}));
+
+const mergeState = vi.hoisted(() => ({ merges: [] as CampaignEntityMerge[] }));
+vi.mock("@/hooks/useCampaignMerges", () => ({
+  useCampaignMerges: () => ({ merges: mergeState.merges }),
+  primeCampaignMerges: vi.fn(),
 }));
 
 const ENTITY_ID = "ent-1";
@@ -49,6 +60,7 @@ const BACKLINK: EntityBacklink = {
     body: "We fought the goblin chief at the bridge.",
   },
   characterName: "Thorne",
+  identity: { id: ENTITY_ID, name: "Goblin Chief" },
 };
 
 function campaign(role: "OWNER" | "PLAYER"): Campaign {
@@ -81,6 +93,7 @@ const ENTITY_PATH = `/campaigns/${CAMPAIGN_ID}/entities/${ENTITY_ID}`;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mergeState.merges = [];
   vi.mocked(client.fetchEntities).mockResolvedValue([ENTITY]);
   vi.mocked(client.fetchEntityBacklinks).mockResolvedValue([BACKLINK]);
   vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("PLAYER"));
@@ -116,6 +129,35 @@ describe("EntityDetailPage (#248)", () => {
     expect(await screen.findByRole("heading", { name: /Goblin Chief/ })).toBeInTheDocument();
     expect(screen.getByText(/Leads the warren/)).toBeInTheDocument();
     expect(await screen.findByText(/fought the goblin chief/)).toBeInTheDocument();
+  });
+
+  it("shows a 'Revealed to be' banner on an executed merged identity (#387)", async () => {
+    const survivor: CampaignEntity = { ...ENTITY, id: "ent-2", name: "Vecna" };
+    vi.mocked(useCampaignEntities).mockReturnValue({
+      entities: [ENTITY, survivor],
+      byId: new Map([
+        [ENTITY_ID, ENTITY],
+        ["ent-2", survivor],
+      ]),
+    });
+    mergeState.merges = [
+      {
+        id: "m1",
+        campaignId: CAMPAIGN_ID,
+        mergedEntityId: ENTITY_ID,
+        survivorEntityId: "ent-2",
+        status: "EXECUTED",
+        note: null,
+        preparedAt: "2026-01-01T00:00:00.000Z",
+        executedAt: "2026-01-02T00:00:00.000Z",
+      },
+    ];
+    renderPage();
+    expect(await screen.findByText(/Revealed to be/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "@Vecna" })).toHaveAttribute(
+      "href",
+      `/campaigns/${CAMPAIGN_ID}/entities/ent-2`,
+    );
   });
 
   it("shows the delete control to an OWNER", async () => {

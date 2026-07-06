@@ -143,6 +143,8 @@ model Campaign {
   entities   CampaignEntity[]
   // DM-authored campaign items, each auto-linked to an ITEM entity (#380).
   items      CampaignItem[]
+  // Non-destructive "revealed to be" identity links between entities (#387).
+  entityMerges CampaignEntityMerge[]
   sessions   Session[]
 }
 
@@ -205,6 +207,10 @@ model CampaignEntity {
   characterLink CampaignCharacterLink?
   // Back-relation to the DM-authored item this entity fronts (#380).
   itemLink      CampaignItemLink?
+  // Identity-merge back-relations (#387): the (single) merge where this entity
+  // is the old identity, and the merges where it is the surviving true identity.
+  mergedInto    CampaignEntityMerge?  @relation("MergedIdentity")
+  survivorOf    CampaignEntityMerge[] @relation("SurvivorIdentity")
 
   @@index([campaignId, type])
 }
@@ -229,6 +235,38 @@ model CampaignCharacterLink {
   campaignEntity   CampaignEntity @relation(fields: [campaignEntityId], references: [id], onDelete: Cascade)
   characterId      String         @unique
   character        Character      @relation(fields: [characterId], references: [id], onDelete: Cascade)
+}
+
+// --- Entity identity merges (#387) ------------------------------------------
+// A non-destructive "revealed to be" link: `mergedEntity` (the old identity,
+// e.g. Jenkins) is the same being as `survivorEntity` (the true identity, e.g.
+// Vecna). Neither row is destroyed and no journal ref is rewritten — a chip that
+// tagged the old id keeps resolving to the old id. PREPARED is the DM's secret
+// prep (scrubbed from every non-owner payload, like a HIDDEN entity #379);
+// EXECUTED is the public reveal. Chains resolve transitively (Jenkins→Vecna→
+// Whispered One). Cascades from either entity so the record dies with either side.
+enum MergeStatus {
+  PREPARED
+  EXECUTED
+}
+
+model CampaignEntityMerge {
+  id               String         @id @default(uuid())
+  campaignId       String
+  campaign         Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  // The old identity; at most one merge per merged entity.
+  mergedEntityId   String         @unique
+  mergedEntity     CampaignEntity @relation("MergedIdentity", fields: [mergedEntityId], references: [id], onDelete: Cascade)
+  // The surviving true identity (may itself be merged further up the chain).
+  survivorEntityId String
+  survivorEntity   CampaignEntity @relation("SurvivorIdentity", fields: [survivorEntityId], references: [id], onDelete: Cascade)
+  status           MergeStatus    @default(PREPARED)
+  note             String?
+  preparedAt       DateTime       @default(now())
+  executedAt       DateTime?
+
+  @@index([campaignId])
+  @@index([survivorEntityId])
 }
 
 // --- DM-authored campaign items (#380) --------------------------------------
