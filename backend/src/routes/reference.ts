@@ -4,7 +4,6 @@ import {
   ALIGNMENTS,
   MULTICLASS_PREREQUISITES,
   multiclassPrerequisitesMet,
-  TOOLS,
   toolsByCategory,
 } from "../lib/srd.js";
 import { STARTING_EQUIPMENT } from "../lib/starting-equipment.js";
@@ -13,9 +12,10 @@ import { prisma } from "../lib/prisma.js";
 export const referenceRouter = Router();
 
 // Feeds the character-creation form's baseline lists: catalog rows for
-// race/class/background plus the fixed alignment set, per-class starting-
-// equipment definitions, and the TOOLS rules constant (grouped by category
-// for the creation form's tool-proficiency pickers).
+// race/class/background plus the fixed alignment set and per-class starting-
+// equipment definitions. Also ships the artisan-tool list for the sheet's
+// Proficiencies-card dropdown (creation tool pickers derive from per-class
+// toolChoices, not this list).
 referenceRouter.get("/reference", async (_req, res) => {
   // Sequential rather than Promise.all — see the matching comment in
   // routes/characters.ts's POST handler.
@@ -66,17 +66,8 @@ referenceRouter.get("/reference", async (_req, res) => {
     toolProficiencies: b.toolProficiencies,
   }));
 
-  // TOOLS rules data grouped by category for the creation form's pickers.
-  // Sending all 40+ tools is tiny; grouping here saves the frontend a filter.
-  const tools = {
-    all: TOOLS,
-    byCategory: {
-      artisan:          toolsByCategory("artisan"),
-      gamingSet:        toolsByCategory("gamingSet"),
-      musicalInstrument: toolsByCategory("musicalInstrument"),
-      other:            toolsByCategory("other"),
-    },
-  };
+  // Artisan tools for the sheet's Proficiencies-card dropdown (the only category consumed).
+  const artisanTools = toolsByCategory("artisan");
 
-  res.json({ races: racesWithTools, classes, backgrounds: backgroundsWithTools, alignments: ALIGNMENTS, tools });
+  res.json({ races: racesWithTools, classes, backgrounds: backgroundsWithTools, alignments: ALIGNMENTS, artisanTools });
 });

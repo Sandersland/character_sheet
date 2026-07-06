@@ -53,15 +53,7 @@ const referenceFixture: ReferenceData = {
     { id: "bg-sage", name: "Sage", skillProficiencies: ["history"], toolProficiencies: [] },
   ],
   alignments: ["Lawful Good"],
-  tools: {
-    all: [{ name: "Lute", category: "musicalInstrument" }],
-    byCategory: {
-      artisan: [],
-      gamingSet: [],
-      musicalInstrument: [{ name: "Lute", category: "musicalInstrument" }],
-      other: [],
-    },
-  },
+  artisanTools: [{ name: "Smith's Tools", category: "artisan" }],
 };
 
 beforeEach(() => {
