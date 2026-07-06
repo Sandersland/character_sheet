@@ -292,6 +292,10 @@ model CampaignItem {
   category           ItemCategory
   rarity             ItemRarity?
   requiresAttunement Boolean      @default(false)
+  // Attunement prerequisite (#545) — null kind = attunable by anyone. Snapshotted
+  // onto InventoryItem on award so the check runs against the frozen copy.
+  attunementPrereqKind  AttunementPrereqKind?
+  attunementPrereqValue String?
   isUnique           Boolean      @default(false)
   weight             Float?
   cost               Json? // {cp,sp,gp,pp} — same shape as Item.cost
@@ -303,6 +307,7 @@ model CampaignItem {
   weaponDetail     CampaignItemWeaponDetail?
   armorDetail      CampaignItemArmorDetail?
   consumableDetail CampaignItemConsumableDetail?
+  capabilities     CampaignItemCapability[]
   link             CampaignItemLink?
   // Awarded snapshots on player sheets (#381) — holder derivation reads these.
   awards           InventoryItem[]           @relation("CampaignItemAwards")
@@ -362,6 +367,33 @@ model CampaignItemConsumableDetail {
   effectDiceFaces   Int?
   effectModifier    Int?
   effectDescription String?
+}
+
+// Typed 1:N capability side-table (#545). Kind-discriminated with flat columns;
+// readCapability in lib/capabilities.ts is the adapter. Only passiveBonus is
+// read today. Snapshotted to InventoryCapability on award (same column set).
+model CampaignItemCapability {
+  id             String       @id @default(uuid())
+  campaignItemId String
+  campaignItem   CampaignItem @relation(fields: [campaignItemId], references: [id], onDelete: Cascade)
+
+  kind        CapabilityKind
+  description String?
+
+  // passiveBonus payload
+  target    CapabilityTarget?
+  op        CapabilityOp?
+  value     Int?
+  // Specific skill/ability/save key when target is skill|abilityScore|save.
+  targetKey String?
+  condition String?
+
+  // Dice-valued bonus (round-trips now; consumed in the damage roll at #526C).
+  valueDiceCount  Int?
+  valueDiceFaces  Int?
+  valueDamageType String?
+
+  @@index([campaignItemId])
 }
 
 // Links a CampaignItem to its auto-created ITEM entity (1:1 both ways), same
@@ -597,6 +629,49 @@ enum WeaponRange {
 enum SessionStatus {
   active
   ended
+}
+
+// Item-capability discriminator (#545). Reserves the full A–E menu; only
+// passiveBonus is implemented this slice — the rest are forward-declared so the
+// side-table column set + adapter don't churn when they land.
+enum CapabilityKind {
+  passiveBonus
+  castSpell
+  charges
+  grant
+  activatedEffect
+}
+
+// Which derived stat a passiveBonus capability targets. Only scalar targets are
+// summed into the modifier channel today; ac (#383) + dice→damage (#526C) defer.
+enum CapabilityTarget {
+  ac
+  attack
+  damage
+  save
+  skill
+  abilityScore
+  spellAttack
+  spellDc
+  initiative
+  speed
+  maxHp
+}
+
+// How a passiveBonus applies: add to the target's modifier channel, or set an
+// absolute floor/override (setTo not yet consumed in derivation this slice).
+enum CapabilityOp {
+  add
+  setTo
+}
+
+// Attunement prerequisite category (5e "requires attunement by a …"). value
+// carries the specific class/species/alignment; spellcaster needs no value.
+enum AttunementPrereqKind {
+  class
+  spellcaster
+  species
+  alignment
 }
 
 // Spell schools per the 5e SRD. Mirrors frontend/src/types/character.ts
@@ -899,12 +974,42 @@ model InventoryItem {
   description String?
   quantity    Int          @default(1)
   equipped    Boolean      @default(false)
+  // Attunement state (#545) — persisted boolean; the 3-item cap is DERIVED
+  // (counted), never stored. attune/unattune go through …/inventory/transactions.
+  attuned     Boolean      @default(false)
+  // Snapshot of the source CampaignItem's attunement prerequisite (#545).
+  attunementPrereqKind  AttunementPrereqKind?
+  attunementPrereqValue String?
   notes       String?
   position    Int          @default(0)
 
   weaponDetail     InventoryWeaponDetail?
   armorDetail      InventoryArmorDetail?
   consumableDetail InventoryConsumableDetail?
+  capabilities     InventoryCapability[]
+}
+
+// Snapshot twin of CampaignItemCapability, owned by InventoryItem (#545). Same
+// column set — a straight field copy on award (snapshotCampaignItemDetail).
+model InventoryCapability {
+  id              String        @id @default(uuid())
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  kind        CapabilityKind
+  description String?
+
+  target    CapabilityTarget?
+  op        CapabilityOp?
+  value     Int?
+  targetKey String?
+  condition String?
+
+  valueDiceCount  Int?
+  valueDiceFaces  Int?
+  valueDamageType String?
+
+  @@index([inventoryItemId])
 }
 
 // Same shape as ItemWeaponDetail, owned by InventoryItem instead of Item.
@@ -1067,6 +1172,9 @@ enum CharacterEventType {
   // inventory (equip/unequip are logged so they appear on the timeline)
   equipped
   unequipped
+  // inventory attunement (#545)
+  attuned
+  unattuned
   // session lifecycle
   sessionStarted
   sessionEnded
