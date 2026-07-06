@@ -22,6 +22,9 @@ export const characterInclude = {
   // a UTC-midnight date) sort by their capture time.
   // Unfiltered today (single-owner access); campaign-visible sharing means threading a userId into serializeCharacter to call the visibleEntries helper (routes/journal.ts).
   journalEntries: { orderBy: [{ date: "desc" }, { loggedAt: "desc" }, { createdAt: "desc" }] },
+  // Per-campaign play prefs (#537); serializeCharacter surfaces the row matching
+  // the character's current campaignId (in-memory filter — at most a few rows).
+  campaignPreferences: true,
 } satisfies Prisma.CharacterInclude;
 
 export type CharacterWithRelations = Prisma.CharacterGetPayload<{ include: typeof characterInclude }>;
