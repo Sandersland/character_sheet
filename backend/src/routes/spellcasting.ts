@@ -5,10 +5,7 @@ import {
   applySpellcastingOperations,
   InvalidSpellcastingOperationError,
 } from "../lib/spellcasting.js";
-import { assertCharacterAccess } from "../lib/auth/access.js";
-import { prisma } from "../lib/prisma.js";
-import { characterInclude } from "../lib/character-include.js";
-import { serializeCharacter } from "../lib/character-serialize.js";
+import { makeTransactionsEndpoint } from "../lib/transactions-endpoint.js";
 
 export const spellcastingRouter = Router({ mergeParams: true });
 
@@ -130,28 +127,9 @@ const transactionsRequestSchema = z.object({
 // endpoints — re-fetched with characterInclude so derived spellcasting fields
 // reflect the new state).
 
-spellcastingRouter.post<{ id: string }>("/transactions", async (req, res) => {
-  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
-
-  const parseResult = transactionsRequestSchema.safeParse(req.body);
-  if (!parseResult.success) {
-    res.status(400).json({ error: "Invalid request body", details: parseResult.error.flatten() });
-    return;
-  }
-
-  try {
-    await applySpellcastingOperations(req.params.id, parseResult.data.operations);
-  } catch (error) {
-    if (error instanceof InvalidSpellcastingOperationError) {
-      res.status(400).json({ error: error.message });
-      return;
-    }
-    throw error;
-  }
-
-  const updated = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    include: characterInclude,
-  });
-  res.json(serializeCharacter(updated!));
+makeTransactionsEndpoint({
+  router: spellcastingRouter,
+  schema: transactionsRequestSchema,
+  apply: (characterId, data) => applySpellcastingOperations(characterId, data.operations),
+  domainErrors: [InvalidSpellcastingOperationError],
 });

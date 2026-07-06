@@ -8,11 +8,8 @@ import {
   applyAdvancementOperations,
   InvalidAdvancementOperationError,
 } from "../lib/advancement.js";
-import { assertCharacterAccess } from "../lib/auth/access.js";
-import { prisma } from "../lib/prisma.js";
 import { FEAT_IMPROVEMENT_TARGETS } from "../lib/srd.js";
-import { characterInclude } from "../lib/character-include.js";
-import { serializeCharacter } from "../lib/character-serialize.js";
+import { makeTransactionsEndpoint } from "../lib/transactions-endpoint.js";
 
 export const advancementRouter = Router({ mergeParams: true });
 
@@ -94,34 +91,9 @@ const transactionsRequestSchema = z.object({
 //
 // Returns the full updated character on success.
 
-advancementRouter.post<{ id: string }>(
-  "/transactions",
-  async (req, res) => {
-    await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
-
-    const parseResult = transactionsRequestSchema.safeParse(req.body);
-    if (!parseResult.success) {
-      res.status(400).json({
-        error: "Invalid request body",
-        details: parseResult.error.flatten(),
-      });
-      return;
-    }
-
-    try {
-      await applyAdvancementOperations(req.params.id, parseResult.data.operations);
-    } catch (error) {
-      if (error instanceof InvalidAdvancementOperationError) {
-        res.status(400).json({ error: error.message });
-        return;
-      }
-      throw error;
-    }
-
-    const updated = await prisma.character.findUnique({
-      where: { id: req.params.id },
-      include: characterInclude,
-    });
-    res.json(serializeCharacter(updated!));
-  },
-);
+makeTransactionsEndpoint({
+  router: advancementRouter,
+  schema: transactionsRequestSchema,
+  apply: (characterId, data) => applyAdvancementOperations(characterId, data.operations),
+  domainErrors: [InvalidAdvancementOperationError],
+});
