@@ -141,9 +141,11 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
 
     const matches = (() => {
       if (!trigger || !campaignId) return [] as CampaignEntity[];
+      // Never surface hidden entities in the tag picker, even to the owner (#534).
+      const visible = entities.filter((e) => e.visibility !== "HIDDEN");
       const scoped = trigger.typeFilter
-        ? entities.filter((e) => e.type === trigger.typeFilter)
-        : entities;
+        ? visible.filter((e) => e.type === trigger.typeFilter)
+        : visible;
       return matchEntities(scoped, trigger.query).slice(0, MAX_MATCHES);
     })();
 
