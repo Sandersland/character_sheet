@@ -37,6 +37,7 @@ export default function DiceInput({
         id={`${idPrefix}-count`}
         type="number"
         aria-label={`${label} dice count`}
+        fullWidth={false}
         className={numCls}
         value={value.count}
         onChange={(e) => onChange({ ...value, count: e.target.value })}
@@ -48,6 +49,7 @@ export default function DiceInput({
         id={`${idPrefix}-faces`}
         type="number"
         aria-label={`${label} dice faces`}
+        fullWidth={false}
         className={numCls}
         value={value.faces}
         onChange={(e) => onChange({ ...value, faces: e.target.value })}
@@ -61,6 +63,7 @@ export default function DiceInput({
             id={`${idPrefix}-mod`}
             type="number"
             aria-label={`${label} modifier`}
+            fullWidth={false}
             className={numCls}
             value={value.modifier ?? ""}
             onChange={(e) => onChange({ ...value, modifier: e.target.value })}
@@ -72,6 +75,7 @@ export default function DiceInput({
           id={`${idPrefix}-type`}
           type="text"
           aria-label={`${label} type`}
+          fullWidth={false}
           className="w-28 text-parchment-900"
           value={value.type ?? ""}
           onChange={(e) => onChange({ ...value, type: e.target.value })}

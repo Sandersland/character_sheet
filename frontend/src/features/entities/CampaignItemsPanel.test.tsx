@@ -254,6 +254,39 @@ describe("CampaignItemsPanel field parity (#527/#542)", () => {
     expect(sent.weapon?.versatileDiceFaces).toBeUndefined();
   });
 
+  it("drops range when a thrown weapon is switched back to melee", async () => {
+    vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "new-1c", name: "Handaxe" });
+    renderPanel();
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
+
+    await userEvent.type(screen.getByLabelText("Name *"), "Handaxe");
+    await userEvent.click(screen.getByRole("button", { name: "thrown" }));
+    await userEvent.type(screen.getByLabelText("Range (normal)"), "20");
+    await userEvent.type(screen.getByLabelText("Range (long)"), "60");
+    // Turn thrown back off — range disappears and must not be persisted.
+    await userEvent.click(screen.getByRole("button", { name: "thrown" }));
+    expect(screen.queryByLabelText("Range (normal)")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Create item" }));
+
+    await waitFor(() => expect(createCampaignItem).toHaveBeenCalled());
+    const sent = vi.mocked(createCampaignItem).mock.calls[0][1];
+    expect(sent.weapon?.rangeNormal).toBeUndefined();
+    expect(sent.weapon?.rangeLong).toBeUndefined();
+  });
+
+  it("shows an existing non-gp cost in the single Value field on edit", async () => {
+    vi.mocked(fetchCampaignItems).mockResolvedValue([
+      { ...baseItem, cost: { cp: 0, sp: 50, gp: 0, pp: 0 } },
+    ]);
+    renderPanel();
+    await screen.findByText("Flametongue");
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect((screen.getByLabelText("Value") as HTMLInputElement).value).toBe("50");
+    expect((screen.getByLabelText("Value unit") as HTMLSelectElement).value).toBe("sp");
+  });
+
   it("sends the full armor field set on create", async () => {
     vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "new-2", name: "Half Plate", category: "armor" });
     renderPanel();

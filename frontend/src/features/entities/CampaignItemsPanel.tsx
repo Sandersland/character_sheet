@@ -234,6 +234,7 @@ function formFromCatalog(item: Item): FormState {
     category: item.category,
     weight: item.weight?.toString() ?? "",
     ...currencyFields(item.cost),
+    valueUnit: unitForCost(item.cost),
     description: item.description ?? "",
     ...weaponFields(item.weapon),
     ...armorFields(item.armor),
@@ -256,6 +257,7 @@ function formFromItem(item: CampaignItem): FormState {
     isUnique: item.isUnique,
     weight: item.weight?.toString() ?? "",
     ...currencyFields(item.cost),
+    valueUnit: unitForCost(item.cost),
     description: item.description ?? "",
     dmNotes: item.dmNotes ?? "",
     ...weaponFields(item.weapon),
@@ -265,6 +267,17 @@ function formFromItem(item: CampaignItem): FormState {
     effectModifier: item.consumable?.effectModifier?.toString() ?? "",
     effectDescription: item.consumable?.effectDescription ?? "",
   };
+}
+
+// Range is shown/sent only for a ranged or thrown weapon.
+const hasRange = (f: FormState): boolean => f.weaponRange === "ranged" || f.thrown;
+
+// Highest populated denomination, so the single Value field faithfully shows an
+// existing cost on edit (e.g. {sp:50} → "sp"). Defaults to gp for a blank cost.
+const UNIT_ORDER: readonly CurrencyUnit[] = ["pp", "gp", "sp", "cp"];
+function unitForCost(cost: Currency | undefined): CurrencyUnit {
+  if (!cost) return "gp";
+  return UNIT_ORDER.find((u) => (cost[u] ?? 0) > 0) ?? "gp";
 }
 
 // The four-denomination cost, or undefined when every field is blank.
@@ -304,8 +317,10 @@ function buildInput(f: FormState): CampaignItemInput {
       reach: f.reach,
       thrown: f.thrown,
       ammunition: f.ammunition,
-      rangeNormal: num(f.rangeNormal),
-      rangeLong: num(f.rangeLong),
+      // Range only applies (and is only editable) when ranged or thrown — mirror
+      // the versatile gate so a melee weapon can't keep phantom hidden range.
+      rangeNormal: hasRange(f) ? num(f.rangeNormal) : undefined,
+      rangeLong: hasRange(f) ? num(f.rangeLong) : undefined,
       weaponClass: f.weaponClass || undefined,
       weaponRange: f.weaponRange || undefined,
     };
@@ -570,7 +585,7 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
     isConsumable: form.category === "consumable",
   });
   const cost = currencyFromForm(form);
-  const showRange = form.weaponRange === "ranged" || form.thrown;
+  const showRange = hasRange(form);
 
   return (
     <Card

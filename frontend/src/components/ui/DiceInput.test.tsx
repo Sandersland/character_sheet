@@ -41,4 +41,11 @@ describe("DiceInput", () => {
     render(<DiceInput value={base} onChange={() => {}} label="Damage" idPrefix="d" />);
     expect(screen.getByLabelText("Damage dice count").className).toContain("text-parchment-900");
   });
+
+  it("renders narrow segments — opts out of the control's w-full so they stay inline", () => {
+    render(<DiceInput value={base} onChange={() => {}} label="Damage" idPrefix="d" />);
+    const count = screen.getByLabelText("Damage dice count");
+    expect(count.className).toContain("w-14");
+    expect(count.className).not.toContain("w-full");
+  });
 });
