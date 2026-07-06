@@ -12,10 +12,15 @@
 import { Prisma } from "../generated/prisma/client.js";
 import { payAbilityCostInTx, type AbilityCost, type PayCostContext } from "./ability-cost.js";
 import { appendActiveBuffInTx, clearBuffsForSourceInTx } from "./active-effects.js";
+import { assertCampaignMembership } from "./auth/access.js";
+import { AuthorizationError } from "./auth/errors.js";
 import { resolveBuffSpec, type EffectSpec } from "./effects.js";
 import { logEvent, type EventType } from "./events.js";
 import { applyHealInTx, applyDamageInTx, applyTempHpInTx } from "./hitpoints.js";
 import type { ConcentrationState, SpellcastingMutableState } from "./spell-state.js";
+
+/** A cast's effect target: the caster themselves, or a consenting ally's sheet (#462). */
+export type CastTarget = "self" | { characterId: string };
 
 // The per-op result the dispatcher logs (before/after snapshots + logEvent).
 export interface OpOutcome {
@@ -31,6 +36,12 @@ export interface CastAbilityContext {
   sessionId: string | null;
   cost: PayCostContext;
   concentrationHost: SpellcastingMutableState;
+  // Caster identity — required only for party-target heals (#462); the caster
+  // must be a member of the target's campaign, and their name attributes the
+  // cross-sheet heal event.
+  casterUserId?: string;
+  casterName?: string;
+  casterCampaignId?: string | null;
 }
 
 export interface CastAbilityInput {
@@ -42,7 +53,7 @@ export interface CastAbilityInput {
   roll: number;
   eventType: EventType;
   concentrates: boolean;
-  apply?: { target: "self"; kind: "heal" | "damage" | "tempHp"; amount: number };
+  apply?: { target: CastTarget; kind: "heal" | "damage" | "tempHp"; amount: number };
 }
 
 // Byte-load-bearing: reproduces the current castSpell summary exactly.
@@ -113,6 +124,40 @@ async function applySelfEffectInTx(
   }
 }
 
+// Apply a rolled heal to a consenting ally's sheet in the same batch (#462).
+// Guards: healing only, caster is a member of the target's (shared) campaign,
+// and the target has opted in via autoFriendlyHealing. The heal event is written
+// on the TARGET (actor "player", source = caster's name) so it's theirs to undo.
+async function applyPartyHealInTx(
+  ctx: CastAbilityContext,
+  targetId: string,
+  kind: "heal" | "damage" | "tempHp",
+  amount: number,
+): Promise<void> {
+  if (kind !== "heal") {
+    throw new AuthorizationError("Only healing can be applied to an ally's sheet");
+  }
+  if (!ctx.casterUserId) {
+    throw new AuthorizationError("Caster identity is required to heal an ally");
+  }
+  const target = await ctx.tx.character.findUnique({
+    where: { id: targetId },
+    select: { id: true, campaignId: true },
+  });
+  if (!target?.campaignId || target.campaignId !== ctx.casterCampaignId) {
+    throw new AuthorizationError("Target does not share your campaign");
+  }
+  await assertCampaignMembership(ctx.tx, ctx.casterUserId, target.campaignId, "edit");
+  const pref = await ctx.tx.campaignCharacterPreference.findUnique({
+    where: { campaignId_characterId: { campaignId: target.campaignId, characterId: targetId } },
+    select: { autoFriendlyHealing: true },
+  });
+  if (!pref?.autoFriendlyHealing) {
+    throw new AuthorizationError("This ally has not opted in to party healing");
+  }
+  await applyHealInTx(ctx.tx, targetId, amount, ctx.batchId, ctx.sessionId, { source: ctx.casterName });
+}
+
 // The one shared cast sequence. Returns the OpOutcome the dispatcher logs.
 export async function castAbilityInTx(ctx: CastAbilityContext, input: CastAbilityInput): Promise<OpOutcome> {
   const paid = await payAbilityCostInTx(ctx.cost, input.cost, input.requested);
@@ -139,8 +184,12 @@ export async function castAbilityInTx(ctx: CastAbilityContext, input: CastAbilit
       ctx.sessionId,
     );
   }
-  if (input.apply?.target === "self" && input.apply.amount > 0) {
-    await applySelfEffectInTx(ctx, input.apply);
+  if (input.apply && input.apply.amount > 0) {
+    if (input.apply.target === "self") {
+      await applySelfEffectInTx(ctx, input.apply);
+    } else {
+      await applyPartyHealInTx(ctx, input.apply.target.characterId, input.apply.kind, input.apply.amount);
+    }
   }
 
   return { eventType: input.eventType, summary, eventData };

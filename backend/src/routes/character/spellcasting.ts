@@ -51,7 +51,8 @@ const castSpellOpSchema = z.object({
   roll: z.number().int().min(0),
   apply: z
     .object({
-      target: z.literal("self"),
+      // "self" hits the caster; { characterId } heals a consenting ally (#462).
+      target: z.union([z.literal("self"), z.object({ characterId: z.string().min(1) })]),
       kind: z.enum(["heal", "damage"]),
       amount: z.number().int().positive(),
     })
@@ -130,6 +131,6 @@ const transactionsRequestSchema = z.object({
 makeTransactionsEndpoint({
   router: spellcastingRouter,
   schema: transactionsRequestSchema,
-  apply: (characterId, data) => applySpellcastingOperations(characterId, data.operations),
+  apply: (characterId, data, userId) => applySpellcastingOperations(characterId, data.operations, userId),
   domainErrors: [InvalidSpellcastingOperationError],
 });

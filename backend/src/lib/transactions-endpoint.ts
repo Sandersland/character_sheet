@@ -17,7 +17,9 @@ interface TransactionsEndpointConfig<Schema extends z.ZodTypeAny, Result> {
   router: Router;
   schema: Schema;
   // Applies the parsed body atomically; the returned value is passed to respond.
-  apply: (characterId: string, data: z.infer<Schema>) => Promise<Result>;
+  // `userId` is the authenticated caller — needed by domains that mutate a second
+  // sheet under consent (e.g. party-target healing #462).
+  apply: (characterId: string, data: z.infer<Schema>, userId: string) => Promise<Result>;
   // Errors mapped to 400 { error: message }; anything else rethrows (→ 500).
   domainErrors: DomainErrorClass[];
   // Route sub-path — defaults to "/transactions" (experience mounts on "/").
@@ -42,7 +44,7 @@ export function makeTransactionsEndpoint<Schema extends z.ZodTypeAny, Result = v
 
     let result: Result;
     try {
-      result = await apply(req.params.id, parseResult.data);
+      result = await apply(req.params.id, parseResult.data, req.user!.id);
     } catch (error) {
       if (domainErrors.some((ErrorClass) => error instanceof ErrorClass)) {
         res.status(400).json({ error: (error as Error).message });
