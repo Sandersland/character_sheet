@@ -30,7 +30,6 @@ import { deriveGrantedSpells } from "./granted-spells.js";
 import type {
   SpellEntry,
   SpellComponents,
-  ConcentrationState,
   SpellcastingMutableState,
 } from "./spell-state.js";
 import { deriveSpellcasting } from "./srd.js";
@@ -44,7 +43,7 @@ export { InvalidSpellcastingOperationError };
 // (extracted to break the hitpoints ↔ spellcasting import cycle). Re-exported
 // here so this module's public surface stays stable.
 export { normalizeSpellcastingMutable };
-export type { SpellEntry, SpellComponents, ConcentrationState, SpellcastingMutableState };
+export type { SpellComponents };
 
 // ── Custom spell input shape ──────────────────────────────────────────────────
 export interface CustomSpellInput {

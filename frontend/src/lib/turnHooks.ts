@@ -26,7 +26,7 @@ export interface DurableBuffEndCondition {
   endsWhen: (window: TurnActivityWindow) => boolean;
 }
 
-export const DURABLE_BUFF_END_CONDITIONS: DurableBuffEndCondition[] = [
+const DURABLE_BUFF_END_CONDITIONS: DurableBuffEndCondition[] = [
   {
     key: "rage",
     endActionKey: "endRage",

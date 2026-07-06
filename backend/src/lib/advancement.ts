@@ -47,7 +47,7 @@ const ABILITY_CAP = 20;
  * Returns the new scores and the delta amounts to add to hitPoints.max/current
  * and initiativeBonus. All side-effects on persisted columns derive from here.
  */
-export function computeAdvancementEffect(
+function computeAdvancementEffect(
   scores: Record<string, number>,
   hitDiceTotal: number,
   abilityDeltas: Record<string, number>,

@@ -18,7 +18,7 @@ export const ITEM_RARITY_LABELS: Record<ItemRarity, string> = {
 };
 
 /** Ascending tier order for pickers/badges. */
-export const RARITY_ORDER: readonly ItemRarity[] = [
+const RARITY_ORDER: readonly ItemRarity[] = [
   "COMMON",
   "UNCOMMON",
   "RARE",

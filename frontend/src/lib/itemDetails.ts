@@ -2,7 +2,7 @@ import { formatRollSpec } from "@/lib/dice";
 import type { InventoryItem, WeaponDetail } from "@/types/character";
 
 // "1d6 bludgeoning", plus a "versatile: 1d8" fragment if the weapon has an alt grip die.
-export function weaponDamageParts(weapon: WeaponDetail): string[] {
+function weaponDamageParts(weapon: WeaponDetail): string[] {
   const base = `${formatRollSpec({
     count: weapon.damageDiceCount,
     faces: weapon.damageDiceFaces,
@@ -18,7 +18,7 @@ export function weaponDamageParts(weapon: WeaponDetail): string[] {
 }
 
 // Weapon properties folded into natural language rather than separate badges.
-export function weaponPropertyTags(weapon: WeaponDetail): string[] {
+function weaponPropertyTags(weapon: WeaponDetail): string[] {
   const tags = [
     weapon.finesse && "finesse",
     weapon.light && "light",

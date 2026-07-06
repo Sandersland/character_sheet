@@ -221,7 +221,7 @@ export const BACKGROUNDS = [
   { name: "Noble",     skillProficiencies: ["history", "persuasion"] },
 ];
 
-export function coins(gp: number, sp = 0, cp = 0) {
+function coins(gp: number, sp = 0, cp = 0) {
   return { cp, sp, gp, pp: 0 };
 }
 

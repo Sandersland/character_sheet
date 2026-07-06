@@ -31,7 +31,7 @@ export const FIGHTING_STYLE_DESCRIPTIONS: Record<FightingStyleKey, string> = {
 };
 
 /** Canonical order for iterating styles in the picker (matches srd.ts order). */
-export const FIGHTING_STYLE_ORDER: readonly FightingStyleKey[] = [
+const FIGHTING_STYLE_ORDER: readonly FightingStyleKey[] = [
   "archery",
   "defense",
   "dueling",

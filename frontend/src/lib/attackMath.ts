@@ -30,7 +30,7 @@ export interface AttackEntry {
 }
 
 // d20 spec for a weapon's attack roll.
-export function weaponAttackSpec(w: WeaponDetail): RollSpecTriple {
+function weaponAttackSpec(w: WeaponDetail): RollSpecTriple {
   return { count: 1, faces: 20, modifier: w.attackBonus ?? 0 };
 }
 

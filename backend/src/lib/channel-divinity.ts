@@ -89,7 +89,7 @@ export function isEntitled(gate: ChannelDivinityGate, entries: GateEntry[], char
 
 // The Channel Divinity save DC for the granting class: cleric keys off Wisdom,
 // paladin off Charisma (its spell save DC). Both are 8 + prof + ability mod.
-export function channelDivinitySaveDC(
+function channelDivinitySaveDC(
   className: "cleric" | "paladin",
   abilityScores: Record<string, number>,
   profBonus: number,
@@ -99,7 +99,7 @@ export function channelDivinitySaveDC(
 }
 
 /** Preserve Life healing pool: 5× cleric level. */
-export function preserveLifeHpPool(clericLevel: number): number {
+function preserveLifeHpPool(clericLevel: number): number {
   return clericLevel * 5;
 }
 
@@ -170,7 +170,7 @@ function sacredWeaponBonus(abilityScores: Record<string, number>): number {
 }
 
 // The CD option's EffectSpec: a buff for Sacred Weapon, roll-less utility otherwise.
-export function channelDivinityEffectSpec(kind: ChannelDivinityKind): EffectSpec {
+function channelDivinityEffectSpec(kind: ChannelDivinityKind): EffectSpec {
   return {
     effectType: kind === "buff" ? "buff" : "utility",
     damageType: null,

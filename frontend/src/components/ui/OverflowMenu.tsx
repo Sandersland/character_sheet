@@ -1,7 +1,7 @@
 import { MoreVertical } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
-export interface OverflowMenuItem {
+interface OverflowMenuItem {
   label: string;
   onSelect: () => void;
   danger?: boolean;
