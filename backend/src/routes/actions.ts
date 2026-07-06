@@ -72,19 +72,23 @@ actionsRouter.post(
     const { operations } = parsed.data;
 
     try {
-      // Level-derived Rage bonus, so the rage effect fn stays pure (no DB).
-      const classRow = await prisma.character.findUnique({
-        where: { id: characterId },
-        select: { classEntries: { select: { name: true, level: true } } },
-      });
-      const barbarianLevel = classRow?.classEntries.find((e) => e.name.toLowerCase() === "barbarian")?.level ?? 0;
-      const rageDamageBonus = rageMeleeDamageBonus(barbarianLevel);
-
-      // Fail fast on unknown keys BEFORE opening a transaction (400, not 500).
+      // Fail fast on unknown keys BEFORE any DB work (400, not 500).
       for (const op of operations) {
         if (!ACTION_CAST_FN[op.actionKey] && !ACTION_EFFECT_FN[op.actionKey]) {
           throw new Error(`Unknown action key: ${op.actionKey}`);
         }
+      }
+
+      // Level-derived Rage bonus, so the rage effect fn stays pure (no DB).
+      // Only fires when a rage op is actually present — other batches skip the round-trip.
+      let rageDamageBonus = 0;
+      if (operations.some((op) => op.actionKey === "rage")) {
+        const classRow = await prisma.character.findUnique({
+          where: { id: characterId },
+          select: { classEntries: { select: { name: true, level: true } } },
+        });
+        const barbarianLevel = classRow?.classEntries.find((e) => e.name.toLowerCase() === "barbarian")?.level ?? 0;
+        rageDamageBonus = rageMeleeDamageBonus(barbarianLevel);
       }
       const batchId = randomUUID();
       const sessionId = await getActiveSessionId(characterId);

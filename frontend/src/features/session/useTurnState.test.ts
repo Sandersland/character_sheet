@@ -462,4 +462,19 @@ describe("turn-hook activity window (#457)", () => {
     expect(result.current.tookDamageThisTurn).toBe(false);
     expect(result.current.attackedThisTurn).toBe(false);
   });
+
+  it("marks tookDamageThisTurn for damage taken out of turn (since your last turn)", () => {
+    // 5e: Rage stays if you took damage "since your last turn" — including an
+    // opportunity attack / reaction damage during another creature's turn, when
+    // the barbarian's own phase is idle. The window is scoped by startTurn, not phase.
+    const { result, rerender } = renderHook((c: Character) => useTurnState(c, SESSION_ID), {
+      initialProps: withHp(20),
+    });
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    act(() => { result.current.endTurn(); }); // phase now idle (others' turns)
+    expect(result.current.phase).toBe("idle");
+    rerender(withHp(15)); // took 5 out-of-turn damage
+    expect(result.current.tookDamageThisTurn).toBe(true);
+  });
 });

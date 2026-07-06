@@ -164,12 +164,15 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     saveTurnState(sessionId, state);
   }, [sessionId, state]);
 
-  // Watch current HP: a drop during an active turn marks damage taken (feeds the
-  // durable-buff turn-hook). Heals and non-HP updates are ignored.
+  // Watch current HP: any drop since this turn started marks damage taken (feeds
+  // the durable-buff turn-hook). The window is scoped by the `startTurn`
+  // re-baseline below — NOT by phase — so damage taken out of turn (opportunity
+  // attacks, reactions during another creature's turn) counts too, matching the
+  // 5e rule "took damage since your last turn". Heals and non-HP updates ignored.
   const prevHpRef = useRef(currentHp);
   useEffect(() => {
     if (currentHp < prevHpRef.current) {
-      setState((s) => (s.phase === "active" && !s.tookDamageThisTurn ? { ...s, tookDamageThisTurn: true } : s));
+      setState((s) => (s.tookDamageThisTurn ? s : { ...s, tookDamageThisTurn: true }));
     }
     prevHpRef.current = currentHp;
   }, [currentHp]);

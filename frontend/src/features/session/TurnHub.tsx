@@ -364,7 +364,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
             key={r.key}
             className="rounded-control border border-garnet-200 bg-garnet-50 px-3 py-2 text-xs font-semibold text-garnet-800"
           >
-            🔥 {r.reminder}
+            {r.reminder}
           </p>
         ))}
 
