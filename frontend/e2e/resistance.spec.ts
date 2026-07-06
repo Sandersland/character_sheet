@@ -26,8 +26,8 @@ test("resistance: raging Barbarian halves matching damage, full for others", asy
   });
 
   // Enter rage via the actions endpoint — applies the while-active b/p/s buff.
-  const rage = await page.request.post(`/api/characters/${id}/actions`, {
-    data: { operations: [{ actionKey: "rage" }] },
+  const rage = await page.request.post(`/api/characters/${id}/actions/transactions`, {
+    data: { operations: [{ type: "executeAction", actionKey: "rage" }] },
   });
   expect(rage.ok(), `rage: ${rage.status()}`).toBeTruthy();
 
