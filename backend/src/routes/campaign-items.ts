@@ -4,6 +4,13 @@ import { z } from "zod";
 import { Prisma } from "../generated/prisma/client.js";
 import { assertCampaignMembership } from "../lib/auth/access.js";
 import {
+  awardCampaignItem,
+  CampaignItemAwardError,
+  campaignItemHolders,
+  revokeCampaignItem,
+  type CampaignItemHolder,
+} from "../lib/campaign-item-award.js";
+import {
   serializeArmorDetail,
   serializeConsumableDetail,
   serializeWeaponDetail,
@@ -89,6 +96,11 @@ const baseFields = {
 const createItemSchema = z.object(baseFields).strict();
 const updateItemSchema = z.object(baseFields).partial().strict();
 
+const awardSchema = z
+  .object({ characterId: z.string().min(1), quantity: z.number().int().positive().optional() })
+  .strict();
+const revokeSchema = z.object({ characterId: z.string().min(1) }).strict();
+
 const itemInclude = {
   weaponDetail: true,
   armorDetail: true,
@@ -100,9 +112,16 @@ type ItemWithDetails = Prisma.CampaignItemGetPayload<{ include: typeof itemInclu
 
 // Serialize for the wire. dmNotes is included ONLY when includeDmNotes is true —
 // the single guard behind "dmNotes never reaches a player-facing payload".
-function serializeCampaignItem(row: ItemWithDetails, includeDmNotes: boolean) {
+// holders (derived from live InventoryItem rows) is player-safe: just who holds
+// how many, so it appears on both the owner list and the revealed Codex card.
+function serializeCampaignItem(
+  row: ItemWithDetails,
+  includeDmNotes: boolean,
+  holders: CampaignItemHolder[] = [],
+) {
   const entity = row.link?.campaignEntity;
   return {
+    holders,
     id: row.id,
     campaignId: row.campaignId,
     name: row.name,
@@ -151,7 +170,8 @@ campaignItemsRouter.get("/campaigns/:id/items", async (req, res) => {
     include: itemInclude,
     orderBy: { name: "asc" },
   });
-  res.json(items.map((row) => serializeCampaignItem(row, true)));
+  const holders = await campaignItemHolders(items.map((i) => i.id));
+  res.json(items.map((row) => serializeCampaignItem(row, true, holders.get(row.id) ?? [])));
 });
 
 // ── GET /api/campaigns/:id/items/by-entity/:entityId ─────────────────────────
@@ -178,7 +198,8 @@ campaignItemsRouter.get("/campaigns/:id/items/by-entity/:entityId", async (req, 
     return;
   }
 
-  res.json(serializeCampaignItem(link.campaignItem, isOwner));
+  const holders = await campaignItemHolders([link.campaignItem.id]);
+  res.json(serializeCampaignItem(link.campaignItem, isOwner, holders.get(link.campaignItem.id) ?? []));
 });
 
 // ── POST /api/campaigns/:id/items ────────────────────────────────────────────
@@ -310,4 +331,75 @@ campaignItemsRouter.delete("/campaigns/:id/items/:itemId", async (req, res) => {
   });
 
   res.status(204).end();
+});
+
+// ── POST /api/campaigns/:id/items/:campaignItemId/award ───────────────────────
+// Owner-only intent-bearing transaction (#381): snapshots the item into a member
+// character's inventory, reveals the fronting entity, and writes an undoable
+// audit event on the TARGET character. Unique-item conflicts 409 with the holder.
+campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/award", async (req, res) => {
+  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
+  if (role !== "OWNER") {
+    res.status(403).json({ error: "Only the campaign owner may award campaign items" });
+    return;
+  }
+
+  const parseResult = awardSchema.safeParse(req.body);
+  if (!parseResult.success) {
+    res.status(400).json({ error: "Invalid request body", details: parseResult.error.flatten() });
+    return;
+  }
+
+  try {
+    await awardCampaignItem({
+      campaignId: req.params.id,
+      campaignItemId: req.params.campaignItemId,
+      characterId: parseResult.data.characterId,
+      quantity: parseResult.data.quantity ?? 1,
+    });
+  } catch (err) {
+    if (err instanceof CampaignItemAwardError) {
+      res.status(err.status).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
+
+  const holders = await campaignItemHolders([req.params.campaignItemId]);
+  res.status(200).json({ holders: holders.get(req.params.campaignItemId) ?? [] });
+});
+
+// ── POST /api/campaigns/:id/items/:campaignItemId/revoke ──────────────────────
+// Owner-only counterpart: removes the provenance-matched inventory row (undoable
+// audit event on the target character). A player-modified snapshot is still
+// revocable — the match is by campaignItemId, not by field equality.
+campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/revoke", async (req, res) => {
+  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
+  if (role !== "OWNER") {
+    res.status(403).json({ error: "Only the campaign owner may revoke campaign items" });
+    return;
+  }
+
+  const parseResult = revokeSchema.safeParse(req.body);
+  if (!parseResult.success) {
+    res.status(400).json({ error: "Invalid request body", details: parseResult.error.flatten() });
+    return;
+  }
+
+  try {
+    await revokeCampaignItem({
+      campaignId: req.params.id,
+      campaignItemId: req.params.campaignItemId,
+      characterId: parseResult.data.characterId,
+    });
+  } catch (err) {
+    if (err instanceof CampaignItemAwardError) {
+      res.status(err.status).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
+
+  const holders = await campaignItemHolders([req.params.campaignItemId]);
+  res.status(200).json({ holders: holders.get(req.params.campaignItemId) ?? [] });
 });

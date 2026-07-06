@@ -974,6 +974,13 @@ export interface CampaignEntity {
   updatedAt: string;
 }
 
+/** One current holder of an awarded campaign item (#381). */
+export interface CampaignItemHolder {
+  characterId: string;
+  characterName: string;
+  quantity: number;
+}
+
 /**
  * DM-authored campaign item (#380): loot/magic-item prep that lives in a
  * campaign, not on any sheet. Mirrors `Item` plus DM-only fields (rarity,
@@ -998,6 +1005,8 @@ export interface CampaignItem {
   consumable?: ConsumableDetail;
   /** The fronting ITEM CampaignEntity — its `visibility` drives player reveal. */
   entity?: { id: string; name: string; visibility: EntityVisibility };
+  /** Current holders derived from live inventory rows (#381). */
+  holders?: CampaignItemHolder[];
   createdAt: string;
   updatedAt: string;
 }

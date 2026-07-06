@@ -45,6 +45,17 @@ describe("CampaignItemCard (#380)", () => {
     expect(screen.queryByText(/DM notes/)).not.toBeInTheDocument();
   });
 
+  it("shows holders once the item is awarded (#381)", () => {
+    render(
+      <CampaignItemCard
+        item={item({ holders: [{ characterId: "c1", characterName: "Bruenor", quantity: 2 }] })}
+        isOwner={false}
+      />,
+    );
+    expect(screen.getByText("Held by")).toBeInTheDocument();
+    expect(screen.getByText("Bruenor ×2")).toBeInTheDocument();
+  });
+
   it("renders armor detail for an armor item", () => {
     render(
       <CampaignItemCard

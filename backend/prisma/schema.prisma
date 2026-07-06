@@ -299,6 +299,8 @@ model CampaignItem {
   armorDetail      CampaignItemArmorDetail?
   consumableDetail CampaignItemConsumableDetail?
   link             CampaignItemLink?
+  // Awarded snapshots on player sheets (#381) — holder derivation reads these.
+  awards           InventoryItem[]           @relation("CampaignItemAwards")
 
   @@index([campaignId])
 }
@@ -844,6 +846,11 @@ model InventoryItem {
   character   Character    @relation(fields: [characterId], references: [id], onDelete: Cascade)
   itemId      String?
   item        Item?        @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  // Provenance of a DM-awarded campaign item (#381) — mirrors the itemId
+  // provenance pattern above. Null for player-acquired rows; SetNull so
+  // deleting the CampaignItem leaves the awarded snapshot intact.
+  campaignItemId String?
+  campaignItem   CampaignItem? @relation("CampaignItemAwards", fields: [campaignItemId], references: [id], onDelete: SetNull)
   name        String
   category    ItemCategory
   weight      Float?
@@ -960,6 +967,9 @@ enum CharacterEventType {
   sold
   bought
   removed
+  // DM campaign-item award/revoke (#381)
+  awarded
+  revoked
   // hitPoints
   damage
   heal

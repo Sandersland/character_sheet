@@ -86,6 +86,20 @@ export default function CampaignItemCard({ item, isOwner }: CampaignItemCardProp
           </div>
         )}
 
+        {item.holders && item.holders.length > 0 && (
+          <div>
+            <p className={labelCls}>Held by</p>
+            <ul className="mt-1 flex flex-col gap-1 text-sm text-parchment-800">
+              {item.holders.map((h) => (
+                <li key={h.characterId}>
+                  {h.characterName}
+                  {h.quantity > 1 ? ` ×${h.quantity}` : ""}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {isOwner && item.dmNotes && (
           <div className="rounded-control border border-garnet-200 bg-garnet-50 p-3">
             <p className="text-xs font-semibold text-garnet-700">🔒 DM notes (hidden from players)</p>

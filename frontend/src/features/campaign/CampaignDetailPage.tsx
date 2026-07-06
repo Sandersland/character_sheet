@@ -104,7 +104,7 @@ export default function CampaignDetailPage() {
         {onManage && isOwner ? (
           <>
             <CampaignManagePanel campaignId={campaign.id} />
-            <CampaignItemsPanel campaignId={campaign.id} />
+            <CampaignItemsPanel campaignId={campaign.id} characters={campaign.characters ?? []} />
           </>
         ) : onCodex ? (
           <CampaignCodex campaignId={campaign.id} role={campaign.role} />

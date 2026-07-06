@@ -205,7 +205,7 @@ export const inventoryItemDetailInclude = {
   consumableDetail: true,
 } satisfies Prisma.InventoryItemInclude;
 
-type InventoryItemWithDetails = Prisma.InventoryItemGetPayload<{ include: typeof inventoryItemDetailInclude }>;
+export type InventoryItemWithDetails = Prisma.InventoryItemGetPayload<{ include: typeof inventoryItemDetailInclude }>;
 
 // The Item catalog include used when fetching a catalog Item's detail rows
 // for snapshot — same shape as inventoryItemDetailInclude above but typed
@@ -356,6 +356,7 @@ function snapshotItemDetail(item: CatalogItemWithDetails) {
 export interface DeletedInventoryItemSnapshot {
   id: string;
   itemId: string | null;
+  campaignItemId: string | null;
   name: string;
   category: ItemCategoryName;
   weight: number | null;
@@ -374,10 +375,11 @@ export interface DeletedInventoryItemSnapshot {
 // `data.deletedItem` snapshot. Mirror of snapshotItemDetail's field-by-field
 // style, but reads from an InventoryItem (live row) rather than a catalog Item
 // and keeps the scalar item columns alongside the detail blocks.
-function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): DeletedInventoryItemSnapshot {
+export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): DeletedInventoryItemSnapshot {
   return {
     id: item.id,
     itemId: item.itemId,
+    campaignItemId: item.campaignItemId,
     name: item.name,
     category: item.category,
     weight: item.weight,
@@ -864,11 +866,20 @@ export async function revertInventoryEvent(
       const catalogItem = await tx.item.findUnique({ where: { id: itemId }, select: { id: true } });
       if (!catalogItem) itemId = null; // catalog row gone → snapshot is self-contained
     }
+    // Restore the campaign-item provenance FK too (#381) — without it, undo of a
+    // revoke would drop the row from holder/unique-guard queries. Null when the
+    // snapshot predates the FK, or the CampaignItem was since deleted (SetNull).
+    let campaignItemId = deletedItem.campaignItemId ?? null;
+    if (campaignItemId) {
+      const campaignItem = await tx.campaignItem.findUnique({ where: { id: campaignItemId }, select: { id: true } });
+      if (!campaignItem) campaignItemId = null;
+    }
     await tx.inventoryItem.create({
       data: {
         id: event.entityId,
         characterId,
         itemId,
+        campaignItemId,
         name: deletedItem.name,
         category: deletedItem.category,
         weight: deletedItem.weight ?? undefined,
