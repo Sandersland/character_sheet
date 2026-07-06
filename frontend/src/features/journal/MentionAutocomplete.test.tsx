@@ -18,6 +18,11 @@ vi.mock("@/api/client", () => ({
   createEntity: vi.fn(),
 }));
 
+vi.mock("@/hooks/useCampaignMerges", () => ({
+  useCampaignMerges: () => ({ merges: [] }),
+  primeCampaignMerges: vi.fn(),
+}));
+
 const GOBLIN = "11111111-1111-1111-1111-111111111111";
 const SWORD = "22222222-2222-2222-2222-222222222222";
 const GATE = "33333333-3333-3333-3333-333333333333";

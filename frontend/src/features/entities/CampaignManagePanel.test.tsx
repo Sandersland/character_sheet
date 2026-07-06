@@ -13,6 +13,15 @@ vi.mock("@/api/client", () => ({
   createEntity: vi.fn(),
   updateEntity: vi.fn(),
   deleteEntity: vi.fn(),
+  prepareEntityMerge: vi.fn(),
+  executeEntityMerge: vi.fn(),
+  unmergeEntityMerge: vi.fn(),
+}));
+
+const mergeState = vi.hoisted(() => ({ merges: [] as import("@/types/character").CampaignEntityMerge[] }));
+vi.mock("@/hooks/useCampaignMerges", () => ({
+  useCampaignMerges: () => ({ merges: mergeState.merges }),
+  primeCampaignMerges: vi.fn(),
 }));
 
 const CAMPAIGN_ID = "camp-1";
@@ -40,6 +49,7 @@ function renderPanel() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mergeState.merges = [];
   __resetCampaignEntitiesCacheForTests();
 });
 
@@ -135,5 +145,61 @@ describe("CampaignManagePanel (#379)", () => {
       name: "Big Bad",
       visibility: "HIDDEN",
     });
+  });
+
+  it("prepares a merge from the two-entity form (#387)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(client.fetchEntities).mockResolvedValue([
+      entity({ id: "jenkins", name: "Jenkins" }),
+      entity({ id: "vecna", name: "Vecna", visibility: "HIDDEN" }),
+    ]);
+    vi.mocked(client.prepareEntityMerge).mockResolvedValue({
+      id: "m1",
+      campaignId: CAMPAIGN_ID,
+      mergedEntityId: "jenkins",
+      survivorEntityId: "vecna",
+      status: "PREPARED",
+      note: null,
+      preparedAt: "2026-01-01T00:00:00.000Z",
+      executedAt: null,
+    });
+
+    renderPanel();
+
+    await screen.findByText("Jenkins");
+    await user.click(screen.getByRole("button", { name: /prepare merge/i }));
+    await user.selectOptions(screen.getByLabelText(/Old identity/i), "jenkins");
+    await user.selectOptions(screen.getByLabelText(/Revealed to be/i), "vecna");
+    await user.click(screen.getByRole("button", { name: /^Prepare merge$/i }));
+
+    expect(vi.mocked(client.prepareEntityMerge)).toHaveBeenCalledWith(CAMPAIGN_ID, {
+      mergedEntityId: "jenkins",
+      survivorEntityId: "vecna",
+      note: undefined,
+    });
+  });
+
+  it("shows a 'Secretly linked' badge on entities in a PREPARED merge (#387)", async () => {
+    vi.mocked(client.fetchEntities).mockResolvedValue([
+      entity({ id: "jenkins", name: "Jenkins" }),
+      entity({ id: "vecna", name: "Vecna", visibility: "HIDDEN" }),
+    ]);
+    mergeState.merges = [
+      {
+        id: "m1",
+        campaignId: CAMPAIGN_ID,
+        mergedEntityId: "jenkins",
+        survivorEntityId: "vecna",
+        status: "PREPARED",
+        note: null,
+        preparedAt: "2026-01-01T00:00:00.000Z",
+        executedAt: null,
+      },
+    ];
+
+    renderPanel();
+
+    await screen.findByText("Jenkins");
+    expect(screen.getAllByText(/Secretly linked/).length).toBeGreaterThan(0);
   });
 });
