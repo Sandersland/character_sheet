@@ -58,8 +58,19 @@ const TYPE_LABEL: Partial<Record<string, string>> = {
   combatEnded: "combat end",
   attackRoll: "attack",
   damageRoll: "damage",
+  awarded: "loot",
+  revoked: "revoked",
   revert: "undo",
 };
+
+// DM award/revoke loot events (#382) carry the recipient in data.recipientName.
+// The session feed spans the whole party, so append "→ Recipient" to name who
+// the grant landed on (the stored summary alone doesn't say).
+function lootSummary(event: CharacterEvent): string | null {
+  if (event.type !== "awarded" && event.type !== "revoked") return null;
+  const recipient = (event.data as { recipientName?: string } | undefined)?.recipientName;
+  return recipient ? `${event.summary} → ${recipient}` : event.summary;
+}
 
 // Roll events logged by the new client carry their kept die faces in `data.faces`.
 // When present, rebuild the summary with the raw breakdown injected after the dice
@@ -166,7 +177,7 @@ export default function SessionLog({ characterId, sessionId, refreshKey }: Sessi
             )}
             <Badge tone={tone}>{label}</Badge>
             <span className="text-parchment-800">
-              {rollBreakdownSummary(event) ?? event.summary}
+              {rollBreakdownSummary(event) ?? lootSummary(event) ?? event.summary}
             </span>
           </li>
         );

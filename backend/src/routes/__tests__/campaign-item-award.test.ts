@@ -281,4 +281,104 @@ describe("campaign item award/revoke (#381)", () => {
     expect(card.body.holders).toEqual([{ characterId: CHAR, characterName: "Bruenor", quantity: 3 }]);
     await prisma.inventoryItem.deleteMany({ where: { campaignItemId: id } });
   });
+
+  // ── Session-threaded loot (#382) ──────────────────────────────────────────────
+
+  it("threads an award onto an explicit active session: log entry + end-of-session loot", async () => {
+    const { id } = await createItem({ ...weaponItem, name: "Session Blade" });
+    const start = await agent(cookiePlayer)
+      .post(`/api/campaigns/${campaignId}/sessions`)
+      .send({ characterId: CHAR, title: "Loot Night" });
+    expect(start.status).toBe(201);
+    const sessionId = start.body.session.id as string;
+
+    const award = await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/award`)
+      .send({ characterId: CHAR, quantity: 2, sessionId });
+    expect(award.status).toBe(200);
+
+    // The loot event is threaded onto the session feed with item, recipient, qty.
+    const detail = await agent(cookieOwner).get(
+      `/api/campaigns/${campaignId}/sessions/${sessionId}`,
+    );
+    const loot = detail.body.events.find((e: { type: string }) => e.type === "awarded");
+    expect(loot).toBeDefined();
+    expect(loot.summary).toContain("Session Blade");
+    expect(loot.data.quantityDelta).toBe(2);
+    expect(loot.data.recipientName).toBe("Bruenor");
+
+    // End-of-session summary carries the Loot line-up (recap + per participant).
+    const end = await agent(cookieOwner).post(
+      `/api/campaigns/${campaignId}/sessions/${sessionId}/end`,
+    );
+    expect(end.status).toBe(200);
+    expect(end.body.session.summary.loot).toEqual([{ name: "Session Blade", qty: 2 }]);
+    const participant = end.body.session.participants.find(
+      (p: { characterId: string }) => p.characterId === CHAR,
+    );
+    expect(participant.summary.loot).toEqual([{ name: "Session Blade", qty: 2 }]);
+
+    await prisma.inventoryItem.deleteMany({ where: { campaignItemId: id } });
+  });
+
+  it("auto-threads to the campaign's active session when no sessionId is passed", async () => {
+    const { id } = await createItem({ ...weaponItem, name: "Auto Blade" });
+    const start = await agent(cookiePlayer)
+      .post(`/api/campaigns/${campaignId}/sessions`)
+      .send({ characterId: CHAR });
+    const sessionId = start.body.session.id as string;
+
+    // No sessionId in the body — #381 behaviour still tags the active session.
+    await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/award`)
+      .send({ characterId: CHAR });
+
+    const detail = await agent(cookieOwner).get(
+      `/api/campaigns/${campaignId}/sessions/${sessionId}`,
+    );
+    const loot = detail.body.events.find((e: { type: string }) => e.type === "awarded");
+    expect(loot).toBeDefined();
+
+    // Undo during the session removes both the inventory row and the log entry.
+    const row = await prisma.inventoryItem.findFirstOrThrow({
+      where: { characterId: CHAR, campaignItemId: id },
+    });
+    const revert = await agent(cookiePlayer).post(
+      `/api/characters/${CHAR}/events/${loot.batchId}/revert`,
+    );
+    expect(revert.status).toBe(200);
+    expect(await prisma.inventoryItem.findFirst({ where: { id: row.id } })).toBeNull();
+    const after = await agent(cookieOwner).get(
+      `/api/campaigns/${campaignId}/sessions/${sessionId}`,
+    );
+    const stillActive = after.body.events.find(
+      (e: { type: string; reverted: boolean }) => e.type === "awarded" && !e.reverted,
+    );
+    expect(stillActive).toBeUndefined();
+
+    await agent(cookieOwner).post(`/api/campaigns/${campaignId}/sessions/${sessionId}/end`);
+    await prisma.inventoryItem.deleteMany({ where: { campaignItemId: id } });
+  });
+
+  it("rejects an award whose sessionId belongs to a different campaign", async () => {
+    const { id } = await createItem({ ...weaponItem, name: "Cross Blade" });
+    const foreignCampaign = await prisma.campaign.create({
+      data: { name: "Elsewhere", ownerId: OWNER, inviteCode: `x-${Date.now()}` },
+    });
+    const foreignSession = await prisma.session.create({
+      data: { campaignId: foreignCampaign.id, status: "active" },
+    });
+
+    const res = await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/award`)
+      .send({ characterId: CHAR, sessionId: foreignSession.id });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("does not belong");
+    // The award was rejected — nothing landed on the sheet.
+    expect(
+      await prisma.inventoryItem.findFirst({ where: { characterId: CHAR, campaignItemId: id } }),
+    ).toBeNull();
+
+    await prisma.campaign.delete({ where: { id: foreignCampaign.id } });
+  });
 });
