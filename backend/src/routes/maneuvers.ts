@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
 
-import { assertCharacterAccess } from "../lib/auth/access.js";
 import {
   applyManeuverOperations,
   InvalidManeuverOperationError,
@@ -9,8 +8,7 @@ import {
 import { InvalidResourceOperationError } from "../lib/resources.js";
 import { InvalidSpellcastingOperationError } from "../lib/ability-cost.js";
 import { prisma } from "../lib/prisma.js";
-import { characterInclude } from "../lib/character-include.js";
-import { serializeCharacter } from "../lib/character-serialize.js";
+import { makeTransactionsEndpoint } from "../lib/transactions-endpoint.js";
 
 export const maneuversRouter = Router({ mergeParams: true });
 
@@ -54,33 +52,14 @@ const transactionsRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),
 });
 
-maneuversRouter.post<{ id: string }>("/transactions", async (req, res) => {
-  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
-
-  const parseResult = transactionsRequestSchema.safeParse(req.body);
-  if (!parseResult.success) {
-    res.status(400).json({ error: "Invalid request body", details: parseResult.error.flatten() });
-    return;
-  }
-
-  let results;
-  try {
-    results = await applyManeuverOperations(req.params.id, parseResult.data.operations);
-  } catch (error) {
-    if (
-      error instanceof InvalidManeuverOperationError ||
-      error instanceof InvalidResourceOperationError ||
-      error instanceof InvalidSpellcastingOperationError
-    ) {
-      res.status(400).json({ error: error.message });
-      return;
-    }
-    throw error;
-  }
-
-  const updated = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    include: characterInclude,
-  });
-  res.json({ character: serializeCharacter(updated!), results });
+makeTransactionsEndpoint({
+  router: maneuversRouter,
+  schema: transactionsRequestSchema,
+  apply: (characterId, data) => applyManeuverOperations(characterId, data.operations),
+  domainErrors: [
+    InvalidManeuverOperationError,
+    InvalidResourceOperationError,
+    InvalidSpellcastingOperationError,
+  ],
+  respond: (character, results) => ({ character, results }),
 });

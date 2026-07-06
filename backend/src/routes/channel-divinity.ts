@@ -14,8 +14,7 @@ import {
 } from "../lib/channel-divinity.js";
 import { proficiencyBonusForLevel, levelForExperience } from "../lib/experience.js";
 import { prisma } from "../lib/prisma.js";
-import { characterInclude } from "../lib/character-include.js";
-import { serializeCharacter } from "../lib/character-serialize.js";
+import { makeTransactionsEndpoint } from "../lib/transactions-endpoint.js";
 
 export const channelDivinityRouter = Router({ mergeParams: true });
 
@@ -73,32 +72,13 @@ const transactionsRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),
 });
 
-channelDivinityRouter.post<{ id: string }>("/transactions", async (req, res) => {
-  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
-
-  const parseResult = transactionsRequestSchema.safeParse(req.body);
-  if (!parseResult.success) {
-    res.status(400).json({ error: "Invalid request body", details: parseResult.error.flatten() });
-    return;
-  }
-
-  try {
-    await applyChannelDivinityOperations(req.params.id, parseResult.data.operations);
-  } catch (error) {
-    if (
-      error instanceof InvalidChannelDivinityOperationError ||
-      error instanceof InvalidResourceOperationError ||
-      error instanceof InvalidSpellcastingOperationError
-    ) {
-      res.status(400).json({ error: error.message });
-      return;
-    }
-    throw error;
-  }
-
-  const updated = await prisma.character.findUnique({
-    where: { id: req.params.id },
-    include: characterInclude,
-  });
-  res.json(serializeCharacter(updated!));
+makeTransactionsEndpoint({
+  router: channelDivinityRouter,
+  schema: transactionsRequestSchema,
+  apply: (characterId, data) => applyChannelDivinityOperations(characterId, data.operations),
+  domainErrors: [
+    InvalidChannelDivinityOperationError,
+    InvalidResourceOperationError,
+    InvalidSpellcastingOperationError,
+  ],
 });
