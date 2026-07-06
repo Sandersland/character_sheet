@@ -320,11 +320,22 @@ The manual toggle is `features/dice/RollModeToggle.tsx` — a sticky Normal/ADV/
 
 **3D rollers** (`features/dice/DiceRoller.tsx` scripted, `features/dice/PhysicsDiceRoller.tsx` physics) both produce a `RollResult` shape via `summarizeRoll` — they're interchangeable via the shared `DiceRollerProps` contract in `features/dice/diceRollerTypes.ts`. In tests, stub `@/features/dice/DiceRoller` (it mounts a Three.js Canvas that won't render in jsdom) to fire `onResult` on mount — see `RollContext.test.tsx` / `ConcentrationSaveModal.test.tsx`.
 
+**Lazy 3D stack (#432).** The three.js/@react-three/cannon-es/troika stack is heavy, so it never sits in the initial bundle. The two dice seams on eager pages load it via `React.lazy` behind `<Suspense fallback={null}>` — `RollContext` lazy-loads `DiceRollModal`, and `ConcentrationSaveModal` lazy-loads `DiceRoller` — so the vendor chunk is fetched only when a roll animates. Character creation's `PhysicsDiceRoller` rides the route-lazy `CharacterCreatePage` chunk instead. Because the tests stub `@/features/dice/DiceRoller` and the lazy import resolves a tick later, assert the roller with `findByTestId` (async), not `getByTestId`. See the Bundle splitting note below for the matching `manualChunks` config.
+
 The dice face numbers are drei `<Text>` (troika). Two things keep them working under the single-origin CSP (#408), which local split-origin dev never exercises:
-- **Main-thread typesetting** — `lib/troikaTextConfig.ts` (`configureDiceText()`, called once in `main.tsx` before render) sets troika `useWorker: false`. Troika's default worker rehydrates via a `blob:` `importScripts`, which the CSP `script-src` blocks (`worker-src` doesn't cover `importScripts`), so `<Text>` would otherwise suspend forever and stall the whole roller.
+- **Main-thread typesetting** — `lib/troikaTextConfig.ts` (`configureDiceText()`, run at module scope in `features/dice/DiceScene.tsx` so it fires when the lazy dice chunk evaluates, before any `<Text>` renders — kept out of `main.tsx` so it doesn't pin troika into the initial bundle, #432) sets troika `useWorker: false`. Troika's default worker rehydrates via a `blob:` `importScripts`, which the CSP `script-src` blocks (`worker-src` doesn't cover `importScripts`), so `<Text>` would otherwise suspend forever and stall the whole roller.
 - **Bundled font** — `DieMesh` passes an explicit `font` (a same-origin `@fontsource/source-sans-3` **woff**, imported so Vite hashes it into `dist`). Without it, main-thread troika fetches unicode-font-resolver data from a CDN, which the CSP `connect-src` blocks. woff, not woff2 — troika's parser can't read woff2.
 
 Defense-in-depth: `DieMesh` keeps its `<Text>` in its own `<Suspense>` and `DiceScene` renders the physics rig **outside** the cosmetic-environment `<Suspense>`, so a text/env load can never suspend away the sim that produces the result (this decoupling is what makes the roll survive even if the labels fail).
+
+## Bundle splitting
+
+The initial JS bundle is kept small (#432) by two levers that work together — one alone isn't enough, since a chunk is preloaded whenever the entry can reach it through a *static* import:
+
+- **Lazy seams (dynamic `import()`)** break static reachability. `App.tsx` route-lazies the heavy non-initial pages (`SessionPage`, `CharacterCreatePage`) via `React.lazy`, and the dice seams above lazy the 3D rollers. Nothing eager imports the three.js stack.
+- **`manualChunks` (in `frontend/vite.config.ts`)** isolates the vendors into two chunks: `dice-vendor` (three / @react-three / cannon-es / troika) and `react-vendor` (react, react-dom, scheduler, react-router). Both are needed: without a dedicated `react-vendor`, Rollup folds React into `dice-vendor`, and the entry's static React import then drags the whole 3D stack back into the initial preload. The Vite `preload-helper` (imported by every `React.lazy` call site) is likewise pinned to `react-vendor` for the same reason.
+
+Net effect: `dice-vendor` (~1.1 MB) is fetched only when a roll animates or character creation loads — verify by confirming it is **not** a `modulepreload` in the built `dist/index.html`. `build.chunkSizeWarningLimit` is raised past `dice-vendor` on purpose (it never gates first paint); the warning still guards the initial `index`/`react-vendor` chunks.
 
 ## Feature-orchestrator split convention
 
