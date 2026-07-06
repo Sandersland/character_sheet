@@ -244,7 +244,16 @@ export function isKnownCondition(key: string): key is ConditionKey {
 // priceless (null). This is the single source of truth for rarity rules data —
 // the frontend resolves display labels from these keys, never rendering them raw.
 
-export type ItemRarity = "COMMON" | "UNCOMMON" | "RARE" | "VERY_RARE" | "LEGENDARY" | "ARTIFACT";
+export const ITEM_RARITY_KEYS = [
+  "COMMON",
+  "UNCOMMON",
+  "RARE",
+  "VERY_RARE",
+  "LEGENDARY",
+  "ARTIFACT",
+] as const;
+
+export type ItemRarity = (typeof ITEM_RARITY_KEYS)[number];
 
 export interface RarityDefinition {
   key: ItemRarity;

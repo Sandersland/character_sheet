@@ -16,6 +16,7 @@ import {
   serializeWeaponDetail,
 } from "../lib/itemDetail.js";
 import { prisma } from "../lib/prisma.js";
+import { ITEM_RARITY_KEYS } from "../lib/srd.js";
 
 // DM-authored campaign items (#380). Owner-only CRUD (list/create/update/delete)
 // under /api/campaigns/:id/items; a member-readable by-entity GET feeds the Codex
@@ -82,7 +83,7 @@ const baseFields = {
   name: z.string().min(1),
   description: z.string().optional(),
   category: z.enum(CATEGORIES),
-  rarity: z.string().optional(),
+  rarity: z.enum(ITEM_RARITY_KEYS).nullable().optional(),
   requiresAttunement: z.boolean().optional(),
   isUnique: z.boolean().optional(),
   weight: z.number().optional(),
