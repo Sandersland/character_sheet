@@ -19,7 +19,7 @@ backend/src/lib/experience.ts
                                       nextLevelThreshold, xpToNextLevel }
 ```
 
-`serializeCharacter` (`backend/src/routes/characters.ts`) calls `experienceProgress(row.experiencePoints)` and spreads the result onto the wire shape. These values must never be added back as columns — add or modify the curve in `experience.ts` and every read automatically reflects it.
+`serializeCharacter` (`backend/src/lib/character-serialize.ts`) calls `experienceProgress(row.experiencePoints)` and spreads the result onto the wire shape. These values must never be added back as columns — add or modify the curve in `experience.ts` and every read automatically reflects it.
 
 ---
 

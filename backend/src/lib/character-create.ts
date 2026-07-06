@@ -9,8 +9,8 @@ import { ALIGNMENTS, deriveCreatedCharacter, isKnownTool } from "./srd.js";
 import { STARTING_EQUIPMENT } from "./starting-equipment.js";
 import type { CreateCharacterBody } from "./character-schemas.js";
 
-// Discriminated result: the caller persists then re-fetches by id (keeps
-// characterInclude/serializeCharacter in the route, avoiding a lib→routes edge).
+// Discriminated result: return just the new id so the route re-fetches by id
+// with characterInclude and serializes (persist-then-reserialize idiom).
 export type CreateCharacterResult =
   | { ok: true; id: string }
   | { ok: false; status: 400; error: string };

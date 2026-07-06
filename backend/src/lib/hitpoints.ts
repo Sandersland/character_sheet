@@ -38,7 +38,7 @@ export interface HitDice {
 }
 
 // ---- Normalizers ----
-// These are applied in serializeCharacter (routes/characters.ts) so every
+// These are applied in serializeCharacter (lib/character-serialize.ts) so every
 // GET response carries the new fields even for rows that predate the
 // `deathSaves` / `spent` additions — no data migration needed.
 
