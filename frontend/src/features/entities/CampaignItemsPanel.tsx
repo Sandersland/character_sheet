@@ -12,6 +12,7 @@ import {
   fetchCampaignItems,
   fetchItems,
   revokeCampaignItem,
+  updateCampaignItem,
   updateEntity,
 } from "@/api/client";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
@@ -109,6 +110,33 @@ function formFromCatalog(item: Item): FormState {
   };
 }
 
+// Prefill the shared form from an existing campaign item (edit path):
+// every base field + the matching detail block, so a save re-sends the full item.
+function formFromItem(item: CampaignItem): FormState {
+  return {
+    ...emptyForm,
+    name: item.name,
+    category: item.category,
+    rarity: item.rarity ?? "",
+    requiresAttunement: item.requiresAttunement,
+    isUnique: item.isUnique,
+    weight: item.weight?.toString() ?? "",
+    costGp: item.cost?.gp?.toString() ?? "",
+    description: item.description ?? "",
+    dmNotes: item.dmNotes ?? "",
+    damageDiceCount: item.weapon?.damageDiceCount?.toString() ?? emptyForm.damageDiceCount,
+    damageDiceFaces: item.weapon?.damageDiceFaces?.toString() ?? emptyForm.damageDiceFaces,
+    damageType: item.weapon?.damageType ?? emptyForm.damageType,
+    armorCategory: item.armor?.armorCategory ?? emptyForm.armorCategory,
+    baseArmorClass: item.armor?.baseArmorClass?.toString() ?? "",
+    stealthDisadvantage: item.armor?.stealthDisadvantage ?? false,
+    effectDiceCount: item.consumable?.effectDiceCount?.toString() ?? "",
+    effectDiceFaces: item.consumable?.effectDiceFaces?.toString() ?? "",
+    effectModifier: item.consumable?.effectModifier?.toString() ?? "",
+    effectDescription: item.consumable?.effectDescription ?? "",
+  };
+}
+
 function buildInput(f: FormState): CampaignItemInput {
   const gp = num(f.costGp);
   const base: CampaignItemInput = {
@@ -148,13 +176,16 @@ function buildInput(f: FormState): CampaignItemInput {
 
 // Owner-only Manage-tab panel (#380): authors DM campaign items via two paths —
 // clone-from-SRD-catalog (pre-fills the form from a chosen Item) and from-scratch
-// with category-conditional detail fields. Each create auto-registers a HIDDEN
-// ITEM entity; reveal/delete here keep the shared Codex cache in sync.
+// with category-conditional detail fields. The same form re-opens pre-filled to
+// edit an existing item (#505). Each create auto-registers a HIDDEN ITEM entity;
+// reveal/edit/delete here keep the shared Codex cache in sync.
 export default function CampaignItemsPanel({ campaignId, characters }: CampaignItemsPanelProps) {
   const { entities } = useCampaignEntities(campaignId);
   const [items, setItems] = useState<CampaignItem[]>([]);
   const [catalog, setCatalog] = useState<Item[]>([]);
   const [creating, setCreating] = useState(false);
+  // Non-null while editing an existing item; drives the shared form's mode.
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -188,18 +219,60 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
     }
   }
 
-  async function handleCreate() {
+  // Mirror a saved rename onto the fronting entity in the shared Codex cache.
+  function renameInCache(entityId: string, name: string) {
+    const target = entities.find((e) => e.id === entityId);
+    if (target) {
+      primeCampaignEntities(
+        campaignId,
+        entities.map((e) => (e.id === entityId ? { ...e, name } : e)),
+      );
+    }
+  }
+
+  function startCreate() {
+    setEditingId(null);
+    setForm(emptyForm);
+    setCreating((c) => !c);
+  }
+
+  function startEdit(item: CampaignItem) {
+    setEditingId(item.id);
+    setForm(formFromItem(item));
+    setCreating(false);
+    setError(null);
+  }
+
+  function cancelForm() {
+    setCreating(false);
+    setEditingId(null);
+    setForm(emptyForm);
+  }
+
+  async function handleSubmit() {
     if (form.name.trim() === "") return;
-    setBusyId("new");
+    const editing = editingId !== null;
+    setBusyId(editing ? editingId : "new");
     setError(null);
     try {
-      const created = await createCampaignItem(campaignId, buildInput(form));
-      setItems((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
-      if (created.entity) primeCampaignEntities(campaignId, [...entities, { id: created.entity.id, campaignId, type: "ITEM", name: created.entity.name, aliases: [], notes: null, visibility: created.entity.visibility, createdAt: created.createdAt, updatedAt: created.updatedAt }]);
+      if (editing) {
+        const updated = await updateCampaignItem(campaignId, editingId, buildInput(form));
+        setItems((prev) =>
+          prev
+            .map((i) => (i.id === updated.id ? { ...updated, holders: i.holders ?? [] } : i))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        );
+        if (updated.entity) renameInCache(updated.entity.id, updated.entity.name);
+      } else {
+        const created = await createCampaignItem(campaignId, buildInput(form));
+        setItems((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+        if (created.entity) primeCampaignEntities(campaignId, [...entities, { id: created.entity.id, campaignId, type: "ITEM", name: created.entity.name, aliases: [], notes: null, visibility: created.entity.visibility, createdAt: created.createdAt, updatedAt: created.updatedAt }]);
+      }
       setForm(emptyForm);
       setCreating(false);
+      setEditingId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create item.");
+      setError(err instanceof Error ? err.message : editing ? "Failed to update item." : "Failed to create item.");
     } finally {
       setBusyId(null);
     }
@@ -287,7 +360,7 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
         <button
           type="button"
           aria-expanded={creating}
-          onClick={() => setCreating((c) => !c)}
+          onClick={startCreate}
           className="text-xs font-semibold text-garnet-700 hover:underline"
         >
           ➕ New item
@@ -302,29 +375,31 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
           </p>
         )}
 
-        {creating && (
+        {(creating || editingId !== null) && (
           <div className="flex flex-col gap-3 rounded-control border border-parchment-200 bg-parchment-100 p-3">
-            <div>
-              <label className={labelCls} htmlFor="item-clone">
-                Clone from catalog (optional)
-              </label>
-              <select
-                id="item-clone"
-                className={inputCls}
-                value=""
-                onChange={(e) => {
-                  const chosen = catalog.find((c) => c.id === e.target.value);
-                  if (chosen) setForm(formFromCatalog(chosen));
-                }}
-              >
-                <option value="">Start from scratch…</option>
-                {catalog.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {editingId === null && (
+              <div>
+                <label className={labelCls} htmlFor="item-clone">
+                  Clone from catalog (optional)
+                </label>
+                <select
+                  id="item-clone"
+                  className={inputCls}
+                  value=""
+                  onChange={(e) => {
+                    const chosen = catalog.find((c) => c.id === e.target.value);
+                    if (chosen) setForm(formFromCatalog(chosen));
+                  }}
+                >
+                  <option value="">Start from scratch…</option>
+                  {catalog.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div>
               <label className={labelCls} htmlFor="item-name">
@@ -574,14 +649,27 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
               />
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
               <button
                 type="button"
-                disabled={busyId === "new" || form.name.trim() === ""}
-                onClick={handleCreate}
+                onClick={cancelForm}
+                className="rounded-control border border-parchment-300 px-3 py-1.5 text-xs font-semibold text-parchment-700 hover:bg-parchment-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={busyId !== null || form.name.trim() === ""}
+                onClick={handleSubmit}
                 className="rounded-control bg-garnet-600 px-3 py-1.5 text-xs font-semibold text-parchment-50 hover:bg-garnet-700 disabled:opacity-40"
               >
-                {busyId === "new" ? "Creating…" : "Create item"}
+                {editingId !== null
+                  ? busyId === editingId
+                    ? "Saving…"
+                    : "Save changes"
+                  : busyId === "new"
+                    ? "Creating…"
+                    : "Create item"}
               </button>
             </div>
           </div>
@@ -624,6 +712,14 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
                         className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
                       >
                         {hidden ? "Reveal" : "Hide"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyId === item.id}
+                        onClick={() => startEdit(item)}
+                        className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
+                      >
+                        Edit
                       </button>
                       <button
                         type="button"
