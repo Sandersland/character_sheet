@@ -47,7 +47,10 @@ export default function SpellRow({
   const isCantrip = spell.level === 0;
   // An item-granted spell (#528): cast from the item's own resource, not a slot.
   const item = spell.source === "item" ? spell.item : undefined;
-  const atWill = item ? item.usesTotal === Infinity : false;
+  // Gate on the `resource` string, NOT `usesTotal === Infinity`: JSON.stringify(Infinity)
+  // is `null`, so an at-will item arrives as usesTotal:null and the Infinity check never
+  // matches (would wrongly show the spell as exhausted). `resource` transmits as a string.
+  const atWill = item ? item.resource === "atWill" : false;
   const itemExhausted = Boolean(item) && !atWill && (item?.usesRemaining ?? 0) <= 0;
   // Subclass- and item-granted spells are derived, not persisted — no Remove ✕.
   const isGranted = spell.source === "subclass" || spell.source === "item";

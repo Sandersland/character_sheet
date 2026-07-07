@@ -223,9 +223,12 @@ describe("SpellRow", () => {
     });
 
     it("shows 'at will' and never a uses count for an at-will item spell", () => {
+      // Wire reality: JSON.stringify(Infinity) === null, so an at-will item's
+      // numeric use counts arrive as 0/null, NOT Infinity. Gate must key off
+      // `resource`, not `usesTotal === Infinity` (which never matches on the wire).
       const atWill: Spell = {
         ...itemSpell,
-        item: { ...itemSpell.item!, resource: "atWill", usesRemaining: Infinity, usesTotal: Infinity },
+        item: { ...itemSpell.item!, resource: "atWill", usesRemaining: 0, usesTotal: 0 },
       };
       render(<ul><SpellRow {...defaultProps(atWill, { availableSlots: [] })} /></ul>);
       expect(screen.getByText("at will")).toBeInTheDocument();
