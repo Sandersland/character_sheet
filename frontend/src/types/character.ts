@@ -159,6 +159,55 @@ export interface Item {
   consumable?: ConsumableDetail;
 }
 
+// ── Item capabilities & attunement (#546) ─────────────────────────────────────
+// Mirrors backend lib/capabilities.ts. Only passiveBonus is authorable/rendered
+// this slice; the reserved kinds round-trip as opaque.
+export type CapabilityKind = "passiveBonus" | "castSpell" | "charges" | "grant" | "activatedEffect";
+
+export type CapabilityTarget =
+  | "ac"
+  | "attack"
+  | "damage"
+  | "save"
+  | "skill"
+  | "abilityScore"
+  | "spellAttack"
+  | "spellDc"
+  | "initiative"
+  | "speed"
+  | "maxHp";
+
+export type CapabilityOp = "add" | "setTo";
+
+export type AttunementPrereqKind = "class" | "spellcaster" | "species" | "alignment";
+
+/** Dice-valued bonus (e.g. +2d6 fire); consumed in the damage roll at #526C. */
+export interface CapabilityDice {
+  count: number;
+  faces: number;
+  damageType?: string;
+}
+
+/** One capability as served on a campaign item or an inventory-item snapshot. */
+export interface ItemCapability {
+  kind: CapabilityKind;
+  target?: CapabilityTarget;
+  op?: CapabilityOp;
+  value?: number;
+  /** Specific skill/ability/save key when target is skill|abilityScore|save. */
+  targetKey?: string;
+  condition?: string;
+  description?: string;
+  dice?: CapabilityDice;
+  /** activatedEffect (#543) — reuses target/op/value for the inline self-buff. */
+  activation?: ActivationType;
+  duration?: "whileActive" | "untilRest";
+  resourceKind?: "perRest" | "perDay" | "atWill";
+  resourcePeriod?: "short" | "long" | "dawn" | "dusk";
+  resourceCharges?: number;
+  durationText?: string;
+}
+
 /**
  * A character's own copy of an item's stats, optionally traced back to a
  * catalog `Item` via `itemId` (undefined means homebrew/no catalog match —
@@ -178,14 +227,21 @@ export interface InventoryItem {
   cost?: Currency;
   description?: string;
   equipped: boolean;
-  attuned?: boolean;
-  requiresAttunement?: boolean;
+  /** Attunement state (#546); the 3-item cap is derived, never stored. */
+  attuned: boolean;
+  /** Snapshotted from the source item — whether attunement is required to activate. */
+  requiresAttunement: boolean;
+  attunementPrereqKind?: AttunementPrereqKind;
+  attunementPrereqValue?: string;
+
   notes?: string;
   weapon?: WeaponDetail;
   armor?: ArmorDetail;
   consumable?: ConsumableDetail;
+  capabilities?: ItemCapability[];
   /** Activate/deactivate control state for an item's activatedEffect capability (#543). */
   activated?: ActivatedEffectState;
+
 }
 
 // The derived activate/deactivate control state the API serializes for an
@@ -303,12 +359,14 @@ export type InventoryOperation =
   | { type: "sell"; inventoryItemId: string; quantity?: number; currencyDelta: Currency }
   /** Equips or unequips an item. Unlike `update`, this IS logged on the timeline. */
   | { type: "setEquipped"; inventoryItemId: string; equipped: boolean }
-  /** Attunes / unattunes a magic item (#545). */
+  /** Attunes an item — enforces the derived 3-item cap + prereq server-side (#546). */
   | { type: "attune"; inventoryItemId: string }
+  /** Ends attunement; always legal (#546). */
   | { type: "unattune"; inventoryItemId: string }
   /** Activates / deactivates an item's activatedEffect capability (#543). */
   | { type: "activate"; inventoryItemId: string }
   | { type: "deactivate"; inventoryItemId: string };
+
 
 // ── Unified activity timeline ─────────────────────────────────────────────────
 
@@ -1041,6 +1099,8 @@ export interface CampaignItem {
   category: ItemCategory;
   rarity?: ItemRarity;
   requiresAttunement: boolean;
+  attunementPrereqKind?: AttunementPrereqKind;
+  attunementPrereqValue?: string;
   isUnique: boolean;
   weight?: number;
   cost?: Currency;
@@ -1048,7 +1108,8 @@ export interface CampaignItem {
   weapon?: WeaponDetail;
   armor?: ArmorDetail;
   consumable?: ConsumableDetail;
-  capabilities?: ItemCapabilityInput[];
+  capabilities?: ItemCapability[];
+
   /** The fronting ITEM CampaignEntity — its `visibility` drives player reveal. */
   entity?: { id: string; name: string; visibility: EntityVisibility };
   /** Current holders derived from live inventory rows (#381). */
@@ -1064,6 +1125,9 @@ export interface CampaignItemInput {
   category: ItemCategory;
   rarity?: ItemRarity;
   requiresAttunement?: boolean;
+  /** null clears the prerequisite (attunable by anyone). */
+  attunementPrereqKind?: AttunementPrereqKind | null;
+  attunementPrereqValue?: string | null;
   isUnique?: boolean;
   weight?: number;
   cost?: Currency;
@@ -1071,24 +1135,9 @@ export interface CampaignItemInput {
   weapon?: WeaponDetailInput;
   armor?: ArmorDetailInput;
   consumable?: ConsumableDetail;
-  capabilities?: ItemCapabilityInput[];
-}
+  /** REPLACE semantics server-side: the full set the item should have, [] clears. */
+  capabilities?: ItemCapability[];
 
-// A capability the DM authors on a magic item (#545/#543). Mirrors the backend
-// campaign-items capabilitySchema; activatedEffect reuses target/op/value.
-export interface ItemCapabilityInput {
-  kind: "passiveBonus" | "activatedEffect" | "castSpell" | "charges" | "grant";
-  description?: string;
-  target?: string;
-  op?: "add" | "setTo";
-  value?: number;
-  targetKey?: string;
-  activation?: ActivationType;
-  activatedDuration?: "whileActive" | "untilRest";
-  resourceKind?: "perRest" | "perDay" | "atWill";
-  resourcePeriod?: "short" | "long" | "dawn" | "dusk";
-  resourceCharges?: number;
-  durationText?: string;
 }
 
 /** One note that @-tags an entity, surfaced on the entity detail page. */

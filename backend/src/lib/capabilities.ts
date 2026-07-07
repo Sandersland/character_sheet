@@ -7,22 +7,29 @@ import { casterFractionFor } from "./srd.js";
 
 export type CapabilityKind = "passiveBonus" | "castSpell" | "charges" | "grant" | "activatedEffect";
 
-export type CapabilityTarget =
-  | "ac"
-  | "attack"
-  | "damage"
-  | "save"
-  | "skill"
-  | "abilityScore"
-  | "spellAttack"
-  | "spellDc"
-  | "initiative"
-  | "speed"
-  | "maxHp";
+// The passiveBonus target enum, as a value tuple so the route's zod schema and
+// the frontend option list share one source of truth with the type below.
+export const CAPABILITY_TARGETS = [
+  "ac",
+  "attack",
+  "damage",
+  "save",
+  "skill",
+  "abilityScore",
+  "spellAttack",
+  "spellDc",
+  "initiative",
+  "speed",
+  "maxHp",
+] as const;
 
-export type CapabilityOp = "add" | "setTo";
+export type CapabilityTarget = (typeof CAPABILITY_TARGETS)[number];
 
-export type AttunementPrereqKind = "class" | "spellcaster" | "species" | "alignment";
+export const CAPABILITY_OPS = ["add", "setTo"] as const;
+export type CapabilityOp = (typeof CAPABILITY_OPS)[number];
+
+export const ATTUNEMENT_PREREQ_KINDS = ["class", "spellcaster", "species", "alignment"] as const;
+export type AttunementPrereqKind = (typeof ATTUNEMENT_PREREQ_KINDS)[number];
 
 // activatedEffect axes (#543) — mirror the ActivationType / ActivatedDuration /
 // ItemResourceKind / ItemResourcePeriod schema enums.
@@ -179,10 +186,66 @@ export function describeActivatedReminder(cap: ActivatedEffectCapability): strin
   return parts.join(" · ");
 }
 
+// The flat wire shape a capability serializes to — the same fields the DM authors
+// and the sheet renders. Dice is nested; opaque kinds carry only kind+description.
+export interface SerializedCapability {
+  kind: CapabilityKind;
+  target?: CapabilityTarget;
+  op?: CapabilityOp;
+  value?: number;
+  targetKey?: string;
+  condition?: string;
+  description?: string;
+  dice?: CapabilityDice;
+  // activatedEffect (#543) — round-tripped so the DM editor can re-populate.
+  activation?: ActivationType;
+  duration?: ActivatedDurationKind;
+  resourceKind?: ItemResourceKind;
+  resourcePeriod?: ItemResourcePeriod;
+  resourceCharges?: number;
+  durationText?: string;
+}
+
+// Serialize a capability row for the API (campaign item + inventory item alike),
+// dropping nulls so the wire shape matches the optional-field DM input.
+export function serializeCapability(row: CapabilityColumns): SerializedCapability {
+  const cap = readCapability(row);
+  if (cap.kind === "passiveBonus") {
+    return {
+      kind: cap.kind,
+      target: cap.target,
+      op: cap.op,
+      value: cap.value,
+      ...(cap.targetKey ? { targetKey: cap.targetKey } : {}),
+      ...(cap.condition ? { condition: cap.condition } : {}),
+      ...(cap.description ? { description: cap.description } : {}),
+      ...(cap.dice ? { dice: { count: cap.dice.count, faces: cap.dice.faces, ...(cap.dice.damageType ? { damageType: cap.dice.damageType } : {}) } } : {}),
+    };
+  }
+  if (cap.kind === "activatedEffect") {
+    return {
+      kind: cap.kind,
+      activation: cap.activation,
+      target: cap.target,
+      op: cap.op,
+      value: cap.value,
+      duration: cap.duration,
+      resourceKind: cap.resourceKind,
+      resourceCharges: cap.resourceCharges,
+      ...(cap.targetKey ? { targetKey: cap.targetKey } : {}),
+      ...(cap.resourcePeriod ? { resourcePeriod: cap.resourcePeriod } : {}),
+      ...(cap.durationText ? { durationText: cap.durationText } : {}),
+      ...(cap.description ? { description: cap.description } : {}),
+    };
+  }
+  return { kind: cap.kind, ...(cap.description ? { description: cap.description } : {}) };
+}
+
 // The buffsByTarget channel key a scalar passiveBonus contributes to, or null
-// when the target isn't yet wired into a per-target modifier channel: ac (#383),
-// dice→damage (#526C), and save/abilityScore/spell*/initiative/speed/maxHp
-// (later slices). Reuses the same channel keys active buffs already use so item
+// when the target isn't yet wired into a per-target modifier channel: dice→damage
+// (#526C) and save/abilityScore/spell*/initiative/speed/maxHp (later slices).
+// The "ac" channel (#383) is consumed at the serialize acParts seam, not by
+// buffsByTarget. Reuses the same channel keys active buffs already use so item
 // bonuses and cast buffs sum together on read.
 export function passiveBonusChannel(cap: PassiveBonusCapability): string | null {
   switch (cap.target) {
@@ -192,6 +255,8 @@ export function passiveBonusChannel(cap: PassiveBonusCapability): string | null 
       return "meleeDamage";
     case "attack":
       return "attackRoll";
+    case "ac":
+      return "ac";
     default:
       return null;
   }
@@ -203,6 +268,9 @@ export interface ItemPassiveContribution {
   target: string;
   modifier: number;
   source: string;
+  // Optional 5e usage condition (e.g. AC "while wearing no armor"); surfaced as
+  // reminder text where the channel can't auto-apply it (#383). Omitted when absent.
+  condition?: string;
 }
 
 // The minimal item shape the passive-bonus derivation needs. An item is "active"
@@ -228,7 +296,12 @@ export function deriveItemPassiveBonuses(items: PassiveBonusItem[]): ItemPassive
       if (cap.dice) continue;
       const channel = passiveBonusChannel(cap);
       if (!channel) continue;
-      out.push({ target: channel, modifier: cap.value, source: item.name });
+      out.push({
+        target: channel,
+        modifier: cap.value,
+        source: item.name,
+        ...(cap.condition ? { condition: cap.condition } : {}),
+      });
     }
   }
   return out;

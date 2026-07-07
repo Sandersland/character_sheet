@@ -4,7 +4,7 @@ import { hasItemProse, itemDetailParts } from "@/lib/itemDetails";
 import type { InventoryItem } from "@/types/character";
 
 function makeItem(overrides: Partial<InventoryItem> = {}): InventoryItem {
-  return { id: "i1", name: "Thing", category: "gear", quantity: 1, equipped: false, ...overrides };
+  return { id: "i1", name: "Thing", category: "gear", quantity: 1, equipped: false, attuned: false, requiresAttunement: false, ...overrides };
 }
 
 describe("itemDetailParts", () => {

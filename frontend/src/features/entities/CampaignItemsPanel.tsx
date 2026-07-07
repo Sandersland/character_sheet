@@ -24,17 +24,21 @@ import {
   updateCampaignItem,
   updateEntity,
 } from "@/api/client";
+import CapabilityEditor from "@/features/entities/CapabilityEditor";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
+import { ATTUNEMENT_PREREQ_OPTIONS } from "@/lib/capabilities";
 import { formatCurrency, fromCopper, toCopper } from "@/lib/currency";
 import { ITEM_CATEGORY_OPTIONS, itemCategoryLabel } from "@/lib/items";
 import { RARITY_OPTIONS, rarityLabel, rarityTone, rarityValueHint } from "@/lib/rarity";
 import type {
   ArmorCategory,
   ArmorDetail,
+  AttunementPrereqKind,
   CampaignItem,
   CampaignItemInput,
   Currency,
   Item,
+  ItemCapability,
   ItemCategory,
   ItemRarity,
   WeaponClass,
@@ -88,6 +92,9 @@ interface FormState {
   category: ItemCategory;
   rarity: ItemRarity | "";
   requiresAttunement: boolean;
+  attunementPrereqKind: AttunementPrereqKind | "";
+  attunementPrereqValue: string;
+  capabilities: ItemCapability[];
   isUnique: boolean;
   weight: string;
   costCp: string;
@@ -135,6 +142,9 @@ const emptyForm: FormState = {
   category: "weapon",
   rarity: "",
   requiresAttunement: false,
+  attunementPrereqKind: "",
+  attunementPrereqValue: "",
+  capabilities: [],
   isUnique: false,
   weight: "",
   costCp: "",
@@ -254,6 +264,9 @@ function formFromItem(item: CampaignItem): FormState {
     category: item.category,
     rarity: item.rarity ?? "",
     requiresAttunement: item.requiresAttunement,
+    attunementPrereqKind: item.attunementPrereqKind ?? "",
+    attunementPrereqValue: item.attunementPrereqValue ?? "",
+    capabilities: item.capabilities ?? [],
     isUnique: item.isUnique,
     weight: item.weight?.toString() ?? "",
     ...currencyFields(item.cost),
@@ -299,6 +312,15 @@ function buildInput(f: FormState): CampaignItemInput {
     category: f.category,
     rarity: f.rarity || undefined,
     requiresAttunement: magic && f.requiresAttunement,
+    // Prereq only meaningful for an attunable magic item; a value-bearing kind
+    // without a value degrades to null (attunable by anyone).
+    attunementPrereqKind:
+      magic && f.requiresAttunement && f.attunementPrereqKind ? f.attunementPrereqKind : null,
+    attunementPrereqValue:
+      magic && f.requiresAttunement && f.attunementPrereqKind && f.attunementPrereqKind !== "spellcaster"
+        ? f.attunementPrereqValue.trim() || null
+        : null,
+    capabilities: magic ? f.capabilities : [],
     isUnique: magic && f.isUnique,
     weight: num(f.weight),
     cost: currencyFromForm(f),
@@ -846,7 +868,39 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
                   </ChipToggle>
                 </ChipGroup>
               )}
-              {/* Structural slot for the #526 magic-item capabilities editor. */}
+              {isMagic && form.requiresAttunement && (
+                <div className={pairGridCls}>
+                  <Field label="Attunement requires" htmlFor="item-prereq-kind">
+                    <Select
+                      id="item-prereq-kind"
+                      value={form.attunementPrereqKind}
+                      onChange={(e) => set("attunementPrereqKind", e.target.value as AttunementPrereqKind | "")}
+                    >
+                      {ATTUNEMENT_PREREQ_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  {form.attunementPrereqKind !== "" && form.attunementPrereqKind !== "spellcaster" && (
+                    <Field label="Prerequisite value" htmlFor="item-prereq-value">
+                      <Input
+                        id="item-prereq-value"
+                        placeholder="e.g. Wizard"
+                        value={form.attunementPrereqValue}
+                        onChange={(e) => set("attunementPrereqValue", e.target.value)}
+                      />
+                    </Field>
+                  )}
+                </div>
+              )}
+              {isMagic && (
+                <CapabilityEditor
+                  capabilities={form.capabilities}
+                  onChange={(capabilities) => set("capabilities", capabilities)}
+                />
+              )}
             </fieldset>
 
             <fieldset className={fieldsetCls}>
