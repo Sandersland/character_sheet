@@ -21,6 +21,8 @@ export default function UseConsumableButton({ item, pending, onSubmit }: UseCons
   const depleted = charged && (consumable?.usesRemaining ?? 0) <= 0;
 
   const handleUse = () => {
+    // With effect dice: play the 3D roll and forward the SAME settled die values
+    // to the server (via `rolls`) so the shown roll is exactly the applied one.
     if (consumable?.effectDiceCount && consumable.effectDiceFaces) {
       rollAnimated(
         {
@@ -29,7 +31,13 @@ export default function UseConsumableButton({ item, pending, onSubmit }: UseCons
           modifier: consumable.effectModifier ?? 0,
         },
         `${item.name}${consumable.effectDescription ? ` — ${consumable.effectDescription}` : ""}`,
+        undefined,
+        (result) => {
+          const rolls = result.dice.filter((d) => !d.dropped).map((d) => d.value);
+          void onSubmit([{ type: "use", inventoryItemId: item.id, rolls }]);
+        },
       );
+      return;
     }
     void onSubmit([{ type: "use", inventoryItemId: item.id }]);
   };

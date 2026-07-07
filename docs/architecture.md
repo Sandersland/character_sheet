@@ -227,7 +227,7 @@ Every mutable domain follows the same shape:
 
 `lib/inventory.ts` is the reference implementation for the lib layer; `lib/transactions-endpoint.ts` for the route layer. Do not add new mutable domains via `PATCH /characters/:id`.
 
-The inventory `use` op (#121) consumes one use of a consumable (category-scoped — ammo is gear, excluded): it decrements `quantity` or `usesRemaining`, rolls the effect dice (client-supplied raw values for the 3D animation, else server-rolled via `dice.ts`), writes a `consumed` event with the roll in `data`, and **auto-applies only healing** through the HP domain (`applyHealInTx`, same shared `batchId` → atomic + LIFO-undoable). Non-heal effects are rolled + recorded but never applied. The route surfaces the per-use roll outcomes as `useResults` (via `makeTransactionsEndpoint`'s `respond`) so the client plays the dice + toast.
+The inventory `use` op (#121) consumes one use of a consumable (category-scoped — ammo is gear, excluded): it decrements `quantity` or `usesRemaining`, rolls the effect dice, writes a `consumed` event with the roll in `data`, and **auto-applies only healing** through the HP domain (`applyHealInTx`, same shared `batchId` → atomic + LIFO-undoable). Non-heal effects are rolled + recorded but never applied. The client rolls the effect dice for the 3D animation + toast and forwards the raw die values via the op's `rolls`, so the shown roll is exactly the applied one; the server validates them (count/range) and applies them verbatim (`rolls` absent → server rolls via `dice.ts`). The route also echoes each use's applied outcome as `useResults` (via `makeTransactionsEndpoint`'s `respond`).
 
 ---
 

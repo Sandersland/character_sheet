@@ -75,8 +75,10 @@ interface RollContextValue {
   lastRoll: RollEntry | null;
   /** Instant fast-roll: publish to the toast and return the result. */
   roll: (spec: RollSpec, label: string) => RollResult;
-  /** Play the 3D dice, publish to the toast, and log the roll when in a session. */
-  rollAnimated: (spec: RollSpec, label: string, log?: RollLog) => void;
+  /** Play the 3D dice, publish to the toast, and log the roll when in a session.
+   *  `onSettled` fires with the settled result so a caller can apply the exact
+   *  shown roll server-side (e.g. forwarding a consumable's effect dice). */
+  rollAnimated: (spec: RollSpec, label: string, log?: RollLog, onSettled?: (result: RollResult) => void) => void;
   /** Best-effort session-log emit — no-op outside an active session. */
   logSessionRoll: (input: RollLogInput) => void;
   /** Sticky manual advantage/disadvantage applied to eligible d20 rolls. */
@@ -101,7 +103,13 @@ export function RollProvider({ children, characterId, sessionId, onRollLogged }:
   const [lastRoll, setLastRoll] = useState<RollEntry | null>(null);
   const [mode, setMode] = useState<RollMode>("normal");
   // The active animated roll awaiting its 3D tumble (null when no overlay is open).
-  const [pending, setPending] = useState<{ id: number; spec: RollSpec; label: string; log?: RollLog } | null>(null);
+  const [pending, setPending] = useState<{
+    id: number;
+    spec: RollSpec;
+    label: string;
+    log?: RollLog;
+    onSettled?: (result: RollResult) => void;
+  } | null>(null);
   const idRef = useRef(0);
   // Read live values inside stable callbacks without re-creating them per change.
   const modeRef = useRef(mode);
@@ -132,10 +140,13 @@ export function RollProvider({ children, characterId, sessionId, onRollLogged }:
 
   // Open the 3D overlay for this spec, resolving the sticky mode up front so the
   // animation (and the logged rollMode) reflect advantage/disadvantage.
-  const rollAnimated = useCallback((spec: RollSpec, label: string, log?: RollLog) => {
-    const resolvedSpec = { ...spec, mode: spec.mode ?? modeRef.current };
-    setPending({ id: ++idRef.current, spec: resolvedSpec, label, log });
-  }, []);
+  const rollAnimated = useCallback(
+    (spec: RollSpec, label: string, log?: RollLog, onSettled?: (result: RollResult) => void) => {
+      const resolvedSpec = { ...spec, mode: spec.mode ?? modeRef.current };
+      setPending({ id: ++idRef.current, spec: resolvedSpec, label, log, onSettled });
+    },
+    [],
+  );
 
   // Fired when the overlay's die settles: toast it, then log it if requested.
   const handleResult = useCallback((result: RollResult) => {
@@ -151,6 +162,8 @@ export function RollProvider({ children, characterId, sessionId, onRollLogged }:
         rollMode: current.spec.mode,
       });
     }
+    // Hand the settled roll back so the caller can apply the exact shown values.
+    current.onSettled?.(result);
   }, [logSessionRoll]);
 
   return (
