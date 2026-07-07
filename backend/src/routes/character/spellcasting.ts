@@ -59,6 +59,19 @@ const castSpellOpSchema = z.object({
     .optional(),
 });
 
+const castItemSpellOpSchema = z.object({
+  type: z.literal("castItemSpell"),
+  entryId: z.string().min(1),
+  roll: z.number().int().min(0),
+  apply: z
+    .object({
+      target: z.union([z.literal("self"), z.object({ characterId: z.string().min(1) })]),
+      kind: z.enum(["heal", "damage"]),
+      amount: z.number().int().positive(),
+    })
+    .optional(),
+});
+
 const expendSlotOpSchema = z.object({
   type: z.literal("expendSlot"),
   level: z.number().int().min(1).max(9),
@@ -100,6 +113,7 @@ const dropConcentrationOpSchema = z.object({
 
 const operationSchema = z.discriminatedUnion("type", [
   castSpellOpSchema,
+  castItemSpellOpSchema,
   expendSlotOpSchema,
   restoreSlotOpSchema,
   learnSpellOpSchema,

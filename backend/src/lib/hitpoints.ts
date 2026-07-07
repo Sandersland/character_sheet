@@ -27,6 +27,7 @@ import { rollDie } from "./dice.js";
 import { deriveResources } from "./class-features.js";
 import { normalizeResourcesMutable, serializeResourcesState } from "./resources.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
+import { castResourceRechargesOn, readCapability, type CapabilityColumns } from "./capabilities.js";
 
 export class InvalidHitPointOperationError extends Error {}
 
@@ -659,7 +660,14 @@ interface HpOpContext {
     resources: Prisma.JsonValue;
     activeEffects: Prisma.JsonValue;
     classEntries: ClassEntryRow[];
-    inventoryItems?: (Omit<GrantItem, "equipped"> & { equippedSlot: string | null })[];
+    // Union of three shapes over the same rows: castSpell rest-reset (#528: capability
+    // id + used), grant derivation (#529: GrantItem name/requiresAttunement), and the
+    // paper-doll placement (#565: equippedSlot replaces the derived `equipped`).
+    inventoryItems?: (Omit<GrantItem, "capabilities" | "equipped"> & {
+      id: string;
+      capabilities: (CapabilityColumns & { id: string; used?: number | null })[];
+      equippedSlot: string | null;
+    })[];
   };
   hp: HitPoints;
   hd: HitDice;
@@ -935,6 +943,33 @@ async function applyLevelUpOp(ctx: HpOpContext, op: LevelUpOperation): Promise<H
   };
 }
 
+// Reset the per-capability `used` counter of any active item castSpell whose
+// resource recharges on this rest (#528). Returns how many charges were restored.
+async function resetItemSpellUsesOnRest(
+  ctx: Pick<HpOpContext, "tx" | "row">,
+  rest: "short" | "long",
+): Promise<number> {
+  let restored = 0;
+  const ids: string[] = [];
+  for (const item of ctx.row.inventoryItems ?? []) {
+    // #565: `equipped` is derived from equippedSlot (no persisted boolean).
+    if (item.equippedSlot == null && !item.attuned) continue;
+    for (const col of item.capabilities) {
+      const cap = readCapability(col);
+      if (cap.kind !== "castSpell") continue;
+      if (!castResourceRechargesOn(cap.resource, rest)) continue;
+      if ((col.used ?? 0) > 0) {
+        restored += col.used ?? 0;
+        ids.push(col.id);
+      }
+    }
+  }
+  if (ids.length > 0) {
+    await ctx.tx.inventoryCapability.updateMany({ where: { id: { in: ids } }, data: { used: 0 } });
+  }
+  return restored;
+}
+
 async function applyShortRestOp(ctx: HpOpContext, op: ShortRestOperation): Promise<HpOpResult> {
   const { tx, characterId, row, hp, hd, conMod, faces, effMax } = ctx;
   const available = hd.total - hd.spent;
@@ -1013,18 +1048,22 @@ async function applyShortRestOp(ctx: HpOpContext, op: ShortRestOperation): Promi
     } as unknown as Prisma.InputJsonValue;
   }
 
+  const srItemSpellsRestored = await resetItemSpellUsesOnRest(ctx, "short");
+
   const eventData: Record<string, unknown> = {
     rolls: op.rolls,
     totalGain,
     conMod,
     resourcesRestored: srResourcesRestored,
     slotsRestored: srSlotsRestored,
+    itemSpellsRestored: srItemSpellsRestored,
     beforeResourceState: beforeSrResourceState,
     ...(beforeSrSpellState ? { beforeSpellState: beforeSrSpellState } : {}),
   };
   const restParts: string[] = [`+${totalGain} HP`];
   if (srSlotsRestored > 0) restParts.push(`${srSlotsRestored} Pact slot${srSlotsRestored !== 1 ? "s" : ""} restored`);
   if (srResourcesRestored > 0) restParts.push(`resources restored`);
+  if (srItemSpellsRestored > 0) restParts.push(`item spells restored`);
   const summary = `Short rest — spent ${spending} hit ${spending === 1 ? "die" : "dice"}: ${restParts.join(", ")}`;
 
   // Write the resource reset (and any Pact slot restore) alongside HP in the
@@ -1098,6 +1137,8 @@ async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
 
   const afterResourceState = serializeResourcesState(resourceState);
 
+  const itemSpellsRestored = await resetItemSpellUsesOnRest(ctx, "long");
+
   // Recharge limited-use consumables (#121): charged items (maxUses set) reset
   // to full. Inlined here rather than in lib/inventory.ts to avoid an import
   // cycle (inventory already imports this module).
@@ -1121,7 +1162,7 @@ async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
   }
 
   const hpRestored = effMax - prevCurrent;
-  const eventData: Record<string, unknown> = { recovered, hpRestored, slotsRestored, resourcesRestored };
+  const eventData: Record<string, unknown> = { recovered, hpRestored, slotsRestored, resourcesRestored, itemSpellsRestored };
   if (consumablesRecharged > 0) {
     eventData.consumablesRecharged = consumablesRecharged;
     eventData.consumableChargesBefore = consumableChargesBefore;
@@ -1132,6 +1173,7 @@ async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
   else parts.push("HP already full");
   if (slotsRestored > 0) parts.push(`${slotsRestored} slot${slotsRestored !== 1 ? "s" : ""} restored`);
   if (resourcesRestored > 0) parts.push(`resources restored`);
+  if (itemSpellsRestored > 0) parts.push(`item spells restored`);
   if (consumablesRecharged > 0) parts.push(`consumables recharged`);
   const summary = `Long rest — ${parts.join(", ")}`;
 
@@ -1206,6 +1248,19 @@ export async function applyHitPointOperations(
           spellcasting: true,
           resources: true,
           activeEffects: true,
+          // Selected fields feed two seams: id + capabilities (with used) for the
+          // castSpell rest reset (#528), and name/requiresAttunement + capabilities
+          // for item-granted resistances (#529, feeding the #456 halve flow below).
+          inventoryItems: {
+            select: {
+              id: true,
+              name: true,
+              equippedSlot: true,
+              attuned: true,
+              requiresAttunement: true,
+              capabilities: true,
+            },
+          },
           classEntries: {
             orderBy: { position: "asc" as const },
             select: {
@@ -1216,16 +1271,6 @@ export async function applyHitPointOperations(
               classId: true,
               position: true,
               class: { select: { hitDie: true } },
-            },
-          },
-          // Item-granted resistances (#529) feed the #456 halve flow below.
-          inventoryItems: {
-            select: {
-              name: true,
-              equippedSlot: true,
-              attuned: true,
-              requiresAttunement: true,
-              capabilities: true,
             },
           },
         },
