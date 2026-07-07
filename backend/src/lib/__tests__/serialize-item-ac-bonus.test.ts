@@ -96,7 +96,7 @@ describe("serialize applies active-item AC passiveBonus into armorClassBreakdown
         name: "Chain Shirt",
         category: "armor",
         quantity: 1,
-        equipped: true,
+        equippedSlot: "BODY",
         armorDetail: { create: { armorCategory: "medium", baseArmorClass: 13, dexModifierApplies: true, dexModifierMax: 2 } },
       },
     });
@@ -106,7 +106,7 @@ describe("serialize applies active-item AC passiveBonus into armorClassBreakdown
         name: "Shield",
         category: "armor",
         quantity: 1,
-        equipped: true,
+        equippedSlot: "OFF_HAND",
         armorDetail: { create: { armorCategory: "shield", baseArmorClass: 2 } },
       },
     });

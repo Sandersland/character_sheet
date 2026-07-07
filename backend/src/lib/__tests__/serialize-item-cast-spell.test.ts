@@ -73,7 +73,6 @@ describe("serialize surfaces item-granted spells (#528)", () => {
         category: "gear",
         quantity: 1,
         requiresAttunement: true,
-        equipped: false,
         attuned: false,
         capabilities: { create: [CAST_WITCH_BOLT] },
       },

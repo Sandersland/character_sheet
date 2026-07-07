@@ -108,9 +108,18 @@ describe("derived armorClass", () => {
     expect(unequipped.body.armorClass).toBe(15); // 10 + 5
   });
 
-  it("picks the highest-AC body armor when multiple are equipped", async () => {
-    await acquire(leather); // 11 + 3 = 14
-    const res = await acquire(chainMail); // 16 > 14
+  it("only one body armor occupies the BODY slot; swapping re-derives AC", async () => {
+    const first = await acquire(leather); // 11 + 3 = 14, auto-equipped into BODY
+    expect(first.body.armorClass).toBe(14);
+    // A second body armor can't auto-equip while BODY is full — it stays in the bag.
+    const second = await acquire(chainMail);
+    expect(second.body.armorClass).toBe(14);
+    const leatherId = second.body.inventory.find((i: { name: string; id: string }) => i.name === "Test Leather")!.id;
+    const chainId = second.body.inventory.find((i: { name: string; id: string }) => i.name === "Test Chain Mail")!.id;
+    await supertest.agent(createApp()).set("Cookie", COOKIE).post(url)
+      .send({ operations: [{ type: "setEquipped", inventoryItemId: leatherId, equipped: false }] });
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).post(url)
+      .send({ operations: [{ type: "equip", inventoryItemId: chainId, slot: "BODY" }] });
     expect(res.body.armorClass).toBe(16);
   });
 

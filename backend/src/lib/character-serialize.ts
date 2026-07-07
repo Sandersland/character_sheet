@@ -189,7 +189,11 @@ function serializeInventoryItem(
     weight: row.weight ?? undefined,
     cost: row.cost ?? undefined,
     description: row.description ?? undefined,
-    equipped: row.equipped,
+    // `equipped` is DERIVED from placement (#565) — equippedSlot is the source of truth.
+    equipped: row.equippedSlot != null,
+    equippedSlot: row.equippedSlot ?? undefined,
+    slot: row.slot ?? undefined,
+    rarity: row.rarity ?? undefined,
     attuned: row.attuned,
     requiresAttunement: row.requiresAttunement,
     attunementPrereqKind: row.attunementPrereqKind ?? undefined,
@@ -224,7 +228,7 @@ function serializeActivatedEffect(
     maxUses,
     remainingUses: maxUses === null ? null : Math.max(0, maxUses - row.activatedUsesSpent),
     active: context.activeItemBuffKeys.has(itemBuffKey(row.id)),
-    available: row.equipped || row.attuned,
+    available: row.equippedSlot != null || row.attuned,
   };
 }
 
@@ -382,7 +386,8 @@ function deriveItemSpellsFor(row: CharacterWithRelations): SpellEntry[] {
     row.inventoryItems.map((i) => ({
       id: i.id,
       name: i.name,
-      equipped: i.equipped,
+      // #565: `equipped` is derived from equippedSlot (no persisted boolean).
+      equipped: i.equippedSlot != null,
       attuned: i.attuned,
       capabilities: i.capabilities,
     })),
@@ -739,7 +744,7 @@ function buildInventoryContext(
   fightingStyle: FightingStyleKey | null,
   buffTargets: TargetModifierMap,
 ): InventoryItemContext {
-  const equippedItems = row.inventoryItems.filter((i) => i.equipped);
+  const equippedItems = row.inventoryItems.filter((i) => i.equippedSlot != null);
   const equippedShieldPresent = equippedItems.some(
     (i) => i.armorDetail?.armorCategory === "shield",
   );
@@ -831,7 +836,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
   const itemPassiveBonuses = deriveItemPassiveBonuses(
     row.inventoryItems.map((i) => ({
       name: i.name,
-      equipped: i.equipped,
+      equipped: i.equippedSlot != null,
       attuned: i.attuned,
       capabilities: i.capabilities,
     })),
@@ -845,7 +850,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
   const itemGrants = deriveItemGrants(
     row.inventoryItems.map((i) => ({
       name: i.name,
-      equipped: i.equipped,
+      equipped: i.equippedSlot != null,
       attuned: i.attuned,
       requiresAttunement: i.requiresAttunement,
       capabilities: i.capabilities,
@@ -868,9 +873,9 @@ export function serializeCharacter(row: CharacterWithRelations) {
   );
 
   // AC is derived, not persisted: best equipped body armor + Dex (per category)
-  // + shield. No slot model exists, so the highest-AC body armor wins.
+  // + shield. The BODY slot holds one body armor (#565), so "best" is defensive.
   const equippedArmorDetails = row.inventoryItems
-    .filter((i) => i.equipped && i.armorDetail)
+    .filter((i) => i.equippedSlot != null && i.armorDetail)
     .map((i) => ({ name: i.name, ...i.armorDetail! }));
   const hasShield = equippedArmorDetails.some((a) => a.armorCategory === "shield");
   const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);

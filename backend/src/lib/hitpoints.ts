@@ -660,11 +660,13 @@ interface HpOpContext {
     resources: Prisma.JsonValue;
     activeEffects: Prisma.JsonValue;
     classEntries: ClassEntryRow[];
-    // Union of the castSpell rest-reset shape (#528: needs capability id + used)
-    // and the grant-derivation shape (#529: GrantItem's name/requiresAttunement).
-    inventoryItems?: (Omit<GrantItem, "capabilities"> & {
+    // Union of three shapes over the same rows: castSpell rest-reset (#528: capability
+    // id + used), grant derivation (#529: GrantItem name/requiresAttunement), and the
+    // paper-doll placement (#565: equippedSlot replaces the derived `equipped`).
+    inventoryItems?: (Omit<GrantItem, "capabilities" | "equipped"> & {
       id: string;
       capabilities: (CapabilityColumns & { id: string; used?: number | null })[];
+      equippedSlot: string | null;
     })[];
   };
   hp: HitPoints;
@@ -701,8 +703,10 @@ function applyDamageOp(ctx: HpOpContext, op: DamageOperation): HpOpResult {
   // (#529) unless the player declined: cast-buff resistances (Rage) unioned with
   // item-granted resistances; item immunities zero the matching type.
   const resisted = activeResistedDamageTypes(normalizeActiveEffectsMutable(row.activeEffects));
-  for (const t of itemResistedDamageTypes(row.inventoryItems ?? [])) resisted.add(t);
-  const immune = itemImmuneDamageTypes(row.inventoryItems ?? []);
+  // Map the paper-doll placement to the boolean "worn" flag the grant helpers expect (#565).
+  const itemsForGrants = (row.inventoryItems ?? []).map((i) => ({ ...i, equipped: i.equippedSlot != null }));
+  for (const t of itemResistedDamageTypes(itemsForGrants)) resisted.add(t);
+  const immune = itemImmuneDamageTypes(itemsForGrants);
   const { applied, resisted: wasResisted, immune: wasImmune } = resolveDamageAmount(
     op.amount,
     op.damageType,
@@ -948,7 +952,8 @@ async function resetItemSpellUsesOnRest(
   let restored = 0;
   const ids: string[] = [];
   for (const item of ctx.row.inventoryItems ?? []) {
-    if (!item.equipped && !item.attuned) continue;
+    // #565: `equipped` is derived from equippedSlot (no persisted boolean).
+    if (item.equippedSlot == null && !item.attuned) continue;
     for (const col of item.capabilities) {
       const cap = readCapability(col);
       if (cap.kind !== "castSpell") continue;
@@ -1250,7 +1255,7 @@ export async function applyHitPointOperations(
             select: {
               id: true,
               name: true,
-              equipped: true,
+              equippedSlot: true,
               attuned: true,
               requiresAttunement: true,
               capabilities: true,

@@ -291,6 +291,8 @@ model CampaignItem {
   description        String?
   category           ItemCategory
   rarity             ItemRarity?
+  // Paper-doll slot for wearable gear (#565); same meaning as Item.slot.
+  slot               EquipSlot?
   requiresAttunement Boolean      @default(false)
   // Attunement prerequisite (#545) — null kind = attunable by anyone. Snapshotted
   // onto InventoryItem on award so the check runs against the frozen copy.
@@ -640,6 +642,25 @@ enum ArmorCategory {
   shield
 }
 
+// Paper-doll equip slots (#565). A worn/wielded item occupies exactly one slot
+// per row; RING has capacity 2, every other slot capacity 1. A two-handed weapon
+// sits in MAIN_HAND and locks OFF_HAND (never a second row). Weapons/body armor
+// derive their eligible slots from detail data; gear declares its slot via the
+// nullable Item.slot / InventoryItem.slot column (null = bag-only, not wearable).
+enum EquipSlot {
+  MAIN_HAND
+  OFF_HAND
+  BODY
+  HEAD
+  NECK
+  CLOAK
+  HANDS
+  WRISTS
+  BELT
+  FEET
+  RING
+}
+
 // Weapon proficiency group — used by the starting-equipment package resolver
 // to filter open picks like "any martial weapon". Nullable on both detail
 // tables: homebrew weapons (custom acquire) may omit classification without
@@ -926,6 +947,10 @@ model Item {
   weight      Float?
   cost        Json? // {cp,sp,gp,pp} — sell/buy default, player can override
   description String?
+  // Paper-doll slot for gear (#565). null = bag-only (not wearable). Weapons
+  // and body armor derive their slot from detail data, so this is only set for
+  // wearable gear (rings, cloaks, amulets, boots, etc.).
+  slot        EquipSlot?
 
   weaponDetail     ItemWeaponDetail?
   armorDetail      ItemArmorDetail?
@@ -1061,7 +1086,16 @@ model InventoryItem {
   cost        Json?
   description String?
   quantity    Int          @default(1)
-  equipped    Boolean      @default(false)
+  // Paper-doll placement (#565). The SINGLE source of truth for "is this equipped":
+  // the wire `equipped` field is DERIVED as (equippedSlot != null) in
+  // serializeCharacter — there is no persisted `equipped` boolean. A two-handed
+  // weapon occupies MAIN_HAND and locks OFF_HAND (never a second row).
+  equippedSlot EquipSlot?
+  // Snapshot of the source Item/CampaignItem.slot for wearable gear (#565).
+  slot        EquipSlot?
+  // Snapshot of the source CampaignItem.rarity for the Worn view (#565) — carried
+  // alongside requiresAttunement below; display-only, no derivation reads it.
+  rarity      ItemRarity?
   // Attunement state (#545) — persisted boolean; the 3-item cap is DERIVED
   // (counted), never stored. attune/unattune go through …/inventory/transactions.
   attuned     Boolean      @default(false)

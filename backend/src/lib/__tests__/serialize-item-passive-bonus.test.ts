@@ -54,7 +54,8 @@ describe("serialize sums active-item scalar passiveBonus into tempModifier (#545
         name: "Cloak of Elvenkind",
         category: "gear",
         quantity: 1,
-        equipped: false,
+        slot: "CLOAK",
+        equippedSlot: null,
         capabilities: {
           create: [{ kind: "passiveBonus", target: "skill", op: "add", value: 2, targetKey: "stealth" }],
         },
@@ -105,7 +106,7 @@ describe("serialize sums active-item scalar passiveBonus into tempModifier (#545
   });
 
   it("applies the bonus while equipped, with a labeled source", async () => {
-    await prisma.inventoryItem.update({ where: { id: itemId }, data: { equipped: true } });
+    await prisma.inventoryItem.update({ where: { id: itemId }, data: { equippedSlot: "CLOAK" } });
     const view = await serialize(characterId);
     expect(stealth(view).tempModifier).toBe(2);
     expect(stealth(view).tempModifierSources).toEqual([{ label: "Cloak of Elvenkind", value: 2 }]);
