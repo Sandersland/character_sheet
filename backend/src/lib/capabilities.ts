@@ -157,8 +157,9 @@ export function activatedRechargeRest(cap: ActivatedEffectCapability): "short" |
   return "long";
 }
 
-// Human phrasing for an activation type (the reminder text prefix).
-export function describeActivation(activation: ActivationType): string {
+// Human phrasing for an activation type (the reminder text prefix). Internal to
+// describeActivatedReminder — not exported (the frontend has its own copy).
+function describeActivation(activation: ActivationType): string {
   switch (activation) {
     case "action":
       return "Action";
