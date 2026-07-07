@@ -1,13 +1,29 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  activatedMaxUses,
+  activatedRechargeRest,
+  describeActivatedReminder,
   deriveItemPassiveBonuses,
   describeAttunementPrereq,
   meetsAttunementPrereq,
   passiveBonusChannel,
   readCapability,
+  type ActivatedEffectCapability,
   type CapabilityColumns,
 } from "../capabilities.js";
+
+const bootsOfSpeed: CapabilityColumns = {
+  kind: "activatedEffect",
+  activation: "bonus",
+  target: "speed",
+  op: "add",
+  value: 30,
+  activatedDuration: "untilRest",
+  resourceKind: "perRest",
+  resourcePeriod: "long",
+  resourceCharges: 1,
+};
 
 const scalarSkill: CapabilityColumns = {
   kind: "passiveBonus",
@@ -36,6 +52,35 @@ describe("readCapability", () => {
     expect(cap.kind).toBe("passiveBonus");
     if (cap.kind !== "passiveBonus") return;
     expect(cap.dice).toEqual({ count: 1, faces: 6, damageType: "fire" });
+  });
+
+  it("materializes an activatedEffect (Boots of Speed)", () => {
+    const cap = readCapability(bootsOfSpeed);
+    expect(cap).toMatchObject({
+      kind: "activatedEffect",
+      activation: "bonus",
+      target: "speed",
+      op: "add",
+      value: 30,
+      duration: "untilRest",
+      resourceKind: "perRest",
+      resourcePeriod: "long",
+      resourceCharges: 1,
+    });
+  });
+
+  it("reads an activatedEffect missing activation as opaque", () => {
+    const cap = readCapability({ kind: "activatedEffect", target: "speed", op: "add", value: 30 });
+    expect(cap).toEqual({ kind: "activatedEffect", description: null });
+  });
+
+  it("defaults an activatedEffect's recharge to atWill / 1 charge", () => {
+    const cap = readCapability({ kind: "activatedEffect", activation: "commandWord", target: "ac", op: "add", value: 1 });
+    expect(cap.kind).toBe("activatedEffect");
+    if (cap.kind !== "activatedEffect") return;
+    expect(cap.resourceKind).toBe("atWill");
+    expect(cap.resourceCharges).toBe(1);
+    expect(cap.duration).toBe("whileActive");
   });
 
   it("reads a reserved kind as opaque", () => {
@@ -99,6 +144,37 @@ describe("deriveItemPassiveBonuses", () => {
       },
     ]);
     expect(out).toEqual([]);
+  });
+});
+
+describe("activatedEffect helpers", () => {
+  const boots = readCapability(bootsOfSpeed) as ActivatedEffectCapability;
+  const atWill = readCapability({
+    kind: "activatedEffect",
+    activation: "commandWord",
+    target: "ac",
+    op: "add",
+    value: 1,
+    resourceKind: "atWill",
+  }) as ActivatedEffectCapability;
+
+  it("caps uses per recharge (null for atWill)", () => {
+    expect(activatedMaxUses(boots)).toBe(1);
+    expect(activatedMaxUses(atWill)).toBeNull();
+  });
+
+  it("resolves the recharge rest (long for perRest(long), null for atWill)", () => {
+    expect(activatedRechargeRest(boots)).toBe("long");
+    expect(activatedRechargeRest(atWill)).toBeNull();
+    const shortRest = readCapability({ ...bootsOfSpeed, resourcePeriod: "short" }) as ActivatedEffectCapability;
+    expect(activatedRechargeRest(shortRest)).toBe("short");
+  });
+
+  it("surfaces activation + duration as reminder text", () => {
+    expect(describeActivatedReminder(boots)).toBe("Bonus action · until a long rest");
+    const timed = readCapability({ ...bootsOfSpeed, durationText: "10 minutes" }) as ActivatedEffectCapability;
+    expect(describeActivatedReminder(timed)).toContain("10 minutes");
+    expect(describeActivatedReminder(atWill)).toContain("Command word");
   });
 });
 
