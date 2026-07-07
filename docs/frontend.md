@@ -42,8 +42,9 @@ frontend/src/
 │   │                    #   Sub-components: HpActionControl (damage/heal/temp + optional
 │   │                    #   damage-type picker + resistance auto-halve toggle, #456),
 │   │                    #   HpMeter, RestControls, DeathSaveTracker, LevelUpCallout, AdvancementCallout
-│   ├── inventory/       # InventoryList, InventoryRow (→ InventoryEditForm/EquipToggle/AttuneToggle/
-│   │                    #   ItemSummary/ItemProse), AddItemPanel, SellPanel, StartingEquipmentEditor
+│   ├── inventory/       # InventoryList (Bag ⇄ Worn toggle), InventoryRow (→ InventoryEditForm/
+│   │                    #   EquipToggle/AttuneToggle/ItemSummary/ItemProse), AddItemPanel, SellPanel,
+│   │                    #   StartingEquipmentEditor, EquipmentDoll (→ EquipSlotCell → SlotPickerPanel)
 │   ├── journal/         # CapturePalette (Cmd/Ctrl+J quick-capture NOTE overlay)
 │   ├── session/         # TurnHub (→ useTurnActions + TurnControls/ActionSlot/BonusActionSlot/
 │   │                    #   ReactionSlot/EffectManeuverStrip/LayOnHandsInput), useTurnState, SessionLog,
@@ -59,7 +60,7 @@ frontend/src/
 │   │                    #    useThemePreference, useGlobalKeyboard)
 ├── lib/                 # pure TS logic — NO React/JSX (dice, abilities, timeline, startingEquipment, …)
 ├── pages/               # route-level views (CharacterListPage, CharacterSheetPage,
-│   │                    #   CharacterCreatePage, SessionPage, LoginPage)
+│   │                    #   CharacterCreatePage, SessionPage, LoginPage, AboutPage)
 ├── api/
 │   └── client.ts        # the only fetch() call site (apiFetch wrapper: credentials + 401)
 ├── types/
@@ -95,6 +96,7 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 | `sellBatch.ts` | `summarizeSellBatch` collapses a bulk-sale batch (>1 row, all `sold`) into one line summary for ActivityModal; returns `null` for non-bulk-sale batches. |
 | `bulkSell.ts` | Bulk-sell math. `buildSellOperations` (per-line `quantity` + `perItem`/`lumpSum` pricing); `defaultSellPrice` (half per-unit catalog value, rounded down, × qty); `resolveSellPrices` (single sale total + per-line pin overrides → per-line `Currency`, pinned lines exact + the rest split evenly, gp/sp/cp with **no** platinum roll-up); `gpToCopper`/`copperToGp` for the single decimal-gold input. Consumed by `SellPanel`/`InventoryList`; distinct from `sellBatch.ts` (which summarizes a completed batch). |
 | `startingEquipment.ts` | Character-creation equipment helpers (`isPackageComplete`, `isGoldValid`, `EquipmentDraft`). |
+| `paperDoll.ts` | Paper-doll slot taxonomy + placement rules for the Worn view (#566) — `allowedSlotsForItem` (mirrors the backend), `itemsInSlot`, `bagItemsForSlot`, `isOffHandLocked`, `equipSlotLabel`, `SLOT_GROUPS` (Hands/Armor/Adornment). |
 | `characterCreationValidation.ts` | Explains *why* the creation Save button is disabled (`missingRequirements`). |
 | `abilityGen.ts` | Ability-score generation methods (point-buy / standard array / roll). |
 | `dieFaces.ts` | Static die-face geometry data for the 3D rollers. |
@@ -373,7 +375,7 @@ Large interactive sections follow the orchestrator/row pattern:
 ```
 
 Examples:
-- `features/inventory/`: `InventoryList` (orchestrator; also owns the derived **X/3 attunement** readout, shown when any held item is attunable) / `InventoryRow` (delegates to `InventoryEditForm`/`EquipToggle`/`AttuneToggle`/`UseConsumableButton`/`ActivateControl`/`ItemSummary`/`ItemProse`) / `AddItemPanel` / `SellPanel`. `AttuneToggle` (#546) is the attune/unattune pill, shown only for `requiresAttunement` items; it's disabled when 3 items are already attuned (`atCap`, passed down from `InventoryList`) and the server's prereq/cap rejection surfaces through the list's error line. `UseConsumableButton` (#121) is the Use affordance shown only for `category === "consumable"` rows; it plays the 3D effect-dice roll (forwarding the shown values to the server) and, for charged consumables, renders an X/Y charge indicator, disabled at 0 until a long rest recharges. `ActivateControl` (#543) is the activate/deactivate toggle for an item's `activatedEffect` capability, shown while the item is equipped/attuned; it surfaces remaining uses + the activation/duration reminder and disables at 0 uses until the matching rest recharges. `ItemSummary` renders the attunement state ("Attuned" / "Requires attunement") + a gold chip per `passiveBonus` capability (label via `capabilitySummary`).
+- `features/inventory/`: `InventoryList` (orchestrator; also owns the derived **X/3 attunement** readout, shown when any held item is attunable) / `InventoryRow` (delegates to `InventoryEditForm`/`EquipToggle`/`AttuneToggle`/`UseConsumableButton`/`ActivateControl`/`ItemSummary`/`ItemProse`) / `AddItemPanel` / `SellPanel`. `AttuneToggle` (#546) is the attune/unattune pill, shown only for `requiresAttunement` items; it's disabled when 3 items are already attuned (`atCap`, passed down from `InventoryList`) and the server's prereq/cap rejection surfaces through the list's error line. `UseConsumableButton` (#121) is the Use affordance shown only for `category === "consumable"` rows; it plays the 3D effect-dice roll (forwarding the shown values to the server) and, for charged consumables, renders an X/Y charge indicator, disabled at 0 until a long rest recharges. `ActivateControl` (#543) is the activate/deactivate toggle for an item's `activatedEffect` capability, shown while the item is equipped/attuned; it surfaces remaining uses + the activation/duration reminder and disables at 0 uses until the matching rest recharges. `ItemSummary` renders the attunement state ("Attuned" / "Requires attunement") + a gold chip per `passiveBonus` capability (label via `capabilitySummary`). `EquipmentDoll` (#566) is the interactive paper-doll **Worn** view, reached via `InventoryList`'s Bag ⇄ Worn `Segmented` toggle: desktop armor/adornment rails + center portrait + AC crest with Main/Off hand bottom-center, and a grouped 3-column tile grid on mobile (Hands / Armor / Adornment, no doll figure). It consumes the `equip { inventoryItemId, slot }` op from #565 and batches an unequip+equip for swaps (toasting the returned item). Each of the twelve cells is an `EquipSlotCell` (RING renders two): an empty cell opens an inline **expand-in-place** `SlotPickerPanel` (not a Modal) of slot-compatible bag items; a filled cell is a read-only `Popover` summary with Unequip / Swap; a two-handed weapon locks the off-hand cell. Slot glyphs come from `EQUIP_SLOT_ICONS` (`components/ui/icons.ts`, game-icons.net via react-icons/gi, CC BY 3.0 — credited on `/about`); placement rules mirror the backend in `lib/paperDoll.ts`.
 - `features/spells/`: `SpellsSection` (orchestrator) / `SpellRow` / `AddSpellPanel`
 
 The orchestrator pattern keeps async state and API batching in one place and makes rows easy to unit-test in isolation — pass mock callbacks, assert they fire with the right args. See `testing.md` for component test patterns.
