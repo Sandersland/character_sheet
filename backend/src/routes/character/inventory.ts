@@ -141,6 +141,16 @@ const setEquippedOpSchema = z.object({
   equipped: z.boolean(),
 });
 
+const attuneOpSchema = z.object({
+  type: z.literal("attune"),
+  inventoryItemId: z.string().min(1),
+});
+
+const unattuneOpSchema = z.object({
+  type: z.literal("unattune"),
+  inventoryItemId: z.string().min(1),
+});
+
 const operationSchema = z.discriminatedUnion("type", [
   acquireOpSchema,
   adjustQuantityOpSchema,
@@ -148,6 +158,8 @@ const operationSchema = z.discriminatedUnion("type", [
   removeOpSchema,
   sellOpSchema,
   setEquippedOpSchema,
+  attuneOpSchema,
+  unattuneOpSchema,
 ]);
 
 const transactionsRequestSchema = z.object({

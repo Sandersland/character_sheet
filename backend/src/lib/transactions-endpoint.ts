@@ -47,7 +47,12 @@ export function makeTransactionsEndpoint<Schema extends z.ZodTypeAny, Result = v
       result = await apply(req.params.id, parseResult.data, req.user!.id);
     } catch (error) {
       if (domainErrors.some((ErrorClass) => error instanceof ErrorClass)) {
-        res.status(400).json({ error: (error as Error).message });
+        // A domain error may carry an explicit HTTP status (e.g. attunement-cap
+        // breach → 409); default to 400 for plain validation failures.
+        const status = typeof (error as { status?: unknown }).status === "number"
+          ? (error as { status: number }).status
+          : 400;
+        res.status(status).json({ error: (error as Error).message });
         return;
       }
       throw error;

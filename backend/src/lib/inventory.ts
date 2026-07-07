@@ -1,10 +1,19 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "../generated/prisma/client.js";
+import {
+  type AttunementPrereqKind,
+  describeAttunementPrereq,
+  meetsAttunementPrereq,
+} from "./capabilities.js";
 import { logEvent } from "./events.js";
 import { isEquippable } from "./items.js";
 import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
+
+// 5e: a character can attune to at most 3 magic items (DMG p. 138). Derived
+// (counted from live rows), never persisted.
+export const ATTUNEMENT_LIMIT = 3;
 
 // Same {cp,sp,gp,pp} shape as Character.currency and Item/InventoryItem.cost.
 // The index signature is just to satisfy Prisma's InputJsonObject structural
@@ -20,6 +29,11 @@ export interface Currency {
 
 export class InsufficientCurrencyError extends Error {}
 export class InvalidInventoryOperationError extends Error {}
+// Attunement cap breach — carries an explicit 409 (conflict) so the transactions
+// endpoint surfaces it distinctly from a plain 400 validation error.
+export class AttunementLimitError extends InvalidInventoryOperationError {
+  status = 409;
+}
 
 function applyCurrencyDelta(current: Currency, delta: Currency, sign: 1 | -1): Currency {
   const next: Currency = {
@@ -179,13 +193,28 @@ export interface SetEquippedOperation {
   equipped: boolean;
 }
 
+// Attunes an item (#545). Logged + undoable. Enforces the derived 3-item cap
+// (409 on the 4th) and the snapshotted attunement prerequisite.
+export interface AttuneOperation {
+  type: "attune";
+  inventoryItemId: string;
+}
+
+// Ends attunement. Logged + undoable; always legal so a stuck row can clear.
+export interface UnattuneOperation {
+  type: "unattune";
+  inventoryItemId: string;
+}
+
 export type InventoryOperation =
   | AcquireOperation
   | AdjustQuantityOperation
   | UpdateOperation
   | RemoveOperation
   | SellOperation
-  | SetEquippedOperation;
+  | SetEquippedOperation
+  | AttuneOperation
+  | UnattuneOperation;
 
 async function getCharacterCurrency(tx: Prisma.TransactionClient, characterId: string): Promise<Currency> {
   const character = await tx.character.findUnique({ where: { id: characterId }, select: { currency: true } });
@@ -203,6 +232,7 @@ export const inventoryItemDetailInclude = {
   weaponDetail: true,
   armorDetail: true,
   consumableDetail: true,
+  capabilities: true,
 } satisfies Prisma.InventoryItemInclude;
 
 export type InventoryItemWithDetails = Prisma.InventoryItemGetPayload<{ include: typeof inventoryItemDetailInclude }>;
@@ -364,11 +394,16 @@ export interface DeletedInventoryItemSnapshot {
   description: string | null;
   quantity: number;
   equipped: boolean;
+  attuned: boolean;
+  requiresAttunement: boolean;
+  attunementPrereqKind: AttunementPrereqKind | null;
+  attunementPrereqValue: string | null;
   notes: string | null;
   position: number;
   weaponDetail: Prisma.InventoryWeaponDetailCreateWithoutInventoryItemInput | null;
   armorDetail: Prisma.InventoryArmorDetailCreateWithoutInventoryItemInput | null;
   consumableDetail: Prisma.InventoryConsumableDetailCreateWithoutInventoryItemInput | null;
+  capabilities: Prisma.InventoryCapabilityCreateWithoutInventoryItemInput[];
 }
 
 // Serializes an already-fetched InventoryItemWithDetails into the
@@ -387,8 +422,24 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
     description: item.description,
     quantity: item.quantity,
     equipped: item.equipped,
+    attuned: item.attuned,
+    requiresAttunement: item.requiresAttunement,
+    attunementPrereqKind: item.attunementPrereqKind,
+    attunementPrereqValue: item.attunementPrereqValue,
     notes: item.notes,
     position: item.position,
+    capabilities: item.capabilities.map((c) => ({
+      kind: c.kind,
+      description: c.description,
+      target: c.target,
+      op: c.op,
+      value: c.value,
+      targetKey: c.targetKey,
+      condition: c.condition,
+      valueDiceCount: c.valueDiceCount,
+      valueDiceFaces: c.valueDiceFaces,
+      valueDamageType: c.valueDamageType,
+    })),
     weaponDetail: item.weaponDetail
       ? {
           damageDiceCount: item.weaponDetail.damageDiceCount,
@@ -737,6 +788,94 @@ async function applySetEquipped(
   });
 }
 
+async function applyAttune(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: AttuneOperation,
+  batchId: string,
+  sessionId: string | null,
+) {
+  const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
+  if (item.attuned) {
+    throw new InvalidInventoryOperationError(`${item.name} is already attuned`);
+  }
+
+  // Prerequisite check against the snapshotted columns (5e "requires attunement
+  // by a …"). Loads only the identity facts the check needs.
+  if (item.attunementPrereqKind) {
+    const character = await tx.character.findUnique({
+      where: { id: characterId },
+      select: {
+        alignment: true,
+        raceSelection: { select: { name: true } },
+        classEntries: { select: { name: true, subclass: true } },
+      },
+    });
+    const prereq = { kind: item.attunementPrereqKind, value: item.attunementPrereqValue };
+    const subject = {
+      classEntries: character?.classEntries ?? [],
+      raceName: character?.raceSelection?.name ?? null,
+      alignment: character?.alignment ?? null,
+    };
+    if (!meetsAttunementPrereq(prereq, subject)) {
+      throw new InvalidInventoryOperationError(
+        `${item.name} requires attunement by ${describeAttunementPrereq(prereq)}`,
+      );
+    }
+  }
+
+  // Derived 3-item cap: count currently-attuned rows, reject the 4th with a 409.
+  const attunedCount = await tx.inventoryItem.count({ where: { characterId, attuned: true } });
+  if (attunedCount >= ATTUNEMENT_LIMIT) {
+    throw new AttunementLimitError(
+      `Cannot attune to more than ${ATTUNEMENT_LIMIT} items — unattune one first`,
+    );
+  }
+
+  await tx.inventoryItem.update({ where: { id: item.id }, data: { attuned: true } });
+
+  await logEvent(tx, {
+    characterId,
+    category: "inventory",
+    type: "attuned",
+    summary: `Attuned to ${item.name}`,
+    entityType: "InventoryItem",
+    entityId: item.id,
+    before: { attuned: false },
+    after: { attuned: true },
+    batchId,
+    sessionId,
+  });
+}
+
+async function applyUnattune(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: UnattuneOperation,
+  batchId: string,
+  sessionId: string | null,
+) {
+  const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
+  if (!item.attuned) {
+    throw new InvalidInventoryOperationError(`${item.name} is not attuned`);
+  }
+
+  await tx.inventoryItem.update({ where: { id: item.id }, data: { attuned: false } });
+
+  await logEvent(tx, {
+    characterId,
+    category: "inventory",
+    type: "unattuned",
+    summary: `Ended attunement to ${item.name}`,
+    entityType: "InventoryItem",
+    entityId: item.id,
+    before: { attuned: true },
+    after: { attuned: false },
+    batchId,
+    sessionId,
+  });
+}
+
 async function applyRemove(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -887,6 +1026,10 @@ export async function revertInventoryEvent(
         description: deletedItem.description ?? undefined,
         quantity: deletedItem.quantity,
         equipped: deletedItem.equipped,
+        attuned: deletedItem.attuned ?? false,
+        requiresAttunement: deletedItem.requiresAttunement ?? false,
+        attunementPrereqKind: deletedItem.attunementPrereqKind ?? undefined,
+        attunementPrereqValue: deletedItem.attunementPrereqValue ?? undefined,
         notes: deletedItem.notes ?? undefined,
         position: deletedItem.position,
         weaponDetail: deletedItem.weaponDetail ? { create: deletedItem.weaponDetail } : undefined,
@@ -894,17 +1037,23 @@ export async function revertInventoryEvent(
         consumableDetail: deletedItem.consumableDetail
           ? { create: deletedItem.consumableDetail }
           : undefined,
+        capabilities:
+          deletedItem.capabilities && deletedItem.capabilities.length > 0
+            ? { create: deletedItem.capabilities }
+            : undefined,
       },
     });
     return;
   }
 
   // The row still exists → restore the scalar(s) captured in before
-  // (quantity for partial sell/adjust, equipped for setEquipped).
-  const before = event.before as { quantity?: number; equipped?: boolean };
+  // (quantity for partial sell/adjust, equipped for setEquipped, attuned for
+  // attune/unattune).
+  const before = event.before as { quantity?: number; equipped?: boolean; attuned?: boolean };
   const updateData: Prisma.InventoryItemUpdateInput = {};
   if (before.quantity !== undefined) updateData.quantity = before.quantity;
   if (before.equipped !== undefined) updateData.equipped = before.equipped;
+  if (before.attuned !== undefined) updateData.attuned = before.attuned;
   if (Object.keys(updateData).length > 0) {
     await tx.inventoryItem.update({ where: { id: event.entityId }, data: updateData });
   }
@@ -940,6 +1089,12 @@ export async function applyInventoryOperations(
           break;
         case "setEquipped":
           await applySetEquipped(tx, characterId, op, batchId, sessionId);
+          break;
+        case "attune":
+          await applyAttune(tx, characterId, op, batchId, sessionId);
+          break;
+        case "unattune":
+          await applyUnattune(tx, characterId, op, batchId, sessionId);
           break;
       }
     }

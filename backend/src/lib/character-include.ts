@@ -15,7 +15,7 @@ export const characterInclude = {
   },
   inventoryItems: {
     orderBy: { position: "asc" },
-    include: { weaponDetail: true, armorDetail: true, consumableDetail: true },
+    include: { weaponDetail: true, armorDetail: true, consumableDetail: true, capabilities: true },
   },
   // Newest-first by the user-entered calendar `date`; `loggedAt desc` then
   // `createdAt desc` are stable tiebreakers so same-date NOTE rows (which share

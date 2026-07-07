@@ -25,6 +25,7 @@ const campaignItemInclude = {
   weaponDetail: true,
   armorDetail: true,
   consumableDetail: true,
+  capabilities: true,
   link: { select: { campaignEntityId: true } },
 } satisfies Prisma.CampaignItemInclude;
 
@@ -90,6 +91,26 @@ function snapshotCampaignItemDetail(item: CampaignItemWithDetails) {
           },
         }
       : undefined,
+    // Typed capability rows snapshotted 1:1 onto the awarded item (#545) — a
+    // straight column copy, same as the detail tables above. The snapshot is
+    // self-contained, so a later edit/revoke of the source leaves these intact.
+    capabilities:
+      item.capabilities.length > 0
+        ? {
+            create: item.capabilities.map((c) => ({
+              kind: c.kind,
+              description: c.description,
+              target: c.target,
+              op: c.op,
+              value: c.value,
+              targetKey: c.targetKey,
+              condition: c.condition,
+              valueDiceCount: c.valueDiceCount,
+              valueDiceFaces: c.valueDiceFaces,
+              valueDamageType: c.valueDamageType,
+            })),
+          }
+        : undefined,
   };
 }
 
@@ -185,6 +206,11 @@ export async function awardCampaignItem(params: {
         description: item.description ?? undefined,
         quantity,
         equipped: false,
+        // Snapshot the attunement metadata so the attune check runs against
+        // the frozen copy, not the mutable source (#545).
+        requiresAttunement: item.requiresAttunement,
+        attunementPrereqKind: item.attunementPrereqKind,
+        attunementPrereqValue: item.attunementPrereqValue,
         position,
         ...snapshotCampaignItemDetail(item),
       },
