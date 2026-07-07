@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { Prisma } from "../generated/prisma/client.js";
+import { Prisma, type EquipSlot, type ItemRarity } from "../generated/prisma/client.js";
 import {
   activatedMaxUses,
   activatedRechargeRest,
@@ -18,7 +18,6 @@ import {
 import { rollDie } from "./dice.js";
 import { logEvent } from "./events.js";
 import { applyHealInTx } from "./hitpoints.js";
-import { isEquippable } from "./items.js";
 import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
 
@@ -144,6 +143,8 @@ export interface CustomItemInput {
   weight?: number;
   cost?: Currency;
   description?: string;
+  // Paper-doll slot for wearable custom gear (#565); null/omitted = bag-only.
+  slot?: EquipSlot;
   weapon?: WeaponDetailInput;
   armor?: ArmorDetailInput;
   consumable?: ConsumableDetailInput;
@@ -174,13 +175,13 @@ export interface AdjustQuantityOperation {
 
 // Cosmetic edit — never logged. weapon/armor/consumable overrides are
 // partial (only provided fields change); this is the "Club +1" path,
-// e.g. bumping just `weapon.damageModifier`.
+// e.g. bumping just `weapon.damageModifier`. Placement is NOT edited here —
+// equip/unequip go through the `equip`/`setEquipped` ops so they're logged.
 export interface UpdateOperation {
   type: "update";
   inventoryItemId: string;
   name?: string;
   notes?: string | null;
-  equipped?: boolean;
   weight?: number;
   cost?: Currency;
   description?: string;
@@ -205,8 +206,19 @@ export interface SellOperation {
   currencyDelta: Currency;
 }
 
-// Equips or unequips a single item. Unlike `update`, this IS logged so
-// it appears on the activity timeline and is undoable.
+// Equips a single item into an explicit paper-doll slot (#565). Logged +
+// undoable. Validates slot-compatibility, capacity (RING 2, else 1), and the
+// two-handed off-hand lock. Rejects a full slot (no silent displacement).
+export interface EquipOperation {
+  type: "equip";
+  inventoryItemId: string;
+  slot: EquipSlot;
+}
+
+// Equips (auto-picking the first free compatible slot) or unequips a single
+// item. Unlike `update`, this IS logged so it appears on the activity timeline
+// and is undoable. The slot-less companion to `equip` — unequip clears
+// equippedSlot; equip=true delegates to the same placement rules as `equip`.
 export interface SetEquippedOperation {
   type: "setEquipped";
   inventoryItemId: string;
@@ -258,6 +270,7 @@ export type InventoryOperation =
   | UpdateOperation
   | RemoveOperation
   | SellOperation
+  | EquipOperation
   | SetEquippedOperation
   | AttuneOperation
   | UnattuneOperation
@@ -461,6 +474,119 @@ function snapshotItemDetail(item: CatalogItemWithDetails) {
   };
 }
 
+// ── Paper-doll placement (#565) ──────────────────────────────────────────────
+//
+// equippedSlot is the single source of truth for "is this equipped" — the wire
+// `equipped` field derives from (equippedSlot != null). RING holds 2 items;
+// every other slot holds 1. A two-handed weapon sits in MAIN_HAND and LOCKS
+// OFF_HAND (never a second row). Full slots are rejected, not silently displaced.
+
+const RING_SLOT_CAPACITY = 2;
+
+function slotCapacity(slot: EquipSlot): number {
+  return slot === "RING" ? RING_SLOT_CAPACITY : 1;
+}
+
+// Human-readable slot name for event summaries / error messages.
+function slotLabel(slot: EquipSlot): string {
+  return slot.toLowerCase().replace(/_/g, " ");
+}
+
+// Minimal shape the placement rules read — a subset of InventoryItemWithDetails.
+interface PlaceableItem {
+  category: ItemCategoryName;
+  slot: EquipSlot | null;
+  weaponDetail: { twoHanded: boolean } | null;
+  armorDetail: { armorCategory: ArmorCategoryName } | null;
+}
+
+function isTwoHandedWeapon(item: PlaceableItem): boolean {
+  return item.category === "weapon" && Boolean(item.weaponDetail?.twoHanded);
+}
+
+// The slots an item may legally occupy. Weapons/body armor derive from detail
+// data; gear declares its slot (null = bag-only). Empty = not equippable.
+export function allowedSlotsForItem(item: PlaceableItem): EquipSlot[] {
+  if (item.category === "weapon") {
+    return isTwoHandedWeapon(item) ? ["MAIN_HAND"] : ["MAIN_HAND", "OFF_HAND"];
+  }
+  if (item.category === "armor") {
+    return item.armorDetail?.armorCategory === "shield" ? ["OFF_HAND"] : ["BODY"];
+  }
+  if (item.category === "gear") {
+    return item.slot ? [item.slot] : [];
+  }
+  return [];
+}
+
+// Other currently-equipped rows, with just the two-handed flag needed for the
+// off-hand lock. Excludes the item being (re)placed so a re-slot never self-collides.
+type EquippedRow = { equippedSlot: EquipSlot | null; weaponDetail: { twoHanded: boolean } | null };
+
+async function fetchEquippedRows(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  excludeId: string,
+): Promise<EquippedRow[]> {
+  return tx.inventoryItem.findMany({
+    where: { characterId, equippedSlot: { not: null }, id: { not: excludeId } },
+    select: { equippedSlot: true, weaponDetail: { select: { twoHanded: true } } },
+  });
+}
+
+// Returns a clear error string if `item` may NOT occupy `slot` given the other
+// equipped rows, or null when the placement is legal.
+function placementError(rows: EquippedRow[], item: PlaceableItem, slot: EquipSlot): string | null {
+  const allowed = allowedSlotsForItem(item);
+  if (allowed.length === 0) return `${item.category} items cannot be equipped`;
+  if (!allowed.includes(slot)) return `This item cannot be equipped in the ${slotLabel(slot)} slot`;
+
+  const mainHandTwoHanded = rows.some((r) => r.equippedSlot === "MAIN_HAND" && r.weaponDetail?.twoHanded);
+  const offHandOccupied = rows.some((r) => r.equippedSlot === "OFF_HAND");
+  if (slot === "OFF_HAND" && mainHandTwoHanded) {
+    return "The off-hand is locked by a two-handed weapon — unequip it first";
+  }
+  if (isTwoHandedWeapon(item) && offHandOccupied) {
+    return "A two-handed weapon needs a free off-hand — unequip your off-hand first";
+  }
+
+  const occupants = rows.filter((r) => r.equippedSlot === slot).length;
+  if (occupants >= slotCapacity(slot)) return `The ${slotLabel(slot)} slot is full`;
+  return null;
+}
+
+// First allowed slot with a legal placement, or null when none is available.
+function firstFreeSlot(rows: EquippedRow[], item: PlaceableItem): EquipSlot | null {
+  for (const slot of allowedSlotsForItem(item)) {
+    if (placementError(rows, item, slot) === null) return slot;
+  }
+  return null;
+}
+
+// Places an item into a validated slot + logs the undoable `equipped` event.
+async function equipIntoSlot(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  item: InventoryItemWithDetails,
+  slot: EquipSlot,
+  batchId: string,
+  sessionId: string | null,
+) {
+  await tx.inventoryItem.update({ where: { id: item.id }, data: { equippedSlot: slot } });
+  await logEvent(tx, {
+    characterId,
+    category: "inventory",
+    type: "equipped",
+    summary: `Equipped ${item.name} (${slotLabel(slot)})`,
+    entityType: "InventoryItem",
+    entityId: item.id,
+    before: { equippedSlot: item.equippedSlot },
+    after: { equippedSlot: slot },
+    batchId,
+    sessionId,
+  });
+}
+
 // ── Undo snapshot ────────────────────────────────────────────────────────────
 //
 // When an op DELETES an InventoryItem row (full sell, remove, adjust-to-zero)
@@ -481,7 +607,9 @@ export interface DeletedInventoryItemSnapshot {
   cost: Currency | null;
   description: string | null;
   quantity: number;
-  equipped: boolean;
+  equippedSlot: EquipSlot | null;
+  slot: EquipSlot | null;
+  rarity: ItemRarity | null;
   attuned: boolean;
   requiresAttunement: boolean;
   attunementPrereqKind: AttunementPrereqKind | null;
@@ -509,7 +637,9 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
     cost: asCurrency(item.cost),
     description: item.description,
     quantity: item.quantity,
-    equipped: item.equipped,
+    equippedSlot: item.equippedSlot,
+    slot: item.slot,
+    rarity: item.rarity,
     attuned: item.attuned,
     requiresAttunement: item.requiresAttunement,
     attunementPrereqKind: item.attunementPrereqKind,
@@ -596,7 +726,9 @@ export function buildInventoryCreateFromCatalog(
     cost: toJsonInput(asCurrency(item.cost)),
     description: item.description ?? undefined,
     quantity: opts.quantity,
-    equipped: false,
+    // Placement is assigned by the auto-equip pass (autoEquipSlot); null = in the bag.
+    equippedSlot: null as EquipSlot | null,
+    slot: item.slot,
     position: opts.position,
     ...snapshotItemDetail(item),
   };
@@ -664,6 +796,15 @@ export function selectAutoEquip(items: AutoEquipCandidate[]): number[] {
   return selected;
 }
 
+// The paper-doll slot an auto-equipped starting-gear candidate occupies (#565).
+// selectAutoEquip only ever picks one weapon (MAIN_HAND), one shield (OFF_HAND),
+// and one body armor (BODY), so this mapping is unambiguous.
+export function autoEquipSlot(item: AutoEquipCandidate): EquipSlot {
+  if (item.category === "weapon") return "MAIN_HAND";
+  if (item.armorDetail?.create.armorCategory === "shield") return "OFF_HAND";
+  return "BODY";
+}
+
 /** Formats a currency delta as "+7 gp" / "−5 gp 2 sp" for event summaries. */
 function formatCurrencyForSummary(delta: Currency | null | undefined): string | null {
   if (!delta) return null;
@@ -693,6 +834,7 @@ async function applyAcquire(
   let weight: number | undefined;
   let cost: Currency | undefined;
   let description: string | undefined;
+  let slot: EquipSlot | null = null;
   let detail: ReturnType<typeof snapshotItemDetail>;
 
   if (op.itemId) {
@@ -709,6 +851,7 @@ async function applyAcquire(
     weight = catalogItem.weight ?? undefined;
     cost = asCurrency(catalogItem.cost) ?? undefined;
     description = catalogItem.description ?? undefined;
+    slot = catalogItem.slot;
     detail = snapshotItemDetail(catalogItem);
   } else if (op.custom) {
     itemId = null;
@@ -717,6 +860,7 @@ async function applyAcquire(
     weight = op.custom.weight;
     cost = op.custom.cost;
     description = op.custom.description;
+    slot = op.custom.slot ?? null;
     detail = {
       weaponDetail: op.custom.weapon ? { create: normalizeWeaponDetail(op.custom.weapon) } : undefined,
       armorDetail: op.custom.armor ? { create: normalizeArmorDetail(op.custom.armor) } : undefined,
@@ -738,12 +882,30 @@ async function applyAcquire(
       cost: toJsonInput(cost),
       description,
       quantity,
-      equipped: op.equipped ?? false,
+      equippedSlot: null,
+      slot,
       notes: op.notes,
       position,
       ...detail,
     },
   });
+
+  // "Add & equip": auto-place into the first free compatible slot (#565). Silent
+  // (no separate equipped event) — a fresh acquire that can't be slotted stays in
+  // the bag rather than failing the acquire.
+  if (op.equipped) {
+    const placeable: PlaceableItem = {
+      category,
+      slot,
+      weaponDetail: detail.weaponDetail ? { twoHanded: Boolean(detail.weaponDetail.create.twoHanded) } : null,
+      armorDetail: detail.armorDetail ? { armorCategory: detail.armorDetail.create.armorCategory } : null,
+    };
+    const rows = await fetchEquippedRows(tx, characterId, created.id);
+    const autoSlot = firstFreeSlot(rows, placeable);
+    if (autoSlot) {
+      await tx.inventoryItem.update({ where: { id: created.id }, data: { equippedSlot: autoSlot } });
+    }
+  }
 
   const currencyDelta = hasNonzeroCurrency(op.currencyDelta) ? op.currencyDelta : null;
   if (currencyDelta) {
@@ -958,7 +1120,6 @@ async function applyUpdate(tx: Prisma.TransactionClient, characterId: string, op
     data: {
       name: op.name,
       notes: op.notes,
-      equipped: op.equipped,
       weight: op.weight,
       cost: op.cost !== undefined ? toJsonInput(op.cost) : undefined,
       description: op.description,
@@ -970,6 +1131,25 @@ async function applyUpdate(tx: Prisma.TransactionClient, characterId: string, op
   });
 }
 
+// Equips an item into an explicit slot (#565). Validates slot-compatibility,
+// capacity, and the two-handed off-hand lock; rejects a full slot.
+async function applyEquip(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: EquipOperation,
+  batchId: string,
+  sessionId: string | null,
+) {
+  const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
+  const rows = await fetchEquippedRows(tx, characterId, item.id);
+  const error = placementError(rows, item, op.slot);
+  if (error) throw new InvalidInventoryOperationError(error);
+  await equipIntoSlot(tx, characterId, item, op.slot, batchId, sessionId);
+}
+
+// Unequips (equipped=false) by clearing equippedSlot, or equips (equipped=true)
+// by auto-picking the first free compatible slot — the slot-less companion to
+// `equip`. Unequip is always legal so a row can always be cleared.
 async function applySetEquipped(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -979,31 +1159,35 @@ async function applySetEquipped(
 ) {
   const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
 
-  // Only weapons/armor are equippable. Gate equipping only — unequip is always
-  // legal so a legacy row stuck `equipped` can still be cleared.
-  if (op.equipped && !isEquippable(item.category)) {
-    throw new InvalidInventoryOperationError(`${item.name} (${item.category}) cannot be equipped`);
+  if (op.equipped) {
+    if (allowedSlotsForItem(item).length === 0) {
+      throw new InvalidInventoryOperationError(`${item.name} (${item.category}) cannot be equipped`);
+    }
+    const rows = await fetchEquippedRows(tx, characterId, item.id);
+    const slot = firstFreeSlot(rows, item);
+    if (!slot) {
+      throw new InvalidInventoryOperationError(`No free slot available to equip ${item.name}`);
+    }
+    await equipIntoSlot(tx, characterId, item, slot, batchId, sessionId);
+    return;
   }
 
-  await tx.inventoryItem.update({
-    where: { id: item.id },
-    data: { equipped: op.equipped },
-  });
+  await tx.inventoryItem.update({ where: { id: item.id }, data: { equippedSlot: null } });
 
   // Unequipping ends any active effect once the item is no longer attuned either.
-  if (!op.equipped && !item.attuned) {
+  if (!item.attuned) {
     await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `unequipped ${item.name}`);
   }
 
   await logEvent(tx, {
     characterId,
     category: "inventory",
-    type: op.equipped ? "equipped" : "unequipped",
-    summary: op.equipped ? `Equipped ${item.name}` : `Unequipped ${item.name}`,
+    type: "unequipped",
+    summary: `Unequipped ${item.name}`,
     entityType: "InventoryItem",
     entityId: item.id,
-    before: { equipped: item.equipped },
-    after: { equipped: op.equipped },
+    before: { equippedSlot: item.equippedSlot },
+    after: { equippedSlot: null },
     batchId,
     sessionId,
   });
@@ -1084,7 +1268,7 @@ async function applyUnattune(
   await tx.inventoryItem.update({ where: { id: item.id }, data: { attuned: false } });
 
   // Unattuning ends any active effect once the item is no longer equipped either.
-  if (!item.equipped) {
+  if (item.equippedSlot == null) {
     await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `unattuned ${item.name}`);
   }
 
@@ -1116,7 +1300,7 @@ async function applyActivate(
   if (!cap) {
     throw new InvalidInventoryOperationError(`${item.name} has no activated effect`);
   }
-  if (!item.equipped && !item.attuned) {
+  if (item.equippedSlot == null && !item.attuned) {
     throw new InvalidInventoryOperationError(`${item.name} must be equipped or attuned to activate`);
   }
 
@@ -1423,7 +1607,9 @@ export async function revertInventoryEvent(
         cost: toJsonInput(deletedItem.cost),
         description: deletedItem.description ?? undefined,
         quantity: deletedItem.quantity,
-        equipped: deletedItem.equipped,
+        equippedSlot: deletedItem.equippedSlot ?? null,
+        slot: deletedItem.slot ?? null,
+        rarity: deletedItem.rarity ?? null,
         attuned: deletedItem.attuned ?? false,
         requiresAttunement: deletedItem.requiresAttunement ?? false,
         attunementPrereqKind: deletedItem.attunementPrereqKind ?? undefined,
@@ -1449,14 +1635,14 @@ export async function revertInventoryEvent(
   // attune/unattune, usesRemaining for a charged `use`, activatedUsesSpent for activate).
   const before = event.before as {
     quantity?: number;
-    equipped?: boolean;
+    equippedSlot?: EquipSlot | null;
     attuned?: boolean;
     activatedUsesSpent?: number;
     usesRemaining?: number;
   };
   const updateData: Prisma.InventoryItemUpdateInput = {};
   if (before.quantity !== undefined) updateData.quantity = before.quantity;
-  if (before.equipped !== undefined) updateData.equipped = before.equipped;
+  if (before.equippedSlot !== undefined) updateData.equippedSlot = before.equippedSlot;
   if (before.attuned !== undefined) updateData.attuned = before.attuned;
   if (before.activatedUsesSpent !== undefined) updateData.activatedUsesSpent = before.activatedUsesSpent;
   if (Object.keys(updateData).length > 0) {
@@ -1502,6 +1688,9 @@ export async function applyInventoryOperations(
           break;
         case "sell":
           await applySell(tx, characterId, op, batchId, sessionId);
+          break;
+        case "equip":
+          await applyEquip(tx, characterId, op, batchId, sessionId);
           break;
         case "setEquipped":
           await applySetEquipped(tx, characterId, op, batchId, sessionId);

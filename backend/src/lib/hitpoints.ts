@@ -659,7 +659,7 @@ interface HpOpContext {
     resources: Prisma.JsonValue;
     activeEffects: Prisma.JsonValue;
     classEntries: ClassEntryRow[];
-    inventoryItems?: GrantItem[];
+    inventoryItems?: (Omit<GrantItem, "equipped"> & { equippedSlot: string | null })[];
   };
   hp: HitPoints;
   hd: HitDice;
@@ -695,8 +695,10 @@ function applyDamageOp(ctx: HpOpContext, op: DamageOperation): HpOpResult {
   // (#529) unless the player declined: cast-buff resistances (Rage) unioned with
   // item-granted resistances; item immunities zero the matching type.
   const resisted = activeResistedDamageTypes(normalizeActiveEffectsMutable(row.activeEffects));
-  for (const t of itemResistedDamageTypes(row.inventoryItems ?? [])) resisted.add(t);
-  const immune = itemImmuneDamageTypes(row.inventoryItems ?? []);
+  // Map the paper-doll placement to the boolean "worn" flag the grant helpers expect (#565).
+  const itemsForGrants = (row.inventoryItems ?? []).map((i) => ({ ...i, equipped: i.equippedSlot != null }));
+  for (const t of itemResistedDamageTypes(itemsForGrants)) resisted.add(t);
+  const immune = itemImmuneDamageTypes(itemsForGrants);
   const { applied, resisted: wasResisted, immune: wasImmune } = resolveDamageAmount(
     op.amount,
     op.damageType,
@@ -1220,7 +1222,7 @@ export async function applyHitPointOperations(
           inventoryItems: {
             select: {
               name: true,
-              equipped: true,
+              equippedSlot: true,
               attuned: true,
               requiresAttunement: true,
               capabilities: true,
