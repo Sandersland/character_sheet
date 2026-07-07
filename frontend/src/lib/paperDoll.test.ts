@@ -9,6 +9,8 @@ import {
   isOffHandLocked,
   itemsInSlot,
   SLOT_GROUPS,
+  WORN_SLOTS,
+  wornSlotItemKindLabel,
 } from "@/lib/paperDoll";
 
 function item(overrides: Partial<InventoryItem> = {}): InventoryItem {
@@ -125,6 +127,24 @@ describe("bagItemsForSlot", () => {
   it("excludes an already-equipped candidate", () => {
     const inv = [item({ id: "hat", slot: "HEAD", equippedSlot: "HEAD" })];
     expect(bagItemsForSlot(inv, "HEAD")).toEqual([]);
+  });
+});
+
+describe("WORN_SLOTS (#572)", () => {
+  it("lists exactly the eight worn slots, excluding the derived ones", () => {
+    expect(WORN_SLOTS).toEqual(["HEAD", "NECK", "CLOAK", "HANDS", "WRISTS", "BELT", "FEET", "RING"]);
+    expect(WORN_SLOTS).not.toContain("MAIN_HAND");
+    expect(WORN_SLOTS).not.toContain("OFF_HAND");
+    expect(WORN_SLOTS).not.toContain("BODY");
+  });
+
+  it("labels each worn slot by item kind, not body location", () => {
+    expect(wornSlotItemKindLabel("HANDS")).toBe("Gloves");
+    expect(wornSlotItemKindLabel("WRISTS")).toBe("Bracers");
+    expect(wornSlotItemKindLabel("NECK")).toBe("Amulet / Necklace");
+    expect(wornSlotItemKindLabel("HEAD")).toBe("Headwear");
+    expect(wornSlotItemKindLabel("FEET")).toBe("Boots");
+    expect(wornSlotItemKindLabel("RING")).toBe("Ring");
   });
 });
 
