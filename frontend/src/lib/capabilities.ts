@@ -2,8 +2,11 @@ import { abilityLabel, skillLabel } from "@/lib/abilities";
 import { formatModifier } from "@/lib/abilities";
 import type {
   AttunementPrereqKind,
+  CapabilityKind,
   CapabilityOp,
   CapabilityTarget,
+  CastResource,
+  CastStatMode,
   ItemCapability,
 } from "@/types/character";
 
@@ -33,6 +36,34 @@ export const CAPABILITY_OP_OPTIONS: readonly { value: CapabilityOp; label: strin
   { value: "add", label: "Add" },
   { value: "setTo", label: "Set to" },
 ];
+
+// Authorable capability kinds (#528). passiveBonus grants a stat; castSpell casts
+// a spell from the item's own resource. The other kinds aren't authorable yet.
+export const CAPABILITY_KIND_OPTIONS: readonly { value: CapabilityKind; label: string }[] = [
+  { value: "passiveBonus", label: "Passive bonus" },
+  { value: "castSpell", label: "Cast a spell" },
+];
+
+export const CAST_RESOURCE_OPTIONS: readonly { value: CastResource; label: string }[] = [
+  { value: "perRestShort", label: "1×/short rest" },
+  { value: "perRestLong", label: "1×/long rest" },
+  { value: "perDayDawn", label: "1×/day (dawn)" },
+  { value: "perDayDusk", label: "1×/day (dusk)" },
+  { value: "atWill", label: "At will" },
+];
+
+export const CAST_STAT_MODE_OPTIONS: readonly { value: CastStatMode; label: string }[] = [
+  { value: "fixed", label: "Fixed value" },
+  { value: "wielder", label: "Wielder's own" },
+];
+
+/** castSpell save-DC/attack summary phrasing, e.g. "DC 15" or "wielder DC". */
+export function castSpellSummary(cap: ItemCapability): string {
+  const name = cap.spellName ?? "spell";
+  const dc = cap.dcMode === "wielder" ? "wielder DC" : cap.dcValue != null ? `DC ${cap.dcValue}` : "";
+  const resource = CAST_RESOURCE_OPTIONS.find((o) => o.value === cap.resource)?.label ?? "";
+  return [`Casts ${name}`, resource, dc].filter(Boolean).join(" · ");
+}
 
 export const ATTUNEMENT_PREREQ_OPTIONS: readonly { value: AttunementPrereqKind | ""; label: string }[] = [
   { value: "", label: "Anyone" },
@@ -76,6 +107,7 @@ function valuePhrase(cap: ItemCapability): string {
 
 /** One-line human summary, e.g. "+2 Stealth", "+2d6 fire Damage (when on hit)". */
 export function capabilitySummary(cap: ItemCapability): string {
+  if (cap.kind === "castSpell") return castSpellSummary(cap);
   if (cap.kind !== "passiveBonus") return cap.description ?? cap.kind;
   const core = `${valuePhrase(cap)} ${targetPhrase(cap)}`.trim();
   return cap.condition ? `${core} (when ${cap.condition})` : core;

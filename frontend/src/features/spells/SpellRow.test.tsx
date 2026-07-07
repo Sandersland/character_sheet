@@ -180,6 +180,69 @@ describe("SpellRow", () => {
     });
   });
 
+  describe("item-granted spell", () => {
+    const itemSpell: Spell = {
+      ...mockSpell,
+      id: "item:inv-1:witch-bolt",
+      name: "Witch Bolt",
+      level: 1,
+      source: "item",
+      item: {
+        inventoryItemId: "inv-1",
+        capabilityId: "cap-1",
+        itemName: "Wand of Witch Bolt",
+        castLevel: 1,
+        resource: "perRestShort",
+        usesRemaining: 1,
+        usesTotal: 1,
+        dcMode: "fixed",
+        dc: 15,
+        attackMode: "fixed",
+        attack: null,
+      },
+    };
+
+    it("shows the item-name, uses, and DC badges", () => {
+      render(<ul><SpellRow {...defaultProps(itemSpell, { availableSlots: [] })} /></ul>);
+      expect(screen.getByText("Wand of Witch Bolt")).toBeInTheDocument();
+      expect(screen.getByText("1/1")).toBeInTheDocument();
+      expect(screen.getByText("DC 15")).toBeInTheDocument();
+    });
+
+    it("hides the Remove ✕ button (derived, not persisted)", () => {
+      render(<ul><SpellRow {...defaultProps(itemSpell, { availableSlots: [] })} /></ul>);
+      expect(screen.queryByRole("button", { name: /Remove Witch Bolt/ })).not.toBeInTheDocument();
+    });
+
+    it("casts directly with the spell (no slot picker) even at level 1", async () => {
+      const user = userEvent.setup();
+      const onCast = vi.fn();
+      render(<ul><SpellRow {...defaultProps(itemSpell, { onCast, availableSlots: [] })} /></ul>);
+      await user.click(screen.getByRole("button", { name: "Cast" }));
+      expect(onCast).toHaveBeenCalledWith(itemSpell);
+    });
+
+    it("shows 'at will' and never a uses count for an at-will item spell", () => {
+      const atWill: Spell = {
+        ...itemSpell,
+        item: { ...itemSpell.item!, resource: "atWill", usesRemaining: Infinity, usesTotal: Infinity },
+      };
+      render(<ul><SpellRow {...defaultProps(atWill, { availableSlots: [] })} /></ul>);
+      expect(screen.getByText("at will")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Cast" })).not.toBeDisabled();
+    });
+
+    it("disables Cast and shows 'no uses' once the item resource is spent", () => {
+      const spent: Spell = {
+        ...itemSpell,
+        item: { ...itemSpell.item!, usesRemaining: 0, usesTotal: 1 },
+      };
+      render(<ul><SpellRow {...defaultProps(spent, { availableSlots: [] })} /></ul>);
+      expect(screen.getByText("no uses")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Cast" })).toBeDisabled();
+    });
+  });
+
   describe("upcast slot picker", () => {
     it("opens a slot button for each available level when multiple slots exist", async () => {
       const user = userEvent.setup();

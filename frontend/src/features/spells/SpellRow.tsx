@@ -45,15 +45,22 @@ export default function SpellRow({
   const [slotPickerOpen, setSlotPickerOpen] = useState(false);
 
   const isCantrip = spell.level === 0;
-  // Subclass-granted spells are derived, not persisted — they can't be removed.
-  const isGranted = spell.source === "subclass";
+  // An item-granted spell (#528): cast from the item's own resource, not a slot.
+  const item = spell.source === "item" ? spell.item : undefined;
+  const atWill = item ? item.usesTotal === Infinity : false;
+  const itemExhausted = Boolean(item) && !atWill && (item?.usesRemaining ?? 0) <= 0;
+  // Subclass- and item-granted spells are derived, not persisted — no Remove ✕.
+  const isGranted = spell.source === "subclass" || spell.source === "item";
   const schoolTone = SCHOOL_TONE[spell.school as keyof typeof SCHOOL_TONE] ?? "neutral";
 
-  // Castability: leveled spells with no remaining slots are shown but dimmed.
-  const noBudget = !isCantrip && availableSlots.length === 0;
+  // Castability: leveled spells with no remaining slots are shown but dimmed;
+  // an item spell is dimmed once its uses are spent (until the item's rest).
+  const noBudget = (!isCantrip && !item && availableSlots.length === 0) || itemExhausted;
 
   function handleCastClick() {
-    if (isCantrip) {
+    if (item) {
+      onCast(spell); // item spell — spends the item's resource, no slot picker
+    } else if (isCantrip) {
       onCast(spell); // no slot needed
     } else if (availableSlots.length === 0) {
       // No slots — cast at natural level still shows no-slots feedback via parent
@@ -95,8 +102,12 @@ export default function SpellRow({
                   <Badge tone="arcane">conc</Badge>
                 ))}
               {spell.ritual && <Badge tone="gold">ritual</Badge>}
-              {isGranted && <Badge tone="arcane">subclass</Badge>}
-              {noBudget && <Badge tone="neutral">no slots</Badge>}
+              {spell.source === "subclass" && <Badge tone="arcane">subclass</Badge>}
+              {item && <Badge tone="gold">{item.itemName}</Badge>}
+              {item && <Badge tone="neutral">{atWill ? "at will" : `${item.usesRemaining}/${item.usesTotal}`}</Badge>}
+              {item?.dc != null && <Badge tone="arcane">DC {item.dc}</Badge>}
+              {!item && noBudget && <Badge tone="neutral">no slots</Badge>}
+              {itemExhausted && <Badge tone="neutral">no uses</Badge>}
             </div>
           </div>
           {effect && (
@@ -129,10 +140,10 @@ export default function SpellRow({
           {/* Cast button */}
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || itemExhausted}
             onClick={handleCastClick}
             className="rounded bg-garnet-600 px-2.5 py-0.5 text-xs font-semibold text-parchment-50 hover:bg-garnet-700 disabled:opacity-40"
-            title={isCantrip ? `Cast ${spell.name}` : `Cast ${spell.name} (choose slot)`}
+            title={item ? `Cast ${spell.name} from ${item.itemName}` : isCantrip ? `Cast ${spell.name}` : `Cast ${spell.name} (choose slot)`}
           >
             Cast
           </button>

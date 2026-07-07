@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   capabilitySummary,
+  castSpellSummary,
   describeAttunementPrereq,
   targetUsesAbilityKey,
   targetUsesSkillKey,
@@ -41,6 +42,42 @@ describe("capabilitySummary", () => {
 
   it("falls back to description for a reserved (opaque) kind", () => {
     expect(capabilitySummary({ kind: "charges", description: "3 charges of light" })).toBe("3 charges of light");
+  });
+
+  it("routes a castSpell cap through castSpellSummary", () => {
+    expect(
+      capabilitySummary({
+        kind: "castSpell",
+        spellName: "Witch Bolt",
+        resource: "perRestShort",
+        dcMode: "fixed",
+        dcValue: 15,
+      }),
+    ).toBe("Casts Witch Bolt · 1×/short rest · DC 15");
+  });
+});
+
+describe("castSpellSummary", () => {
+  it("names the spell, resource, and a fixed DC", () => {
+    expect(
+      castSpellSummary({
+        kind: "castSpell",
+        spellName: "Fireball",
+        resource: "perDayDawn",
+        dcMode: "fixed",
+        dcValue: 15,
+      }),
+    ).toBe("Casts Fireball · 1×/day (dawn) · DC 15");
+  });
+
+  it("phrases wielder mode without a numeric DC", () => {
+    expect(
+      castSpellSummary({ kind: "castSpell", spellName: "Bless", resource: "perRestLong", dcMode: "wielder", dcValue: 15 }),
+    ).toBe("Casts Bless · 1×/long rest · wielder DC");
+  });
+
+  it("omits the DC segment when fixed mode carries no value, and falls back to 'spell'", () => {
+    expect(castSpellSummary({ kind: "castSpell", resource: "atWill", dcMode: "fixed" })).toBe("Casts spell · At will");
   });
 });
 
