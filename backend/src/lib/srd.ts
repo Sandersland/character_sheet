@@ -379,7 +379,8 @@ export function deriveFightingStyleBonuses(
 export type BodyArmorCategory = "light" | "medium" | "heavy";
 
 // One labeled addend of the derived AC; the wire shape for armorClassBreakdown.
-export type ArmorClassPart = { label: string; value: number };
+// reminder carries condition text for an addend not auto-applied (value 0, #383).
+export type ArmorClassPart = { label: string; value: number; reminder?: string };
 
 type UnarmoredDefense = { classNames: string[]; conMod: number; wisMod: number };
 
