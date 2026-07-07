@@ -12,8 +12,9 @@ interface SlotPickerPanelProps {
   onClose: () => void;
 }
 
-// Inline expand-in-place picker (NOT a Modal): lists the bag items that fit a
-// paper-doll slot; picking one fires the equip/replace op on the parent.
+// Slot picker rendered inside an anchored Popover (NOT a Modal): lists the bag
+// items that fit a paper-doll slot; picking one fires the equip/replace op. The
+// Popover provides the card chrome, so this stays bare content.
 export default function SlotPickerPanel({
   slotLabel,
   candidates,
@@ -23,7 +24,7 @@ export default function SlotPickerPanel({
   onClose,
 }: SlotPickerPanelProps) {
   return (
-    <div className="mt-2 rounded-card border border-parchment-200 bg-parchment-50 p-2 text-left shadow-card">
+    <div className="text-left">
       <div className="mb-1 flex items-center justify-between">
         <span className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
           {slotLabel}

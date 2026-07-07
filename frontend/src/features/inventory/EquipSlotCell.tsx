@@ -24,9 +24,10 @@ interface EquipSlotCellProps {
 const TILE =
   "flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-card border p-1 text-center transition-colors";
 
-// One physical paper-doll position. Empty → an inline expand-in-place picker
-// (SlotPickerPanel); filled → a read-only Popover summary with unequip/swap;
-// two-handed-locked → a disabled tile. RING renders as two of these cells.
+// One physical paper-doll position. Both empty and filled open an anchored
+// Popover (consistent floating panel, never stretches the tile): empty → a
+// SlotPickerPanel; filled → a read-only summary with unequip/swap. Two-handed-
+// locked → a disabled tile. RING renders as two of these cells.
 export default function EquipSlotCell({
   slot,
   label,
@@ -39,7 +40,6 @@ export default function EquipSlotCell({
   onUnequip,
   onReplace,
 }: EquipSlotCellProps) {
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [swapping, setSwapping] = useState(false);
   const Icon = EQUIP_SLOT_ICONS[slot];
 
@@ -130,30 +130,34 @@ export default function EquipSlotCell({
   }
 
   return (
-    <div className="w-full">
-      <button
-        type="button"
-        disabled={pending}
-        aria-label={`${label} slot, empty — equip an item`}
-        onClick={() => setPickerOpen((open) => !open)}
-        className={`${TILE} border-dashed border-parchment-300 bg-parchment-50/50 text-parchment-400 hover:border-garnet-400 hover:text-garnet-600 disabled:opacity-50`}
-      >
-        <Icon aria-hidden="true" className="size-6 opacity-60" />
-        <span className="text-[0.625rem] font-medium">{label}</span>
-      </button>
-      {pickerOpen && (
-        <SlotPickerPanel
-          slotLabel={`Equip ${label}`}
-          candidates={candidates}
-          pending={pending}
-          action="equip"
-          onPick={(picked) => {
-            setPickerOpen(false);
-            onEquip(picked);
-          }}
-          onClose={() => setPickerOpen(false)}
-        />
+    <Popover
+      label={`${label} slot, empty — equip an item`}
+      className="w-full"
+      triggerClassName="w-full rounded-card"
+      trigger={
+        <span
+          className={`${TILE} border-dashed border-parchment-300 bg-parchment-50/50 text-parchment-400 hover:border-garnet-400 hover:text-garnet-600`}
+        >
+          <Icon aria-hidden="true" className="size-6 opacity-60" />
+          <span className="text-[0.625rem] font-medium">{label}</span>
+        </span>
+      }
+    >
+      {(close) => (
+        <div className="w-56 p-3">
+          <SlotPickerPanel
+            slotLabel={`Equip ${label}`}
+            candidates={candidates}
+            pending={pending}
+            action="equip"
+            onPick={(picked) => {
+              close();
+              onEquip(picked);
+            }}
+            onClose={close}
+          />
+        </div>
       )}
-    </div>
+    </Popover>
   );
 }
