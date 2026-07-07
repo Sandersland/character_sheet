@@ -26,7 +26,7 @@ import { readEffectSpec } from "./effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
-import { deriveGrantedSpells } from "./granted-spells.js";
+import { deriveGrantedSpells, deriveItemSpells } from "./granted-spells.js";
 import type {
   SpellEntry,
   SpellComponents,
@@ -90,6 +90,20 @@ export interface CastSpellOperation {
   apply?: { target: CastTarget; kind: "heal" | "damage"; amount: number };
 }
 
+/**
+ * Cast a spell granted by a held magic item (#528). `entryId` is the derived
+ * `item:<inventoryItemId>:<spellId>` seam. Spends the item's own resource (its
+ * per-capability `used` counter), never a character spell slot. `roll` is the
+ * client-computed effect total (0 for utility). Blocked when the item is inactive
+ * (not equipped/attuned) or its uses are exhausted until the matching rest.
+ */
+export interface CastItemSpellOperation {
+  type: "castItemSpell";
+  entryId: string;
+  roll: number;
+  apply?: { target: CastTarget; kind: "heal" | "damage"; amount: number };
+}
+
 /** Expend one slot of a given level without associating it with a specific spell. */
 export interface ExpendSlotOperation {
   type: "expendSlot";
@@ -134,6 +148,7 @@ export interface DropConcentrationOperation {
 
 export type SpellcastingOperation =
   | CastSpellOperation
+  | CastItemSpellOperation
   | ExpendSlotOperation
   | RestoreSlotOperation
   | LearnSpellOperation
@@ -158,6 +173,10 @@ interface SpellOpContext {
   casterUserId: string;
   casterName: string;
   casterCampaignId: string | null;
+  // The character's own derived spell save DC / attack bonus, used to resolve a
+  // wielder-mode item spell's DC/attack (#528). Null for a non-caster.
+  wielderSpellSaveDC: number | null;
+  wielderSpellAttackBonus: number | null;
 }
 
 function applyExpendSlotOp(ctx: SpellOpContext, op: ExpendSlotOperation): OpOutcome {
@@ -381,6 +400,82 @@ async function applyCastSpellOp(ctx: SpellOpContext, op: CastSpellOperation): Pr
   );
 }
 
+// Cast a spell granted by a held item (#528). Adapts the item's castSpell
+// capability into a CastAbilityInput: effect = the referenced Spell's EffectSpec,
+// cost = none (the item resource is spent here, not a character slot), DC/attack
+// per the fixed/wielder mode. Decrements the item's per-capability use counter.
+async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperation): Promise<OpOutcome> {
+  const entry = ctx.state.spells.find((s) => s.id === op.entryId && s.source === "item");
+  if (!entry?.item) {
+    throw new InvalidSpellcastingOperationError(
+      `Item spell not available: ${op.entryId} (item unequipped/unattuned or removed)`,
+    );
+  }
+  const meta = entry.item;
+  if (meta.usesRemaining <= 0) {
+    throw new InvalidSpellcastingOperationError(
+      `${entry.name} has no uses remaining — recharges on the item's rest`,
+    );
+  }
+  if (!entry.spellId) {
+    throw new InvalidSpellcastingOperationError(`Item spell ${op.entryId} has no referenced spell`);
+  }
+  const spell = await ctx.tx.spell.findUnique({ where: { id: entry.spellId } });
+  if (!spell) {
+    throw new InvalidSpellcastingOperationError(`Referenced spell not found in catalog: ${entry.spellId}`);
+  }
+
+  // Resolve the announced DC/attack: fixed uses the item's value, wielder the
+  // character's own (null-safe: a non-caster wielder is prevented at authoring).
+  const dc = meta.dcMode === "wielder" ? ctx.wielderSpellSaveDC : meta.dc ?? null;
+  const attack = meta.attackMode === "wielder" ? ctx.wielderSpellAttackBonus : meta.attack ?? null;
+
+  const outcome = await castAbilityInTx(
+    {
+      tx: ctx.tx,
+      characterId: ctx.characterId,
+      batchId: ctx.batchId,
+      sessionId: ctx.sessionId,
+      cost: costCtx(ctx),
+      concentrationHost: ctx.state,
+      casterUserId: ctx.casterUserId,
+      casterName: ctx.casterName,
+      casterCampaignId: ctx.casterCampaignId,
+    },
+    {
+      name: entry.name,
+      entryId: op.entryId,
+      cost: { kind: "none" },
+      effect: readEffectSpec(spell),
+      roll: op.roll,
+      eventType: "castSpell",
+      concentrates: Boolean(spell.concentration),
+      apply: op.apply,
+    },
+  );
+
+  // Spend the item's resource (skip for at-will), persisted outside the spell blob.
+  if (meta.usesTotal !== Infinity) {
+    await ctx.tx.inventoryCapability.update({
+      where: { id: meta.capabilityId },
+      data: { used: { increment: 1 } },
+    });
+  }
+
+  const dcText = dc != null ? ` (DC ${dc})` : attack != null ? ` (+${attack} to hit)` : "";
+  outcome.summary += dcText;
+  outcome.eventData = {
+    ...outcome.eventData,
+    source: "item",
+    inventoryItemId: meta.inventoryItemId,
+    capabilityId: meta.capabilityId,
+    itemName: meta.itemName,
+    dc,
+    attack,
+  };
+  return outcome;
+}
+
 async function applyDropConcentrationOp(ctx: SpellOpContext): Promise<OpOutcome | null> {
   const { state } = ctx;
   const prior = state.concentratingOn;
@@ -425,6 +520,9 @@ export async function applySpellcastingOperations(
         take: 1,
         select: { name: true, subclass: true },
       },
+      inventoryItems: {
+        select: { id: true, name: true, equipped: true, attuned: true, capabilities: true },
+      },
     },
     notFound: (id) => new InvalidSpellcastingOperationError(`Character not found: ${id}`),
     applyOp: async ({ tx, row, op, batchId, sessionId }) => {
@@ -468,6 +566,18 @@ export async function applySpellcastingOperations(
         const names = new Set(state.spells.map((s) => s.name.toLowerCase()));
         for (const g of granted) if (!names.has(g.name.toLowerCase())) state.spells.push(g);
       }
+      // Inject derived item-granted spells (#528) so castItemSpell resolves them;
+      // their `item:` ids are disjoint, so they're stripped (with grants) pre-persist.
+      const itemSpells = deriveItemSpells(
+        row.inventoryItems.map((i) => ({
+          id: i.id,
+          name: i.name,
+          equipped: i.equipped,
+          attuned: i.attuned,
+          capabilities: i.capabilities,
+        })),
+      );
+      for (const s of itemSpells) state.spells.push(s);
 
       const ctx: SpellOpContext = {
         tx,
@@ -480,6 +590,8 @@ export async function applySpellcastingOperations(
         casterUserId,
         casterName: row.name,
         casterCampaignId: row.campaignId,
+        wielderSpellSaveDC: derived?.spellSaveDC ?? null,
+        wielderSpellAttackBonus: derived?.spellAttackBonus ?? null,
       };
 
       // Route to the per-op helper. A null outcome means no-op — skip both the
@@ -487,6 +599,7 @@ export async function applySpellcastingOperations(
       let outcome: OpOutcome | null = null;
       switch (op.type) {
         case "castSpell": outcome = await applyCastSpellOp(ctx, op); break;
+        case "castItemSpell": outcome = await applyCastItemSpellOp(ctx, op); break;
         case "expendSlot": outcome = applyExpendSlotOp(ctx, op); break;
         case "restoreSlot": outcome = applyRestoreSlotOp(ctx, op); break;
         case "learnSpell": outcome = await applyLearnSpellOp(ctx, op); break;
@@ -497,9 +610,9 @@ export async function applySpellcastingOperations(
       }
       if (outcome === null) return;
 
-      // Strip derived grants before persisting — they are never stored (they are
-      // re-derived on read; reconcileGrantedSpells is the safety net for leaks).
-      state.spells = state.spells.filter((s) => s.source !== "subclass");
+      // Strip derived grants + item spells before persisting — they are never
+      // stored (both re-derived on read; reconcileGrantedSpells guards leaks).
+      state.spells = state.spells.filter((s) => s.source !== "subclass" && s.source !== "item");
 
       // Write the updated state back as a compact object.
       await tx.character.update({

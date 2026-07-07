@@ -91,6 +91,15 @@ export function castUsesTotal(cap: CastSpellCapability): number {
   return cap.uses > 0 ? cap.uses : 1;
 }
 
+// Does a castSpell resource recharge on the given rest? perRestShort recharges on
+// a short OR long rest; perRestLong and the perDay dawn/dusk approximations recharge
+// on a long rest only; atWill never tracks uses (nothing to reset).
+export function castResourceRechargesOn(resource: string, rest: "short" | "long"): boolean {
+  if (resource === "atWill") return false;
+  if (resource === "perRestShort") return true; // short or long
+  return rest === "long";
+}
+
 // The flat columns shared by CampaignItemCapability and InventoryCapability.
 export interface CapabilityColumns {
   kind: string;

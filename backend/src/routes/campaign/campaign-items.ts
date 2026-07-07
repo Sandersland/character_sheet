@@ -7,6 +7,8 @@ import {
   ATTUNEMENT_PREREQ_KINDS,
   CAPABILITY_OPS,
   CAPABILITY_TARGETS,
+  CAST_RESOURCES,
+  CAST_STAT_MODES,
   serializeCapability,
 } from "../../lib/capabilities.js";
 import {
@@ -85,9 +87,9 @@ const consumableInputSchema = z
   })
   .strict();
 
-// A DM-authored passiveBonus capability (#546). Only passiveBonus is authorable
-// this slice; dice is nested and consumed in the damage roll at #526C.
-const capabilityInputSchema = z
+// A DM-authored passiveBonus capability (#546). Dice is nested and consumed in
+// the damage roll at #526C.
+const passiveBonusInputSchema = z
   .object({
     kind: z.literal("passiveBonus"),
     target: z.enum(CAPABILITY_TARGETS),
@@ -106,6 +108,29 @@ const capabilityInputSchema = z
       .optional(),
   })
   .strict();
+
+// A DM-authored castSpell capability (#528): the item casts a catalog spell from
+// its own resource. wielder DC/attack is only meaningful for a spellcaster-
+// intended item, so it's rejected unless the item requires spellcaster attunement.
+const castSpellInputSchema = z
+  .object({
+    kind: z.literal("castSpell"),
+    spellId: z.string().min(1),
+    spellName: z.string().min(1),
+    spellLevel: z.number().int().min(0).max(9),
+    castLevel: z.number().int().min(0).max(9),
+    resource: z.enum(CAST_RESOURCES),
+    uses: z.number().int().positive().optional(),
+    concentration: z.boolean().optional(),
+    dcMode: z.enum(CAST_STAT_MODES),
+    dcValue: z.number().int().optional(),
+    attackMode: z.enum(CAST_STAT_MODES),
+    attackValue: z.number().int().optional(),
+    description: z.string().optional(),
+  })
+  .strict();
+
+const capabilityInputSchema = z.discriminatedUnion("kind", [passiveBonusInputSchema, castSpellInputSchema]);
 
 const baseFields = {
   name: z.string().min(1),
@@ -127,6 +152,23 @@ const baseFields = {
 
 // Map a capability input onto the flat side-table columns.
 function capabilityCreate(cap: z.infer<typeof capabilityInputSchema>) {
+  if (cap.kind === "castSpell") {
+    return {
+      kind: cap.kind,
+      description: cap.description ?? null,
+      spellId: cap.spellId,
+      spellName: cap.spellName,
+      spellLevel: cap.spellLevel,
+      castLevel: cap.castLevel,
+      castResource: cap.resource,
+      castUses: cap.uses ?? 1,
+      castConcentration: cap.concentration ?? false,
+      dcMode: cap.dcMode,
+      dcValue: cap.dcValue ?? null,
+      attackMode: cap.attackMode,
+      attackValue: cap.attackValue ?? null,
+    };
+  }
   return {
     kind: cap.kind,
     target: cap.target,
@@ -139,6 +181,21 @@ function capabilityCreate(cap: z.infer<typeof capabilityInputSchema>) {
     valueDiceFaces: cap.dice?.faces ?? null,
     valueDamageType: cap.dice?.damageType ?? null,
   };
+}
+
+// Reject a wielder-mode castSpell on an item not intended for a spellcaster —
+// wielder DC/attack resolves to the holder's spell stats, meaningless otherwise (#528).
+function assertWielderModeAllowed(data: {
+  attunementPrereqKind?: string | null;
+  capabilities?: z.infer<typeof capabilityInputSchema>[];
+}): string | null {
+  const wantsWielder = (data.capabilities ?? []).some(
+    (c) => c.kind === "castSpell" && (c.dcMode === "wielder" || c.attackMode === "wielder"),
+  );
+  if (wantsWielder && data.attunementPrereqKind !== "spellcaster") {
+    return "wielder DC/attack requires the item to be attunable by a spellcaster; use fixed values otherwise";
+  }
+  return null;
 }
 
 const createItemSchema = z.object(baseFields).strict();
@@ -274,6 +331,11 @@ campaignItemsRouter.post("/campaigns/:id/items", async (req, res) => {
     return;
   }
   const data = parseResult.data;
+  const wielderError = assertWielderModeAllowed(data);
+  if (wielderError) {
+    res.status(400).json({ error: wielderError });
+    return;
+  }
   const campaignId = req.params.id;
 
   const created = await prisma.$transaction(async (tx) => {
