@@ -3,7 +3,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 interface PopoverProps {
   trigger: ReactNode;
   label: string;
-  children: ReactNode;
+  /** ReactNode, or a render fn receiving a `close()` so panel controls can dismiss the popover. */
+  children: ReactNode | ((close: () => void) => ReactNode);
   align?: "right" | "left";
   className?: string;
   triggerClassName?: string;
@@ -81,7 +82,12 @@ export default function Popover({
           tabIndex={-1}
           className={`absolute ${align === "left" ? "left-0" : "right-0"} z-10 mt-1 min-w-[12rem] rounded-card border border-parchment-200 bg-parchment-50 shadow-raised focus:outline-none`}
         >
-          {children}
+          {typeof children === "function"
+            ? children(() => {
+                setOpen(false);
+                triggerRef.current?.focus();
+              })
+            : children}
         </div>
       )}
     </div>
