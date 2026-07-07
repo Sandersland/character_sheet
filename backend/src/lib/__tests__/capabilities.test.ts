@@ -61,8 +61,10 @@ describe("passiveBonusChannel", () => {
     expect(passiveBonusChannel({ kind: "passiveBonus", target: "damage", op: "add", value: 1 })).toBe("meleeDamage");
     expect(passiveBonusChannel({ kind: "passiveBonus", target: "attack", op: "add", value: 1 })).toBe("attackRoll");
   });
-  it("returns null for deferred targets (ac, maxHp)", () => {
-    expect(passiveBonusChannel({ kind: "passiveBonus", target: "ac", op: "add", value: 1 })).toBeNull();
+  it("maps ac to its own channel (#383)", () => {
+    expect(passiveBonusChannel({ kind: "passiveBonus", target: "ac", op: "add", value: 1 })).toBe("ac");
+  });
+  it("returns null for still-deferred targets (maxHp)", () => {
     expect(passiveBonusChannel({ kind: "passiveBonus", target: "maxHp", op: "add", value: 1 })).toBeNull();
   });
 });
@@ -76,6 +78,17 @@ describe("deriveItemPassiveBonuses", () => {
     expect(out).toEqual([
       { target: "stealth", modifier: 2, source: "Cloak" },
       { target: "attackRoll", modifier: 1, source: "Ring" },
+    ]);
+  });
+
+  it("channels an active item's ac bonus, carrying condition text when present (#383)", () => {
+    const out = deriveItemPassiveBonuses([
+      { name: "Ring of Protection", equipped: false, attuned: true, capabilities: [{ kind: "passiveBonus", target: "ac", op: "add", value: 1 }] },
+      { name: "Bracers of Defense", equipped: false, attuned: true, capabilities: [{ kind: "passiveBonus", target: "ac", op: "add", value: 2, condition: "while wearing no armor and no shield" }] },
+    ]);
+    expect(out).toEqual([
+      { target: "ac", modifier: 1, source: "Ring of Protection" },
+      { target: "ac", modifier: 2, source: "Bracers of Defense", condition: "while wearing no armor and no shield" },
     ]);
   });
 
@@ -94,7 +107,7 @@ describe("deriveItemPassiveBonuses", () => {
         capabilities: [
           { kind: "passiveBonus", target: "skill", op: "setTo", value: 20, targetKey: "stealth" },
           { kind: "passiveBonus", target: "damage", op: "add", value: 0, valueDiceCount: 1, valueDiceFaces: 6 },
-          { kind: "passiveBonus", target: "ac", op: "add", value: 1 },
+          { kind: "passiveBonus", target: "maxHp", op: "add", value: 1 },
         ],
       },
     ]);

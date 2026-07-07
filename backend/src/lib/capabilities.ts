@@ -127,9 +127,10 @@ export function serializeCapability(row: CapabilityColumns): SerializedCapabilit
 }
 
 // The buffsByTarget channel key a scalar passiveBonus contributes to, or null
-// when the target isn't yet wired into a per-target modifier channel: ac (#383),
-// dice→damage (#526C), and save/abilityScore/spell*/initiative/speed/maxHp
-// (later slices). Reuses the same channel keys active buffs already use so item
+// when the target isn't yet wired into a per-target modifier channel: dice→damage
+// (#526C) and save/abilityScore/spell*/initiative/speed/maxHp (later slices).
+// The "ac" channel (#383) is consumed at the serialize acParts seam, not by
+// buffsByTarget. Reuses the same channel keys active buffs already use so item
 // bonuses and cast buffs sum together on read.
 export function passiveBonusChannel(cap: PassiveBonusCapability): string | null {
   switch (cap.target) {
@@ -139,6 +140,8 @@ export function passiveBonusChannel(cap: PassiveBonusCapability): string | null 
       return "meleeDamage";
     case "attack":
       return "attackRoll";
+    case "ac":
+      return "ac";
     default:
       return null;
   }
@@ -150,6 +153,9 @@ export interface ItemPassiveContribution {
   target: string;
   modifier: number;
   source: string;
+  // Optional 5e usage condition (e.g. AC "while wearing no armor"); surfaced as
+  // reminder text where the channel can't auto-apply it (#383). Omitted when absent.
+  condition?: string;
 }
 
 // The minimal item shape the passive-bonus derivation needs. An item is "active"
@@ -175,7 +181,12 @@ export function deriveItemPassiveBonuses(items: PassiveBonusItem[]): ItemPassive
       if (cap.dice) continue;
       const channel = passiveBonusChannel(cap);
       if (!channel) continue;
-      out.push({ target: channel, modifier: cap.value, source: item.name });
+      out.push({
+        target: channel,
+        modifier: cap.value,
+        source: item.name,
+        ...(cap.condition ? { condition: cap.condition } : {}),
+      });
     }
   }
   return out;

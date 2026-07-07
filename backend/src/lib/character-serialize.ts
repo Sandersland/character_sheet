@@ -672,7 +672,7 @@ function buildInventoryContext(
 // buffs (buffsByTarget) merged with active-item scalar passiveBonus contributions
 // (#545). Keyed the same way (skill name / meleeDamage / attackRoll) so item
 // bonuses and buffs sum together.
-type TargetModifierMap = Record<string, Array<{ modifier: number; source: string }>>;
+type TargetModifierMap = Record<string, Array<{ modifier: number; source: string; condition?: string }>>;
 
 function mergeTargetModifiers(
   buffTargets: Record<string, ActiveBuff[]>,
@@ -683,7 +683,11 @@ function mergeTargetModifiers(
     out[key] = buffs.map((b) => ({ modifier: b.modifier, source: b.source }));
   }
   for (const c of contributions) {
-    (out[c.target] ??= []).push({ modifier: c.modifier, source: c.source });
+    (out[c.target] ??= []).push({
+      modifier: c.modifier,
+      source: c.source,
+      ...(c.condition ? { condition: c.condition } : {}),
+    });
   }
   return out;
 }
@@ -821,6 +825,13 @@ export function serializeCharacter(row: CharacterWithRelations) {
   const styleAc = bestArmor !== null ? deriveFightingStyleBonuses(fightingStyle).armorClass : 0;
   if (styleAc !== 0) acParts.push({ label: "Defense fighting style", value: styleAc });
   if (featBonuses.armorClass !== 0) acParts.push({ label: "Feats", value: featBonuses.armorClass });
+  // Active-item AC bonuses (#383): Ring/Cloak of Protection etc., each labeled per
+  // source. v1 applies only unconditional bonuses; a conditional one surfaces as
+  // reminder text (value 0) rather than being silently added.
+  for (const c of buffTargets.ac ?? []) {
+    if (c.condition) acParts.push({ label: c.source, value: 0, reminder: c.condition });
+    else acParts.push({ label: c.source, value: c.modifier });
+  }
 
   return {
     id: row.id,
