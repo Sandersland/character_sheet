@@ -521,7 +521,7 @@ export async function applySpellcastingOperations(
         select: { name: true, subclass: true },
       },
       inventoryItems: {
-        select: { id: true, name: true, equipped: true, attuned: true, capabilities: true },
+        select: { id: true, name: true, equippedSlot: true, attuned: true, capabilities: true },
       },
     },
     notFound: (id) => new InvalidSpellcastingOperationError(`Character not found: ${id}`),
@@ -572,7 +572,8 @@ export async function applySpellcastingOperations(
         row.inventoryItems.map((i) => ({
           id: i.id,
           name: i.name,
-          equipped: i.equipped,
+          // #565: `equipped` is derived from equippedSlot (no persisted boolean).
+          equipped: i.equippedSlot != null,
           attuned: i.attuned,
           capabilities: i.capabilities,
         })),
