@@ -222,4 +222,76 @@ describe("campaign items (#380)", () => {
       .send({ name: "x" });
     expect(res.status).toBe(404);
   });
+
+  // Boots of Speed: bonus action, +30 speed, once per long rest, until a long rest.
+  const bootsCapability = {
+    kind: "activatedEffect" as const,
+    activation: "bonus" as const,
+    target: "speed" as const,
+    op: "add" as const,
+    value: 30,
+    activatedDuration: "untilRest" as const,
+    resourceKind: "perRest" as const,
+    resourcePeriod: "long" as const,
+    resourceCharges: 1,
+    durationText: "10 minutes",
+  };
+
+  it("authors an activatedEffect capability on create and serializes it (#543)", async () => {
+    const res = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({ name: "Boots of Speed", category: "gear", rarity: "RARE", requiresAttunement: true, capabilities: [bootsCapability] });
+    expect(res.status).toBe(201);
+    expect(res.body.capabilities).toHaveLength(1);
+    expect(res.body.capabilities[0]).toMatchObject({
+      kind: "activatedEffect",
+      activation: "bonus",
+      target: "speed",
+      op: "add",
+      value: 30,
+      activatedDuration: "untilRest",
+      resourceKind: "perRest",
+      resourcePeriod: "long",
+      resourceCharges: 1,
+      durationText: "10 minutes",
+    });
+
+    const persisted = await prisma.campaignItemCapability.findMany({ where: { campaignItemId: res.body.id } });
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0].activation).toBe("bonus");
+  });
+
+  it("replaces capabilities on PATCH (deleteMany + create, not merge)", async () => {
+    const created = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({ name: "Reauthored Boots", category: "gear", capabilities: [bootsCapability] });
+    const itemId = created.body.id as string;
+
+    const res = await supertest(app)
+      .patch(`/api/campaigns/${campaignId}/items/${itemId}`)
+      .set("Cookie", cookieOwner)
+      .send({
+        capabilities: [
+          { kind: "passiveBonus", target: "skill", op: "add", value: 2, targetKey: "stealth" },
+        ],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.capabilities).toHaveLength(1);
+    expect(res.body.capabilities[0]).toMatchObject({ kind: "passiveBonus", target: "skill", value: 2, targetKey: "stealth" });
+
+    // The old activatedEffect row is gone — replace, not merge.
+    const persisted = await prisma.campaignItemCapability.findMany({ where: { campaignItemId: itemId } });
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0].kind).toBe("passiveBonus");
+  });
+
+  it("rejects an unknown capability field with 400 (strict schema)", async () => {
+    const res = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({ name: "Bad Cap", category: "gear", capabilities: [{ kind: "activatedEffect", bogus: true }] });
+    expect(res.status).toBe(400);
+  });
 });

@@ -36,6 +36,7 @@ const bootsCapability = {
   resourceKind: "perRest" as const,
   resourcePeriod: "long" as const,
   resourceCharges: 1,
+  durationText: "10 minutes",
 };
 
 async function serialize(characterId: string) {
@@ -80,6 +81,22 @@ describe("item activatedEffect activate/deactivate (#543)", () => {
 
   afterEach(async () => {
     await prisma.character.deleteMany({ where: { id: characterId } });
+  });
+
+  it("serializes the activated control state (uses, active flag, reminder)", async () => {
+    const before = (await serialize(characterId)).inventory.find((i) => i.id === itemId)!;
+    expect(before.activated).toMatchObject({
+      activation: "bonus",
+      remainingUses: 1,
+      maxUses: 1,
+      active: false,
+      available: true,
+    });
+    expect(before.activated?.reminder).toContain("10 minutes");
+
+    await applyInventoryOperations(characterId, [{ type: "activate", inventoryItemId: itemId }]);
+    const after = (await serialize(characterId)).inventory.find((i) => i.id === itemId)!;
+    expect(after.activated).toMatchObject({ remainingUses: 0, active: true });
   });
 
   it("activate spends the use and speed reflects the buff", async () => {
@@ -142,5 +159,23 @@ describe("item activatedEffect activate/deactivate (#543)", () => {
     await applyHitPointOperations(characterId, [{ type: "shortRest", rolls: [] }]);
     const row = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } });
     expect(row.activatedUsesSpent).toBe(1);
+  });
+
+  it("removing an active item clears its buff (no leak, no residue)", async () => {
+    await applyInventoryOperations(characterId, [{ type: "activate", inventoryItemId: itemId }]);
+    expect((await serialize(characterId)).speed).toBe(60);
+
+    await applyInventoryOperations(characterId, [{ type: "remove", inventoryItemId: itemId }]);
+    expect(await buffCount(characterId, itemId)).toBe(0);
+    expect((await serialize(characterId)).speed).toBe(30);
+  });
+
+  it("selling the full stack of an active item clears its buff", async () => {
+    await applyInventoryOperations(characterId, [{ type: "activate", inventoryItemId: itemId }]);
+    await applyInventoryOperations(characterId, [
+      { type: "sell", inventoryItemId: itemId, currencyDelta: { cp: 0, sp: 0, gp: 5, pp: 0 } },
+    ]);
+    expect(await buffCount(characterId, itemId)).toBe(0);
+    expect((await serialize(characterId)).speed).toBe(30);
   });
 });

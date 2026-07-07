@@ -38,7 +38,15 @@ import { deriveActions, type AvailableAction } from "./actions.js";
 import { normalizeResourcesMutable, type AdvancementEntry, type ToolProfEntry } from "./resources.js";
 import { normalizeConditionsMutable } from "./conditions.js";
 import { buffsByTarget, normalizeActiveEffectsMutable, type ActiveBuff } from "./active-effects.js";
-import { deriveItemPassiveBonuses, type ItemPassiveContribution } from "./capabilities.js";
+import {
+  activatedMaxUses,
+  describeActivatedReminder,
+  deriveItemPassiveBonuses,
+  readCapability,
+  type ActivatedEffectCapability,
+  type ItemPassiveContribution,
+} from "./capabilities.js";
+import { itemBuffKey } from "./inventory.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeSpellcastingMutable } from "./spellcasting.js";
 import type { SpellEntry } from "./spell-state.js";
@@ -120,6 +128,8 @@ interface InventoryItemContext {
   meleeDamageBonus: number;
   /** Sum of active "attackRoll" buffs (#419, e.g. Sacred Weapon); added to weapon attack bonus. */
   attackRollBonus: number;
+  /** Buff keys currently active — an activatedEffect item is "active" when its key is present (#543). */
+  activeItemBuffKeys: Set<string>;
 }
 
 function serializeInventoryItem(
@@ -183,6 +193,29 @@ function serializeInventoryItem(
     weapon,
     armor: row.armorDetail ? serializeArmorDetail(row.armorDetail) : undefined,
     consumable: row.consumableDetail ? serializeConsumableDetail(row.consumableDetail) : undefined,
+    activated: serializeActivatedEffect(row, context),
+  };
+}
+
+// Derives the activate/deactivate control state for an item's activatedEffect
+// capability (#543): remaining uses, active flag, and the reminder text. Absent
+// when the item has no activatedEffect capability.
+function serializeActivatedEffect(
+  row: CharacterWithRelations["inventoryItems"][number],
+  context: InventoryItemContext,
+) {
+  const cap = row.capabilities.map(readCapability).find((c) => c.kind === "activatedEffect") as
+    | ActivatedEffectCapability
+    | undefined;
+  if (!cap) return undefined;
+  const maxUses = activatedMaxUses(cap);
+  return {
+    activation: cap.activation,
+    reminder: describeActivatedReminder(cap),
+    maxUses,
+    remainingUses: maxUses === null ? null : Math.max(0, maxUses - row.activatedUsesSpent),
+    active: context.activeItemBuffKeys.has(itemBuffKey(row.id)),
+    available: row.equipped || row.attuned,
   };
 }
 
@@ -662,7 +695,10 @@ function buildInventoryContext(
   // to weapon attack bonus (#419/#545).
   const attackRollBonus = (buffTargets.attackRoll ?? []).reduce((sum, b) => sum + b.modifier, 0);
 
-  return { effectiveScores, proficiencyBonus, weaponGrants, offHandBusy, fightingStyle, meleeDamageBonus, attackRollBonus };
+  // Active-item buff keys — an activatedEffect item is "active" when its item:<id> buff is present.
+  const activeItemBuffKeys = new Set(normalizeActiveEffectsMutable(row.activeEffects).buffs.map((b) => b.key));
+
+  return { effectiveScores, proficiencyBonus, weaponGrants, offHandBusy, fightingStyle, meleeDamageBonus, attackRollBonus, activeItemBuffKeys };
 }
 
 // The per-target modifier channel both skills and weapon math read: active cast

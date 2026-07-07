@@ -762,6 +762,8 @@ export async function applyAdjustQuantity(
   });
 
   if (nextQuantity === 0) {
+    // Adjusting to zero deletes the row — clear any seeded buff so it can't leak.
+    await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `used up ${item.name}`);
     await tx.inventoryItem.delete({ where: { id: item.id } });
   } else {
     await tx.inventoryItem.update({ where: { id: item.id }, data: { quantity: nextQuantity } });
@@ -1096,6 +1098,9 @@ async function applyRemove(
     sessionId,
   });
 
+  // Deleting the row must clear any active-effect buff it seeded (undo re-applies
+  // it via the paired effects-event revert, symmetric with the recreated row).
+  await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `removed ${item.name}`);
   await tx.inventoryItem.delete({ where: { id: item.id } });
 }
 
@@ -1133,6 +1138,8 @@ async function applySell(tx: Prisma.TransactionClient, characterId: string, op: 
   });
 
   if (quantitySold === item.quantity) {
+    // Full-stack sell deletes the row — clear any seeded buff so it can't leak.
+    await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `sold ${item.name}`);
     await tx.inventoryItem.delete({ where: { id: item.id } });
   } else {
     await tx.inventoryItem.update({ where: { id: item.id }, data: { quantity: item.quantity - quantitySold } });

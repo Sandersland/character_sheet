@@ -178,11 +178,28 @@ export interface InventoryItem {
   cost?: Currency;
   description?: string;
   equipped: boolean;
+  attuned?: boolean;
+  requiresAttunement?: boolean;
   notes?: string;
   weapon?: WeaponDetail;
   armor?: ArmorDetail;
   consumable?: ConsumableDetail;
+  /** Activate/deactivate control state for an item's activatedEffect capability (#543). */
+  activated?: ActivatedEffectState;
 }
+
+// The derived activate/deactivate control state the API serializes for an
+// activatedEffect item (#543). Absent when the item has no such capability.
+export interface ActivatedEffectState {
+  activation: ActivationType;
+  reminder: string;
+  maxUses: number | null;
+  remainingUses: number | null;
+  active: boolean;
+  available: boolean;
+}
+
+export type ActivationType = "action" | "bonus" | "reaction" | "commandWord";
 
 // Looser than WeaponDetail/ArmorDetail above (which describe what the API
 // always returns, every flag included) — these describe what a client only
@@ -285,7 +302,13 @@ export type InventoryOperation =
   | { type: "remove"; inventoryItemId: string }
   | { type: "sell"; inventoryItemId: string; quantity?: number; currencyDelta: Currency }
   /** Equips or unequips an item. Unlike `update`, this IS logged on the timeline. */
-  | { type: "setEquipped"; inventoryItemId: string; equipped: boolean };
+  | { type: "setEquipped"; inventoryItemId: string; equipped: boolean }
+  /** Attunes / unattunes a magic item (#545). */
+  | { type: "attune"; inventoryItemId: string }
+  | { type: "unattune"; inventoryItemId: string }
+  /** Activates / deactivates an item's activatedEffect capability (#543). */
+  | { type: "activate"; inventoryItemId: string }
+  | { type: "deactivate"; inventoryItemId: string };
 
 // ── Unified activity timeline ─────────────────────────────────────────────────
 
@@ -1025,6 +1048,7 @@ export interface CampaignItem {
   weapon?: WeaponDetail;
   armor?: ArmorDetail;
   consumable?: ConsumableDetail;
+  capabilities?: ItemCapabilityInput[];
   /** The fronting ITEM CampaignEntity — its `visibility` drives player reveal. */
   entity?: { id: string; name: string; visibility: EntityVisibility };
   /** Current holders derived from live inventory rows (#381). */
@@ -1047,6 +1071,24 @@ export interface CampaignItemInput {
   weapon?: WeaponDetailInput;
   armor?: ArmorDetailInput;
   consumable?: ConsumableDetail;
+  capabilities?: ItemCapabilityInput[];
+}
+
+// A capability the DM authors on a magic item (#545/#543). Mirrors the backend
+// campaign-items capabilitySchema; activatedEffect reuses target/op/value.
+export interface ItemCapabilityInput {
+  kind: "passiveBonus" | "activatedEffect" | "castSpell" | "charges" | "grant";
+  description?: string;
+  target?: string;
+  op?: "add" | "setTo";
+  value?: number;
+  targetKey?: string;
+  activation?: ActivationType;
+  activatedDuration?: "whileActive" | "untilRest";
+  resourceKind?: "perRest" | "perDay" | "atWill";
+  resourcePeriod?: "short" | "long" | "dawn" | "dusk";
+  resourceCharges?: number;
+  durationText?: string;
 }
 
 /** One note that @-tags an entity, surfaced on the entity detail page. */
