@@ -2,12 +2,25 @@
 // unarmed-strike, and improvised-weapon rows plus their roll/log label strings.
 
 import { formatRollSpec } from "@/lib/dice";
-import type { Character, WeaponDetail } from "@/types/character";
+import type { Character, InventoryItem, WeaponDetail } from "@/types/character";
 
 export interface RollSpecTriple {
   count: number;
   faces: number;
   modifier: number;
+}
+
+// One dice-valued on-hit rider a weapon adds to its damage roll (Flame Tongue
+// +2d6 fire): its own spec + damage type, rolled as a separate typed term. A
+// `condition` (e.g. "vs dragons") is reminder text — never auto-gated on a target.
+export interface DamageRider {
+  id: string;
+  spec: RollSpecTriple;
+  damageType?: string;
+  label: string;
+  rollLabel: string;
+  logSource: string;
+  condition?: string;
 }
 
 // One attack row, fully resolved for display + rolling. Roll-source labels
@@ -27,6 +40,45 @@ export interface AttackEntry {
   attackRollLabel: string;
   damageRollLabel: string;
   logSource: string;
+  /** Dice-valued on-hit riders from THIS item's active capabilities (Flame Tongue +2d6). */
+  damageRiders: DamageRider[];
+}
+
+// A weapon's capabilities are live when equipped/attuned; an attunement-required
+// item needs attunement specifically, so unattuning removes its riders.
+export function capabilitiesActive(item: Pick<InventoryItem, "equipped" | "attuned" | "requiresAttunement">): boolean {
+  return item.requiresAttunement ? item.attuned : item.equipped || item.attuned;
+}
+
+// Compact term label for a dice rider, e.g. "+2d6 fire" or "+1d4".
+function damageRiderLabel(count: number, faces: number, damageType?: string): string {
+  const dice = `+${count}d${faces}`;
+  return damageType ? `${dice} ${damageType}` : dice;
+}
+
+// This item's dice-valued on-hit passiveBonus riders (target: damage, op: add,
+// dice present), scoped to THIS item only so other items never leak in. Scalar,
+// setTo, and non-damage capabilities are not riders. Empty when the item's
+// capabilities are inactive (not equipped/attuned).
+export function weaponDamageRiders(item: InventoryItem): DamageRider[] {
+  if (!capabilitiesActive(item)) return [];
+  const riders: DamageRider[] = [];
+  (item.capabilities ?? []).forEach((cap, index) => {
+    if (cap.kind !== "passiveBonus" || cap.target !== "damage") return;
+    if ((cap.op ?? "add") !== "add" || !cap.dice) return;
+    const { count, faces, damageType } = cap.dice;
+    const label = damageRiderLabel(count, faces, damageType);
+    riders.push({
+      id: `${item.id}:rider:${index}`,
+      spec: { count, faces, modifier: 0 },
+      damageType,
+      label,
+      rollLabel: `${item.name}: ${label}`,
+      logSource: item.name,
+      ...(cap.condition ? { condition: cap.condition } : {}),
+    });
+  });
+  return riders;
 }
 
 // d20 spec for a weapon's attack roll.
@@ -99,6 +151,7 @@ export function buildAttackEntries(character: Character): AttackEntry[] {
       attackRollLabel: `${item.name} attack`,
       damageRollLabel: `${item.name} damage (${damageType})`,
       logSource: item.name,
+      damageRiders: weaponDamageRiders(item),
     });
   }
 
@@ -121,6 +174,7 @@ export function buildAttackEntries(character: Character): AttackEntry[] {
     attackRollLabel: "Unarmed strike attack",
     damageRollLabel: "Unarmed strike damage (bludgeoning)",
     logSource: "Unarmed Strike",
+    damageRiders: [],
   });
 
   const improvisedSpec: RollSpecTriple = {
@@ -140,6 +194,7 @@ export function buildAttackEntries(character: Character): AttackEntry[] {
     attackRollLabel: "Improvised weapon attack",
     damageRollLabel: "Improvised weapon damage (bludgeoning)",
     logSource: "Improvised Weapon",
+    damageRiders: [],
   });
 
   return entries;
