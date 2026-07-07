@@ -7,6 +7,8 @@ interface PopoverProps {
   align?: "right" | "left";
   className?: string;
   triggerClassName?: string;
+  /** Fired whenever the popover transitions open → closed (Escape, click-outside, or toggle). */
+  onClose?: () => void;
 }
 
 // Owned-trigger disclosure popover for read-only detail panels (role=dialog);
@@ -18,11 +20,20 @@ export default function Popover({
   align = "left",
   className = "",
   triggerClassName = "",
+  onClose,
 }: PopoverProps) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
+
+  // Notify the parent on every open → closed transition, whatever the cause
+  // (Escape, click-outside, or a toggle-off) — lets callers reset panel state.
+  useEffect(() => {
+    if (wasOpen.current && !open) onClose?.();
+    wasOpen.current = open;
+  }, [open, onClose]);
 
   useEffect(() => {
     if (!open) return;

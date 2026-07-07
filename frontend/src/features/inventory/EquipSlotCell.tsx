@@ -62,6 +62,8 @@ export default function EquipSlotCell({
         label={`${label}: ${item.name}`}
         className="w-full"
         triggerClassName="w-full rounded-card"
+        // Reset swap mode on dismiss so the next open lands on the summary, not the picker.
+        onClose={() => setSwapping(false)}
         trigger={
           <span
             className={`${TILE} border-solid bg-parchment-50 hover:bg-parchment-100 ${

@@ -392,15 +392,18 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
             onConfirm={confirmSell}
             onCancel={() => setConfiguringSell(false)}
           />
-        ) : view === "worn" ? (
-          <EquipmentDoll character={character} pending={pending} onSubmit={submitOperations} />
         ) : !hasItems ? (
+          // Empty state wins over the view: if the last item is removed while on the
+          // Worn tab (the Segmented toggle is hidden when !hasItems), fall back to the
+          // Add-item CTA rather than stranding the user on an empty doll.
           <EmptyState
             icon={<GiKnapsack />}
             title="Your pack is empty"
             description="Add gear, weapons, and treasure to track what you're carrying."
             action={{ label: "+ Add item", onClick: () => setAddOpen(true) }}
           />
+        ) : view === "worn" ? (
+          <EquipmentDoll character={character} pending={pending} onSubmit={submitOperations} />
         ) : hasMatches ? (
           <div className="max-h-96 overflow-y-auto">
             {sections.map((section) => {
