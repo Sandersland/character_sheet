@@ -99,6 +99,25 @@ describe("Popover", () => {
     expect(onClose).toHaveBeenCalledTimes(3);
   });
 
+  it("passes a close() to a render-prop child that dismisses the panel and refocuses the trigger", async () => {
+    const user = userEvent.setup();
+    render(
+      <Popover trigger={<span>17</span>} label="Armor Class breakdown">
+        {(close) => (
+          <button type="button" onClick={close}>
+            Dismiss
+          </button>
+        )}
+      </Popover>,
+    );
+    const trigger = screen.getByRole("button", { name: "Armor Class breakdown" });
+    await user.click(trigger);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
   it("has no axe violations when open", async () => {
     const user = userEvent.setup();
     const { container } = renderPopover();
