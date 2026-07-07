@@ -1209,6 +1209,8 @@ export interface CampaignItem {
   name: string;
   description?: string;
   category: ItemCategory;
+  /** Declared paper-doll slot for wearable gear (#571); absent = carried. */
+  slot?: EquipSlot;
   rarity?: ItemRarity;
   requiresAttunement: boolean;
   attunementPrereqKind?: AttunementPrereqKind;
@@ -1235,6 +1237,8 @@ export interface CampaignItemInput {
   name: string;
   description?: string;
   category: ItemCategory;
+  /** Worn-slot placement for gear; null clears it (mirrors backend #571). */
+  slot?: EquipSlot | null;
   rarity?: ItemRarity;
   requiresAttunement?: boolean;
   /** null clears the prerequisite (attunable by anyone). */

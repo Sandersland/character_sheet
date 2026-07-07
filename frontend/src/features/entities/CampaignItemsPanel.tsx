@@ -29,6 +29,7 @@ import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignE
 import { ATTUNEMENT_PREREQ_OPTIONS } from "@/lib/capabilities";
 import { formatCurrency, fromCopper, toCopper } from "@/lib/currency";
 import { ITEM_CATEGORY_OPTIONS, itemCategoryLabel } from "@/lib/items";
+import { allowedSlotsForItem, equipSlotLabel, WORN_SLOTS, wornSlotItemKindLabel } from "@/lib/paperDoll";
 import { RARITY_OPTIONS, rarityLabel, rarityTone, rarityValueHint } from "@/lib/rarity";
 import type {
   ArmorCategory,
@@ -37,6 +38,8 @@ import type {
   CampaignItem,
   CampaignItemInput,
   Currency,
+  EquipSlot,
+  InventoryItem,
   Item,
   ItemCapability,
   ItemCategory,
@@ -90,6 +93,7 @@ const COST_KEYS: Record<CurrencyUnit, "costCp" | "costSp" | "costGp" | "costPp">
 interface FormState {
   name: string;
   category: ItemCategory;
+  slot: EquipSlot | "";
   rarity: ItemRarity | "";
   requiresAttunement: boolean;
   attunementPrereqKind: AttunementPrereqKind | "";
@@ -140,6 +144,7 @@ interface FormState {
 const emptyForm: FormState = {
   name: "",
   category: "weapon",
+  slot: "",
   rarity: "",
   requiresAttunement: false,
   attunementPrereqKind: "",
@@ -262,6 +267,7 @@ function formFromItem(item: CampaignItem): FormState {
     ...emptyForm,
     name: item.name,
     category: item.category,
+    slot: item.slot ?? "",
     rarity: item.rarity ?? "",
     requiresAttunement: item.requiresAttunement,
     attunementPrereqKind: item.attunementPrereqKind ?? "",
@@ -310,6 +316,8 @@ function buildInput(f: FormState): CampaignItemInput {
   const base: CampaignItemInput = {
     name: f.name.trim(),
     category: f.category,
+    // Slot only rides on gear; null clears it for everything else (backend #571).
+    slot: f.category === "gear" ? f.slot || null : null,
     rarity: f.rarity || undefined,
     requiresAttunement: magic && f.requiresAttunement,
     // Prereq only meaningful for an attunable magic item; a value-bearing kind
@@ -403,6 +411,11 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  // Changing category away from gear drops any authored slot (mirrors backend #571).
+  function setCategory(next: ItemCategory) {
+    setForm((f) => ({ ...f, category: next, slot: next === "gear" ? f.slot : "" }));
   }
 
   // Single "Value" field writes one denomination and clears the rest.
@@ -611,6 +624,13 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
   });
   const cost = currencyFromForm(form);
   const showRange = hasRange(form);
+  // Weapon/armor placement is derived from detail data — show it read-only so the
+  // DM sees where it lands without a picker. Reuses the backend-mirroring rule.
+  const equipsToSlots = allowedSlotsForItem({
+    category: form.category,
+    weapon: form.category === "weapon" ? { twoHanded: form.twoHanded } : undefined,
+    armor: form.category === "armor" ? { armorCategory: form.armorCategory as ArmorCategory } : undefined,
+  } as InventoryItem);
 
   return (
     <Card
@@ -668,7 +688,7 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
                   label="Category"
                   options={CATEGORY_OPTIONS}
                   value={form.category}
-                  onChange={(v) => set("category", v)}
+                  onChange={setCategory}
                 />
               </Field>
             </fieldset>
@@ -677,7 +697,30 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
               <legend className={legendCls}>Category details</legend>
 
               {form.category === "gear" && (
-                <p className="text-xs text-parchment-500">Gear has no extra mechanics.</p>
+                <Field
+                  label="Slot"
+                  htmlFor="item-slot"
+                  hint="Where this gear sits on the paper doll when worn."
+                >
+                  <Select
+                    id="item-slot"
+                    value={form.slot}
+                    onChange={(e) => set("slot", e.target.value as EquipSlot | "")}
+                  >
+                    <option value="">Carried (not worn)</option>
+                    {WORN_SLOTS.map((s) => (
+                      <option key={s} value={s}>
+                        {wornSlotItemKindLabel(s)}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
+
+              {(form.category === "weapon" || form.category === "armor") && (
+                <p className="text-xs text-parchment-500">
+                  Equips to: {equipsToSlots.map(equipSlotLabel).join(" / ")}
+                </p>
               )}
 
               {form.category === "weapon" && (
