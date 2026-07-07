@@ -36,7 +36,7 @@ import { useManeuverDie } from "@/features/session/useManeuverDie";
 import AttackRow from "@/features/session/AttackRow";
 import AttackOptionRow from "@/features/session/AttackOptionRow";
 import EquipWeaponPanel from "@/features/session/EquipWeaponPanel";
-import type { AttackEntry } from "@/lib/attackMath";
+import type { AttackEntry, DamageRider } from "@/lib/attackMath";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character, ManeuverEntry } from "@/types/character";
 import type { RollResult } from "@/lib/dice";
@@ -94,6 +94,9 @@ export default function InlineAttackPicker({
   // Per-weapon last roll results (keyed by item.id, "unarmed", or "improvised").
   const [lastAttackRolls, setLastAttackRolls] = useState<Record<string, RollResult | null>>({});
   const [lastDamageRolls, setLastDamageRolls] = useState<Record<string, RollResult | null>>({});
+
+  // Last rolled total per on-hit rider id (Flame Tongue +2d6), shown inline.
+  const [riderTotals, setRiderTotals] = useState<Record<string, number>>({});
 
   // Auto-summed override totals set by ManeuverPrompt after a die spend.
   // When non-null, displayed instead of the raw roll total.
@@ -164,6 +167,14 @@ export default function InlineAttackPicker({
     logRollSafe("damage", entry.logSource, result, entry.damageSpec, entry.damageType);
     setLastDamageRolls((prev) => ({ ...prev, [entry.id]: result }));
     setDamageTotals((prev) => ({ ...prev, [entry.id]: null }));
+  }
+
+  // Roll one on-hit dice rider (e.g. Flame Tongue +2d6 fire) as its own typed
+  // damage term through the shared dice engine + Session Log, carrying its type.
+  function handleDamageRider(rider: DamageRider) {
+    const result = roll(rider.spec, rider.rollLabel);
+    logRollSafe("damage", rider.logSource, result, rider.spec, rider.damageType);
+    setRiderTotals((prev) => ({ ...prev, [rider.id]: result.total }));
   }
 
   // Callback for ManeuverPrompt — stores auto-sum overrides per weapon.
@@ -239,8 +250,10 @@ export default function InlineAttackPicker({
           damageTotal={damageTotals[entry.id]}
           lastAttackRoll={lastAttackRolls[entry.id] ?? null}
           lastDamageRoll={lastDamageRolls[entry.id] ?? null}
+          riderTotals={riderTotals}
           onAttack={handleAttack}
           onDamage={handleDamage}
+          onDamageRider={handleDamageRider}
           onRollsUpdated={makeOnRollsUpdated(entry.id)}
           onUpdate={onUpdate}
         />
