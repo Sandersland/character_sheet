@@ -6,6 +6,12 @@ import InventoryList from "@/features/inventory/InventoryList";
 import { applyInventoryTransactions, updateCharacter } from "@/api/client";
 import type { Character, Currency, InventoryItem } from "@/types/character";
 
+// Consumable rows render a Use button that reads useRoll(); this suite doesn't
+// exercise rolling, so stub the roll context instead of wrapping every render.
+vi.mock("@/features/dice/RollContext", () => ({
+  useRoll: () => ({ rollAnimated: vi.fn() }),
+}));
+
 // InventoryList calls fetchItems() on mount to load the catalog; stub the
 // client so the component renders without a real network request.
 vi.mock("@/api/client", () => ({
@@ -22,6 +28,8 @@ function makeItem(overrides: Partial<InventoryItem> = {}): InventoryItem {
     quantity: 1,
     weight: 65,
     equipped: false,
+    attuned: false,
+    requiresAttunement: false,
     ...overrides,
   };
 }
@@ -180,6 +188,21 @@ describe("InventoryList empty state", () => {
     expect(screen.getAllByRole("button", { name: "+ Add item" })).toHaveLength(2);
     expect(screen.queryByRole("meter")).toBeNull();
     expect(screen.queryByRole("heading", { level: 4 })).toBeNull();
+  });
+
+  it("falls back to the empty state (not the doll) when the last item is removed on the Worn tab", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <InventoryList
+        character={makeCharacter(10, [makeItem({ id: "w1", name: "Longsword", category: "weapon" })])}
+        onUpdate={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole("radio", { name: "Worn" }));
+    // Remove the last item: parent re-renders with an empty inventory while `view` stays "worn".
+    rerender(<InventoryList character={makeCharacter(10, [])} onUpdate={vi.fn()} />);
+    expect(screen.getByText(/your pack is empty/i)).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "+ Add item" }).length).toBeGreaterThan(0);
   });
 });
 

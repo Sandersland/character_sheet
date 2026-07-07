@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { axe } from "@/test/axe";
 
 const logout = vi.fn();
@@ -16,9 +17,11 @@ import { ThemeProvider } from "@/features/theme/ThemeProvider";
 
 function renderMenu() {
   return render(
-    <ThemeProvider>
-      <AccountMenu />
-    </ThemeProvider>,
+    <MemoryRouter>
+      <ThemeProvider>
+        <AccountMenu />
+      </ThemeProvider>
+    </MemoryRouter>,
   );
 }
 

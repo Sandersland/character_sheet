@@ -10,6 +10,20 @@ import { makeTransactionsEndpoint } from "../../lib/transactions-endpoint.js";
 
 export const inventoryRouter = Router({ mergeParams: true });
 
+const equipSlotSchema = z.enum([
+  "MAIN_HAND",
+  "OFF_HAND",
+  "BODY",
+  "HEAD",
+  "NECK",
+  "CLOAK",
+  "HANDS",
+  "WRISTS",
+  "BELT",
+  "FEET",
+  "RING",
+]);
+
 const currencySchema = z.object({
   cp: z.number().int(),
   sp: z.number().int(),
@@ -86,6 +100,8 @@ const customItemSchema = z.discriminatedUnion("category", [
     weight: z.number().nonnegative().optional(),
     cost: currencySchema.optional(),
     description: z.string().optional(),
+    // Wearable gear declares its paper-doll slot (#565); omit for bag-only gear.
+    slot: equipSlotSchema.optional(),
   }),
 ]);
 
@@ -109,12 +125,19 @@ const adjustQuantityOpSchema = z.object({
   delta: z.number().int().refine((n) => n !== 0, { message: "delta must not be zero" }),
 });
 
+const useOpSchema = z.object({
+  type: z.literal("use"),
+  inventoryItemId: z.string().min(1),
+  // Raw effect-die values, client-rolled for the 3D animation. Omit to have the
+  // server roll. Length/range are validated against the consumable in lib/.
+  rolls: z.array(z.number().int().positive()).optional(),
+});
+
 const updateOpSchema = z.object({
   type: z.literal("update"),
   inventoryItemId: z.string().min(1),
   name: z.string().min(1).optional(),
   notes: z.string().nullable().optional(),
-  equipped: z.boolean().optional(),
   weight: z.number().nonnegative().optional(),
   cost: currencySchema.optional(),
   description: z.string().optional(),
@@ -135,19 +158,51 @@ const sellOpSchema = z.object({
   currencyDelta: currencySchema,
 });
 
+const equipOpSchema = z.object({
+  type: z.literal("equip"),
+  inventoryItemId: z.string().min(1),
+  slot: equipSlotSchema,
+});
+
 const setEquippedOpSchema = z.object({
   type: z.literal("setEquipped"),
   inventoryItemId: z.string().min(1),
   equipped: z.boolean(),
 });
 
+const attuneOpSchema = z.object({
+  type: z.literal("attune"),
+  inventoryItemId: z.string().min(1),
+});
+
+const unattuneOpSchema = z.object({
+  type: z.literal("unattune"),
+  inventoryItemId: z.string().min(1),
+});
+
+const activateOpSchema = z.object({
+  type: z.literal("activate"),
+  inventoryItemId: z.string().min(1),
+});
+
+const deactivateOpSchema = z.object({
+  type: z.literal("deactivate"),
+  inventoryItemId: z.string().min(1),
+});
+
 const operationSchema = z.discriminatedUnion("type", [
   acquireOpSchema,
   adjustQuantityOpSchema,
+  useOpSchema,
   updateOpSchema,
   removeOpSchema,
   sellOpSchema,
+  equipOpSchema,
   setEquippedOpSchema,
+  attuneOpSchema,
+  unattuneOpSchema,
+  activateOpSchema,
+  deactivateOpSchema,
 ]);
 
 const transactionsRequestSchema = z.object({
@@ -159,4 +214,7 @@ makeTransactionsEndpoint({
   schema: transactionsRequestSchema,
   apply: (characterId, data) => applyInventoryOperations(characterId, data.operations),
   domainErrors: [InsufficientCurrencyError, InvalidInventoryOperationError],
+  // Surface per-use roll outcomes so the client can play the 3D dice + toast.
+  respond: (character, useResults) =>
+    useResults.length > 0 ? { ...character, useResults } : character,
 });

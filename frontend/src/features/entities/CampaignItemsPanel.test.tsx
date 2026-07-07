@@ -185,7 +185,7 @@ describe("CampaignItemsPanel edit (#505)", () => {
   });
 });
 
-describe("CampaignItemsPanel field parity (#527)", () => {
+describe("CampaignItemsPanel field parity (#527/#542)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockEntities = [];
@@ -198,16 +198,19 @@ describe("CampaignItemsPanel field parity (#527)", () => {
     await userEvent.click(screen.getByRole("button", { name: "New item" }));
 
     await userEvent.type(screen.getByLabelText("Name *"), "Spear");
-    await userEvent.clear(screen.getByLabelText("Damage bonus"));
-    await userEvent.type(screen.getByLabelText("Damage bonus"), "1");
-    await userEvent.type(screen.getByLabelText("Versatile count"), "1");
-    await userEvent.type(screen.getByLabelText("Versatile faces"), "8");
+    await userEvent.clear(screen.getByLabelText("Damage modifier"));
+    await userEvent.type(screen.getByLabelText("Damage modifier"), "1");
+    await userEvent.click(screen.getByRole("radio", { name: "Martial" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Melee" }));
+    // Versatile die is revealed only after toggling versatile on (defaults 1d10).
+    await userEvent.click(screen.getByRole("button", { name: "versatile" }));
+    await userEvent.clear(screen.getByLabelText("Versatile damage dice faces"));
+    await userEvent.type(screen.getByLabelText("Versatile damage dice faces"), "8");
+    // Range is revealed only after thrown (or ranged) is set.
+    await userEvent.click(screen.getByRole("button", { name: "thrown" }));
+    await userEvent.click(screen.getByRole("button", { name: "reach" }));
     await userEvent.type(screen.getByLabelText("Range (normal)"), "20");
     await userEvent.type(screen.getByLabelText("Range (long)"), "60");
-    await userEvent.selectOptions(screen.getByLabelText("Weapon class"), "martial");
-    await userEvent.selectOptions(screen.getByLabelText("Weapon range"), "melee");
-    await userEvent.click(screen.getByRole("checkbox", { name: "thrown" }));
-    await userEvent.click(screen.getByRole("checkbox", { name: "reach" }));
 
     await userEvent.click(screen.getByRole("button", { name: "Create item" }));
 
@@ -232,17 +235,69 @@ describe("CampaignItemsPanel field parity (#527)", () => {
     );
   });
 
+  it("drops the versatile die when versatile is toggled off", async () => {
+    vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "new-1b", name: "Club" });
+    renderPanel();
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
+
+    await userEvent.type(screen.getByLabelText("Name *"), "Club");
+    await userEvent.click(screen.getByRole("button", { name: "versatile" }));
+    expect(screen.getByLabelText("Versatile damage dice faces")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "versatile" }));
+    expect(screen.queryByLabelText("Versatile damage dice faces")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Create item" }));
+
+    await waitFor(() => expect(createCampaignItem).toHaveBeenCalled());
+    const sent = vi.mocked(createCampaignItem).mock.calls[0][1];
+    expect(sent.weapon?.versatileDiceCount).toBeUndefined();
+    expect(sent.weapon?.versatileDiceFaces).toBeUndefined();
+  });
+
+  it("drops range when a thrown weapon is switched back to melee", async () => {
+    vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "new-1c", name: "Handaxe" });
+    renderPanel();
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
+
+    await userEvent.type(screen.getByLabelText("Name *"), "Handaxe");
+    await userEvent.click(screen.getByRole("button", { name: "thrown" }));
+    await userEvent.type(screen.getByLabelText("Range (normal)"), "20");
+    await userEvent.type(screen.getByLabelText("Range (long)"), "60");
+    // Turn thrown back off — range disappears and must not be persisted.
+    await userEvent.click(screen.getByRole("button", { name: "thrown" }));
+    expect(screen.queryByLabelText("Range (normal)")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Create item" }));
+
+    await waitFor(() => expect(createCampaignItem).toHaveBeenCalled());
+    const sent = vi.mocked(createCampaignItem).mock.calls[0][1];
+    expect(sent.weapon?.rangeNormal).toBeUndefined();
+    expect(sent.weapon?.rangeLong).toBeUndefined();
+  });
+
+  it("shows an existing non-gp cost in the single Value field on edit", async () => {
+    vi.mocked(fetchCampaignItems).mockResolvedValue([
+      { ...baseItem, cost: { cp: 0, sp: 50, gp: 0, pp: 0 } },
+    ]);
+    renderPanel();
+    await screen.findByText("Flametongue");
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect((screen.getByLabelText("Value") as HTMLInputElement).value).toBe("50");
+    expect((screen.getByLabelText("Value unit") as HTMLSelectElement).value).toBe("sp");
+  });
+
   it("sends the full armor field set on create", async () => {
     vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "new-2", name: "Half Plate", category: "armor" });
     renderPanel();
     await userEvent.click(screen.getByRole("button", { name: "New item" }));
 
     await userEvent.type(screen.getByLabelText("Name *"), "Half Plate");
-    await userEvent.selectOptions(screen.getByLabelText("Category"), "armor");
+    await userEvent.click(screen.getByRole("radio", { name: "Armor" }));
     await userEvent.type(screen.getByLabelText("Base AC"), "15");
     await userEvent.type(screen.getByLabelText("Max Dex bonus"), "2");
     await userEvent.type(screen.getByLabelText("Strength requirement"), "13");
-    await userEvent.click(screen.getByLabelText("Dex applies"));
+    await userEvent.click(screen.getByRole("button", { name: "Dex applies" }));
 
     await userEvent.click(screen.getByRole("button", { name: "Create item" }));
 
@@ -261,12 +316,13 @@ describe("CampaignItemsPanel field parity (#527)", () => {
     );
   });
 
-  it("sends the full currency cost, not gp-only", async () => {
+  it("sends the full currency cost via the coin-breakdown disclosure", async () => {
     vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "new-3", name: "Trinket" });
     renderPanel();
     await userEvent.click(screen.getByRole("button", { name: "New item" }));
 
     await userEvent.type(screen.getByLabelText("Name *"), "Trinket");
+    await userEvent.click(screen.getByRole("button", { name: "Coin breakdown" }));
     await userEvent.type(screen.getByLabelText("Value (cp)"), "5");
     await userEvent.type(screen.getByLabelText("Value (sp)"), "3");
     await userEvent.type(screen.getByLabelText("Value (gp)"), "2");
@@ -278,6 +334,24 @@ describe("CampaignItemsPanel field parity (#527)", () => {
       expect(createCampaignItem).toHaveBeenCalledWith(
         "camp-1",
         expect.objectContaining({ cost: { cp: 5, sp: 3, gp: 2, pp: 1 } }),
+      ),
+    );
+  });
+
+  it("persists the single Value field into one denomination", async () => {
+    vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "new-3b", name: "Gem" });
+    renderPanel();
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
+
+    await userEvent.type(screen.getByLabelText("Name *"), "Gem");
+    await userEvent.type(screen.getByLabelText("Value"), "200");
+
+    await userEvent.click(screen.getByRole("button", { name: "Create item" }));
+
+    await waitFor(() =>
+      expect(createCampaignItem).toHaveBeenCalledWith(
+        "camp-1",
+        expect.objectContaining({ cost: { cp: 0, sp: 0, gp: 200, pp: 0 } }),
       ),
     );
   });
@@ -295,7 +369,7 @@ describe("CampaignItemsPanel field parity (#527)", () => {
     expect(sent.cost).toBeUndefined();
   });
 
-  it("pre-fills the new weapon fields when editing an existing item", async () => {
+  it("pre-fills the weapon fields when editing an existing item", async () => {
     vi.mocked(fetchCampaignItems).mockResolvedValue([
       {
         ...baseItem,
@@ -324,15 +398,15 @@ describe("CampaignItemsPanel field parity (#527)", () => {
     await screen.findByText("Flametongue");
     await userEvent.click(screen.getByRole("button", { name: "Edit" }));
 
-    expect((screen.getByLabelText("Damage bonus") as HTMLInputElement).value).toBe("2");
-    expect((screen.getByLabelText("Versatile faces") as HTMLInputElement).value).toBe("8");
+    expect((screen.getByLabelText("Damage modifier") as HTMLInputElement).value).toBe("2");
+    expect((screen.getByLabelText("Versatile damage dice faces") as HTMLInputElement).value).toBe("8");
     expect((screen.getByLabelText("Range (normal)") as HTMLInputElement).value).toBe("20");
-    expect((screen.getByLabelText("Weapon class") as HTMLSelectElement).value).toBe("martial");
-    expect((screen.getByRole("checkbox", { name: "finesse" }) as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByRole("checkbox", { name: "thrown" }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole("radio", { name: "Martial" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("button", { name: "finesse" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "thrown" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("pre-fills the new armor fields when editing an existing item", async () => {
+  it("pre-fills the armor fields when editing an existing item", async () => {
     vi.mocked(fetchCampaignItems).mockResolvedValue([
       {
         ...baseItem,
@@ -354,11 +428,33 @@ describe("CampaignItemsPanel field parity (#527)", () => {
 
     expect((screen.getByLabelText("Max Dex bonus") as HTMLInputElement).value).toBe("2");
     expect((screen.getByLabelText("Strength requirement") as HTMLInputElement).value).toBe("13");
-    expect((screen.getByLabelText("Dex applies") as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByRole("button", { name: "Dex applies" })).toHaveAttribute("aria-pressed", "false");
   });
 });
 
-describe("CampaignItemsPanel rarity (#497)", () => {
+describe("CampaignItemsPanel progressive disclosure (#542)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockEntities = [];
+    vi.mocked(fetchCampaignItems).mockResolvedValue([]);
+  });
+
+  it("hides versatile die and range on a default melee weapon, then reveals them", async () => {
+    renderPanel();
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
+
+    expect(screen.queryByLabelText("Versatile damage dice faces")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Range (normal)")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "versatile" }));
+    expect(screen.getByLabelText("Versatile damage dice faces")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "thrown" }));
+    expect(screen.getByLabelText("Range (normal)")).toBeInTheDocument();
+  });
+});
+
+describe("CampaignItemsPanel rarity (#497/#542)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockEntities = [];
@@ -381,10 +477,47 @@ describe("CampaignItemsPanel rarity (#497)", () => {
     expect(rarity.tagName).toBe("SELECT");
     // Mundane empty option + the six tiers.
     expect(rarity.querySelectorAll("option")).toHaveLength(7);
-    expect(screen.queryByText("Standard value:")).not.toBeInTheDocument();
+    expect(screen.queryByText("Standard value: 4,000 gp")).not.toBeInTheDocument();
 
     await userEvent.selectOptions(rarity, "RARE");
     expect(screen.getByText("Standard value: 4,000 gp")).toBeInTheDocument();
+  });
+
+  it("hides attunement/unique and the value hint when rarity is Mundane", async () => {
+    renderPanel();
+    await screen.findByText("Flametongue");
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
+
+    await userEvent.selectOptions(screen.getByLabelText("Rarity"), "RARE");
+    expect(screen.getByRole("button", { name: "Requires attunement" })).toBeInTheDocument();
+    expect(screen.getByText("Standard value: 4,000 gp")).toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByLabelText("Rarity"), "");
+    expect(screen.queryByRole("button", { name: "Requires attunement" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Standard value: 4,000 gp")).not.toBeInTheDocument();
+  });
+
+  it("clears attunement/unique when rarity is switched back to Mundane", async () => {
+    vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "new-5", name: "Plain Ring" });
+    renderPanel();
+    await screen.findByText("Flametongue");
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
+
+    await userEvent.type(screen.getByLabelText("Name *"), "Plain Ring");
+    await userEvent.selectOptions(screen.getByLabelText("Rarity"), "RARE");
+    await userEvent.click(screen.getByRole("button", { name: "Requires attunement" }));
+    await userEvent.click(screen.getByRole("button", { name: "Unique" }));
+    // Demote to mundane — the flags are hidden and must not persist.
+    await userEvent.selectOptions(screen.getByLabelText("Rarity"), "");
+
+    await userEvent.click(screen.getByRole("button", { name: "Create item" }));
+
+    await waitFor(() =>
+      expect(createCampaignItem).toHaveBeenCalledWith(
+        "camp-1",
+        expect.objectContaining({ requiresAttunement: false, isUnique: false }),
+      ),
+    );
   });
 
   it("halves the value hint for a consumable and sends the enum on create", async () => {
@@ -393,7 +526,7 @@ describe("CampaignItemsPanel rarity (#497)", () => {
     await screen.findByText("Flametongue");
     await userEvent.click(screen.getByRole("button", { name: "New item" }));
 
-    await userEvent.selectOptions(screen.getByLabelText("Category"), "consumable");
+    await userEvent.click(screen.getByRole("radio", { name: "Consumables" }));
     await userEvent.selectOptions(screen.getByLabelText("Rarity"), "RARE");
     expect(screen.getByText("Standard value: 2,000 gp")).toBeInTheDocument();
 
@@ -406,5 +539,99 @@ describe("CampaignItemsPanel rarity (#497)", () => {
         expect.objectContaining({ rarity: "RARE" }),
       ),
     );
+  });
+});
+
+describe("CampaignItemsPanel slot authoring (#572)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockEntities = [];
+    vi.mocked(fetchCampaignItems).mockResolvedValue([]);
+  });
+
+  // DM-1: a gear item saves its chosen slot.
+  it("saves the chosen worn slot on a gear item", async () => {
+    vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "g-1", name: "Ring of X", category: "gear" });
+    renderPanel();
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
+
+    await userEvent.type(screen.getByLabelText("Name *"), "Ring of X");
+    await userEvent.click(screen.getByRole("radio", { name: "Gear" }));
+    await userEvent.selectOptions(screen.getByLabelText("Slot"), "RING");
+
+    await userEvent.click(screen.getByRole("button", { name: "Create item" }));
+
+    await waitFor(() =>
+      expect(createCampaignItem).toHaveBeenCalledWith(
+        "camp-1",
+        expect.objectContaining({ category: "gear", slot: "RING" }),
+      ),
+    );
+  });
+
+  // DM-2: leaving the default "Carried (not worn)" saves a null slot.
+  it("sends a null slot when gear stays carried", async () => {
+    vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "g-2", name: "Rope", category: "gear" });
+    renderPanel();
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
+
+    await userEvent.type(screen.getByLabelText("Name *"), "Rope");
+    await userEvent.click(screen.getByRole("radio", { name: "Gear" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Create item" }));
+
+    await waitFor(() => expect(createCampaignItem).toHaveBeenCalled());
+    expect(vi.mocked(createCampaignItem).mock.calls[0][1].slot).toBeNull();
+  });
+
+  // DM-1 (re-open): editing a slotted gear item pre-selects its slot.
+  it("pre-selects the stored slot when editing a gear item", async () => {
+    vi.mocked(fetchCampaignItems).mockResolvedValue([
+      { ...baseItem, name: "Amulet", category: "gear", slot: "NECK" },
+    ]);
+    renderPanel();
+    await screen.findByText("Amulet");
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect((screen.getByLabelText("Slot") as HTMLSelectElement).value).toBe("NECK");
+  });
+
+  // DM-3: no Slot picker for weapon/armor/consumable; weapon/armor show Equips to.
+  it("shows no Slot picker for weapon/armor/consumable and a read-only Equips-to for weapon/armor", async () => {
+    renderPanel();
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
+
+    // Default category is weapon: no picker, read-only placement instead.
+    expect(screen.queryByLabelText("Slot")).not.toBeInTheDocument();
+    expect(screen.getByText(/Equips to:/)).toHaveTextContent("Main hand / Off hand");
+
+    await userEvent.click(screen.getByRole("radio", { name: "Armor" }));
+    expect(screen.queryByLabelText("Slot")).not.toBeInTheDocument();
+    expect(screen.getByText(/Equips to:/)).toHaveTextContent("Body");
+
+    await userEvent.click(screen.getByRole("radio", { name: "Consumables" }));
+    expect(screen.queryByLabelText("Slot")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Equips to:/)).not.toBeInTheDocument();
+
+    // Gear reveals the picker and drops the read-only line.
+    await userEvent.click(screen.getByRole("radio", { name: "Gear" }));
+    expect(screen.getByLabelText("Slot")).toBeInTheDocument();
+    expect(screen.queryByText(/Equips to:/)).not.toBeInTheDocument();
+  });
+
+  // DM-4: switching category away from gear clears the selected slot in the form.
+  it("clears a selected slot when category switches away from gear", async () => {
+    vi.mocked(createCampaignItem).mockResolvedValue({ ...baseItem, id: "g-3", name: "Belt", category: "gear" });
+    renderPanel();
+    await userEvent.click(screen.getByRole("button", { name: "New item" }));
+
+    await userEvent.click(screen.getByRole("radio", { name: "Gear" }));
+    await userEvent.selectOptions(screen.getByLabelText("Slot"), "BELT");
+    expect((screen.getByLabelText("Slot") as HTMLSelectElement).value).toBe("BELT");
+
+    // Leave gear, then return: the previously-chosen slot must be gone.
+    await userEvent.click(screen.getByRole("radio", { name: "Weapons" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Gear" }));
+    expect((screen.getByLabelText("Slot") as HTMLSelectElement).value).toBe("");
   });
 });

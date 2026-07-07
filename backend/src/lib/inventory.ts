@@ -1,10 +1,29 @@
 import { randomUUID } from "node:crypto";
 
-import { Prisma } from "../generated/prisma/client.js";
+import { Prisma, type EquipSlot, type ItemRarity } from "../generated/prisma/client.js";
+import {
+  activatedMaxUses,
+  activatedRechargeRest,
+  type AttunementPrereqKind,
+  describeAttunementPrereq,
+  meetsAttunementPrereq,
+  readCapability,
+  type ActivatedEffectCapability,
+} from "./capabilities.js";
+import {
+  appendActiveBuffInTx,
+  clearBuffByKeyInTx,
+  normalizeActiveEffectsMutable,
+} from "./active-effects.js";
+import { rollDie } from "./dice.js";
 import { logEvent } from "./events.js";
-import { isEquippable } from "./items.js";
+import { applyHealInTx } from "./hitpoints.js";
 import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
+
+// 5e: a character can attune to at most 3 magic items (DMG p. 138). Derived
+// (counted from live rows), never persisted.
+export const ATTUNEMENT_LIMIT = 3;
 
 // Same {cp,sp,gp,pp} shape as Character.currency and Item/InventoryItem.cost.
 // The index signature is just to satisfy Prisma's InputJsonObject structural
@@ -20,6 +39,11 @@ export interface Currency {
 
 export class InsufficientCurrencyError extends Error {}
 export class InvalidInventoryOperationError extends Error {}
+// Attunement cap breach — carries an explicit 409 (conflict) so the transactions
+// endpoint surfaces it distinctly from a plain 400 validation error.
+export class AttunementLimitError extends InvalidInventoryOperationError {
+  status = 409;
+}
 
 function applyCurrencyDelta(current: Currency, delta: Currency, sign: 1 | -1): Currency {
   const next: Currency = {
@@ -102,6 +126,15 @@ export interface ConsumableDetailInput {
   effectDiceFaces?: number;
   effectModifier?: number;
   effectDescription?: string;
+  maxUses?: number;
+  usesRemaining?: number;
+}
+
+// A consumable auto-applies its effect only when it heals (#121). Non-heal
+// effects are rolled + recorded but never applied server-side.
+export function isHealingConsumable(effectDescription: string | null | undefined): boolean {
+  if (!effectDescription) return false;
+  return /hit point|\bheal/i.test(effectDescription);
 }
 
 export interface CustomItemInput {
@@ -110,6 +143,8 @@ export interface CustomItemInput {
   weight?: number;
   cost?: Currency;
   description?: string;
+  // Paper-doll slot for wearable custom gear (#565); null/omitted = bag-only.
+  slot?: EquipSlot;
   weapon?: WeaponDetailInput;
   armor?: ArmorDetailInput;
   consumable?: ConsumableDetailInput;
@@ -140,13 +175,13 @@ export interface AdjustQuantityOperation {
 
 // Cosmetic edit — never logged. weapon/armor/consumable overrides are
 // partial (only provided fields change); this is the "Club +1" path,
-// e.g. bumping just `weapon.damageModifier`.
+// e.g. bumping just `weapon.damageModifier`. Placement is NOT edited here —
+// equip/unequip go through the `equip`/`setEquipped` ops so they're logged.
 export interface UpdateOperation {
   type: "update";
   inventoryItemId: string;
   name?: string;
   notes?: string | null;
-  equipped?: boolean;
   weight?: number;
   cost?: Currency;
   description?: string;
@@ -171,12 +206,62 @@ export interface SellOperation {
   currencyDelta: Currency;
 }
 
-// Equips or unequips a single item. Unlike `update`, this IS logged so
-// it appears on the activity timeline and is undoable.
+// Equips a single item into an explicit paper-doll slot (#565). Logged +
+// undoable. Validates slot-compatibility, capacity (RING 2, else 1), and the
+// two-handed off-hand lock. Rejects a full slot (no silent displacement).
+export interface EquipOperation {
+  type: "equip";
+  inventoryItemId: string;
+  slot: EquipSlot;
+}
+
+// Equips (auto-picking the first free compatible slot) or unequips a single
+// item. Unlike `update`, this IS logged so it appears on the activity timeline
+// and is undoable. The slot-less companion to `equip` — unequip clears
+// equippedSlot; equip=true delegates to the same placement rules as `equip`.
 export interface SetEquippedOperation {
   type: "setEquipped";
   inventoryItemId: string;
   equipped: boolean;
+}
+
+// Attunes an item (#545). Logged + undoable. Enforces the derived 3-item cap
+// (409 on the 4th) and the snapshotted attunement prerequisite.
+export interface AttuneOperation {
+  type: "attune";
+  inventoryItemId: string;
+}
+
+// Ends attunement. Logged + undoable; always legal so a stuck row can clear.
+export interface UnattuneOperation {
+  type: "unattune";
+  inventoryItemId: string;
+}
+
+// Activates an item's activatedEffect capability (#543): spends a use and seeds
+// the while-active/until-rest self-buff. Logged + undoable.
+export interface ActivateOperation {
+  type: "activate";
+  inventoryItemId: string;
+}
+
+// Toggles off an active item effect (#543): clears the seeded buff. The spent use
+// is NOT restored (it recharges on the matching rest). Logged + undoable.
+export interface DeactivateOperation {
+  type: "deactivate";
+  inventoryItemId: string;
+}
+
+// Consumes one use of a consumable (#121). Stackable (maxUses null) decrements
+// quantity; charged (maxUses set) decrements usesRemaining. Rolls the effect
+// dice (client-supplied for the 3D animation, else server-rolled) and
+// auto-applies ONLY healing through the HP domain. Logged + LIFO-undoable.
+export interface UseOperation {
+  type: "use";
+  inventoryItemId: string;
+  // Raw effect-die values. When present, length must equal effectDiceCount and
+  // each be in 1..effectDiceFaces; when absent the server rolls.
+  rolls?: number[];
 }
 
 export type InventoryOperation =
@@ -185,7 +270,45 @@ export type InventoryOperation =
   | UpdateOperation
   | RemoveOperation
   | SellOperation
-  | SetEquippedOperation;
+  | EquipOperation
+  | SetEquippedOperation
+  | AttuneOperation
+  | UnattuneOperation
+  | ActivateOperation
+  | DeactivateOperation
+  | UseOperation;
+
+// The while-active buff key an item's activatedEffect seeds. One buff per item.
+export function itemBuffKey(inventoryItemId: string): string {
+  return `item:${inventoryItemId}`;
+}
+
+// The (first) activatedEffect capability on a live inventory row, or null.
+function activatedCapabilityOf(item: InventoryItemWithDetails): ActivatedEffectCapability | null {
+  for (const col of item.capabilities) {
+    const cap = readCapability(col);
+    // Type-predicate guard (not a bare kind check): an opaque row with
+    // kind="activatedEffect" but no activation must not be returned as a
+    // malformed ActivatedEffectCapability — applyActivate would seed a buff
+    // with target/modifier undefined.
+    if (cap.kind === "activatedEffect" && "activation" in cap) return cap;
+  }
+  return null;
+}
+
+// Per-use outcome surfaced to the client so it can play the 3D dice animation
+// and toast the result. `applied` is "heal" only when the effect auto-applied.
+export interface UseResult {
+  inventoryItemId: string;
+  itemName: string;
+  effectDescription: string | null;
+  rolls: number[];
+  effectModifier: number;
+  total: number | null;
+  applied: "heal" | null;
+  usesRemaining: number | null;
+  quantity: number | null;
+}
 
 async function getCharacterCurrency(tx: Prisma.TransactionClient, characterId: string): Promise<Currency> {
   const character = await tx.character.findUnique({ where: { id: characterId }, select: { currency: true } });
@@ -203,6 +326,7 @@ export const inventoryItemDetailInclude = {
   weaponDetail: true,
   armorDetail: true,
   consumableDetail: true,
+  capabilities: true,
 } satisfies Prisma.InventoryItemInclude;
 
 export type InventoryItemWithDetails = Prisma.InventoryItemGetPayload<{ include: typeof inventoryItemDetailInclude }>;
@@ -281,11 +405,15 @@ function normalizeArmorDetail(input: ArmorDetailInput) {
 }
 
 function normalizeConsumableDetail(input: ConsumableDetailInput) {
+  const maxUses = input.maxUses ?? null;
   return {
     effectDiceCount: input.effectDiceCount ?? null,
     effectDiceFaces: input.effectDiceFaces ?? null,
     effectModifier: input.effectModifier ?? null,
     effectDescription: input.effectDescription ?? null,
+    maxUses,
+    // A fresh charged consumable starts full: default usesRemaining to maxUses.
+    usesRemaining: input.usesRemaining ?? maxUses,
   };
 }
 
@@ -337,10 +465,126 @@ function snapshotItemDetail(item: CatalogItemWithDetails) {
             effectDiceFaces: item.consumableDetail.effectDiceFaces,
             effectModifier: item.consumableDetail.effectModifier,
             effectDescription: item.consumableDetail.effectDescription,
+            maxUses: item.consumableDetail.maxUses,
+            // A freshly-snapshotted charged consumable starts full.
+            usesRemaining: item.consumableDetail.usesRemaining ?? item.consumableDetail.maxUses,
           },
         }
       : undefined,
   };
+}
+
+// ── Paper-doll placement (#565) ──────────────────────────────────────────────
+//
+// equippedSlot is the single source of truth for "is this equipped" — the wire
+// `equipped` field derives from (equippedSlot != null). RING holds 2 items;
+// every other slot holds 1. A two-handed weapon sits in MAIN_HAND and LOCKS
+// OFF_HAND (never a second row). Full slots are rejected, not silently displaced.
+
+const RING_SLOT_CAPACITY = 2;
+
+function slotCapacity(slot: EquipSlot): number {
+  return slot === "RING" ? RING_SLOT_CAPACITY : 1;
+}
+
+// Human-readable slot name for event summaries / error messages.
+function slotLabel(slot: EquipSlot): string {
+  return slot.toLowerCase().replace(/_/g, " ");
+}
+
+// Minimal shape the placement rules read — a subset of InventoryItemWithDetails.
+interface PlaceableItem {
+  category: ItemCategoryName;
+  slot: EquipSlot | null;
+  weaponDetail: { twoHanded: boolean } | null;
+  armorDetail: { armorCategory: ArmorCategoryName } | null;
+}
+
+function isTwoHandedWeapon(item: PlaceableItem): boolean {
+  return item.category === "weapon" && Boolean(item.weaponDetail?.twoHanded);
+}
+
+// The slots an item may legally occupy. Weapons/body armor derive from detail
+// data; gear declares its slot (null = bag-only). Empty = not equippable.
+export function allowedSlotsForItem(item: PlaceableItem): EquipSlot[] {
+  if (item.category === "weapon") {
+    return isTwoHandedWeapon(item) ? ["MAIN_HAND"] : ["MAIN_HAND", "OFF_HAND"];
+  }
+  if (item.category === "armor") {
+    return item.armorDetail?.armorCategory === "shield" ? ["OFF_HAND"] : ["BODY"];
+  }
+  if (item.category === "gear") {
+    return item.slot ? [item.slot] : [];
+  }
+  return [];
+}
+
+// Other currently-equipped rows, with just the two-handed flag needed for the
+// off-hand lock. Excludes the item being (re)placed so a re-slot never self-collides.
+type EquippedRow = { equippedSlot: EquipSlot | null; weaponDetail: { twoHanded: boolean } | null };
+
+async function fetchEquippedRows(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  excludeId: string,
+): Promise<EquippedRow[]> {
+  return tx.inventoryItem.findMany({
+    where: { characterId, equippedSlot: { not: null }, id: { not: excludeId } },
+    select: { equippedSlot: true, weaponDetail: { select: { twoHanded: true } } },
+  });
+}
+
+// Returns a clear error string if `item` may NOT occupy `slot` given the other
+// equipped rows, or null when the placement is legal.
+function placementError(rows: EquippedRow[], item: PlaceableItem, slot: EquipSlot): string | null {
+  const allowed = allowedSlotsForItem(item);
+  if (allowed.length === 0) return `${item.category} items cannot be equipped`;
+  if (!allowed.includes(slot)) return `This item cannot be equipped in the ${slotLabel(slot)} slot`;
+
+  const mainHandTwoHanded = rows.some((r) => r.equippedSlot === "MAIN_HAND" && r.weaponDetail?.twoHanded);
+  const offHandOccupied = rows.some((r) => r.equippedSlot === "OFF_HAND");
+  if (slot === "OFF_HAND" && mainHandTwoHanded) {
+    return "The off-hand is locked by a two-handed weapon — unequip it first";
+  }
+  if (isTwoHandedWeapon(item) && offHandOccupied) {
+    return "A two-handed weapon needs a free off-hand — unequip your off-hand first";
+  }
+
+  const occupants = rows.filter((r) => r.equippedSlot === slot).length;
+  if (occupants >= slotCapacity(slot)) return `The ${slotLabel(slot)} slot is full`;
+  return null;
+}
+
+// First allowed slot with a legal placement, or null when none is available.
+function firstFreeSlot(rows: EquippedRow[], item: PlaceableItem): EquipSlot | null {
+  for (const slot of allowedSlotsForItem(item)) {
+    if (placementError(rows, item, slot) === null) return slot;
+  }
+  return null;
+}
+
+// Places an item into a validated slot + logs the undoable `equipped` event.
+async function equipIntoSlot(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  item: InventoryItemWithDetails,
+  slot: EquipSlot,
+  batchId: string,
+  sessionId: string | null,
+) {
+  await tx.inventoryItem.update({ where: { id: item.id }, data: { equippedSlot: slot } });
+  await logEvent(tx, {
+    characterId,
+    category: "inventory",
+    type: "equipped",
+    summary: `Equipped ${item.name} (${slotLabel(slot)})`,
+    entityType: "InventoryItem",
+    entityId: item.id,
+    before: { equippedSlot: item.equippedSlot },
+    after: { equippedSlot: slot },
+    batchId,
+    sessionId,
+  });
 }
 
 // ── Undo snapshot ────────────────────────────────────────────────────────────
@@ -363,12 +607,19 @@ export interface DeletedInventoryItemSnapshot {
   cost: Currency | null;
   description: string | null;
   quantity: number;
-  equipped: boolean;
+  equippedSlot: EquipSlot | null;
+  slot: EquipSlot | null;
+  rarity: ItemRarity | null;
+  attuned: boolean;
+  requiresAttunement: boolean;
+  attunementPrereqKind: AttunementPrereqKind | null;
+  attunementPrereqValue: string | null;
   notes: string | null;
   position: number;
   weaponDetail: Prisma.InventoryWeaponDetailCreateWithoutInventoryItemInput | null;
   armorDetail: Prisma.InventoryArmorDetailCreateWithoutInventoryItemInput | null;
   consumableDetail: Prisma.InventoryConsumableDetailCreateWithoutInventoryItemInput | null;
+  capabilities: Prisma.InventoryCapabilityCreateWithoutInventoryItemInput[];
 }
 
 // Serializes an already-fetched InventoryItemWithDetails into the
@@ -386,9 +637,33 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
     cost: asCurrency(item.cost),
     description: item.description,
     quantity: item.quantity,
-    equipped: item.equipped,
+    equippedSlot: item.equippedSlot,
+    slot: item.slot,
+    rarity: item.rarity,
+    attuned: item.attuned,
+    requiresAttunement: item.requiresAttunement,
+    attunementPrereqKind: item.attunementPrereqKind,
+    attunementPrereqValue: item.attunementPrereqValue,
     notes: item.notes,
     position: item.position,
+    capabilities: item.capabilities.map((c) => ({
+      kind: c.kind,
+      description: c.description,
+      target: c.target,
+      op: c.op,
+      value: c.value,
+      targetKey: c.targetKey,
+      condition: c.condition,
+      valueDiceCount: c.valueDiceCount,
+      valueDiceFaces: c.valueDiceFaces,
+      valueDamageType: c.valueDamageType,
+      activation: c.activation,
+      activatedDuration: c.activatedDuration,
+      resourceKind: c.resourceKind,
+      resourcePeriod: c.resourcePeriod,
+      resourceCharges: c.resourceCharges,
+      durationText: c.durationText,
+    })),
     weaponDetail: item.weaponDetail
       ? {
           damageDiceCount: item.weaponDetail.damageDiceCount,
@@ -426,6 +701,8 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
           effectDiceFaces: item.consumableDetail.effectDiceFaces,
           effectModifier: item.consumableDetail.effectModifier,
           effectDescription: item.consumableDetail.effectDescription,
+          maxUses: item.consumableDetail.maxUses,
+          usesRemaining: item.consumableDetail.usesRemaining,
         }
       : null,
   };
@@ -449,7 +726,9 @@ export function buildInventoryCreateFromCatalog(
     cost: toJsonInput(asCurrency(item.cost)),
     description: item.description ?? undefined,
     quantity: opts.quantity,
-    equipped: false,
+    // Placement is assigned by the auto-equip pass (autoEquipSlot); null = in the bag.
+    equippedSlot: null as EquipSlot | null,
+    slot: item.slot,
     position: opts.position,
     ...snapshotItemDetail(item),
   };
@@ -517,6 +796,15 @@ export function selectAutoEquip(items: AutoEquipCandidate[]): number[] {
   return selected;
 }
 
+// The paper-doll slot an auto-equipped starting-gear candidate occupies (#565).
+// selectAutoEquip only ever picks one weapon (MAIN_HAND), one shield (OFF_HAND),
+// and one body armor (BODY), so this mapping is unambiguous.
+export function autoEquipSlot(item: AutoEquipCandidate): EquipSlot {
+  if (item.category === "weapon") return "MAIN_HAND";
+  if (item.armorDetail?.create.armorCategory === "shield") return "OFF_HAND";
+  return "BODY";
+}
+
 /** Formats a currency delta as "+7 gp" / "−5 gp 2 sp" for event summaries. */
 function formatCurrencyForSummary(delta: Currency | null | undefined): string | null {
   if (!delta) return null;
@@ -546,6 +834,7 @@ async function applyAcquire(
   let weight: number | undefined;
   let cost: Currency | undefined;
   let description: string | undefined;
+  let slot: EquipSlot | null = null;
   let detail: ReturnType<typeof snapshotItemDetail>;
 
   if (op.itemId) {
@@ -562,6 +851,7 @@ async function applyAcquire(
     weight = catalogItem.weight ?? undefined;
     cost = asCurrency(catalogItem.cost) ?? undefined;
     description = catalogItem.description ?? undefined;
+    slot = catalogItem.slot;
     detail = snapshotItemDetail(catalogItem);
   } else if (op.custom) {
     itemId = null;
@@ -570,6 +860,7 @@ async function applyAcquire(
     weight = op.custom.weight;
     cost = op.custom.cost;
     description = op.custom.description;
+    slot = op.custom.slot ?? null;
     detail = {
       weaponDetail: op.custom.weapon ? { create: normalizeWeaponDetail(op.custom.weapon) } : undefined,
       armorDetail: op.custom.armor ? { create: normalizeArmorDetail(op.custom.armor) } : undefined,
@@ -591,12 +882,30 @@ async function applyAcquire(
       cost: toJsonInput(cost),
       description,
       quantity,
-      equipped: op.equipped ?? false,
+      equippedSlot: null,
+      slot,
       notes: op.notes,
       position,
       ...detail,
     },
   });
+
+  // "Add & equip": auto-place into the first free compatible slot (#565). Silent
+  // (no separate equipped event) — a fresh acquire that can't be slotted stays in
+  // the bag rather than failing the acquire.
+  if (op.equipped) {
+    const placeable: PlaceableItem = {
+      category,
+      slot,
+      weaponDetail: detail.weaponDetail ? { twoHanded: Boolean(detail.weaponDetail.create.twoHanded) } : null,
+      armorDetail: detail.armorDetail ? { armorCategory: detail.armorDetail.create.armorCategory } : null,
+    };
+    const rows = await fetchEquippedRows(tx, characterId, created.id);
+    const autoSlot = firstFreeSlot(rows, placeable);
+    if (autoSlot) {
+      await tx.inventoryItem.update({ where: { id: created.id }, data: { equippedSlot: autoSlot } });
+    }
+  }
 
   const currencyDelta = hasNonzeroCurrency(op.currencyDelta) ? op.currencyDelta : null;
   if (currencyDelta) {
@@ -667,10 +976,130 @@ export async function applyAdjustQuantity(
   });
 
   if (nextQuantity === 0) {
+    // Adjusting to zero deletes the row — clear any seeded buff so it can't leak.
+    await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `used up ${item.name}`);
     await tx.inventoryItem.delete({ where: { id: item.id } });
   } else {
     await tx.inventoryItem.update({ where: { id: item.id }, data: { quantity: nextQuantity } });
   }
+}
+
+// Consumes one use of a consumable (#121). Ammo is gear, not consumable, so it
+// is excluded here without any ammoKind dependency. Rolls the effect dice, logs
+// a `consumed` event with the roll in `data`, and auto-applies ONLY healing.
+async function applyUse(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: UseOperation,
+  batchId: string,
+  sessionId: string | null,
+): Promise<UseResult> {
+  const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
+  if (item.category !== "consumable") {
+    throw new InvalidInventoryOperationError(`${item.name} (${item.category}) is not a consumable`);
+  }
+  const detail = item.consumableDetail;
+  const charged = detail?.maxUses != null;
+
+  // Roll the effect dice (client-supplied for the 3D animation, else server-rolled).
+  const diceCount = detail?.effectDiceCount ?? 0;
+  const faces = detail?.effectDiceFaces ?? 0;
+  const modifier = detail?.effectModifier ?? 0;
+  let rolls: number[] = [];
+  let total: number | null = null;
+  if (diceCount > 0 && faces > 0) {
+    if (op.rolls) {
+      if (op.rolls.length !== diceCount || op.rolls.some((r) => r < 1 || r > faces)) {
+        throw new InvalidInventoryOperationError(
+          `${item.name} effect roll must be ${diceCount}d${faces}`,
+        );
+      }
+      rolls = op.rolls;
+    } else {
+      rolls = Array.from({ length: diceCount }, () => rollDie(faces));
+    }
+    total = rolls.reduce((sum, r) => sum + r, 0) + modifier;
+  }
+
+  // Decrement quantity (stackable) or usesRemaining (charged). A charged item at
+  // 0 uses stays with Use disabled until a long rest recharges it.
+  let before: Record<string, unknown>;
+  let after: Record<string, unknown> | null;
+  let deletedItem: DeletedInventoryItemSnapshot | undefined;
+  let remainingUses: number | null = null;
+  let remainingQty: number | null = null;
+
+  if (charged) {
+    const current = detail?.usesRemaining ?? 0;
+    if (current <= 0) {
+      throw new InvalidInventoryOperationError(`${item.name} has no uses remaining`);
+    }
+    remainingUses = current - 1;
+    before = { usesRemaining: current };
+    after = { usesRemaining: remainingUses };
+  } else {
+    if (item.quantity <= 0) {
+      throw new InvalidInventoryOperationError(`${item.name} has none left to use`);
+    }
+    remainingQty = item.quantity - 1;
+    before = { quantity: item.quantity };
+    after = remainingQty === 0 ? null : { quantity: remainingQty };
+    if (remainingQty === 0) deletedItem = snapshotInventoryItemForUndo(item);
+  }
+
+  // Auto-apply healing only — non-heal effects are rolled + recorded, not applied.
+  const healing = isHealingConsumable(detail?.effectDescription);
+  let applied: "heal" | null = null;
+  if (healing && total !== null && total > 0) {
+    await applyHealInTx(tx, characterId, total, batchId, sessionId, { source: item.name });
+    applied = "heal";
+  }
+
+  await logEvent(tx, {
+    characterId,
+    category: "inventory",
+    type: "consumed",
+    summary: total !== null ? `Used ${item.name} (rolled ${total})` : `Used ${item.name}`,
+    entityType: "InventoryItem",
+    entityId: item.id,
+    before,
+    after,
+    data: {
+      itemName: item.name,
+      use: true,
+      rolls,
+      effectModifier: modifier,
+      total,
+      applied,
+      effectDescription: detail?.effectDescription ?? null,
+      ...(deletedItem ? { deletedItem } : {}),
+    },
+    batchId,
+    sessionId,
+  });
+
+  if (charged) {
+    await tx.inventoryConsumableDetail.update({
+      where: { inventoryItemId: item.id },
+      data: { usesRemaining: remainingUses ?? 0 },
+    });
+  } else if (remainingQty === 0) {
+    await tx.inventoryItem.delete({ where: { id: item.id } });
+  } else {
+    await tx.inventoryItem.update({ where: { id: item.id }, data: { quantity: remainingQty ?? 0 } });
+  }
+
+  return {
+    inventoryItemId: item.id,
+    itemName: item.name,
+    effectDescription: detail?.effectDescription ?? null,
+    rolls,
+    effectModifier: modifier,
+    total,
+    applied,
+    usesRemaining: remainingUses,
+    quantity: remainingQty,
+  };
 }
 
 async function applyUpdate(tx: Prisma.TransactionClient, characterId: string, op: UpdateOperation) {
@@ -691,7 +1120,6 @@ async function applyUpdate(tx: Prisma.TransactionClient, characterId: string, op
     data: {
       name: op.name,
       notes: op.notes,
-      equipped: op.equipped,
       weight: op.weight,
       cost: op.cost !== undefined ? toJsonInput(op.cost) : undefined,
       description: op.description,
@@ -703,6 +1131,25 @@ async function applyUpdate(tx: Prisma.TransactionClient, characterId: string, op
   });
 }
 
+// Equips an item into an explicit slot (#565). Validates slot-compatibility,
+// capacity, and the two-handed off-hand lock; rejects a full slot.
+async function applyEquip(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: EquipOperation,
+  batchId: string,
+  sessionId: string | null,
+) {
+  const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
+  const rows = await fetchEquippedRows(tx, characterId, item.id);
+  const error = placementError(rows, item, op.slot);
+  if (error) throw new InvalidInventoryOperationError(error);
+  await equipIntoSlot(tx, characterId, item, op.slot, batchId, sessionId);
+}
+
+// Unequips (equipped=false) by clearing equippedSlot, or equips (equipped=true)
+// by auto-picking the first free compatible slot — the slot-less companion to
+// `equip`. Unequip is always legal so a row can always be cleared.
 async function applySetEquipped(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -712,26 +1159,279 @@ async function applySetEquipped(
 ) {
   const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
 
-  // Only weapons/armor are equippable. Gate equipping only — unequip is always
-  // legal so a legacy row stuck `equipped` can still be cleared.
-  if (op.equipped && !isEquippable(item.category)) {
-    throw new InvalidInventoryOperationError(`${item.name} (${item.category}) cannot be equipped`);
+  if (op.equipped) {
+    if (allowedSlotsForItem(item).length === 0) {
+      throw new InvalidInventoryOperationError(`${item.name} (${item.category}) cannot be equipped`);
+    }
+    const rows = await fetchEquippedRows(tx, characterId, item.id);
+    const slot = firstFreeSlot(rows, item);
+    if (!slot) {
+      throw new InvalidInventoryOperationError(`No free slot available to equip ${item.name}`);
+    }
+    await equipIntoSlot(tx, characterId, item, slot, batchId, sessionId);
+    return;
   }
 
-  await tx.inventoryItem.update({
-    where: { id: item.id },
-    data: { equipped: op.equipped },
-  });
+  await tx.inventoryItem.update({ where: { id: item.id }, data: { equippedSlot: null } });
+
+  // Unequipping ends any active effect once the item is no longer attuned either.
+  if (!item.attuned) {
+    await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `unequipped ${item.name}`);
+  }
 
   await logEvent(tx, {
     characterId,
     category: "inventory",
-    type: op.equipped ? "equipped" : "unequipped",
-    summary: op.equipped ? `Equipped ${item.name}` : `Unequipped ${item.name}`,
+    type: "unequipped",
+    summary: `Unequipped ${item.name}`,
     entityType: "InventoryItem",
     entityId: item.id,
-    before: { equipped: item.equipped },
-    after: { equipped: op.equipped },
+    before: { equippedSlot: item.equippedSlot },
+    after: { equippedSlot: null },
+    batchId,
+    sessionId,
+  });
+}
+
+async function applyAttune(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: AttuneOperation,
+  batchId: string,
+  sessionId: string | null,
+) {
+  const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
+  if (item.attuned) {
+    throw new InvalidInventoryOperationError(`${item.name} is already attuned`);
+  }
+
+  // Prerequisite check against the snapshotted columns (5e "requires attunement
+  // by a …"). Loads only the identity facts the check needs.
+  if (item.attunementPrereqKind) {
+    const character = await tx.character.findUnique({
+      where: { id: characterId },
+      select: {
+        alignment: true,
+        raceSelection: { select: { name: true } },
+        classEntries: { select: { name: true, subclass: true } },
+      },
+    });
+    const prereq = { kind: item.attunementPrereqKind, value: item.attunementPrereqValue };
+    const subject = {
+      classEntries: character?.classEntries ?? [],
+      raceName: character?.raceSelection?.name ?? null,
+      alignment: character?.alignment ?? null,
+    };
+    if (!meetsAttunementPrereq(prereq, subject)) {
+      throw new InvalidInventoryOperationError(
+        `${item.name} requires attunement by ${describeAttunementPrereq(prereq)}`,
+      );
+    }
+  }
+
+  // Derived 3-item cap: count currently-attuned rows, reject the 4th with a 409.
+  const attunedCount = await tx.inventoryItem.count({ where: { characterId, attuned: true } });
+  if (attunedCount >= ATTUNEMENT_LIMIT) {
+    throw new AttunementLimitError(
+      `Cannot attune to more than ${ATTUNEMENT_LIMIT} items — unattune one first`,
+    );
+  }
+
+  await tx.inventoryItem.update({ where: { id: item.id }, data: { attuned: true } });
+
+  await logEvent(tx, {
+    characterId,
+    category: "inventory",
+    type: "attuned",
+    summary: `Attuned to ${item.name}`,
+    entityType: "InventoryItem",
+    entityId: item.id,
+    before: { attuned: false },
+    after: { attuned: true },
+    batchId,
+    sessionId,
+  });
+}
+
+async function applyUnattune(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: UnattuneOperation,
+  batchId: string,
+  sessionId: string | null,
+) {
+  const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
+  if (!item.attuned) {
+    throw new InvalidInventoryOperationError(`${item.name} is not attuned`);
+  }
+
+  await tx.inventoryItem.update({ where: { id: item.id }, data: { attuned: false } });
+
+  // Unattuning ends any active effect once the item is no longer equipped either.
+  if (item.equippedSlot == null) {
+    await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `unattuned ${item.name}`);
+  }
+
+  await logEvent(tx, {
+    characterId,
+    category: "inventory",
+    type: "unattuned",
+    summary: `Ended attunement to ${item.name}`,
+    entityType: "InventoryItem",
+    entityId: item.id,
+    before: { attuned: true },
+    after: { attuned: false },
+    batchId,
+    sessionId,
+  });
+}
+
+// Spends a use of an item's activatedEffect and seeds its self-buff (#543). Gated
+// on the item being equipped/attuned and on remaining uses.
+async function applyActivate(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: ActivateOperation,
+  batchId: string,
+  sessionId: string | null,
+) {
+  const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
+  const cap = activatedCapabilityOf(item);
+  if (!cap) {
+    throw new InvalidInventoryOperationError(`${item.name} has no activated effect`);
+  }
+  if (item.equippedSlot == null && !item.attuned) {
+    throw new InvalidInventoryOperationError(`${item.name} must be equipped or attuned to activate`);
+  }
+
+  // Guard against double-activation FIRST (before the uses check, so an active
+  // last-charge item reports "already active", not "no uses remaining"): spending
+  // a second use on a buff that's already seeded dedupes the buff in-place (no
+  // double-apply) but still wastes the charge.
+  const charRow = await tx.character.findUnique({ where: { id: characterId }, select: { activeEffects: true } });
+  const cur = normalizeActiveEffectsMutable(charRow?.activeEffects ?? null);
+  if (cur.buffs.some((b) => b.key === itemBuffKey(item.id))) {
+    throw new InvalidInventoryOperationError(`${item.name} is already active`);
+  }
+
+  const maxUses = activatedMaxUses(cap);
+  if (maxUses !== null && item.activatedUsesSpent >= maxUses) {
+    throw new InvalidInventoryOperationError(`${item.name} has no uses remaining — recharges on a rest`);
+  }
+
+  const duration = cap.duration === "untilRest" ? "until-rest" : "while-active";
+  const restType = duration === "until-rest" ? (activatedRechargeRest(cap) ?? "long") : undefined;
+  await appendActiveBuffInTx(
+    tx,
+    characterId,
+    {
+      key: itemBuffKey(item.id),
+      target: cap.target,
+      modifier: cap.value,
+      source: item.name,
+      sourceEntryId: itemBuffKey(item.id),
+      duration,
+      ...(restType ? { restType } : {}),
+    },
+    batchId,
+    sessionId,
+  );
+
+  const nextSpent = maxUses !== null ? item.activatedUsesSpent + 1 : item.activatedUsesSpent;
+  if (maxUses !== null) {
+    await tx.inventoryItem.update({ where: { id: item.id }, data: { activatedUsesSpent: nextSpent } });
+  }
+
+  const remaining = maxUses !== null ? maxUses - nextSpent : null;
+  await logEvent(tx, {
+    characterId,
+    category: "inventory",
+    type: "activated",
+    summary: remaining !== null ? `Activated ${item.name} (${remaining} left)` : `Activated ${item.name}`,
+    entityType: "InventoryItem",
+    entityId: item.id,
+    before: { activatedUsesSpent: item.activatedUsesSpent },
+    after: { activatedUsesSpent: nextSpent },
+    data: { itemName: item.name, remaining },
+    batchId,
+    sessionId,
+  });
+}
+
+// Toggles off an active item effect (#543). Clears the buff; the spent use stays
+// spent until the recharge rest.
+async function applyDeactivate(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: DeactivateOperation,
+  batchId: string,
+  sessionId: string | null,
+) {
+  const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
+  await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `deactivated ${item.name}`);
+
+  await logEvent(tx, {
+    characterId,
+    category: "inventory",
+    type: "deactivated",
+    summary: `Deactivated ${item.name}`,
+    entityType: "InventoryItem",
+    entityId: item.id,
+    // Non-null empty snapshots: the buff re-applies via the paired effects-event
+    // revert, so this inventory event is a no-op on undo (must not read as a create).
+    before: {},
+    after: {},
+    data: { itemName: item.name },
+    batchId,
+    sessionId,
+  });
+}
+
+// Resets activatedUsesSpent to 0 for items whose activatedEffect recharges on the
+// given rest (#543). perRest(short) recharges on short|long; everything else on
+// long only. The seeded buff is cleared separately by the rest's buff sweep.
+// Called from the HP rest handler so item uses recharge alongside class resources.
+export async function resetActivatedUsesForRestInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  restType: "short" | "long",
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  const items = await tx.inventoryItem.findMany({
+    where: { characterId, activatedUsesSpent: { gt: 0 } },
+    include: { capabilities: true },
+  });
+  const toReset: { id: string; name: string; previousSpent: number }[] = [];
+  for (const item of items) {
+    // Type-predicate filter (not a bare cast): an opaque row with kind="activatedEffect"
+    // but no activation must not slip through as a malformed ActivatedEffectCapability
+    // — activatedRechargeRest would read resourceKind=undefined and spuriously recharge.
+    const cap = item.capabilities
+      .map(readCapability)
+      .find((c): c is ActivatedEffectCapability => c.kind === "activatedEffect" && "activation" in c);
+    if (!cap) continue;
+    const recharge = activatedRechargeRest(cap);
+    if (recharge === null) continue;
+    if (restType === "long" || recharge === "short") {
+      toReset.push({ id: item.id, name: item.name, previousSpent: item.activatedUsesSpent });
+    }
+  }
+  if (toReset.length === 0) return;
+
+  await tx.inventoryItem.updateMany({
+    where: { id: { in: toReset.map((t) => t.id) } },
+    data: { activatedUsesSpent: 0 },
+  });
+  await logEvent(tx, {
+    characterId,
+    category: "inventory",
+    type: "activatedRecharged",
+    summary: `Recharged ${toReset.length} item${toReset.length !== 1 ? "s" : ""} (${restType} rest)`,
+    before: { rechargedCount: toReset.length },
+    after: null,
+    // recharged carries per-item pre-rest spent so undo restores exactly (no entityId).
+    data: { restType, recharged: toReset },
     batchId,
     sessionId,
   });
@@ -765,6 +1465,9 @@ async function applyRemove(
     sessionId,
   });
 
+  // Deleting the row must clear any active-effect buff it seeded (undo re-applies
+  // it via the paired effects-event revert, symmetric with the recreated row).
+  await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `removed ${item.name}`);
   await tx.inventoryItem.delete({ where: { id: item.id } });
 }
 
@@ -802,6 +1505,8 @@ async function applySell(tx: Prisma.TransactionClient, characterId: string, op: 
   });
 
   if (quantitySold === item.quantity) {
+    // Full-stack sell deletes the row — clear any seeded buff so it can't leak.
+    await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `sold ${item.name}`);
     await tx.inventoryItem.delete({ where: { id: item.id } });
   } else {
     await tx.inventoryItem.update({ where: { id: item.id }, data: { quantity: item.quantity - quantitySold } });
@@ -834,8 +1539,24 @@ export async function revertInventoryEvent(
   }
 ): Promise<void> {
   const data = event.data as
-    | { currencyDelta?: Currency | null; deletedItem?: DeletedInventoryItemSnapshot }
+    | {
+        currencyDelta?: Currency | null;
+        deletedItem?: DeletedInventoryItemSnapshot;
+        recharged?: { id: string; previousSpent: number }[];
+      }
     | null;
+
+  // A rest recharge event has no single entityId — restore each item's pre-rest
+  // spent count. Handled before the entityId guard below.
+  if (data?.recharged) {
+    for (const r of data.recharged) {
+      await tx.inventoryItem.updateMany({
+        where: { id: r.id },
+        data: { activatedUsesSpent: r.previousSpent },
+      });
+    }
+    return;
+  }
 
   // Defensive: nothing to act on without a row id. Checked BEFORE the currency
   // reversal so a malformed event carrying a currencyDelta but no entityId can't
@@ -886,7 +1607,13 @@ export async function revertInventoryEvent(
         cost: toJsonInput(deletedItem.cost),
         description: deletedItem.description ?? undefined,
         quantity: deletedItem.quantity,
-        equipped: deletedItem.equipped,
+        equippedSlot: deletedItem.equippedSlot ?? null,
+        slot: deletedItem.slot ?? null,
+        rarity: deletedItem.rarity ?? null,
+        attuned: deletedItem.attuned ?? false,
+        requiresAttunement: deletedItem.requiresAttunement ?? false,
+        attunementPrereqKind: deletedItem.attunementPrereqKind ?? undefined,
+        attunementPrereqValue: deletedItem.attunementPrereqValue ?? undefined,
         notes: deletedItem.notes ?? undefined,
         position: deletedItem.position,
         weaponDetail: deletedItem.weaponDetail ? { create: deletedItem.weaponDetail } : undefined,
@@ -894,19 +1621,39 @@ export async function revertInventoryEvent(
         consumableDetail: deletedItem.consumableDetail
           ? { create: deletedItem.consumableDetail }
           : undefined,
+        capabilities:
+          deletedItem.capabilities && deletedItem.capabilities.length > 0
+            ? { create: deletedItem.capabilities }
+            : undefined,
       },
     });
     return;
   }
 
   // The row still exists → restore the scalar(s) captured in before
-  // (quantity for partial sell/adjust, equipped for setEquipped).
-  const before = event.before as { quantity?: number; equipped?: boolean };
+  // (quantity for partial sell/adjust, equipped for setEquipped, attuned for
+  // attune/unattune, usesRemaining for a charged `use`, activatedUsesSpent for activate).
+  const before = event.before as {
+    quantity?: number;
+    equippedSlot?: EquipSlot | null;
+    attuned?: boolean;
+    activatedUsesSpent?: number;
+    usesRemaining?: number;
+  };
   const updateData: Prisma.InventoryItemUpdateInput = {};
   if (before.quantity !== undefined) updateData.quantity = before.quantity;
-  if (before.equipped !== undefined) updateData.equipped = before.equipped;
+  if (before.equippedSlot !== undefined) updateData.equippedSlot = before.equippedSlot;
+  if (before.attuned !== undefined) updateData.attuned = before.attuned;
+  if (before.activatedUsesSpent !== undefined) updateData.activatedUsesSpent = before.activatedUsesSpent;
   if (Object.keys(updateData).length > 0) {
     await tx.inventoryItem.update({ where: { id: event.entityId }, data: updateData });
+  }
+  // usesRemaining lives on the detail row, so restore it separately.
+  if (before.usesRemaining !== undefined) {
+    await tx.inventoryConsumableDetail.update({
+      where: { inventoryItemId: event.entityId },
+      data: { usesRemaining: before.usesRemaining },
+    });
   }
 }
 
@@ -917,9 +1664,10 @@ export async function revertInventoryEvent(
 export async function applyInventoryOperations(
   characterId: string,
   operations: InventoryOperation[]
-): Promise<void> {
+): Promise<UseResult[]> {
   const batchId = randomUUID();
   const sessionId = await getActiveSessionId(characterId);
+  const useResults: UseResult[] = [];
   await prisma.$transaction(async (tx) => {
     for (const op of operations) {
       switch (op.type) {
@@ -928,6 +1676,9 @@ export async function applyInventoryOperations(
           break;
         case "adjustQuantity":
           await applyAdjustQuantity(tx, characterId, op, batchId, sessionId);
+          break;
+        case "use":
+          useResults.push(await applyUse(tx, characterId, op, batchId, sessionId));
           break;
         case "update":
           await applyUpdate(tx, characterId, op);
@@ -938,10 +1689,26 @@ export async function applyInventoryOperations(
         case "sell":
           await applySell(tx, characterId, op, batchId, sessionId);
           break;
+        case "equip":
+          await applyEquip(tx, characterId, op, batchId, sessionId);
+          break;
         case "setEquipped":
           await applySetEquipped(tx, characterId, op, batchId, sessionId);
+          break;
+        case "attune":
+          await applyAttune(tx, characterId, op, batchId, sessionId);
+          break;
+        case "unattune":
+          await applyUnattune(tx, characterId, op, batchId, sessionId);
+          break;
+        case "activate":
+          await applyActivate(tx, characterId, op, batchId, sessionId);
+          break;
+        case "deactivate":
+          await applyDeactivate(tx, characterId, op, batchId, sessionId);
           break;
       }
     }
   });
+  return useResults;
 }

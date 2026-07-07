@@ -52,7 +52,7 @@ const FIXTURE_BASE = {
 const RANGED_WEAPON = {
   name: "Longbow",
   category: "weapon" as const,
-  equipped: true,
+  equippedSlot: "MAIN_HAND" as const,
   weaponDetail: {
     create: {
       damageDiceCount: 1,
@@ -67,7 +67,7 @@ const RANGED_WEAPON = {
 const MELEE_WEAPON = {
   name: "Longsword",
   category: "weapon" as const,
-  equipped: false,
+  equippedSlot: null,
   weaponDetail: {
     create: {
       damageDiceCount: 1,

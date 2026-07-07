@@ -38,12 +38,24 @@ import { deriveActions, type AvailableAction } from "./actions.js";
 import { normalizeResourcesMutable, type AdvancementEntry, type ToolProfEntry } from "./resources.js";
 import { normalizeConditionsMutable } from "./conditions.js";
 import { buffsByTarget, normalizeActiveEffectsMutable, type ActiveBuff } from "./active-effects.js";
+import {
+  activatedMaxUses,
+  describeActivatedReminder,
+  deriveItemGrants,
+  deriveItemPassiveBonuses,
+  readCapability,
+  serializeCapability,
+  type ActivatedEffectCapability,
+  type ItemPassiveContribution,
+} from "./capabilities.js";
+import { itemBuffKey } from "./inventory.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeSpellcastingMutable } from "./spellcasting.js";
 import type { SpellEntry } from "./spell-state.js";
 import {
   deriveGrantedSpells,
   deriveGrantedCastingAbility,
+  deriveItemSpells,
   type AbilityScores,
 } from "./granted-spells.js";
 import { SHADOW_ART_CONCENTRATION_PREFIX } from "./shadow-arts.js";
@@ -119,6 +131,8 @@ interface InventoryItemContext {
   meleeDamageBonus: number;
   /** Sum of active "attackRoll" buffs (#419, e.g. Sacred Weapon); added to weapon attack bonus. */
   attackRollBonus: number;
+  /** Buff keys currently active — an activatedEffect item is "active" when its key is present (#543). */
+  activeItemBuffKeys: Set<string>;
 }
 
 function serializeInventoryItem(
@@ -175,11 +189,46 @@ function serializeInventoryItem(
     weight: row.weight ?? undefined,
     cost: row.cost ?? undefined,
     description: row.description ?? undefined,
-    equipped: row.equipped,
+    // `equipped` is DERIVED from placement (#565) — equippedSlot is the source of truth.
+    equipped: row.equippedSlot != null,
+    equippedSlot: row.equippedSlot ?? undefined,
+    slot: row.slot ?? undefined,
+    rarity: row.rarity ?? undefined,
+    attuned: row.attuned,
+    requiresAttunement: row.requiresAttunement,
+    attunementPrereqKind: row.attunementPrereqKind ?? undefined,
+    attunementPrereqValue: row.attunementPrereqValue ?? undefined,
     notes: row.notes ?? undefined,
     weapon,
     armor: row.armorDetail ? serializeArmorDetail(row.armorDetail) : undefined,
     consumable: row.consumableDetail ? serializeConsumableDetail(row.consumableDetail) : undefined,
+    capabilities: row.capabilities.length > 0 ? row.capabilities.map(serializeCapability) : undefined,
+    activated: serializeActivatedEffect(row, context),
+  };
+}
+
+// Derives the activate/deactivate control state for an item's activatedEffect
+// capability (#543): remaining uses, active flag, and the reminder text. Absent
+// when the item has no activatedEffect capability.
+function serializeActivatedEffect(
+  row: CharacterWithRelations["inventoryItems"][number],
+  context: InventoryItemContext,
+) {
+  const cap = row.capabilities
+    .map(readCapability)
+    // Type-predicate (not a cast): an opaque row with kind "activatedEffect" but no
+    // `activation` (readCapability's fallthrough) must NOT match — else the reminder
+    // string would drop the DM's label. Require the field to be present.
+    .find((c): c is ActivatedEffectCapability => c.kind === "activatedEffect" && "activation" in c);
+  if (!cap) return undefined;
+  const maxUses = activatedMaxUses(cap);
+  return {
+    activation: cap.activation,
+    reminder: describeActivatedReminder(cap),
+    maxUses,
+    remainingUses: maxUses === null ? null : Math.max(0, maxUses - row.activatedUsesSpent),
+    active: context.activeItemBuffKeys.has(itemBuffKey(row.id)),
+    available: row.equippedSlot != null || row.attuned,
   };
 }
 
@@ -283,6 +332,38 @@ function buildMergedWeaponProficiencies(
   return out;
 }
 
+// Append item-granted weapon proficiencies (#529) after class/race/feat grants,
+// tagged source "item". Deduped by name — an existing grant wins (never demoted).
+function mergeItemWeaponProficiencies(
+  base: Array<{ name: string; source: "class" | "race" | "feat" | "item" }>,
+  itemProfs: { value: string; source: string }[],
+): Array<{ name: string; source: "class" | "race" | "feat" | "item" }> {
+  const seen = new Set(base.map((e) => e.name));
+  const out = [...base];
+  for (const p of itemProfs) {
+    if (seen.has(p.value)) continue;
+    seen.add(p.value);
+    out.push({ name: p.value, source: "item" });
+  }
+  return out;
+}
+
+// Append item-granted tool proficiencies (#529) after the merged creation/subclass
+// tools, tagged source "item". Deduped by name — an existing entry wins.
+function mergeItemToolProficiencies(
+  base: Array<{ name: string; category: string; source: string }>,
+  itemProfs: { value: string; source: string }[],
+): Array<{ name: string; category: string; source: string }> {
+  const seen = new Set(base.map((e) => e.name));
+  const out = [...base];
+  for (const p of itemProfs) {
+    if (seen.has(p.value)) continue;
+    seen.add(p.value);
+    out.push({ name: p.value, category: TOOLS.find((t) => t.name === p.value)?.category ?? "other", source: "item" });
+  }
+  return out;
+}
+
 type PrimaryClass = CharacterWithRelations["classEntries"][number] | undefined;
 
 // Merge derived subclass-granted spells after the stored spells, dropping any
@@ -296,6 +377,21 @@ function mergeGrantedSpells(stored: SpellEntry[], granted: SpellEntry[]): SpellE
 // Subclass-granted spells across every class entry (each gated by its own level).
 function collectGrantedSpells(entries: CharacterWithRelations["classEntries"]): SpellEntry[] {
   return entries.flatMap((e) => deriveGrantedSpells(e.name, e.subclass ?? undefined, e.level));
+}
+
+// Item-granted spells (#528) for a holder's active items. Appended after learned
+// + subclass-granted spells; their `item:` ids are a disjoint space so no name dedup.
+function deriveItemSpellsFor(row: CharacterWithRelations): SpellEntry[] {
+  return deriveItemSpells(
+    row.inventoryItems.map((i) => ({
+      id: i.id,
+      name: i.name,
+      // #565: `equipped` is derived from equippedSlot (no persisted boolean).
+      equipped: i.equippedSlot != null,
+      attuned: i.attuned,
+      capabilities: i.capabilities,
+    })),
+  );
 }
 
 // Casting ability for the slotless multiclass view — from the first entry that
@@ -357,10 +453,12 @@ function buildSpellcastingView(
     primaryClass?.subclass ?? undefined,
     level,
   );
+  // Item-granted spells (#528) — surfaced for any holder, caster or not.
+  const itemSpells = deriveItemSpellsFor(row);
 
   if (derivedSpell) {
     const stored = normalizeSpellcastingMutable(row.spellcasting);
-    const spells = mergeGrantedSpells(stored.spells, granted);
+    const spells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
     return {
       ability: derivedSpell.ability,
       spellSaveDC: derivedSpell.spellSaveDC,
@@ -388,11 +486,11 @@ function buildSpellcastingView(
   // Non-caster class that nonetheless gets a subclass-granted spell (e.g. a Way
   // of Shadow monk's Minor Illusion). Surface a slotless view so the grant
   // renders; the casting ability is derived per rule (Wisdom is the default).
-  if (granted.length > 0) {
+  if (granted.length > 0 || itemSpells.length > 0) {
     const stored = normalizeSpellcastingMutable(row.spellcasting);
     const castingAbility = deriveGrantedCastingAbility(primaryClass?.subclass ?? undefined);
     const abilMod = abilityModifier(abilityScores[castingAbility] ?? 10);
-    const grantedSpells = mergeGrantedSpells(stored.spells, granted);
+    const grantedSpells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
     return {
       ability: castingAbility,
       spellSaveDC: 8 + proficiencyBonus + abilMod,
@@ -437,15 +535,16 @@ function buildMulticlassSpellcastingView(
 
   // Subclass-granted spells across every class entry (each gated by its own level).
   const granted = collectGrantedSpells(row.classEntries);
+  const itemSpells = deriveItemSpellsFor(row);
   const stored = normalizeSpellcastingMutable(row.spellcasting);
 
-  // No caster class in the mix, but a subclass still grants a spell — surface a
-  // slotless granted view (ability derived per rule; mirrors the single-class branch).
+  // No caster class in the mix, but a subclass or item still grants a spell —
+  // surface a slotless view (ability derived per rule; mirrors the single-class branch).
   if (multi.classes.length === 0) {
-    if (granted.length === 0) return undefined;
+    if (granted.length === 0 && itemSpells.length === 0) return undefined;
     const castingAbility = collectGrantedCastingAbility(row.classEntries);
     const abilMod = abilityModifier(abilityScores[castingAbility] ?? 10);
-    const grantedSpells = mergeGrantedSpells(stored.spells, granted);
+    const grantedSpells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
     return {
       ability: castingAbility,
       spellSaveDC: 8 + proficiencyBonus + abilMod,
@@ -458,7 +557,7 @@ function buildMulticlassSpellcastingView(
   }
 
   const primaryCaster = multi.classes[0];
-  const mergedSpells = mergeGrantedSpells(stored.spells, granted);
+  const mergedSpells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
   return {
     ability: primaryCaster.ability,
     spellSaveDC: primaryCaster.spellSaveDC,
@@ -643,22 +742,50 @@ function buildInventoryContext(
   proficiencyBonus: number,
   weaponGrants: ReturnType<typeof buildMergedWeaponProficiencies>,
   fightingStyle: FightingStyleKey | null,
+  buffTargets: TargetModifierMap,
 ): InventoryItemContext {
-  const equippedItems = row.inventoryItems.filter((i) => i.equipped);
+  const equippedItems = row.inventoryItems.filter((i) => i.equippedSlot != null);
   const equippedShieldPresent = equippedItems.some(
     (i) => i.armorDetail?.armorCategory === "shield",
   );
   const equippedWeaponCount = equippedItems.filter((i) => i.category === "weapon").length;
   const offHandBusy = equippedShieldPresent || equippedWeaponCount >= 2;
 
-  // Sum active "meleeDamage" buffs (e.g. Rage) — added to melee weapon damage
-  // in deriveWeaponDamage, the same derive-on-read path skills use (#455).
-  const targetedBuffs = buffsByTarget(normalizeActiveEffectsMutable(row.activeEffects));
-  const meleeDamageBonus = (targetedBuffs.meleeDamage ?? []).reduce((sum, b) => sum + b.modifier, 0);
-  // Sum active "attackRoll" buffs (e.g. Sacred Weapon) — added to weapon attack bonus (#419).
-  const attackRollBonus = (targetedBuffs.attackRoll ?? []).reduce((sum, b) => sum + b.modifier, 0);
+  // Sum "meleeDamage" contributions (Rage buff + item passiveBonus) — added to
+  // melee weapon damage in deriveWeaponDamage, the same read path skills use (#455/#545).
+  const meleeDamageBonus = (buffTargets.meleeDamage ?? []).reduce((sum, b) => sum + b.modifier, 0);
+  // Sum "attackRoll" contributions (Sacred Weapon buff + item passiveBonus) — added
+  // to weapon attack bonus (#419/#545).
+  const attackRollBonus = (buffTargets.attackRoll ?? []).reduce((sum, b) => sum + b.modifier, 0);
 
-  return { effectiveScores, proficiencyBonus, weaponGrants, offHandBusy, fightingStyle, meleeDamageBonus, attackRollBonus };
+  // Active-item buff keys — an activatedEffect item is "active" when its item:<id> buff is present.
+  const activeItemBuffKeys = new Set(normalizeActiveEffectsMutable(row.activeEffects).buffs.map((b) => b.key));
+
+  return { effectiveScores, proficiencyBonus, weaponGrants, offHandBusy, fightingStyle, meleeDamageBonus, attackRollBonus, activeItemBuffKeys };
+}
+
+// The per-target modifier channel both skills and weapon math read: active cast
+// buffs (buffsByTarget) merged with active-item scalar passiveBonus contributions
+// (#545). Keyed the same way (skill name / meleeDamage / attackRoll) so item
+// bonuses and buffs sum together.
+type TargetModifierMap = Record<string, Array<{ modifier: number; source: string; condition?: string }>>;
+
+function mergeTargetModifiers(
+  buffTargets: Record<string, ActiveBuff[]>,
+  contributions: ItemPassiveContribution[],
+): TargetModifierMap {
+  const out: TargetModifierMap = {};
+  for (const [key, buffs] of Object.entries(buffTargets)) {
+    out[key] = buffs.map((b) => ({ modifier: b.modifier, source: b.source }));
+  }
+  for (const c of contributions) {
+    (out[c.target] ??= []).push({
+      modifier: c.modifier,
+      source: c.source,
+      ...(c.condition ? { condition: c.condition } : {}),
+    });
+  }
+  return out;
 }
 
 export function serializeCharacter(row: CharacterWithRelations) {
@@ -701,18 +828,54 @@ export function serializeCharacter(row: CharacterWithRelations) {
     featProficiencies.weapons,
   );
 
+  // Active cast-granted buffs (#438) merged with active-item scalar passiveBonus
+  // contributions (#545), summed per target into the affected skill/stat's
+  // tempModifier below (and into melee/attack weapon math). Both follow the
+  // base + additive-terms pattern; item bonuses apply only while equipped/attuned.
+  const activeEffects = normalizeActiveEffectsMutable(row.activeEffects);
+  const itemPassiveBonuses = deriveItemPassiveBonuses(
+    row.inventoryItems.map((i) => ({
+      name: i.name,
+      equipped: i.equippedSlot != null,
+      attuned: i.attuned,
+      capabilities: i.capabilities,
+    })),
+  );
+  const buffTargets = mergeTargetModifiers(buffsByTarget(activeEffects), itemPassiveBonuses);
+
+  // Item-granted traits (#529): resistances/immunities/conditionImmunities/
+  // advantages/proficiencies from active (equipped or attuned-when-required)
+  // items. Derived on read — nothing here is persisted. resistances also feed
+  // the #456 halve flow at damage-apply time (lib/hitpoints.ts).
+  const itemGrants = deriveItemGrants(
+    row.inventoryItems.map((i) => ({
+      name: i.name,
+      equipped: i.equippedSlot != null,
+      attuned: i.attuned,
+      requiresAttunement: i.requiresAttunement,
+      capabilities: i.capabilities,
+    })),
+  );
+  const itemSkillProfs = new Set(
+    itemGrants.proficiencies.filter((p) => p.profType === "skill").map((p) => p.value),
+  );
+  const itemSaveProfs = new Set(
+    itemGrants.proficiencies.filter((p) => p.profType === "save").map((p) => p.value),
+  );
+
   const inventoryContext = buildInventoryContext(
     row,
     effectiveScores,
     progress.proficiencyBonus,
     weaponGrants,
     fightingStyle,
+    buffTargets,
   );
 
   // AC is derived, not persisted: best equipped body armor + Dex (per category)
-  // + shield. No slot model exists, so the highest-AC body armor wins.
+  // + shield. The BODY slot holds one body armor (#565), so "best" is defensive.
   const equippedArmorDetails = row.inventoryItems
-    .filter((i) => i.equipped && i.armorDetail)
+    .filter((i) => i.equippedSlot != null && i.armorDetail)
     .map((i) => ({ name: i.name, ...i.armorDetail! }));
   const hasShield = equippedArmorDetails.some((a) => a.armorCategory === "shield");
   const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
@@ -772,17 +935,19 @@ export function serializeCharacter(row: CharacterWithRelations) {
     wearingHeavyArmor: bestArmor?.armorCategory === "heavy",
   });
 
-  // Active cast-granted buffs (#438): summed per target into the affected
-  // skill/stat's tempModifier below, following the base + additive-terms pattern.
-  const activeEffects = normalizeActiveEffectsMutable(row.activeEffects);
-  const buffTargets = buffsByTarget(activeEffects);
-
   // Labeled AC addends; armorClass below is their exact sum (single source in srd.ts).
   const acParts = deriveArmorClassParts(bestArmor, hasShield, dexMod, unarmoredDefense);
   // Defense fighting style only applies while wearing body armor (5e).
   const styleAc = bestArmor !== null ? deriveFightingStyleBonuses(fightingStyle).armorClass : 0;
   if (styleAc !== 0) acParts.push({ label: "Defense fighting style", value: styleAc });
   if (featBonuses.armorClass !== 0) acParts.push({ label: "Feats", value: featBonuses.armorClass });
+  // Active-item AC bonuses (#383): Ring/Cloak of Protection etc., each labeled per
+  // source. v1 applies only unconditional bonuses; a conditional one surfaces as
+  // reminder text (value 0) rather than being silently added.
+  for (const c of buffTargets.ac ?? []) {
+    if (c.condition) acParts.push({ label: c.source, value: 0, reminder: c.condition });
+    else acParts.push({ label: c.source, value: c.modifier });
+  }
 
   return {
     id: row.id,
@@ -814,7 +979,13 @@ export function serializeCharacter(row: CharacterWithRelations) {
     armorClass: acParts.reduce((total, p) => total + p.value, 0),
     armorClassBreakdown: acParts,
     initiativeBonus: effectiveInitBonus + featBonuses.initiative,
-    speed: row.speed + featBonuses.speed + unarmoredMovementBonus + fastMovementBonus,
+    // Additive terms + any active "speed"-targeted buff (e.g. Boots of Speed, #543).
+    speed:
+      row.speed +
+      featBonuses.speed +
+      unarmoredMovementBonus +
+      fastMovementBonus +
+      (buffTargets["speed"] ?? []).reduce((sum, b) => sum + b.modifier, 0),
     proficiencyBonus: progress.proficiencyBonus,
 
     experiencePoints: row.experiencePoints,
@@ -836,8 +1007,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
     abilityScores: effectiveScores,
     // Merge feat-granted saving throw proficiencies (OR with class-fixed stored set;
     // deduped via Set round-trip).
-    savingThrowProficiencies: featProficiencies.savingThrows.size > 0
-      ? [...new Set([...row.savingThrowProficiencies, ...featProficiencies.savingThrows])]
+    savingThrowProficiencies: featProficiencies.savingThrows.size > 0 || itemSaveProfs.size > 0
+      ? [...new Set([...row.savingThrowProficiencies, ...featProficiencies.savingThrows, ...itemSaveProfs])]
       : row.savingThrowProficiencies,
     // Merge feat-granted skill proficiencies (proficient stays true if already
     // true; feats only add) and overlay any active buff as an optional
@@ -847,11 +1018,11 @@ export function serializeCharacter(row: CharacterWithRelations) {
       const tempModifier = buffs.reduce((sum, b) => sum + b.modifier, 0);
       return {
         ...s,
-        proficient: s.proficient || featProficiencies.skills.has(s.name),
+        proficient: s.proficient || featProficiencies.skills.has(s.name) || itemSkillProfs.has(s.name),
         ...(tempModifier !== 0
           ? {
               tempModifier,
-              tempModifierSources: buffs.map((b: ActiveBuff) => ({ label: b.source, value: b.modifier })),
+              tempModifierSources: buffs.map((b) => ({ label: b.source, value: b.modifier })),
             }
           : {}),
       };
@@ -860,11 +1031,14 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // Character.toolProficiencies) + level-gated subclass choices (from
     // resources.toolProficienciesKnown, already clamped above).
     // Deduped by name: creation-fixed wins over subclass if both appear.
-    toolProficiencies: buildMergedToolProficiencies(
-      row.toolProficiencies,
-      resources && "toolProficienciesKnown" in resources
-        ? (resources as { toolProficienciesKnown: ToolProfEntry[] }).toolProficienciesKnown
-        : [],
+    toolProficiencies: mergeItemToolProficiencies(
+      buildMergedToolProficiencies(
+        row.toolProficiencies,
+        resources && "toolProficienciesKnown" in resources
+          ? (resources as { toolProficienciesKnown: ToolProfEntry[] }).toolProficienciesKnown
+          : [],
+      ),
+      itemGrants.proficiencies.filter((p) => p.profType === "tool"),
     ),
     // Armor/weapon proficiencies — derived fully at read time from class, race,
     // and feat grants. No persistence needed: these are fixed by class/race and
@@ -876,7 +1050,10 @@ export function serializeCharacter(row: CharacterWithRelations) {
       row.raceSelection?.name,
       featProficiencies.armor,
     ),
-    weaponProficiencies: weaponGrants,
+    weaponProficiencies: mergeItemWeaponProficiencies(
+      weaponGrants,
+      itemGrants.proficiencies.filter((p) => p.profType === "weapon"),
+    ),
     inventory: row.inventoryItems.map((item) => serializeInventoryItem(item, inventoryContext)),
     currency: row.currency,
     spellcasting,
@@ -888,6 +1065,15 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // Active cast-granted passive modifiers (buffs). Normalized on read; each is
     // also summed into its target skill/stat's tempModifier above.
     activeEffects,
+
+    // Item-granted traits (#529), derived from active items — no persisted
+    // columns. resistances also feed the #456 auto-halve at damage-apply time;
+    // the rest render as item-sourced flags/reminders on the sheet.
+    resistances: itemGrants.resistances.map((r) => ({ damageType: r.value, source: r.source })),
+    damageImmunities: itemGrants.immunities.map((i) => ({ damageType: i.value, source: i.source })),
+    conditionImmunities: itemGrants.conditionImmunities.map((c) => ({ condition: c.value, source: c.source })),
+    grantedAdvantages: itemGrants.advantages,
+    grantedProficiencies: itemGrants.proficiencies,
 
     // Advancements (ASI + feats) — top-level so every class sees them,
     // independent of whether deriveResources returns a non-null value.

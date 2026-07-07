@@ -1,4 +1,5 @@
 import { Check, Monitor, Moon, Sun, type LucideIcon } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import Avatar from "@/components/ui/Avatar";
 import DropdownMenu from "@/components/ui/DropdownMenu";
@@ -71,6 +72,14 @@ export default function AccountMenu() {
               );
             })}
           </div>
+          <Link
+            to="/about"
+            role="menuitem"
+            onClick={close}
+            className="block w-full px-3 py-1.5 text-left text-sm text-parchment-700 transition-colors hover:bg-parchment-100 focus-visible:bg-parchment-100 focus-visible:outline-none"
+          >
+            About &amp; credits
+          </Link>
           <button
             type="button"
             role="menuitem"

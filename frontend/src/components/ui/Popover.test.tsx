@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "@/test/axe";
@@ -80,6 +80,44 @@ describe("Popover", () => {
     const { container } = renderPopover({ className: "my-wrap", triggerClassName: "my-trigger" });
     expect(container.firstChild).toHaveClass("my-wrap");
     expect(screen.getByRole("button", { name: "Armor Class breakdown" })).toHaveClass("my-trigger");
+  });
+
+  it("fires onClose on every open → closed transition (toggle, Escape, outside), not on open", async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderPopover({ onClose });
+    const trigger = screen.getByRole("button", { name: "Armor Class breakdown" });
+    await user.click(trigger); // open — must NOT fire onClose
+    expect(onClose).not.toHaveBeenCalled();
+    await user.click(trigger); // toggle closed
+    expect(onClose).toHaveBeenCalledTimes(1);
+    await user.click(trigger); // open again
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(2);
+    await user.click(trigger); // open again
+    fireEvent.mouseDown(document.body);
+    expect(onClose).toHaveBeenCalledTimes(3);
+  });
+
+  it("passes a close() to a render-prop child that dismisses the panel, refocuses the trigger, and fires onClose", async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <Popover trigger={<span>17</span>} label="Armor Class breakdown" onClose={onClose}>
+        {(close) => (
+          <button type="button" onClick={close}>
+            Dismiss
+          </button>
+        )}
+      </Popover>,
+    );
+    const trigger = screen.getByRole("button", { name: "Armor Class breakdown" });
+    await user.click(trigger);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("has no axe violations when open", async () => {

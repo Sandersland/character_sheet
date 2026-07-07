@@ -108,6 +108,11 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
   // ── Cast handler ────────────────────────────────────────────────────────────
 
   function handleCast(spell: Spell, slotLevel?: number) {
+    // Item-granted spell (#528): cast from the item's own resource, never a slot.
+    if (spell.source === "item") {
+      handleCastItemSpell(spell);
+      return;
+    }
     const isCantrip = spell.level === 0;
     const resolvedSlotLevel = slotLevel ?? spell.level;
 
@@ -139,6 +144,25 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
         : { type: "castSpell", entryId: spell.id, slotLevel: resolvedSlotLevel, roll: castRoll.total },
     ];
     send(ops);
+  }
+
+  // Cast an item-granted spell: roll the effect (0 when the entry carries no
+  // dice), show the banner with the item's announced DC, and spend the item use.
+  function handleCastItemSpell(spell: Spell) {
+    // The item casts at its configured slot level (may upcast above the spell's
+    // base level), so the effect dice must scale to castLevel — not spell.level.
+    const castLevel = spell.item?.castLevel ?? spell.level;
+    const castRoll = computeCastRoll(spell, character, castLevel);
+    if (castRoll && spell.effectKind) {
+      setCastResult({
+        spellName: spell.name,
+        total: castRoll.total,
+        diceStr: `${castRoll.spec.count}d${castRoll.spec.faces}`,
+        effectKind: spell.effectKind,
+        damageType: spell.damageType,
+      });
+    }
+    send([{ type: "castItemSpell", entryId: spell.id, roll: castRoll?.total ?? 0 }]);
   }
 
   // ── Slot handlers ───────────────────────────────────────────────────────────

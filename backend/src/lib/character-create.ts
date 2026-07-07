@@ -1,6 +1,7 @@
 import { Prisma } from "../generated/prisma/client.js";
 import { prisma } from "./prisma.js";
 import {
+  autoEquipSlot,
   buildInventoryCreateFromCatalog,
   catalogItemDetailInclude,
   selectAutoEquip,
@@ -325,10 +326,10 @@ export async function createCharacter(
 
   // Auto-equip a new character's starting weapon/armor so the in-session
   // Attack picker isn't empty on a freshly created sheet (issue #51). The 5e
-  // selection rule lives in lib/ (selectAutoEquip); the route just applies its
-  // decision by flipping `equipped` on the chosen create payloads.
+  // selection rule lives in lib/ (selectAutoEquip); the route applies its
+  // decision by assigning each chosen payload its paper-doll slot (#565).
   for (const idx of selectAutoEquip(inventoryItemCreates)) {
-    inventoryItemCreates[idx].equipped = true;
+    inventoryItemCreates[idx].equippedSlot = autoEquipSlot(inventoryItemCreates[idx]);
   }
 
   const derived = deriveCreatedCharacter(

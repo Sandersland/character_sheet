@@ -25,6 +25,7 @@ const campaignItemInclude = {
   weaponDetail: true,
   armorDetail: true,
   consumableDetail: true,
+  capabilities: true,
   link: { select: { campaignEntityId: true } },
 } satisfies Prisma.CampaignItemInclude;
 
@@ -87,9 +88,58 @@ function snapshotCampaignItemDetail(item: CampaignItemWithDetails) {
             effectDiceFaces: item.consumableDetail.effectDiceFaces,
             effectModifier: item.consumableDetail.effectModifier,
             effectDescription: item.consumableDetail.effectDescription,
+            maxUses: item.consumableDetail.maxUses,
+            // An awarded charged consumable starts full (#121).
+            usesRemaining: item.consumableDetail.usesRemaining ?? item.consumableDetail.maxUses,
           },
         }
       : undefined,
+    // Typed capability rows snapshotted 1:1 onto the awarded item (#545) — a
+    // straight column copy, same as the detail tables above. The snapshot is
+    // self-contained, so a later edit/revoke of the source leaves these intact.
+    capabilities:
+      item.capabilities.length > 0
+        ? {
+            create: item.capabilities.map((c) => ({
+              kind: c.kind,
+              description: c.description,
+              target: c.target,
+              op: c.op,
+              value: c.value,
+              targetKey: c.targetKey,
+              condition: c.condition,
+              valueDiceCount: c.valueDiceCount,
+              valueDiceFaces: c.valueDiceFaces,
+              valueDamageType: c.valueDamageType,
+              // castSpell columns (#528) — provenance spellId + authored config.
+              // `used` is NOT copied (runtime state resets to 0 on the new item).
+              spellId: c.spellId,
+              spellName: c.spellName,
+              spellLevel: c.spellLevel,
+              castLevel: c.castLevel,
+              castResource: c.castResource,
+              castUses: c.castUses,
+              castConcentration: c.castConcentration,
+              dcMode: c.dcMode,
+              dcValue: c.dcValue,
+              attackMode: c.attackMode,
+              attackValue: c.attackValue,
+              // activatedEffect columns (#543).
+              activation: c.activation,
+              activatedDuration: c.activatedDuration,
+              resourceKind: c.resourceKind,
+              resourcePeriod: c.resourcePeriod,
+              resourceCharges: c.resourceCharges,
+              durationText: c.durationText,
+              // grant columns (#529).
+              grantType: c.grantType,
+              grantOn: c.grantOn,
+              grantValueKind: c.grantValueKind,
+              grantValue: c.grantValue,
+              cantBeSurprised: c.cantBeSurprised,
+            })),
+          }
+        : undefined,
   };
 }
 
@@ -184,7 +234,14 @@ export async function awardCampaignItem(params: {
         cost: toJsonInput(item.cost),
         description: item.description ?? undefined,
         quantity,
-        equipped: false,
+        // Snapshot placement metadata (#565): gear slot + rarity for the Worn view.
+        slot: item.slot,
+        rarity: item.rarity,
+        // Snapshot the attunement metadata so the attune check runs against
+        // the frozen copy, not the mutable source (#545).
+        requiresAttunement: item.requiresAttunement,
+        attunementPrereqKind: item.attunementPrereqKind,
+        attunementPrereqValue: item.attunementPrereqValue,
         position,
         ...snapshotCampaignItemDetail(item),
       },

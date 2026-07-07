@@ -8,8 +8,10 @@ import {
   clearWhileActiveBuffsInTx,
   normalizeActiveEffectsMutable,
 } from "./active-effects.js";
+import { itemImmuneDamageTypes, itemResistedDamageTypes, type GrantItem } from "./capabilities.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
+import { resetActivatedUsesForRestInTx } from "./inventory.js";
 import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
 import {
@@ -25,6 +27,7 @@ import { rollDie } from "./dice.js";
 import { deriveResources } from "./class-features.js";
 import { normalizeResourcesMutable, serializeResourcesState } from "./resources.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
+import { castResourceRechargesOn, readCapability, type CapabilityColumns } from "./capabilities.js";
 
 export class InvalidHitPointOperationError extends Error {}
 
@@ -107,20 +110,24 @@ export function hitDieHeal(roll: number, conMod: number): number {
 }
 
 /**
- * Resolve an incoming damage instance against active resistances (#456). When
- * the (optional) damage type matches an active resistance and the player has not
- * declined, the applied amount is halved (round down, 5e resistance). Returns the
- * amount actually applied plus whether a halving occurred (for history/UI).
+ * Resolve an incoming damage instance against active resistances (#456) and
+ * item-granted damage immunities (#529). When the (optional) damage type matches
+ * an immunity the applied amount is zeroed; when it matches a resistance it is
+ * halved (round down, 5e). Immunity wins over resistance. Both honor the player's
+ * decline override (applyResistance=false → full damage). Returns the amount
+ * applied plus whether it was halved and/or zeroed (for history/UI).
  */
 export function resolveDamageAmount(
   rawAmount: number,
   damageType: string | undefined,
   resistedTypes: Set<string>,
   applyResistance: boolean,
-): { applied: number; resisted: boolean } {
-  const matches = applyResistance && damageType !== undefined && resistedTypes.has(damageType);
-  if (!matches) return { applied: rawAmount, resisted: false };
-  return { applied: Math.floor(rawAmount / 2), resisted: true };
+  immuneTypes: Set<string> = new Set(),
+): { applied: number; resisted: boolean; immune: boolean } {
+  const typed = applyResistance && damageType !== undefined;
+  if (typed && immuneTypes.has(damageType)) return { applied: 0, resisted: false, immune: true };
+  if (typed && resistedTypes.has(damageType)) return { applied: Math.floor(rawAmount / 2), resisted: true, immune: false };
+  return { applied: rawAmount, resisted: false, immune: false };
 }
 
 /**
@@ -653,6 +660,14 @@ interface HpOpContext {
     resources: Prisma.JsonValue;
     activeEffects: Prisma.JsonValue;
     classEntries: ClassEntryRow[];
+    // Union of three shapes over the same rows: castSpell rest-reset (#528: capability
+    // id + used), grant derivation (#529: GrantItem name/requiresAttunement), and the
+    // paper-doll placement (#565: equippedSlot replaces the derived `equipped`).
+    inventoryItems?: (Omit<GrantItem, "capabilities" | "equipped"> & {
+      id: string;
+      capabilities: (CapabilityColumns & { id: string; used?: number | null })[];
+      equippedSlot: string | null;
+    })[];
   };
   hp: HitPoints;
   hd: HitDice;
@@ -684,13 +699,20 @@ function applyDamageOp(ctx: HpOpContext, op: DamageOperation): HpOpResult {
   if (op.amount <= 0) {
     throw new InvalidHitPointOperationError("damage amount must be positive");
   }
-  // Auto-halve against active resistances (#456) unless the player declined.
+  // Auto-halve against active resistances (#456) / zero against item immunities
+  // (#529) unless the player declined: cast-buff resistances (Rage) unioned with
+  // item-granted resistances; item immunities zero the matching type.
   const resisted = activeResistedDamageTypes(normalizeActiveEffectsMutable(row.activeEffects));
-  const { applied, resisted: wasResisted } = resolveDamageAmount(
+  // Map the paper-doll placement to the boolean "worn" flag the grant helpers expect (#565).
+  const itemsForGrants = (row.inventoryItems ?? []).map((i) => ({ ...i, equipped: i.equippedSlot != null }));
+  for (const t of itemResistedDamageTypes(itemsForGrants)) resisted.add(t);
+  const immune = itemImmuneDamageTypes(itemsForGrants);
+  const { applied, resisted: wasResisted, immune: wasImmune } = resolveDamageAmount(
     op.amount,
     op.damageType,
     resisted,
     op.applyResistance !== false,
+    immune,
   );
 
   const beforeCurrent = hp.current;
@@ -700,7 +722,7 @@ function applyDamageOp(ctx: HpOpContext, op: DamageOperation): HpOpResult {
   hp.current = Math.max(0, hp.current - (applied - absorbed));
 
   const typeLabel = op.damageType ? ` ${op.damageType}` : "";
-  const resistNote = wasResisted ? ` (resisted from ${op.amount})` : "";
+  const resistNote = wasImmune ? ` (immune, from ${op.amount})` : wasResisted ? ` (resisted from ${op.amount})` : "";
   // The 5e concentration save uses the damage actually taken (post-resistance).
   return {
     summary: `Took ${applied}${typeLabel} damage${resistNote} (${beforeCurrent} → ${hp.current} HP)`,
@@ -709,6 +731,7 @@ function applyDamageOp(ctx: HpOpContext, op: DamageOperation): HpOpResult {
       rawAmount: op.amount,
       damageType: op.damageType ?? null,
       resisted: wasResisted,
+      immune: wasImmune,
     },
     damageForConcentration: applied,
   };
@@ -920,6 +943,33 @@ async function applyLevelUpOp(ctx: HpOpContext, op: LevelUpOperation): Promise<H
   };
 }
 
+// Reset the per-capability `used` counter of any active item castSpell whose
+// resource recharges on this rest (#528). Returns how many charges were restored.
+async function resetItemSpellUsesOnRest(
+  ctx: Pick<HpOpContext, "tx" | "row">,
+  rest: "short" | "long",
+): Promise<number> {
+  let restored = 0;
+  const ids: string[] = [];
+  for (const item of ctx.row.inventoryItems ?? []) {
+    // #565: `equipped` is derived from equippedSlot (no persisted boolean).
+    if (item.equippedSlot == null && !item.attuned) continue;
+    for (const col of item.capabilities) {
+      const cap = readCapability(col);
+      if (cap.kind !== "castSpell") continue;
+      if (!castResourceRechargesOn(cap.resource, rest)) continue;
+      if ((col.used ?? 0) > 0) {
+        restored += col.used ?? 0;
+        ids.push(col.id);
+      }
+    }
+  }
+  if (ids.length > 0) {
+    await ctx.tx.inventoryCapability.updateMany({ where: { id: { in: ids } }, data: { used: 0 } });
+  }
+  return restored;
+}
+
 async function applyShortRestOp(ctx: HpOpContext, op: ShortRestOperation): Promise<HpOpResult> {
   const { tx, characterId, row, hp, hd, conMod, faces, effMax } = ctx;
   const available = hd.total - hd.spent;
@@ -998,18 +1048,22 @@ async function applyShortRestOp(ctx: HpOpContext, op: ShortRestOperation): Promi
     } as unknown as Prisma.InputJsonValue;
   }
 
+  const srItemSpellsRestored = await resetItemSpellUsesOnRest(ctx, "short");
+
   const eventData: Record<string, unknown> = {
     rolls: op.rolls,
     totalGain,
     conMod,
     resourcesRestored: srResourcesRestored,
     slotsRestored: srSlotsRestored,
+    itemSpellsRestored: srItemSpellsRestored,
     beforeResourceState: beforeSrResourceState,
     ...(beforeSrSpellState ? { beforeSpellState: beforeSrSpellState } : {}),
   };
   const restParts: string[] = [`+${totalGain} HP`];
   if (srSlotsRestored > 0) restParts.push(`${srSlotsRestored} Pact slot${srSlotsRestored !== 1 ? "s" : ""} restored`);
   if (srResourcesRestored > 0) restParts.push(`resources restored`);
+  if (srItemSpellsRestored > 0) restParts.push(`item spells restored`);
   const summary = `Short rest — spent ${spending} hit ${spending === 1 ? "die" : "dice"}: ${restParts.join(", ")}`;
 
   // Write the resource reset (and any Pact slot restore) alongside HP in the
@@ -1083,13 +1137,44 @@ async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
 
   const afterResourceState = serializeResourcesState(resourceState);
 
+  const itemSpellsRestored = await resetItemSpellUsesOnRest(ctx, "long");
+
+  // Recharge limited-use consumables (#121): charged items (maxUses set) reset
+  // to full. Inlined here rather than in lib/inventory.ts to avoid an import
+  // cycle (inventory already imports this module).
+  const chargedRows = await tx.inventoryConsumableDetail.findMany({
+    where: { inventoryItem: { characterId }, maxUses: { not: null } },
+    select: { inventoryItemId: true, usesRemaining: true, maxUses: true },
+  });
+  const consumableChargesBefore: { inventoryItemId: string; usesRemaining: number | null }[] = [];
+  const consumableChargesAfter: { inventoryItemId: string; usesRemaining: number | null }[] = [];
+  let consumablesRecharged = 0;
+  for (const c of chargedRows) {
+    if (c.usesRemaining !== c.maxUses) {
+      consumableChargesBefore.push({ inventoryItemId: c.inventoryItemId, usesRemaining: c.usesRemaining });
+      consumableChargesAfter.push({ inventoryItemId: c.inventoryItemId, usesRemaining: c.maxUses });
+      await tx.inventoryConsumableDetail.update({
+        where: { inventoryItemId: c.inventoryItemId },
+        data: { usesRemaining: c.maxUses },
+      });
+      consumablesRecharged += 1;
+    }
+  }
+
   const hpRestored = effMax - prevCurrent;
-  const eventData: Record<string, unknown> = { recovered, hpRestored, slotsRestored, resourcesRestored };
+  const eventData: Record<string, unknown> = { recovered, hpRestored, slotsRestored, resourcesRestored, itemSpellsRestored };
+  if (consumablesRecharged > 0) {
+    eventData.consumablesRecharged = consumablesRecharged;
+    eventData.consumableChargesBefore = consumableChargesBefore;
+    eventData.consumableChargesAfter = consumableChargesAfter;
+  }
   const parts: string[] = [];
   if (hpRestored > 0) parts.push(`+${hpRestored} HP`);
   else parts.push("HP already full");
   if (slotsRestored > 0) parts.push(`${slotsRestored} slot${slotsRestored !== 1 ? "s" : ""} restored`);
   if (resourcesRestored > 0) parts.push(`resources restored`);
+  if (itemSpellsRestored > 0) parts.push(`item spells restored`);
+  if (consumablesRecharged > 0) parts.push(`consumables recharged`);
   const summary = `Long rest — ${parts.join(", ")}`;
 
   // Write spellcasting + resources; the dispatcher writes HP separately below.
@@ -1163,6 +1248,19 @@ export async function applyHitPointOperations(
           spellcasting: true,
           resources: true,
           activeEffects: true,
+          // Selected fields feed two seams: id + capabilities (with used) for the
+          // castSpell rest reset (#528), and name/requiresAttunement + capabilities
+          // for item-granted resistances (#529, feeding the #456 halve flow below).
+          inventoryItems: {
+            select: {
+              id: true,
+              name: true,
+              equippedSlot: true,
+              attuned: true,
+              requiresAttunement: true,
+              capabilities: true,
+            },
+          },
           classEntries: {
             orderBy: { position: "asc" as const },
             select: {
@@ -1308,6 +1406,13 @@ export async function applyHitPointOperations(
           delete data.beforeResourceState;
           delete data.afterResourceState;
         }
+        // Consumable recharge (#121) — snapshot so undo re-expends the charges.
+        if (data.consumableChargesBefore !== undefined) {
+          beforeState.consumableCharges = data.consumableChargesBefore;
+          afterState.consumableCharges = data.consumableChargesAfter ?? data.consumableChargesBefore;
+          delete data.consumableChargesBefore;
+          delete data.consumableChargesAfter;
+        }
       }
       if (op.type === "shortRest") {
         const data = eventData as Record<string, unknown>;
@@ -1344,13 +1449,10 @@ export async function applyHitPointOperations(
       // A rest clears its matching "until-rest" durable buffs (#455). Long rest
       // clears both short- and long-rest buffs; short rest only short.
       if (op.type === "shortRest" || op.type === "longRest") {
-        await clearBuffsForRestInTx(
-          tx,
-          characterId,
-          op.type === "longRest" ? "long" : "short",
-          batchId,
-          sessionId,
-        );
+        const rest = op.type === "longRest" ? "long" : "short";
+        await clearBuffsForRestInTx(tx, characterId, rest, batchId, sessionId);
+        // Recharge item activatedEffect uses on the matching rest (#543).
+        await resetActivatedUsesForRestInTx(tx, characterId, rest, batchId, sessionId);
       }
 
       // A long rest or falling unconscious (0 HP) ends all "while-active" durable

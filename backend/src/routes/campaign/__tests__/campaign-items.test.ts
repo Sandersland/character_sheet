@@ -222,4 +222,233 @@ describe("campaign items (#380)", () => {
       .send({ name: "x" });
     expect(res.status).toBe(404);
   });
+
+  // Boots of Speed: bonus action, +30 speed, once per long rest, until a long rest.
+  const bootsCapability = {
+    kind: "activatedEffect" as const,
+    activation: "bonus" as const,
+    target: "speed" as const,
+    op: "add" as const,
+    value: 30,
+    activatedDuration: "untilRest" as const,
+    resourceKind: "perRest" as const,
+    resourcePeriod: "long" as const,
+    resourceCharges: 1,
+    durationText: "10 minutes",
+  };
+
+  it("authors an activatedEffect capability on create and serializes it (#543)", async () => {
+    const res = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({ name: "Boots of Speed", category: "gear", rarity: "RARE", requiresAttunement: true, capabilities: [bootsCapability] });
+    expect(res.status).toBe(201);
+    expect(res.body.capabilities).toHaveLength(1);
+    expect(res.body.capabilities[0]).toMatchObject({
+      kind: "activatedEffect",
+      activation: "bonus",
+      target: "speed",
+      op: "add",
+      value: 30,
+      activatedDuration: "untilRest",
+      resourceKind: "perRest",
+      resourcePeriod: "long",
+      resourceCharges: 1,
+      durationText: "10 minutes",
+    });
+
+    const persisted = await prisma.campaignItemCapability.findMany({ where: { campaignItemId: res.body.id } });
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0].activation).toBe("bonus");
+  });
+
+  it("replaces capabilities on PATCH (deleteMany + create, not merge)", async () => {
+    const created = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({ name: "Reauthored Boots", category: "gear", capabilities: [bootsCapability] });
+    const itemId = created.body.id as string;
+
+    const res = await supertest(app)
+      .patch(`/api/campaigns/${campaignId}/items/${itemId}`)
+      .set("Cookie", cookieOwner)
+      .send({
+        capabilities: [
+          { kind: "passiveBonus", target: "skill", op: "add", value: 2, targetKey: "stealth" },
+        ],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.capabilities).toHaveLength(1);
+    expect(res.body.capabilities[0]).toMatchObject({ kind: "passiveBonus", target: "skill", value: 2, targetKey: "stealth" });
+
+    // The old activatedEffect row is gone — replace, not merge.
+    const persisted = await prisma.campaignItemCapability.findMany({ where: { campaignItemId: itemId } });
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0].kind).toBe("passiveBonus");
+  });
+
+  it("rejects an unknown capability field with 400 (strict schema)", async () => {
+    const res = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({ name: "Bad Cap", category: "gear", capabilities: [{ kind: "activatedEffect", bogus: true }] });
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects activatedEffect missing activation with 400 (superRefine)", async () => {
+    const res = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({
+        name: "Incomplete Effect",
+        category: "gear",
+        capabilities: [{ kind: "activatedEffect", target: "speed", op: "add", value: 30 }],
+      });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain("activation");
+  });
+
+  it("rejects activatedEffect with a non-add op with 400 (superRefine)", async () => {
+    const res = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({
+        name: "SetTo Effect",
+        category: "gear",
+        capabilities: [
+          { kind: "activatedEffect", activation: "bonus", target: "ac", op: "setTo", value: 1, resourceKind: "atWill" },
+        ],
+      });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain("op");
+  });
+
+  // ── Worn-slot authoring (#571) ──────────────────────────────────────────────
+
+  it("DM-1: a gear item with a worn slot round-trips through create + PATCH", async () => {
+    const created = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({ name: "Circlet of Blasting", category: "gear", slot: "HEAD" });
+    expect(created.status).toBe(201);
+    expect(created.body.slot).toBe("HEAD");
+    const itemId = created.body.id as string;
+    const entityId = created.body.entity.id as string;
+
+    const fetched = await supertest(app)
+      .get(`/api/campaigns/${campaignId}/items/by-entity/${entityId}`)
+      .set("Cookie", cookieOwner);
+    expect(fetched.body.slot).toBe("HEAD");
+
+    const patched = await supertest(app)
+      .patch(`/api/campaigns/${campaignId}/items/${itemId}`)
+      .set("Cookie", cookieOwner)
+      .send({ slot: "NECK" });
+    expect(patched.status).toBe(200);
+    expect(patched.body.slot).toBe("NECK");
+  });
+
+  it("DM-2: slot is optional — a gear item without one saves with slot = null", async () => {
+    const res = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({ name: "Loose Marble", category: "gear" });
+    expect(res.status).toBe(201);
+    expect(res.body.slot).toBeUndefined();
+
+    const persisted = await prisma.campaignItem.findUnique({ where: { id: res.body.id } });
+    expect(persisted?.slot).toBeNull();
+  });
+
+  it("DM-5: a slot on a non-gear item is rejected 400, naming the field", async () => {
+    const res = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({
+        name: "Slotted Sword",
+        category: "weapon",
+        slot: "HEAD",
+        weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageType: "slashing" },
+      });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain("slot");
+  });
+
+  it("DM-5: a non-worn slot (MAIN_HAND/OFF_HAND/BODY) on gear is rejected 400", async () => {
+    for (const slot of ["MAIN_HAND", "OFF_HAND", "BODY"]) {
+      const res = await supertest(app)
+        .post(`/api/campaigns/${campaignId}/items`)
+        .set("Cookie", cookieOwner)
+        .send({ name: `Bad Slot ${slot}`, category: "gear", slot });
+      expect(res.status).toBe(400);
+      expect(JSON.stringify(res.body)).toContain("slot");
+    }
+  });
+
+  it("DM-5: a PATCH that sets slot on an existing weapon (without resending category) is rejected 400", async () => {
+    const created = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({
+        name: "Plain Sword",
+        category: "weapon",
+        weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageType: "slashing" },
+      });
+    const itemId = created.body.id as string;
+    // The schema-level refine can't see the existing category on a category-less PATCH;
+    // the handler's effective-category guard must still reject the slot.
+    const res = await supertest(app)
+      .patch(`/api/campaigns/${campaignId}/items/${itemId}`)
+      .set("Cookie", cookieOwner)
+      .send({ slot: "NECK" });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain("slot");
+    const after = await prisma.campaignItem.findUnique({ where: { id: itemId } });
+    expect(after?.slot).toBeNull();
+  });
+
+  it("DM-4: updating a gear item's category to weapon clears its slot", async () => {
+    const created = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({ name: "Shifting Trinket", category: "gear", slot: "BELT" });
+    expect(created.body.slot).toBe("BELT");
+    const itemId = created.body.id as string;
+
+    const patched = await supertest(app)
+      .patch(`/api/campaigns/${campaignId}/items/${itemId}`)
+      .set("Cookie", cookieOwner)
+      .send({ category: "weapon", weapon: { damageDiceCount: 1, damageDiceFaces: 6, damageType: "bludgeoning" } });
+    expect(patched.status).toBe(200);
+    expect(patched.body.slot).toBeUndefined();
+
+    const persisted = await prisma.campaignItem.findUnique({ where: { id: itemId } });
+    expect(persisted?.slot).toBeNull();
+  });
+
+  it("PATCH replaces capabilities preserving dice fields via capabilityCreate (#543)", async () => {
+    const diceCapability = {
+      kind: "passiveBonus" as const,
+      target: "damage" as const,
+      op: "add" as const,
+      value: 0,
+      dice: { count: 1, faces: 6 },
+    };
+    const created = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({ name: "Flametongue", category: "weapon", capabilities: [] });
+    const itemId = created.body.id as string;
+
+    const res = await supertest(app)
+      .patch(`/api/campaigns/${campaignId}/items/${itemId}`)
+      .set("Cookie", cookieOwner)
+      .send({ capabilities: [diceCapability] });
+    expect(res.status).toBe(200);
+    expect(res.body.capabilities[0]).toMatchObject({ kind: "passiveBonus", target: "damage" });
+
+    const persisted = await prisma.campaignItemCapability.findMany({ where: { campaignItemId: itemId } });
+    expect(persisted[0].valueDiceCount).toBe(1);
+    expect(persisted[0].valueDiceFaces).toBe(6);
+  });
 });
