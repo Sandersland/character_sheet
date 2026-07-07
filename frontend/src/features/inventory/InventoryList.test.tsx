@@ -22,6 +22,8 @@ function makeItem(overrides: Partial<InventoryItem> = {}): InventoryItem {
     quantity: 1,
     weight: 65,
     equipped: false,
+    attuned: false,
+    requiresAttunement: false,
     ...overrides,
   };
 }

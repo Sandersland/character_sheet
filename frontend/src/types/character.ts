@@ -159,6 +159,48 @@ export interface Item {
   consumable?: ConsumableDetail;
 }
 
+// ── Item capabilities & attunement (#546) ─────────────────────────────────────
+// Mirrors backend lib/capabilities.ts. Only passiveBonus is authorable/rendered
+// this slice; the reserved kinds round-trip as opaque.
+export type CapabilityKind = "passiveBonus" | "castSpell" | "charges" | "grant" | "activatedEffect";
+
+export type CapabilityTarget =
+  | "ac"
+  | "attack"
+  | "damage"
+  | "save"
+  | "skill"
+  | "abilityScore"
+  | "spellAttack"
+  | "spellDc"
+  | "initiative"
+  | "speed"
+  | "maxHp";
+
+export type CapabilityOp = "add" | "setTo";
+
+export type AttunementPrereqKind = "class" | "spellcaster" | "species" | "alignment";
+
+/** Dice-valued bonus (e.g. +2d6 fire); consumed in the damage roll at #526C. */
+export interface CapabilityDice {
+  count: number;
+  faces: number;
+  damageType?: string;
+}
+
+/** One capability as served on a campaign item or an inventory-item snapshot. */
+export interface ItemCapability {
+  kind: CapabilityKind;
+  target?: CapabilityTarget;
+  op?: CapabilityOp;
+  value?: number;
+  /** Specific skill/ability/save key when target is skill|abilityScore|save. */
+  targetKey?: string;
+  condition?: string;
+  description?: string;
+  dice?: CapabilityDice;
+}
+
 /**
  * A character's own copy of an item's stats, optionally traced back to a
  * catalog `Item` via `itemId` (undefined means homebrew/no catalog match —
@@ -178,10 +220,17 @@ export interface InventoryItem {
   cost?: Currency;
   description?: string;
   equipped: boolean;
+  /** Attunement state (#546); the 3-item cap is derived, never stored. */
+  attuned: boolean;
+  /** Snapshotted from the source item — whether attunement is required to activate. */
+  requiresAttunement: boolean;
+  attunementPrereqKind?: AttunementPrereqKind;
+  attunementPrereqValue?: string;
   notes?: string;
   weapon?: WeaponDetail;
   armor?: ArmorDetail;
   consumable?: ConsumableDetail;
+  capabilities?: ItemCapability[];
 }
 
 // Looser than WeaponDetail/ArmorDetail above (which describe what the API
@@ -285,7 +334,11 @@ export type InventoryOperation =
   | { type: "remove"; inventoryItemId: string }
   | { type: "sell"; inventoryItemId: string; quantity?: number; currencyDelta: Currency }
   /** Equips or unequips an item. Unlike `update`, this IS logged on the timeline. */
-  | { type: "setEquipped"; inventoryItemId: string; equipped: boolean };
+  | { type: "setEquipped"; inventoryItemId: string; equipped: boolean }
+  /** Attunes an item — enforces the derived 3-item cap + prereq server-side (#546). */
+  | { type: "attune"; inventoryItemId: string }
+  /** Ends attunement; always legal (#546). */
+  | { type: "unattune"; inventoryItemId: string };
 
 // ── Unified activity timeline ─────────────────────────────────────────────────
 
@@ -1018,6 +1071,8 @@ export interface CampaignItem {
   category: ItemCategory;
   rarity?: ItemRarity;
   requiresAttunement: boolean;
+  attunementPrereqKind?: AttunementPrereqKind;
+  attunementPrereqValue?: string;
   isUnique: boolean;
   weight?: number;
   cost?: Currency;
@@ -1025,6 +1080,7 @@ export interface CampaignItem {
   weapon?: WeaponDetail;
   armor?: ArmorDetail;
   consumable?: ConsumableDetail;
+  capabilities?: ItemCapability[];
   /** The fronting ITEM CampaignEntity — its `visibility` drives player reveal. */
   entity?: { id: string; name: string; visibility: EntityVisibility };
   /** Current holders derived from live inventory rows (#381). */
@@ -1040,6 +1096,9 @@ export interface CampaignItemInput {
   category: ItemCategory;
   rarity?: ItemRarity;
   requiresAttunement?: boolean;
+  /** null clears the prerequisite (attunable by anyone). */
+  attunementPrereqKind?: AttunementPrereqKind | null;
+  attunementPrereqValue?: string | null;
   isUnique?: boolean;
   weight?: number;
   cost?: Currency;
@@ -1047,6 +1106,8 @@ export interface CampaignItemInput {
   weapon?: WeaponDetailInput;
   armor?: ArmorDetailInput;
   consumable?: ConsumableDetail;
+  /** REPLACE semantics server-side: the full set the item should have, [] clears. */
+  capabilities?: ItemCapability[];
 }
 
 /** One note that @-tags an entity, surfaced on the entity detail page. */

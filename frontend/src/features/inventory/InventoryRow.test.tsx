@@ -11,6 +11,8 @@ const mockItem: InventoryItem = {
   category: "weapon",
   quantity: 2,
   equipped: false,
+  attuned: false,
+  requiresAttunement: false,
   weapon: {
     damageDiceCount: 1,
     damageDiceFaces: 4,
@@ -146,6 +148,8 @@ describe("InventoryRow (edit mode)", () => {
     category: "weapon",
     quantity: 2,
     equipped: false,
+    attuned: false,
+    requiresAttunement: false,
     weapon: {
       damageDiceCount: 1,
       damageDiceFaces: 4,
@@ -167,6 +171,8 @@ describe("InventoryRow (edit mode)", () => {
     category: "armor",
     quantity: 1,
     equipped: false,
+    attuned: false,
+    requiresAttunement: false,
     armor: {
       armorCategory: "light",
       baseArmorClass: 11,
@@ -181,6 +187,8 @@ describe("InventoryRow (edit mode)", () => {
     category: "consumable",
     quantity: 3,
     equipped: false,
+    attuned: false,
+    requiresAttunement: false,
     consumable: {
       effectDiceCount: 2,
       effectDiceFaces: 4,
