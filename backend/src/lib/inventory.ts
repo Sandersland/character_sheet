@@ -395,6 +395,7 @@ export interface DeletedInventoryItemSnapshot {
   quantity: number;
   equipped: boolean;
   attuned: boolean;
+  requiresAttunement: boolean;
   attunementPrereqKind: AttunementPrereqKind | null;
   attunementPrereqValue: string | null;
   notes: string | null;
@@ -422,6 +423,7 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
     quantity: item.quantity,
     equipped: item.equipped,
     attuned: item.attuned,
+    requiresAttunement: item.requiresAttunement,
     attunementPrereqKind: item.attunementPrereqKind,
     attunementPrereqValue: item.attunementPrereqValue,
     notes: item.notes,
@@ -1025,6 +1027,7 @@ export async function revertInventoryEvent(
         quantity: deletedItem.quantity,
         equipped: deletedItem.equipped,
         attuned: deletedItem.attuned ?? false,
+        requiresAttunement: deletedItem.requiresAttunement ?? false,
         attunementPrereqKind: deletedItem.attunementPrereqKind ?? undefined,
         attunementPrereqValue: deletedItem.attunementPrereqValue ?? undefined,
         notes: deletedItem.notes ?? undefined,

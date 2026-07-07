@@ -74,6 +74,7 @@ describe("capability snapshot on award (#545)", () => {
       include: inventoryItemDetailInclude,
     });
 
+    expect(row.requiresAttunement).toBe(true);
     expect(row.attunementPrereqKind).toBe("species");
     expect(row.attunementPrereqValue).toBe("Elf");
     expect(row.capabilities).toHaveLength(2);
@@ -97,6 +98,7 @@ describe("capability snapshot on award (#545)", () => {
     // Provenance FK nulled by SetNull, but the snapshotted capabilities survive.
     expect(row.campaignItemId).toBeNull();
     expect(row.capabilities).toHaveLength(2);
+    expect(row.requiresAttunement).toBe(true);
     expect(row.attunementPrereqValue).toBe("Elf");
   });
 });

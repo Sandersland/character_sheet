@@ -178,6 +178,7 @@ function serializeInventoryItem(
     description: row.description ?? undefined,
     equipped: row.equipped,
     attuned: row.attuned,
+    requiresAttunement: row.requiresAttunement,
     notes: row.notes ?? undefined,
     weapon,
     armor: row.armorDetail ? serializeArmorDetail(row.armorDetail) : undefined,

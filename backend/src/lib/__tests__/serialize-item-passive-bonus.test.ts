@@ -72,6 +72,24 @@ describe("serialize sums active-item scalar passiveBonus into tempModifier (#545
     expect(stealth(view).tempModifier).toBeUndefined();
   });
 
+  it("surfaces the snapshotted requiresAttunement flag on the serialized item (#545)", async () => {
+    const attunable = await prisma.inventoryItem.create({
+      data: {
+        character: { connect: { id: characterId } },
+        name: "Ring of Protection",
+        category: "gear",
+        quantity: 1,
+        requiresAttunement: true,
+      },
+    });
+    const view = await serialize(characterId);
+    const ring = view.inventory.find((i) => i.id === attunable.id);
+    expect(ring?.requiresAttunement).toBe(true);
+    // A plain item (no flag) reports false, not undefined — a reliable frontend signal.
+    const cloak = view.inventory.find((i) => i.id === itemId);
+    expect(cloak?.requiresAttunement).toBe(false);
+  });
+
   it("applies the bonus while equipped, with a labeled source", async () => {
     await prisma.inventoryItem.update({ where: { id: itemId }, data: { equipped: true } });
     const view = await serialize(characterId);

@@ -977,7 +977,10 @@ model InventoryItem {
   // Attunement state (#545) — persisted boolean; the 3-item cap is DERIVED
   // (counted), never stored. attune/unattune go through …/inventory/transactions.
   attuned     Boolean      @default(false)
-  // Snapshot of the source CampaignItem's attunement prerequisite (#545).
+  // Snapshot of the source CampaignItem's attunement metadata (#545). requiresAttunement
+  // is captured at award time because the frozen copy outlives the mutable/deletable source;
+  // prereqKind null = attunable by anyone (distinct from requiresAttunement false = not attunable).
+  requiresAttunement    Boolean               @default(false)
   attunementPrereqKind  AttunementPrereqKind?
   attunementPrereqValue String?
   notes       String?

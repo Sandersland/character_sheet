@@ -206,8 +206,9 @@ export async function awardCampaignItem(params: {
         description: item.description ?? undefined,
         quantity,
         equipped: false,
-        // Snapshot the attunement prerequisite so the attune check runs against
+        // Snapshot the attunement metadata so the attune check runs against
         // the frozen copy, not the mutable source (#545).
+        requiresAttunement: item.requiresAttunement,
         attunementPrereqKind: item.attunementPrereqKind,
         attunementPrereqValue: item.attunementPrereqValue,
         position,
