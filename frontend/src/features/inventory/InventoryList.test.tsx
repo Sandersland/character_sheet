@@ -189,6 +189,21 @@ describe("InventoryList empty state", () => {
     expect(screen.queryByRole("meter")).toBeNull();
     expect(screen.queryByRole("heading", { level: 4 })).toBeNull();
   });
+
+  it("falls back to the empty state (not the doll) when the last item is removed on the Worn tab", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <InventoryList
+        character={makeCharacter(10, [makeItem({ id: "w1", name: "Longsword", category: "weapon" })])}
+        onUpdate={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole("radio", { name: "Worn" }));
+    // Remove the last item: parent re-renders with an empty inventory while `view` stays "worn".
+    rerender(<InventoryList character={makeCharacter(10, [])} onUpdate={vi.fn()} />);
+    expect(screen.getByText(/your pack is empty/i)).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "+ Add item" }).length).toBeGreaterThan(0);
+  });
 });
 
 describe("InventoryList search and filter", () => {

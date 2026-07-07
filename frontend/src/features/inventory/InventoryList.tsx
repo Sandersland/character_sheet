@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { applyInventoryTransactions, fetchItems, updateCharacter } from "@/api/client";
 import type { Character, Currency, InventoryOperation, Item, ItemCategory } from "@/types/character";
 import AddItemPanel from "@/features/inventory/AddItemPanel";
+import EquipmentDoll from "@/features/inventory/EquipmentDoll";
+import Segmented from "@/components/ui/Segmented";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import { GiKnapsack, ITEM_CATEGORY_ICONS } from "@/components/ui/icons";
@@ -131,6 +133,7 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [view, setView] = useState<"bag" | "worn">("bag");
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [configuringSell, setConfiguringSell] = useState(false);
@@ -322,6 +325,18 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
         )}
 
         {hasItems && !configuringSell && (
+          <Segmented
+            label="Inventory view"
+            options={[
+              { value: "bag", label: "Bag" },
+              { value: "worn", label: "Worn" },
+            ]}
+            value={view}
+            onChange={setView}
+          />
+        )}
+
+        {hasItems && !configuringSell && view === "bag" && (
           <div className="flex flex-col gap-2">
             <div className="relative">
               <Search
@@ -378,12 +393,17 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
             onCancel={() => setConfiguringSell(false)}
           />
         ) : !hasItems ? (
+          // Empty state wins over the view: if the last item is removed while on the
+          // Worn tab (the Segmented toggle is hidden when !hasItems), fall back to the
+          // Add-item CTA rather than stranding the user on an empty doll.
           <EmptyState
             icon={<GiKnapsack />}
             title="Your pack is empty"
             description="Add gear, weapons, and treasure to track what you're carrying."
             action={{ label: "+ Add item", onClick: () => setAddOpen(true) }}
           />
+        ) : view === "worn" ? (
+          <EquipmentDoll character={character} pending={pending} onSubmit={submitOperations} />
         ) : hasMatches ? (
           <div className="max-h-96 overflow-y-auto">
             {sections.map((section) => {

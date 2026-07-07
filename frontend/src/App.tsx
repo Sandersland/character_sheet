@@ -10,6 +10,7 @@ import CampaignDetailPage from "@/features/campaign/CampaignDetailPage";
 import CampaignsPage from "@/features/campaign/CampaignsPage";
 import JoinCampaignRoute from "@/features/campaign/JoinCampaignRoute";
 import EntityDetailPage from "@/features/entities/EntityDetailPage";
+import AboutPage from "@/pages/AboutPage";
 import CharacterListPage from "@/pages/CharacterListPage";
 import CharacterSheetPage from "@/pages/CharacterSheetPage";
 
@@ -56,6 +57,8 @@ export default function App() {
                   element={<EntityDetailPage />}
                 />
                 <Route path="/join/:code" element={<JoinCampaignRoute />} />
+                {/* About / third-party asset credits (#566) */}
+                <Route path="/about" element={<AboutPage />} />
               </Routes>
               </Suspense>
             </AuthGate>
