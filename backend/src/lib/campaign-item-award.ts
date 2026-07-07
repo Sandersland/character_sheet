@@ -88,6 +88,9 @@ function snapshotCampaignItemDetail(item: CampaignItemWithDetails) {
             effectDiceFaces: item.consumableDetail.effectDiceFaces,
             effectModifier: item.consumableDetail.effectModifier,
             effectDescription: item.consumableDetail.effectDescription,
+            maxUses: item.consumableDetail.maxUses,
+            // An awarded charged consumable starts full (#121).
+            usesRemaining: item.consumableDetail.usesRemaining ?? item.consumableDetail.maxUses,
           },
         }
       : undefined,
@@ -108,6 +111,11 @@ function snapshotCampaignItemDetail(item: CampaignItemWithDetails) {
               valueDiceCount: c.valueDiceCount,
               valueDiceFaces: c.valueDiceFaces,
               valueDamageType: c.valueDamageType,
+              grantType: c.grantType,
+              grantOn: c.grantOn,
+              grantValueKind: c.grantValueKind,
+              grantValue: c.grantValue,
+              cantBeSurprised: c.cantBeSurprised,
             })),
           }
         : undefined,

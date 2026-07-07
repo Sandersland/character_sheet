@@ -9,6 +9,7 @@ import JournalSection from "@/features/character-meta/JournalSection";
 import SpellsSection from "@/features/spells/SpellsSection";
 import ProficienciesCard from "@/features/abilities/ProficienciesCard";
 import VitalsStrip from "@/features/character-meta/VitalsStrip";
+import ItemGrantsCard from "@/features/character-meta/ItemGrantsCard";
 import ConditionsStrip from "@/features/conditions/ConditionsStrip";
 import Card from "@/components/ui/Card";
 import { hasAdvancements, hasProficiencies } from "@/lib/characterSections";
@@ -60,6 +61,9 @@ export default function CharacterSheetBody({
           />
         </Card>
       )}
+
+      {/* ── Item-granted resistances, immunities & advantages (#529) ── */}
+      <ItemGrantsCard character={character} />
 
       {/* ── Features & Traits ──────────────────────────────────────── */}
       {/* Class features + Advancements grouped together as on a printed sheet. */}

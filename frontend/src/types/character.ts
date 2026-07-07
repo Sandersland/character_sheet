@@ -138,6 +138,10 @@ export interface ConsumableDetail {
   effectDiceFaces?: number;
   effectModifier?: number;
   effectDescription?: string; // e.g. "Restores hit points"
+  // Limited-use charges (#121). Undefined = stackable (use decrements quantity);
+  // set = charged (use decrements usesRemaining, recharges on long rest).
+  maxUses?: number;
+  usesRemaining?: number;
 }
 
 /**
@@ -181,6 +185,12 @@ export type CapabilityOp = "add" | "setTo";
 
 export type AttunementPrereqKind = "class" | "spellcaster" | "species" | "alignment";
 
+// grant kind (#529). Mirrors backend lib/capabilities.ts.
+export type GrantType = "resistance" | "immunity" | "conditionImmunity" | "advantage" | "proficiency";
+export type AdvantageOn = "save" | "check" | "initiative" | "attack";
+export type GrantValueKind = "damageType" | "condition" | "skill" | "ability" | "save" | "weapon" | "tool" | "language";
+export type ProficiencyKind = "skill" | "save" | "weapon" | "tool" | "language";
+
 /** Dice-valued bonus (e.g. +2d6 fire); consumed in the damage roll at #526C. */
 export interface CapabilityDice {
   count: number;
@@ -199,6 +209,41 @@ export interface ItemCapability {
   condition?: string;
   description?: string;
   dice?: CapabilityDice;
+  /** grant kind (#529): the trait/proficiency the item confers while active. */
+  grantType?: GrantType;
+  grantOn?: AdvantageOn;
+  grantValueKind?: GrantValueKind;
+  grantValue?: string;
+  cantBeSurprised?: boolean;
+}
+
+/** An item-granted damage resistance/immunity, tagged with its item source (#529). */
+export interface ItemDamageTrait {
+  damageType: string;
+  source: string;
+}
+
+/** An item-granted condition immunity, tagged with its item source (#529). */
+export interface ItemConditionImmunity {
+  condition: string;
+  source: string;
+}
+
+/** An item-granted advantage (rendered as reminder text on its surface) (#529). */
+export interface ItemAdvantageGrant {
+  on: AdvantageOn;
+  valueKind?: GrantValueKind;
+  value?: string;
+  cantBeSurprised: boolean;
+  source: string;
+  description?: string;
+}
+
+/** An item-granted proficiency, for the item-source display marker (#529). */
+export interface ItemProficiencyGrant {
+  profType: ProficiencyKind;
+  value: string;
+  source: string;
 }
 
 /**
@@ -318,6 +363,9 @@ export type InventoryOperation =
       currencyDelta?: Currency;
     }
   | { type: "adjustQuantity"; inventoryItemId: string; delta: number }
+  /** Consumes one use of a consumable (#121). `rolls` are client-rolled effect
+   *  dice for the 3D animation; omit to have the server roll. */
+  | { type: "use"; inventoryItemId: string; rolls?: number[] }
   | {
       type: "update";
       inventoryItemId: string;
@@ -728,8 +776,8 @@ export interface CatalogFeat {
 export interface ToolProficiency {
   name: string;
   category: "artisan" | "gamingSet" | "musicalInstrument" | "other";
-  /** Where this proficiency came from. */
-  source: "background" | "class" | "race" | "subclass";
+  /** Where this proficiency came from ("item" = a magic item grant, #529). */
+  source: "background" | "class" | "race" | "subclass" | "item";
 }
 
 /** Armor category that a character is proficient with. */
@@ -752,7 +800,7 @@ export interface ArmorProficiency {
  */
 export interface WeaponProficiency {
   name: string;
-  source: "class" | "race" | "feat";
+  source: "class" | "race" | "feat" | "item";
 }
 
 /** Level-gated tool proficiency entry within the resources JSON. */
@@ -968,6 +1016,14 @@ export interface Character {
    * read). Each is also summed into its target skill/stat's tempModifier.
    */
   activeEffects: ActiveEffectsState;
+
+  // Item-granted traits (#529), derived from active items. resistances also feed
+  // the #456 auto-halve at damage-apply; all render as item-sourced sheet flags.
+  resistances?: ItemDamageTrait[];
+  damageImmunities?: ItemDamageTrait[];
+  conditionImmunities?: ItemConditionImmunity[];
+  grantedAdvantages?: ItemAdvantageGrant[];
+  grantedProficiencies?: ItemProficiencyGrant[];
 
   /**
    * Derived available actions for the current turn — filtered by class/level/

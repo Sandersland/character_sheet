@@ -367,6 +367,10 @@ model CampaignItemConsumableDetail {
   effectDiceFaces   Int?
   effectModifier    Int?
   effectDescription String?
+
+  // Limited-use charges (#121). null = stackable; non-null = charged.
+  maxUses       Int?
+  usesRemaining Int?
 }
 
 // Typed 1:N capability side-table (#545). Kind-discriminated with flat columns;
@@ -392,6 +396,13 @@ model CampaignItemCapability {
   valueDiceCount  Int?
   valueDiceFaces  Int?
   valueDamageType String?
+
+  // grant payload (#529): resistance/immunity/conditionImmunity/advantage/proficiency.
+  grantType       String?
+  grantOn         String?
+  grantValueKind  String?
+  grantValue      String?
+  cantBeSurprised Boolean @default(false)
 
   @@index([campaignItemId])
 }
@@ -921,6 +932,10 @@ model ItemConsumableDetail {
   effectDiceFaces   Int?
   effectModifier    Int?
   effectDescription String? // e.g. "Restores hit points"
+
+  // Limited-use charges (#121). null = stackable; non-null = charged.
+  maxUses       Int?
+  usesRemaining Int?
 }
 
 // Equipment packs — a named collection of items awarded as a bundle at
@@ -1012,6 +1027,13 @@ model InventoryCapability {
   valueDiceFaces  Int?
   valueDamageType String?
 
+  // grant payload (#529): resistance/immunity/conditionImmunity/advantage/proficiency.
+  grantType       String?
+  grantOn         String?
+  grantValueKind  String?
+  grantValue      String?
+  cantBeSurprised Boolean @default(false)
+
   @@index([inventoryItemId])
 }
 
@@ -1069,6 +1091,10 @@ model InventoryConsumableDetail {
   effectDiceFaces   Int?
   effectModifier    Int?
   effectDescription String?
+
+  // Limited-use charges (#121). null = stackable; non-null = charged.
+  maxUses       Int?
+  usesRemaining Int?
 }
 
 // ── Unified character activity log ──────────────────────────────────────────

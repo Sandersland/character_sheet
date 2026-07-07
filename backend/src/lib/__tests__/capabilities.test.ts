@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  deriveItemGrants,
   deriveItemPassiveBonuses,
   describeAttunementPrereq,
+  isItemActive,
+  itemImmuneDamageTypes,
+  itemResistedDamageTypes,
   meetsAttunementPrereq,
   passiveBonusChannel,
   readCapability,
+  serializeCapability,
   type CapabilityColumns,
 } from "../capabilities.js";
 
@@ -112,6 +117,106 @@ describe("deriveItemPassiveBonuses", () => {
       },
     ]);
     expect(out).toEqual([]);
+  });
+});
+
+describe("grant capabilities (#529)", () => {
+  const resistFire: CapabilityColumns = { kind: "grant", grantType: "resistance", grantValueKind: "damageType", grantValue: "fire" };
+  const profPerception: CapabilityColumns = { kind: "grant", grantType: "proficiency", grantValueKind: "skill", grantValue: "perception" };
+  const advCheckPerception: CapabilityColumns = { kind: "grant", grantType: "advantage", grantOn: "check", grantValueKind: "skill", grantValue: "perception" };
+  const advInitSurprise: CapabilityColumns = { kind: "grant", grantType: "advantage", grantOn: "initiative", cantBeSurprised: true };
+  const immPoisoned: CapabilityColumns = { kind: "grant", grantType: "conditionImmunity", grantValueKind: "condition", grantValue: "poisoned" };
+
+  it("materializes a grant capability", () => {
+    expect(readCapability(resistFire)).toEqual({
+      kind: "grant",
+      grantType: "resistance",
+      grantOn: null,
+      grantValueKind: "damageType",
+      grantValue: "fire",
+      cantBeSurprised: false,
+      description: null,
+    });
+  });
+
+  it("reads a grant missing grantType as opaque", () => {
+    expect(readCapability({ kind: "grant" }).kind).toBe("grant");
+    expect("grantType" in readCapability({ kind: "grant" })).toBe(false);
+  });
+
+  it("round-trips a grant through serializeCapability (nulls dropped)", () => {
+    expect(serializeCapability(advInitSurprise)).toEqual({ kind: "grant", grantType: "advantage", grantOn: "initiative", cantBeSurprised: true });
+    expect(serializeCapability(resistFire)).toEqual({ kind: "grant", grantType: "resistance", grantValueKind: "damageType", grantValue: "fire" });
+  });
+
+  it("gates activation: attunement item active only when attuned; else when equipped", () => {
+    expect(isItemActive({ equipped: true, attuned: false, requiresAttunement: true })).toBe(false);
+    expect(isItemActive({ equipped: false, attuned: true, requiresAttunement: true })).toBe(true);
+    expect(isItemActive({ equipped: true, attuned: false, requiresAttunement: false })).toBe(true);
+    expect(isItemActive({ equipped: false, attuned: false, requiresAttunement: false })).toBe(false);
+  });
+
+  it("buckets grants from active items by derivation channel", () => {
+    const out = deriveItemGrants([
+      { name: "Ring of Fire Resistance", equipped: false, attuned: true, requiresAttunement: true, capabilities: [resistFire] },
+      { name: "Eyes of the Eagle", equipped: false, attuned: true, requiresAttunement: true, capabilities: [advCheckPerception, profPerception] },
+      { name: "Weapon of Warning", equipped: true, attuned: true, requiresAttunement: true, capabilities: [advInitSurprise] },
+      { name: "Amulet", equipped: false, attuned: true, requiresAttunement: true, capabilities: [immPoisoned] },
+    ]);
+    expect(out.resistances).toEqual([{ value: "fire", source: "Ring of Fire Resistance" }]);
+    expect(out.proficiencies).toEqual([{ profType: "skill", value: "perception", source: "Eyes of the Eagle" }]);
+    expect(out.conditionImmunities).toEqual([{ value: "poisoned", source: "Amulet" }]);
+    expect(out.advantages).toEqual([
+      { on: "check", valueKind: "skill", value: "perception", cantBeSurprised: false, source: "Eyes of the Eagle" },
+      { on: "initiative", cantBeSurprised: true, source: "Weapon of Warning" },
+    ]);
+  });
+
+  it("drops grants from an inactive (unattuned) item — no residue", () => {
+    const out = deriveItemGrants([
+      { name: "Ring of Fire Resistance", equipped: true, attuned: false, requiresAttunement: true, capabilities: [resistFire] },
+    ]);
+    expect(out.resistances).toEqual([]);
+    expect(itemResistedDamageTypes([
+      { name: "Ring of Fire Resistance", equipped: true, attuned: false, requiresAttunement: true, capabilities: [resistFire] },
+    ]).size).toBe(0);
+  });
+
+  it("exposes active resistances as a damage-type set for the #456 halve flow", () => {
+    const set = itemResistedDamageTypes([
+      { name: "Ring of Fire Resistance", equipped: false, attuned: true, requiresAttunement: true, capabilities: [resistFire] },
+    ]);
+    expect(set.has("fire")).toBe(true);
+  });
+
+  it("exposes active damage immunities as a set for the damage-apply zeroing", () => {
+    const immFire: CapabilityColumns = { kind: "grant", grantType: "immunity", grantValueKind: "damageType", grantValue: "fire" };
+    const set = itemImmuneDamageTypes([
+      { name: "Amulet", equipped: false, attuned: true, requiresAttunement: true, capabilities: [immFire] },
+    ]);
+    expect(set.has("fire")).toBe(true);
+    // Inactive item contributes nothing.
+    expect(itemImmuneDamageTypes([
+      { name: "Amulet", equipped: false, attuned: false, requiresAttunement: true, capabilities: [immFire] },
+    ]).size).toBe(0);
+  });
+
+  it("drops a stale skill/ability qualifier from a whole-axis (initiative/attack) advantage", () => {
+    // A grant mis-authored with a leftover skill value on an initiative axis.
+    const staleInit: CapabilityColumns = {
+      kind: "grant",
+      grantType: "advantage",
+      grantOn: "initiative",
+      grantValueKind: "skill",
+      grantValue: "perception",
+      cantBeSurprised: true,
+    };
+    const out = deriveItemGrants([
+      { name: "Weapon of Warning", equipped: true, attuned: true, requiresAttunement: true, capabilities: [staleInit] },
+    ]);
+    expect(out.advantages).toEqual([
+      { on: "initiative", cantBeSurprised: true, source: "Weapon of Warning" },
+    ]);
   });
 });
 

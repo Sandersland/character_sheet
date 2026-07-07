@@ -14,24 +14,35 @@ describe("resolveDamageAmount (#456)", () => {
   const bps = new Set(["bludgeoning", "piercing", "slashing"]);
 
   it("halves (round down) when the damage type matches an active resistance", () => {
-    expect(resolveDamageAmount(12, "slashing", bps, true)).toEqual({ applied: 6, resisted: true });
-    expect(resolveDamageAmount(13, "piercing", bps, true)).toEqual({ applied: 6, resisted: true });
+    expect(resolveDamageAmount(12, "slashing", bps, true)).toEqual({ applied: 6, resisted: true, immune: false });
+    expect(resolveDamageAmount(13, "piercing", bps, true)).toEqual({ applied: 6, resisted: true, immune: false });
   });
 
   it("leaves non-matching damage types unaffected", () => {
-    expect(resolveDamageAmount(12, "fire", bps, true)).toEqual({ applied: 12, resisted: false });
+    expect(resolveDamageAmount(12, "fire", bps, true)).toEqual({ applied: 12, resisted: false, immune: false });
   });
 
   it("leaves typeless damage unaffected (no regression)", () => {
-    expect(resolveDamageAmount(12, undefined, bps, true)).toEqual({ applied: 12, resisted: false });
+    expect(resolveDamageAmount(12, undefined, bps, true)).toEqual({ applied: 12, resisted: false, immune: false });
   });
 
   it("takes the full amount when the player declines resistance (manual override)", () => {
-    expect(resolveDamageAmount(12, "slashing", bps, false)).toEqual({ applied: 12, resisted: false });
+    expect(resolveDamageAmount(12, "slashing", bps, false)).toEqual({ applied: 12, resisted: false, immune: false });
   });
 
   it("does not halve when no resistances are active", () => {
-    expect(resolveDamageAmount(12, "slashing", new Set(), true)).toEqual({ applied: 12, resisted: false });
+    expect(resolveDamageAmount(12, "slashing", new Set(), true)).toEqual({ applied: 12, resisted: false, immune: false });
+  });
+
+  it("zeroes an immune damage type, taking precedence over resistance (#529)", () => {
+    const immune = new Set(["fire"]);
+    expect(resolveDamageAmount(12, "fire", bps, true, immune)).toEqual({ applied: 0, resisted: false, immune: true });
+    // A type that is both immune and resisted zeroes (immunity wins).
+    expect(resolveDamageAmount(12, "slashing", bps, true, new Set(["slashing"]))).toEqual({ applied: 0, resisted: false, immune: true });
+  });
+
+  it("takes full immune damage when the player declines the override (#529)", () => {
+    expect(resolveDamageAmount(12, "fire", bps, false, new Set(["fire"]))).toEqual({ applied: 12, resisted: false, immune: false });
   });
 });
 
