@@ -5,6 +5,7 @@ import { hasItemProse, itemDetailParts } from "@/lib/itemDetails";
 import { isEquippable } from "@/lib/items";
 import type { InventoryItem, InventoryOperation } from "@/types/character";
 import OverflowMenu from "@/components/ui/OverflowMenu";
+import AttuneToggle from "@/features/inventory/AttuneToggle";
 import EquipToggle from "@/features/inventory/EquipToggle";
 import InventoryEditForm from "@/features/inventory/InventoryEditForm";
 import ItemProse from "@/features/inventory/ItemProse";
@@ -17,6 +18,8 @@ interface InventoryRowProps {
   onEdit: () => void;
   onCancel: () => void;
   onSubmit: (operations: InventoryOperation[]) => Promise<void>;
+  // True when 3 items are already attuned — gates a new attune (5e cap).
+  atCap?: boolean;
   // Multi-select sell mode: a leading checkbox replaces the per-row actions.
   selectMode?: boolean;
   selected?: boolean;
@@ -49,6 +52,7 @@ export default function InventoryRow({
   onEdit,
   onCancel,
   onSubmit,
+  atCap = false,
   selectMode = false,
   selected = false,
   onToggleSelect,
@@ -90,6 +94,9 @@ export default function InventoryRow({
           )}
           {isEquippable(item.category) && (
             <EquipToggle item={item} pending={pending} onSubmit={onSubmit} />
+          )}
+          {item.requiresAttunement && (
+            <AttuneToggle item={item} pending={pending} atCap={atCap} onSubmit={onSubmit} />
           )}
           <OverflowMenu
             label={`Actions for ${item.name}`}

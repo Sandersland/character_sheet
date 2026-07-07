@@ -38,7 +38,7 @@ import { deriveActions, type AvailableAction } from "./actions.js";
 import { normalizeResourcesMutable, type AdvancementEntry, type ToolProfEntry } from "./resources.js";
 import { normalizeConditionsMutable } from "./conditions.js";
 import { buffsByTarget, normalizeActiveEffectsMutable, type ActiveBuff } from "./active-effects.js";
-import { deriveItemPassiveBonuses, type ItemPassiveContribution } from "./capabilities.js";
+import { deriveItemPassiveBonuses, serializeCapability, type ItemPassiveContribution } from "./capabilities.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeSpellcastingMutable } from "./spellcasting.js";
 import type { SpellEntry } from "./spell-state.js";
@@ -179,10 +179,13 @@ function serializeInventoryItem(
     equipped: row.equipped,
     attuned: row.attuned,
     requiresAttunement: row.requiresAttunement,
+    attunementPrereqKind: row.attunementPrereqKind ?? undefined,
+    attunementPrereqValue: row.attunementPrereqValue ?? undefined,
     notes: row.notes ?? undefined,
     weapon,
     armor: row.armorDetail ? serializeArmorDetail(row.armorDetail) : undefined,
     consumable: row.consumableDetail ? serializeConsumableDetail(row.consumableDetail) : undefined,
+    capabilities: row.capabilities.length > 0 ? row.capabilities.map(serializeCapability) : undefined,
   };
 }
 

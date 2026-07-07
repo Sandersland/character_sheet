@@ -4,6 +4,12 @@ import { z } from "zod";
 import { Prisma } from "../../generated/prisma/client.js";
 import { assertCampaignMembership } from "../../lib/auth/access.js";
 import {
+  ATTUNEMENT_PREREQ_KINDS,
+  CAPABILITY_OPS,
+  CAPABILITY_TARGETS,
+  serializeCapability,
+} from "../../lib/capabilities.js";
+import {
   awardCampaignItem,
   CampaignItemAwardError,
   campaignItemHolders,
@@ -79,12 +85,36 @@ const consumableInputSchema = z
   })
   .strict();
 
+// A DM-authored passiveBonus capability (#546). Only passiveBonus is authorable
+// this slice; dice is nested and consumed in the damage roll at #526C.
+const capabilityInputSchema = z
+  .object({
+    kind: z.literal("passiveBonus"),
+    target: z.enum(CAPABILITY_TARGETS),
+    op: z.enum(CAPABILITY_OPS),
+    value: z.number().int().optional(),
+    targetKey: z.string().min(1).optional(),
+    condition: z.string().optional(),
+    description: z.string().optional(),
+    dice: z
+      .object({
+        count: z.number().int().positive(),
+        faces: z.number().int().positive(),
+        damageType: z.string().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 const baseFields = {
   name: z.string().min(1),
   description: z.string().optional(),
   category: z.enum(CATEGORIES),
   rarity: z.enum(ITEM_RARITY_KEYS).nullable().optional(),
   requiresAttunement: z.boolean().optional(),
+  attunementPrereqKind: z.enum(ATTUNEMENT_PREREQ_KINDS).nullable().optional(),
+  attunementPrereqValue: z.string().nullable().optional(),
   isUnique: z.boolean().optional(),
   weight: z.number().optional(),
   cost: currencySchema.optional(),
@@ -92,7 +122,24 @@ const baseFields = {
   weapon: weaponInputSchema.optional(),
   armor: armorInputSchema.optional(),
   consumable: consumableInputSchema.optional(),
+  capabilities: z.array(capabilityInputSchema).optional(),
 };
+
+// Map a capability input onto the flat side-table columns.
+function capabilityCreate(cap: z.infer<typeof capabilityInputSchema>) {
+  return {
+    kind: cap.kind,
+    target: cap.target,
+    op: cap.op,
+    value: cap.value ?? null,
+    targetKey: cap.targetKey ?? null,
+    condition: cap.condition ?? null,
+    description: cap.description ?? null,
+    valueDiceCount: cap.dice?.count ?? null,
+    valueDiceFaces: cap.dice?.faces ?? null,
+    valueDamageType: cap.dice?.damageType ?? null,
+  };
+}
 
 const createItemSchema = z.object(baseFields).strict();
 const updateItemSchema = z.object(baseFields).partial().strict();
@@ -111,6 +158,7 @@ const itemInclude = {
   weaponDetail: true,
   armorDetail: true,
   consumableDetail: true,
+  capabilities: true,
   link: { include: { campaignEntity: { select: { id: true, name: true, visibility: true } } } },
 } satisfies Prisma.CampaignItemInclude;
 
@@ -135,9 +183,12 @@ function serializeCampaignItem(
     category: row.category,
     rarity: row.rarity ?? undefined,
     requiresAttunement: row.requiresAttunement,
+    attunementPrereqKind: row.attunementPrereqKind ?? undefined,
+    attunementPrereqValue: row.attunementPrereqValue ?? undefined,
     isUnique: row.isUnique,
     weight: row.weight ?? undefined,
     cost: row.cost ?? undefined,
+    capabilities: row.capabilities.length > 0 ? row.capabilities.map(serializeCapability) : undefined,
     ...(includeDmNotes ? { dmNotes: row.dmNotes ?? undefined } : {}),
     weapon: row.weaponDetail ? serializeWeaponDetail(row.weaponDetail) : undefined,
     armor: row.armorDetail ? serializeArmorDetail(row.armorDetail) : undefined,
@@ -237,11 +288,16 @@ campaignItemsRouter.post("/campaigns/:id/items", async (req, res) => {
         category: data.category,
         rarity: data.rarity ?? null,
         requiresAttunement: data.requiresAttunement ?? false,
+        attunementPrereqKind: data.attunementPrereqKind ?? null,
+        attunementPrereqValue: data.attunementPrereqValue ?? null,
         isUnique: data.isUnique ?? false,
         weight: data.weight ?? null,
         cost: data.cost ?? Prisma.DbNull,
         dmNotes: data.dmNotes ?? null,
         ...detailCreate(data),
+        ...(data.capabilities && data.capabilities.length > 0
+          ? { capabilities: { create: data.capabilities.map(capabilityCreate) } }
+          : {}),
         link: { create: { campaignEntityId: entity.id } },
       },
       include: itemInclude,
@@ -291,6 +347,8 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
         ...(data.category !== undefined ? { category: data.category } : {}),
         ...(data.rarity !== undefined ? { rarity: data.rarity } : {}),
         ...(data.requiresAttunement !== undefined ? { requiresAttunement: data.requiresAttunement } : {}),
+        ...(data.attunementPrereqKind !== undefined ? { attunementPrereqKind: data.attunementPrereqKind } : {}),
+        ...(data.attunementPrereqValue !== undefined ? { attunementPrereqValue: data.attunementPrereqValue } : {}),
         ...(data.isUnique !== undefined ? { isUnique: data.isUnique } : {}),
         ...(data.weight !== undefined ? { weight: data.weight } : {}),
         ...(data.cost !== undefined ? { cost: data.cost } : {}),
@@ -299,6 +357,11 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
         ...(data.armor ? { armorDetail: { upsert: { create: data.armor, update: data.armor } } } : {}),
         ...(data.consumable
           ? { consumableDetail: { upsert: { create: data.consumable, update: data.consumable } } }
+          : {}),
+        // Capabilities REPLACE on any send (including []): clear then recreate, so
+        // an edit that drops a bonus removes its row rather than merging.
+        ...(data.capabilities !== undefined
+          ? { capabilities: { deleteMany: {}, create: data.capabilities.map(capabilityCreate) } }
           : {}),
       },
       include: itemInclude,

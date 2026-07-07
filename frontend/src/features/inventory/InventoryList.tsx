@@ -151,6 +151,10 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
   const capacity = carryingCapacity(character.abilityScores.strength);
   const overCapacity = totalWeight > capacity;
   const hasItems = character.inventory.length > 0;
+  // 5e: at most 3 attuned items. Derived from live rows; the server enforces it.
+  const attunedCount = character.inventory.filter((item) => item.attuned).length;
+  const hasAttunable = character.inventory.some((item) => item.requiresAttunement);
+  const atCap = attunedCount >= 3;
 
   // Apply the active filter chip + name search before sectioning; encumbrance still reflects the full pack.
   const query = search.trim().toLowerCase();
@@ -308,6 +312,15 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
           </div>
         )}
 
+        {hasAttunable && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold uppercase tracking-wide text-parchment-600">Attunement</span>
+            <span className={atCap ? "font-semibold text-arcane-700" : "text-parchment-600"}>
+              {attunedCount}/3 attuned
+            </span>
+          </div>
+        )}
+
         {hasItems && !configuringSell && (
           <div className="flex flex-col gap-2">
             <div className="relative">
@@ -392,6 +405,7 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
                       onEdit={() => setEditingId(item.id)}
                       onCancel={() => setEditingId(null)}
                       onSubmit={submitOperations}
+                      atCap={atCap}
                       selectMode={selectMode}
                       selected={selectedIds.has(item.id)}
                       onToggleSelect={() => toggleSelect(item.id)}
