@@ -105,7 +105,7 @@ const capabilityInputSchema = z
       })
       .strict()
       .optional(),
-    // activatedEffect payload (#543). Per-kind required-field enforcement: follow-up.
+    // activatedEffect payload (#543).
     activation: z.enum(["action", "bonus", "reaction", "commandWord"]).optional(),
     activatedDuration: z.enum(["whileActive", "untilRest"]).optional(),
     resourceKind: z.enum(["perRest", "perDay", "atWill"]).optional(),
@@ -113,7 +113,16 @@ const capabilityInputSchema = z
     resourceCharges: z.number().int().positive().optional(),
     durationText: z.string().optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((val, ctx) => {
+    if (val.kind === "activatedEffect" && val.activation === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["activation"],
+        message: "Required when kind is activatedEffect",
+      });
+    }
+  });
 
 const baseFields = {
   name: z.string().min(1),
@@ -356,8 +365,10 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
     // Capabilities are authored as a whole set — replace rather than merge.
     if (data.capabilities !== undefined) {
       await tx.campaignItemCapability.deleteMany({ where: { campaignItemId: existing.id } });
-      for (const c of data.capabilities) {
-        await tx.campaignItemCapability.create({ data: { campaignItemId: existing.id, ...c } });
+      if (data.capabilities.length > 0) {
+        await tx.campaignItemCapability.createMany({
+          data: data.capabilities.map((c) => ({ campaignItemId: existing.id, ...capabilityCreate(c) })),
+        });
       }
     }
     return tx.campaignItem.update({

@@ -294,4 +294,43 @@ describe("campaign items (#380)", () => {
       .send({ name: "Bad Cap", category: "gear", capabilities: [{ kind: "activatedEffect", bogus: true }] });
     expect(res.status).toBe(400);
   });
+
+  it("rejects activatedEffect missing activation with 400 (superRefine)", async () => {
+    const res = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({
+        name: "Incomplete Effect",
+        category: "gear",
+        capabilities: [{ kind: "activatedEffect", target: "speed", op: "add", value: 30 }],
+      });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain("activation");
+  });
+
+  it("PATCH replaces capabilities preserving dice fields via capabilityCreate (#543)", async () => {
+    const diceCapability = {
+      kind: "passiveBonus" as const,
+      target: "damage" as const,
+      op: "add" as const,
+      value: 0,
+      dice: { count: 1, faces: 6 },
+    };
+    const created = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({ name: "Flametongue", category: "weapon", capabilities: [] });
+    const itemId = created.body.id as string;
+
+    const res = await supertest(app)
+      .patch(`/api/campaigns/${campaignId}/items/${itemId}`)
+      .set("Cookie", cookieOwner)
+      .send({ capabilities: [diceCapability] });
+    expect(res.status).toBe(200);
+    expect(res.body.capabilities[0]).toMatchObject({ kind: "passiveBonus", target: "damage" });
+
+    const persisted = await prisma.campaignItemCapability.findMany({ where: { campaignItemId: itemId } });
+    expect(persisted[0].valueDiceCount).toBe(1);
+    expect(persisted[0].valueDiceFaces).toBe(6);
+  });
 });

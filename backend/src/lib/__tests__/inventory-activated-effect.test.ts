@@ -178,4 +178,14 @@ describe("item activatedEffect activate/deactivate (#543)", () => {
     expect(await buffCount(characterId, itemId)).toBe(0);
     expect((await serialize(characterId)).speed).toBe(30);
   });
+
+  it("blocks double-activation — second activate while already active throws", async () => {
+    await applyInventoryOperations(characterId, [{ type: "activate", inventoryItemId: itemId }]);
+    await expect(
+      applyInventoryOperations(characterId, [{ type: "activate", inventoryItemId: itemId }]),
+    ).rejects.toThrow(/already active/i);
+    // Uses not double-spent: still 1 spent, not 2.
+    const row = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } });
+    expect(row.activatedUsesSpent).toBe(1);
+  });
 });
