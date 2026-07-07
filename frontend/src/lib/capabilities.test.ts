@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  advantageGrantSummary,
   capabilitySummary,
   castSpellSummary,
   describeAttunementPrereq,
+  grantSummary,
   targetUsesAbilityKey,
   targetUsesSkillKey,
 } from "@/lib/capabilities";
@@ -78,6 +80,35 @@ describe("castSpellSummary", () => {
 
   it("omits the DC segment when fixed mode carries no value, and falls back to 'spell'", () => {
     expect(castSpellSummary({ kind: "castSpell", resource: "atWill", dcMode: "fixed" })).toBe("Casts spell · At will");
+  });
+});
+
+describe("grant summaries (#529)", () => {
+  it("resolves a check-axis advantage skill through skillLabel", () => {
+    expect(
+      capabilitySummary({ kind: "grant", grantType: "advantage", grantOn: "check", grantValueKind: "skill", grantValue: "perception" }),
+    ).toBe("Advantage on Ability check (Perception)");
+  });
+
+  it("ignores a stale skill/ability qualifier on a whole-axis (initiative) advantage", () => {
+    // Even if a stale grantValue survives, initiative renders without "(Perception)".
+    expect(
+      grantSummary({ kind: "grant", grantType: "advantage", grantOn: "initiative", grantValueKind: "skill", grantValue: "perception", cantBeSurprised: true }),
+    ).toBe("Advantage on Initiative; can't be surprised");
+    expect(
+      advantageGrantSummary({ on: "initiative", valueKind: "skill", value: "perception", cantBeSurprised: true, source: "Weapon of Warning" }),
+    ).toBe("Advantage on Initiative; can't be surprised");
+  });
+
+  it("ignores a stale qualifier on an attack-axis advantage too", () => {
+    expect(
+      advantageGrantSummary({ on: "attack", valueKind: "skill", value: "perception", cantBeSurprised: false, source: "X" }),
+    ).toBe("Advantage on Attack roll");
+  });
+
+  it("resolves resistance/condition-immunity grants through label helpers", () => {
+    expect(capabilitySummary({ kind: "grant", grantType: "resistance", grantValueKind: "damageType", grantValue: "fire" })).toBe("Resistance to Fire");
+    expect(capabilitySummary({ kind: "grant", grantType: "conditionImmunity", grantValueKind: "condition", grantValue: "poisoned" })).toBe("Immune to Poisoned");
   });
 });
 

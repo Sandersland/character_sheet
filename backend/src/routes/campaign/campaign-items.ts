@@ -4,11 +4,14 @@ import { z } from "zod";
 import { Prisma } from "../../generated/prisma/client.js";
 import { assertCampaignMembership } from "../../lib/auth/access.js";
 import {
+  ADVANTAGE_ON,
   ATTUNEMENT_PREREQ_KINDS,
   CAPABILITY_OPS,
   CAPABILITY_TARGETS,
   CAST_RESOURCES,
   CAST_STAT_MODES,
+  GRANT_TYPES,
+  GRANT_VALUE_KINDS,
   serializeCapability,
 } from "../../lib/capabilities.js";
 import {
@@ -130,7 +133,22 @@ const castSpellInputSchema = z
   })
   .strict();
 
-const capabilityInputSchema = z.discriminatedUnion("kind", [passiveBonusInputSchema, castSpellInputSchema]);
+// A DM-authored grant capability (#529): resistance/immunity/conditionImmunity/
+// advantage/proficiency conferred while the item is active. grantValue is the
+// damage-type/condition/skill/ability/name; grantOn is advantage-only.
+const grantInputSchema = z
+  .object({
+    kind: z.literal("grant"),
+    grantType: z.enum(GRANT_TYPES),
+    grantOn: z.enum(ADVANTAGE_ON).optional(),
+    grantValueKind: z.enum(GRANT_VALUE_KINDS).optional(),
+    grantValue: z.string().min(1).optional(),
+    cantBeSurprised: z.boolean().optional(),
+    description: z.string().optional(),
+  })
+  .strict();
+
+const capabilityInputSchema = z.discriminatedUnion("kind", [passiveBonusInputSchema, castSpellInputSchema, grantInputSchema]);
 
 const baseFields = {
   name: z.string().min(1),
@@ -167,6 +185,17 @@ function capabilityCreate(cap: z.infer<typeof capabilityInputSchema>) {
       dcValue: cap.dcValue ?? null,
       attackMode: cap.attackMode,
       attackValue: cap.attackValue ?? null,
+    };
+  }
+  if (cap.kind === "grant") {
+    return {
+      kind: cap.kind,
+      description: cap.description ?? null,
+      grantType: cap.grantType,
+      grantOn: cap.grantOn ?? null,
+      grantValueKind: cap.grantValueKind ?? null,
+      grantValue: cap.grantValue ?? null,
+      cantBeSurprised: cap.cantBeSurprised ?? false,
     };
   }
   return {

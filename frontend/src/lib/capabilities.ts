@@ -1,13 +1,20 @@
 import { abilityLabel, skillLabel } from "@/lib/abilities";
 import { formatModifier } from "@/lib/abilities";
+import { conditionLabel } from "@/lib/conditions";
+import { damageTypeLabel } from "@/lib/damageTypes";
 import type {
+  AdvantageOn,
   AttunementPrereqKind,
   CapabilityKind,
   CapabilityOp,
   CapabilityTarget,
   CastResource,
   CastStatMode,
+  GrantType,
+  GrantValueKind,
+  ItemAdvantageGrant,
   ItemCapability,
+  ProficiencyKind,
 } from "@/types/character";
 
 // Fixed display labels for each passiveBonus target. A `keyed` target draws its
@@ -37,11 +44,13 @@ export const CAPABILITY_OP_OPTIONS: readonly { value: CapabilityOp; label: strin
   { value: "setTo", label: "Set to" },
 ];
 
-// Authorable capability kinds (#528). passiveBonus grants a stat; castSpell casts
-// a spell from the item's own resource. The other kinds aren't authorable yet.
+// Authorable capability kinds. passiveBonus grants a stat (#546); castSpell casts
+// a spell from the item's own resource (#528); grant confers a resistance/immunity/
+// advantage/proficiency (#529). The other kinds aren't authorable yet.
 export const CAPABILITY_KIND_OPTIONS: readonly { value: CapabilityKind; label: string }[] = [
   { value: "passiveBonus", label: "Passive bonus" },
   { value: "castSpell", label: "Cast a spell" },
+  { value: "grant", label: "Grant (resistance/advantage/…)" },
 ];
 
 export const CAST_RESOURCE_OPTIONS: readonly { value: CastResource; label: string }[] = [
@@ -105,9 +114,87 @@ function valuePhrase(cap: ItemCapability): string {
   return cap.op === "setTo" ? `set to ${value}` : formatModifier(value);
 }
 
+export const GRANT_TYPE_OPTIONS: readonly { value: GrantType; label: string }[] = [
+  { value: "resistance", label: "Resistance" },
+  { value: "immunity", label: "Damage immunity" },
+  { value: "conditionImmunity", label: "Condition immunity" },
+  { value: "advantage", label: "Advantage" },
+  { value: "proficiency", label: "Proficiency" },
+];
+
+export const ADVANTAGE_ON_OPTIONS: readonly { value: AdvantageOn; label: string }[] = [
+  { value: "check", label: "Ability check" },
+  { value: "save", label: "Saving throw" },
+  { value: "initiative", label: "Initiative" },
+  { value: "attack", label: "Attack roll" },
+];
+
+export const PROFICIENCY_KIND_OPTIONS: readonly { value: ProficiencyKind; label: string }[] = [
+  { value: "skill", label: "Skill" },
+  { value: "save", label: "Saving throw" },
+  { value: "weapon", label: "Weapon" },
+  { value: "tool", label: "Tool" },
+  { value: "language", label: "Language" },
+];
+
+// Resolve a grant value (damage type / condition / skill / ability key) through
+// the right label helper — never a raw key. Free-text values pass through as-is.
+export function grantValueLabel(kind: GrantValueKind | undefined, value: string): string {
+  switch (kind) {
+    case "damageType":
+      return damageTypeLabel(value);
+    case "condition":
+      return conditionLabel(value);
+    case "skill":
+      return skillLabel(value);
+    case "ability":
+      return abilityLabel(value);
+    case "save":
+      return `${abilityLabel(value)} save`;
+    default:
+      return value;
+  }
+}
+
+/** One-line human summary of a grant capability, resolved through label helpers. */
+export function grantSummary(cap: ItemCapability): string {
+  if (cap.kind !== "grant" || !cap.grantType) return cap.description ?? cap.kind;
+  const value = cap.grantValue ? grantValueLabel(cap.grantValueKind, cap.grantValue) : "";
+  switch (cap.grantType) {
+    case "resistance":
+      return `Resistance to ${value}`;
+    case "immunity":
+      return `Immunity to ${value}`;
+    case "conditionImmunity":
+      return `Immune to ${value}`;
+    case "proficiency":
+      return `Proficiency: ${value}`;
+    case "advantage": {
+      const on = ADVANTAGE_ON_OPTIONS.find((o) => o.value === cap.grantOn)?.label ?? "rolls";
+      // initiative/attack are whole-axis — ignore any stale skill/ability qualifier.
+      const wholeAxis = cap.grantOn === "initiative" || cap.grantOn === "attack";
+      const core = value && !wholeAxis ? `Advantage on ${on} (${value})` : `Advantage on ${on}`;
+      return cap.cantBeSurprised ? `${core}; can't be surprised` : core;
+    }
+    default:
+      return cap.description ?? cap.grantType;
+  }
+}
+
+/** Reminder text for an item-granted advantage on the relevant sheet surface. */
+export function advantageGrantSummary(grant: ItemAdvantageGrant): string {
+  const on = ADVANTAGE_ON_OPTIONS.find((o) => o.value === grant.on)?.label ?? "rolls";
+  // initiative/attack are whole-axis — ignore any stale skill/ability qualifier.
+  const wholeAxis = grant.on === "initiative" || grant.on === "attack";
+  const value = grant.value && !wholeAxis ? grantValueLabel(grant.valueKind, grant.value) : "";
+  const core = value ? `Advantage on ${on} (${value})` : `Advantage on ${on}`;
+  return grant.cantBeSurprised ? `${core}; can't be surprised` : core;
+}
+
 /** One-line human summary, e.g. "+2 Stealth", "+2d6 fire Damage (when on hit)". */
 export function capabilitySummary(cap: ItemCapability): string {
   if (cap.kind === "castSpell") return castSpellSummary(cap);
+  if (cap.kind === "grant") return grantSummary(cap);
   if (cap.kind !== "passiveBonus") return cap.description ?? cap.kind;
   const core = `${valuePhrase(cap)} ${targetPhrase(cap)}`.trim();
   return cap.condition ? `${core} (when ${cap.condition})` : core;

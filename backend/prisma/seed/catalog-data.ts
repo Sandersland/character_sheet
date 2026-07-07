@@ -270,6 +270,8 @@ export interface ConsumableDetailInput {
   effectDiceFaces?: number;
   effectModifier?: number;
   effectDescription?: string;
+  maxUses?: number;
+  usesRemaining?: number;
 }
 
 export interface CatalogItem {

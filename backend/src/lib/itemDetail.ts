@@ -45,6 +45,8 @@ interface ConsumableDetailFields {
   effectDiceFaces: number | null;
   effectModifier: number | null;
   effectDescription: string | null;
+  maxUses: number | null;
+  usesRemaining: number | null;
 }
 
 export function serializeWeaponDetail(detail: WeaponDetailFields) {
@@ -86,5 +88,7 @@ export function serializeConsumableDetail(detail: ConsumableDetailFields) {
     effectDiceFaces: detail.effectDiceFaces ?? undefined,
     effectModifier: detail.effectModifier ?? undefined,
     effectDescription: detail.effectDescription ?? undefined,
+    maxUses: detail.maxUses ?? undefined,
+    usesRemaining: detail.usesRemaining ?? undefined,
   };
 }
