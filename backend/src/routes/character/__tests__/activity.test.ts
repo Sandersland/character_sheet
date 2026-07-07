@@ -713,7 +713,7 @@ describe("POST /:id/events/:batchId/revert — inventory undo", () => {
       id: itemId,
       name: "Sellable Saber",
       quantity: 2,
-      equipped: true,
+      equippedSlot: "MAIN_HAND",
       notes: "heirloom",
       position: original.position,
     });
@@ -792,11 +792,11 @@ describe("POST /:id/events/:batchId/revert — inventory undo", () => {
     const itemId = findItem(acquire.body, "Padded Armor")!.id as string;
 
     await inv([{ type: "setEquipped", inventoryItemId: itemId, equipped: true }]);
-    expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).equipped).toBe(true);
+    expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).equippedSlot).toBe("BODY");
 
     const batchId = await latestBatchId(INV_ID);
     await revert(INV_ID, batchId);
-    expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).equipped).toBe(false);
+    expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: itemId } })).equippedSlot).toBeNull();
   });
 
   it("undoes a bulk batch (sell A + remove B in one tx), restoring both atomically", async () => {

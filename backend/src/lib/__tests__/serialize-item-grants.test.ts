@@ -108,7 +108,7 @@ describe("serialize derives item grants (#529)", () => {
         name: "Greataxe of Training",
         category: "weapon",
         quantity: 1,
-        equipped: true,
+        equippedSlot: "MAIN_HAND",
         capabilities: {
           create: [{ kind: "grant", grantType: "proficiency", grantValueKind: "weapon", grantValue: "Greataxes" }],
         },
