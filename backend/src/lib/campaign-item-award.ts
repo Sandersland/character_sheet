@@ -219,7 +219,9 @@ export async function awardCampaignItem(params: {
         cost: toJsonInput(item.cost),
         description: item.description ?? undefined,
         quantity,
-        equipped: false,
+        // Snapshot placement metadata (#565): gear slot + rarity for the Worn view.
+        slot: item.slot,
+        rarity: item.rarity,
         // Snapshot the attunement metadata so the attune check runs against
         // the frozen copy, not the mutable source (#545).
         requiresAttunement: item.requiresAttunement,

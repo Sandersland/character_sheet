@@ -326,7 +326,7 @@ describe("applyInventoryOperations", () => {
     expect(deletedItem.cost).toEqual({ cp: 0, sp: 0, gp: 2, pp: 0 });
     expect(deletedItem.description).toBe("A test blade");
     expect(deletedItem.quantity).toBe(1);
-    expect(deletedItem.equipped).toBe(true);
+    expect(deletedItem.equippedSlot).toBe("MAIN_HAND");
     expect(deletedItem.notes).toBe("keep sharp");
     expect(deletedItem.position).toBe(created.position);
     expect(deletedItem.armorDetail).toBeNull();
@@ -354,10 +354,10 @@ describe("applyInventoryOperations", () => {
     ).rejects.toThrow(InvalidInventoryOperationError);
 
     const after = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
-    expect(after.equipped).toBe(false);
+    expect(after.equippedSlot).toBeNull();
   });
 
-  it("setEquipped equips a weapon row", async () => {
+  it("setEquipped auto-assigns a weapon into MAIN_HAND", async () => {
     await applyInventoryOperations(characterAId, [{ type: "acquire", itemId, quantity: 1 }]);
     const [created] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
 
@@ -366,22 +366,143 @@ describe("applyInventoryOperations", () => {
     ]);
 
     const after = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
-    expect(after.equipped).toBe(true);
+    expect(after.equippedSlot).toBe("MAIN_HAND");
   });
 
-  it("setEquipped can unequip a gear row that is stuck equipped", async () => {
+  it("setEquipped can unequip a wearable gear row (clears equippedSlot)", async () => {
     await applyInventoryOperations(characterAId, [
-      { type: "acquire", custom: { name: "Stuck Gear", category: "gear" }, quantity: 1, equipped: true },
+      { type: "acquire", custom: { name: "Wide Belt", category: "gear", slot: "BELT" }, quantity: 1, equipped: true },
     ]);
     const [created] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
-    expect(created.equipped).toBe(true);
+    expect(created.equippedSlot).toBe("BELT");
 
     await applyInventoryOperations(characterAId, [
       { type: "setEquipped", inventoryItemId: created.id, equipped: false },
     ]);
 
     const after = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
-    expect(after.equipped).toBe(false);
+    expect(after.equippedSlot).toBeNull();
+  });
+
+  // ── equip op: paper-doll placement (#565) ────────────────────────────────────
+
+  async function acquireCustom(custom: Record<string, unknown>) {
+    await applyInventoryOperations(characterAId, [{ type: "acquire", custom } as never]);
+    const rows = await prisma.inventoryItem.findMany({
+      where: { characterId: characterAId },
+      orderBy: { position: "desc" },
+    });
+    return rows[0];
+  }
+
+  const TWO_HANDED = {
+    name: "Greatsword",
+    category: "weapon" as const,
+    weapon: { damageDiceCount: 2, damageDiceFaces: 6, damageType: "slashing", twoHanded: true, heavy: true },
+  };
+  const SHIELD = { name: "Shield", category: "armor" as const, armor: { armorCategory: "shield" as const, baseArmorClass: 2 } };
+  const RING = (name: string) => ({ name, category: "gear" as const, slot: "RING" as const });
+
+  it("equip places a weapon in MAIN_HAND and derives equipped=true on the wire", async () => {
+    await applyInventoryOperations(characterAId, [{ type: "acquire", itemId, quantity: 1 }]);
+    const [created] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+
+    await applyInventoryOperations(characterAId, [
+      { type: "equip", inventoryItemId: created.id, slot: "MAIN_HAND" },
+    ]);
+
+    const after = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
+    expect(after.equippedSlot).toBe("MAIN_HAND");
+
+    // The equip event is logged + undoable, mirroring setEquipped.
+    const event = await prisma.characterEvent.findFirstOrThrow({
+      where: { characterId: characterAId, type: "equipped" },
+    });
+    expect((event.before as Record<string, unknown>).equippedSlot).toBeNull();
+    expect((event.after as Record<string, unknown>).equippedSlot).toBe("MAIN_HAND");
+  });
+
+  it("equip rejects an incompatible slot (a weapon into BODY)", async () => {
+    const weapon = await acquireCustom({
+      name: "Handaxe",
+      category: "weapon",
+      weapon: { damageDiceCount: 1, damageDiceFaces: 6, damageType: "slashing" },
+    });
+    await expect(
+      applyInventoryOperations(characterAId, [{ type: "equip", inventoryItemId: weapon.id, slot: "BODY" }]),
+    ).rejects.toThrow(InvalidInventoryOperationError);
+    const after = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: weapon.id } });
+    expect(after.equippedSlot).toBeNull();
+  });
+
+  it("equip rejects bag-only gear (slot=null)", async () => {
+    const rope = await acquireCustom({ name: "Silk Rope", category: "gear" });
+    await expect(
+      applyInventoryOperations(characterAId, [{ type: "equip", inventoryItemId: rope.id, slot: "BELT" }]),
+    ).rejects.toThrow(InvalidInventoryOperationError);
+  });
+
+  it("a two-handed weapon in MAIN_HAND locks OFF_HAND", async () => {
+    const gs = await acquireCustom(TWO_HANDED);
+    await applyInventoryOperations(characterAId, [{ type: "equip", inventoryItemId: gs.id, slot: "MAIN_HAND" }]);
+
+    const shield = await acquireCustom(SHIELD);
+    await expect(
+      applyInventoryOperations(characterAId, [{ type: "equip", inventoryItemId: shield.id, slot: "OFF_HAND" }]),
+    ).rejects.toThrow(/off-hand is locked/i);
+    expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: shield.id } })).equippedSlot).toBeNull();
+  });
+
+  it("a two-handed weapon cannot be equipped while the off-hand is occupied", async () => {
+    const shield = await acquireCustom(SHIELD);
+    await applyInventoryOperations(characterAId, [{ type: "equip", inventoryItemId: shield.id, slot: "OFF_HAND" }]);
+
+    const gs = await acquireCustom(TWO_HANDED);
+    await expect(
+      applyInventoryOperations(characterAId, [{ type: "equip", inventoryItemId: gs.id, slot: "MAIN_HAND" }]),
+    ).rejects.toThrow(/two-handed/i);
+  });
+
+  it("RING accepts two rings but rejects the third (reject-on-full)", async () => {
+    const r1 = await acquireCustom(RING("Ring of Jumping"));
+    const r2 = await acquireCustom(RING("Ring of Swimming"));
+    const r3 = await acquireCustom(RING("Ring of Free Action"));
+
+    await applyInventoryOperations(characterAId, [{ type: "equip", inventoryItemId: r1.id, slot: "RING" }]);
+    await applyInventoryOperations(characterAId, [{ type: "equip", inventoryItemId: r2.id, slot: "RING" }]);
+    await expect(
+      applyInventoryOperations(characterAId, [{ type: "equip", inventoryItemId: r3.id, slot: "RING" }]),
+    ).rejects.toThrow(/full/i);
+
+    const equipped = await prisma.inventoryItem.findMany({
+      where: { characterId: characterAId, equippedSlot: "RING" },
+    });
+    expect(equipped).toHaveLength(2);
+  });
+
+  it("a single-capacity slot rejects a second occupant", async () => {
+    const a = await acquireCustom({ name: "Cloak A", category: "gear", slot: "CLOAK" });
+    const b = await acquireCustom({ name: "Cloak B", category: "gear", slot: "CLOAK" });
+    await applyInventoryOperations(characterAId, [{ type: "equip", inventoryItemId: a.id, slot: "CLOAK" }]);
+    await expect(
+      applyInventoryOperations(characterAId, [{ type: "equip", inventoryItemId: b.id, slot: "CLOAK" }]),
+    ).rejects.toThrow(/full/i);
+  });
+
+  it("unequip clears equippedSlot and the equipped event is undoable", async () => {
+    const gs = await acquireCustom(TWO_HANDED);
+    await applyInventoryOperations(characterAId, [{ type: "equip", inventoryItemId: gs.id, slot: "MAIN_HAND" }]);
+
+    await applyInventoryOperations(characterAId, [{ type: "setEquipped", inventoryItemId: gs.id, equipped: false }]);
+    expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: gs.id } })).equippedSlot).toBeNull();
+
+    // Undo the unequip event → slot restored to MAIN_HAND.
+    const unequipped = await prisma.characterEvent.findFirstOrThrow({
+      where: { characterId: characterAId, type: "unequipped" },
+      orderBy: { createdAt: "desc" },
+    });
+    await prisma.$transaction((tx) => revertInventoryEvent(tx, characterAId, unequipped));
+    expect((await prisma.inventoryItem.findUniqueOrThrow({ where: { id: gs.id } })).equippedSlot).toBe("MAIN_HAND");
   });
 
   it("selling the FULL stack snapshots data.deletedItem; a partial sell does not", async () => {
@@ -499,7 +620,7 @@ describe("applyInventoryOperations", () => {
         id: created.id,
         name: "Revert Test Dagger",
         quantity: 4,
-        equipped: true,
+        equippedSlot: "MAIN_HAND",
         notes: "sheathed",
         position: created.position,
       });
@@ -535,7 +656,7 @@ describe("applyInventoryOperations", () => {
       expect(restored.quantity).toBe(5);
     });
 
-    it("restores equipped from before for a setEquipped event", async () => {
+    it("restores equippedSlot from before for a setEquipped event", async () => {
       await applyInventoryOperations(characterAId, [{ type: "acquire", itemId, quantity: 1 }]);
       const [created] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
 
@@ -546,7 +667,7 @@ describe("applyInventoryOperations", () => {
       await prisma.$transaction((tx) => revertInventoryEvent(tx, characterAId, equipped));
 
       const restored = await prisma.inventoryItem.findUniqueOrThrow({ where: { id: created.id } });
-      expect(restored.equipped).toBe(false);
+      expect(restored.equippedSlot).toBeNull();
     });
 
     it("reverses a purchase debit (adds the gold back)", async () => {

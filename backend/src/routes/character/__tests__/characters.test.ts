@@ -118,7 +118,7 @@ describe("characters routes", () => {
               weight: item.weight,
               cost: TEST_ITEM.cost,
               quantity: 1,
-              equipped: true,
+              equippedSlot: "MAIN_HAND",
               position: 0,
               weaponDetail: { create: TEST_ITEM_WEAPON_DETAIL },
             },
@@ -249,7 +249,7 @@ describe("characters routes", () => {
                     name: `${equippedArmorCategory} armor`,
                     category: "armor",
                     quantity: 1,
-                    equipped: true,
+                    equippedSlot: equippedArmorCategory === "shield" ? "OFF_HAND" : "BODY",
                     position: 0,
                     armorDetail: {
                       create: {

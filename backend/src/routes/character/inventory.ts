@@ -10,6 +10,20 @@ import { makeTransactionsEndpoint } from "../../lib/transactions-endpoint.js";
 
 export const inventoryRouter = Router({ mergeParams: true });
 
+const equipSlotSchema = z.enum([
+  "MAIN_HAND",
+  "OFF_HAND",
+  "BODY",
+  "HEAD",
+  "NECK",
+  "CLOAK",
+  "HANDS",
+  "WRISTS",
+  "BELT",
+  "FEET",
+  "RING",
+]);
+
 const currencySchema = z.object({
   cp: z.number().int(),
   sp: z.number().int(),
@@ -86,6 +100,8 @@ const customItemSchema = z.discriminatedUnion("category", [
     weight: z.number().nonnegative().optional(),
     cost: currencySchema.optional(),
     description: z.string().optional(),
+    // Wearable gear declares its paper-doll slot (#565); omit for bag-only gear.
+    slot: equipSlotSchema.optional(),
   }),
 ]);
 
@@ -122,7 +138,6 @@ const updateOpSchema = z.object({
   inventoryItemId: z.string().min(1),
   name: z.string().min(1).optional(),
   notes: z.string().nullable().optional(),
-  equipped: z.boolean().optional(),
   weight: z.number().nonnegative().optional(),
   cost: currencySchema.optional(),
   description: z.string().optional(),
@@ -141,6 +156,12 @@ const sellOpSchema = z.object({
   inventoryItemId: z.string().min(1),
   quantity: z.number().int().positive().optional(),
   currencyDelta: currencySchema,
+});
+
+const equipOpSchema = z.object({
+  type: z.literal("equip"),
+  inventoryItemId: z.string().min(1),
+  slot: equipSlotSchema,
 });
 
 const setEquippedOpSchema = z.object({
@@ -176,6 +197,7 @@ const operationSchema = z.discriminatedUnion("type", [
   updateOpSchema,
   removeOpSchema,
   sellOpSchema,
+  equipOpSchema,
   setEquippedOpSchema,
   attuneOpSchema,
   unattuneOpSchema,
