@@ -951,17 +951,19 @@ async function applyActivate(
     throw new InvalidInventoryOperationError(`${item.name} must be equipped or attuned to activate`);
   }
 
+  // Guard against double-activation FIRST (before the uses check, so an active
+  // last-charge item reports "already active", not "no uses remaining"): spending
+  // a second use on a buff that's already seeded dedupes the buff in-place (no
+  // double-apply) but still wastes the charge.
+  const charRow = await tx.character.findUnique({ where: { id: characterId }, select: { activeEffects: true } });
+  const cur = normalizeActiveEffectsMutable(charRow?.activeEffects ?? null);
+  if (cur.buffs.some((b) => b.key === itemBuffKey(item.id))) {
+    throw new InvalidInventoryOperationError(`${item.name} is already active`);
+  }
+
   const maxUses = activatedMaxUses(cap);
   if (maxUses !== null && item.activatedUsesSpent >= maxUses) {
     throw new InvalidInventoryOperationError(`${item.name} has no uses remaining — recharges on a rest`);
-  }
-
-  // Guard against double-activation: spending a second use on a buff that's already
-  // seeded dedupes the buff in-place (no double-apply) but still wastes the charge.
-  const charRow = await tx.character.findUnique({ where: { id: characterId }, select: { activeEffects: true } });
-  const cur = normalizeActiveEffectsMutable(charRow?.activeEffects);
-  if (cur.buffs.some((b) => b.key === itemBuffKey(item.id))) {
-    throw new InvalidInventoryOperationError(`${item.name} is already active`);
   }
 
   const duration = cap.duration === "untilRest" ? "until-rest" : "while-active";

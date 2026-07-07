@@ -119,7 +119,9 @@ const capabilityInputSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["activation"],
-        message: "Required when kind is activatedEffect",
+        // Name the field in the message too: the route 400s with error.flatten(),
+        // which collapses the nested path (capabilities.N.activation) away.
+        message: "activation is required when kind is activatedEffect",
       });
     }
   });
@@ -361,15 +363,6 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
         where: { id: existing.link.campaignEntityId },
         data: { name: data.name },
       });
-    }
-    // Capabilities are authored as a whole set — replace rather than merge.
-    if (data.capabilities !== undefined) {
-      await tx.campaignItemCapability.deleteMany({ where: { campaignItemId: existing.id } });
-      if (data.capabilities.length > 0) {
-        await tx.campaignItemCapability.createMany({
-          data: data.capabilities.map((c) => ({ campaignItemId: existing.id, ...capabilityCreate(c) })),
-        });
-      }
     }
     return tx.campaignItem.update({
       where: { id: existing.id },

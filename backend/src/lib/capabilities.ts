@@ -199,8 +199,10 @@ export interface SerializedCapability {
   description?: string;
   dice?: CapabilityDice;
   // activatedEffect (#543) — round-tripped so the DM editor can re-populate.
+  // activatedDuration matches the authoring input field name (the internal
+  // Capability shape calls it `duration`).
   activation?: ActivationType;
-  duration?: ActivatedDurationKind;
+  activatedDuration?: ActivatedDurationKind;
   resourceKind?: ItemResourceKind;
   resourcePeriod?: ItemResourcePeriod;
   resourceCharges?: number;
@@ -230,7 +232,7 @@ export function serializeCapability(row: CapabilityColumns): SerializedCapabilit
       target: cap.target,
       op: cap.op,
       value: cap.value,
-      duration: cap.duration,
+      activatedDuration: cap.duration,
       resourceKind: cap.resourceKind,
       resourceCharges: cap.resourceCharges,
       ...(cap.targetKey ? { targetKey: cap.targetKey } : {}),

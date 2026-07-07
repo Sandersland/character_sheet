@@ -201,7 +201,7 @@ export interface ItemCapability {
   dice?: CapabilityDice;
   /** activatedEffect (#543) — reuses target/op/value for the inline self-buff. */
   activation?: ActivationType;
-  duration?: "whileActive" | "untilRest";
+  activatedDuration?: "whileActive" | "untilRest";
   resourceKind?: "perRest" | "perDay" | "atWill";
   resourcePeriod?: "short" | "long" | "dawn" | "dusk";
   resourceCharges?: number;
