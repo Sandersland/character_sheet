@@ -39,6 +39,8 @@ import { ITEM_RARITY_KEYS } from "../../lib/srd.js";
 export const campaignItemsRouter = Router();
 
 const CATEGORIES = ["weapon", "armor", "consumable", "gear"] as const;
+// The 8 worn EquipSlot values gear may declare; MAIN_HAND/OFF_HAND/BODY are derived from detail data, never authored.
+const WORN_SLOTS = ["HEAD", "NECK", "CLOAK", "HANDS", "WRISTS", "BELT", "FEET", "RING"] as const;
 const ARMOR_CATEGORIES = ["light", "medium", "heavy", "shield"] as const;
 const WEAPON_CLASSES = ["simple", "martial"] as const;
 const WEAPON_RANGES = ["melee", "ranged"] as const;
@@ -182,6 +184,7 @@ const baseFields = {
   name: z.string().min(1),
   description: z.string().optional(),
   category: z.enum(CATEGORIES),
+  slot: z.enum(WORN_SLOTS).nullable().optional(),
   rarity: z.enum(ITEM_RARITY_KEYS).nullable().optional(),
   requiresAttunement: z.boolean().optional(),
   attunementPrereqKind: z.enum(ATTUNEMENT_PREREQ_KINDS).nullable().optional(),
@@ -261,8 +264,16 @@ function assertWielderModeAllowed(data: {
   return null;
 }
 
-const createItemSchema = z.object(baseFields).strict();
-const updateItemSchema = z.object(baseFields).partial().strict();
+// A worn slot only makes sense on gear (weapons/armor derive their slot from detail data).
+// Name the field: the route 400s with error.flatten(), which needs a field key.
+function refineSlotCategory(val: { category?: string; slot?: string | null }, ctx: z.RefinementCtx) {
+  if (val.slot != null && val.category !== undefined && val.category !== "gear") {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["slot"], message: "slot is only valid on a gear item" });
+  }
+}
+
+const createItemSchema = z.object(baseFields).strict().superRefine(refineSlotCategory);
+const updateItemSchema = z.object(baseFields).partial().strict().superRefine(refineSlotCategory);
 
 const awardSchema = z
   .object({
@@ -301,6 +312,7 @@ function serializeCampaignItem(
     name: row.name,
     description: row.description ?? undefined,
     category: row.category,
+    slot: row.slot ?? undefined,
     rarity: row.rarity ?? undefined,
     requiresAttunement: row.requiresAttunement,
     attunementPrereqKind: row.attunementPrereqKind ?? undefined,
@@ -411,6 +423,7 @@ campaignItemsRouter.post("/campaigns/:id/items", async (req, res) => {
         name: data.name,
         description: data.description ?? null,
         category: data.category,
+        slot: data.slot ?? null,
         rarity: data.rarity ?? null,
         requiresAttunement: data.requiresAttunement ?? false,
         attunementPrereqKind: data.attunementPrereqKind ?? null,
@@ -483,6 +496,12 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
         ...(data.name !== undefined ? { name: data.name } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
         ...(data.category !== undefined ? { category: data.category } : {}),
+        // Clear a stale slot when the item leaves gear; else persist an explicit slot send.
+        ...(data.category !== undefined && data.category !== "gear"
+          ? { slot: null }
+          : data.slot !== undefined
+            ? { slot: data.slot }
+            : {}),
         ...(data.rarity !== undefined ? { rarity: data.rarity } : {}),
         ...(data.requiresAttunement !== undefined ? { requiresAttunement: data.requiresAttunement } : {}),
         ...(data.attunementPrereqKind !== undefined ? { attunementPrereqKind: data.attunementPrereqKind } : {}),
