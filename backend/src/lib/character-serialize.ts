@@ -854,7 +854,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
   );
 
   // AC is derived, not persisted: best equipped body armor + Dex (per category)
-  // + shield. No slot model exists, so the highest-AC body armor wins.
+  // + shield. The BODY slot holds one body armor (#565), so "best" is defensive.
   const equippedArmorDetails = row.inventoryItems
     .filter((i) => i.equippedSlot != null && i.armorDetail)
     .map((i) => ({ name: i.name, ...i.armorDetail! }));

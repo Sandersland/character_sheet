@@ -30,7 +30,7 @@ let COOKIE: string;
 const GREATSWORD = {
   name: "Greatsword",
   category: "weapon" as const,
-  equipped: true,
+  equippedSlot: "MAIN_HAND" as const,
   weaponDetail: {
     create: { damageDiceCount: 2, damageDiceFaces: 6, damageType: "slashing", weaponRange: "melee" as const, twoHanded: true },
   },
