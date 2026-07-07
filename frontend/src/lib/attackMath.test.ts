@@ -3,13 +3,39 @@ import { describe, it, expect } from "vitest";
 import {
   attacksExhausted,
   buildAttackEntries,
+  capabilitiesActive,
   hasSuperiorityDice,
   unarmedDamageDisplay,
+  weaponDamageRiders,
   weaponDamageSpec,
   weaponDamageType,
   weaponGripLabel,
 } from "@/lib/attackMath";
-import type { Character, WeaponDetail } from "@/types/character";
+import type { Character, InventoryItem, ItemCapability, WeaponDetail } from "@/types/character";
+
+// A dice-valued on-hit damage capability (Flame Tongue +2d6 fire).
+function diceCap(overrides: Partial<ItemCapability> = {}): ItemCapability {
+  return {
+    kind: "passiveBonus",
+    target: "damage",
+    op: "add",
+    dice: { count: 2, faces: 6, damageType: "fire" },
+    ...overrides,
+  };
+}
+
+function invItem(overrides: Partial<InventoryItem> = {}): InventoryItem {
+  return {
+    id: "inv-1",
+    name: "Flame Tongue",
+    category: "weapon",
+    quantity: 1,
+    equipped: true,
+    attuned: true,
+    requiresAttunement: true,
+    ...overrides,
+  } as InventoryItem;
+}
 
 function makeCharacter(overrides: Partial<Character> = {}): Character {
   return {
@@ -217,5 +243,105 @@ describe("buildAttackEntries", () => {
     const improvised = buildAttackEntries(character).find((e) => e.id === "improvised")!;
     expect(improvised.attackLabel).toBe("-1");
     expect(improvised.note).toBeUndefined();
+  });
+
+  it("carries a weapon's active dice riders and leaves unarmed/improvised rider-free", () => {
+    const weapon = {
+      ...invItem({ weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 2, damageType: "slashing", attackBonus: 5 } as WeaponDetail, capabilities: [diceCap()] }),
+    };
+    const character = makeCharacter({ inventory: [weapon] as unknown as Character["inventory"] });
+    const entries = buildAttackEntries(character);
+    const flame = entries.find((e) => e.id === "inv-1")!;
+    expect(flame.damageRiders).toHaveLength(1);
+    expect(flame.damageRiders[0].label).toBe("+2d6 fire");
+    expect(entries.find((e) => e.id === "unarmed")!.damageRiders).toEqual([]);
+    expect(entries.find((e) => e.id === "improvised")!.damageRiders).toEqual([]);
+  });
+
+  it("scopes riders to their own weapon — capabilities on other items don't leak", () => {
+    const flame = invItem({
+      id: "inv-1",
+      name: "Flame Tongue",
+      weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "slashing", attackBonus: 3 } as WeaponDetail,
+      capabilities: [diceCap()],
+    });
+    const plain = invItem({
+      id: "inv-2",
+      name: "Dagger",
+      requiresAttunement: false,
+      attuned: false,
+      weapon: { damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 0, damageType: "piercing", attackBonus: 3 } as WeaponDetail,
+    });
+    const character = makeCharacter({ inventory: [flame, plain] as unknown as Character["inventory"] });
+    const entries = buildAttackEntries(character);
+    expect(entries.find((e) => e.id === "inv-1")!.damageRiders).toHaveLength(1);
+    expect(entries.find((e) => e.id === "inv-2")!.damageRiders).toEqual([]);
+  });
+});
+
+describe("capabilitiesActive", () => {
+  it("gates an attunement-required item on attunement (not mere equip)", () => {
+    expect(capabilitiesActive({ equipped: true, attuned: true, requiresAttunement: true })).toBe(true);
+    expect(capabilitiesActive({ equipped: true, attuned: false, requiresAttunement: true })).toBe(false);
+  });
+
+  it("gates a non-attunement item on equipped (mirrors backend isItemActive)", () => {
+    expect(capabilitiesActive({ equipped: true, attuned: false, requiresAttunement: false })).toBe(true);
+    // An unattunable item that is somehow `attuned` is unreachable; the gate does
+    // not diverge from the backend by falling back to attunement here.
+    expect(capabilitiesActive({ equipped: false, attuned: true, requiresAttunement: false })).toBe(false);
+    expect(capabilitiesActive({ equipped: false, attuned: false, requiresAttunement: false })).toBe(false);
+  });
+});
+
+describe("weaponDamageRiders", () => {
+  it("builds a typed +2d6 fire rider from an active dice capability", () => {
+    const [rider] = weaponDamageRiders(invItem({ capabilities: [diceCap()] }));
+    expect(rider.id).toBe("inv-1:rider:0");
+    expect(rider.spec).toEqual({ count: 2, faces: 6, modifier: 0 });
+    expect(rider.damageType).toBe("fire");
+    expect(rider.label).toBe("+2d6 fire");
+    expect(rider.rollLabel).toBe("Flame Tongue: +2d6 fire");
+    expect(rider.logSource).toBe("Flame Tongue");
+    expect(rider.condition).toBeUndefined();
+  });
+
+  it("surfaces a conditional rider's condition as reminder text (never auto-gated)", () => {
+    const [rider] = weaponDamageRiders(
+      invItem({ name: "Dragon Slayer", capabilities: [diceCap({ dice: { count: 3, faces: 6 }, condition: "vs dragons" })] }),
+    );
+    expect(rider.label).toBe("+3d6");
+    expect(rider.condition).toBe("vs dragons");
+  });
+
+  it("removes riders when an attunement-required item is unattuned", () => {
+    expect(weaponDamageRiders(invItem({ attuned: false, capabilities: [diceCap()] }))).toEqual([]);
+  });
+
+  it("stacks multiple dice capabilities on one weapon", () => {
+    const riders = weaponDamageRiders(
+      invItem({ capabilities: [diceCap(), diceCap({ dice: { count: 1, faces: 8, damageType: "radiant" } })] }),
+    );
+    expect(riders.map((r) => r.label)).toEqual(["+2d6 fire", "+1d8 radiant"]);
+    expect(riders.map((r) => r.id)).toEqual(["inv-1:rider:0", "inv-1:rider:1"]);
+  });
+
+  it("ignores scalar, setTo, and non-damage capabilities", () => {
+    expect(
+      weaponDamageRiders(
+        invItem({
+          capabilities: [
+            { kind: "passiveBonus", target: "damage", op: "add", value: 2 },
+            { kind: "passiveBonus", target: "damage", op: "setTo", dice: { count: 2, faces: 6 } },
+            { kind: "passiveBonus", target: "attack", op: "add", dice: { count: 1, faces: 4 } },
+            { kind: "castSpell", description: "cast fireball" },
+          ],
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("returns nothing for an item with no capabilities", () => {
+    expect(weaponDamageRiders(invItem({ capabilities: undefined }))).toEqual([]);
   });
 });

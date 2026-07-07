@@ -1,7 +1,7 @@
 // One attack row (equipped weapon, unarmed, or improvised) driven by an AttackEntry.
 
 import ManeuverPrompt from "@/features/session/ManeuverPrompt";
-import type { AttackEntry } from "@/lib/attackMath";
+import type { AttackEntry, DamageRider } from "@/lib/attackMath";
 import type { Character } from "@/types/character";
 import type { RollResult } from "@/lib/dice";
 
@@ -14,8 +14,11 @@ interface AttackRowProps {
   damageTotal: number | null | undefined;
   lastAttackRoll: RollResult | null;
   lastDamageRoll: RollResult | null;
+  /** Last rolled total per rider id (from InlineAttackPicker), shown inline. */
+  riderTotals: Record<string, number>;
   onAttack: (entry: AttackEntry) => void;
   onDamage: (entry: AttackEntry) => void;
+  onDamageRider: (rider: DamageRider) => void;
   onRollsUpdated: (newAttackTotal: number | null, newDamageTotal: number | null) => void;
   onUpdate: (c: Character) => void;
 }
@@ -29,8 +32,10 @@ export default function AttackRow({
   damageTotal,
   lastAttackRoll,
   lastDamageRoll,
+  riderTotals,
   onAttack,
   onDamage,
+  onDamageRider,
   onRollsUpdated,
   onUpdate,
 }: AttackRowProps) {
@@ -85,6 +90,27 @@ export default function AttackRow({
           </button>
         </div>
       </div>
+      {/* On-hit dice riders (Flame Tongue +2d6 fire): each a separate typed term. */}
+      {entry.damageRiders.map((rider) => (
+        <div key={rider.id} className="flex items-center justify-between pl-3">
+          <p className="text-xs text-parchment-700">
+            <span className="font-semibold text-gold-800">{rider.label}</span>
+            {rider.condition && (
+              <span className="ml-1 italic text-parchment-600">(when {rider.condition})</span>
+            )}
+            {riderTotals[rider.id] !== undefined && (
+              <span className="ml-2 font-semibold text-gold-800">= {riderTotals[rider.id]}</span>
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={() => onDamageRider(rider)}
+            className="rounded-control border border-gold-200 bg-gold-50 px-2.5 py-1 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-100"
+          >
+            Roll {rider.label}
+          </button>
+        </div>
+      ))}
       {showManeuvers && (
         <ManeuverPrompt
           character={character}
