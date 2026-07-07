@@ -90,11 +90,12 @@ const consumableInputSchema = z
   })
   .strict();
 
-// A DM-authored passiveBonus capability (#546). Dice is nested and consumed in
-// the damage roll at #526C.
+// A DM-authored passiveBonus/activatedEffect capability (#545/#546/#543). passiveBonus
+// is an always-on modifier (dice nested, consumed at #526C); activatedEffect is a
+// toggled self-buff with a recharge (#543), reusing target/op/value for its inline buff.
 const passiveBonusInputSchema = z
   .object({
-    kind: z.literal("passiveBonus"),
+    kind: z.enum(["passiveBonus", "activatedEffect"]),
     target: z.enum(CAPABILITY_TARGETS),
     op: z.enum(CAPABILITY_OPS),
     value: z.number().int().optional(),
@@ -109,8 +110,35 @@ const passiveBonusInputSchema = z
       })
       .strict()
       .optional(),
+    // activatedEffect payload (#543).
+    activation: z.enum(["action", "bonus", "reaction", "commandWord"]).optional(),
+    activatedDuration: z.enum(["whileActive", "untilRest"]).optional(),
+    resourceKind: z.enum(["perRest", "perDay", "atWill"]).optional(),
+    resourcePeriod: z.enum(["short", "long", "dawn", "dusk"]).optional(),
+    resourceCharges: z.number().int().positive().optional(),
+    durationText: z.string().optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((val, ctx) => {
+    if (val.kind === "activatedEffect" && val.activation === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["activation"],
+        // Name the field in the message too: the route 400s with error.flatten(),
+        // which collapses the nested path (capabilities.N.activation) away.
+        message: "activation is required when kind is activatedEffect",
+      });
+    }
+    // applyActivate seeds an ADDITIVE buff (modifier: value) and does not honor setTo,
+    // so reject a non-add op at the authoring boundary rather than silently misapplying.
+    if (val.kind === "activatedEffect" && val.op !== undefined && val.op !== "add") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["op"],
+        message: "op must be add when kind is activatedEffect (the buff value is additive)",
+      });
+    }
+  });
 
 // A DM-authored castSpell capability (#528): the item casts a catalog spell from
 // its own resource. wielder DC/attack is only meaningful for a spellcaster-
@@ -209,6 +237,12 @@ function capabilityCreate(cap: z.infer<typeof capabilityInputSchema>) {
     valueDiceCount: cap.dice?.count ?? null,
     valueDiceFaces: cap.dice?.faces ?? null,
     valueDamageType: cap.dice?.damageType ?? null,
+    activation: cap.activation ?? null,
+    activatedDuration: cap.activatedDuration ?? null,
+    resourceKind: cap.resourceKind ?? null,
+    resourcePeriod: cap.resourcePeriod ?? null,
+    resourceCharges: cap.resourceCharges ?? null,
+    durationText: cap.durationText ?? null,
   };
 }
 
@@ -420,6 +454,19 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
   });
   if (!existing || existing.campaignId !== req.params.id) {
     res.status(404).json({ error: "Item not found" });
+    return;
+  }
+
+  // Same wielder-mode guard as the create path (#528). A PATCH may omit
+  // attunementPrereqKind while replacing capabilities, so resolve it against the
+  // existing row rather than treating an unsent field as "not a spellcaster item".
+  const wielderError = assertWielderModeAllowed({
+    attunementPrereqKind:
+      data.attunementPrereqKind !== undefined ? data.attunementPrereqKind : existing.attunementPrereqKind,
+    capabilities: data.capabilities,
+  });
+  if (wielderError) {
+    res.status(400).json({ error: wielderError });
     return;
   }
 

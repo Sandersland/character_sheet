@@ -61,6 +61,14 @@ async function used(itemId: string) {
   return cap.used;
 }
 
+// The derived item-spell entry id carries the capability id suffix (#528 review
+// fix — keeps two castSpell caps for the same spell distinct), so resolve it from
+// the live capability rather than hardcoding the seam.
+async function entryIdFor(itemId: string): Promise<string> {
+  const cap = await prisma.inventoryCapability.findFirstOrThrow({ where: { inventoryItemId: itemId } });
+  return `item:${itemId}:${cap.spellId}:${cap.id}`;
+}
+
 describe("castItemSpell op (#528)", () => {
   let spellId: string;
 
@@ -104,7 +112,7 @@ describe("castItemSpell op (#528)", () => {
 
   it("a non-caster casts a fixed-DC item spell, spending the item resource (not a slot)", async () => {
     const { characterId, itemId } = await makeHolder("Barbarian", NONCASTER_SCORES);
-    const entryId = `item:${itemId}:${spellId}`;
+    const entryId = await entryIdFor(itemId);
 
     await applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId, roll: 9 }], OWNER_ID);
 
@@ -125,7 +133,7 @@ describe("castItemSpell op (#528)", () => {
 
   it("blocks a second cast once uses are exhausted, then restores them on a short rest", async () => {
     const { characterId, itemId } = await makeHolder("Barbarian", NONCASTER_SCORES);
-    const entryId = `item:${itemId}:${spellId}`;
+    const entryId = await entryIdFor(itemId);
 
     await applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId, roll: 9 }], OWNER_ID);
     await expect(
@@ -143,7 +151,7 @@ describe("castItemSpell op (#528)", () => {
 
   it("a long rest restores a perRestLong item spell that a short rest does not", async () => {
     const { characterId, itemId } = await makeHolder("Barbarian", NONCASTER_SCORES, { castResource: "perRestLong" });
-    const entryId = `item:${itemId}:${spellId}`;
+    const entryId = await entryIdFor(itemId);
     await applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId, roll: 9 }], OWNER_ID);
     expect(await used(itemId)).toBe(1);
 
@@ -158,7 +166,7 @@ describe("castItemSpell op (#528)", () => {
     // Wizard L3, INT 16 → +3 mod, prof +2 → spell save DC 13.
     const wizScores = { strength: 8, dexterity: 12, constitution: 12, intelligence: 16, wisdom: 10, charisma: 10 };
     const { characterId, itemId } = await makeHolder("wizard", wizScores, { dcMode: "wielder", dcValue: null });
-    const entryId = `item:${itemId}:${spellId}`;
+    const entryId = await entryIdFor(itemId);
 
     await applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId, roll: 9 }], OWNER_ID);
     const ev = await prisma.characterEvent.findFirstOrThrow({ where: { characterId, type: "castSpell" } });
@@ -168,7 +176,7 @@ describe("castItemSpell op (#528)", () => {
 
   it("does not track uses for an at-will item spell", async () => {
     const { characterId, itemId } = await makeHolder("Barbarian", NONCASTER_SCORES, { castResource: "atWill" });
-    const entryId = `item:${itemId}:${spellId}`;
+    const entryId = await entryIdFor(itemId);
     await applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId, roll: 9 }], OWNER_ID);
     await applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId, roll: 9 }], OWNER_ID);
     expect(await used(itemId)).toBe(0);

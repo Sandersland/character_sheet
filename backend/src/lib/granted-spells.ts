@@ -73,10 +73,12 @@ export interface ItemSpellSourceItem {
 }
 
 // Item-granted spells (#528), derived at read time from a holder's active items.
-// The derived entry id is the `item:<inventoryItemId>:<spellId>` seam — a stable,
-// disjoint id space (like `granted:` and `shadow-art:`) that the cast op parses
-// to find the source capability, and that concentration/resolveConcentration key
-// on. Never persisted: re-derived on every read from the InventoryCapability rows.
+// The derived entry id is the `item:<inventoryItemId>:<spellId>:<capabilityId>`
+// seam — a stable, disjoint id space (like `granted:` and `shadow-art:`) that the
+// cast op matches on to resolve the source capability (via meta.capabilityId), and
+// that concentration/resolveConcentration key on. The trailing capabilityId keeps
+// the id unique when one item carries two castSpell caps for the SAME spell.
+// Never persisted: re-derived on every read from the InventoryCapability rows.
 export function deriveItemSpells(items: ItemSpellSourceItem[]): SpellEntry[] {
   const out: SpellEntry[] = [];
   for (const item of items) {
@@ -87,7 +89,7 @@ export function deriveItemSpells(items: ItemSpellSourceItem[]): SpellEntry[] {
       const total = castUsesTotal(cap);
       const used = col.used ?? 0;
       out.push({
-        id: `item:${item.id}:${cap.spellId}`,
+        id: `item:${item.id}:${cap.spellId}:${col.id}`,
         spellId: cap.spellId,
         name: cap.spellName || "Item spell",
         level: cap.spellLevel,

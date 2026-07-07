@@ -149,7 +149,10 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
   // Cast an item-granted spell: roll the effect (0 when the entry carries no
   // dice), show the banner with the item's announced DC, and spend the item use.
   function handleCastItemSpell(spell: Spell) {
-    const castRoll = computeCastRoll(spell, character, spell.level);
+    // The item casts at its configured slot level (may upcast above the spell's
+    // base level), so the effect dice must scale to castLevel — not spell.level.
+    const castLevel = spell.item?.castLevel ?? spell.level;
+    const castRoll = computeCastRoll(spell, character, castLevel);
     if (castRoll && spell.effectKind) {
       setCastResult({
         spellName: spell.name,

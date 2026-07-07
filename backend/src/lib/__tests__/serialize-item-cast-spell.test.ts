@@ -94,7 +94,9 @@ describe("serialize surfaces item-granted spells (#528)", () => {
     await prisma.inventoryItem.update({ where: { id: itemId }, data: { attuned: true } });
     const [spell] = itemSpells(await serialize(characterId));
     expect(spell).toBeDefined();
-    expect(spell.id).toBe(`item:${itemId}:spell-witch-bolt`);
+    // Entry id carries the capability id suffix so two castSpell caps for the
+    // same spell on one item stay distinct (#528 review fix).
+    expect(spell.id).toBe(`item:${itemId}:spell-witch-bolt:${spell.item?.capabilityId}`);
     expect(spell.name).toBe("Witch Bolt");
     expect(spell.level).toBe(1);
     expect(spell.concentration).toBe(true);

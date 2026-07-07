@@ -410,6 +410,16 @@ model CampaignItemCapability {
   attackMode        CapabilityCastStatMode?
   attackValue       Int?
 
+  // activatedEffect payload (#543). The inline while-active self-buff reuses the
+  // target/op/value columns above; these add the activation + recharge model.
+  activation      ActivationType?
+  activatedDuration ActivatedDuration?
+  resourceKind    ItemResourceKind?
+  resourcePeriod  ItemResourcePeriod?
+  resourceCharges Int?
+  // Free-text wall-clock duration ("10 minutes") surfaced as reminder text.
+  durationText    String?
+
   // grant payload (#529): resistance/immunity/conditionImmunity/advantage/proficiency.
   grantType       String?
   grantOn         String?
@@ -704,6 +714,39 @@ enum CapabilityTarget {
 enum CapabilityOp {
   add
   setTo
+}
+
+// How an activatedEffect capability (#543) is triggered in play. commandWord is
+// a no-action verbal toggle; the rest mirror 5e's action economy.
+enum ActivationType {
+  action
+  bonus
+  reaction
+  commandWord
+}
+
+// How long an activatedEffect's seeded self-buff rides the holder (#543). Maps to
+// the ActiveBuff duration axis: whileActive = manual toggle-off, untilRest = a rest.
+enum ActivatedDuration {
+  whileActive
+  untilRest
+}
+
+// The recharge model for an activatedEffect's uses (#543). perRest/perDay bound
+// the uses per period; atWill is unlimited (never spends).
+enum ItemResourceKind {
+  perRest
+  perDay
+  atWill
+}
+
+// The period an ItemResourceKind recharges over (#543). short|long pair with
+// perRest; dawn|dusk with perDay (approximated to a long rest on reset).
+enum ItemResourcePeriod {
+  short
+  long
+  dawn
+  dusk
 }
 
 // Attunement prerequisite category (5e "requires attunement by a …"). value
@@ -1030,6 +1073,9 @@ model InventoryItem {
   attunementPrereqValue String?
   notes       String?
   position    Int          @default(0)
+  // Uses spent on an activatedEffect capability since its last recharge (#543).
+  // Reset by the matching rest; the seeded self-buff tracks the "active" state.
+  activatedUsesSpent Int    @default(0)
 
   weaponDetail     InventoryWeaponDetail?
   armorDetail      InventoryArmorDetail?
@@ -1069,6 +1115,14 @@ model InventoryCapability {
   dcValue           Int?
   attackMode        CapabilityCastStatMode?
   attackValue       Int?
+
+  // activatedEffect payload (#543) — snapshot twin of CampaignItemCapability.
+  activation      ActivationType?
+  activatedDuration ActivatedDuration?
+  resourceKind    ItemResourceKind?
+  resourcePeriod  ItemResourcePeriod?
+  resourceCharges Int?
+  durationText    String?
 
   // grant payload (#529): resistance/immunity/conditionImmunity/advantage/proficiency.
   grantType       String?
@@ -1251,6 +1305,10 @@ enum CharacterEventType {
   // inventory attunement (#545)
   attuned
   unattuned
+  // inventory activated effects (#543)
+  activated
+  deactivated
+  activatedRecharged
   // session lifecycle
   sessionStarted
   sessionEnded

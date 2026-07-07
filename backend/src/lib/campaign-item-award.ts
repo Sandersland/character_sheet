@@ -124,6 +124,13 @@ function snapshotCampaignItemDetail(item: CampaignItemWithDetails) {
               dcValue: c.dcValue,
               attackMode: c.attackMode,
               attackValue: c.attackValue,
+              // activatedEffect columns (#543).
+              activation: c.activation,
+              activatedDuration: c.activatedDuration,
+              resourceKind: c.resourceKind,
+              resourcePeriod: c.resourcePeriod,
+              resourceCharges: c.resourceCharges,
+              durationText: c.durationText,
               // grant columns (#529).
               grantType: c.grantType,
               grantOn: c.grantOn,
