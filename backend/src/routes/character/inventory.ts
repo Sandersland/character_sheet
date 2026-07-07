@@ -159,6 +159,16 @@ const unattuneOpSchema = z.object({
   inventoryItemId: z.string().min(1),
 });
 
+const activateOpSchema = z.object({
+  type: z.literal("activate"),
+  inventoryItemId: z.string().min(1),
+});
+
+const deactivateOpSchema = z.object({
+  type: z.literal("deactivate"),
+  inventoryItemId: z.string().min(1),
+});
+
 const operationSchema = z.discriminatedUnion("type", [
   acquireOpSchema,
   adjustQuantityOpSchema,
@@ -169,6 +179,8 @@ const operationSchema = z.discriminatedUnion("type", [
   setEquippedOpSchema,
   attuneOpSchema,
   unattuneOpSchema,
+  activateOpSchema,
+  deactivateOpSchema,
 ]);
 
 const transactionsRequestSchema = z.object({

@@ -31,6 +31,13 @@ export type CapabilityOp = (typeof CAPABILITY_OPS)[number];
 export const ATTUNEMENT_PREREQ_KINDS = ["class", "spellcaster", "species", "alignment"] as const;
 export type AttunementPrereqKind = (typeof ATTUNEMENT_PREREQ_KINDS)[number];
 
+// activatedEffect axes (#543) — mirror the ActivationType / ActivatedDuration /
+// ItemResourceKind / ItemResourcePeriod schema enums.
+export type ActivationType = "action" | "bonus" | "reaction" | "commandWord";
+export type ActivatedDurationKind = "whileActive" | "untilRest";
+export type ItemResourceKind = "perRest" | "perDay" | "atWill";
+export type ItemResourcePeriod = "short" | "long" | "dawn" | "dusk";
+
 // grant kind (#529). "sense"/"movement" are reserved: valid enum values the DM
 // can't yet author and no derivation consumes them.
 export const GRANT_TYPES = ["resistance", "immunity", "conditionImmunity", "advantage", "proficiency"] as const;
@@ -66,6 +73,24 @@ export interface PassiveBonusCapability {
   dice?: CapabilityDice | null;
 }
 
+// An activatedEffect (#543): a command-word / action / bonus-action toggle that
+// seeds a while-active (or until-rest) self-buff and spends an item resource. The
+// inline self-buff reuses the passiveBonus target/op/value shape.
+export interface ActivatedEffectCapability {
+  kind: "activatedEffect";
+  activation: ActivationType;
+  target: CapabilityTarget;
+  op: CapabilityOp;
+  value: number;
+  targetKey?: string | null;
+  duration: ActivatedDurationKind;
+  resourceKind: ItemResourceKind;
+  resourcePeriod?: ItemResourcePeriod | null;
+  resourceCharges: number;
+  durationText?: string | null;
+  description?: string | null;
+}
+
 // A grant capability (#529): a resistance/immunity/conditionImmunity/advantage/
 // proficiency the item confers while active. grantOn is advantage-only; grantValue
 // is null for whole-axis advantage (e.g. all initiative rolls).
@@ -82,11 +107,15 @@ export interface GrantCapability {
 // A reserved (not-yet-implemented) capability — surfaced as opaque so callers can
 // skip it without a schema change when the real payload lands.
 export interface OpaqueCapability {
-  kind: Exclude<CapabilityKind, "passiveBonus" | "grant">;
+  kind: Exclude<CapabilityKind, "passiveBonus" | "activatedEffect" | "grant">;
   description?: string | null;
 }
 
-export type Capability = PassiveBonusCapability | GrantCapability | OpaqueCapability;
+export type Capability =
+  | PassiveBonusCapability
+  | ActivatedEffectCapability
+  | GrantCapability
+  | OpaqueCapability;
 
 // The flat columns shared by CampaignItemCapability and InventoryCapability.
 export interface CapabilityColumns {
@@ -100,6 +129,12 @@ export interface CapabilityColumns {
   valueDiceCount?: number | null;
   valueDiceFaces?: number | null;
   valueDamageType?: string | null;
+  activation?: string | null;
+  activatedDuration?: string | null;
+  resourceKind?: string | null;
+  resourcePeriod?: string | null;
+  resourceCharges?: number | null;
+  durationText?: string | null;
   grantType?: string | null;
   grantOn?: string | null;
   grantValueKind?: string | null;
@@ -138,7 +173,69 @@ export function readCapability(row: CapabilityColumns): Capability {
       dice,
     };
   }
+  if (row.kind === "activatedEffect" && row.activation && row.target && row.op) {
+    return {
+      kind: "activatedEffect",
+      activation: row.activation as ActivationType,
+      target: row.target as CapabilityTarget,
+      op: row.op as CapabilityOp,
+      value: row.value ?? 0,
+      targetKey: row.targetKey ?? null,
+      duration: row.activatedDuration === "untilRest" ? "untilRest" : "whileActive",
+      resourceKind: (row.resourceKind as ItemResourceKind) ?? "atWill",
+      resourcePeriod: (row.resourcePeriod as ItemResourcePeriod) ?? null,
+      resourceCharges: row.resourceCharges ?? 1,
+      durationText: row.durationText ?? null,
+      description: row.description ?? null,
+    };
+  }
   return { kind: row.kind as OpaqueCapability["kind"], description: row.description ?? null };
+}
+
+// Max uses per recharge for an activatedEffect. atWill is unlimited (null = no
+// cap); perRest/perDay allow resourceCharges uses (default 1) per period.
+export function activatedMaxUses(cap: ActivatedEffectCapability): number | null {
+  if (cap.resourceKind === "atWill") return null;
+  return Math.max(1, cap.resourceCharges);
+}
+
+// The rest that recharges an activatedEffect's uses, or null when it never rests
+// (atWill). perRest(short) recharges on a short rest; perRest(long) and perDay
+// (dawn/dusk approximated to a rest) recharge on a long rest.
+export function activatedRechargeRest(cap: ActivatedEffectCapability): "short" | "long" | null {
+  if (cap.resourceKind === "atWill") return null;
+  if (cap.resourceKind === "perRest" && cap.resourcePeriod === "short") return "short";
+  return "long";
+}
+
+// Human phrasing for an activation type (the reminder text prefix). Internal to
+// describeActivatedReminder — not exported (the frontend has its own copy).
+function describeActivation(activation: ActivationType): string {
+  switch (activation) {
+    case "action":
+      return "Action";
+    case "bonus":
+      return "Bonus action";
+    case "reaction":
+      return "Reaction";
+    case "commandWord":
+      return "Command word";
+  }
+}
+
+// Reminder text an activated item surfaces: the activation verb + the duration
+// approximation. A free-text durationText ("10 minutes") is shown verbatim since
+// no minute timer is modeled — the holder toggles it off manually or on a rest.
+export function describeActivatedReminder(cap: ActivatedEffectCapability): string {
+  const parts = [describeActivation(cap.activation)];
+  if (cap.durationText) {
+    parts.push(`lasts ${cap.durationText} (toggle off manually)`);
+  } else if (cap.duration === "untilRest") {
+    parts.push(activatedRechargeRest(cap) === "short" ? "until a short rest" : "until a long rest");
+  } else {
+    parts.push("while active (toggle off)");
+  }
+  return parts.join(" · ");
 }
 
 // The flat wire shape a capability serializes to — the same fields the DM authors
@@ -152,6 +249,15 @@ export interface SerializedCapability {
   condition?: string;
   description?: string;
   dice?: CapabilityDice;
+  // activatedEffect (#543) — round-tripped so the DM editor can re-populate.
+  // activatedDuration matches the authoring input field name (the internal
+  // Capability shape calls it `duration`).
+  activation?: ActivationType;
+  activatedDuration?: ActivatedDurationKind;
+  resourceKind?: ItemResourceKind;
+  resourcePeriod?: ItemResourcePeriod;
+  resourceCharges?: number;
+  durationText?: string;
   grantType?: GrantType;
   grantOn?: AdvantageOn;
   grantValueKind?: GrantValueKind;
@@ -184,6 +290,22 @@ export function serializeCapability(row: CapabilityColumns): SerializedCapabilit
       ...(cap.condition ? { condition: cap.condition } : {}),
       ...(cap.description ? { description: cap.description } : {}),
       ...(cap.dice ? { dice: { count: cap.dice.count, faces: cap.dice.faces, ...(cap.dice.damageType ? { damageType: cap.dice.damageType } : {}) } } : {}),
+    };
+  }
+  if (cap.kind === "activatedEffect") {
+    return {
+      kind: cap.kind,
+      activation: cap.activation,
+      target: cap.target,
+      op: cap.op,
+      value: cap.value,
+      activatedDuration: cap.duration,
+      resourceKind: cap.resourceKind,
+      resourceCharges: cap.resourceCharges,
+      ...(cap.targetKey ? { targetKey: cap.targetKey } : {}),
+      ...(cap.resourcePeriod ? { resourcePeriod: cap.resourcePeriod } : {}),
+      ...(cap.durationText ? { durationText: cap.durationText } : {}),
+      ...(cap.description ? { description: cap.description } : {}),
     };
   }
   return { kind: cap.kind, ...(cap.description ? { description: cap.description } : {}) };

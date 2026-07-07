@@ -285,9 +285,11 @@ describe("capabilitiesActive", () => {
     expect(capabilitiesActive({ equipped: true, attuned: false, requiresAttunement: true })).toBe(false);
   });
 
-  it("gates a non-attunement item on equipped OR attuned", () => {
+  it("gates a non-attunement item on equipped (mirrors backend isItemActive)", () => {
     expect(capabilitiesActive({ equipped: true, attuned: false, requiresAttunement: false })).toBe(true);
-    expect(capabilitiesActive({ equipped: false, attuned: true, requiresAttunement: false })).toBe(true);
+    // An unattunable item that is somehow `attuned` is unreachable; the gate does
+    // not diverge from the backend by falling back to attunement here.
+    expect(capabilitiesActive({ equipped: false, attuned: true, requiresAttunement: false })).toBe(false);
     expect(capabilitiesActive({ equipped: false, attuned: false, requiresAttunement: false })).toBe(false);
   });
 });

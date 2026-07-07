@@ -47,7 +47,10 @@ export interface AttackEntry {
 // A weapon's capabilities are live when equipped/attuned; an attunement-required
 // item needs attunement specifically, so unattuning removes its riders.
 export function capabilitiesActive(item: Pick<InventoryItem, "equipped" | "attuned" | "requiresAttunement">): boolean {
-  return item.requiresAttunement ? item.attuned : item.equipped || item.attuned;
+  // Mirror backend isItemActive exactly: attunement items gate on `attuned`,
+  // everything else on `equipped` (an unattunable item that is somehow `attuned`
+  // is unreachable, but we don't want the frontend gate to diverge from the wire).
+  return item.requiresAttunement ? item.attuned : item.equipped;
 }
 
 // Compact term label for a dice rider, e.g. "+2d6 fire" or "+1d4".
