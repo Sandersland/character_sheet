@@ -79,8 +79,38 @@ const consumableInputSchema = z
   })
   .strict();
 
+const CAPABILITY_TARGETS = [
+  "ac", "attack", "damage", "save", "skill", "abilityScore",
+  "spellAttack", "spellDc", "initiative", "speed", "maxHp",
+] as const;
+
+// A capability the DM authors on a magic item (#545/#543). passiveBonus is an
+// always-on modifier; activatedEffect is a toggled self-buff with a recharge.
+const capabilitySchema = z
+  .object({
+    kind: z.enum(["passiveBonus", "activatedEffect", "castSpell", "charges", "grant"]),
+    description: z.string().optional(),
+    target: z.enum(CAPABILITY_TARGETS).optional(),
+    op: z.enum(["add", "setTo"]).optional(),
+    value: z.number().int().optional(),
+    targetKey: z.string().optional(),
+    condition: z.string().optional(),
+    valueDiceCount: z.number().int().optional(),
+    valueDiceFaces: z.number().int().optional(),
+    valueDamageType: z.string().optional(),
+    // activatedEffect payload (#543).
+    activation: z.enum(["action", "bonus", "reaction", "commandWord"]).optional(),
+    activatedDuration: z.enum(["whileActive", "untilRest"]).optional(),
+    resourceKind: z.enum(["perRest", "perDay", "atWill"]).optional(),
+    resourcePeriod: z.enum(["short", "long", "dawn", "dusk"]).optional(),
+    resourceCharges: z.number().int().positive().optional(),
+    durationText: z.string().optional(),
+  })
+  .strict();
+
 const baseFields = {
   name: z.string().min(1),
+  capabilities: z.array(capabilitySchema).optional(),
   description: z.string().optional(),
   category: z.enum(CATEGORIES),
   rarity: z.enum(ITEM_RARITY_KEYS).nullable().optional(),
@@ -111,8 +141,15 @@ const itemInclude = {
   weaponDetail: true,
   armorDetail: true,
   consumableDetail: true,
+  capabilities: true,
   link: { include: { campaignEntity: { select: { id: true, name: true, visibility: true } } } },
 } satisfies Prisma.CampaignItemInclude;
+
+// Nested-create payload for a campaign item's capability rows (undefined = none).
+function capabilityCreate(caps: z.infer<typeof capabilitySchema>[] | undefined) {
+  if (!caps || caps.length === 0) return undefined;
+  return { create: caps.map((c) => ({ ...c })) };
+}
 
 type ItemWithDetails = Prisma.CampaignItemGetPayload<{ include: typeof itemInclude }>;
 
@@ -142,6 +179,24 @@ function serializeCampaignItem(
     weapon: row.weaponDetail ? serializeWeaponDetail(row.weaponDetail) : undefined,
     armor: row.armorDetail ? serializeArmorDetail(row.armorDetail) : undefined,
     consumable: row.consumableDetail ? serializeConsumableDetail(row.consumableDetail) : undefined,
+    capabilities: row.capabilities.map((c) => ({
+      kind: c.kind,
+      description: c.description ?? undefined,
+      target: c.target ?? undefined,
+      op: c.op ?? undefined,
+      value: c.value ?? undefined,
+      targetKey: c.targetKey ?? undefined,
+      condition: c.condition ?? undefined,
+      valueDiceCount: c.valueDiceCount ?? undefined,
+      valueDiceFaces: c.valueDiceFaces ?? undefined,
+      valueDamageType: c.valueDamageType ?? undefined,
+      activation: c.activation ?? undefined,
+      activatedDuration: c.activatedDuration ?? undefined,
+      resourceKind: c.resourceKind ?? undefined,
+      resourcePeriod: c.resourcePeriod ?? undefined,
+      resourceCharges: c.resourceCharges ?? undefined,
+      durationText: c.durationText ?? undefined,
+    })),
     entity: entity ? { id: entity.id, name: entity.name, visibility: entity.visibility } : undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -242,6 +297,7 @@ campaignItemsRouter.post("/campaigns/:id/items", async (req, res) => {
         cost: data.cost ?? Prisma.DbNull,
         dmNotes: data.dmNotes ?? null,
         ...detailCreate(data),
+        ...(capabilityCreate(data.capabilities) ? { capabilities: capabilityCreate(data.capabilities) } : {}),
         link: { create: { campaignEntityId: entity.id } },
       },
       include: itemInclude,
@@ -282,6 +338,13 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
         where: { id: existing.link.campaignEntityId },
         data: { name: data.name },
       });
+    }
+    // Capabilities are authored as a whole set — replace rather than merge.
+    if (data.capabilities !== undefined) {
+      await tx.campaignItemCapability.deleteMany({ where: { campaignItemId: existing.id } });
+      for (const c of data.capabilities) {
+        await tx.campaignItemCapability.create({ data: { campaignItemId: existing.id, ...c } });
+      }
     }
     return tx.campaignItem.update({
       where: { id: existing.id },
