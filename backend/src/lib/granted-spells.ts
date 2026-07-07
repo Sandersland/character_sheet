@@ -5,6 +5,7 @@
 // Phase-D versioning concern (introduced uniformly with spells/items), not by
 // persisting grants ad-hoc.
 
+import { castUsesTotal, readCapability, type CapabilityColumns } from "./capabilities.js";
 import type { SpellEntry } from "./spell-state.js";
 
 // The six ability scores, lowercase — the shape of Character.abilityScores.
@@ -59,4 +60,60 @@ export function deriveGrantedSpells(
 export function deriveGrantedCastingAbility(subclass: string | undefined): keyof AbilityScores {
   if (!subclass) return "wisdom";
   return SUBCLASS_GRANTED_SPELLS[subclass.toLowerCase()]?.castingAbility ?? "wisdom";
+}
+
+// The minimal inventory-item shape item-spell derivation needs: an item is a
+// live spell source only while equipped OR attuned (same gate as passive bonuses).
+export interface ItemSpellSourceItem {
+  id: string;
+  name: string;
+  equipped: boolean;
+  attuned: boolean;
+  capabilities: (CapabilityColumns & { id: string; used?: number | null })[];
+}
+
+// Item-granted spells (#528), derived at read time from a holder's active items.
+// The derived entry id is the `item:<inventoryItemId>:<spellId>` seam — a stable,
+// disjoint id space (like `granted:` and `shadow-art:`) that the cast op parses
+// to find the source capability, and that concentration/resolveConcentration key
+// on. Never persisted: re-derived on every read from the InventoryCapability rows.
+export function deriveItemSpells(items: ItemSpellSourceItem[]): SpellEntry[] {
+  const out: SpellEntry[] = [];
+  for (const item of items) {
+    if (!item.equipped && !item.attuned) continue;
+    for (const col of item.capabilities) {
+      const cap = readCapability(col);
+      if (cap.kind !== "castSpell") continue;
+      const total = castUsesTotal(cap);
+      const used = col.used ?? 0;
+      out.push({
+        id: `item:${item.id}:${cap.spellId}`,
+        spellId: cap.spellId,
+        name: cap.spellName || "Item spell",
+        level: cap.spellLevel,
+        school: "evocation",
+        prepared: true,
+        castingTime: "1 action",
+        range: "—",
+        duration: cap.concentration ? "Concentration" : "—",
+        description: cap.description ?? "",
+        concentration: cap.concentration,
+        source: "item",
+        item: {
+          inventoryItemId: item.id,
+          capabilityId: col.id,
+          itemName: item.name,
+          castLevel: cap.castLevel,
+          resource: cap.resource,
+          usesRemaining: total === Infinity ? Infinity : Math.max(0, total - used),
+          usesTotal: total,
+          dcMode: cap.dcMode,
+          dc: cap.dcMode === "fixed" ? cap.dcValue ?? null : null,
+          attackMode: cap.attackMode,
+          attack: cap.attackMode === "fixed" ? cap.attackValue ?? null : null,
+        },
+      });
+    }
+  }
+  return out;
 }
