@@ -99,10 +99,11 @@ describe("Popover", () => {
     expect(onClose).toHaveBeenCalledTimes(3);
   });
 
-  it("passes a close() to a render-prop child that dismisses the panel and refocuses the trigger", async () => {
+  it("passes a close() to a render-prop child that dismisses the panel, refocuses the trigger, and fires onClose", async () => {
+    const onClose = vi.fn();
     const user = userEvent.setup();
     render(
-      <Popover trigger={<span>17</span>} label="Armor Class breakdown">
+      <Popover trigger={<span>17</span>} label="Armor Class breakdown" onClose={onClose}>
         {(close) => (
           <button type="button" onClick={close}>
             Dismiss
@@ -116,6 +117,7 @@ describe("Popover", () => {
     await user.click(screen.getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(trigger);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("has no axe violations when open", async () => {

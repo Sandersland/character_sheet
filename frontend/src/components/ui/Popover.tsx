@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 interface PopoverProps {
   trigger: ReactNode;
@@ -28,6 +28,13 @@ export default function Popover({
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const wasOpen = useRef(false);
+
+  // Stable close() handed to a render-prop child (setOpen is stable, triggerRef is a
+  // ref) so it never defeats memoization of the panel content.
+  const closePanel = useCallback(() => {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }, []);
 
   // Notify the parent on every open → closed transition, whatever the cause
   // (Escape, click-outside, or a toggle-off) — lets callers reset panel state.
@@ -82,12 +89,7 @@ export default function Popover({
           tabIndex={-1}
           className={`absolute ${align === "left" ? "left-0" : "right-0"} z-10 mt-1 min-w-[12rem] rounded-card border border-parchment-200 bg-parchment-50 shadow-raised focus:outline-none`}
         >
-          {typeof children === "function"
-            ? children(() => {
-                setOpen(false);
-                triggerRef.current?.focus();
-              })
-            : children}
+          {typeof children === "function" ? children(closePanel) : children}
         </div>
       )}
     </div>
