@@ -32,4 +32,4 @@ export const ITEM_CATEGORY_ICONS: Record<ItemCategory, IconType> = {
 };
 
 export { GiQuillInk, GiKnapsack, GiSpellBook, GiHealthNormal } from "react-icons/gi";
-export { Lock, Plus, Zap, VenetianMask, ChevronDown } from "lucide-react";
+export { Lock, Plus, Zap, VenetianMask, ChevronDown, Trash2, Sparkles } from "lucide-react";
