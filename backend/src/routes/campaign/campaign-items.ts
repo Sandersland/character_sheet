@@ -88,11 +88,12 @@ const consumableInputSchema = z
   })
   .strict();
 
-// A DM-authored passiveBonus capability (#546). Only passiveBonus is authorable
-// this slice; dice is nested and consumed in the damage roll at #526C.
+// A DM-authored passiveBonus/activatedEffect capability (#545/#546/#543). passiveBonus
+// is an always-on modifier (dice nested, consumed at #526C); activatedEffect is a
+// toggled self-buff with a recharge (#543), reusing target/op/value for its inline buff.
 const passiveBonusInputSchema = z
   .object({
-    kind: z.literal("passiveBonus"),
+    kind: z.enum(["passiveBonus", "activatedEffect"]),
     target: z.enum(CAPABILITY_TARGETS),
     op: z.enum(CAPABILITY_OPS),
     value: z.number().int().optional(),
@@ -107,8 +108,35 @@ const passiveBonusInputSchema = z
       })
       .strict()
       .optional(),
+    // activatedEffect payload (#543).
+    activation: z.enum(["action", "bonus", "reaction", "commandWord"]).optional(),
+    activatedDuration: z.enum(["whileActive", "untilRest"]).optional(),
+    resourceKind: z.enum(["perRest", "perDay", "atWill"]).optional(),
+    resourcePeriod: z.enum(["short", "long", "dawn", "dusk"]).optional(),
+    resourceCharges: z.number().int().positive().optional(),
+    durationText: z.string().optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((val, ctx) => {
+    if (val.kind === "activatedEffect" && val.activation === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["activation"],
+        // Name the field in the message too: the route 400s with error.flatten(),
+        // which collapses the nested path (capabilities.N.activation) away.
+        message: "activation is required when kind is activatedEffect",
+      });
+    }
+    // applyActivate seeds an ADDITIVE buff (modifier: value) and does not honor setTo,
+    // so reject a non-add op at the authoring boundary rather than silently misapplying.
+    if (val.kind === "activatedEffect" && val.op !== undefined && val.op !== "add") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["op"],
+        message: "op must be add when kind is activatedEffect (the buff value is additive)",
+      });
+    }
+  });
 
 // A DM-authored grant capability (#529): resistance/immunity/conditionImmunity/
 // advantage/proficiency conferred while the item is active. grantValue is the
@@ -169,6 +197,12 @@ function capabilityCreate(cap: z.infer<typeof capabilityInputSchema>) {
     valueDiceCount: cap.dice?.count ?? null,
     valueDiceFaces: cap.dice?.faces ?? null,
     valueDamageType: cap.dice?.damageType ?? null,
+    activation: cap.activation ?? null,
+    activatedDuration: cap.activatedDuration ?? null,
+    resourceKind: cap.resourceKind ?? null,
+    resourcePeriod: cap.resourcePeriod ?? null,
+    resourceCharges: cap.resourceCharges ?? null,
+    durationText: cap.durationText ?? null,
   };
 }
 

@@ -86,6 +86,10 @@ export type EventType =
   // inventory attunement (#545)
   | "attuned"
   | "unattuned"
+  // inventory activated effects (#543)
+  | "activated"
+  | "deactivated"
+  | "activatedRecharged"
   // session lifecycle
   | "sessionStarted"
   | "sessionEnded"

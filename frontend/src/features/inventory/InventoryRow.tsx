@@ -5,6 +5,7 @@ import { hasItemProse, itemDetailParts } from "@/lib/itemDetails";
 import { isEquippable } from "@/lib/items";
 import type { InventoryItem, InventoryOperation } from "@/types/character";
 import OverflowMenu from "@/components/ui/OverflowMenu";
+import ActivateControl from "@/features/inventory/ActivateControl";
 import AttuneToggle from "@/features/inventory/AttuneToggle";
 import EquipToggle from "@/features/inventory/EquipToggle";
 import InventoryEditForm from "@/features/inventory/InventoryEditForm";
@@ -138,6 +139,10 @@ export default function InventoryRow({
             Cancel
           </button>
         </div>
+      )}
+
+      {!selectMode && item.activated && (
+        <ActivateControl item={item} pending={pending} onSubmit={onSubmit} />
       )}
 
       {!selectMode && state.expanded && hasProse && <ItemProse item={item} />}

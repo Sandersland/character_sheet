@@ -209,6 +209,13 @@ export interface ItemCapability {
   condition?: string;
   description?: string;
   dice?: CapabilityDice;
+  /** activatedEffect (#543) — reuses target/op/value for the inline self-buff. */
+  activation?: ActivationType;
+  activatedDuration?: "whileActive" | "untilRest";
+  resourceKind?: "perRest" | "perDay" | "atWill";
+  resourcePeriod?: "short" | "long" | "dawn" | "dusk";
+  resourceCharges?: number;
+  durationText?: string;
   /** grant kind (#529): the trait/proficiency the item confers while active. */
   grantType?: GrantType;
   grantOn?: AdvantageOn;
@@ -271,12 +278,29 @@ export interface InventoryItem {
   requiresAttunement: boolean;
   attunementPrereqKind?: AttunementPrereqKind;
   attunementPrereqValue?: string;
+
   notes?: string;
   weapon?: WeaponDetail;
   armor?: ArmorDetail;
   consumable?: ConsumableDetail;
   capabilities?: ItemCapability[];
+  /** Activate/deactivate control state for an item's activatedEffect capability (#543). */
+  activated?: ActivatedEffectState;
+
 }
+
+// The derived activate/deactivate control state the API serializes for an
+// activatedEffect item (#543). Absent when the item has no such capability.
+export interface ActivatedEffectState {
+  activation: ActivationType;
+  reminder: string;
+  maxUses: number | null;
+  remainingUses: number | null;
+  active: boolean;
+  available: boolean;
+}
+
+export type ActivationType = "action" | "bonus" | "reaction" | "commandWord";
 
 // Looser than WeaponDetail/ArmorDetail above (which describe what the API
 // always returns, every flag included) — these describe what a client only
@@ -386,7 +410,11 @@ export type InventoryOperation =
   /** Attunes an item — enforces the derived 3-item cap + prereq server-side (#546). */
   | { type: "attune"; inventoryItemId: string }
   /** Ends attunement; always legal (#546). */
-  | { type: "unattune"; inventoryItemId: string };
+  | { type: "unattune"; inventoryItemId: string }
+  /** Activates / deactivates an item's activatedEffect capability (#543). */
+  | { type: "activate"; inventoryItemId: string }
+  | { type: "deactivate"; inventoryItemId: string };
+
 
 // ── Unified activity timeline ─────────────────────────────────────────────────
 
@@ -1137,6 +1165,7 @@ export interface CampaignItem {
   armor?: ArmorDetail;
   consumable?: ConsumableDetail;
   capabilities?: ItemCapability[];
+
   /** The fronting ITEM CampaignEntity — its `visibility` drives player reveal. */
   entity?: { id: string; name: string; visibility: EntityVisibility };
   /** Current holders derived from live inventory rows (#381). */
@@ -1164,6 +1193,7 @@ export interface CampaignItemInput {
   consumable?: ConsumableDetail;
   /** REPLACE semantics server-side: the full set the item should have, [] clears. */
   capabilities?: ItemCapability[];
+
 }
 
 /** One note that @-tags an entity, surfaced on the entity detail page. */
