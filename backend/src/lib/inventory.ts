@@ -274,7 +274,11 @@ export function itemBuffKey(inventoryItemId: string): string {
 function activatedCapabilityOf(item: InventoryItemWithDetails): ActivatedEffectCapability | null {
   for (const col of item.capabilities) {
     const cap = readCapability(col);
-    if (cap.kind === "activatedEffect") return cap;
+    // Type-predicate guard (not a bare kind check): an opaque row with
+    // kind="activatedEffect" but no activation must not be returned as a
+    // malformed ActivatedEffectCapability — applyActivate would seed a buff
+    // with target/modifier undefined.
+    if (cap.kind === "activatedEffect" && "activation" in cap) return cap;
   }
   return null;
 }
