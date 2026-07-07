@@ -483,6 +483,18 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
     return;
   }
 
+  // A PATCH may set { slot } without resending category; refineSlotCategory can't see
+  // the existing row, so guard slot-on-non-gear against the effective category here —
+  // else `{ slot: "NECK" }` on an existing weapon would corrupt paper-doll data on award.
+  const effectiveCategory = data.category ?? existing.category;
+  if (data.slot != null && effectiveCategory !== "gear") {
+    res.status(400).json({
+      error: "Invalid request body",
+      details: { formErrors: [], fieldErrors: { slot: ["slot is only valid on a gear item"] } },
+    });
+    return;
+  }
+
   const updated = await prisma.$transaction(async (tx) => {
     if (data.name !== undefined && existing.link) {
       await tx.campaignEntity.update({

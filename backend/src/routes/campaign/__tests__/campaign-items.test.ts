@@ -385,6 +385,28 @@ describe("campaign items (#380)", () => {
     }
   });
 
+  it("DM-5: a PATCH that sets slot on an existing weapon (without resending category) is rejected 400", async () => {
+    const created = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({
+        name: "Plain Sword",
+        category: "weapon",
+        weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageType: "slashing" },
+      });
+    const itemId = created.body.id as string;
+    // The schema-level refine can't see the existing category on a category-less PATCH;
+    // the handler's effective-category guard must still reject the slot.
+    const res = await supertest(app)
+      .patch(`/api/campaigns/${campaignId}/items/${itemId}`)
+      .set("Cookie", cookieOwner)
+      .send({ slot: "NECK" });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain("slot");
+    const after = await prisma.campaignItem.findUnique({ where: { id: itemId } });
+    expect(after?.slot).toBeNull();
+  });
+
   it("DM-4: updating a gear item's category to weapon clears its slot", async () => {
     const created = await supertest(app)
       .post(`/api/campaigns/${campaignId}/items`)
