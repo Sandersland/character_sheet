@@ -290,6 +290,8 @@ export interface InventoryItem {
   equippedSlot?: EquipSlot;
   /** Declared paper-doll slot for wearable gear (#565); absent = bag-only. */
   slot?: EquipSlot;
+  /** Magic-item rarity tier snapshot; absent for mundane gear. */
+  rarity?: ItemRarity;
   /** Attunement state (#546); the 3-item cap is derived, never stored. */
   attuned: boolean;
   /** Snapshotted from the source item — whether attunement is required to activate. */

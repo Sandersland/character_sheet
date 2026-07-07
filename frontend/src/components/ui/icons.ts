@@ -57,5 +57,5 @@ export const EQUIP_SLOT_ICONS: Record<EquipSlot, IconType> = {
   RING: GiRing,
 };
 
-export { GiQuillInk, GiKnapsack, GiSpellBook, GiHealthNormal } from "react-icons/gi";
+export { GiQuillInk, GiKnapsack, GiSpellBook, GiHealthNormal, GiChestArmor } from "react-icons/gi";
 export { Lock, Plus, Zap, VenetianMask, ChevronDown, Trash2, Sparkles } from "lucide-react";

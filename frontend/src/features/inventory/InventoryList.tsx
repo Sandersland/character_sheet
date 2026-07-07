@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { applyInventoryTransactions, fetchItems, updateCharacter } from "@/api/client";
 import type { Character, Currency, InventoryOperation, Item, ItemCategory } from "@/types/character";
 import AddItemPanel from "@/features/inventory/AddItemPanel";
+import EquipmentDoll from "@/features/inventory/EquipmentDoll";
+import Segmented from "@/components/ui/Segmented";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import { GiKnapsack, ITEM_CATEGORY_ICONS } from "@/components/ui/icons";
@@ -131,6 +133,7 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [view, setView] = useState<"bag" | "worn">("bag");
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [configuringSell, setConfiguringSell] = useState(false);
@@ -322,6 +325,18 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
         )}
 
         {hasItems && !configuringSell && (
+          <Segmented
+            label="Inventory view"
+            options={[
+              { value: "bag", label: "Bag" },
+              { value: "worn", label: "Worn" },
+            ]}
+            value={view}
+            onChange={setView}
+          />
+        )}
+
+        {hasItems && !configuringSell && view === "bag" && (
           <div className="flex flex-col gap-2">
             <div className="relative">
               <Search
@@ -377,6 +392,8 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
             onConfirm={confirmSell}
             onCancel={() => setConfiguringSell(false)}
           />
+        ) : view === "worn" ? (
+          <EquipmentDoll character={character} pending={pending} onSubmit={submitOperations} />
         ) : !hasItems ? (
           <EmptyState
             icon={<GiKnapsack />}
