@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "@/test/axe";
@@ -74,6 +74,61 @@ describe("Popover", () => {
     renderPopover({ align: "right" });
     await user.click(screen.getByRole("button", { name: "Armor Class breakdown" }));
     expect(screen.getByRole("dialog").className).toContain("right-0");
+  });
+
+  describe("viewport-overflow auto-flip", () => {
+    // jsdom has no layout, so simulate a real viewport + anchor position.
+    function mockViewport(width: number, anchor: { left: number; right: number }) {
+      Object.defineProperty(document.documentElement, "clientWidth", {
+        value: width,
+        configurable: true,
+      });
+      vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+        left: anchor.left,
+        right: anchor.right,
+        top: 100,
+        bottom: 160,
+        width: anchor.right - anchor.left,
+        height: 60,
+        x: anchor.left,
+        y: 100,
+        toJSON: () => ({}),
+      } as DOMRect);
+    }
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      // Remove the instance override so the prototype getter shows through again.
+      delete (document.documentElement as unknown as Record<string, unknown>).clientWidth;
+    });
+
+    it("flips a left-aligned panel to right-0 when it would overflow the right edge", async () => {
+      // Trigger near the right edge of a 390px viewport: left-aligned 224px panel
+      // would end at 300 + 224 = 524 > 390 → must flip right.
+      mockViewport(390, { left: 300, right: 360 });
+      const user = userEvent.setup();
+      renderPopover();
+      await user.click(screen.getByRole("button", { name: "Armor Class breakdown" }));
+      expect(screen.getByRole("dialog").className).toContain("right-0");
+    });
+
+    it("flips a right-aligned panel to left-0 when it would overflow the left edge", async () => {
+      // Trigger near the left edge: right-aligned 224px panel would start at
+      // 90 - 224 = -134 < 0 → must flip left.
+      mockViewport(390, { left: 30, right: 90 });
+      const user = userEvent.setup();
+      renderPopover({ align: "right" });
+      await user.click(screen.getByRole("button", { name: "Armor Class breakdown" }));
+      expect(screen.getByRole("dialog").className).toContain("left-0");
+    });
+
+    it("keeps the preferred left alignment when the panel fits", async () => {
+      mockViewport(390, { left: 30, right: 90 });
+      const user = userEvent.setup();
+      renderPopover();
+      await user.click(screen.getByRole("button", { name: "Armor Class breakdown" }));
+      expect(screen.getByRole("dialog").className).toContain("left-0");
+    });
   });
 
   it("applies className to the wrapper and triggerClassName to the trigger", () => {
