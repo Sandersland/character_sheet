@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 
 import InlineAttackPicker from "@/features/session/InlineAttackPicker";
 import { RollProvider } from "@/features/dice/RollContext";
-import { applyInventoryTransactions } from "@/api/client";
+import { applyInventoryTransactions, logRoll } from "@/api/client";
 import type { Character } from "@/types/character";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 
@@ -121,5 +121,82 @@ describe("InlineAttackPicker — inline equip affordance", () => {
   it("shows the attacks-per-Attack-action count", () => {
     renderPicker(makeCharacter({ attacksPerAction: 3 }));
     expect(screen.getByText(/Attacks:\s*3/)).toBeInTheDocument();
+  });
+});
+
+// An equipped weapon carrying a dice-valued on-hit passiveBonus capability.
+function flameTongue(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "inv-flame",
+    name: "Flame Tongue",
+    category: "weapon" as const,
+    quantity: 1,
+    equipped: true,
+    attuned: true,
+    requiresAttunement: true,
+    weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "slashing", attackBonus: 3 },
+    capabilities: [{ kind: "passiveBonus", target: "damage", op: "add", dice: { count: 2, faces: 6, damageType: "fire" } }],
+    ...overrides,
+  };
+}
+
+describe("InlineAttackPicker — on-hit dice riders", () => {
+  it("renders a typed rider button for an attuned Flame Tongue and rolls it with the fire type", async () => {
+    const onLogChanged = vi.fn();
+    renderPicker(
+      makeCharacter({ inventory: [flameTongue()] as unknown as Character["inventory"] }),
+      vi.fn(),
+      onLogChanged,
+    );
+
+    const riderButton = screen.getByRole("button", { name: /Roll \+2d6 fire/ });
+    expect(riderButton).toBeInTheDocument();
+
+    await userEvent.click(riderButton);
+
+    expect(vi.mocked(logRoll)).toHaveBeenCalledWith(
+      "char-1",
+      "sess-1",
+      expect.objectContaining({ kind: "damage", source: "Flame Tongue", damageType: "fire" }),
+    );
+  });
+
+  it("hides the rider when the attunement-required weapon is unattuned", () => {
+    renderPicker(
+      makeCharacter({ inventory: [flameTongue({ attuned: false })] as unknown as Character["inventory"] }),
+    );
+    expect(screen.queryByRole("button", { name: /Roll \+2d6 fire/ })).not.toBeInTheDocument();
+  });
+
+  it("shows a conditional rider's condition as reminder text", () => {
+    renderPicker(
+      makeCharacter({
+        inventory: [
+          flameTongue({
+            name: "Dragon Slayer",
+            capabilities: [{ kind: "passiveBonus", target: "damage", op: "add", dice: { count: 3, faces: 6 }, condition: "vs dragons" }],
+          }),
+        ] as unknown as Character["inventory"],
+      }),
+    );
+    expect(screen.getByText(/vs dragons/)).toBeInTheDocument();
+  });
+
+  it("does not leak one weapon's rider onto another equipped weapon", () => {
+    const plainSword = {
+      id: "inv-plain",
+      name: "Longsword",
+      category: "weapon" as const,
+      quantity: 1,
+      equipped: true,
+      attuned: false,
+      requiresAttunement: false,
+      weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "slashing", attackBonus: 2 },
+    };
+    renderPicker(
+      makeCharacter({ inventory: [flameTongue(), plainSword] as unknown as Character["inventory"] }),
+    );
+    // Exactly one rider button in the whole picker — the Flame Tongue's.
+    expect(screen.getAllByRole("button", { name: /Roll \+\dd\d/ })).toHaveLength(1);
   });
 });
