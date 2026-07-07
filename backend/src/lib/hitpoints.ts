@@ -1084,13 +1084,41 @@ async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
 
   const afterResourceState = serializeResourcesState(resourceState);
 
+  // Recharge limited-use consumables (#121): charged items (maxUses set) reset
+  // to full. Inlined here rather than in lib/inventory.ts to avoid an import
+  // cycle (inventory already imports this module).
+  const chargedRows = await tx.inventoryConsumableDetail.findMany({
+    where: { inventoryItem: { characterId }, maxUses: { not: null } },
+    select: { inventoryItemId: true, usesRemaining: true, maxUses: true },
+  });
+  const consumableChargesBefore: { inventoryItemId: string; usesRemaining: number | null }[] = [];
+  const consumableChargesAfter: { inventoryItemId: string; usesRemaining: number | null }[] = [];
+  let consumablesRecharged = 0;
+  for (const c of chargedRows) {
+    if (c.usesRemaining !== c.maxUses) {
+      consumableChargesBefore.push({ inventoryItemId: c.inventoryItemId, usesRemaining: c.usesRemaining });
+      consumableChargesAfter.push({ inventoryItemId: c.inventoryItemId, usesRemaining: c.maxUses });
+      await tx.inventoryConsumableDetail.update({
+        where: { inventoryItemId: c.inventoryItemId },
+        data: { usesRemaining: c.maxUses },
+      });
+      consumablesRecharged += 1;
+    }
+  }
+
   const hpRestored = effMax - prevCurrent;
   const eventData: Record<string, unknown> = { recovered, hpRestored, slotsRestored, resourcesRestored };
+  if (consumablesRecharged > 0) {
+    eventData.consumablesRecharged = consumablesRecharged;
+    eventData.consumableChargesBefore = consumableChargesBefore;
+    eventData.consumableChargesAfter = consumableChargesAfter;
+  }
   const parts: string[] = [];
   if (hpRestored > 0) parts.push(`+${hpRestored} HP`);
   else parts.push("HP already full");
   if (slotsRestored > 0) parts.push(`${slotsRestored} slot${slotsRestored !== 1 ? "s" : ""} restored`);
   if (resourcesRestored > 0) parts.push(`resources restored`);
+  if (consumablesRecharged > 0) parts.push(`consumables recharged`);
   const summary = `Long rest — ${parts.join(", ")}`;
 
   // Write spellcasting + resources; the dispatcher writes HP separately below.
@@ -1308,6 +1336,13 @@ export async function applyHitPointOperations(
           afterState.resources = data.afterResourceState ?? data.beforeResourceState;
           delete data.beforeResourceState;
           delete data.afterResourceState;
+        }
+        // Consumable recharge (#121) — snapshot so undo re-expends the charges.
+        if (data.consumableChargesBefore !== undefined) {
+          beforeState.consumableCharges = data.consumableChargesBefore;
+          afterState.consumableCharges = data.consumableChargesAfter ?? data.consumableChargesBefore;
+          delete data.consumableChargesBefore;
+          delete data.consumableChargesAfter;
         }
       }
       if (op.type === "shortRest") {

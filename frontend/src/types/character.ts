@@ -138,6 +138,10 @@ export interface ConsumableDetail {
   effectDiceFaces?: number;
   effectModifier?: number;
   effectDescription?: string; // e.g. "Restores hit points"
+  // Limited-use charges (#121). Undefined = stackable (use decrements quantity);
+  // set = charged (use decrements usesRemaining, recharges on long rest).
+  maxUses?: number;
+  usesRemaining?: number;
 }
 
 /**
@@ -342,6 +346,9 @@ export type InventoryOperation =
       currencyDelta?: Currency;
     }
   | { type: "adjustQuantity"; inventoryItemId: string; delta: number }
+  /** Consumes one use of a consumable (#121). `rolls` are client-rolled effect
+   *  dice for the 3D animation; omit to have the server roll. */
+  | { type: "use"; inventoryItemId: string; rolls?: number[] }
   | {
       type: "update";
       inventoryItemId: string;

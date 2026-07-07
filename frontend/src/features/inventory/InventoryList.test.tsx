@@ -6,6 +6,12 @@ import InventoryList from "@/features/inventory/InventoryList";
 import { applyInventoryTransactions, updateCharacter } from "@/api/client";
 import type { Character, Currency, InventoryItem } from "@/types/character";
 
+// Consumable rows render a Use button that reads useRoll(); this suite doesn't
+// exercise rolling, so stub the roll context instead of wrapping every render.
+vi.mock("@/features/dice/RollContext", () => ({
+  useRoll: () => ({ rollAnimated: vi.fn() }),
+}));
+
 // InventoryList calls fetchItems() on mount to load the catalog; stub the
 // client so the component renders without a real network request.
 vi.mock("@/api/client", () => ({

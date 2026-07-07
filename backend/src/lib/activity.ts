@@ -117,6 +117,19 @@ async function reverseEvent(
       });
     }
 
+    // Undo a long-rest consumable recharge (#121): re-expend each charge.
+    const beforeCharges = before.consumableCharges as
+      | { inventoryItemId: string; usesRemaining: number | null }[]
+      | undefined;
+    if (beforeCharges) {
+      for (const c of beforeCharges) {
+        await tx.inventoryConsumableDetail.updateMany({
+          where: { inventoryItemId: c.inventoryItemId },
+          data: { usesRemaining: c.usesRemaining },
+        });
+      }
+    }
+
     // Restore class-entry level if the event touched it (levelUp/levelDown).
     const data = event.data as Record<string, unknown> | null;
     if (data?.primaryEntryId && before.classEntryLevel !== undefined) {
