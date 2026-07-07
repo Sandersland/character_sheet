@@ -393,6 +393,13 @@ model CampaignItemCapability {
   valueDiceFaces  Int?
   valueDamageType String?
 
+  // grant payload (#529): resistance/immunity/conditionImmunity/advantage/proficiency.
+  grantType       String?
+  grantOn         String?
+  grantValueKind  String?
+  grantValue      String?
+  cantBeSurprised Boolean @default(false)
+
   @@index([campaignItemId])
 }
 
@@ -1011,6 +1018,13 @@ model InventoryCapability {
   valueDiceCount  Int?
   valueDiceFaces  Int?
   valueDamageType String?
+
+  // grant payload (#529): resistance/immunity/conditionImmunity/advantage/proficiency.
+  grantType       String?
+  grantOn         String?
+  grantValueKind  String?
+  grantValue      String?
+  cantBeSurprised Boolean @default(false)
 
   @@index([inventoryItemId])
 }

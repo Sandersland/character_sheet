@@ -108,6 +108,11 @@ function snapshotCampaignItemDetail(item: CampaignItemWithDetails) {
               valueDiceCount: c.valueDiceCount,
               valueDiceFaces: c.valueDiceFaces,
               valueDamageType: c.valueDamageType,
+              grantType: c.grantType,
+              grantOn: c.grantOn,
+              grantValueKind: c.grantValueKind,
+              grantValue: c.grantValue,
+              cantBeSurprised: c.cantBeSurprised,
             })),
           }
         : undefined,
