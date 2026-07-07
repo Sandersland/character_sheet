@@ -108,6 +108,12 @@ function snapshotCampaignItemDetail(item: CampaignItemWithDetails) {
               valueDiceCount: c.valueDiceCount,
               valueDiceFaces: c.valueDiceFaces,
               valueDamageType: c.valueDamageType,
+              activation: c.activation,
+              activatedDuration: c.activatedDuration,
+              resourceKind: c.resourceKind,
+              resourcePeriod: c.resourcePeriod,
+              resourceCharges: c.resourceCharges,
+              durationText: c.durationText,
             })),
           }
         : undefined,

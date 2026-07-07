@@ -2,10 +2,18 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma } from "../generated/prisma/client.js";
 import {
+  activatedMaxUses,
+  activatedRechargeRest,
   type AttunementPrereqKind,
   describeAttunementPrereq,
   meetsAttunementPrereq,
+  readCapability,
+  type ActivatedEffectCapability,
 } from "./capabilities.js";
+import {
+  appendActiveBuffInTx,
+  clearBuffByKeyInTx,
+} from "./active-effects.js";
 import { logEvent } from "./events.js";
 import { isEquippable } from "./items.js";
 import { prisma } from "./prisma.js";
@@ -206,6 +214,20 @@ export interface UnattuneOperation {
   inventoryItemId: string;
 }
 
+// Activates an item's activatedEffect capability (#543): spends a use and seeds
+// the while-active/until-rest self-buff. Logged + undoable.
+export interface ActivateOperation {
+  type: "activate";
+  inventoryItemId: string;
+}
+
+// Toggles off an active item effect (#543): clears the seeded buff. The spent use
+// is NOT restored (it recharges on the matching rest). Logged + undoable.
+export interface DeactivateOperation {
+  type: "deactivate";
+  inventoryItemId: string;
+}
+
 export type InventoryOperation =
   | AcquireOperation
   | AdjustQuantityOperation
@@ -214,7 +236,23 @@ export type InventoryOperation =
   | SellOperation
   | SetEquippedOperation
   | AttuneOperation
-  | UnattuneOperation;
+  | UnattuneOperation
+  | ActivateOperation
+  | DeactivateOperation;
+
+// The while-active buff key an item's activatedEffect seeds. One buff per item.
+export function itemBuffKey(inventoryItemId: string): string {
+  return `item:${inventoryItemId}`;
+}
+
+// The (first) activatedEffect capability on a live inventory row, or null.
+function activatedCapabilityOf(item: InventoryItemWithDetails): ActivatedEffectCapability | null {
+  for (const col of item.capabilities) {
+    const cap = readCapability(col);
+    if (cap.kind === "activatedEffect") return cap;
+  }
+  return null;
+}
 
 async function getCharacterCurrency(tx: Prisma.TransactionClient, characterId: string): Promise<Currency> {
   const character = await tx.character.findUnique({ where: { id: characterId }, select: { currency: true } });
@@ -439,6 +477,12 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
       valueDiceCount: c.valueDiceCount,
       valueDiceFaces: c.valueDiceFaces,
       valueDamageType: c.valueDamageType,
+      activation: c.activation,
+      activatedDuration: c.activatedDuration,
+      resourceKind: c.resourceKind,
+      resourcePeriod: c.resourcePeriod,
+      resourceCharges: c.resourceCharges,
+      durationText: c.durationText,
     })),
     weaponDetail: item.weaponDetail
       ? {
@@ -774,6 +818,11 @@ async function applySetEquipped(
     data: { equipped: op.equipped },
   });
 
+  // Unequipping ends any active effect once the item is no longer attuned either.
+  if (!op.equipped && !item.attuned) {
+    await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `unequipped ${item.name}`);
+  }
+
   await logEvent(tx, {
     characterId,
     category: "inventory",
@@ -862,6 +911,11 @@ async function applyUnattune(
 
   await tx.inventoryItem.update({ where: { id: item.id }, data: { attuned: false } });
 
+  // Unattuning ends any active effect once the item is no longer equipped either.
+  if (!item.equipped) {
+    await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `unattuned ${item.name}`);
+  }
+
   await logEvent(tx, {
     characterId,
     category: "inventory",
@@ -871,6 +925,144 @@ async function applyUnattune(
     entityId: item.id,
     before: { attuned: true },
     after: { attuned: false },
+    batchId,
+    sessionId,
+  });
+}
+
+// Spends a use of an item's activatedEffect and seeds its self-buff (#543). Gated
+// on the item being equipped/attuned and on remaining uses.
+async function applyActivate(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: ActivateOperation,
+  batchId: string,
+  sessionId: string | null,
+) {
+  const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
+  const cap = activatedCapabilityOf(item);
+  if (!cap) {
+    throw new InvalidInventoryOperationError(`${item.name} has no activated effect`);
+  }
+  if (!item.equipped && !item.attuned) {
+    throw new InvalidInventoryOperationError(`${item.name} must be equipped or attuned to activate`);
+  }
+
+  const maxUses = activatedMaxUses(cap);
+  if (maxUses !== null && item.activatedUsesSpent >= maxUses) {
+    throw new InvalidInventoryOperationError(`${item.name} has no uses remaining — recharges on a rest`);
+  }
+
+  const duration = cap.duration === "untilRest" ? "until-rest" : "while-active";
+  const restType = duration === "until-rest" ? (activatedRechargeRest(cap) ?? "long") : undefined;
+  await appendActiveBuffInTx(
+    tx,
+    characterId,
+    {
+      key: itemBuffKey(item.id),
+      target: cap.target,
+      modifier: cap.value,
+      source: item.name,
+      sourceEntryId: itemBuffKey(item.id),
+      duration,
+      ...(restType ? { restType } : {}),
+    },
+    batchId,
+    sessionId,
+  );
+
+  const nextSpent = maxUses !== null ? item.activatedUsesSpent + 1 : item.activatedUsesSpent;
+  if (maxUses !== null) {
+    await tx.inventoryItem.update({ where: { id: item.id }, data: { activatedUsesSpent: nextSpent } });
+  }
+
+  const remaining = maxUses !== null ? maxUses - nextSpent : null;
+  await logEvent(tx, {
+    characterId,
+    category: "inventory",
+    type: "activated",
+    summary: remaining !== null ? `Activated ${item.name} (${remaining} left)` : `Activated ${item.name}`,
+    entityType: "InventoryItem",
+    entityId: item.id,
+    before: { activatedUsesSpent: item.activatedUsesSpent },
+    after: { activatedUsesSpent: nextSpent },
+    data: { itemName: item.name, remaining },
+    batchId,
+    sessionId,
+  });
+}
+
+// Toggles off an active item effect (#543). Clears the buff; the spent use stays
+// spent until the recharge rest.
+async function applyDeactivate(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: DeactivateOperation,
+  batchId: string,
+  sessionId: string | null,
+) {
+  const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
+  await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `deactivated ${item.name}`);
+
+  await logEvent(tx, {
+    characterId,
+    category: "inventory",
+    type: "deactivated",
+    summary: `Deactivated ${item.name}`,
+    entityType: "InventoryItem",
+    entityId: item.id,
+    // Non-null empty snapshots: the buff re-applies via the paired effects-event
+    // revert, so this inventory event is a no-op on undo (must not read as a create).
+    before: {},
+    after: {},
+    data: { itemName: item.name },
+    batchId,
+    sessionId,
+  });
+}
+
+// Resets activatedUsesSpent to 0 for items whose activatedEffect recharges on the
+// given rest (#543). perRest(short) recharges on short|long; everything else on
+// long only. The seeded buff is cleared separately by the rest's buff sweep.
+// Called from the HP rest handler so item uses recharge alongside class resources.
+export async function resetActivatedUsesForRestInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  restType: "short" | "long",
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  const items = await tx.inventoryItem.findMany({
+    where: { characterId, activatedUsesSpent: { gt: 0 } },
+    include: { capabilities: true },
+  });
+  const toReset: { id: string; name: string; previousSpent: number }[] = [];
+  for (const item of items) {
+    const cap = item.capabilities.map(readCapability).find((c) => c.kind === "activatedEffect") as
+      | ActivatedEffectCapability
+      | undefined;
+    if (!cap) continue;
+    const recharge = activatedRechargeRest(cap);
+    if (recharge === null) continue;
+    if (restType === "long" || recharge === "short") {
+      toReset.push({ id: item.id, name: item.name, previousSpent: item.activatedUsesSpent });
+    }
+  }
+  if (toReset.length === 0) return;
+
+  await tx.inventoryItem.updateMany({
+    where: { id: { in: toReset.map((t) => t.id) } },
+    data: { activatedUsesSpent: 0 },
+  });
+  await logEvent(tx, {
+    characterId,
+    category: "inventory",
+    type: "activatedRecharged",
+    summary: `Recharged ${toReset.length} item${toReset.length !== 1 ? "s" : ""} (${restType} rest)`,
+    before: { rechargedCount: toReset.length },
+    after: null,
+    // recharged carries per-item pre-rest spent so undo restores exactly (no entityId).
+    data: { restType, recharged: toReset },
     batchId,
     sessionId,
   });
@@ -973,8 +1165,24 @@ export async function revertInventoryEvent(
   }
 ): Promise<void> {
   const data = event.data as
-    | { currencyDelta?: Currency | null; deletedItem?: DeletedInventoryItemSnapshot }
+    | {
+        currencyDelta?: Currency | null;
+        deletedItem?: DeletedInventoryItemSnapshot;
+        recharged?: { id: string; previousSpent: number }[];
+      }
     | null;
+
+  // A rest recharge event has no single entityId — restore each item's pre-rest
+  // spent count. Handled before the entityId guard below.
+  if (data?.recharged) {
+    for (const r of data.recharged) {
+      await tx.inventoryItem.updateMany({
+        where: { id: r.id },
+        data: { activatedUsesSpent: r.previousSpent },
+      });
+    }
+    return;
+  }
 
   // Defensive: nothing to act on without a row id. Checked BEFORE the currency
   // reversal so a malformed event carrying a currencyDelta but no entityId can't
@@ -1049,11 +1257,17 @@ export async function revertInventoryEvent(
   // The row still exists → restore the scalar(s) captured in before
   // (quantity for partial sell/adjust, equipped for setEquipped, attuned for
   // attune/unattune).
-  const before = event.before as { quantity?: number; equipped?: boolean; attuned?: boolean };
+  const before = event.before as {
+    quantity?: number;
+    equipped?: boolean;
+    attuned?: boolean;
+    activatedUsesSpent?: number;
+  };
   const updateData: Prisma.InventoryItemUpdateInput = {};
   if (before.quantity !== undefined) updateData.quantity = before.quantity;
   if (before.equipped !== undefined) updateData.equipped = before.equipped;
   if (before.attuned !== undefined) updateData.attuned = before.attuned;
+  if (before.activatedUsesSpent !== undefined) updateData.activatedUsesSpent = before.activatedUsesSpent;
   if (Object.keys(updateData).length > 0) {
     await tx.inventoryItem.update({ where: { id: event.entityId }, data: updateData });
   }
@@ -1095,6 +1309,12 @@ export async function applyInventoryOperations(
           break;
         case "unattune":
           await applyUnattune(tx, characterId, op, batchId, sessionId);
+          break;
+        case "activate":
+          await applyActivate(tx, characterId, op, batchId, sessionId);
+          break;
+        case "deactivate":
+          await applyDeactivate(tx, characterId, op, batchId, sessionId);
           break;
       }
     }

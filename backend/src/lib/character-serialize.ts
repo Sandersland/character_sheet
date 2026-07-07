@@ -849,7 +849,13 @@ export function serializeCharacter(row: CharacterWithRelations) {
     armorClass: acParts.reduce((total, p) => total + p.value, 0),
     armorClassBreakdown: acParts,
     initiativeBonus: effectiveInitBonus + featBonuses.initiative,
-    speed: row.speed + featBonuses.speed + unarmoredMovementBonus + fastMovementBonus,
+    // Additive terms + any active "speed"-targeted buff (e.g. Boots of Speed, #543).
+    speed:
+      row.speed +
+      featBonuses.speed +
+      unarmoredMovementBonus +
+      fastMovementBonus +
+      (buffTargets["speed"] ?? []).reduce((sum, b) => sum + b.modifier, 0),
     proficiencyBonus: progress.proficiencyBonus,
 
     experiencePoints: row.experiencePoints,

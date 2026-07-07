@@ -10,6 +10,7 @@ import {
 } from "./active-effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
+import { resetActivatedUsesForRestInTx } from "./inventory.js";
 import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
 import {
@@ -1344,13 +1345,10 @@ export async function applyHitPointOperations(
       // A rest clears its matching "until-rest" durable buffs (#455). Long rest
       // clears both short- and long-rest buffs; short rest only short.
       if (op.type === "shortRest" || op.type === "longRest") {
-        await clearBuffsForRestInTx(
-          tx,
-          characterId,
-          op.type === "longRest" ? "long" : "short",
-          batchId,
-          sessionId,
-        );
+        const rest = op.type === "longRest" ? "long" : "short";
+        await clearBuffsForRestInTx(tx, characterId, rest, batchId, sessionId);
+        // Recharge item activatedEffect uses on the matching rest (#543).
+        await resetActivatedUsesForRestInTx(tx, characterId, rest, batchId, sessionId);
       }
 
       // A long rest or falling unconscious (0 HP) ends all "while-active" durable
