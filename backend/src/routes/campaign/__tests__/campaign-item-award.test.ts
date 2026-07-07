@@ -121,6 +121,19 @@ describe("campaign item award/revoke (#381)", () => {
     expect(await prisma.inventoryItem.findFirst({ where: { id: row!.id } })).toBeNull();
   });
 
+  it("PL-1: awarding a slotted gear item snapshots slot onto the InventoryItem", async () => {
+    const { id } = await createItem({ name: "Amulet of Health", category: "gear", slot: "NECK" });
+    await agent(cookieOwner)
+      .post(`/api/campaigns/${campaignId}/items/${id}/award`)
+      .send({ characterId: CHAR });
+
+    const row = await prisma.inventoryItem.findFirstOrThrow({
+      where: { characterId: CHAR, campaignItemId: id },
+    });
+    expect(row.slot).toBe("NECK");
+    await prisma.inventoryItem.deleteMany({ where: { campaignItemId: id } });
+  });
+
   it("revokes a player-modified (renamed + equipped) snapshot, undoably", async () => {
     // Unique so we can also assert the unique guard still fires after undo.
     const { id } = await createItem({ ...weaponItem, name: "Sunblade", isUnique: true });
