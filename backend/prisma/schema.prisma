@@ -393,6 +393,19 @@ model CampaignItemCapability {
   valueDiceFaces  Int?
   valueDamageType String?
 
+  // castSpell payload (#528): the item grants a spell cast from the item itself.
+  spellId           String? // catalog Spell.id provenance
+  spellName         String? // snapshot for display without a catalog join
+  spellLevel        Int?
+  castLevel         Int? // slot level the item casts the spell at
+  castResource      CapabilityCastResource?
+  castUses          Int? // uses per recharge period (null = 1)
+  castConcentration Boolean?
+  dcMode            CapabilityCastStatMode?
+  dcValue           Int?
+  attackMode        CapabilityCastStatMode?
+  attackValue       Int?
+
   @@index([campaignItemId])
 }
 
@@ -640,6 +653,23 @@ enum CapabilityKind {
   charges
   grant
   activatedEffect
+}
+
+// Recharge period of a castSpell capability's item resource (#528). atWill is
+// unlimited (no use tracking). perDay dawn/dusk approximate to a long rest.
+enum CapabilityCastResource {
+  perRestShort
+  perRestLong
+  perDayDawn
+  perDayDusk
+  atWill
+}
+
+// Whether a castSpell DC / attack bonus is a fixed item value or resolves to the
+// wielder's own spell save DC / spell attack (#528).
+enum CapabilityCastStatMode {
+  fixed
+  wielder
 }
 
 // Which derived stat a passiveBonus capability targets. Only scalar targets are
@@ -1011,6 +1041,22 @@ model InventoryCapability {
   valueDiceCount  Int?
   valueDiceFaces  Int?
   valueDamageType String?
+
+  // castSpell payload (#528) — authored columns snapshotted 1:1 from the source.
+  spellId           String?
+  spellName         String?
+  spellLevel        Int?
+  castLevel         Int?
+  castResource      CapabilityCastResource?
+  castUses          Int?
+  castConcentration Boolean?
+  dcMode            CapabilityCastStatMode?
+  dcValue           Int?
+  attackMode        CapabilityCastStatMode?
+  attackValue       Int?
+  // Runtime use counter — inventory-only (not an authored field). Reset on the
+  // matching rest by the HP rest handlers; never copied on award.
+  used              Int     @default(0)
 
   @@index([inventoryItemId])
 }

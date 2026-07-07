@@ -31,6 +31,14 @@ export type CapabilityOp = (typeof CAPABILITY_OPS)[number];
 export const ATTUNEMENT_PREREQ_KINDS = ["class", "spellcaster", "species", "alignment"] as const;
 export type AttunementPrereqKind = (typeof ATTUNEMENT_PREREQ_KINDS)[number];
 
+// castSpell resource + stat-mode enums (#528), value tuples so the route schema
+// and the frontend option lists share one source of truth with the types below.
+export const CAST_RESOURCES = ["perRestShort", "perRestLong", "perDayDawn", "perDayDusk", "atWill"] as const;
+export type CastResource = (typeof CAST_RESOURCES)[number];
+
+export const CAST_STAT_MODES = ["fixed", "wielder"] as const;
+export type CastStatMode = (typeof CAST_STAT_MODES)[number];
+
 // Dice-valued bonus payload — round-trips now; consumed in the damage roll at #526C.
 export interface CapabilityDice {
   count: number;
@@ -49,14 +57,39 @@ export interface PassiveBonusCapability {
   dice?: CapabilityDice | null;
 }
 
-// A reserved (not-yet-implemented) capability — surfaced as opaque so callers can
-// skip it without a schema change when the real payload lands.
-export interface OpaqueCapability {
-  kind: Exclude<CapabilityKind, "passiveBonus">;
+// A castSpell capability (#528): the item casts a referenced Spell from its own
+// resource. DC/attack are either fixed item values or resolve to the wielder's.
+export interface CastSpellCapability {
+  kind: "castSpell";
+  spellId: string;
+  spellName: string;
+  spellLevel: number;
+  castLevel: number;
+  resource: CastResource;
+  uses: number;
+  concentration: boolean;
+  dcMode: CastStatMode;
+  dcValue?: number | null;
+  attackMode: CastStatMode;
+  attackValue?: number | null;
   description?: string | null;
 }
 
-export type Capability = PassiveBonusCapability | OpaqueCapability;
+// A reserved (not-yet-implemented) capability — surfaced as opaque so callers can
+// skip it without a schema change when the real payload lands.
+export interface OpaqueCapability {
+  kind: Exclude<CapabilityKind, "passiveBonus" | "castSpell">;
+  description?: string | null;
+}
+
+export type Capability = PassiveBonusCapability | CastSpellCapability | OpaqueCapability;
+
+// Number of uses a castSpell capability has per recharge period. atWill is
+// unlimited (Infinity); every other resource defaults to 1 when uses is unset.
+export function castUsesTotal(cap: CastSpellCapability): number {
+  if (cap.resource === "atWill") return Infinity;
+  return cap.uses > 0 ? cap.uses : 1;
+}
 
 // The flat columns shared by CampaignItemCapability and InventoryCapability.
 export interface CapabilityColumns {
@@ -70,11 +103,39 @@ export interface CapabilityColumns {
   valueDiceCount?: number | null;
   valueDiceFaces?: number | null;
   valueDamageType?: string | null;
+  spellId?: string | null;
+  spellName?: string | null;
+  spellLevel?: number | null;
+  castLevel?: number | null;
+  castResource?: string | null;
+  castUses?: number | null;
+  castConcentration?: boolean | null;
+  dcMode?: string | null;
+  dcValue?: number | null;
+  attackMode?: string | null;
+  attackValue?: number | null;
 }
 
 // Adapter over the flat capability columns — no per-kind tables. A malformed
 // passiveBonus (missing target/op) reads as opaque rather than throwing.
 export function readCapability(row: CapabilityColumns): Capability {
+  if (row.kind === "castSpell" && row.spellId) {
+    return {
+      kind: "castSpell",
+      spellId: row.spellId,
+      spellName: row.spellName ?? "",
+      spellLevel: row.spellLevel ?? 0,
+      castLevel: row.castLevel ?? row.spellLevel ?? 0,
+      resource: (row.castResource as CastResource | null) ?? "perDayDawn",
+      uses: row.castUses ?? 1,
+      concentration: row.castConcentration ?? false,
+      dcMode: (row.dcMode as CastStatMode | null) ?? "fixed",
+      dcValue: row.dcValue ?? null,
+      attackMode: (row.attackMode as CastStatMode | null) ?? "fixed",
+      attackValue: row.attackValue ?? null,
+      description: row.description ?? null,
+    };
+  }
   if (row.kind === "passiveBonus" && row.target && row.op) {
     const dice =
       row.valueDiceCount && row.valueDiceFaces
@@ -105,12 +166,41 @@ export interface SerializedCapability {
   condition?: string;
   description?: string;
   dice?: CapabilityDice;
+  // castSpell fields (#528).
+  spellId?: string;
+  spellName?: string;
+  spellLevel?: number;
+  castLevel?: number;
+  resource?: CastResource;
+  uses?: number;
+  concentration?: boolean;
+  dcMode?: CastStatMode;
+  dcValue?: number;
+  attackMode?: CastStatMode;
+  attackValue?: number;
 }
 
 // Serialize a capability row for the API (campaign item + inventory item alike),
 // dropping nulls so the wire shape matches the optional-field DM input.
 export function serializeCapability(row: CapabilityColumns): SerializedCapability {
   const cap = readCapability(row);
+  if (cap.kind === "castSpell") {
+    return {
+      kind: cap.kind,
+      spellId: cap.spellId,
+      spellName: cap.spellName,
+      spellLevel: cap.spellLevel,
+      castLevel: cap.castLevel,
+      resource: cap.resource,
+      uses: cap.uses,
+      concentration: cap.concentration,
+      dcMode: cap.dcMode,
+      ...(cap.dcValue != null ? { dcValue: cap.dcValue } : {}),
+      attackMode: cap.attackMode,
+      ...(cap.attackValue != null ? { attackValue: cap.attackValue } : {}),
+      ...(cap.description ? { description: cap.description } : {}),
+    };
+  }
   if (cap.kind === "passiveBonus") {
     return {
       kind: cap.kind,
