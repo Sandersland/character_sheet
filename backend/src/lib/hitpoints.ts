@@ -8,6 +8,7 @@ import {
   clearWhileActiveBuffsInTx,
   normalizeActiveEffectsMutable,
 } from "./active-effects.js";
+import { itemResistedDamageTypes, type GrantItem } from "./capabilities.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
@@ -653,6 +654,7 @@ interface HpOpContext {
     resources: Prisma.JsonValue;
     activeEffects: Prisma.JsonValue;
     classEntries: ClassEntryRow[];
+    inventoryItems?: GrantItem[];
   };
   hp: HitPoints;
   hd: HitDice;
@@ -684,8 +686,10 @@ function applyDamageOp(ctx: HpOpContext, op: DamageOperation): HpOpResult {
   if (op.amount <= 0) {
     throw new InvalidHitPointOperationError("damage amount must be positive");
   }
-  // Auto-halve against active resistances (#456) unless the player declined.
+  // Auto-halve against active resistances (#456) unless the player declined:
+  // cast-buff resistances (Rage) unioned with item-granted resistances (#529).
   const resisted = activeResistedDamageTypes(normalizeActiveEffectsMutable(row.activeEffects));
+  for (const t of itemResistedDamageTypes(row.inventoryItems ?? [])) resisted.add(t);
   const { applied, resisted: wasResisted } = resolveDamageAmount(
     op.amount,
     op.damageType,
@@ -1173,6 +1177,16 @@ export async function applyHitPointOperations(
               classId: true,
               position: true,
               class: { select: { hitDie: true } },
+            },
+          },
+          // Item-granted resistances (#529) feed the #456 halve flow below.
+          inventoryItems: {
+            select: {
+              name: true,
+              equipped: true,
+              attuned: true,
+              requiresAttunement: true,
+              capabilities: true,
             },
           },
         },

@@ -728,8 +728,8 @@ export interface CatalogFeat {
 export interface ToolProficiency {
   name: string;
   category: "artisan" | "gamingSet" | "musicalInstrument" | "other";
-  /** Where this proficiency came from. */
-  source: "background" | "class" | "race" | "subclass";
+  /** Where this proficiency came from ("item" = a magic item grant, #529). */
+  source: "background" | "class" | "race" | "subclass" | "item";
 }
 
 /** Armor category that a character is proficient with. */
@@ -752,7 +752,7 @@ export interface ArmorProficiency {
  */
 export interface WeaponProficiency {
   name: string;
-  source: "class" | "race" | "feat";
+  source: "class" | "race" | "feat" | "item";
 }
 
 /** Level-gated tool proficiency entry within the resources JSON. */
