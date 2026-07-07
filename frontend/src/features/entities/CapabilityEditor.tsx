@@ -4,20 +4,37 @@ import Select from "@/components/ui/Select";
 import { Plus, Trash2 } from "@/components/ui/icons";
 import { ABILITY_OPTIONS, SKILL_OPTIONS } from "@/lib/abilities";
 import {
+  ADVANTAGE_ON_OPTIONS,
   CAPABILITY_OP_OPTIONS,
   CAPABILITY_TARGET_OPTIONS,
+  GRANT_TYPE_OPTIONS,
+  PROFICIENCY_KIND_OPTIONS,
   capabilitySummary,
   targetUsesAbilityKey,
   targetUsesSkillKey,
 } from "@/lib/capabilities";
-import type { CapabilityTarget, ItemCapability } from "@/types/character";
+import { CONDITION_OPTIONS } from "@/lib/conditions";
+import { DAMAGE_TYPES, damageTypeLabel } from "@/lib/damageTypes";
+import type {
+  CapabilityKind,
+  CapabilityTarget,
+  GrantType,
+  ItemCapability,
+  ProficiencyKind,
+} from "@/types/character";
 
 interface CapabilityEditorProps {
   capabilities: ItemCapability[];
   onChange: (capabilities: ItemCapability[]) => void;
 }
 
-const NEW_CAPABILITY: ItemCapability = { kind: "passiveBonus", target: "ac", op: "add", value: 1 };
+const NEW_PASSIVE: ItemCapability = { kind: "passiveBonus", target: "ac", op: "add", value: 1 };
+const NEW_GRANT: ItemCapability = { kind: "grant", grantType: "resistance", grantValueKind: "damageType", grantValue: "fire" };
+
+const CAPABILITY_KIND_OPTIONS: readonly { value: CapabilityKind; label: string }[] = [
+  { value: "passiveBonus", label: "Passive bonus" },
+  { value: "grant", label: "Grant (resistance / proficiency / advantage)" },
+];
 
 // The key options for a target that names a skill/ability via targetKey.
 function keyOptions(target: CapabilityTarget): readonly { key: string; label: string }[] {
@@ -46,6 +63,27 @@ export default function CapabilityEditor({ capabilities, onChange }: CapabilityE
     update(index, useDice ? { dice: { count: 1, faces: 6 }, value: undefined } : { dice: undefined, value: 1 });
   }
 
+  function setKind(index: number, kind: CapabilityKind) {
+    onChange(capabilities.map((c, i) => (i === index ? { ...(kind === "grant" ? NEW_GRANT : NEW_PASSIVE) } : c)));
+  }
+
+  // Reset the value picker to a sensible default when the grant type changes.
+  function setGrantType(index: number, grantType: GrantType) {
+    const defaults: Record<GrantType, Partial<ItemCapability>> = {
+      resistance: { grantValueKind: "damageType", grantValue: "fire", grantOn: undefined, cantBeSurprised: undefined },
+      immunity: { grantValueKind: "damageType", grantValue: "fire", grantOn: undefined, cantBeSurprised: undefined },
+      conditionImmunity: { grantValueKind: "condition", grantValue: "poisoned", grantOn: undefined, cantBeSurprised: undefined },
+      advantage: { grantOn: "check", grantValueKind: "skill", grantValue: "perception", cantBeSurprised: false },
+      proficiency: { grantValueKind: "skill", grantValue: "perception", grantOn: undefined, cantBeSurprised: undefined },
+    };
+    update(index, { grantType, ...defaults[grantType] });
+  }
+
+  function setProfKind(index: number, profKind: ProficiencyKind) {
+    const value = profKind === "skill" ? "perception" : profKind === "save" ? "strength" : "";
+    update(index, { grantValueKind: profKind, grantValue: value });
+  }
+
   function remove(index: number) {
     onChange(capabilities.filter((_, i) => i !== index));
   }
@@ -56,7 +94,7 @@ export default function CapabilityEditor({ capabilities, onChange }: CapabilityE
         <span className="text-xs font-semibold text-parchment-700">Capabilities</span>
         <button
           type="button"
-          onClick={() => onChange([...capabilities, { ...NEW_CAPABILITY }])}
+          onClick={() => onChange([...capabilities, { ...NEW_PASSIVE }])}
           className="inline-flex items-center gap-1 text-xs font-semibold text-garnet-700 hover:underline"
         >
           <Plus aria-hidden="true" className="h-3.5 w-3.5" />
@@ -65,7 +103,7 @@ export default function CapabilityEditor({ capabilities, onChange }: CapabilityE
       </div>
 
       {capabilities.length === 0 ? (
-        <p className="text-xs text-parchment-500">No passive bonuses. Add one to grant a stat while active.</p>
+        <p className="text-xs text-parchment-500">No capabilities. Add a passive bonus or a grant (resistance, proficiency, advantage) to apply while active.</p>
       ) : (
         <ul className="flex flex-col gap-3">
           {capabilities.map((cap, index) => {
@@ -89,6 +127,30 @@ export default function CapabilityEditor({ capabilities, onChange }: CapabilityE
                   </button>
                 </div>
 
+                <Field label="Kind" htmlFor={`cap-${index}-kind`}>
+                  <Select
+                    id={`cap-${index}-kind`}
+                    value={cap.kind}
+                    onChange={(e) => setKind(index, e.target.value as CapabilityKind)}
+                  >
+                    {CAPABILITY_KIND_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+
+                {cap.kind === "grant" ? (
+                  <GrantFields
+                    cap={cap}
+                    index={index}
+                    onGrantType={(t) => setGrantType(index, t)}
+                    onProfKind={(k) => setProfKind(index, k)}
+                    onUpdate={(patch) => update(index, patch)}
+                  />
+                ) : (
+                <>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <Field label="Affects" htmlFor={`cap-${index}-target`}>
                     <Select
@@ -198,6 +260,8 @@ export default function CapabilityEditor({ capabilities, onChange }: CapabilityE
                     onChange={(e) => update(index, { condition: e.target.value || undefined })}
                   />
                 </Field>
+                </>
+                )}
 
                 <Field label="Description (optional)" htmlFor={`cap-${index}-desc`}>
                   <Input
@@ -210,6 +274,136 @@ export default function CapabilityEditor({ capabilities, onChange }: CapabilityE
             );
           })}
         </ul>
+      )}
+    </div>
+  );
+}
+
+interface GrantFieldsProps {
+  cap: ItemCapability;
+  index: number;
+  onGrantType: (t: GrantType) => void;
+  onProfKind: (k: ProficiencyKind) => void;
+  onUpdate: (patch: Partial<ItemCapability>) => void;
+}
+
+// DM authoring for a grant capability (#529). Value pickers resolve through the
+// label helpers — a skill/ability/condition/damage-type is chosen, never typed.
+function GrantFields({ cap, index, onGrantType, onProfKind, onUpdate }: GrantFieldsProps) {
+  const type = cap.grantType ?? "resistance";
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <Field label="Grant" htmlFor={`cap-${index}-grantType`}>
+        <Select id={`cap-${index}-grantType`} value={type} onChange={(e) => onGrantType(e.target.value as GrantType)}>
+          {GRANT_TYPE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </Select>
+      </Field>
+
+      {(type === "resistance" || type === "immunity") && (
+        <Field label="Damage type" htmlFor={`cap-${index}-dmg`}>
+          <Select id={`cap-${index}-dmg`} value={cap.grantValue ?? "fire"} onChange={(e) => onUpdate({ grantValueKind: "damageType", grantValue: e.target.value })}>
+            {DAMAGE_TYPES.map((t) => (
+              <option key={t} value={t}>{damageTypeLabel(t)}</option>
+            ))}
+          </Select>
+        </Field>
+      )}
+
+      {type === "conditionImmunity" && (
+        <Field label="Condition" htmlFor={`cap-${index}-cond`}>
+          <Select id={`cap-${index}-cond`} value={cap.grantValue ?? "poisoned"} onChange={(e) => onUpdate({ grantValueKind: "condition", grantValue: e.target.value })}>
+            {CONDITION_OPTIONS.map((o) => (
+              <option key={o.key} value={o.key}>{o.label}</option>
+            ))}
+          </Select>
+        </Field>
+      )}
+
+      {type === "advantage" && (
+        <>
+          <Field label="On" htmlFor={`cap-${index}-on`}>
+            <Select
+              id={`cap-${index}-on`}
+              value={cap.grantOn ?? "check"}
+              onChange={(e) => {
+                const grantOn = e.target.value as ItemCapability["grantOn"];
+                // Reset the qualifier to match the new axis so it never keeps a stale key:
+                // initiative/attack are whole-axis (no qualifier); a check is per-skill, a
+                // save is per-ability. grantValue resets to "All" on any axis change.
+                const wholeAxis = grantOn === "initiative" || grantOn === "attack";
+                const qualifier = wholeAxis
+                  ? { grantValueKind: undefined, grantValue: undefined }
+                  : { grantValueKind: grantOn === "save" ? ("save" as const) : ("skill" as const), grantValue: undefined };
+                onUpdate({ grantOn, ...qualifier });
+              }}
+            >
+              {ADVANTAGE_ON_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </Select>
+          </Field>
+          {(cap.grantOn === "check" || cap.grantOn === "save" || cap.grantOn === undefined) &&
+            (() => {
+              // A save is per-ability (STR/DEX/…); a check is per-skill. Pick the matching
+              // key list + qualifier so an advantage-on-save grant never stores a skill key.
+              const onSave = cap.grantOn === "save";
+              const options = onSave ? ABILITY_OPTIONS : SKILL_OPTIONS;
+              const valueKind = onSave ? ("save" as const) : ("skill" as const);
+              return (
+                <Field label={onSave ? "Which save (optional)" : "Which skill (optional)"} htmlFor={`cap-${index}-advkey`}>
+                  <Select
+                    id={`cap-${index}-advkey`}
+                    value={cap.grantValue ?? ""}
+                    onChange={(e) => onUpdate({ grantValueKind: valueKind, grantValue: e.target.value || undefined })}
+                  >
+                    <option value="">All</option>
+                    {options.map((o) => (
+                      <option key={o.key} value={o.key}>{o.label}</option>
+                    ))}
+                  </Select>
+                </Field>
+              );
+            })()}
+          <label className="flex items-center gap-2 text-xs text-parchment-700 sm:col-span-2">
+            <input type="checkbox" checked={cap.cantBeSurprised ?? false} onChange={(e) => onUpdate({ cantBeSurprised: e.target.checked })} />
+            Also can&apos;t be surprised (Weapon of Warning)
+          </label>
+        </>
+      )}
+
+      {type === "proficiency" && (
+        <>
+          <Field label="Proficiency" htmlFor={`cap-${index}-profkind`}>
+            <Select id={`cap-${index}-profkind`} value={(cap.grantValueKind as ProficiencyKind) ?? "skill"} onChange={(e) => onProfKind(e.target.value as ProficiencyKind)}>
+              {PROFICIENCY_KIND_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </Select>
+          </Field>
+          {cap.grantValueKind === "skill" ? (
+            <Field label="Skill" htmlFor={`cap-${index}-profval`}>
+              <Select id={`cap-${index}-profval`} value={cap.grantValue ?? "perception"} onChange={(e) => onUpdate({ grantValue: e.target.value })}>
+                {SKILL_OPTIONS.map((o) => (
+                  <option key={o.key} value={o.key}>{o.label}</option>
+                ))}
+              </Select>
+            </Field>
+          ) : cap.grantValueKind === "save" ? (
+            <Field label="Saving throw" htmlFor={`cap-${index}-profval`}>
+              <Select id={`cap-${index}-profval`} value={cap.grantValue ?? "strength"} onChange={(e) => onUpdate({ grantValue: e.target.value })}>
+                {ABILITY_OPTIONS.map((o) => (
+                  <option key={o.key} value={o.key}>{o.label}</option>
+                ))}
+              </Select>
+            </Field>
+          ) : (
+            <Field label="Name" htmlFor={`cap-${index}-profval`}>
+              <Input id={`cap-${index}-profval`} placeholder="e.g. Longswords" value={cap.grantValue ?? ""} onChange={(e) => onUpdate({ grantValue: e.target.value || undefined })} />
+            </Field>
+          )}
+        </>
       )}
     </div>
   );

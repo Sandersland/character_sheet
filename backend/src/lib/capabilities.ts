@@ -31,6 +31,23 @@ export type CapabilityOp = (typeof CAPABILITY_OPS)[number];
 export const ATTUNEMENT_PREREQ_KINDS = ["class", "spellcaster", "species", "alignment"] as const;
 export type AttunementPrereqKind = (typeof ATTUNEMENT_PREREQ_KINDS)[number];
 
+// grant kind (#529). "sense"/"movement" are reserved: valid enum values the DM
+// can't yet author and no derivation consumes them.
+export const GRANT_TYPES = ["resistance", "immunity", "conditionImmunity", "advantage", "proficiency"] as const;
+export type GrantType = (typeof GRANT_TYPES)[number];
+
+export const ADVANTAGE_ON = ["save", "check", "initiative", "attack"] as const;
+export type AdvantageOn = (typeof ADVANTAGE_ON)[number];
+
+// What grantValue names: a damage type, a condition, a skill/ability/save key,
+// or a weapon/tool/language name. Disambiguates the flat grantValue column.
+export const GRANT_VALUE_KINDS = ["damageType", "condition", "skill", "ability", "save", "weapon", "tool", "language"] as const;
+export type GrantValueKind = (typeof GRANT_VALUE_KINDS)[number];
+
+// Proficiency grants name one of these categories via grantValueKind.
+export const PROFICIENCY_KINDS = ["skill", "save", "weapon", "tool", "language"] as const;
+export type ProficiencyKind = (typeof PROFICIENCY_KINDS)[number];
+
 // Dice-valued bonus payload — round-trips now; consumed in the damage roll at #526C.
 export interface CapabilityDice {
   count: number;
@@ -49,14 +66,27 @@ export interface PassiveBonusCapability {
   dice?: CapabilityDice | null;
 }
 
-// A reserved (not-yet-implemented) capability — surfaced as opaque so callers can
-// skip it without a schema change when the real payload lands.
-export interface OpaqueCapability {
-  kind: Exclude<CapabilityKind, "passiveBonus">;
+// A grant capability (#529): a resistance/immunity/conditionImmunity/advantage/
+// proficiency the item confers while active. grantOn is advantage-only; grantValue
+// is null for whole-axis advantage (e.g. all initiative rolls).
+export interface GrantCapability {
+  kind: "grant";
+  grantType: GrantType;
+  grantOn?: AdvantageOn | null;
+  grantValueKind?: GrantValueKind | null;
+  grantValue?: string | null;
+  cantBeSurprised: boolean;
   description?: string | null;
 }
 
-export type Capability = PassiveBonusCapability | OpaqueCapability;
+// A reserved (not-yet-implemented) capability — surfaced as opaque so callers can
+// skip it without a schema change when the real payload lands.
+export interface OpaqueCapability {
+  kind: Exclude<CapabilityKind, "passiveBonus" | "grant">;
+  description?: string | null;
+}
+
+export type Capability = PassiveBonusCapability | GrantCapability | OpaqueCapability;
 
 // The flat columns shared by CampaignItemCapability and InventoryCapability.
 export interface CapabilityColumns {
@@ -70,11 +100,28 @@ export interface CapabilityColumns {
   valueDiceCount?: number | null;
   valueDiceFaces?: number | null;
   valueDamageType?: string | null;
+  grantType?: string | null;
+  grantOn?: string | null;
+  grantValueKind?: string | null;
+  grantValue?: string | null;
+  cantBeSurprised?: boolean | null;
 }
 
 // Adapter over the flat capability columns — no per-kind tables. A malformed
-// passiveBonus (missing target/op) reads as opaque rather than throwing.
+// passiveBonus (missing target/op) or grant (missing grantType) reads as opaque
+// rather than throwing.
 export function readCapability(row: CapabilityColumns): Capability {
+  if (row.kind === "grant" && row.grantType) {
+    return {
+      kind: "grant",
+      grantType: row.grantType as GrantType,
+      grantOn: (row.grantOn as AdvantageOn | null) ?? null,
+      grantValueKind: (row.grantValueKind as GrantValueKind | null) ?? null,
+      grantValue: row.grantValue ?? null,
+      cantBeSurprised: row.cantBeSurprised ?? false,
+      description: row.description ?? null,
+    };
+  }
   if (row.kind === "passiveBonus" && row.target && row.op) {
     const dice =
       row.valueDiceCount && row.valueDiceFaces
@@ -105,12 +152,28 @@ export interface SerializedCapability {
   condition?: string;
   description?: string;
   dice?: CapabilityDice;
+  grantType?: GrantType;
+  grantOn?: AdvantageOn;
+  grantValueKind?: GrantValueKind;
+  grantValue?: string;
+  cantBeSurprised?: boolean;
 }
 
 // Serialize a capability row for the API (campaign item + inventory item alike),
 // dropping nulls so the wire shape matches the optional-field DM input.
 export function serializeCapability(row: CapabilityColumns): SerializedCapability {
   const cap = readCapability(row);
+  if (cap.kind === "grant") {
+    return {
+      kind: cap.kind,
+      grantType: cap.grantType,
+      ...(cap.grantOn ? { grantOn: cap.grantOn } : {}),
+      ...(cap.grantValueKind ? { grantValueKind: cap.grantValueKind } : {}),
+      ...(cap.grantValue ? { grantValue: cap.grantValue } : {}),
+      ...(cap.cantBeSurprised ? { cantBeSurprised: true } : {}),
+      ...(cap.description ? { description: cap.description } : {}),
+    };
+  }
   if (cap.kind === "passiveBonus") {
     return {
       kind: cap.kind,
@@ -190,6 +253,113 @@ export function deriveItemPassiveBonuses(items: PassiveBonusItem[]): ItemPassive
     }
   }
   return out;
+}
+
+// The minimal item shape grant derivation needs. Activation gate (#545): an item
+// that requires attunement is active only when attuned; otherwise when equipped.
+export interface GrantItem {
+  name: string;
+  equipped: boolean;
+  attuned: boolean;
+  requiresAttunement: boolean;
+  capabilities: CapabilityColumns[];
+}
+
+/** Is this item currently conferring its capabilities? (equip, or attune when required.) */
+export function isItemActive(item: { equipped: boolean; attuned: boolean; requiresAttunement: boolean }): boolean {
+  return item.requiresAttunement ? item.attuned : item.equipped;
+}
+
+/** One item-sourced damage resistance/immunity or condition immunity. */
+export interface ItemTraitGrant {
+  value: string;
+  source: string;
+}
+
+/** One item-sourced advantage grant (rendered as reminder text on its surface). */
+export interface ItemAdvantageGrant {
+  on: AdvantageOn;
+  valueKind?: GrantValueKind;
+  value?: string;
+  cantBeSurprised: boolean;
+  source: string;
+  description?: string;
+}
+
+/** One item-sourced proficiency grant, merged into the derived proficiency lists. */
+export interface ItemProficiencyGrant {
+  profType: ProficiencyKind;
+  value: string;
+  source: string;
+}
+
+export interface DerivedItemGrants {
+  resistances: ItemTraitGrant[];
+  immunities: ItemTraitGrant[];
+  conditionImmunities: ItemTraitGrant[];
+  advantages: ItemAdvantageGrant[];
+  proficiencies: ItemProficiencyGrant[];
+}
+
+// Gather every grant capability from active items into per-derivation buckets.
+// resistance feeds the #456 halve channel; proficiency merges into the derived
+// proficiency lists; advantage/conditionImmunity/immunity surface as flags + text.
+export function deriveItemGrants(items: GrantItem[]): DerivedItemGrants {
+  const out: DerivedItemGrants = {
+    resistances: [],
+    immunities: [],
+    conditionImmunities: [],
+    advantages: [],
+    proficiencies: [],
+  };
+  for (const item of items) {
+    if (!isItemActive(item)) continue;
+    for (const col of item.capabilities) {
+      const cap = readCapability(col);
+      if (cap.kind !== "grant") continue;
+      switch (cap.grantType) {
+        case "resistance":
+          if (cap.grantValue) out.resistances.push({ value: cap.grantValue, source: item.name });
+          break;
+        case "immunity":
+          if (cap.grantValue) out.immunities.push({ value: cap.grantValue, source: item.name });
+          break;
+        case "conditionImmunity":
+          if (cap.grantValue) out.conditionImmunities.push({ value: cap.grantValue, source: item.name });
+          break;
+        case "advantage":
+          if (cap.grantOn) {
+            // initiative/attack are whole-axis — drop any stale skill/ability qualifier.
+            const wholeAxis = cap.grantOn === "initiative" || cap.grantOn === "attack";
+            out.advantages.push({
+              on: cap.grantOn,
+              ...(!wholeAxis && cap.grantValueKind ? { valueKind: cap.grantValueKind } : {}),
+              ...(!wholeAxis && cap.grantValue ? { value: cap.grantValue } : {}),
+              cantBeSurprised: cap.cantBeSurprised,
+              source: item.name,
+              ...(cap.description ? { description: cap.description } : {}),
+            });
+          }
+          break;
+        case "proficiency":
+          if (cap.grantValue && cap.grantValueKind && (PROFICIENCY_KINDS as readonly string[]).includes(cap.grantValueKind)) {
+            out.proficiencies.push({ profType: cap.grantValueKind as ProficiencyKind, value: cap.grantValue, source: item.name });
+          }
+          break;
+      }
+    }
+  }
+  return out;
+}
+
+/** Damage types item grants make the character resistant to (fed into #456 halving). */
+export function itemResistedDamageTypes(items: GrantItem[]): Set<string> {
+  return new Set(deriveItemGrants(items).resistances.map((r) => r.value));
+}
+
+/** Damage types item grants make the character immune to (zeroed at damage-apply). */
+export function itemImmuneDamageTypes(items: GrantItem[]): Set<string> {
+  return new Set(deriveItemGrants(items).immunities.map((i) => i.value));
 }
 
 /** A concrete attunement prerequisite resolved from the snapshotted columns. */
