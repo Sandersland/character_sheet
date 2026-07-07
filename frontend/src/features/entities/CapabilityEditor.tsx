@@ -329,9 +329,14 @@ function GrantFields({ cap, index, onGrantType, onProfKind, onUpdate }: GrantFie
               value={cap.grantOn ?? "check"}
               onChange={(e) => {
                 const grantOn = e.target.value as ItemCapability["grantOn"];
-                // initiative/attack are whole-axis — clear the stale skill/ability qualifier.
+                // Reset the qualifier to match the new axis so it never keeps a stale key:
+                // initiative/attack are whole-axis (no qualifier); a check is per-skill, a
+                // save is per-ability. grantValue resets to "All" on any axis change.
                 const wholeAxis = grantOn === "initiative" || grantOn === "attack";
-                onUpdate({ grantOn, ...(wholeAxis ? { grantValueKind: undefined, grantValue: undefined } : {}) });
+                const qualifier = wholeAxis
+                  ? { grantValueKind: undefined, grantValue: undefined }
+                  : { grantValueKind: grantOn === "save" ? ("save" as const) : ("skill" as const), grantValue: undefined };
+                onUpdate({ grantOn, ...qualifier });
               }}
             >
               {ADVANTAGE_ON_OPTIONS.map((o) => (
@@ -339,20 +344,28 @@ function GrantFields({ cap, index, onGrantType, onProfKind, onUpdate }: GrantFie
               ))}
             </Select>
           </Field>
-          {(cap.grantOn === "check" || cap.grantOn === "save" || cap.grantOn === undefined) && (
-            <Field label="Which (optional)" htmlFor={`cap-${index}-advkey`}>
-              <Select
-                id={`cap-${index}-advkey`}
-                value={cap.grantValue ?? ""}
-                onChange={(e) => onUpdate({ grantValueKind: "skill", grantValue: e.target.value || undefined })}
-              >
-                <option value="">All</option>
-                {SKILL_OPTIONS.map((o) => (
-                  <option key={o.key} value={o.key}>{o.label}</option>
-                ))}
-              </Select>
-            </Field>
-          )}
+          {(cap.grantOn === "check" || cap.grantOn === "save" || cap.grantOn === undefined) &&
+            (() => {
+              // A save is per-ability (STR/DEX/…); a check is per-skill. Pick the matching
+              // key list + qualifier so an advantage-on-save grant never stores a skill key.
+              const onSave = cap.grantOn === "save";
+              const options = onSave ? ABILITY_OPTIONS : SKILL_OPTIONS;
+              const valueKind = onSave ? ("save" as const) : ("skill" as const);
+              return (
+                <Field label={onSave ? "Which save (optional)" : "Which skill (optional)"} htmlFor={`cap-${index}-advkey`}>
+                  <Select
+                    id={`cap-${index}-advkey`}
+                    value={cap.grantValue ?? ""}
+                    onChange={(e) => onUpdate({ grantValueKind: valueKind, grantValue: e.target.value || undefined })}
+                  >
+                    <option value="">All</option>
+                    {options.map((o) => (
+                      <option key={o.key} value={o.key}>{o.label}</option>
+                    ))}
+                  </Select>
+                </Field>
+              );
+            })()}
           <label className="flex items-center gap-2 text-xs text-parchment-700 sm:col-span-2">
             <input type="checkbox" checked={cap.cantBeSurprised ?? false} onChange={(e) => onUpdate({ cantBeSurprised: e.target.checked })} />
             Also can&apos;t be surprised (Weapon of Warning)
