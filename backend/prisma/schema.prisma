@@ -407,6 +407,13 @@ model CampaignItemCapability {
   // Free-text wall-clock duration ("10 minutes") surfaced as reminder text.
   durationText    String?
 
+  // grant payload (#529): resistance/immunity/conditionImmunity/advantage/proficiency.
+  grantType       String?
+  grantOn         String?
+  grantValueKind  String?
+  grantValue      String?
+  cantBeSurprised Boolean @default(false)
+
   @@index([campaignItemId])
 }
 
@@ -1073,6 +1080,13 @@ model InventoryCapability {
   resourcePeriod  ItemResourcePeriod?
   resourceCharges Int?
   durationText    String?
+
+  // grant payload (#529): resistance/immunity/conditionImmunity/advantage/proficiency.
+  grantType       String?
+  grantOn         String?
+  grantValueKind  String?
+  grantValue      String?
+  cantBeSurprised Boolean @default(false)
 
   @@index([inventoryItemId])
 }

@@ -1216,9 +1216,12 @@ export async function resetActivatedUsesForRestInTx(
   });
   const toReset: { id: string; name: string; previousSpent: number }[] = [];
   for (const item of items) {
-    const cap = item.capabilities.map(readCapability).find((c) => c.kind === "activatedEffect") as
-      | ActivatedEffectCapability
-      | undefined;
+    // Type-predicate filter (not a bare cast): an opaque row with kind="activatedEffect"
+    // but no activation must not slip through as a malformed ActivatedEffectCapability
+    // — activatedRechargeRest would read resourceKind=undefined and spuriously recharge.
+    const cap = item.capabilities
+      .map(readCapability)
+      .find((c): c is ActivatedEffectCapability => c.kind === "activatedEffect" && "activation" in c);
     if (!cap) continue;
     const recharge = activatedRechargeRest(cap);
     if (recharge === null) continue;

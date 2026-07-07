@@ -41,6 +41,7 @@ import { buffsByTarget, normalizeActiveEffectsMutable, type ActiveBuff } from ".
 import {
   activatedMaxUses,
   describeActivatedReminder,
+  deriveItemGrants,
   deriveItemPassiveBonuses,
   readCapability,
   serializeCapability,
@@ -323,6 +324,38 @@ function buildMergedWeaponProficiencies(
   }
   for (const w of featWeapons) push(w, "feat");
 
+  return out;
+}
+
+// Append item-granted weapon proficiencies (#529) after class/race/feat grants,
+// tagged source "item". Deduped by name — an existing grant wins (never demoted).
+function mergeItemWeaponProficiencies(
+  base: Array<{ name: string; source: "class" | "race" | "feat" | "item" }>,
+  itemProfs: { value: string; source: string }[],
+): Array<{ name: string; source: "class" | "race" | "feat" | "item" }> {
+  const seen = new Set(base.map((e) => e.name));
+  const out = [...base];
+  for (const p of itemProfs) {
+    if (seen.has(p.value)) continue;
+    seen.add(p.value);
+    out.push({ name: p.value, source: "item" });
+  }
+  return out;
+}
+
+// Append item-granted tool proficiencies (#529) after the merged creation/subclass
+// tools, tagged source "item". Deduped by name — an existing entry wins.
+function mergeItemToolProficiencies(
+  base: Array<{ name: string; category: string; source: string }>,
+  itemProfs: { value: string; source: string }[],
+): Array<{ name: string; category: string; source: string }> {
+  const seen = new Set(base.map((e) => e.name));
+  const out = [...base];
+  for (const p of itemProfs) {
+    if (seen.has(p.value)) continue;
+    seen.add(p.value);
+    out.push({ name: p.value, category: TOOLS.find((t) => t.name === p.value)?.category ?? "other", source: "item" });
+  }
   return out;
 }
 
@@ -787,6 +820,26 @@ export function serializeCharacter(row: CharacterWithRelations) {
   );
   const buffTargets = mergeTargetModifiers(buffsByTarget(activeEffects), itemPassiveBonuses);
 
+  // Item-granted traits (#529): resistances/immunities/conditionImmunities/
+  // advantages/proficiencies from active (equipped or attuned-when-required)
+  // items. Derived on read — nothing here is persisted. resistances also feed
+  // the #456 halve flow at damage-apply time (lib/hitpoints.ts).
+  const itemGrants = deriveItemGrants(
+    row.inventoryItems.map((i) => ({
+      name: i.name,
+      equipped: i.equipped,
+      attuned: i.attuned,
+      requiresAttunement: i.requiresAttunement,
+      capabilities: i.capabilities,
+    })),
+  );
+  const itemSkillProfs = new Set(
+    itemGrants.proficiencies.filter((p) => p.profType === "skill").map((p) => p.value),
+  );
+  const itemSaveProfs = new Set(
+    itemGrants.proficiencies.filter((p) => p.profType === "save").map((p) => p.value),
+  );
+
   const inventoryContext = buildInventoryContext(
     row,
     effectiveScores,
@@ -931,8 +984,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
     abilityScores: effectiveScores,
     // Merge feat-granted saving throw proficiencies (OR with class-fixed stored set;
     // deduped via Set round-trip).
-    savingThrowProficiencies: featProficiencies.savingThrows.size > 0
-      ? [...new Set([...row.savingThrowProficiencies, ...featProficiencies.savingThrows])]
+    savingThrowProficiencies: featProficiencies.savingThrows.size > 0 || itemSaveProfs.size > 0
+      ? [...new Set([...row.savingThrowProficiencies, ...featProficiencies.savingThrows, ...itemSaveProfs])]
       : row.savingThrowProficiencies,
     // Merge feat-granted skill proficiencies (proficient stays true if already
     // true; feats only add) and overlay any active buff as an optional
@@ -942,7 +995,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
       const tempModifier = buffs.reduce((sum, b) => sum + b.modifier, 0);
       return {
         ...s,
-        proficient: s.proficient || featProficiencies.skills.has(s.name),
+        proficient: s.proficient || featProficiencies.skills.has(s.name) || itemSkillProfs.has(s.name),
         ...(tempModifier !== 0
           ? {
               tempModifier,
@@ -955,11 +1008,14 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // Character.toolProficiencies) + level-gated subclass choices (from
     // resources.toolProficienciesKnown, already clamped above).
     // Deduped by name: creation-fixed wins over subclass if both appear.
-    toolProficiencies: buildMergedToolProficiencies(
-      row.toolProficiencies,
-      resources && "toolProficienciesKnown" in resources
-        ? (resources as { toolProficienciesKnown: ToolProfEntry[] }).toolProficienciesKnown
-        : [],
+    toolProficiencies: mergeItemToolProficiencies(
+      buildMergedToolProficiencies(
+        row.toolProficiencies,
+        resources && "toolProficienciesKnown" in resources
+          ? (resources as { toolProficienciesKnown: ToolProfEntry[] }).toolProficienciesKnown
+          : [],
+      ),
+      itemGrants.proficiencies.filter((p) => p.profType === "tool"),
     ),
     // Armor/weapon proficiencies — derived fully at read time from class, race,
     // and feat grants. No persistence needed: these are fixed by class/race and
@@ -971,7 +1027,10 @@ export function serializeCharacter(row: CharacterWithRelations) {
       row.raceSelection?.name,
       featProficiencies.armor,
     ),
-    weaponProficiencies: weaponGrants,
+    weaponProficiencies: mergeItemWeaponProficiencies(
+      weaponGrants,
+      itemGrants.proficiencies.filter((p) => p.profType === "weapon"),
+    ),
     inventory: row.inventoryItems.map((item) => serializeInventoryItem(item, inventoryContext)),
     currency: row.currency,
     spellcasting,
@@ -983,6 +1042,15 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // Active cast-granted passive modifiers (buffs). Normalized on read; each is
     // also summed into its target skill/stat's tempModifier above.
     activeEffects,
+
+    // Item-granted traits (#529), derived from active items — no persisted
+    // columns. resistances also feed the #456 auto-halve at damage-apply time;
+    // the rest render as item-sourced flags/reminders on the sheet.
+    resistances: itemGrants.resistances.map((r) => ({ damageType: r.value, source: r.source })),
+    damageImmunities: itemGrants.immunities.map((i) => ({ damageType: i.value, source: i.source })),
+    conditionImmunities: itemGrants.conditionImmunities.map((c) => ({ condition: c.value, source: c.source })),
+    grantedAdvantages: itemGrants.advantages,
+    grantedProficiencies: itemGrants.proficiencies,
 
     // Advancements (ASI + feats) — top-level so every class sees them,
     // independent of whether deriveResources returns a non-null value.

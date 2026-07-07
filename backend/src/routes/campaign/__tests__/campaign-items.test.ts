@@ -308,6 +308,21 @@ describe("campaign items (#380)", () => {
     expect(JSON.stringify(res.body)).toContain("activation");
   });
 
+  it("rejects activatedEffect with a non-add op with 400 (superRefine)", async () => {
+    const res = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({
+        name: "SetTo Effect",
+        category: "gear",
+        capabilities: [
+          { kind: "activatedEffect", activation: "bonus", target: "ac", op: "setTo", value: 1, resourceKind: "atWill" },
+        ],
+      });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain("op");
+  });
+
   it("PATCH replaces capabilities preserving dice fields via capabilityCreate (#543)", async () => {
     const diceCapability = {
       kind: "passiveBonus" as const,

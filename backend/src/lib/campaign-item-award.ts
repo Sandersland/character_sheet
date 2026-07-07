@@ -117,6 +117,11 @@ function snapshotCampaignItemDetail(item: CampaignItemWithDetails) {
               resourcePeriod: c.resourcePeriod,
               resourceCharges: c.resourceCharges,
               durationText: c.durationText,
+              grantType: c.grantType,
+              grantOn: c.grantOn,
+              grantValueKind: c.grantValueKind,
+              grantValue: c.grantValue,
+              cantBeSurprised: c.cantBeSurprised,
             })),
           }
         : undefined,
