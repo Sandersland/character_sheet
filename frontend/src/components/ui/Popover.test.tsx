@@ -129,6 +129,16 @@ describe("Popover", () => {
       await user.click(screen.getByRole("button", { name: "Armor Class breakdown" }));
       expect(screen.getByRole("dialog").className).toContain("left-0");
     });
+
+    it("stays at the preferred alignment when the panel is wider than the viewport (both sides overflow)", async () => {
+      // A 224px panel can't fit a 180px viewport either way, so the `!overflowsLeft`
+      // guard suppresses the flip and it stays on the caller's preferred side.
+      mockViewport(180, { left: 40, right: 100 });
+      const user = userEvent.setup();
+      renderPopover(); // default align="left"
+      await user.click(screen.getByRole("button", { name: "Armor Class breakdown" }));
+      expect(screen.getByRole("dialog").className).toContain("left-0");
+    });
   });
 
   it("applies className to the wrapper and triggerClassName to the trigger", () => {
