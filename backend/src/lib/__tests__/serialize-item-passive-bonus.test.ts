@@ -90,6 +90,20 @@ describe("serialize sums active-item scalar passiveBonus into tempModifier (#545
     expect(cloak?.requiresAttunement).toBe(false);
   });
 
+  it("exposes the item's capabilities on the serialized inventory row (#546)", async () => {
+    const view = await serialize(characterId);
+    const cloak = view.inventory.find((i) => i.id === itemId);
+    expect(cloak?.capabilities).toEqual([
+      { kind: "passiveBonus", target: "skill", op: "add", value: 2, targetKey: "stealth" },
+    ]);
+    // A plain item carries no capabilities key at all.
+    const bare = await prisma.inventoryItem.create({
+      data: { character: { connect: { id: characterId } }, name: "Torch", category: "gear", quantity: 1 },
+    });
+    const reloaded = await serialize(characterId);
+    expect(reloaded.inventory.find((i) => i.id === bare.id)?.capabilities).toBeUndefined();
+  });
+
   it("applies the bonus while equipped, with a labeled source", async () => {
     await prisma.inventoryItem.update({ where: { id: itemId }, data: { equipped: true } });
     const view = await serialize(characterId);

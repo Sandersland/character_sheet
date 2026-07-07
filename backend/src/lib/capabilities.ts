@@ -7,22 +7,29 @@ import { casterFractionFor } from "./srd.js";
 
 export type CapabilityKind = "passiveBonus" | "castSpell" | "charges" | "grant" | "activatedEffect";
 
-export type CapabilityTarget =
-  | "ac"
-  | "attack"
-  | "damage"
-  | "save"
-  | "skill"
-  | "abilityScore"
-  | "spellAttack"
-  | "spellDc"
-  | "initiative"
-  | "speed"
-  | "maxHp";
+// The passiveBonus target enum, as a value tuple so the route's zod schema and
+// the frontend option list share one source of truth with the type below.
+export const CAPABILITY_TARGETS = [
+  "ac",
+  "attack",
+  "damage",
+  "save",
+  "skill",
+  "abilityScore",
+  "spellAttack",
+  "spellDc",
+  "initiative",
+  "speed",
+  "maxHp",
+] as const;
 
-export type CapabilityOp = "add" | "setTo";
+export type CapabilityTarget = (typeof CAPABILITY_TARGETS)[number];
 
-export type AttunementPrereqKind = "class" | "spellcaster" | "species" | "alignment";
+export const CAPABILITY_OPS = ["add", "setTo"] as const;
+export type CapabilityOp = (typeof CAPABILITY_OPS)[number];
+
+export const ATTUNEMENT_PREREQ_KINDS = ["class", "spellcaster", "species", "alignment"] as const;
+export type AttunementPrereqKind = (typeof ATTUNEMENT_PREREQ_KINDS)[number];
 
 // Dice-valued bonus payload — round-trips now; consumed in the damage roll at #526C.
 export interface CapabilityDice {
@@ -85,6 +92,38 @@ export function readCapability(row: CapabilityColumns): Capability {
     };
   }
   return { kind: row.kind as OpaqueCapability["kind"], description: row.description ?? null };
+}
+
+// The flat wire shape a capability serializes to — the same fields the DM authors
+// and the sheet renders. Dice is nested; opaque kinds carry only kind+description.
+export interface SerializedCapability {
+  kind: CapabilityKind;
+  target?: CapabilityTarget;
+  op?: CapabilityOp;
+  value?: number;
+  targetKey?: string;
+  condition?: string;
+  description?: string;
+  dice?: CapabilityDice;
+}
+
+// Serialize a capability row for the API (campaign item + inventory item alike),
+// dropping nulls so the wire shape matches the optional-field DM input.
+export function serializeCapability(row: CapabilityColumns): SerializedCapability {
+  const cap = readCapability(row);
+  if (cap.kind === "passiveBonus") {
+    return {
+      kind: cap.kind,
+      target: cap.target,
+      op: cap.op,
+      value: cap.value,
+      ...(cap.targetKey ? { targetKey: cap.targetKey } : {}),
+      ...(cap.condition ? { condition: cap.condition } : {}),
+      ...(cap.description ? { description: cap.description } : {}),
+      ...(cap.dice ? { dice: { count: cap.dice.count, faces: cap.dice.faces, ...(cap.dice.damageType ? { damageType: cap.dice.damageType } : {}) } } : {}),
+    };
+  }
+  return { kind: cap.kind, ...(cap.description ? { description: cap.description } : {}) };
 }
 
 // The buffsByTarget channel key a scalar passiveBonus contributes to, or null
