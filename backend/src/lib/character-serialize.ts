@@ -208,9 +208,12 @@ function serializeActivatedEffect(
   row: CharacterWithRelations["inventoryItems"][number],
   context: InventoryItemContext,
 ) {
-  const cap = row.capabilities.map(readCapability).find((c) => c.kind === "activatedEffect") as
-    | ActivatedEffectCapability
-    | undefined;
+  const cap = row.capabilities
+    .map(readCapability)
+    // Type-predicate (not a cast): an opaque row with kind "activatedEffect" but no
+    // `activation` (readCapability's fallthrough) must NOT match — else the reminder
+    // string would drop the DM's label. Require the field to be present.
+    .find((c): c is ActivatedEffectCapability => c.kind === "activatedEffect" && "activation" in c);
   if (!cap) return undefined;
   const maxUses = activatedMaxUses(cap);
   return {

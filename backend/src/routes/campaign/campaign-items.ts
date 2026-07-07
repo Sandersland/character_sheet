@@ -124,6 +124,15 @@ const capabilityInputSchema = z
         message: "activation is required when kind is activatedEffect",
       });
     }
+    // applyActivate seeds an ADDITIVE buff (modifier: value) and does not honor setTo,
+    // so reject a non-add op at the authoring boundary rather than silently misapplying.
+    if (val.kind === "activatedEffect" && val.op !== undefined && val.op !== "add") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["op"],
+        message: "op must be add when kind is activatedEffect (the buff value is additive)",
+      });
+    }
   });
 
 const baseFields = {
