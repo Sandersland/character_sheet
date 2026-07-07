@@ -899,6 +899,7 @@ export default function CampaignItemsPanel({ campaignId, characters }: CampaignI
                 <CapabilityEditor
                   capabilities={form.capabilities}
                   onChange={(capabilities) => set("capabilities", capabilities)}
+                  spellcasterAttunable={form.requiresAttunement && form.attunementPrereqKind === "spellcaster"}
                 />
               )}
             </fieldset>

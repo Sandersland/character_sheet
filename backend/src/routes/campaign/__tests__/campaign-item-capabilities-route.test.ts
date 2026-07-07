@@ -115,6 +115,49 @@ describe("campaign item capabilities route (#546)", () => {
     expect(rows).toHaveLength(0);
   });
 
+  it("applies the wielder-mode guard on PATCH the same as on create (#528)", async () => {
+    // A spellcaster-attunable item may author a wielder-mode castSpell.
+    const created = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookie)
+      .send({
+        name: "Wand of Wielded Bolts",
+        category: "gear",
+        rarity: "RARE",
+        requiresAttunement: true,
+        attunementPrereqKind: "spellcaster",
+        capabilities: [],
+      });
+    expect(created.status).toBe(201);
+
+    const wielderCap = {
+      kind: "castSpell",
+      spellId: "spell-witch-bolt",
+      spellName: "Witch Bolt",
+      spellLevel: 1,
+      castLevel: 1,
+      resource: "perRestLong",
+      dcMode: "wielder",
+      attackMode: "wielder",
+    };
+
+    // While the item stays spellcaster-attunable, the wielder-mode cap is allowed.
+    const ok = await supertest(app)
+      .patch(`/api/campaigns/${campaignId}/items/${created.body.id}`)
+      .set("Cookie", cookie)
+      .send({ capabilities: [wielderCap] });
+    expect(ok.status).toBe(200);
+
+    // Dropping the spellcaster prereq alongside a wielder-mode cap is rejected —
+    // the PATCH guard resolves the prereq from the request (now "class").
+    const rejected = await supertest(app)
+      .patch(`/api/campaigns/${campaignId}/items/${created.body.id}`)
+      .set("Cookie", cookie)
+      .send({ attunementPrereqKind: "class", attunementPrereqValue: "Wizard", capabilities: [wielderCap] });
+    expect(rejected.status).toBe(400);
+    expect(rejected.body.error).toMatch(/wielder/i);
+  });
+
   it("rejects an unknown capability target", async () => {
     const res = await supertest(app)
       .post(`/api/campaigns/${campaignId}/items`)

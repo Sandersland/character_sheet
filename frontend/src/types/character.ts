@@ -199,6 +199,11 @@ export interface CapabilityDice {
 }
 
 /** One capability as served on a campaign item or an inventory-item snapshot. */
+/** castSpell resource recharge (#528). atWill is unlimited; perDay ≈ long rest. */
+export type CastResource = "perRestShort" | "perRestLong" | "perDayDawn" | "perDayDusk" | "atWill";
+/** Whether a castSpell DC/attack is a fixed item value or the wielder's own (#528). */
+export type CastStatMode = "fixed" | "wielder";
+
 export interface ItemCapability {
   kind: CapabilityKind;
   target?: CapabilityTarget;
@@ -209,6 +214,18 @@ export interface ItemCapability {
   condition?: string;
   description?: string;
   dice?: CapabilityDice;
+  // castSpell fields (#528).
+  spellId?: string;
+  spellName?: string;
+  spellLevel?: number;
+  castLevel?: number;
+  resource?: CastResource;
+  uses?: number;
+  concentration?: boolean;
+  dcMode?: CastStatMode;
+  dcValue?: number;
+  attackMode?: CastStatMode;
+  attackValue?: number;
   /** activatedEffect (#543) — reuses target/op/value for the inline self-buff. */
   activation?: ActivationType;
   activatedDuration?: "whileActive" | "untilRest";
@@ -222,6 +239,21 @@ export interface ItemCapability {
   grantValueKind?: GrantValueKind;
   grantValue?: string;
   cantBeSurprised?: boolean;
+}
+
+/** Item-granted-spell metadata on a Spell whose source is "item" (#528). */
+export interface ItemSpellMeta {
+  inventoryItemId: string;
+  capabilityId: string;
+  itemName: string;
+  castLevel: number;
+  resource: CastResource;
+  usesRemaining: number;
+  usesTotal: number;
+  dcMode: CastStatMode;
+  dc?: number | null;
+  attackMode: CastStatMode;
+  attack?: number | null;
 }
 
 /** An item-granted damage resistance/immunity, tagged with its item source (#529). */
@@ -516,8 +548,10 @@ export interface SpellComponents {
 export interface Spell {
   id: string;
   spellId?: string;   // catalog Spell.id provenance — undefined for custom spells
-  /** Provenance; "subclass" marks a derived, non-persisted grant (no Remove ✕). */
-  source?: "subclass";
+  /** Provenance; "subclass"/"item" mark derived, non-persisted grants (no Remove ✕). */
+  source?: "subclass" | "item";
+  /** Item-granted-spell metadata, present only when source === "item" (#528). */
+  item?: ItemSpellMeta;
   name: string;
   level: number; // 0 = cantrip
   school: SpellSchool;
@@ -1432,6 +1466,16 @@ export interface CastSpellOperation {
   // "self" hits the caster; { characterId } heals a consenting ally's sheet (#462).
   apply?: { target: "self" | { characterId: string }; kind: "heal" | "damage"; amount: number };
 }
+/**
+ * Cast a spell granted by a held magic item (#528). `entryId` is the derived
+ * `item:<inventoryItemId>:<spellId>` seam; spends the item's own resource.
+ */
+export interface CastItemSpellOperation {
+  type: "castItemSpell";
+  entryId: string;
+  roll: number;
+  apply?: { target: "self" | { characterId: string }; kind: "heal" | "damage"; amount: number };
+}
 /** Bare slot expenditure (no specific spell). */
 export interface ExpendSlotOperation { type: "expendSlot"; level: number }
 /** Restore one previously-expended slot (undo mis-click). */
@@ -1449,6 +1493,7 @@ export interface DropConcentrationOperation { type: "dropConcentration" }
 
 export type SpellcastingOperation =
   | CastSpellOperation
+  | CastItemSpellOperation
   | ExpendSlotOperation
   | RestoreSlotOperation
   | LearnSpellOperation

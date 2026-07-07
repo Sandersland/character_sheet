@@ -111,12 +111,27 @@ function snapshotCampaignItemDetail(item: CampaignItemWithDetails) {
               valueDiceCount: c.valueDiceCount,
               valueDiceFaces: c.valueDiceFaces,
               valueDamageType: c.valueDamageType,
+              // castSpell columns (#528) — provenance spellId + authored config.
+              // `used` is NOT copied (runtime state resets to 0 on the new item).
+              spellId: c.spellId,
+              spellName: c.spellName,
+              spellLevel: c.spellLevel,
+              castLevel: c.castLevel,
+              castResource: c.castResource,
+              castUses: c.castUses,
+              castConcentration: c.castConcentration,
+              dcMode: c.dcMode,
+              dcValue: c.dcValue,
+              attackMode: c.attackMode,
+              attackValue: c.attackValue,
+              // activatedEffect columns (#543).
               activation: c.activation,
               activatedDuration: c.activatedDuration,
               resourceKind: c.resourceKind,
               resourcePeriod: c.resourcePeriod,
               resourceCharges: c.resourceCharges,
               durationText: c.durationText,
+              // grant columns (#529).
               grantType: c.grantType,
               grantOn: c.grantOn,
               grantValueKind: c.grantValueKind,

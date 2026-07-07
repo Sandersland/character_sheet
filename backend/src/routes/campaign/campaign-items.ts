@@ -8,6 +8,8 @@ import {
   ATTUNEMENT_PREREQ_KINDS,
   CAPABILITY_OPS,
   CAPABILITY_TARGETS,
+  CAST_RESOURCES,
+  CAST_STAT_MODES,
   GRANT_TYPES,
   GRANT_VALUE_KINDS,
   serializeCapability,
@@ -138,6 +140,27 @@ const passiveBonusInputSchema = z
     }
   });
 
+// A DM-authored castSpell capability (#528): the item casts a catalog spell from
+// its own resource. wielder DC/attack is only meaningful for a spellcaster-
+// intended item, so it's rejected unless the item requires spellcaster attunement.
+const castSpellInputSchema = z
+  .object({
+    kind: z.literal("castSpell"),
+    spellId: z.string().min(1),
+    spellName: z.string().min(1),
+    spellLevel: z.number().int().min(0).max(9),
+    castLevel: z.number().int().min(0).max(9),
+    resource: z.enum(CAST_RESOURCES),
+    uses: z.number().int().positive().optional(),
+    concentration: z.boolean().optional(),
+    dcMode: z.enum(CAST_STAT_MODES),
+    dcValue: z.number().int().optional(),
+    attackMode: z.enum(CAST_STAT_MODES),
+    attackValue: z.number().int().optional(),
+    description: z.string().optional(),
+  })
+  .strict();
+
 // A DM-authored grant capability (#529): resistance/immunity/conditionImmunity/
 // advantage/proficiency conferred while the item is active. grantValue is the
 // damage-type/condition/skill/ability/name; grantOn is advantage-only.
@@ -153,7 +176,7 @@ const grantInputSchema = z
   })
   .strict();
 
-const capabilityInputSchema = z.discriminatedUnion("kind", [passiveBonusInputSchema, grantInputSchema]);
+const capabilityInputSchema = z.discriminatedUnion("kind", [passiveBonusInputSchema, castSpellInputSchema, grantInputSchema]);
 
 const baseFields = {
   name: z.string().min(1),
@@ -175,6 +198,23 @@ const baseFields = {
 
 // Map a capability input onto the flat side-table columns.
 function capabilityCreate(cap: z.infer<typeof capabilityInputSchema>) {
+  if (cap.kind === "castSpell") {
+    return {
+      kind: cap.kind,
+      description: cap.description ?? null,
+      spellId: cap.spellId,
+      spellName: cap.spellName,
+      spellLevel: cap.spellLevel,
+      castLevel: cap.castLevel,
+      castResource: cap.resource,
+      castUses: cap.uses ?? 1,
+      castConcentration: cap.concentration ?? false,
+      dcMode: cap.dcMode,
+      dcValue: cap.dcValue ?? null,
+      attackMode: cap.attackMode,
+      attackValue: cap.attackValue ?? null,
+    };
+  }
   if (cap.kind === "grant") {
     return {
       kind: cap.kind,
@@ -204,6 +244,21 @@ function capabilityCreate(cap: z.infer<typeof capabilityInputSchema>) {
     resourceCharges: cap.resourceCharges ?? null,
     durationText: cap.durationText ?? null,
   };
+}
+
+// Reject a wielder-mode castSpell on an item not intended for a spellcaster —
+// wielder DC/attack resolves to the holder's spell stats, meaningless otherwise (#528).
+function assertWielderModeAllowed(data: {
+  attunementPrereqKind?: string | null;
+  capabilities?: z.infer<typeof capabilityInputSchema>[];
+}): string | null {
+  const wantsWielder = (data.capabilities ?? []).some(
+    (c) => c.kind === "castSpell" && (c.dcMode === "wielder" || c.attackMode === "wielder"),
+  );
+  if (wantsWielder && data.attunementPrereqKind !== "spellcaster") {
+    return "wielder DC/attack requires the item to be attunable by a spellcaster; use fixed values otherwise";
+  }
+  return null;
 }
 
 const createItemSchema = z.object(baseFields).strict();
@@ -339,6 +394,11 @@ campaignItemsRouter.post("/campaigns/:id/items", async (req, res) => {
     return;
   }
   const data = parseResult.data;
+  const wielderError = assertWielderModeAllowed(data);
+  if (wielderError) {
+    res.status(400).json({ error: wielderError });
+    return;
+  }
   const campaignId = req.params.id;
 
   const created = await prisma.$transaction(async (tx) => {
@@ -394,6 +454,19 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
   });
   if (!existing || existing.campaignId !== req.params.id) {
     res.status(404).json({ error: "Item not found" });
+    return;
+  }
+
+  // Same wielder-mode guard as the create path (#528). A PATCH may omit
+  // attunementPrereqKind while replacing capabilities, so resolve it against the
+  // existing row rather than treating an unsent field as "not a spellcaster item".
+  const wielderError = assertWielderModeAllowed({
+    attunementPrereqKind:
+      data.attunementPrereqKind !== undefined ? data.attunementPrereqKind : existing.attunementPrereqKind,
+    capabilities: data.capabilities,
+  });
+  if (wielderError) {
+    res.status(400).json({ error: wielderError });
     return;
   }
 

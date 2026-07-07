@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   activatedMaxUses,
   activatedRechargeRest,
+  castUsesTotal,
   describeActivatedReminder,
   deriveItemGrants,
   deriveItemPassiveBonuses,
@@ -100,6 +101,92 @@ describe("readCapability", () => {
     // no op → falls through to opaque, value dropped
     const cap = readCapability({ kind: "passiveBonus", target: "skill", value: 2 });
     expect("value" in cap).toBe(false);
+  });
+});
+
+const castSpellRow: CapabilityColumns = {
+  kind: "castSpell",
+  spellId: "spell-witch-bolt",
+  spellName: "Witch Bolt",
+  spellLevel: 1,
+  castLevel: 1,
+  castResource: "perRestShort",
+  castUses: 1,
+  castConcentration: true,
+  dcMode: "fixed",
+  dcValue: 15,
+  attackMode: "fixed",
+  attackValue: 7,
+};
+
+describe("readCapability — castSpell (#528)", () => {
+  it("materializes a castSpell capability with fixed DC/attack", () => {
+    const cap = readCapability(castSpellRow);
+    expect(cap).toMatchObject({
+      kind: "castSpell",
+      spellId: "spell-witch-bolt",
+      spellName: "Witch Bolt",
+      spellLevel: 1,
+      castLevel: 1,
+      resource: "perRestShort",
+      uses: 1,
+      concentration: true,
+      dcMode: "fixed",
+      dcValue: 15,
+      attackMode: "fixed",
+      attackValue: 7,
+    });
+  });
+
+  it("defaults resource/uses/modes when unset", () => {
+    const cap = readCapability({ kind: "castSpell", spellId: "s1", spellName: "X", spellLevel: 0 });
+    if (cap.kind !== "castSpell") throw new Error("expected castSpell");
+    expect(cap.resource).toBe("perDayDawn");
+    expect(cap.uses).toBe(1);
+    expect(cap.dcMode).toBe("fixed");
+    expect(cap.attackMode).toBe("fixed");
+  });
+
+  it("reads a castSpell without a spellId as opaque", () => {
+    expect(readCapability({ kind: "castSpell", description: "cast fireball" })).toEqual({
+      kind: "castSpell",
+      description: "cast fireball",
+    });
+  });
+
+  it("round-trips through serializeCapability", () => {
+    expect(serializeCapability(castSpellRow)).toEqual({
+      kind: "castSpell",
+      spellId: "spell-witch-bolt",
+      spellName: "Witch Bolt",
+      spellLevel: 1,
+      castLevel: 1,
+      resource: "perRestShort",
+      uses: 1,
+      concentration: true,
+      dcMode: "fixed",
+      dcValue: 15,
+      attackMode: "fixed",
+      attackValue: 7,
+    });
+  });
+});
+
+describe("castUsesTotal", () => {
+  it("returns Infinity for atWill", () => {
+    const cap = readCapability({ ...castSpellRow, castResource: "atWill" });
+    if (cap.kind !== "castSpell") throw new Error("expected castSpell");
+    expect(castUsesTotal(cap)).toBe(Infinity);
+  });
+  it("returns the authored uses for a rest resource", () => {
+    const cap = readCapability({ ...castSpellRow, castUses: 3 });
+    if (cap.kind !== "castSpell") throw new Error("expected castSpell");
+    expect(castUsesTotal(cap)).toBe(3);
+  });
+  it("floors to 1 when uses is zero/unset", () => {
+    const cap = readCapability({ ...castSpellRow, castUses: 0 });
+    if (cap.kind !== "castSpell") throw new Error("expected castSpell");
+    expect(castUsesTotal(cap)).toBe(1);
   });
 });
 

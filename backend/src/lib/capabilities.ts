@@ -1,7 +1,7 @@
 // Item-capability adapter (#545). Mirrors readEffectSpec (effects.ts) and
 // readAbilityCost (ability-cost.ts): a flat-column side-table row → a typed,
-// kind-discriminated Capability. Only passiveBonus is materialized this slice;
-// the reserved kinds (castSpell/charges/grant/activatedEffect) read as opaque.
+// kind-discriminated Capability. passiveBonus, castSpell (#528), and grant (#529)
+// are materialized; the remaining reserved kinds (charges/activatedEffect) read as opaque.
 
 import { casterFractionFor } from "./srd.js";
 
@@ -30,6 +30,14 @@ export type CapabilityOp = (typeof CAPABILITY_OPS)[number];
 
 export const ATTUNEMENT_PREREQ_KINDS = ["class", "spellcaster", "species", "alignment"] as const;
 export type AttunementPrereqKind = (typeof ATTUNEMENT_PREREQ_KINDS)[number];
+
+// castSpell resource + stat-mode enums (#528), value tuples so the route schema
+// and the frontend option lists share one source of truth with the types below.
+export const CAST_RESOURCES = ["perRestShort", "perRestLong", "perDayDawn", "perDayDusk", "atWill"] as const;
+export type CastResource = (typeof CAST_RESOURCES)[number];
+
+export const CAST_STAT_MODES = ["fixed", "wielder"] as const;
+export type CastStatMode = (typeof CAST_STAT_MODES)[number];
 
 // activatedEffect axes (#543) — mirror the ActivationType / ActivatedDuration /
 // ItemResourceKind / ItemResourcePeriod schema enums.
@@ -73,6 +81,24 @@ export interface PassiveBonusCapability {
   dice?: CapabilityDice | null;
 }
 
+// A castSpell capability (#528): the item casts a referenced Spell from its own
+// resource. DC/attack are either fixed item values or resolve to the wielder's.
+export interface CastSpellCapability {
+  kind: "castSpell";
+  spellId: string;
+  spellName: string;
+  spellLevel: number;
+  castLevel: number;
+  resource: CastResource;
+  uses: number;
+  concentration: boolean;
+  dcMode: CastStatMode;
+  dcValue?: number | null;
+  attackMode: CastStatMode;
+  attackValue?: number | null;
+  description?: string | null;
+}
+
 // An activatedEffect (#543): a command-word / action / bonus-action toggle that
 // seeds a while-active (or until-rest) self-buff and spends an item resource. The
 // inline self-buff reuses the passiveBonus target/op/value shape.
@@ -107,15 +133,32 @@ export interface GrantCapability {
 // A reserved (not-yet-implemented) capability — surfaced as opaque so callers can
 // skip it without a schema change when the real payload lands.
 export interface OpaqueCapability {
-  kind: Exclude<CapabilityKind, "passiveBonus" | "activatedEffect" | "grant">;
+  kind: Exclude<CapabilityKind, "passiveBonus" | "castSpell" | "activatedEffect" | "grant">;
   description?: string | null;
 }
 
 export type Capability =
   | PassiveBonusCapability
+  | CastSpellCapability
   | ActivatedEffectCapability
   | GrantCapability
   | OpaqueCapability;
+
+// Number of uses a castSpell capability has per recharge period. atWill is
+// unlimited (Infinity); every other resource defaults to 1 when uses is unset.
+export function castUsesTotal(cap: CastSpellCapability): number {
+  if (cap.resource === "atWill") return Infinity;
+  return cap.uses > 0 ? cap.uses : 1;
+}
+
+// Does a castSpell resource recharge on the given rest? perRestShort recharges on
+// a short OR long rest; perRestLong and the perDay dawn/dusk approximations recharge
+// on a long rest only; atWill never tracks uses (nothing to reset).
+export function castResourceRechargesOn(resource: string, rest: "short" | "long"): boolean {
+  if (resource === "atWill") return false;
+  if (resource === "perRestShort") return true; // short or long
+  return rest === "long";
+}
 
 // The flat columns shared by CampaignItemCapability and InventoryCapability.
 export interface CapabilityColumns {
@@ -129,6 +172,17 @@ export interface CapabilityColumns {
   valueDiceCount?: number | null;
   valueDiceFaces?: number | null;
   valueDamageType?: string | null;
+  spellId?: string | null;
+  spellName?: string | null;
+  spellLevel?: number | null;
+  castLevel?: number | null;
+  castResource?: string | null;
+  castUses?: number | null;
+  castConcentration?: boolean | null;
+  dcMode?: string | null;
+  dcValue?: number | null;
+  attackMode?: string | null;
+  attackValue?: number | null;
   activation?: string | null;
   activatedDuration?: string | null;
   resourceKind?: string | null;
@@ -146,6 +200,23 @@ export interface CapabilityColumns {
 // passiveBonus (missing target/op) or grant (missing grantType) reads as opaque
 // rather than throwing.
 export function readCapability(row: CapabilityColumns): Capability {
+  if (row.kind === "castSpell" && row.spellId) {
+    return {
+      kind: "castSpell",
+      spellId: row.spellId,
+      spellName: row.spellName ?? "",
+      spellLevel: row.spellLevel ?? 0,
+      castLevel: row.castLevel ?? row.spellLevel ?? 0,
+      resource: (row.castResource as CastResource | null) ?? "perDayDawn",
+      uses: row.castUses ?? 1,
+      concentration: row.castConcentration ?? false,
+      dcMode: (row.dcMode as CastStatMode | null) ?? "fixed",
+      dcValue: row.dcValue ?? null,
+      attackMode: (row.attackMode as CastStatMode | null) ?? "fixed",
+      attackValue: row.attackValue ?? null,
+      description: row.description ?? null,
+    };
+  }
   if (row.kind === "grant" && row.grantType) {
     return {
       kind: "grant",
@@ -249,6 +320,18 @@ export interface SerializedCapability {
   condition?: string;
   description?: string;
   dice?: CapabilityDice;
+  // castSpell fields (#528).
+  spellId?: string;
+  spellName?: string;
+  spellLevel?: number;
+  castLevel?: number;
+  resource?: CastResource;
+  uses?: number;
+  concentration?: boolean;
+  dcMode?: CastStatMode;
+  dcValue?: number;
+  attackMode?: CastStatMode;
+  attackValue?: number;
   // activatedEffect (#543) — round-tripped so the DM editor can re-populate.
   // activatedDuration matches the authoring input field name (the internal
   // Capability shape calls it `duration`).
@@ -258,6 +341,7 @@ export interface SerializedCapability {
   resourcePeriod?: ItemResourcePeriod;
   resourceCharges?: number;
   durationText?: string;
+  // grant fields (#529).
   grantType?: GrantType;
   grantOn?: AdvantageOn;
   grantValueKind?: GrantValueKind;
@@ -269,6 +353,23 @@ export interface SerializedCapability {
 // dropping nulls so the wire shape matches the optional-field DM input.
 export function serializeCapability(row: CapabilityColumns): SerializedCapability {
   const cap = readCapability(row);
+  if (cap.kind === "castSpell") {
+    return {
+      kind: cap.kind,
+      spellId: cap.spellId,
+      spellName: cap.spellName,
+      spellLevel: cap.spellLevel,
+      castLevel: cap.castLevel,
+      resource: cap.resource,
+      uses: cap.uses,
+      concentration: cap.concentration,
+      dcMode: cap.dcMode,
+      ...(cap.dcValue != null ? { dcValue: cap.dcValue } : {}),
+      attackMode: cap.attackMode,
+      ...(cap.attackValue != null ? { attackValue: cap.attackValue } : {}),
+      ...(cap.description ? { description: cap.description } : {}),
+    };
+  }
   if (cap.kind === "grant") {
     return {
       kind: cap.kind,

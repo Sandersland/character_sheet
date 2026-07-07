@@ -1,6 +1,32 @@
 import { describe, it, expect } from "vitest";
 
-import { deriveGrantedSpells, deriveGrantedCastingAbility } from "../granted-spells.js";
+import {
+  deriveGrantedSpells,
+  deriveGrantedCastingAbility,
+  deriveItemSpells,
+  type ItemSpellSourceItem,
+} from "../granted-spells.js";
+
+// A minimal castSpell capability row (flat columns + id) for deriveItemSpells.
+function castSpellCap(id: string, spellId: string, over: Partial<ItemSpellSourceItem["capabilities"][number]> = {}) {
+  return {
+    id,
+    kind: "castSpell",
+    spellId,
+    spellName: "Item Spell",
+    spellLevel: 1,
+    castLevel: 1,
+    castResource: "perRestLong",
+    castUses: 1,
+    castConcentration: false,
+    dcMode: "fixed",
+    dcValue: 13,
+    attackMode: "fixed",
+    attackValue: 5,
+    used: 0,
+    ...over,
+  } as ItemSpellSourceItem["capabilities"][number];
+}
 
 describe("deriveGrantedSpells", () => {
   it("grants Minor Illusion to a Way of Shadow monk at level 3", () => {
@@ -33,6 +59,37 @@ describe("deriveGrantedSpells", () => {
     expect(first[0].components).not.toBe(second[0].components);
     first[0].components!.verbal = false;
     expect(second[0].components!.verbal).toBe(true);
+  });
+});
+
+describe("deriveItemSpells (#528)", () => {
+  it("gives two castSpell caps for the SAME spell on one item distinct entry ids", () => {
+    const item: ItemSpellSourceItem = {
+      id: "inv-1",
+      name: "Staff of Twin Bolts",
+      equipped: false,
+      attuned: true,
+      capabilities: [castSpellCap("cap-a", "spell-witch-bolt"), castSpellCap("cap-b", "spell-witch-bolt")],
+    };
+    const spells = deriveItemSpells([item]);
+    expect(spells).toHaveLength(2);
+    const ids = spells.map((s) => s.id);
+    expect(new Set(ids).size).toBe(2); // no collision
+    expect(ids).toContain("item:inv-1:spell-witch-bolt:cap-a");
+    expect(ids).toContain("item:inv-1:spell-witch-bolt:cap-b");
+    // Each entry still points at its own capability for the cast op to resolve.
+    expect(spells.map((s) => s.item?.capabilityId).sort()).toEqual(["cap-a", "cap-b"]);
+  });
+
+  it("omits an item that is neither equipped nor attuned", () => {
+    const item: ItemSpellSourceItem = {
+      id: "inv-2",
+      name: "Dormant Wand",
+      equipped: false,
+      attuned: false,
+      capabilities: [castSpellCap("cap-x", "spell-fire-bolt")],
+    };
+    expect(deriveItemSpells([item])).toEqual([]);
   });
 });
 

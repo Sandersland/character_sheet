@@ -55,6 +55,7 @@ import type { SpellEntry } from "./spell-state.js";
 import {
   deriveGrantedSpells,
   deriveGrantedCastingAbility,
+  deriveItemSpells,
   type AbilityScores,
 } from "./granted-spells.js";
 import { SHADOW_ART_CONCENTRATION_PREFIX } from "./shadow-arts.js";
@@ -378,6 +379,21 @@ function collectGrantedSpells(entries: CharacterWithRelations["classEntries"]): 
   return entries.flatMap((e) => deriveGrantedSpells(e.name, e.subclass ?? undefined, e.level));
 }
 
+// Item-granted spells (#528) for a holder's active items. Appended after learned
+// + subclass-granted spells; their `item:` ids are a disjoint space so no name dedup.
+function deriveItemSpellsFor(row: CharacterWithRelations): SpellEntry[] {
+  return deriveItemSpells(
+    row.inventoryItems.map((i) => ({
+      id: i.id,
+      name: i.name,
+      // #565: `equipped` is derived from equippedSlot (no persisted boolean).
+      equipped: i.equippedSlot != null,
+      attuned: i.attuned,
+      capabilities: i.capabilities,
+    })),
+  );
+}
+
 // Casting ability for the slotless multiclass view — from the first entry that
 // actually grants a spell (defaults to Wisdom when none do).
 function collectGrantedCastingAbility(entries: CharacterWithRelations["classEntries"]): keyof AbilityScores {
@@ -437,10 +453,12 @@ function buildSpellcastingView(
     primaryClass?.subclass ?? undefined,
     level,
   );
+  // Item-granted spells (#528) — surfaced for any holder, caster or not.
+  const itemSpells = deriveItemSpellsFor(row);
 
   if (derivedSpell) {
     const stored = normalizeSpellcastingMutable(row.spellcasting);
-    const spells = mergeGrantedSpells(stored.spells, granted);
+    const spells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
     return {
       ability: derivedSpell.ability,
       spellSaveDC: derivedSpell.spellSaveDC,
@@ -468,11 +486,11 @@ function buildSpellcastingView(
   // Non-caster class that nonetheless gets a subclass-granted spell (e.g. a Way
   // of Shadow monk's Minor Illusion). Surface a slotless view so the grant
   // renders; the casting ability is derived per rule (Wisdom is the default).
-  if (granted.length > 0) {
+  if (granted.length > 0 || itemSpells.length > 0) {
     const stored = normalizeSpellcastingMutable(row.spellcasting);
     const castingAbility = deriveGrantedCastingAbility(primaryClass?.subclass ?? undefined);
     const abilMod = abilityModifier(abilityScores[castingAbility] ?? 10);
-    const grantedSpells = mergeGrantedSpells(stored.spells, granted);
+    const grantedSpells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
     return {
       ability: castingAbility,
       spellSaveDC: 8 + proficiencyBonus + abilMod,
@@ -517,15 +535,16 @@ function buildMulticlassSpellcastingView(
 
   // Subclass-granted spells across every class entry (each gated by its own level).
   const granted = collectGrantedSpells(row.classEntries);
+  const itemSpells = deriveItemSpellsFor(row);
   const stored = normalizeSpellcastingMutable(row.spellcasting);
 
-  // No caster class in the mix, but a subclass still grants a spell — surface a
-  // slotless granted view (ability derived per rule; mirrors the single-class branch).
+  // No caster class in the mix, but a subclass or item still grants a spell —
+  // surface a slotless view (ability derived per rule; mirrors the single-class branch).
   if (multi.classes.length === 0) {
-    if (granted.length === 0) return undefined;
+    if (granted.length === 0 && itemSpells.length === 0) return undefined;
     const castingAbility = collectGrantedCastingAbility(row.classEntries);
     const abilMod = abilityModifier(abilityScores[castingAbility] ?? 10);
-    const grantedSpells = mergeGrantedSpells(stored.spells, granted);
+    const grantedSpells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
     return {
       ability: castingAbility,
       spellSaveDC: 8 + proficiencyBonus + abilMod,
@@ -538,7 +557,7 @@ function buildMulticlassSpellcastingView(
   }
 
   const primaryCaster = multi.classes[0];
-  const mergedSpells = mergeGrantedSpells(stored.spells, granted);
+  const mergedSpells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
   return {
     ability: primaryCaster.ability,
     spellSaveDC: primaryCaster.spellSaveDC,

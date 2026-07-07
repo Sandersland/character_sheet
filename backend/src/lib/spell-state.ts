@@ -36,8 +36,30 @@ export interface SpellEntry {
   saveAbility?: string | null;
   upcastDicePerLevel?: number | null;
   cantripScaling?: boolean;
-  // Provenance of the entry; "subclass" marks a derived, non-persisted grant.
-  source?: "subclass";
+  // Provenance of the entry; "subclass" marks a derived, non-persisted grant,
+  // "item" a spell granted by a held magic item (#528, cast from the item).
+  source?: "subclass" | "item";
+  // Item-granted-spell fields (#528), present only when source === "item".
+  item?: ItemSpellMeta;
+}
+
+/**
+ * Metadata for a spell granted by a magic item (#528). Carries the provenance
+ * needed to cast from + track the item's resource, plus the fixed/wielder DC and
+ * attack overrides the sheet renders in place of the character's own values.
+ */
+export interface ItemSpellMeta {
+  inventoryItemId: string;
+  capabilityId: string;
+  itemName: string;
+  castLevel: number;
+  resource: string;
+  usesRemaining: number; // Infinity for at-will
+  usesTotal: number;     // Infinity for at-will
+  dcMode: "fixed" | "wielder";
+  dc?: number | null;         // resolved value when dcMode === "fixed"
+  attackMode: "fixed" | "wielder";
+  attack?: number | null;     // resolved value when attackMode === "fixed"
 }
 
 /** Spell verbal/somatic/material component flags + optional material text. */
