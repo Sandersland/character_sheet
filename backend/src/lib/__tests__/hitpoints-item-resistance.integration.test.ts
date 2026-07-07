@@ -84,4 +84,27 @@ describe("item-granted resistance halves damage via #456 flow (#529)", () => {
     await applyHitPointOperations(characterId, [{ type: "damage", amount: 10, damageType: "fire" }]);
     expect(await current(characterId)).toBe(20);
   });
+
+  it("zeroes matching damage from an active damage-immunity grant (#529)", async () => {
+    const amulet = await prisma.inventoryItem.create({
+      data: {
+        character: { connect: { id: characterId } },
+        name: "Amulet of Poison Immunity",
+        category: "gear",
+        quantity: 1,
+        requiresAttunement: true,
+        attuned: true,
+        capabilities: {
+          create: [{ kind: "grant", grantType: "immunity", grantValueKind: "damageType", grantValue: "poison" }],
+        },
+      },
+    });
+    await applyHitPointOperations(characterId, [{ type: "damage", amount: 10, damageType: "poison" }]);
+    expect(await current(characterId)).toBe(30);
+
+    // Unattune → immunity drops, full damage again.
+    await prisma.inventoryItem.update({ where: { id: amulet.id }, data: { attuned: false } });
+    await applyHitPointOperations(characterId, [{ type: "damage", amount: 10, damageType: "poison" }]);
+    expect(await current(characterId)).toBe(20);
+  });
 });

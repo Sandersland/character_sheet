@@ -324,7 +324,16 @@ function GrantFields({ cap, index, onGrantType, onProfKind, onUpdate }: GrantFie
       {type === "advantage" && (
         <>
           <Field label="On" htmlFor={`cap-${index}-on`}>
-            <Select id={`cap-${index}-on`} value={cap.grantOn ?? "check"} onChange={(e) => onUpdate({ grantOn: e.target.value as ItemCapability["grantOn"] })}>
+            <Select
+              id={`cap-${index}-on`}
+              value={cap.grantOn ?? "check"}
+              onChange={(e) => {
+                const grantOn = e.target.value as ItemCapability["grantOn"];
+                // initiative/attack are whole-axis — clear the stale skill/ability qualifier.
+                const wholeAxis = grantOn === "initiative" || grantOn === "attack";
+                onUpdate({ grantOn, ...(wholeAxis ? { grantValueKind: undefined, grantValue: undefined } : {}) });
+              }}
+            >
               {ADVANTAGE_ON_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}

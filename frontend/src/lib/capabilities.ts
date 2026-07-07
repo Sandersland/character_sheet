@@ -138,7 +138,9 @@ export function grantSummary(cap: ItemCapability): string {
       return `Proficiency: ${value}`;
     case "advantage": {
       const on = ADVANTAGE_ON_OPTIONS.find((o) => o.value === cap.grantOn)?.label ?? "rolls";
-      const core = value ? `Advantage on ${on} (${value})` : `Advantage on ${on}`;
+      // initiative/attack are whole-axis — ignore any stale skill/ability qualifier.
+      const wholeAxis = cap.grantOn === "initiative" || cap.grantOn === "attack";
+      const core = value && !wholeAxis ? `Advantage on ${on} (${value})` : `Advantage on ${on}`;
       return cap.cantBeSurprised ? `${core}; can't be surprised` : core;
     }
     default:
@@ -149,7 +151,9 @@ export function grantSummary(cap: ItemCapability): string {
 /** Reminder text for an item-granted advantage on the relevant sheet surface. */
 export function advantageGrantSummary(grant: ItemAdvantageGrant): string {
   const on = ADVANTAGE_ON_OPTIONS.find((o) => o.value === grant.on)?.label ?? "rolls";
-  const value = grant.value ? grantValueLabel(grant.valueKind, grant.value) : "";
+  // initiative/attack are whole-axis — ignore any stale skill/ability qualifier.
+  const wholeAxis = grant.on === "initiative" || grant.on === "attack";
+  const value = grant.value && !wholeAxis ? grantValueLabel(grant.valueKind, grant.value) : "";
   const core = value ? `Advantage on ${on} (${value})` : `Advantage on ${on}`;
   return grant.cantBeSurprised ? `${core}; can't be surprised` : core;
 }

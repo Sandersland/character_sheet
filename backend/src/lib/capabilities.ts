@@ -329,10 +329,12 @@ export function deriveItemGrants(items: GrantItem[]): DerivedItemGrants {
           break;
         case "advantage":
           if (cap.grantOn) {
+            // initiative/attack are whole-axis — drop any stale skill/ability qualifier.
+            const wholeAxis = cap.grantOn === "initiative" || cap.grantOn === "attack";
             out.advantages.push({
               on: cap.grantOn,
-              ...(cap.grantValueKind ? { valueKind: cap.grantValueKind } : {}),
-              ...(cap.grantValue ? { value: cap.grantValue } : {}),
+              ...(!wholeAxis && cap.grantValueKind ? { valueKind: cap.grantValueKind } : {}),
+              ...(!wholeAxis && cap.grantValue ? { value: cap.grantValue } : {}),
               cantBeSurprised: cap.cantBeSurprised,
               source: item.name,
               ...(cap.description ? { description: cap.description } : {}),
@@ -353,6 +355,11 @@ export function deriveItemGrants(items: GrantItem[]): DerivedItemGrants {
 /** Damage types item grants make the character resistant to (fed into #456 halving). */
 export function itemResistedDamageTypes(items: GrantItem[]): Set<string> {
   return new Set(deriveItemGrants(items).resistances.map((r) => r.value));
+}
+
+/** Damage types item grants make the character immune to (zeroed at damage-apply). */
+export function itemImmuneDamageTypes(items: GrantItem[]): Set<string> {
+  return new Set(deriveItemGrants(items).immunities.map((i) => i.value));
 }
 
 /** A concrete attunement prerequisite resolved from the snapshotted columns. */

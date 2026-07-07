@@ -8,7 +8,7 @@ import {
   clearWhileActiveBuffsInTx,
   normalizeActiveEffectsMutable,
 } from "./active-effects.js";
-import { itemResistedDamageTypes, type GrantItem } from "./capabilities.js";
+import { itemImmuneDamageTypes, itemResistedDamageTypes, type GrantItem } from "./capabilities.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { prisma } from "./prisma.js";
@@ -108,20 +108,24 @@ export function hitDieHeal(roll: number, conMod: number): number {
 }
 
 /**
- * Resolve an incoming damage instance against active resistances (#456). When
- * the (optional) damage type matches an active resistance and the player has not
- * declined, the applied amount is halved (round down, 5e resistance). Returns the
- * amount actually applied plus whether a halving occurred (for history/UI).
+ * Resolve an incoming damage instance against active resistances (#456) and
+ * item-granted damage immunities (#529). When the (optional) damage type matches
+ * an immunity the applied amount is zeroed; when it matches a resistance it is
+ * halved (round down, 5e). Immunity wins over resistance. Both honor the player's
+ * decline override (applyResistance=false → full damage). Returns the amount
+ * applied plus whether it was halved and/or zeroed (for history/UI).
  */
 export function resolveDamageAmount(
   rawAmount: number,
   damageType: string | undefined,
   resistedTypes: Set<string>,
   applyResistance: boolean,
-): { applied: number; resisted: boolean } {
-  const matches = applyResistance && damageType !== undefined && resistedTypes.has(damageType);
-  if (!matches) return { applied: rawAmount, resisted: false };
-  return { applied: Math.floor(rawAmount / 2), resisted: true };
+  immuneTypes: Set<string> = new Set(),
+): { applied: number; resisted: boolean; immune: boolean } {
+  const typed = applyResistance && damageType !== undefined;
+  if (typed && immuneTypes.has(damageType)) return { applied: 0, resisted: false, immune: true };
+  if (typed && resistedTypes.has(damageType)) return { applied: Math.floor(rawAmount / 2), resisted: true, immune: false };
+  return { applied: rawAmount, resisted: false, immune: false };
 }
 
 /**
@@ -686,15 +690,18 @@ function applyDamageOp(ctx: HpOpContext, op: DamageOperation): HpOpResult {
   if (op.amount <= 0) {
     throw new InvalidHitPointOperationError("damage amount must be positive");
   }
-  // Auto-halve against active resistances (#456) unless the player declined:
-  // cast-buff resistances (Rage) unioned with item-granted resistances (#529).
+  // Auto-halve against active resistances (#456) / zero against item immunities
+  // (#529) unless the player declined: cast-buff resistances (Rage) unioned with
+  // item-granted resistances; item immunities zero the matching type.
   const resisted = activeResistedDamageTypes(normalizeActiveEffectsMutable(row.activeEffects));
   for (const t of itemResistedDamageTypes(row.inventoryItems ?? [])) resisted.add(t);
-  const { applied, resisted: wasResisted } = resolveDamageAmount(
+  const immune = itemImmuneDamageTypes(row.inventoryItems ?? []);
+  const { applied, resisted: wasResisted, immune: wasImmune } = resolveDamageAmount(
     op.amount,
     op.damageType,
     resisted,
     op.applyResistance !== false,
+    immune,
   );
 
   const beforeCurrent = hp.current;
@@ -704,7 +711,7 @@ function applyDamageOp(ctx: HpOpContext, op: DamageOperation): HpOpResult {
   hp.current = Math.max(0, hp.current - (applied - absorbed));
 
   const typeLabel = op.damageType ? ` ${op.damageType}` : "";
-  const resistNote = wasResisted ? ` (resisted from ${op.amount})` : "";
+  const resistNote = wasImmune ? ` (immune, from ${op.amount})` : wasResisted ? ` (resisted from ${op.amount})` : "";
   // The 5e concentration save uses the damage actually taken (post-resistance).
   return {
     summary: `Took ${applied}${typeLabel} damage${resistNote} (${beforeCurrent} → ${hp.current} HP)`,
@@ -713,6 +720,7 @@ function applyDamageOp(ctx: HpOpContext, op: DamageOperation): HpOpResult {
       rawAmount: op.amount,
       damageType: op.damageType ?? null,
       resisted: wasResisted,
+      immune: wasImmune,
     },
     damageForConcentration: applied,
   };

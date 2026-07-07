@@ -5,6 +5,7 @@ import {
   deriveItemPassiveBonuses,
   describeAttunementPrereq,
   isItemActive,
+  itemImmuneDamageTypes,
   itemResistedDamageTypes,
   meetsAttunementPrereq,
   passiveBonusChannel,
@@ -186,6 +187,36 @@ describe("grant capabilities (#529)", () => {
       { name: "Ring of Fire Resistance", equipped: false, attuned: true, requiresAttunement: true, capabilities: [resistFire] },
     ]);
     expect(set.has("fire")).toBe(true);
+  });
+
+  it("exposes active damage immunities as a set for the damage-apply zeroing", () => {
+    const immFire: CapabilityColumns = { kind: "grant", grantType: "immunity", grantValueKind: "damageType", grantValue: "fire" };
+    const set = itemImmuneDamageTypes([
+      { name: "Amulet", equipped: false, attuned: true, requiresAttunement: true, capabilities: [immFire] },
+    ]);
+    expect(set.has("fire")).toBe(true);
+    // Inactive item contributes nothing.
+    expect(itemImmuneDamageTypes([
+      { name: "Amulet", equipped: false, attuned: false, requiresAttunement: true, capabilities: [immFire] },
+    ]).size).toBe(0);
+  });
+
+  it("drops a stale skill/ability qualifier from a whole-axis (initiative/attack) advantage", () => {
+    // A grant mis-authored with a leftover skill value on an initiative axis.
+    const staleInit: CapabilityColumns = {
+      kind: "grant",
+      grantType: "advantage",
+      grantOn: "initiative",
+      grantValueKind: "skill",
+      grantValue: "perception",
+      cantBeSurprised: true,
+    };
+    const out = deriveItemGrants([
+      { name: "Weapon of Warning", equipped: true, attuned: true, requiresAttunement: true, capabilities: [staleInit] },
+    ]);
+    expect(out.advantages).toEqual([
+      { on: "initiative", cantBeSurprised: true, source: "Weapon of Warning" },
+    ]);
   });
 });
 
