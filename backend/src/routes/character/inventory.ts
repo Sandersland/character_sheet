@@ -109,6 +109,14 @@ const adjustQuantityOpSchema = z.object({
   delta: z.number().int().refine((n) => n !== 0, { message: "delta must not be zero" }),
 });
 
+const useOpSchema = z.object({
+  type: z.literal("use"),
+  inventoryItemId: z.string().min(1),
+  // Raw effect-die values, client-rolled for the 3D animation. Omit to have the
+  // server roll. Length/range are validated against the consumable in lib/.
+  rolls: z.array(z.number().int().positive()).optional(),
+});
+
 const updateOpSchema = z.object({
   type: z.literal("update"),
   inventoryItemId: z.string().min(1),
@@ -154,6 +162,7 @@ const unattuneOpSchema = z.object({
 const operationSchema = z.discriminatedUnion("type", [
   acquireOpSchema,
   adjustQuantityOpSchema,
+  useOpSchema,
   updateOpSchema,
   removeOpSchema,
   sellOpSchema,
@@ -171,4 +180,7 @@ makeTransactionsEndpoint({
   schema: transactionsRequestSchema,
   apply: (characterId, data) => applyInventoryOperations(characterId, data.operations),
   domainErrors: [InsufficientCurrencyError, InvalidInventoryOperationError],
+  // Surface per-use roll outcomes so the client can play the 3D dice + toast.
+  respond: (character, useResults) =>
+    useResults.length > 0 ? { ...character, useResults } : character,
 });

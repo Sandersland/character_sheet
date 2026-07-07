@@ -159,7 +159,7 @@ Two distinct approaches, both in play:
 
 **Full snapshots** (inventory items, spells): at acquire/learn time, all catalog fields are copied into the per-character row (`InventoryItem`, spell `SpellEntry` in the JSON). After that, the catalog is ignored — the snapshot is fully self-contained and freely editable (e.g. "Club" → "Club +1"). No merge-with-catalog logic anywhere.
 
-**Detail tables** (items only): `ItemWeaponDetail`/`ItemArmorDetail`/`ItemConsumableDetail` + their `InventoryWeapon/Armor/ConsumableDetail` snapshot mirrors. Spells are flat — school/level/effectKind/effectDice/scaling all on the `Spell` row directly, no detail table split needed.
+**Detail tables** (items only): `ItemWeaponDetail`/`ItemArmorDetail`/`ItemConsumableDetail` + their `InventoryWeapon/Armor/ConsumableDetail` snapshot mirrors (and the `CampaignItem*Detail` award mirrors). Spells are flat — school/level/effectKind/effectDice/scaling all on the `Spell` row directly, no detail table split needed. The consumable detail carries optional `maxUses`/`usesRemaining` (#121): `null` = stackable (a use decrements the row `quantity`); non-null = charged (a use decrements `usesRemaining`, and a long rest recharges it to `maxUses`). Snapshotted on acquire/award with `usesRemaining` defaulting to `maxUses`; not level-gated (no reconciler).
 
 **Dice fields**: decomposed as `...DiceCount`/`...DiceFaces`/`...Modifier` to match `dice.ts`'s `RollSpec` shape — never stored as `"1d6"` strings.
 
@@ -226,6 +226,8 @@ Every mutable domain follows the same shape:
 3. **Route** — the uniform handler scaffold (assert `edit` access → zod `safeParse` + 400 → `apply` → domain-error → 400 → re-fetch with `characterInclude` → `serializeCharacter`) is owned by `makeTransactionsEndpoint` in `lib/transactions-endpoint.ts`. Each route supplies only its `schema`, an `apply(characterId, data)` closure, and its `domainErrors` classes; optional `path` (experience mounts on `/`) and `respond` (maneuvers returns `{ character, results }`) cover the two non-default shapes. Non-uniform endpoints (e.g. `/hp`, whose response is `{ character, concentrationChecks }`) keep a hand-written handler.
 
 `lib/inventory.ts` is the reference implementation for the lib layer; `lib/transactions-endpoint.ts` for the route layer. Do not add new mutable domains via `PATCH /characters/:id`.
+
+The inventory `use` op (#121) consumes one use of a consumable (category-scoped — ammo is gear, excluded): it decrements `quantity` or `usesRemaining`, rolls the effect dice (client-supplied raw values for the 3D animation, else server-rolled via `dice.ts`), writes a `consumed` event with the roll in `data`, and **auto-applies only healing** through the HP domain (`applyHealInTx`, same shared `batchId` → atomic + LIFO-undoable). Non-heal effects are rolled + recorded but never applied. The route surfaces the per-use roll outcomes as `useResults` (via `makeTransactionsEndpoint`'s `respond`) so the client plays the dice + toast.
 
 ---
 

@@ -88,6 +88,9 @@ function snapshotCampaignItemDetail(item: CampaignItemWithDetails) {
             effectDiceFaces: item.consumableDetail.effectDiceFaces,
             effectModifier: item.consumableDetail.effectModifier,
             effectDescription: item.consumableDetail.effectDescription,
+            maxUses: item.consumableDetail.maxUses,
+            // An awarded charged consumable starts full (#121).
+            usesRemaining: item.consumableDetail.usesRemaining ?? item.consumableDetail.maxUses,
           },
         }
       : undefined,
