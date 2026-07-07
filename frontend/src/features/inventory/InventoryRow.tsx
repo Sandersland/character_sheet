@@ -10,6 +10,7 @@ import EquipToggle from "@/features/inventory/EquipToggle";
 import InventoryEditForm from "@/features/inventory/InventoryEditForm";
 import ItemProse from "@/features/inventory/ItemProse";
 import ItemSummary from "@/features/inventory/ItemSummary";
+import UseConsumableButton from "@/features/inventory/UseConsumableButton";
 
 interface InventoryRowProps {
   item: InventoryItem;
@@ -91,6 +92,9 @@ export default function InventoryRow({
                 className={`h-4 w-4 transition-transform ${state.expanded ? "rotate-180" : ""}`}
               />
             </button>
+          )}
+          {item.category === "consumable" && (
+            <UseConsumableButton item={item} pending={pending} onSubmit={onSubmit} />
           )}
           {isEquippable(item.category) && (
             <EquipToggle item={item} pending={pending} onSubmit={onSubmit} />
