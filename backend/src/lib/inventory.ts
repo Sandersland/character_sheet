@@ -6,7 +6,9 @@ import {
   describeAttunementPrereq,
   meetsAttunementPrereq,
 } from "./capabilities.js";
+import { rollDie } from "./dice.js";
 import { logEvent } from "./events.js";
+import { applyHealInTx } from "./hitpoints.js";
 import { isEquippable } from "./items.js";
 import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
@@ -116,6 +118,15 @@ export interface ConsumableDetailInput {
   effectDiceFaces?: number;
   effectModifier?: number;
   effectDescription?: string;
+  maxUses?: number;
+  usesRemaining?: number;
+}
+
+// A consumable auto-applies its effect only when it heals (#121). Non-heal
+// effects are rolled + recorded but never applied server-side.
+export function isHealingConsumable(effectDescription: string | null | undefined): boolean {
+  if (!effectDescription) return false;
+  return /hit point|\bheal/i.test(effectDescription);
 }
 
 export interface CustomItemInput {
@@ -206,6 +217,18 @@ export interface UnattuneOperation {
   inventoryItemId: string;
 }
 
+// Consumes one use of a consumable (#121). Stackable (maxUses null) decrements
+// quantity; charged (maxUses set) decrements usesRemaining. Rolls the effect
+// dice (client-supplied for the 3D animation, else server-rolled) and
+// auto-applies ONLY healing through the HP domain. Logged + LIFO-undoable.
+export interface UseOperation {
+  type: "use";
+  inventoryItemId: string;
+  // Raw effect-die values. When present, length must equal effectDiceCount and
+  // each be in 1..effectDiceFaces; when absent the server rolls.
+  rolls?: number[];
+}
+
 export type InventoryOperation =
   | AcquireOperation
   | AdjustQuantityOperation
@@ -214,7 +237,22 @@ export type InventoryOperation =
   | SellOperation
   | SetEquippedOperation
   | AttuneOperation
-  | UnattuneOperation;
+  | UnattuneOperation
+  | UseOperation;
+
+// Per-use outcome surfaced to the client so it can play the 3D dice animation
+// and toast the result. `applied` is "heal" only when the effect auto-applied.
+export interface UseResult {
+  inventoryItemId: string;
+  itemName: string;
+  effectDescription: string | null;
+  rolls: number[];
+  effectModifier: number;
+  total: number | null;
+  applied: "heal" | null;
+  usesRemaining: number | null;
+  quantity: number | null;
+}
 
 async function getCharacterCurrency(tx: Prisma.TransactionClient, characterId: string): Promise<Currency> {
   const character = await tx.character.findUnique({ where: { id: characterId }, select: { currency: true } });
@@ -311,11 +349,15 @@ function normalizeArmorDetail(input: ArmorDetailInput) {
 }
 
 function normalizeConsumableDetail(input: ConsumableDetailInput) {
+  const maxUses = input.maxUses ?? null;
   return {
     effectDiceCount: input.effectDiceCount ?? null,
     effectDiceFaces: input.effectDiceFaces ?? null,
     effectModifier: input.effectModifier ?? null,
     effectDescription: input.effectDescription ?? null,
+    maxUses,
+    // A fresh charged consumable starts full: default usesRemaining to maxUses.
+    usesRemaining: input.usesRemaining ?? maxUses,
   };
 }
 
@@ -367,6 +409,9 @@ function snapshotItemDetail(item: CatalogItemWithDetails) {
             effectDiceFaces: item.consumableDetail.effectDiceFaces,
             effectModifier: item.consumableDetail.effectModifier,
             effectDescription: item.consumableDetail.effectDescription,
+            maxUses: item.consumableDetail.maxUses,
+            // A freshly-snapshotted charged consumable starts full.
+            usesRemaining: item.consumableDetail.usesRemaining ?? item.consumableDetail.maxUses,
           },
         }
       : undefined,
@@ -477,6 +522,8 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
           effectDiceFaces: item.consumableDetail.effectDiceFaces,
           effectModifier: item.consumableDetail.effectModifier,
           effectDescription: item.consumableDetail.effectDescription,
+          maxUses: item.consumableDetail.maxUses,
+          usesRemaining: item.consumableDetail.usesRemaining,
         }
       : null,
   };
@@ -722,6 +769,124 @@ export async function applyAdjustQuantity(
   } else {
     await tx.inventoryItem.update({ where: { id: item.id }, data: { quantity: nextQuantity } });
   }
+}
+
+// Consumes one use of a consumable (#121). Ammo is gear, not consumable, so it
+// is excluded here without any ammoKind dependency. Rolls the effect dice, logs
+// a `consumed` event with the roll in `data`, and auto-applies ONLY healing.
+async function applyUse(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: UseOperation,
+  batchId: string,
+  sessionId: string | null,
+): Promise<UseResult> {
+  const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
+  if (item.category !== "consumable") {
+    throw new InvalidInventoryOperationError(`${item.name} (${item.category}) is not a consumable`);
+  }
+  const detail = item.consumableDetail;
+  const charged = detail?.maxUses != null;
+
+  // Roll the effect dice (client-supplied for the 3D animation, else server-rolled).
+  const diceCount = detail?.effectDiceCount ?? 0;
+  const faces = detail?.effectDiceFaces ?? 0;
+  const modifier = detail?.effectModifier ?? 0;
+  let rolls: number[] = [];
+  let total: number | null = null;
+  if (diceCount > 0 && faces > 0) {
+    if (op.rolls) {
+      if (op.rolls.length !== diceCount || op.rolls.some((r) => r < 1 || r > faces)) {
+        throw new InvalidInventoryOperationError(
+          `${item.name} effect roll must be ${diceCount}d${faces}`,
+        );
+      }
+      rolls = op.rolls;
+    } else {
+      rolls = Array.from({ length: diceCount }, () => rollDie(faces));
+    }
+    total = rolls.reduce((sum, r) => sum + r, 0) + modifier;
+  }
+
+  // Decrement quantity (stackable) or usesRemaining (charged). A charged item at
+  // 0 uses stays with Use disabled until a long rest recharges it.
+  let before: Record<string, unknown>;
+  let after: Record<string, unknown> | null;
+  let deletedItem: DeletedInventoryItemSnapshot | undefined;
+  let remainingUses: number | null = null;
+  let remainingQty: number | null = null;
+
+  if (charged) {
+    const current = detail?.usesRemaining ?? 0;
+    if (current <= 0) {
+      throw new InvalidInventoryOperationError(`${item.name} has no uses remaining`);
+    }
+    remainingUses = current - 1;
+    before = { usesRemaining: current };
+    after = { usesRemaining: remainingUses };
+  } else {
+    if (item.quantity <= 0) {
+      throw new InvalidInventoryOperationError(`${item.name} has none left to use`);
+    }
+    remainingQty = item.quantity - 1;
+    before = { quantity: item.quantity };
+    after = remainingQty === 0 ? null : { quantity: remainingQty };
+    if (remainingQty === 0) deletedItem = snapshotInventoryItemForUndo(item);
+  }
+
+  // Auto-apply healing only — non-heal effects are rolled + recorded, not applied.
+  const healing = isHealingConsumable(detail?.effectDescription);
+  let applied: "heal" | null = null;
+  if (healing && total !== null && total > 0) {
+    await applyHealInTx(tx, characterId, total, batchId, sessionId, { source: item.name });
+    applied = "heal";
+  }
+
+  await logEvent(tx, {
+    characterId,
+    category: "inventory",
+    type: "consumed",
+    summary: total !== null ? `Used ${item.name} (rolled ${total})` : `Used ${item.name}`,
+    entityType: "InventoryItem",
+    entityId: item.id,
+    before,
+    after,
+    data: {
+      itemName: item.name,
+      use: true,
+      rolls,
+      effectModifier: modifier,
+      total,
+      applied,
+      effectDescription: detail?.effectDescription ?? null,
+      ...(deletedItem ? { deletedItem } : {}),
+    },
+    batchId,
+    sessionId,
+  });
+
+  if (charged) {
+    await tx.inventoryConsumableDetail.update({
+      where: { inventoryItemId: item.id },
+      data: { usesRemaining: remainingUses ?? 0 },
+    });
+  } else if (remainingQty === 0) {
+    await tx.inventoryItem.delete({ where: { id: item.id } });
+  } else {
+    await tx.inventoryItem.update({ where: { id: item.id }, data: { quantity: remainingQty ?? 0 } });
+  }
+
+  return {
+    inventoryItemId: item.id,
+    itemName: item.name,
+    effectDescription: detail?.effectDescription ?? null,
+    rolls,
+    effectModifier: modifier,
+    total,
+    applied,
+    usesRemaining: remainingUses,
+    quantity: remainingQty,
+  };
 }
 
 async function applyUpdate(tx: Prisma.TransactionClient, characterId: string, op: UpdateOperation) {
@@ -1048,14 +1213,26 @@ export async function revertInventoryEvent(
 
   // The row still exists → restore the scalar(s) captured in before
   // (quantity for partial sell/adjust, equipped for setEquipped, attuned for
-  // attune/unattune).
-  const before = event.before as { quantity?: number; equipped?: boolean; attuned?: boolean };
+  // attune/unattune, usesRemaining for a charged `use`).
+  const before = event.before as {
+    quantity?: number;
+    equipped?: boolean;
+    attuned?: boolean;
+    usesRemaining?: number;
+  };
   const updateData: Prisma.InventoryItemUpdateInput = {};
   if (before.quantity !== undefined) updateData.quantity = before.quantity;
   if (before.equipped !== undefined) updateData.equipped = before.equipped;
   if (before.attuned !== undefined) updateData.attuned = before.attuned;
   if (Object.keys(updateData).length > 0) {
     await tx.inventoryItem.update({ where: { id: event.entityId }, data: updateData });
+  }
+  // usesRemaining lives on the detail row, so restore it separately.
+  if (before.usesRemaining !== undefined) {
+    await tx.inventoryConsumableDetail.update({
+      where: { inventoryItemId: event.entityId },
+      data: { usesRemaining: before.usesRemaining },
+    });
   }
 }
 
@@ -1066,9 +1243,10 @@ export async function revertInventoryEvent(
 export async function applyInventoryOperations(
   characterId: string,
   operations: InventoryOperation[]
-): Promise<void> {
+): Promise<UseResult[]> {
   const batchId = randomUUID();
   const sessionId = await getActiveSessionId(characterId);
+  const useResults: UseResult[] = [];
   await prisma.$transaction(async (tx) => {
     for (const op of operations) {
       switch (op.type) {
@@ -1077,6 +1255,9 @@ export async function applyInventoryOperations(
           break;
         case "adjustQuantity":
           await applyAdjustQuantity(tx, characterId, op, batchId, sessionId);
+          break;
+        case "use":
+          useResults.push(await applyUse(tx, characterId, op, batchId, sessionId));
           break;
         case "update":
           await applyUpdate(tx, characterId, op);
@@ -1099,4 +1280,5 @@ export async function applyInventoryOperations(
       }
     }
   });
+  return useResults;
 }
