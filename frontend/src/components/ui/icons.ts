@@ -11,9 +11,19 @@ import {
   GiChestArmor,
   GiKnapsack,
   GiHealthPotion,
+  GiSwordWound,
+  GiShield,
+  GiVisoredHelm,
+  GiNecklaceDisplay,
+  GiCape,
+  GiGloves,
+  GiWalkingBoot,
+  GiBelt,
+  GiRing,
+  GiBracers,
 } from "react-icons/gi";
 
-import type { AbilityName, ItemCategory } from "@/types/character";
+import type { AbilityName, EquipSlot, ItemCategory } from "@/types/character";
 
 export const ABILITY_ICONS: Record<AbilityName, IconType> = {
   strength: GiBiceps,
@@ -29,6 +39,22 @@ export const ITEM_CATEGORY_ICONS: Record<ItemCategory, IconType> = {
   armor: GiChestArmor,
   gear: GiKnapsack,
   consumable: GiHealthPotion,
+};
+
+// Paper-doll slot glyphs (#566) — game-icons.net via react-icons/gi. RING shares
+// the ring glyph across both sub-slots. CC BY 3.0 attribution lives on /about.
+export const EQUIP_SLOT_ICONS: Record<EquipSlot, IconType> = {
+  MAIN_HAND: GiSwordWound,
+  OFF_HAND: GiShield,
+  BODY: GiChestArmor,
+  HEAD: GiVisoredHelm,
+  NECK: GiNecklaceDisplay,
+  CLOAK: GiCape,
+  HANDS: GiGloves,
+  WRISTS: GiBracers,
+  BELT: GiBelt,
+  FEET: GiWalkingBoot,
+  RING: GiRing,
 };
 
 export { GiQuillInk, GiKnapsack, GiSpellBook, GiHealthNormal } from "react-icons/gi";

@@ -262,6 +262,20 @@ export interface ItemProficiencyGrant {
  * to diverge from the catalog (e.g. renaming "Club" to "Club +1" and
  * bumping its own `weapon.damageModifier` after a magic bonus).
  */
+/** Paper-doll placement slot (#565) — mirrors backend's EquipSlot enum. */
+export type EquipSlot =
+  | "MAIN_HAND"
+  | "OFF_HAND"
+  | "BODY"
+  | "HEAD"
+  | "NECK"
+  | "CLOAK"
+  | "HANDS"
+  | "WRISTS"
+  | "BELT"
+  | "FEET"
+  | "RING";
+
 export interface InventoryItem {
   id: string;
   itemId?: string;
@@ -272,6 +286,10 @@ export interface InventoryItem {
   cost?: Currency;
   description?: string;
   equipped: boolean;
+  /** The slot this item currently occupies (#565); absent = in the bag. */
+  equippedSlot?: EquipSlot;
+  /** Declared paper-doll slot for wearable gear (#565); absent = bag-only. */
+  slot?: EquipSlot;
   /** Attunement state (#546); the 3-item cap is derived, never stored. */
   attuned: boolean;
   /** Snapshotted from the source item — whether attunement is required to activate. */
@@ -407,6 +425,8 @@ export type InventoryOperation =
   | { type: "sell"; inventoryItemId: string; quantity?: number; currencyDelta: Currency }
   /** Equips or unequips an item. Unlike `update`, this IS logged on the timeline. */
   | { type: "setEquipped"; inventoryItemId: string; equipped: boolean }
+  /** Equips an item into an explicit paper-doll slot (#565); logged + undoable. */
+  | { type: "equip"; inventoryItemId: string; slot: EquipSlot }
   /** Attunes an item — enforces the derived 3-item cap + prereq server-side (#546). */
   | { type: "attune"; inventoryItemId: string }
   /** Ends attunement; always legal (#546). */
