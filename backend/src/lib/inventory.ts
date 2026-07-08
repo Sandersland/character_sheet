@@ -5,6 +5,7 @@ import {
   activatedMaxUses,
   activatedRechargeRest,
   type AttunementPrereqKind,
+  chargePoolOf,
   describeAttunementPrereq,
   meetsAttunementPrereq,
   readCapability,
@@ -657,12 +658,36 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
       valueDiceCount: c.valueDiceCount,
       valueDiceFaces: c.valueDiceFaces,
       valueDamageType: c.valueDamageType,
+      spellId: c.spellId,
+      spellName: c.spellName,
+      spellLevel: c.spellLevel,
+      castLevel: c.castLevel,
+      castResource: c.castResource,
+      castUses: c.castUses,
+      castConcentration: c.castConcentration,
+      dcMode: c.dcMode,
+      dcValue: c.dcValue,
+      attackMode: c.attackMode,
+      attackValue: c.attackValue,
       activation: c.activation,
       activatedDuration: c.activatedDuration,
       resourceKind: c.resourceKind,
       resourcePeriod: c.resourcePeriod,
       resourceCharges: c.resourceCharges,
       durationText: c.durationText,
+      grantType: c.grantType,
+      grantOn: c.grantOn,
+      grantValueKind: c.grantValueKind,
+      grantValue: c.grantValue,
+      cantBeSurprised: c.cantBeSurprised,
+      maxCharges: c.maxCharges,
+      rechargeDiceCount: c.rechargeDiceCount,
+      rechargeDiceFaces: c.rechargeDiceFaces,
+      rechargeBonus: c.rechargeBonus,
+      rechargeTrigger: c.rechargeTrigger,
+      chargeCost: c.chargeCost,
+      // Runtime counter: undo-of-delete restores the row verbatim, spend state included.
+      used: c.used,
     })),
     weaponDetail: item.weaponDetail
       ? {
@@ -1319,6 +1344,22 @@ async function applyActivate(
     throw new InvalidInventoryOperationError(`${item.name} has no uses remaining — recharges on a rest`);
   }
 
+  // A charges-costed activation (#555) spends chargeCost from the item's shared
+  // pool instead of the per-item activatedUsesSpent counter.
+  const pool = cap.resourceKind === "charges" ? chargePoolOf(item.capabilities) : null;
+  const chargeCost = cap.resourceKind === "charges" ? Math.max(1, cap.chargeCost) : null;
+  if (chargeCost != null) {
+    if (!pool) {
+      throw new InvalidInventoryOperationError(`${item.name} has no charges pool to spend from`);
+    }
+    const poolRemaining = Math.max(0, pool.cap.maxCharges - (pool.row.used ?? 0));
+    if (poolRemaining < chargeCost) {
+      throw new InvalidInventoryOperationError(
+        `${item.name} needs ${chargeCost} charge${chargeCost === 1 ? "" : "s"} — ${poolRemaining} remaining`,
+      );
+    }
+  }
+
   const duration = cap.duration === "untilRest" ? "until-rest" : "while-active";
   const restType = duration === "until-rest" ? (activatedRechargeRest(cap) ?? "long") : undefined;
   await appendActiveBuffInTx(
@@ -1341,18 +1382,44 @@ async function applyActivate(
   if (maxUses !== null) {
     await tx.inventoryItem.update({ where: { id: item.id }, data: { activatedUsesSpent: nextSpent } });
   }
+  // Charges path: spend the pool row (capabilityUsed before/after makes the
+  // revert restore the pool, symmetric with the activatedUsesSpent snapshots).
+  const poolUsedBefore = pool ? pool.row.used ?? 0 : null;
+  const poolUsedAfter = pool && chargeCost != null ? poolUsedBefore! + chargeCost : null;
+  if (pool && chargeCost != null) {
+    await tx.inventoryCapability.update({
+      where: { id: pool.row.id },
+      data: { used: { increment: chargeCost } },
+    });
+  }
 
-  const remaining = maxUses !== null ? maxUses - nextSpent : null;
+  const remaining =
+    pool && chargeCost != null
+      ? Math.max(0, pool.cap.maxCharges - poolUsedAfter!)
+      : maxUses !== null
+        ? maxUses - nextSpent
+        : null;
   await logEvent(tx, {
     characterId,
     category: "inventory",
     type: "activated",
-    summary: remaining !== null ? `Activated ${item.name} (${remaining} left)` : `Activated ${item.name}`,
+    summary:
+      pool && remaining !== null
+        ? `Activated ${item.name} (${remaining} charge${remaining === 1 ? "" : "s"} left)`
+        : remaining !== null
+          ? `Activated ${item.name} (${remaining} left)`
+          : `Activated ${item.name}`,
     entityType: "InventoryItem",
     entityId: item.id,
-    before: { activatedUsesSpent: item.activatedUsesSpent },
-    after: { activatedUsesSpent: nextSpent },
-    data: { itemName: item.name, remaining },
+    before: {
+      activatedUsesSpent: item.activatedUsesSpent,
+      ...(pool && chargeCost != null ? { capabilityUsed: { capabilityId: pool.row.id, used: poolUsedBefore } } : {}),
+    },
+    after: {
+      activatedUsesSpent: nextSpent,
+      ...(pool && chargeCost != null ? { capabilityUsed: { capabilityId: pool.row.id, used: poolUsedAfter } } : {}),
+    },
+    data: { itemName: item.name, remaining, ...(chargeCost != null ? { chargesSpent: chargeCost } : {}) },
     batchId,
     sessionId,
   });
@@ -1632,13 +1699,15 @@ export async function revertInventoryEvent(
 
   // The row still exists → restore the scalar(s) captured in before
   // (quantity for partial sell/adjust, equipped for setEquipped, attuned for
-  // attune/unattune, usesRemaining for a charged `use`, activatedUsesSpent for activate).
+  // attune/unattune, usesRemaining for a charged `use`, activatedUsesSpent for
+  // activate, capabilityUsed for a charges-pool spend).
   const before = event.before as {
     quantity?: number;
     equippedSlot?: EquipSlot | null;
     attuned?: boolean;
     activatedUsesSpent?: number;
     usesRemaining?: number;
+    capabilityUsed?: { capabilityId: string; used: number };
   };
   const updateData: Prisma.InventoryItemUpdateInput = {};
   if (before.quantity !== undefined) updateData.quantity = before.quantity;
@@ -1653,6 +1722,13 @@ export async function revertInventoryEvent(
     await tx.inventoryConsumableDetail.update({
       where: { inventoryItemId: event.entityId },
       data: { usesRemaining: before.usesRemaining },
+    });
+  }
+  // A charges-pool spend (#555) lives on the capability row — restore its counter.
+  if (before.capabilityUsed !== undefined) {
+    await tx.inventoryCapability.update({
+      where: { id: before.capabilityUsed.capabilityId },
+      data: { used: before.capabilityUsed.used },
     });
   }
 }

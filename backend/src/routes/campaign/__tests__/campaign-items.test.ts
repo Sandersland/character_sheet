@@ -287,6 +287,73 @@ describe("campaign items (#380)", () => {
     expect(persisted[0].kind).toBe("passiveBonus");
   });
 
+  // Wand of Magic Missiles' pool + a charges-costed cast (#555).
+  const wandPool = {
+    kind: "charges" as const,
+    maxCharges: 7,
+    recharge: { trigger: "dawn" as const, dice: { count: 1, faces: 6 }, bonus: 1 },
+  };
+  const chargesCast = {
+    kind: "castSpell" as const,
+    spellId: "spell-mm",
+    spellName: "Magic Missile",
+    spellLevel: 1,
+    castLevel: 1,
+    resource: "charges" as const,
+    chargeCost: 1,
+    dcMode: "fixed" as const,
+    attackMode: "fixed" as const,
+  };
+
+  it("authors a charges pool + charges-costed castSpell and round-trips the editor shape (#555)", async () => {
+    const res = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({ name: "Wand of Magic Missiles", category: "gear", rarity: "UNCOMMON", capabilities: [wandPool, chargesCast] });
+    expect(res.status).toBe(201);
+    expect(res.body.capabilities).toHaveLength(2);
+    // The serialized pool matches the input shape 1:1 (round-trips the DM editor).
+    expect(res.body.capabilities[0]).toEqual({
+      kind: "charges",
+      maxCharges: 7,
+      recharge: { trigger: "dawn", dice: { count: 1, faces: 6 }, bonus: 1 },
+    });
+    expect(res.body.capabilities[1]).toMatchObject({ kind: "castSpell", resource: "charges", chargeCost: 1 });
+
+    const persisted = await prisma.campaignItemCapability.findMany({
+      where: { campaignItemId: res.body.id },
+      orderBy: { kind: "asc" },
+    });
+    const pool = persisted.find((c) => c.kind === "charges")!;
+    expect(pool).toMatchObject({ maxCharges: 7, rechargeDiceCount: 1, rechargeDiceFaces: 6, rechargeBonus: 1, rechargeTrigger: "dawn" });
+  });
+
+  it("rejects two charges pools on one item with 400 (#555)", async () => {
+    const res = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({ name: "Two Pools", category: "gear", capabilities: [wandPool, { ...wandPool, maxCharges: 3 }] });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain("at most one charges pool");
+  });
+
+  it("rejects a charges-costed castSpell without a pool with 400 (#555)", async () => {
+    const res = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({ name: "Poolless Wand", category: "gear", capabilities: [chargesCast] });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain("requires a charges pool");
+  });
+
+  it("rejects a non-positive maxCharges with 400 (#555)", async () => {
+    const res = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/items`)
+      .set("Cookie", cookieOwner)
+      .send({ name: "Empty Pool", category: "gear", capabilities: [{ ...wandPool, maxCharges: 0 }] });
+    expect(res.status).toBe(400);
+  });
+
   it("rejects an unknown capability field with 400 (strict schema)", async () => {
     const res = await supertest(app)
       .post(`/api/campaigns/${campaignId}/items`)

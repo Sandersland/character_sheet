@@ -1,7 +1,7 @@
 // Item-capability adapter (#545). Mirrors readEffectSpec (effects.ts) and
 // readAbilityCost (ability-cost.ts): a flat-column side-table row → a typed,
-// kind-discriminated Capability. passiveBonus, castSpell (#528), and grant (#529)
-// are materialized; the remaining reserved kinds (charges/activatedEffect) read as opaque.
+// kind-discriminated Capability. All five kinds are materialized: passiveBonus,
+// castSpell (#528), grant (#529), activatedEffect (#543), charges (#555).
 
 import { casterFractionFor } from "./srd.js";
 
@@ -33,7 +33,7 @@ export type AttunementPrereqKind = (typeof ATTUNEMENT_PREREQ_KINDS)[number];
 
 // castSpell resource + stat-mode enums (#528), value tuples so the route schema
 // and the frontend option lists share one source of truth with the types below.
-export const CAST_RESOURCES = ["perRestShort", "perRestLong", "perDayDawn", "perDayDusk", "atWill"] as const;
+export const CAST_RESOURCES = ["perRestShort", "perRestLong", "perDayDawn", "perDayDusk", "atWill", "charges"] as const;
 export type CastResource = (typeof CAST_RESOURCES)[number];
 
 export const CAST_STAT_MODES = ["fixed", "wielder"] as const;
@@ -43,8 +43,13 @@ export type CastStatMode = (typeof CAST_STAT_MODES)[number];
 // ItemResourceKind / ItemResourcePeriod schema enums.
 export type ActivationType = "action" | "bonus" | "reaction" | "commandWord";
 export type ActivatedDurationKind = "whileActive" | "untilRest";
-export type ItemResourceKind = "perRest" | "perDay" | "atWill";
+export type ItemResourceKind = "perRest" | "perDay" | "atWill" | "charges";
 export type ItemResourcePeriod = "short" | "long" | "dawn" | "dusk";
+
+// Recharge triggers for a charges pool (#555) — the ItemResourcePeriod values,
+// as a tuple so the route schema and frontend option list share one source.
+export const CHARGE_TRIGGERS = ["short", "long", "dawn", "dusk"] as const;
+export type ChargeTrigger = (typeof CHARGE_TRIGGERS)[number];
 
 // grant kind (#529). "sense"/"movement" are reserved: valid enum values the DM
 // can't yet author and no derivation consumes them.
@@ -96,6 +101,8 @@ export interface CastSpellCapability {
   dcValue?: number | null;
   attackMode: CastStatMode;
   attackValue?: number | null;
+  // Pool charges spent per cast when resource is "charges" (#555); 1 when unset.
+  chargeCost: number;
   description?: string | null;
 }
 
@@ -113,6 +120,8 @@ export interface ActivatedEffectCapability {
   resourceKind: ItemResourceKind;
   resourcePeriod?: ItemResourcePeriod | null;
   resourceCharges: number;
+  // Pool charges spent per activation when resourceKind is "charges" (#555).
+  chargeCost: number;
   durationText?: string | null;
   description?: string | null;
 }
@@ -130,10 +139,26 @@ export interface GrantCapability {
   description?: string | null;
 }
 
-// A reserved (not-yet-implemented) capability — surfaced as opaque so callers can
-// skip it without a schema change when the real payload lands.
+// The item's shared charge pool (#555) — at most one per item. Spending
+// capabilities (castSpell/activatedEffect with a `charges` resource) draw from
+// it implicitly; remaining = maxCharges − the row's `used` counter (derived,
+// never stored). Null recharge dice = full refill on the trigger.
+export interface ChargesCapability {
+  kind: "charges";
+  maxCharges: number;
+  rechargeTrigger: ChargeTrigger;
+  rechargeDice?: { count: number; faces: number } | null;
+  rechargeBonus?: number | null;
+  description?: string | null;
+}
+
+// A malformed capability row (e.g. a charges row missing maxCharges) reads as
+// opaque so callers skip payload fields rather than throw. All five kinds are
+// materialized, so the Exclude<> is `never`: no well-formed row lands here, and
+// the fallback cast in readCapability is the single escape hatch. (Kept literal
+// so discriminant narrowing on Capability.kind stays sound.)
 export interface OpaqueCapability {
-  kind: Exclude<CapabilityKind, "passiveBonus" | "castSpell" | "activatedEffect" | "grant">;
+  kind: Exclude<CapabilityKind, "passiveBonus" | "castSpell" | "activatedEffect" | "grant" | "charges">;
   description?: string | null;
 }
 
@@ -142,6 +167,7 @@ export type Capability =
   | CastSpellCapability
   | ActivatedEffectCapability
   | GrantCapability
+  | ChargesCapability
   | OpaqueCapability;
 
 // Number of uses a castSpell capability has per recharge period. atWill is
@@ -153,10 +179,20 @@ export function castUsesTotal(cap: CastSpellCapability): number {
 
 // Does a castSpell resource recharge on the given rest? perRestShort recharges on
 // a short OR long rest; perRestLong and the perDay dawn/dusk approximations recharge
-// on a long rest only; atWill never tracks uses (nothing to reset).
+// on a long rest only; atWill never tracks uses (nothing to reset). charges spends
+// the item's shared pool — the POOL recharges (rechargeItemChargePoolsOnRest),
+// never the capability's own counter.
 export function castResourceRechargesOn(resource: string, rest: "short" | "long"): boolean {
-  if (resource === "atWill") return false;
+  if (resource === "atWill" || resource === "charges") return false;
   if (resource === "perRestShort") return true; // short or long
+  return rest === "long";
+}
+
+// Does a charges pool's recharge trigger fire on the given rest? `short` fires on
+// a short OR long rest; `long` and the dawn/dusk day-boundary approximations fire
+// on a long rest only (same convention as castResourceRechargesOn).
+export function chargeTriggerRechargesOn(trigger: ChargeTrigger, rest: "short" | "long"): boolean {
+  if (trigger === "short") return true; // short or long
   return rest === "long";
 }
 
@@ -194,6 +230,12 @@ export interface CapabilityColumns {
   grantValueKind?: string | null;
   grantValue?: string | null;
   cantBeSurprised?: boolean | null;
+  maxCharges?: number | null;
+  rechargeDiceCount?: number | null;
+  rechargeDiceFaces?: number | null;
+  rechargeBonus?: number | null;
+  rechargeTrigger?: string | null;
+  chargeCost?: number | null;
 }
 
 // Adapter over the flat capability columns — no per-kind tables. A malformed
@@ -214,6 +256,20 @@ export function readCapability(row: CapabilityColumns): Capability {
       dcValue: row.dcValue ?? null,
       attackMode: (row.attackMode as CastStatMode | null) ?? "fixed",
       attackValue: row.attackValue ?? null,
+      chargeCost: row.chargeCost ?? 1,
+      description: row.description ?? null,
+    };
+  }
+  if (row.kind === "charges" && row.maxCharges != null) {
+    return {
+      kind: "charges",
+      maxCharges: row.maxCharges,
+      rechargeTrigger: (row.rechargeTrigger as ChargeTrigger | null) ?? "dawn",
+      rechargeDice:
+        row.rechargeDiceCount && row.rechargeDiceFaces
+          ? { count: row.rechargeDiceCount, faces: row.rechargeDiceFaces }
+          : null,
+      rechargeBonus: row.rechargeBonus ?? null,
       description: row.description ?? null,
     };
   }
@@ -256,6 +312,7 @@ export function readCapability(row: CapabilityColumns): Capability {
       resourceKind: (row.resourceKind as ItemResourceKind) ?? "atWill",
       resourcePeriod: (row.resourcePeriod as ItemResourcePeriod) ?? null,
       resourceCharges: row.resourceCharges ?? 1,
+      chargeCost: row.chargeCost ?? 1,
       durationText: row.durationText ?? null,
       description: row.description ?? null,
     };
@@ -264,19 +321,56 @@ export function readCapability(row: CapabilityColumns): Capability {
 }
 
 // Max uses per recharge for an activatedEffect. atWill is unlimited (null = no
-// cap); perRest/perDay allow resourceCharges uses (default 1) per period.
+// cap); perRest/perDay allow resourceCharges uses (default 1) per period. A
+// charges-costed effect is gated by the item's shared pool, not a per-item
+// counter — null here (applyActivate spends the pool instead).
 export function activatedMaxUses(cap: ActivatedEffectCapability): number | null {
-  if (cap.resourceKind === "atWill") return null;
+  if (cap.resourceKind === "atWill" || cap.resourceKind === "charges") return null;
   return Math.max(1, cap.resourceCharges);
 }
 
 // The rest that recharges an activatedEffect's uses, or null when it never rests
-// (atWill). perRest(short) recharges on a short rest; perRest(long) and perDay
-// (dawn/dusk approximated to a rest) recharge on a long rest.
+// (atWill, or charges — the pool recharges itself). perRest(short) recharges on a
+// short rest; perRest(long) and perDay (dawn/dusk approximated) on a long rest.
 export function activatedRechargeRest(cap: ActivatedEffectCapability): "short" | "long" | null {
-  if (cap.resourceKind === "atWill") return null;
+  if (cap.resourceKind === "atWill" || cap.resourceKind === "charges") return null;
   if (cap.resourceKind === "perRest" && cap.resourcePeriod === "short") return "short";
   return "long";
+}
+
+// The item's shared charge pool (#555): the first well-formed kind=charges row,
+// paired with its raw row so callers keep the row's id/used fields. Authoring
+// enforces at most one pool per item; extra rows are ignored, not merged.
+export function chargePoolOf<T extends CapabilityColumns>(
+  rows: T[],
+): { cap: ChargesCapability; row: T } | null {
+  for (const row of rows) {
+    const cap = readCapability(row);
+    // Field-presence guard (same reasoning as activatedCapabilityOf): a malformed
+    // charges row falls through to opaque, which still carries kind "charges" at
+    // runtime — require maxCharges so it can't masquerade as the pool.
+    if (cap.kind === "charges" && "maxCharges" in cap) return { cap, row };
+  }
+  return null;
+}
+
+// Human phrasing for a pool's recharge: "regains 1d6+1 at dawn", "regains 1 at
+// dawn" (fixed amount), "refills on a long rest" (no dice, no bonus = full refill).
+export function describeChargeRecharge(cap: ChargesCapability): string {
+  const when =
+    cap.rechargeTrigger === "dawn"
+      ? "at dawn"
+      : cap.rechargeTrigger === "dusk"
+        ? "at dusk"
+        : cap.rechargeTrigger === "short"
+          ? "on a short rest"
+          : "on a long rest";
+  if (cap.rechargeDice) {
+    const bonus = cap.rechargeBonus ? `+${cap.rechargeBonus}` : "";
+    return `regains ${cap.rechargeDice.count}d${cap.rechargeDice.faces}${bonus} ${when}`;
+  }
+  if (cap.rechargeBonus) return `regains ${cap.rechargeBonus} ${when}`;
+  return `refills ${when}`;
 }
 
 // Human phrasing for an activation type (the reminder text prefix). Internal to
@@ -347,6 +441,11 @@ export interface SerializedCapability {
   grantValueKind?: GrantValueKind;
   grantValue?: string;
   cantBeSurprised?: boolean;
+  // charges pool (#555) — nested recharge mirrors the DM input shape.
+  maxCharges?: number;
+  recharge?: { trigger: ChargeTrigger; dice?: { count: number; faces: number }; bonus?: number };
+  // Pool cost on a spending castSpell/activatedEffect capability (omitted = 1).
+  chargeCost?: number;
 }
 
 // Serialize a capability row for the API (campaign item + inventory item alike),
@@ -367,6 +466,19 @@ export function serializeCapability(row: CapabilityColumns): SerializedCapabilit
       ...(cap.dcValue != null ? { dcValue: cap.dcValue } : {}),
       attackMode: cap.attackMode,
       ...(cap.attackValue != null ? { attackValue: cap.attackValue } : {}),
+      ...(cap.resource === "charges" ? { chargeCost: cap.chargeCost } : {}),
+      ...(cap.description ? { description: cap.description } : {}),
+    };
+  }
+  if (cap.kind === "charges") {
+    return {
+      kind: cap.kind,
+      maxCharges: cap.maxCharges,
+      recharge: {
+        trigger: cap.rechargeTrigger,
+        ...(cap.rechargeDice ? { dice: { count: cap.rechargeDice.count, faces: cap.rechargeDice.faces } } : {}),
+        ...(cap.rechargeBonus != null ? { bonus: cap.rechargeBonus } : {}),
+      },
       ...(cap.description ? { description: cap.description } : {}),
     };
   }
@@ -405,11 +517,14 @@ export function serializeCapability(row: CapabilityColumns): SerializedCapabilit
       resourceCharges: cap.resourceCharges,
       ...(cap.targetKey ? { targetKey: cap.targetKey } : {}),
       ...(cap.resourcePeriod ? { resourcePeriod: cap.resourcePeriod } : {}),
+      ...(cap.resourceKind === "charges" ? { chargeCost: cap.chargeCost } : {}),
       ...(cap.durationText ? { durationText: cap.durationText } : {}),
       ...(cap.description ? { description: cap.description } : {}),
     };
   }
-  return { kind: cap.kind, ...(cap.description ? { description: cap.description } : {}) };
+  // Malformed-row fallthrough (cap is OpaqueCapability, kind typed never) —
+  // emit the raw row's kind + description so the wire still names the payload.
+  return { kind: row.kind as CapabilityKind, ...(row.description ? { description: row.description } : {}) };
 }
 
 // The buffsByTarget channel key a scalar passiveBonus contributes to, or null

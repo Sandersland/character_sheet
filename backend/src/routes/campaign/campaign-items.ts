@@ -10,6 +10,7 @@ import {
   CAPABILITY_TARGETS,
   CAST_RESOURCES,
   CAST_STAT_MODES,
+  CHARGE_TRIGGERS,
   GRANT_TYPES,
   GRANT_VALUE_KINDS,
   serializeCapability,
@@ -154,11 +155,31 @@ const castSpellInputSchema = z
     castLevel: z.number().int().min(0).max(9),
     resource: z.enum(CAST_RESOURCES),
     uses: z.number().int().positive().optional(),
+    // Pool charges per cast (#555), meaningful only when resource is "charges".
+    chargeCost: z.number().int().positive().optional(),
     concentration: z.boolean().optional(),
     dcMode: z.enum(CAST_STAT_MODES),
     dcValue: z.number().int().optional(),
     attackMode: z.enum(CAST_STAT_MODES),
     attackValue: z.number().int().optional(),
+    description: z.string().optional(),
+  })
+  .strict();
+
+// A DM-authored charges pool (#555): the item's shared charge reservoir that
+// castSpell/activatedEffect capabilities with a `charges` resource spend from.
+// At most one per item (enforced on the capabilities array below).
+const chargesInputSchema = z
+  .object({
+    kind: z.literal("charges"),
+    maxCharges: z.number().int().positive(),
+    recharge: z
+      .object({
+        trigger: z.enum(CHARGE_TRIGGERS),
+        dice: z.object({ count: z.number().int().positive(), faces: z.number().int().positive() }).strict().optional(),
+        bonus: z.number().int().positive().optional(),
+      })
+      .strict(),
     description: z.string().optional(),
   })
   .strict();
@@ -178,7 +199,31 @@ const grantInputSchema = z
   })
   .strict();
 
-const capabilityInputSchema = z.discriminatedUnion("kind", [passiveBonusInputSchema, castSpellInputSchema, grantInputSchema]);
+const capabilityInputSchema = z.discriminatedUnion("kind", [
+  passiveBonusInputSchema,
+  castSpellInputSchema,
+  grantInputSchema,
+  chargesInputSchema,
+]);
+
+// Item-level charges-pool rules (#555): at most ONE pool per item (the spend path
+// resolves "the item's pool" implicitly), and a charges-costed castSpell needs a
+// pool to spend from. Runs on the capabilities array so create + update share it.
+function refineChargesPool(caps: z.infer<typeof capabilityInputSchema>[], ctx: z.RefinementCtx) {
+  const pools = caps.filter((c) => c.kind === "charges");
+  if (pools.length > 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "an item can have at most one charges pool",
+    });
+  }
+  if (pools.length === 0 && caps.some((c) => c.kind === "castSpell" && c.resource === "charges")) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "a castSpell capability that spends charges requires a charges pool on the same item",
+    });
+  }
+}
 
 const baseFields = {
   name: z.string().min(1),
@@ -196,7 +241,7 @@ const baseFields = {
   weapon: weaponInputSchema.optional(),
   armor: armorInputSchema.optional(),
   consumable: consumableInputSchema.optional(),
-  capabilities: z.array(capabilityInputSchema).optional(),
+  capabilities: z.array(capabilityInputSchema).superRefine(refineChargesPool).optional(),
 };
 
 // Map a capability input onto the flat side-table columns.
@@ -216,6 +261,18 @@ function capabilityCreate(cap: z.infer<typeof capabilityInputSchema>) {
       dcValue: cap.dcValue ?? null,
       attackMode: cap.attackMode,
       attackValue: cap.attackValue ?? null,
+      chargeCost: cap.resource === "charges" ? cap.chargeCost ?? 1 : null,
+    };
+  }
+  if (cap.kind === "charges") {
+    return {
+      kind: cap.kind,
+      description: cap.description ?? null,
+      maxCharges: cap.maxCharges,
+      rechargeTrigger: cap.recharge.trigger,
+      rechargeDiceCount: cap.recharge.dice?.count ?? null,
+      rechargeDiceFaces: cap.recharge.dice?.faces ?? null,
+      rechargeBonus: cap.recharge.bonus ?? null,
     };
   }
   if (cap.kind === "grant") {

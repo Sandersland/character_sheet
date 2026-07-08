@@ -27,7 +27,12 @@ import { rollDie } from "./dice.js";
 import { deriveResources } from "./class-features.js";
 import { normalizeResourcesMutable, serializeResourcesState } from "./resources.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
-import { castResourceRechargesOn, readCapability, type CapabilityColumns } from "./capabilities.js";
+import {
+  castResourceRechargesOn,
+  chargeTriggerRechargesOn,
+  readCapability,
+  type CapabilityColumns,
+} from "./capabilities.js";
 
 export class InvalidHitPointOperationError extends Error {}
 
@@ -970,6 +975,52 @@ async function resetItemSpellUsesOnRest(
   return restored;
 }
 
+// Per-pool before/after snapshot entries for the rest event (undo restores `used`).
+interface ChargePoolSnapshot {
+  capabilityId: string;
+  itemName: string;
+  used: number;
+}
+
+// Recharge item charge pools (#555) whose trigger fires on this rest: regain the
+// server-rolled dice formula (dice-less + bonus-less = full refill) capped at max,
+// i.e. used = max(0, used − regained). Dawn/dusk approximate to a long rest (the
+// app's standing convention). Deliberately NOT gated on equipped/attuned — a wand
+// in the bag still recharges at dawn (same reasoning as consumable recharge).
+async function rechargeItemChargePoolsOnRest(
+  ctx: Pick<HpOpContext, "tx" | "row">,
+  rest: "short" | "long",
+): Promise<{ recharged: number; before: ChargePoolSnapshot[]; after: ChargePoolSnapshot[] }> {
+  const before: ChargePoolSnapshot[] = [];
+  const after: ChargePoolSnapshot[] = [];
+  let recharged = 0;
+  for (const item of ctx.row.inventoryItems ?? []) {
+    for (const col of item.capabilities) {
+      const cap = readCapability(col);
+      if (cap.kind !== "charges") continue;
+      const used = col.used ?? 0;
+      if (used <= 0) continue;
+      if (!chargeTriggerRechargesOn(cap.rechargeTrigger, rest)) continue;
+      let regained: number;
+      if (cap.rechargeDice) {
+        regained = cap.rechargeBonus ?? 0;
+        for (let i = 0; i < cap.rechargeDice.count; i++) regained += rollDie(cap.rechargeDice.faces);
+      } else if (cap.rechargeBonus) {
+        regained = cap.rechargeBonus; // fixed amount ("regains 1 charge daily at dawn")
+      } else {
+        regained = used; // no formula = full refill
+      }
+      const nextUsed = Math.max(0, used - regained);
+      if (nextUsed === used) continue;
+      before.push({ capabilityId: col.id, itemName: item.name, used });
+      after.push({ capabilityId: col.id, itemName: item.name, used: nextUsed });
+      await ctx.tx.inventoryCapability.update({ where: { id: col.id }, data: { used: nextUsed } });
+      recharged += used - nextUsed;
+    }
+  }
+  return { recharged, before, after };
+}
+
 async function applyShortRestOp(ctx: HpOpContext, op: ShortRestOperation): Promise<HpOpResult> {
   const { tx, characterId, row, hp, hd, conMod, faces, effMax } = ctx;
   const available = hd.total - hd.spent;
@@ -1049,6 +1100,7 @@ async function applyShortRestOp(ctx: HpOpContext, op: ShortRestOperation): Promi
   }
 
   const srItemSpellsRestored = await resetItemSpellUsesOnRest(ctx, "short");
+  const srChargePools = await rechargeItemChargePoolsOnRest(ctx, "short");
 
   const eventData: Record<string, unknown> = {
     rolls: op.rolls,
@@ -1059,11 +1111,19 @@ async function applyShortRestOp(ctx: HpOpContext, op: ShortRestOperation): Promi
     itemSpellsRestored: srItemSpellsRestored,
     beforeResourceState: beforeSrResourceState,
     ...(beforeSrSpellState ? { beforeSpellState: beforeSrSpellState } : {}),
+    ...(srChargePools.recharged > 0
+      ? {
+          itemChargesRecharged: srChargePools.recharged,
+          chargePoolsBefore: srChargePools.before,
+          chargePoolsAfter: srChargePools.after,
+        }
+      : {}),
   };
   const restParts: string[] = [`+${totalGain} HP`];
   if (srSlotsRestored > 0) restParts.push(`${srSlotsRestored} Pact slot${srSlotsRestored !== 1 ? "s" : ""} restored`);
   if (srResourcesRestored > 0) restParts.push(`resources restored`);
   if (srItemSpellsRestored > 0) restParts.push(`item spells restored`);
+  if (srChargePools.recharged > 0) restParts.push(`item charges recharged`);
   const summary = `Short rest — spent ${spending} hit ${spending === 1 ? "die" : "dice"}: ${restParts.join(", ")}`;
 
   // Write the resource reset (and any Pact slot restore) alongside HP in the
@@ -1138,6 +1198,7 @@ async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
   const afterResourceState = serializeResourcesState(resourceState);
 
   const itemSpellsRestored = await resetItemSpellUsesOnRest(ctx, "long");
+  const chargePools = await rechargeItemChargePoolsOnRest(ctx, "long");
 
   // Recharge limited-use consumables (#121): charged items (maxUses set) reset
   // to full. Inlined here rather than in lib/inventory.ts to avoid an import
@@ -1168,6 +1229,11 @@ async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
     eventData.consumableChargesBefore = consumableChargesBefore;
     eventData.consumableChargesAfter = consumableChargesAfter;
   }
+  if (chargePools.recharged > 0) {
+    eventData.itemChargesRecharged = chargePools.recharged;
+    eventData.chargePoolsBefore = chargePools.before;
+    eventData.chargePoolsAfter = chargePools.after;
+  }
   const parts: string[] = [];
   if (hpRestored > 0) parts.push(`+${hpRestored} HP`);
   else parts.push("HP already full");
@@ -1175,6 +1241,7 @@ async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
   if (resourcesRestored > 0) parts.push(`resources restored`);
   if (itemSpellsRestored > 0) parts.push(`item spells restored`);
   if (consumablesRecharged > 0) parts.push(`consumables recharged`);
+  if (chargePools.recharged > 0) parts.push(`item charges recharged`);
   const summary = `Long rest — ${parts.join(", ")}`;
 
   // Write spellcasting + resources; the dispatcher writes HP separately below.
@@ -1412,6 +1479,17 @@ export async function applyHitPointOperations(
           afterState.consumableCharges = data.consumableChargesAfter ?? data.consumableChargesBefore;
           delete data.consumableChargesBefore;
           delete data.consumableChargesAfter;
+        }
+      }
+      // Item charge-pool recharge (#555) — either rest can fire it (short-trigger
+      // pools recharge on short rests too); snapshot so undo re-expends the pool.
+      if (op.type === "shortRest" || op.type === "longRest") {
+        const data = eventData as Record<string, unknown>;
+        if (data.chargePoolsBefore !== undefined) {
+          beforeState.chargePools = data.chargePoolsBefore;
+          afterState.chargePools = data.chargePoolsAfter ?? data.chargePoolsBefore;
+          delete data.chargePoolsBefore;
+          delete data.chargePoolsAfter;
         }
       }
       if (op.type === "shortRest") {

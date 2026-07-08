@@ -5,7 +5,7 @@
 // Phase-D versioning concern (introduced uniformly with spells/items), not by
 // persisting grants ad-hoc.
 
-import { castUsesTotal, readCapability, type CapabilityColumns } from "./capabilities.js";
+import { castUsesTotal, chargePoolOf, readCapability, type CapabilityColumns } from "./capabilities.js";
 import type { SpellEntry } from "./spell-state.js";
 
 // The six ability scores, lowercase — the shape of Character.abilityScores.
@@ -83,11 +83,25 @@ export function deriveItemSpells(items: ItemSpellSourceItem[]): SpellEntry[] {
   const out: SpellEntry[] = [];
   for (const item of items) {
     if (!item.equipped && !item.attuned) continue;
+    // The item's shared charge pool (#555): charges-costed casts draw from it,
+    // so their uses columns mirror the pool's remaining/max. Resolved once per item.
+    const pool = chargePoolOf(item.capabilities);
     for (const col of item.capabilities) {
       const cap = readCapability(col);
       if (cap.kind !== "castSpell") continue;
-      const total = castUsesTotal(cap);
-      const used = col.used ?? 0;
+      let total: number;
+      let remaining: number;
+      let poolCapabilityId: string | null = null;
+      if (cap.resource === "charges") {
+        // No pool on the item = misauthored (authoring forbids it): exhausted, not a crash.
+        total = pool ? pool.cap.maxCharges : 0;
+        remaining = pool ? Math.max(0, pool.cap.maxCharges - (pool.row.used ?? 0)) : 0;
+        poolCapabilityId = pool?.row.id ?? null;
+      } else {
+        total = castUsesTotal(cap);
+        const used = col.used ?? 0;
+        remaining = total === Infinity ? Infinity : Math.max(0, total - used);
+      }
       out.push({
         id: `item:${item.id}:${cap.spellId}:${col.id}`,
         spellId: cap.spellId,
@@ -107,12 +121,13 @@ export function deriveItemSpells(items: ItemSpellSourceItem[]): SpellEntry[] {
           itemName: item.name,
           castLevel: cap.castLevel,
           resource: cap.resource,
-          usesRemaining: total === Infinity ? Infinity : Math.max(0, total - used),
+          usesRemaining: remaining,
           usesTotal: total,
           dcMode: cap.dcMode,
           dc: cap.dcMode === "fixed" ? cap.dcValue ?? null : null,
           attackMode: cap.attackMode,
           attack: cap.attackMode === "fixed" ? cap.attackValue ?? null : null,
+          ...(cap.resource === "charges" ? { poolCapabilityId, chargeCost: cap.chargeCost } : {}),
         },
       });
     }

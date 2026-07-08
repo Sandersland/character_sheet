@@ -429,6 +429,18 @@ model CampaignItemCapability {
   grantValue      String?
   cantBeSurprised Boolean @default(false)
 
+  // charges payload (#555): the item's shared charge pool — at most ONE charges
+  // row per item (authoring-enforced). All-null recharge dice = full refill on
+  // the trigger; dawn/dusk approximate to a long rest (see ItemResourcePeriod).
+  maxCharges        Int?
+  rechargeDiceCount Int?
+  rechargeDiceFaces Int?
+  rechargeBonus     Int?
+  rechargeTrigger   ItemResourcePeriod?
+  // Cost (in pool charges) paid by a castSpell/activatedEffect capability whose
+  // resource is `charges` (null = 1). Lives on the SPENDING capability's row.
+  chargeCost        Int?
+
   @@index([campaignItemId])
 }
 
@@ -699,12 +711,15 @@ enum CapabilityKind {
 
 // Recharge period of a castSpell capability's item resource (#528). atWill is
 // unlimited (no use tracking). perDay dawn/dusk approximate to a long rest.
+// charges (#555) spends the item's shared charge pool (chargeCost per cast)
+// instead of a per-capability counter.
 enum CapabilityCastResource {
   perRestShort
   perRestLong
   perDayDawn
   perDayDusk
   atWill
+  charges
 }
 
 // Whether a castSpell DC / attack bonus is a fixed item value or resolves to the
@@ -754,11 +769,13 @@ enum ActivatedDuration {
 }
 
 // The recharge model for an activatedEffect's uses (#543). perRest/perDay bound
-// the uses per period; atWill is unlimited (never spends).
+// the uses per period; atWill is unlimited (never spends). charges (#555) spends
+// the item's shared charge pool (chargeCost per activation).
 enum ItemResourceKind {
   perRest
   perDay
   atWill
+  charges
 }
 
 // The period an ItemResourceKind recharges over (#543). short|long pair with
@@ -1164,6 +1181,16 @@ model InventoryCapability {
   grantValueKind  String?
   grantValue      String?
   cantBeSurprised Boolean @default(false)
+
+  // charges payload (#555) — snapshot twin of CampaignItemCapability. On a
+  // kind=charges row, `used` below is the POOL's spend counter (remaining is
+  // derived as maxCharges − used, never stored).
+  maxCharges        Int?
+  rechargeDiceCount Int?
+  rechargeDiceFaces Int?
+  rechargeBonus     Int?
+  rechargeTrigger   ItemResourcePeriod?
+  chargeCost        Int?
 
   // Runtime use counter — inventory-only (not an authored field). Reset on the
   // matching rest by the HP rest handlers; never copied on award.
