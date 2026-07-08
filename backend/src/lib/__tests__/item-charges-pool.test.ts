@@ -9,6 +9,7 @@ import { applyInventoryOperations } from "../inventory.js";
 import { applySpellcastingOperations } from "../spellcasting.js";
 import { prisma } from "../prisma.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
+import type { SpellEntry } from "../spell-state.js";
 
 const OWNER_ID = "owner-item-charges-pool";
 
@@ -290,7 +291,8 @@ describe("item charges pool (#555)", () => {
     expect(wire.charges).toEqual({ max: 7, remaining: 5, recharge: "regains 1d6+1 at dawn" });
 
     // The pool-backed spell mirrors the POOL's remaining/max + carries its cost.
-    const spell = sheet.spellcasting?.spells.find((s) => s.source === "item" && s.item?.inventoryItemId === item.id);
+    const sc = sheet.spellcasting as { spells?: SpellEntry[] } | undefined;
+    const spell = sc?.spells?.find((s) => s.source === "item" && s.item?.inventoryItemId === item.id);
     expect(spell?.item).toMatchObject({ usesTotal: 7, usesRemaining: 5, chargeCost: 3 });
 
     // The activated readout floors remaining/cost: 5 remaining / cost 2 → 2 uses.
@@ -308,12 +310,13 @@ describe("item charges pool (#555)", () => {
     expect((await poolRow(item.id)).used).toBe(3); // pool untouched
     const sheet = await serialize(characterId);
     // A non-caster with no remaining item spells has no spellcasting section at all.
-    expect(sheet.spellcasting?.spells.some((s) => s.item?.inventoryItemId === item.id) ?? false).toBe(false);
+    const sc = sheet.spellcasting as { spells?: SpellEntry[] } | undefined;
+    expect(sc?.spells?.some((s) => s.item?.inventoryItemId === item.id) ?? false).toBe(false);
 
     // Re-attune: the spend state is exactly where it was left.
     await applyInventoryOperations(characterId, [{ type: "attune", inventoryItemId: item.id }]);
-    const sheet2 = await serialize(characterId);
-    const spell = sheet2.spellcasting?.spells.find((s) => s.item?.inventoryItemId === item.id);
+    const sc2 = (await serialize(characterId)).spellcasting as { spells?: SpellEntry[] } | undefined;
+    const spell = sc2?.spells?.find((s) => s.item?.inventoryItemId === item.id);
     expect(spell?.item).toMatchObject({ usesRemaining: 4 });
   });
 });
