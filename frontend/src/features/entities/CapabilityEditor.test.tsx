@@ -107,7 +107,8 @@ describe("CapabilityEditor — castSpell DC/attack fields are conditional on the
 
   it("no DC/attack fields before a spell is chosen", async () => {
     render(<Harness />);
-    await screen.findByRole("option", { name: /Fireball/ });
+    await screen.findAllByRole("option", { name: /\(L\d+\)/ }); // catalog loaded
+
     expect(screen.queryByLabelText("Save DC")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Attack bonus")).not.toBeInTheDocument();
   });
