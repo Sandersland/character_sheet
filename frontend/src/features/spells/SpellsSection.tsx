@@ -86,6 +86,13 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
   // Unique spell levels present, in ascending order.
   const spellLevels = [...new Set(sortedSpells.map((s) => s.level))].sort((a, b) => a - b);
 
+  // Active while-active spell buffs (e.g. Mage Armor, #363) — a durable, non-
+  // concentration self-buff that stays until dismissed / a long rest. Scoped to
+  // buffs whose source is a spell in this book (excludes Rage / item buffs).
+  const dismissibleSpellBuffs = (character.activeEffects?.buffs ?? []).filter(
+    (b) => b.duration === "while-active" && spells.some((s) => s.id === b.sourceEntryId),
+  );
+
   // The spellcasting ability modifier (for healing bonus).
   const abilityScore = character.abilityScores[ability as AbilityName] ?? 10;
   const abilityMod = abilityModifier(abilityScore);
@@ -133,7 +140,9 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
       spellName: spell.name,
       total: castRoll.total,
       diceStr,
-      effectKind: spell.effectKind!,
+      // Only damage/heal spells produce a roll to display; a buff spell has no
+      // dice so computeCastRoll returned null and we never reach here (#363).
+      effectKind: spell.effectKind as "damage" | "heal",
       damageType: spell.damageType,
       slotLevel: isCantrip ? undefined : slotLevel,
     });
@@ -158,7 +167,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
         spellName: spell.name,
         total: castRoll.total,
         diceStr: `${castRoll.spec.count}d${castRoll.spec.faces}`,
-        effectKind: spell.effectKind,
+        effectKind: spell.effectKind as "damage" | "heal",
         damageType: spell.damageType,
       });
     }
@@ -193,6 +202,10 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
 
   function handleDropConcentration() {
     send([{ type: "dropConcentration" }]);
+  }
+
+  function handleDismissBuff(entryId: string) {
+    send([{ type: "dismissBuff", entryId }]);
   }
 
   // ── Available slots per spell (for the slot picker in SpellRow) ─────────────
@@ -267,6 +280,28 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
           </button>
         </div>
       )}
+
+      {/* ── Active while-active spell buffs (e.g. Mage Armor, #363) ── */}
+      {dismissibleSpellBuffs.map((buff) => (
+        <div
+          key={buff.id}
+          className="flex items-center justify-between gap-3 rounded-control border border-arcane-300 bg-arcane-50 px-4 py-2.5"
+          role="status"
+        >
+          <p className="text-sm text-arcane-800">
+            <span className="font-semibold">{buff.source}</span> active
+          </p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => handleDismissBuff(buff.sourceEntryId!)}
+            className="shrink-0 rounded bg-arcane-200 px-2.5 py-0.5 text-xs font-semibold text-arcane-800 hover:bg-arcane-300 disabled:opacity-40"
+            title={`Dismiss ${buff.source}`}
+          >
+            Dismiss
+          </button>
+        </div>
+      ))}
 
       {/* ── Spell slot meters ── */}
       {slots.length > 0 && (

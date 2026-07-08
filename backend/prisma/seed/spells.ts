@@ -25,7 +25,7 @@ export interface CatalogSpell {
     materialDescription?: string;
   };
   saveEffect?: "half" | "none"; // for save-based damage spells
-  effectKind?: "damage" | "heal";
+  effectKind?: "damage" | "heal" | "buff";
   effectDiceCount?: number;
   effectDiceFaces?: number;
   effectModifier?: number;    // flat bonus (e.g. +3 in "3d4+3" for Magic Missile)
@@ -34,6 +34,11 @@ export interface CatalogSpell {
   saveAbility?: string;
   upcastDicePerLevel?: number;
   cantripScaling?: boolean;
+  // AC-buff effect (#363): target consumed at the AC-assembly seam — "ac" (flat
+  // add, Shield of Faith +2), "acUnarmoredBase" (Mage Armor base 13+Dex),
+  // "acFloor" (Barkskin floor 16). buffModifier carries N.
+  buffTarget?: "ac" | "acUnarmoredBase" | "acFloor";
+  buffModifier?: number;
 }
 
 export const SPELLS: CatalogSpell[] = [
@@ -214,6 +219,28 @@ export const SPELLS: CatalogSpell[] = [
     description: "Touch a willing creature not wearing armor. Until the spell ends, the target's base AC becomes 13 + its Dexterity modifier. The spell ends if the target dons armor.",
     classes: ["wizard", "sorcerer"],
     components: { verbal: true, somatic: true, material: true, materialDescription: "a piece of cured leather" },
+    // Non-concentration → seeded as a while-active buff; ends on long rest, on
+    // dismiss, or when the wearer dons body armor (true-end equip hook, #363).
+    effectKind: "buff",
+    buffTarget: "acUnarmoredBase",
+    buffModifier: 13,
+  },
+  {
+    name: "Shield of Faith",
+    level: 1,
+    school: "abjuration",
+    castingTime: "1 bonus action",
+    range: "60 feet",
+    duration: "Concentration, up to 10 minutes",
+    description: "A shimmering field surrounds a creature of your choice within range, granting it a +2 bonus to AC for the duration.",
+    concentration: true,
+    classes: ["cleric", "paladin"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a small parchment with a bit of holy text written on it" },
+    // Flat +2 AC — rides the #383 additive `ac` breakdown channel; drops when
+    // concentration breaks.
+    effectKind: "buff",
+    buffTarget: "ac",
+    buffModifier: 2,
   },
   {
     name: "Shield",
@@ -278,6 +305,23 @@ export const SPELLS: CatalogSpell[] = [
     ritual: true,
   },
   // ── Level 2 ───────────────────────────────────────────────────────────────
+  {
+    name: "Barkskin",
+    level: 2,
+    school: "transmutation",
+    castingTime: "1 action",
+    range: "Touch",
+    duration: "Concentration, up to 1 hour",
+    description: "You touch a willing creature. Until the spell ends, the target's skin has a rough, bark-like appearance, and the target's AC can't be less than 16, regardless of what kind of armor it is wearing.",
+    concentration: true,
+    classes: ["druid", "ranger"],
+    components: { verbal: true, somatic: true, material: true, materialDescription: "a handful of oak bark" },
+    // AC floor 16 — applied last at the AC-assembly seam, stacking as a floor
+    // over armor/Dex; drops when concentration breaks.
+    effectKind: "buff",
+    buffTarget: "acFloor",
+    buffModifier: 16,
+  },
   {
     name: "Scorching Ray",
     level: 2,

@@ -292,6 +292,53 @@ export async function clearBuffByKeyInTx(
 }
 
 /**
+ * Clear every non-concentration durable buff aimed at a given target — used for a
+ * true-end hook that keys on the buff's *effect* rather than a per-character key
+ * (e.g. donning body armor ends Mage Armor, an "acUnarmoredBase" buff, #363; the
+ * equip path can't know the caster's per-character spell entry id). No-op + no
+ * event when none match. Logs a `buffCleared` event under "effects".
+ */
+export async function clearBuffsByTargetInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  target: string,
+  batchId: string,
+  sessionId: string | null,
+  reason: string,
+): Promise<void> {
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: { activeEffects: true },
+  });
+  if (!row) return;
+
+  const state = normalizeActiveEffectsMutable(row.activeEffects);
+  // Concentration buffs end via clearBuffsForSourceInTx; leave them alone here.
+  const matches = (b: ActiveBuff) => b.target === target && b.duration !== "concentration";
+  const dropped = state.buffs.filter(matches);
+  if (dropped.length === 0) return;
+  const before = snapshot(state);
+  state.buffs = state.buffs.filter((b) => !matches(b));
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: { activeEffects: serializeActiveEffectsState(state) },
+  });
+
+  await logEvent(tx, {
+    characterId,
+    category: "effects",
+    type: "buffCleared",
+    summary: `Cleared ${dropped[0].source} (${reason})`,
+    before,
+    after: snapshot(state),
+    data: { target, reason, clearedKeys: dropped.map((b) => b.key) },
+    batchId,
+    sessionId,
+  });
+}
+
+/**
  * Clear every "while-active" durable buff (e.g. Rage). Called when a blanket
  * event ends all combat self-buffs — falling unconscious (0 HP) or a long rest.
  * No-op + no event when none match. Logs a `buffCleared` event under "effects".

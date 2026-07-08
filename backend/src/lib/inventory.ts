@@ -14,6 +14,7 @@ import {
 import {
   appendActiveBuffInTx,
   clearBuffByKeyInTx,
+  clearBuffsByTargetInTx,
   normalizeActiveEffectsMutable,
 } from "./active-effects.js";
 import { rollDie } from "./dice.js";
@@ -574,6 +575,12 @@ async function equipIntoSlot(
   sessionId: string | null,
 ) {
   await tx.inventoryItem.update({ where: { id: item.id }, data: { equippedSlot: slot } });
+  // Donning body armor true-ends Mage Armor (an "acUnarmoredBase" buff) per RAW —
+  // "The spell ends if the target dons armor" — so it must be recast (#363).
+  // A shield (OFF_HAND) doesn't count; concentration AC buffs are unaffected.
+  if (slot === "BODY") {
+    await clearBuffsByTargetInTx(tx, characterId, "acUnarmoredBase", batchId, sessionId, `donned ${item.name}`);
+  }
   await logEvent(tx, {
     characterId,
     category: "inventory",

@@ -933,13 +933,19 @@ model Spell {
 
   // Structured effect data for auto-rolling at cast time (RollSpec-shaped,
   // mirrors ItemWeaponDetail / ItemConsumableDetail). null = utility spell.
-  effectKind         String?  // "damage" | "heal" — null means utility (no roll)
+  effectKind         String?  // "damage" | "heal" | "buff" — null means utility (no roll)
   effectDiceCount    Int?
   effectDiceFaces    Int?
   effectModifier     Int?     // flat bonus added after dice (e.g. +3 in "3d4+3")
   damageType         String?  // "fire" / "radiant" / etc. — for damage spells
   attackType         String?  // "attack" | "save" | null
   saveAbility        String?  // ability the target saves with, e.g. "dexterity"
+  // Passive-modifier (buff) effect (#363): applies a flat modifier to an AC/stat
+  // target while active. AC targets: "ac" (flat add), "acUnarmoredBase" (Mage
+  // Armor base override 13+Dex), "acFloor" (Barkskin floor). Duration derives from
+  // `concentration` (true → concentration, else while-active). null = not a buff.
+  buffTarget         String?
+  buffModifier       Int?
   // For save-based damage spells: "half" = half damage on a successful save
   // (Fireball), "none" = no damage on save. null for attack spells / utility.
   saveEffect         String?
