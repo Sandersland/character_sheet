@@ -87,6 +87,57 @@ describe("capability snapshot on award (#545)", () => {
     expect(dice).toMatchObject({ valueDiceCount: 1, valueDiceFaces: 6, valueDamageType: "fire" });
   });
 
+  it("snapshots the charges pool columns; the awarded pool starts full (used = 0) (#555)", async () => {
+    const wand = await prisma.campaignItem.create({
+      data: {
+        campaignId,
+        name: "Wand of Magic Missiles",
+        category: "gear",
+        capabilities: {
+          create: [
+            {
+              kind: "charges",
+              maxCharges: 7,
+              rechargeDiceCount: 1,
+              rechargeDiceFaces: 6,
+              rechargeBonus: 1,
+              rechargeTrigger: "dawn",
+            },
+            {
+              kind: "castSpell",
+              spellId: "spell-mm",
+              spellName: "Magic Missile",
+              spellLevel: 1,
+              castLevel: 1,
+              castResource: "charges",
+              chargeCost: 1,
+              dcMode: "fixed",
+              attackMode: "fixed",
+            },
+          ],
+        },
+      },
+    });
+
+    await awardCampaignItem({ campaignId, campaignItemId: wand.id, characterId, quantity: 1 });
+
+    const row = await prisma.inventoryItem.findFirstOrThrow({
+      where: { characterId, campaignItemId: wand.id },
+      include: inventoryItemDetailInclude,
+    });
+    const pool = row.capabilities.find((c) => c.kind === "charges")!;
+    expect(pool).toMatchObject({
+      maxCharges: 7,
+      rechargeDiceCount: 1,
+      rechargeDiceFaces: 6,
+      rechargeBonus: 1,
+      rechargeTrigger: "dawn",
+      used: 0, // runtime counter never copied — awarded pool starts full
+    });
+    const cast = row.capabilities.find((c) => c.kind === "castSpell")!;
+    expect(cast).toMatchObject({ castResource: "charges", chargeCost: 1 });
+  });
+
   it("keeps the snapshot after the source CampaignItem is deleted (provenance FK SetNull)", async () => {
     await awardCampaignItem({ campaignId, campaignItemId, characterId, quantity: 1 });
     await prisma.campaignItem.delete({ where: { id: campaignItemId } });

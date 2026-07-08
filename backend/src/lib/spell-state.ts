@@ -60,6 +60,11 @@ export interface ItemSpellMeta {
   dc?: number | null;         // resolved value when dcMode === "fixed"
   attackMode: "fixed" | "wielder";
   attack?: number | null;     // resolved value when attackMode === "fixed"
+  // Charges-pool fields (#555), present when resource === "charges": the pool
+  // row the cast spends from and its per-cast cost (usesRemaining/usesTotal
+  // then mirror the POOL's remaining/max, shared across the item's spells).
+  poolCapabilityId?: string | null;
+  chargeCost?: number;
 }
 
 /** Spell verbal/somatic/material component flags + optional material text. */

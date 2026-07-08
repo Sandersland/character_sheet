@@ -42,8 +42,24 @@ describe("capabilitySummary", () => {
     );
   });
 
-  it("falls back to description for a reserved (opaque) kind", () => {
+  it("falls back to description for a malformed charges cap (no maxCharges)", () => {
     expect(capabilitySummary({ kind: "charges", description: "3 charges of light" })).toBe("3 charges of light");
+  });
+
+  it("summarizes a charges pool (#555)", () => {
+    expect(
+      capabilitySummary({
+        kind: "charges",
+        maxCharges: 7,
+        recharge: { trigger: "dawn", dice: { count: 1, faces: 6 }, bonus: 1 },
+      }),
+    ).toBe("7 charges · regains 1d6+1 at dawn");
+    expect(capabilitySummary({ kind: "charges", maxCharges: 3, recharge: { trigger: "long" } })).toBe(
+      "3 charges · refills on a long rest",
+    );
+    expect(capabilitySummary({ kind: "charges", maxCharges: 1, recharge: { trigger: "dawn", bonus: 1 } })).toBe(
+      "1 charge · regains 1 at dawn",
+    );
   });
 
   it("routes a castSpell cap through castSpellSummary", () => {
@@ -56,6 +72,15 @@ describe("capabilitySummary", () => {
         dcValue: 15,
       }),
     ).toBe("Casts Witch Bolt · 1×/short rest · DC 15");
+  });
+
+  it("shows the pool cost on a charges-costed castSpell (#555)", () => {
+    expect(
+      capabilitySummary({ kind: "castSpell", spellName: "Magic Missile", resource: "charges", chargeCost: 3, dcMode: "fixed" }),
+    ).toBe("Casts Magic Missile · costs 3 charges");
+    expect(
+      capabilitySummary({ kind: "castSpell", spellName: "Magic Missile", resource: "charges", dcMode: "fixed" }),
+    ).toBe("Casts Magic Missile · costs 1 charge");
   });
 });
 
