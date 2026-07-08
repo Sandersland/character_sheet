@@ -55,7 +55,10 @@ function Harness({ onChange }: { onChange?: (caps: ItemCapability[]) => void }) 
 }
 
 async function pickSpell(spellId: string) {
-  await screen.findByRole("option", { name: /Fireball/ }); // catalog loaded
+  // Catalog loaded once any spell option (labelled "Name (L<n>)") is present —
+  // findAll (not findBy) so we don't key off one spell and don't trip the
+  // single-match rule when the mock has several.
+  await screen.findAllByRole("option", { name: /\(L\d+\)/ });
   await userEvent.selectOptions(screen.getByLabelText("Spell"), spellId);
 }
 
