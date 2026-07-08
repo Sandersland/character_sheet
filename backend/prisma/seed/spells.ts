@@ -34,9 +34,10 @@ export interface CatalogSpell {
   saveAbility?: string;
   upcastDicePerLevel?: number;
   cantripScaling?: boolean;
-  // AC-buff effect (#363): target consumed at the AC-assembly seam — "ac" (flat
-  // add, Shield of Faith +2), "acUnarmoredBase" (Mage Armor base 13+Dex),
-  // "acFloor" (Barkskin floor 16). buffModifier carries N.
+  // AC-buff effect (#363): target consumed at the AC-assembly seam. buffModifier
+  // is the ABSOLUTE value the target reads, not a delta — a flat add for "ac"
+  // (Shield of Faith 2), the full unarmored base for "acUnarmoredBase" (Mage Armor
+  // 13, not 3), the floor for "acFloor" (Barkskin 16).
   buffTarget?: "ac" | "acUnarmoredBase" | "acFloor";
   buffModifier?: number;
 }

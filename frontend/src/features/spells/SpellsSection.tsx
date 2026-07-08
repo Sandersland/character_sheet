@@ -136,16 +136,19 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
 
     const diceStr = `${castRoll.spec.count}d${castRoll.spec.faces}`;
 
-    setCastResult({
-      spellName: spell.name,
-      total: castRoll.total,
-      diceStr,
-      // Only damage/heal spells produce a roll to display; a buff spell has no
-      // dice so computeCastRoll returned null and we never reach here (#363).
-      effectKind: spell.effectKind as "damage" | "heal",
-      damageType: spell.damageType,
-      slotLevel: isCantrip ? undefined : slotLevel,
-    });
+    // Only damage/heal spells produce a roll to display; a buff spell has no dice
+    // (computeCastRoll returned null above). Narrow rather than cast so the roll
+    // banner stays correct even if a buff ever gains a secondary roll (#363).
+    if (spell.effectKind === "damage" || spell.effectKind === "heal") {
+      setCastResult({
+        spellName: spell.name,
+        total: castRoll.total,
+        diceStr,
+        effectKind: spell.effectKind,
+        damageType: spell.damageType,
+        slotLevel: isCantrip ? undefined : slotLevel,
+      });
+    }
 
     const ops: Parameters<typeof applySpellcastingTransactions>[1] = [
       isCantrip
@@ -162,12 +165,14 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
     // base level), so the effect dice must scale to castLevel — not spell.level.
     const castLevel = spell.item?.castLevel ?? spell.level;
     const castRoll = computeCastRoll(spell, character, castLevel);
-    if (castRoll && spell.effectKind) {
+    // Only a damage/heal roll produces a result banner; buff item-spells have no
+    // dice. Narrow explicitly rather than cast (#363).
+    if (castRoll && (spell.effectKind === "damage" || spell.effectKind === "heal")) {
       setCastResult({
         spellName: spell.name,
         total: castRoll.total,
         diceStr: `${castRoll.spec.count}d${castRoll.spec.faces}`,
-        effectKind: spell.effectKind as "damage" | "heal",
+        effectKind: spell.effectKind,
         damageType: spell.damageType,
       });
     }
