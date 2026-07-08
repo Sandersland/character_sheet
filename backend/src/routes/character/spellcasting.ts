@@ -111,6 +111,13 @@ const dropConcentrationOpSchema = z.object({
   type: z.literal("dropConcentration"),
 });
 
+// Dismiss an active while-active spell buff by its spell entry id (#363) — e.g.
+// ending Mage Armor early. Concentration buffs end via dropConcentration instead.
+const dismissBuffOpSchema = z.object({
+  type: z.literal("dismissBuff"),
+  entryId: z.string().min(1),
+});
+
 const operationSchema = z.discriminatedUnion("type", [
   castSpellOpSchema,
   castItemSpellOpSchema,
@@ -121,6 +128,7 @@ const operationSchema = z.discriminatedUnion("type", [
   prepareSpellOpSchema,
   unprepareSpellOpSchema,
   dropConcentrationOpSchema,
+  dismissBuffOpSchema,
 ]);
 
 const transactionsRequestSchema = z.object({

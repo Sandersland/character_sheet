@@ -27,6 +27,11 @@ export interface OpOutcome {
   eventType: string;
   summary: string;
   eventData: Record<string, unknown>;
+  // Extra sub-state folded into the logged event's before/after snapshots beyond
+  // the domain JSON the dispatcher captures. Item-spell casts use this to snapshot
+  // the spent InventoryCapability.used counter (#580) so undo can restore it.
+  beforeExtra?: Record<string, unknown>;
+  afterExtra?: Record<string, unknown>;
 }
 
 export interface CastAbilityContext {
@@ -173,13 +178,23 @@ export async function castAbilityInTx(ctx: CastAbilityContext, input: CastAbilit
   if (input.concentrates) {
     await handleConcentrationOnCast(ctx, { entryId: input.entryId, spellName: input.name });
   }
-  // Buffs ride concentration (no duration engine), so only seed one when the cast concentrates.
-  const buff = input.concentrates ? resolveBuffSpec(input.effect) : null;
+  // Seed a self-buff from the effect. A concentration cast's buff rides the
+  // concentration host (drops when it breaks); a non-concentration buff spell
+  // (e.g. Mage Armor, 8h ≈ a while-active toggle, #363) persists as `while-active`
+  // until dismissed, a long rest, or a true-end hook clears it.
+  const buff = resolveBuffSpec(input.effect);
   if (buff) {
     await appendActiveBuffInTx(
       ctx.tx,
       ctx.characterId,
-      { key: input.entryId, target: buff.target, modifier: buff.modifier, source: input.name, sourceEntryId: input.entryId, duration: "concentration" },
+      {
+        key: input.entryId,
+        target: buff.target,
+        modifier: buff.modifier,
+        source: input.name,
+        sourceEntryId: input.entryId,
+        duration: input.concentrates ? "concentration" : "while-active",
+      },
       ctx.batchId,
       ctx.sessionId,
     );

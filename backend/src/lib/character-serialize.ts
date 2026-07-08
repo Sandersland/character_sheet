@@ -967,18 +967,41 @@ export function serializeCharacter(row: CharacterWithRelations) {
     wearingHeavyArmor: bestArmor?.armorCategory === "heavy",
   });
 
+  // Mage Armor (#363): a spell buff sets the unarmored base to 13 + Dex — the
+  // highest-valued `acUnarmoredBase` buff becomes a best-of candidate in the
+  // unarmored formula (ignored while wearing body armor; the equip hook true-ends it).
+  const mageArmor = (buffTargets.acUnarmoredBase ?? []).reduce<{ label: string; value: number } | undefined>(
+    (best, c) => (best && best.value >= c.modifier ? best : { label: c.source, value: c.modifier }),
+    undefined,
+  );
   // Labeled AC addends; armorClass below is their exact sum (single source in srd.ts).
-  const acParts = deriveArmorClassParts(bestArmor, hasShield, dexMod, unarmoredDefense);
+  const acParts = deriveArmorClassParts(bestArmor, hasShield, dexMod, unarmoredDefense, mageArmor);
   // Defense fighting style only applies while wearing body armor (5e).
   const styleAc = bestArmor !== null ? deriveFightingStyleBonuses(fightingStyle).armorClass : 0;
   if (styleAc !== 0) acParts.push({ label: "Defense fighting style", value: styleAc });
   if (featBonuses.armorClass !== 0) acParts.push({ label: "Feats", value: featBonuses.armorClass });
-  // Active-item AC bonuses (#383): Ring/Cloak of Protection etc., each labeled per
-  // source. v1 applies only unconditional bonuses; a conditional one surfaces as
-  // reminder text (value 0) rather than being silently added.
+  // Active-item AC bonuses (#383) + flat AC spell buffs (Shield of Faith +2, #363):
+  // each labeled per source. v1 applies only unconditional bonuses; a conditional
+  // one surfaces as reminder text (value 0) rather than being silently added.
   for (const c of buffTargets.ac ?? []) {
     if (c.condition) acParts.push({ label: c.source, value: 0, reminder: c.condition });
     else acParts.push({ label: c.source, value: c.modifier });
+  }
+  // Barkskin (#363): AC can't drop below the floor while active — applied last,
+  // stacking over armor/Dex/buffs. Kept in the breakdown as a reconciling part so
+  // the labeled parts still sum to armorClass (a 0-value reminder when AC already
+  // meets the floor). Highest floor wins if several are active.
+  const acFloor = (buffTargets.acFloor ?? []).reduce<{ source: string; value: number } | undefined>(
+    (best, c) => (best && best.value >= c.modifier ? best : { source: c.source, value: c.modifier }),
+    undefined,
+  );
+  if (acFloor) {
+    const subtotal = acParts.reduce((total, p) => total + p.value, 0);
+    if (subtotal < acFloor.value) {
+      acParts.push({ label: `${acFloor.source} (floor ${acFloor.value})`, value: acFloor.value - subtotal });
+    } else {
+      acParts.push({ label: acFloor.source, value: 0, reminder: `floor ${acFloor.value}` });
+    }
   }
 
   return {

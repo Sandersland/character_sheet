@@ -19,7 +19,7 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma } from "../generated/prisma/client.js";
 import { castAbilityInTx, type CastTarget, type OpOutcome } from "./ability-cast.js";
-import { clearBuffsForSourceInTx } from "./active-effects.js";
+import { clearBuffByKeyInTx, clearBuffsForSourceInTx } from "./active-effects.js";
 import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";
 import { runCharacterTransaction } from "./character-transaction.js";
 import { readEffectSpec } from "./effects.js";
@@ -146,6 +146,12 @@ export interface DropConcentrationOperation {
   type: "dropConcentration";
 }
 
+/** Dismiss an active while-active spell buff by its spell entry id (#363). */
+export interface DismissBuffOperation {
+  type: "dismissBuff";
+  entryId: string;
+}
+
 export type SpellcastingOperation =
   | CastSpellOperation
   | CastItemSpellOperation
@@ -155,7 +161,8 @@ export type SpellcastingOperation =
   | ForgetSpellOperation
   | PrepareSpellOperation
   | UnprepareSpellOperation
-  | DropConcentrationOperation;
+  | DropConcentrationOperation
+  | DismissBuffOperation;
 
 // ── Per-op helper context + outcome ───────────────────────────────────────────
 // Each helper mutates ctx.state in place and returns an OpOutcome, or null for a
@@ -262,6 +269,9 @@ async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): 
       saveAbility: catalogSpell.saveAbility ?? undefined,
       upcastDicePerLevel: catalogSpell.upcastDicePerLevel ?? undefined,
       cantripScaling: catalogSpell.cantripScaling,
+      // AC/stat buff effect (#363) — snapshotted so cast resolves the buff.
+      buffTarget: catalogSpell.buffTarget ?? undefined,
+      buffModifier: catalogSpell.buffModifier ?? undefined,
     };
   } else {
     // Custom spell.
@@ -466,7 +476,11 @@ async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperat
   // Spend the item's resource (skip for at-will), persisted outside the spell
   // blob. Charges-costed casts increment the shared POOL row by chargeCost;
   // everything else increments the capability's own per-period counter by 1.
+  // Snapshot the row's used counter before/after so undo can refund it (#580) —
+  // mirrors the #555 activate-op capabilityUsed pattern.
   let poolUsedAfter: number | null = null;
+  let capabilityUsedBefore: { capabilityId: string; used: number } | null = null;
+  let capabilityUsedAfter: { capabilityId: string; used: number } | null = null;
   if (chargeCost != null) {
     if (!meta.poolCapabilityId) {
       throw new InvalidSpellcastingOperationError(`${meta.itemName} has no charges pool to spend from`);
@@ -491,15 +505,26 @@ async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperat
       select: { used: true },
     });
     poolUsedAfter = fresh.used;
+    capabilityUsedBefore = { capabilityId: meta.poolCapabilityId, used: fresh.used - chargeCost };
+    capabilityUsedAfter = { capabilityId: meta.poolCapabilityId, used: fresh.used };
   } else if (meta.usesTotal !== Infinity) {
-    await ctx.tx.inventoryCapability.update({
+    const updated = await ctx.tx.inventoryCapability.update({
       where: { id: meta.capabilityId },
       data: { used: { increment: 1 } },
+      select: { used: true },
     });
+    capabilityUsedBefore = { capabilityId: meta.capabilityId, used: updated.used - 1 };
+    capabilityUsedAfter = { capabilityId: meta.capabilityId, used: updated.used };
   }
 
   const dcText = dc != null ? ` (DC ${dc})` : attack != null ? ` (+${attack} to hit)` : "";
   outcome.summary += dcText;
+  // Fold the capability-used snapshot into the event's before/after so the
+  // spellcasting revert branch refunds the spent use/charges on undo (#580).
+  if (capabilityUsedBefore && capabilityUsedAfter) {
+    outcome.beforeExtra = { capabilityUsed: capabilityUsedBefore };
+    outcome.afterExtra = { capabilityUsed: capabilityUsedAfter };
+  }
   outcome.eventData = {
     ...outcome.eventData,
     source: "item",
@@ -532,6 +557,15 @@ async function applyDropConcentrationOp(ctx: SpellOpContext): Promise<OpOutcome 
     summary: `Stopped concentrating on ${prior.spellName}`,
     eventData: { droppedEntryId: prior.entryId, droppedSpellName: prior.spellName, reason: "manual" },
   };
+}
+
+// Dismiss an active while-active spell buff (e.g. ending Mage Armor early, #363).
+// The clear helper logs its own undoable `effects` event and no-ops when the buff
+// is absent or is concentration-scoped, so this returns null (no spellcasting-blob
+// change) and the dispatcher skips its own event.
+async function applyDismissBuffOp(ctx: SpellOpContext, op: DismissBuffOperation): Promise<OpOutcome | null> {
+  await clearBuffByKeyInTx(ctx.tx, ctx.characterId, op.entryId, ctx.batchId, ctx.sessionId, "dismissed");
+  return null;
 }
 
 // ── Transaction handler ───────────────────────────────────────────────────────
@@ -651,6 +685,7 @@ export async function applySpellcastingOperations(
         case "prepareSpell":
         case "unprepareSpell": outcome = applyPrepareSpellOp(ctx, op); break;
         case "dropConcentration": outcome = await applyDropConcentrationOp(ctx); break;
+        case "dismissBuff": outcome = await applyDismissBuffOp(ctx, op); break;
       }
       if (outcome === null) return;
 
@@ -685,8 +720,8 @@ export async function applySpellcastingOperations(
         category: "spellcasting",
         type: outcome.eventType as Parameters<typeof logEvent>[1]["type"],
         summary: outcome.summary,
-        before: beforeState,
-        after: afterState,
+        before: { ...beforeState, ...(outcome.beforeExtra ?? {}) },
+        after: { ...afterState, ...(outcome.afterExtra ?? {}) },
         data: outcome.eventData,
         batchId,
         sessionId,

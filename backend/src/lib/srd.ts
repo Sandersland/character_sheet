@@ -387,10 +387,24 @@ type UnarmoredDefense = { classNames: string[]; conMod: number; wisMod: number }
 const sumParts = (parts: ArmorClassPart[]) => parts.reduce((total, p) => total + p.value, 0);
 
 // Candidate part-lists for the unarmored formulas; the highest total wins (ties keep base).
-function bestUnarmoredParts(hasShield: boolean, dexMod: number, ud?: UnarmoredDefense): ArmorClassPart[] {
+// `unarmoredBaseOverride` (Mage Armor, #363) adds a `override + Dex` candidate — a
+// spell-granted unarmored base that competes best-of with 10+Dex and Unarmored Defense.
+function bestUnarmoredParts(
+  hasShield: boolean,
+  dexMod: number,
+  ud?: UnarmoredDefense,
+  unarmoredBaseOverride?: { label: string; value: number },
+): ArmorClassPart[] {
   const dexPart = dexMod !== 0 ? [{ label: "Dex", value: dexMod }] : [];
   const shieldPart = hasShield ? [{ label: "Shield", value: 2 }] : [];
   const candidates: ArmorClassPart[][] = [[{ label: "Unarmored", value: 10 }, ...dexPart, ...shieldPart]];
+  if (unarmoredBaseOverride) {
+    candidates.push([
+      { label: unarmoredBaseOverride.label, value: unarmoredBaseOverride.value },
+      ...dexPart,
+      ...shieldPart,
+    ]);
+  }
   const classes = ud?.classNames.map((n) => n.toLowerCase()) ?? [];
   if (ud && classes.includes("barbarian")) {
     candidates.push([
@@ -419,8 +433,12 @@ export function deriveArmorClassParts(
   hasShield: boolean,
   dexMod: number,
   unarmoredDefense?: UnarmoredDefense,
+  // Mage Armor (#363): a spell-granted unarmored base (label + value, e.g. 13),
+  // applied only while unarmored — donning body armor suppresses it here and the
+  // equip hook true-ends the buff.
+  unarmoredBaseOverride?: { label: string; value: number },
 ): ArmorClassPart[] {
-  if (armor === null) return bestUnarmoredParts(hasShield, dexMod, unarmoredDefense);
+  if (armor === null) return bestUnarmoredParts(hasShield, dexMod, unarmoredDefense, unarmoredBaseOverride);
   const parts: ArmorClassPart[] = [{ label: armor.name ?? "Armor", value: armor.baseArmorClass }];
   if (armor.armorCategory !== "heavy") {
     const cap = armor.armorCategory === "medium" ? (armor.dexModifierMax ?? 2) : null;
@@ -438,8 +456,9 @@ export function deriveArmorClass(
   hasShield: boolean,
   dexMod: number,
   unarmoredDefense?: UnarmoredDefense,
+  unarmoredBaseOverride?: { label: string; value: number },
 ): number {
-  return sumParts(deriveArmorClassParts(armor, hasShield, dexMod, unarmoredDefense));
+  return sumParts(deriveArmorClassParts(armor, hasShield, dexMod, unarmoredDefense, unarmoredBaseOverride));
 }
 
 // Monk Unarmored Movement speed bonus by monk level (PHB p.78): +10 at L2, rising
