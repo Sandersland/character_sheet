@@ -27,6 +27,11 @@ export interface OpOutcome {
   eventType: string;
   summary: string;
   eventData: Record<string, unknown>;
+  // Extra sub-state folded into the logged event's before/after snapshots beyond
+  // the domain JSON the dispatcher captures. Item-spell casts use this to snapshot
+  // the spent InventoryCapability.used counter (#580) so undo can restore it.
+  beforeExtra?: Record<string, unknown>;
+  afterExtra?: Record<string, unknown>;
 }
 
 export interface CastAbilityContext {

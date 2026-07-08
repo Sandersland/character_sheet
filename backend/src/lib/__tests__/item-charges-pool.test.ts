@@ -143,6 +143,20 @@ describe("item charges pool (#555)", () => {
     expect(data.poolCapabilityId).toBe((await poolRow(item.id)).id);
   });
 
+  it("undo of a charges-costed cast refunds the pool (#580)", async () => {
+    const item = await makeWand([WAND_POOL, chargesCast(spellId, { chargeCost: 3 })]);
+    const castCap = item.capabilities.find((c) => c.kind === "castSpell")!;
+    const entryId = await entryIdFor(item.id, castCap.id);
+
+    await applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId, roll: 9 }], OWNER_ID);
+    expect((await poolRow(item.id)).used).toBe(3);
+
+    const ev = await prisma.characterEvent.findFirstOrThrow({ where: { characterId, type: "castSpell" } });
+    const undone = await revertBatch(prisma, characterId, ev.batchId!);
+    expect(undone.ok).toBe(true);
+    expect((await poolRow(item.id)).used).toBe(0); // the 3 spent charges are refunded
+  });
+
   it("blocks a cast whose cost exceeds the remaining charges", async () => {
     const item = await makeWand([
       WAND_POOL,
