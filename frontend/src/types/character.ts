@@ -607,7 +607,7 @@ export interface Spell {
   components?: SpellComponents | null;
   saveEffect?: "half" | "none" | null;
   // Structured effect for auto-rolling at cast time (RollSpec-shaped):
-  effectKind?: "damage" | "heal" | null;
+  effectKind?: "damage" | "heal" | "buff" | null;
   effectDiceCount?: number | null;
   effectDiceFaces?: number | null;
   effectModifier?: number | null;
@@ -616,6 +616,10 @@ export interface Spell {
   saveAbility?: string | null;
   upcastDicePerLevel?: number | null;
   cantripScaling?: boolean;
+  // AC-buff effect (#363): applied server-side on cast; the FE treats a buff
+  // spell as no-roll (its AC change shows in armorClassBreakdown).
+  buffTarget?: string | null;
+  buffModifier?: number | null;
 }
 
 /**
@@ -638,7 +642,7 @@ export interface CatalogSpell {
   classes: string[];
   components?: SpellComponents | null;
   saveEffect?: "half" | "none" | null;
-  effectKind?: "damage" | "heal";
+  effectKind?: "damage" | "heal" | "buff";
   effectDiceCount?: number;
   effectDiceFaces?: number;
   effectModifier?: number;
@@ -647,6 +651,8 @@ export interface CatalogSpell {
   saveAbility?: string;
   upcastDicePerLevel?: number;
   cantripScaling: boolean;
+  buffTarget?: string;
+  buffModifier?: number;
 }
 
 /** Ki (or other pool) cost of an activated ability. Mirror of backend AbilityCost. */
@@ -1536,6 +1542,8 @@ export interface PrepareSpellOperation { type: "prepareSpell"; entryId: string }
 export interface UnprepareSpellOperation { type: "unprepareSpell"; entryId: string }
 /** End the active concentration spell manually. */
 export interface DropConcentrationOperation { type: "dropConcentration" }
+/** Dismiss an active while-active spell buff by its spell entry id (e.g. Mage Armor, #363). */
+export interface DismissBuffOperation { type: "dismissBuff"; entryId: string }
 
 export type SpellcastingOperation =
   | CastSpellOperation
@@ -1546,7 +1554,8 @@ export type SpellcastingOperation =
   | ForgetSpellOperation
   | PrepareSpellOperation
   | UnprepareSpellOperation
-  | DropConcentrationOperation;
+  | DropConcentrationOperation
+  | DismissBuffOperation;
 
 // ── Class operation types (mirrors backend/src/lib/class.ts) ─────────────────
 // Sent as `{ operations: ClassOperation[] }` to POST /api/characters/:id/class/transactions.

@@ -27,7 +27,7 @@ export interface SpellEntry {
   components?: SpellComponents | null;
   saveEffect?: string | null;    // "half" | "none" | null
   // Structured roll effect (snapshotted from catalog at learn time):
-  effectKind?: string | null;    // "damage" | "heal" | null (utility)
+  effectKind?: string | null;    // "damage" | "heal" | "buff" | null (utility)
   effectDiceCount?: number | null;
   effectDiceFaces?: number | null;
   effectModifier?: number | null; // flat bonus added to dice total
@@ -36,6 +36,11 @@ export interface SpellEntry {
   saveAbility?: string | null;
   upcastDicePerLevel?: number | null;
   cantripScaling?: boolean;
+  // AC/stat buff effect (#363): target consumed at the AC-assembly seam
+  // ("ac" | "acUnarmoredBase" | "acFloor") + the flat modifier. Present only
+  // for effectKind "buff"; snapshotted from the catalog at learn time.
+  buffTarget?: string | null;
+  buffModifier?: number | null;
   // Provenance of the entry; "subclass" marks a derived, non-persisted grant,
   // "item" a spell granted by a held magic item (#528, cast from the item).
   source?: "subclass" | "item";

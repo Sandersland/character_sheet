@@ -190,3 +190,29 @@ describe("deriveArmorClass — Unarmored Defense", () => {
     expect(deriveArmorClass(null, false, 2, ud(["Monk"], 0, 3))).toBe(15);
   });
 });
+
+describe("Mage Armor unarmored base override (#363)", () => {
+  const ud = (classNames: string[], conMod: number, wisMod: number) => ({ classNames, conMod, wisMod });
+  const mageArmor = { label: "Mage Armor", value: 13 };
+
+  it("sets the unarmored base to 13 + Dex, beating 10 + Dex", () => {
+    const parts = deriveArmorClassParts(null, false, 2, undefined, mageArmor);
+    expect(parts).toEqual([{ label: "Mage Armor", value: 13 }, { label: "Dex", value: 2 }]);
+    expect(parts.reduce((t, p) => t + p.value, 0)).toBe(15);
+  });
+
+  it("stacks a shield on top of the Mage Armor base", () => {
+    expect(deriveArmorClass(null, true, 2, undefined, mageArmor)).toBe(17); // 13 + 2 Dex + 2 shield
+  });
+
+  it("keeps the higher of Mage Armor and Unarmored Defense (best-of)", () => {
+    // Barbarian 10 + Dex2 + Con5 = 17 beats Mage Armor 13 + Dex2 = 15.
+    expect(deriveArmorClass(null, false, 2, ud(["barbarian"], 5, 0), mageArmor)).toBe(17);
+    // Mage Armor 13 + Dex2 = 15 beats a Con-less barbarian 10 + Dex2 = 12.
+    expect(deriveArmorClass(null, false, 2, ud(["barbarian"], 0, 0), mageArmor)).toBe(15);
+  });
+
+  it("is ignored while wearing body armor (suppressed at derive time)", () => {
+    expect(deriveArmorClass(leather, false, 2, undefined, mageArmor)).toBe(deriveArmorClass(leather, false, 2));
+  });
+});

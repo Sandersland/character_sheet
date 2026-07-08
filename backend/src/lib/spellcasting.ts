@@ -19,7 +19,7 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma } from "../generated/prisma/client.js";
 import { castAbilityInTx, type CastTarget, type OpOutcome } from "./ability-cast.js";
-import { clearBuffsForSourceInTx } from "./active-effects.js";
+import { clearBuffByKeyInTx, clearBuffsForSourceInTx } from "./active-effects.js";
 import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";
 import { runCharacterTransaction } from "./character-transaction.js";
 import { readEffectSpec } from "./effects.js";
@@ -146,6 +146,12 @@ export interface DropConcentrationOperation {
   type: "dropConcentration";
 }
 
+/** Dismiss an active while-active spell buff by its spell entry id (#363). */
+export interface DismissBuffOperation {
+  type: "dismissBuff";
+  entryId: string;
+}
+
 export type SpellcastingOperation =
   | CastSpellOperation
   | CastItemSpellOperation
@@ -155,7 +161,8 @@ export type SpellcastingOperation =
   | ForgetSpellOperation
   | PrepareSpellOperation
   | UnprepareSpellOperation
-  | DropConcentrationOperation;
+  | DropConcentrationOperation
+  | DismissBuffOperation;
 
 // ── Per-op helper context + outcome ───────────────────────────────────────────
 // Each helper mutates ctx.state in place and returns an OpOutcome, or null for a
@@ -262,6 +269,9 @@ async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): 
       saveAbility: catalogSpell.saveAbility ?? undefined,
       upcastDicePerLevel: catalogSpell.upcastDicePerLevel ?? undefined,
       cantripScaling: catalogSpell.cantripScaling,
+      // AC/stat buff effect (#363) — snapshotted so cast resolves the buff.
+      buffTarget: catalogSpell.buffTarget ?? undefined,
+      buffModifier: catalogSpell.buffModifier ?? undefined,
     };
   } else {
     // Custom spell.
@@ -549,6 +559,15 @@ async function applyDropConcentrationOp(ctx: SpellOpContext): Promise<OpOutcome 
   };
 }
 
+// Dismiss an active while-active spell buff (e.g. ending Mage Armor early, #363).
+// The clear helper logs its own undoable `effects` event and no-ops when the buff
+// is absent or is concentration-scoped, so this returns null (no spellcasting-blob
+// change) and the dispatcher skips its own event.
+async function applyDismissBuffOp(ctx: SpellOpContext, op: DismissBuffOperation): Promise<OpOutcome | null> {
+  await clearBuffByKeyInTx(ctx.tx, ctx.characterId, op.entryId, ctx.batchId, ctx.sessionId, "dismissed");
+  return null;
+}
+
 // ── Transaction handler ───────────────────────────────────────────────────────
 
 /**
@@ -666,6 +685,7 @@ export async function applySpellcastingOperations(
         case "prepareSpell":
         case "unprepareSpell": outcome = applyPrepareSpellOp(ctx, op); break;
         case "dropConcentration": outcome = await applyDropConcentrationOp(ctx); break;
+        case "dismissBuff": outcome = await applyDismissBuffOp(ctx, op); break;
       }
       if (outcome === null) return;
 
