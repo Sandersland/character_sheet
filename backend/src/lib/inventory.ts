@@ -1384,13 +1384,28 @@ async function applyActivate(
   }
   // Charges path: spend the pool row (capabilityUsed before/after makes the
   // revert restore the pool, symmetric with the activatedUsesSpent snapshots).
-  const poolUsedBefore = pool ? pool.row.used ?? 0 : null;
-  const poolUsedAfter = pool && chargeCost != null ? poolUsedBefore! + chargeCost : null;
+  // Atomic conditional spend (TOCTOU guard, same as applyCastItemSpellOp): the
+  // WHERE re-evaluates under the row's write lock so concurrent spenders can't
+  // push `used` past maxCharges; a loser's whole batch rolls back.
+  let poolUsedBefore: number | null = null;
+  let poolUsedAfter: number | null = null;
   if (pool && chargeCost != null) {
-    await tx.inventoryCapability.update({
-      where: { id: pool.row.id },
+    const spent = await tx.inventoryCapability.updateMany({
+      where: { id: pool.row.id, used: { lte: pool.cap.maxCharges - chargeCost } },
       data: { used: { increment: chargeCost } },
     });
+    if (spent.count === 0) {
+      throw new InvalidInventoryOperationError(
+        `${item.name} needs ${chargeCost} charge${chargeCost === 1 ? "" : "s"} — too few remaining`,
+      );
+    }
+    // Re-read for the event snapshot: under a race the pre-read `pool.row.used` is stale.
+    const fresh = await tx.inventoryCapability.findUniqueOrThrow({
+      where: { id: pool.row.id },
+      select: { used: true },
+    });
+    poolUsedAfter = fresh.used;
+    poolUsedBefore = fresh.used - chargeCost;
   }
 
   const remaining =

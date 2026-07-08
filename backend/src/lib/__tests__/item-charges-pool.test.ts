@@ -217,6 +217,26 @@ describe("item charges pool (#555)", () => {
     expect((await poolRow(item.id)).used).toBe(0);
   });
 
+  it("concurrent casts cannot overdraw the pool (atomic conditional spend)", async () => {
+    // TOCTOU regression (PR #579 review): under READ COMMITTED, concurrent
+    // transactions can each snapshot the same `used` and all pass the derived
+    // remaining-check. The conditional increment (used <= max - cost) must let
+    // exactly two cost-3 casts through a 7-charge pool, never pushing used past 7.
+    const item = await makeWand([WAND_POOL, chargesCast(spellId, { chargeCost: 3 })]);
+    const castCap = item.capabilities.find((c) => c.kind === "castSpell")!;
+    const entryId = await entryIdFor(item.id, castCap.id);
+
+    const results = await Promise.allSettled(
+      Array.from({ length: 3 }, () =>
+        applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId, roll: 9 }], OWNER_ID),
+      ),
+    );
+    const succeeded = results.filter((r) => r.status === "fulfilled").length;
+    expect(succeeded).toBe(2); // 7 charges afford exactly two cost-3 casts
+    const used = (await poolRow(item.id)).used;
+    expect(used).toBe(6);
+  });
+
   it("recharges 1d6+1 at dawn on a long rest (bounded, capped at max) and undo re-expends", async () => {
     const item = await makeWand([WAND_POOL, chargesCast(spellId)]);
     await prisma.inventoryCapability.updateMany({ where: { inventoryItemId: item.id, kind: "charges" }, data: { used: 7 } });

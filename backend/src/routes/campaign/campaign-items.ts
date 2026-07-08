@@ -217,6 +217,9 @@ function refineChargesPool(caps: z.infer<typeof capabilityInputSchema>[], ctx: z
       message: "an item can have at most one charges pool",
     });
   }
+  // NOTE: only castSpell is checked — the activatedEffect schema doesn't accept
+  // resourceKind "charges" yet (see the enum above). When activatedEffect
+  // charges-authoring lands, extend this poolless check to cover it too.
   if (pools.length === 0 && caps.some((c) => c.kind === "castSpell" && c.resource === "charges")) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,

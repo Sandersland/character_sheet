@@ -466,14 +466,31 @@ async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperat
   // Spend the item's resource (skip for at-will), persisted outside the spell
   // blob. Charges-costed casts increment the shared POOL row by chargeCost;
   // everything else increments the capability's own per-period counter by 1.
+  let poolUsedAfter: number | null = null;
   if (chargeCost != null) {
     if (!meta.poolCapabilityId) {
       throw new InvalidSpellcastingOperationError(`${meta.itemName} has no charges pool to spend from`);
     }
-    await ctx.tx.inventoryCapability.update({
-      where: { id: meta.poolCapabilityId },
+    // Atomic conditional spend (TOCTOU guard): under READ COMMITTED, two
+    // concurrent casts can both pass the derived remaining-check above. The
+    // WHERE re-evaluates against the committed row under its write lock, so
+    // racers serialize and an overdraw loses (count 0 → whole tx rolls back)
+    // instead of pushing `used` past maxCharges.
+    const spent = await ctx.tx.inventoryCapability.updateMany({
+      where: { id: meta.poolCapabilityId, used: { lte: meta.usesTotal - chargeCost } },
       data: { used: { increment: chargeCost } },
     });
+    if (spent.count === 0) {
+      throw new InvalidSpellcastingOperationError(
+        `${entry.name} needs ${chargeCost} charge${chargeCost === 1 ? "" : "s"} — ${meta.itemName} has too few remaining`,
+      );
+    }
+    // Re-read for the event data: under a race the pre-tx snapshot is stale.
+    const fresh = await ctx.tx.inventoryCapability.findUniqueOrThrow({
+      where: { id: meta.poolCapabilityId },
+      select: { used: true },
+    });
+    poolUsedAfter = fresh.used;
   } else if (meta.usesTotal !== Infinity) {
     await ctx.tx.inventoryCapability.update({
       where: { id: meta.capabilityId },
@@ -495,7 +512,7 @@ async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperat
       ? {
           poolCapabilityId: meta.poolCapabilityId,
           chargesSpent: chargeCost,
-          chargesRemaining: meta.usesRemaining - chargeCost,
+          chargesRemaining: Math.max(0, meta.usesTotal - (poolUsedAfter ?? 0)),
         }
       : {}),
   };
