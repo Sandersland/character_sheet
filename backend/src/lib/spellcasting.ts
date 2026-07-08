@@ -466,7 +466,11 @@ async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperat
   // Spend the item's resource (skip for at-will), persisted outside the spell
   // blob. Charges-costed casts increment the shared POOL row by chargeCost;
   // everything else increments the capability's own per-period counter by 1.
+  // Snapshot the row's used counter before/after so undo can refund it (#580) —
+  // mirrors the #555 activate-op capabilityUsed pattern.
   let poolUsedAfter: number | null = null;
+  let capabilityUsedBefore: { capabilityId: string; used: number } | null = null;
+  let capabilityUsedAfter: { capabilityId: string; used: number } | null = null;
   if (chargeCost != null) {
     if (!meta.poolCapabilityId) {
       throw new InvalidSpellcastingOperationError(`${meta.itemName} has no charges pool to spend from`);
@@ -491,15 +495,26 @@ async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperat
       select: { used: true },
     });
     poolUsedAfter = fresh.used;
+    capabilityUsedBefore = { capabilityId: meta.poolCapabilityId, used: fresh.used - chargeCost };
+    capabilityUsedAfter = { capabilityId: meta.poolCapabilityId, used: fresh.used };
   } else if (meta.usesTotal !== Infinity) {
-    await ctx.tx.inventoryCapability.update({
+    const updated = await ctx.tx.inventoryCapability.update({
       where: { id: meta.capabilityId },
       data: { used: { increment: 1 } },
+      select: { used: true },
     });
+    capabilityUsedBefore = { capabilityId: meta.capabilityId, used: updated.used - 1 };
+    capabilityUsedAfter = { capabilityId: meta.capabilityId, used: updated.used };
   }
 
   const dcText = dc != null ? ` (DC ${dc})` : attack != null ? ` (+${attack} to hit)` : "";
   outcome.summary += dcText;
+  // Fold the capability-used snapshot into the event's before/after so the
+  // spellcasting revert branch refunds the spent use/charges on undo (#580).
+  if (capabilityUsedBefore && capabilityUsedAfter) {
+    outcome.beforeExtra = { capabilityUsed: capabilityUsedBefore };
+    outcome.afterExtra = { capabilityUsed: capabilityUsedAfter };
+  }
   outcome.eventData = {
     ...outcome.eventData,
     source: "item",
@@ -685,8 +700,8 @@ export async function applySpellcastingOperations(
         category: "spellcasting",
         type: outcome.eventType as Parameters<typeof logEvent>[1]["type"],
         summary: outcome.summary,
-        before: beforeState,
-        after: afterState,
+        before: { ...beforeState, ...(outcome.beforeExtra ?? {}) },
+        after: { ...afterState, ...(outcome.afterExtra ?? {}) },
         data: outcome.eventData,
         batchId,
         sessionId,

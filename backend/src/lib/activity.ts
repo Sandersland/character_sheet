@@ -177,6 +177,20 @@ async function reverseEvent(
         data: { spellcasting: beforeSpellcasting as Prisma.InputJsonValue },
       });
     }
+    // An item-spell cast (#528/#555) also spent an InventoryCapability.used
+    // counter (per-capability uses or a shared charges pool), persisted outside
+    // the spell blob — restore it so undo refunds the use/charges (#580).
+    // updateMany so a since-deleted item (new capability ids after a
+    // delete/undo-delete cycle) is a no-op, matching the rest-undo pattern.
+    const capabilityUsed = before.capabilityUsed as
+      | { capabilityId: string; used: number }
+      | undefined;
+    if (capabilityUsed !== undefined) {
+      await tx.inventoryCapability.updateMany({
+        where: { id: capabilityUsed.capabilityId },
+        data: { used: capabilityUsed.used },
+      });
+    }
   } else if (category === "resources") {
     // Restore the full resources JSON (used counts + maneuversKnown) from
     // the before snapshot — identical pattern to spellcasting revert.

@@ -5,6 +5,7 @@ import { prisma } from "../prisma.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
 import { applySpellcastingOperations } from "../spellcasting.js";
 import { applyHitPointOperations } from "../hitpoints.js";
+import { revertBatch } from "../activity.js";
 
 const OWNER_ID = "owner-item-cast-op";
 
@@ -172,6 +173,19 @@ describe("castItemSpell op (#528)", () => {
     const ev = await prisma.characterEvent.findFirstOrThrow({ where: { characterId, type: "castSpell" } });
     expect((ev.data as Record<string, unknown>).dc).toBe(13);
     expect(ev.summary).toContain("DC 13");
+  });
+
+  it("undo of a per-rest item-spell cast refunds the capability's used counter (#580)", async () => {
+    const { characterId, itemId } = await makeHolder("Barbarian", NONCASTER_SCORES);
+    const entryId = await entryIdFor(itemId);
+
+    await applySpellcastingOperations(characterId, [{ type: "castItemSpell", entryId, roll: 9 }], OWNER_ID);
+    expect(await used(itemId)).toBe(1);
+
+    const ev = await prisma.characterEvent.findFirstOrThrow({ where: { characterId, type: "castSpell" } });
+    const undone = await revertBatch(prisma, characterId, ev.batchId!);
+    expect(undone.ok).toBe(true);
+    expect(await used(itemId)).toBe(0); // the use is refunded, not silently lost
   });
 
   it("does not track uses for an at-will item spell", async () => {
