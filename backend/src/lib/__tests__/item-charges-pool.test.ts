@@ -197,6 +197,39 @@ describe("item charges pool (#555)", () => {
     expect((await poolRow(item.id)).used).toBe(0);
   });
 
+  it("undo of an activation survives a delete/undo-delete cycle (capability ids changed)", async () => {
+    // LIFO seam (PR #579 round-2): activate → remove item → undo remove
+    // (recreates capability rows with NEW ids) → undo activate. The
+    // capabilityUsed restore must no-op on the vanished old id (updateMany),
+    // not throw RecordNotFound and fail the whole undo.
+    const item = await makeWand([
+      WAND_POOL,
+      {
+        kind: "activatedEffect",
+        activation: "commandWord",
+        target: "ac",
+        op: "add",
+        value: 1,
+        activatedDuration: "whileActive",
+        resourceKind: "charges",
+        chargeCost: 2,
+      },
+    ]);
+    await applyInventoryOperations(characterId, [{ type: "activate", inventoryItemId: item.id }]);
+    const activateEv = await prisma.characterEvent.findFirstOrThrow({ where: { characterId, type: "activated" } });
+
+    await applyInventoryOperations(characterId, [{ type: "remove", inventoryItemId: item.id }]);
+    const removeEv = await prisma.characterEvent.findFirstOrThrow({ where: { characterId, type: "removed" } });
+
+    // Undo the delete: the item is recreated from the snapshot — same item id,
+    // NEW capability row ids, `used` restored from the snapshot (spent state kept).
+    expect((await revertBatch(prisma, characterId, removeEv.batchId!)).ok).toBe(true);
+    expect((await poolRow(item.id)).used).toBe(2);
+
+    // Undo the activation: the old capability id no longer exists — must no-op, not fail.
+    expect((await revertBatch(prisma, characterId, activateEv.batchId!)).ok).toBe(true);
+  });
+
   it("blocks activation when the pool can't cover the cost", async () => {
     const item = await makeWand([
       { ...WAND_POOL, maxCharges: 1 },

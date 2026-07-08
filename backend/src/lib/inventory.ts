@@ -1740,8 +1740,11 @@ export async function revertInventoryEvent(
     });
   }
   // A charges-pool spend (#555) lives on the capability row — restore its counter.
+  // updateMany (not update) so a vanished row is a no-op, matching the rest-undo
+  // pattern: a delete/undo-delete cycle recreates capabilities with NEW ids, so
+  // the old id here may legitimately no longer exist.
   if (before.capabilityUsed !== undefined) {
-    await tx.inventoryCapability.update({
+    await tx.inventoryCapability.updateMany({
       where: { id: before.capabilityUsed.capabilityId },
       data: { used: before.capabilityUsed.used },
     });
