@@ -13,6 +13,7 @@ import {
   CAPABILITY_TARGET_OPTIONS,
   CAST_RESOURCE_OPTIONS,
   CAST_STAT_MODE_OPTIONS,
+  CHARGE_TRIGGER_OPTIONS,
   GRANT_TYPE_OPTIONS,
   PROFICIENCY_KIND_OPTIONS,
   capabilitySummary,
@@ -25,6 +26,7 @@ import type {
   CapabilityKind,
   CapabilityTarget,
   CatalogSpell,
+  ChargeTrigger,
   GrantType,
   ItemCapability,
   ProficiencyKind,
@@ -48,6 +50,12 @@ const NEW_CAST: ItemCapability = {
   attackValue: 5,
 };
 const NEW_GRANT: ItemCapability = { kind: "grant", grantType: "resistance", grantValueKind: "damageType", grantValue: "fire" };
+// Wand of Magic Missiles defaults: 7 charges, regains 1d6+1 daily at dawn (#555).
+const NEW_CHARGES: ItemCapability = {
+  kind: "charges",
+  maxCharges: 7,
+  recharge: { trigger: "dawn", dice: { count: 1, faces: 6 }, bonus: 1 },
+};
 
 // The key options for a target that names a skill/ability via targetKey.
 function keyOptions(target: CapabilityTarget): readonly { key: string; label: string }[] {
@@ -73,7 +81,8 @@ export default function CapabilityEditor({ capabilities, onChange, spellcasterAt
   }
 
   function setKind(index: number, kind: CapabilityKind) {
-    const next = kind === "castSpell" ? NEW_CAST : kind === "grant" ? NEW_GRANT : NEW_PASSIVE;
+    const next =
+      kind === "castSpell" ? NEW_CAST : kind === "grant" ? NEW_GRANT : kind === "charges" ? NEW_CHARGES : NEW_PASSIVE;
     onChange(capabilities.map((c, i) => (i === index ? { ...next } : c)));
   }
 
@@ -218,16 +227,29 @@ export default function CapabilityEditor({ capabilities, onChange, spellcasterAt
                       </Select>
                     </Field>
 
-                    {cap.resource !== "atWill" && (
-                      <Field label="Uses per period" htmlFor={`cap-${index}-uses`}>
+                    {cap.resource === "charges" ? (
+                      <Field label="Charges per cast" htmlFor={`cap-${index}-chargecost`}>
                         <Input
-                          id={`cap-${index}-uses`}
+                          id={`cap-${index}-chargecost`}
                           type="number"
+                          min={1}
                           className="text-parchment-900"
-                          value={cap.uses ?? 1}
-                          onChange={(e) => update(index, { uses: Number(e.target.value) })}
+                          value={cap.chargeCost ?? 1}
+                          onChange={(e) => update(index, { chargeCost: Number(e.target.value) })}
                         />
                       </Field>
+                    ) : (
+                      cap.resource !== "atWill" && (
+                        <Field label="Uses per period" htmlFor={`cap-${index}-uses`}>
+                          <Input
+                            id={`cap-${index}-uses`}
+                            type="number"
+                            className="text-parchment-900"
+                            value={cap.uses ?? 1}
+                            onChange={(e) => update(index, { uses: Number(e.target.value) })}
+                          />
+                        </Field>
+                      )
                     )}
 
                     <Field label="Save DC" htmlFor={`cap-${index}-dcmode`}>
@@ -296,6 +318,8 @@ export default function CapabilityEditor({ capabilities, onChange, spellcasterAt
                     onProfKind={(k) => setProfKind(index, k)}
                     onUpdate={(patch) => update(index, patch)}
                   />
+                ) : cap.kind === "charges" ? (
+                  <ChargesFields cap={cap} index={index} onUpdate={(patch) => update(index, patch)} />
                 ) : (
                 <>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -421,6 +445,108 @@ export default function CapabilityEditor({ capabilities, onChange, spellcasterAt
             );
           })}
         </ul>
+      )}
+    </div>
+  );
+}
+
+interface ChargesFieldsProps {
+  cap: ItemCapability;
+  index: number;
+  onUpdate: (patch: Partial<ItemCapability>) => void;
+}
+
+// DM authoring for the item's shared charge pool (#555): max charges, recharge
+// trigger, and an optional dice formula ("regains 1d6+1 at dawn"; unchecked =
+// refills to max). castSpell capabilities on the same item spend from this pool
+// via the "Spends item charges" resource.
+function ChargesFields({ cap, index, onUpdate }: ChargesFieldsProps) {
+  const recharge = cap.recharge ?? { trigger: "dawn" as ChargeTrigger };
+  const rollToRegain = Boolean(recharge.dice);
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <Field label="Max charges" htmlFor={`cap-${index}-maxcharges`}>
+        <Input
+          id={`cap-${index}-maxcharges`}
+          type="number"
+          min={1}
+          className="text-parchment-900"
+          value={cap.maxCharges ?? 7}
+          onChange={(e) => onUpdate({ maxCharges: Number(e.target.value) })}
+        />
+      </Field>
+
+      <Field label="Recharges" htmlFor={`cap-${index}-trigger`}>
+        <Select
+          id={`cap-${index}-trigger`}
+          value={recharge.trigger}
+          onChange={(e) => onUpdate({ recharge: { ...recharge, trigger: e.target.value as ChargeTrigger } })}
+        >
+          {CHARGE_TRIGGER_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </Select>
+      </Field>
+
+      <label className="flex items-center gap-2 text-xs text-parchment-700 sm:col-span-2">
+        <input
+          type="checkbox"
+          checked={rollToRegain}
+          onChange={(e) =>
+            onUpdate({
+              recharge: e.target.checked
+                ? { ...recharge, dice: { count: 1, faces: 6 }, bonus: 1 }
+                : { trigger: recharge.trigger },
+            })
+          }
+        />
+        Roll to regain (e.g. 1d6+1); unchecked refills to max
+      </label>
+
+      {rollToRegain && (
+        <div className="flex flex-col gap-1 sm:col-span-2">
+          <span className="text-xs font-semibold text-parchment-700">Regain roll</span>
+          <div className="flex items-center gap-1.5">
+            <Input
+              type="number"
+              min={1}
+              aria-label={`Capability ${index + 1} recharge dice count`}
+              fullWidth={false}
+              className="w-14 text-center text-parchment-900"
+              value={recharge.dice?.count ?? 1}
+              onChange={(e) =>
+                onUpdate({ recharge: { ...recharge, dice: { count: Number(e.target.value), faces: recharge.dice?.faces ?? 6 } } })
+              }
+            />
+            <span aria-hidden="true" className="text-sm font-semibold text-parchment-600">d</span>
+            <Input
+              type="number"
+              min={2}
+              aria-label={`Capability ${index + 1} recharge dice faces`}
+              fullWidth={false}
+              className="w-14 text-center text-parchment-900"
+              value={recharge.dice?.faces ?? 6}
+              onChange={(e) =>
+                onUpdate({ recharge: { ...recharge, dice: { count: recharge.dice?.count ?? 1, faces: Number(e.target.value) } } })
+              }
+            />
+            <span aria-hidden="true" className="text-sm font-semibold text-parchment-600">+</span>
+            <Input
+              type="number"
+              min={0}
+              aria-label={`Capability ${index + 1} recharge bonus`}
+              fullWidth={false}
+              className="w-14 text-center text-parchment-900"
+              value={recharge.bonus ?? 0}
+              onChange={(e) => {
+                const bonus = Number(e.target.value);
+                onUpdate({ recharge: { ...recharge, bonus: bonus > 0 ? bonus : undefined } });
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

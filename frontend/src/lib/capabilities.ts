@@ -10,6 +10,7 @@ import type {
   CapabilityTarget,
   CastResource,
   CastStatMode,
+  ChargeTrigger,
   GrantType,
   GrantValueKind,
   ItemAdvantageGrant,
@@ -46,11 +47,13 @@ export const CAPABILITY_OP_OPTIONS: readonly { value: CapabilityOp; label: strin
 
 // Authorable capability kinds. passiveBonus grants a stat (#546); castSpell casts
 // a spell from the item's own resource (#528); grant confers a resistance/immunity/
-// advantage/proficiency (#529). The other kinds aren't authorable yet.
+// advantage/proficiency (#529); charges is the item's shared charge pool (#555).
+// activatedEffect isn't authorable yet.
 export const CAPABILITY_KIND_OPTIONS: readonly { value: CapabilityKind; label: string }[] = [
   { value: "passiveBonus", label: "Passive bonus" },
   { value: "castSpell", label: "Cast a spell" },
   { value: "grant", label: "Grant (resistance/advantage/…)" },
+  { value: "charges", label: "Charges pool" },
 ];
 
 export const CAST_RESOURCE_OPTIONS: readonly { value: CastResource; label: string }[] = [
@@ -59,6 +62,15 @@ export const CAST_RESOURCE_OPTIONS: readonly { value: CastResource; label: strin
   { value: "perDayDawn", label: "1×/day (dawn)" },
   { value: "perDayDusk", label: "1×/day (dusk)" },
   { value: "atWill", label: "At will" },
+  { value: "charges", label: "Spends item charges" },
+];
+
+// Charges-pool recharge triggers (#555); dawn/dusk approximate to a long rest.
+export const CHARGE_TRIGGER_OPTIONS: readonly { value: ChargeTrigger; label: string }[] = [
+  { value: "dawn", label: "At dawn" },
+  { value: "dusk", label: "At dusk" },
+  { value: "short", label: "On a short rest" },
+  { value: "long", label: "On a long rest" },
 ];
 
 export const CAST_STAT_MODE_OPTIONS: readonly { value: CastStatMode; label: string }[] = [
@@ -70,8 +82,27 @@ export const CAST_STAT_MODE_OPTIONS: readonly { value: CastStatMode; label: stri
 export function castSpellSummary(cap: ItemCapability): string {
   const name = cap.spellName ?? "spell";
   const dc = cap.dcMode === "wielder" ? "wielder DC" : cap.dcValue != null ? `DC ${cap.dcValue}` : "";
-  const resource = CAST_RESOURCE_OPTIONS.find((o) => o.value === cap.resource)?.label ?? "";
+  // A charges-costed cast (#555) shows its pool cost instead of the resource label.
+  const resource =
+    cap.resource === "charges"
+      ? `costs ${cap.chargeCost ?? 1} charge${(cap.chargeCost ?? 1) === 1 ? "" : "s"}`
+      : (CAST_RESOURCE_OPTIONS.find((o) => o.value === cap.resource)?.label ?? "");
   return [`Casts ${name}`, resource, dc].filter(Boolean).join(" · ");
+}
+
+/** One-line human summary of a charges pool, e.g. "7 charges · regains 1d6+1 at dawn". */
+export function chargesSummary(cap: ItemCapability): string {
+  if (cap.maxCharges == null) return cap.description ?? "Charges";
+  const count = `${cap.maxCharges} charge${cap.maxCharges === 1 ? "" : "s"}`;
+  const trigger = CHARGE_TRIGGER_OPTIONS.find((o) => o.value === cap.recharge?.trigger)?.label.toLowerCase() ?? "at dawn";
+  const dice = cap.recharge?.dice;
+  const bonus = cap.recharge?.bonus;
+  const regain = dice
+    ? `regains ${dice.count}d${dice.faces}${bonus ? `+${bonus}` : ""}`
+    : bonus
+      ? `regains ${bonus}`
+      : "refills";
+  return `${count} · ${regain} ${trigger}`;
 }
 
 export const ATTUNEMENT_PREREQ_OPTIONS: readonly { value: AttunementPrereqKind | ""; label: string }[] = [
@@ -195,6 +226,7 @@ export function advantageGrantSummary(grant: ItemAdvantageGrant): string {
 export function capabilitySummary(cap: ItemCapability): string {
   if (cap.kind === "castSpell") return castSpellSummary(cap);
   if (cap.kind === "grant") return grantSummary(cap);
+  if (cap.kind === "charges") return chargesSummary(cap);
   if (cap.kind !== "passiveBonus") return cap.description ?? cap.kind;
   const core = `${valuePhrase(cap)} ${targetPhrase(cap)}`.trim();
   return cap.condition ? `${core} (when ${cap.condition})` : core;

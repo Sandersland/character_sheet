@@ -31,7 +31,7 @@ export default function ItemSummary({
       <div className="min-w-0">
         <p className="text-sm font-medium text-parchment-900">{item.name}</p>
         <p className="mt-0.5 text-xs text-parchment-600">{details.join(" · ")}</p>
-        {(item.requiresAttunement || (item.capabilities?.length ?? 0) > 0) && (
+        {(item.requiresAttunement || item.charges || (item.capabilities?.length ?? 0) > 0) && (
           <div className="mt-1 flex flex-wrap gap-1">
             {item.requiresAttunement && (
               <span
@@ -42,6 +42,18 @@ export default function ItemSummary({
                 }`}
               >
                 {item.attuned ? "Attuned" : "Requires attunement"}
+              </span>
+            )}
+            {item.charges && (
+              <span
+                title={item.charges.recharge}
+                className={`rounded-full px-1.5 py-0.5 text-[0.625rem] font-semibold ${
+                  item.charges.remaining === 0
+                    ? "border border-parchment-300 text-parchment-500"
+                    : "bg-arcane-100 text-arcane-800"
+                }`}
+              >
+                {item.charges.remaining}/{item.charges.max} charges
               </span>
             )}
             {(item.capabilities ?? [])

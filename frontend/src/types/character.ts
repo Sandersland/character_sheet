@@ -199,8 +199,12 @@ export interface CapabilityDice {
 }
 
 /** One capability as served on a campaign item or an inventory-item snapshot. */
-/** castSpell resource recharge (#528). atWill is unlimited; perDay ≈ long rest. */
-export type CastResource = "perRestShort" | "perRestLong" | "perDayDawn" | "perDayDusk" | "atWill";
+/** castSpell resource recharge (#528). atWill is unlimited; perDay ≈ long rest.
+ * charges (#555) spends the item's shared pool (chargeCost per cast). */
+export type CastResource = "perRestShort" | "perRestLong" | "perDayDawn" | "perDayDusk" | "atWill" | "charges";
+
+/** Charges-pool recharge trigger (#555); dawn/dusk ≈ long rest. */
+export type ChargeTrigger = "short" | "long" | "dawn" | "dusk";
 /** Whether a castSpell DC/attack is a fixed item value or the wielder's own (#528). */
 export type CastStatMode = "fixed" | "wielder";
 
@@ -229,7 +233,7 @@ export interface ItemCapability {
   /** activatedEffect (#543) — reuses target/op/value for the inline self-buff. */
   activation?: ActivationType;
   activatedDuration?: "whileActive" | "untilRest";
-  resourceKind?: "perRest" | "perDay" | "atWill";
+  resourceKind?: "perRest" | "perDay" | "atWill" | "charges";
   resourcePeriod?: "short" | "long" | "dawn" | "dusk";
   resourceCharges?: number;
   durationText?: string;
@@ -239,6 +243,11 @@ export interface ItemCapability {
   grantValueKind?: GrantValueKind;
   grantValue?: string;
   cantBeSurprised?: boolean;
+  /** charges pool (#555): the item's shared charge reservoir. */
+  maxCharges?: number;
+  recharge?: { trigger: ChargeTrigger; dice?: { count: number; faces: number }; bonus?: number };
+  /** Pool charges a castSpell/activatedEffect spends when its resource is "charges" (default 1). */
+  chargeCost?: number;
 }
 
 /** Item-granted-spell metadata on a Spell whose source is "item" (#528). */
@@ -254,6 +263,16 @@ export interface ItemSpellMeta {
   dc?: number | null;
   attackMode: CastStatMode;
   attack?: number | null;
+  /** Pool charges per cast when resource is "charges" (#555); usesRemaining/Total mirror the pool. */
+  chargeCost?: number;
+}
+
+/** Derived charge-pool state on an inventory item (#555): remaining is derived
+ * (maxCharges − used) server-side; recharge is the human tooltip text. */
+export interface ItemChargesState {
+  max: number;
+  remaining: number;
+  recharge: string;
 }
 
 /** An item-granted damage resistance/immunity, tagged with its item source (#529). */
@@ -338,7 +357,8 @@ export interface InventoryItem {
   capabilities?: ItemCapability[];
   /** Activate/deactivate control state for an item's activatedEffect capability (#543). */
   activated?: ActivatedEffectState;
-
+  /** Shared charge-pool state for an item with a charges capability (#555). */
+  charges?: ItemChargesState;
 }
 
 // The derived activate/deactivate control state the API serializes for an

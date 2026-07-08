@@ -244,6 +244,30 @@ describe("SpellRow", () => {
       expect(screen.getByText("no uses")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Cast" })).toBeDisabled();
     });
+
+    describe("charges-costed cast (#555)", () => {
+      const chargesSpell: Spell = {
+        ...itemSpell,
+        item: { ...itemSpell.item!, resource: "charges", usesRemaining: 4, usesTotal: 7, chargeCost: 3 },
+      };
+
+      it("shows the pool count and the cost badge", () => {
+        render(<ul><SpellRow {...defaultProps(chargesSpell, { availableSlots: [] })} /></ul>);
+        expect(screen.getByText("4/7")).toBeInTheDocument();
+        expect(screen.getByText("3 charges")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Cast" })).not.toBeDisabled();
+      });
+
+      it("disables Cast when remaining charges can't cover the cost (not just at 0)", () => {
+        const low: Spell = {
+          ...chargesSpell,
+          item: { ...chargesSpell.item!, usesRemaining: 2 },
+        };
+        render(<ul><SpellRow {...defaultProps(low, { availableSlots: [] })} /></ul>);
+        expect(screen.getByText("no charges")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Cast" })).toBeDisabled();
+      });
+    });
   });
 
   describe("upcast slot picker", () => {
