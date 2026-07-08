@@ -89,12 +89,24 @@ export default function CapabilityEditor({ capabilities, onChange, spellcasterAt
   function setSpell(index: number, spellId: string) {
     const spell = spells.find((s) => s.id === spellId);
     if (!spell) return;
+    const cap = capabilities[index];
+    // A spell only carries a DC (save spells) or an attack bonus (attack spells),
+    // never both — utility/buff spells carry neither. Normalize the two fields to
+    // the picked spell so a utility spell (e.g. Fly) persists no DC/attack: keep
+    // the applicable one, clear the other. (dcMode "wielder" would announce a DC
+    // even with a null value, so reset the mode too when it no longer applies.)
+    const needsDc = spell.attackType === "save";
+    const needsAttack = spell.attackType === "attack";
     update(index, {
       spellId: spell.id,
       spellName: spell.name,
       spellLevel: spell.level,
       castLevel: spell.level,
       concentration: spell.concentration ?? false,
+      dcMode: needsDc ? cap.dcMode ?? "fixed" : "fixed",
+      dcValue: needsDc ? cap.dcValue ?? 13 : undefined,
+      attackMode: needsAttack ? cap.attackMode ?? "fixed" : "fixed",
+      attackValue: needsAttack ? cap.attackValue ?? 5 : undefined,
     });
   }
 
@@ -153,6 +165,14 @@ export default function CapabilityEditor({ capabilities, onChange, spellcasterAt
             const target = cap.target ?? "ac";
             const opts = keyOptions(target);
             const useDice = Boolean(cap.dice);
+            // A castSpell's Save DC / Attack fields are only relevant to the
+            // referenced spell's roll kind: DC for save spells, attack for attack
+            // spells, neither for utility/buff spells (#363 fallout). undefined
+            // until a spell is picked or the catalog finishes loading → hide both.
+            const spellAttackType =
+              cap.kind === "castSpell" ? spells.find((s) => s.id === cap.spellId)?.attackType : undefined;
+            const showDc = spellAttackType === "save";
+            const showAttack = spellAttackType === "attack";
             return (
               <li
                 key={index}
@@ -252,21 +272,23 @@ export default function CapabilityEditor({ capabilities, onChange, spellcasterAt
                       )
                     )}
 
-                    <Field label="Save DC" htmlFor={`cap-${index}-dcmode`}>
-                      <Select
-                        id={`cap-${index}-dcmode`}
-                        value={cap.dcMode ?? "fixed"}
-                        onChange={(e) => update(index, { dcMode: e.target.value as ItemCapability["dcMode"] })}
-                      >
-                        {CAST_STAT_MODE_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value} disabled={o.value === "wielder" && !spellcasterAttunable}>
-                            {o.label}
-                          </option>
-                        ))}
-                      </Select>
-                    </Field>
+                    {showDc && (
+                      <Field label="Save DC" htmlFor={`cap-${index}-dcmode`}>
+                        <Select
+                          id={`cap-${index}-dcmode`}
+                          value={cap.dcMode ?? "fixed"}
+                          onChange={(e) => update(index, { dcMode: e.target.value as ItemCapability["dcMode"] })}
+                        >
+                          {CAST_STAT_MODE_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value} disabled={o.value === "wielder" && !spellcasterAttunable}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                    )}
 
-                    {cap.dcMode !== "wielder" && (
+                    {showDc && cap.dcMode !== "wielder" && (
                       <Field label="DC value" htmlFor={`cap-${index}-dcvalue`}>
                         <Input
                           id={`cap-${index}-dcvalue`}
@@ -278,21 +300,23 @@ export default function CapabilityEditor({ capabilities, onChange, spellcasterAt
                       </Field>
                     )}
 
-                    <Field label="Attack bonus" htmlFor={`cap-${index}-atkmode`}>
-                      <Select
-                        id={`cap-${index}-atkmode`}
-                        value={cap.attackMode ?? "fixed"}
-                        onChange={(e) => update(index, { attackMode: e.target.value as ItemCapability["attackMode"] })}
-                      >
-                        {CAST_STAT_MODE_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value} disabled={o.value === "wielder" && !spellcasterAttunable}>
-                            {o.label}
-                          </option>
-                        ))}
-                      </Select>
-                    </Field>
+                    {showAttack && (
+                      <Field label="Attack bonus" htmlFor={`cap-${index}-atkmode`}>
+                        <Select
+                          id={`cap-${index}-atkmode`}
+                          value={cap.attackMode ?? "fixed"}
+                          onChange={(e) => update(index, { attackMode: e.target.value as ItemCapability["attackMode"] })}
+                        >
+                          {CAST_STAT_MODE_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value} disabled={o.value === "wielder" && !spellcasterAttunable}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                    )}
 
-                    {cap.attackMode !== "wielder" && (
+                    {showAttack && cap.attackMode !== "wielder" && (
                       <Field label="Attack value" htmlFor={`cap-${index}-atkvalue`}>
                         <Input
                           id={`cap-${index}-atkvalue`}
@@ -304,7 +328,7 @@ export default function CapabilityEditor({ capabilities, onChange, spellcasterAt
                       </Field>
                     )}
 
-                    {!spellcasterAttunable && (
+                    {(showDc || showAttack) && !spellcasterAttunable && (
                       <p className="text-[11px] text-parchment-500 sm:col-span-2">
                         Wielder DC/attack needs the item attunable by a spellcaster; use fixed values otherwise.
                       </p>
