@@ -40,7 +40,9 @@ import { normalizeConditionsMutable } from "./conditions.js";
 import { buffsByTarget, normalizeActiveEffectsMutable, type ActiveBuff } from "./active-effects.js";
 import {
   activatedMaxUses,
+  chargePoolOf,
   describeActivatedReminder,
+  describeChargeRecharge,
   deriveItemGrants,
   deriveItemPassiveBonuses,
   readCapability,
@@ -204,6 +206,20 @@ function serializeInventoryItem(
     consumable: row.consumableDetail ? serializeConsumableDetail(row.consumableDetail) : undefined,
     capabilities: row.capabilities.length > 0 ? row.capabilities.map(serializeCapability) : undefined,
     activated: serializeActivatedEffect(row, context),
+    charges: serializeChargePool(row),
+  };
+}
+
+// Derives the item's shared charge-pool state (#555): max, remaining (derived,
+// never stored), and the human recharge text for the pill's tooltip. Absent when
+// the item has no well-formed charges capability.
+function serializeChargePool(row: CharacterWithRelations["inventoryItems"][number]) {
+  const pool = chargePoolOf(row.capabilities);
+  if (!pool) return undefined;
+  return {
+    max: pool.cap.maxCharges,
+    remaining: Math.max(0, pool.cap.maxCharges - (pool.row.used ?? 0)),
+    recharge: describeChargeRecharge(pool.cap),
   };
 }
 
@@ -221,6 +237,22 @@ function serializeActivatedEffect(
     // string would drop the DM's label. Require the field to be present.
     .find((c): c is ActivatedEffectCapability => c.kind === "activatedEffect" && "activation" in c);
   if (!cap) return undefined;
+  // A charges-costed effect (#555) is bounded by the item's shared pool: "uses"
+  // = how many activations the remaining charges afford (floor division), so
+  // ActivateControl's readout and out-of-uses gating work unchanged.
+  if (cap.resourceKind === "charges") {
+    const pool = chargePoolOf(row.capabilities);
+    const cost = Math.max(1, cap.chargeCost);
+    const remaining = pool ? Math.max(0, pool.cap.maxCharges - (pool.row.used ?? 0)) : 0;
+    return {
+      activation: cap.activation,
+      reminder: describeActivatedReminder(cap),
+      maxUses: pool ? Math.floor(pool.cap.maxCharges / cost) : 0,
+      remainingUses: Math.floor(remaining / cost),
+      active: context.activeItemBuffKeys.has(itemBuffKey(row.id)),
+      available: row.equippedSlot != null || row.attuned,
+    };
+  }
   const maxUses = activatedMaxUses(cap);
   return {
     activation: cap.activation,

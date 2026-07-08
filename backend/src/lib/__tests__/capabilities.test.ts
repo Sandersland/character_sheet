@@ -3,8 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   activatedMaxUses,
   activatedRechargeRest,
+  castResourceRechargesOn,
   castUsesTotal,
+  chargePoolOf,
+  chargeTriggerRechargesOn,
   describeActivatedReminder,
+  describeChargeRecharge,
   deriveItemGrants,
   deriveItemPassiveBonuses,
   describeAttunementPrereq,
@@ -17,6 +21,7 @@ import {
   serializeCapability,
   type ActivatedEffectCapability,
   type CapabilityColumns,
+  type ChargesCapability,
 } from "../capabilities.js";
 
 const bootsOfSpeed: CapabilityColumns = {
@@ -380,6 +385,118 @@ describe("grant capabilities (#529)", () => {
     expect(out.advantages).toEqual([
       { on: "initiative", cantBeSurprised: true, source: "Weapon of Warning" },
     ]);
+  });
+});
+
+describe("charges pool (#555)", () => {
+  // Wand of Magic Missiles: 7 charges, regains 1d6+1 daily at dawn.
+  const wandPool: CapabilityColumns = {
+    kind: "charges",
+    maxCharges: 7,
+    rechargeDiceCount: 1,
+    rechargeDiceFaces: 6,
+    rechargeBonus: 1,
+    rechargeTrigger: "dawn",
+  };
+
+  it("materializes a charges capability", () => {
+    expect(readCapability(wandPool)).toEqual({
+      kind: "charges",
+      maxCharges: 7,
+      rechargeTrigger: "dawn",
+      rechargeDice: { count: 1, faces: 6 },
+      rechargeBonus: 1,
+      description: null,
+    });
+  });
+
+  it("defaults the trigger to dawn and dice to null", () => {
+    const cap = readCapability({ kind: "charges", maxCharges: 3 });
+    expect(cap).toEqual({ kind: "charges", maxCharges: 3, rechargeTrigger: "dawn", rechargeDice: null, rechargeBonus: null, description: null });
+  });
+
+  it("reads a charges row missing maxCharges as opaque", () => {
+    const cap = readCapability({ kind: "charges", description: "3 charges of light" });
+    expect(cap).toEqual({ kind: "charges", description: "3 charges of light" });
+    expect("maxCharges" in cap).toBe(false);
+  });
+
+  it("round-trips through serializeCapability with a nested recharge", () => {
+    expect(serializeCapability(wandPool)).toEqual({
+      kind: "charges",
+      maxCharges: 7,
+      recharge: { trigger: "dawn", dice: { count: 1, faces: 6 }, bonus: 1 },
+    });
+    // Dice-less full-refill pool: recharge carries only the trigger.
+    expect(serializeCapability({ kind: "charges", maxCharges: 3, rechargeTrigger: "long" })).toEqual({
+      kind: "charges",
+      maxCharges: 3,
+      recharge: { trigger: "long" },
+    });
+  });
+
+  it("serializes chargeCost on a charges-costed castSpell (and defaults it to 1)", () => {
+    expect(serializeCapability({ ...castSpellRow, castResource: "charges", chargeCost: 2 })).toMatchObject({
+      kind: "castSpell",
+      resource: "charges",
+      chargeCost: 2,
+    });
+    expect(serializeCapability({ ...castSpellRow, castResource: "charges" })).toMatchObject({ chargeCost: 1 });
+    // Non-charges resources don't carry a chargeCost.
+    expect("chargeCost" in serializeCapability(castSpellRow)).toBe(false);
+  });
+
+  it("finds the item's pool (first well-formed charges row) with its raw row", () => {
+    const rows = [scalarSkill, { ...wandPool, id: "cap-pool" } as CapabilityColumns & { id: string }];
+    const pool = chargePoolOf(rows);
+    expect(pool?.cap.maxCharges).toBe(7);
+    expect((pool?.row as { id?: string })?.id).toBe("cap-pool");
+    // Malformed charges rows don't count as a pool.
+    expect(chargePoolOf([{ kind: "charges" } as CapabilityColumns])).toBeNull();
+    expect(chargePoolOf([scalarSkill])).toBeNull();
+  });
+
+  it("maps recharge triggers to rests (short fires on both; dawn/dusk/long on long only)", () => {
+    expect(chargeTriggerRechargesOn("short", "short")).toBe(true);
+    expect(chargeTriggerRechargesOn("short", "long")).toBe(true);
+    expect(chargeTriggerRechargesOn("dawn", "short")).toBe(false);
+    expect(chargeTriggerRechargesOn("dawn", "long")).toBe(true);
+    expect(chargeTriggerRechargesOn("dusk", "long")).toBe(true);
+    expect(chargeTriggerRechargesOn("long", "short")).toBe(false);
+  });
+
+  it("never recharges a charges-costed castSpell's own counter (the pool recharges)", () => {
+    expect(castResourceRechargesOn("charges", "short")).toBe(false);
+    expect(castResourceRechargesOn("charges", "long")).toBe(false);
+  });
+
+  it("pool-gates a charges-costed activatedEffect (no per-item counter, no rest reset)", () => {
+    const cap = readCapability({
+      kind: "activatedEffect",
+      activation: "commandWord",
+      target: "ac",
+      op: "add",
+      value: 1,
+      resourceKind: "charges",
+      chargeCost: 2,
+    }) as ActivatedEffectCapability;
+    expect(cap.chargeCost).toBe(2);
+    expect(activatedMaxUses(cap)).toBeNull();
+    expect(activatedRechargeRest(cap)).toBeNull();
+  });
+
+  it("describes the recharge for the pill tooltip", () => {
+    const pool = readCapability(wandPool) as ChargesCapability;
+    expect(describeChargeRecharge(pool)).toBe("regains 1d6+1 at dawn");
+    expect(describeChargeRecharge(readCapability({ kind: "charges", maxCharges: 3, rechargeTrigger: "long" }) as ChargesCapability)).toBe(
+      "refills on a long rest",
+    );
+    expect(
+      describeChargeRecharge(readCapability({ kind: "charges", maxCharges: 3, rechargeTrigger: "dawn", rechargeBonus: 1 }) as ChargesCapability),
+    ).toBe("regains 1 at dawn");
+    expect(
+      describeChargeRecharge(readCapability({ kind: "charges", maxCharges: 3, rechargeTrigger: "short", rechargeDiceCount: 1, rechargeDiceFaces: 4 }) as ChargesCapability),
+    ).toBe("regains 1d4 on a short rest");
   });
 });
 

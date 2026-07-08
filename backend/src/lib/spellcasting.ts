@@ -403,7 +403,8 @@ async function applyCastSpellOp(ctx: SpellOpContext, op: CastSpellOperation): Pr
 // Cast a spell granted by a held item (#528). Adapts the item's castSpell
 // capability into a CastAbilityInput: effect = the referenced Spell's EffectSpec,
 // cost = none (the item resource is spent here, not a character slot), DC/attack
-// per the fixed/wielder mode. Decrements the item's per-capability use counter.
+// per the fixed/wielder mode. Decrements the item's per-capability use counter —
+// or, for a charges-costed cast (#555), the item's shared pool by chargeCost.
 async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperation): Promise<OpOutcome> {
   const entry = ctx.state.spells.find((s) => s.id === op.entryId && s.source === "item");
   if (!entry?.item) {
@@ -412,7 +413,15 @@ async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperat
     );
   }
   const meta = entry.item;
-  if (meta.usesRemaining <= 0) {
+  // Charges-costed casts (#555) spend chargeCost from the item's shared pool;
+  // usesRemaining already mirrors the pool's remaining (deriveItemSpells).
+  const chargeCost = meta.resource === "charges" ? meta.chargeCost ?? 1 : null;
+  if (chargeCost != null && meta.usesRemaining < chargeCost) {
+    throw new InvalidSpellcastingOperationError(
+      `${entry.name} needs ${chargeCost} charge${chargeCost === 1 ? "" : "s"} — ${meta.itemName} has ${meta.usesRemaining} remaining`,
+    );
+  }
+  if (chargeCost == null && meta.usesRemaining <= 0) {
     throw new InvalidSpellcastingOperationError(
       `${entry.name} has no uses remaining — recharges on the item's rest`,
     );
@@ -454,8 +463,35 @@ async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperat
     },
   );
 
-  // Spend the item's resource (skip for at-will), persisted outside the spell blob.
-  if (meta.usesTotal !== Infinity) {
+  // Spend the item's resource (skip for at-will), persisted outside the spell
+  // blob. Charges-costed casts increment the shared POOL row by chargeCost;
+  // everything else increments the capability's own per-period counter by 1.
+  let poolUsedAfter: number | null = null;
+  if (chargeCost != null) {
+    if (!meta.poolCapabilityId) {
+      throw new InvalidSpellcastingOperationError(`${meta.itemName} has no charges pool to spend from`);
+    }
+    // Atomic conditional spend (TOCTOU guard): under READ COMMITTED, two
+    // concurrent casts can both pass the derived remaining-check above. The
+    // WHERE re-evaluates against the committed row under its write lock, so
+    // racers serialize and an overdraw loses (count 0 → whole tx rolls back)
+    // instead of pushing `used` past maxCharges.
+    const spent = await ctx.tx.inventoryCapability.updateMany({
+      where: { id: meta.poolCapabilityId, used: { lte: meta.usesTotal - chargeCost } },
+      data: { used: { increment: chargeCost } },
+    });
+    if (spent.count === 0) {
+      throw new InvalidSpellcastingOperationError(
+        `${entry.name} needs ${chargeCost} charge${chargeCost === 1 ? "" : "s"} — ${meta.itemName} has too few remaining`,
+      );
+    }
+    // Re-read for the event data: under a race the pre-tx snapshot is stale.
+    const fresh = await ctx.tx.inventoryCapability.findUniqueOrThrow({
+      where: { id: meta.poolCapabilityId },
+      select: { used: true },
+    });
+    poolUsedAfter = fresh.used;
+  } else if (meta.usesTotal !== Infinity) {
     await ctx.tx.inventoryCapability.update({
       where: { id: meta.capabilityId },
       data: { used: { increment: 1 } },
@@ -472,6 +508,13 @@ async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperat
     itemName: meta.itemName,
     dc,
     attack,
+    ...(chargeCost != null
+      ? {
+          poolCapabilityId: meta.poolCapabilityId,
+          chargesSpent: chargeCost,
+          chargesRemaining: Math.max(0, meta.usesTotal - (poolUsedAfter ?? 0)),
+        }
+      : {}),
   };
   return outcome;
 }

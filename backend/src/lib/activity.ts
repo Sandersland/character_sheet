@@ -130,6 +130,20 @@ async function reverseEvent(
       }
     }
 
+    // Undo a rest's item charge-pool recharge (#555): re-expend each pool.
+    // updateMany so a pool whose item was deleted after the rest is a no-op.
+    const beforeChargePools = before.chargePools as
+      | { capabilityId: string; used: number }[]
+      | undefined;
+    if (beforeChargePools) {
+      for (const p of beforeChargePools) {
+        await tx.inventoryCapability.updateMany({
+          where: { id: p.capabilityId },
+          data: { used: p.used },
+        });
+      }
+    }
+
     // Restore class-entry level if the event touched it (levelUp/levelDown).
     const data = event.data as Record<string, unknown> | null;
     if (data?.primaryEntryId && before.classEntryLevel !== undefined) {

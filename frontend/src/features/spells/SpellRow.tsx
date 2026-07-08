@@ -51,7 +51,9 @@ export default function SpellRow({
   // is `null`, so an at-will item arrives as usesTotal:null and the Infinity check never
   // matches (would wrongly show the spell as exhausted). `resource` transmits as a string.
   const atWill = item ? item.resource === "atWill" : false;
-  const itemExhausted = Boolean(item) && !atWill && (item?.usesRemaining ?? 0) <= 0;
+  // A charges-costed cast (#555) needs its full cost, not just one remaining use.
+  const chargeCost = item?.resource === "charges" ? item.chargeCost ?? 1 : 1;
+  const itemExhausted = Boolean(item) && !atWill && (item?.usesRemaining ?? 0) < chargeCost;
   // Subclass- and item-granted spells are derived, not persisted — no Remove ✕.
   const isGranted = spell.source === "subclass" || spell.source === "item";
   const schoolTone = SCHOOL_TONE[spell.school as keyof typeof SCHOOL_TONE] ?? "neutral";
@@ -108,9 +110,10 @@ export default function SpellRow({
               {spell.source === "subclass" && <Badge tone="arcane">subclass</Badge>}
               {item && <Badge tone="gold">{item.itemName}</Badge>}
               {item && <Badge tone="neutral">{atWill ? "at will" : `${item.usesRemaining}/${item.usesTotal}`}</Badge>}
+              {item?.resource === "charges" && chargeCost > 1 && <Badge tone="gold">{chargeCost} charges</Badge>}
               {item?.dc != null && <Badge tone="arcane">DC {item.dc}</Badge>}
               {!item && noBudget && <Badge tone="neutral">no slots</Badge>}
-              {itemExhausted && <Badge tone="neutral">no uses</Badge>}
+              {itemExhausted && <Badge tone="neutral">{item?.resource === "charges" ? "no charges" : "no uses"}</Badge>}
             </div>
           </div>
           {effect && (

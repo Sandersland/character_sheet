@@ -69,6 +69,21 @@ describe("InventoryRow (view mode)", () => {
     expect(screen.queryByRole("button", { name: "Equipped" })).toBeNull();
   });
 
+  it("shows the charge-pool pill with the recharge tooltip (#555)", () => {
+    renderRow({
+      item: {
+        ...mockItem,
+        name: "Wand of Magic Missiles",
+        category: "gear",
+        weapon: undefined,
+        charges: { max: 7, remaining: 4, recharge: "regains 1d6+1 at dawn" },
+      },
+    });
+    const pill = screen.getByText("4/7 charges");
+    expect(pill).toBeInTheDocument();
+    expect(pill).toHaveAttribute("title", "regains 1d6+1 at dawn");
+  });
+
   it("clicking the Equip toggle submits a setEquipped op", async () => {
     const user = userEvent.setup();
     const { props } = renderRow();

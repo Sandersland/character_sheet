@@ -137,6 +137,14 @@ function snapshotCampaignItemDetail(item: CampaignItemWithDetails) {
               grantValueKind: c.grantValueKind,
               grantValue: c.grantValue,
               cantBeSurprised: c.cantBeSurprised,
+              // charges pool columns (#555). `used` stays uncopied — an awarded
+              // pool starts full (remaining = maxCharges − 0).
+              maxCharges: c.maxCharges,
+              rechargeDiceCount: c.rechargeDiceCount,
+              rechargeDiceFaces: c.rechargeDiceFaces,
+              rechargeBonus: c.rechargeBonus,
+              rechargeTrigger: c.rechargeTrigger,
+              chargeCost: c.chargeCost,
             })),
           }
         : undefined,
