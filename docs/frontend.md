@@ -39,6 +39,8 @@ frontend/src/
 │   ├── entities/        # CampaignCodex (Codex tab: the single entity list — browse/search/filter/create #367/#523),
 │   │                    #   EntityList (shared search/filter/rows, #523), CampaignManagePanel (owner Manage tab:
 │   │                    #   identity merges only #379/#523), EntityDetailPage (detail/edit/delete/reveal-hide + backlinks) (#248)
+│   │                    #     → ~80-line orchestrator over EntityDetailHeader/EntityDetailsCard/EntityMentions/
+│   │                    #       EntityMergeCards + hooks useEntityDetail/useEntityMerges/useEntityBackTo (#605)
 │   ├── experience/      # ExperienceTracker
 │   ├── hitpoints/       # HitPointTracker orchestrator (inline Card; hosts LevelUpModal + ConcentrationSaveModal)
 │   │                    #   Sub-components: HpActionControl (damage/heal/temp + optional
@@ -67,7 +69,8 @@ frontend/src/
 ├── hooks/               # reusable React hooks used by pages or multiple clusters
 │   │                    #   (useCharacter, useCharacterList, useCharacterDraft, useReferenceData,
 │   │                    #    useCharacterCreation, useThemePreference, useGlobalKeyboard, useDismissable)
-├── lib/                 # pure TS logic — NO React/JSX (dice, abilities, timeline, startingEquipment, …)
+├── lib/                 # pure TS logic — NO React/JSX (dice, abilities, timeline, startingEquipment,
+│   │                    #   entityBacklinks group-by-session/identity #605, …)
 ├── pages/               # route-level views (CharacterListPage, CharacterSheetPage,
 │   │                    #   CharacterCreatePage, SessionPage, LoginPage, AboutPage)
 ├── api/
