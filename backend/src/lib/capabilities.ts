@@ -342,7 +342,9 @@ const CAPABILITY_READERS: Record<string, ((row: CapabilityColumns) => Capability
   activatedEffect: readActivatedEffectRow,
 };
 
-// Adapter over the flat capability columns — no per-kind tables. A malformed
+// Adapter over the flat capability columns — one CampaignItemCapability row per
+// capability, with no per-kind DB tables (the dispatch table above is code, not
+// schema). A malformed
 // passiveBonus (missing target/op) or grant (missing grantType) reads as opaque
 // rather than throwing.
 export function readCapability(row: CapabilityColumns): Capability {
