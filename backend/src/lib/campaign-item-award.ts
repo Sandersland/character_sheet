@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "../generated/prisma/client.js";
+import { snapshotDetailCreate } from "./detail-snapshot.js";
 import { logEvent } from "./events.js";
 import { snapshotInventoryItemForUndo, inventoryItemDetailInclude } from "./inventory.js";
 import { prisma } from "./prisma.js";
@@ -46,54 +47,7 @@ function toJsonInput(value: Prisma.JsonValue | null): Prisma.InputJsonValue | Pr
 // shape of the Inventory*Detail tables, so this is a straight field copy.
 function snapshotCampaignItemDetail(item: CampaignItemWithDetails) {
   return {
-    weaponDetail: item.weaponDetail
-      ? {
-          create: {
-            damageDiceCount: item.weaponDetail.damageDiceCount,
-            damageDiceFaces: item.weaponDetail.damageDiceFaces,
-            damageModifier: item.weaponDetail.damageModifier,
-            damageType: item.weaponDetail.damageType,
-            versatileDiceCount: item.weaponDetail.versatileDiceCount,
-            versatileDiceFaces: item.weaponDetail.versatileDiceFaces,
-            finesse: item.weaponDetail.finesse,
-            light: item.weaponDetail.light,
-            heavy: item.weaponDetail.heavy,
-            twoHanded: item.weaponDetail.twoHanded,
-            reach: item.weaponDetail.reach,
-            thrown: item.weaponDetail.thrown,
-            ammunition: item.weaponDetail.ammunition,
-            rangeNormal: item.weaponDetail.rangeNormal,
-            rangeLong: item.weaponDetail.rangeLong,
-            weaponClass: item.weaponDetail.weaponClass,
-            weaponRange: item.weaponDetail.weaponRange,
-          },
-        }
-      : undefined,
-    armorDetail: item.armorDetail
-      ? {
-          create: {
-            armorCategory: item.armorDetail.armorCategory,
-            baseArmorClass: item.armorDetail.baseArmorClass,
-            dexModifierApplies: item.armorDetail.dexModifierApplies,
-            dexModifierMax: item.armorDetail.dexModifierMax,
-            stealthDisadvantage: item.armorDetail.stealthDisadvantage,
-            strengthRequirement: item.armorDetail.strengthRequirement,
-          },
-        }
-      : undefined,
-    consumableDetail: item.consumableDetail
-      ? {
-          create: {
-            effectDiceCount: item.consumableDetail.effectDiceCount,
-            effectDiceFaces: item.consumableDetail.effectDiceFaces,
-            effectModifier: item.consumableDetail.effectModifier,
-            effectDescription: item.consumableDetail.effectDescription,
-            maxUses: item.consumableDetail.maxUses,
-            // An awarded charged consumable starts full (#121).
-            usesRemaining: item.consumableDetail.usesRemaining ?? item.consumableDetail.maxUses,
-          },
-        }
-      : undefined,
+    ...snapshotDetailCreate(item),
     // Typed capability rows snapshotted 1:1 onto the awarded item (#545) — a
     // straight column copy, same as the detail tables above. The snapshot is
     // self-contained, so a later edit/revoke of the source leaves these intact.
