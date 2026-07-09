@@ -22,4 +22,23 @@ describe("createCharacter defensive guards", () => {
       expect(result.error).toMatch(/class/i);
     }
   });
+
+  // The alignment guard also short-circuits before any DB access.
+  it("returns a 400 result for an unknown alignment (no DB access)", async () => {
+    const input = {
+      name: "Nameless",
+      race: "Human",
+      background: "Acolyte",
+      alignment: "Chaotic Confused",
+      classes: [{ name: "Fighter" }],
+    } as unknown as CreateCharacterBody;
+
+    const result = await createCharacter(input, "owner-1");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(400);
+      expect(result.error).toMatch(/alignment/i);
+    }
+  });
 });
