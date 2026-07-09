@@ -15,10 +15,16 @@ import { CHANNEL_DIVINITIES } from "./seed/channel-divinity.js";
 import { FEATS } from "./seed/feats.js";
 import { SPELLS } from "./seed/spells.js";
 import { PACKS } from "./seed/packs.js";
+import { assertUniqueGrantedAbilityNames } from "./seed/guards.js";
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
+
+// Optional catalog field → explicit null / fallback for Prisma. Keeps the wide
+// mappers flat (each ?? here would otherwise add a branch to every seeder).
+const orNull = <T>(v: T | null | undefined): T | null => v ?? null;
+const orElse = <T>(v: T | null | undefined, fallback: T): T => v ?? fallback;
 
 // Nested-create fields for an Item's optional 1:1 detail relations.
 function itemDetailCreateFields(item: CatalogItem) {
@@ -46,24 +52,24 @@ function itemDetailUpsertFields(item: CatalogItem) {
   };
 }
 
-async function main() {
-  // Fail fast: GrantedAbility.name is globally unique, so the four source
-  // arrays must not collide before we upsert them by name.
-  const grantedNames = [...MANEUVERS, ...DISCIPLINES, ...SHADOW_ARTS, ...CHANNEL_DIVINITIES].map((a) => a.name);
-  const dupeGranted = grantedNames.find((name, i) => grantedNames.indexOf(name) !== i);
-  if (dupeGranted) throw new Error(`Seed error: duplicate GrantedAbility name "${dupeGranted}" across maneuvers/disciplines/shadow-arts/channel-divinity`);
-
+async function seedRaces(prisma: PrismaClient) {
   for (const race of RACES) {
     await prisma.race.upsert({ where: { name: race.name }, create: race, update: race });
   }
+}
 
+// Returns className → id so subclasses can resolve their parent class.
+async function seedClasses(prisma: PrismaClient) {
   const classIds = new Map<string, string>();
   for (const cls of CLASSES) {
     const row = await prisma.characterClass.upsert({ where: { name: cls.name }, create: cls, update: cls });
     classIds.set(row.name, row.id);
   }
+  return classIds;
+}
 
-  // Seed subclasses — upsert by (classId, name) unique constraint.
+// Upsert by (classId, name) unique constraint.
+async function seedSubclasses(prisma: PrismaClient, classIds: Map<string, string>) {
   for (const sub of SUBCLASSES) {
     const classId = classIds.get(sub.className);
     if (!classId) throw new Error(`Seed error: unknown class "${sub.className}" in SUBCLASSES`);
@@ -73,39 +79,33 @@ async function main() {
       update: { description: sub.description },
     });
   }
+}
 
-  // Seed action catalog — upsert by unique key.
+// Upsert the action catalog by unique key.
+async function seedActions(prisma: PrismaClient) {
   for (const action of ACTIONS) {
+    const fields = {
+      name: action.name,
+      description: action.description,
+      cost: action.cost,
+      universal: action.universal ?? false,
+      grantClass: orNull(action.grantClass),
+      grantSubclass: orNull(action.grantSubclass),
+      grantLevel: orNull(action.grantLevel),
+      resourceKey: orNull(action.resourceKey),
+      resourceAmount: orNull(action.resourceAmount),
+    };
     await prisma.action.upsert({
       where: { key: action.key },
-      create: {
-        key: action.key,
-        name: action.name,
-        description: action.description,
-        cost: action.cost,
-        universal: action.universal ?? false,
-        grantClass: action.grantClass ?? null,
-        grantSubclass: action.grantSubclass ?? null,
-        grantLevel: action.grantLevel ?? null,
-        resourceKey: action.resourceKey ?? null,
-        resourceAmount: action.resourceAmount ?? null,
-      },
-      update: {
-        name: action.name,
-        description: action.description,
-        cost: action.cost,
-        universal: action.universal ?? false,
-        grantClass: action.grantClass ?? null,
-        grantSubclass: action.grantSubclass ?? null,
-        grantLevel: action.grantLevel ?? null,
-        resourceKey: action.resourceKey ?? null,
-        resourceAmount: action.resourceAmount ?? null,
-      },
+      create: { key: action.key, ...fields },
+      update: fields,
     });
   }
+}
 
-  // Seed maneuver catalog as GrantedAbility rows (source "maneuver"). Every
-  // maneuver costs 1 superiority die and rolls it (effectDieSource).
+// Seed maneuver catalog as GrantedAbility rows (source "maneuver"). Every
+// maneuver costs 1 superiority die and rolls it (effectDieSource).
+async function seedManeuvers(prisma: PrismaClient) {
   for (const maneuver of MANEUVERS) {
     const data = {
       name: maneuver.name,
@@ -114,9 +114,9 @@ async function main() {
       minLevel: 3,
       alwaysKnown: false,
       placement: maneuver.placement,
-      actionSlot: maneuver.actionSlot ?? null,
-      selfTempHp: maneuver.selfTempHp ?? false,
-      saveAbility: maneuver.saveAbility ?? null,
+      actionSlot: orNull(maneuver.actionSlot),
+      selfTempHp: orElse(maneuver.selfTempHp, false),
+      saveAbility: orNull(maneuver.saveAbility),
       costKind: "pool",
       costPoolKey: "superiorityDice",
       costBase: 1,
@@ -128,26 +128,28 @@ async function main() {
       update: data,
     });
   }
+}
 
-  // Seed elemental discipline catalog — upsert by unique name.
+// Seed elemental discipline catalog — upsert by unique name.
+async function seedDisciplines(prisma: PrismaClient) {
   for (const discipline of DISCIPLINES) {
     const data = {
       name: discipline.name,
       source: "discipline",
       description: discipline.description,
       minLevel: discipline.minLevel,
-      alwaysKnown: discipline.alwaysKnown ?? false,
-      saveAbility: discipline.saveAbility ?? null,
-      costKind: discipline.costKind ?? null,
-      costPoolKey: discipline.costPoolKey ?? null,
-      costBase: discipline.costBase ?? null,
-      costPerStep: discipline.costPerStep ?? null,
-      effectKind: discipline.effectKind ?? null,
-      effectDiceCount: discipline.effectDiceCount ?? null,
-      effectDiceFaces: discipline.effectDiceFaces ?? null,
-      damageType: discipline.damageType ?? null,
-      attackType: discipline.attackType ?? null,
-      saveEffect: discipline.saveEffect ?? null,
+      alwaysKnown: orElse(discipline.alwaysKnown, false),
+      saveAbility: orNull(discipline.saveAbility),
+      costKind: orNull(discipline.costKind),
+      costPoolKey: orNull(discipline.costPoolKey),
+      costBase: orNull(discipline.costBase),
+      costPerStep: orNull(discipline.costPerStep),
+      effectKind: orNull(discipline.effectKind),
+      effectDiceCount: orNull(discipline.effectDiceCount),
+      effectDiceFaces: orNull(discipline.effectDiceFaces),
+      damageType: orNull(discipline.damageType),
+      attackType: orNull(discipline.attackType),
+      saveEffect: orNull(discipline.saveEffect),
     };
     await prisma.grantedAbility.upsert({
       where: { name: discipline.name },
@@ -155,8 +157,10 @@ async function main() {
       update: data,
     });
   }
+}
 
-  // Seed Shadow Arts catalog — upsert by unique name. Flat 2-ki, no scaling.
+// Seed Shadow Arts catalog — upsert by unique name. Flat 2-ki, no scaling.
+async function seedShadowArts(prisma: PrismaClient) {
   for (const art of SHADOW_ARTS) {
     const data = {
       name: art.name,
@@ -168,9 +172,9 @@ async function main() {
       costPoolKey: "ki",
       costBase: 2,
       costPerStep: null,
-      effectKind: art.effectKind ?? null,
-      buffTarget: art.buffTarget ?? null,
-      buffModifier: art.buffModifier ?? null,
+      effectKind: orNull(art.effectKind),
+      buffTarget: orNull(art.buffTarget),
+      buffModifier: orNull(art.buffModifier),
     };
     await prisma.grantedAbility.upsert({
       where: { name: art.name },
@@ -178,8 +182,10 @@ async function main() {
       update: data,
     });
   }
+}
 
-  // Seed Channel Divinity catalog — upsert by unique name. Each spends 1 CD charge.
+// Seed Channel Divinity catalog — upsert by unique name. Each spends 1 CD charge.
+async function seedChannelDivinities(prisma: PrismaClient) {
   for (const cd of CHANNEL_DIVINITIES) {
     const data = {
       name: cd.name,
@@ -191,9 +197,9 @@ async function main() {
       costPoolKey: "channelDivinity",
       costBase: 1,
       costPerStep: null,
-      saveAbility: cd.saveAbility ?? null,
-      effectKind: cd.effectKind ?? null,
-      buffTarget: cd.buffTarget ?? null,
+      saveAbility: orNull(cd.saveAbility),
+      effectKind: orNull(cd.effectKind),
+      buffTarget: orNull(cd.buffTarget),
       buffModifier: null,
     };
     await prisma.grantedAbility.upsert({
@@ -202,22 +208,26 @@ async function main() {
       update: data,
     });
   }
+}
 
-  // Seed feat catalog — upsert by unique name.
+// Seed feat catalog — upsert by unique name.
+async function seedFeats(prisma: PrismaClient) {
   for (const feat of FEATS) {
     await prisma.feat.upsert({
       where: { name: feat.name },
       create: feat,
       update: {
         description: feat.description,
-        prerequisite: feat.prerequisite ?? null,
-        abilityOptions: feat.abilityOptions ?? [],
-        abilityIncrease: feat.abilityIncrease ?? 0,
-        improvements: feat.improvements ?? [],
+        prerequisite: orNull(feat.prerequisite),
+        abilityOptions: orElse(feat.abilityOptions, []),
+        abilityIncrease: orElse(feat.abilityIncrease, 0),
+        improvements: orElse(feat.improvements, []),
       },
     });
   }
+}
 
+async function seedBackgrounds(prisma: PrismaClient) {
   for (const background of BACKGROUNDS) {
     await prisma.background.upsert({
       where: { name: background.name },
@@ -225,8 +235,10 @@ async function main() {
       update: background,
     });
   }
+}
 
-  // Seed spell catalog — upsert by unique name, same idempotent pattern as items.
+// Seed spell catalog — upsert by unique name, same idempotent pattern as items.
+async function seedSpells(prisma: PrismaClient) {
   for (const spell of SPELLS) {
     await prisma.spell.upsert({
       where: { name: spell.name },
@@ -234,7 +246,10 @@ async function main() {
       update: spell,
     });
   }
+}
 
+// Returns itemName → id so packs can resolve their contents.
+async function seedItems(prisma: PrismaClient) {
   const itemIdsByName = new Map<string, string>();
   for (const item of ITEMS) {
     const { name, category, weight, cost, description } = item;
@@ -245,10 +260,13 @@ async function main() {
     });
     itemIdsByName.set(row.name, row.id);
   }
+  return itemIdsByName;
+}
 
-  // Seed equipment packs. Each pack is upserted by name; contents are replaced
-  // wholesale (deleteMany + create) since PackContent has no stable business key
-  // to upsert against — same pattern as classEntries / inventoryItems above.
+// Seed equipment packs. Each pack is upserted by name; contents are replaced
+// wholesale (deleteMany + create) since PackContent has no stable business key
+// to upsert against — same pattern as classEntries / inventoryItems above.
+async function seedPacks(prisma: PrismaClient, itemIdsByName: Map<string, string>) {
   for (const pack of PACKS) {
     const { id: packId } = await prisma.pack.upsert({
       where: { name: pack.name },
@@ -264,7 +282,23 @@ async function main() {
       })),
     });
   }
+}
 
+async function main() {
+  assertUniqueGrantedAbilityNames([...MANEUVERS, ...DISCIPLINES, ...SHADOW_ARTS, ...CHANNEL_DIVINITIES]);
+  await seedRaces(prisma);
+  const classIds = await seedClasses(prisma);
+  await seedSubclasses(prisma, classIds);
+  await seedActions(prisma);
+  await seedManeuvers(prisma);
+  await seedDisciplines(prisma);
+  await seedShadowArts(prisma);
+  await seedChannelDivinities(prisma);
+  await seedFeats(prisma);
+  await seedBackgrounds(prisma);
+  await seedSpells(prisma);
+  const itemIdsByName = await seedItems(prisma);
+  await seedPacks(prisma, itemIdsByName);
 }
 
 main()
