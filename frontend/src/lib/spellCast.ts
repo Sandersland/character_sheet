@@ -11,8 +11,81 @@
 import { rollSpec } from "@/lib/dice";
 import { abilityModifier } from "@/lib/abilities";
 import { readEffectSpec, resolveEffectSpec } from "@/lib/effects";
-import type { AbilityName, Character, Spell } from "@/types/character";
+import type {
+  AbilityName,
+  CastSpellOperation,
+  Character,
+  Spell,
+  SpellcastingOperation,
+} from "@/types/character";
 import type { RollSpec, RollResult } from "@/lib/dice";
+
+// The inline result banner shown immediately after a cast.
+export interface CastResult {
+  spellName: string;
+  total: number;
+  diceStr: string;
+  effectKind: "damage" | "heal";
+  damageType?: string | null;
+  slotLevel?: number;
+}
+
+// The ops to send + the banner to show for a cast — no React/state.
+export interface CastPlan {
+  ops: SpellcastingOperation[];
+  result: CastResult | null;
+}
+
+// A cast produces a display banner only for damage/heal spells; buff/utility
+// spells have no effect dice (computeCastRoll returns null).
+function bannerFor(
+  spell: Spell,
+  roll: { spec: RollSpec; total: number },
+  slotLevel: number | undefined,
+): CastResult | null {
+  if (spell.effectKind !== "damage" && spell.effectKind !== "heal") return null;
+  return {
+    spellName: spell.name,
+    total: roll.total,
+    diceStr: `${roll.spec.count}d${roll.spec.faces}`,
+    effectKind: spell.effectKind,
+    damageType: spell.damageType,
+    slotLevel,
+  };
+}
+
+// Item-granted spell (#528): cast from the item's own resource at its configured
+// slot level (may upcast above the spell's base level), never a spell slot.
+function planItemCast(spell: Spell, character: Character): CastPlan {
+  const castLevel = spell.item?.castLevel ?? spell.level;
+  const castRoll = computeCastRoll(spell, character, castLevel);
+  const result = castRoll ? bannerFor(spell, castRoll, undefined) : null;
+  return { ops: [{ type: "castItemSpell", entryId: spell.id, roll: castRoll?.total ?? 0 }], result };
+}
+
+// Plan a cast: which ops to send and whether to show a roll banner. Rolls dice
+// via computeCastRoll but holds no React state — SpellsSection wires the result.
+export function planCast(spell: Spell, character: Character, slotLevel?: number): CastPlan {
+  if (spell.source === "item") return planItemCast(spell, character);
+
+  const isCantrip = spell.level === 0;
+  const resolvedSlotLevel = slotLevel ?? spell.level;
+  const castRoll = computeCastRoll(spell, character, resolvedSlotLevel);
+
+  if (!castRoll) {
+    // No effect dice — just expend the slot (cantrips expend nothing).
+    const ops: SpellcastingOperation[] = isCantrip
+      ? []
+      : [{ type: "castSpell", entryId: spell.id, slotLevel: resolvedSlotLevel, roll: 0 }];
+    return { ops, result: null };
+  }
+
+  const result = bannerFor(spell, castRoll, isCantrip ? undefined : slotLevel);
+  const op: CastSpellOperation = isCantrip
+    ? { type: "castSpell", entryId: spell.id, roll: castRoll.total }
+    : { type: "castSpell", entryId: spell.id, slotLevel: resolvedSlotLevel, roll: castRoll.total };
+  return { ops: [op], result };
+}
 
 /**
  * Compute the dice spec for casting `spell` at `slotLevel` — pure, no side
@@ -40,15 +113,10 @@ export function computeCastSpec(
   return resolveEffectSpec(spec, effectiveStep, { characterLevel: character.level, abilityMod });
 }
 
-/**
- * Roll the effect dice for casting `spell` at `slotLevel`. Returns null when
- * the spell has no effect dice (same condition as computeCastSpec).
- *
- * Use this in out-of-session contexts (SpellsSection) where the caller owns
- * the random roll. In session mode (InlineSpellPicker) prefer `computeCastSpec`
- * + `RollContext.roll()` so the result surfaces in the shared toast.
- */
-export function computeCastRoll(
+// Roll the effect dice for casting `spell` at `slotLevel` — null when the spell
+// has no effect dice. Internal to planCast; session mode uses computeCastSpec +
+// RollContext.roll() so the result surfaces in the shared toast.
+function computeCastRoll(
   spell: Spell,
   character: Character,
   slotLevel: number,

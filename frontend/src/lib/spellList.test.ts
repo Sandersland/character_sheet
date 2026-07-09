@@ -69,6 +69,9 @@ describe("deriveSpellList", () => {
     expect(deriveSpellList(character).availableArcanaLevels).toEqual([6]);
   });
 
+});
+
+describe("deriveSpellList — spellbook grouping", () => {
   it("collects learned catalog spell ids and skips entries without a spellId", () => {
     const character = makeCharacter({
       spellcasting: {
@@ -102,6 +105,9 @@ describe("deriveSpellList", () => {
     expect(d.spellLevels).toEqual([0, 1]);
   });
 
+});
+
+describe("deriveSpellList — buffs & pact labeling", () => {
   it("selects only while-active buffs sourced from a spell in the book", () => {
     const character = makeCharacter({
       activeEffects: {
