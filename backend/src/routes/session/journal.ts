@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { assertCharacterAccess } from "../../lib/auth/access.js";
+import { parseBodyOr400 } from "../../lib/http/parse-body.js";
 import type { Prisma, PrismaClient } from "../../generated/prisma/client.js";
 import { extractEntityIds, reconcileEntryRefs } from "../../lib/journal-refs.js";
 import { prisma } from "../../lib/prisma.js";
@@ -145,15 +146,8 @@ async function serializeForCharacter(characterId: string) {
 journalRouter.post("/characters/:id/journal", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
-  const parseResult = createJournalSchema.safeParse(req.body);
-  if (!parseResult.success) {
-    res
-      .status(400)
-      .json({ error: "Invalid request body", details: parseResult.error.flatten() });
-    return;
-  }
-
-  const data = parseResult.data;
+  const data = parseBodyOr400(createJournalSchema, req.body, res);
+  if (data === undefined) return;
 
   // A NOTE with no explicit session auto-attaches to the character's active
   // session (if one is running), so in-session capture lands on the right log.
@@ -186,13 +180,8 @@ journalRouter.post("/characters/:id/journal", async (req, res) => {
 journalRouter.patch("/characters/:id/journal/:entryId", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
 
-  const parseResult = updateJournalSchema.safeParse(req.body);
-  if (!parseResult.success) {
-    res
-      .status(400)
-      .json({ error: "Invalid request body", details: parseResult.error.flatten() });
-    return;
-  }
+  const data = parseBodyOr400(updateJournalSchema, req.body, res);
+  if (data === undefined) return;
 
   const entry = await prisma.journalEntry.findUnique({
     where: { id: req.params.entryId },
@@ -206,11 +195,11 @@ journalRouter.patch("/characters/:id/journal/:entryId", async (req, res) => {
   await prisma.$transaction(async (tx) => {
     await tx.journalEntry.update({
       where: { id: entry.id },
-      data: parseResult.data,
+      data,
     });
     // Re-derive refs only when the body changed.
-    if (parseResult.data.body !== undefined) {
-      await syncEntryRefs(tx, req.params.id, entry.id, parseResult.data.body, req.user!.id);
+    if (data.body !== undefined) {
+      await syncEntryRefs(tx, req.params.id, entry.id, data.body, req.user!.id);
     }
   });
 
