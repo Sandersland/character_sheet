@@ -173,8 +173,10 @@ describe("POST /:id/actions/transactions — Rage (#458)", () => {
   it("the activation batch logs exactly a spendResource + buffApplied pair under one batchId", async () => {
     await createBarbarian(L1);
     await executeAction("rage");
-    const batchId = await latestBatchId();
-    const types = (await activity()).filter((e) => e.batchId === batchId).map((e) => e.type).sort();
+    const events = await activity();
+    const batchId = events.find((e) => e.type !== "revert" && e.batchId)?.batchId;
+    expect(batchId).toBeDefined();
+    const types = events.filter((e) => e.batchId === batchId).map((e) => e.type).sort();
     expect(types).toEqual(["buffApplied", "spendResource"]);
   });
 
@@ -194,6 +196,14 @@ describe("POST /:id/actions/transactions — Rage (#458)", () => {
     const res = await damage(12, "bludgeoning");
     expect(res.status).toBe(200);
     expect(res.body.hitPoints.current).toBe(34); // 40 - (12 halved to 6)
+  });
+
+  it("does NOT halve non-matching (fire) damage while raging — resistance is b/p/s only", async () => {
+    await createBarbarian(L1);
+    await executeAction("rage");
+    const res = await damage(12, "fire");
+    expect(res.status).toBe(200);
+    expect(res.body.hitPoints.current).toBe(28); // 40 - 12 taken in full, not halved
   });
 
   it("endRage clears the buff and resistance, and does NOT refund the rage use", async () => {
