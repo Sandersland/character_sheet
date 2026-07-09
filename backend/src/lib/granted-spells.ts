@@ -5,7 +5,15 @@
 // Phase-D versioning concern (introduced uniformly with spells/items), not by
 // persisting grants ad-hoc.
 
-import { castUsesTotal, chargePoolOf, readCapability, type CapabilityColumns } from "./capabilities.js";
+import {
+  castUsesTotal,
+  chargePoolOf,
+  readCapability,
+  type CapabilityColumns,
+  type CastSpellCapability,
+  type CastStatMode,
+  type ChargesCapability,
+} from "./capabilities.js";
 import type { SpellEntry } from "./spell-state.js";
 
 // The six ability scores, lowercase — the shape of Character.abilityScores.
@@ -79,6 +87,74 @@ export interface ItemSpellSourceItem {
 // that concentration/resolveConcentration key on. The trailing capabilityId keeps
 // the id unique when one item carries two castSpell caps for the SAME spell.
 // Never persisted: re-derived on every read from the InventoryCapability rows.
+// The item's shared charge pool resolved once per item (null when the item has
+// none). row carries the capability's id/used columns for the pool's remaining.
+type ItemSpellCap = ItemSpellSourceItem["capabilities"][number];
+type ItemChargePool = { cap: ChargesCapability; row: ItemSpellCap } | null;
+
+// One castSpell capability's remaining/total uses. A charges-costed cast mirrors
+// the shared pool's remaining/max (no per-item counter); every other resource
+// tracks its own `used` column against castUsesTotal.
+function itemSpellUses(
+  cap: CastSpellCapability,
+  used: number,
+  pool: ItemChargePool,
+): { total: number; remaining: number; poolCapabilityId: string | null } {
+  if (cap.resource === "charges") {
+    // No pool on the item = misauthored (authoring forbids it): exhausted, not a crash.
+    const total = pool ? pool.cap.maxCharges : 0;
+    const remaining = pool ? Math.max(0, pool.cap.maxCharges - (pool.row.used ?? 0)) : 0;
+    return { total, remaining, poolCapabilityId: pool?.row.id ?? null };
+  }
+  const total = castUsesTotal(cap);
+  const remaining = total === Infinity ? Infinity : Math.max(0, total - used);
+  return { total, remaining, poolCapabilityId: null };
+}
+
+// A fixed-mode DC/attack resolves to its item value; wielder mode resolves later
+// against the holder's spell stats, so it's null here.
+function fixedStat(mode: CastStatMode, value: number | null | undefined): number | null {
+  return mode === "fixed" ? value ?? null : null;
+}
+
+// Build the derived SpellEntry for one item's castSpell capability.
+function itemSpellEntry(
+  item: ItemSpellSourceItem,
+  col: ItemSpellSourceItem["capabilities"][number],
+  cap: CastSpellCapability,
+  pool: ItemChargePool,
+): SpellEntry {
+  const { total, remaining, poolCapabilityId } = itemSpellUses(cap, col.used ?? 0, pool);
+  return {
+    id: `item:${item.id}:${cap.spellId}:${col.id}`,
+    spellId: cap.spellId,
+    name: cap.spellName || "Item spell",
+    level: cap.spellLevel,
+    school: "evocation",
+    prepared: true,
+    castingTime: "1 action",
+    range: "—",
+    duration: cap.concentration ? "Concentration" : "—",
+    description: cap.description ?? "",
+    concentration: cap.concentration,
+    source: "item",
+    item: {
+      inventoryItemId: item.id,
+      capabilityId: col.id,
+      itemName: item.name,
+      castLevel: cap.castLevel,
+      resource: cap.resource,
+      usesRemaining: remaining,
+      usesTotal: total,
+      dcMode: cap.dcMode,
+      dc: fixedStat(cap.dcMode, cap.dcValue),
+      attackMode: cap.attackMode,
+      attack: fixedStat(cap.attackMode, cap.attackValue),
+      ...(cap.resource === "charges" ? { poolCapabilityId, chargeCost: cap.chargeCost } : {}),
+    },
+  };
+}
+
 export function deriveItemSpells(items: ItemSpellSourceItem[]): SpellEntry[] {
   const out: SpellEntry[] = [];
   for (const item of items) {
@@ -89,47 +165,7 @@ export function deriveItemSpells(items: ItemSpellSourceItem[]): SpellEntry[] {
     for (const col of item.capabilities) {
       const cap = readCapability(col);
       if (cap.kind !== "castSpell") continue;
-      let total: number;
-      let remaining: number;
-      let poolCapabilityId: string | null = null;
-      if (cap.resource === "charges") {
-        // No pool on the item = misauthored (authoring forbids it): exhausted, not a crash.
-        total = pool ? pool.cap.maxCharges : 0;
-        remaining = pool ? Math.max(0, pool.cap.maxCharges - (pool.row.used ?? 0)) : 0;
-        poolCapabilityId = pool?.row.id ?? null;
-      } else {
-        total = castUsesTotal(cap);
-        const used = col.used ?? 0;
-        remaining = total === Infinity ? Infinity : Math.max(0, total - used);
-      }
-      out.push({
-        id: `item:${item.id}:${cap.spellId}:${col.id}`,
-        spellId: cap.spellId,
-        name: cap.spellName || "Item spell",
-        level: cap.spellLevel,
-        school: "evocation",
-        prepared: true,
-        castingTime: "1 action",
-        range: "—",
-        duration: cap.concentration ? "Concentration" : "—",
-        description: cap.description ?? "",
-        concentration: cap.concentration,
-        source: "item",
-        item: {
-          inventoryItemId: item.id,
-          capabilityId: col.id,
-          itemName: item.name,
-          castLevel: cap.castLevel,
-          resource: cap.resource,
-          usesRemaining: remaining,
-          usesTotal: total,
-          dcMode: cap.dcMode,
-          dc: cap.dcMode === "fixed" ? cap.dcValue ?? null : null,
-          attackMode: cap.attackMode,
-          attack: cap.attackMode === "fixed" ? cap.attackValue ?? null : null,
-          ...(cap.resource === "charges" ? { poolCapabilityId, chargeCost: cap.chargeCost } : {}),
-        },
-      });
+      out.push(itemSpellEntry(item, col, cap, pool));
     }
   }
   return out;

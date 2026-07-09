@@ -248,66 +248,97 @@ const baseFields = {
   capabilities: z.array(capabilityInputSchema).superRefine(refineChargesPool).optional(),
 };
 
-// Map a capability input onto the flat side-table columns.
-function capabilityCreate(cap: z.infer<typeof capabilityInputSchema>) {
-  if (cap.kind === "castSpell") {
-    return {
-      kind: cap.kind,
-      description: cap.description ?? null,
-      spellId: cap.spellId,
-      spellName: cap.spellName,
-      spellLevel: cap.spellLevel,
-      castLevel: cap.castLevel,
-      castResource: cap.resource,
-      castUses: cap.uses ?? 1,
-      castConcentration: cap.concentration ?? false,
-      dcMode: cap.dcMode,
-      dcValue: cap.dcValue ?? null,
-      attackMode: cap.attackMode,
-      attackValue: cap.attackValue ?? null,
-      chargeCost: cap.resource === "charges" ? cap.chargeCost ?? 1 : null,
-    };
-  }
-  if (cap.kind === "charges") {
-    return {
-      kind: cap.kind,
-      description: cap.description ?? null,
-      maxCharges: cap.maxCharges,
-      rechargeTrigger: cap.recharge.trigger,
-      rechargeDiceCount: cap.recharge.dice?.count ?? null,
-      rechargeDiceFaces: cap.recharge.dice?.faces ?? null,
-      rechargeBonus: cap.recharge.bonus ?? null,
-    };
-  }
-  if (cap.kind === "grant") {
-    return {
-      kind: cap.kind,
-      description: cap.description ?? null,
-      grantType: cap.grantType,
-      grantOn: cap.grantOn ?? null,
-      grantValueKind: cap.grantValueKind ?? null,
-      grantValue: cap.grantValue ?? null,
-      cantBeSurprised: cap.cantBeSurprised ?? false,
-    };
-  }
+// Nullish default as a call, not a `??` operator — keeps each per-kind column
+// builder's field defaulting out of its branch count.
+function orElse<T>(value: T | null | undefined, fallback: T): T {
+  return value ?? fallback;
+}
+
+// The three flat dice columns a passiveBonus/activatedEffect input maps to.
+function diceColumns(dice?: { count: number; faces: number; damageType?: string }) {
+  return {
+    valueDiceCount: orElse(dice?.count, null),
+    valueDiceFaces: orElse(dice?.faces, null),
+    valueDamageType: orElse(dice?.damageType, null),
+  };
+}
+
+// Per-kind builders mapping a capability input onto the flat side-table columns.
+function castSpellColumns(cap: z.infer<typeof castSpellInputSchema>) {
+  return {
+    kind: cap.kind,
+    description: orElse(cap.description, null),
+    spellId: cap.spellId,
+    spellName: cap.spellName,
+    spellLevel: cap.spellLevel,
+    castLevel: cap.castLevel,
+    castResource: cap.resource,
+    castUses: orElse(cap.uses, 1),
+    castConcentration: orElse(cap.concentration, false),
+    dcMode: cap.dcMode,
+    dcValue: orElse(cap.dcValue, null),
+    attackMode: cap.attackMode,
+    attackValue: orElse(cap.attackValue, null),
+    chargeCost: cap.resource === "charges" ? orElse(cap.chargeCost, 1) : null,
+  };
+}
+
+function chargesColumns(cap: z.infer<typeof chargesInputSchema>) {
+  return {
+    kind: cap.kind,
+    description: orElse(cap.description, null),
+    maxCharges: cap.maxCharges,
+    rechargeTrigger: cap.recharge.trigger,
+    rechargeDiceCount: orElse(cap.recharge.dice?.count, null),
+    rechargeDiceFaces: orElse(cap.recharge.dice?.faces, null),
+    rechargeBonus: orElse(cap.recharge.bonus, null),
+  };
+}
+
+function grantColumns(cap: z.infer<typeof grantInputSchema>) {
+  return {
+    kind: cap.kind,
+    description: orElse(cap.description, null),
+    grantType: cap.grantType,
+    grantOn: orElse(cap.grantOn, null),
+    grantValueKind: orElse(cap.grantValueKind, null),
+    grantValue: orElse(cap.grantValue, null),
+    cantBeSurprised: orElse(cap.cantBeSurprised, false),
+  };
+}
+
+// passiveBonus + activatedEffect share the flat target/op/value + activation columns.
+function passiveColumns(cap: z.infer<typeof passiveBonusInputSchema>) {
   return {
     kind: cap.kind,
     target: cap.target,
     op: cap.op,
-    value: cap.value ?? null,
-    targetKey: cap.targetKey ?? null,
-    condition: cap.condition ?? null,
-    description: cap.description ?? null,
-    valueDiceCount: cap.dice?.count ?? null,
-    valueDiceFaces: cap.dice?.faces ?? null,
-    valueDamageType: cap.dice?.damageType ?? null,
-    activation: cap.activation ?? null,
-    activatedDuration: cap.activatedDuration ?? null,
-    resourceKind: cap.resourceKind ?? null,
-    resourcePeriod: cap.resourcePeriod ?? null,
-    resourceCharges: cap.resourceCharges ?? null,
-    durationText: cap.durationText ?? null,
+    value: orElse(cap.value, null),
+    targetKey: orElse(cap.targetKey, null),
+    condition: orElse(cap.condition, null),
+    description: orElse(cap.description, null),
+    ...diceColumns(cap.dice),
+    activation: orElse(cap.activation, null),
+    activatedDuration: orElse(cap.activatedDuration, null),
+    resourceKind: orElse(cap.resourceKind, null),
+    resourcePeriod: orElse(cap.resourcePeriod, null),
+    resourceCharges: orElse(cap.resourceCharges, null),
+    durationText: orElse(cap.durationText, null),
   };
+}
+
+// Map a capability input onto the flat side-table columns.
+function capabilityCreate(cap: z.infer<typeof capabilityInputSchema>) {
+  switch (cap.kind) {
+    case "castSpell":
+      return castSpellColumns(cap);
+    case "charges":
+      return chargesColumns(cap);
+    case "grant":
+      return grantColumns(cap);
+    default:
+      return passiveColumns(cap);
+  }
 }
 
 // Reject a wielder-mode castSpell on an item not intended for a spellcaster —
