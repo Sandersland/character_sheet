@@ -48,7 +48,9 @@ frontend/src/
 │   ├── journal/         # CapturePalette (Cmd/Ctrl+J quick-capture NOTE overlay)
 │   ├── session/         # TurnHub (→ useTurnActions + TurnControls/ActionSlot/BonusActionSlot/
 │   │                    #   ReactionSlot/EffectManeuverStrip/LayOnHandsInput), useTurnState, SessionLog,
-│   │                    #   SessionsModal, SessionSummaryModal, Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
+│   │                    #   SessionsModal, SessionSummaryModal (→ useSessionRecapDetail +
+│   │                    #   CampaignRecapSection/RecapFacts/RecapPrimitives/ParticipantRecapCard/
+│   │                    #   SessionJournalList/SessionAddXpForm), Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
 │   │                    #   AttackRow, EquipWeaponPanel, AttackOptionRow,
 │   │                    #   useSpellPicker + SpellPickerRow/SlotLevelSelector/SpellTargetToggle,
 │   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie,
@@ -121,6 +123,7 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 | `activatedEffect.ts` | Display labels for an `activatedEffect` capability's activation type — `activationLabel`/`ACTIVATION_LABELS` (action/bonus/reaction/commandWord), mirroring the backend `describeActivation`. Feeds `ActivateControl`. |
 | `characterSections.ts` | Sheet-section visibility predicates (`hasProficiencies`/`hasAdvancements`) — the inline card-gate expressions from CharacterSheetPage. |
 | `formatJournalDate.ts` | Formats ISO journal dates in UTC ("Jun 22, 2026"). |
+| `sessionRecap.ts` | Pure recap-shaping for `SessionSummaryModal` — `formatDuration`/`formatTimeRange` (window strings), `sortSlotsSpent` (drop-zero + ascending slot pairs), `withSummary` (participants carrying a computed summary) + the `SummarizedParticipant` type. |
 | `advancement.ts` | `entryDetail` — pretty-prints an AdvancementEntry's ASI/feat effects for AdvancementSection's list view. |
 
 ### `@/` path alias
