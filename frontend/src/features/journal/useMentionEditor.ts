@@ -404,6 +404,8 @@ export function useMentionEditor({ value, onChange, campaignId, onKeyDown }: Use
   useEffect(() => {
     const el = innerRef.current;
     if (el) syncEditorDom(el, value, s.namesKey, lastNamesKey, s.resolve);
+    // innerRef/lastNamesKey are stable refs; s.resolve changes exactly when s.namesKey
+    // changes (both track byId), so namesKey in the dep array already covers it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, s.namesKey]);
 
