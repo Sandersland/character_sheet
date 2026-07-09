@@ -21,7 +21,7 @@ pre-commit:
   parallel: true
   commands:
     # fallow audit on changed files: dead code, complexity, duplication.
-    # Baseline-aware (.fallowrc.json + .fallow/baseline.json); skips silently
+    # Baseline-aware (.fallowrc.jsonc + .fallow/baseline.json); skips silently
     # if fallow isn't installed so the hook stays infra-free.
     fallow:
       run: |
@@ -30,7 +30,7 @@ pre-commit:
         if [ -n "$UPSTREAM" ]; then
           BASE="$(git merge-base "$UPSTREAM" HEAD 2>/dev/null || echo "$UPSTREAM")"
         else
-          BASE="staging"
+          BASE="origin/staging"
         fi
         fallow audit --base "$BASE" --quiet --gate-marker pre-commit
     lint-backend:
