@@ -2,7 +2,8 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { Prisma } from "../../generated/prisma/client.js";
-import { assertCampaignMembership } from "../../lib/auth/access.js";
+import { assertCampaignMembership, assertCampaignOwner } from "../../lib/auth/access.js";
+import { parseBodyOr400 } from "../../lib/http/parse-body.js";
 import {
   ADVANTAGE_ON,
   ATTUNEMENT_PREREQ_KINDS,
@@ -408,11 +409,13 @@ function detailCreate(data: z.infer<typeof createItemSchema>) {
 // ── GET /api/campaigns/:id/items ─────────────────────────────────────────────
 // Owner-only full list (Manage tab) — includes dmNotes. Players get 403.
 campaignItemsRouter.get("/campaigns/:id/items", async (req, res) => {
-  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
-  if (role !== "OWNER") {
-    res.status(403).json({ error: "Only the campaign owner may manage campaign items" });
-    return;
-  }
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    req.params.id,
+    "view",
+    "Only the campaign owner may manage campaign items",
+  );
 
   const items = await prisma.campaignItem.findMany({
     where: { campaignId: req.params.id },
@@ -454,18 +457,16 @@ campaignItemsRouter.get("/campaigns/:id/items/by-entity/:entityId", async (req, 
 // ── POST /api/campaigns/:id/items ────────────────────────────────────────────
 // Owner-only create. Auto-registers a HIDDEN ITEM entity + link in one txn.
 campaignItemsRouter.post("/campaigns/:id/items", async (req, res) => {
-  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
-  if (role !== "OWNER") {
-    res.status(403).json({ error: "Only the campaign owner may manage campaign items" });
-    return;
-  }
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    req.params.id,
+    "edit",
+    "Only the campaign owner may manage campaign items",
+  );
 
-  const parseResult = createItemSchema.safeParse(req.body);
-  if (!parseResult.success) {
-    res.status(400).json({ error: "Invalid request body", details: parseResult.error.flatten() });
-    return;
-  }
-  const data = parseResult.data;
+  const data = parseBodyOr400(createItemSchema, req.body, res);
+  if (data === undefined) return;
   const wielderError = assertWielderModeAllowed(data);
   if (wielderError) {
     res.status(400).json({ error: wielderError });
@@ -508,18 +509,16 @@ campaignItemsRouter.post("/campaigns/:id/items", async (req, res) => {
 // ── PATCH /api/campaigns/:id/items/:itemId ───────────────────────────────────
 // Owner-only update. A rename is mirrored onto the fronting entity in the txn.
 campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
-  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
-  if (role !== "OWNER") {
-    res.status(403).json({ error: "Only the campaign owner may manage campaign items" });
-    return;
-  }
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    req.params.id,
+    "edit",
+    "Only the campaign owner may manage campaign items",
+  );
 
-  const parseResult = updateItemSchema.safeParse(req.body);
-  if (!parseResult.success) {
-    res.status(400).json({ error: "Invalid request body", details: parseResult.error.flatten() });
-    return;
-  }
-  const data = parseResult.data;
+  const data = parseBodyOr400(updateItemSchema, req.body, res);
+  if (data === undefined) return;
 
   const existing = await prisma.campaignItem.findUnique({
     where: { id: req.params.itemId },
@@ -606,11 +605,13 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
 // deletes its linked entity in the same transaction (which cascades the link +
 // any journal refs). The item delete cascades its detail rows.
 campaignItemsRouter.delete("/campaigns/:id/items/:itemId", async (req, res) => {
-  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
-  if (role !== "OWNER") {
-    res.status(403).json({ error: "Only the campaign owner may manage campaign items" });
-    return;
-  }
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    req.params.id,
+    "edit",
+    "Only the campaign owner may manage campaign items",
+  );
 
   const existing = await prisma.campaignItem.findUnique({
     where: { id: req.params.itemId },
@@ -636,25 +637,24 @@ campaignItemsRouter.delete("/campaigns/:id/items/:itemId", async (req, res) => {
 // character's inventory, reveals the fronting entity, and writes an undoable
 // audit event on the TARGET character. Unique-item conflicts 409 with the holder.
 campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/award", async (req, res) => {
-  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
-  if (role !== "OWNER") {
-    res.status(403).json({ error: "Only the campaign owner may award campaign items" });
-    return;
-  }
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    req.params.id,
+    "edit",
+    "Only the campaign owner may award campaign items",
+  );
 
-  const parseResult = awardSchema.safeParse(req.body);
-  if (!parseResult.success) {
-    res.status(400).json({ error: "Invalid request body", details: parseResult.error.flatten() });
-    return;
-  }
+  const data = parseBodyOr400(awardSchema, req.body, res);
+  if (data === undefined) return;
 
   try {
     await awardCampaignItem({
       campaignId: req.params.id,
       campaignItemId: req.params.campaignItemId,
-      characterId: parseResult.data.characterId,
-      quantity: parseResult.data.quantity ?? 1,
-      sessionId: parseResult.data.sessionId,
+      characterId: data.characterId,
+      quantity: data.quantity ?? 1,
+      sessionId: data.sessionId,
     });
   } catch (err) {
     if (err instanceof CampaignItemAwardError) {
@@ -673,23 +673,22 @@ campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/award", async (re
 // audit event on the target character). A player-modified snapshot is still
 // revocable — the match is by campaignItemId, not by field equality.
 campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/revoke", async (req, res) => {
-  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
-  if (role !== "OWNER") {
-    res.status(403).json({ error: "Only the campaign owner may revoke campaign items" });
-    return;
-  }
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    req.params.id,
+    "edit",
+    "Only the campaign owner may revoke campaign items",
+  );
 
-  const parseResult = revokeSchema.safeParse(req.body);
-  if (!parseResult.success) {
-    res.status(400).json({ error: "Invalid request body", details: parseResult.error.flatten() });
-    return;
-  }
+  const data = parseBodyOr400(revokeSchema, req.body, res);
+  if (data === undefined) return;
 
   try {
     await revokeCampaignItem({
       campaignId: req.params.id,
       campaignItemId: req.params.campaignItemId,
-      characterId: parseResult.data.characterId,
+      characterId: data.characterId,
     });
   } catch (err) {
     if (err instanceof CampaignItemAwardError) {

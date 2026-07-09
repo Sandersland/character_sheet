@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
 
-import { assertCampaignMembership } from "../../lib/auth/access.js";
+import { assertCampaignMembership, assertCampaignOwner } from "../../lib/auth/access.js";
 import { collectMergedInIdentities, wouldCreateCycle } from "../../lib/entity-merges.js";
+import { parseBodyOr400 } from "../../lib/http/parse-body.js";
 import { normalizeForMatch } from "../../lib/journal-refs.js";
 import { prisma } from "../../lib/prisma.js";
 
@@ -81,15 +82,8 @@ entitiesRouter.get("/campaigns/:id/entities", async (req, res) => {
 entitiesRouter.post("/campaigns/:id/entities", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
 
-  const parseResult = createEntitySchema.safeParse(req.body);
-  if (!parseResult.success) {
-    res
-      .status(400)
-      .json({ error: "Invalid request body", details: parseResult.error.flatten() });
-    return;
-  }
-
-  const data = parseResult.data;
+  const data = parseBodyOr400(createEntitySchema, req.body, res);
+  if (data === undefined) return;
   // Setting visibility is an owner-only act (#379); a player creates REVEALED.
   if (data.visibility !== undefined && role !== "OWNER") {
     res.status(403).json({ error: "Only the campaign owner may set entity visibility" });
@@ -178,18 +172,17 @@ entitiesRouter.get("/campaigns/:id/entities/merges", async (req, res) => {
 // POST prepare — OWNER only. Validates same-campaign, no self-merge, the merged
 // entity isn't already merged, and no cycle. Creates a PREPARED record.
 entitiesRouter.post("/campaigns/:id/entities/merges", async (req, res) => {
-  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
-  if (role !== "OWNER") {
-    res.status(403).json({ error: "Only the campaign owner may merge entities" });
-    return;
-  }
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    req.params.id,
+    "edit",
+    "Only the campaign owner may merge entities",
+  );
 
-  const parsed = prepareMergeSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Invalid request body", details: parsed.error.flatten() });
-    return;
-  }
-  const { mergedEntityId, survivorEntityId, note } = parsed.data;
+  const parsed = parseBodyOr400(prepareMergeSchema, req.body, res);
+  if (parsed === undefined) return;
+  const { mergedEntityId, survivorEntityId, note } = parsed;
 
   if (mergedEntityId === survivorEntityId) {
     res.status(400).json({ error: "An entity cannot merge into itself" });
@@ -229,11 +222,13 @@ entitiesRouter.post("/campaigns/:id/entities/merges", async (req, res) => {
 // POST execute — OWNER only. Flips PREPARED→EXECUTED and auto-reveals a HIDDEN
 // survivor in the same txn (#379). Idempotent: keeps the first executedAt.
 entitiesRouter.post("/campaigns/:id/entities/merges/:mergeId/execute", async (req, res) => {
-  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
-  if (role !== "OWNER") {
-    res.status(403).json({ error: "Only the campaign owner may execute a merge" });
-    return;
-  }
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    req.params.id,
+    "edit",
+    "Only the campaign owner may execute a merge",
+  );
 
   const merge = await prisma.campaignEntityMerge.findUnique({ where: { id: req.params.mergeId } });
   if (!merge || merge.campaignId !== req.params.id) {
@@ -257,11 +252,13 @@ entitiesRouter.post("/campaigns/:id/entities/merges/:mergeId/execute", async (re
 // DELETE unmerge — OWNER only. Removes the record; the entities regain full
 // independence and refs stay pointing at whichever id was actually tagged.
 entitiesRouter.delete("/campaigns/:id/entities/merges/:mergeId", async (req, res) => {
-  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
-  if (role !== "OWNER") {
-    res.status(403).json({ error: "Only the campaign owner may unmerge entities" });
-    return;
-  }
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    req.params.id,
+    "edit",
+    "Only the campaign owner may unmerge entities",
+  );
 
   const merge = await prisma.campaignEntityMerge.findUnique({
     where: { id: req.params.mergeId },
@@ -282,16 +279,11 @@ entitiesRouter.delete("/campaigns/:id/entities/merges/:mergeId", async (req, res
 entitiesRouter.patch("/campaigns/:id/entities/:entityId", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
 
-  const parseResult = updateEntitySchema.safeParse(req.body);
-  if (!parseResult.success) {
-    res
-      .status(400)
-      .json({ error: "Invalid request body", details: parseResult.error.flatten() });
-    return;
-  }
+  const data = parseBodyOr400(updateEntitySchema, req.body, res);
+  if (data === undefined) return;
 
   // Changing visibility is owner-only (#379); basic-field edits stay member-level.
-  if (parseResult.data.visibility !== undefined && role !== "OWNER") {
+  if (data.visibility !== undefined && role !== "OWNER") {
     res.status(403).json({ error: "Only the campaign owner may change entity visibility" });
     return;
   }
@@ -312,7 +304,7 @@ entitiesRouter.patch("/campaigns/:id/entities/:entityId", async (req, res) => {
 
   const entity = await prisma.campaignEntity.update({
     where: { id: req.params.entityId },
-    data: parseResult.data,
+    data,
   });
 
   res.json(entity);
@@ -322,16 +314,13 @@ entitiesRouter.patch("/campaigns/:id/entities/:entityId", async (req, res) => {
 // Delete an entity (cascades its refs). OWNER only.
 
 entitiesRouter.delete("/campaigns/:id/entities/:entityId", async (req, res) => {
-  const { role } = await assertCampaignMembership(
+  await assertCampaignOwner(
     prisma,
     req.user!.id,
     req.params.id,
     "edit",
+    "Only the campaign owner may delete entities",
   );
-  if (role !== "OWNER") {
-    res.status(403).json({ error: "Only the campaign owner may delete entities" });
-    return;
-  }
 
   const existing = await prisma.campaignEntity.findUnique({
     where: { id: req.params.entityId },
