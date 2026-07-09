@@ -238,86 +238,117 @@ export interface CapabilityColumns {
   chargeCost?: number | null;
 }
 
+// Nullish default as a call, not a `??` operator — keeps the per-kind readers'
+// field defaulting out of their branch count (each `??` is a cyclomatic branch).
+function orElse<T>(value: T | null | undefined, fallback: T): T {
+  return value ?? fallback;
+}
+
+// Optional dice payload shared by passiveBonus (value dice) and charges (recharge
+// dice): present only when both count and faces are set, else null.
+function readDicePair(count?: number | null, faces?: number | null): { count: number; faces: number } | null {
+  return count && faces ? { count, faces } : null;
+}
+
+// Per-kind readers over the flat columns. Each returns null when the row is
+// malformed for its kind (missing a required column), so readCapability falls
+// through to opaque rather than throwing.
+function readCastSpellRow(row: CapabilityColumns): CastSpellCapability | null {
+  if (!row.spellId) return null;
+  return {
+    kind: "castSpell",
+    spellId: row.spellId,
+    spellName: orElse(row.spellName, ""),
+    spellLevel: orElse(row.spellLevel, 0),
+    castLevel: orElse(row.castLevel, orElse(row.spellLevel, 0)),
+    resource: orElse(row.castResource as CastResource | null, "perDayDawn"),
+    uses: orElse(row.castUses, 1),
+    concentration: orElse(row.castConcentration, false),
+    dcMode: orElse(row.dcMode as CastStatMode | null, "fixed"),
+    dcValue: orElse(row.dcValue, null),
+    attackMode: orElse(row.attackMode as CastStatMode | null, "fixed"),
+    attackValue: orElse(row.attackValue, null),
+    chargeCost: orElse(row.chargeCost, 1),
+    description: orElse(row.description, null),
+  };
+}
+
+function readChargesRow(row: CapabilityColumns): ChargesCapability | null {
+  if (row.maxCharges == null) return null;
+  return {
+    kind: "charges",
+    maxCharges: row.maxCharges,
+    rechargeTrigger: orElse(row.rechargeTrigger as ChargeTrigger | null, "dawn"),
+    rechargeDice: readDicePair(row.rechargeDiceCount, row.rechargeDiceFaces),
+    rechargeBonus: orElse(row.rechargeBonus, null),
+    description: orElse(row.description, null),
+  };
+}
+
+function readGrantRow(row: CapabilityColumns): GrantCapability | null {
+  if (!row.grantType) return null;
+  return {
+    kind: "grant",
+    grantType: row.grantType as GrantType,
+    grantOn: orElse(row.grantOn as AdvantageOn | null, null),
+    grantValueKind: orElse(row.grantValueKind as GrantValueKind | null, null),
+    grantValue: orElse(row.grantValue, null),
+    cantBeSurprised: orElse(row.cantBeSurprised, false),
+    description: orElse(row.description, null),
+  };
+}
+
+function readPassiveBonusRow(row: CapabilityColumns): PassiveBonusCapability | null {
+  if (!row.target || !row.op) return null;
+  const base = readDicePair(row.valueDiceCount, row.valueDiceFaces);
+  const dice = base ? { ...base, damageType: orElse(row.valueDamageType, null) } : null;
+  return {
+    kind: "passiveBonus",
+    target: row.target as CapabilityTarget,
+    op: row.op as CapabilityOp,
+    value: orElse(row.value, 0),
+    targetKey: orElse(row.targetKey, null),
+    condition: orElse(row.condition, null),
+    description: orElse(row.description, null),
+    dice,
+  };
+}
+
+function readActivatedEffectRow(row: CapabilityColumns): ActivatedEffectCapability | null {
+  if (!row.activation || !row.target || !row.op) return null;
+  return {
+    kind: "activatedEffect",
+    activation: row.activation as ActivationType,
+    target: row.target as CapabilityTarget,
+    op: row.op as CapabilityOp,
+    value: orElse(row.value, 0),
+    targetKey: orElse(row.targetKey, null),
+    duration: row.activatedDuration === "untilRest" ? "untilRest" : "whileActive",
+    resourceKind: orElse(row.resourceKind as ItemResourceKind | null, "atWill"),
+    resourcePeriod: orElse(row.resourcePeriod as ItemResourcePeriod | null, null),
+    resourceCharges: orElse(row.resourceCharges, 1),
+    chargeCost: orElse(row.chargeCost, 1),
+    durationText: orElse(row.durationText, null),
+    description: orElse(row.description, null),
+  };
+}
+
+// Dispatch table keyed by the row's kind discriminant.
+const CAPABILITY_READERS: Record<string, ((row: CapabilityColumns) => Capability | null) | undefined> = {
+  castSpell: readCastSpellRow,
+  charges: readChargesRow,
+  grant: readGrantRow,
+  passiveBonus: readPassiveBonusRow,
+  activatedEffect: readActivatedEffectRow,
+};
+
 // Adapter over the flat capability columns — no per-kind tables. A malformed
 // passiveBonus (missing target/op) or grant (missing grantType) reads as opaque
 // rather than throwing.
 export function readCapability(row: CapabilityColumns): Capability {
-  if (row.kind === "castSpell" && row.spellId) {
-    return {
-      kind: "castSpell",
-      spellId: row.spellId,
-      spellName: row.spellName ?? "",
-      spellLevel: row.spellLevel ?? 0,
-      castLevel: row.castLevel ?? row.spellLevel ?? 0,
-      resource: (row.castResource as CastResource | null) ?? "perDayDawn",
-      uses: row.castUses ?? 1,
-      concentration: row.castConcentration ?? false,
-      dcMode: (row.dcMode as CastStatMode | null) ?? "fixed",
-      dcValue: row.dcValue ?? null,
-      attackMode: (row.attackMode as CastStatMode | null) ?? "fixed",
-      attackValue: row.attackValue ?? null,
-      chargeCost: row.chargeCost ?? 1,
-      description: row.description ?? null,
-    };
-  }
-  if (row.kind === "charges" && row.maxCharges != null) {
-    return {
-      kind: "charges",
-      maxCharges: row.maxCharges,
-      rechargeTrigger: (row.rechargeTrigger as ChargeTrigger | null) ?? "dawn",
-      rechargeDice:
-        row.rechargeDiceCount && row.rechargeDiceFaces
-          ? { count: row.rechargeDiceCount, faces: row.rechargeDiceFaces }
-          : null,
-      rechargeBonus: row.rechargeBonus ?? null,
-      description: row.description ?? null,
-    };
-  }
-  if (row.kind === "grant" && row.grantType) {
-    return {
-      kind: "grant",
-      grantType: row.grantType as GrantType,
-      grantOn: (row.grantOn as AdvantageOn | null) ?? null,
-      grantValueKind: (row.grantValueKind as GrantValueKind | null) ?? null,
-      grantValue: row.grantValue ?? null,
-      cantBeSurprised: row.cantBeSurprised ?? false,
-      description: row.description ?? null,
-    };
-  }
-  if (row.kind === "passiveBonus" && row.target && row.op) {
-    const dice =
-      row.valueDiceCount && row.valueDiceFaces
-        ? { count: row.valueDiceCount, faces: row.valueDiceFaces, damageType: row.valueDamageType ?? null }
-        : null;
-    return {
-      kind: "passiveBonus",
-      target: row.target as CapabilityTarget,
-      op: row.op as CapabilityOp,
-      value: row.value ?? 0,
-      targetKey: row.targetKey ?? null,
-      condition: row.condition ?? null,
-      description: row.description ?? null,
-      dice,
-    };
-  }
-  if (row.kind === "activatedEffect" && row.activation && row.target && row.op) {
-    return {
-      kind: "activatedEffect",
-      activation: row.activation as ActivationType,
-      target: row.target as CapabilityTarget,
-      op: row.op as CapabilityOp,
-      value: row.value ?? 0,
-      targetKey: row.targetKey ?? null,
-      duration: row.activatedDuration === "untilRest" ? "untilRest" : "whileActive",
-      resourceKind: (row.resourceKind as ItemResourceKind) ?? "atWill",
-      resourcePeriod: (row.resourcePeriod as ItemResourcePeriod) ?? null,
-      resourceCharges: row.resourceCharges ?? 1,
-      chargeCost: row.chargeCost ?? 1,
-      durationText: row.durationText ?? null,
-      description: row.description ?? null,
-    };
-  }
-  return { kind: row.kind as OpaqueCapability["kind"], description: row.description ?? null };
+  return (
+    CAPABILITY_READERS[row.kind]?.(row) ?? { kind: row.kind as OpaqueCapability["kind"], description: row.description ?? null }
+  );
 }
 
 // Max uses per recharge for an activatedEffect. atWill is unlimited (null = no
@@ -448,83 +479,103 @@ export interface SerializedCapability {
   chargeCost?: number;
 }
 
+// Per-kind serializers. Each drops nulls so the wire shape matches the optional-
+// field DM input; nested dice/recharge mirror the authoring shape.
+function serializeCastSpell(cap: CastSpellCapability): SerializedCapability {
+  return {
+    kind: cap.kind,
+    spellId: cap.spellId,
+    spellName: cap.spellName,
+    spellLevel: cap.spellLevel,
+    castLevel: cap.castLevel,
+    resource: cap.resource,
+    uses: cap.uses,
+    concentration: cap.concentration,
+    dcMode: cap.dcMode,
+    ...(cap.dcValue != null ? { dcValue: cap.dcValue } : {}),
+    attackMode: cap.attackMode,
+    ...(cap.attackValue != null ? { attackValue: cap.attackValue } : {}),
+    ...(cap.resource === "charges" ? { chargeCost: cap.chargeCost } : {}),
+    ...(cap.description ? { description: cap.description } : {}),
+  };
+}
+
+function serializeCharges(cap: ChargesCapability): SerializedCapability {
+  return {
+    kind: cap.kind,
+    maxCharges: cap.maxCharges,
+    recharge: {
+      trigger: cap.rechargeTrigger,
+      ...(cap.rechargeDice ? { dice: { count: cap.rechargeDice.count, faces: cap.rechargeDice.faces } } : {}),
+      ...(cap.rechargeBonus != null ? { bonus: cap.rechargeBonus } : {}),
+    },
+    ...(cap.description ? { description: cap.description } : {}),
+  };
+}
+
+function serializeGrant(cap: GrantCapability): SerializedCapability {
+  return {
+    kind: cap.kind,
+    grantType: cap.grantType,
+    ...(cap.grantOn ? { grantOn: cap.grantOn } : {}),
+    ...(cap.grantValueKind ? { grantValueKind: cap.grantValueKind } : {}),
+    ...(cap.grantValue ? { grantValue: cap.grantValue } : {}),
+    ...(cap.cantBeSurprised ? { cantBeSurprised: true } : {}),
+    ...(cap.description ? { description: cap.description } : {}),
+  };
+}
+
+function serializePassiveBonus(cap: PassiveBonusCapability): SerializedCapability {
+  return {
+    kind: cap.kind,
+    target: cap.target,
+    op: cap.op,
+    value: cap.value,
+    ...(cap.targetKey ? { targetKey: cap.targetKey } : {}),
+    ...(cap.condition ? { condition: cap.condition } : {}),
+    ...(cap.description ? { description: cap.description } : {}),
+    ...(cap.dice ? { dice: { count: cap.dice.count, faces: cap.dice.faces, ...(cap.dice.damageType ? { damageType: cap.dice.damageType } : {}) } } : {}),
+  };
+}
+
+function serializeActivatedEffect(cap: ActivatedEffectCapability): SerializedCapability {
+  return {
+    kind: cap.kind,
+    activation: cap.activation,
+    target: cap.target,
+    op: cap.op,
+    value: cap.value,
+    activatedDuration: cap.duration,
+    resourceKind: cap.resourceKind,
+    resourceCharges: cap.resourceCharges,
+    ...(cap.targetKey ? { targetKey: cap.targetKey } : {}),
+    ...(cap.resourcePeriod ? { resourcePeriod: cap.resourcePeriod } : {}),
+    ...(cap.resourceKind === "charges" ? { chargeCost: cap.chargeCost } : {}),
+    ...(cap.durationText ? { durationText: cap.durationText } : {}),
+    ...(cap.description ? { description: cap.description } : {}),
+  };
+}
+
 // Serialize a capability row for the API (campaign item + inventory item alike),
 // dropping nulls so the wire shape matches the optional-field DM input.
 export function serializeCapability(row: CapabilityColumns): SerializedCapability {
   const cap = readCapability(row);
-  if (cap.kind === "castSpell") {
-    return {
-      kind: cap.kind,
-      spellId: cap.spellId,
-      spellName: cap.spellName,
-      spellLevel: cap.spellLevel,
-      castLevel: cap.castLevel,
-      resource: cap.resource,
-      uses: cap.uses,
-      concentration: cap.concentration,
-      dcMode: cap.dcMode,
-      ...(cap.dcValue != null ? { dcValue: cap.dcValue } : {}),
-      attackMode: cap.attackMode,
-      ...(cap.attackValue != null ? { attackValue: cap.attackValue } : {}),
-      ...(cap.resource === "charges" ? { chargeCost: cap.chargeCost } : {}),
-      ...(cap.description ? { description: cap.description } : {}),
-    };
+  switch (cap.kind) {
+    case "castSpell":
+      return serializeCastSpell(cap);
+    case "charges":
+      return serializeCharges(cap);
+    case "grant":
+      return serializeGrant(cap);
+    case "passiveBonus":
+      return serializePassiveBonus(cap);
+    case "activatedEffect":
+      return serializeActivatedEffect(cap);
+    default:
+      // Malformed-row fallthrough (cap is OpaqueCapability, kind typed never) —
+      // emit the raw row's kind + description so the wire still names the payload.
+      return { kind: row.kind as CapabilityKind, ...(row.description ? { description: row.description } : {}) };
   }
-  if (cap.kind === "charges") {
-    return {
-      kind: cap.kind,
-      maxCharges: cap.maxCharges,
-      recharge: {
-        trigger: cap.rechargeTrigger,
-        ...(cap.rechargeDice ? { dice: { count: cap.rechargeDice.count, faces: cap.rechargeDice.faces } } : {}),
-        ...(cap.rechargeBonus != null ? { bonus: cap.rechargeBonus } : {}),
-      },
-      ...(cap.description ? { description: cap.description } : {}),
-    };
-  }
-  if (cap.kind === "grant") {
-    return {
-      kind: cap.kind,
-      grantType: cap.grantType,
-      ...(cap.grantOn ? { grantOn: cap.grantOn } : {}),
-      ...(cap.grantValueKind ? { grantValueKind: cap.grantValueKind } : {}),
-      ...(cap.grantValue ? { grantValue: cap.grantValue } : {}),
-      ...(cap.cantBeSurprised ? { cantBeSurprised: true } : {}),
-      ...(cap.description ? { description: cap.description } : {}),
-    };
-  }
-  if (cap.kind === "passiveBonus") {
-    return {
-      kind: cap.kind,
-      target: cap.target,
-      op: cap.op,
-      value: cap.value,
-      ...(cap.targetKey ? { targetKey: cap.targetKey } : {}),
-      ...(cap.condition ? { condition: cap.condition } : {}),
-      ...(cap.description ? { description: cap.description } : {}),
-      ...(cap.dice ? { dice: { count: cap.dice.count, faces: cap.dice.faces, ...(cap.dice.damageType ? { damageType: cap.dice.damageType } : {}) } } : {}),
-    };
-  }
-  if (cap.kind === "activatedEffect") {
-    return {
-      kind: cap.kind,
-      activation: cap.activation,
-      target: cap.target,
-      op: cap.op,
-      value: cap.value,
-      activatedDuration: cap.duration,
-      resourceKind: cap.resourceKind,
-      resourceCharges: cap.resourceCharges,
-      ...(cap.targetKey ? { targetKey: cap.targetKey } : {}),
-      ...(cap.resourcePeriod ? { resourcePeriod: cap.resourcePeriod } : {}),
-      ...(cap.resourceKind === "charges" ? { chargeCost: cap.chargeCost } : {}),
-      ...(cap.durationText ? { durationText: cap.durationText } : {}),
-      ...(cap.description ? { description: cap.description } : {}),
-    };
-  }
-  // Malformed-row fallthrough (cap is OpaqueCapability, kind typed never) —
-  // emit the raw row's kind + description so the wire still names the payload.
-  return { kind: row.kind as CapabilityKind, ...(row.description ? { description: row.description } : {}) };
 }
 
 // The buffsByTarget channel key a scalar passiveBonus contributes to, or null
@@ -639,6 +690,40 @@ export interface DerivedItemGrants {
   proficiencies: ItemProficiencyGrant[];
 }
 
+// Per-grant-type collectors: each folds one grant capability into the matching
+// bucket. resistance/immunity/conditionImmunity share the trait-grant shape.
+function collectTraitGrant(bucket: ItemTraitGrant[], cap: GrantCapability, source: string) {
+  if (cap.grantValue) bucket.push({ value: cap.grantValue, source });
+}
+
+function collectAdvantageGrant(out: DerivedItemGrants, cap: GrantCapability, source: string) {
+  if (!cap.grantOn) return;
+  // initiative/attack are whole-axis — drop any stale skill/ability qualifier.
+  const wholeAxis = cap.grantOn === "initiative" || cap.grantOn === "attack";
+  out.advantages.push({
+    on: cap.grantOn,
+    ...(!wholeAxis && cap.grantValueKind ? { valueKind: cap.grantValueKind } : {}),
+    ...(!wholeAxis && cap.grantValue ? { value: cap.grantValue } : {}),
+    cantBeSurprised: cap.cantBeSurprised,
+    source,
+    ...(cap.description ? { description: cap.description } : {}),
+  });
+}
+
+function collectProficiencyGrant(out: DerivedItemGrants, cap: GrantCapability, source: string) {
+  if (cap.grantValue && cap.grantValueKind && (PROFICIENCY_KINDS as readonly string[]).includes(cap.grantValueKind)) {
+    out.proficiencies.push({ profType: cap.grantValueKind as ProficiencyKind, value: cap.grantValue, source });
+  }
+}
+
+const GRANT_COLLECTORS: Record<GrantType, (out: DerivedItemGrants, cap: GrantCapability, source: string) => void> = {
+  resistance: (out, cap, source) => collectTraitGrant(out.resistances, cap, source),
+  immunity: (out, cap, source) => collectTraitGrant(out.immunities, cap, source),
+  conditionImmunity: (out, cap, source) => collectTraitGrant(out.conditionImmunities, cap, source),
+  advantage: collectAdvantageGrant,
+  proficiency: collectProficiencyGrant,
+};
+
 // Gather every grant capability from active items into per-derivation buckets.
 // resistance feeds the #456 halve channel; proficiency merges into the derived
 // proficiency lists; advantage/conditionImmunity/immunity surface as flags + text.
@@ -655,36 +740,7 @@ export function deriveItemGrants(items: GrantItem[]): DerivedItemGrants {
     for (const col of item.capabilities) {
       const cap = readCapability(col);
       if (cap.kind !== "grant") continue;
-      switch (cap.grantType) {
-        case "resistance":
-          if (cap.grantValue) out.resistances.push({ value: cap.grantValue, source: item.name });
-          break;
-        case "immunity":
-          if (cap.grantValue) out.immunities.push({ value: cap.grantValue, source: item.name });
-          break;
-        case "conditionImmunity":
-          if (cap.grantValue) out.conditionImmunities.push({ value: cap.grantValue, source: item.name });
-          break;
-        case "advantage":
-          if (cap.grantOn) {
-            // initiative/attack are whole-axis — drop any stale skill/ability qualifier.
-            const wholeAxis = cap.grantOn === "initiative" || cap.grantOn === "attack";
-            out.advantages.push({
-              on: cap.grantOn,
-              ...(!wholeAxis && cap.grantValueKind ? { valueKind: cap.grantValueKind } : {}),
-              ...(!wholeAxis && cap.grantValue ? { value: cap.grantValue } : {}),
-              cantBeSurprised: cap.cantBeSurprised,
-              source: item.name,
-              ...(cap.description ? { description: cap.description } : {}),
-            });
-          }
-          break;
-        case "proficiency":
-          if (cap.grantValue && cap.grantValueKind && (PROFICIENCY_KINDS as readonly string[]).includes(cap.grantValueKind)) {
-            out.proficiencies.push({ profType: cap.grantValueKind as ProficiencyKind, value: cap.grantValue, source: item.name });
-          }
-          break;
-      }
+      GRANT_COLLECTORS[cap.grantType]?.(out, cap, item.name);
     }
   }
   return out;
