@@ -17,7 +17,7 @@
 import { randomUUID } from "node:crypto";
 
 
-import { Prisma } from "../generated/prisma/client.js";
+import { Prisma, type Spell } from "../generated/prisma/client.js";
 import { castAbilityInTx, type CastTarget, type OpOutcome } from "./ability-cast.js";
 import { clearBuffByKeyInTx, clearBuffsForSourceInTx } from "./active-effects.js";
 import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";
@@ -27,8 +27,10 @@ import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
 import { deriveGrantedSpells, deriveItemSpells } from "./granted-spells.js";
+import type { ItemSpellSourceItem } from "./granted-spells.js";
 import type {
   SpellEntry,
+  ItemSpellMeta,
   SpellComponents,
   SpellcastingMutableState,
 } from "./spell-state.js";
@@ -224,6 +226,84 @@ function applyRestoreSlotOp(ctx: SpellOpContext, op: RestoreSlotOperation): OpOu
   return { eventType: "restoreSlot", summary, eventData: { level: op.level } };
 }
 
+// Normalize a nullable catalog column to the SpellEntry's optional (undefined).
+const orUndef = <T>(v: T | null): T | undefined => v ?? undefined;
+
+// Snapshot a catalog Spell row into a new learned SpellEntry (buff fields #363).
+function catalogSpellToEntry(catalogSpell: Spell): SpellEntry {
+  return {
+    id: randomUUID(),
+    spellId: catalogSpell.id,
+    name: catalogSpell.name,
+    level: catalogSpell.level,
+    school: catalogSpell.school as string,
+    prepared: false,
+    castingTime: catalogSpell.castingTime,
+    range: catalogSpell.range,
+    duration: catalogSpell.duration,
+    description: catalogSpell.description,
+    concentration: catalogSpell.concentration,
+    ritual: catalogSpell.ritual,
+    components: orUndef(catalogSpell.components as SpellComponents | null),
+    saveEffect: orUndef(catalogSpell.saveEffect),
+    effectKind: orUndef(catalogSpell.effectKind),
+    effectDiceCount: orUndef(catalogSpell.effectDiceCount),
+    effectDiceFaces: orUndef(catalogSpell.effectDiceFaces),
+    effectModifier: orUndef(catalogSpell.effectModifier),
+    damageType: orUndef(catalogSpell.damageType),
+    attackType: orUndef(catalogSpell.attackType),
+    saveAbility: orUndef(catalogSpell.saveAbility),
+    upcastDicePerLevel: orUndef(catalogSpell.upcastDicePerLevel),
+    cantripScaling: catalogSpell.cantripScaling,
+    buffTarget: orUndef(catalogSpell.buffTarget),
+    buffModifier: orUndef(catalogSpell.buffModifier),
+  };
+}
+
+// Build a learned SpellEntry from custom DM-authored input.
+function customSpellToEntry(custom: CustomSpellInput): SpellEntry {
+  return {
+    id: randomUUID(),
+    name: custom.name,
+    level: custom.level,
+    school: custom.school,
+    prepared: false,
+    castingTime: custom.castingTime,
+    range: custom.range,
+    duration: custom.duration,
+    description: custom.description,
+    concentration: custom.concentration,
+    ritual: custom.ritual,
+    components: custom.components,
+    saveEffect: custom.saveEffect,
+    effectKind: custom.effectKind,
+    effectDiceCount: custom.effectDiceCount,
+    effectDiceFaces: custom.effectDiceFaces,
+    effectModifier: custom.effectModifier,
+    damageType: custom.damageType,
+    attackType: custom.attackType,
+    saveAbility: custom.saveAbility,
+    upcastDicePerLevel: custom.upcastDicePerLevel,
+    cantripScaling: custom.cantripScaling,
+  };
+}
+
+// Reject a duplicate, look up the catalog row, and snapshot it into an entry.
+async function resolveCatalogSpellEntry(
+  tx: Prisma.TransactionClient,
+  state: SpellcastingMutableState,
+  spellId: string,
+): Promise<SpellEntry> {
+  if (state.spells.some((s) => s.spellId === spellId)) {
+    throw new InvalidSpellcastingOperationError(`Spell already in spellbook (spellId: ${spellId})`);
+  }
+  const catalogSpell = await tx.spell.findUnique({ where: { id: spellId } });
+  if (!catalogSpell) {
+    throw new InvalidSpellcastingOperationError(`Spell not found in catalog: ${spellId}`);
+  }
+  return catalogSpellToEntry(catalogSpell);
+}
+
 async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): Promise<OpOutcome> {
   const { tx, state } = ctx;
   if (Boolean(op.spellId) === Boolean(op.custom)) {
@@ -231,77 +311,9 @@ async function applyLearnSpellOp(ctx: SpellOpContext, op: LearnSpellOperation): 
       "learnSpell: provide exactly one of spellId or custom"
     );
   }
-
-  let newEntry: SpellEntry;
-
-  if (op.spellId) {
-    // Check for duplicate before DB lookup.
-    if (state.spells.some((s) => s.spellId === op.spellId)) {
-      throw new InvalidSpellcastingOperationError(
-        `Spell already in spellbook (spellId: ${op.spellId})`
-      );
-    }
-    const catalogSpell = await tx.spell.findUnique({ where: { id: op.spellId } });
-    if (!catalogSpell) {
-      throw new InvalidSpellcastingOperationError(`Spell not found in catalog: ${op.spellId}`);
-    }
-    newEntry = {
-      id: randomUUID(),
-      spellId: catalogSpell.id,
-      name: catalogSpell.name,
-      level: catalogSpell.level,
-      school: catalogSpell.school as string,
-      prepared: false,
-      castingTime: catalogSpell.castingTime,
-      range: catalogSpell.range,
-      duration: catalogSpell.duration,
-      description: catalogSpell.description,
-      concentration: catalogSpell.concentration,
-      ritual: catalogSpell.ritual,
-      components: (catalogSpell.components as SpellComponents | null) ?? undefined,
-      saveEffect: catalogSpell.saveEffect ?? undefined,
-      effectKind: catalogSpell.effectKind ?? undefined,
-      effectDiceCount: catalogSpell.effectDiceCount ?? undefined,
-      effectDiceFaces: catalogSpell.effectDiceFaces ?? undefined,
-      effectModifier: catalogSpell.effectModifier ?? undefined,
-      damageType: catalogSpell.damageType ?? undefined,
-      attackType: catalogSpell.attackType ?? undefined,
-      saveAbility: catalogSpell.saveAbility ?? undefined,
-      upcastDicePerLevel: catalogSpell.upcastDicePerLevel ?? undefined,
-      cantripScaling: catalogSpell.cantripScaling,
-      // AC/stat buff effect (#363) — snapshotted so cast resolves the buff.
-      buffTarget: catalogSpell.buffTarget ?? undefined,
-      buffModifier: catalogSpell.buffModifier ?? undefined,
-    };
-  } else {
-    // Custom spell.
-    const custom = op.custom!;
-    newEntry = {
-      id: randomUUID(),
-      name: custom.name,
-      level: custom.level,
-      school: custom.school,
-      prepared: false,
-      castingTime: custom.castingTime,
-      range: custom.range,
-      duration: custom.duration,
-      description: custom.description,
-      concentration: custom.concentration,
-      ritual: custom.ritual,
-      components: custom.components,
-      saveEffect: custom.saveEffect,
-      effectKind: custom.effectKind,
-      effectDiceCount: custom.effectDiceCount,
-      effectDiceFaces: custom.effectDiceFaces,
-      effectModifier: custom.effectModifier,
-      damageType: custom.damageType,
-      attackType: custom.attackType,
-      saveAbility: custom.saveAbility,
-      upcastDicePerLevel: custom.upcastDicePerLevel,
-      cantripScaling: custom.cantripScaling,
-    };
-  }
-
+  const newEntry = op.spellId
+    ? await resolveCatalogSpellEntry(tx, state, op.spellId)
+    : customSpellToEntry(op.custom!);
   state.spells.push(newEntry);
   return {
     eventType: "learnSpell",
@@ -415,17 +427,26 @@ async function applyCastSpellOp(ctx: SpellOpContext, op: CastSpellOperation): Pr
 // cost = none (the item resource is spent here, not a character slot), DC/attack
 // per the fixed/wielder mode. Decrements the item's per-capability use counter —
 // or, for a charges-costed cast (#555), the item's shared pool by chargeCost.
-async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperation): Promise<OpOutcome> {
-  const entry = ctx.state.spells.find((s) => s.id === op.entryId && s.source === "item");
-  if (!entry?.item) {
-    throw new InvalidSpellcastingOperationError(
-      `Item spell not available: ${op.entryId} (item unequipped/unattuned or removed)`,
-    );
-  }
-  const meta = entry.item;
-  // Charges-costed casts (#555) spend chargeCost from the item's shared pool;
-  // usesRemaining already mirrors the pool's remaining (deriveItemSpells).
-  const chargeCost = meta.resource === "charges" ? meta.chargeCost ?? 1 : null;
+// A held item spell resolved and validated for casting: the entry, its item
+// meta, the referenced catalog spell, and the resolved cost/DC/attack.
+interface ResolvedItemSpell {
+  entry: SpellEntry;
+  meta: ItemSpellMeta;
+  spell: Spell;
+  chargeCost: number | null;
+  dc: number | null;
+  attack: number | null;
+}
+
+// The item resource-use snapshot folded into the event for undo refunds (#580).
+interface ItemResourceSpend {
+  poolUsedAfter: number | null;
+  capabilityUsedBefore: { capabilityId: string; used: number } | null;
+  capabilityUsedAfter: { capabilityId: string; used: number } | null;
+}
+
+// Throw unless the item has enough remaining uses/charges for this cast.
+function assertItemSpellUses(entry: SpellEntry, meta: ItemSpellMeta, chargeCost: number | null): void {
   if (chargeCost != null && meta.usesRemaining < chargeCost) {
     throw new InvalidSpellcastingOperationError(
       `${entry.name} needs ${chargeCost} charge${chargeCost === 1 ? "" : "s"} — ${meta.itemName} has ${meta.usesRemaining} remaining`,
@@ -436,6 +457,37 @@ async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperat
       `${entry.name} has no uses remaining — recharges on the item's rest`,
     );
   }
+}
+
+// Resolve the announced DC/attack: fixed uses the item's value, wielder the
+// character's own (null-safe: a non-caster wielder is prevented at authoring).
+function resolveItemDcAttack(
+  ctx: SpellOpContext,
+  meta: ItemSpellMeta,
+): { dc: number | null; attack: number | null } {
+  return {
+    dc: meta.dcMode === "wielder" ? ctx.wielderSpellSaveDC : meta.dc ?? null,
+    attack: meta.attackMode === "wielder" ? ctx.wielderSpellAttackBonus : meta.attack ?? null,
+  };
+}
+
+// Find the item spell entry, validate availability + remaining uses, load the
+// referenced catalog spell, and resolve the announced DC/attack.
+async function resolveItemSpellCast(
+  ctx: SpellOpContext,
+  op: CastItemSpellOperation,
+): Promise<ResolvedItemSpell> {
+  const entry = ctx.state.spells.find((s) => s.id === op.entryId && s.source === "item");
+  if (!entry?.item) {
+    throw new InvalidSpellcastingOperationError(
+      `Item spell not available: ${op.entryId} (item unequipped/unattuned or removed)`,
+    );
+  }
+  const meta = entry.item;
+  // Charges-costed casts (#555) spend chargeCost from the item's shared pool;
+  // usesRemaining already mirrors the pool's remaining (deriveItemSpells).
+  const chargeCost = meta.resource === "charges" ? meta.chargeCost ?? 1 : null;
+  assertItemSpellUses(entry, meta, chargeCost);
   if (!entry.spellId) {
     throw new InvalidSpellcastingOperationError(`Item spell ${op.entryId} has no referenced spell`);
   }
@@ -443,41 +495,21 @@ async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperat
   if (!spell) {
     throw new InvalidSpellcastingOperationError(`Referenced spell not found in catalog: ${entry.spellId}`);
   }
+  const { dc, attack } = resolveItemDcAttack(ctx, meta);
+  return { entry, meta, spell, chargeCost, dc, attack };
+}
 
-  // Resolve the announced DC/attack: fixed uses the item's value, wielder the
-  // character's own (null-safe: a non-caster wielder is prevented at authoring).
-  const dc = meta.dcMode === "wielder" ? ctx.wielderSpellSaveDC : meta.dc ?? null;
-  const attack = meta.attackMode === "wielder" ? ctx.wielderSpellAttackBonus : meta.attack ?? null;
-
-  const outcome = await castAbilityInTx(
-    {
-      tx: ctx.tx,
-      characterId: ctx.characterId,
-      batchId: ctx.batchId,
-      sessionId: ctx.sessionId,
-      cost: costCtx(ctx),
-      concentrationHost: ctx.state,
-      casterUserId: ctx.casterUserId,
-      casterName: ctx.casterName,
-      casterCampaignId: ctx.casterCampaignId,
-    },
-    {
-      name: entry.name,
-      entryId: op.entryId,
-      cost: { kind: "none" },
-      effect: readEffectSpec(spell),
-      roll: op.roll,
-      eventType: "castSpell",
-      concentrates: Boolean(spell.concentration),
-      apply: op.apply,
-    },
-  );
-
-  // Spend the item's resource (skip for at-will), persisted outside the spell
-  // blob. Charges-costed casts increment the shared POOL row by chargeCost;
-  // everything else increments the capability's own per-period counter by 1.
-  // Snapshot the row's used counter before/after so undo can refund it (#580) —
-  // mirrors the #555 activate-op capabilityUsed pattern.
+// Spend the item's resource (skip for at-will), persisted outside the spell
+// blob. Charges-costed casts increment the shared POOL row by chargeCost;
+// everything else increments the capability's own per-period counter by 1.
+// Snapshot the row's used counter before/after so undo can refund it (#580) —
+// mirrors the #555 activate-op capabilityUsed pattern.
+async function spendItemSpellResource(
+  ctx: SpellOpContext,
+  entry: SpellEntry,
+  meta: ItemSpellMeta,
+  chargeCost: number | null,
+): Promise<ItemResourceSpend> {
   let poolUsedAfter: number | null = null;
   let capabilityUsedBefore: { capabilityId: string; used: number } | null = null;
   let capabilityUsedAfter: { capabilityId: string; used: number } | null = null;
@@ -516,14 +548,22 @@ async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperat
     capabilityUsedBefore = { capabilityId: meta.capabilityId, used: updated.used - 1 };
     capabilityUsedAfter = { capabilityId: meta.capabilityId, used: updated.used };
   }
+  return { poolUsedAfter, capabilityUsedBefore, capabilityUsedAfter };
+}
 
+// Fold the item-cast DC/attack text, the capability-used snapshot (undo refund,
+// #580), and the item provenance into the cast outcome.
+function decorateItemSpellOutcome(
+  outcome: OpOutcome,
+  resolved: ResolvedItemSpell,
+  spend: ItemResourceSpend,
+): void {
+  const { meta, chargeCost, dc, attack } = resolved;
   const dcText = dc != null ? ` (DC ${dc})` : attack != null ? ` (+${attack} to hit)` : "";
   outcome.summary += dcText;
-  // Fold the capability-used snapshot into the event's before/after so the
-  // spellcasting revert branch refunds the spent use/charges on undo (#580).
-  if (capabilityUsedBefore && capabilityUsedAfter) {
-    outcome.beforeExtra = { capabilityUsed: capabilityUsedBefore };
-    outcome.afterExtra = { capabilityUsed: capabilityUsedAfter };
+  if (spend.capabilityUsedBefore && spend.capabilityUsedAfter) {
+    outcome.beforeExtra = { capabilityUsed: spend.capabilityUsedBefore };
+    outcome.afterExtra = { capabilityUsed: spend.capabilityUsedAfter };
   }
   outcome.eventData = {
     ...outcome.eventData,
@@ -537,10 +577,42 @@ async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperat
       ? {
           poolCapabilityId: meta.poolCapabilityId,
           chargesSpent: chargeCost,
-          chargesRemaining: Math.max(0, meta.usesTotal - (poolUsedAfter ?? 0)),
+          chargesRemaining: Math.max(0, meta.usesTotal - (spend.poolUsedAfter ?? 0)),
         }
       : {}),
   };
+}
+
+async function applyCastItemSpellOp(ctx: SpellOpContext, op: CastItemSpellOperation): Promise<OpOutcome> {
+  const resolved = await resolveItemSpellCast(ctx, op);
+  const { entry, meta, spell, chargeCost } = resolved;
+
+  const outcome = await castAbilityInTx(
+    {
+      tx: ctx.tx,
+      characterId: ctx.characterId,
+      batchId: ctx.batchId,
+      sessionId: ctx.sessionId,
+      cost: costCtx(ctx),
+      concentrationHost: ctx.state,
+      casterUserId: ctx.casterUserId,
+      casterName: ctx.casterName,
+      casterCampaignId: ctx.casterCampaignId,
+    },
+    {
+      name: entry.name,
+      entryId: op.entryId,
+      cost: { kind: "none" },
+      effect: readEffectSpec(spell),
+      roll: op.roll,
+      eventType: "castSpell",
+      concentrates: Boolean(spell.concentration),
+      apply: op.apply,
+    },
+  );
+
+  const spend = await spendItemSpellResource(ctx, entry, meta, chargeCost);
+  decorateItemSpellOutcome(outcome, resolved, spend);
   return outcome;
 }
 
@@ -566,6 +638,157 @@ async function applyDropConcentrationOp(ctx: SpellOpContext): Promise<OpOutcome 
 async function applyDismissBuffOp(ctx: SpellOpContext, op: DismissBuffOperation): Promise<OpOutcome | null> {
   await clearBuffByKeyInTx(ctx.tx, ctx.characterId, op.entryId, ctx.batchId, ctx.sessionId, "dismissed");
   return null;
+}
+
+// ── applyOp helpers ───────────────────────────────────────────────────────────
+
+type DerivedSpellcasting = ReturnType<typeof deriveSpellcasting>;
+
+// Build the slot/arcana level→total maps from derived spellcasting, falling back
+// to any stored legacy totals for unsupported caster classes.
+function computeSlotTables(
+  spellcasting: Prisma.JsonValue,
+  derived: DerivedSpellcasting,
+): { slotTotals: Record<number, number>; arcanaTotals: Record<number, number> } {
+  const slotTotals: Record<number, number> = {};
+  const arcanaTotals: Record<number, number> = {};
+  if (derived) {
+    for (const s of derived.slotTotals) slotTotals[s.level] = s.total;
+    for (const a of derived.arcana) arcanaTotals[a.level] = a.total;
+  } else if (spellcasting && typeof spellcasting === "object" && !Array.isArray(spellcasting)) {
+    const stored = spellcasting as Record<string, unknown>;
+    const oldSlots = (stored.slots as Array<{ level: number; total: number }>) ?? [];
+    for (const s of oldSlots) slotTotals[s.level] = s.total;
+  }
+  return { slotTotals, arcanaTotals };
+}
+
+// Inject derived subclass-granted (#438) + item-granted (#528) spells into the
+// working state so ops that target them resolve. Disjoint id spaces; stripped
+// again before persist (persistSpellState) — they live only in the read view.
+function injectDerivedSpells(
+  state: SpellcastingMutableState,
+  className: string,
+  subclass: string | undefined,
+  level: number,
+  itemSources: ItemSpellSourceItem[],
+): void {
+  const granted = deriveGrantedSpells(className, subclass, level);
+  if (granted.length > 0) {
+    const names = new Set(state.spells.map((s) => s.name.toLowerCase()));
+    for (const g of granted) if (!names.has(g.name.toLowerCase())) state.spells.push(g);
+  }
+  for (const s of deriveItemSpells(itemSources)) state.spells.push(s);
+}
+
+// Shallow-clone the mutable state for an event before/after snapshot.
+function cloneSpellState(state: SpellcastingMutableState): { spellcasting: SpellcastingMutableState } {
+  return {
+    spellcasting: {
+      slotsUsed: { ...state.slotsUsed },
+      arcanumUsed: { ...state.arcanumUsed },
+      spells: [...state.spells],
+      concentratingOn: state.concentratingOn ? { ...state.concentratingOn } : null,
+    },
+  };
+}
+
+// Strip derived grants + item spells (re-derived on read) and persist the state.
+async function persistSpellState(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  state: SpellcastingMutableState,
+): Promise<void> {
+  state.spells = state.spells.filter((s) => s.source !== "subclass" && s.source !== "item");
+  await tx.character.update({
+    where: { id: characterId },
+    data: {
+      spellcasting: {
+        slotsUsed: state.slotsUsed,
+        arcanumUsed: state.arcanumUsed,
+        spells: state.spells,
+        concentratingOn: state.concentratingOn,
+      } as unknown as Prisma.InputJsonValue,
+    },
+  });
+}
+
+type SpellOpResult = OpOutcome | null | Promise<OpOutcome | null>;
+
+// Per-op handlers keyed by discriminant. A null outcome means no-op — the
+// dispatcher skips both the state write-back and the logEvent.
+const SPELL_OP_HANDLERS: {
+  [K in SpellcastingOperation["type"]]: (
+    ctx: SpellOpContext,
+    op: Extract<SpellcastingOperation, { type: K }>,
+  ) => SpellOpResult;
+} = {
+  castSpell: applyCastSpellOp,
+  castItemSpell: applyCastItemSpellOp,
+  expendSlot: applyExpendSlotOp,
+  restoreSlot: applyRestoreSlotOp,
+  learnSpell: applyLearnSpellOp,
+  forgetSpell: applyForgetSpellOp,
+  prepareSpell: applyPrepareSpellOp,
+  unprepareSpell: applyPrepareSpellOp,
+  dropConcentration: applyDropConcentrationOp,
+  dismissBuff: applyDismissBuffOp,
+};
+
+function dispatchSpellOp(ctx: SpellOpContext, op: SpellcastingOperation): SpellOpResult {
+  const handler = SPELL_OP_HANDLERS[op.type] as (ctx: SpellOpContext, op: SpellcastingOperation) => SpellOpResult;
+  return handler(ctx, op);
+}
+
+type SpellStateSnapshot = ReturnType<typeof cloneSpellState>;
+
+// Assemble the per-op context, resolving the wielder's own DC/attack (#528).
+function buildSpellOpContext(
+  ids: {
+    tx: Prisma.TransactionClient;
+    characterId: string;
+    batchId: string;
+    sessionId: string | null;
+    casterUserId: string;
+  },
+  row: { name: string; campaignId: string | null },
+  state: SpellcastingMutableState,
+  slotTotals: Record<number, number>,
+  arcanaTotals: Record<number, number>,
+  derived: DerivedSpellcasting,
+): SpellOpContext {
+  return {
+    ...ids,
+    state,
+    slotTotals,
+    arcanaTotals,
+    casterName: row.name,
+    casterCampaignId: row.campaignId,
+    wielderSpellSaveDC: derived?.spellSaveDC ?? null,
+    wielderSpellAttackBonus: derived?.spellAttackBonus ?? null,
+  };
+}
+
+// Log the per-op CharacterEvent with the full before/after snapshot (+ any
+// capability-used extras) for revert symmetry with the HP/XP undo handler.
+async function logSpellcastingEvent(
+  tx: Prisma.TransactionClient,
+  ids: { characterId: string; batchId: string; sessionId: string | null },
+  outcome: OpOutcome,
+  beforeState: SpellStateSnapshot,
+  afterState: SpellStateSnapshot,
+): Promise<void> {
+  await logEvent(tx, {
+    characterId: ids.characterId,
+    category: "spellcasting",
+    type: outcome.eventType as Parameters<typeof logEvent>[1]["type"],
+    summary: outcome.summary,
+    before: { ...beforeState, ...(outcome.beforeExtra ?? {}) },
+    after: { ...afterState, ...(outcome.afterExtra ?? {}) },
+    data: outcome.eventData,
+    batchId: ids.batchId,
+    sessionId: ids.sessionId,
+  });
 }
 
 // ── Transaction handler ───────────────────────────────────────────────────────
@@ -610,42 +833,16 @@ export async function applySpellcastingOperations(
       const abilityScores = row.abilityScores as Record<string, number>;
       const derived = deriveSpellcasting(className, level, abilityScores, profBonus);
 
-      // Slot totals map: level → total (0 if no entry).
-      const slotTotals: Record<number, number> = {};
-      // Mystic Arcanum totals map: spell level → charges (Warlock only).
-      const arcanaTotals: Record<number, number> = {};
-      if (derived) {
-        for (const s of derived.slotTotals) slotTotals[s.level] = s.total;
-        for (const a of derived.arcana) arcanaTotals[a.level] = a.total;
-      } else if (row.spellcasting && typeof row.spellcasting === "object" && !Array.isArray(row.spellcasting)) {
-        // Fallback for unsupported caster classes: read stored totals if present.
-        const stored = row.spellcasting as Record<string, unknown>;
-        const oldSlots = (stored.slots as Array<{ level: number; total: number }>) ?? [];
-        for (const s of oldSlots) slotTotals[s.level] = s.total;
-      }
+      const { slotTotals, arcanaTotals } = computeSlotTables(row.spellcasting, derived);
 
       const state = normalizeSpellcastingMutable(row.spellcasting);
-      const beforeState = {
-        spellcasting: {
-          ...state,
-          slotsUsed: { ...state.slotsUsed },
-          arcanumUsed: { ...state.arcanumUsed },
-          spells: [...state.spells],
-          concentratingOn: state.concentratingOn ? { ...state.concentratingOn } : null,
-        },
-      };
+      const beforeState = cloneSpellState(state);
 
-      // Inject derived subclass-granted spells into the working state so ops that
-      // target them (e.g. casting a Way of Shadow monk's Minor Illusion) resolve.
-      // These are stripped again before persist — they live only in the read view.
-      const granted = deriveGrantedSpells(className, row.classEntries[0]?.subclass ?? undefined, level);
-      if (granted.length > 0) {
-        const names = new Set(state.spells.map((s) => s.name.toLowerCase()));
-        for (const g of granted) if (!names.has(g.name.toLowerCase())) state.spells.push(g);
-      }
-      // Inject derived item-granted spells (#528) so castItemSpell resolves them;
-      // their `item:` ids are disjoint, so they're stripped (with grants) pre-persist.
-      const itemSpells = deriveItemSpells(
+      injectDerivedSpells(
+        state,
+        className,
+        row.classEntries[0]?.subclass ?? undefined,
+        level,
         row.inventoryItems.map((i) => ({
           id: i.id,
           name: i.name,
@@ -655,77 +852,27 @@ export async function applySpellcastingOperations(
           capabilities: i.capabilities,
         })),
       );
-      for (const s of itemSpells) state.spells.push(s);
 
-      const ctx: SpellOpContext = {
-        tx,
-        characterId,
-        batchId,
-        sessionId,
+      const ctx = buildSpellOpContext(
+        { tx, characterId, batchId, sessionId, casterUserId },
+        row,
         state,
         slotTotals,
         arcanaTotals,
-        casterUserId,
-        casterName: row.name,
-        casterCampaignId: row.campaignId,
-        wielderSpellSaveDC: derived?.spellSaveDC ?? null,
-        wielderSpellAttackBonus: derived?.spellAttackBonus ?? null,
-      };
+        derived,
+      );
 
-      // Route to the per-op helper. A null outcome means no-op — skip both the
-      // state write-back and the logEvent below.
-      let outcome: OpOutcome | null = null;
-      switch (op.type) {
-        case "castSpell": outcome = await applyCastSpellOp(ctx, op); break;
-        case "castItemSpell": outcome = await applyCastItemSpellOp(ctx, op); break;
-        case "expendSlot": outcome = applyExpendSlotOp(ctx, op); break;
-        case "restoreSlot": outcome = applyRestoreSlotOp(ctx, op); break;
-        case "learnSpell": outcome = await applyLearnSpellOp(ctx, op); break;
-        case "forgetSpell": outcome = await applyForgetSpellOp(ctx, op); break;
-        case "prepareSpell":
-        case "unprepareSpell": outcome = applyPrepareSpellOp(ctx, op); break;
-        case "dropConcentration": outcome = await applyDropConcentrationOp(ctx); break;
-        case "dismissBuff": outcome = await applyDismissBuffOp(ctx, op); break;
-      }
+      const outcome = await dispatchSpellOp(ctx, op);
       if (outcome === null) return;
 
-      // Strip derived grants + item spells before persisting — they are never
-      // stored (both re-derived on read; reconcileGrantedSpells guards leaks).
-      state.spells = state.spells.filter((s) => s.source !== "subclass" && s.source !== "item");
-
-      // Write the updated state back as a compact object.
-      await tx.character.update({
-        where: { id: characterId },
-        data: {
-          spellcasting: {
-            slotsUsed: state.slotsUsed,
-            arcanumUsed: state.arcanumUsed,
-            spells: state.spells,
-            concentratingOn: state.concentratingOn,
-          } as unknown as Prisma.InputJsonValue,
-        },
-      });
-
-      const afterState = {
-        spellcasting: {
-          slotsUsed: { ...state.slotsUsed },
-          arcanumUsed: { ...state.arcanumUsed },
-          spells: [...state.spells],
-          concentratingOn: state.concentratingOn ? { ...state.concentratingOn } : null,
-        },
-      };
-
-      await logEvent(tx, {
-        characterId,
-        category: "spellcasting",
-        type: outcome.eventType as Parameters<typeof logEvent>[1]["type"],
-        summary: outcome.summary,
-        before: { ...beforeState, ...(outcome.beforeExtra ?? {}) },
-        after: { ...afterState, ...(outcome.afterExtra ?? {}) },
-        data: outcome.eventData,
-        batchId,
-        sessionId,
-      });
+      await persistSpellState(tx, characterId, state);
+      await logSpellcastingEvent(
+        tx,
+        { characterId, batchId, sessionId },
+        outcome,
+        beforeState,
+        cloneSpellState(state),
+      );
     },
   });
 }

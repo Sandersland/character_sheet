@@ -2,7 +2,8 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { Prisma } from "../../generated/prisma/client.js";
-import { assertCampaignMembership } from "../../lib/auth/access.js";
+import { assertCampaignMembership, assertCampaignOwner } from "../../lib/auth/access.js";
+import { parseBodyOr400 } from "../../lib/http/parse-body.js";
 import {
   ADVANTAGE_ON,
   ATTUNEMENT_PREREQ_KINDS,
@@ -247,66 +248,97 @@ const baseFields = {
   capabilities: z.array(capabilityInputSchema).superRefine(refineChargesPool).optional(),
 };
 
-// Map a capability input onto the flat side-table columns.
-function capabilityCreate(cap: z.infer<typeof capabilityInputSchema>) {
-  if (cap.kind === "castSpell") {
-    return {
-      kind: cap.kind,
-      description: cap.description ?? null,
-      spellId: cap.spellId,
-      spellName: cap.spellName,
-      spellLevel: cap.spellLevel,
-      castLevel: cap.castLevel,
-      castResource: cap.resource,
-      castUses: cap.uses ?? 1,
-      castConcentration: cap.concentration ?? false,
-      dcMode: cap.dcMode,
-      dcValue: cap.dcValue ?? null,
-      attackMode: cap.attackMode,
-      attackValue: cap.attackValue ?? null,
-      chargeCost: cap.resource === "charges" ? cap.chargeCost ?? 1 : null,
-    };
-  }
-  if (cap.kind === "charges") {
-    return {
-      kind: cap.kind,
-      description: cap.description ?? null,
-      maxCharges: cap.maxCharges,
-      rechargeTrigger: cap.recharge.trigger,
-      rechargeDiceCount: cap.recharge.dice?.count ?? null,
-      rechargeDiceFaces: cap.recharge.dice?.faces ?? null,
-      rechargeBonus: cap.recharge.bonus ?? null,
-    };
-  }
-  if (cap.kind === "grant") {
-    return {
-      kind: cap.kind,
-      description: cap.description ?? null,
-      grantType: cap.grantType,
-      grantOn: cap.grantOn ?? null,
-      grantValueKind: cap.grantValueKind ?? null,
-      grantValue: cap.grantValue ?? null,
-      cantBeSurprised: cap.cantBeSurprised ?? false,
-    };
-  }
+// Nullish default as a call, not a `??` operator — keeps each per-kind column
+// builder's field defaulting out of its branch count.
+function orElse<T>(value: T | null | undefined, fallback: T): T {
+  return value ?? fallback;
+}
+
+// The three flat dice columns a passiveBonus/activatedEffect input maps to.
+function diceColumns(dice?: { count: number; faces: number; damageType?: string }) {
+  return {
+    valueDiceCount: orElse(dice?.count, null),
+    valueDiceFaces: orElse(dice?.faces, null),
+    valueDamageType: orElse(dice?.damageType, null),
+  };
+}
+
+// Per-kind builders mapping a capability input onto the flat side-table columns.
+function castSpellColumns(cap: z.infer<typeof castSpellInputSchema>) {
+  return {
+    kind: cap.kind,
+    description: orElse(cap.description, null),
+    spellId: cap.spellId,
+    spellName: cap.spellName,
+    spellLevel: cap.spellLevel,
+    castLevel: cap.castLevel,
+    castResource: cap.resource,
+    castUses: orElse(cap.uses, 1),
+    castConcentration: orElse(cap.concentration, false),
+    dcMode: cap.dcMode,
+    dcValue: orElse(cap.dcValue, null),
+    attackMode: cap.attackMode,
+    attackValue: orElse(cap.attackValue, null),
+    chargeCost: cap.resource === "charges" ? orElse(cap.chargeCost, 1) : null,
+  };
+}
+
+function chargesColumns(cap: z.infer<typeof chargesInputSchema>) {
+  return {
+    kind: cap.kind,
+    description: orElse(cap.description, null),
+    maxCharges: cap.maxCharges,
+    rechargeTrigger: cap.recharge.trigger,
+    rechargeDiceCount: orElse(cap.recharge.dice?.count, null),
+    rechargeDiceFaces: orElse(cap.recharge.dice?.faces, null),
+    rechargeBonus: orElse(cap.recharge.bonus, null),
+  };
+}
+
+function grantColumns(cap: z.infer<typeof grantInputSchema>) {
+  return {
+    kind: cap.kind,
+    description: orElse(cap.description, null),
+    grantType: cap.grantType,
+    grantOn: orElse(cap.grantOn, null),
+    grantValueKind: orElse(cap.grantValueKind, null),
+    grantValue: orElse(cap.grantValue, null),
+    cantBeSurprised: orElse(cap.cantBeSurprised, false),
+  };
+}
+
+// passiveBonus + activatedEffect share the flat target/op/value + activation columns.
+function passiveColumns(cap: z.infer<typeof passiveBonusInputSchema>) {
   return {
     kind: cap.kind,
     target: cap.target,
     op: cap.op,
-    value: cap.value ?? null,
-    targetKey: cap.targetKey ?? null,
-    condition: cap.condition ?? null,
-    description: cap.description ?? null,
-    valueDiceCount: cap.dice?.count ?? null,
-    valueDiceFaces: cap.dice?.faces ?? null,
-    valueDamageType: cap.dice?.damageType ?? null,
-    activation: cap.activation ?? null,
-    activatedDuration: cap.activatedDuration ?? null,
-    resourceKind: cap.resourceKind ?? null,
-    resourcePeriod: cap.resourcePeriod ?? null,
-    resourceCharges: cap.resourceCharges ?? null,
-    durationText: cap.durationText ?? null,
+    value: orElse(cap.value, null),
+    targetKey: orElse(cap.targetKey, null),
+    condition: orElse(cap.condition, null),
+    description: orElse(cap.description, null),
+    ...diceColumns(cap.dice),
+    activation: orElse(cap.activation, null),
+    activatedDuration: orElse(cap.activatedDuration, null),
+    resourceKind: orElse(cap.resourceKind, null),
+    resourcePeriod: orElse(cap.resourcePeriod, null),
+    resourceCharges: orElse(cap.resourceCharges, null),
+    durationText: orElse(cap.durationText, null),
   };
+}
+
+// Map a capability input onto the flat side-table columns.
+function capabilityCreate(cap: z.infer<typeof capabilityInputSchema>) {
+  switch (cap.kind) {
+    case "castSpell":
+      return castSpellColumns(cap);
+    case "charges":
+      return chargesColumns(cap);
+    case "grant":
+      return grantColumns(cap);
+    default:
+      return passiveColumns(cap);
+  }
 }
 
 // Reject a wielder-mode castSpell on an item not intended for a spellcaster —
@@ -408,11 +440,13 @@ function detailCreate(data: z.infer<typeof createItemSchema>) {
 // ── GET /api/campaigns/:id/items ─────────────────────────────────────────────
 // Owner-only full list (Manage tab) — includes dmNotes. Players get 403.
 campaignItemsRouter.get("/campaigns/:id/items", async (req, res) => {
-  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
-  if (role !== "OWNER") {
-    res.status(403).json({ error: "Only the campaign owner may manage campaign items" });
-    return;
-  }
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    req.params.id,
+    "view",
+    "Only the campaign owner may manage campaign items",
+  );
 
   const items = await prisma.campaignItem.findMany({
     where: { campaignId: req.params.id },
@@ -454,18 +488,16 @@ campaignItemsRouter.get("/campaigns/:id/items/by-entity/:entityId", async (req, 
 // ── POST /api/campaigns/:id/items ────────────────────────────────────────────
 // Owner-only create. Auto-registers a HIDDEN ITEM entity + link in one txn.
 campaignItemsRouter.post("/campaigns/:id/items", async (req, res) => {
-  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
-  if (role !== "OWNER") {
-    res.status(403).json({ error: "Only the campaign owner may manage campaign items" });
-    return;
-  }
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    req.params.id,
+    "edit",
+    "Only the campaign owner may manage campaign items",
+  );
 
-  const parseResult = createItemSchema.safeParse(req.body);
-  if (!parseResult.success) {
-    res.status(400).json({ error: "Invalid request body", details: parseResult.error.flatten() });
-    return;
-  }
-  const data = parseResult.data;
+  const data = parseBodyOr400(createItemSchema, req.body, res);
+  if (data === undefined) return;
   const wielderError = assertWielderModeAllowed(data);
   if (wielderError) {
     res.status(400).json({ error: wielderError });
@@ -508,18 +540,16 @@ campaignItemsRouter.post("/campaigns/:id/items", async (req, res) => {
 // ── PATCH /api/campaigns/:id/items/:itemId ───────────────────────────────────
 // Owner-only update. A rename is mirrored onto the fronting entity in the txn.
 campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
-  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
-  if (role !== "OWNER") {
-    res.status(403).json({ error: "Only the campaign owner may manage campaign items" });
-    return;
-  }
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    req.params.id,
+    "edit",
+    "Only the campaign owner may manage campaign items",
+  );
 
-  const parseResult = updateItemSchema.safeParse(req.body);
-  if (!parseResult.success) {
-    res.status(400).json({ error: "Invalid request body", details: parseResult.error.flatten() });
-    return;
-  }
-  const data = parseResult.data;
+  const data = parseBodyOr400(updateItemSchema, req.body, res);
+  if (data === undefined) return;
 
   const existing = await prisma.campaignItem.findUnique({
     where: { id: req.params.itemId },
@@ -606,11 +636,13 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
 // deletes its linked entity in the same transaction (which cascades the link +
 // any journal refs). The item delete cascades its detail rows.
 campaignItemsRouter.delete("/campaigns/:id/items/:itemId", async (req, res) => {
-  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
-  if (role !== "OWNER") {
-    res.status(403).json({ error: "Only the campaign owner may manage campaign items" });
-    return;
-  }
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    req.params.id,
+    "edit",
+    "Only the campaign owner may manage campaign items",
+  );
 
   const existing = await prisma.campaignItem.findUnique({
     where: { id: req.params.itemId },
@@ -636,25 +668,24 @@ campaignItemsRouter.delete("/campaigns/:id/items/:itemId", async (req, res) => {
 // character's inventory, reveals the fronting entity, and writes an undoable
 // audit event on the TARGET character. Unique-item conflicts 409 with the holder.
 campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/award", async (req, res) => {
-  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
-  if (role !== "OWNER") {
-    res.status(403).json({ error: "Only the campaign owner may award campaign items" });
-    return;
-  }
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    req.params.id,
+    "edit",
+    "Only the campaign owner may award campaign items",
+  );
 
-  const parseResult = awardSchema.safeParse(req.body);
-  if (!parseResult.success) {
-    res.status(400).json({ error: "Invalid request body", details: parseResult.error.flatten() });
-    return;
-  }
+  const data = parseBodyOr400(awardSchema, req.body, res);
+  if (data === undefined) return;
 
   try {
     await awardCampaignItem({
       campaignId: req.params.id,
       campaignItemId: req.params.campaignItemId,
-      characterId: parseResult.data.characterId,
-      quantity: parseResult.data.quantity ?? 1,
-      sessionId: parseResult.data.sessionId,
+      characterId: data.characterId,
+      quantity: data.quantity ?? 1,
+      sessionId: data.sessionId,
     });
   } catch (err) {
     if (err instanceof CampaignItemAwardError) {
@@ -673,23 +704,22 @@ campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/award", async (re
 // audit event on the target character). A player-modified snapshot is still
 // revocable — the match is by campaignItemId, not by field equality.
 campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/revoke", async (req, res) => {
-  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
-  if (role !== "OWNER") {
-    res.status(403).json({ error: "Only the campaign owner may revoke campaign items" });
-    return;
-  }
+  await assertCampaignOwner(
+    prisma,
+    req.user!.id,
+    req.params.id,
+    "edit",
+    "Only the campaign owner may revoke campaign items",
+  );
 
-  const parseResult = revokeSchema.safeParse(req.body);
-  if (!parseResult.success) {
-    res.status(400).json({ error: "Invalid request body", details: parseResult.error.flatten() });
-    return;
-  }
+  const data = parseBodyOr400(revokeSchema, req.body, res);
+  if (data === undefined) return;
 
   try {
     await revokeCampaignItem({
       campaignId: req.params.id,
       campaignItemId: req.params.campaignItemId,
-      characterId: parseResult.data.characterId,
+      characterId: data.characterId,
     });
   } catch (err) {
     if (err instanceof CampaignItemAwardError) {

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
+import { useDismissable } from "@/hooks/useDismissable";
+
 interface PopoverProps {
   trigger: ReactNode;
   label: string;
@@ -77,26 +79,14 @@ export default function Popover({
   useEffect(() => {
     if (!open) return;
     panelRef.current?.focus();
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-        triggerRef.current?.focus();
-      }
-    }
-    function handleMouseDown(event: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("mousedown", handleMouseDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("mousedown", handleMouseDown);
-    };
   }, [open]);
+
+  useDismissable({
+    open,
+    wrapperRef,
+    onEscape: closePanel,
+    onOutsideClick: () => setOpen(false),
+  });
 
   return (
     <div ref={wrapperRef} className={`relative ${className}`}>

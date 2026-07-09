@@ -177,6 +177,38 @@ export function mentionBodyToFragment(
   return frag;
 }
 
+// Splice `@[<id>] ` into a body at the trigger, replacing the in-progress query.
+// Returns the new body and the caret offset just past the inserted token+space.
+export function spliceMentionToken(
+  body: string,
+  triggerStart: number,
+  caretOffset: number,
+  entityId: string,
+): { body: string; caret: number } {
+  const before = body.slice(0, triggerStart);
+  const after = body.slice(caretOffset);
+  const token = `@[${entityId}]`;
+  return { body: `${before}${token} ${after}`, caret: before.length + token.length + 1 };
+}
+
+// Find the mention chip immediately adjacent to a collapsed caret, or null. For
+// backspace (`forward=false`) the caret must sit at the end of the text before a
+// chip (or on an element boundary just after it); for Delete the reverse.
+export function resolveAdjacentChip(range: Range, forward: boolean): HTMLElement | null {
+  const { startContainer: node, startOffset: offset } = range;
+  let chip: Node | null;
+  if (node.nodeType === Node.TEXT_NODE) {
+    if (forward ? offset < (node.textContent?.length ?? 0) : offset > 0) return null;
+    chip = forward ? node.nextSibling : node.previousSibling;
+  } else {
+    chip = node.childNodes[forward ? offset : offset - 1] ?? null;
+  }
+  if (!chip || chip.nodeType !== Node.ELEMENT_NODE || !(chip as HTMLElement).dataset.mentionId) {
+    return null;
+  }
+  return chip as HTMLElement;
+}
+
 // Walk editor DOM back into a @[<uuid>] body string. Chips emit their token;
 // <br> and block elements (DIV/P) emit newlines; trailing placeholder <br>s drop.
 export function serializeMentionDom(root: Node): string {

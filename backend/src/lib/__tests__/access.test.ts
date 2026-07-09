@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { assertCharacterAccess } from "../auth/access.js";
+import { assertCampaignOwner, assertCharacterAccess } from "../auth/access.js";
 import { AuthorizationError, NotFoundError } from "../auth/errors.js";
 import { prisma } from "../prisma.js";
 import { ensureTestOwner } from "../../test-support/owner.js";
@@ -72,5 +72,71 @@ describe("assertCharacterAccess", () => {
       assertCharacterAccess(tx, OWNER_A, CHARACTER_ID, "edit"),
     );
     expect(row.ownerId).toBe(OWNER_A);
+  });
+});
+
+const CAMPAIGN_OWNER = "owner-campaign-owner";
+const CAMPAIGN_PLAYER = "owner-campaign-player";
+const CAMPAIGN_OUTSIDER = "owner-campaign-outsider";
+const CAMPAIGN_ID = "test-owner-campaign-1";
+const DENY = "Only the campaign owner may do the thing";
+
+describe("assertCampaignOwner", () => {
+  beforeAll(async () => {
+    await ensureTestOwner(CAMPAIGN_OWNER);
+    await ensureTestOwner(CAMPAIGN_PLAYER);
+    await ensureTestOwner(CAMPAIGN_OUTSIDER);
+    await prisma.campaign.deleteMany({ where: { id: CAMPAIGN_ID } });
+    await prisma.campaign.create({
+      data: {
+        id: CAMPAIGN_ID,
+        name: "Owner Guard Fixture",
+        ownerId: CAMPAIGN_OWNER,
+        inviteCode: `owner-guard-${Date.now()}`,
+        members: {
+          create: [
+            { userId: CAMPAIGN_OWNER, role: "OWNER" },
+            { userId: CAMPAIGN_PLAYER, role: "PLAYER" },
+          ],
+        },
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.campaign.deleteMany({ where: { id: CAMPAIGN_ID } });
+  });
+
+  it("returns the OWNER membership for the owner", async () => {
+    const row = await assertCampaignOwner(prisma, CAMPAIGN_OWNER, CAMPAIGN_ID, "edit", DENY);
+    expect(row).toEqual({ campaignId: CAMPAIGN_ID, role: "OWNER" });
+  });
+
+  it("throws a 403 with the supplied message for a non-owner member", async () => {
+    await expect(
+      assertCampaignOwner(prisma, CAMPAIGN_PLAYER, CAMPAIGN_ID, "edit", DENY),
+    ).rejects.toMatchObject({ status: 403, message: DENY });
+    await expect(
+      assertCampaignOwner(prisma, CAMPAIGN_PLAYER, CAMPAIGN_ID, "edit", DENY),
+    ).rejects.toBeInstanceOf(AuthorizationError);
+  });
+
+  it("throws the membership 403 for a non-member (before the owner check)", async () => {
+    await expect(
+      assertCampaignOwner(prisma, CAMPAIGN_OUTSIDER, CAMPAIGN_ID, "edit", DENY),
+    ).rejects.toMatchObject({ status: 403, message: "You do not have access to this campaign" });
+  });
+
+  it("throws a 404 for a missing campaign", async () => {
+    await expect(
+      assertCampaignOwner(prisma, CAMPAIGN_OWNER, "does-not-exist", "edit", DENY),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("works inside a $transaction client", async () => {
+    const row = await prisma.$transaction((tx) =>
+      assertCampaignOwner(tx, CAMPAIGN_OWNER, CAMPAIGN_ID, "view", DENY),
+    );
+    expect(row.role).toBe("OWNER");
   });
 });

@@ -6,6 +6,7 @@ import {
   activatedRechargeRest,
   type AttunementPrereqKind,
   chargePoolOf,
+  type ChargesCapability,
   describeAttunementPrereq,
   meetsAttunementPrereq,
   readCapability,
@@ -17,6 +18,12 @@ import {
   clearBuffsByTargetInTx,
   normalizeActiveEffectsMutable,
 } from "./active-effects.js";
+import {
+  armorDetailFields,
+  consumableDetailFields,
+  snapshotDetailCreate,
+  weaponDetailFields,
+} from "./detail-snapshot.js";
 import { rollDie } from "./dice.js";
 import { logEvent } from "./events.js";
 import { applyHealInTx } from "./hitpoints.js";
@@ -424,56 +431,7 @@ function normalizeConsumableDetail(input: ConsumableDetailInput) {
 // copy — the live-DB counterpart to prisma/seed.ts's itemDetailCreateFields,
 // which does the same thing from a seed-time literal instead of a DB read.
 function snapshotItemDetail(item: CatalogItemWithDetails) {
-  return {
-    weaponDetail: item.weaponDetail
-      ? {
-          create: {
-            damageDiceCount: item.weaponDetail.damageDiceCount,
-            damageDiceFaces: item.weaponDetail.damageDiceFaces,
-            damageModifier: item.weaponDetail.damageModifier,
-            damageType: item.weaponDetail.damageType,
-            versatileDiceCount: item.weaponDetail.versatileDiceCount,
-            versatileDiceFaces: item.weaponDetail.versatileDiceFaces,
-            finesse: item.weaponDetail.finesse,
-            light: item.weaponDetail.light,
-            heavy: item.weaponDetail.heavy,
-            twoHanded: item.weaponDetail.twoHanded,
-            reach: item.weaponDetail.reach,
-            thrown: item.weaponDetail.thrown,
-            ammunition: item.weaponDetail.ammunition,
-            rangeNormal: item.weaponDetail.rangeNormal,
-            rangeLong: item.weaponDetail.rangeLong,
-            weaponClass: item.weaponDetail.weaponClass,
-            weaponRange: item.weaponDetail.weaponRange,
-          },
-        }
-      : undefined,
-    armorDetail: item.armorDetail
-      ? {
-          create: {
-            armorCategory: item.armorDetail.armorCategory,
-            baseArmorClass: item.armorDetail.baseArmorClass,
-            dexModifierApplies: item.armorDetail.dexModifierApplies,
-            dexModifierMax: item.armorDetail.dexModifierMax,
-            stealthDisadvantage: item.armorDetail.stealthDisadvantage,
-            strengthRequirement: item.armorDetail.strengthRequirement,
-          },
-        }
-      : undefined,
-    consumableDetail: item.consumableDetail
-      ? {
-          create: {
-            effectDiceCount: item.consumableDetail.effectDiceCount,
-            effectDiceFaces: item.consumableDetail.effectDiceFaces,
-            effectModifier: item.consumableDetail.effectModifier,
-            effectDescription: item.consumableDetail.effectDescription,
-            maxUses: item.consumableDetail.maxUses,
-            // A freshly-snapshotted charged consumable starts full.
-            usesRemaining: item.consumableDetail.usesRemaining ?? item.consumableDetail.maxUses,
-          },
-        }
-      : undefined,
-  };
+  return snapshotDetailCreate(item);
 }
 
 // ── Paper-doll placement (#565) ──────────────────────────────────────────────
@@ -696,47 +654,9 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
       // Runtime counter: undo-of-delete restores the row verbatim, spend state included.
       used: c.used,
     })),
-    weaponDetail: item.weaponDetail
-      ? {
-          damageDiceCount: item.weaponDetail.damageDiceCount,
-          damageDiceFaces: item.weaponDetail.damageDiceFaces,
-          damageModifier: item.weaponDetail.damageModifier,
-          damageType: item.weaponDetail.damageType,
-          versatileDiceCount: item.weaponDetail.versatileDiceCount,
-          versatileDiceFaces: item.weaponDetail.versatileDiceFaces,
-          finesse: item.weaponDetail.finesse,
-          light: item.weaponDetail.light,
-          heavy: item.weaponDetail.heavy,
-          twoHanded: item.weaponDetail.twoHanded,
-          reach: item.weaponDetail.reach,
-          thrown: item.weaponDetail.thrown,
-          ammunition: item.weaponDetail.ammunition,
-          rangeNormal: item.weaponDetail.rangeNormal,
-          rangeLong: item.weaponDetail.rangeLong,
-          weaponClass: item.weaponDetail.weaponClass,
-          weaponRange: item.weaponDetail.weaponRange,
-        }
-      : null,
-    armorDetail: item.armorDetail
-      ? {
-          armorCategory: item.armorDetail.armorCategory,
-          baseArmorClass: item.armorDetail.baseArmorClass,
-          dexModifierApplies: item.armorDetail.dexModifierApplies,
-          dexModifierMax: item.armorDetail.dexModifierMax,
-          stealthDisadvantage: item.armorDetail.stealthDisadvantage,
-          strengthRequirement: item.armorDetail.strengthRequirement,
-        }
-      : null,
-    consumableDetail: item.consumableDetail
-      ? {
-          effectDiceCount: item.consumableDetail.effectDiceCount,
-          effectDiceFaces: item.consumableDetail.effectDiceFaces,
-          effectModifier: item.consumableDetail.effectModifier,
-          effectDescription: item.consumableDetail.effectDescription,
-          maxUses: item.consumableDetail.maxUses,
-          usesRemaining: item.consumableDetail.usesRemaining,
-        }
-      : null,
+    weaponDetail: item.weaponDetail ? weaponDetailFields(item.weaponDetail) : null,
+    armorDetail: item.armorDetail ? armorDetailFields(item.armorDetail) : null,
+    consumableDetail: item.consumableDetail ? consumableDetailFields(item.consumableDetail) : null,
   };
 }
 
@@ -850,6 +770,111 @@ function formatCurrencyForSummary(delta: Currency | null | undefined): string | 
   return `${sign}${parts.join(" ")}`;
 }
 
+// The resolved item facts an acquire creates its row from — catalog snapshot
+// or homebrew custom, unified so applyAcquire's create is source-agnostic.
+interface AcquireSource {
+  itemId: string | null;
+  name: string;
+  category: ItemCategoryName;
+  weight: number | undefined;
+  cost: Currency | undefined;
+  description: string | undefined;
+  slot: EquipSlot | null;
+  detail: ReturnType<typeof snapshotItemDetail>;
+}
+
+// Snapshots a catalog Item into acquire item-facts; throws on an unknown id.
+async function catalogAcquireSource(
+  tx: Prisma.TransactionClient,
+  itemId: string,
+): Promise<AcquireSource> {
+  const catalogItem = await tx.item.findUnique({
+    where: { id: itemId },
+    include: catalogItemDetailInclude,
+  });
+  if (!catalogItem) {
+    throw new InvalidInventoryOperationError(`Unknown catalog item: ${itemId}`);
+  }
+  return {
+    itemId: catalogItem.id,
+    name: catalogItem.name,
+    category: catalogItem.category,
+    weight: catalogItem.weight ?? undefined,
+    cost: asCurrency(catalogItem.cost) ?? undefined,
+    description: catalogItem.description ?? undefined,
+    slot: catalogItem.slot,
+    detail: snapshotItemDetail(catalogItem),
+  };
+}
+
+// Homebrew acquire item-facts, with the weapon/armor/consumable nested-create.
+function customAcquireSource(custom: CustomItemInput): AcquireSource {
+  return {
+    itemId: null,
+    name: custom.name,
+    category: custom.category,
+    weight: custom.weight,
+    cost: custom.cost,
+    description: custom.description,
+    slot: custom.slot ?? null,
+    detail: {
+      weaponDetail: custom.weapon ? { create: normalizeWeaponDetail(custom.weapon) } : undefined,
+      armorDetail: custom.armor ? { create: normalizeArmorDetail(custom.armor) } : undefined,
+      consumableDetail: custom.consumable ? { create: normalizeConsumableDetail(custom.consumable) } : undefined,
+    },
+  };
+}
+
+// Resolves an acquire op to its item facts: catalog snapshot (itemId) or
+// homebrew (custom) — exactly one; throws when neither is supplied.
+async function resolveAcquireSource(
+  tx: Prisma.TransactionClient,
+  op: AcquireOperation,
+): Promise<AcquireSource> {
+  if (op.itemId) return catalogAcquireSource(tx, op.itemId);
+  if (op.custom) return customAcquireSource(op.custom);
+  throw new InvalidInventoryOperationError("acquire requires either itemId or custom");
+}
+
+// "Add & equip": auto-place a freshly-created row into the first free compatible
+// slot (#565). Silent — a fresh acquire that can't be slotted stays in the bag.
+async function autoEquipAcquired(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  createdId: string,
+  source: AcquireSource,
+) {
+  const placeable: PlaceableItem = {
+    category: source.category,
+    slot: source.slot,
+    weaponDetail: source.detail.weaponDetail
+      ? { twoHanded: Boolean(source.detail.weaponDetail.create.twoHanded) }
+      : null,
+    armorDetail: source.detail.armorDetail
+      ? { armorCategory: source.detail.armorDetail.create.armorCategory }
+      : null,
+  };
+  const rows = await fetchEquippedRows(tx, characterId, createdId);
+  const autoSlot = firstFreeSlot(rows, placeable);
+  if (autoSlot) {
+    await tx.inventoryItem.update({ where: { id: createdId }, data: { equippedSlot: autoSlot } });
+  }
+}
+
+// Applies the acquire's currency debit (the "Buy" path) and returns the signed
+// delta stored on the event (negated debit), or null for a plain "Add".
+async function applyAcquireCurrency(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: AcquireOperation,
+): Promise<Currency | null> {
+  const currencyDelta = hasNonzeroCurrency(op.currencyDelta) ? op.currencyDelta : null;
+  if (!currencyDelta) return null;
+  const currency = await getCharacterCurrency(tx, characterId);
+  await setCharacterCurrency(tx, characterId, currencyDebit(currency, currencyDelta));
+  return negate(currencyDelta);
+}
+
 async function applyAcquire(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -859,94 +884,32 @@ async function applyAcquire(
 ) {
   const quantity = op.quantity ?? 1;
   const position = await nextPosition(tx, characterId);
-
-  let itemId: string | null;
-  let name: string;
-  let category: ItemCategoryName;
-  let weight: number | undefined;
-  let cost: Currency | undefined;
-  let description: string | undefined;
-  let slot: EquipSlot | null = null;
-  let detail: ReturnType<typeof snapshotItemDetail>;
-
-  if (op.itemId) {
-    const catalogItem = await tx.item.findUnique({
-      where: { id: op.itemId },
-      include: catalogItemDetailInclude,
-    });
-    if (!catalogItem) {
-      throw new InvalidInventoryOperationError(`Unknown catalog item: ${op.itemId}`);
-    }
-    itemId = catalogItem.id;
-    name = catalogItem.name;
-    category = catalogItem.category;
-    weight = catalogItem.weight ?? undefined;
-    cost = asCurrency(catalogItem.cost) ?? undefined;
-    description = catalogItem.description ?? undefined;
-    slot = catalogItem.slot;
-    detail = snapshotItemDetail(catalogItem);
-  } else if (op.custom) {
-    itemId = null;
-    name = op.custom.name;
-    category = op.custom.category;
-    weight = op.custom.weight;
-    cost = op.custom.cost;
-    description = op.custom.description;
-    slot = op.custom.slot ?? null;
-    detail = {
-      weaponDetail: op.custom.weapon ? { create: normalizeWeaponDetail(op.custom.weapon) } : undefined,
-      armorDetail: op.custom.armor ? { create: normalizeArmorDetail(op.custom.armor) } : undefined,
-      consumableDetail: op.custom.consumable
-        ? { create: normalizeConsumableDetail(op.custom.consumable) }
-        : undefined,
-    };
-  } else {
-    throw new InvalidInventoryOperationError("acquire requires either itemId or custom");
-  }
+  const source = await resolveAcquireSource(tx, op);
 
   const created = await tx.inventoryItem.create({
     data: {
       characterId,
-      itemId,
-      name,
-      category,
-      weight,
-      cost: toJsonInput(cost),
-      description,
+      itemId: source.itemId,
+      name: source.name,
+      category: source.category,
+      weight: source.weight,
+      cost: toJsonInput(source.cost),
+      description: source.description,
       quantity,
       equippedSlot: null,
-      slot,
+      slot: source.slot,
       notes: op.notes,
       position,
-      ...detail,
+      ...source.detail,
     },
   });
 
-  // "Add & equip": auto-place into the first free compatible slot (#565). Silent
-  // (no separate equipped event) — a fresh acquire that can't be slotted stays in
-  // the bag rather than failing the acquire.
   if (op.equipped) {
-    const placeable: PlaceableItem = {
-      category,
-      slot,
-      weaponDetail: detail.weaponDetail ? { twoHanded: Boolean(detail.weaponDetail.create.twoHanded) } : null,
-      armorDetail: detail.armorDetail ? { armorCategory: detail.armorDetail.create.armorCategory } : null,
-    };
-    const rows = await fetchEquippedRows(tx, characterId, created.id);
-    const autoSlot = firstFreeSlot(rows, placeable);
-    if (autoSlot) {
-      await tx.inventoryItem.update({ where: { id: created.id }, data: { equippedSlot: autoSlot } });
-    }
+    await autoEquipAcquired(tx, characterId, created.id, source);
   }
 
-  const currencyDelta = hasNonzeroCurrency(op.currencyDelta) ? op.currencyDelta : null;
-  if (currencyDelta) {
-    const currency = await getCharacterCurrency(tx, characterId);
-    await setCharacterCurrency(tx, characterId, currencyDebit(currency, currencyDelta));
-  }
-
-  const eventType = currencyDelta ? "bought" : "acquired";
-  const storedDelta = currencyDelta ? negate(currencyDelta) : null;
+  const storedDelta = await applyAcquireCurrency(tx, characterId, op);
+  const eventType = storedDelta ? "bought" : "acquired";
   const currencyText = formatCurrencyForSummary(storedDelta);
   const summary = eventType === "bought"
     ? `Bought ${created.name} ×${quantity}${currencyText ? ` (${currencyText})` : ""}`
@@ -1016,6 +979,119 @@ export async function applyAdjustQuantity(
   }
 }
 
+type ConsumableDetail = InventoryItemWithDetails["consumableDetail"];
+
+// A consumable's effect-dice metadata (0 count/faces ⇒ no roll).
+function consumableEffectDice(detail: ConsumableDetail): { diceCount: number; faces: number; modifier: number } {
+  return {
+    diceCount: detail?.effectDiceCount ?? 0,
+    faces: detail?.effectDiceFaces ?? 0,
+    modifier: detail?.effectModifier ?? 0,
+  };
+}
+
+// Rolls a consumable's effect dice — client-supplied for the 3D animation, else
+// server-rolled — validating any supplied rolls. total is null when it has no dice.
+function rollConsumableEffect(
+  op: UseOperation,
+  item: InventoryItemWithDetails,
+  detail: ConsumableDetail,
+): { rolls: number[]; modifier: number; total: number | null } {
+  const { diceCount, faces, modifier } = consumableEffectDice(detail);
+  if (diceCount <= 0 || faces <= 0) return { rolls: [], modifier, total: null };
+  let rolls: number[];
+  if (op.rolls) {
+    if (op.rolls.length !== diceCount || op.rolls.some((r) => r < 1 || r > faces)) {
+      throw new InvalidInventoryOperationError(
+        `${item.name} effect roll must be ${diceCount}d${faces}`,
+      );
+    }
+    rolls = op.rolls;
+  } else {
+    rolls = Array.from({ length: diceCount }, () => rollDie(faces));
+  }
+  return { rolls, modifier, total: rolls.reduce((sum, r) => sum + r, 0) + modifier };
+}
+
+// The event before/after snapshots + row-effect of consuming one use. Decrements
+// usesRemaining (charged) or quantity (stackable); throws when nothing is left.
+interface UseDecrement {
+  before: Record<string, unknown>;
+  after: Record<string, unknown> | null;
+  deletedItem: DeletedInventoryItemSnapshot | undefined;
+  remainingUses: number | null;
+  remainingQty: number | null;
+}
+
+function computeUseDecrement(
+  item: InventoryItemWithDetails,
+  detail: ConsumableDetail,
+  charged: boolean,
+): UseDecrement {
+  if (charged) {
+    const current = detail?.usesRemaining ?? 0;
+    if (current <= 0) {
+      throw new InvalidInventoryOperationError(`${item.name} has no uses remaining`);
+    }
+    const remainingUses = current - 1;
+    return {
+      before: { usesRemaining: current },
+      after: { usesRemaining: remainingUses },
+      deletedItem: undefined,
+      remainingUses,
+      remainingQty: null,
+    };
+  }
+  if (item.quantity <= 0) {
+    throw new InvalidInventoryOperationError(`${item.name} has none left to use`);
+  }
+  const remainingQty = item.quantity - 1;
+  return {
+    before: { quantity: item.quantity },
+    after: remainingQty === 0 ? null : { quantity: remainingQty },
+    deletedItem: remainingQty === 0 ? snapshotInventoryItemForUndo(item) : undefined,
+    remainingUses: null,
+    remainingQty,
+  };
+}
+
+// Writes the computed decrement to the row: charged updates usesRemaining, a
+// depleted stackable deletes the row, otherwise the quantity drops by one.
+async function persistUseDecrement(
+  tx: Prisma.TransactionClient,
+  item: InventoryItemWithDetails,
+  charged: boolean,
+  remainingUses: number | null,
+  remainingQty: number | null,
+) {
+  if (charged) {
+    await tx.inventoryConsumableDetail.update({
+      where: { inventoryItemId: item.id },
+      data: { usesRemaining: remainingUses ?? 0 },
+    });
+  } else if (remainingQty === 0) {
+    await tx.inventoryItem.delete({ where: { id: item.id } });
+  } else {
+    await tx.inventoryItem.update({ where: { id: item.id }, data: { quantity: remainingQty ?? 0 } });
+  }
+}
+
+// Auto-applies a consumable's healing only — non-heal effects are rolled and
+// recorded but never applied server-side (#121). Returns "heal" when it applied.
+async function applyConsumableHeal(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  item: InventoryItemWithDetails,
+  detail: ConsumableDetail,
+  total: number | null,
+  batchId: string,
+  sessionId: string | null,
+): Promise<"heal" | null> {
+  if (!isHealingConsumable(detail?.effectDescription) || total === null || total <= 0) return null;
+  await applyHealInTx(tx, characterId, total, batchId, sessionId, { source: item.name });
+  return "heal";
+}
+
 // Consumes one use of a consumable (#121). Ammo is gear, not consumable, so it
 // is excluded here without any ammoKind dependency. Rolls the effect dice, logs
 // a `consumed` event with the roll in `data`, and auto-applies ONLY healing.
@@ -1033,59 +1109,9 @@ async function applyUse(
   const detail = item.consumableDetail;
   const charged = detail?.maxUses != null;
 
-  // Roll the effect dice (client-supplied for the 3D animation, else server-rolled).
-  const diceCount = detail?.effectDiceCount ?? 0;
-  const faces = detail?.effectDiceFaces ?? 0;
-  const modifier = detail?.effectModifier ?? 0;
-  let rolls: number[] = [];
-  let total: number | null = null;
-  if (diceCount > 0 && faces > 0) {
-    if (op.rolls) {
-      if (op.rolls.length !== diceCount || op.rolls.some((r) => r < 1 || r > faces)) {
-        throw new InvalidInventoryOperationError(
-          `${item.name} effect roll must be ${diceCount}d${faces}`,
-        );
-      }
-      rolls = op.rolls;
-    } else {
-      rolls = Array.from({ length: diceCount }, () => rollDie(faces));
-    }
-    total = rolls.reduce((sum, r) => sum + r, 0) + modifier;
-  }
-
-  // Decrement quantity (stackable) or usesRemaining (charged). A charged item at
-  // 0 uses stays with Use disabled until a long rest recharges it.
-  let before: Record<string, unknown>;
-  let after: Record<string, unknown> | null;
-  let deletedItem: DeletedInventoryItemSnapshot | undefined;
-  let remainingUses: number | null = null;
-  let remainingQty: number | null = null;
-
-  if (charged) {
-    const current = detail?.usesRemaining ?? 0;
-    if (current <= 0) {
-      throw new InvalidInventoryOperationError(`${item.name} has no uses remaining`);
-    }
-    remainingUses = current - 1;
-    before = { usesRemaining: current };
-    after = { usesRemaining: remainingUses };
-  } else {
-    if (item.quantity <= 0) {
-      throw new InvalidInventoryOperationError(`${item.name} has none left to use`);
-    }
-    remainingQty = item.quantity - 1;
-    before = { quantity: item.quantity };
-    after = remainingQty === 0 ? null : { quantity: remainingQty };
-    if (remainingQty === 0) deletedItem = snapshotInventoryItemForUndo(item);
-  }
-
-  // Auto-apply healing only — non-heal effects are rolled + recorded, not applied.
-  const healing = isHealingConsumable(detail?.effectDescription);
-  let applied: "heal" | null = null;
-  if (healing && total !== null && total > 0) {
-    await applyHealInTx(tx, characterId, total, batchId, sessionId, { source: item.name });
-    applied = "heal";
-  }
+  const { rolls, modifier, total } = rollConsumableEffect(op, item, detail);
+  const { before, after, deletedItem, remainingUses, remainingQty } = computeUseDecrement(item, detail, charged);
+  const applied = await applyConsumableHeal(tx, characterId, item, detail, total, batchId, sessionId);
 
   await logEvent(tx, {
     characterId,
@@ -1110,16 +1136,7 @@ async function applyUse(
     sessionId,
   });
 
-  if (charged) {
-    await tx.inventoryConsumableDetail.update({
-      where: { inventoryItemId: item.id },
-      data: { usesRemaining: remainingUses ?? 0 },
-    });
-  } else if (remainingQty === 0) {
-    await tx.inventoryItem.delete({ where: { id: item.id } });
-  } else {
-    await tx.inventoryItem.update({ where: { id: item.id }, data: { quantity: remainingQty ?? 0 } });
-  }
+  await persistUseDecrement(tx, item, charged, remainingUses, remainingQty);
 
   return {
     inventoryItemId: item.id,
@@ -1318,55 +1335,93 @@ async function applyUnattune(
   });
 }
 
-// Spends a use of an item's activatedEffect and seeds its self-buff (#543). Gated
-// on the item being equipped/attuned and on remaining uses.
-async function applyActivate(
+// The charges pool + cost for a #555 charges-costed activation, sitting on the
+// item's shared capability rows; typed off the live include so the pool row
+// carries its runtime `used` counter.
+type ChargePool = { cap: ChargesCapability; row: InventoryItemWithDetails["capabilities"][number] };
+
+// Throws if the item can't currently activate: not equipped/attuned, already
+// active, or out of uses. The already-active guard comes FIRST (before the uses
+// check) so an active last-charge item reports "already active", not "no uses".
+// A second activation of a seeded buff would dedupe in-place but still waste a charge.
+async function assertActivatable(
   tx: Prisma.TransactionClient,
   characterId: string,
-  op: ActivateOperation,
-  batchId: string,
-  sessionId: string | null,
+  item: InventoryItemWithDetails,
+  cap: ActivatedEffectCapability,
 ) {
-  const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
-  const cap = activatedCapabilityOf(item);
-  if (!cap) {
-    throw new InvalidInventoryOperationError(`${item.name} has no activated effect`);
-  }
   if (item.equippedSlot == null && !item.attuned) {
     throw new InvalidInventoryOperationError(`${item.name} must be equipped or attuned to activate`);
   }
-
-  // Guard against double-activation FIRST (before the uses check, so an active
-  // last-charge item reports "already active", not "no uses remaining"): spending
-  // a second use on a buff that's already seeded dedupes the buff in-place (no
-  // double-apply) but still wastes the charge.
   const charRow = await tx.character.findUnique({ where: { id: characterId }, select: { activeEffects: true } });
   const cur = normalizeActiveEffectsMutable(charRow?.activeEffects ?? null);
   if (cur.buffs.some((b) => b.key === itemBuffKey(item.id))) {
     throw new InvalidInventoryOperationError(`${item.name} is already active`);
   }
-
   const maxUses = activatedMaxUses(cap);
   if (maxUses !== null && item.activatedUsesSpent >= maxUses) {
     throw new InvalidInventoryOperationError(`${item.name} has no uses remaining — recharges on a rest`);
   }
+}
 
-  // A charges-costed activation (#555) spends chargeCost from the item's shared
-  // pool instead of the per-item activatedUsesSpent counter.
-  const pool = cap.resourceKind === "charges" ? chargePoolOf(item.capabilities) : null;
-  const chargeCost = cap.resourceKind === "charges" ? Math.max(1, cap.chargeCost) : null;
-  if (chargeCost != null) {
-    if (!pool) {
-      throw new InvalidInventoryOperationError(`${item.name} has no charges pool to spend from`);
-    }
-    const poolRemaining = Math.max(0, pool.cap.maxCharges - (pool.row.used ?? 0));
-    if (poolRemaining < chargeCost) {
-      throw new InvalidInventoryOperationError(
-        `${item.name} needs ${chargeCost} charge${chargeCost === 1 ? "" : "s"} — ${poolRemaining} remaining`,
-      );
-    }
+// The pool + cost for a charges-costed activation (#555), or nulls when the
+// activation spends the per-item use counter instead. Throws when the pool is
+// missing or holds fewer charges than the cost.
+function resolveActivationCharges(
+  item: InventoryItemWithDetails,
+  cap: ActivatedEffectCapability,
+): { pool: ChargePool | null; chargeCost: number | null } {
+  if (cap.resourceKind !== "charges") return { pool: null, chargeCost: null };
+  const pool = chargePoolOf(item.capabilities);
+  const chargeCost = Math.max(1, cap.chargeCost);
+  if (!pool) {
+    throw new InvalidInventoryOperationError(`${item.name} has no charges pool to spend from`);
   }
+  const poolRemaining = Math.max(0, pool.cap.maxCharges - (pool.row.used ?? 0));
+  if (poolRemaining < chargeCost) {
+    throw new InvalidInventoryOperationError(
+      `${item.name} needs ${chargeCost} charge${chargeCost === 1 ? "" : "s"} — ${poolRemaining} remaining`,
+    );
+  }
+  return { pool, chargeCost };
+}
 
+// Atomically spends chargeCost from the pool row (TOCTOU guard, same as
+// applyCastItemSpellOp): the WHERE re-evaluates under the row's write lock so
+// concurrent spenders can't push `used` past maxCharges; a loser's batch rolls
+// back. Returns the pre/post `used` counter for the event snapshot.
+async function spendActivationCharges(
+  tx: Prisma.TransactionClient,
+  item: InventoryItemWithDetails,
+  pool: ChargePool,
+  chargeCost: number,
+): Promise<{ before: number; after: number }> {
+  const spent = await tx.inventoryCapability.updateMany({
+    where: { id: pool.row.id, used: { lte: pool.cap.maxCharges - chargeCost } },
+    data: { used: { increment: chargeCost } },
+  });
+  if (spent.count === 0) {
+    throw new InvalidInventoryOperationError(
+      `${item.name} needs ${chargeCost} charge${chargeCost === 1 ? "" : "s"} — too few remaining`,
+    );
+  }
+  // Re-read for the event snapshot: under a race the pre-read `pool.row.used` is stale.
+  const fresh = await tx.inventoryCapability.findUniqueOrThrow({
+    where: { id: pool.row.id },
+    select: { used: true },
+  });
+  return { after: fresh.used, before: fresh.used - chargeCost };
+}
+
+// Seeds the item's while-active / until-rest self-buff (#543).
+async function seedActivationBuff(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  item: InventoryItemWithDetails,
+  cap: ActivatedEffectCapability,
+  batchId: string,
+  sessionId: string | null,
+) {
   const duration = cap.duration === "untilRest" ? "until-rest" : "while-active";
   const restType = duration === "until-rest" ? (activatedRechargeRest(cap) ?? "long") : undefined;
   await appendActiveBuffInTx(
@@ -1384,63 +1439,88 @@ async function applyActivate(
     batchId,
     sessionId,
   );
+}
 
+// Uses left to report after an activation: pool charges remaining when
+// charges-costed, else the per-item use budget, else null (unlimited).
+function activationRemaining(
+  pool: ChargePool | null,
+  chargeCost: number | null,
+  poolUsedAfter: number | null,
+  maxUses: number | null,
+  nextSpent: number,
+): number | null {
+  if (pool && chargeCost != null) return Math.max(0, pool.cap.maxCharges - poolUsedAfter!);
+  return maxUses !== null ? maxUses - nextSpent : null;
+}
+
+// Event summary for an activation: names the charges/uses left, or neither.
+function activateSummary(itemName: string, hasPool: boolean, remaining: number | null): string {
+  if (hasPool && remaining !== null) {
+    return `Activated ${itemName} (${remaining} charge${remaining === 1 ? "" : "s"} left)`;
+  }
+  if (remaining !== null) return `Activated ${itemName} (${remaining} left)`;
+  return `Activated ${itemName}`;
+}
+
+// The activatedUsesSpent (+ optional charges-pool) snapshot for an activate
+// event's before/after — capabilityUsed only when the spend came from a pool.
+function activationSnapshot(
+  spent: number,
+  pool: ChargePool | null,
+  chargeCost: number | null,
+  poolUsed: number | null,
+): Record<string, unknown> {
+  return {
+    activatedUsesSpent: spent,
+    ...(pool && chargeCost != null ? { capabilityUsed: { capabilityId: pool.row.id, used: poolUsed } } : {}),
+  };
+}
+
+// Spends a use of an item's activatedEffect and seeds its self-buff (#543). Gated
+// on the item being equipped/attuned and on remaining uses.
+async function applyActivate(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: ActivateOperation,
+  batchId: string,
+  sessionId: string | null,
+) {
+  const item = await getOwnedInventoryItem(tx, characterId, op.inventoryItemId);
+  const cap = activatedCapabilityOf(item);
+  if (!cap) {
+    throw new InvalidInventoryOperationError(`${item.name} has no activated effect`);
+  }
+  await assertActivatable(tx, characterId, item, cap);
+  const { pool, chargeCost } = resolveActivationCharges(item, cap);
+
+  await seedActivationBuff(tx, characterId, item, cap, batchId, sessionId);
+
+  const maxUses = activatedMaxUses(cap);
   const nextSpent = maxUses !== null ? item.activatedUsesSpent + 1 : item.activatedUsesSpent;
   if (maxUses !== null) {
     await tx.inventoryItem.update({ where: { id: item.id }, data: { activatedUsesSpent: nextSpent } });
   }
   // Charges path: spend the pool row (capabilityUsed before/after makes the
   // revert restore the pool, symmetric with the activatedUsesSpent snapshots).
-  // Atomic conditional spend (TOCTOU guard, same as applyCastItemSpellOp): the
-  // WHERE re-evaluates under the row's write lock so concurrent spenders can't
-  // push `used` past maxCharges; a loser's whole batch rolls back.
   let poolUsedBefore: number | null = null;
   let poolUsedAfter: number | null = null;
   if (pool && chargeCost != null) {
-    const spent = await tx.inventoryCapability.updateMany({
-      where: { id: pool.row.id, used: { lte: pool.cap.maxCharges - chargeCost } },
-      data: { used: { increment: chargeCost } },
-    });
-    if (spent.count === 0) {
-      throw new InvalidInventoryOperationError(
-        `${item.name} needs ${chargeCost} charge${chargeCost === 1 ? "" : "s"} — too few remaining`,
-      );
-    }
-    // Re-read for the event snapshot: under a race the pre-read `pool.row.used` is stale.
-    const fresh = await tx.inventoryCapability.findUniqueOrThrow({
-      where: { id: pool.row.id },
-      select: { used: true },
-    });
-    poolUsedAfter = fresh.used;
-    poolUsedBefore = fresh.used - chargeCost;
+    const { before, after } = await spendActivationCharges(tx, item, pool, chargeCost);
+    poolUsedBefore = before;
+    poolUsedAfter = after;
   }
 
-  const remaining =
-    pool && chargeCost != null
-      ? Math.max(0, pool.cap.maxCharges - poolUsedAfter!)
-      : maxUses !== null
-        ? maxUses - nextSpent
-        : null;
+  const remaining = activationRemaining(pool, chargeCost, poolUsedAfter, maxUses, nextSpent);
   await logEvent(tx, {
     characterId,
     category: "inventory",
     type: "activated",
-    summary:
-      pool && remaining !== null
-        ? `Activated ${item.name} (${remaining} charge${remaining === 1 ? "" : "s"} left)`
-        : remaining !== null
-          ? `Activated ${item.name} (${remaining} left)`
-          : `Activated ${item.name}`,
+    summary: activateSummary(item.name, pool != null, remaining),
     entityType: "InventoryItem",
     entityId: item.id,
-    before: {
-      activatedUsesSpent: item.activatedUsesSpent,
-      ...(pool && chargeCost != null ? { capabilityUsed: { capabilityId: pool.row.id, used: poolUsedBefore } } : {}),
-    },
-    after: {
-      activatedUsesSpent: nextSpent,
-      ...(pool && chargeCost != null ? { capabilityUsed: { capabilityId: pool.row.id, used: poolUsedAfter } } : {}),
-    },
+    before: activationSnapshot(item.activatedUsesSpent, pool, chargeCost, poolUsedBefore),
+    after: activationSnapshot(nextSpent, pool, chargeCost, poolUsedAfter),
     data: { itemName: item.name, remaining, ...(chargeCost != null ? { chargesSpent: chargeCost } : {}) },
     batchId,
     sessionId,
@@ -1568,6 +1648,142 @@ async function applySell(tx: Prisma.TransactionClient, characterId: string, op: 
 // it per-denomination undoes either direction. A negative result (the player
 // has since spent the proceeds) throws InsufficientCurrencyError, which rolls
 // back the whole revert batch.
+// Undo of a rest-recharge event: it has no single entityId, so restore each
+// item's pre-rest spent count. Handled before the entityId guard in the caller.
+async function revertRecharge(
+  tx: Prisma.TransactionClient,
+  recharged: { id: string; previousSpent: number }[],
+) {
+  for (const r of recharged) {
+    await tx.inventoryItem.updateMany({
+      where: { id: r.id },
+      data: { activatedUsesSpent: r.previousSpent },
+    });
+  }
+}
+
+// Reverses a purchase/sale currency movement — currencyDelta is the signed
+// amount applied at write time, so debiting it per-denomination undoes either way.
+async function reverseCurrencyDelta(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  currencyDelta: Currency | undefined,
+) {
+  if (!hasNonzeroCurrency(currencyDelta)) return;
+  const current = await getCharacterCurrency(tx, characterId);
+  await setCharacterCurrency(tx, characterId, currencyDebit(current, currencyDelta));
+}
+
+// Re-links a deleted row's provenance FKs on recreate: itemId (catalog) and
+// campaignItemId (#381) survive only when their referent still exists (else
+// null — the snapshot is self-contained / SetNull).
+async function resolveSnapshotRefs(
+  tx: Prisma.TransactionClient,
+  deletedItem: DeletedInventoryItemSnapshot,
+): Promise<{ itemId: string | null; campaignItemId: string | null }> {
+  let itemId = deletedItem.itemId;
+  if (itemId) {
+    const catalogItem = await tx.item.findUnique({ where: { id: itemId }, select: { id: true } });
+    if (!catalogItem) itemId = null;
+  }
+  let campaignItemId = deletedItem.campaignItemId ?? null;
+  if (campaignItemId) {
+    const campaignItem = await tx.campaignItem.findUnique({ where: { id: campaignItemId }, select: { id: true } });
+    if (!campaignItem) campaignItemId = null;
+  }
+  return { itemId, campaignItemId };
+}
+
+// The nested detail-block create payload for a recreated row (weapon/armor/
+// consumable/capabilities), each present only when the snapshot carried it.
+function snapshotDetailNestedCreate(deletedItem: DeletedInventoryItemSnapshot) {
+  return {
+    weaponDetail: deletedItem.weaponDetail ? { create: deletedItem.weaponDetail } : undefined,
+    armorDetail: deletedItem.armorDetail ? { create: deletedItem.armorDetail } : undefined,
+    consumableDetail: deletedItem.consumableDetail ? { create: deletedItem.consumableDetail } : undefined,
+    capabilities:
+      deletedItem.capabilities && deletedItem.capabilities.length > 0
+        ? { create: deletedItem.capabilities }
+        : undefined,
+  };
+}
+
+// Recreates a deleted row from its undo snapshot, reusing the original id so
+// soft-reference entityIds on other events stay valid.
+async function recreateDeletedItem(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  entityId: string,
+  deletedItem: DeletedInventoryItemSnapshot,
+) {
+  const { itemId, campaignItemId } = await resolveSnapshotRefs(tx, deletedItem);
+  await tx.inventoryItem.create({
+    data: {
+      id: entityId,
+      characterId,
+      itemId,
+      campaignItemId,
+      name: deletedItem.name,
+      category: deletedItem.category,
+      weight: deletedItem.weight ?? undefined,
+      cost: toJsonInput(deletedItem.cost),
+      description: deletedItem.description ?? undefined,
+      quantity: deletedItem.quantity,
+      equippedSlot: deletedItem.equippedSlot,
+      slot: deletedItem.slot,
+      rarity: deletedItem.rarity,
+      attuned: deletedItem.attuned,
+      requiresAttunement: deletedItem.requiresAttunement,
+      attunementPrereqKind: deletedItem.attunementPrereqKind,
+      attunementPrereqValue: deletedItem.attunementPrereqValue,
+      notes: deletedItem.notes ?? undefined,
+      position: deletedItem.position,
+      ...snapshotDetailNestedCreate(deletedItem),
+    },
+  });
+}
+
+// Restores the scalar(s) captured in a surviving row's `before` snapshot:
+// quantity (partial sell/adjust), equippedSlot (setEquipped), attuned
+// (attune/unattune), activatedUsesSpent (activate), usesRemaining (charged use),
+// and capabilityUsed (a #555 charges-pool spend).
+async function restoreScalars(
+  tx: Prisma.TransactionClient,
+  entityId: string,
+  before: {
+    quantity?: number;
+    equippedSlot?: EquipSlot | null;
+    attuned?: boolean;
+    activatedUsesSpent?: number;
+    usesRemaining?: number;
+    capabilityUsed?: { capabilityId: string; used: number };
+  },
+) {
+  const updateData: Prisma.InventoryItemUpdateInput = {};
+  if (before.quantity !== undefined) updateData.quantity = before.quantity;
+  if (before.equippedSlot !== undefined) updateData.equippedSlot = before.equippedSlot;
+  if (before.attuned !== undefined) updateData.attuned = before.attuned;
+  if (before.activatedUsesSpent !== undefined) updateData.activatedUsesSpent = before.activatedUsesSpent;
+  if (Object.keys(updateData).length > 0) {
+    await tx.inventoryItem.update({ where: { id: entityId }, data: updateData });
+  }
+  // usesRemaining lives on the detail row, so restore it separately.
+  if (before.usesRemaining !== undefined) {
+    await tx.inventoryConsumableDetail.update({
+      where: { inventoryItemId: entityId },
+      data: { usesRemaining: before.usesRemaining },
+    });
+  }
+  // updateMany (not update) so a vanished row is a no-op — a delete/undo-delete
+  // cycle recreates capabilities with NEW ids, so the old id may be gone.
+  if (before.capabilityUsed !== undefined) {
+    await tx.inventoryCapability.updateMany({
+      where: { id: before.capabilityUsed.capabilityId },
+      data: { used: before.capabilityUsed.used },
+    });
+  }
+}
+
 export async function revertInventoryEvent(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -1585,15 +1801,8 @@ export async function revertInventoryEvent(
       }
     | null;
 
-  // A rest recharge event has no single entityId — restore each item's pre-rest
-  // spent count. Handled before the entityId guard below.
   if (data?.recharged) {
-    for (const r of data.recharged) {
-      await tx.inventoryItem.updateMany({
-        where: { id: r.id },
-        data: { activatedUsesSpent: r.previousSpent },
-      });
-    }
+    await revertRecharge(tx, data.recharged);
     return;
   }
 
@@ -1604,11 +1813,7 @@ export async function revertInventoryEvent(
   if (!event.entityId) return;
 
   // 1. Reverse any currency movement (purchase or sale proceeds).
-  const currencyDelta = data?.currencyDelta ?? undefined;
-  if (hasNonzeroCurrency(currencyDelta)) {
-    const current = await getCharacterCurrency(tx, characterId);
-    await setCharacterCurrency(tx, characterId, currencyDebit(current, currencyDelta));
-  }
+  await reverseCurrencyDelta(tx, characterId, data?.currencyDelta ?? undefined);
 
   // 2. Reverse the row mutation, shape-driven.
   if (event.before === null) {
@@ -1617,95 +1822,12 @@ export async function revertInventoryEvent(
     return;
   }
 
-  const deletedItem = data?.deletedItem;
-  if (deletedItem) {
-    // The row was deleted → recreate it, reusing the original id so the
-    // soft-reference entityId on other events stays valid.
-    let itemId = deletedItem.itemId;
-    if (itemId) {
-      const catalogItem = await tx.item.findUnique({ where: { id: itemId }, select: { id: true } });
-      if (!catalogItem) itemId = null; // catalog row gone → snapshot is self-contained
-    }
-    // Restore the campaign-item provenance FK too (#381) — without it, undo of a
-    // revoke would drop the row from holder/unique-guard queries. Null when the
-    // snapshot predates the FK, or the CampaignItem was since deleted (SetNull).
-    let campaignItemId = deletedItem.campaignItemId ?? null;
-    if (campaignItemId) {
-      const campaignItem = await tx.campaignItem.findUnique({ where: { id: campaignItemId }, select: { id: true } });
-      if (!campaignItem) campaignItemId = null;
-    }
-    await tx.inventoryItem.create({
-      data: {
-        id: event.entityId,
-        characterId,
-        itemId,
-        campaignItemId,
-        name: deletedItem.name,
-        category: deletedItem.category,
-        weight: deletedItem.weight ?? undefined,
-        cost: toJsonInput(deletedItem.cost),
-        description: deletedItem.description ?? undefined,
-        quantity: deletedItem.quantity,
-        equippedSlot: deletedItem.equippedSlot ?? null,
-        slot: deletedItem.slot ?? null,
-        rarity: deletedItem.rarity ?? null,
-        attuned: deletedItem.attuned ?? false,
-        requiresAttunement: deletedItem.requiresAttunement ?? false,
-        attunementPrereqKind: deletedItem.attunementPrereqKind ?? undefined,
-        attunementPrereqValue: deletedItem.attunementPrereqValue ?? undefined,
-        notes: deletedItem.notes ?? undefined,
-        position: deletedItem.position,
-        weaponDetail: deletedItem.weaponDetail ? { create: deletedItem.weaponDetail } : undefined,
-        armorDetail: deletedItem.armorDetail ? { create: deletedItem.armorDetail } : undefined,
-        consumableDetail: deletedItem.consumableDetail
-          ? { create: deletedItem.consumableDetail }
-          : undefined,
-        capabilities:
-          deletedItem.capabilities && deletedItem.capabilities.length > 0
-            ? { create: deletedItem.capabilities }
-            : undefined,
-      },
-    });
+  if (data?.deletedItem) {
+    await recreateDeletedItem(tx, characterId, event.entityId, data.deletedItem);
     return;
   }
 
-  // The row still exists → restore the scalar(s) captured in before
-  // (quantity for partial sell/adjust, equipped for setEquipped, attuned for
-  // attune/unattune, usesRemaining for a charged `use`, activatedUsesSpent for
-  // activate, capabilityUsed for a charges-pool spend).
-  const before = event.before as {
-    quantity?: number;
-    equippedSlot?: EquipSlot | null;
-    attuned?: boolean;
-    activatedUsesSpent?: number;
-    usesRemaining?: number;
-    capabilityUsed?: { capabilityId: string; used: number };
-  };
-  const updateData: Prisma.InventoryItemUpdateInput = {};
-  if (before.quantity !== undefined) updateData.quantity = before.quantity;
-  if (before.equippedSlot !== undefined) updateData.equippedSlot = before.equippedSlot;
-  if (before.attuned !== undefined) updateData.attuned = before.attuned;
-  if (before.activatedUsesSpent !== undefined) updateData.activatedUsesSpent = before.activatedUsesSpent;
-  if (Object.keys(updateData).length > 0) {
-    await tx.inventoryItem.update({ where: { id: event.entityId }, data: updateData });
-  }
-  // usesRemaining lives on the detail row, so restore it separately.
-  if (before.usesRemaining !== undefined) {
-    await tx.inventoryConsumableDetail.update({
-      where: { inventoryItemId: event.entityId },
-      data: { usesRemaining: before.usesRemaining },
-    });
-  }
-  // A charges-pool spend (#555) lives on the capability row — restore its counter.
-  // updateMany (not update) so a vanished row is a no-op, matching the rest-undo
-  // pattern: a delete/undo-delete cycle recreates capabilities with NEW ids, so
-  // the old id here may legitimately no longer exist.
-  if (before.capabilityUsed !== undefined) {
-    await tx.inventoryCapability.updateMany({
-      where: { id: before.capabilityUsed.capabilityId },
-      data: { used: before.capabilityUsed.used },
-    });
-  }
+  await restoreScalars(tx, event.entityId, event.before as Parameters<typeof restoreScalars>[2]);
 }
 
 // Applies a batch of operations atomically — one InventoryTransaction

@@ -11,6 +11,7 @@ import { useState } from "react";
 
 import { applyActionTransactions, startCombat, endCombat, advanceCombatRound } from "@/api/client";
 import { rollSpec } from "@/lib/dice";
+import { planActionClick } from "@/lib/turnActionPlan";
 import { buffsToAutoEnd, endActionKeyFor, endReminders } from "@/lib/turnHooks";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { resolverFor } from "@/features/session/actionResolvers";
@@ -110,76 +111,30 @@ export function useTurnActions({
     }
   }
 
-  // Action button click handler — routes through the resolver registry.
-  function handleActionClick(key: string, cost: "action" | "bonusAction" | "reaction") {
-    const resolver = resolverFor(key);
-
-    // Close the menu row that was open.
+  // Close the menu row for the clicked cost.
+  function closeMenuFor(cost: "action" | "bonusAction" | "reaction") {
     if (cost === "action") setShowActionMenu(false);
     else if (cost === "bonusAction") setShowBonusMenu(false);
-    else if (cost === "reaction") setShowReactionMenu(false);
+    else setShowReactionMenu(false);
+  }
 
-    if (!resolver) {
-      // No resolver — just consume the slot.
-      if (cost === "action") consumeAction();
-      else if (cost === "bonusAction") consumeBonusAction();
-      else if (cost === "reaction") consumeReaction();
-      return;
+  // Consume the economy slot for the clicked cost.
+  function consumeSlotFor(cost: "action" | "bonusAction" | "reaction") {
+    if (cost === "action") consumeAction();
+    else if (cost === "bonusAction") consumeBonusAction();
+    else consumeReaction();
+  }
+
+  // Action button click handler — plans via planActionClick, then applies effects.
+  function handleActionClick(key: string, cost: "action" | "bonusAction" | "reaction") {
+    closeMenuFor(cost);
+    const plan = planActionClick(resolverFor(key), character);
+    if (plan.consumeSlot) consumeSlotFor(cost);
+    if (plan.send === "plain") void send(key);
+    else if (plan.send === "healRoll" && plan.healRoll) {
+      void send(key, { roll: rollSpec(plan.healRoll).total });
     }
-
-    switch (resolver.kind) {
-      case "attack-picker":
-        // Class attack-pickers consume their slot and open the inline picker;
-        // the main "attack" action goes through handleAttackAction instead.
-        if (cost === "action") consumeAction();
-        else if (cost === "bonusAction") consumeBonusAction();
-        else if (cost === "reaction") consumeReaction();
-        if (resolver.serverEffect) void send(key);
-        openResolution(key);
-        break;
-
-      case "heal-roll": {
-        // e.g. Second Wind — consume bonus slot, roll the dice, send with total.
-        if (cost === "action") consumeAction();
-        else if (cost === "bonusAction") consumeBonusAction();
-        else if (cost === "reaction") consumeReaction();
-        if (resolver.healRoll) {
-          const spec = resolver.healRoll(character);
-          const result = rollSpec(spec);
-          void send(key, { roll: result.total });
-        }
-        break;
-      }
-
-      case "heal-input":
-        // e.g. Lay on Hands — consume action, open the numeric input inline.
-        if (cost === "action") consumeAction();
-        else if (cost === "bonusAction") consumeBonusAction();
-        else if (cost === "reaction") consumeReaction();
-        openResolution(key);
-        break;
-
-      case "item-picker":
-        if (cost === "action") consumeAction();
-        else if (cost === "bonusAction") consumeBonusAction();
-        else if (cost === "reaction") consumeReaction();
-        openResolution(key);
-        break;
-
-      case "spell-picker":
-        // Do NOT consume the slot here — InlineSpellPicker commits it on cast.
-        openResolution(key);
-        break;
-
-      case "simple-confirm":
-        if (cost === "action") consumeAction();
-        else if (cost === "bonusAction") consumeBonusAction();
-        else if (cost === "reaction") consumeReaction();
-        if (resolver.serverEffect) {
-          void send(key);
-        }
-        break;
-    }
+    if (plan.openResolution) openResolution(key);
   }
 
   // Special path for Attack action — must use enterAttackMode, not consumeAction.

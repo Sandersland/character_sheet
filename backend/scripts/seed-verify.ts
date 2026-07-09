@@ -18,6 +18,8 @@
 // On success it prints the `cs_session` cookie and the frontend URL, ready to
 // inject into Playwright before navigating.
 
+import { pickClassChoice, planInventory, type CatalogRow, type RefClass } from "./seed-verify-helpers.js";
+
 const BACKEND_URL = (process.env.BACKEND_URL ?? "http://localhost:4000").replace(/\/$/, "");
 const FRONTEND_URL = (process.env.FRONTEND_URL ?? "http://localhost:5173").replace(/\/$/, "");
 
@@ -75,10 +77,20 @@ function report(cookie: string, token: string, charId: string) {
   console.log("─────────────────────────────────────────────\n");
 }
 
-async function main() {
-  console.log(`→ seeding verification data against ${BACKEND_URL}`);
+type Reference = {
+  races: { name: string }[];
+  classes: RefClass[];
+  backgrounds: { name: string }[];
+  alignments: string[];
+};
 
-  // 1. Mint a session via the guarded dev-login endpoint.
+// Prefer the Set-Cookie token, falling back to the JSON body token.
+function tokenOf(setCookie: string | null, body: { token?: string } | undefined): string | null {
+  return sessionTokenFrom(setCookie) ?? body?.token ?? null;
+}
+
+// 1. Mint a session via the guarded dev-login endpoint.
+async function devLogin(): Promise<{ cookie: string; token: string }> {
   const login = await api<{ token: string; user: { id: string } }>("/api/auth/dev-login", {
     method: "POST",
     body: "{}",
@@ -90,57 +102,48 @@ async function main() {
     );
   }
   if (login.status !== 200) die(`dev-login returned ${login.status}: ${JSON.stringify(login.body)}`);
-  const token = sessionTokenFrom(login.setCookie) ?? login.body?.token;
+  const token = tokenOf(login.setCookie, login.body);
   if (!token) die("dev-login succeeded but no cs_session token was returned");
-  const cookie = `${SESSION_COOKIE}=${token}`;
+  return { cookie: `${SESSION_COOKIE}=${token}`, token };
+}
 
-  // Idempotent: if a previous run already left a "Verify Dummy", reuse it
-  // instead of piling up duplicates every time verify-frontend runs.
+// Idempotent: if a previous run already left a "Verify Dummy", reuse it instead
+// of piling up duplicates every time verify-frontend runs.
+async function findExisting(cookie: string): Promise<{ id: string; name: string } | null> {
   const existing = await api<{ id: string; name: string }[]>("/api/characters", { cookie });
   if (existing.status === 200 && Array.isArray(existing.body)) {
-    const found = existing.body.find((c) => c.name === CHARACTER_NAME);
-    if (found) {
-      console.log(`✓ reusing existing character "${found.name}" ${found.id}`);
-      report(cookie, token, found.id);
-      return;
-    }
+    return existing.body.find((c) => c.name === CHARACTER_NAME) ?? null;
   }
+  return null;
+}
 
-  // 2. Read valid creation options from the catalog.
-  const ref = await api<{
-    races: { name: string }[];
-    classes: { name: string; subclassLevel: number | null; subclasses: { id: string }[] }[];
-    backgrounds: { name: string }[];
-    alignments: string[];
-  }>("/api/reference", { cookie });
+function assertCatalogPopulated(ref: Reference) {
+  const empty = [ref.races, ref.classes, ref.backgrounds].some((xs) => !xs?.length);
+  if (empty) die("catalog is empty — run the DB seed first (the dev stack does this on boot)");
+}
+
+// 2. Read valid creation options from the catalog.
+async function loadReference(cookie: string): Promise<Reference> {
+  const ref = await api<Reference>("/api/reference", { cookie });
   if (ref.status !== 200) die(`GET /api/reference returned ${ref.status}: ${JSON.stringify(ref.body)}`);
-  const { races, classes, backgrounds, alignments } = ref.body;
-  if (!races?.length || !classes?.length || !backgrounds?.length) {
-    die("catalog is empty — run the DB seed first (the dev stack does this on boot)");
-  }
+  assertCatalogPopulated(ref.body);
+  return ref.body;
+}
 
-  // Prefer a class that does NOT pick its subclass at level 1 (e.g. Fighter),
-  // so we don't need to supply a subclassId. Fall back to the first class +
-  // its first subclass id if every class grants a subclass at creation.
-  const noSubclass = classes.find((c) => c.subclassLevel == null || c.subclassLevel > 1);
-  const chosenClass = noSubclass ?? classes[0];
-  const needsSubclass = !noSubclass;
-  const classChoice = needsSubclass
-    ? { name: chosenClass.name, subclassId: chosenClass.subclasses[0]?.id }
-    : { name: chosenClass.name };
-  if (needsSubclass && !classChoice.subclassId) {
-    die(`class "${chosenClass.name}" needs a subclass at L1 but the catalog has none`);
-  }
-
-  // 3. Create the character through the real endpoint.
+// 3. Create the character through the real endpoint.
+async function createCharacter(
+  cookie: string,
+  ref: Reference,
+  classChoice: { name: string; subclassId?: string },
+): Promise<string> {
   const create = await api<{ id: string; name: string }>("/api/characters", {
     method: "POST",
     cookie,
     body: JSON.stringify({
       name: CHARACTER_NAME,
-      alignment: alignments[0],
-      race: races[0].name,
-      background: backgrounds[0].name,
+      alignment: ref.alignments[0],
+      race: ref.races[0].name,
+      background: ref.backgrounds[0].name,
       classes: [classChoice],
       abilityScores: { strength: 15, dexterity: 14, constitution: 13, intelligence: 12, wisdom: 10, charisma: 8 },
       startingEquipment: { mode: "gold", gold: 75 },
@@ -151,64 +154,92 @@ async function main() {
   }
   const charId = create.body.id;
   if (!charId) die(`POST /api/characters returned no id: ${JSON.stringify(create.body)}`);
-  console.log(`✓ created character "${create.body.name}" (${chosenClass.name}) ${charId}`);
+  console.log(`✓ created character "${create.body.name}" (${classChoice.name}) ${charId}`);
+  return charId;
+}
 
-  // 4. Add representative inventory: an equippable weapon + armor, plus two
-  //    sellable trinkets we then sell together (one transaction → one batchId →
-  //    a "bulk sale" entry in the activity log).
-  const items = await api<{ id: string; name: string; weapon?: unknown; armor?: unknown }[]>("/api/items", {
+// 4. Sell the freshly-acquired trinkets in one transaction → one batchId → a
+//    "bulk sale" entry in the activity log.
+async function sellTrinkets(
+  cookie: string,
+  charId: string,
+  inventory: { id: string; itemId?: string }[],
+  trinketIds: Set<string>,
+) {
+  const sellRows = inventory.filter((r) => r.itemId != null && trinketIds.has(r.itemId));
+  const sellOps = sellRows.map((r) => ({
+    type: "sell",
+    inventoryItemId: r.id,
+    quantity: 1,
+    currencyDelta: { pp: 0, gp: 1, sp: 0, cp: 0 },
+  }));
+  if (sellOps.length < 2) return;
+  const sale = await api(`/api/characters/${charId}/inventory/transactions`, {
+    method: "POST",
     cookie,
+    body: JSON.stringify({ operations: sellOps }),
   });
-  if (items.status === 200 && Array.isArray(items.body) && items.body.length) {
-    const weapon = items.body.find((i) => i.weapon);
-    const armor = items.body.find((i) => i.armor);
-    const trinkets = items.body.filter((i) => !i.weapon && !i.armor).slice(0, 2);
-
-    const acquireOps = [
-      weapon && { type: "acquire", itemId: weapon.id, quantity: 1, equipped: true },
-      armor && { type: "acquire", itemId: armor.id, quantity: 1, equipped: true },
-      ...trinkets.map((t) => ({ type: "acquire", itemId: t.id, quantity: 3 })),
-    ].filter(Boolean);
-
-    if (acquireOps.length) {
-      const acq = await api<{ inventory: { id: string; itemId?: string }[] }>(
-        `/api/characters/${charId}/inventory/transactions`,
-        { method: "POST", cookie, body: JSON.stringify({ operations: acquireOps }) },
-      );
-      if (acq.status !== 200) {
-        console.warn(`  ⚠ inventory acquire returned ${acq.status} — skipping enrichment`);
-      } else if (trinkets.length) {
-        // Find the freshly-acquired trinket rows (matched by catalog itemId) and
-        // sell them in one transaction → one batchId → a "bulk sale" entry.
-        const inv = acq.body.inventory ?? [];
-        const trinketIds = new Set(trinkets.map((t) => t.id));
-        const sellRows = inv.filter((r) => r.itemId != null && trinketIds.has(r.itemId));
-        const sellOps = sellRows.map((r) => ({
-          type: "sell",
-          inventoryItemId: r.id,
-          quantity: 1,
-          currencyDelta: { pp: 0, gp: 1, sp: 0, cp: 0 },
-        }));
-        if (sellOps.length >= 2) {
-          const sale = await api(`/api/characters/${charId}/inventory/transactions`, {
-            method: "POST",
-            cookie,
-            body: JSON.stringify({ operations: sellOps }),
-          });
-          if (sale.status === 200) {
-            console.log(`✓ added a ${sellOps.length}-item bulk sale to the activity log`);
-          } else {
-            console.warn(`  ⚠ bulk sale returned ${sale.status} — skipped`);
-          }
-        }
-      }
-      console.log(`✓ added inventory (weapon + armor equipped, trinkets)`);
-    }
+  if (sale.status === 200) {
+    console.log(`✓ added a ${sellOps.length}-item bulk sale to the activity log`);
   } else {
+    console.warn(`  ⚠ bulk sale returned ${sale.status} — skipped`);
+  }
+}
+
+// Fetch the item catalog, warning + returning null on an empty/unavailable list.
+async function fetchItems(cookie: string): Promise<CatalogRow[] | null> {
+  const items = await api<CatalogRow[]>("/api/items", { cookie });
+  if (items.status !== 200 || !Array.isArray(items.body) || !items.body.length) {
     console.warn("  ⚠ /api/items empty or unavailable — character has gold but no items");
+    return null;
+  }
+  return items.body;
+}
+
+// Acquire the planned items, then sell the trinkets in one bulk transaction.
+async function acquireAndSell(
+  cookie: string,
+  charId: string,
+  acquireOps: unknown[],
+  trinketIds: Set<string>,
+) {
+  const acq = await api<{ inventory: { id: string; itemId?: string }[] }>(
+    `/api/characters/${charId}/inventory/transactions`,
+    { method: "POST", cookie, body: JSON.stringify({ operations: acquireOps }) },
+  );
+  if (acq.status !== 200) {
+    console.warn(`  ⚠ inventory acquire returned ${acq.status} — skipping enrichment`);
+    return;
+  }
+  if (trinketIds.size) await sellTrinkets(cookie, charId, acq.body.inventory ?? [], trinketIds);
+  console.log(`✓ added inventory (weapon + armor equipped, trinkets)`);
+}
+
+// 4. Add representative inventory: an equippable weapon + armor, plus two
+//    sellable trinkets we then sell together.
+async function seedInventory(cookie: string, charId: string) {
+  const items = await fetchItems(cookie);
+  if (!items) return;
+  const { acquireOps, trinketIds } = planInventory(items);
+  if (acquireOps.length) await acquireAndSell(cookie, charId, acquireOps, trinketIds);
+}
+
+async function main() {
+  console.log(`→ seeding verification data against ${BACKEND_URL}`);
+
+  const { cookie, token } = await devLogin();
+
+  const found = await findExisting(cookie);
+  if (found) {
+    console.log(`✓ reusing existing character "${found.name}" ${found.id}`);
+    report(cookie, token, found.id);
+    return;
   }
 
-  // 5. Report what to inject into Playwright.
+  const ref = await loadReference(cookie);
+  const { classChoice } = pickClassChoice(ref.classes);
+  const charId = await createCharacter(cookie, ref, classChoice);
+  await seedInventory(cookie, charId);
   report(cookie, token, charId);
 }
 

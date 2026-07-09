@@ -59,40 +59,61 @@ export interface ActiveEffectsMutableState {
 // Tolerant of null (character has never had a buff) and of malformed entries
 // (dropped). Mirror of normalizeConditionsMutable.
 
+function parseBuffDuration(value: unknown): BuffDuration {
+  return BUFF_DURATIONS.includes(value as BuffDuration) ? (value as BuffDuration) : "concentration";
+}
+
+function parseRestType(value: unknown): "short" | "long" | undefined {
+  return value === "short" || value === "long" ? value : undefined;
+}
+
+function parseResistDamageTypes(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const types = value.filter((t): t is string => typeof t === "string");
+  return types.length > 0 ? types : undefined;
+}
+
+// Build a valid ActiveBuff from a validated entry (key/target are strings, modifier finite).
+function buildBuff(entry: Record<string, unknown>, key: string, target: string, modifier: number): ActiveBuff {
+  const restType = parseRestType(entry.restType);
+  const resistDamageTypes = parseResistDamageTypes(entry.resistDamageTypes);
+  return {
+    id: typeof entry.id === "string" ? entry.id : randomUUID(),
+    key,
+    target,
+    modifier,
+    source: typeof entry.source === "string" ? entry.source : key,
+    sourceEntryId: typeof entry.sourceEntryId === "string" ? entry.sourceEntryId : undefined,
+    duration: parseBuffDuration(entry.duration),
+    ...(restType ? { restType } : {}),
+    ...(resistDamageTypes ? { resistDamageTypes } : {}),
+  };
+}
+
+// Parse one raw buff entry; returns null for malformed input (dropped by the caller).
+function normalizeBuff(raw: unknown): ActiveBuff | null {
+  if (!raw || typeof raw !== "object") return null;
+  const entry = raw as Record<string, unknown>;
+  const { key, target } = entry;
+  if (typeof key !== "string" || typeof target !== "string") return null;
+  const modifier = Number(entry.modifier);
+  if (!Number.isFinite(modifier)) return null;
+  return buildBuff(entry, key, target, Math.trunc(modifier));
+}
+
 export function normalizeActiveEffectsMutable(json: Prisma.JsonValue): ActiveEffectsMutableState {
   if (!json || typeof json !== "object" || Array.isArray(json)) {
     return { buffs: [] };
   }
-  const obj = json as Record<string, unknown>;
-  const rawBuffs = Array.isArray(obj.buffs) ? (obj.buffs as unknown[]) : [];
+  const rawBuffs = Array.isArray((json as Record<string, unknown>).buffs)
+    ? ((json as Record<string, unknown>).buffs as unknown[])
+    : [];
 
   const buffs: ActiveBuff[] = [];
   for (const raw of rawBuffs) {
-    if (!raw || typeof raw !== "object") continue;
-    const entry = raw as Record<string, unknown>;
-    if (typeof entry.key !== "string" || typeof entry.target !== "string") continue;
-    const modifier = Number(entry.modifier);
-    if (!Number.isFinite(modifier)) continue;
-    const duration = BUFF_DURATIONS.includes(entry.duration as BuffDuration)
-      ? (entry.duration as BuffDuration)
-      : "concentration";
-    const restType = entry.restType === "short" || entry.restType === "long" ? entry.restType : undefined;
-    const resistDamageTypes = Array.isArray(entry.resistDamageTypes)
-      ? (entry.resistDamageTypes as unknown[]).filter((t): t is string => typeof t === "string")
-      : undefined;
-    buffs.push({
-      id: typeof entry.id === "string" ? entry.id : randomUUID(),
-      key: entry.key,
-      target: entry.target,
-      modifier: Math.trunc(modifier),
-      source: typeof entry.source === "string" ? entry.source : entry.key,
-      sourceEntryId: typeof entry.sourceEntryId === "string" ? entry.sourceEntryId : undefined,
-      duration,
-      ...(restType ? { restType } : {}),
-      ...(resistDamageTypes && resistDamageTypes.length > 0 ? { resistDamageTypes } : {}),
-    });
+    const buff = normalizeBuff(raw);
+    if (buff) buffs.push(buff);
   }
-
   return { buffs };
 }
 
@@ -198,6 +219,61 @@ export async function appendActiveBuffInTx(
   });
 }
 
+// Plural buff count phrase, e.g. "1 buff" / "3 buffs".
+function buffCount(n: number): string {
+  return `${n} buff${n !== 1 ? "s" : ""}`;
+}
+
+// Builds the `buffCleared` event's summary + data from the buffs it dropped.
+interface BuffClearDescribe {
+  summary: (dropped: ActiveBuff[]) => string;
+  data: (dropped: ActiveBuff[]) => Record<string, unknown>;
+}
+
+/**
+ * Shared core for every clear* wrapper: read → filter by `predicate` → (no-op +
+ * no event when nothing matches) → write → log one `buffCleared` event under the
+ * "effects" category. `describe` supplies the wrapper-specific summary + data
+ * keys so the exact event payload each caller has always written is preserved.
+ */
+async function clearBuffsMatchingInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  predicate: (b: ActiveBuff) => boolean,
+  describe: BuffClearDescribe,
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: { activeEffects: true },
+  });
+  if (!row) return;
+
+  const state = normalizeActiveEffectsMutable(row.activeEffects);
+  const dropped = state.buffs.filter(predicate);
+  if (dropped.length === 0) return;
+  const before = snapshot(state);
+  state.buffs = state.buffs.filter((b) => !predicate(b));
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: { activeEffects: serializeActiveEffectsState(state) },
+  });
+
+  await logEvent(tx, {
+    characterId,
+    category: "effects",
+    type: "buffCleared",
+    summary: describe.summary(dropped),
+    before,
+    after: snapshot(state),
+    data: describe.data(dropped),
+    batchId,
+    sessionId,
+  });
+}
+
 /**
  * Clear every buff granted by `sourceEntryId` (the concentration that just
  * ended). No-op + no event when none match. Logs a `buffCleared` event under
@@ -211,37 +287,19 @@ export async function clearBuffsForSourceInTx(
   sessionId: string | null,
   reason: string,
 ): Promise<void> {
-  const row = await tx.character.findUnique({
-    where: { id: characterId },
-    select: { activeEffects: true },
-  });
-  if (!row) return;
-
-  const state = normalizeActiveEffectsMutable(row.activeEffects);
   // Only concentration-duration buffs clear when a concentration ends; durable
   // (while-active / until-rest) buffs survive concentration changes (#455).
-  const matches = (b: ActiveBuff) => b.sourceEntryId === sourceEntryId && b.duration === "concentration";
-  const dropped = state.buffs.filter(matches);
-  if (dropped.length === 0) return;
-  const before = snapshot(state);
-  state.buffs = state.buffs.filter((b) => !matches(b));
-
-  await tx.character.update({
-    where: { id: characterId },
-    data: { activeEffects: serializeActiveEffectsState(state) },
-  });
-
-  await logEvent(tx, {
+  await clearBuffsMatchingInTx(
+    tx,
     characterId,
-    category: "effects",
-    type: "buffCleared",
-    summary: `Cleared ${dropped.length} buff${dropped.length !== 1 ? "s" : ""} (${reason})`,
-    before,
-    after: snapshot(state),
-    data: { sourceEntryId, reason, clearedKeys: dropped.map((b) => b.key) },
+    (b) => b.sourceEntryId === sourceEntryId && b.duration === "concentration",
+    {
+      summary: (dropped) => `Cleared ${buffCount(dropped.length)} (${reason})`,
+      data: (dropped) => ({ sourceEntryId, reason, clearedKeys: dropped.map((b) => b.key) }),
+    },
     batchId,
     sessionId,
-  });
+  );
 }
 
 /**
@@ -257,38 +315,20 @@ export async function clearBuffByKeyInTx(
   sessionId: string | null,
   reason: string,
 ): Promise<void> {
-  const row = await tx.character.findUnique({
-    where: { id: characterId },
-    select: { activeEffects: true },
-  });
-  if (!row) return;
-
-  const state = normalizeActiveEffectsMutable(row.activeEffects);
   // Durable-only toggle: never clear a concentration buff (those end via
   // clearBuffsForSourceInTx). Dedup-by-key keeps one buff per key today, but the
   // guard makes the "durable only" contract machine-readable if that ever relaxes.
-  const matches = (b: ActiveBuff) => b.key === key && b.duration !== "concentration";
-  const dropped = state.buffs.filter(matches);
-  if (dropped.length === 0) return;
-  const before = snapshot(state);
-  state.buffs = state.buffs.filter((b) => !matches(b));
-
-  await tx.character.update({
-    where: { id: characterId },
-    data: { activeEffects: serializeActiveEffectsState(state) },
-  });
-
-  await logEvent(tx, {
+  await clearBuffsMatchingInTx(
+    tx,
     characterId,
-    category: "effects",
-    type: "buffCleared",
-    summary: `Cleared ${dropped[0].source} (${reason})`,
-    before,
-    after: snapshot(state),
-    data: { key, reason, clearedKeys: dropped.map((b) => b.key) },
+    (b) => b.key === key && b.duration !== "concentration",
+    {
+      summary: (dropped) => `Cleared ${dropped[0].source} (${reason})`,
+      data: (dropped) => ({ key, reason, clearedKeys: dropped.map((b) => b.key) }),
+    },
     batchId,
     sessionId,
-  });
+  );
 }
 
 /**
@@ -306,36 +346,18 @@ export async function clearBuffsByTargetInTx(
   sessionId: string | null,
   reason: string,
 ): Promise<void> {
-  const row = await tx.character.findUnique({
-    where: { id: characterId },
-    select: { activeEffects: true },
-  });
-  if (!row) return;
-
-  const state = normalizeActiveEffectsMutable(row.activeEffects);
   // Concentration buffs end via clearBuffsForSourceInTx; leave them alone here.
-  const matches = (b: ActiveBuff) => b.target === target && b.duration !== "concentration";
-  const dropped = state.buffs.filter(matches);
-  if (dropped.length === 0) return;
-  const before = snapshot(state);
-  state.buffs = state.buffs.filter((b) => !matches(b));
-
-  await tx.character.update({
-    where: { id: characterId },
-    data: { activeEffects: serializeActiveEffectsState(state) },
-  });
-
-  await logEvent(tx, {
+  await clearBuffsMatchingInTx(
+    tx,
     characterId,
-    category: "effects",
-    type: "buffCleared",
-    summary: `Cleared ${dropped[0].source} (${reason})`,
-    before,
-    after: snapshot(state),
-    data: { target, reason, clearedKeys: dropped.map((b) => b.key) },
+    (b) => b.target === target && b.duration !== "concentration",
+    {
+      summary: (dropped) => `Cleared ${dropped[0].source} (${reason})`,
+      data: (dropped) => ({ target, reason, clearedKeys: dropped.map((b) => b.key) }),
+    },
     batchId,
     sessionId,
-  });
+  );
 }
 
 /**
@@ -350,35 +372,17 @@ export async function clearWhileActiveBuffsInTx(
   sessionId: string | null,
   reason: string,
 ): Promise<void> {
-  const row = await tx.character.findUnique({
-    where: { id: characterId },
-    select: { activeEffects: true },
-  });
-  if (!row) return;
-
-  const state = normalizeActiveEffectsMutable(row.activeEffects);
-  const clears = (b: ActiveBuff) => b.duration === "while-active";
-  const dropped = state.buffs.filter(clears);
-  if (dropped.length === 0) return;
-  const before = snapshot(state);
-  state.buffs = state.buffs.filter((b) => !clears(b));
-
-  await tx.character.update({
-    where: { id: characterId },
-    data: { activeEffects: serializeActiveEffectsState(state) },
-  });
-
-  await logEvent(tx, {
+  await clearBuffsMatchingInTx(
+    tx,
     characterId,
-    category: "effects",
-    type: "buffCleared",
-    summary: `Cleared ${dropped.length} buff${dropped.length !== 1 ? "s" : ""} (${reason})`,
-    before,
-    after: snapshot(state),
-    data: { reason, clearedKeys: dropped.map((b) => b.key) },
+    (b) => b.duration === "while-active",
+    {
+      summary: (dropped) => `Cleared ${buffCount(dropped.length)} (${reason})`,
+      data: (dropped) => ({ reason, clearedKeys: dropped.map((b) => b.key) }),
+    },
     batchId,
     sessionId,
-  });
+  );
 }
 
 /**
@@ -393,34 +397,15 @@ export async function clearBuffsForRestInTx(
   batchId: string,
   sessionId: string | null,
 ): Promise<void> {
-  const row = await tx.character.findUnique({
-    where: { id: characterId },
-    select: { activeEffects: true },
-  });
-  if (!row) return;
-
-  const state = normalizeActiveEffectsMutable(row.activeEffects);
-  const clears = (b: ActiveBuff) =>
-    b.duration === "until-rest" && (restType === "long" || b.restType === "short");
-  const dropped = state.buffs.filter(clears);
-  if (dropped.length === 0) return;
-  const before = snapshot(state);
-  state.buffs = state.buffs.filter((b) => !clears(b));
-
-  await tx.character.update({
-    where: { id: characterId },
-    data: { activeEffects: serializeActiveEffectsState(state) },
-  });
-
-  await logEvent(tx, {
+  await clearBuffsMatchingInTx(
+    tx,
     characterId,
-    category: "effects",
-    type: "buffCleared",
-    summary: `Cleared ${dropped.length} buff${dropped.length !== 1 ? "s" : ""} (${restType} rest)`,
-    before,
-    after: snapshot(state),
-    data: { restType, reason: `${restType}Rest`, clearedKeys: dropped.map((b) => b.key) },
+    (b) => b.duration === "until-rest" && (restType === "long" || b.restType === "short"),
+    {
+      summary: (dropped) => `Cleared ${buffCount(dropped.length)} (${restType} rest)`,
+      data: (dropped) => ({ restType, reason: `${restType}Rest`, clearedKeys: dropped.map((b) => b.key) }),
+    },
     batchId,
     sessionId,
-  });
+  );
 }
