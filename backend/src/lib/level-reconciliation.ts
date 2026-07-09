@@ -235,10 +235,13 @@ interface KnownListConfig {
   summary: (removedCount: number, allowed: number) => string;
   /**
    * before/after snapshot for the audit event. Called on the LIVE state — once
-   * before the trim and once after. The shapes intentionally diverge per
-   * reconciler (maneuvers/tool profs persist a hand-cloned 4-key object;
-   * disciplines the full serializeResourcesState blob); do not normalize them —
-   * the persisted event payloads are load-bearing for undo.
+   * before the trim and once after. MUST return a freshly-constructed object
+   * (not `state` itself): the same function runs twice on the same mutable
+   * object, so returning a live reference would yield identical before/after
+   * payloads. The shapes intentionally diverge per reconciler (maneuvers/tool
+   * profs persist a hand-cloned 4-key object; disciplines the full
+   * serializeResourcesState blob); do not normalize them — the persisted event
+   * payloads are load-bearing for undo.
    */
   snapshot: (state: ResourcesMutableState) => Record<string, unknown>;
 }
