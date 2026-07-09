@@ -577,6 +577,77 @@ describe("applyInventoryOperations", () => {
     expect(items).toHaveLength(1);
   });
 
+  // ── acquire source resolution + use guards (#597 decomposition) ──────────────
+
+  it("acquire rejects when neither itemId nor custom is supplied", async () => {
+    await expect(
+      applyInventoryOperations(characterAId, [{ type: "acquire", quantity: 1 }])
+    ).rejects.toThrow(/either itemId or custom/i);
+    const items = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+    expect(items).toHaveLength(0);
+  });
+
+  it("acquire rejects an unknown catalog itemId", async () => {
+    await expect(
+      applyInventoryOperations(characterAId, [{ type: "acquire", itemId: "does-not-exist", quantity: 1 }])
+    ).rejects.toThrow(/unknown catalog item/i);
+  });
+
+  it("use rejects a non-consumable item", async () => {
+    await applyInventoryOperations(characterAId, [{ type: "acquire", itemId, quantity: 1 }]);
+    const [created] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+    await expect(
+      applyInventoryOperations(characterAId, [{ type: "use", inventoryItemId: created.id }])
+    ).rejects.toThrow(/not a consumable/i);
+  });
+
+  it("use of the last stackable unit deletes the row and snapshots it for undo", async () => {
+    await applyInventoryOperations(characterAId, [
+      {
+        type: "acquire",
+        custom: {
+          name: "Single Potion",
+          category: "consumable",
+          consumable: { effectDescription: "heals wounds", effectDiceCount: 1, effectDiceFaces: 4 },
+        },
+        quantity: 1,
+      },
+    ]);
+    const [potion] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+
+    await applyInventoryOperations(characterAId, [
+      { type: "use", inventoryItemId: potion.id, rolls: [3] },
+    ]);
+
+    const remaining = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+    expect(remaining).toHaveLength(0);
+    const event = await prisma.characterEvent.findFirstOrThrow({
+      where: { characterId: characterAId, type: "consumed" },
+      orderBy: { createdAt: "desc" },
+    });
+    expect((event.data as Record<string, unknown>).deletedItem).toBeTruthy();
+    // Depleting the last unit deletes the row, so `after` is null (not a quantity).
+    expect(event.after).toBeNull();
+  });
+
+  it("use of a depleted charged consumable throws without mutating the row", async () => {
+    await applyInventoryOperations(characterAId, [
+      {
+        type: "acquire",
+        custom: {
+          name: "Spent Wand",
+          category: "consumable",
+          consumable: { effectDescription: "zap", maxUses: 1, usesRemaining: 0 },
+        },
+        quantity: 1,
+      },
+    ]);
+    const [wand] = await prisma.inventoryItem.findMany({ where: { characterId: characterAId } });
+    await expect(
+      applyInventoryOperations(characterAId, [{ type: "use", inventoryItemId: wand.id }])
+    ).rejects.toThrow(/no uses remaining/i);
+  });
+
   // ── revertInventoryEvent reconstruction (Issue #117) ─────────────────────────
 
   async function latestEventOfType(characterId: string, type: CharacterEventType) {
