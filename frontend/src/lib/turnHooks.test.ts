@@ -30,6 +30,7 @@ describe("endReminders — surfaced while a durable buff is active (#457)", () =
     expect(reminders).toHaveLength(1);
     expect(reminders[0].key).toBe("rage");
     expect(reminders[0].reminder).toMatch(/rage/i);
+    expect(reminders[0].reminder).toMatch(/advantage on Strength checks & saves/i);
   });
 
   it("returns nothing when no durable buff with a reminder is active", () => {

@@ -30,7 +30,8 @@ const DURABLE_BUFF_END_CONDITIONS: DurableBuffEndCondition[] = [
   {
     key: "rage",
     endActionKey: "endRage",
-    reminder: "Rage ends at the end of your turn unless you attacked or took damage this turn.",
+    reminder:
+      "Rage ends at the end of your turn unless you attacked or took damage this turn. While raging you have advantage on Strength checks & saves — apply it with the roll-mode toggle.",
     endsWhen: (w) => !w.attacked && !w.tookDamage,
   },
 ];

@@ -127,7 +127,7 @@ describe("deriveResources — Barbarian Rage", () => {
   const PROF_4 = 4;
 
   it.each([
-    [1, 2], [2, 2], [3, 3], [5, 3], [6, 4], [11, 4], [12, 5], [16, 5], [17, 6], [19, 6],
+    [1, 2], [2, 2], [3, 3], [5, 3], [6, 4], [9, 4], [11, 4], [12, 5], [16, 5], [17, 6], [19, 6],
   ])("level %i → %i rage uses", (level, expectedTotal) => {
     const result = deriveResources("barbarian", undefined, level, ABILITY_SCORES, PROF_2);
     const rage = result!.resources.find((r) => r.key === "rage");

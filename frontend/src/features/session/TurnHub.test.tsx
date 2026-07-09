@@ -309,7 +309,9 @@ describe("TurnHub — Rage turn-hook (#457)", () => {
     const user = userEvent.setup();
     renderHub(ragingBarbarian());
     await startTurn(user);
-    expect(screen.getByText(/Rage ends at the end of your turn/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Rage ends at the end of your turn.*advantage on Strength checks & saves/i),
+    ).toBeInTheDocument();
   });
 
   it("auto-ends Rage when the turn passes with no attack or damage taken", async () => {
