@@ -1406,6 +1406,11 @@ async function dispatchHpOp(ctx: HpOpContext, op: HpStateOperation): Promise<HpO
  * JSON columns. longRest captures spellcasting so undoing it re-expends the
  * slots. Rest-op snapshot keys are lifted OUT of eventData (and deleted) so
  * they live in before/after rather than being duplicated in the data payload.
+ *
+ * @param eventData MUTATED: rest/level snapshot keys (beforeSpellState,
+ *   beforeResourceState, chargePoolsBefore, consumableChargesBefore, …) are
+ *   lifted into before/after and `delete`d here, so on return `eventData` holds
+ *   only the fields that belong in the event's `data` payload.
  */
 function buildHpOpSnapshots(
   ctx: HpOpContext,

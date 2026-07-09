@@ -112,7 +112,8 @@ describe("HP transaction event-stream characterization (#614)", () => {
     expect(evs).toHaveLength(1);
     expect(evs[0].summary).toBe("Healed 5 HP (10 → 15 HP)");
     expect(evs[0].data).toEqual({ amount: 5 });
-    expect((evs[0].after as { hitPoints: { current: number } }).hitPoints.current).toBe(15);
+    expect(evs[0].before).toEqual({ hitPoints: { current: 10, max: 44, temp: 0, deathSaves: { successes: 0, failures: 0 } }, hitDice: { total: 5, die: "d10", spent: 3 } });
+    expect(evs[0].after).toEqual({ hitPoints: { current: 15, max: 44, temp: 0, deathSaves: { successes: 0, failures: 0 } }, hitDice: { total: 5, die: "d10", spent: 3 } });
   });
 
   it("setTemp: single hitPoints event, exact payload", async () => {
@@ -124,7 +125,8 @@ describe("HP transaction event-stream characterization (#614)", () => {
     expect(evs).toHaveLength(1);
     expect(evs[0].summary).toBe("Set temporary HP to 7");
     expect(evs[0].data).toEqual({ amount: 7 });
-    expect((evs[0].after as { hitPoints: { temp: number } }).hitPoints.temp).toBe(7);
+    expect(evs[0].before).toEqual({ hitPoints: { current: 10, max: 44, temp: 0, deathSaves: { successes: 0, failures: 0 } }, hitDice: { total: 5, die: "d10", spent: 3 } });
+    expect(evs[0].after).toEqual({ hitPoints: { current: 10, max: 44, temp: 7, deathSaves: { successes: 0, failures: 0 } }, hitDice: { total: 5, die: "d10", spent: 3 } });
   });
 
   it("deathSave: single hitPoints event", async () => {
@@ -137,6 +139,8 @@ describe("HP transaction event-stream characterization (#614)", () => {
     expect(evs[0].type).toBe("deathSave");
     expect(evs[0].summary).toBe("Death save: rolled 12 (1 success, 0 failures)");
     expect(evs[0].data).toEqual({ roll: 12 });
+    expect(evs[0].before).toEqual({ hitPoints: { current: 0, max: 44, temp: 0, deathSaves: { successes: 0, failures: 0 } }, hitDice: { total: 5, die: "d10", spent: 3 } });
+    expect(evs[0].after).toEqual({ hitPoints: { current: 0, max: 44, temp: 0, deathSaves: { successes: 1, failures: 0 } }, hitDice: { total: 5, die: "d10", spent: 3 } });
   });
 
   it("stabilize: single hitPoints event", async () => {
@@ -149,7 +153,8 @@ describe("HP transaction event-stream characterization (#614)", () => {
     expect(evs[0].type).toBe("stabilize");
     expect(evs[0].summary).toBe("Stabilized");
     expect(evs[0].data).toEqual({});
-    expect((evs[0].after as { hitPoints: { deathSaves: unknown } }).hitPoints.deathSaves).toEqual({ successes: 0, failures: 0 });
+    expect(evs[0].before).toEqual({ hitPoints: { current: 0, max: 44, temp: 0, deathSaves: { successes: 1, failures: 2 } }, hitDice: { total: 5, die: "d10", spent: 3 } });
+    expect(evs[0].after).toEqual({ hitPoints: { current: 0, max: 44, temp: 0, deathSaves: { successes: 0, failures: 0 } }, hitDice: { total: 5, die: "d10", spent: 3 } });
   });
 
   it("longRest: single hitPoints event, assembles spellcasting + resources into before/after", async () => {
