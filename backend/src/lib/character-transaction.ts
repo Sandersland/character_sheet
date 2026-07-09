@@ -1,7 +1,7 @@
 /**
  * Shared character-transaction preamble — the plumbing every intent-bearing
  * domain handler (resources, spellcasting, conditions, advancement, disciplines,
- * shadow-arts, channel-divinity) repeated verbatim. It owns the batch id, the
+ * maneuvers, shadow-arts, channel-divinity) repeated verbatim. It owns the batch id, the
  * active-session lookup, the prisma.$transaction wrapper, and the per-op re-read
  * loop; the caller supplies its select extras (5e-rules columns stay in the
  * caller) and the per-op apply logic. This is the documented starting point for

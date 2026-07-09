@@ -1,0 +1,254 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+
+import { useCharacterCreation } from "@/hooks/useCharacterCreation";
+import type { CharacterDraft } from "@/hooks/useCharacterDraft";
+import type { ClassOption, ReferenceData } from "@/types/character";
+
+const navigate = vi.fn();
+vi.mock("react-router-dom", () => ({ useNavigate: () => navigate }));
+
+const fetchReference = vi.fn();
+const fetchItems = vi.fn();
+const createCharacter = vi.fn();
+vi.mock("@/api/client", () => ({
+  fetchReference: (...args: unknown[]) => fetchReference(...args),
+  fetchItems: (...args: unknown[]) => fetchItems(...args),
+  createCharacter: (...args: unknown[]) => createCharacter(...args),
+}));
+
+const DRAFT_KEY = "character-draft:new";
+
+function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
+  return {
+    id: "class-1",
+    name: "Rogue",
+    hitDie: "d8",
+    savingThrows: [],
+    skillChoiceCount: 2,
+    skillChoices: ["acrobatics", "stealth", "perception"],
+    isSpellcaster: false,
+    subclassLevel: 3,
+    subclasses: [],
+    startingEquipment: null,
+    multiclassPrerequisite: null,
+    toolProficiencies: [],
+    toolChoices: [],
+    toolChoiceCount: 0,
+    ...overrides,
+  };
+}
+
+const reference: ReferenceData = {
+  races: [{ id: "race-1", name: "Elf", speed: 30, toolProficiencies: [] }],
+  classes: [makeClass()],
+  backgrounds: [
+    { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [] },
+  ],
+  alignments: ["Neutral Good"],
+  artisanTools: [],
+};
+
+function seedDraft(overrides: Partial<CharacterDraft>) {
+  const base: CharacterDraft = {
+    name: "",
+    alignment: "",
+    race: "",
+    className: "",
+    subclass: "",
+    subclassId: "",
+    portraitUrl: "",
+    background: "",
+    useCustomBackground: false,
+    customBackground: "",
+    abilityMethod: "manual",
+    abilityPool: null,
+    abilityAssignments: {
+      strength: null,
+      dexterity: null,
+      constitution: null,
+      intelligence: null,
+      wisdom: null,
+      charisma: null,
+    },
+    abilityScores: {
+      strength: 10,
+      dexterity: 10,
+      constitution: 10,
+      intelligence: 10,
+      wisdom: 10,
+      charisma: 10,
+    },
+    skillProficiencies: [],
+    toolChoices: [],
+    equipmentDraft: null,
+  };
+  localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...base, ...overrides }));
+}
+
+function validDraft(): Partial<CharacterDraft> {
+  return {
+    name: "Lidda",
+    alignment: "Neutral Good",
+    race: "Elf",
+    className: "Rogue",
+    background: "Sage",
+    skillProficiencies: ["stealth", "acrobatics"],
+  };
+}
+
+async function mount() {
+  const hook = renderHook(() => useCharacterCreation());
+  await waitFor(() => expect(hook.result.current.reference).not.toBeNull());
+  return hook;
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  navigate.mockReset();
+  fetchReference.mockReset().mockResolvedValue(reference);
+  fetchItems.mockReset().mockResolvedValue([]);
+  createCharacter.mockReset().mockResolvedValue({ id: "char-99" });
+});
+
+afterEach(() => {
+  localStorage.clear();
+});
+
+describe("useCharacterCreation", () => {
+  it("derives granted skills from the background and excludes them from class options", async () => {
+    seedDraft({ race: "Elf", className: "Rogue", background: "Sage" });
+    const { result } = await mount();
+    expect(result.current.skills.granted).toEqual(["perception"]);
+    expect(result.current.skills.options).toEqual(["acrobatics", "stealth"]);
+    expect(result.current.skills.max).toBe(2);
+  });
+
+  it("drops background-granted skills when a custom background is used", async () => {
+    seedDraft({ className: "Rogue", background: "Sage", useCustomBackground: true });
+    const { result } = await mount();
+    expect(result.current.skills.granted).toEqual([]);
+    expect(result.current.skills.options).toContain("perception");
+  });
+
+  it("toggle adds a class skill and removes it again", async () => {
+    seedDraft({ className: "Rogue", background: "Sage" });
+    const { result } = await mount();
+
+    act(() => result.current.skills.toggle("stealth"));
+    await waitFor(() => expect(result.current.skills.selected).toEqual(["stealth"]));
+
+    act(() => result.current.skills.toggle("stealth"));
+    await waitFor(() => expect(result.current.skills.selected).toEqual([]));
+  });
+
+  it("toggle does not exceed the class choice cap", async () => {
+    seedDraft({ className: "Rogue", background: "Sage", skillProficiencies: ["stealth", "acrobatics"] });
+    const { result } = await mount();
+    expect(result.current.skills.selected).toEqual(["stealth", "acrobatics"]);
+
+    act(() => result.current.skills.toggle("perception"));
+    await Promise.resolve();
+    expect(result.current.skills.selected).toEqual(["stealth", "acrobatics"]);
+  });
+
+  it("lists every unmet requirement for an empty draft and marks it invalid", async () => {
+    seedDraft({});
+    const { result } = await mount();
+    expect(result.current.isValid).toBe(false);
+    expect(result.current.missing).toEqual(["Name", "Alignment", "Race", "Class", "Background"]);
+  });
+
+  it("uses the trimmed custom background name for validation when custom is on", async () => {
+    seedDraft({
+      name: "A",
+      alignment: "Neutral Good",
+      race: "Elf",
+      className: "Rogue",
+      useCustomBackground: true,
+      customBackground: "   ",
+    });
+    const { result } = await mount();
+    expect(result.current.missing).toEqual(["Background"]);
+  });
+
+  it("is valid once all required fields are present", async () => {
+    seedDraft(validDraft());
+    const { result } = await mount();
+    expect(result.current.missing).toEqual([]);
+    expect(result.current.isValid).toBe(true);
+  });
+
+  it("derives preview AC, speed, and max HP from scores and class hit die", async () => {
+    seedDraft({
+      race: "Elf",
+      className: "Rogue",
+      abilityScores: {
+        strength: 10,
+        dexterity: 16,
+        constitution: 14,
+        intelligence: 10,
+        wisdom: 10,
+        charisma: 10,
+      },
+    });
+    const { result } = await mount();
+    expect(result.current.preview.dexModifier).toBe(3);
+    expect(result.current.preview.armorClass).toBe(13);
+    expect(result.current.preview.speed).toBe(30);
+    expect(result.current.preview.maxHp).toBe(10); // d8 + con mod 2
+  });
+
+  it("has no preview speed or maxHp before race/class are chosen", async () => {
+    seedDraft({});
+    const { result } = await mount();
+    expect(result.current.preview.speed).toBeUndefined();
+    expect(result.current.preview.maxHp).toBeUndefined();
+  });
+
+  it("submits the create payload and navigates on success", async () => {
+    seedDraft(validDraft());
+    const { result } = await mount();
+
+    await act(async () => {
+      await result.current.save();
+    });
+
+    expect(createCharacter).toHaveBeenCalledTimes(1);
+    expect(createCharacter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "Lidda",
+        race: "Elf",
+        background: "Sage",
+        classes: [{ name: "Rogue", subclass: null, subclassId: undefined }],
+        skillProficiencies: ["perception", "stealth", "acrobatics"],
+      }),
+    );
+    expect(navigate).toHaveBeenCalledWith("/characters/char-99", { replace: true });
+    expect(result.current.submitError).toBe(false);
+  });
+
+  it("does not submit an invalid draft", async () => {
+    seedDraft({ name: "Only a name" });
+    const { result } = await mount();
+
+    await act(async () => {
+      await result.current.save();
+    });
+    expect(createCharacter).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a submit error and does not navigate when create fails", async () => {
+    createCharacter.mockRejectedValue(new Error("boom"));
+    seedDraft(validDraft());
+    const { result } = await mount();
+
+    await act(async () => {
+      await result.current.save();
+    });
+    expect(result.current.submitError).toBe(true);
+    expect(navigate).not.toHaveBeenCalled();
+    expect(result.current.submitting).toBe(false);
+  });
+});
