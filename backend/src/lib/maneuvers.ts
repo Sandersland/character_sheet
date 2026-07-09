@@ -11,17 +11,15 @@
  * from the catalog; the known list + die size come from resources + deriveResources.
  */
 
-import { randomUUID } from "node:crypto";
-
+import { Prisma } from "../generated/prisma/client.js";
 import { castAbilityInTx } from "./ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "./ability-cost.js";
+import { runCharacterTransaction, type CharacterTxContext } from "./character-transaction.js";
 import { deriveResources, resolveClassDie } from "./class-features.js";
 import type { EffectSpec } from "./effects.js";
 import { logEvent } from "./events.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
-import { prisma } from "./prisma.js";
-import { normalizeResourcesMutable } from "./resources.js";
-import { getActiveSessionId } from "./sessions.js";
+import { normalizeResourcesMutable, type ManeuverEntry } from "./resources.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
 import { abilityModifier } from "./srd.js";
 
@@ -57,6 +55,161 @@ function maneuverEffectSpec(saveAbility: string | null): EffectSpec {
   };
 }
 
+// Columns/relations re-read per op (5e-rules columns supplied here per the
+// character-transaction contract).
+const MANEUVER_SELECT = {
+  spellcasting: true,
+  resources: true,
+  experiencePoints: true,
+  abilityScores: true,
+  classEntries: {
+    orderBy: { position: "asc" as const },
+    take: 1,
+    select: { name: true, subclass: true },
+  },
+} satisfies Prisma.CharacterSelect;
+
+type ManeuverRow = Prisma.CharacterGetPayload<{ select: typeof MANEUVER_SELECT }>;
+
+// Gate: only a Battle Master fighter (L3+) has a superiority die + save DC.
+function resolveSuperiority(row: ManeuverRow): { saveDcBase: number; dieFaces: number } {
+  const level = levelForExperience(row.experiencePoints);
+  const profBonus = proficiencyBonusForLevel(level);
+  const primaryEntry = row.classEntries[0];
+  const abilityScores = row.abilityScores as Record<string, number>;
+  const derived = deriveResources(primaryEntry?.name ?? "", primaryEntry?.subclass ?? undefined, level, abilityScores, profBonus);
+
+  const saveDcBase = derived?.maneuverSaveDC;
+  const dieFaces = derived ? resolveClassDie("superiorityDice", derived) : null;
+  if (saveDcBase === undefined || dieFaces === null) {
+    throw new InvalidManeuverOperationError(
+      "Only a Battle Master fighter (level 3+) can spend maneuvers",
+    );
+  }
+  return { saveDcBase, dieFaces };
+}
+
+// Resolve the known-maneuver entry + its catalog row (null for custom, die-only
+// maneuvers). Throws if the entry isn't on the character's known list.
+async function loadManeuver(tx: Prisma.TransactionClient, row: ManeuverRow, entryId: string) {
+  const resources = normalizeResourcesMutable(row.resources);
+  const entry = resources.maneuversKnown.find((m) => m.id === entryId);
+  if (!entry) {
+    throw new InvalidManeuverOperationError(`Maneuver not known: ${entryId}`);
+  }
+  const catalog = entry.maneuverId
+    ? await tx.grantedAbility.findUnique({ where: { id: entry.maneuverId } })
+    : null;
+  return { entry, catalog };
+}
+
+function buildManeuverSummary(
+  entry: ManeuverEntry,
+  dieLabel: string,
+  roll: number,
+  saveDc: number | null,
+  saveAbility: string | null,
+  selfTempHp: boolean,
+  tempHp: number,
+): string {
+  let summary = `Used ${entry.name} — ${dieLabel}:${roll}`;
+  if (saveDc !== null && saveAbility) summary += `, DC ${saveDc} ${abbr(saveAbility)} save`;
+  if (selfTempHp) summary += ` (${tempHp} temp HP)`;
+  return summary;
+}
+
+interface ManeuverCastArgs {
+  entry: ManeuverEntry;
+  cost: ReturnType<typeof readAbilityCost>;
+  saveAbility: string | null;
+  roll: number;
+  selfTempHp: boolean;
+  tempHp: number;
+  spellState: ReturnType<typeof normalizeSpellcastingMutable>;
+}
+
+// Spend the die via the shared cost path — pays the pool and (Rally) self-applies
+// temp HP. The pool payer logs its own spendResource event for revert.
+async function spendManeuverDie(
+  ctx: CharacterTxContext<ManeuverRow, CastManeuverOperation>,
+  { entry, cost, saveAbility, roll, selfTempHp, tempHp, spellState }: ManeuverCastArgs,
+): Promise<void> {
+  const { tx, characterId, batchId, sessionId } = ctx;
+  const costCtx: PayCostContext = { tx, characterId, batchId, sessionId };
+  await castAbilityInTx(
+    { tx, characterId, batchId, sessionId, cost: costCtx, concentrationHost: spellState },
+    {
+      name: entry.name,
+      entryId: entry.id,
+      cost,
+      effect: maneuverEffectSpec(saveAbility),
+      requested: cost.kind === "pool" ? 1 : undefined,
+      roll,
+      eventType: "castManeuver",
+      concentrates: false,
+      apply: selfTempHp && tempHp > 0 ? { target: "self", kind: "tempHp", amount: tempHp } : undefined,
+    },
+  );
+}
+
+// The resources-category cast record carrying the roll + announced DC.
+async function logManeuverCast(
+  ctx: CharacterTxContext<ManeuverRow, CastManeuverOperation>,
+  args: { entry: ManeuverEntry; roll: number; dieLabel: string; saveDc: number | null; saveAbility: string | null; summary: string },
+): Promise<void> {
+  const { tx, characterId, batchId, sessionId } = ctx;
+  const { entry, roll, dieLabel, saveDc, saveAbility, summary } = args;
+  await logEvent(tx, {
+    characterId,
+    category: "resources",
+    type: "castManeuver",
+    summary,
+    data: {
+      entryId: entry.id,
+      maneuverId: entry.maneuverId ?? null,
+      maneuverName: entry.name,
+      roll,
+      die: dieLabel,
+      saveDc,
+      saveAbility,
+    },
+    batchId,
+    sessionId,
+  });
+}
+
+// Casts one known maneuver: spends one superiority die (server rolls it) and
+// logs the resources-category castManeuver event. See applyManeuverOperations.
+async function castManeuver(
+  ctx: CharacterTxContext<ManeuverRow, CastManeuverOperation>,
+): Promise<ManeuverCastResult> {
+  const { tx, row, op } = ctx;
+
+  const { saveDcBase, dieFaces } = resolveSuperiority(row);
+  const { entry, catalog } = await loadManeuver(tx, row, op.entryId);
+  const saveAbility = catalog?.saveAbility ?? null;
+  const selfTempHp = catalog?.selfTempHp ?? false;
+
+  // Server owns the roll: 1× the current superiority die.
+  const roll = 1 + Math.floor(Math.random() * dieFaces);
+  const dieLabel = `d${dieFaces}`;
+  const cost = readAbilityCost(catalog ?? { costKind: "pool", costPoolKey: "superiorityDice", costBase: 1 });
+
+  // Rally: die + Cha mod as self temp HP via the core self-apply path.
+  const abilityScores = row.abilityScores as Record<string, number>;
+  const chaMod = abilityModifier(abilityScores.charisma ?? 10);
+  const tempHp = selfTempHp ? Math.max(0, roll + chaMod) : 0;
+
+  const spellState = normalizeSpellcastingMutable(row.spellcasting);
+  await spendManeuverDie(ctx, { entry, cost, saveAbility, roll, selfTempHp, tempHp, spellState });
+
+  const saveDc = saveAbility ? saveDcBase : null;
+  const summary = buildManeuverSummary(entry, dieLabel, roll, saveDc, saveAbility, selfTempHp, tempHp);
+  await logManeuverCast(ctx, { entry, roll, dieLabel, saveDc, saveAbility, summary });
+
+  return { roll, saveDc, summary };
+}
+
 /**
  * Applies a batch of maneuver operations atomically. Mirrors
  * applyDisciplineOperations: one batchId, LIFO-undoable events, state re-read
@@ -69,110 +222,13 @@ export async function applyManeuverOperations(
   characterId: string,
   operations: ManeuverOperation[],
 ): Promise<ManeuverCastResult[]> {
-  const batchId = randomUUID();
-  const sessionId = await getActiveSessionId(characterId);
   const results: ManeuverCastResult[] = [];
-
-  await prisma.$transaction(async (tx) => {
-    for (const op of operations) {
-      const row = await tx.character.findUnique({
-        where: { id: characterId },
-        select: {
-          spellcasting: true,
-          resources: true,
-          experiencePoints: true,
-          abilityScores: true,
-          classEntries: {
-            orderBy: { position: "asc" as const },
-            take: 1,
-            select: { name: true, subclass: true },
-          },
-        },
-      });
-      if (!row) {
-        throw new InvalidManeuverOperationError(`Character not found: ${characterId}`);
-      }
-
-      const level = levelForExperience(row.experiencePoints);
-      const profBonus = proficiencyBonusForLevel(level);
-      const primaryEntry = row.classEntries[0];
-      const abilityScores = row.abilityScores as Record<string, number>;
-      const derived = deriveResources(primaryEntry?.name ?? "", primaryEntry?.subclass ?? undefined, level, abilityScores, profBonus);
-
-      const saveDcBase = derived?.maneuverSaveDC;
-      const dieFaces = derived ? resolveClassDie("superiorityDice", derived) : null;
-      if (saveDcBase === undefined || dieFaces === null) {
-        throw new InvalidManeuverOperationError(
-          "Only a Battle Master fighter (level 3+) can spend maneuvers",
-        );
-      }
-
-      const resources = normalizeResourcesMutable(row.resources);
-      const entry = resources.maneuversKnown.find((m) => m.id === op.entryId);
-      if (!entry) {
-        throw new InvalidManeuverOperationError(`Maneuver not known: ${op.entryId}`);
-      }
-
-      // Catalog row (present for seeded maneuvers; custom maneuvers are die-only).
-      const catalog = entry.maneuverId
-        ? await tx.grantedAbility.findUnique({ where: { id: entry.maneuverId } })
-        : null;
-      const saveAbility = catalog?.saveAbility ?? null;
-      const selfTempHp = catalog?.selfTempHp ?? false;
-
-      // Server owns the roll: 1× the current superiority die.
-      const roll = 1 + Math.floor(Math.random() * dieFaces);
-      const dieLabel = `d${dieFaces}`;
-
-      const cost = readAbilityCost(catalog ?? { costKind: "pool", costPoolKey: "superiorityDice", costBase: 1 });
-
-      // Rally: die + Cha mod as self temp HP via the core self-apply path.
-      const chaMod = abilityModifier(abilityScores.charisma ?? 10);
-      const tempHp = selfTempHp ? Math.max(0, roll + chaMod) : 0;
-
-      const spellState = normalizeSpellcastingMutable(row.spellcasting);
-      const costCtx: PayCostContext = { tx, characterId, batchId, sessionId };
-      await castAbilityInTx(
-        { tx, characterId, batchId, sessionId, cost: costCtx, concentrationHost: spellState },
-        {
-          name: entry.name,
-          entryId: entry.id,
-          cost,
-          effect: maneuverEffectSpec(saveAbility),
-          requested: cost.kind === "pool" ? 1 : undefined,
-          roll,
-          eventType: "castManeuver",
-          concentrates: false,
-          apply: selfTempHp && tempHp > 0 ? { target: "self", kind: "tempHp", amount: tempHp } : undefined,
-        },
-      );
-
-      const saveDc = saveAbility ? saveDcBase : null;
-      let summary = `Used ${entry.name} — ${dieLabel}:${roll}`;
-      if (saveDc !== null && saveAbility) summary += `, DC ${saveDc} ${abbr(saveAbility)} save`;
-      if (selfTempHp) summary += ` (${tempHp} temp HP)`;
-
-      await logEvent(tx, {
-        characterId,
-        category: "resources",
-        type: "castManeuver",
-        summary,
-        data: {
-          entryId: entry.id,
-          maneuverId: entry.maneuverId ?? null,
-          maneuverName: entry.name,
-          roll,
-          die: dieLabel,
-          saveDc,
-          saveAbility,
-        },
-        batchId,
-        sessionId,
-      });
-
-      results.push({ roll, saveDc, summary });
-    }
+  await runCharacterTransaction<typeof MANEUVER_SELECT, ManeuverOperation>(characterId, operations, {
+    select: MANEUVER_SELECT,
+    notFound: (id) => new InvalidManeuverOperationError(`Character not found: ${id}`),
+    applyOp: async (ctx) => {
+      results.push(await castManeuver(ctx));
+    },
   });
-
   return results;
 }
