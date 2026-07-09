@@ -7,7 +7,9 @@ import {
   normalizeForMatch,
   parseMentionBody,
   parseTrigger,
+  resolveAdjacentChip,
   serializeMentionDom,
+  spliceMentionToken,
   type MentionResolved,
 } from "@/lib/mentions";
 
@@ -168,5 +170,70 @@ describe("mention DOM serialization (#269)", () => {
     const root = document.createElement("div");
     root.innerHTML = "text<br>";
     expect(serializeMentionDom(root)).toBe("text");
+  });
+});
+
+describe("spliceMentionToken", () => {
+  it("splices the token + trailing space at the trigger, returning the caret past it", () => {
+    // "Hi @go" — trigger starts at 3, caret at end (6).
+    const { body, caret } = spliceMentionToken(`Hi @go`, 3, 6, A);
+    expect(body).toBe(`Hi @[${A}] `);
+    expect(caret).toBe(body.length);
+  });
+
+  it("preserves text after the caret when the trigger is mid-body", () => {
+    // "Hi @go there" — trigger at 3, caret at 6, " there" kept.
+    const { body, caret } = spliceMentionToken(`Hi @go there`, 3, 6, A);
+    expect(body).toBe(`Hi @[${A}]  there`);
+    expect(caret).toBe(`Hi @[${A}] `.length);
+  });
+
+  it("splices at the very start of the body", () => {
+    const { body, caret } = spliceMentionToken(`@g`, 0, 2, A);
+    expect(body).toBe(`@[${A}] `);
+    expect(caret).toBe(body.length);
+  });
+});
+
+describe("resolveAdjacentChip", () => {
+  function editorWithChip(): { root: HTMLElement; chip: HTMLElement; text: Text } {
+    // "@[A]!" → chip, then text "!" — so the caret can sit right after the chip.
+    const root = document.createElement("div");
+    root.appendChild(mentionBodyToFragment(`@[${A}]!`, () => ({ name: "Goblin", type: "NPC" })));
+    const chip = root.querySelector("[data-mention-id]") as HTMLElement;
+    const text = root.childNodes[1] as Text;
+    return { root, chip, text };
+  }
+
+  function collapsedRange(node: Node, offset: number): Range {
+    const range = document.createRange();
+    range.setStart(node, offset);
+    range.collapse(true);
+    return range;
+  }
+
+  it("returns the chip when the caret sits at the start of the text after it (backspace)", () => {
+    const { chip, text } = editorWithChip();
+    expect(resolveAdjacentChip(collapsedRange(text, 0), false)).toBe(chip);
+  });
+
+  it("returns null when the caret is mid-text, not at the chip boundary", () => {
+    const { text } = editorWithChip();
+    expect(resolveAdjacentChip(collapsedRange(text, 1), false)).toBeNull();
+  });
+
+  it("returns the chip for a forward Delete from the text node before it", () => {
+    const root = document.createElement("div");
+    root.appendChild(mentionBodyToFragment(`@[${A}] hi`, () => ({ name: "Goblin", type: "NPC" })));
+    const chip = root.querySelector("[data-mention-id]") as HTMLElement;
+    // Element-container range positioned before the chip (childNode index 0).
+    expect(resolveAdjacentChip(collapsedRange(root, 0), true)).toBe(chip);
+  });
+
+  it("returns null when the adjacent node is not a chip", () => {
+    const root = document.createElement("div");
+    root.textContent = "plain";
+    const text = root.childNodes[0] as Text;
+    expect(resolveAdjacentChip(collapsedRange(text, text.length), false)).toBeNull();
   });
 });
