@@ -91,7 +91,7 @@ export function castSpellSummary(cap: ItemCapability): string {
 }
 
 /** One-line human summary of a charges pool, e.g. "7 charges · regains 1d6+1 at dawn". */
-export function chargesSummary(cap: ItemCapability): string {
+function chargesSummary(cap: ItemCapability): string {
   if (cap.maxCharges == null) return cap.description ?? "Charges";
   const count = `${cap.maxCharges} charge${cap.maxCharges === 1 ? "" : "s"}`;
   const trigger = CHARGE_TRIGGER_OPTIONS.find((o) => o.value === cap.recharge?.trigger)?.label.toLowerCase() ?? "at dawn";
@@ -170,7 +170,7 @@ export const PROFICIENCY_KIND_OPTIONS: readonly { value: ProficiencyKind; label:
 
 // Resolve a grant value (damage type / condition / skill / ability key) through
 // the right label helper — never a raw key. Free-text values pass through as-is.
-export function grantValueLabel(kind: GrantValueKind | undefined, value: string): string {
+function grantValueLabel(kind: GrantValueKind | undefined, value: string): string {
   switch (kind) {
     case "damageType":
       return damageTypeLabel(value);

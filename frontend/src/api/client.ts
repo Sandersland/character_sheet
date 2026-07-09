@@ -753,18 +753,6 @@ export async function fetchCampaignSessions(campaignId: string): Promise<Session
   return request<Session[]>(`/campaigns/${campaignId}/sessions`, undefined, "Failed to fetch sessions");
 }
 
-/** Get one campaign session with its participants, events, and journals. */
-export async function fetchCampaignSession(
-  campaignId: string,
-  sessionId: string,
-): Promise<Session & { events: CharacterEvent[] }> {
-  return request<Session & { events: CharacterEvent[] }>(
-    `/campaigns/${campaignId}/sessions/${sessionId}`,
-    undefined,
-    "Failed to fetch session",
-  );
-}
-
 /** List sessions a character participated in (newest first) — activity filter. */
 export async function fetchSessions(characterId: string): Promise<Session[]> {
   return request<Session[]>(`/characters/${characterId}/sessions`, undefined, "Failed to fetch sessions");

@@ -18,7 +18,7 @@ export function equipSlotLabel(slot: EquipSlot): string {
 
 // Item-kind label per worn slot — names the thing you wear ("Gloves" for HANDS),
 // not the body location. Single source for the DM gear slot-authoring picker.
-export const WORN_SLOT_ITEM_KIND_LABELS = {
+const WORN_SLOT_ITEM_KIND_LABELS = {
   HEAD: "Headwear",
   NECK: "Amulet / Necklace",
   CLOAK: "Cloak",
@@ -78,7 +78,9 @@ export function allowedSlotsForItem(item: InventoryItem): EquipSlot[] {
 }
 
 // Any item the paper doll can place — i.e. it has at least one legal slot.
-export function isEquippable(item: InventoryItem): boolean {
+// (Named to avoid colliding with lib/items.ts isEquippable, which is the
+// category-level rule; this one is slot-aware and takes the full item.)
+export function hasEquipSlots(item: InventoryItem): boolean {
   return allowedSlotsForItem(item).length > 0;
 }
 

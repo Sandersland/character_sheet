@@ -1,3 +1,4 @@
+// fallow-ignore-file unused-file -- loaded via vitest setupFiles in vite.config.ts, not imported
 import "@testing-library/jest-dom/vitest";
 import { afterEach, expect } from "vitest";
 import { cleanup } from "@testing-library/react";

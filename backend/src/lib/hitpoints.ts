@@ -11,7 +11,7 @@ import {
 import { itemImmuneDamageTypes, itemResistedDamageTypes, type GrantItem } from "./capabilities.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
-import { resetActivatedUsesForRestInTx } from "./inventory.js";
+import { resetActivatedUsesForRestInTx } from "./item-recharge.js";
 import { prisma } from "./prisma.js";
 import { getActiveSessionId } from "./sessions.js";
 import {
