@@ -124,6 +124,27 @@ describe("EntityDetailPage (#248)", () => {
     );
   });
 
+  it("evicts the deleted entity from the shared cache so live chips drop it", async () => {
+    const user = userEvent.setup();
+    const survivor: CampaignEntity = { ...ENTITY, id: "ent-2", name: "Vecna" };
+    vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("OWNER"));
+    vi.mocked(useCampaignEntities).mockReturnValue({
+      entities: [ENTITY, survivor],
+      byId: new Map([
+        [ENTITY_ID, ENTITY],
+        ["ent-2", survivor],
+      ]),
+    });
+    vi.mocked(client.deleteEntity).mockResolvedValue(undefined);
+
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: /delete entity/i }));
+
+    await waitFor(() =>
+      expect(vi.mocked(primeCampaignEntities)).toHaveBeenCalledWith(CAMPAIGN_ID, [survivor]),
+    );
+  });
+
   it("renders the entity and its backlinks", async () => {
     renderPage();
     expect(await screen.findByRole("heading", { name: /Goblin Chief/ })).toBeInTheDocument();

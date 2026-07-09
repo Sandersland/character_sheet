@@ -116,6 +116,8 @@ export function useEntityDetail(campaignId?: string, entityId?: string) {
     setError(null);
     try {
       await deleteEntity(campaignId, entityId);
+      // Evict from the shared cache so live @Name chips drop the deleted entity.
+      primeCampaignEntities(campaignId, entities.filter((e) => e.id !== entityId));
       navigate(`/campaigns/${campaignId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete entity.");
