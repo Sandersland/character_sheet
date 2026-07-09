@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
+import { useDismissable } from "@/hooks/useDismissable";
+
 interface DropdownMenuProps {
   trigger: ReactNode;
   label: string;
@@ -45,23 +47,14 @@ export default function DropdownMenu({
       item.tabIndex = i === 0 ? 0 : -1;
     });
     list[0]?.focus();
-
-    function handleKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.key === "Escape") close();
-    }
-    function handleMouseDown(event: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("mousedown", handleMouseDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("mousedown", handleMouseDown);
-    };
   }, [open]);
+
+  useDismissable({
+    open,
+    wrapperRef,
+    onEscape: close,
+    onOutsideClick: () => setOpen(false),
+  });
 
   function handleTriggerKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
     if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
