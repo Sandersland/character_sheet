@@ -904,6 +904,10 @@ function selectEquippedBodyArmor(
 // the base formula in srd.ts). Layered in order: base parts (armor/Dex/shield/
 // Unarmored Defense/Mage Armor best-of) → Defense fighting style → feat AC →
 // per-source "ac" buffs → the acFloor (Barkskin) reconciling part last.
+// The branchiness is inherent to the 5e AC layering (each optional source is a
+// conditional addend), not accidental complexity — it was previously inlined in
+// serializeCharacter's body; extracting it here is a net structural win.
+// fallow-ignore-next-line complexity
 function buildArmorClassView(
   row: CharacterWithRelations,
   effectiveScores: Record<string, number>,
