@@ -170,6 +170,159 @@ function isArcanumCast(event: SummaryEventInput, level: number): boolean {
 
 // ── Aggregation ──────────────────────────────────────────────────────────────
 
+/** Mutable running totals folded across a session's events. */
+interface SummaryAccumulator {
+  xpGained: number;
+  levelsGained: number;
+  spellsCast: number;
+  combatRounds: number;
+  attackRolls: number;
+  damageRolls: number;
+  itemNet: Map<string, number>;
+  soldNet: Map<string, number>;
+  lootNet: Map<string, number>;
+  slotsSpent: Record<string, number>;
+  featsOrAsis: SummaryAdvancement[];
+}
+
+function createAccumulator(): SummaryAccumulator {
+  return {
+    xpGained: 0,
+    levelsGained: 0,
+    spellsCast: 0,
+    combatRounds: 0,
+    attackRolls: 0,
+    damageRolls: 0,
+    itemNet: new Map(),
+    soldNet: new Map(),
+    lootNet: new Map(),
+    slotsSpent: {},
+    featsOrAsis: [],
+  };
+}
+
+/** Add an event's `{ itemName, quantityDelta }` into a name→qty map. */
+function tallyItemEvent(
+  map: Map<string, number>,
+  event: SummaryEventInput,
+  transform: (delta: number) => number = (delta) => delta,
+): void {
+  const data = asRecord(event.data);
+  const name = typeof data.itemName === "string" ? data.itemName : null;
+  const delta = numField(event.data, "quantityDelta");
+  if (name && delta !== undefined) {
+    map.set(name, (map.get(name) ?? 0) + transform(delta));
+  }
+}
+
+/** XP net (award/set) and level-up count. */
+function applyProgressEvent(acc: SummaryAccumulator, event: SummaryEventInput): void {
+  if (event.type === "levelUp") {
+    acc.levelsGained += 1;
+    return;
+  }
+  if (event.type !== "xpAward" && event.type !== "xpSet") return;
+  // before/after carry the authoritative XP values for both award and set.
+  const before = numField(event.before, "experiencePoints");
+  const after = numField(event.after, "experiencePoints");
+  if (before !== undefined && after !== undefined) acc.xpGained += after - before;
+}
+
+/** Combat round high-water mark and attack/damage roll counts. */
+function applyRollEvent(acc: SummaryAccumulator, event: SummaryEventInput): void {
+  switch (event.type) {
+    case "combatRoundAdvanced": {
+      const round = numField(event.data, "round");
+      if (typeof round === "number") acc.combatRounds = Math.max(acc.combatRounds, round);
+      break;
+    }
+    case "attackRoll":
+      acc.attackRolls += 1;
+      break;
+    case "damageRoll":
+      acc.damageRolls += 1;
+      break;
+    default:
+      break;
+  }
+}
+
+/** Inventory nets: acquisitions, sales (magnitude), and DM loot grants (#382). */
+function applyItemEvent(acc: SummaryAccumulator, event: SummaryEventInput): void {
+  switch (event.type) {
+    case "acquired":
+    case "bought":
+    case "consumed":
+    case "removed":
+      tallyItemEvent(acc.itemNet, event);
+      break;
+    case "sold":
+      // A sale's quantityDelta is negative; record the magnitude as a positive count.
+      tallyItemEvent(acc.soldNet, event, Math.abs);
+      break;
+    case "awarded":
+    case "revoked":
+      tallyItemEvent(acc.lootNet, event);
+      break;
+    default:
+      break;
+  }
+}
+
+/** Casts (expendSlot/castSpell): counts the cast and tallies the slot spent. */
+function applyCastEvent(acc: SummaryAccumulator, event: SummaryEventInput): void {
+  if (event.type !== "expendSlot" && event.type !== "castSpell") return;
+  if (event.type === "castSpell") acc.spellsCast += 1;
+  // castSpell stores `slotLevel` (null for cantrips); expendSlot stores `level`.
+  const data = asRecord(event.data);
+  const level = numField(event.data, "level") ?? numField(event.data, "slotLevel");
+  if (typeof level !== "number" || data.slotLevel === null) return;
+  // A Mystic Arcanum cast has a non-null slotLevel but spends a charge, not a slot.
+  if (isArcanumCast(event, level)) return;
+  const key = String(level);
+  acc.slotsSpent[key] = (acc.slotsSpent[key] ?? 0) + 1;
+}
+
+/** restoreSlot: nets a real slot restore against slots spent, floored at 0. */
+function applyRestoreEvent(acc: SummaryAccumulator, event: SummaryEventInput): void {
+  if (event.type !== "restoreSlot") return;
+  const level = numField(event.data, "level");
+  if (typeof level !== "number") return;
+  // Arcanum charge restores share this event type but aren't spell slots — skip.
+  if (isArcanumRestore(event, level)) return;
+  const key = String(level);
+  // Floor at 0: a cross-session restore has no in-window expend to net against.
+  const next = (acc.slotsSpent[key] ?? 0) - 1;
+  if (next > 0) acc.slotsSpent[key] = next;
+  else delete acc.slotsSpent[key];
+}
+
+/** ASIs and feats taken, surfaced with a readable label. */
+function applyAdvancementEvent(acc: SummaryAccumulator, event: SummaryEventInput): void {
+  if (event.type !== "abilityScoreImprovement" && event.type !== "featTaken") return;
+  const data = asRecord(event.data);
+  const label =
+    typeof data.featName === "string"
+      ? `Feat: ${data.featName}`
+      : event.type === "featTaken"
+        ? "Feat taken"
+        : "Ability Score Improvement";
+  acc.featsOrAsis.push({ type: event.type, label });
+}
+
+// checkRoll / saveRoll / initiativeRoll are logged (roll category) but not yet
+// surfaced in session-summary stats — intentional scope limit (#128).
+
+/** Route one non-reverted event through every per-concern accumulator. */
+function applyEvent(acc: SummaryAccumulator, event: SummaryEventInput): void {
+  applyProgressEvent(acc, event);
+  applyRollEvent(acc, event);
+  applyItemEvent(acc, event);
+  applyCastEvent(acc, event);
+  applyRestoreEvent(acc, event);
+  applyAdvancementEvent(acc, event);
+}
+
 /**
  * Folds a session's events into a typed summary. Reverted events are skipped so
  * the summary reflects the net result of the session (undone actions don't
@@ -179,176 +332,35 @@ export function computeSessionSummary(
   events: SummaryEventInput[],
   window: SummaryWindow,
 ): SessionSummary {
-  let xpGained = 0;
-  let levelsGained = 0;
-  let spellsCast = 0;
-  let combatRounds = 0;
-  let attackRolls = 0;
-  let damageRolls = 0;
-
-  const itemNet = new Map<string, number>();
-  const soldNet = new Map<string, number>();
-  const lootNet = new Map<string, number>();
-  const slotsSpent: Record<string, number> = {};
-  const featsOrAsis: SummaryAdvancement[] = [];
-
+  const acc = createAccumulator();
   for (const event of events) {
     if (event.reverted) continue;
-
-    switch (event.type) {
-      case "xpAward":
-      case "xpSet": {
-        // before/after carry the authoritative XP values for both award and
-        // set, so the net delta is robust regardless of op kind.
-        const before = numField(event.before, "experiencePoints");
-        const after = numField(event.after, "experiencePoints");
-        if (before !== undefined && after !== undefined) {
-          xpGained += after - before;
-        }
-        break;
-      }
-
-      case "levelUp":
-        levelsGained += 1;
-        break;
-
-      case "acquired":
-      case "bought":
-      case "consumed":
-      case "removed": {
-        // Net inventory change (gains minus uses). Sales are tallied separately
-        // (see the `sold` case) so they never surface as a negative "acquired".
-        const data = asRecord(event.data);
-        const name = typeof data.itemName === "string" ? data.itemName : null;
-        const delta = numField(event.data, "quantityDelta");
-        if (name && delta !== undefined) {
-          itemNet.set(name, (itemNet.get(name) ?? 0) + delta);
-        }
-        break;
-      }
-
-      case "sold": {
-        // A sale's quantityDelta is negative; record the magnitude as a positive
-        // "sold" count so the recap can show "Sold ×N" in its own section.
-        const data = asRecord(event.data);
-        const name = typeof data.itemName === "string" ? data.itemName : null;
-        const delta = numField(event.data, "quantityDelta");
-        if (name && delta !== undefined) {
-          soldNet.set(name, (soldNet.get(name) ?? 0) + Math.abs(delta));
-        }
-        break;
-      }
-
-      case "awarded":
-      case "revoked": {
-        // DM campaign-item grants (#382). awarded carries a positive
-        // quantityDelta, revoked a negative one, so netting matches a grant then
-        // its undo/revoke to zero — dropped by itemsFromMap.
-        const data = asRecord(event.data);
-        const name = typeof data.itemName === "string" ? data.itemName : null;
-        const delta = numField(event.data, "quantityDelta");
-        if (name && delta !== undefined) {
-          lootNet.set(name, (lootNet.get(name) ?? 0) + delta);
-        }
-        break;
-      }
-
-      case "expendSlot":
-      case "castSpell": {
-        if (event.type === "castSpell") spellsCast += 1;
-        // castSpell stores `slotLevel` (null for cantrips); expendSlot stores `level`.
-        const data = asRecord(event.data);
-        const level = numField(event.data, "level") ?? numField(event.data, "slotLevel");
-        if (typeof level === "number" && data.slotLevel !== null) {
-          // A Mystic Arcanum cast emits a non-null slotLevel but spends an
-          // Arcanum charge, not a slot — disambiguate via the snapshot and skip
-          // the slot tally (spellsCast above still counts the cast itself).
-          if (isArcanumCast(event, level)) break;
-          const key = String(level);
-          slotsSpent[key] = (slotsSpent[key] ?? 0) + 1;
-        }
-        break;
-      }
-
-      case "restoreSlot": {
-        const level = numField(event.data, "level");
-        if (typeof level === "number") {
-          // Mystic Arcanum (Warlock 11+) charge restores share the `restoreSlot`
-          // event type but must NOT net against spell slots spent — they're a
-          // separate resource. Skip those; only real slot restores reduce the
-          // slot-spent tally.
-          if (isArcanumRestore(event, level)) break;
-
-          const key = String(level);
-          // Floor at 0 deliberately: a restoreSlot whose matching expendSlot
-          // happened in a PRIOR session (cross-session restore) has nothing to
-          // net against here. Rather than letting it drive slotsSpent negative —
-          // which would misreport this session as having "un-spent" slots it
-          // never expended — we clamp at 0. The summary reports slots SPENT in
-          // this session; an out-of-window restore can at most cancel an
-          // in-window expend, never push the count below zero.
-          const next = (slotsSpent[key] ?? 0) - 1;
-          if (next > 0) slotsSpent[key] = next;
-          else delete slotsSpent[key];
-        }
-        break;
-      }
-
-      case "combatRoundAdvanced": {
-        const round = numField(event.data, "round");
-        if (typeof round === "number") combatRounds = Math.max(combatRounds, round);
-        break;
-      }
-
-      case "attackRoll":
-        attackRolls += 1;
-        break;
-
-      case "damageRoll":
-        damageRolls += 1;
-        break;
-
-      // checkRoll / saveRoll / initiativeRoll are logged (roll category) but not
-      // yet surfaced in session-summary stats — intentional scope limit (#128).
-
-      case "abilityScoreImprovement":
-      case "featTaken": {
-        const data = asRecord(event.data);
-        const label =
-          typeof data.featName === "string"
-            ? `Feat: ${data.featName}`
-            : event.type === "featTaken"
-              ? "Feat taken"
-              : "Ability Score Improvement";
-        featsOrAsis.push({ type: event.type, label });
-        break;
-      }
-
-      default:
-        break;
-    }
+    applyEvent(acc, event);
   }
-
-  const itemsAcquired = itemsFromMap(itemNet);
-  const itemsSold = itemsFromMap(soldNet);
-  const loot = itemsFromMap(lootNet);
 
   return {
     startedAt: window.startedAt.toISOString(),
     endedAt: window.endedAt.toISOString(),
     durationMs: Math.max(0, window.endedAt.getTime() - window.startedAt.getTime()),
-    xpGained,
-    levelsGained,
-    itemsAcquired,
-    itemsSold,
-    loot,
-    slotsSpent,
-    spellsCast,
-    combatRounds,
-    attackRolls,
-    damageRolls,
-    featsOrAsis,
+    xpGained: acc.xpGained,
+    levelsGained: acc.levelsGained,
+    itemsAcquired: itemsFromMap(acc.itemNet),
+    itemsSold: itemsFromMap(acc.soldNet),
+    loot: itemsFromMap(acc.lootNet),
+    slotsSpent: acc.slotsSpent,
+    spellsCast: acc.spellsCast,
+    combatRounds: acc.combatRounds,
+    attackRolls: acc.attackRolls,
+    damageRolls: acc.damageRolls,
+    featsOrAsis: acc.featsOrAsis,
   };
+}
+
+/** Merge a list of already-summed items into a name→qty map. */
+function mergeItems(map: Map<string, number>, items: SummaryItem[]): void {
+  for (const item of items) {
+    map.set(item.name, (map.get(item.name) ?? 0) + item.qty);
+  }
 }
 
 /** Net a name→qty map into a sorted SummaryItem[], dropping zero-net entries. */
@@ -391,16 +403,10 @@ export function computeCampaignRecap(participants: ParticipantSummary[]): Campai
     totalPresentMs += p.presentMs;
     startMs = Math.min(startMs, new Date(p.joinedAt).getTime());
     endMs = Math.max(endMs, new Date(p.leftAt ?? p.endedAt).getTime());
-    for (const item of p.itemsAcquired) {
-      itemNet.set(item.name, (itemNet.get(item.name) ?? 0) + item.qty);
-    }
-    for (const item of p.itemsSold) {
-      soldNet.set(item.name, (soldNet.get(item.name) ?? 0) + item.qty);
-    }
+    mergeItems(itemNet, p.itemsAcquired);
+    mergeItems(soldNet, p.itemsSold);
     // Coalesce: participant summaries stored before #382 lack loot.
-    for (const item of p.loot ?? []) {
-      lootNet.set(item.name, (lootNet.get(item.name) ?? 0) + item.qty);
-    }
+    mergeItems(lootNet, p.loot ?? []);
     for (const [level, count] of Object.entries(p.slotsSpent)) {
       slotsSpent[level] = (slotsSpent[level] ?? 0) + count;
     }
