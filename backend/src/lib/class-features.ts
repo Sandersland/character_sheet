@@ -892,14 +892,13 @@ const CLASS_RESOURCE_FN: Record<
       level >= 12 ? 5 :
       level >= 6  ? 4 :
       level >= 3  ? 3 : 2;
-    const rageDmg = level >= 16 ? 4 : level >= 9 ? 3 : 2;
     return [
       {
         key: "rage",
         label: "Rage",
         total: rageCount,
         recharge: "longRest",
-        description: `Bonus action: enter a rage for up to 1 minute. +${rageDmg} melee damage, resistance to bludgeoning/piercing/slashing. Regain all rages on a long rest.${level >= 20 ? " Unlimited uses at level 20." : ""}`,
+        description: `Bonus action: enter a rage for up to 1 minute (ends early if you fall unconscious or choose to end it). Resistance to bludgeoning, piercing, and slashing damage (applied automatically) and advantage on Strength checks & saves while raging. Regain all rages on a long rest.${level >= 20 ? " Unlimited uses at level 20." : ""}`,
       },
     ];
   },
