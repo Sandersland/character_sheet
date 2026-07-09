@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "workspaces": {
+    "packages": [
+      "backend",
+      "frontend"
+    ]
+  },
+  // pino-pretty is loaded by string as a pino transport target (backend/src/lib/logger.ts),
+  // so import analysis can't see it.
+  "ignoreDependencies": ["pino-pretty"],
+  // Error classes carry a numeric `status` read duck-typed by the Express error
+  // middleware (backend/src/lib/auth/errors.ts, lib/inventory.ts) — never a static reference.
+  "usedClassMembers": ["status"],
+  "duplicates": {
+    // Hide pair-only clones; focus on widespread copy-paste
+    // worth refactoring. Lower to 2 to report every duplicate pair.
+    "minOccurrences": 3
+  },
+  "rules": {}
+}

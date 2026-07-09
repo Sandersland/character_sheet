@@ -42,7 +42,7 @@ CI runs the same suite in a dedicated `e2e` job (`.github/workflows/ci.yml`) on 
 
 | Hook | Runs | Why |
 |---|---|---|
-| `pre-commit` | `eslint --fix` on staged `*.{ts,tsx}` | catch + auto-fix lint before it lands |
+| `pre-commit` | `eslint --fix` on staged `*.{ts,tsx}`; `fallow audit` on changed files | catch + auto-fix lint before it lands; fallow gates NEW dead code / complexity / duplication (config `.fallowrc.json`; skips silently when `fallow` isn't installed — `npm i -g fallow`) |
 | `pre-push` | `tsc --noEmit` + (frontend) unit tests | the **tsc** gate is the key one — vitest transpiles via esbuild and does NOT type-check, so type-only errors otherwise only surface in CI's `build` job |
 
 Jobs are **scoped per workspace** via lefthook `root:` — a backend-only push runs `typecheck-backend` and skips the frontend jobs (and vice-versa), since the two workspaces share no types. The first push of a brand-new branch can't resolve a file range, so it skips (CI is the backstop); subsequent pushes gate normally.
