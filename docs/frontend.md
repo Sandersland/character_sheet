@@ -19,7 +19,9 @@ frontend/src/
 │   │                    #   CampaignIndicator (sheet badge/link), JoinCampaignRoute (#246),
 │   │                    #   CampaignPreferencesPanel (per-campaign play prefs, sheet-only when attached #537)
 │   ├── character-create/ # IdentitySection, AbilityScoresSection, SkillSection,
-│   │                    #   ToolProficiencySection + useToolProficiencyChoices (CharacterCreatePage sections)
+│   │                    #   ToolProficiencySection + useToolProficiencyChoices,
+│   │                    #   StartingEquipmentSection, PreviewSection, CreateActions
+│   │                    #   (CharacterCreatePage step frames; orchestrated by hooks/useCharacterCreation)
 │   ├── character-meta/  # CharacterCard, VitalsStrip, JournalSection, JournalEntryPanel,
 │   │                    #   ActivityModal, DeleteCharacterModal, BackendStatus,
 │   │                    #   CharacterSheet{Header,Body,Modals}, CharacterLoadError (sheet-page sections)
@@ -57,7 +59,7 @@ frontend/src/
 │   └── theme/           # ThemeProvider (useTheme) — applies data-theme app-wide
 ├── hooks/               # reusable React hooks used by pages or multiple clusters
 │   │                    #   (useCharacter, useCharacterList, useCharacterDraft, useReferenceData,
-│   │                    #    useThemePreference, useGlobalKeyboard, useDismissable)
+│   │                    #    useCharacterCreation, useThemePreference, useGlobalKeyboard, useDismissable)
 ├── lib/                 # pure TS logic — NO React/JSX (dice, abilities, timeline, startingEquipment, …)
 ├── pages/               # route-level views (CharacterListPage, CharacterSheetPage,
 │   │                    #   CharacterCreatePage, SessionPage, LoginPage, AboutPage)
