@@ -5,7 +5,7 @@ import {
   allowedSlotsForItem,
   bagItemsForSlot,
   equipSlotLabel,
-  isEquippable,
+  hasEquipSlots,
   isOffHandLocked,
   itemsInSlot,
   SLOT_GROUPS,
@@ -79,7 +79,7 @@ describe("allowedSlotsForItem", () => {
 
   it("consumables are never equippable", () => {
     expect(allowedSlotsForItem(item({ category: "consumable" }))).toEqual([]);
-    expect(isEquippable(item({ category: "consumable" }))).toBe(false);
+    expect(hasEquipSlots(item({ category: "consumable" }))).toBe(false);
   });
 });
 

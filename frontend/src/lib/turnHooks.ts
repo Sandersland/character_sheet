@@ -17,7 +17,7 @@ export interface TurnActivityWindow {
 }
 
 /** End-condition for one durable (while-active) buff, keyed by its buff `key`. */
-export interface DurableBuffEndCondition {
+interface DurableBuffEndCondition {
   key: string;
   /** Action key the turn tracker invokes to clear this buff server-side. */
   endActionKey: string;

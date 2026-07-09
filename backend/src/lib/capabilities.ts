@@ -65,7 +65,7 @@ export const GRANT_VALUE_KINDS = ["damageType", "condition", "skill", "ability",
 export type GrantValueKind = (typeof GRANT_VALUE_KINDS)[number];
 
 // Proficiency grants name one of these categories via grantValueKind.
-export const PROFICIENCY_KINDS = ["skill", "save", "weapon", "tool", "language"] as const;
+const PROFICIENCY_KINDS = ["skill", "save", "weapon", "tool", "language"] as const;
 export type ProficiencyKind = (typeof PROFICIENCY_KINDS)[number];
 
 // Dice-valued bonus payload — round-trips now; consumed in the damage roll at #526C.
