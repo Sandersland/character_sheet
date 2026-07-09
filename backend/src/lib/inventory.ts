@@ -17,6 +17,12 @@ import {
   clearBuffsByTargetInTx,
   normalizeActiveEffectsMutable,
 } from "./active-effects.js";
+import {
+  armorDetailFields,
+  consumableDetailFields,
+  snapshotDetailCreate,
+  weaponDetailFields,
+} from "./detail-snapshot.js";
 import { rollDie } from "./dice.js";
 import { logEvent } from "./events.js";
 import { applyHealInTx } from "./hitpoints.js";
@@ -424,56 +430,7 @@ function normalizeConsumableDetail(input: ConsumableDetailInput) {
 // copy — the live-DB counterpart to prisma/seed.ts's itemDetailCreateFields,
 // which does the same thing from a seed-time literal instead of a DB read.
 function snapshotItemDetail(item: CatalogItemWithDetails) {
-  return {
-    weaponDetail: item.weaponDetail
-      ? {
-          create: {
-            damageDiceCount: item.weaponDetail.damageDiceCount,
-            damageDiceFaces: item.weaponDetail.damageDiceFaces,
-            damageModifier: item.weaponDetail.damageModifier,
-            damageType: item.weaponDetail.damageType,
-            versatileDiceCount: item.weaponDetail.versatileDiceCount,
-            versatileDiceFaces: item.weaponDetail.versatileDiceFaces,
-            finesse: item.weaponDetail.finesse,
-            light: item.weaponDetail.light,
-            heavy: item.weaponDetail.heavy,
-            twoHanded: item.weaponDetail.twoHanded,
-            reach: item.weaponDetail.reach,
-            thrown: item.weaponDetail.thrown,
-            ammunition: item.weaponDetail.ammunition,
-            rangeNormal: item.weaponDetail.rangeNormal,
-            rangeLong: item.weaponDetail.rangeLong,
-            weaponClass: item.weaponDetail.weaponClass,
-            weaponRange: item.weaponDetail.weaponRange,
-          },
-        }
-      : undefined,
-    armorDetail: item.armorDetail
-      ? {
-          create: {
-            armorCategory: item.armorDetail.armorCategory,
-            baseArmorClass: item.armorDetail.baseArmorClass,
-            dexModifierApplies: item.armorDetail.dexModifierApplies,
-            dexModifierMax: item.armorDetail.dexModifierMax,
-            stealthDisadvantage: item.armorDetail.stealthDisadvantage,
-            strengthRequirement: item.armorDetail.strengthRequirement,
-          },
-        }
-      : undefined,
-    consumableDetail: item.consumableDetail
-      ? {
-          create: {
-            effectDiceCount: item.consumableDetail.effectDiceCount,
-            effectDiceFaces: item.consumableDetail.effectDiceFaces,
-            effectModifier: item.consumableDetail.effectModifier,
-            effectDescription: item.consumableDetail.effectDescription,
-            maxUses: item.consumableDetail.maxUses,
-            // A freshly-snapshotted charged consumable starts full.
-            usesRemaining: item.consumableDetail.usesRemaining ?? item.consumableDetail.maxUses,
-          },
-        }
-      : undefined,
-  };
+  return snapshotDetailCreate(item);
 }
 
 // ── Paper-doll placement (#565) ──────────────────────────────────────────────
@@ -696,47 +653,9 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
       // Runtime counter: undo-of-delete restores the row verbatim, spend state included.
       used: c.used,
     })),
-    weaponDetail: item.weaponDetail
-      ? {
-          damageDiceCount: item.weaponDetail.damageDiceCount,
-          damageDiceFaces: item.weaponDetail.damageDiceFaces,
-          damageModifier: item.weaponDetail.damageModifier,
-          damageType: item.weaponDetail.damageType,
-          versatileDiceCount: item.weaponDetail.versatileDiceCount,
-          versatileDiceFaces: item.weaponDetail.versatileDiceFaces,
-          finesse: item.weaponDetail.finesse,
-          light: item.weaponDetail.light,
-          heavy: item.weaponDetail.heavy,
-          twoHanded: item.weaponDetail.twoHanded,
-          reach: item.weaponDetail.reach,
-          thrown: item.weaponDetail.thrown,
-          ammunition: item.weaponDetail.ammunition,
-          rangeNormal: item.weaponDetail.rangeNormal,
-          rangeLong: item.weaponDetail.rangeLong,
-          weaponClass: item.weaponDetail.weaponClass,
-          weaponRange: item.weaponDetail.weaponRange,
-        }
-      : null,
-    armorDetail: item.armorDetail
-      ? {
-          armorCategory: item.armorDetail.armorCategory,
-          baseArmorClass: item.armorDetail.baseArmorClass,
-          dexModifierApplies: item.armorDetail.dexModifierApplies,
-          dexModifierMax: item.armorDetail.dexModifierMax,
-          stealthDisadvantage: item.armorDetail.stealthDisadvantage,
-          strengthRequirement: item.armorDetail.strengthRequirement,
-        }
-      : null,
-    consumableDetail: item.consumableDetail
-      ? {
-          effectDiceCount: item.consumableDetail.effectDiceCount,
-          effectDiceFaces: item.consumableDetail.effectDiceFaces,
-          effectModifier: item.consumableDetail.effectModifier,
-          effectDescription: item.consumableDetail.effectDescription,
-          maxUses: item.consumableDetail.maxUses,
-          usesRemaining: item.consumableDetail.usesRemaining,
-        }
-      : null,
+    weaponDetail: item.weaponDetail ? weaponDetailFields(item.weaponDetail) : null,
+    armorDetail: item.armorDetail ? armorDetailFields(item.armorDetail) : null,
+    consumableDetail: item.consumableDetail ? consumableDetailFields(item.consumableDetail) : null,
   };
 }
 
