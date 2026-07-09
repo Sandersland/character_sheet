@@ -70,3 +70,20 @@ export async function assertCampaignMembership(
   }
   return { campaignId, role: membership.role };
 }
+
+// Owner-only campaign gate (#591): asserts membership first (404 missing / 403
+// non-member), then requires the OWNER role — throwing AuthorizationError (403)
+// with the caller-supplied action message for a member who isn't the owner.
+export async function assertCampaignOwner(
+  db: Db,
+  userId: string,
+  campaignId: string,
+  level: "view" | "edit",
+  forbiddenMessage: string,
+): Promise<{ campaignId: string; role: CampaignRole }> {
+  const membership = await assertCampaignMembership(db, userId, campaignId, level);
+  if (membership.role !== "OWNER") {
+    throw new AuthorizationError(forbiddenMessage);
+  }
+  return membership;
+}
