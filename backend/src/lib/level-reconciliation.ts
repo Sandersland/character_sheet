@@ -18,7 +18,9 @@
  *
  * ## Adding a new level-gated feature
  *
- * 1. Write a `Reconciler` function in this file.
+ * 1. Write a `Reconciler` function in this file. If the feature is a "known"
+ *    list in Character.resources trimmed by a level-derived choice count,
+ *    write it as a thin `reconcileKnownList` config instead of hand-rolling.
  * 2. Add it to `LEVEL_GATED_RECONCILERS` (order matters — later reconcilers
  *    see results of earlier ones; maneuvers must run after subclass).
  * 3. Add a matching clamp-on-read in serializeCharacter.
@@ -29,16 +31,18 @@
 
 import { Prisma } from "../generated/prisma/client.js";
 import { proficiencyBonusForLevel } from "./experience.js";
-import { logEvent } from "./events.js";
+import { logEvent, type EventType } from "./events.js";
 import {
   normalizeResourcesMutable,
   serializeResourcesState,
   type AdvancementEntry,
+  type DisciplineEntry,
   type ManeuverEntry,
+  type ResourcesMutableState,
   type ToolProfEntry,
 } from "./resources.js";
 import { advancementSlotsForLevel, fightingStyleChoiceCount, FIGHTING_STYLES } from "./srd.js";
-import { deriveResources } from "./class-features.js";
+import { deriveResources, type DerivedClassInfo } from "./class-features.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeHitPoints } from "./hitpoints.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
@@ -204,19 +208,42 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
   });
 }
 
-// ── reconcileManeuvers ────────────────────────────────────────────────────────
-// Trims the persisted maneuversKnown array when the level-derived choice count
-// has decreased. Runs AFTER reconcileSubclass so an already-cleared subclass
-// produces allowed=0 (deriveResources returns null → maneuverChoiceCount
-// undefined → allowed 0 → all maneuvers removed).
+// ── reconcileKnownList ────────────────────────────────────────────────────────
+// Shared flow for trimming a level-gated "known" list in Character.resources
+// (maneuvers, elemental disciplines, tool proficiency choices) when the level-
+// derived choice count has decreased. Each runs AFTER reconcileSubclass so an
+// already-cleared subclass produces allowed=0 (deriveResources returns null →
+// choice count undefined → allowed 0 → all entries removed).
 //
 // Keeps the oldest entries (LIFO: drop the most-recently-learned), consistent
 // with the app's LIFO-undo model and the read-clamp's slice(0, n) behavior.
 //
-// Uses a `resources`-category event so the existing undo branch in activity.ts
-// (lines 197-206) restores the full before.resources JSON with no new undo code.
+// Uses `resources`-category events so the existing undo branch in activity.ts
+// restores the full before.resources JSON with no new undo code.
 
-async function reconcileManeuvers(ctx: ReconcileContext): Promise<void> {
+type KnownListKey = "maneuversKnown" | "disciplinesKnown" | "toolProficienciesKnown";
+type KnownEntry = ManeuverEntry | DisciplineEntry | ToolProfEntry;
+
+interface KnownListConfig {
+  /** Which ResourcesMutableState array this reconciler trims. */
+  listKey: KnownListKey;
+  /** Level-derived cap; 0 when derived is null (subclass cleared) or below grant level. */
+  allowed: (derived: DerivedClassInfo | null) => number;
+  /** Audit-event type (always `resources` category). */
+  eventType: EventType;
+  /** Two-branch summary: allowed === 0 (subclass gone) vs. reduced level cap. */
+  summary: (removedCount: number, allowed: number) => string;
+  /**
+   * before/after snapshot for the audit event. Called on the LIVE state — once
+   * before the trim and once after. The shapes intentionally diverge per
+   * reconciler (maneuvers/tool profs persist a hand-cloned 4-key object;
+   * disciplines the full serializeResourcesState blob); do not normalize them —
+   * the persisted event payloads are load-bearing for undo.
+   */
+  snapshot: (state: ResourcesMutableState) => Record<string, unknown>;
+}
+
+async function reconcileKnownList(ctx: ReconcileContext, config: KnownListConfig): Promise<void> {
   const { tx, characterId, newDerivedLevel, batchId } = ctx;
 
   const row = await tx.character.findUnique({
@@ -234,7 +261,10 @@ async function reconcileManeuvers(ctx: ReconcileContext): Promise<void> {
   if (!row) return;
 
   const state = normalizeResourcesMutable(row.resources);
-  if (state.maneuversKnown.length === 0) return; // nothing to trim
+  // Widened view of the three list slots so the union-keyed write typechecks;
+  // only ever writes back the same (sliced) list it read.
+  const lists: Record<KnownListKey, KnownEntry[]> = state;
+  if (lists[config.listKey].length === 0) return; // nothing to trim
 
   const abilityScores = row.abilityScores as Record<string, number>;
   const profBonus = proficiencyBonusForLevel(newDerivedLevel);
@@ -248,209 +278,99 @@ async function reconcileManeuvers(ctx: ReconcileContext): Promise<void> {
   );
 
   // allowed = 0 when subclass is cleared (derived is null) or below grant level.
-  const allowed = derived?.maneuverChoiceCount ?? 0;
+  const allowed = config.allowed(derived);
 
-  if (state.maneuversKnown.length <= allowed) return; // within cap, no action needed
+  if (lists[config.listKey].length <= allowed) return; // within cap, no action needed
 
-  const before = {
-    resources: {
-      used: { ...state.used },
-      maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
-      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
-      toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
-    },
-  };
+  const before = config.snapshot(state);
 
-  const trimmed = state.maneuversKnown.slice(0, allowed);
-  const removedCount = state.maneuversKnown.length - allowed;
+  const removedCount = lists[config.listKey].length - allowed;
 
-  // Update the maneuversKnown slice while preserving toolProficienciesKnown.
-  state.maneuversKnown = trimmed;
+  // Trim the target list while preserving the other resources sub-state.
+  lists[config.listKey] = lists[config.listKey].slice(0, allowed);
   await tx.character.update({
     where: { id: characterId },
     data: { resources: serializeResourcesState(state) },
   });
 
-  const after = {
-    resources: {
-      used: { ...state.used },
-      maneuversKnown: trimmed.map((m: ManeuverEntry) => ({ ...m })),
-      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
-      toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
-    },
-  };
+  const after = config.snapshot(state);
 
   await logEvent(tx, {
     characterId,
     category: "resources",
-    type: "maneuversReconciled",
-    summary:
-      allowed === 0
-        ? `All ${removedCount} maneuver${removedCount > 1 ? "s" : ""} removed — subclass no longer available`
-        : `${removedCount} maneuver${removedCount > 1 ? "s" : ""} removed — level cap reduced to ${allowed}`,
+    type: config.eventType,
+    summary: config.summary(removedCount, allowed),
     before,
     after,
     data: { removedCount, allowed },
     batchId,
+  });
+}
+
+// ── reconcileManeuvers ────────────────────────────────────────────────────────
+// Trims the persisted maneuversKnown array when the level-derived choice count
+// has decreased. See reconcileKnownList for the shared trim/audit flow.
+
+async function reconcileManeuvers(ctx: ReconcileContext): Promise<void> {
+  return reconcileKnownList(ctx, {
+    listKey: "maneuversKnown",
+    allowed: (derived) => derived?.maneuverChoiceCount ?? 0,
+    eventType: "maneuversReconciled",
+    summary: (removedCount, allowed) =>
+      allowed === 0
+        ? `All ${removedCount} maneuver${removedCount > 1 ? "s" : ""} removed — subclass no longer available`
+        : `${removedCount} maneuver${removedCount > 1 ? "s" : ""} removed — level cap reduced to ${allowed}`,
+    snapshot: (state) => ({
+      resources: {
+        used: { ...state.used },
+        maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+        disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
+        toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
+      },
+    }),
   });
 }
 
 // ── reconcileDisciplines ──────────────────────────────────────────────────────
 // Trims persisted disciplinesKnown (Way of the Four Elements) when the level-
-// derived choice count decreases. Mirrors reconcileManeuvers: runs AFTER
-// reconcileSubclass so a cleared subclass yields allowed=0 (deriveResources
-// returns null → disciplineChoiceCount undefined → all disciplines removed).
-// LIFO trim (drop most-recently-learned) matches the read-clamp's slice(0, n).
+// derived choice count decreases. See reconcileKnownList for the shared flow.
 
 async function reconcileDisciplines(ctx: ReconcileContext): Promise<void> {
-  const { tx, characterId, newDerivedLevel, batchId } = ctx;
-
-  const row = await tx.character.findUnique({
-    where: { id: characterId },
-    select: {
-      resources: true,
-      abilityScores: true,
-      classEntries: {
-        orderBy: { position: "asc" as const },
-        take: 1,
-        select: { name: true, subclass: true },
-      },
-    },
-  });
-  if (!row) return;
-
-  const state = normalizeResourcesMutable(row.resources);
-  if (state.disciplinesKnown.length === 0) return; // nothing to trim
-
-  const abilityScores = row.abilityScores as Record<string, number>;
-  const profBonus = proficiencyBonusForLevel(newDerivedLevel);
-  const primaryEntry = row.classEntries[0];
-  const derived = deriveResources(
-    primaryEntry?.name ?? "",
-    primaryEntry?.subclass ?? undefined,
-    newDerivedLevel,
-    abilityScores,
-    profBonus,
-  );
-
-  // allowed = 0 when subclass is cleared (derived is null) or below grant level.
-  const allowed = derived?.disciplineChoiceCount ?? 0;
-
-  if (state.disciplinesKnown.length <= allowed) return; // within cap
-
-  const before = { resources: serializeResourcesState(state) };
-
-  const trimmed = state.disciplinesKnown.slice(0, allowed);
-  const removedCount = state.disciplinesKnown.length - allowed;
-
-  state.disciplinesKnown = trimmed;
-  await tx.character.update({
-    where: { id: characterId },
-    data: { resources: serializeResourcesState(state) },
-  });
-
-  const after = { resources: serializeResourcesState(state) };
-
-  await logEvent(tx, {
-    characterId,
-    category: "resources",
-    type: "disciplinesReconciled",
-    summary:
+  return reconcileKnownList(ctx, {
+    listKey: "disciplinesKnown",
+    allowed: (derived) => derived?.disciplineChoiceCount ?? 0,
+    eventType: "disciplinesReconciled",
+    summary: (removedCount, allowed) =>
       allowed === 0
         ? `All ${removedCount} elemental discipline${removedCount > 1 ? "s" : ""} removed — subclass no longer available`
         : `${removedCount} elemental discipline${removedCount > 1 ? "s" : ""} removed — level cap reduced to ${allowed}`,
-    before,
-    after,
-    data: { removedCount, allowed },
-    batchId,
+    snapshot: (state) => ({ resources: serializeResourcesState(state) }),
   });
 }
 
 // ── reconcileToolProficiencies ────────────────────────────────────────────────
 // Trims toolProficienciesKnown when the subclass no longer grants a tool choice
-// (character leveled down below 3, or subclass was cleared). Like
-// reconcileManeuvers, runs AFTER reconcileSubclass for the same reason: a
-// cleared subclass produces allowed=0 so all level-gated tool profs are removed.
-//
-// Uses a `resources`-category event → undo is free (activity.ts restores
-// before.resources wholesale). Only creation-fixed tool profs (stored in
-// Character.toolProficiencies) are untouched — they are never in this array.
+// (character leveled down below 3, or subclass was cleared). Only creation-fixed
+// tool profs (stored in Character.toolProficiencies) are untouched — they are
+// never in this array. See reconcileKnownList for the shared flow.
 
 async function reconcileToolProficiencies(ctx: ReconcileContext): Promise<void> {
-  const { tx, characterId, newDerivedLevel, batchId } = ctx;
-
-  const row = await tx.character.findUnique({
-    where: { id: characterId },
-    select: {
-      resources: true,
-      abilityScores: true,
-      classEntries: {
-        orderBy: { position: "asc" as const },
-        take: 1,
-        select: { name: true, subclass: true },
-      },
-    },
-  });
-  if (!row) return;
-
-  const state = normalizeResourcesMutable(row.resources);
-  if (state.toolProficienciesKnown.length === 0) return; // nothing to trim
-
-  const abilityScores = row.abilityScores as Record<string, number>;
-  const profBonus = proficiencyBonusForLevel(newDerivedLevel);
-  const primaryEntry = row.classEntries[0];
-  const derived = deriveResources(
-    primaryEntry?.name ?? "",
-    primaryEntry?.subclass ?? undefined,
-    newDerivedLevel,
-    abilityScores,
-    profBonus,
-  );
-
-  // allowed = 0 when subclass is cleared or character is below grant level.
-  const allowed = derived?.toolProfChoiceCount ?? 0;
-
-  if (state.toolProficienciesKnown.length <= allowed) return;
-
-  const before = {
-    resources: {
-      used: { ...state.used },
-      maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
-      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
-      toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
-    },
-  };
-
-  const trimmed = state.toolProficienciesKnown.slice(0, allowed);
-  const removedCount = state.toolProficienciesKnown.length - allowed;
-
-  state.toolProficienciesKnown = trimmed;
-  await tx.character.update({
-    where: { id: characterId },
-    data: { resources: serializeResourcesState(state) },
-  });
-
-  const after = {
-    resources: {
-      used: { ...state.used },
-      maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
-      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
-      toolProficienciesKnown: trimmed.map((t: ToolProfEntry) => ({ ...t })),
-    },
-  };
-
-  await logEvent(tx, {
-    characterId,
-    category: "resources",
-    type: "toolProficienciesReconciled",
-    summary:
+  return reconcileKnownList(ctx, {
+    listKey: "toolProficienciesKnown",
+    allowed: (derived) => derived?.toolProfChoiceCount ?? 0,
+    eventType: "toolProficienciesReconciled",
+    summary: (removedCount, allowed) =>
       allowed === 0
         ? `${removedCount} tool proficiency choice${removedCount > 1 ? "s" : ""} removed — subclass no longer available`
         : `${removedCount} tool proficiency choice${removedCount > 1 ? "s" : ""} removed — level cap reduced to ${allowed}`,
-    before,
-    after,
-    data: { removedCount, allowed },
-    batchId,
+    snapshot: (state) => ({
+      resources: {
+        used: { ...state.used },
+        maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
+        disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
+        toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
+      },
+    }),
   });
 }
 

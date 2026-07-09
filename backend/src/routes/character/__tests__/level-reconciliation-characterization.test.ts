@@ -89,7 +89,8 @@ async function postXp(characterId: string, body: object) {
 }
 
 // Raw event rows (not the serialized activity feed) so before/after are byte-exact.
-async function eventsByType(characterId: string, type: string) {
+type ReconEventType = "maneuversReconciled" | "disciplinesReconciled" | "toolProficienciesReconciled";
+async function eventsByType(characterId: string, type: ReconEventType) {
   return prisma.characterEvent.findMany({
     where: { characterId, type },
     orderBy: { createdAt: "asc" as const },
