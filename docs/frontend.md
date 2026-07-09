@@ -57,7 +57,7 @@ frontend/src/
 │   └── theme/           # ThemeProvider (useTheme) — applies data-theme app-wide
 ├── hooks/               # reusable React hooks used by pages or multiple clusters
 │   │                    #   (useCharacter, useCharacterList, useCharacterDraft, useReferenceData,
-│   │                    #    useThemePreference, useGlobalKeyboard)
+│   │                    #    useThemePreference, useGlobalKeyboard, useDismissable)
 ├── lib/                 # pure TS logic — NO React/JSX (dice, abilities, timeline, startingEquipment, …)
 ├── pages/               # route-level views (CharacterListPage, CharacterSheetPage,
 │   │                    #   CharacterCreatePage, SessionPage, LoginPage, AboutPage)
@@ -199,6 +199,8 @@ When adding a new editing surface: **default to inline**. Reach for `Modal` only
 ## Primitive components
 
 These live in `src/components/ui/` and are intentionally domain-agnostic — they must not import from `@/features`, `@/api`, or `@/types/character`. They know nothing about D&D.
+
+`OverflowMenu`, `DropdownMenu`, and `Popover` all share their Esc-to-close + click-outside-to-close behavior via `hooks/useDismissable.ts` — add a new dismissable popup on top of that hook rather than re-hand-rolling the `keydown`/`mousedown` listener pair.
 
 | Component | Usage |
 |---|---|

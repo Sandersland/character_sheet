@@ -1,6 +1,8 @@
 import { MoreVertical } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
+import { useDismissable } from "@/hooks/useDismissable";
+
 interface OverflowMenuItem {
   label: string;
   onSelect: () => void;
@@ -36,23 +38,14 @@ export default function OverflowMenu({ items, label, className = "" }: OverflowM
     if (!open) return;
     setActiveIndex(0);
     itemRefs.current[0]?.focus();
-
-    function handleKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.key === "Escape") close();
-    }
-    function handleMouseDown(event: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("mousedown", handleMouseDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("mousedown", handleMouseDown);
-    };
   }, [open]);
+
+  useDismissable({
+    open,
+    wrapperRef,
+    onEscape: close,
+    onOutsideClick: () => setOpen(false),
+  });
 
   function select(item: OverflowMenuItem) {
     item.onSelect();
