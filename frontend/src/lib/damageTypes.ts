@@ -17,8 +17,6 @@ export const DAMAGE_TYPES = [
   "thunder",
 ] as const;
 
-export type DamageType = (typeof DAMAGE_TYPES)[number];
-
 /** Title-case a damage type for display (e.g. "slashing" → "Slashing"). */
 export function damageTypeLabel(type: string): string {
   return type.charAt(0).toUpperCase() + type.slice(1);

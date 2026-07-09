@@ -20,6 +20,19 @@
 pre-commit:
   parallel: true
   commands:
+    # fallow audit on changed files: dead code, complexity, duplication.
+    # Baseline-aware (.fallowrc.jsonc + .fallow/baseline.json); skips silently
+    # if fallow isn't installed so the hook stays infra-free.
+    fallow:
+      run: |
+        command -v fallow >/dev/null 2>&1 || exit 0
+        UPSTREAM="$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)"
+        if [ -n "$UPSTREAM" ]; then
+          BASE="$(git merge-base "$UPSTREAM" HEAD 2>/dev/null || echo "$UPSTREAM")"
+        else
+          BASE="origin/staging"
+        fi
+        fallow audit --base "$BASE" --quiet --gate-marker pre-commit
     lint-backend:
       root: "backend/"
       glob: "**/*.{ts,tsx}"

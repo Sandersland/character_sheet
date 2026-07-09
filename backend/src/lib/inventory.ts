@@ -25,7 +25,7 @@ import { getActiveSessionId } from "./sessions.js";
 
 // 5e: a character can attune to at most 3 magic items (DMG p. 138). Derived
 // (counted from live rows), never persisted.
-export const ATTUNEMENT_LIMIT = 3;
+const ATTUNEMENT_LIMIT = 3;
 
 // Same {cp,sp,gp,pp} shape as Character.currency and Item/InventoryItem.cost.
 // The index signature is just to satisfy Prisma's InputJsonObject structural
@@ -508,7 +508,7 @@ function isTwoHandedWeapon(item: PlaceableItem): boolean {
 
 // The slots an item may legally occupy. Weapons/body armor derive from detail
 // data; gear declares its slot (null = bag-only). Empty = not equippable.
-export function allowedSlotsForItem(item: PlaceableItem): EquipSlot[] {
+function allowedSlotsForItem(item: PlaceableItem): EquipSlot[] {
   if (item.category === "weapon") {
     return isTwoHandedWeapon(item) ? ["MAIN_HAND"] : ["MAIN_HAND", "OFF_HAND"];
   }
@@ -1471,56 +1471,6 @@ async function applyDeactivate(
     before: {},
     after: {},
     data: { itemName: item.name },
-    batchId,
-    sessionId,
-  });
-}
-
-// Resets activatedUsesSpent to 0 for items whose activatedEffect recharges on the
-// given rest (#543). perRest(short) recharges on short|long; everything else on
-// long only. The seeded buff is cleared separately by the rest's buff sweep.
-// Called from the HP rest handler so item uses recharge alongside class resources.
-export async function resetActivatedUsesForRestInTx(
-  tx: Prisma.TransactionClient,
-  characterId: string,
-  restType: "short" | "long",
-  batchId: string,
-  sessionId: string | null,
-): Promise<void> {
-  const items = await tx.inventoryItem.findMany({
-    where: { characterId, activatedUsesSpent: { gt: 0 } },
-    include: { capabilities: true },
-  });
-  const toReset: { id: string; name: string; previousSpent: number }[] = [];
-  for (const item of items) {
-    // Type-predicate filter (not a bare cast): an opaque row with kind="activatedEffect"
-    // but no activation must not slip through as a malformed ActivatedEffectCapability
-    // — activatedRechargeRest would read resourceKind=undefined and spuriously recharge.
-    const cap = item.capabilities
-      .map(readCapability)
-      .find((c): c is ActivatedEffectCapability => c.kind === "activatedEffect" && "activation" in c);
-    if (!cap) continue;
-    const recharge = activatedRechargeRest(cap);
-    if (recharge === null) continue;
-    if (restType === "long" || recharge === "short") {
-      toReset.push({ id: item.id, name: item.name, previousSpent: item.activatedUsesSpent });
-    }
-  }
-  if (toReset.length === 0) return;
-
-  await tx.inventoryItem.updateMany({
-    where: { id: { in: toReset.map((t) => t.id) } },
-    data: { activatedUsesSpent: 0 },
-  });
-  await logEvent(tx, {
-    characterId,
-    category: "inventory",
-    type: "activatedRecharged",
-    summary: `Recharged ${toReset.length} item${toReset.length !== 1 ? "s" : ""} (${restType} rest)`,
-    before: { rechargedCount: toReset.length },
-    after: null,
-    // recharged carries per-item pre-rest spent so undo restores exactly (no entityId).
-    data: { restType, recharged: toReset },
     batchId,
     sessionId,
   });
