@@ -12,22 +12,16 @@ import {
   logCombatEvent,
   logRollEvent,
   SessionError,
-  CombatError,
-  type RollKind,
-  type RollMode,
 } from "../../lib/sessions.js";
 import { characterInclude } from "../../lib/character-include.js";
 import { serializeCharacter } from "../../lib/character-serialize.js";
+import { parseRollInput, requireCharacterId, withSessionErrors } from "./session-route-helpers.js";
 
 export const sessionsRouter = Router();
 
 // Campaign-level sessions (#245): one shared session per play night that party
 // members join/leave. Campaign-scoped routes are gated by assertCampaignMembership;
 // the character-scoped reads the SessionPage polls stay for back-compat.
-
-function sessionErrorStatus(message: string): number {
-  return message.includes("not found") ? 404 : 409;
-}
 
 // Confirms the character is attached to the campaign (so a session only ever
 // gathers that campaign's characters). Assumes existence already checked.
@@ -56,16 +50,15 @@ async function assertSessionInCampaign(sessionId: string, campaignId: string): P
 // Start a shared session with the given character as first participant. 409 if a
 // session is already active for the campaign. Returns { session, character }.
 
-sessionsRouter.post("/campaigns/:campaignId/sessions", async (req, res) => {
-  await assertCampaignMembership(prisma, req.user!.id, req.params.campaignId, "view");
-  const { characterId, title } = req.body as { characterId?: string; title?: string };
-  if (typeof characterId !== "string" || characterId.trim() === "") {
-    res.status(400).json({ error: "characterId is required" });
-    return;
-  }
-  await assertCharacterAccess(prisma, req.user!.id, characterId, "edit");
+sessionsRouter.post(
+  "/campaigns/:campaignId/sessions",
+  withSessionErrors(async (req, res) => {
+    await assertCampaignMembership(prisma, req.user!.id, req.params.campaignId, "view");
+    const characterId = requireCharacterId(req, res);
+    if (characterId === null) return;
+    const { title } = req.body as { title?: string };
+    await assertCharacterAccess(prisma, req.user!.id, characterId, "edit");
 
-  try {
     await assertCharacterInCampaign(characterId, req.params.campaignId);
     const session = await startCampaignSession(req.params.campaignId, characterId, title);
     const updated = await prisma.character.findUniqueOrThrow({
@@ -73,28 +66,20 @@ sessionsRouter.post("/campaigns/:campaignId/sessions", async (req, res) => {
       include: characterInclude,
     });
     res.status(201).json({ session, character: serializeCharacter(updated) });
-  } catch (err) {
-    if (err instanceof SessionError) {
-      res.status(sessionErrorStatus(err.message)).json({ error: err.message });
-      return;
-    }
-    throw err;
-  }
-});
+  }),
+);
 
 // ── POST /api/campaigns/:campaignId/sessions/:sessionId/join ───────────────────
 // Add (or re-add) the caller's character to the active session.
 
-sessionsRouter.post("/campaigns/:campaignId/sessions/:sessionId/join", async (req, res) => {
-  await assertCampaignMembership(prisma, req.user!.id, req.params.campaignId, "view");
-  const { characterId } = req.body as { characterId?: string };
-  if (typeof characterId !== "string" || characterId.trim() === "") {
-    res.status(400).json({ error: "characterId is required" });
-    return;
-  }
-  await assertCharacterAccess(prisma, req.user!.id, characterId, "edit");
+sessionsRouter.post(
+  "/campaigns/:campaignId/sessions/:sessionId/join",
+  withSessionErrors(async (req, res) => {
+    await assertCampaignMembership(prisma, req.user!.id, req.params.campaignId, "view");
+    const characterId = requireCharacterId(req, res);
+    if (characterId === null) return;
+    await assertCharacterAccess(prisma, req.user!.id, characterId, "edit");
 
-  try {
     await assertSessionInCampaign(req.params.sessionId, req.params.campaignId);
     await assertCharacterInCampaign(characterId, req.params.campaignId);
     // 201 only on first join; a rejoin updates an existing row, so 200.
@@ -104,59 +89,40 @@ sessionsRouter.post("/campaigns/:campaignId/sessions/:sessionId/join", async (re
     });
     const participant = await joinSession(req.params.sessionId, characterId);
     res.status(existing ? 200 : 201).json({ participant });
-  } catch (err) {
-    if (err instanceof SessionError) {
-      res.status(sessionErrorStatus(err.message)).json({ error: err.message });
-      return;
-    }
-    throw err;
-  }
-});
+  }),
+);
 
 // ── POST /api/campaigns/:campaignId/sessions/:sessionId/leave ──────────────────
 // Record that the caller's character left; the session stays open for others.
 
-sessionsRouter.post("/campaigns/:campaignId/sessions/:sessionId/leave", async (req, res) => {
-  await assertCampaignMembership(prisma, req.user!.id, req.params.campaignId, "view");
-  const { characterId } = req.body as { characterId?: string };
-  if (typeof characterId !== "string" || characterId.trim() === "") {
-    res.status(400).json({ error: "characterId is required" });
-    return;
-  }
-  await assertCharacterAccess(prisma, req.user!.id, characterId, "edit");
+sessionsRouter.post(
+  "/campaigns/:campaignId/sessions/:sessionId/leave",
+  withSessionErrors(async (req, res) => {
+    await assertCampaignMembership(prisma, req.user!.id, req.params.campaignId, "view");
+    const characterId = requireCharacterId(req, res);
+    if (characterId === null) return;
+    await assertCharacterAccess(prisma, req.user!.id, characterId, "edit");
 
-  try {
     await assertSessionInCampaign(req.params.sessionId, req.params.campaignId);
     const participant = await leaveSession(req.params.sessionId, characterId);
     res.json({ participant });
-  } catch (err) {
-    if (err instanceof SessionError) {
-      res.status(sessionErrorStatus(err.message)).json({ error: err.message });
-      return;
-    }
-    throw err;
-  }
-});
+  }),
+);
 
 // ── POST /api/campaigns/:campaignId/sessions/:sessionId/end ────────────────────
 // End the shared session. Any campaign member may end it (an OWNER can do so even
 // without a character in the session — the role is surfaced for that force-end).
 
-sessionsRouter.post("/campaigns/:campaignId/sessions/:sessionId/end", async (req, res) => {
-  await assertCampaignMembership(prisma, req.user!.id, req.params.campaignId, "view");
+sessionsRouter.post(
+  "/campaigns/:campaignId/sessions/:sessionId/end",
+  withSessionErrors(async (req, res) => {
+    await assertCampaignMembership(prisma, req.user!.id, req.params.campaignId, "view");
 
-  try {
     await assertSessionInCampaign(req.params.sessionId, req.params.campaignId);
     const session = await endSession(req.params.sessionId);
     res.json({ session });
-  } catch (err) {
-    if (err instanceof SessionError) {
-      res.status(sessionErrorStatus(err.message)).json({ error: err.message });
-      return;
-    }
-    throw err;
-  }
-});
+  }),
+);
 
 // ── GET /api/campaigns/:campaignId/sessions ───────────────────────────────────
 // Session history for the campaign, newest first, with participants.
@@ -263,126 +229,50 @@ sessionsRouter.get("/characters/:id/sessions/:sessionId", async (req, res) => {
 // Write-only audit log entries — no character-state mutation. The lib validates
 // the caller is an active participant of an active session.
 
-sessionsRouter.post("/characters/:id/sessions/:sessionId/combat/start", async (req, res) => {
-  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
-  try {
+sessionsRouter.post(
+  "/characters/:id/sessions/:sessionId/combat/start",
+  withSessionErrors(async (req, res) => {
+    await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
     await logCombatEvent(req.params.id, req.params.sessionId, "combatStarted");
     res.status(201).json({ ok: true });
-  } catch (err) {
-    if (err instanceof CombatError) {
-      res.status(sessionErrorStatus(err.message)).json({ error: err.message });
-      return;
-    }
-    throw err;
-  }
-});
+  }),
+);
 
-sessionsRouter.post("/characters/:id/sessions/:sessionId/combat/end", async (req, res) => {
-  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
-  try {
+sessionsRouter.post(
+  "/characters/:id/sessions/:sessionId/combat/end",
+  withSessionErrors(async (req, res) => {
+    await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
     await logCombatEvent(req.params.id, req.params.sessionId, "combatEnded");
     res.status(201).json({ ok: true });
-  } catch (err) {
-    if (err instanceof CombatError) {
-      res.status(sessionErrorStatus(err.message)).json({ error: err.message });
+  }),
+);
+
+sessionsRouter.post(
+  "/characters/:id/sessions/:sessionId/combat/round",
+  withSessionErrors(async (req, res) => {
+    await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
+    const { round } = req.body as { round?: number };
+    if (typeof round !== "number" || round < 1) {
+      res.status(400).json({ error: "round must be a positive integer" });
       return;
     }
-    throw err;
-  }
-});
-
-sessionsRouter.post("/characters/:id/sessions/:sessionId/combat/round", async (req, res) => {
-  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
-  const { round } = req.body as { round?: number };
-  if (typeof round !== "number" || round < 1) {
-    res.status(400).json({ error: "round must be a positive integer" });
-    return;
-  }
-  try {
     await logCombatEvent(req.params.id, req.params.sessionId, "combatRoundAdvanced", { round });
     res.status(201).json({ ok: true });
-  } catch (err) {
-    if (err instanceof CombatError) {
-      res.status(sessionErrorStatus(err.message)).json({ error: err.message });
-      return;
-    }
-    throw err;
-  }
-});
+  }),
+);
 
 // ── Roll event route (character-scoped) ───────────────────────────────────────
 
-sessionsRouter.post("/characters/:id/sessions/:sessionId/roll", async (req, res) => {
-  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
-
-  const { kind, source, total, specLabel, damageType, faces, ability, skill, dc, rollMode } =
-    req.body as {
-      kind?: unknown;
-      source?: unknown;
-      total?: unknown;
-      specLabel?: unknown;
-      damageType?: unknown;
-      faces?: unknown;
-      ability?: unknown;
-      skill?: unknown;
-      dc?: unknown;
-      rollMode?: unknown;
-    };
-
-  const VALID_KINDS: RollKind[] = ["attack", "damage", "check", "save", "initiative"];
-  if (typeof kind !== "string" || !VALID_KINDS.includes(kind as RollKind)) {
-    res.status(400).json({ error: `kind must be one of ${VALID_KINDS.join(", ")}` });
-    return;
-  }
-  if (typeof source !== "string" || source.trim() === "") {
-    res.status(400).json({ error: "source must be a non-empty string" });
-    return;
-  }
-  const trimmedSource = source.trim();
-  if (typeof total !== "number" || !Number.isFinite(total)) {
-    res.status(400).json({ error: "total must be a finite number" });
-    return;
-  }
-  if (
-    faces !== undefined &&
-    (!Array.isArray(faces) ||
-      !faces.every((f) => typeof f === "number" && Number.isInteger(f) && f > 0))
-  ) {
-    res.status(400).json({ error: "faces must be an array of positive integers" });
-    return;
-  }
-  if (dc !== undefined && (typeof dc !== "number" || !Number.isFinite(dc))) {
-    res.status(400).json({ error: "dc must be a finite number" });
-    return;
-  }
-  const VALID_MODES: RollMode[] = ["normal", "advantage", "disadvantage"];
-  if (rollMode !== undefined && !VALID_MODES.includes(rollMode as RollMode)) {
-    res.status(400).json({ error: `rollMode must be one of ${VALID_MODES.join(", ")}` });
-    return;
-  }
-
-  try {
-    await logRollEvent(req.params.id, req.params.sessionId, {
-      kind: kind as RollKind,
-      source: trimmedSource,
-      total,
-      specLabel: typeof specLabel === "string" ? specLabel : undefined,
-      damageType: typeof damageType === "string" ? damageType : undefined,
-      faces: faces as number[] | undefined,
-      ability: typeof ability === "string" ? ability : undefined,
-      skill: typeof skill === "string" ? skill : undefined,
-      dc: typeof dc === "number" ? dc : undefined,
-      rollMode: rollMode as RollMode | undefined,
-    });
+sessionsRouter.post(
+  "/characters/:id/sessions/:sessionId/roll",
+  withSessionErrors(async (req, res) => {
+    await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
+    const roll = parseRollInput(req, res);
+    if (roll === null) return;
+    await logRollEvent(req.params.id, req.params.sessionId, roll);
     res.status(201).json({ ok: true });
-  } catch (err) {
-    if (err instanceof CombatError) {
-      res.status(sessionErrorStatus(err.message)).json({ error: err.message });
-      return;
-    }
-    throw err;
-  }
-});
+  }),
+);
 
 // Shared event serialization for session detail reads.
 function serializeEvent(row: {
