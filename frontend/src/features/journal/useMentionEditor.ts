@@ -27,6 +27,7 @@ import {
   serializeMentionDomBeforeCaret,
   spliceMentionToken,
   type MentionResolved,
+  type MentionSegment,
   type MentionTrigger,
 } from "@/lib/mentions";
 import type { CampaignEntity, EntityType } from "@/types/character";
@@ -44,9 +45,9 @@ const NAV_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"]);
 // when an entity loads or is renamed (so we re-render chips), not while typing.
 function computeNamesKey(value: string, byId: Map<string, CampaignEntity>): string {
   return parseMentionBody(value)
-    .filter((s) => s.type === "mention")
+    .filter((s): s is Extract<MentionSegment, { type: "mention" }> => s.type === "mention")
     .map((s) => {
-      const id = (s as { id: string }).id;
+      const id = s.id;
       const ent = byId.get(id);
       return `${id}:${ent?.name ?? ""}:${ent?.type ?? ""}`;
     })
@@ -312,6 +313,7 @@ function useMentionHandlers(
     const parsed = parseTrigger(before);
     s.setTrigger(parsed ? { ...parsed, caretOffset: before.length } : null);
     s.setActiveIndex(0);
+    // Captures only stable refs + state setters; adding `s` would recreate this every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -377,6 +379,7 @@ function useMentionHandlers(
   const handleBlur = useCallback(() => {
     if (blurTimer.current) clearTimeout(blurTimer.current);
     blurTimer.current = setTimeout(() => s.setTrigger(null), 120);
+    // Captures only stable refs + state setters; adding `s` would recreate this every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
