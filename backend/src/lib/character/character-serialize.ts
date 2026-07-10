@@ -1,5 +1,5 @@
 import { Prisma } from "@/generated/prisma/client.js";
-import { experienceProgress, levelForExperience } from "@/lib/experience.js";
+import { experienceProgress, levelForExperience } from "@/lib/leveling/experience.js";
 import {
   serializeArmorDetail,
   serializeConsumableDetail,
@@ -51,7 +51,7 @@ import {
   type ItemPassiveContribution,
 } from "@/lib/inventory/capabilities.js";
 import { itemBuffKey } from "@/lib/inventory/inventory.js";
-import { reverseAdvancementEffects } from "@/lib/advancement.js";
+import { reverseAdvancementEffects } from "@/lib/leveling/advancement.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spellcasting.js";
 import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
 import {

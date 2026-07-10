@@ -2,7 +2,7 @@
  * Shape of character data returned by `GET /api/characters` and
  * `GET /api/characters/:id`. `level`/`proficiencyBonus`/threshold fields
  * are derived server-side from `experiencePoints` (see backend's
- * src/lib/experience.ts) and never set directly by the client.
+ * src/lib/leveling/experience.ts) and never set directly by the client.
  */
 
 import type { EffectSpec } from "@/lib/effects";
@@ -1702,7 +1702,7 @@ export type ConditionOperation =
   | RemoveConditionOperation
   | SetExhaustionOperation;
 
-// ── Advancement operation types (mirrors backend/src/lib/advancement.ts) ─────
+// ── Advancement operation types (mirrors backend/src/lib/leveling/advancement.ts) ─────
 // Sent as `{ operations: AdvancementOperation[] }` to
 // POST /api/characters/:id/advancement/transactions.
 
@@ -1734,7 +1734,7 @@ export type AdvancementOperation =
   | TakeFeatOperation
   | RemoveAdvancementOperation;
 
-// ── XP operation types (mirrors backend/src/lib/experience-ops.ts) ──────────
+// ── XP operation types (mirrors backend/src/lib/leveling/experience-ops.ts) ──────────
 // Sent as `{ operations: ExperienceOperation[] }` to POST /api/characters/:id/experience.
 
 /** Award or deduct XP by a signed delta. */

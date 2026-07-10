@@ -17,7 +17,7 @@ import { runCharacterTransaction } from "@/lib/character/character-transaction.j
 import { deriveResources } from "./class-features.js";
 import type { EffectSpec } from "../effects.js";
 import { logEvent } from "../events.js";
-import { proficiencyBonusForLevel, levelForExperience } from "../experience.js";
+import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { normalizeResourcesMutable } from "./resources.js";
 import { normalizeSpellcastingMutable, type SpellcastingMutableState } from "@/lib/spellcasting/spell-state.js";
 

@@ -9,7 +9,7 @@ import {
   normalizeActiveEffectsMutable,
 } from "./active-effects.js";
 import { itemImmuneDamageTypes, itemResistedDamageTypes, type GrantItem } from "./inventory/capabilities.js";
-import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
+import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "./events.js";
 import { resetActivatedUsesForRestInTx } from "./inventory/item-recharge.js";
 import { prisma } from "@/lib/core/prisma.js";
