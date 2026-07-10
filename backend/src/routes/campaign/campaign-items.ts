@@ -28,7 +28,7 @@ import {
   serializeConsumableDetail,
   serializeWeaponDetail,
 } from "@/lib/itemDetail.js";
-import { prisma } from "@/lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import { ITEM_RARITY_KEYS } from "@/lib/srd.js";
 
 // DM-authored campaign items (#380). Owner-only CRUD (list/create/update/delete)

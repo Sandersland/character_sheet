@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { applyHitPointOperations, InvalidHitPointOperationError } from "@/lib/hitpoints.js";
-import { prisma } from "@/lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import { characterInclude } from "@/lib/character-include.js";
 import { serializeCharacter } from "@/lib/character-serialize.js";
 

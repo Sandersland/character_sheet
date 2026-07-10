@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { logEvent, type EventType } from "./events.js";
-import { prisma } from "./prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import {
   computeCampaignRecap,
   computeSessionSummary,

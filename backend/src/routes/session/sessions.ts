@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import { assertCampaignMembership, assertCharacterAccess } from "@/lib/auth/access.js";
-import { prisma } from "@/lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import {
   startCampaignSession,
   endSession,

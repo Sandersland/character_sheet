@@ -6,7 +6,7 @@ import {
   serializeActivityEvent,
 } from "@/lib/activity.js";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
-import { prisma } from "@/lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 
 export const activityRouter = Router({ mergeParams: true });
 

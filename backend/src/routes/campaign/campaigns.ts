@@ -4,7 +4,7 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { assertCampaignMembership, assertCharacterAccess } from "@/lib/auth/access.js";
-import { prisma } from "@/lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import { characterInclude } from "@/lib/character-include.js";
 import { serializeCharacter } from "@/lib/character-serialize.js";
 

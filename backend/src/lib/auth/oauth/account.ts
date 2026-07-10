@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import type { TokenColumns } from "./flow.js";
 import type { AuthProvider, NormalizedProfile } from "./types.js";
 

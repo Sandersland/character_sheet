@@ -21,7 +21,7 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { assertCharacterAccess } from "@/lib/auth/access.js";
-import { prisma } from "@/lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import { ACTION_EFFECT_FN, ACTION_CAST_FN, rageMeleeDamageBonus } from "@/lib/actions.js";
 import { castAbilityInTx } from "@/lib/ability-cast.js";
 import type { PayCostContext } from "@/lib/ability-cost.js";

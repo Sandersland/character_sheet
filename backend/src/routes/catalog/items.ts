@@ -6,7 +6,7 @@ import {
   serializeConsumableDetail,
   serializeWeaponDetail,
 } from "@/lib/itemDetail.js";
-import { prisma } from "@/lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 
 export const itemsRouter = Router();
 
