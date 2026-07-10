@@ -9,7 +9,7 @@ datasource db {
 
 // level and proficiencyBonus are intentionally NOT columns here — they're
 // always derived from experiencePoints at read time (see
-// src/lib/experience.ts). Don't add them back as persisted fields.
+// src/lib/leveling/experience.ts). Don't add them back as persisted fields.
 //
 // race/class/background are NOT columns here either — they're modeled as
 // per-character selection rows (CharacterRace/CharacterClassEntry/

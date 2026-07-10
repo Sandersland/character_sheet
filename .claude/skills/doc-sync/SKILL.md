@@ -35,7 +35,7 @@ Use the doc-ownership map in `CLAUDE.md` (its Doc-map table + the per-surface ma
 |---|---|
 | `backend/src/app.ts`, `backend/src/routes/*` | `architecture.md` → router map (and `api/client.ts` notes if a new endpoint) |
 | `backend/src/lib/*` | `architecture.md` → lib responsibility table |
-| `backend/src/lib/level-reconciliation.ts`, `lib/experience*.ts` | `architecture.md` lib table **+ `leveling.md`** |
+| `backend/src/lib/leveling/level-reconciliation.ts`, `lib/leveling/experience*.ts` | `architecture.md` lib table **+ `leveling.md`** |
 | `backend/src/lib/srd.ts` (rules data) | `architecture.md` lib table **+ `CLAUDE.md`** (5e-rules-only-in-`lib` non-negotiable) |
 | `backend/prisma/schema.prisma` — JSON columns, models, event types | `architecture.md` → data patterns / audit-log sections |
 | `backend/src/lib/events.ts` — `EventCategory`/`EventType` | `architecture.md` → unified audit log |
