@@ -14,7 +14,7 @@
  */
 
 import { Prisma } from "@/generated/prisma/client.js";
-import { runCharacterTransaction } from "./character-transaction.js";
+import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { logEvent } from "./events.js";
 import {
   CONDITIONS,

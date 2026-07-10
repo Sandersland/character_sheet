@@ -4,7 +4,7 @@
  * known-maneuver lists.
  *
  * What is persisted: `used` counts per resource key and the `maneuversKnown`
- * snapshot array. What is derived at read time (in lib/character-serialize.ts
+ * snapshot array. What is derived at read time (in lib/character/character-serialize.ts
  * serializeCharacter): pool totals, die size, recharge timing, maneuver
  * choice count — all via deriveResources() in src/lib/class-features.ts.
  */
@@ -12,7 +12,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client.js";
-import { runCharacterTransaction } from "./character-transaction.js";
+import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { deriveResources, type DerivedClassInfo } from "./class-features.js";

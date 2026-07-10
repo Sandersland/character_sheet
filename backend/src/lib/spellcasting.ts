@@ -9,7 +9,7 @@
  * `CharacterSpell` table.
  *
  * What is persisted: slot `used` counts and the learned `spells[]` array.
- * What is derived at read time (in lib/character-serialize.ts serializeCharacter):
+ * What is derived at read time (in lib/character/character-serialize.ts serializeCharacter):
  *   - slot totals (from srd/srd.ts FULL_CASTER_SLOTS + class + level)
  *   - spellSaveDC / spellAttackBonus / ability (from srd/srd.ts deriveSpellcasting)
  */
@@ -21,7 +21,7 @@ import { Prisma, type Spell } from "@/generated/prisma/client.js";
 import { castAbilityInTx, type CastTarget, type OpOutcome } from "./ability-cast.js";
 import { clearBuffByKeyInTx, clearBuffsForSourceInTx } from "./active-effects.js";
 import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";
-import { runCharacterTransaction } from "./character-transaction.js";
+import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { readEffectSpec } from "./effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";

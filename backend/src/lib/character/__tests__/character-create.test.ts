@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { createCharacter } from "@/lib/character-create.js";
-import type { CreateCharacterBody } from "@/lib/character-schemas.js";
+import { createCharacter } from "@/lib/character/character-create.js";
+import type { CreateCharacterBody } from "@/lib/character/character-schemas.js";
 
 // The empty-classes guard returns before any DB access, so this needs no Postgres.
 describe("createCharacter defensive guards", () => {
