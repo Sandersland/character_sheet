@@ -10,7 +10,7 @@ import {
   applyResourceOperations,
   InvalidResourceOperationError,
 } from "@/lib/resources.js";
-import { makeTransactionsEndpoint } from "@/lib/transactions-endpoint.js";
+import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const resourcesRouter = Router({ mergeParams: true });
 

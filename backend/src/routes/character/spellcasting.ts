@@ -5,7 +5,7 @@ import {
   applySpellcastingOperations,
   InvalidSpellcastingOperationError,
 } from "@/lib/spellcasting.js";
-import { makeTransactionsEndpoint } from "@/lib/transactions-endpoint.js";
+import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const spellcastingRouter = Router({ mergeParams: true });
 

@@ -4,7 +4,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { reconcileLevelGatedState } from "./level-reconciliation.js";
-import { prisma } from "./prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import { fixedAverageForDie, normalizeHitDice, normalizeHitPoints } from "./hitpoints.js";
 import { abilityModifier, hitDieFace } from "./srd.js";
 import { getActiveSessionId, recomputeSummaries } from "./sessions.js";

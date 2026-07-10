@@ -7,7 +7,7 @@ import { revertBatch } from "@/lib/activity.js";
 import { applyHitPointOperations } from "@/lib/hitpoints.js";
 import { applyInventoryOperations } from "@/lib/inventory.js";
 import { applySpellcastingOperations } from "@/lib/spellcasting.js";
-import { prisma } from "@/lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import type { SpellEntry } from "@/lib/spell-state.js";
 

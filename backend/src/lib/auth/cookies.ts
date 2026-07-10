@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 
-import { config } from "@/lib/config.js";
+import { config } from "@/lib/core/config.js";
 
 // Method-agnostic cookie handling. No cookie-parser dependency — cookies are
 // parsed and serialized by hand so the only client state is opaque, HttpOnly

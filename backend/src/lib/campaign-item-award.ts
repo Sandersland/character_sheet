@@ -4,7 +4,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { snapshotDetailCreate } from "./detail-snapshot.js";
 import { logEvent } from "./events.js";
 import { snapshotInventoryItemForUndo, inventoryItemDetailInclude } from "./inventory.js";
-import { prisma } from "./prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import { getActiveSessionId } from "./sessions.js";
 
 // DM item award/revoke (#381). A campaign owner grants a DM-authored

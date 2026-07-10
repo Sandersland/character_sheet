@@ -1,5 +1,5 @@
 /**
- * Global error-handler tests (lib/error-handler.ts).
+ * Global error-handler tests (lib/core/error-handler.ts).
  *
  * Verifies the terminal middleware turns uncaught route errors into a consistent
  * JSON 500 — never HTML, never a hang — and preserves intentional HTTP status
@@ -15,7 +15,7 @@ import express from "express";
 import supertest from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { errorHandler } from "@/lib/error-handler.js";
+import { errorHandler } from "@/lib/core/error-handler.js";
 
 function appThatThrows(thrower: () => void) {
   const app = express();

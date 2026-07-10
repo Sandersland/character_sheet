@@ -1,8 +1,8 @@
 import { Router } from "express";
 import type { Request } from "express";
 
-import { config } from "@/lib/config.js";
-import { prisma } from "@/lib/prisma.js";
+import { config } from "@/lib/core/config.js";
+import { prisma } from "@/lib/core/prisma.js";
 import { clearCookie, getCookie, setCookie } from "@/lib/auth/cookies.js";
 import { AuthenticationError } from "@/lib/auth/errors.js";
 import {
