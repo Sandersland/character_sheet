@@ -1,14 +1,14 @@
 import { Router } from "express";
 import { z } from "zod";
 
-import { assertCharacterAccess } from "../../lib/auth/access.js";
-import { parseBodyOr400 } from "../../lib/http/parse-body.js";
-import type { Prisma, PrismaClient } from "../../generated/prisma/client.js";
-import { extractEntityIds, reconcileEntryRefs } from "../../lib/journal-refs.js";
-import { prisma } from "../../lib/prisma.js";
-import { getActiveSessionId } from "../../lib/sessions.js";
-import { characterInclude } from "../../lib/character-include.js";
-import { serializeCharacter } from "../../lib/character-serialize.js";
+import { assertCharacterAccess } from "@/lib/auth/access.js";
+import { parseBodyOr400 } from "@/lib/http/parse-body.js";
+import type { Prisma, PrismaClient } from "@/generated/prisma/client.js";
+import { extractEntityIds, reconcileEntryRefs } from "@/lib/activity/journal-refs.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { getActiveSessionId } from "@/lib/session/sessions.js";
+import { characterInclude } from "@/lib/character/character-include.js";
+import { serializeCharacter } from "@/lib/character/character-serialize.js";
 
 // Freeform campaign journal CRUD. Unlike inventory/HP/XP/spellcasting, journal
 // entries carry no mechanical effect, so these are PLAIN REST routes: no audit

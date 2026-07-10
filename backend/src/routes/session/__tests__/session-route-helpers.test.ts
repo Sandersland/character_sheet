@@ -7,13 +7,13 @@
 import type { Request, Response } from "express";
 import { describe, expect, it } from "vitest";
 
-import { CombatError, SessionError } from "../../../lib/sessions.js";
+import { CombatError, SessionError } from "@/lib/session/sessions.js";
 import {
   parseRollInput,
   requireCharacterId,
   sessionErrorStatus,
   withSessionErrors,
-} from "../session-route-helpers.js";
+} from "@/routes/session/session-route-helpers.js";
 
 function mockRes() {
   const res = {

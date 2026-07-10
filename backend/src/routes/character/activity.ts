@@ -4,9 +4,9 @@ import {
   buildActivityQuery,
   revertBatch,
   serializeActivityEvent,
-} from "../../lib/activity.js";
-import { assertCharacterAccess } from "../../lib/auth/access.js";
-import { prisma } from "../../lib/prisma.js";
+} from "@/lib/activity/activity.js";
+import { assertCharacterAccess } from "@/lib/auth/access.js";
+import { prisma } from "@/lib/core/prisma.js";
 
 export const activityRouter = Router({ mergeParams: true });
 
@@ -49,7 +49,7 @@ activityRouter.get<{ id: string }>("/activity", async (req, res) => {
 //
 // Inventory events are fully revertable: deleted InventoryItem + detail rows
 // are reconstructed from `data.deletedItem` and currency is reversed from
-// `data.currencyDelta` (see revertInventoryEvent in lib/inventory.ts).
+// `data.currencyDelta` (see revertInventoryEvent in lib/inventory/inventory.ts).
 
 activityRouter.post<{ id: string; batchId: string }>("/events/:batchId/revert", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
@@ -61,8 +61,8 @@ activityRouter.post<{ id: string; batchId: string }>("/events/:batchId/revert", 
   }
 
   // Re-fetch the character with full relations and return.
-  const { characterInclude } = await import("../../lib/character-include.js");
-  const { serializeCharacter } = await import("../../lib/character-serialize.js");
+  const { characterInclude } = await import("@/lib/character/character-include.js");
+  const { serializeCharacter } = await import("@/lib/character/character-serialize.js");
   const updated = await prisma.character.findUnique({
     where: { id: req.params.id },
     include: characterInclude,

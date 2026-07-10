@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "../../../app.js";
-import { prisma } from "../../../lib/prisma.js";
-import { authCookie } from "../../../test-support/auth.js";
+import { createApp } from "@/app.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { authCookie } from "@/test-support/auth.js";
 
 describe("GET /api/health", () => {
   it("returns ok status (public, no session)", async () => {

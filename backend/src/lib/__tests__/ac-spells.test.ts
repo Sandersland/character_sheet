@@ -7,14 +7,14 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { Prisma } from "../../generated/prisma/client.js";
-import { prisma } from "../prisma.js";
-import { ensureTestOwner } from "../../test-support/owner.js";
-import { characterInclude } from "../character-include.js";
-import { serializeCharacter } from "../character-serialize.js";
-import { applySpellcastingOperations } from "../spellcasting.js";
-import { applyInventoryOperations } from "../inventory.js";
-import { applyHitPointOperations } from "../hitpoints.js";
+import { Prisma } from "@/generated/prisma/client.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
+import { characterInclude } from "@/lib/character/character-include.js";
+import { serializeCharacter } from "@/lib/character/character-serialize.js";
+import { applySpellcastingOperations } from "@/lib/spellcasting/spellcasting.js";
+import { applyInventoryOperations } from "@/lib/inventory/inventory.js";
+import { applyHitPointOperations } from "@/lib/combat/hitpoints.js";
 
 const OWNER_ID = "owner-ac-spells";
 

@@ -12,7 +12,7 @@ Read this when you are:
 `experiencePoints` is the only stored authority for a character's level. `level` and `proficiencyBonus` are **never columns** — they are computed at read time:
 
 ```
-backend/src/lib/experience.ts
+backend/src/lib/leveling/experience.ts
   levelForExperience(xp)         → number 1–20 (pure, no DB)
   proficiencyBonusForLevel(lvl)  → number
   experienceProgress(xp)         → { level, proficiencyBonus, currentLevelThreshold,
@@ -42,7 +42,7 @@ XP going up does **not** automatically raise HP. A character can have XP at leve
 When a new XP value drops the derived level below `hitDice.total`, `applyExperienceOperations` calls `revertLevelUps` inside the same transaction:
 
 ```
-backend/src/lib/experience-ops.ts
+backend/src/lib/leveling/experience-ops.ts
   revertLevelUps(tx, characterId, currentHdTotal, targetLevel, batchId)
 ```
 
@@ -61,7 +61,7 @@ When level drops, this state must be reconciled. The system uses two complementa
 Runs inside the XP transaction immediately after `revertLevelUps`. The entry point is:
 
 ```
-backend/src/lib/level-reconciliation.ts
+backend/src/lib/leveling/level-reconciliation.ts
   reconcileLevelGatedState(ctx: ReconcileContext)
 ```
 
@@ -84,7 +84,7 @@ Order matters: later reconcilers observe earlier ones' writes (maneuvers and too
 
 #### Choice-less level-gated grants are pure-derived, not persisted
 
-A level-gated grant with **zero player choice** (e.g. a Way of Shadow monk always gets Minor Illusion at L3) is a pure function of `(subclass, level)`. It is therefore **derived at serialize time** by `deriveGrantedSpells` in `backend/src/lib/granted-spells.ts` and merged into the spellcasting view — it is **never written** into `spellcasting.spells[]`. The op runner injects it transiently so the Cast button resolves its id, then strips it before persisting. This keeps the reconciler/clamp non-negotiable satisfied without reintroducing drift: `reconcileGrantedSpells` is a **guard** against a leaked persisted grant, not the primary enforcement. The derived id scheme `granted:<subclass>:<spell>` is the seam a future side-table would key on if a *stateful* granted spell ever appears. Snapshotting granted content (freezing the SRD text at grant time) is a Phase-D versioning concern introduced uniformly with spells/items — not by persisting grants ad-hoc.
+A level-gated grant with **zero player choice** (e.g. a Way of Shadow monk always gets Minor Illusion at L3) is a pure function of `(subclass, level)`. It is therefore **derived at serialize time** by `deriveGrantedSpells` in `backend/src/lib/spellcasting/granted-spells.ts` and merged into the spellcasting view — it is **never written** into `spellcasting.spells[]`. The op runner injects it transiently so the Cast button resolves its id, then strips it before persisting. This keeps the reconciler/clamp non-negotiable satisfied without reintroducing drift: `reconcileGrantedSpells` is a **guard** against a leaked persisted grant, not the primary enforcement. The derived id scheme `granted:<subclass>:<spell>` is the seam a future side-table would key on if a *stateful* granted spell ever appears. Snapshotting granted content (freezing the SRD text at grant time) is a Phase-D versioning concern introduced uniformly with spells/items — not by persisting grants ad-hoc.
 
 Each reconciler is an async function with the same signature:
 ```typescript
@@ -123,7 +123,7 @@ When you ship a feature whose count or availability depends on level (feats, ASI
 Add the level table and derivation function to `backend/src/lib/srd.ts`. Example: a `featsGrantedAt(className, level)` helper returning how many feats the character is allowed. Never inline rules in a route or duplicate them on the frontend (see CLAUDE.md non-negotiables).
 
 ### 2. Write a `Reconciler` and register it
-In `backend/src/lib/level-reconciliation.ts`:
+In `backend/src/lib/leveling/level-reconciliation.ts`:
 - If the feature is a **"known" list in `Character.resources`** capped by a level-derived choice count (like maneuvers/disciplines/tool profs), write it as a thin `reconcileKnownList(ctx, config)` config — the helper owns the fetch → derive → early-return → trim → update → `logEvent` flow. The config supplies: `listKey`, `allowed(derived)` (the choice-count extractor), `eventType`, `summary(removedCount, allowed)`, and `snapshot(state)` (the before/after event payload — called on the live state before and after the trim).
 - Otherwise write `async function reconcile<Feature>(ctx: ReconcileContext): Promise<void>` by hand:
   - Re-read only the persisted fields you need (one indexed read).
@@ -138,7 +138,7 @@ In `backend/src/routes/characters.ts`, add a `Math.min`/`slice` clamp in the ser
 
 ### 4. New `EventType` (if needed)
 - Add the value to `CharacterEventType` enum in `backend/prisma/schema.prisma`.
-- Add it to the `EventType` union in `backend/src/lib/events.ts`.
+- Add it to the `EventType` union in `backend/src/lib/activity/events.ts`.
 - Migrate + regenerate:
   ```bash
   cd backend

@@ -1,4 +1,4 @@
-import type { SessionUser } from "../lib/auth/session.js";
+import type { SessionUser } from "@/lib/auth/session.js";
 
 // Augment Express's Request with the authenticated user that `requireAuth`
 // (lib/auth/middleware.ts) attaches after resolving the session cookie. Routes

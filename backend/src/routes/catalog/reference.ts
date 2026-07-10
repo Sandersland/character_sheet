@@ -5,9 +5,9 @@ import {
   MULTICLASS_PREREQUISITES,
   multiclassPrerequisitesMet,
   toolsByCategory,
-} from "../../lib/srd.js";
-import { STARTING_EQUIPMENT } from "../../lib/starting-equipment.js";
-import { prisma } from "../../lib/prisma.js";
+} from "@/lib/srd/srd.js";
+import { STARTING_EQUIPMENT } from "@/lib/inventory/starting-equipment.js";
+import { prisma } from "@/lib/core/prisma.js";
 
 export const referenceRouter = Router();
 

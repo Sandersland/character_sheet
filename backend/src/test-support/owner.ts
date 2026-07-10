@@ -1,4 +1,4 @@
-import { prisma } from "../lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 
 // Test-only helper. Character.ownerId is NOT NULL (issue #99), so every
 // character a test creates needs an owning User row. Tests call this in their

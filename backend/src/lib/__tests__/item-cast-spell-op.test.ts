@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { Prisma } from "../../generated/prisma/client.js";
-import { prisma } from "../prisma.js";
-import { ensureTestOwner } from "../../test-support/owner.js";
-import { applySpellcastingOperations } from "../spellcasting.js";
-import { applyHitPointOperations } from "../hitpoints.js";
-import { revertBatch } from "../activity.js";
+import { Prisma } from "@/generated/prisma/client.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
+import { applySpellcastingOperations } from "@/lib/spellcasting/spellcasting.js";
+import { applyHitPointOperations } from "@/lib/combat/hitpoints.js";
+import { revertBatch } from "@/lib/activity/activity.js";
 
 const OWNER_ID = "owner-item-cast-op";
 

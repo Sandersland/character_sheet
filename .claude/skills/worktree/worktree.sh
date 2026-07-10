@@ -129,9 +129,13 @@ print_ports() {
 
 cmd_create() {
   local branch="${1:-}"; shift || true
-  [ -n "$branch" ] || die "usage: worktree.sh create <branch> [--up]"
-  local do_up=0
-  [ "${1:-}" = "--up" ] && do_up=1
+  [ -n "$branch" ] || die "usage: worktree.sh create <branch> [base] [--up]"
+  # Optional positional base ref to fork from (e.g. "staging") plus the --up flag,
+  # in any order. Empty base → fork from the main checkout's HEAD (legacy behavior).
+  local base="" do_up=0
+  for arg in "$@"; do
+    if [ "$arg" = "--up" ]; then do_up=1; else base="$arg"; fi
+  done
 
   local path; path="$(worktree_path "$branch")"
   local slot; slot="$(slot_of "$branch")"
@@ -142,9 +146,16 @@ cmd_create() {
   else
     lock_slots
     slot="$(next_free_slot)"
-    # Reuse the branch if it already exists, otherwise create it from HEAD.
+    # Reuse the branch if it already exists, otherwise create it. A new branch
+    # forks from a FRESHLY-FETCHED origin/<base> when a base is given, so a slice
+    # never forks off a stale local ref — that stale fork was the cause of the
+    # cross-slice merge conflicts in the lib-reorg batch. With no base, fall back
+    # to the main checkout's HEAD.
     if git -C "$ROOT" show-ref --verify --quiet "refs/heads/$branch"; then
       git -C "$ROOT" worktree add "$path" "$branch"
+    elif [ -n "$base" ]; then
+      git -C "$ROOT" fetch --quiet origin "$base"
+      git -C "$ROOT" worktree add "$path" -b "$branch" "origin/$base"
     else
       git -C "$ROOT" worktree add "$path" -b "$branch"
     fi

@@ -2,7 +2,7 @@
  * Shape of character data returned by `GET /api/characters` and
  * `GET /api/characters/:id`. `level`/`proficiencyBonus`/threshold fields
  * are derived server-side from `experiencePoints` (see backend's
- * src/lib/experience.ts) and never set directly by the client.
+ * src/lib/leveling/experience.ts) and never set directly by the client.
  */
 
 import type { EffectSpec } from "@/lib/effects";
@@ -164,7 +164,7 @@ export interface Item {
 }
 
 // ── Item capabilities & attunement (#546) ─────────────────────────────────────
-// Mirrors backend lib/capabilities.ts. Only passiveBonus is authorable/rendered
+// Mirrors backend lib/inventory/capabilities.ts. Only passiveBonus is authorable/rendered
 // this slice; the reserved kinds round-trip as opaque.
 export type CapabilityKind = "passiveBonus" | "castSpell" | "charges" | "grant" | "activatedEffect";
 
@@ -185,7 +185,7 @@ export type CapabilityOp = "add" | "setTo";
 
 export type AttunementPrereqKind = "class" | "spellcaster" | "species" | "alignment";
 
-// grant kind (#529). Mirrors backend lib/capabilities.ts.
+// grant kind (#529). Mirrors backend lib/inventory/capabilities.ts.
 export type GrantType = "resistance" | "immunity" | "conditionImmunity" | "advantage" | "proficiency";
 export type AdvantageOn = "save" | "check" | "initiative" | "attack";
 export type GrantValueKind = "damageType" | "condition" | "skill" | "ability" | "save" | "weapon" | "tool" | "language";
@@ -377,7 +377,7 @@ export type ActivationType = "action" | "bonus" | "reaction" | "commandWord";
 // Looser than WeaponDetail/ArmorDetail above (which describe what the API
 // always returns, every flag included) — these describe what a client only
 // has to *send*: just the fields the matching *Detail table's columns are
-// NOT NULL for, matching backend's lib/inventory.ts WeaponDetailInput/
+// NOT NULL for, matching backend's lib/inventory/inventory.ts WeaponDetailInput/
 // ArmorDetailInput exactly. Everything else defaults server-side and is
 // refinable later via an `update` operation.
 export interface WeaponDetailInput {
@@ -413,7 +413,7 @@ export interface ArmorDetailInput {
  * Body for a custom (homebrew) `acquire` operation — same shape as `Item`
  * minus `id`, plus the category's required minimal detail block (backend's
  * routes/inventory.ts rejects e.g. a "weapon" with no `weapon` block, since
- * those columns are NOT NULL). Matches backend's lib/inventory.ts
+ * those columns are NOT NULL). Matches backend's lib/inventory/inventory.ts
  * CustomItemInput.
  */
 export type CustomItemInput =
@@ -445,7 +445,7 @@ export type CustomItemInput =
 
 /**
  * One operation in a `POST /api/characters/:id/inventory/transactions`
- * batch — see backend's lib/inventory.ts for the full semantics (which ops
+ * batch — see backend's lib/inventory/inventory.ts for the full semantics (which ops
  * get logged to the ledger, atomicity, etc). A request batches 1+ of these.
  */
 export type InventoryOperation =
@@ -1634,7 +1634,7 @@ export interface CastChannelDivinityOperation {
 }
 export type ChannelDivinityOperation = CastChannelDivinityOperation;
 
-// ── Conditions state + operation types (mirrors backend/src/lib/conditions.ts)
+// ── Conditions state + operation types (mirrors backend/src/lib/combat/conditions.ts)
 // Sent as `{ operations: ConditionOperation[] }` to
 // POST /api/characters/:id/conditions/transactions.
 
@@ -1668,7 +1668,7 @@ export interface ConditionsState {
   exhaustion: number;
 }
 
-// ── Active effects (buffs) — mirrors backend/src/lib/active-effects.ts ─────────
+// ── Active effects (buffs) — mirrors backend/src/lib/combat/active-effects.ts ─────────
 
 // Duration axis (#455). Absent on the wire means "concentration" (byte-parity
 // with #438). while-active / until-rest are durable self-buffs (e.g. Rage).
@@ -1702,7 +1702,7 @@ export type ConditionOperation =
   | RemoveConditionOperation
   | SetExhaustionOperation;
 
-// ── Advancement operation types (mirrors backend/src/lib/advancement.ts) ─────
+// ── Advancement operation types (mirrors backend/src/lib/leveling/advancement.ts) ─────
 // Sent as `{ operations: AdvancementOperation[] }` to
 // POST /api/characters/:id/advancement/transactions.
 
@@ -1734,7 +1734,7 @@ export type AdvancementOperation =
   | TakeFeatOperation
   | RemoveAdvancementOperation;
 
-// ── XP operation types (mirrors backend/src/lib/experience-ops.ts) ──────────
+// ── XP operation types (mirrors backend/src/lib/leveling/experience-ops.ts) ──────────
 // Sent as `{ operations: ExperienceOperation[] }` to POST /api/characters/:id/experience.
 
 /** Award or deduct XP by a signed delta. */
@@ -1743,7 +1743,7 @@ export interface XpAwardOperation { type: "award"; amount: number }
 export interface XpSetOperation { type: "set"; value: number }
 export type ExperienceOperation = XpAwardOperation | XpSetOperation;
 
-// ── HP operation types (mirrors backend/src/lib/hitpoints.ts) ───────────────
+// ── HP operation types (mirrors backend/src/lib/combat/hitpoints.ts) ───────────────
 // Sent as `{ operations: HitPointOperation[] }` to POST /api/characters/:id/hp.
 
 /**

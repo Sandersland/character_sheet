@@ -9,7 +9,7 @@ datasource db {
 
 // level and proficiencyBonus are intentionally NOT columns here — they're
 // always derived from experiencePoints at read time (see
-// src/lib/experience.ts). Don't add them back as persisted fields.
+// src/lib/leveling/experience.ts). Don't add them back as persisted fields.
 //
 // race/class/background are NOT columns here either — they're modeled as
 // per-character selection rows (CharacterRace/CharacterClassEntry/
@@ -376,7 +376,7 @@ model CampaignItemConsumableDetail {
 }
 
 // Typed 1:N capability side-table (#545). Kind-discriminated with flat columns;
-// readCapability in lib/capabilities.ts is the adapter. Only passiveBonus is
+// readCapability in lib/inventory/capabilities.ts is the adapter. Only passiveBonus is
 // read today. Snapshotted to InventoryCapability on award (same column set).
 model CampaignItemCapability {
   id             String       @id @default(uuid())

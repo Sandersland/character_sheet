@@ -20,21 +20,21 @@ import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
 
-import { assertCharacterAccess } from "../../lib/auth/access.js";
-import { prisma } from "../../lib/prisma.js";
-import { ACTION_EFFECT_FN, ACTION_CAST_FN, rageMeleeDamageBonus } from "../../lib/actions.js";
-import { castAbilityInTx } from "../../lib/ability-cast.js";
-import type { PayCostContext } from "../../lib/ability-cost.js";
-import type { SpendResourceOperation } from "../../lib/resources.js";
-import type { AdjustQuantityOperation } from "../../lib/inventory.js";
-import { applyAdjustQuantity } from "../../lib/inventory.js";
-import { applyHealInTx } from "../../lib/hitpoints.js";
-import { applySpendResourceInTx } from "../../lib/resources.js";
-import { appendActiveBuffInTx, clearBuffByKeyInTx } from "../../lib/active-effects.js";
-import { normalizeSpellcastingMutable } from "../../lib/spell-state.js";
-import { getActiveSessionId } from "../../lib/sessions.js";
-import { characterInclude } from "../../lib/character-include.js";
-import { serializeCharacter } from "../../lib/character-serialize.js";
+import { assertCharacterAccess } from "@/lib/auth/access.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { ACTION_EFFECT_FN, ACTION_CAST_FN, rageMeleeDamageBonus } from "@/lib/classes/actions.js";
+import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
+import type { PayCostContext } from "@/lib/spellcasting/ability-cost.js";
+import type { SpendResourceOperation } from "@/lib/classes/resources.js";
+import type { AdjustQuantityOperation } from "@/lib/inventory/inventory.js";
+import { applyAdjustQuantity } from "@/lib/inventory/inventory.js";
+import { applyHealInTx } from "@/lib/combat/hitpoints.js";
+import { applySpendResourceInTx } from "@/lib/classes/resources.js";
+import { appendActiveBuffInTx, clearBuffByKeyInTx } from "@/lib/combat/active-effects.js";
+import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
+import { getActiveSessionId } from "@/lib/session/sessions.js";
+import { characterInclude } from "@/lib/character/character-include.js";
+import { serializeCharacter } from "@/lib/character/character-serialize.js";
 
 export const actionsRouter = Router({ mergeParams: true });
 

@@ -4,8 +4,8 @@ import { z } from "zod";
 import {
   applyClassOperations,
   InvalidClassOperationError,
-} from "../../lib/class.js";
-import { makeTransactionsEndpoint } from "../../lib/transactions-endpoint.js";
+} from "@/lib/classes/class.js";
+import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const classRouter = Router({ mergeParams: true });
 

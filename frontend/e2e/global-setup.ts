@@ -35,7 +35,7 @@ const ABILITY_SCORES = {
   charisma: 8,
 };
 
-// L5 threshold from the XP curve (backend/src/lib/experience.ts). The curve is
+// L5 threshold from the XP curve (backend/src/lib/leveling/experience.ts). The curve is
 // class-independent, so this is L5 for both the Wizard and the Battle Master.
 const LEVEL_5_XP = 6500;
 // L6 threshold — gates Monk Ki-Empowered Strikes (magical unarmed strikes).

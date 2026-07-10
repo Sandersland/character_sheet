@@ -8,11 +8,11 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "../../../app.js";
-import { Prisma } from "../../../generated/prisma/client.js";
-import { prisma } from "../../../lib/prisma.js";
-import { ensureTestOwner } from "../../../test-support/owner.js";
-import { authCookie } from "../../../test-support/auth.js";
+import { createApp } from "@/app.js";
+import { Prisma } from "@/generated/prisma/client.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
+import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-advancement";
 let COOKIE: string;

@@ -47,11 +47,11 @@ import { randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "../../../app.js";
-import { Prisma } from "../../../generated/prisma/client.js";
-import { prisma } from "../../../lib/prisma.js";
-import { ensureTestOwner } from "../../../test-support/owner.js";
-import { authCookie } from "../../../test-support/auth.js";
+import { createApp } from "@/app.js";
+import { Prisma } from "@/generated/prisma/client.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
+import { authCookie } from "@/test-support/auth.js";
 
 // Sessions are campaign-level (#245): create a throwaway campaign to host a
 // Session row when a test only needs a valid sessionId to tag events with.

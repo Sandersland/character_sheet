@@ -5,10 +5,10 @@ import {
   applyDisciplineOperations,
   disciplineEffectSpec,
   InvalidDisciplineOperationError,
-} from "../../lib/disciplines.js";
-import { prisma } from "../../lib/prisma.js";
-import { readAbilityCost } from "../../lib/ability-cost.js";
-import { makeTransactionsEndpoint } from "../../lib/transactions-endpoint.js";
+} from "@/lib/classes/disciplines.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { readAbilityCost } from "@/lib/spellcasting/ability-cost.js";
+import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const disciplinesRouter = Router({ mergeParams: true });
 

@@ -3,10 +3,10 @@ import crypto from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
 
-import { assertCampaignMembership, assertCharacterAccess } from "../../lib/auth/access.js";
-import { prisma } from "../../lib/prisma.js";
-import { characterInclude } from "../../lib/character-include.js";
-import { serializeCharacter } from "../../lib/character-serialize.js";
+import { assertCampaignMembership, assertCharacterAccess } from "@/lib/auth/access.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { characterInclude } from "@/lib/character/character-include.js";
+import { serializeCharacter } from "@/lib/character/character-serialize.js";
 
 // Shared-campaign backbone (#246). Plain-REST (like journal.ts): no audit log,
 // no transaction-op pattern. Membership is identity state, access is gated via

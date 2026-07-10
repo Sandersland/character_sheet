@@ -3,11 +3,11 @@ import { randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "../../../app.js";
-import { Prisma } from "../../../generated/prisma/client.js";
-import { prisma } from "../../../lib/prisma.js";
-import { findInList } from "../../../test-support/list.js";
-import { authCookie } from "../../../test-support/auth.js";
+import { createApp } from "@/app.js";
+import { Prisma } from "@/generated/prisma/client.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { findInList } from "@/test-support/list.js";
+import { authCookie } from "@/test-support/auth.js";
 
 const TEST_USER = { id: "test-user-1", email: "fixture-owner@test.local" };
 let COOKIE: string;

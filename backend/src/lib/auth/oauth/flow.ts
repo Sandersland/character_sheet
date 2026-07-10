@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 
 import { z } from "zod";
 
-import { appRedirectUri } from "../../config.js";
+import { appRedirectUri } from "@/lib/core/config.js";
 import type { AuthProvider, NormalizedProfile } from "./types.js";
 
 // The provider-agnostic OAuth 2.0 authorization-code + PKCE flow: build the

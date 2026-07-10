@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
 
-import { Prisma } from "../../generated/prisma/client.js";
-import { assertCampaignMembership, assertCampaignOwner } from "../../lib/auth/access.js";
-import { parseBodyOr400 } from "../../lib/http/parse-body.js";
+import { Prisma } from "@/generated/prisma/client.js";
+import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
+import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import {
   ADVANTAGE_ON,
   ATTUNEMENT_PREREQ_KINDS,
@@ -15,21 +15,21 @@ import {
   GRANT_TYPES,
   GRANT_VALUE_KINDS,
   serializeCapability,
-} from "../../lib/capabilities.js";
+} from "@/lib/inventory/capabilities.js";
 import {
   awardCampaignItem,
   CampaignItemAwardError,
   campaignItemHolders,
   revokeCampaignItem,
   type CampaignItemHolder,
-} from "../../lib/campaign-item-award.js";
+} from "@/lib/campaign/campaign-item-award.js";
 import {
   serializeArmorDetail,
   serializeConsumableDetail,
   serializeWeaponDetail,
-} from "../../lib/itemDetail.js";
-import { prisma } from "../../lib/prisma.js";
-import { ITEM_RARITY_KEYS } from "../../lib/srd.js";
+} from "@/lib/inventory/itemDetail.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { ITEM_RARITY_KEYS } from "@/lib/srd/srd.js";
 
 // DM-authored campaign items (#380). Owner-only CRUD (list/create/update/delete)
 // under /api/campaigns/:id/items; a member-readable by-entity GET feeds the Codex

@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 
-import { CombatError, SessionError, type RollKind, type RollMode } from "../../lib/sessions.js";
+import { CombatError, SessionError, type RollKind, type RollMode } from "@/lib/session/sessions.js";
 
 export interface RollInput {
   kind: RollKind;

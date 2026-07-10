@@ -1,17 +1,17 @@
 import { Router } from "express";
 import type { Request } from "express";
 
-import { config } from "../../lib/config.js";
-import { prisma } from "../../lib/prisma.js";
-import { clearCookie, getCookie, setCookie } from "../../lib/auth/cookies.js";
-import { AuthenticationError } from "../../lib/auth/errors.js";
+import { config } from "@/lib/core/config.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { clearCookie, getCookie, setCookie } from "@/lib/auth/cookies.js";
+import { AuthenticationError } from "@/lib/auth/errors.js";
 import {
   createSession,
   destroySession,
   lookupSession,
   SESSION_COOKIE,
   SESSION_TTL_SECONDS,
-} from "../../lib/auth/session.js";
+} from "@/lib/auth/session.js";
 import {
   buildAuthorizeUrl,
   challengeFromVerifier,
@@ -28,7 +28,7 @@ import {
   resolveUserId,
   safeEqual,
   tokenColumns,
-} from "../../lib/auth/oauth/index.js";
+} from "@/lib/auth/oauth/index.js";
 
 // Hand-rolled OAuth 2.0 + PKCE sign-in. This is the auth MECHANISM only:
 // per-route read/write enforcement (requireAuth) is deferred to #101, so every

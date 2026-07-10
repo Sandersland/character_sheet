@@ -1,7 +1,7 @@
 /**
  * Revert-matrix characterization for reverseEvent (#615).
  *
- * reverseEvent (lib/activity.ts) is the LIFO-undo core: a switch over event
+ * reverseEvent (lib/activity/activity.ts) is the LIFO-undo core: a switch over event
  * category that restores the before-snapshot. The refactor moves each category
  * branch into a REVERT_HANDLERS registry, so every category needs undo coverage
  * that stays green UNEDITED through the migration.
@@ -17,11 +17,11 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "../../../app.js";
-import { prisma } from "../../../lib/prisma.js";
-import { applySpellcastingOperations } from "../../../lib/spellcasting.js";
-import { ensureTestOwner } from "../../../test-support/owner.js";
-import { authCookie } from "../../../test-support/auth.js";
+import { createApp } from "@/app.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { applySpellcastingOperations } from "@/lib/spellcasting/spellcasting.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
+import { authCookie } from "@/test-support/auth.js";
 
 const OWNER_ID = "owner-revert-matrix";
 let COOKIE: string;

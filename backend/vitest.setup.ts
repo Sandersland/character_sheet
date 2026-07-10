@@ -1,6 +1,6 @@
 import { afterAll } from "vitest";
 
-import { prisma, pool } from "./src/lib/prisma.js";
+import { prisma, pool } from "./src/lib/core/prisma.js";
 
 // Per-file teardown. Vitest runs each test file in its own isolated module
 // context (default `isolate: true`), so this file's `lib/prisma` — and its

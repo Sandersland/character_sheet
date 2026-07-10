@@ -1,0 +1,56 @@
+import { describe, expect, it } from "vitest";
+import type { Request, Response } from "express";
+
+import { securityHeaders } from "@/lib/core/security.js";
+
+// Pure middleware test — no Postgres. Runs the helmet handler against a fake
+// res and reads back the Content-Security-Policy header it sets. Guards the
+// single-origin CSP allowances (#149 avatars, #150 dice worker, #151 CF beacon)
+// that only bite in SERVE_STATIC_DIR mode and so never surface in local dev.
+function cspFor(servesStatic: boolean): string {
+  const handler = securityHeaders(servesStatic);
+  const headers: Record<string, string> = {};
+  const res = {
+    setHeader(name: string, value: string) {
+      headers[name.toLowerCase()] = String(value);
+    },
+    getHeader(name: string) {
+      return headers[name.toLowerCase()];
+    },
+    removeHeader(name: string) {
+      delete headers[name.toLowerCase()];
+    },
+  } as unknown as Response;
+  const req = { secure: true, headers: {} } as unknown as Request;
+  handler(req, res, () => {});
+  return headers["content-security-policy"] ?? "";
+}
+
+describe("securityHeaders single-origin CSP", () => {
+  const csp = cspFor(true);
+
+  it("allows Google profile avatars in img-src (#149)", () => {
+    expect(csp).toContain("img-src 'self' data: https://lh3.googleusercontent.com");
+  });
+
+  it("allows the 3D dice blob: Web Worker via a dedicated worker-src (#150)", () => {
+    expect(csp).toContain("worker-src 'self' blob:");
+  });
+
+  it("keeps script-src restricted to self + the CF beacon, not blob: (#150/#151)", () => {
+    expect(csp).toContain("script-src 'self' https://static.cloudflareinsights.com");
+    expect(csp).not.toContain("script-src 'self' https://static.cloudflareinsights.com blob:");
+  });
+
+  it("allows the Cloudflare Web Analytics beacon POST in connect-src (#151)", () => {
+    expect(csp).toContain("connect-src 'self' https://cloudflareinsights.com");
+  });
+});
+
+describe("securityHeaders API-only mode", () => {
+  it("does not apply the single-origin third-party allowances", () => {
+    const csp = cspFor(false);
+    expect(csp).not.toContain("lh3.googleusercontent.com");
+    expect(csp).not.toContain("cloudflareinsights.com");
+  });
+});
