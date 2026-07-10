@@ -11,6 +11,8 @@ interface PopoverProps {
   align?: "right" | "left";
   className?: string;
   triggerClassName?: string;
+  /** DOM id for the trigger button — lets another control move focus here (e.g. the paper-doll off-hand lock focusing its two-handed main-hand owner). */
+  id?: string;
   /** Fired whenever the popover transitions open → closed (Escape, click-outside, or toggle). */
   onClose?: () => void;
 }
@@ -24,6 +26,7 @@ export default function Popover({
   align = "left",
   className = "",
   triggerClassName = "",
+  id,
   onClose,
 }: PopoverProps) {
   const [open, setOpen] = useState(false);
@@ -92,6 +95,7 @@ export default function Popover({
     <div ref={wrapperRef} className={`relative ${className}`}>
       <button
         ref={triggerRef}
+        id={id}
         type="button"
         aria-haspopup="dialog"
         aria-expanded={open}

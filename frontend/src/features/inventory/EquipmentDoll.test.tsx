@@ -39,17 +39,48 @@ const weapon = (twoHanded: boolean, o: Partial<InventoryItem> = {}) =>
 
 const ring = (o: Partial<InventoryItem> = {}) => item({ category: "gear", slot: "RING", ...o });
 
-function makeCharacter(inventory: InventoryItem[]): Character {
+// A versatile weapon carrying the server-derived grip snapshot the doll reads.
+const versatileWeapon = (
+  grip: "one-handed" | "versatile-two-handed",
+  faces: number,
+  o: Partial<InventoryItem> = {},
+) =>
+  weapon(false, {
+    name: "Longsword",
+    weapon: {
+      ...weapon(false).weapon!,
+      weaponClass: "martial",
+      versatileDiceCount: 1,
+      versatileDiceFaces: 10,
+      damage: { damageDiceCount: 1, damageDiceFaces: faces, damageModifier: 0, damageType: "slashing", grip },
+    },
+    ...o,
+  });
+
+interface Profs {
+  weapon?: { name: string }[];
+  armor?: { category: string }[];
+}
+
+function makeCharacter(inventory: InventoryItem[], profs: Profs = {}): Character {
   return {
     id: "char-1",
     name: "Aria",
     armorClass: 15,
     inventory,
+    weaponProficiencies: profs.weapon ?? [],
+    armorProficiencies: profs.armor ?? [],
   } as unknown as Character;
 }
 
-function renderDoll(inventory: InventoryItem[], onSubmit = vi.fn().mockResolvedValue(undefined)) {
-  render(<EquipmentDoll character={makeCharacter(inventory)} pending={false} onSubmit={onSubmit} />);
+function renderDoll(
+  inventory: InventoryItem[],
+  onSubmit = vi.fn().mockResolvedValue(undefined),
+  profs: Profs = {},
+) {
+  render(
+    <EquipmentDoll character={makeCharacter(inventory, profs)} pending={false} onSubmit={onSubmit} />,
+  );
   return { onSubmit };
 }
 
@@ -69,10 +100,59 @@ describe("EquipmentDoll slot rendering", () => {
     expect(screen.queryByRole("button", { name: /Main hand slot, empty/ })).toBeNull();
   });
 
-  it("locks the off-hand when a two-handed weapon holds the main hand", () => {
+  it("ghosts the two-handed weapon into the off-hand and focuses it on click (#554)", async () => {
+    const user = userEvent.setup();
     renderDoll([weapon(true, { id: "gs", name: "Greatsword", equippedSlot: "MAIN_HAND" })]);
-    expect(screen.getByLabelText("Off hand slot locked")).toBeInTheDocument();
+    const lock = screen.getByRole("button", { name: /Off hand held by two-handed Greatsword/ });
+    expect(lock).toBeInTheDocument();
+    expect(screen.getByText("Two-handed")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Off hand slot, empty/ })).toBeNull();
+    // Clicking the ghosted off-hand jumps focus to its main-hand owner.
+    await user.click(lock);
+    expect(screen.getByRole("button", { name: /Main hand: Greatsword/ })).toHaveFocus();
+  });
+
+  it("warns on a non-proficient equipped item but not a proficient one (#554)", () => {
+    const martial = weapon(false, {
+      id: "gs",
+      name: "Greataxe",
+      equippedSlot: "MAIN_HAND",
+      weapon: { ...weapon(false).weapon!, weaponClass: "martial" },
+    });
+    // No proficiencies granted → the tile warns.
+    const { unmount } = render(
+      <EquipmentDoll character={makeCharacter([martial])} pending={false} onSubmit={vi.fn()} />,
+    );
+    expect(screen.getByText("Not proficient")).toBeInTheDocument();
+    unmount();
+
+    // Martial Weapons granted → no warning.
+    renderDoll([martial], vi.fn(), { weapon: [{ name: "Martial Weapons" }] });
+    expect(screen.queryByText("Not proficient")).toBeNull();
+  });
+
+  it("shows the versatile grip die on the main-hand tile and flips it (#554)", () => {
+    const prof: Profs = { weapon: [{ name: "Martial Weapons" }] };
+    const { unmount } = render(
+      <EquipmentDoll
+        character={makeCharacter(
+          [versatileWeapon("versatile-two-handed", 10, { id: "ls", equippedSlot: "MAIN_HAND" })],
+          prof,
+        )}
+        pending={false}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("1d10")).toBeInTheDocument();
+    unmount();
+
+    // Off-hand filled → server derives the one-handed die; the badge flips.
+    renderDoll(
+      [versatileWeapon("one-handed", 8, { id: "ls", equippedSlot: "MAIN_HAND" })],
+      vi.fn(),
+      prof,
+    );
+    expect(screen.getByText("1d8")).toBeInTheDocument();
   });
 
   it("renders RING as two independent sub-slots", () => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import type { Character, EquipSlot, InventoryItem, InventoryOperation } from "@/types/character";
 import EquipSlotCell from "@/features/inventory/EquipSlotCell";
@@ -7,10 +7,12 @@ import {
   bagItemsForSlot,
   equipSlotLabel,
   isOffHandLocked,
+  isProficientWithItem,
   itemsInSlot,
   RING_CAPACITY,
   SLOT_GROUP_ORDER,
   SLOT_GROUPS,
+  versatileGrip,
   type SlotGroup,
 } from "@/lib/paperDoll";
 
@@ -63,6 +65,11 @@ const GROUP_PLACEMENT: Record<SlotGroup, string> = {
 export default function EquipmentDoll({ character, pending, onSubmit }: EquipmentDollProps) {
   const inventory = character.inventory;
   const offHandLocked = isOffHandLocked(inventory);
+  // The two-handed weapon that locks the off-hand — ghosted into the OFF_HAND
+  // tile, and the target the off-hand's focus jump lands on. Only needed while
+  // the off-hand is locked, so it's computed only then.
+  const mainHandItem = offHandLocked ? (itemsInSlot(inventory, "MAIN_HAND")[0] ?? null) : null;
+  const mainHandTriggerId = useId();
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -110,6 +117,15 @@ export default function EquipmentDoll({ character, pending, onSubmit }: Equipmen
               <div className={`grid gap-2 ${GROUP_GRID[group]}`}>
                 {cells.map((cell) => {
                   const locked = cell.slot === "OFF_HAND" && offHandLocked;
+                  const notProficient =
+                    cell.item != null &&
+                    !isProficientWithItem(
+                      cell.item,
+                      character.weaponProficiencies,
+                      character.armorProficiencies,
+                    );
+                  const grip =
+                    cell.slot === "MAIN_HAND" && cell.item ? versatileGrip(cell.item) : null;
                   return (
                     <EquipSlotCell
                       key={cell.key}
@@ -120,6 +136,15 @@ export default function EquipmentDoll({ character, pending, onSubmit }: Equipmen
                       lockReason={
                         locked ? "Locked by a two-handed weapon — unequip it first" : undefined
                       }
+                      lockedByItem={locked ? mainHandItem : undefined}
+                      onFocusLockOwner={
+                        locked
+                          ? () => document.getElementById(mainHandTriggerId)?.focus()
+                          : undefined
+                      }
+                      notProficient={notProficient}
+                      grip={grip}
+                      triggerId={cell.slot === "MAIN_HAND" ? mainHandTriggerId : undefined}
                       candidates={bagItemsForSlot(inventory, cell.slot)}
                       pending={pending}
                       onEquip={(item) => equip(item, cell.slot)}
