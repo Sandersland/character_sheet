@@ -13,7 +13,7 @@ import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/exp
 import { logEvent } from "@/lib/events.js";
 import { resetActivatedUsesForRestInTx } from "@/lib/inventory/item-recharge.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { getActiveSessionId } from "@/lib/sessions.js";
+import { getActiveSessionId } from "@/lib/session/sessions.js";
 import {
   abilityModifier,
   advancementSlotsForLevel,

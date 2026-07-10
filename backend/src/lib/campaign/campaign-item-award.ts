@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client.js";
-import { snapshotDetailCreate } from "./inventory/detail-snapshot.js";
-import { logEvent } from "./events.js";
-import { snapshotInventoryItemForUndo, inventoryItemDetailInclude } from "./inventory/inventory.js";
+import { snapshotDetailCreate } from "@/lib/inventory/detail-snapshot.js";
+import { logEvent } from "../events.js";
+import { snapshotInventoryItemForUndo, inventoryItemDetailInclude } from "@/lib/inventory/inventory.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { getActiveSessionId } from "./sessions.js";
+import { getActiveSessionId } from "@/lib/session/sessions.js";
 
 // DM item award/revoke (#381). A campaign owner grants a DM-authored
 // CampaignItem into a member character's inventory: the mechanical fields +

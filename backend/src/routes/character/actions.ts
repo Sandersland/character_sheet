@@ -32,7 +32,7 @@ import { applyHealInTx } from "@/lib/combat/hitpoints.js";
 import { applySpendResourceInTx } from "@/lib/classes/resources.js";
 import { appendActiveBuffInTx, clearBuffByKeyInTx } from "@/lib/combat/active-effects.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
-import { getActiveSessionId } from "@/lib/sessions.js";
+import { getActiveSessionId } from "@/lib/session/sessions.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 

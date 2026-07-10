@@ -1,5 +1,5 @@
 // Pure helpers for entity identity merges (#387), in parity with the backend
-// lib/entity-merges.ts. Operate on the flat merge list the API returns plus an
+// lib/campaign/entity-merges.ts. Operate on the flat merge list the API returns plus an
 // id→entity map, resolving transitive "revealed to be" chains for the UI.
 
 import type { CampaignEntity, CampaignEntityMerge } from "@/types/character";

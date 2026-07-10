@@ -14,7 +14,7 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { getActiveSessionId } from "@/lib/sessions.js";
+import { getActiveSessionId } from "@/lib/session/sessions.js";
 
 // Per-op context handed to a domain's applyOp callback. `row` is the freshly
 // re-read character narrowed to the caller's select; `batchId`/`sessionId` are

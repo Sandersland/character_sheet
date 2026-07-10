@@ -12,7 +12,7 @@ import {
   logCombatEvent,
   logRollEvent,
   SessionError,
-} from "@/lib/sessions.js";
+} from "@/lib/session/sessions.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 import { parseRollInput, requireCharacterId, withSessionErrors } from "./session-route-helpers.js";

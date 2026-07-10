@@ -11,7 +11,7 @@ import {
   computeSessionSummary,
   type ParticipantSummary,
   type SummaryEventInput,
-} from "@/lib/session-summary.js";
+} from "@/lib/session/session-summary.js";
 
 const WINDOW = {
   startedAt: new Date("2026-06-22T18:00:00.000Z"),

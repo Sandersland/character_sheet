@@ -7,7 +7,7 @@ import { reconcileLevelGatedState } from "./level-reconciliation.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { fixedAverageForDie, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import { abilityModifier, hitDieFace } from "@/lib/srd/srd.js";
-import { getActiveSessionId, recomputeSummaries } from "@/lib/sessions.js";
+import { getActiveSessionId, recomputeSummaries } from "@/lib/session/sessions.js";
 
 export class InvalidExperienceOperationError extends Error {}
 

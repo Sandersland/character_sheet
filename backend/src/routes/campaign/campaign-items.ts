@@ -22,7 +22,7 @@ import {
   campaignItemHolders,
   revokeCampaignItem,
   type CampaignItemHolder,
-} from "@/lib/campaign-item-award.js";
+} from "@/lib/campaign/campaign-item-award.js";
 import {
   serializeArmorDetail,
   serializeConsumableDetail,
