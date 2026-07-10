@@ -29,7 +29,7 @@
  * Feats and Ability Score Improvements ship via `reconcileAdvancements`.
  */
 
-import { Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "@/generated/prisma/client.js";
 import { proficiencyBonusForLevel } from "./experience.js";
 import { logEvent, type EventType } from "./events.js";
 import {

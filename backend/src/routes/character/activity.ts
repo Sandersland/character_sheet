@@ -4,9 +4,9 @@ import {
   buildActivityQuery,
   revertBatch,
   serializeActivityEvent,
-} from "../../lib/activity.js";
-import { assertCharacterAccess } from "../../lib/auth/access.js";
-import { prisma } from "../../lib/prisma.js";
+} from "@/lib/activity.js";
+import { assertCharacterAccess } from "@/lib/auth/access.js";
+import { prisma } from "@/lib/prisma.js";
 
 export const activityRouter = Router({ mergeParams: true });
 
@@ -61,8 +61,8 @@ activityRouter.post<{ id: string; batchId: string }>("/events/:batchId/revert", 
   }
 
   // Re-fetch the character with full relations and return.
-  const { characterInclude } = await import("../../lib/character-include.js");
-  const { serializeCharacter } = await import("../../lib/character-serialize.js");
+  const { characterInclude } = await import("@/lib/character-include.js");
+  const { serializeCharacter } = await import("@/lib/character-serialize.js");
   const updated = await prisma.character.findUnique({
     where: { id: req.params.id },
     include: characterInclude,

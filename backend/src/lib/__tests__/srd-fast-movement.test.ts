@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { deriveFastMovement } from "../srd.js";
+import { deriveFastMovement } from "@/lib/srd.js";
 
 const bonus = (barbarianLevel: number, wearingHeavyArmor = false) =>
   deriveFastMovement({ barbarianLevel, wearingHeavyArmor });

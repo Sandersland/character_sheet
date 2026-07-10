@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "@/generated/prisma/client.js";
 import { levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { reconcileLevelGatedState } from "./level-reconciliation.js";

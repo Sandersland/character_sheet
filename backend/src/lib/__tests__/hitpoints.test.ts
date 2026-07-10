@@ -8,7 +8,7 @@ import {
   normalizeHitDice,
   normalizeHitPoints,
   resolveDamageAmount,
-} from "../hitpoints.js";
+} from "@/lib/hitpoints.js";
 
 describe("resolveDamageAmount (#456)", () => {
   const bps = new Set(["bludgeoning", "piercing", "slashing"]);

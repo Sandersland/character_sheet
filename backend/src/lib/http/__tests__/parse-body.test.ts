@@ -2,7 +2,7 @@ import type { Response } from "express";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { parseBodyOr400 } from "../parse-body.js";
+import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 
 // A minimal res double capturing status + json, so the helper can be exercised
 // without an Express app.

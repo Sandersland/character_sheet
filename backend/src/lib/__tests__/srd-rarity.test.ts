@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ITEM_RARITIES, isKnownRarity, standardValueForRarity } from "../srd.js";
+import { ITEM_RARITIES, isKnownRarity, standardValueForRarity } from "@/lib/srd.js";
 
 describe("item rarity (#497)", () => {
   it("orders the six tiers with their standard GP values", () => {

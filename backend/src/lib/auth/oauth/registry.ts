@@ -1,6 +1,6 @@
 import type { AuthProvider } from "./types.js";
 
-import { PROVIDERS } from "./providers/index.js";
+import { PROVIDERS } from "@/lib/auth/oauth/providers/index.js";
 
 // Resolves the provider manifest (./providers) against env. Kept separate from
 // the manifest so adding a provider only ever touches the array, not this logic.

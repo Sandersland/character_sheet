@@ -9,11 +9,11 @@
  * {ability-cost, effects, spell-state, hitpoints, events}.
  */
 
-import { Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "@/generated/prisma/client.js";
 import { payAbilityCostInTx, type AbilityCost, type PayCostContext } from "./ability-cost.js";
 import { appendActiveBuffInTx, clearBuffsForSourceInTx } from "./active-effects.js";
-import { assertCampaignMembership } from "./auth/access.js";
-import { AuthorizationError } from "./auth/errors.js";
+import { assertCampaignMembership } from "@/lib/auth/access.js";
+import { AuthorizationError } from "@/lib/auth/errors.js";
 import { resolveBuffSpec, type EffectSpec } from "./effects.js";
 import { logEvent, type EventType } from "./events.js";
 import { applyHealInTx, applyDamageInTx, applyTempHpInTx } from "./hitpoints.js";

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "@/generated/prisma/client.js";
 import { snapshotDetailCreate } from "./detail-snapshot.js";
 import { logEvent } from "./events.js";
 import { snapshotInventoryItemForUndo, inventoryItemDetailInclude } from "./inventory.js";

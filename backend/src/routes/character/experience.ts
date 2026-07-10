@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
 
-import { applyExperienceOperations, InvalidExperienceOperationError } from "../../lib/experience-ops.js";
-import { makeTransactionsEndpoint } from "../../lib/transactions-endpoint.js";
+import { applyExperienceOperations, InvalidExperienceOperationError } from "@/lib/experience-ops.js";
+import { makeTransactionsEndpoint } from "@/lib/transactions-endpoint.js";
 
 export const experienceRouter = Router({ mergeParams: true });
 

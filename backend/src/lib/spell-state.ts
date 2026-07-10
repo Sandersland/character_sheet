@@ -1,6 +1,6 @@
 // Leaf module: persisted spellcasting JSON shape + its normalizer, no back-imports.
 
-import { Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "@/generated/prisma/client.js";
 
 // ── Canonical mutable state shape ─────────────────────────────────────────────
 // Stored in Character.spellcasting JSON column.

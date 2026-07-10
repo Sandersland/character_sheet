@@ -16,7 +16,7 @@
 
 import { randomUUID } from "node:crypto";
 
-import { Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "./events.js";
 
 // ── Canonical mutable state shape ─────────────────────────────────────────────

@@ -8,11 +8,11 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { Prisma } from "../../generated/prisma/client.js";
-import { prisma } from "../prisma.js";
-import { ensureTestOwner } from "../../test-support/owner.js";
-import { payAbilityCostInTx } from "../ability-cost.js";
-import { InvalidResourceOperationError } from "../resources.js";
+import { Prisma } from "@/generated/prisma/client.js";
+import { prisma } from "@/lib/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
+import { payAbilityCostInTx } from "@/lib/ability-cost.js";
+import { InvalidResourceOperationError } from "@/lib/resources.js";
 
 const OWNER_ID = "owner-ability-cost-pool";
 

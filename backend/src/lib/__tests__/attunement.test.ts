@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { Prisma } from "../../generated/prisma/client.js";
-import { prisma } from "../prisma.js";
-import { ensureTestOwner } from "../../test-support/owner.js";
+import { Prisma } from "@/generated/prisma/client.js";
+import { prisma } from "@/lib/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
 import {
   applyInventoryOperations,
   AttunementLimitError,
   InvalidInventoryOperationError,
   inventoryItemDetailInclude,
   revertInventoryEvent,
-} from "../inventory.js";
+} from "@/lib/inventory.js";
 
 const OWNER_ID = "owner-attunement-lib";
 

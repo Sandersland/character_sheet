@@ -7,7 +7,7 @@ import {
   CASTER_FRACTION_BY_CLASS,
   MULTICLASS_SPELL_SLOTS,
   FULL_CASTER_SLOTS,
-} from "../srd.js";
+} from "@/lib/srd.js";
 
 // Even scores keep the ability math simple: mod = +2 at 14, +3 at 16, +0 at 10.
 const SCORES = { intelligence: 16, wisdom: 14, charisma: 16, strength: 10, dexterity: 10, constitution: 10 };

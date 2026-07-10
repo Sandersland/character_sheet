@@ -9,8 +9,8 @@ import { randomUUID } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { prisma } from "../prisma.js";
-import { ensureTestOwner } from "../../test-support/owner.js";
+import { prisma } from "@/lib/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
 import {
   clearBuffByKeyInTx,
   clearBuffsByTargetInTx,
@@ -20,7 +20,7 @@ import {
   normalizeActiveEffectsMutable,
   serializeActiveEffectsState,
   type ActiveBuff,
-} from "../active-effects.js";
+} from "@/lib/active-effects.js";
 
 const OWNER_ID = "owner-clear-events";
 const FIXTURE_ID = "test-clear-events-character-1";

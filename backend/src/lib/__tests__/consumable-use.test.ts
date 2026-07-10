@@ -1,10 +1,10 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { Prisma } from "../../generated/prisma/client.js";
-import { prisma } from "../prisma.js";
-import { ensureTestOwner } from "../../test-support/owner.js";
-import { applyInventoryOperations, revertInventoryEvent, isHealingConsumable } from "../inventory.js";
-import { applyHitPointOperations } from "../hitpoints.js";
+import { Prisma } from "@/generated/prisma/client.js";
+import { prisma } from "@/lib/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
+import { applyInventoryOperations, revertInventoryEvent, isHealingConsumable } from "@/lib/inventory.js";
+import { applyHitPointOperations } from "@/lib/hitpoints.js";
 
 const OWNER_ID = "owner-consumable-use";
 

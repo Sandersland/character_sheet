@@ -36,6 +36,8 @@ CI runs the same suite in a dedicated `e2e` job (`.github/workflows/ci.yml`) on 
 
 `typecheck` is the quick way to catch the schema/shape-drift class that `lint`/`test` miss (vitest transpiles via esbuild and does **not** type-check). Run it — root, or `-w frontend` / `-w backend` for one workspace — after touching frontend/backend code, before declaring the change done. It's the same `tsc --noEmit` the `pre-push` hook runs, just on demand mid-change.
 
+Both workspaces use a `@/*` → `src/*` path alias for cross-directory imports (frontend via Vite; backend via tsconfig `paths`, resolved by `tsx` in dev, **`tsc-alias`** in the build, and vitest `resolve.alias`). Because Node can't resolve a bare `@/` at runtime, the backend `build` is `tsc && tsc-alias` — `tsc-alias` rewrites every `@/…` back to a relative specifier in `dist/`. **Prod-safety guard:** after `npm run build -w backend`, `! grep -rlE 'from "@/|import\("@/' backend/dist` must be empty (an alias leaking into `dist` would crash `node dist/index.js`).
+
 ## Guardrails (local git hooks)
 
 [lefthook](https://lefthook.dev) runs fast, infra-free gates before code reaches CI. Hooks install automatically via the root `prepare` script on `npm install` — config is `lefthook.yml`.

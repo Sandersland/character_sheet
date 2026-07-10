@@ -5,20 +5,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { Router } from "express";
 
-vi.mock("../prisma.js", () => ({
+vi.mock("@/lib/prisma.js", () => ({
   prisma: { character: { findUnique: vi.fn() } },
 }));
-vi.mock("../auth/access.js", () => ({
+vi.mock("@/lib/auth/access.js", () => ({
   assertCharacterAccess: vi.fn(),
 }));
-vi.mock("../character-serialize.js", () => ({
+vi.mock("@/lib/character-serialize.js", () => ({
   serializeCharacter: vi.fn((row: { id: string }) => ({ id: row.id, serialized: true })),
 }));
-vi.mock("../character-include.js", () => ({ characterInclude: { marker: true } }));
+vi.mock("@/lib/character-include.js", () => ({ characterInclude: { marker: true } }));
 
-import { makeTransactionsEndpoint } from "../transactions-endpoint.js";
-import { prisma } from "../prisma.js";
-import { assertCharacterAccess } from "../auth/access.js";
+import { makeTransactionsEndpoint } from "@/lib/transactions-endpoint.js";
+import { prisma } from "@/lib/prisma.js";
+import { assertCharacterAccess } from "@/lib/auth/access.js";
 
 const findUnique = vi.mocked(prisma.character.findUnique);
 const access = vi.mocked(assertCharacterAccess);

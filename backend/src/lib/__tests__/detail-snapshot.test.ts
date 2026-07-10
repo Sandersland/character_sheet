@@ -8,7 +8,7 @@ import {
   type ArmorDetailFields,
   type ConsumableDetailFields,
   type WeaponDetailFields,
-} from "../detail-snapshot.js";
+} from "@/lib/detail-snapshot.js";
 
 // Pure unit tests — no DB. Covers the field-copy builders shared by the
 // catalog-acquire, campaign-award, and undo-restore snapshot sites.

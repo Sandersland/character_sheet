@@ -1,4 +1,4 @@
-import { Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "@/generated/prisma/client.js";
 import { experienceProgress, levelForExperience } from "./experience.js";
 import {
   serializeArmorDetail,

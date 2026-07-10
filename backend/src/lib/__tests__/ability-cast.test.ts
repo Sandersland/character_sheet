@@ -8,13 +8,13 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { Prisma } from "../../generated/prisma/client.js";
-import { prisma } from "../prisma.js";
-import { ensureTestOwner } from "../../test-support/owner.js";
-import { castAbilityInTx } from "../ability-cast.js";
-import type { EffectSpec } from "../effects.js";
-import type { PayCostContext } from "../ability-cost.js";
-import type { SpellcastingMutableState } from "../spell-state.js";
+import { Prisma } from "@/generated/prisma/client.js";
+import { prisma } from "@/lib/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
+import { castAbilityInTx } from "@/lib/ability-cast.js";
+import type { EffectSpec } from "@/lib/effects.js";
+import type { PayCostContext } from "@/lib/ability-cost.js";
+import type { SpellcastingMutableState } from "@/lib/spell-state.js";
 
 const OWNER_ID = "owner-ability-cast";
 

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { prisma } from "../prisma.js";
+import { prisma } from "@/lib/prisma.js";
 import {
   createSession,
   destroySession,
   lookupSession,
-} from "../auth/session.js";
+} from "@/lib/auth/session.js";
 
 // Postgres-backed: session create/lookup/destroy hit AuthSession. A per-file
 // owner avoids cross-file races on the shared dev DB. Cookie helpers and the

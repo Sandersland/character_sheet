@@ -11,7 +11,7 @@
  * deriveResources() (class-features.ts).
  */
 
-import { Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "@/generated/prisma/client.js";
 import { castAbilityInTx } from "./ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "./ability-cost.js";
 import { runCharacterTransaction } from "./character-transaction.js";

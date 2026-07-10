@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
 
-import { assertCharacterAccess } from "../../lib/auth/access.js";
-import { InvalidResourceOperationError } from "../../lib/resources.js";
-import { InvalidSpellcastingOperationError } from "../../lib/ability-cost.js";
+import { assertCharacterAccess } from "@/lib/auth/access.js";
+import { InvalidResourceOperationError } from "@/lib/resources.js";
+import { InvalidSpellcastingOperationError } from "@/lib/ability-cost.js";
 import {
   applyChannelDivinityOperations,
   describeChannelDivinity,
@@ -11,10 +11,10 @@ import {
   isEntitled,
   InvalidChannelDivinityOperationError,
   type GateEntry,
-} from "../../lib/channel-divinity.js";
-import { proficiencyBonusForLevel, levelForExperience } from "../../lib/experience.js";
-import { prisma } from "../../lib/prisma.js";
-import { makeTransactionsEndpoint } from "../../lib/transactions-endpoint.js";
+} from "@/lib/channel-divinity.js";
+import { proficiencyBonusForLevel, levelForExperience } from "@/lib/experience.js";
+import { prisma } from "@/lib/prisma.js";
+import { makeTransactionsEndpoint } from "@/lib/transactions-endpoint.js";
 
 export const channelDivinityRouter = Router({ mergeParams: true });
 

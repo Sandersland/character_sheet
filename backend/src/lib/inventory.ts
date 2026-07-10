@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { Prisma, type EquipSlot, type ItemRarity } from "../generated/prisma/client.js";
+import { Prisma, type EquipSlot, type ItemRarity } from "@/generated/prisma/client.js";
 import {
   activatedMaxUses,
   activatedRechargeRest,

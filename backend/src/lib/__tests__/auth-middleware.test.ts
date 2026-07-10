@@ -3,11 +3,11 @@ import express from "express";
 import supertest from "supertest";
 import "express-async-errors";
 
-import { requireAuth } from "../auth/middleware.js";
-import { createSession, SESSION_COOKIE } from "../auth/session.js";
-import { errorHandler } from "../error-handler.js";
-import { prisma } from "../prisma.js";
-import { ensureTestOwner } from "../../test-support/owner.js";
+import { requireAuth } from "@/lib/auth/middleware.js";
+import { createSession, SESSION_COOKIE } from "@/lib/auth/session.js";
+import { errorHandler } from "@/lib/error-handler.js";
+import { prisma } from "@/lib/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
 
 // Minimal app that mounts requireAuth in front of one protected route which
 // echoes the resolved user. Real Postgres for the session lookup. The terminal

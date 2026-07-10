@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "../../../app.js";
+import { createApp } from "@/app.js";
 
 // The SPA sends `credentials: "include"` so the session cookie flows
 // cross-origin (dev: 5173 → 4000). That requires CORS to allow credentials AND

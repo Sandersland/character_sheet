@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "../../../app.js";
-import { prisma } from "../../../lib/prisma.js";
-import { authCookie } from "../../../test-support/auth.js";
-import { ensureTestOwner } from "../../../test-support/owner.js";
+import { createApp } from "@/app.js";
+import { prisma } from "@/lib/prisma.js";
+import { authCookie } from "@/test-support/auth.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
 
 // Minimal valid character row for a given owner (no relations needed — these
 // tests only exercise ownership, not derivation).

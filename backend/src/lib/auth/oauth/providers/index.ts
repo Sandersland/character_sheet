@@ -1,4 +1,4 @@
-import type { ProviderDefinition } from "../types.js";
+import type { ProviderDefinition } from "@/lib/auth/oauth/types.js";
 
 import { googleProvider } from "./google.js";
 

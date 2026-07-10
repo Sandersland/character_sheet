@@ -1,4 +1,4 @@
-import type { ArmorCategory, WeaponClass, WeaponRange } from "../generated/prisma/client.js";
+import type { ArmorCategory, WeaponClass, WeaponRange } from "@/generated/prisma/client.js";
 
 // Every *Detail table (Item, CampaignItem, InventoryItem tiers — see
 // schema.prisma) carries this exact mechanical column shape. This module is

@@ -6,8 +6,8 @@ import {
   normalizeActiveEffectsMutable,
   serializeActiveEffectsState,
   type ActiveEffectsMutableState,
-} from "../active-effects.js";
-import { readEffectSpec, resolveBuffSpec, type EffectRow } from "../effects.js";
+} from "@/lib/active-effects.js";
+import { readEffectSpec, resolveBuffSpec, type EffectRow } from "@/lib/effects.js";
 
 describe("normalizeActiveEffectsMutable", () => {
   it("returns an empty buff list for null / non-object input", () => {
