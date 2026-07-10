@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Request, Response } from "express";
 
-import { securityHeaders } from "@/lib/security.js";
+import { securityHeaders } from "@/lib/core/security.js";
 
 // Pure middleware test — no Postgres. Runs the helmet handler against a fake
 // res and reads back the Content-Security-Policy header it sets. Guards the

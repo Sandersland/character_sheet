@@ -9,9 +9,9 @@ import type { CorsOptions } from "cors";
 import express from "express";
 
 import { requireAuth } from "@/lib/auth/middleware.js";
-import { errorHandler } from "@/lib/error-handler.js";
-import { httpLogger } from "@/lib/logger.js";
-import { creationRateLimiter, globalRateLimiter, securityHeaders } from "@/lib/security.js";
+import { errorHandler } from "@/lib/core/error-handler.js";
+import { httpLogger } from "@/lib/core/logger.js";
+import { creationRateLimiter, globalRateLimiter, securityHeaders } from "@/lib/core/security.js";
 import { actionsRouter } from "@/routes/character/actions.js";
 import { activityRouter } from "@/routes/character/activity.js";
 import { authRouter } from "@/routes/platform/auth.js";

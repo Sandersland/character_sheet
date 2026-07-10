@@ -5,8 +5,8 @@ import "express-async-errors";
 
 import { requireAuth } from "@/lib/auth/middleware.js";
 import { createSession, SESSION_COOKIE } from "@/lib/auth/session.js";
-import { errorHandler } from "@/lib/error-handler.js";
-import { prisma } from "@/lib/prisma.js";
+import { errorHandler } from "@/lib/core/error-handler.js";
+import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 
 // Minimal app that mounts requireAuth in front of one protected route which

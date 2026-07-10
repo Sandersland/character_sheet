@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import { SESSION_COOKIE } from "@/lib/auth/session.js";
 
 // Test-only helper. Once requireAuth gates every protected /api route, route

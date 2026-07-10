@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
-import { prisma } from "@/lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { awardCampaignItem } from "@/lib/campaign-item-award.js";
 import { inventoryItemDetailInclude } from "@/lib/inventory.js";

@@ -5,7 +5,7 @@ import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access
 import { collectMergedInIdentities, wouldCreateCycle } from "@/lib/entity-merges.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { normalizeForMatch } from "@/lib/journal-refs.js";
-import { prisma } from "@/lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 
 // Campaign entity registry (#248): the shared wiki of NPCs/locations/factions/
 // items/PCs a table tags from journal notes. Plain-REST (like campaigns.ts):

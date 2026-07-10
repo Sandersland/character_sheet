@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-import { prisma } from "@/lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 
 // Opaque server-side sessions — the method-agnostic identity layer. Any auth
 // method (OAuth today, password/magic-link later) mints a session the same way.

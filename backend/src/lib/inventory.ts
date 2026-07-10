@@ -24,10 +24,10 @@ import {
   snapshotDetailCreate,
   weaponDetailFields,
 } from "./detail-snapshot.js";
-import { rollDie } from "./dice.js";
+import { rollDie } from "@/lib/core/dice.js";
 import { logEvent } from "./events.js";
 import { applyHealInTx } from "./hitpoints.js";
-import { prisma } from "./prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import { getActiveSessionId } from "./sessions.js";
 
 // 5e: a character can attune to at most 3 magic items (DMG p. 138). Derived

@@ -1,5 +1,5 @@
 import { createApp } from "./app.js";
-import { logger } from "@/lib/logger.js";
+import { logger } from "@/lib/core/logger.js";
 
 const port = process.env.PORT ? Number(process.env.PORT) : 4000;
 
