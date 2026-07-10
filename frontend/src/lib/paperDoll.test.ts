@@ -7,8 +7,10 @@ import {
   equipSlotLabel,
   hasEquipSlots,
   isOffHandLocked,
+  isProficientWithItem,
   itemsInSlot,
   SLOT_GROUPS,
+  versatileGrip,
   WORN_SLOTS,
   wornSlotItemKindLabel,
 } from "@/lib/paperDoll";
@@ -145,6 +147,71 @@ describe("WORN_SLOTS (#572)", () => {
     expect(wornSlotItemKindLabel("HEAD")).toBe("Headwear");
     expect(wornSlotItemKindLabel("FEET")).toBe("Boots");
     expect(wornSlotItemKindLabel("RING")).toBe("Ring");
+  });
+});
+
+describe("isProficientWithItem (#554)", () => {
+  const simpleSword = weapon(false, { name: "Club", weapon: { ...weapon().weapon!, weaponClass: "simple" } });
+  const martialSword = weapon(false, { name: "Longsword", weapon: { ...weapon().weapon!, weaponClass: "martial" } });
+
+  it("matches weapon category grants against weaponClass", () => {
+    expect(isProficientWithItem(simpleSword, [{ name: "Simple Weapons" }], [])).toBe(true);
+    expect(isProficientWithItem(martialSword, [{ name: "Simple Weapons" }], [])).toBe(false);
+    expect(isProficientWithItem(martialSword, [{ name: "Martial Weapons" }], [])).toBe(true);
+  });
+
+  it("matches a pluralised specific-weapon grant against the singular catalog name", () => {
+    expect(isProficientWithItem(martialSword, [{ name: "Longswords" }], [])).toBe(true);
+    expect(isProficientWithItem(martialSword, [{ name: "Shortswords" }], [])).toBe(false);
+  });
+
+  it("warns (false) when no grant covers the weapon", () => {
+    expect(isProficientWithItem(martialSword, [{ name: "Simple Weapons" }], [])).toBe(false);
+    expect(isProficientWithItem(simpleSword, [], [])).toBe(false);
+  });
+
+  it("matches armor by category, including shields", () => {
+    expect(isProficientWithItem(bodyArmor(), [], [{ category: "medium" }])).toBe(true);
+    expect(isProficientWithItem(bodyArmor(), [], [{ category: "light" }])).toBe(false);
+    expect(isProficientWithItem(shield(), [], [{ category: "shield" }])).toBe(true);
+  });
+
+  it("never warns on items that carry no proficiency requirement", () => {
+    expect(isProficientWithItem(item(), [], [])).toBe(true); // gear
+    expect(isProficientWithItem(item({ category: "consumable" }), [], [])).toBe(true);
+  });
+});
+
+describe("versatileGrip (#554)", () => {
+  const versatile = (grip: "one-handed" | "two-handed" | "versatile-two-handed", faces: number) =>
+    weapon(false, {
+      name: "Longsword",
+      weapon: {
+        ...weapon().weapon!,
+        versatileDiceCount: 1,
+        versatileDiceFaces: 10,
+        damage: { damageDiceCount: 1, damageDiceFaces: faces, damageModifier: 0, damageType: "slashing", grip },
+      },
+    });
+
+  it("shows the two-handed die + caption when the off-hand is free", () => {
+    expect(versatileGrip(versatile("versatile-two-handed", 10))).toEqual({
+      short: "1d10",
+      full: "1d10 · two-handed grip",
+    });
+  });
+
+  it("shows the one-handed die alone when a shield/weapon fills the off-hand", () => {
+    expect(versatileGrip(versatile("one-handed", 8))).toEqual({ short: "1d8", full: "1d8" });
+  });
+
+  it("is null for a non-versatile weapon and for a weapon with no derived damage", () => {
+    expect(versatileGrip(weapon(false))).toBeNull();
+    expect(
+      versatileGrip(
+        weapon(false, { weapon: { ...weapon().weapon!, versatileDiceCount: 1, versatileDiceFaces: 10 } }),
+      ),
+    ).toBeNull();
   });
 });
 

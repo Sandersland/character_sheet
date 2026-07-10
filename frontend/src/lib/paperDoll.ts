@@ -105,3 +105,55 @@ export function bagItemsForSlot(inventory: InventoryItem[], slot: EquipSlot): In
     .filter((item) => item.equippedSlot == null && allowedSlotsForItem(item).includes(slot))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
+
+// Whether the character is proficient with an equipped item — the frontend
+// mirror of backend srd.ts isProficientWithWeapon plus the armor-category rule.
+// Weapon grants mix category labels ("Simple Weapons"/"Martial Weapons", matched
+// by weaponClass) with pluralised specific names ("Longswords", matched against
+// the singular catalog name); armor grants are category-keyed. Items that carry
+// no proficiency requirement (gear, consumables, detail-less weapons/armor) are
+// always "proficient" so the doll never warns on them. Reads arrays already on
+// the wire — no server round-trip.
+export function isProficientWithItem(
+  item: InventoryItem,
+  weaponProficiencies: ReadonlyArray<{ name: string }>,
+  armorProficiencies: ReadonlyArray<{ category: string }>,
+): boolean {
+  if (item.category === "weapon") {
+    const weaponClass = item.weapon?.weaponClass;
+    const lcName = item.name.toLowerCase();
+    return weaponProficiencies.some((grant) => {
+      if (grant.name === "Simple Weapons" && weaponClass === "simple") return true;
+      if (grant.name === "Martial Weapons" && weaponClass === "martial") return true;
+      // Specific weapon: grants are plural ("Longswords"), catalog names singular.
+      return grant.name.toLowerCase().replace(/s$/, "") === lcName;
+    });
+  }
+  if (item.category === "armor") {
+    const category = item.armor?.armorCategory;
+    if (!category) return true;
+    return armorProficiencies.some((grant) => grant.category === category);
+  }
+  return true;
+}
+
+// A versatile weapon's current grip, split for the two display surfaces: `short`
+// ("1d10"/"1d8") is the compact tile badge that flips as the off-hand fills or
+// clears; `full` ("1d10 · two-handed grip") is the Popover detail line. Both read
+// the server-derived damage snapshot (deriveWeaponDamage picks the two-handed die
+// only when the off-hand is free). Null for non-versatile weapons (nothing flips)
+// or items lacking a derived damage snapshot.
+export interface VersatileGrip {
+  short: string;
+  full: string;
+}
+
+export function versatileGrip(item: InventoryItem): VersatileGrip | null {
+  const weapon = item.weapon;
+  if (weapon?.versatileDiceCount == null || weapon.versatileDiceFaces == null) return null;
+  const damage = weapon.damage;
+  if (!damage) return null;
+  const short = `${damage.damageDiceCount}d${damage.damageDiceFaces}`;
+  const full = damage.grip === "versatile-two-handed" ? `${short} · two-handed grip` : short;
+  return { short, full };
+}

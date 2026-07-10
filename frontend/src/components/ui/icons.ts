@@ -58,4 +58,4 @@ export const EQUIP_SLOT_ICONS: Record<EquipSlot, IconType> = {
 };
 
 export { GiQuillInk, GiKnapsack, GiSpellBook, GiHealthNormal, GiChestArmor } from "react-icons/gi";
-export { Lock, Plus, Zap, VenetianMask, ChevronDown, Trash2 } from "lucide-react";
+export { Lock, Plus, Zap, VenetianMask, ChevronDown, Trash2, TriangleAlert, Link2 } from "lucide-react";
