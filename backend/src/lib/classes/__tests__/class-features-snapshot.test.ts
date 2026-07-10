@@ -4,7 +4,7 @@
 // byte-identical before and after the refactor.
 import { describe, expect, it } from "vitest";
 
-import { deriveResources, deriveResourcesForCharacterRow, resolveClassDie } from "@/lib/class-features.js";
+import { deriveResources, deriveResourcesForCharacterRow, resolveClassDie } from "@/lib/classes/class-features.js";
 import { proficiencyBonusForLevel } from "@/lib/experience.js";
 
 const CLASS_SUBCLASSES: Record<string, (string | undefined)[]> = {

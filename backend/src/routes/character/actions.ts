@@ -22,14 +22,14 @@ import { z } from "zod";
 
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { ACTION_EFFECT_FN, ACTION_CAST_FN, rageMeleeDamageBonus } from "@/lib/actions.js";
+import { ACTION_EFFECT_FN, ACTION_CAST_FN, rageMeleeDamageBonus } from "@/lib/classes/actions.js";
 import { castAbilityInTx } from "@/lib/ability-cast.js";
 import type { PayCostContext } from "@/lib/ability-cost.js";
-import type { SpendResourceOperation } from "@/lib/resources.js";
+import type { SpendResourceOperation } from "@/lib/classes/resources.js";
 import type { AdjustQuantityOperation } from "@/lib/inventory/inventory.js";
 import { applyAdjustQuantity } from "@/lib/inventory/inventory.js";
 import { applyHealInTx } from "@/lib/hitpoints.js";
-import { applySpendResourceInTx } from "@/lib/resources.js";
+import { applySpendResourceInTx } from "@/lib/classes/resources.js";
 import { appendActiveBuffInTx, clearBuffByKeyInTx } from "@/lib/active-effects.js";
 import { normalizeSpellcastingMutable } from "@/lib/spell-state.js";
 import { getActiveSessionId } from "@/lib/sessions.js";

@@ -33,9 +33,9 @@ import {
   type FightingStyleKey,
   type ToolProficiencyEntry,
 } from "@/lib/srd/srd.js";
-import { deriveResources } from "@/lib/class-features.js";
-import { deriveActions, type AvailableAction } from "@/lib/actions.js";
-import { normalizeResourcesMutable, type AdvancementEntry, type ToolProfEntry } from "@/lib/resources.js";
+import { deriveResources } from "@/lib/classes/class-features.js";
+import { deriveActions, type AvailableAction } from "@/lib/classes/actions.js";
+import { normalizeResourcesMutable, type AdvancementEntry, type ToolProfEntry } from "@/lib/classes/resources.js";
 import { normalizeConditionsMutable } from "@/lib/conditions.js";
 import { buffsByTarget, normalizeActiveEffectsMutable, type ActiveBuff } from "@/lib/active-effects.js";
 import {
@@ -60,7 +60,7 @@ import {
   deriveItemSpells,
   type AbilityScores,
 } from "@/lib/granted-spells.js";
-import { SHADOW_ART_CONCENTRATION_PREFIX } from "@/lib/shadow-arts.js";
+import { SHADOW_ART_CONCENTRATION_PREFIX } from "@/lib/classes/shadow-arts.js";
 import type { CharacterWithRelations } from "./character-include.js";
 
 export function serializeCharacterSummary(row: {

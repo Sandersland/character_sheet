@@ -4,8 +4,8 @@ import { z } from "zod";
 import {
   applyManeuverOperations,
   InvalidManeuverOperationError,
-} from "@/lib/maneuvers.js";
-import { InvalidResourceOperationError } from "@/lib/resources.js";
+} from "@/lib/classes/maneuvers.js";
+import { InvalidResourceOperationError } from "@/lib/classes/resources.js";
 import { InvalidSpellcastingOperationError } from "@/lib/ability-cost.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";

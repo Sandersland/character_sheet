@@ -13,8 +13,8 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
-import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
-import { logEvent } from "./events.js";
+import { proficiencyBonusForLevel, levelForExperience } from "../experience.js";
+import { logEvent } from "../events.js";
 import { deriveResources, type DerivedClassInfo } from "./class-features.js";
 import {
   toolsByCategory,
