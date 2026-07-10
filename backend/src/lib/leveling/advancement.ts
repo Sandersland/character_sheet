@@ -23,10 +23,10 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { levelForExperience, proficiencyBonusForLevel } from "./experience.js";
-import { logEvent } from "./events.js";
-import { normalizeResourcesMutable, serializeResourcesState, type AdvancementEntry } from "./classes/resources.js";
+import { logEvent } from "@/lib/events.js";
+import { normalizeResourcesMutable, serializeResourcesState, type AdvancementEntry } from "@/lib/classes/resources.js";
 import { advancementSlotsForLevel, abilityModifier } from "@/lib/srd/srd.js";
-import { normalizeHitPoints, normalizeHitDice } from "./hitpoints.js";
+import { normalizeHitPoints, normalizeHitDice } from "@/lib/hitpoints.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 
@@ -121,7 +121,7 @@ export interface TakeFeatOperation {
   custom?: {
     name: string;
     description: string;
-    improvements?: import("./classes/resources.js").FeatImprovement[];
+    improvements?: import("@/lib/classes/resources.js").FeatImprovement[];
     /**
      * Half-feat style: list of ability names the player may choose to bump.
      * When provided (non-empty), `abilityChoice` must be set at the operation level.
@@ -309,7 +309,7 @@ export async function applyAdvancementOperations(
           let featDescription: string;
           const abilityDeltas: Record<string, number> = {};
           let resolvedFeatId: string | undefined;
-          let featImprovements: import("./classes/resources.js").FeatImprovement[] = [];
+          let featImprovements: import("@/lib/classes/resources.js").FeatImprovement[] = [];
 
           if (op.featId) {
             const catalogFeat = await tx.feat.findUnique({ where: { id: op.featId } });
@@ -323,7 +323,7 @@ export async function applyAdvancementOperations(
             resolvedFeatId = catalogFeat.id;
             // Snapshot the catalog's improvements so removal/derivation never
             // depend on the catalog row being present or unchanged.
-            featImprovements = (catalogFeat.improvements as unknown as import("./classes/resources.js").FeatImprovement[]) ?? [];
+            featImprovements = (catalogFeat.improvements as unknown as import("@/lib/classes/resources.js").FeatImprovement[]) ?? [];
 
             // Half-feat ability bump.
             if (catalogFeat.abilityOptions.length > 0) {

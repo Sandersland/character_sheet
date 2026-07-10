@@ -1,7 +1,7 @@
 // Flattens the per-class definitions in classes/<class>.ts into the dispatch
 // tables deriveResources() merges from, and exposes the class-features.ts
 // public surface (resolveClassDie / deriveResources / deriveResourcesForCharacterRow).
-import { levelForExperience, proficiencyBonusForLevel } from "@/lib/experience.js";
+import { levelForExperience, proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
 import { barbarian } from "./barbarian.js";
 import { bard } from "./bard.js";

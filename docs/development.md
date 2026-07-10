@@ -150,7 +150,7 @@ npx prisma generate
 Additive changes (new model, new enum value via `ALTER TYPE ADD VALUE`) are safe to deploy without backfill.
 
 ### 2. Rules data (if any)
-If the feature has 5e rules logic, add it to `backend/src/lib/srd.ts` (or `experience.ts` for XP math). Never inline rules in a route or duplicate them on the frontend.
+If the feature has 5e rules logic, add it to `backend/src/lib/srd.ts` (or `leveling/experience.ts` for XP math). Never inline rules in a route or duplicate them on the frontend.
 
 > **Level-gated feature?** If the feature's availability or count depends on character level (feats, ASI, subclass unlocks, etc.), follow the reconciliation pattern in `docs/leveling.md` in addition to this recipe. The transaction-handler checklist below still applies, but you also need a reconciler + read-clamp.
 

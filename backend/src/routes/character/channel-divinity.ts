@@ -12,7 +12,7 @@ import {
   InvalidChannelDivinityOperationError,
   type GateEntry,
 } from "@/lib/classes/channel-divinity.js";
-import { proficiencyBonusForLevel, levelForExperience } from "@/lib/experience.js";
+import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 

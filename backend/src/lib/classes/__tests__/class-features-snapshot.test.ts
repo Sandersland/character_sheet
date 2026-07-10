@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import { deriveResources, deriveResourcesForCharacterRow, resolveClassDie } from "@/lib/classes/class-features.js";
-import { proficiencyBonusForLevel } from "@/lib/experience.js";
+import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 
 const CLASS_SUBCLASSES: Record<string, (string | undefined)[]> = {
   barbarian: [undefined, "totem warrior", "berserker"],

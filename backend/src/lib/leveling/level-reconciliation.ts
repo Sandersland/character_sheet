@@ -31,7 +31,7 @@
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { proficiencyBonusForLevel } from "./experience.js";
-import { logEvent, type EventType } from "./events.js";
+import { logEvent, type EventType } from "@/lib/events.js";
 import {
   normalizeResourcesMutable,
   serializeResourcesState,
@@ -40,13 +40,13 @@ import {
   type ManeuverEntry,
   type ResourcesMutableState,
   type ToolProfEntry,
-} from "./classes/resources.js";
+} from "@/lib/classes/resources.js";
 import { advancementSlotsForLevel, fightingStyleChoiceCount, FIGHTING_STYLES } from "@/lib/srd/srd.js";
-import { deriveResources, type DerivedClassInfo } from "./classes/class-features.js";
+import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { reverseAdvancementEffects } from "./advancement.js";
-import { normalizeHitPoints } from "./hitpoints.js";
-import { normalizeSpellcastingMutable } from "./spell-state.js";
-import { deriveGrantedSpells } from "./granted-spells.js";
+import { normalizeHitPoints } from "@/lib/hitpoints.js";
+import { normalizeSpellcastingMutable } from "@/lib/spell-state.js";
+import { deriveGrantedSpells } from "@/lib/granted-spells.js";
 
 // ── Reconcile context ─────────────────────────────────────────────────────────
 

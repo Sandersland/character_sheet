@@ -2,12 +2,12 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { levelForExperience } from "./experience.js";
-import { logEvent } from "./events.js";
+import { logEvent } from "@/lib/events.js";
 import { reconcileLevelGatedState } from "./level-reconciliation.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { fixedAverageForDie, normalizeHitDice, normalizeHitPoints } from "./hitpoints.js";
+import { fixedAverageForDie, normalizeHitDice, normalizeHitPoints } from "@/lib/hitpoints.js";
 import { abilityModifier, hitDieFace } from "@/lib/srd/srd.js";
-import { getActiveSessionId, recomputeSummaries } from "./sessions.js";
+import { getActiveSessionId, recomputeSummaries } from "@/lib/sessions.js";
 
 export class InvalidExperienceOperationError extends Error {}
 

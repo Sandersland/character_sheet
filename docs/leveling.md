@@ -12,7 +12,7 @@ Read this when you are:
 `experiencePoints` is the only stored authority for a character's level. `level` and `proficiencyBonus` are **never columns** — they are computed at read time:
 
 ```
-backend/src/lib/experience.ts
+backend/src/lib/leveling/experience.ts
   levelForExperience(xp)         → number 1–20 (pure, no DB)
   proficiencyBonusForLevel(lvl)  → number
   experienceProgress(xp)         → { level, proficiencyBonus, currentLevelThreshold,
@@ -42,7 +42,7 @@ XP going up does **not** automatically raise HP. A character can have XP at leve
 When a new XP value drops the derived level below `hitDice.total`, `applyExperienceOperations` calls `revertLevelUps` inside the same transaction:
 
 ```
-backend/src/lib/experience-ops.ts
+backend/src/lib/leveling/experience-ops.ts
   revertLevelUps(tx, characterId, currentHdTotal, targetLevel, batchId)
 ```
 
@@ -61,7 +61,7 @@ When level drops, this state must be reconciled. The system uses two complementa
 Runs inside the XP transaction immediately after `revertLevelUps`. The entry point is:
 
 ```
-backend/src/lib/level-reconciliation.ts
+backend/src/lib/leveling/level-reconciliation.ts
   reconcileLevelGatedState(ctx: ReconcileContext)
 ```
 
@@ -123,7 +123,7 @@ When you ship a feature whose count or availability depends on level (feats, ASI
 Add the level table and derivation function to `backend/src/lib/srd.ts`. Example: a `featsGrantedAt(className, level)` helper returning how many feats the character is allowed. Never inline rules in a route or duplicate them on the frontend (see CLAUDE.md non-negotiables).
 
 ### 2. Write a `Reconciler` and register it
-In `backend/src/lib/level-reconciliation.ts`:
+In `backend/src/lib/leveling/level-reconciliation.ts`:
 - If the feature is a **"known" list in `Character.resources`** capped by a level-derived choice count (like maneuvers/disciplines/tool profs), write it as a thin `reconcileKnownList(ctx, config)` config — the helper owns the fetch → derive → early-return → trim → update → `logEvent` flow. The config supplies: `listKey`, `allowed(derived)` (the choice-count extractor), `eventType`, `summary(removedCount, allowed)`, and `snapshot(state)` (the before/after event payload — called on the live state before and after the trim).
 - Otherwise write `async function reconcile<Feature>(ctx: ReconcileContext): Promise<void>` by hand:
   - Re-read only the persisted fields you need (one indexed read).
