@@ -5,7 +5,7 @@ import {
   serializeArmorDetail,
   serializeConsumableDetail,
   serializeWeaponDetail,
-} from "@/lib/itemDetail.js";
+} from "@/lib/inventory/itemDetail.js";
 import { prisma } from "@/lib/core/prisma.js";
 
 export const itemsRouter = Router();
@@ -19,7 +19,7 @@ const itemInclude = {
 type ItemWithDetails = Prisma.ItemGetPayload<{ include: typeof itemInclude }>;
 
 // Same nested weapon/armor/consumable shape serializeInventoryItem in
-// routes/characters.ts builds for an InventoryItem — see lib/itemDetail.ts.
+// routes/characters.ts builds for an InventoryItem — see lib/inventory/itemDetail.ts.
 function serializeItem(row: ItemWithDetails) {
   return {
     id: row.id,

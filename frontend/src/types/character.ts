@@ -164,7 +164,7 @@ export interface Item {
 }
 
 // ── Item capabilities & attunement (#546) ─────────────────────────────────────
-// Mirrors backend lib/capabilities.ts. Only passiveBonus is authorable/rendered
+// Mirrors backend lib/inventory/capabilities.ts. Only passiveBonus is authorable/rendered
 // this slice; the reserved kinds round-trip as opaque.
 export type CapabilityKind = "passiveBonus" | "castSpell" | "charges" | "grant" | "activatedEffect";
 
@@ -185,7 +185,7 @@ export type CapabilityOp = "add" | "setTo";
 
 export type AttunementPrereqKind = "class" | "spellcaster" | "species" | "alignment";
 
-// grant kind (#529). Mirrors backend lib/capabilities.ts.
+// grant kind (#529). Mirrors backend lib/inventory/capabilities.ts.
 export type GrantType = "resistance" | "immunity" | "conditionImmunity" | "advantage" | "proficiency";
 export type AdvantageOn = "save" | "check" | "initiative" | "attack";
 export type GrantValueKind = "damageType" | "condition" | "skill" | "ability" | "save" | "weapon" | "tool" | "language";
@@ -377,7 +377,7 @@ export type ActivationType = "action" | "bonus" | "reaction" | "commandWord";
 // Looser than WeaponDetail/ArmorDetail above (which describe what the API
 // always returns, every flag included) — these describe what a client only
 // has to *send*: just the fields the matching *Detail table's columns are
-// NOT NULL for, matching backend's lib/inventory.ts WeaponDetailInput/
+// NOT NULL for, matching backend's lib/inventory/inventory.ts WeaponDetailInput/
 // ArmorDetailInput exactly. Everything else defaults server-side and is
 // refinable later via an `update` operation.
 export interface WeaponDetailInput {
@@ -413,7 +413,7 @@ export interface ArmorDetailInput {
  * Body for a custom (homebrew) `acquire` operation — same shape as `Item`
  * minus `id`, plus the category's required minimal detail block (backend's
  * routes/inventory.ts rejects e.g. a "weapon" with no `weapon` block, since
- * those columns are NOT NULL). Matches backend's lib/inventory.ts
+ * those columns are NOT NULL). Matches backend's lib/inventory/inventory.ts
  * CustomItemInput.
  */
 export type CustomItemInput =
@@ -445,7 +445,7 @@ export type CustomItemInput =
 
 /**
  * One operation in a `POST /api/characters/:id/inventory/transactions`
- * batch — see backend's lib/inventory.ts for the full semantics (which ops
+ * batch — see backend's lib/inventory/inventory.ts for the full semantics (which ops
  * get logged to the ledger, atomicity, etc). A request batches 1+ of these.
  */
 export type InventoryOperation =

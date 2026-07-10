@@ -26,8 +26,8 @@ import { ACTION_EFFECT_FN, ACTION_CAST_FN, rageMeleeDamageBonus } from "@/lib/ac
 import { castAbilityInTx } from "@/lib/ability-cast.js";
 import type { PayCostContext } from "@/lib/ability-cost.js";
 import type { SpendResourceOperation } from "@/lib/resources.js";
-import type { AdjustQuantityOperation } from "@/lib/inventory.js";
-import { applyAdjustQuantity } from "@/lib/inventory.js";
+import type { AdjustQuantityOperation } from "@/lib/inventory/inventory.js";
+import { applyAdjustQuantity } from "@/lib/inventory/inventory.js";
 import { applyHealInTx } from "@/lib/hitpoints.js";
 import { applySpendResourceInTx } from "@/lib/resources.js";
 import { appendActiveBuffInTx, clearBuffByKeyInTx } from "@/lib/active-effects.js";

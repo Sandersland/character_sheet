@@ -10,7 +10,7 @@ import {
   InsufficientCurrencyError,
   InvalidInventoryOperationError,
   revertInventoryEvent,
-} from "@/lib/inventory.js";
+} from "@/lib/inventory/inventory.js";
 
 const OWNER_ID = "owner-inventory-lib";
 

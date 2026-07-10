@@ -5,7 +5,7 @@ import {
   applyInventoryOperations,
   InsufficientCurrencyError,
   InvalidInventoryOperationError,
-} from "@/lib/inventory.js";
+} from "@/lib/inventory/inventory.js";
 import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const inventoryRouter = Router({ mergeParams: true });

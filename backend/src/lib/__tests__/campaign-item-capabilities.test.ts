@@ -6,7 +6,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { awardCampaignItem } from "@/lib/campaign-item-award.js";
-import { inventoryItemDetailInclude } from "@/lib/inventory.js";
+import { inventoryItemDetailInclude } from "@/lib/inventory/inventory.js";
 
 const OWNER_ID = "owner-cap-award-lib";
 

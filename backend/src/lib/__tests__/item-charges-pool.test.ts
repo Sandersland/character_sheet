@@ -5,7 +5,7 @@ import { characterInclude } from "@/lib/character-include.js";
 import { serializeCharacter } from "@/lib/character-serialize.js";
 import { revertBatch } from "@/lib/activity.js";
 import { applyHitPointOperations } from "@/lib/hitpoints.js";
-import { applyInventoryOperations } from "@/lib/inventory.js";
+import { applyInventoryOperations } from "@/lib/inventory/inventory.js";
 import { applySpellcastingOperations } from "@/lib/spellcasting.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";

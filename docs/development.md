@@ -159,7 +159,7 @@ If the feature has 5e rules logic, add it to `backend/src/lib/srd.ts` (or `exper
 - `export async function apply<Domain>Operations(characterId, ops)`: one `randomUUID()` batchId → `prisma.$transaction` → per-op: validate, mutate, `logEvent(tx, { category, type, summary, before, after, batchId })`.
 - Throw domain errors for invalid ops (the route catches them → 400).
 
-See `lib/inventory.ts` as the reference.
+See `lib/inventory/inventory.ts` as the reference.
 
 ### 4. `routes/<domain>.ts` — endpoint
 ```typescript

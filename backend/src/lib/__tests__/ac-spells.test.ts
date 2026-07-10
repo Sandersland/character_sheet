@@ -13,7 +13,7 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import { characterInclude } from "@/lib/character-include.js";
 import { serializeCharacter } from "@/lib/character-serialize.js";
 import { applySpellcastingOperations } from "@/lib/spellcasting.js";
-import { applyInventoryOperations } from "@/lib/inventory.js";
+import { applyInventoryOperations } from "@/lib/inventory/inventory.js";
 import { applyHitPointOperations } from "@/lib/hitpoints.js";
 
 const OWNER_ID = "owner-ac-spells";

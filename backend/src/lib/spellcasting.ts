@@ -1,6 +1,6 @@
 /**
  * Spellcasting transaction handler — the spellcasting counterpart to
- * lib/inventory.ts and lib/hitpoints.ts.
+ * lib/inventory/inventory.ts and lib/hitpoints.ts.
  *
  * The per-character mutable spell state lives in a single JSON column
  * (Character.spellcasting) rather than relational rows — see the plan note

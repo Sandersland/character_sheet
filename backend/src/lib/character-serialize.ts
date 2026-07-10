@@ -4,7 +4,7 @@ import {
   serializeArmorDetail,
   serializeConsumableDetail,
   serializeWeaponDetail,
-} from "./itemDetail.js";
+} from "./inventory/itemDetail.js";
 import { normalizeHitDice, normalizeHitPoints } from "./hitpoints.js";
 import {
   abilityModifier,
@@ -49,8 +49,8 @@ import {
   serializeCapability,
   type ActivatedEffectCapability,
   type ItemPassiveContribution,
-} from "./capabilities.js";
-import { itemBuffKey } from "./inventory.js";
+} from "./inventory/capabilities.js";
+import { itemBuffKey } from "./inventory/inventory.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeSpellcastingMutable } from "./spellcasting.js";
 import type { SpellEntry } from "./spell-state.js";
