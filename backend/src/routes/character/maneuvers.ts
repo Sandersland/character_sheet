@@ -6,7 +6,7 @@ import {
   InvalidManeuverOperationError,
 } from "@/lib/classes/maneuvers.js";
 import { InvalidResourceOperationError } from "@/lib/classes/resources.js";
-import { InvalidSpellcastingOperationError } from "@/lib/ability-cost.js";
+import { InvalidSpellcastingOperationError } from "@/lib/spellcasting/ability-cost.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 

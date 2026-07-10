@@ -5,7 +5,7 @@ import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
-import type { SpellEntry } from "@/lib/spell-state.js";
+import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
 
 const OWNER_ID = "owner-serialize-item-cast";
 

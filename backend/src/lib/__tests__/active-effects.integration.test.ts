@@ -13,10 +13,10 @@ import { createApp } from "@/app.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
-import { castAbilityInTx } from "@/lib/ability-cast.js";
+import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { clearBuffsForSourceInTx, normalizeActiveEffectsMutable } from "@/lib/active-effects.js";
 import type { EffectSpec } from "@/lib/effects.js";
-import { normalizeSpellcastingMutable } from "@/lib/spell-state.js";
+import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import { revertBatch } from "@/lib/activity.js";
 
 const OWNER_ID = "owner-active-effects";

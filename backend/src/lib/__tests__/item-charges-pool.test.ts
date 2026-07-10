@@ -6,10 +6,10 @@ import { serializeCharacter } from "@/lib/character/character-serialize.js";
 import { revertBatch } from "@/lib/activity.js";
 import { applyHitPointOperations } from "@/lib/hitpoints.js";
 import { applyInventoryOperations } from "@/lib/inventory/inventory.js";
-import { applySpellcastingOperations } from "@/lib/spellcasting.js";
+import { applySpellcastingOperations } from "@/lib/spellcasting/spellcasting.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
-import type { SpellEntry } from "@/lib/spell-state.js";
+import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
 
 const OWNER_ID = "owner-item-charges-pool";
 
