@@ -810,121 +810,143 @@ function applyStabilizeOp(ctx: HpOpContext): HpOpResult {
   return { summary: "Stabilized", eventData: {} };
 }
 
-async function applyLevelUpOp(ctx: HpOpContext, op: LevelUpOperation): Promise<HpOpResult> {
-  const { tx, characterId, row, hp, hd, conMod, faces, primaryEntry, beforeClassLevel } = ctx;
-  const derivedLevel = levelForExperience(row.experiencePoints);
-  if (hd.total >= derivedLevel) {
+// ---- Level-up helpers ----
+// applyLevelUpOp dispatches on the op's target: a NEW class (multiclass), an
+// EXISTING class entry, or the no-target position-0 self-heal. All three share
+// the roll validation + HP/hit-dice bump and the same eventData shape, which
+// stores enough to exactly reverse the level-up (Phase 4 undo, and the
+// auto-reverse in experience-ops.ts when XP is lowered).
+
+/**
+ * Validate the client roll against the CHOSEN class's die (may differ from
+ * the position-0 die stored in hd.die once multiclassing is in play).
+ */
+function requireLevelUpRoll(op: LevelUpOperation, dieFaces: number): void {
+  if (op.method === "roll" && (op.roll === undefined || op.roll < 1 || op.roll > dieFaces)) {
     throw new InvalidHitPointOperationError(
-      `No pending level-up: already at level ${hd.total} (XP derives level ${derivedLevel})`
+      `Roll for level-up must be between 1 and ${dieFaces} (got ${String(op.roll)})`
     );
   }
+}
 
-  // Validate the client roll against the CHOSEN class's die (may differ from
-  // the position-0 die stored in hd.die once multiclassing is in play).
-  const requireRoll = (dieFaces: number): void => {
-    if (op.method === "roll" && (op.roll === undefined || op.roll < 1 || op.roll > dieFaces)) {
-      throw new InvalidHitPointOperationError(
-        `Roll for level-up must be between 1 and ${dieFaces} (got ${String(op.roll)})`
-      );
-    }
+/** Apply the shared HP/hit-dice bump for a given die face count; returns the gain. */
+function bumpHpForLevelUp(ctx: HpOpContext, op: LevelUpOperation, dieFaces: number): number {
+  const gain = levelUpHpGain(dieFaces, ctx.conMod, op.method, op.roll);
+  ctx.hd.total += 1;
+  ctx.hp.max += gain;
+  ctx.hp.current += gain;
+  return gain;
+}
+
+/** The reversal-grade eventData every level-up variant shares. */
+function levelUpEventData(
+  op: LevelUpOperation,
+  conMod: number,
+  faces: number,
+  hpGain: number,
+  entry: { primaryEntryId: string | null; prevEntryLevel: number | null; newEntryLevel: number },
+): Record<string, unknown> {
+  return {
+    method: op.method,
+    roll: op.roll ?? null,
+    conMod,
+    faces,
+    hpGain,
+    ...entry,
   };
+}
 
-  // Apply the shared HP/hit-dice bump for a given die face count.
-  const bumpHp = (dieFaces: number): number => {
-    const gain = levelUpHpGain(dieFaces, conMod, op.method, op.roll);
-    hd.total += 1;
-    hp.max += gain;
-    hp.current += gain;
-    return gain;
-  };
-
-  const target = op.target;
-
-  // ── New class (multiclass) ───────────────────────────────────────────────
-  if (target?.kind === "new") {
-    const catalog = await tx.characterClass.findUnique({
-      where: { id: target.classId },
-      select: { id: true, name: true, hitDie: true },
-    });
-    if (!catalog) {
-      throw new InvalidHitPointOperationError(`Class not found: ${target.classId}`);
-    }
-    if (row.classEntries.some((e) => e.classId === catalog.id)) {
-      throw new InvalidHitPointOperationError(
-        `Character already has levels in ${catalog.name} — use an existing-class target`
-      );
-    }
-    const abilityScores = row.abilityScores as Record<string, number>;
-    const prereq = multiclassPrerequisitesMet(catalog.name, abilityScores);
-    if (!prereq.met) {
-      throw new InvalidHitPointOperationError(
-        `Cannot multiclass into ${catalog.name}: requires ${prereq.description}`
-      );
-    }
-    const newFaces = hitDieFace(catalog.hitDie);
-    requireRoll(newFaces);
-    const gain = bumpHp(newFaces);
-    const position = row.classEntries.reduce((max, e) => Math.max(max, e.position), -1) + 1;
-    const created = await tx.characterClassEntry.create({
-      data: { characterId, classId: catalog.id, name: catalog.name, level: 1, position },
-    });
-    return {
-      summary: `Multiclassed into ${catalog.name} (level 1, +${gain} HP)`,
-      eventData: {
-        method: op.method,
-        roll: op.roll ?? null,
-        conMod,
-        faces: newFaces,
-        hpGain: gain,
+/** Level up into a NEW class (multiclass): prereq-gated, creates a level-1 entry. */
+async function applyNewClassLevelUp(
+  ctx: HpOpContext,
+  op: LevelUpOperation,
+  target: { classId: string },
+): Promise<HpOpResult> {
+  const { tx, characterId, row, conMod } = ctx;
+  const catalog = await tx.characterClass.findUnique({
+    where: { id: target.classId },
+    select: { id: true, name: true, hitDie: true },
+  });
+  if (!catalog) {
+    throw new InvalidHitPointOperationError(`Class not found: ${target.classId}`);
+  }
+  if (row.classEntries.some((e) => e.classId === catalog.id)) {
+    throw new InvalidHitPointOperationError(
+      `Character already has levels in ${catalog.name} — use an existing-class target`
+    );
+  }
+  const abilityScores = row.abilityScores as Record<string, number>;
+  const prereq = multiclassPrerequisitesMet(catalog.name, abilityScores);
+  if (!prereq.met) {
+    throw new InvalidHitPointOperationError(
+      `Cannot multiclass into ${catalog.name}: requires ${prereq.description}`
+    );
+  }
+  const newFaces = hitDieFace(catalog.hitDie);
+  requireLevelUpRoll(op, newFaces);
+  const gain = bumpHpForLevelUp(ctx, op, newFaces);
+  const position = row.classEntries.reduce((max, e) => Math.max(max, e.position), -1) + 1;
+  const created = await tx.characterClassEntry.create({
+    data: { characterId, classId: catalog.id, name: catalog.name, level: 1, position },
+  });
+  return {
+    summary: `Multiclassed into ${catalog.name} (level 1, +${gain} HP)`,
+    eventData: {
+      ...levelUpEventData(op, conMod, newFaces, gain, {
         primaryEntryId: null,
-        createdClassEntryId: created.id,
         prevEntryLevel: null,
         newEntryLevel: 1,
-      },
-    };
-  }
+      }),
+      createdClassEntryId: created.id,
+    },
+  };
+}
 
-  // ── Existing class (chosen entry) ────────────────────────────────────────
-  if (target?.kind === "existing") {
-    const entry = row.classEntries.find((e) => e.id === target.classEntryId);
-    if (!entry) {
-      throw new InvalidHitPointOperationError(`Class entry not found: ${target.classEntryId}`);
-    }
-    const entryFaces = entry.class ? hitDieFace(entry.class.hitDie) : faces;
-    requireRoll(entryFaces);
-    const gain = bumpHp(entryFaces);
-    const newEntryLevel = entry.level + 1;
-    await tx.characterClassEntry.update({
-      where: { id: entry.id },
-      data: { level: newEntryLevel },
-    });
-    return {
-      summary: `Leveled up ${entry.name} to ${newEntryLevel} (+${gain} HP)`,
-      eventData: {
-        method: op.method,
-        roll: op.roll ?? null,
-        conMod,
-        faces: entryFaces,
-        hpGain: gain,
-        primaryEntryId: entry.id,
-        prevEntryLevel: entry.level,
-        newEntryLevel,
-      },
-    };
+/** Level up a CHOSEN existing class entry, rolling that entry's own die. */
+async function applyExistingClassLevelUp(
+  ctx: HpOpContext,
+  op: LevelUpOperation,
+  target: { classEntryId: string },
+): Promise<HpOpResult> {
+  const { tx, row, conMod, faces } = ctx;
+  const entry = row.classEntries.find((e) => e.id === target.classEntryId);
+  if (!entry) {
+    throw new InvalidHitPointOperationError(`Class entry not found: ${target.classEntryId}`);
   }
+  const entryFaces = entry.class ? hitDieFace(entry.class.hitDie) : faces;
+  requireLevelUpRoll(op, entryFaces);
+  const gain = bumpHpForLevelUp(ctx, op, entryFaces);
+  const newEntryLevel = entry.level + 1;
+  await tx.characterClassEntry.update({
+    where: { id: entry.id },
+    data: { level: newEntryLevel },
+  });
+  return {
+    summary: `Leveled up ${entry.name} to ${newEntryLevel} (+${gain} HP)`,
+    eventData: levelUpEventData(op, conMod, entryFaces, gain, {
+      primaryEntryId: entry.id,
+      prevEntryLevel: entry.level,
+      newEntryLevel,
+    }),
+  };
+}
 
-  // ── No target — position-0 self-heal (backward-compatible path) ──────────
-  // Only valid for single-class characters. A multiclass character has no
-  // unambiguous position-0 to self-heal: this path would set that entry's
-  // level to `hd.total` (the *total* character level), inflating it (#124).
-  // Require an explicit target instead.
+/**
+ * No target — position-0 self-heal (backward-compatible path). Only valid for
+ * single-class characters. A multiclass character has no unambiguous
+ * position-0 to self-heal: this path would set that entry's level to
+ * `hd.total` (the *total* character level), inflating it (#124). Callers with
+ * more than one entry must pass an explicit target instead.
+ */
+async function applySelfHealLevelUp(ctx: HpOpContext, op: LevelUpOperation): Promise<HpOpResult> {
+  const { tx, row, hd, conMod, faces, primaryEntry, beforeClassLevel } = ctx;
   if (row.classEntries.length > 1) {
     throw new InvalidHitPointOperationError(
       "Multiclass character requires an explicit level-up target (existing or new class)"
     );
   }
-  requireRoll(faces);
-  const gain = bumpHp(faces);
+  requireLevelUpRoll(op, faces);
+  const gain = bumpHpForLevelUp(ctx, op, faces);
 
   // Repair the position-0 class entry's `level` to match the newly-applied
   // total. The seed defaults all entries to level 1 even for level-7 chars;
@@ -936,21 +958,28 @@ async function applyLevelUpOp(ctx: HpOpContext, op: LevelUpOperation): Promise<H
     });
   }
 
-  // Store enough data to exactly reverse this level-up later (Phase 4 undo)
-  // or when XP is lowered (auto-reverse in experience-ops.ts).
   return {
     summary: `Leveled up to ${hd.total} (+${gain} HP)`,
-    eventData: {
-      method: op.method,
-      roll: op.roll ?? null,
-      conMod,
-      faces,
-      hpGain: gain,
+    eventData: levelUpEventData(op, conMod, faces, gain, {
       primaryEntryId: primaryEntry?.id ?? null,
       prevEntryLevel: beforeClassLevel,
       newEntryLevel: hd.total,
-    },
+    }),
   };
+}
+
+async function applyLevelUpOp(ctx: HpOpContext, op: LevelUpOperation): Promise<HpOpResult> {
+  const { hd, row } = ctx;
+  const derivedLevel = levelForExperience(row.experiencePoints);
+  if (hd.total >= derivedLevel) {
+    throw new InvalidHitPointOperationError(
+      `No pending level-up: already at level ${hd.total} (XP derives level ${derivedLevel})`
+    );
+  }
+  const target = op.target;
+  if (target?.kind === "new") return applyNewClassLevelUp(ctx, op, target);
+  if (target?.kind === "existing") return applyExistingClassLevelUp(ctx, op, target);
+  return applySelfHealLevelUp(ctx, op);
 }
 
 // Reset the per-capability `used` counter of any active item castSpell whose
@@ -1473,6 +1502,81 @@ async function dispatchHpOp(ctx: HpOpContext, op: HpStateOperation): Promise<HpO
  *   lifted into before/after and `delete`d here, so on return `eventData` holds
  *   only the fields that belong in the event's `data` payload.
  */
+/** The mutable pair every snapshot lifter below appends to. */
+interface HpOpSnapshots {
+  beforeState: Record<string, unknown>;
+  afterState: Record<string, unknown>;
+}
+
+/**
+ * levelUp: capture the class-entry level diff from the op result — it points
+ * at the CHOSEN entry (or is null for a new-class add), not always position-0.
+ */
+function liftLevelUpSnapshot(snaps: HpOpSnapshots, eventData: Record<string, unknown>): void {
+  snaps.beforeState.classEntryLevel = (eventData.prevEntryLevel as number | null) ?? null;
+  snaps.afterState.classEntryLevel = (eventData.newEntryLevel as number | null) ?? null;
+}
+
+/**
+ * longRest: spellcasting (so undo re-expends the slots), resources, and the
+ * consumable recharge (#121) snapshots. The after-spellcasting reflects the
+ * cleared state, preserving the known-spell list.
+ */
+function liftLongRestSnapshot(snaps: HpOpSnapshots, data: Record<string, unknown>): void {
+  const beforeSpell = data.beforeSpellState as Record<string, unknown>;
+  snaps.beforeState.spellcasting = beforeSpell;
+  snaps.afterState.spellcasting = { slotsUsed: {}, arcanumUsed: {}, spells: beforeSpell?.spells ?? [], concentratingOn: null };
+  delete data.beforeSpellState; // don't duplicate in eventData
+  if (data.beforeResourceState !== undefined) {
+    snaps.beforeState.resources = data.beforeResourceState;
+    snaps.afterState.resources = data.afterResourceState ?? data.beforeResourceState;
+    delete data.beforeResourceState;
+    delete data.afterResourceState;
+  }
+  if (data.consumableChargesBefore !== undefined) {
+    snaps.beforeState.consumableCharges = data.consumableChargesBefore;
+    snaps.afterState.consumableCharges = data.consumableChargesAfter ?? data.consumableChargesBefore;
+    delete data.consumableChargesBefore;
+    delete data.consumableChargesAfter;
+  }
+}
+
+/**
+ * shortRest: resources land in `before` ONLY (there is deliberately no
+ * after.resources key — undo restores from before), plus the Warlock Pact
+ * restore when present; a short rest preserves arcanum and concentration.
+ */
+function liftShortRestSnapshot(snaps: HpOpSnapshots, data: Record<string, unknown>): void {
+  if (data.beforeResourceState !== undefined) {
+    snaps.beforeState.resources = data.beforeResourceState;
+    delete data.beforeResourceState;
+  }
+  if (data.beforeSpellState !== undefined) {
+    const beforeSpell = data.beforeSpellState as Record<string, unknown>;
+    snaps.beforeState.spellcasting = beforeSpell;
+    snaps.afterState.spellcasting = {
+      slotsUsed: {},
+      arcanumUsed: beforeSpell?.arcanumUsed ?? {},
+      spells: beforeSpell?.spells ?? [],
+      concentratingOn: beforeSpell?.concentratingOn ?? null,
+    };
+    delete data.beforeSpellState;
+  }
+}
+
+/**
+ * Item charge-pool recharge (#555) — either rest can fire it (short-trigger
+ * pools recharge on short rests too); snapshot so undo re-expends the pool.
+ */
+function liftChargePoolSnapshot(snaps: HpOpSnapshots, data: Record<string, unknown>): void {
+  if (data.chargePoolsBefore !== undefined) {
+    snaps.beforeState.chargePools = data.chargePoolsBefore;
+    snaps.afterState.chargePools = data.chargePoolsAfter ?? data.chargePoolsBefore;
+    delete data.chargePoolsBefore;
+    delete data.chargePoolsAfter;
+  }
+}
+
 function buildHpOpSnapshots(
   ctx: HpOpContext,
   op: HpStateOperation,
@@ -1481,66 +1585,15 @@ function buildHpOpSnapshots(
   eventData: Record<string, unknown>,
 ): { beforeState: Record<string, unknown>; afterState: Record<string, unknown> } {
   const { hp, hd } = ctx;
-  const beforeState: Record<string, unknown> = { hitPoints: beforeHp, hitDice: beforeHd };
-  const afterState: Record<string, unknown> = { hitPoints: { ...hp }, hitDice: { ...hd } };
-  if (op.type === "levelUp") {
-    // Pull the class-entry level diff from the op result — it points at the
-    // CHOSEN entry (or is null for a new-class add), not always position-0.
-    beforeState.classEntryLevel = (eventData.prevEntryLevel as number | null) ?? null;
-    afterState.classEntryLevel = (eventData.newEntryLevel as number | null) ?? null;
-  }
-  if (op.type === "longRest") {
-    const data = eventData;
-    const beforeSpell = data.beforeSpellState as Record<string, unknown>;
-    beforeState.spellcasting = beforeSpell;
-    // Reflect the cleared state, preserving the known-spell list + arcanum keys.
-    afterState.spellcasting = { slotsUsed: {}, arcanumUsed: {}, spells: beforeSpell?.spells ?? [], concentratingOn: null };
-    delete data.beforeSpellState; // don't duplicate in eventData
-    if (data.beforeResourceState !== undefined) {
-      beforeState.resources = data.beforeResourceState;
-      afterState.resources = data.afterResourceState ?? data.beforeResourceState;
-      delete data.beforeResourceState;
-      delete data.afterResourceState;
-    }
-    // Consumable recharge (#121) — snapshot so undo re-expends the charges.
-    if (data.consumableChargesBefore !== undefined) {
-      beforeState.consumableCharges = data.consumableChargesBefore;
-      afterState.consumableCharges = data.consumableChargesAfter ?? data.consumableChargesBefore;
-      delete data.consumableChargesBefore;
-      delete data.consumableChargesAfter;
-    }
-  }
-  // Item charge-pool recharge (#555) — either rest can fire it (short-trigger
-  // pools recharge on short rests too); snapshot so undo re-expends the pool.
-  if (op.type === "shortRest" || op.type === "longRest") {
-    const data = eventData;
-    if (data.chargePoolsBefore !== undefined) {
-      beforeState.chargePools = data.chargePoolsBefore;
-      afterState.chargePools = data.chargePoolsAfter ?? data.chargePoolsBefore;
-      delete data.chargePoolsBefore;
-      delete data.chargePoolsAfter;
-    }
-  }
-  if (op.type === "shortRest") {
-    const data = eventData;
-    if (data.beforeResourceState !== undefined) {
-      beforeState.resources = data.beforeResourceState;
-      delete data.beforeResourceState;
-    }
-    // Warlock Pact slot restore (present only when the rester is a Warlock).
-    if (data.beforeSpellState !== undefined) {
-      const beforeSpell = data.beforeSpellState as Record<string, unknown>;
-      beforeState.spellcasting = beforeSpell;
-      afterState.spellcasting = {
-        slotsUsed: {},
-        arcanumUsed: beforeSpell?.arcanumUsed ?? {},
-        spells: beforeSpell?.spells ?? [],
-        concentratingOn: beforeSpell?.concentratingOn ?? null,
-      };
-      delete data.beforeSpellState;
-    }
-  }
-  return { beforeState, afterState };
+  const snaps: HpOpSnapshots = {
+    beforeState: { hitPoints: beforeHp, hitDice: beforeHd },
+    afterState: { hitPoints: { ...hp }, hitDice: { ...hd } },
+  };
+  if (op.type === "levelUp") liftLevelUpSnapshot(snaps, eventData);
+  if (op.type === "longRest") liftLongRestSnapshot(snaps, eventData);
+  if (op.type === "shortRest" || op.type === "longRest") liftChargePoolSnapshot(snaps, eventData);
+  if (op.type === "shortRest") liftShortRestSnapshot(snaps, eventData);
+  return snaps;
 }
 
 /**
