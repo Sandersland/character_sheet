@@ -9,7 +9,7 @@ import {
   InsufficientCurrencyError,
   InvalidInventoryOperationError,
   revertInventoryEvent,
-} from "./inventory/inventory.js";
+} from "@/lib/inventory/inventory.js";
 
 // Runtime-checkable set of every valid CharacterEventCategory, derived from the
 // Prisma-generated enum so it can never drift from the schema.

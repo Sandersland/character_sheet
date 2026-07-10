@@ -7,7 +7,7 @@ import {
   readCapability,
   type ActivatedEffectCapability,
 } from "./capabilities.js";
-import { logEvent } from "@/lib/events.js";
+import { logEvent } from "@/lib/activity/events.js";
 
 // Resets activatedUsesSpent to 0 for items whose activatedEffect recharges on the
 // given rest (#543). perRest(short) recharges on short|long; everything else on

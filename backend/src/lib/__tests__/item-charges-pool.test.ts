@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Prisma } from "@/generated/prisma/client.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
-import { revertBatch } from "@/lib/activity.js";
+import { revertBatch } from "@/lib/activity/activity.js";
 import { applyHitPointOperations } from "@/lib/combat/hitpoints.js";
 import { applyInventoryOperations } from "@/lib/inventory/inventory.js";
 import { applySpellcastingOperations } from "@/lib/spellcasting/spellcasting.js";

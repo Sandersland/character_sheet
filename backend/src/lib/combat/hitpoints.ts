@@ -10,7 +10,7 @@ import {
 } from "./active-effects.js";
 import { itemImmuneDamageTypes, itemResistedDamageTypes, type GrantItem } from "@/lib/inventory/capabilities.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
-import { logEvent } from "@/lib/events.js";
+import { logEvent } from "@/lib/activity/events.js";
 import { resetActivatedUsesForRestInTx } from "@/lib/inventory/item-recharge.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { getActiveSessionId } from "@/lib/session/sessions.js";

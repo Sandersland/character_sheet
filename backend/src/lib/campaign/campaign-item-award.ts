@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { snapshotDetailCreate } from "@/lib/inventory/detail-snapshot.js";
-import { logEvent } from "../events.js";
+import { logEvent } from "@/lib/activity/events.js";
 import { snapshotInventoryItemForUndo, inventoryItemDetailInclude } from "@/lib/inventory/inventory.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { getActiveSessionId } from "@/lib/session/sessions.js";

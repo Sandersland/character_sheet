@@ -4,7 +4,7 @@ import {
   buildActivityQuery,
   revertBatch,
   serializeActivityEvent,
-} from "@/lib/activity.js";
+} from "@/lib/activity/activity.js";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { prisma } from "@/lib/core/prisma.js";
 

@@ -17,7 +17,7 @@ import { readAbilityCost, type PayCostContext } from "@/lib/spellcasting/ability
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { deriveResourcesForCharacterRow } from "./class-features.js";
 import type { EffectSpec } from "@/lib/combat/effects.js";
-import { logEvent } from "../events.js";
+import { logEvent } from "@/lib/activity/events.js";
 import { normalizeSpellcastingMutable, type SpellcastingMutableState } from "@/lib/spellcasting/spell-state.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────

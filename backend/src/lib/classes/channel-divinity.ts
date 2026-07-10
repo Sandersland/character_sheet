@@ -17,7 +17,7 @@ import { appendActiveBuffInTx } from "@/lib/combat/active-effects.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { applyConditionInTx } from "@/lib/combat/conditions.js";
 import type { EffectSpec } from "@/lib/combat/effects.js";
-import { logEvent } from "../events.js";
+import { logEvent } from "@/lib/activity/events.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import { abilityModifier } from "@/lib/srd/srd.js";

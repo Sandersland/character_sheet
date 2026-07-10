@@ -1,7 +1,7 @@
 /**
  * Revert-matrix characterization for reverseEvent (#615).
  *
- * reverseEvent (lib/activity.ts) is the LIFO-undo core: a switch over event
+ * reverseEvent (lib/activity/activity.ts) is the LIFO-undo core: a switch over event
  * category that restores the before-snapshot. The refactor moves each category
  * branch into a REVERT_HANDLERS registry, so every category needs undo coverage
  * that stays green UNEDITED through the migration.

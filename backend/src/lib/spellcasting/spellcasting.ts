@@ -24,7 +24,7 @@ import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContex
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { readEffectSpec } from "@/lib/combat/effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
-import { logEvent } from "@/lib/events.js";
+import { logEvent } from "@/lib/activity/events.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
 import { deriveGrantedSpells, deriveItemSpells } from "./granted-spells.js";
 import type { ItemSpellSourceItem } from "./granted-spells.js";

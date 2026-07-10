@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { levelForExperience } from "./experience.js";
-import { logEvent } from "@/lib/events.js";
+import { logEvent } from "@/lib/activity/events.js";
 import { reconcileLevelGatedState } from "./level-reconciliation.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { fixedAverageForDie, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
