@@ -19,6 +19,7 @@
 //   3. Add the feature list to SUBCLASS_FEATURE_LIST.
 //   4. Add an entry to SUBCLASS_GRANT_LEVEL if the subclass is granted before L3.
 
+import { levelForExperience, proficiencyBonusForLevel } from "./experience.js";
 import { abilityModifier } from "@/lib/srd/srd.js";
 
 export type RechargeOn = "shortRest" | "longRest" | "short-or-long" | "none";
@@ -2392,4 +2393,32 @@ export function deriveResources(
   }
 
   return result;
+}
+
+/**
+ * Row-shaped convenience wrapper over {@link deriveResources}: derives level and
+ * proficiency bonus from a character row's XP + primary class entry, then returns
+ * that class's non-slot resource derivation plus the computed `level` — consumers
+ * that also need level-scaled cost math (e.g. a future `disciplines.ts` migration)
+ * can destructure `level` directly. Shared by the die-fueled activated-ability
+ * handlers (maneuvers, shadow arts), which each re-read the same
+ * {name, subclass} + XP + abilityScores select shape per op.
+ */
+export function deriveResourcesForCharacterRow(row: {
+  experiencePoints: number;
+  abilityScores: unknown;
+  classEntries: { name: string; subclass: string | null }[];
+}): { derived: DerivedClassInfo | null; level: number } {
+  const level = levelForExperience(row.experiencePoints);
+  const profBonus = proficiencyBonusForLevel(level);
+  const primaryEntry = row.classEntries[0];
+  const abilityScores = row.abilityScores as Record<string, number>;
+  const derived = deriveResources(
+    primaryEntry?.name ?? "",
+    primaryEntry?.subclass ?? undefined,
+    level,
+    abilityScores,
+    profBonus,
+  );
+  return { derived, level };
 }
