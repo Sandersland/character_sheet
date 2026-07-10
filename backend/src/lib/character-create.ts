@@ -494,7 +494,7 @@ async function persistCreatedCharacter(
       experiencePoints: input.experiencePoints ?? 0,
       abilityScores: input.abilityScores,
       ...derived,
-      // toolProficiencies is ToolProficiencyEntry[] from srd.ts; Prisma
+      // toolProficiencies is ToolProficiencyEntry[] from srd/srd.ts; Prisma
       // expects InputJsonValue for Json columns — safe to cast here.
       toolProficiencies: derived.toolProficiencies as unknown as Prisma.InputJsonValue,
       // Override derived currency with starting gold if the gold path was chosen.

@@ -6,7 +6,7 @@
  * `initiativeBonus` (which are updated atomically in the same transaction).
  *
  * What is derived at read time: the total slot count (advancementSlotsForLevel
- * in srd.ts) and the clamped display values in serializeCharacter.
+ * in srd/srd.ts) and the clamped display values in serializeCharacter.
  *
  * Design notes:
  *   - Each AdvancementEntry records the exact deltas applied so reversal

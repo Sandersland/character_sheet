@@ -10,8 +10,8 @@
  *
  * What is persisted: slot `used` counts and the learned `spells[]` array.
  * What is derived at read time (in lib/character-serialize.ts serializeCharacter):
- *   - slot totals (from srd.ts FULL_CASTER_SLOTS + class + level)
- *   - spellSaveDC / spellAttackBonus / ability (from srd.ts deriveSpellcasting)
+ *   - slot totals (from srd/srd.ts FULL_CASTER_SLOTS + class + level)
+ *   - spellSaveDC / spellAttackBonus / ability (from srd/srd.ts deriveSpellcasting)
  */
 
 import { randomUUID } from "node:crypto";

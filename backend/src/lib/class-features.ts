@@ -1,5 +1,5 @@
 // Class features + trackable resources for all 12 base classes and their SRD
-// subclasses. Extracted from srd.ts to keep that file at its intended scope
+// subclasses. Extracted from srd/srd.ts to keep that file at its intended scope
 // (small rules tables + core derivation helpers).
 //
 // `deriveResources` is the analog to `deriveSpellcasting` for non-slot
