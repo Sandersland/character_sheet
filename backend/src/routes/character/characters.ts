@@ -5,14 +5,14 @@ import { Router } from "express";
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/events.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { createCharacter } from "@/lib/character-create.js";
-import { characterInclude } from "@/lib/character-include.js";
-import { serializeCharacter, serializeCharacterSummary } from "@/lib/character-serialize.js";
+import { createCharacter } from "@/lib/character/character-create.js";
+import { characterInclude } from "@/lib/character/character-include.js";
+import { serializeCharacter, serializeCharacterSummary } from "@/lib/character/character-serialize.js";
 import {
   campaignPreferencesSchema,
   createCharacterSchema,
   updateCharacterSchema,
-} from "@/lib/character-schemas.js";
+} from "@/lib/character/character-schemas.js";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 
 export const charactersRouter = Router();
@@ -50,7 +50,7 @@ charactersRouter.get("/characters/:id", async (req, res) => {
 });
 
 // Thin controller: parse the HTTP contract, delegate domain work to
-// createCharacter (lib/character-create.ts), then re-fetch + serialize with the
+// createCharacter (lib/character/character-create.ts), then re-fetch + serialize with the
 // same persist-then-reserialize idiom the mutation routes use.
 charactersRouter.post("/characters", async (req, res) => {
   const parseResult = createCharacterSchema.safeParse(req.body);

@@ -1,11 +1,11 @@
 import { Prisma } from "@/generated/prisma/client.js";
-import { experienceProgress, levelForExperience } from "./experience.js";
+import { experienceProgress, levelForExperience } from "@/lib/experience.js";
 import {
   serializeArmorDetail,
   serializeConsumableDetail,
   serializeWeaponDetail,
-} from "./itemDetail.js";
-import { normalizeHitDice, normalizeHitPoints } from "./hitpoints.js";
+} from "@/lib/itemDetail.js";
+import { normalizeHitDice, normalizeHitPoints } from "@/lib/hitpoints.js";
 import {
   abilityModifier,
   advancementSlotsForLevel,
@@ -33,11 +33,11 @@ import {
   type FightingStyleKey,
   type ToolProficiencyEntry,
 } from "@/lib/srd/srd.js";
-import { deriveResources } from "./class-features.js";
-import { deriveActions, type AvailableAction } from "./actions.js";
-import { normalizeResourcesMutable, type AdvancementEntry, type ToolProfEntry } from "./resources.js";
-import { normalizeConditionsMutable } from "./conditions.js";
-import { buffsByTarget, normalizeActiveEffectsMutable, type ActiveBuff } from "./active-effects.js";
+import { deriveResources } from "@/lib/class-features.js";
+import { deriveActions, type AvailableAction } from "@/lib/actions.js";
+import { normalizeResourcesMutable, type AdvancementEntry, type ToolProfEntry } from "@/lib/resources.js";
+import { normalizeConditionsMutable } from "@/lib/conditions.js";
+import { buffsByTarget, normalizeActiveEffectsMutable, type ActiveBuff } from "@/lib/active-effects.js";
 import {
   activatedMaxUses,
   chargePoolOf,
@@ -49,18 +49,18 @@ import {
   serializeCapability,
   type ActivatedEffectCapability,
   type ItemPassiveContribution,
-} from "./capabilities.js";
-import { itemBuffKey } from "./inventory.js";
-import { reverseAdvancementEffects } from "./advancement.js";
-import { normalizeSpellcastingMutable } from "./spellcasting.js";
-import type { SpellEntry } from "./spell-state.js";
+} from "@/lib/capabilities.js";
+import { itemBuffKey } from "@/lib/inventory.js";
+import { reverseAdvancementEffects } from "@/lib/advancement.js";
+import { normalizeSpellcastingMutable } from "@/lib/spellcasting.js";
+import type { SpellEntry } from "@/lib/spell-state.js";
 import {
   deriveGrantedSpells,
   deriveGrantedCastingAbility,
   deriveItemSpells,
   type AbilityScores,
-} from "./granted-spells.js";
-import { SHADOW_ART_CONCENTRATION_PREFIX } from "./shadow-arts.js";
+} from "@/lib/granted-spells.js";
+import { SHADOW_ART_CONCENTRATION_PREFIX } from "@/lib/shadow-arts.js";
 import type { CharacterWithRelations } from "./character-include.js";
 
 export function serializeCharacterSummary(row: {
