@@ -13,7 +13,7 @@
  */
 
 import { Prisma } from "@/generated/prisma/client.js";
-import { applySpendResourceInTx, type SpendResourceOperation } from "./resources.js";
+import { applySpendResourceInTx, type SpendResourceOperation } from "./classes/resources.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 

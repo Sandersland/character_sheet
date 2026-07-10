@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { deriveResources } from "@/lib/class-features.js";
+import { deriveResources } from "@/lib/classes/class-features.js";
 import { deriveSpellcasting, type DerivedSpellcastingInfo } from "@/lib/srd/srd.js";
 
 // Ability scores with distinct INT/WIS/CHA mods so tests can assert the right

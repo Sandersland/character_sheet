@@ -6,7 +6,7 @@ import {
   applyShadowArtsOperations,
   shadowArtEffectSpec,
   InvalidShadowArtOperationError,
-} from "@/lib/shadow-arts.js";
+} from "@/lib/classes/shadow-arts.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 

@@ -24,8 +24,8 @@ import {
   multiclassPrerequisitesMet,
 } from "@/lib/srd/srd.js";
 import { rollDie } from "@/lib/core/dice.js";
-import { deriveResources } from "./class-features.js";
-import { normalizeResourcesMutable, serializeResourcesState } from "./resources.js";
+import { deriveResources } from "./classes/class-features.js";
+import { normalizeResourcesMutable, serializeResourcesState } from "./classes/resources.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
 import {
   castResourceRechargesOn,

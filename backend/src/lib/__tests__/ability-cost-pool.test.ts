@@ -12,7 +12,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { payAbilityCostInTx } from "@/lib/ability-cost.js";
-import { InvalidResourceOperationError } from "@/lib/resources.js";
+import { InvalidResourceOperationError } from "@/lib/classes/resources.js";
 
 const OWNER_ID = "owner-ability-cost-pool";
 

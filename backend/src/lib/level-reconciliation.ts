@@ -40,9 +40,9 @@ import {
   type ManeuverEntry,
   type ResourcesMutableState,
   type ToolProfEntry,
-} from "./resources.js";
+} from "./classes/resources.js";
 import { advancementSlotsForLevel, fightingStyleChoiceCount, FIGHTING_STYLES } from "@/lib/srd/srd.js";
-import { deriveResources, type DerivedClassInfo } from "./class-features.js";
+import { deriveResources, type DerivedClassInfo } from "./classes/class-features.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeHitPoints } from "./hitpoints.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";

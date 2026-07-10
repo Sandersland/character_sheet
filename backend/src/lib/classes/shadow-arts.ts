@@ -12,13 +12,13 @@
  */
 
 import { Prisma } from "@/generated/prisma/client.js";
-import { castAbilityInTx } from "./ability-cast.js";
-import { readAbilityCost, type PayCostContext } from "./ability-cost.js";
+import { castAbilityInTx } from "../ability-cast.js";
+import { readAbilityCost, type PayCostContext } from "../ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { deriveResourcesForCharacterRow } from "./class-features.js";
-import type { EffectSpec } from "./effects.js";
-import { logEvent } from "./events.js";
-import { normalizeSpellcastingMutable, type SpellcastingMutableState } from "./spell-state.js";
+import type { EffectSpec } from "../effects.js";
+import { logEvent } from "../events.js";
+import { normalizeSpellcastingMutable, type SpellcastingMutableState } from "../spell-state.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 
