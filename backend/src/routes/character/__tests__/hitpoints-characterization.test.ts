@@ -1,7 +1,7 @@
 /**
  * Characterization lock for the HP transaction event stream (#614).
  *
- * The ~280-line dispatcher in lib/hitpoints.ts (applyHitPointOperations) is the
+ * The ~280-line dispatcher in lib/combat/hitpoints.ts (applyHitPointOperations) is the
  * sole emitter of HP audit events: per op it writes ONE `hitPoints` event whose
  * before/after sub-state is assembled by a chain of conditional blocks, then may
  * append follow-on events (rest buff-clears, while-active clears, a

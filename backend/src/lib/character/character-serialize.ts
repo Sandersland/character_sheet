@@ -841,7 +841,7 @@ function buildTargetModifiers(
 // Item-granted traits (#529): resistances/immunities/conditionImmunities/
 // advantages/proficiencies from active (equipped or attuned-when-required)
 // items. Derived on read — nothing here is persisted. resistances also feed
-// the #456 halve flow at damage-apply time (lib/hitpoints.ts). The skill/save
+// the #456 halve flow at damage-apply time (lib/combat/hitpoints.ts). The skill/save
 // name Sets are pre-split for the proficiency merges below.
 function buildItemGrantsView(row: CharacterWithRelations): {
   itemGrants: ReturnType<typeof deriveItemGrants>;
