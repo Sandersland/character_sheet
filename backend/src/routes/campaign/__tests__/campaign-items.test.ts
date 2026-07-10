@@ -518,4 +518,179 @@ describe("campaign items (#380)", () => {
     expect(persisted[0].valueDiceCount).toBe(1);
     expect(persisted[0].valueDiceFaces).toBe(6);
   });
+
+  // #686 gap pins: the CRUD branches the created/updated/serializeCampaignItem
+  // decomposition most endangers, unpinned above — consumables (zero coverage),
+  // the PATCH detail-upsert branches, capabilities:[] clearing, the entity
+  // name-sync negative, and category-change detail retention. Characterization:
+  // these pin CURRENT behavior. Green before the refactor; unedited through it.
+  describe("create/update/serialize gap pins (#686)", () => {
+    async function createItem(body: object) {
+      return supertest(app).post(`/api/campaigns/${campaignId}/items`).set("Cookie", cookieOwner).send(body);
+    }
+    async function patchItem(itemId: string, body: object) {
+      return supertest(app).patch(`/api/campaigns/${campaignId}/items/${itemId}`).set("Cookie", cookieOwner).send(body);
+    }
+
+    it("consumable create round-trips every detail field", async () => {
+      const res = await createItem({
+        name: "Greater Healing Potion (686)",
+        description: "Restores health.",
+        category: "consumable",
+        consumable: { effectDiceCount: 4, effectDiceFaces: 4, effectModifier: 4, effectDescription: "Regain 4d4+4 HP" },
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.consumable).toEqual({
+        effectDiceCount: 4,
+        effectDiceFaces: 4,
+        effectModifier: 4,
+        effectDescription: "Regain 4d4+4 HP",
+      });
+    });
+
+    it("consumable PATCH exercises the detail upsert-update branch", async () => {
+      const created = await createItem({
+        name: "Weak Potion (686)",
+        category: "consumable",
+        consumable: { effectDiceCount: 2, effectDiceFaces: 4, effectDescription: "Regain 2d4 HP" },
+      });
+      const itemId = created.body.id as string;
+
+      const patched = await patchItem(itemId, {
+        consumable: { effectDiceCount: 2, effectDiceFaces: 4, effectModifier: 2, effectDescription: "Regain 2d4+2 HP" },
+      });
+      expect(patched.status).toBe(200);
+      expect(patched.body.consumable).toEqual({
+        effectDiceCount: 2,
+        effectDiceFaces: 4,
+        effectModifier: 2,
+        effectDescription: "Regain 2d4+2 HP",
+      });
+    });
+
+    it("weapon PATCH round-trips the full detail field set (upsert-update branch)", async () => {
+      const created = await createItem({
+        name: "Adjustable Spear (686)",
+        category: "weapon",
+        weapon: { damageDiceCount: 1, damageDiceFaces: 6, damageType: "piercing" },
+      });
+      const itemId = created.body.id as string;
+
+      const fullWeapon = {
+        damageDiceCount: 1,
+        damageDiceFaces: 8,
+        damageModifier: 1,
+        damageType: "piercing",
+        versatileDiceCount: 1,
+        versatileDiceFaces: 10,
+        finesse: false,
+        light: false,
+        heavy: true,
+        twoHanded: false,
+        reach: true,
+        thrown: true,
+        ammunition: false,
+        rangeNormal: 20,
+        rangeLong: 60,
+        weaponClass: "martial" as const,
+        weaponRange: "melee" as const,
+      };
+      const patched = await patchItem(itemId, { weapon: fullWeapon });
+      expect(patched.status).toBe(200);
+      expect(patched.body.weapon).toEqual(fullWeapon);
+    });
+
+    it("armor PATCH round-trips the full detail field set (upsert-update branch)", async () => {
+      const created = await createItem({
+        name: "Adjustable Plate (686)",
+        category: "armor",
+        armor: { armorCategory: "heavy", baseArmorClass: 16 },
+      });
+      const itemId = created.body.id as string;
+
+      const patched = await patchItem(itemId, {
+        armor: {
+          armorCategory: "medium",
+          baseArmorClass: 14,
+          dexModifierApplies: true,
+          dexModifierMax: 2,
+          stealthDisadvantage: true,
+          strengthRequirement: 13,
+        },
+      });
+      expect(patched.status).toBe(200);
+      expect(patched.body.armor).toEqual({
+        armorCategory: "medium",
+        baseArmorClass: 14,
+        dexModifierApplies: true,
+        dexModifierMax: 2,
+        stealthDisadvantage: true,
+        strengthRequirement: 13,
+      });
+    });
+
+    it("PATCH with a detail block on an item created without one exercises upsert-create", async () => {
+      // detailCreate only nests a detail when the CREATE carries the block;
+      // patching one in later must hit the upsert's create arm.
+      const created = await createItem({ name: "Blank Blade (686)", category: "weapon" });
+      const itemId = created.body.id as string;
+      expect(created.body.weapon).toBeUndefined();
+
+      const patched = await patchItem(itemId, {
+        weapon: { damageDiceCount: 2, damageDiceFaces: 6, damageType: "slashing" },
+      });
+      expect(patched.status).toBe(200);
+      expect(patched.body.weapon).toMatchObject({ damageDiceCount: 2, damageDiceFaces: 6, damageType: "slashing" });
+    });
+
+    it("PATCH capabilities: [] clears an existing populated set (replace semantics)", async () => {
+      const created = await createItem({
+        name: "Fading Charm (686)",
+        category: "gear",
+        capabilities: [{ kind: "passiveBonus", target: "initiative", op: "add", value: 1 }],
+      });
+      const itemId = created.body.id as string;
+      expect(created.body.capabilities).toHaveLength(1);
+
+      const patched = await patchItem(itemId, { capabilities: [] });
+      expect(patched.status).toBe(200);
+      expect(patched.body.capabilities).toBeUndefined();
+      expect(await prisma.campaignItemCapability.count({ where: { campaignItemId: itemId } })).toBe(0);
+    });
+
+    it("PATCH without a name does NOT touch the linked entity (name-sync negative)", async () => {
+      const created = await createItem({ name: "Stable Name (686)", category: "gear" });
+      const itemId = created.body.id as string;
+      const entityId = created.body.entity.id as string;
+      const before = await prisma.campaignEntity.findUniqueOrThrow({ where: { id: entityId } });
+
+      const patched = await patchItem(itemId, { description: "New description only." });
+      expect(patched.status).toBe(200);
+
+      const after = await prisma.campaignEntity.findUniqueOrThrow({ where: { id: entityId } });
+      expect(after.name).toBe("Stable Name (686)");
+      expect(after.updatedAt.getTime()).toBe(before.updatedAt.getTime());
+    });
+
+    it("category change away from weapon KEEPS the stale weapon detail (current behavior)", async () => {
+      // Characterization, not endorsement: the PATCH clears `slot` on
+      // category change but leaves the old detail row in place, and the
+      // serializer keeps emitting it. If the refactor is ever meant to fix
+      // this, do it deliberately — not as a silent side-effect.
+      const created = await createItem({
+        name: "Sword-turned-Trinket (686)",
+        category: "weapon",
+        weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageType: "slashing" },
+      });
+      const itemId = created.body.id as string;
+
+      const patched = await patchItem(itemId, { category: "gear" });
+      expect(patched.status).toBe(200);
+      expect(patched.body.category).toBe("gear");
+      expect(patched.body.weapon).toMatchObject({ damageDiceCount: 1, damageDiceFaces: 8 });
+
+      const detail = await prisma.campaignItemWeaponDetail.findUnique({ where: { campaignItemId: itemId } });
+      expect(detail).not.toBeNull();
+    });
+  });
 });
