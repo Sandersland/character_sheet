@@ -2398,10 +2398,11 @@ export function deriveResources(
 /**
  * Row-shaped convenience wrapper over {@link deriveResources}: derives level and
  * proficiency bonus from a character row's XP + primary class entry, then returns
- * that class's non-slot resource derivation alongside the computed `level` (which
- * callers reuse for level-scaled cost math). Shared by the die-fueled activated-
- * ability handlers (maneuvers, elemental disciplines, shadow arts), which each
- * re-read the same {name, subclass} + XP + abilityScores select shape per op.
+ * that class's non-slot resource derivation plus the computed `level` — consumers
+ * that also need level-scaled cost math (e.g. a future `disciplines.ts` migration)
+ * can destructure `level` directly. Shared by the die-fueled activated-ability
+ * handlers (maneuvers, shadow arts), which each re-read the same
+ * {name, subclass} + XP + abilityScores select shape per op.
  */
 export function deriveResourcesForCharacterRow(row: {
   experiencePoints: number;
