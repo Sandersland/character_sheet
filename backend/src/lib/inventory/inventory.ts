@@ -17,7 +17,7 @@ import {
   clearBuffByKeyInTx,
   clearBuffsByTargetInTx,
   normalizeActiveEffectsMutable,
-} from "./active-effects.js";
+} from "@/lib/active-effects.js";
 import {
   armorDetailFields,
   consumableDetailFields,
@@ -25,10 +25,10 @@ import {
   weaponDetailFields,
 } from "./detail-snapshot.js";
 import { rollDie } from "@/lib/core/dice.js";
-import { logEvent } from "./events.js";
-import { applyHealInTx } from "./hitpoints.js";
+import { logEvent } from "@/lib/events.js";
+import { applyHealInTx } from "@/lib/hitpoints.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { getActiveSessionId } from "./sessions.js";
+import { getActiveSessionId } from "@/lib/sessions.js";
 
 // 5e: a character can attune to at most 3 magic items (DMG p. 138). Derived
 // (counted from live rows), never persisted.

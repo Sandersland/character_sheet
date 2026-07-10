@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { selectAutoEquip, type AutoEquipCandidate } from "@/lib/inventory.js";
+import { selectAutoEquip, type AutoEquipCandidate } from "@/lib/inventory/inventory.js";
 
 // Pure unit tests — no DB. selectAutoEquip decides which starting-equipment
 // InventoryItem create payloads get `equipped: true` on character creation.

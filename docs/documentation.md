@@ -46,9 +46,9 @@ The anchor makes the enumeration self-correcting: if it ever disagrees with the 
 
 For a concept that recurs across many domains, document **ONE worked example** in depth and point everything else at it.
 
-> `lib/inventory.ts` is the reference implementation for the intent-bearing transaction pattern.
+> `lib/inventory/inventory.ts` is the reference implementation for the intent-bearing transaction pattern.
 
-New domains then say "follows the transaction pattern (see `lib/inventory.ts`)" instead of re-describing the whole shape. One canonical write-up to maintain; every other reference is a one-liner that can't drift out of sync with a description it doesn't contain.
+New domains then say "follows the transaction pattern (see `lib/inventory/inventory.ts`)" instead of re-describing the whole shape. One canonical write-up to maintain; every other reference is a one-liner that can't drift out of sync with a description it doesn't contain.
 
 ---
 

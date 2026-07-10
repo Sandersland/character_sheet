@@ -264,7 +264,7 @@ export async function applyChannelDivinityTransactions(
 
 // One inline edit is a batch of one operation; a bulk action (e.g. selling
 // several stacks at once) is a batch of several — see backend's
-// lib/inventory.ts for the atomicity/ledger semantics.
+// lib/inventory/inventory.ts for the atomicity/ledger semantics.
 export async function applyInventoryTransactions(
   characterId: string,
   operations: InventoryOperation[]

@@ -4,7 +4,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 import { applyHitPointOperations } from "@/lib/hitpoints.js";
-import { applyInventoryOperations, itemBuffKey } from "@/lib/inventory.js";
+import { applyInventoryOperations, itemBuffKey } from "@/lib/inventory/inventory.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 

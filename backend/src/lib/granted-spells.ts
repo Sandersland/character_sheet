@@ -13,7 +13,7 @@ import {
   type CastSpellCapability,
   type CastStatMode,
   type ChargesCapability,
-} from "./capabilities.js";
+} from "./inventory/capabilities.js";
 import type { SpellEntry } from "./spell-state.js";
 
 // The six ability scores, lowercase — the shape of Character.abilityScores.

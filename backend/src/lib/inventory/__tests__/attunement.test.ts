@@ -9,7 +9,7 @@ import {
   InvalidInventoryOperationError,
   inventoryItemDetailInclude,
   revertInventoryEvent,
-} from "@/lib/inventory.js";
+} from "@/lib/inventory/inventory.js";
 
 const OWNER_ID = "owner-attunement-lib";
 

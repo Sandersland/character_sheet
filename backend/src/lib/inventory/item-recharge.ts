@@ -1,4 +1,4 @@
-// Rest-triggered recharge of activated-item uses. Lives outside lib/inventory.ts
+// Rest-triggered recharge of activated-item uses. Lives outside lib/inventory/inventory.ts
 // so the rest handler (lib/hitpoints.ts) can import it without creating a cycle
 // (inventory.ts imports applyHealInTx from hitpoints.ts for consumable healing).
 import type { Prisma } from "@/generated/prisma/client.js";
@@ -7,7 +7,7 @@ import {
   readCapability,
   type ActivatedEffectCapability,
 } from "./capabilities.js";
-import { logEvent } from "./events.js";
+import { logEvent } from "@/lib/events.js";
 
 // Resets activatedUsesSpent to 0 for items whose activatedEffect recharges on the
 // given rest (#543). perRest(short) recharges on short|long; everything else on

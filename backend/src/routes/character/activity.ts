@@ -49,7 +49,7 @@ activityRouter.get<{ id: string }>("/activity", async (req, res) => {
 //
 // Inventory events are fully revertable: deleted InventoryItem + detail rows
 // are reconstructed from `data.deletedItem` and currency is reversed from
-// `data.currencyDelta` (see revertInventoryEvent in lib/inventory.ts).
+// `data.currencyDelta` (see revertInventoryEvent in lib/inventory/inventory.ts).
 
 activityRouter.post<{ id: string; batchId: string }>("/events/:batchId/revert", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
