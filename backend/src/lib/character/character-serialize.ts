@@ -52,14 +52,14 @@ import {
 } from "@/lib/inventory/capabilities.js";
 import { itemBuffKey } from "@/lib/inventory/inventory.js";
 import { reverseAdvancementEffects } from "@/lib/advancement.js";
-import { normalizeSpellcastingMutable } from "@/lib/spellcasting.js";
-import type { SpellEntry } from "@/lib/spell-state.js";
+import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spellcasting.js";
+import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
 import {
   deriveGrantedSpells,
   deriveGrantedCastingAbility,
   deriveItemSpells,
   type AbilityScores,
-} from "@/lib/granted-spells.js";
+} from "@/lib/spellcasting/granted-spells.js";
 import { SHADOW_ART_CONCENTRATION_PREFIX } from "@/lib/classes/shadow-arts.js";
 import type { CharacterWithRelations } from "./character-include.js";
 

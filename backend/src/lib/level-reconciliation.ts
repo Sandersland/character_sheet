@@ -45,8 +45,8 @@ import { advancementSlotsForLevel, fightingStyleChoiceCount, FIGHTING_STYLES } f
 import { deriveResources, type DerivedClassInfo } from "./classes/class-features.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeHitPoints } from "./hitpoints.js";
-import { normalizeSpellcastingMutable } from "./spell-state.js";
-import { deriveGrantedSpells } from "./granted-spells.js";
+import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
+import { deriveGrantedSpells } from "@/lib/spellcasting/granted-spells.js";
 
 // ── Reconcile context ─────────────────────────────────────────────────────────
 

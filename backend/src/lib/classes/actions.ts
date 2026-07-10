@@ -31,7 +31,7 @@
  */
 
 import type { ActiveBuff } from "../active-effects.js";
-import type { AbilityCost } from "../ability-cost.js";
+import type { AbilityCost } from "@/lib/spellcasting/ability-cost.js";
 import type { EffectSpec } from "../effects.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────

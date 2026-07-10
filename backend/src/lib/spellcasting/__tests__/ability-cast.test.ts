@@ -11,10 +11,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
-import { castAbilityInTx } from "@/lib/ability-cast.js";
+import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import type { EffectSpec } from "@/lib/effects.js";
-import type { PayCostContext } from "@/lib/ability-cost.js";
-import type { SpellcastingMutableState } from "@/lib/spell-state.js";
+import type { PayCostContext } from "@/lib/spellcasting/ability-cost.js";
+import type { SpellcastingMutableState } from "@/lib/spellcasting/spell-state.js";
 
 const OWNER_ID = "owner-ability-cast";
 
