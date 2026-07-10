@@ -20,6 +20,7 @@
     "e2e": "docker compose --profile e2e run --rm e2e"
   },
   "devDependencies": {
+    "fallow": "3.2.0",
     "lefthook": "^2.1.9"
   }
 }

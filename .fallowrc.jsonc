@@ -15,7 +15,23 @@
   "duplicates": {
     // Hide pair-only clones; focus on widespread copy-paste
     // worth refactoring. Lower to 2 to report every duplicate pair.
+    // (#691 phase 2 plans that lowering once the CRITICAL tier clears.)
     "minOccurrences": 3
+  },
+  // Complexity ceilings pinned to fallow 3.2.0's defaults (#691): the gate's
+  // bar is OURS to move, not an upstream default a version bump can shift.
+  "health": {
+    "maxCyclomatic": 20,
+    "maxCognitive": 15,
+    "maxCrap": 30.0,
+    "maxUnitSize": 60
+  },
+  // Only findings INTRODUCED by a changeset fail the audit (pre-commit hook +
+  // CI fallow job); inherited findings are reported but don't block. "all"
+  // was rejected — file-scoped all-findings blocked mechanical refactors
+  // during the #590 sweep.
+  "audit": {
+    "gate": "new-only"
   },
   "rules": {}
 }

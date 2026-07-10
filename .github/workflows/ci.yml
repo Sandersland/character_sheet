@@ -31,6 +31,48 @@ jobs:
 
       - run: npm run lint
 
+  fallow:
+    # Server-side twin of the lefthook pre-commit fallow gate (#691): audits the
+    # PR diff for NEW dead code / complexity / duplication against the PR base.
+    # This is the enforcement layer — a locally bypassed hook (--no-verify) gets
+    # re-checked here, so adjudicated exceptions must be inline
+    # `fallow-ignore-next-line` suppressions, visible in the diff.
+    #
+    # PR-only (an audit needs a base to diff against; push runs on main/staging
+    # are post-merge). Skips fork PRs and the staging->main promote PR — every
+    # line in a promote was already audited on its feature PR. The skip must
+    # stay JOB-level: a skipped job still reports a "skipped" conclusion, which
+    # satisfies the required check; a workflow-level filter would block merges.
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !(github.event.pull_request.head.ref == 'staging' && github.event.pull_request.base.ref == 'main')
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Full history: `fallow audit --base` needs the base branch and the
+          # merge-base commits, which the default shallow clone doesn't have.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm install -g npm@11  # align with npm 11 that generated package-lock.json (npm/cli#4828)
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: fallow audit (new findings vs PR base)
+        run: npx fallow audit --base "origin/${{ github.event.pull_request.base.ref }}" --gate new-only --no-cache
+
+      # Phase 2 of #691 — repo-wide zero-CRITICAL ratchet. Enable once the
+      # CRITICAL complexity tier is cleared (#684-#689, epic #692 stage 1).
+      # - name: fallow health (no CRITICAL findings repo-wide)
+      #   run: npx fallow health --min-severity critical
+
   build:
     # Production type-check + bundle. vitest transpiles via esbuild and does NOT
     # type-check, so type-only errors slip past `test`/`lint` and only surface in
