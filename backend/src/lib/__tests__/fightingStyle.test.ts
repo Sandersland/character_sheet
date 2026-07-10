@@ -11,7 +11,7 @@ import {
 import {
   normalizeResourcesMutable,
   serializeResourcesState,
-} from "@/lib/resources.js";
+} from "@/lib/classes/resources.js";
 
 describe("FIGHTING_STYLES data block", () => {
   it("defines the 6 core fighting styles with key/label/description", () => {

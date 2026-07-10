@@ -13,11 +13,11 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client.js";
-import { levelForExperience } from "./experience.js";
-import { logEvent } from "./events.js";
+import { levelForExperience } from "../experience.js";
+import { logEvent } from "../events.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { getActiveSessionId } from "./sessions.js";
-import { levelUpHpGain, normalizeHitDice, normalizeHitPoints } from "./hitpoints.js";
+import { getActiveSessionId } from "../sessions.js";
+import { levelUpHpGain, normalizeHitDice, normalizeHitPoints } from "../hitpoints.js";
 import {
   abilityModifier,
   fightingStyleChoiceCount,

@@ -11,15 +11,15 @@
  * from the catalog row.
  */
 
-import { castAbilityInTx } from "./ability-cast.js";
-import { readAbilityCost, type PayCostContext } from "./ability-cost.js";
-import { appendActiveBuffInTx } from "./active-effects.js";
+import { castAbilityInTx } from "../ability-cast.js";
+import { readAbilityCost, type PayCostContext } from "../ability-cost.js";
+import { appendActiveBuffInTx } from "../active-effects.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
-import { applyConditionInTx } from "./conditions.js";
-import type { EffectSpec } from "./effects.js";
-import { logEvent } from "./events.js";
-import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
-import { normalizeSpellcastingMutable } from "./spell-state.js";
+import { applyConditionInTx } from "../conditions.js";
+import type { EffectSpec } from "../effects.js";
+import { logEvent } from "../events.js";
+import { proficiencyBonusForLevel, levelForExperience } from "../experience.js";
+import { normalizeSpellcastingMutable } from "../spell-state.js";
 import { abilityModifier } from "@/lib/srd/srd.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────

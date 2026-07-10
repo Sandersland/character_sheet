@@ -30,9 +30,9 @@
  *    is a client-side economy effect with no server state to apply.
  */
 
-import type { ActiveBuff } from "./active-effects.js";
-import type { AbilityCost } from "./ability-cost.js";
-import type { EffectSpec } from "./effects.js";
+import type { ActiveBuff } from "../active-effects.js";
+import type { AbilityCost } from "../ability-cost.js";
+import type { EffectSpec } from "../effects.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

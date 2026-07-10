@@ -11,15 +11,15 @@
  */
 
 import { Prisma } from "@/generated/prisma/client.js";
-import { castAbilityInTx } from "./ability-cast.js";
-import { readAbilityCost, type PayCostContext } from "./ability-cost.js";
+import { castAbilityInTx } from "../ability-cast.js";
+import { readAbilityCost, type PayCostContext } from "../ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { deriveResources } from "./class-features.js";
-import type { EffectSpec } from "./effects.js";
-import { logEvent } from "./events.js";
-import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
+import type { EffectSpec } from "../effects.js";
+import { logEvent } from "../events.js";
+import { proficiencyBonusForLevel, levelForExperience } from "../experience.js";
 import { normalizeResourcesMutable } from "./resources.js";
-import { normalizeSpellcastingMutable, type SpellcastingMutableState } from "./spell-state.js";
+import { normalizeSpellcastingMutable, type SpellcastingMutableState } from "../spell-state.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 
