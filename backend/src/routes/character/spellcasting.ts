@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
   applySpellcastingOperations,
   InvalidSpellcastingOperationError,
-} from "@/lib/spellcasting.js";
+} from "@/lib/spellcasting/spellcasting.js";
 import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const spellcastingRouter = Router({ mergeParams: true });

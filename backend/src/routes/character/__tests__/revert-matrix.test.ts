@@ -19,7 +19,7 @@ import supertest from "supertest";
 
 import { createApp } from "@/app.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { applySpellcastingOperations } from "@/lib/spellcasting.js";
+import { applySpellcastingOperations } from "@/lib/spellcasting/spellcasting.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 

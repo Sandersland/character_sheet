@@ -26,7 +26,7 @@ import {
 import { rollDie } from "@/lib/core/dice.js";
 import { deriveResources } from "./classes/class-features.js";
 import { normalizeResourcesMutable, serializeResourcesState } from "./classes/resources.js";
-import { normalizeSpellcastingMutable } from "./spell-state.js";
+import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import {
   castResourceRechargesOn,
   chargeTriggerRechargesOn,
@@ -1741,7 +1741,7 @@ export async function applyHealInTx(
  * Apply damage to a character's HP inside an existing transaction, mirroring
  * the `case "damage"` branch of applyHitPointOperations.
  *
- * Exported so the spellcasting orchestrator (lib/spellcasting.ts) can compose a
+ * Exported so the spellcasting orchestrator (lib/spellcasting/spellcasting.ts) can compose a
  * "cast self-targeted damage spell + take damage" pair into one atomic
  * $transaction without nesting. Keep the damage logic in sync with the
  * `case "damage"` branch above (temp-HP absorption, floor at 0).

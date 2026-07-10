@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 
-import { readAbilityCost } from "@/lib/ability-cost.js";
+import { readAbilityCost } from "@/lib/spellcasting/ability-cost.js";
 import {
   applyShadowArtsOperations,
   shadowArtEffectSpec,

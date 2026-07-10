@@ -12,7 +12,7 @@ import {
   payAbilityCostInTx,
   InvalidSpellcastingOperationError,
   type PayCostContext,
-} from "@/lib/ability-cost.js";
+} from "@/lib/spellcasting/ability-cost.js";
 
 function ctx(overrides: Partial<PayCostContext> = {}): PayCostContext {
   return {

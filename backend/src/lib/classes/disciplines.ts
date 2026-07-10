@@ -1,6 +1,6 @@
 /**
  * Elemental Discipline cast handler (Way of the Four Elements) — the discipline
- * counterpart to lib/spellcasting.ts. A discipline is a ki-fuelled activated
+ * counterpart to lib/spellcasting/spellcasting.ts. A discipline is a ki-fuelled activated
  * ability catalogued in the Discipline table (#397); casting one spends ki via
  * the shared payAbilityCostInTx pool path and rolls its EffectSpec.
  *
@@ -11,15 +11,15 @@
  */
 
 import { Prisma } from "@/generated/prisma/client.js";
-import { castAbilityInTx } from "../ability-cast.js";
-import { readAbilityCost, type PayCostContext } from "../ability-cost.js";
+import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
+import { readAbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { deriveResources } from "./class-features.js";
 import type { EffectSpec } from "../effects.js";
 import { logEvent } from "../events.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { normalizeResourcesMutable } from "./resources.js";
-import { normalizeSpellcastingMutable, type SpellcastingMutableState } from "../spell-state.js";
+import { normalizeSpellcastingMutable, type SpellcastingMutableState } from "@/lib/spellcasting/spell-state.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 

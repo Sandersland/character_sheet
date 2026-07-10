@@ -5,7 +5,7 @@ import {
   deriveGrantedCastingAbility,
   deriveItemSpells,
   type ItemSpellSourceItem,
-} from "@/lib/granted-spells.js";
+} from "@/lib/spellcasting/granted-spells.js";
 
 // A minimal castSpell capability row (flat columns + id) for deriveItemSpells.
 function castSpellCap(id: string, spellId: string, over: Partial<ItemSpellSourceItem["capabilities"][number]> = {}) {

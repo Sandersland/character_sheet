@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { InvalidResourceOperationError } from "@/lib/classes/resources.js";
-import { InvalidSpellcastingOperationError } from "@/lib/ability-cost.js";
+import { InvalidSpellcastingOperationError } from "@/lib/spellcasting/ability-cost.js";
 import {
   applyChannelDivinityOperations,
   describeChannelDivinity,
