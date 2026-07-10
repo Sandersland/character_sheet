@@ -32,7 +32,7 @@ import {
   type BodyArmorCategory,
   type FightingStyleKey,
   type ToolProficiencyEntry,
-} from "./srd.js";
+} from "@/lib/srd/srd.js";
 import { deriveResources } from "./class-features.js";
 import { deriveActions, type AvailableAction } from "./actions.js";
 import { normalizeResourcesMutable, type AdvancementEntry, type ToolProfEntry } from "./resources.js";
@@ -901,7 +901,7 @@ function selectEquippedBodyArmor(
 }
 
 // AC assembly: labeled addends whose exact sum is armorClass (single source of
-// the base formula in srd.ts). Layered in order: base parts (armor/Dex/shield/
+// the base formula in srd/srd.ts). Layered in order: base parts (armor/Dex/shield/
 // Unarmored Defense/Mage Armor best-of) → Defense fighting style → feat AC →
 // per-source "ac" buffs → the acFloor (Barkskin) reconciling part last.
 // The branchiness is inherent to the 5e AC layering (each optional source is a
@@ -931,7 +931,7 @@ function buildArmorClassView(
     (best, c) => (best && best.value >= c.modifier ? best : { label: c.source, value: c.modifier }),
     undefined,
   );
-  // Labeled AC addends; armorClass below is their exact sum (single source in srd.ts).
+  // Labeled AC addends; armorClass below is their exact sum (single source in srd/srd.ts).
   const acParts = deriveArmorClassParts(bestArmor, hasShield, dexMod, unarmoredDefense, mageArmor);
   // Defense fighting style only applies while wearing body armor (5e).
   const styleAc = bestArmor !== null ? deriveFightingStyleBonuses(fightingStyle).armorClass : 0;

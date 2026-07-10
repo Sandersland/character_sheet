@@ -9,7 +9,7 @@
  *   - `exhaustion`: a single 0–6 numeric level (special case, not in `active`).
  *
  * Nothing here is derived from level/class — conditions are pure mutable state.
- * The canonical condition rules data (labels/descriptions) lives in srd.ts.
+ * The canonical condition rules data (labels/descriptions) lives in srd/srd.ts.
  * Concentration is intentionally separate (tracked in spellcasting).
  */
 
@@ -21,7 +21,7 @@ import {
   EXHAUSTION_MAX,
   isKnownCondition,
   type ConditionKey,
-} from "./srd.js";
+} from "@/lib/srd/srd.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 

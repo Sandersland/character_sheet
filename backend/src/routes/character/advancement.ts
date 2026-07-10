@@ -8,7 +8,7 @@ import {
   applyAdvancementOperations,
   InvalidAdvancementOperationError,
 } from "@/lib/advancement.js";
-import { FEAT_IMPROVEMENT_TARGETS } from "@/lib/srd.js";
+import { FEAT_IMPROVEMENT_TARGETS } from "@/lib/srd/srd.js";
 import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const advancementRouter = Router({ mergeParams: true });

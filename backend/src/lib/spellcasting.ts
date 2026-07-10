@@ -10,8 +10,8 @@
  *
  * What is persisted: slot `used` counts and the learned `spells[]` array.
  * What is derived at read time (in lib/character-serialize.ts serializeCharacter):
- *   - slot totals (from srd.ts FULL_CASTER_SLOTS + class + level)
- *   - spellSaveDC / spellAttackBonus / ability (from srd.ts deriveSpellcasting)
+ *   - slot totals (from srd/srd.ts FULL_CASTER_SLOTS + class + level)
+ *   - spellSaveDC / spellAttackBonus / ability (from srd/srd.ts deriveSpellcasting)
  */
 
 import { randomUUID } from "node:crypto";
@@ -34,7 +34,7 @@ import type {
   SpellComponents,
   SpellcastingMutableState,
 } from "./spell-state.js";
-import { deriveSpellcasting } from "./srd.js";
+import { deriveSpellcasting } from "@/lib/srd/srd.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 // Defined in ability-cost.ts (one-directional dep graph); re-exported so

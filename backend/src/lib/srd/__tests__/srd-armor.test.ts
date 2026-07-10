@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { deriveArmorClass, deriveArmorClassParts } from "@/lib/srd.js";
+import { deriveArmorClass, deriveArmorClassParts } from "@/lib/srd/srd.js";
 
 const leather = { armorCategory: "light" as const, baseArmorClass: 11 };
 const halfPlate = { armorCategory: "medium" as const, baseArmorClass: 15, dexModifierMax: 2 };

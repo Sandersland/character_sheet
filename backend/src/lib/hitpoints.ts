@@ -22,7 +22,7 @@ import {
   deriveFeatProficiencies,
   hitDieFace,
   multiclassPrerequisitesMet,
-} from "./srd.js";
+} from "@/lib/srd/srd.js";
 import { rollDie } from "@/lib/core/dice.js";
 import { deriveResources } from "./class-features.js";
 import { normalizeResourcesMutable, serializeResourcesState } from "./resources.js";

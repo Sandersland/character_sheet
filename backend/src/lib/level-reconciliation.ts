@@ -41,7 +41,7 @@ import {
   type ResourcesMutableState,
   type ToolProfEntry,
 } from "./resources.js";
-import { advancementSlotsForLevel, fightingStyleChoiceCount, FIGHTING_STYLES } from "./srd.js";
+import { advancementSlotsForLevel, fightingStyleChoiceCount, FIGHTING_STYLES } from "@/lib/srd/srd.js";
 import { deriveResources, type DerivedClassInfo } from "./class-features.js";
 import { reverseAdvancementEffects } from "./advancement.js";
 import { normalizeHitPoints } from "./hitpoints.js";

@@ -1,5 +1,5 @@
 // Class features + trackable resources for all 12 base classes and their SRD
-// subclasses. Extracted from srd.ts to keep that file at its intended scope
+// subclasses. Extracted from srd/srd.ts to keep that file at its intended scope
 // (small rules tables + core derivation helpers).
 //
 // `deriveResources` is the analog to `deriveSpellcasting` for non-slot
@@ -19,7 +19,7 @@
 //   3. Add the feature list to SUBCLASS_FEATURE_LIST.
 //   4. Add an entry to SUBCLASS_GRANT_LEVEL if the subclass is granted before L3.
 
-import { abilityModifier } from "./srd.js";
+import { abilityModifier } from "@/lib/srd/srd.js";
 
 export type RechargeOn = "shortRest" | "longRest" | "short-or-long" | "none";
 

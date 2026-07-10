@@ -26,7 +26,7 @@ import {
   multiclassPrerequisitesMet,
   FIGHTING_STYLES,
   type FightingStyleKey,
-} from "./srd.js";
+} from "@/lib/srd/srd.js";
 import {
   normalizeResourcesMutable,
   serializeResourcesState,
