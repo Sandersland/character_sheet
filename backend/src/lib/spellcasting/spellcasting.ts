@@ -1,6 +1,6 @@
 /**
  * Spellcasting transaction handler — the spellcasting counterpart to
- * lib/inventory/inventory.ts and lib/hitpoints.ts.
+ * lib/inventory/inventory.ts and lib/combat/hitpoints.ts.
  *
  * The per-character mutable spell state lives in a single JSON column
  * (Character.spellcasting) rather than relational rows — see the plan note
@@ -19,10 +19,10 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma, type Spell } from "@/generated/prisma/client.js";
 import { castAbilityInTx, type CastTarget, type OpOutcome } from "./ability-cast.js";
-import { clearBuffByKeyInTx, clearBuffsForSourceInTx } from "@/lib/active-effects.js";
+import { clearBuffByKeyInTx, clearBuffsForSourceInTx } from "@/lib/combat/active-effects.js";
 import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
-import { readEffectSpec } from "@/lib/effects.js";
+import { readEffectSpec } from "@/lib/combat/effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "@/lib/events.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";

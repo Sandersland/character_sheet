@@ -1634,7 +1634,7 @@ export interface CastChannelDivinityOperation {
 }
 export type ChannelDivinityOperation = CastChannelDivinityOperation;
 
-// ── Conditions state + operation types (mirrors backend/src/lib/conditions.ts)
+// ── Conditions state + operation types (mirrors backend/src/lib/combat/conditions.ts)
 // Sent as `{ operations: ConditionOperation[] }` to
 // POST /api/characters/:id/conditions/transactions.
 
@@ -1668,7 +1668,7 @@ export interface ConditionsState {
   exhaustion: number;
 }
 
-// ── Active effects (buffs) — mirrors backend/src/lib/active-effects.ts ─────────
+// ── Active effects (buffs) — mirrors backend/src/lib/combat/active-effects.ts ─────────
 
 // Duration axis (#455). Absent on the wire means "concentration" (byte-parity
 // with #438). while-active / until-rest are durable self-buffs (e.g. Rage).
@@ -1743,7 +1743,7 @@ export interface XpAwardOperation { type: "award"; amount: number }
 export interface XpSetOperation { type: "set"; value: number }
 export type ExperienceOperation = XpAwardOperation | XpSetOperation;
 
-// ── HP operation types (mirrors backend/src/lib/hitpoints.ts) ───────────────
+// ── HP operation types (mirrors backend/src/lib/combat/hitpoints.ts) ───────────────
 // Sent as `{ operations: HitPointOperation[] }` to POST /api/characters/:id/hp.
 
 /**

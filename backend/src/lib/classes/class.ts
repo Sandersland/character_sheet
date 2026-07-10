@@ -17,7 +17,7 @@ import { levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "../events.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { getActiveSessionId } from "../sessions.js";
-import { levelUpHpGain, normalizeHitDice, normalizeHitPoints } from "../hitpoints.js";
+import { levelUpHpGain, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import {
   abilityModifier,
   fightingStyleChoiceCount,

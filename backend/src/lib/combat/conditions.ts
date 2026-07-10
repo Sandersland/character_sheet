@@ -15,7 +15,7 @@
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
-import { logEvent } from "./events.js";
+import { logEvent } from "@/lib/events.js";
 import {
   CONDITIONS,
   EXHAUSTION_MAX,

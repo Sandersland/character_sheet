@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
-import { applyHitPointOperations, normalizeHitPoints } from "@/lib/hitpoints.js";
+import { applyHitPointOperations, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 
 const OWNER_ID = "owner-hp-item-resist";
 

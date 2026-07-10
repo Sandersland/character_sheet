@@ -11,12 +11,12 @@
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { payAbilityCostInTx, type AbilityCost, type PayCostContext } from "./ability-cost.js";
-import { appendActiveBuffInTx, clearBuffsForSourceInTx } from "@/lib/active-effects.js";
+import { appendActiveBuffInTx, clearBuffsForSourceInTx } from "@/lib/combat/active-effects.js";
 import { assertCampaignMembership } from "@/lib/auth/access.js";
 import { AuthorizationError } from "@/lib/auth/errors.js";
-import { resolveBuffSpec, type EffectSpec } from "@/lib/effects.js";
+import { resolveBuffSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { logEvent, type EventType } from "@/lib/events.js";
-import { applyHealInTx, applyDamageInTx, applyTempHpInTx } from "@/lib/hitpoints.js";
+import { applyHealInTx, applyDamageInTx, applyTempHpInTx } from "@/lib/combat/hitpoints.js";
 import type { ConcentrationState, SpellcastingMutableState } from "./spell-state.js";
 
 /** A cast's effect target: the caster themselves, or a consenting ally's sheet (#462). */

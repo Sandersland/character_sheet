@@ -1,6 +1,6 @@
 /**
  * Active-effects state — cast-granted passive modifiers ("buffs") that ride a
- * character until their granting concentration ends. The analog to lib/conditions.ts
+ * character until their granting concentration ends. The analog to lib/combat/conditions.ts
  * for the Character.activeEffects JSON column.
  *
  * What is persisted (Character.activeEffects JSON column):
@@ -17,7 +17,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client.js";
-import { logEvent } from "./events.js";
+import { logEvent } from "@/lib/events.js";
 
 // ── Canonical mutable state shape ─────────────────────────────────────────────
 

@@ -5,7 +5,7 @@ import {
   serializeConsumableDetail,
   serializeWeaponDetail,
 } from "@/lib/inventory/itemDetail.js";
-import { normalizeHitDice, normalizeHitPoints } from "@/lib/hitpoints.js";
+import { normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import {
   abilityModifier,
   advancementSlotsForLevel,
@@ -36,8 +36,8 @@ import {
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { deriveActions, type AvailableAction } from "@/lib/classes/actions.js";
 import { normalizeResourcesMutable, type AdvancementEntry, type ToolProfEntry } from "@/lib/classes/resources.js";
-import { normalizeConditionsMutable } from "@/lib/conditions.js";
-import { buffsByTarget, normalizeActiveEffectsMutable, type ActiveBuff } from "@/lib/active-effects.js";
+import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
+import { buffsByTarget, normalizeActiveEffectsMutable, type ActiveBuff } from "@/lib/combat/active-effects.js";
 import {
   activatedMaxUses,
   chargePoolOf,
@@ -841,7 +841,7 @@ function buildTargetModifiers(
 // Item-granted traits (#529): resistances/immunities/conditionImmunities/
 // advantages/proficiencies from active (equipped or attuned-when-required)
 // items. Derived on read — nothing here is persisted. resistances also feed
-// the #456 halve flow at damage-apply time (lib/hitpoints.ts). The skill/save
+// the #456 halve flow at damage-apply time (lib/combat/hitpoints.ts). The skill/save
 // name Sets are pre-split for the proficiency merges below.
 function buildItemGrantsView(row: CharacterWithRelations): {
   itemGrants: ReturnType<typeof deriveItemGrants>;

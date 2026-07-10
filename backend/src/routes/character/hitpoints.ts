@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { assertCharacterAccess } from "@/lib/auth/access.js";
-import { applyHitPointOperations, InvalidHitPointOperationError } from "@/lib/hitpoints.js";
+import { applyHitPointOperations, InvalidHitPointOperationError } from "@/lib/combat/hitpoints.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
@@ -34,7 +34,7 @@ const setTempOpSchema = z.object({
 });
 
 // `rolls` may be empty (spending 0 dice is a no-op; UI typically disables this).
-// Upper-bound / range validation is done in lib/hitpoints.ts based on live state.
+// Upper-bound / range validation is done in lib/combat/hitpoints.ts based on live state.
 const shortRestOpSchema = z.object({
   type: z.literal("shortRest"),
   rolls: z.array(z.number().int().min(1)).min(0),

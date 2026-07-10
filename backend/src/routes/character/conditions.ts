@@ -8,7 +8,7 @@ import { z } from "zod";
 import {
   applyConditionsOperations,
   InvalidConditionOperationError,
-} from "@/lib/conditions.js";
+} from "@/lib/combat/conditions.js";
 import { CONDITIONS, EXHAUSTION_MAX, type ConditionKey } from "@/lib/srd/srd.js";
 import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
