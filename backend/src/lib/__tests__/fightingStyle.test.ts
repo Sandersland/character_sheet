@@ -7,11 +7,11 @@ import {
   deriveFightingStyleBonuses,
   deriveWeaponAttackBonus,
   type FightingStyleKey,
-} from "../srd.js";
+} from "@/lib/srd.js";
 import {
   normalizeResourcesMutable,
   serializeResourcesState,
-} from "../resources.js";
+} from "@/lib/resources.js";
 
 describe("FIGHTING_STYLES data block", () => {
   it("defines the 6 core fighting styles with key/label/description", () => {

@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { assertCampaignOwner, assertCharacterAccess } from "../auth/access.js";
-import { AuthorizationError, NotFoundError } from "../auth/errors.js";
-import { prisma } from "../prisma.js";
-import { ensureTestOwner } from "../../test-support/owner.js";
+import { assertCampaignOwner, assertCharacterAccess } from "@/lib/auth/access.js";
+import { AuthorizationError, NotFoundError } from "@/lib/auth/errors.js";
+import { prisma } from "@/lib/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
 
 // Unit test for the single character-access chokepoint. Real Postgres (no mocks)
 // — it issues one findUnique. Two owners + one character owned by A.

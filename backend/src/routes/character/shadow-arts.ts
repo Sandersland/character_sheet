@@ -1,14 +1,14 @@
 import { Router } from "express";
 import { z } from "zod";
 
-import { readAbilityCost } from "../../lib/ability-cost.js";
+import { readAbilityCost } from "@/lib/ability-cost.js";
 import {
   applyShadowArtsOperations,
   shadowArtEffectSpec,
   InvalidShadowArtOperationError,
-} from "../../lib/shadow-arts.js";
-import { prisma } from "../../lib/prisma.js";
-import { makeTransactionsEndpoint } from "../../lib/transactions-endpoint.js";
+} from "@/lib/shadow-arts.js";
+import { prisma } from "@/lib/prisma.js";
+import { makeTransactionsEndpoint } from "@/lib/transactions-endpoint.js";
 
 export const shadowArtsRouter = Router({ mergeParams: true });
 

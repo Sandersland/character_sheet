@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { Prisma } from "../../generated/prisma/client.js";
-import { prisma } from "../prisma.js";
-import { ensureTestOwner } from "../../test-support/owner.js";
-import { characterInclude } from "../character-include.js";
-import { serializeCharacter } from "../character-serialize.js";
+import { Prisma } from "@/generated/prisma/client.js";
+import { prisma } from "@/lib/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
+import { characterInclude } from "@/lib/character-include.js";
+import { serializeCharacter } from "@/lib/character-serialize.js";
 
 const OWNER_ID = "owner-serialize-ac-bonus";
 

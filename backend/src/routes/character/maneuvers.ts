@@ -4,11 +4,11 @@ import { z } from "zod";
 import {
   applyManeuverOperations,
   InvalidManeuverOperationError,
-} from "../../lib/maneuvers.js";
-import { InvalidResourceOperationError } from "../../lib/resources.js";
-import { InvalidSpellcastingOperationError } from "../../lib/ability-cost.js";
-import { prisma } from "../../lib/prisma.js";
-import { makeTransactionsEndpoint } from "../../lib/transactions-endpoint.js";
+} from "@/lib/maneuvers.js";
+import { InvalidResourceOperationError } from "@/lib/resources.js";
+import { InvalidSpellcastingOperationError } from "@/lib/ability-cost.js";
+import { prisma } from "@/lib/prisma.js";
+import { makeTransactionsEndpoint } from "@/lib/transactions-endpoint.js";
 
 export const maneuversRouter = Router({ mergeParams: true });
 

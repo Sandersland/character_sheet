@@ -15,7 +15,7 @@ import express from "express";
 import supertest from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { errorHandler } from "../error-handler.js";
+import { errorHandler } from "@/lib/error-handler.js";
 
 function appThatThrows(thrower: () => void) {
   const app = express();

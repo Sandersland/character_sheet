@@ -7,9 +7,9 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { prisma } from "../prisma.js";
-import { ensureTestOwner } from "../../test-support/owner.js";
-import { runCharacterTransaction } from "../character-transaction.js";
+import { prisma } from "@/lib/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
+import { runCharacterTransaction } from "@/lib/character-transaction.js";
 
 const OWNER_ID = "owner-character-transaction";
 

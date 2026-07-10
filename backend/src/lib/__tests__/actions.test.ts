@@ -14,7 +14,7 @@ import {
   ACTION_CAST_FN,
   rageMeleeDamageBonus,
   type AvailableAction,
-} from "../actions.js";
+} from "@/lib/actions.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 

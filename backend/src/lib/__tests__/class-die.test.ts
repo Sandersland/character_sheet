@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { deriveResources, resolveClassDie, type DerivedClassInfo } from "../class-features.js";
-import { readEffectSpec, resolveEffectSpec, type EffectRow } from "../effects.js";
+import { deriveResources, resolveClassDie, type DerivedClassInfo } from "@/lib/class-features.js";
+import { readEffectSpec, resolveEffectSpec, type EffectRow } from "@/lib/effects.js";
 
 const scores = { strength: 16, dexterity: 12 };
 

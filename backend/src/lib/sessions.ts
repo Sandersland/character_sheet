@@ -7,7 +7,7 @@ import {
   computeSessionSummary,
   type ParticipantSummary,
 } from "./session-summary.js";
-import type { Prisma } from "../generated/prisma/client.js";
+import type { Prisma } from "@/generated/prisma/client.js";
 
 export class SessionError extends Error {}
 export class CombatError extends Error {}

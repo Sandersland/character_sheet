@@ -12,7 +12,7 @@
  * is re-exported there so existing importers keep resolving it unchanged.
  */
 
-import { Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "@/generated/prisma/client.js";
 import { applySpendResourceInTx, type SpendResourceOperation } from "./resources.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────

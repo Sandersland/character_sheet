@@ -3,16 +3,16 @@ import express from "express";
 import supertest from "supertest";
 import "express-async-errors";
 
-import { errorHandler } from "../../../lib/error-handler.js";
-import { prisma } from "../../../lib/prisma.js";
-import { authRouter } from "../auth.js";
+import { errorHandler } from "@/lib/error-handler.js";
+import { prisma } from "@/lib/prisma.js";
+import { authRouter } from "@/routes/platform/auth.js";
 
 // config is frozen at import, so ALLOW_DEV_LOGIN can't be flipped via env at
 // runtime. Mock the config module to read the flag from a hoisted, mutable
 // holder while passing everything else (APP_BASE_URL, appRedirectUri, …) through.
 const hoisted = vi.hoisted(() => ({ devLoginEnabled: false }));
-vi.mock("../../../lib/config.js", async (importActual) => {
-  const actual = await importActual<typeof import("../../../lib/config.js")>();
+vi.mock("@/lib/config.js", async (importActual) => {
+  const actual = await importActual<typeof import("@/lib/config.js")>();
   return {
     ...actual,
     get config() {

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { Prisma } from "../../generated/prisma/client.js";
-import { prisma } from "../prisma.js";
-import { ensureTestOwner } from "../../test-support/owner.js";
-import { applyHitPointOperations, normalizeHitPoints } from "../hitpoints.js";
+import { Prisma } from "@/generated/prisma/client.js";
+import { prisma } from "@/lib/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
+import { applyHitPointOperations, normalizeHitPoints } from "@/lib/hitpoints.js";
 
 const OWNER_ID = "owner-hp-item-resist";
 

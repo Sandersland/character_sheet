@@ -1,7 +1,7 @@
 import { Router } from "express";
 
-import { assertCampaignMembership, assertCharacterAccess } from "../../lib/auth/access.js";
-import { prisma } from "../../lib/prisma.js";
+import { assertCampaignMembership, assertCharacterAccess } from "@/lib/auth/access.js";
+import { prisma } from "@/lib/prisma.js";
 import {
   startCampaignSession,
   endSession,
@@ -12,9 +12,9 @@ import {
   logCombatEvent,
   logRollEvent,
   SessionError,
-} from "../../lib/sessions.js";
-import { characterInclude } from "../../lib/character-include.js";
-import { serializeCharacter } from "../../lib/character-serialize.js";
+} from "@/lib/sessions.js";
+import { characterInclude } from "@/lib/character-include.js";
+import { serializeCharacter } from "@/lib/character-serialize.js";
 import { parseRollInput, requireCharacterId, withSessionErrors } from "./session-route-helpers.js";
 
 export const sessionsRouter = Router();

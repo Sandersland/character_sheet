@@ -5,7 +5,7 @@
 import type { Router } from "express";
 import type { z } from "zod";
 
-import { assertCharacterAccess } from "./auth/access.js";
+import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { prisma } from "./prisma.js";
 import { characterInclude } from "./character-include.js";
 import { serializeCharacter } from "./character-serialize.js";

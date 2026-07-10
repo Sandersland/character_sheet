@@ -4,7 +4,7 @@ import {
   experienceProgress,
   levelForExperience,
   proficiencyBonusForLevel,
-} from "../experience.js";
+} from "@/lib/experience.js";
 
 describe("levelForExperience", () => {
   it("treats 0 XP as level 1", () => {

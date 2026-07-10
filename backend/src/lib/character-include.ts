@@ -1,4 +1,4 @@
-import { Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "@/generated/prisma/client.js";
 
 // Shared `include` for fetching a full character with its race/background/
 // class selections. classEntries is ordered so index 0 is always the

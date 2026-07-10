@@ -1,5 +1,5 @@
-import { prisma } from "../lib/prisma.js";
-import { SESSION_COOKIE } from "../lib/auth/session.js";
+import { prisma } from "@/lib/prisma.js";
+import { SESSION_COOKIE } from "@/lib/auth/session.js";
 
 // Test-only helper. Once requireAuth gates every protected /api route, route
 // tests must present a valid session cookie. This upserts the owning User and a

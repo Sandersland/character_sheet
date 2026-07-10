@@ -1,4 +1,4 @@
-import type { CampaignRole, Prisma, PrismaClient } from "../../generated/prisma/client.js";
+import type { CampaignRole, Prisma, PrismaClient } from "@/generated/prisma/client.js";
 
 import { AuthorizationError, NotFoundError } from "./errors.js";
 

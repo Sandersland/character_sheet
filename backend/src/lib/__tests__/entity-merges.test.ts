@@ -5,7 +5,7 @@ import {
   resolveSurvivorChain,
   wouldCreateCycle,
   type MergeEdge,
-} from "../entity-merges.js";
+} from "@/lib/entity-merges.js";
 
 // Jenkins → Vecna → Whispered One, plus a second identity (Oldman) merged into
 // Vecna. One edge (Oldman→Vecna) is only PREPARED to exercise the filter.

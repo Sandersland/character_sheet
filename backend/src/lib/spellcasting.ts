@@ -17,7 +17,7 @@
 import { randomUUID } from "node:crypto";
 
 
-import { Prisma, type Spell } from "../generated/prisma/client.js";
+import { Prisma, type Spell } from "@/generated/prisma/client.js";
 import { castAbilityInTx, type CastTarget, type OpOutcome } from "./ability-cast.js";
 import { clearBuffByKeyInTx, clearBuffsForSourceInTx } from "./active-effects.js";
 import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";

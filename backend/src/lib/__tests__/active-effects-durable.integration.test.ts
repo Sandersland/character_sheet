@@ -10,18 +10,18 @@ import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "../../app.js";
-import { prisma } from "../prisma.js";
-import { ensureTestOwner } from "../../test-support/owner.js";
-import { authCookie } from "../../test-support/auth.js";
+import { createApp } from "@/app.js";
+import { prisma } from "@/lib/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
+import { authCookie } from "@/test-support/auth.js";
 import {
   appendActiveBuffInTx,
   clearBuffByKeyInTx,
   clearBuffsForSourceInTx,
   normalizeActiveEffectsMutable,
   type ActiveBuff,
-} from "../active-effects.js";
-import { applyHitPointOperations } from "../hitpoints.js";
+} from "@/lib/active-effects.js";
+import { applyHitPointOperations } from "@/lib/hitpoints.js";
 
 const OWNER_ID = "owner-durable-buffs";
 const FIXTURE_ID = "test-durable-buffs-character-1";

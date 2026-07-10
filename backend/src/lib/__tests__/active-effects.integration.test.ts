@@ -9,15 +9,15 @@ import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "../../app.js";
-import { prisma } from "../prisma.js";
-import { ensureTestOwner } from "../../test-support/owner.js";
-import { authCookie } from "../../test-support/auth.js";
-import { castAbilityInTx } from "../ability-cast.js";
-import { clearBuffsForSourceInTx, normalizeActiveEffectsMutable } from "../active-effects.js";
-import type { EffectSpec } from "../effects.js";
-import { normalizeSpellcastingMutable } from "../spell-state.js";
-import { revertBatch } from "../activity.js";
+import { createApp } from "@/app.js";
+import { prisma } from "@/lib/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
+import { authCookie } from "@/test-support/auth.js";
+import { castAbilityInTx } from "@/lib/ability-cast.js";
+import { clearBuffsForSourceInTx, normalizeActiveEffectsMutable } from "@/lib/active-effects.js";
+import type { EffectSpec } from "@/lib/effects.js";
+import { normalizeSpellcastingMutable } from "@/lib/spell-state.js";
+import { revertBatch } from "@/lib/activity.js";
 
 const OWNER_ID = "owner-active-effects";
 const FIXTURE_ID = "test-active-effects-character-1";

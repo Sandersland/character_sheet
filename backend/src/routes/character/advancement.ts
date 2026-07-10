@@ -7,9 +7,9 @@ import { z } from "zod";
 import {
   applyAdvancementOperations,
   InvalidAdvancementOperationError,
-} from "../../lib/advancement.js";
-import { FEAT_IMPROVEMENT_TARGETS } from "../../lib/srd.js";
-import { makeTransactionsEndpoint } from "../../lib/transactions-endpoint.js";
+} from "@/lib/advancement.js";
+import { FEAT_IMPROVEMENT_TARGETS } from "@/lib/srd.js";
+import { makeTransactionsEndpoint } from "@/lib/transactions-endpoint.js";
 
 export const advancementRouter = Router({ mergeParams: true });
 

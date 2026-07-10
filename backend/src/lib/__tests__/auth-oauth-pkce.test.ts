@@ -4,7 +4,7 @@ import {
   challengeFromVerifier,
   createVerifier,
   randomState,
-} from "../auth/oauth/pkce.js";
+} from "@/lib/auth/oauth/pkce.js";
 
 // OAuth-only PKCE/state primitives — pure crypto, no Postgres or env.
 

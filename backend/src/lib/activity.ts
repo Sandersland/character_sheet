@@ -4,7 +4,7 @@ import {
   CharacterEventType,
   Prisma,
   PrismaClient,
-} from "../generated/prisma/client.js";
+} from "@/generated/prisma/client.js";
 import {
   InsufficientCurrencyError,
   InvalidInventoryOperationError,

@@ -11,7 +11,7 @@
  * from the catalog; the known list + die size come from resources + deriveResources.
  */
 
-import { Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "@/generated/prisma/client.js";
 import { castAbilityInTx } from "./ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "./ability-cost.js";
 import { runCharacterTransaction, type CharacterTxContext } from "./character-transaction.js";

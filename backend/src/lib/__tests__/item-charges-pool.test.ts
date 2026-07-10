@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { Prisma } from "../../generated/prisma/client.js";
-import { characterInclude } from "../character-include.js";
-import { serializeCharacter } from "../character-serialize.js";
-import { revertBatch } from "../activity.js";
-import { applyHitPointOperations } from "../hitpoints.js";
-import { applyInventoryOperations } from "../inventory.js";
-import { applySpellcastingOperations } from "../spellcasting.js";
-import { prisma } from "../prisma.js";
-import { ensureTestOwner } from "../../test-support/owner.js";
-import type { SpellEntry } from "../spell-state.js";
+import { Prisma } from "@/generated/prisma/client.js";
+import { characterInclude } from "@/lib/character-include.js";
+import { serializeCharacter } from "@/lib/character-serialize.js";
+import { revertBatch } from "@/lib/activity.js";
+import { applyHitPointOperations } from "@/lib/hitpoints.js";
+import { applyInventoryOperations } from "@/lib/inventory.js";
+import { applySpellcastingOperations } from "@/lib/spellcasting.js";
+import { prisma } from "@/lib/prisma.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
+import type { SpellEntry } from "@/lib/spell-state.js";
 
 const OWNER_ID = "owner-item-charges-pool";
 

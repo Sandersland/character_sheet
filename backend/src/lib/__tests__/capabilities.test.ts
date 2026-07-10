@@ -22,7 +22,7 @@ import {
   type ActivatedEffectCapability,
   type CapabilityColumns,
   type ChargesCapability,
-} from "../capabilities.js";
+} from "@/lib/capabilities.js";
 
 const bootsOfSpeed: CapabilityColumns = {
   kind: "activatedEffect",
