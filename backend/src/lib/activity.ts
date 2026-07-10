@@ -78,6 +78,289 @@ type ActivityEventRow = CharacterEvent & {
 
 type RevertResult = { ok: true } | { ok: false; status: 404 | 409; error: string };
 
+// ── Revert context + handler registry ─────────────────────────────────────────
+// Mirrors the LEVEL_GATED_RECONCILERS pattern in level-reconciliation.ts: each
+// category's before-snapshot restore lives in a named handler, and reverseEvent
+// dispatches through REVERT_HANDLERS instead of an if/else chain.
+//
+// Handlers stay in THIS module (not the domain libs) on purpose: nothing here
+// uses domain-lib internals — they're generic `tx.character.update` writes —
+// and moving them into hitpoints.ts/spellcasting.ts/etc. would close an
+// `activity → domainlib → … → activity` import cycle.
+
+interface RevertContext {
+  tx: Prisma.TransactionClient;
+  characterId: string;
+  event: CharacterEvent;
+  /** The event's non-null `before` snapshot (the guard runs before dispatch). */
+  before: Record<string, unknown>;
+}
+
+type RevertHandler = (ctx: RevertContext) => Promise<void>;
+
+// Shared by `hitPoints` and `experience` (registered under both keys).
+async function revertHitPointsEvent(ctx: RevertContext): Promise<void> {
+  const { tx, characterId, event, before } = ctx;
+
+  // Restore hitPoints/hitDice from before snapshot.
+  const updateData: Record<string, unknown> = {};
+  if (before.hitPoints !== undefined) updateData.hitPoints = before.hitPoints;
+  if (before.hitDice !== undefined) updateData.hitDice = before.hitDice;
+  if (before.experiencePoints !== undefined) updateData.experiencePoints = before.experiencePoints;
+  // Long/short rest also snapshot spellcasting + resources — restore them
+  // so undoing a rest re-expends the slots/dice that were cleared.
+  if (before.spellcasting !== undefined) updateData.spellcasting = before.spellcasting;
+  if (before.resources !== undefined) updateData.resources = before.resources;
+  if (Object.keys(updateData).length > 0) {
+    await tx.character.update({
+      where: { id: characterId },
+      data: updateData as Prisma.CharacterUpdateInput,
+    });
+  }
+
+  // Undo a long-rest consumable recharge (#121): re-expend each charge.
+  const beforeCharges = before.consumableCharges as
+    | { inventoryItemId: string; usesRemaining: number | null }[]
+    | undefined;
+  if (beforeCharges) {
+    for (const c of beforeCharges) {
+      await tx.inventoryConsumableDetail.updateMany({
+        where: { inventoryItemId: c.inventoryItemId },
+        data: { usesRemaining: c.usesRemaining },
+      });
+    }
+  }
+
+  // Undo a rest's item charge-pool recharge (#555): re-expend each pool.
+  // updateMany so a pool whose item was deleted after the rest is a no-op.
+  const beforeChargePools = before.chargePools as
+    | { capabilityId: string; used: number }[]
+    | undefined;
+  if (beforeChargePools) {
+    for (const p of beforeChargePools) {
+      await tx.inventoryCapability.updateMany({
+        where: { id: p.capabilityId },
+        data: { used: p.used },
+      });
+    }
+  }
+
+  // Restore class-entry level if the event touched it (levelUp/levelDown).
+  const data = event.data as Record<string, unknown> | null;
+  if (data?.primaryEntryId && before.classEntryLevel !== undefined) {
+    await tx.characterClassEntry.update({
+      where: { id: data.primaryEntryId as string },
+      data: { level: before.classEntryLevel as number },
+    });
+  }
+  // A multiclass "new class" level-up created a fresh CharacterClassEntry
+  // (#124). Undo must delete it, or a ghost entry survives the revert.
+  // deleteMany so a later level-down that already removed it is a no-op.
+  if (data?.createdClassEntryId) {
+    await tx.characterClassEntry.deleteMany({
+      where: { id: data.createdClassEntryId as string },
+    });
+  }
+}
+
+async function revertCurrencyEvent(ctx: RevertContext): Promise<void> {
+  const { tx, characterId, before } = ctx;
+  const beforeCurrency = before.currency as Record<string, number> | undefined;
+  if (beforeCurrency) {
+    await tx.character.update({
+      where: { id: characterId },
+      data: { currency: beforeCurrency as Prisma.InputJsonValue },
+    });
+  }
+}
+
+async function revertSpellcastingEvent(ctx: RevertContext): Promise<void> {
+  const { tx, characterId, before } = ctx;
+  // Restore the full spellcasting JSON from before snapshot.
+  const beforeSpellcasting = before.spellcasting as Record<string, unknown> | undefined;
+  if (beforeSpellcasting !== undefined) {
+    await tx.character.update({
+      where: { id: characterId },
+      data: { spellcasting: beforeSpellcasting as Prisma.InputJsonValue },
+    });
+  }
+  // An item-spell cast (#528/#555) also spent an InventoryCapability.used
+  // counter (per-capability uses or a shared charges pool), persisted outside
+  // the spell blob — restore it so undo refunds the use/charges (#580).
+  // updateMany so a since-deleted item (new capability ids after a
+  // delete/undo-delete cycle) is a no-op, matching the rest-undo pattern.
+  const capabilityUsed = before.capabilityUsed as
+    | { capabilityId: string; used: number }
+    | undefined;
+  if (capabilityUsed !== undefined) {
+    await tx.inventoryCapability.updateMany({
+      where: { id: capabilityUsed.capabilityId },
+      data: { used: capabilityUsed.used },
+    });
+  }
+}
+
+async function revertResourcesEvent(ctx: RevertContext): Promise<void> {
+  const { tx, characterId, before } = ctx;
+  // Restore the full resources JSON (used counts + maneuversKnown) from
+  // the before snapshot — identical pattern to spellcasting revert.
+  const beforeResources = before.resources as Record<string, unknown> | undefined;
+  if (beforeResources !== undefined) {
+    await tx.character.update({
+      where: { id: characterId },
+      data: { resources: beforeResources as Prisma.InputJsonValue },
+    });
+  }
+}
+
+async function revertConditionsEvent(ctx: RevertContext): Promise<void> {
+  const { tx, characterId, before } = ctx;
+  // Restore the full conditions JSON (active list + exhaustion level)
+  // from the before snapshot — identical pattern to resources revert.
+  const beforeConditions = before.conditions as Record<string, unknown> | undefined;
+  if (beforeConditions !== undefined) {
+    await tx.character.update({
+      where: { id: characterId },
+      data: { conditions: beforeConditions as Prisma.InputJsonValue },
+    });
+  }
+}
+
+async function revertEffectsEvent(ctx: RevertContext): Promise<void> {
+  const { tx, characterId, before } = ctx;
+  // Restore the full activeEffects JSON (buff list) from the before snapshot
+  // — identical pattern to the conditions revert.
+  const beforeEffects = before.activeEffects as Record<string, unknown> | undefined;
+  if (beforeEffects !== undefined) {
+    await tx.character.update({
+      where: { id: characterId },
+      data: { activeEffects: beforeEffects as Prisma.InputJsonValue },
+    });
+  }
+}
+
+// Multiclass add-class (issue #125): delete the created entry and restore
+// the HP/hit-dice bump that came with the new class's first level.
+async function revertClassAdded(ctx: RevertContext): Promise<void> {
+  const { tx, characterId, event, before } = ctx;
+  const data = event.data as Record<string, unknown> | null;
+  if (data?.createdClassEntryId) {
+    await tx.characterClassEntry.deleteMany({
+      where: { id: data.createdClassEntryId as string },
+    });
+  }
+  const updateData: Record<string, unknown> = {};
+  if (before.hitPoints !== undefined) updateData.hitPoints = before.hitPoints;
+  if (before.hitDice !== undefined) updateData.hitDice = before.hitDice;
+  if (Object.keys(updateData).length > 0) {
+    await tx.character.update({
+      where: { id: characterId },
+      data: updateData as Prisma.CharacterUpdateInput,
+    });
+  }
+}
+
+// Multiclass level-down reconcile (issue #124): restore each entry's level
+// (recreating any that were deleted when they hit level 0).
+async function revertClassLevelsReconciled(ctx: RevertContext): Promise<void> {
+  const { tx, characterId, before } = ctx;
+  const beforeEntries = before.classEntries as
+    | {
+        id: string;
+        name: string;
+        level: number;
+        position: number;
+        classId: string | null;
+        subclass: string | null;
+        subclassId: string | null;
+      }[]
+    | undefined;
+  if (beforeEntries) {
+    for (const e of beforeEntries) {
+      await tx.characterClassEntry.upsert({
+        where: { id: e.id },
+        update: {
+          level: e.level,
+          name: e.name,
+          position: e.position,
+          classId: e.classId ?? null,
+          subclass: e.subclass ?? null,
+          subclassId: e.subclassId ?? null,
+        },
+        create: {
+          id: e.id,
+          characterId,
+          level: e.level,
+          name: e.name,
+          position: e.position,
+          classId: e.classId ?? null,
+          subclass: e.subclass ?? null,
+          subclassId: e.subclassId ?? null,
+        },
+      });
+    }
+  }
+}
+
+// Restore subclassId + subclass display name onto the class entry.
+// The before snapshot carries the class entry's data (not the whole
+// character row), so grab classEntryId from event.data.
+async function revertSubclassChange(ctx: RevertContext): Promise<void> {
+  const { tx, event, before } = ctx;
+  const data = event.data as Record<string, unknown> | null;
+  const classEntryId = data?.classEntryId as string | undefined;
+  if (classEntryId) {
+    await tx.characterClassEntry.update({
+      where: { id: classEntryId },
+      data: {
+        subclassId: (before.subclassId as string | null) ?? null,
+        subclass: (before.subclass as string | null) ?? null,
+      },
+    });
+  }
+}
+
+async function revertClassEvent(ctx: RevertContext): Promise<void> {
+  if (ctx.event.type === "classAdded") return revertClassAdded(ctx);
+  if (ctx.event.type === "classLevelsReconciled") return revertClassLevelsReconciled(ctx);
+  return revertSubclassChange(ctx);
+}
+
+async function revertAdvancementEvent(ctx: RevertContext): Promise<void> {
+  const { tx, characterId, before } = ctx;
+  // Restore ability scores, hit points, initiative, and resources from
+  // before snapshot — all four columns that advancement ops mutate.
+  const updateData: Record<string, unknown> = {};
+  if (before.abilityScores !== undefined) updateData.abilityScores = before.abilityScores;
+  if (before.hitPoints !== undefined) updateData.hitPoints = before.hitPoints;
+  if (before.initiativeBonus !== undefined) updateData.initiativeBonus = before.initiativeBonus;
+  if (before.resources !== undefined) updateData.resources = before.resources;
+  if (Object.keys(updateData).length > 0) {
+    await tx.character.update({
+      where: { id: characterId },
+      data: updateData as Prisma.CharacterUpdateInput,
+    });
+  }
+}
+
+/**
+ * Per-category revert dispatch. Categories with no handler (roll, session,
+ * combat — and inventory, which is dispatched before the `before` guard) are
+ * intentionally absent: reverseEvent no-ops for them, matching prior behavior.
+ * `hitPoints` and `experience` share one handler.
+ */
+const REVERT_HANDLERS: Partial<Record<CharacterEventCategory, RevertHandler>> = {
+  hitPoints: revertHitPointsEvent,
+  experience: revertHitPointsEvent,
+  currency: revertCurrencyEvent,
+  spellcasting: revertSpellcastingEvent,
+  resources: revertResourcesEvent,
+  conditions: revertConditionsEvent,
+  effects: revertEffectsEvent,
+  class: revertClassEvent,
+  advancement: revertAdvancementEvent,
+};
+
 // Restore one event's `before` sub-state. Inventory is shape-driven and runs
 // before the `if (!before) continue` guard (an acquire carries before==null).
 async function reverseEvent(
@@ -85,14 +368,12 @@ async function reverseEvent(
   characterId: string,
   event: CharacterEvent,
 ) {
-  const category = event.category as string;
-
   // Inventory is handled BEFORE the `if (!before) continue` short-circuit:
   // an acquire event carries before==null (it created the row), and undoing
   // it means DELETING that row — so it must not be skipped. The reversal is
   // shape-driven inside revertInventoryEvent (delete created / recreate
   // deleted / restore scalar + reverse currency).
-  if (category === "inventory") {
+  if (event.category === "inventory") {
     await revertInventoryEvent(tx, characterId, event);
     return;
   }
@@ -100,219 +381,10 @@ async function reverseEvent(
   const before = event.before as Record<string, unknown> | null;
   if (!before) return; // no before snapshot = nothing to restore
 
-  if (category === "hitPoints" || category === "experience") {
-    // Restore hitPoints/hitDice from before snapshot.
-    const updateData: Record<string, unknown> = {};
-    if (before.hitPoints !== undefined) updateData.hitPoints = before.hitPoints;
-    if (before.hitDice !== undefined) updateData.hitDice = before.hitDice;
-    if (before.experiencePoints !== undefined) updateData.experiencePoints = before.experiencePoints;
-    // Long/short rest also snapshot spellcasting + resources — restore them
-    // so undoing a rest re-expends the slots/dice that were cleared.
-    if (before.spellcasting !== undefined) updateData.spellcasting = before.spellcasting;
-    if (before.resources !== undefined) updateData.resources = before.resources;
-    if (Object.keys(updateData).length > 0) {
-      await tx.character.update({
-        where: { id: characterId },
-        data: updateData as Prisma.CharacterUpdateInput,
-      });
-    }
+  const handler = REVERT_HANDLERS[event.category];
+  if (!handler) return; // roll/session/combat etc. — nothing to restore
 
-    // Undo a long-rest consumable recharge (#121): re-expend each charge.
-    const beforeCharges = before.consumableCharges as
-      | { inventoryItemId: string; usesRemaining: number | null }[]
-      | undefined;
-    if (beforeCharges) {
-      for (const c of beforeCharges) {
-        await tx.inventoryConsumableDetail.updateMany({
-          where: { inventoryItemId: c.inventoryItemId },
-          data: { usesRemaining: c.usesRemaining },
-        });
-      }
-    }
-
-    // Undo a rest's item charge-pool recharge (#555): re-expend each pool.
-    // updateMany so a pool whose item was deleted after the rest is a no-op.
-    const beforeChargePools = before.chargePools as
-      | { capabilityId: string; used: number }[]
-      | undefined;
-    if (beforeChargePools) {
-      for (const p of beforeChargePools) {
-        await tx.inventoryCapability.updateMany({
-          where: { id: p.capabilityId },
-          data: { used: p.used },
-        });
-      }
-    }
-
-    // Restore class-entry level if the event touched it (levelUp/levelDown).
-    const data = event.data as Record<string, unknown> | null;
-    if (data?.primaryEntryId && before.classEntryLevel !== undefined) {
-      await tx.characterClassEntry.update({
-        where: { id: data.primaryEntryId as string },
-        data: { level: before.classEntryLevel as number },
-      });
-    }
-    // A multiclass "new class" level-up created a fresh CharacterClassEntry
-    // (#124). Undo must delete it, or a ghost entry survives the revert.
-    // deleteMany so a later level-down that already removed it is a no-op.
-    if (data?.createdClassEntryId) {
-      await tx.characterClassEntry.deleteMany({
-        where: { id: data.createdClassEntryId as string },
-      });
-    }
-  } else if (category === "currency") {
-    const beforeCurrency = before.currency as Record<string, number> | undefined;
-    if (beforeCurrency) {
-      await tx.character.update({
-        where: { id: characterId },
-        data: { currency: beforeCurrency as Prisma.InputJsonValue },
-      });
-    }
-  } else if (category === "spellcasting") {
-    // Restore the full spellcasting JSON from before snapshot.
-    const beforeSpellcasting = before.spellcasting as Record<string, unknown> | undefined;
-    if (beforeSpellcasting !== undefined) {
-      await tx.character.update({
-        where: { id: characterId },
-        data: { spellcasting: beforeSpellcasting as Prisma.InputJsonValue },
-      });
-    }
-    // An item-spell cast (#528/#555) also spent an InventoryCapability.used
-    // counter (per-capability uses or a shared charges pool), persisted outside
-    // the spell blob — restore it so undo refunds the use/charges (#580).
-    // updateMany so a since-deleted item (new capability ids after a
-    // delete/undo-delete cycle) is a no-op, matching the rest-undo pattern.
-    const capabilityUsed = before.capabilityUsed as
-      | { capabilityId: string; used: number }
-      | undefined;
-    if (capabilityUsed !== undefined) {
-      await tx.inventoryCapability.updateMany({
-        where: { id: capabilityUsed.capabilityId },
-        data: { used: capabilityUsed.used },
-      });
-    }
-  } else if (category === "resources") {
-    // Restore the full resources JSON (used counts + maneuversKnown) from
-    // the before snapshot — identical pattern to spellcasting revert.
-    const beforeResources = before.resources as Record<string, unknown> | undefined;
-    if (beforeResources !== undefined) {
-      await tx.character.update({
-        where: { id: characterId },
-        data: { resources: beforeResources as Prisma.InputJsonValue },
-      });
-    }
-  } else if (category === "conditions") {
-    // Restore the full conditions JSON (active list + exhaustion level)
-    // from the before snapshot — identical pattern to resources revert.
-    const beforeConditions = before.conditions as Record<string, unknown> | undefined;
-    if (beforeConditions !== undefined) {
-      await tx.character.update({
-        where: { id: characterId },
-        data: { conditions: beforeConditions as Prisma.InputJsonValue },
-      });
-    }
-  } else if (category === "effects") {
-    // Restore the full activeEffects JSON (buff list) from the before snapshot
-    // — identical pattern to the conditions revert.
-    const beforeEffects = before.activeEffects as Record<string, unknown> | undefined;
-    if (beforeEffects !== undefined) {
-      await tx.character.update({
-        where: { id: characterId },
-        data: { activeEffects: beforeEffects as Prisma.InputJsonValue },
-      });
-    }
-  } else if (category === "class") {
-    // Multiclass add-class (issue #125): delete the created entry and restore
-    // the HP/hit-dice bump that came with the new class's first level.
-    if (event.type === "classAdded") {
-      const data = event.data as Record<string, unknown> | null;
-      if (data?.createdClassEntryId) {
-        await tx.characterClassEntry.deleteMany({
-          where: { id: data.createdClassEntryId as string },
-        });
-      }
-      const updateData: Record<string, unknown> = {};
-      if (before.hitPoints !== undefined) updateData.hitPoints = before.hitPoints;
-      if (before.hitDice !== undefined) updateData.hitDice = before.hitDice;
-      if (Object.keys(updateData).length > 0) {
-        await tx.character.update({
-          where: { id: characterId },
-          data: updateData as Prisma.CharacterUpdateInput,
-        });
-      }
-      return;
-    }
-    // Multiclass level-down reconcile (issue #124): restore each entry's level
-    // (recreating any that were deleted when they hit level 0).
-    if (event.type === "classLevelsReconciled") {
-      const beforeEntries = before.classEntries as
-        | {
-            id: string;
-            name: string;
-            level: number;
-            position: number;
-            classId: string | null;
-            subclass: string | null;
-            subclassId: string | null;
-          }[]
-        | undefined;
-      if (beforeEntries) {
-        for (const e of beforeEntries) {
-          await tx.characterClassEntry.upsert({
-            where: { id: e.id },
-            update: {
-              level: e.level,
-              name: e.name,
-              position: e.position,
-              classId: e.classId ?? null,
-              subclass: e.subclass ?? null,
-              subclassId: e.subclassId ?? null,
-            },
-            create: {
-              id: e.id,
-              characterId,
-              level: e.level,
-              name: e.name,
-              position: e.position,
-              classId: e.classId ?? null,
-              subclass: e.subclass ?? null,
-              subclassId: e.subclassId ?? null,
-            },
-          });
-        }
-      }
-      return;
-    }
-    // Restore subclassId + subclass display name onto the class entry.
-    // The before snapshot carries the class entry's data (not the whole
-    // character row), so grab classEntryId from event.data.
-    const data = event.data as Record<string, unknown> | null;
-    const classEntryId = data?.classEntryId as string | undefined;
-    if (classEntryId) {
-      await tx.characterClassEntry.update({
-        where: { id: classEntryId },
-        data: {
-          subclassId: (before.subclassId as string | null) ?? null,
-          subclass: (before.subclass as string | null) ?? null,
-        },
-      });
-    }
-  } else if (category === "advancement") {
-    // Restore ability scores, hit points, initiative, and resources from
-    // before snapshot — all four columns that advancement ops mutate.
-    const updateData: Record<string, unknown> = {};
-    if (before.abilityScores !== undefined) updateData.abilityScores = before.abilityScores;
-    if (before.hitPoints !== undefined) updateData.hitPoints = before.hitPoints;
-    if (before.initiativeBonus !== undefined) updateData.initiativeBonus = before.initiativeBonus;
-    if (before.resources !== undefined) updateData.resources = before.resources;
-    if (Object.keys(updateData).length > 0) {
-      await tx.character.update({
-        where: { id: characterId },
-        data: updateData as Prisma.CharacterUpdateInput,
-      });
-    }
-  }
-  // (inventory is handled at the top, before the `before` guard)
+  await handler({ tx, characterId, event, before });
 }
 
 // LIFO undo of one batch: validate it is the most-recent non-reverted batch,
