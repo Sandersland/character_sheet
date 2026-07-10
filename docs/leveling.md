@@ -80,6 +80,8 @@ backend/src/lib/level-reconciliation.ts
 
 Order matters: later reconcilers observe earlier ones' writes (maneuvers and tool profs must see the already-cleared subclass so that `deriveResources` returns `null → allowed = 0` for a full reset).
 
+`reconcileManeuvers`, `reconcileDisciplines`, and `reconcileToolProficiencies` are thin configs over a shared `reconcileKnownList(ctx, config)` helper that owns the fetch → derive → trim → audit flow (see the checklist below for the config fields).
+
 #### Choice-less level-gated grants are pure-derived, not persisted
 
 A level-gated grant with **zero player choice** (e.g. a Way of Shadow monk always gets Minor Illusion at L3) is a pure function of `(subclass, level)`. It is therefore **derived at serialize time** by `deriveGrantedSpells` in `backend/src/lib/granted-spells.ts` and merged into the spellcasting view — it is **never written** into `spellcasting.spells[]`. The op runner injects it transiently so the Cast button resolves its id, then strips it before persisting. This keeps the reconciler/clamp non-negotiable satisfied without reintroducing drift: `reconcileGrantedSpells` is a **guard** against a leaked persisted grant, not the primary enforcement. The derived id scheme `granted:<subclass>:<spell>` is the seam a future side-table would key on if a *stateful* granted spell ever appears. Snapshotting granted content (freezing the SRD text at grant time) is a Phase-D versioning concern introduced uniformly with spells/items — not by persisting grants ad-hoc.
@@ -95,7 +97,7 @@ It runs unconditionally on every XP op (cheap — one indexed read). This means:
 
 **Undo:** reconciliation events ride the same LIFO `batchId` as the XP event. Because they use standard `category/type` event shapes that already have undo branches in `backend/src/routes/activity.ts`, no new revert code is needed:
 - `class` category → restores `subclassId`/`subclass` from `before` via `data.classEntryId`
-- `resources` category → restores full `before.resources` JSON (used counts + `maneuversKnown`)
+- `resources` category → restores full `before.resources` JSON (used counts + `maneuversKnown`, `disciplinesKnown`, `toolProficienciesKnown`)
 
 ### Layer 2 — Clamp-on-read (non-destructive, defense-in-depth)
 
@@ -122,7 +124,8 @@ Add the level table and derivation function to `backend/src/lib/srd.ts`. Example
 
 ### 2. Write a `Reconciler` and register it
 In `backend/src/lib/level-reconciliation.ts`:
-- Write `async function reconcile<Feature>(ctx: ReconcileContext): Promise<void>`.
+- If the feature is a **"known" list in `Character.resources`** capped by a level-derived choice count (like maneuvers/disciplines/tool profs), write it as a thin `reconcileKnownList(ctx, config)` config — the helper owns the fetch → derive → early-return → trim → update → `logEvent` flow. The config supplies: `listKey`, `allowed(derived)` (the choice-count extractor), `eventType`, `summary(removedCount, allowed)`, and `snapshot(state)` (the before/after event payload — called on the live state before and after the trim).
+- Otherwise write `async function reconcile<Feature>(ctx: ReconcileContext): Promise<void>` by hand:
   - Re-read only the persisted fields you need (one indexed read).
   - Call the relevant derivation from `srd.ts` to get the new cap.
   - Early-return if current count ≤ cap (no action).
