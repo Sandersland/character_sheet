@@ -20,8 +20,8 @@ import {
   clearBuffsForSourceInTx,
   normalizeActiveEffectsMutable,
   type ActiveBuff,
-} from "@/lib/active-effects.js";
-import { applyHitPointOperations } from "@/lib/hitpoints.js";
+} from "@/lib/combat/active-effects.js";
+import { applyHitPointOperations } from "@/lib/combat/hitpoints.js";
 
 const OWNER_ID = "owner-durable-buffs";
 const FIXTURE_ID = "test-durable-buffs-character-1";

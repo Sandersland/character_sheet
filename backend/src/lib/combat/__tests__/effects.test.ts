@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { readEffectSpec, resolveEffectSpec, type EffectRow } from "@/lib/effects.js";
+import { readEffectSpec, resolveEffectSpec, type EffectRow } from "@/lib/combat/effects.js";
 
 const fireball: EffectRow = {
   level: 3,

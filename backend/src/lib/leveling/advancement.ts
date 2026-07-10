@@ -26,7 +26,7 @@ import { levelForExperience, proficiencyBonusForLevel } from "./experience.js";
 import { logEvent } from "@/lib/events.js";
 import { normalizeResourcesMutable, serializeResourcesState, type AdvancementEntry } from "@/lib/classes/resources.js";
 import { advancementSlotsForLevel, abilityModifier } from "@/lib/srd/srd.js";
-import { normalizeHitPoints, normalizeHitDice } from "@/lib/hitpoints.js";
+import { normalizeHitPoints, normalizeHitDice } from "@/lib/combat/hitpoints.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 

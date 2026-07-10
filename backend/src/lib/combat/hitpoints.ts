@@ -8,12 +8,12 @@ import {
   clearWhileActiveBuffsInTx,
   normalizeActiveEffectsMutable,
 } from "./active-effects.js";
-import { itemImmuneDamageTypes, itemResistedDamageTypes, type GrantItem } from "./inventory/capabilities.js";
+import { itemImmuneDamageTypes, itemResistedDamageTypes, type GrantItem } from "@/lib/inventory/capabilities.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
-import { logEvent } from "./events.js";
-import { resetActivatedUsesForRestInTx } from "./inventory/item-recharge.js";
+import { logEvent } from "@/lib/events.js";
+import { resetActivatedUsesForRestInTx } from "@/lib/inventory/item-recharge.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { getActiveSessionId } from "./sessions.js";
+import { getActiveSessionId } from "@/lib/sessions.js";
 import {
   abilityModifier,
   advancementSlotsForLevel,
@@ -24,15 +24,15 @@ import {
   multiclassPrerequisitesMet,
 } from "@/lib/srd/srd.js";
 import { rollDie } from "@/lib/core/dice.js";
-import { deriveResources } from "./classes/class-features.js";
-import { normalizeResourcesMutable, serializeResourcesState } from "./classes/resources.js";
+import { deriveResources } from "@/lib/classes/class-features.js";
+import { normalizeResourcesMutable, serializeResourcesState } from "@/lib/classes/resources.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import {
   castResourceRechargesOn,
   chargeTriggerRechargesOn,
   readCapability,
   type CapabilityColumns,
-} from "./inventory/capabilities.js";
+} from "@/lib/inventory/capabilities.js";
 
 export class InvalidHitPointOperationError extends Error {}
 

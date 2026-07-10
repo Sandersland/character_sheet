@@ -5,7 +5,7 @@ import {
   serializeConsumableDetail,
   serializeWeaponDetail,
 } from "@/lib/inventory/itemDetail.js";
-import { normalizeHitDice, normalizeHitPoints } from "@/lib/hitpoints.js";
+import { normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import {
   abilityModifier,
   advancementSlotsForLevel,
@@ -36,8 +36,8 @@ import {
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { deriveActions, type AvailableAction } from "@/lib/classes/actions.js";
 import { normalizeResourcesMutable, type AdvancementEntry, type ToolProfEntry } from "@/lib/classes/resources.js";
-import { normalizeConditionsMutable } from "@/lib/conditions.js";
-import { buffsByTarget, normalizeActiveEffectsMutable, type ActiveBuff } from "@/lib/active-effects.js";
+import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
+import { buffsByTarget, normalizeActiveEffectsMutable, type ActiveBuff } from "@/lib/combat/active-effects.js";
 import {
   activatedMaxUses,
   chargePoolOf,

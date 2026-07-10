@@ -13,10 +13,10 @@
 
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
-import { appendActiveBuffInTx } from "../active-effects.js";
+import { appendActiveBuffInTx } from "@/lib/combat/active-effects.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
-import { applyConditionInTx } from "../conditions.js";
-import type { EffectSpec } from "../effects.js";
+import { applyConditionInTx } from "@/lib/combat/conditions.js";
+import type { EffectSpec } from "@/lib/combat/effects.js";
 import { logEvent } from "../events.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";

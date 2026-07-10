@@ -17,7 +17,7 @@ import {
   clearBuffByKeyInTx,
   clearBuffsByTargetInTx,
   normalizeActiveEffectsMutable,
-} from "@/lib/active-effects.js";
+} from "@/lib/combat/active-effects.js";
 import {
   armorDetailFields,
   consumableDetailFields,
@@ -26,7 +26,7 @@ import {
 } from "./detail-snapshot.js";
 import { rollDie } from "@/lib/core/dice.js";
 import { logEvent } from "@/lib/events.js";
-import { applyHealInTx } from "@/lib/hitpoints.js";
+import { applyHealInTx } from "@/lib/combat/hitpoints.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { getActiveSessionId } from "@/lib/sessions.js";
 

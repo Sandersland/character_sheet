@@ -16,7 +16,7 @@ import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import { runCharacterTransaction, type CharacterTxContext } from "@/lib/character/character-transaction.js";
 import { deriveResourcesForCharacterRow, resolveClassDie } from "./class-features.js";
-import type { EffectSpec } from "../effects.js";
+import type { EffectSpec } from "@/lib/combat/effects.js";
 import { logEvent } from "../events.js";
 import { normalizeResourcesMutable, type ManeuverEntry } from "./resources.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";

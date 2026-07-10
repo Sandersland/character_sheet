@@ -20,7 +20,7 @@ import {
   normalizeActiveEffectsMutable,
   serializeActiveEffectsState,
   type ActiveBuff,
-} from "@/lib/active-effects.js";
+} from "@/lib/combat/active-effects.js";
 
 const OWNER_ID = "owner-clear-events";
 const FIXTURE_ID = "test-clear-events-character-1";
