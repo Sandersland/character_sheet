@@ -5,29 +5,47 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 // docs/architecture.md's `lib/` table (`### `lib/` — domain logic`) declares
-// itself sourced from `ls backend/src/lib/` and CLAUDE.md's doc-mapping table
-// requires it to be updated whenever backend/src/lib/* moves or changes — a
-// stale entry here is a documentation bug, not polish (#652 review). This
-// test reads every table row's first-column `lib/...ts` path and asserts the
-// file still exists at that path under backend/src, so a future move that
-// forgets the doc update fails loudly instead of rotting silently.
+// itself sourced from `ls backend/src/lib/`, and its "Intent-bearing
+// transaction pattern" section (under a separate "## Cross-cutting data
+// patterns" heading) prose-references the same backend lib/ files. CLAUDE.md's
+// doc-mapping table requires both to stay in sync with backend/src/lib/* moves
+// — a stale entry is a documentation bug, not polish (#652 review). This test
+// reads every backtick-quoted `lib/...ts` path in those two sections (table
+// rows AND prose, e.g. "owned by `makeTransactionsEndpoint` in `lib/foo.ts`")
+// and asserts the file still exists under backend/src, so a future move that
+// forgets a doc update fails loudly instead of rotting silently.
+//
+// Scoped to just these two sections (not the whole doc) because the "###
+// Router map" and frontend `### `lib/`` sections legitimately reference
+// frontend-only modules with the same bare `lib/x.ts` shorthand (e.g. `the
+// frontend session turn-hook (`lib/turnHooks.ts`...)`) — those aren't backend
+// paths and would be false positives for this check. One such frontend mirror
+// ("the frontend `lib/mentions.ts`") sits inside the domain-logic table's own
+// prose, so it's excluded by a negative lookbehind rather than section scope.
 const backendSrcDir = fileURLToPath(new URL("../..", import.meta.url));
 const architectureDocPath = fileURLToPath(new URL("../../../../docs/architecture.md", import.meta.url));
 
-function tableRowLibPaths(doc: string): string[] {
-  return doc
-    .split("\n")
-    .map((line) => /^\|\s*`(lib\/[^`]+\.ts)`\s*\|/.exec(line))
-    .filter((match): match is RegExpExecArray => match !== null)
-    .map((match) => match[1]);
+function section(doc: string, headingText: string): string {
+  const lines = doc.split("\n");
+  const start = lines.findIndex((line) => /^#+\s/.test(line) && line.includes(headingText));
+  if (start === -1) throw new Error(`heading not found: ${headingText}`);
+  const end = lines.slice(start + 1).findIndex((line) => /^#+\s/.test(line));
+  return lines.slice(start + 1, end === -1 ? undefined : start + 1 + end).join("\n");
 }
 
-describe("docs/architecture.md lib table", () => {
-  it("only lists lib/*.ts paths that exist under backend/src", () => {
-    const doc = readFileSync(architectureDocPath, "utf-8");
-    const referenced = tableRowLibPaths(doc);
+function libTsPaths(text: string): string[] {
+  return [...text.matchAll(/(?<!the frontend )`(lib\/[^`]+\.ts)`/g)].map((match) => match[1]);
+}
 
-    // Guards the test itself against a header rename silently emptying the match set.
+describe("docs/architecture.md lib references", () => {
+  it("only references backend lib/*.ts paths that exist under backend/src", () => {
+    const doc = readFileSync(architectureDocPath, "utf-8");
+    const referenced = [
+      ...libTsPaths(section(doc, "`lib/` — domain logic")),
+      ...libTsPaths(section(doc, "Intent-bearing transaction pattern")),
+    ];
+
+    // Guards the test itself against a heading rename silently emptying the match set.
     expect(referenced.length).toBeGreaterThan(30);
 
     const missing = referenced.filter((relativePath) => !existsSync(path.join(backendSrcDir, relativePath)));
