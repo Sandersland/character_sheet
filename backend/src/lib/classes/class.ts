@@ -16,7 +16,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "../events.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { getActiveSessionId } from "../sessions.js";
+import { getActiveSessionId } from "@/lib/session/sessions.js";
 import { levelUpHpGain, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import {
   abilityModifier,
