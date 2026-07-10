@@ -6,7 +6,7 @@
  * `initiativeBonus` (which are updated atomically in the same transaction).
  *
  * What is derived at read time: the total slot count (advancementSlotsForLevel
- * in srd.ts) and the clamped display values in serializeCharacter.
+ * in srd/srd.ts) and the clamped display values in serializeCharacter.
  *
  * Design notes:
  *   - Each AdvancementEntry records the exact deltas applied so reversal
@@ -25,7 +25,7 @@ import { runCharacterTransaction } from "./character-transaction.js";
 import { levelForExperience, proficiencyBonusForLevel } from "./experience.js";
 import { logEvent } from "./events.js";
 import { normalizeResourcesMutable, serializeResourcesState, type AdvancementEntry } from "./resources.js";
-import { advancementSlotsForLevel, abilityModifier } from "./srd.js";
+import { advancementSlotsForLevel, abilityModifier } from "@/lib/srd/srd.js";
 import { normalizeHitPoints, normalizeHitDice } from "./hitpoints.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────

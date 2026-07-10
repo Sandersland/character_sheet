@@ -4,7 +4,7 @@ import { Router } from "express";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/events.js";
-import { prisma } from "@/lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import { createCharacter } from "@/lib/character-create.js";
 import { characterInclude } from "@/lib/character-include.js";
 import { serializeCharacter, serializeCharacterSummary } from "@/lib/character-serialize.js";

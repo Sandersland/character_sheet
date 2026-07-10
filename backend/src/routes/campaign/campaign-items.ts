@@ -28,8 +28,8 @@ import {
   serializeConsumableDetail,
   serializeWeaponDetail,
 } from "@/lib/itemDetail.js";
-import { prisma } from "@/lib/prisma.js";
-import { ITEM_RARITY_KEYS } from "@/lib/srd.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { ITEM_RARITY_KEYS } from "@/lib/srd/srd.js";
 
 // DM-authored campaign items (#380). Owner-only CRUD (list/create/update/delete)
 // under /api/campaigns/:id/items; a member-readable by-entity GET feeds the Codex

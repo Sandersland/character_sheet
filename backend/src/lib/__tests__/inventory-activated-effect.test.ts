@@ -5,7 +5,7 @@ import { characterInclude } from "@/lib/character-include.js";
 import { serializeCharacter } from "@/lib/character-serialize.js";
 import { applyHitPointOperations } from "@/lib/hitpoints.js";
 import { applyInventoryOperations, itemBuffKey } from "@/lib/inventory.js";
-import { prisma } from "@/lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 
 const OWNER_ID = "owner-activated-effect";

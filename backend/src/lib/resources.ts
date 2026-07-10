@@ -20,7 +20,7 @@ import {
   toolsByCategory,
   isKnownFightingStyle,
   type FightingStyleKey,
-} from "./srd.js";
+} from "@/lib/srd/srd.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 

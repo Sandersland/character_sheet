@@ -1,12 +1,12 @@
 import { Prisma } from "@/generated/prisma/client.js";
-import { prisma } from "./prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import {
   autoEquipSlot,
   buildInventoryCreateFromCatalog,
   catalogItemDetailInclude,
   selectAutoEquip,
 } from "./inventory.js";
-import { ALIGNMENTS, deriveCreatedCharacter, isKnownTool } from "./srd.js";
+import { ALIGNMENTS, deriveCreatedCharacter, isKnownTool } from "@/lib/srd/srd.js";
 import { STARTING_EQUIPMENT } from "./starting-equipment.js";
 import type { CreateCharacterBody } from "./character-schemas.js";
 
@@ -494,7 +494,7 @@ async function persistCreatedCharacter(
       experiencePoints: input.experiencePoints ?? 0,
       abilityScores: input.abilityScores,
       ...derived,
-      // toolProficiencies is ToolProficiencyEntry[] from srd.ts; Prisma
+      // toolProficiencies is ToolProficiencyEntry[] from srd/srd.ts; Prisma
       // expects InputJsonValue for Json columns — safe to cast here.
       toolProficiencies: derived.toolProficiencies as unknown as Prisma.InputJsonValue,
       // Override derived currency with starting gold if the gold path was chosen.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { deriveResources } from "@/lib/class-features.js";
-import { deriveSpellcasting, type DerivedSpellcastingInfo } from "@/lib/srd.js";
+import { deriveSpellcasting, type DerivedSpellcastingInfo } from "@/lib/srd/srd.js";
 
 // Ability scores with distinct INT/WIS/CHA mods so tests can assert the right
 // governing ability is used: INT 12 (+1), WIS 14 (+2), CHA 16 (+3).

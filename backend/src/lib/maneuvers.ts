@@ -20,7 +20,7 @@ import type { EffectSpec } from "./effects.js";
 import { logEvent } from "./events.js";
 import { normalizeResourcesMutable, type ManeuverEntry } from "./resources.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
-import { abilityModifier } from "./srd.js";
+import { abilityModifier } from "@/lib/srd/srd.js";
 
 // "strength" → "Str", "dexterity" → "Dex", "wisdom" → "Wis", "constitution" → "Con".
 function abbr(ability: string): string {

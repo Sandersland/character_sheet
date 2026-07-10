@@ -20,7 +20,7 @@ import type { EffectSpec } from "./effects.js";
 import { logEvent } from "./events.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
-import { abilityModifier } from "./srd.js";
+import { abilityModifier } from "@/lib/srd/srd.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 

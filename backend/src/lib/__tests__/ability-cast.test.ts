@@ -9,7 +9,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { Prisma } from "@/generated/prisma/client.js";
-import { prisma } from "@/lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { castAbilityInTx } from "@/lib/ability-cast.js";
 import type { EffectSpec } from "@/lib/effects.js";

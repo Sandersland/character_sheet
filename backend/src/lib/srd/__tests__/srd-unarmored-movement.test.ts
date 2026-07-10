@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { deriveUnarmoredMovement } from "@/lib/srd.js";
+import { deriveUnarmoredMovement } from "@/lib/srd/srd.js";
 
 const bonus = (monkLevel: number, isUnarmored = true, hasShield = false) =>
   deriveUnarmoredMovement({ monkLevel, isUnarmored, hasShield });

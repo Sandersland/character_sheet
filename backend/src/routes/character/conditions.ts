@@ -9,8 +9,8 @@ import {
   applyConditionsOperations,
   InvalidConditionOperationError,
 } from "@/lib/conditions.js";
-import { CONDITIONS, EXHAUSTION_MAX, type ConditionKey } from "@/lib/srd.js";
-import { makeTransactionsEndpoint } from "@/lib/transactions-endpoint.js";
+import { CONDITIONS, EXHAUSTION_MAX, type ConditionKey } from "@/lib/srd/srd.js";
+import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const conditionsRouter = Router({ mergeParams: true });
 

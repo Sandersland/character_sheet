@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { prisma } from "@/lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 
 // Mirrors the backfill CASE in migrations/…_campaign_item_rarity_enum. Exercising
 // the same expression in Postgres guards the case-insensitive mapping: known

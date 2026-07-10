@@ -15,7 +15,7 @@ import supertest from "supertest";
 
 import { createApp } from "@/app.js";
 import { Prisma } from "@/generated/prisma/client.js";
-import { prisma } from "@/lib/prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import { syncEntryRefs, visibleEntries } from "@/routes/session/journal.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";

@@ -12,7 +12,7 @@ import { itemImmuneDamageTypes, itemResistedDamageTypes, type GrantItem } from "
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
 import { resetActivatedUsesForRestInTx } from "./item-recharge.js";
-import { prisma } from "./prisma.js";
+import { prisma } from "@/lib/core/prisma.js";
 import { getActiveSessionId } from "./sessions.js";
 import {
   abilityModifier,
@@ -22,8 +22,8 @@ import {
   deriveFeatProficiencies,
   hitDieFace,
   multiclassPrerequisitesMet,
-} from "./srd.js";
-import { rollDie } from "./dice.js";
+} from "@/lib/srd/srd.js";
+import { rollDie } from "@/lib/core/dice.js";
 import { deriveResources } from "./class-features.js";
 import { normalizeResourcesMutable, serializeResourcesState } from "./resources.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";

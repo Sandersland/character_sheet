@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { multiclassPrerequisitesMet } from "@/lib/srd.js";
+import { multiclassPrerequisitesMet } from "@/lib/srd/srd.js";
 
 const BASE = { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 };
 

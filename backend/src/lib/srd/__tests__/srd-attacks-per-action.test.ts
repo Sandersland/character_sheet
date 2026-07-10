@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { deriveAttacksPerAction } from "@/lib/srd.js";
+import { deriveAttacksPerAction } from "@/lib/srd/srd.js";
 
 const single = (name: string, level: number, subclass?: string) =>
   deriveAttacksPerAction([{ name, level, subclass }]);

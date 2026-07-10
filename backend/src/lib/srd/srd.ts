@@ -6,7 +6,7 @@
 // ability mapping from its own existing frontend/src/lib/abilities.ts
 // SKILL_LABELS (display-only, no rules logic).
 
-import type { AdvancementEntry } from "./resources.js";
+import type { AdvancementEntry } from "@/lib/resources.js";
 
 export const ALIGNMENTS: readonly string[] = [
   "Lawful Good",
