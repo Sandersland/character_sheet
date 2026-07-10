@@ -15,10 +15,9 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { castAbilityInTx } from "./ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "./ability-cost.js";
 import { runCharacterTransaction, type CharacterTxContext } from "./character-transaction.js";
-import { deriveResources, resolveClassDie } from "./class-features.js";
+import { deriveResourcesForCharacterRow, resolveClassDie } from "./class-features.js";
 import type { EffectSpec } from "./effects.js";
 import { logEvent } from "./events.js";
-import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { normalizeResourcesMutable, type ManeuverEntry } from "./resources.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
 import { abilityModifier } from "./srd.js";
@@ -73,11 +72,7 @@ type ManeuverRow = Prisma.CharacterGetPayload<{ select: typeof MANEUVER_SELECT }
 
 // Gate: only a Battle Master fighter (L3+) has a superiority die + save DC.
 function resolveSuperiority(row: ManeuverRow): { saveDcBase: number; dieFaces: number } {
-  const level = levelForExperience(row.experiencePoints);
-  const profBonus = proficiencyBonusForLevel(level);
-  const primaryEntry = row.classEntries[0];
-  const abilityScores = row.abilityScores as Record<string, number>;
-  const derived = deriveResources(primaryEntry?.name ?? "", primaryEntry?.subclass ?? undefined, level, abilityScores, profBonus);
+  const { derived } = deriveResourcesForCharacterRow(row);
 
   const saveDcBase = derived?.maneuverSaveDC;
   const dieFaces = derived ? resolveClassDie("superiorityDice", derived) : null;

@@ -15,10 +15,9 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { castAbilityInTx } from "./ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "./ability-cost.js";
 import { runCharacterTransaction } from "./character-transaction.js";
-import { deriveResources } from "./class-features.js";
+import { deriveResourcesForCharacterRow } from "./class-features.js";
 import type { EffectSpec } from "./effects.js";
 import { logEvent } from "./events.js";
-import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { normalizeSpellcastingMutable, type SpellcastingMutableState } from "./spell-state.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
@@ -115,11 +114,7 @@ export async function applyShadowArtsOperations(
     },
     notFound: (id) => new InvalidShadowArtOperationError(`Character not found: ${id}`),
     applyOp: async ({ tx, row, op, batchId, sessionId }) => {
-      const level = levelForExperience(row.experiencePoints);
-      const profBonus = proficiencyBonusForLevel(level);
-      const primaryEntry = row.classEntries[0];
-      const abilityScores = row.abilityScores as Record<string, number>;
-      const derived = deriveResources(primaryEntry?.name ?? "", primaryEntry?.subclass ?? undefined, level, abilityScores, profBonus);
+      const { derived } = deriveResourcesForCharacterRow(row);
 
       // Gate: only a Way of Shadow monk of L3+ can cast Shadow Arts.
       if (!derived?.shadowArtsAvailable) {
