@@ -34,7 +34,7 @@ import type {
   SpellComponents,
   SpellcastingMutableState,
 } from "./spell-state.js";
-import { deriveSpellcasting } from "./srd.js";
+import { deriveSpellcasting } from "@/lib/srd/srd.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 // Defined in ability-cost.ts (one-directional dep graph); re-exported so

@@ -25,7 +25,7 @@ import { runCharacterTransaction } from "./character-transaction.js";
 import { levelForExperience, proficiencyBonusForLevel } from "./experience.js";
 import { logEvent } from "./events.js";
 import { normalizeResourcesMutable, serializeResourcesState, type AdvancementEntry } from "./resources.js";
-import { advancementSlotsForLevel, abilityModifier } from "./srd.js";
+import { advancementSlotsForLevel, abilityModifier } from "@/lib/srd/srd.js";
 import { normalizeHitPoints, normalizeHitDice } from "./hitpoints.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────

@@ -32,7 +32,7 @@ import {
   type BodyArmorCategory,
   type FightingStyleKey,
   type ToolProficiencyEntry,
-} from "./srd.js";
+} from "@/lib/srd/srd.js";
 import { deriveResources } from "./class-features.js";
 import { deriveActions, type AvailableAction } from "./actions.js";
 import { normalizeResourcesMutable, type AdvancementEntry, type ToolProfEntry } from "./resources.js";

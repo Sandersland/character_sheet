@@ -7,7 +7,7 @@ import {
   deriveFightingStyleBonuses,
   deriveWeaponAttackBonus,
   type FightingStyleKey,
-} from "@/lib/srd.js";
+} from "@/lib/srd/srd.js";
 import {
   normalizeResourcesMutable,
   serializeResourcesState,

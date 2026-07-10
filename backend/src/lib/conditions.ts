@@ -21,7 +21,7 @@ import {
   EXHAUSTION_MAX,
   isKnownCondition,
   type ConditionKey,
-} from "./srd.js";
+} from "@/lib/srd/srd.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 

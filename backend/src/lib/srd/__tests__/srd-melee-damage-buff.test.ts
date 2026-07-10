@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { deriveWeaponDamage } from "@/lib/srd.js";
+import { deriveWeaponDamage } from "@/lib/srd/srd.js";
 
 const scores = { strength: 16, dexterity: 12 }; // STR +3, DEX +1
 

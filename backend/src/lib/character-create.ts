@@ -6,7 +6,7 @@ import {
   catalogItemDetailInclude,
   selectAutoEquip,
 } from "./inventory.js";
-import { ALIGNMENTS, deriveCreatedCharacter, isKnownTool } from "./srd.js";
+import { ALIGNMENTS, deriveCreatedCharacter, isKnownTool } from "@/lib/srd/srd.js";
 import { STARTING_EQUIPMENT } from "./starting-equipment.js";
 import type { CreateCharacterBody } from "./character-schemas.js";
 

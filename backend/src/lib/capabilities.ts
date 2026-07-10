@@ -3,7 +3,7 @@
 // kind-discriminated Capability. All five kinds are materialized: passiveBonus,
 // castSpell (#528), grant (#529), activatedEffect (#543), charges (#555).
 
-import { casterFractionFor } from "./srd.js";
+import { casterFractionFor } from "@/lib/srd/srd.js";
 
 export type CapabilityKind = "passiveBonus" | "castSpell" | "charges" | "grant" | "activatedEffect";
 

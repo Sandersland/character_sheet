@@ -5,7 +5,7 @@ import {
   MULTICLASS_PREREQUISITES,
   multiclassPrerequisitesMet,
   toolsByCategory,
-} from "@/lib/srd.js";
+} from "@/lib/srd/srd.js";
 import { STARTING_EQUIPMENT } from "@/lib/starting-equipment.js";
 import { prisma } from "@/lib/prisma.js";
 
