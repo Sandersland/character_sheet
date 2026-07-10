@@ -820,51 +820,13 @@ function mergeTargetModifiers(
   return out;
 }
 
-export function serializeCharacter(row: CharacterWithRelations) {
-  const progress = experienceProgress(row.experiencePoints);
-  const primaryClass = row.classEntries[0];
-  const normalizedHitPoints = normalizeHitPoints(row.hitPoints);
-  const hitDice = normalizeHitDice(row.hitDice);
-  const abilityScoresMap = row.abilityScores as Record<string, number>;
-
-  const spellcasting = buildSpellcastingView(
-    row,
-    primaryClass,
-    progress.level,
-    abilityScoresMap,
-    progress.proficiencyBonus,
-  );
-
-  const { resources, fightingStyle } = buildResourcesView(
-    row,
-    primaryClass,
-    progress.level,
-    abilityScoresMap,
-    progress.proficiencyBonus,
-  );
-
-  const { effectiveScores, hitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal } =
-    applyAdvancementClamp(row, primaryClass, progress.level, normalizedHitPoints);
-
-  const { featBonuses, effectiveMaxHp, featProficiencies } = applyFeatLayer(
-    clampedAdvancements,
-    hitDice.total,
-    hitPoints.max,
-  );
-
-  // Pre-compute weapon proficiency grants so they can be reused both in the
-  // inventory serialisation (attack-bonus derivation) and the wire response.
-  const weaponGrants = buildMergedWeaponProficiencies(
-    row.classEntries,
-    row.raceSelection?.name,
-    featProficiencies.weapons,
-  );
-
-  // Active cast-granted buffs (#438) merged with active-item scalar passiveBonus
-  // contributions (#545), summed per target into the affected skill/stat's
-  // tempModifier below (and into melee/attack weapon math). Both follow the
-  // base + additive-terms pattern; item bonuses apply only while equipped/attuned.
-  const activeEffects = normalizeActiveEffectsMutable(row.activeEffects);
+// The per-target modifier channel for one character: active cast buffs merged
+// with active-item scalar passiveBonus contributions (#545), keyed by target
+// (skill name / meleeDamage / attackRoll / ac / speed / …).
+function buildTargetModifiers(
+  row: CharacterWithRelations,
+  activeEffects: ReturnType<typeof normalizeActiveEffectsMutable>,
+): TargetModifierMap {
   const itemPassiveBonuses = deriveItemPassiveBonuses(
     row.inventoryItems.map((i) => ({
       name: i.name,
@@ -873,12 +835,19 @@ export function serializeCharacter(row: CharacterWithRelations) {
       capabilities: i.capabilities,
     })),
   );
-  const buffTargets = mergeTargetModifiers(buffsByTarget(activeEffects), itemPassiveBonuses);
+  return mergeTargetModifiers(buffsByTarget(activeEffects), itemPassiveBonuses);
+}
 
-  // Item-granted traits (#529): resistances/immunities/conditionImmunities/
-  // advantages/proficiencies from active (equipped or attuned-when-required)
-  // items. Derived on read — nothing here is persisted. resistances also feed
-  // the #456 halve flow at damage-apply time (lib/hitpoints.ts).
+// Item-granted traits (#529): resistances/immunities/conditionImmunities/
+// advantages/proficiencies from active (equipped or attuned-when-required)
+// items. Derived on read — nothing here is persisted. resistances also feed
+// the #456 halve flow at damage-apply time (lib/hitpoints.ts). The skill/save
+// name Sets are pre-split for the proficiency merges below.
+function buildItemGrantsView(row: CharacterWithRelations): {
+  itemGrants: ReturnType<typeof deriveItemGrants>;
+  itemSkillProfs: Set<string>;
+  itemSaveProfs: Set<string>;
+} {
   const itemGrants = deriveItemGrants(
     row.inventoryItems.map((i) => ({
       name: i.name,
@@ -894,32 +863,29 @@ export function serializeCharacter(row: CharacterWithRelations) {
   const itemSaveProfs = new Set(
     itemGrants.proficiencies.filter((p) => p.profType === "save").map((p) => p.value),
   );
+  return { itemGrants, itemSkillProfs, itemSaveProfs };
+}
 
-  const inventoryContext = buildInventoryContext(
-    row,
-    effectiveScores,
-    progress.proficiencyBonus,
-    weaponGrants,
-    fightingStyle,
-    buffTargets,
-  );
+// The best equipped body armor snapshot (or null when unarmored) in the shape
+// deriveArmorClassParts consumes.
+type BestBodyArmor = Parameters<typeof deriveArmorClassParts>[0];
 
-  // AC is derived, not persisted: best equipped body armor + Dex (per category)
-  // + shield. The BODY slot holds one body armor (#565), so "best" is defensive.
+// AC is derived, not persisted: best equipped body armor + Dex (per category)
+// + shield. The BODY slot holds one body armor (#565), so "best" is defensive.
+// bestArmor/hasShield also feed speed (Unarmored/Fast Movement) and the Monk
+// unarmed strike, so they're selected once here and threaded to those builders.
+function selectEquippedBodyArmor(
+  row: CharacterWithRelations,
+  effectiveScores: Record<string, number>,
+): { bestArmor: BestBodyArmor; hasShield: boolean } {
   const equippedArmorDetails = row.inventoryItems
     .filter((i) => i.equippedSlot != null && i.armorDetail)
     .map((i) => ({ name: i.name, ...i.armorDetail! }));
   const hasShield = equippedArmorDetails.some((a) => a.armorCategory === "shield");
   const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
-  // Feeds Unarmored Defense (Barbarian/Monk) when no body armor is equipped.
-  const unarmoredDefense = {
-    classNames: row.classEntries.map((e) => e.name),
-    conMod: abilityModifier(effectiveScores.constitution ?? 10),
-    wisMod: abilityModifier(effectiveScores.wisdom ?? 10),
-  };
   const bestArmor = equippedArmorDetails
     .filter((a): a is (typeof equippedArmorDetails)[number] & { armorCategory: BodyArmorCategory } => a.armorCategory !== "shield")
-    .reduce<Parameters<typeof deriveArmorClassParts>[0]>((best, a) => {
+    .reduce<BestBodyArmor>((best, a) => {
       const candidate = {
         name: a.name,
         armorCategory: a.armorCategory,
@@ -931,42 +897,33 @@ export function serializeCharacter(row: CharacterWithRelations) {
         ? candidate
         : best;
     }, null);
+  return { bestArmor, hasShield };
+}
 
-  // Monk Unarmored Movement: level-scaled speed bonus while unarmored & unshielded.
-  // Additive term, off monk class level — never merged into feat/racial speed.
-  const monkLevel = row.classEntries.find((e) => e.name.toLowerCase() === "monk")?.level ?? 0;
-  const unarmoredMovementBonus = deriveUnarmoredMovement({
-    monkLevel,
-    isUnarmored: bestArmor === null,
-    hasShield,
-  });
-
-  // ── Unarmed strike + improvised weapon derivation ────────────────────────
-  // Derived from the same clamped advancements slice so Tavern Brawler's
-  // upgrades are automatically excluded when the character is over-cap. A Monk
-  // (unarmored & unshielded) swaps in max(Dex, Str) + the level-scaled Martial
-  // Arts die, off the monk class-entry level for multiclass correctness.
-  const unarmedDie = deriveUnarmedDamageDie(clampedAdvancements);
-  const unarmedStrike = deriveUnarmedStrike(effectiveScores, progress.proficiencyBonus, unarmedDie, {
-    level: monkLevel,
-    isUnarmored: bestArmor === null,
-    hasShield,
-  });
-  const improvisedProficient = weaponGrants.some((g) => g.name === "Improvised Weapons");
-  const improvisedWeapon = deriveImprovisedAttack(
-    effectiveScores,
-    progress.proficiencyBonus,
-    improvisedProficient,
-  );
-
-  // Barbarian Fast Movement: +10 ft at barbarian class level 5+ unless wearing
-  // heavy armor. Additive term off barbarian class level — never merged into feats.
-  const barbarianLevel = row.classEntries.find((e) => e.name.toLowerCase() === "barbarian")?.level ?? 0;
-  const fastMovementBonus = deriveFastMovement({
-    barbarianLevel,
-    wearingHeavyArmor: bestArmor?.armorCategory === "heavy",
-  });
-
+// AC assembly: labeled addends whose exact sum is armorClass (single source of
+// the base formula in srd.ts). Layered in order: base parts (armor/Dex/shield/
+// Unarmored Defense/Mage Armor best-of) → Defense fighting style → feat AC →
+// per-source "ac" buffs → the acFloor (Barkskin) reconciling part last.
+// The branchiness is inherent to the 5e AC layering (each optional source is a
+// conditional addend), not accidental complexity — it was previously inlined in
+// serializeCharacter's body; extracting it here is a net structural win.
+// fallow-ignore-next-line complexity
+function buildArmorClassView(
+  row: CharacterWithRelations,
+  effectiveScores: Record<string, number>,
+  bestArmor: BestBodyArmor,
+  hasShield: boolean,
+  fightingStyle: FightingStyleKey | null,
+  featBonuses: ReturnType<typeof deriveFeatBonuses>,
+  buffTargets: TargetModifierMap,
+): { armorClass: number; armorClassBreakdown: ReturnType<typeof deriveArmorClassParts> } {
+  const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
+  // Feeds Unarmored Defense (Barbarian/Monk) when no body armor is equipped.
+  const unarmoredDefense = {
+    classNames: row.classEntries.map((e) => e.name),
+    conMod: abilityModifier(effectiveScores.constitution ?? 10),
+    wisMod: abilityModifier(effectiveScores.wisdom ?? 10),
+  };
   // Mage Armor (#363): a spell buff sets the unarmored base to 13 + Dex — the
   // highest-valued `acUnarmoredBase` buff becomes a best-of candidate in the
   // unarmored formula (ignored while wearing body armor; the equip hook true-ends it).
@@ -1003,7 +960,303 @@ export function serializeCharacter(row: CharacterWithRelations) {
       acParts.push({ label: acFloor.source, value: 0, reminder: `floor ${acFloor.value}` });
     }
   }
+  return {
+    armorClass: acParts.reduce((total, p) => total + p.value, 0),
+    armorClassBreakdown: acParts,
+  };
+}
 
+// Per-class level lookup (0 when the class isn't in the mix) — multiclass-safe
+// inputs for the class-level-scaled speed/unarmed terms.
+function classEntryLevel(row: CharacterWithRelations, className: string): number {
+  return row.classEntries.find((e) => e.name.toLowerCase() === className)?.level ?? 0;
+}
+
+// Speed is the persisted racial base plus additive terms only (never merged
+// into each other): feat speed bonuses, Monk Unarmored Movement (monk class
+// level, unarmored & unshielded), Barbarian Fast Movement (barbarian class
+// level 5+, not in heavy armor), and any active "speed"-targeted buff
+// (e.g. Boots of Speed, #543).
+function buildSpeedView(
+  row: CharacterWithRelations,
+  bestArmor: BestBodyArmor,
+  hasShield: boolean,
+  featBonuses: ReturnType<typeof deriveFeatBonuses>,
+  buffTargets: TargetModifierMap,
+): number {
+  const unarmoredMovementBonus = deriveUnarmoredMovement({
+    monkLevel: classEntryLevel(row, "monk"),
+    isUnarmored: bestArmor === null,
+    hasShield,
+  });
+  const fastMovementBonus = deriveFastMovement({
+    barbarianLevel: classEntryLevel(row, "barbarian"),
+    wearingHeavyArmor: bestArmor?.armorCategory === "heavy",
+  });
+  return (
+    row.speed +
+    featBonuses.speed +
+    unarmoredMovementBonus +
+    fastMovementBonus +
+    (buffTargets["speed"] ?? []).reduce((sum, b) => sum + b.modifier, 0)
+  );
+}
+
+// Unarmed strike + improvised weapon rows. Derived from the same clamped
+// advancements slice so Tavern Brawler's upgrades are automatically excluded
+// when the character is over-cap. A Monk (unarmored & unshielded) swaps in
+// max(Dex, Str) + the level-scaled Martial Arts die, off the monk class-entry
+// level for multiclass correctness.
+function buildUnarmedAttacksView(
+  row: CharacterWithRelations,
+  effectiveScores: Record<string, number>,
+  proficiencyBonus: number,
+  clampedAdvancements: AdvancementEntry[],
+  weaponGrants: ReadonlyArray<{ name: string }>,
+  bestArmor: BestBodyArmor,
+  hasShield: boolean,
+): { unarmedStrike: ReturnType<typeof deriveUnarmedStrike>; improvisedWeapon: ReturnType<typeof deriveImprovisedAttack> } {
+  const unarmedDie = deriveUnarmedDamageDie(clampedAdvancements);
+  const unarmedStrike = deriveUnarmedStrike(effectiveScores, proficiencyBonus, unarmedDie, {
+    level: classEntryLevel(row, "monk"),
+    isUnarmored: bestArmor === null,
+    hasShield,
+  });
+  const improvisedProficient = weaponGrants.some((g) => g.name === "Improvised Weapons");
+  const improvisedWeapon = deriveImprovisedAttack(
+    effectiveScores,
+    proficiencyBonus,
+    improvisedProficient,
+  );
+  return { unarmedStrike, improvisedWeapon };
+}
+
+// Merge feat- and item-granted saving throw proficiencies (OR with the
+// class-fixed stored set; deduped via Set round-trip). Returns the stored
+// array untouched when there's nothing to merge.
+function buildSavingThrowProficiencies(
+  stored: string[],
+  featSaves: Set<string>,
+  itemSaveProfs: Set<string>,
+): string[] {
+  return featSaves.size > 0 || itemSaveProfs.size > 0
+    ? [...new Set([...stored, ...featSaves, ...itemSaveProfs])]
+    : stored;
+}
+
+// Merge feat/item-granted skill proficiencies (proficient stays true if already
+// true; grants only add) and overlay any active buff as an optional
+// tempModifier + labeled breakdown (#438). Additive term, derived on read.
+function buildSkillsView(
+  row: CharacterWithRelations,
+  featProficiencies: ReturnType<typeof deriveFeatProficiencies>,
+  itemSkillProfs: Set<string>,
+  buffTargets: TargetModifierMap,
+) {
+  return (row.skills as { name: string; ability: string; proficient: boolean }[]).map((s) => {
+    const buffs = buffTargets[s.name] ?? [];
+    const tempModifier = buffs.reduce((sum, b) => sum + b.modifier, 0);
+    return {
+      ...s,
+      proficient: s.proficient || featProficiencies.skills.has(s.name) || itemSkillProfs.has(s.name),
+      ...(tempModifier !== 0
+        ? {
+            tempModifier,
+            tempModifierSources: buffs.map((b) => ({ label: b.source, value: b.modifier })),
+          }
+        : {}),
+    };
+  });
+}
+
+// Merged tool proficiency list — creation-fixed entries (stored in
+// Character.toolProficiencies) + level-gated subclass choices (from
+// resources.toolProficienciesKnown, already clamped by buildResourcesView)
+// + item grants. Deduped by name: creation-fixed wins over subclass.
+function buildToolProficienciesView(
+  row: CharacterWithRelations,
+  resources: object | undefined,
+  itemGrants: ReturnType<typeof deriveItemGrants>,
+) {
+  return mergeItemToolProficiencies(
+    buildMergedToolProficiencies(
+      row.toolProficiencies,
+      resources && "toolProficienciesKnown" in resources
+        ? (resources as { toolProficienciesKnown: ToolProfEntry[] }).toolProficienciesKnown
+        : [],
+    ),
+    itemGrants.proficiencies.filter((p) => p.profType === "tool"),
+  );
+}
+
+// Class-specific available actions for the turn tracker — derived from
+// class/subclass/level + current resource pools. Universal actions are
+// rendered client-side from UNIVERSAL_ACTIONS in lib/turnRules.ts;
+// only class-specific ones live here to avoid double-rendering.
+function buildAvailableActionsView(
+  primaryClass: PrimaryClass,
+  level: number,
+  resources: object | undefined,
+): AvailableAction[] {
+  const pools =
+    resources && "pools" in resources
+      ? (resources as { pools: { key: string; remaining: number }[] }).pools
+      : [];
+  return deriveActions(
+    primaryClass?.name ?? "",
+    primaryClass?.subclass ?? undefined,
+    level,
+    pools,
+  );
+}
+
+// Journal entries — relational JournalEntry rows (no longer a Json column),
+// already ordered newest-first by the user-entered `date` via the include.
+// `date` is a real DateTime, emitted as an ISO string; sessionId is optional
+// provenance.
+function buildJournalView(row: CharacterWithRelations) {
+  return row.journalEntries.map((e) => ({
+    id: e.id,
+    kind: e.kind,
+    date: e.date.toISOString(),
+    loggedAt: e.loggedAt.toISOString(),
+    body: e.body,
+    visibility: e.visibility,
+    sessionId: e.sessionId ?? undefined,
+  }));
+}
+
+// Structured, multiclass-aware view alongside the flattened class/subclass.
+// Clamp-on-read (issue #124): cap the cumulative per-class levels at the
+// XP-derived total so a not-yet-reconciled over-cap character still renders
+// correctly. Position order = allocation order, so position-0 keeps its levels
+// first and trailing (newest) classes absorb the shortfall.
+function buildClassesView(row: CharacterWithRelations, totalLevel: number) {
+  let remaining = totalLevel;
+  const out: {
+    id: string;
+    name: string;
+    level: number;
+    subclass?: string;
+    subclassId?: string;
+    classId?: string;
+  }[] = [];
+  const singleClass = row.classEntries.length <= 1;
+  for (const entry of row.classEntries) {
+    if (remaining <= 0) break;
+    const level = Math.min(entry.level, remaining);
+    remaining -= level;
+    // Per-entry subclass clamp-on-read (issue #125): hide a subclass whose
+    // grant level exceeds this entry's effective level (per-class for a
+    // multiclass character, XP-derived total for a single class). Mirrors
+    // reconcileSubclass on the write side.
+    const subclassLevel = entry.class?.subclassLevel ?? 3;
+    const effectiveLevel = singleClass ? totalLevel : level;
+    const subclassVisible = effectiveLevel >= subclassLevel;
+    out.push({
+      id: entry.id,
+      name: entry.name,
+      level,
+      subclass: subclassVisible ? (entry.subclass ?? undefined) : undefined,
+      subclassId: subclassVisible ? (entry.subclassId ?? undefined) : undefined,
+      classId: entry.classId ?? undefined,
+    });
+  }
+  return out;
+}
+
+// Campaign-scoped play prefs (#537) for the current campaign; undefined when
+// the character isn't attached to a campaign (campaignId null).
+function buildCampaignPreferencesView(row: CharacterWithRelations) {
+  if (row.campaignId == null) return undefined;
+  const pref = row.campaignPreferences.find((p) => p.campaignId === row.campaignId);
+  return {
+    shareWithDm: pref?.shareWithDm ?? false,
+    autoFriendlyHealing: pref?.autoFriendlyHealing ?? false,
+  };
+}
+
+export function serializeCharacter(row: CharacterWithRelations) {
+  // ── Derivation order (later steps read earlier outputs; do not reorder) ──
+  // 1. XP → level + proficiency bonus (derive-don't-persist; docs/leveling.md).
+  const progress = experienceProgress(row.experiencePoints);
+  const primaryClass = row.classEntries[0];
+  const normalizedHitPoints = normalizeHitPoints(row.hitPoints);
+  const hitDice = normalizeHitDice(row.hitDice);
+  const abilityScoresMap = row.abilityScores as Record<string, number>;
+
+  // 2. Spellcasting + resources views — each clamps stored mutable state to
+  //    its level-derived caps (clamp-on-read mirrors of LEVEL_GATED_RECONCILERS).
+  const spellcasting = buildSpellcastingView(
+    row,
+    primaryClass,
+    progress.level,
+    abilityScoresMap,
+    progress.proficiencyBonus,
+  );
+  const { resources, fightingStyle } = buildResourcesView(
+    row,
+    primaryClass,
+    progress.level,
+    abilityScoresMap,
+    progress.proficiencyBonus,
+  );
+
+  // 3. Advancement clamp → effective scores/HP/initiative, then the feat layer
+  //    summed over the surviving in-cap advancements.
+  const { effectiveScores, hitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal } =
+    applyAdvancementClamp(row, primaryClass, progress.level, normalizedHitPoints);
+  const { featBonuses, effectiveMaxHp, featProficiencies } = applyFeatLayer(
+    clampedAdvancements,
+    hitDice.total,
+    hitPoints.max,
+  );
+
+  // 4. Proficiency grants, the per-target modifier channel (active cast buffs
+  //    #438 + item passive bonuses #545), and item-granted traits (#529).
+  // Pre-compute weapon proficiency grants so they can be reused both in the
+  // inventory serialisation (attack-bonus derivation) and the wire response.
+  const weaponGrants = buildMergedWeaponProficiencies(
+    row.classEntries,
+    row.raceSelection?.name,
+    featProficiencies.weapons,
+  );
+  const activeEffects = normalizeActiveEffectsMutable(row.activeEffects);
+  const buffTargets = buildTargetModifiers(row, activeEffects);
+  const { itemGrants, itemSkillProfs, itemSaveProfs } = buildItemGrantsView(row);
+  const inventoryContext = buildInventoryContext(
+    row,
+    effectiveScores,
+    progress.proficiencyBonus,
+    weaponGrants,
+    fightingStyle,
+    buffTargets,
+  );
+
+  // 5. Equipped-armor selection feeds AC, speed (Unarmored/Fast Movement), and
+  //    the Monk unarmed strike — all derived, never persisted.
+  const { bestArmor, hasShield } = selectEquippedBodyArmor(row, effectiveScores);
+  const { armorClass, armorClassBreakdown } = buildArmorClassView(
+    row,
+    effectiveScores,
+    bestArmor,
+    hasShield,
+    fightingStyle,
+    featBonuses,
+    buffTargets,
+  );
+  const speed = buildSpeedView(row, bestArmor, hasShield, featBonuses, buffTargets);
+  const { unarmedStrike, improvisedWeapon } = buildUnarmedAttacksView(
+    row,
+    effectiveScores,
+    progress.proficiencyBonus,
+    clampedAdvancements,
+    weaponGrants,
+    bestArmor,
+    hasShield,
+  );
+
+  // 6. Final assembly — one field per line, each fed by a builder above.
   return {
     id: row.id,
     name: row.name,
@@ -1020,27 +1273,13 @@ export function serializeCharacter(row: CharacterWithRelations) {
     portraitUrl: row.portraitUrl ?? undefined,
     // Shared-campaign link (#246), or undefined when unassigned.
     campaignId: row.campaignId ?? undefined,
-    // Campaign-scoped play prefs (#537) for the current campaign; undefined when
-    // the character isn't attached to a campaign (campaignId null).
-    campaignPreferences: (() => {
-      if (row.campaignId == null) return undefined;
-      const pref = row.campaignPreferences.find((p) => p.campaignId === row.campaignId);
-      return {
-        shareWithDm: pref?.shareWithDm ?? false,
-        autoFriendlyHealing: pref?.autoFriendlyHealing ?? false,
-      };
-    })(),
+    // Campaign-scoped play prefs (#537), or undefined when unattached.
+    campaignPreferences: buildCampaignPreferencesView(row),
 
-    armorClass: acParts.reduce((total, p) => total + p.value, 0),
-    armorClassBreakdown: acParts,
+    armorClass,
+    armorClassBreakdown,
     initiativeBonus: effectiveInitBonus + featBonuses.initiative,
-    // Additive terms + any active "speed"-targeted buff (e.g. Boots of Speed, #543).
-    speed:
-      row.speed +
-      featBonuses.speed +
-      unarmoredMovementBonus +
-      fastMovementBonus +
-      (buffTargets["speed"] ?? []).reduce((sum, b) => sum + b.modifier, 0),
+    speed,
     proficiencyBonus: progress.proficiencyBonus,
 
     experiencePoints: row.experiencePoints,
@@ -1060,41 +1299,13 @@ export function serializeCharacter(row: CharacterWithRelations) {
     },
     hitDice,
     abilityScores: effectiveScores,
-    // Merge feat-granted saving throw proficiencies (OR with class-fixed stored set;
-    // deduped via Set round-trip).
-    savingThrowProficiencies: featProficiencies.savingThrows.size > 0 || itemSaveProfs.size > 0
-      ? [...new Set([...row.savingThrowProficiencies, ...featProficiencies.savingThrows, ...itemSaveProfs])]
-      : row.savingThrowProficiencies,
-    // Merge feat-granted skill proficiencies (proficient stays true if already
-    // true; feats only add) and overlay any active buff as an optional
-    // tempModifier + labeled breakdown (#438). Additive term, derived on read.
-    skills: (row.skills as { name: string; ability: string; proficient: boolean }[]).map((s) => {
-      const buffs = buffTargets[s.name] ?? [];
-      const tempModifier = buffs.reduce((sum, b) => sum + b.modifier, 0);
-      return {
-        ...s,
-        proficient: s.proficient || featProficiencies.skills.has(s.name) || itemSkillProfs.has(s.name),
-        ...(tempModifier !== 0
-          ? {
-              tempModifier,
-              tempModifierSources: buffs.map((b) => ({ label: b.source, value: b.modifier })),
-            }
-          : {}),
-      };
-    }),
-    // Merged tool proficiency list — creation-fixed entries (stored in
-    // Character.toolProficiencies) + level-gated subclass choices (from
-    // resources.toolProficienciesKnown, already clamped above).
-    // Deduped by name: creation-fixed wins over subclass if both appear.
-    toolProficiencies: mergeItemToolProficiencies(
-      buildMergedToolProficiencies(
-        row.toolProficiencies,
-        resources && "toolProficienciesKnown" in resources
-          ? (resources as { toolProficienciesKnown: ToolProfEntry[] }).toolProficienciesKnown
-          : [],
-      ),
-      itemGrants.proficiencies.filter((p) => p.profType === "tool"),
+    savingThrowProficiencies: buildSavingThrowProficiencies(
+      row.savingThrowProficiencies,
+      featProficiencies.savingThrows,
+      itemSaveProfs,
     ),
+    skills: buildSkillsView(row, featProficiencies, itemSkillProfs, buffTargets),
+    toolProficiencies: buildToolProficienciesView(row, resources, itemGrants),
     // Armor/weapon proficiencies — derived fully at read time from class, race,
     // and feat grants. No persistence needed: these are fixed by class/race and
     // any feat-granted additions are already tracked in advancements. Deduped
@@ -1138,22 +1349,9 @@ export function serializeCharacter(row: CharacterWithRelations) {
       used: clampedAdvancements.length,
     },
 
-    // Class-specific available actions for the turn tracker — derived from
-    // class/subclass/level + current resource pools. Universal actions are
-    // rendered client-side from UNIVERSAL_ACTIONS in lib/turnRules.ts;
-    // only class-specific ones live here to avoid double-rendering.
-    availableActions: ((): AvailableAction[] => {
-      const pools =
-        resources && "pools" in resources
-          ? (resources as { pools: { key: string; remaining: number }[] }).pools
-          : [];
-      return deriveActions(
-        primaryClass?.name ?? "",
-        primaryClass?.subclass ?? undefined,
-        progress.level,
-        pools,
-      );
-    })(),
+    // Class-specific available actions for the turn tracker (universal ones
+    // render client-side from lib/turnRules.ts).
+    availableActions: buildAvailableActionsView(primaryClass, progress.level, resources),
 
     // ── Combat attack rows ─────────────────────────────────────────────────
     // Derived at read time; the frontend renders these directly in AttacksPanel
@@ -1163,57 +1361,10 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // Weapon attacks per Attack action (Extra Attack), max across multiclass.
     attacksPerAction: deriveAttacksPerAction(row.classEntries),
 
-    // Journal entries — relational JournalEntry rows (no longer a Json column),
-    // already ordered newest-first by the user-entered `date` via the include.
-    // `date` is a real DateTime, emitted as an ISO string; sessionId is optional
-    // provenance.
-    journal: row.journalEntries.map((e) => ({
-      id: e.id,
-      kind: e.kind,
-      date: e.date.toISOString(),
-      loggedAt: e.loggedAt.toISOString(),
-      body: e.body,
-      visibility: e.visibility,
-      sessionId: e.sessionId ?? undefined,
-    })),
+    journal: buildJournalView(row),
 
-    // Structured, multiclass-aware view alongside the flattened class/subclass
-    // above. Clamp-on-read (issue #124): cap the cumulative per-class levels at
-    // the XP-derived total so a not-yet-reconciled over-cap character still
-    // renders correctly. Position order = allocation order, so position-0 keeps
-    // its levels first and trailing (newest) classes absorb the shortfall.
-    classes: (() => {
-      let remaining = progress.level;
-      const out: {
-        id: string;
-        name: string;
-        level: number;
-        subclass?: string;
-        subclassId?: string;
-        classId?: string;
-      }[] = [];
-      const singleClass = row.classEntries.length <= 1;
-      for (const entry of row.classEntries) {
-        if (remaining <= 0) break;
-        const level = Math.min(entry.level, remaining);
-        remaining -= level;
-        // Per-entry subclass clamp-on-read (issue #125): hide a subclass whose
-        // grant level exceeds this entry's effective level (per-class for a
-        // multiclass character, XP-derived total for a single class). Mirrors
-        // reconcileSubclass on the write side.
-        const subclassLevel = entry.class?.subclassLevel ?? 3;
-        const effectiveLevel = singleClass ? progress.level : level;
-        const subclassVisible = effectiveLevel >= subclassLevel;
-        out.push({
-          id: entry.id,
-          name: entry.name,
-          level,
-          subclass: subclassVisible ? (entry.subclass ?? undefined) : undefined,
-          subclassId: subclassVisible ? (entry.subclassId ?? undefined) : undefined,
-          classId: entry.classId ?? undefined,
-        });
-      }
-      return out;
-    })(),
+    // Multiclass-aware per-class view with the level + subclass clamps-on-read
+    // (issues #124/#125) — see buildClassesView.
+    classes: buildClassesView(row, progress.level),
   };
 }

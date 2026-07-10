@@ -1265,6 +1265,309 @@ async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
   return { summary, eventData };
 }
 
+// ---- Per-op phase helpers ----
+// The applyHitPointOperations loop runs each op through five ordered phases:
+// context build → dispatch → snapshot assembly → main-event emit → follow-on
+// events. Each phase is a named helper below so the loop reads linearly; the
+// phase ORDER is load-bearing (the main hitPoints event must land before any
+// buff-clear / concentration follow-ups so the timeline and LIFO undo stay
+// consistent).
+
+/** Every HP op except the manual concentration save, which the loop resolves on its own. */
+type HpStateOperation = Exclude<HitPointOperation, ConcentrationSaveOperation>;
+
+/**
+ * Phase 1: read the character row and assemble the per-op context.
+ * State is re-read from the DB for every op so a batch of N levelUp ops
+ * applies sequentially (each sees the previous op's writes).
+ */
+async function buildHpOpContext(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+): Promise<HpOpContext> {
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: {
+      hitPoints: true,
+      hitDice: true,
+      abilityScores: true,
+      experiencePoints: true,
+      spellcasting: true,
+      resources: true,
+      activeEffects: true,
+      // Selected fields feed two seams: id + capabilities (with used) for the
+      // castSpell rest reset (#528), and name/requiresAttunement + capabilities
+      // for item-granted resistances (#529, feeding the #456 halve flow below).
+      inventoryItems: {
+        select: {
+          id: true,
+          name: true,
+          equippedSlot: true,
+          attuned: true,
+          requiresAttunement: true,
+          capabilities: true,
+        },
+      },
+      classEntries: {
+        orderBy: { position: "asc" as const },
+        select: {
+          id: true,
+          level: true,
+          name: true,
+          subclass: true,
+          classId: true,
+          position: true,
+          class: { select: { hitDie: true } },
+        },
+      },
+    },
+  });
+  if (!row) {
+    throw new InvalidHitPointOperationError(`Character not found: ${characterId}`);
+  }
+
+  const hp = normalizeHitPoints(row.hitPoints);
+  const hd = normalizeHitDice(row.hitDice);
+  const abilityScores = row.abilityScores as Record<string, number>;
+  const conMod = abilityModifier(abilityScores.constitution ?? 10);
+  const faces = hitDieFace(hd.die);
+
+  const primaryEntry = row.classEntries[0];
+
+  // Compute the effective HP maximum including feat improvements (e.g. Tough).
+  // This is a read-time overlay — hp.max itself stays the feat-free base so
+  // the value written back to the DB never includes the feat bonus.
+  // Use the in-cap advancements slice so over-cap feats are automatically excluded.
+  const advStateForFeat = normalizeResourcesMutable(row.resources);
+  const featSlotCap = advancementSlotsForLevel(
+    primaryEntry?.name ?? "",
+    levelForExperience(row.experiencePoints),
+  );
+  const featBonus = deriveFeatBonuses(advStateForFeat.advancements.slice(0, featSlotCap), hd.total);
+  // effMax is used for all clamp/ceiling operations instead of hp.max.
+  // hp.max is the stored (feat-free) base and is what gets persisted.
+  const effMax = hp.max + featBonus.maxHp;
+
+  return {
+    tx,
+    characterId,
+    row,
+    hp,
+    hd,
+    conMod,
+    faces,
+    effMax,
+    primaryEntry,
+    beforeClassLevel: primaryEntry?.level ?? null,
+  };
+}
+
+/**
+ * Phase 2: dispatch the op to its applier. Appliers mutate ctx.hp/ctx.hd in
+ * place and return the summary/eventData for the loop to log — they never
+ * call logEvent themselves (the loop is the sole emitter of the main event).
+ */
+async function dispatchHpOp(ctx: HpOpContext, op: HpStateOperation): Promise<HpOpResult> {
+  switch (op.type) {
+    case "damage":
+      return applyDamageOp(ctx, op);
+
+    case "heal":
+      return applyHealOp(ctx, op);
+
+    case "setTemp":
+      return applySetTempOp(ctx, op);
+
+    case "shortRest":
+      return applyShortRestOp(ctx, op);
+
+    case "longRest":
+      return applyLongRestOp(ctx);
+
+    case "levelUp":
+      return applyLevelUpOp(ctx, op);
+
+    case "deathSave":
+      return applyDeathSaveOp(ctx, op);
+
+    case "stabilize":
+      return applyStabilizeOp(ctx);
+
+    default: {
+      const _exhaustive: never = op;
+      throw new InvalidHitPointOperationError(`Unknown op type: ${(_exhaustive as { type: string }).type}`);
+    }
+  }
+}
+
+/**
+ * Phase 3: build the before/after sub-state snapshots for the event. levelUp
+ * also captures the class-entry level because the op mutates that outside the
+ * JSON columns. longRest captures spellcasting so undoing it re-expends the
+ * slots. Rest-op snapshot keys are lifted OUT of eventData (and deleted) so
+ * they live in before/after rather than being duplicated in the data payload.
+ *
+ * @param eventData MUTATED: rest/level snapshot keys (beforeSpellState,
+ *   beforeResourceState, chargePoolsBefore, consumableChargesBefore, …) are
+ *   lifted into before/after and `delete`d here, so on return `eventData` holds
+ *   only the fields that belong in the event's `data` payload.
+ */
+function buildHpOpSnapshots(
+  ctx: HpOpContext,
+  op: HpStateOperation,
+  beforeHp: HitPoints,
+  beforeHd: HitDice,
+  eventData: Record<string, unknown>,
+): { beforeState: Record<string, unknown>; afterState: Record<string, unknown> } {
+  const { hp, hd } = ctx;
+  const beforeState: Record<string, unknown> = { hitPoints: beforeHp, hitDice: beforeHd };
+  const afterState: Record<string, unknown> = { hitPoints: { ...hp }, hitDice: { ...hd } };
+  if (op.type === "levelUp") {
+    // Pull the class-entry level diff from the op result — it points at the
+    // CHOSEN entry (or is null for a new-class add), not always position-0.
+    beforeState.classEntryLevel = (eventData.prevEntryLevel as number | null) ?? null;
+    afterState.classEntryLevel = (eventData.newEntryLevel as number | null) ?? null;
+  }
+  if (op.type === "longRest") {
+    const data = eventData;
+    const beforeSpell = data.beforeSpellState as Record<string, unknown>;
+    beforeState.spellcasting = beforeSpell;
+    // Reflect the cleared state, preserving the known-spell list + arcanum keys.
+    afterState.spellcasting = { slotsUsed: {}, arcanumUsed: {}, spells: beforeSpell?.spells ?? [], concentratingOn: null };
+    delete data.beforeSpellState; // don't duplicate in eventData
+    if (data.beforeResourceState !== undefined) {
+      beforeState.resources = data.beforeResourceState;
+      afterState.resources = data.afterResourceState ?? data.beforeResourceState;
+      delete data.beforeResourceState;
+      delete data.afterResourceState;
+    }
+    // Consumable recharge (#121) — snapshot so undo re-expends the charges.
+    if (data.consumableChargesBefore !== undefined) {
+      beforeState.consumableCharges = data.consumableChargesBefore;
+      afterState.consumableCharges = data.consumableChargesAfter ?? data.consumableChargesBefore;
+      delete data.consumableChargesBefore;
+      delete data.consumableChargesAfter;
+    }
+  }
+  // Item charge-pool recharge (#555) — either rest can fire it (short-trigger
+  // pools recharge on short rests too); snapshot so undo re-expends the pool.
+  if (op.type === "shortRest" || op.type === "longRest") {
+    const data = eventData;
+    if (data.chargePoolsBefore !== undefined) {
+      beforeState.chargePools = data.chargePoolsBefore;
+      afterState.chargePools = data.chargePoolsAfter ?? data.chargePoolsBefore;
+      delete data.chargePoolsBefore;
+      delete data.chargePoolsAfter;
+    }
+  }
+  if (op.type === "shortRest") {
+    const data = eventData;
+    if (data.beforeResourceState !== undefined) {
+      beforeState.resources = data.beforeResourceState;
+      delete data.beforeResourceState;
+    }
+    // Warlock Pact slot restore (present only when the rester is a Warlock).
+    if (data.beforeSpellState !== undefined) {
+      const beforeSpell = data.beforeSpellState as Record<string, unknown>;
+      beforeState.spellcasting = beforeSpell;
+      afterState.spellcasting = {
+        slotsUsed: {},
+        arcanumUsed: beforeSpell?.arcanumUsed ?? {},
+        spells: beforeSpell?.spells ?? [],
+        concentratingOn: beforeSpell?.concentratingOn ?? null,
+      };
+      delete data.beforeSpellState;
+    }
+  }
+  return { beforeState, afterState };
+}
+
+/**
+ * Phase 4: emit the main hitPoints event. This is the SOLE emitter for the op
+ * itself; any follow-on events (buff clears, concentration) come after it.
+ */
+async function logHpOpEvent(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: HpStateOperation,
+  result: HpOpResult,
+  beforeState: Record<string, unknown>,
+  afterState: Record<string, unknown>,
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  await logEvent(tx, {
+    characterId,
+    category: "hitPoints",
+    type: op.type,
+    summary: result.summary,
+    before: beforeState,
+    after: afterState,
+    data: result.eventData,
+    batchId,
+    sessionId,
+  });
+}
+
+/**
+ * Phase 5: follow-on events, in fixed order after the main event: rest
+ * buff-clears + activated-use resets, then while-active buff clears, then the
+ * damage-triggered concentration check. Returns the concentration check (if
+ * one ran) so the route can surface the auto-rolled CON save to the player.
+ */
+async function applyHpOpFollowOns(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: HpStateOperation,
+  hp: HitPoints,
+  damageForConcentration: number | null,
+  batchId: string,
+  sessionId: string | null,
+): Promise<ConcentrationCheckResult | null> {
+  // A rest clears its matching "until-rest" durable buffs (#455). Long rest
+  // clears both short- and long-rest buffs; short rest only short.
+  if (op.type === "shortRest" || op.type === "longRest") {
+    const rest = op.type === "longRest" ? "long" : "short";
+    await clearBuffsForRestInTx(tx, characterId, rest, batchId, sessionId);
+    // Recharge item activatedEffect uses on the matching rest (#543).
+    await resetActivatedUsesForRestInTx(tx, characterId, rest, batchId, sessionId);
+  }
+
+  // A long rest or falling unconscious (0 HP) ends all "while-active" durable
+  // self-buffs (e.g. Rage) — the turn-hook covers the "no attack/no damage" case.
+  if (op.type === "longRest" || (op.type === "damage" && hp.current === 0)) {
+    await clearWhileActiveBuffsInTx(
+      tx,
+      characterId,
+      batchId,
+      sessionId,
+      op.type === "longRest" ? "long rest" : "unconscious",
+    );
+  }
+
+  // After the damage event is logged, resolve concentration (issue #41).
+  // Logged as a separate "spellcasting" event sharing this batchId so the
+  // CON save shows on the timeline and LIFO undo reverses HP + concentration
+  // together. `hp.current` here is the post-damage current HP.
+  if (damageForConcentration !== null) {
+    // `autoRollConcentration: false` (issue #76) defers the save: the check
+    // returns a `pending` result and the client follows up with a
+    // `concentrationSave` op. Omitted/true keeps today's server-side roll.
+    const autoRoll = op.type === "damage" ? op.autoRollConcentration !== false : true;
+    return applyConcentrationCheckInTx(
+      tx,
+      characterId,
+      damageForConcentration,
+      hp.current,
+      batchId,
+      sessionId,
+      autoRoll,
+    );
+  }
+
+  return null;
+}
+
 // ---- Transaction handler ----
 
 /**
@@ -1305,266 +1608,50 @@ export async function applyHitPointOperations(
         continue;
       }
 
-      const row = await tx.character.findUnique({
-        where: { id: characterId },
-        select: {
-          hitPoints: true,
-          hitDice: true,
-          abilityScores: true,
-          experiencePoints: true,
-          spellcasting: true,
-          resources: true,
-          activeEffects: true,
-          // Selected fields feed two seams: id + capabilities (with used) for the
-          // castSpell rest reset (#528), and name/requiresAttunement + capabilities
-          // for item-granted resistances (#529, feeding the #456 halve flow below).
-          inventoryItems: {
-            select: {
-              id: true,
-              name: true,
-              equippedSlot: true,
-              attuned: true,
-              requiresAttunement: true,
-              capabilities: true,
-            },
-          },
-          classEntries: {
-            orderBy: { position: "asc" as const },
-            select: {
-              id: true,
-              level: true,
-              name: true,
-              subclass: true,
-              classId: true,
-              position: true,
-              class: { select: { hitDie: true } },
-            },
-          },
-        },
-      });
-      if (!row) {
-        throw new InvalidHitPointOperationError(`Character not found: ${characterId}`);
-      }
+      // Phase 1: re-read state and build the per-op context.
+      const ctx = await buildHpOpContext(tx, characterId);
 
-      const hp = normalizeHitPoints(row.hitPoints);
-      const hd = normalizeHitDice(row.hitDice);
-      const abilityScores = row.abilityScores as Record<string, number>;
-      const conMod = abilityModifier(abilityScores.constitution ?? 10);
-      const faces = hitDieFace(hd.die);
+      // Snapshot the sub-state before this op so the event can show both
+      // before/after and the per-field diffs (ctx.beforeClassLevel covers the
+      // class-entry level for levelUp).
+      const beforeHp = { ...ctx.hp };
+      const beforeHd = { ...ctx.hd };
 
-      const primaryEntry = row.classEntries[0];
+      // Phase 2: apply the op (mutates ctx.hp/ctx.hd in place).
+      const result = await dispatchHpOp(ctx, op);
+      // For a damage op, a concentration check runs after the common HP
+      // write-back below (it needs the post-damage current HP).
+      const damageForConcentration = result.damageForConcentration ?? null;
 
-      // Compute the effective HP maximum including feat improvements (e.g. Tough).
-      // This is a read-time overlay — hp.max itself stays the feat-free base so
-      // the value written back to the DB never includes the feat bonus.
-      // Use the in-cap advancements slice so over-cap feats are automatically excluded.
-      const advStateForFeat = normalizeResourcesMutable(row.resources);
-      const featSlotCap = advancementSlotsForLevel(
-        primaryEntry?.name ?? "",
-        levelForExperience(row.experiencePoints),
-      );
-      const featBonus = deriveFeatBonuses(advStateForFeat.advancements.slice(0, featSlotCap), hd.total);
-      // effMax is used for all clamp/ceiling operations instead of hp.max.
-      // hp.max is the stored (feat-free) base and is what gets persisted.
-      const effMax = hp.max + featBonus.maxHp;
-
-      // Snapshot the full sub-state before this op so the event can show
-      // both before/after and the per-field diffs. For levelUp, include the
-      // class-entry level since the op mutates that too.
-      const beforeHp = { ...hp };
-      const beforeHd = { ...hd };
-      const beforeClassLevel = primaryEntry?.level ?? null;
-      let eventData: Record<string, unknown> = {};
-      let summary = "";
-      // For a damage op, remember that a concentration check should run after the
-      // common HP write-back below (needs the post-damage current HP).
-      let damageForConcentration: number | null = null;
-
-      const ctx: HpOpContext = {
-        tx,
-        characterId,
-        row,
-        hp,
-        hd,
-        conMod,
-        faces,
-        effMax,
-        primaryEntry,
-        beforeClassLevel,
-      };
-      let result: HpOpResult | null = null;
-
-      switch (op.type) {
-        case "damage":
-          result = applyDamageOp(ctx, op);
-          break;
-
-        case "heal":
-          result = applyHealOp(ctx, op);
-          break;
-
-        case "setTemp":
-          result = applySetTempOp(ctx, op);
-          break;
-
-        case "shortRest":
-          result = await applyShortRestOp(ctx, op);
-          break;
-
-        case "longRest":
-          result = await applyLongRestOp(ctx);
-          break;
-
-        case "levelUp":
-          result = await applyLevelUpOp(ctx, op);
-          break;
-
-        case "deathSave":
-          result = applyDeathSaveOp(ctx, op);
-          break;
-
-        case "stabilize":
-          result = applyStabilizeOp(ctx);
-          break;
-
-        default: {
-          const _exhaustive: never = op;
-          throw new InvalidHitPointOperationError(`Unknown op type: ${(_exhaustive as { type: string }).type}`);
-        }
-      }
-
-      if (result) {
-        summary = result.summary;
-        eventData = result.eventData;
-        if (result.damageForConcentration !== undefined) {
-          damageForConcentration = result.damageForConcentration;
-        }
-      }
-
+      // Common write-back: every op persists hitPoints + hitDice.
       await tx.character.update({
         where: { id: characterId },
         data: {
-          hitPoints: hp as unknown as Prisma.InputJsonValue,
-          hitDice: hd as unknown as Prisma.InputJsonValue,
+          hitPoints: ctx.hp as unknown as Prisma.InputJsonValue,
+          hitDice: ctx.hd as unknown as Prisma.InputJsonValue,
         },
       });
 
-      // Build the before/after sub-state snapshots. levelUp also captures the
-      // class-entry level because the op mutates that outside the JSON columns.
-      // longRest captures spellcasting so undoing it re-expends the slots.
-      const beforeState: Record<string, unknown> = { hitPoints: beforeHp, hitDice: beforeHd };
-      const afterState: Record<string, unknown> = { hitPoints: { ...hp }, hitDice: { ...hd } };
-      if (op.type === "levelUp") {
-        // Pull the class-entry level diff from the op result — it points at the
-        // CHOSEN entry (or is null for a new-class add), not always position-0.
-        beforeState.classEntryLevel = (eventData.prevEntryLevel as number | null) ?? null;
-        afterState.classEntryLevel = (eventData.newEntryLevel as number | null) ?? null;
-      }
-      if (op.type === "longRest") {
-        const data = eventData as Record<string, unknown>;
-        const beforeSpell = data.beforeSpellState as Record<string, unknown>;
-        beforeState.spellcasting = beforeSpell;
-        // Reflect the cleared state, preserving the known-spell list + arcanum keys.
-        afterState.spellcasting = { slotsUsed: {}, arcanumUsed: {}, spells: beforeSpell?.spells ?? [], concentratingOn: null };
-        delete data.beforeSpellState; // don't duplicate in eventData
-        if (data.beforeResourceState !== undefined) {
-          beforeState.resources = data.beforeResourceState;
-          afterState.resources = data.afterResourceState ?? data.beforeResourceState;
-          delete data.beforeResourceState;
-          delete data.afterResourceState;
-        }
-        // Consumable recharge (#121) — snapshot so undo re-expends the charges.
-        if (data.consumableChargesBefore !== undefined) {
-          beforeState.consumableCharges = data.consumableChargesBefore;
-          afterState.consumableCharges = data.consumableChargesAfter ?? data.consumableChargesBefore;
-          delete data.consumableChargesBefore;
-          delete data.consumableChargesAfter;
-        }
-      }
-      // Item charge-pool recharge (#555) — either rest can fire it (short-trigger
-      // pools recharge on short rests too); snapshot so undo re-expends the pool.
-      if (op.type === "shortRest" || op.type === "longRest") {
-        const data = eventData as Record<string, unknown>;
-        if (data.chargePoolsBefore !== undefined) {
-          beforeState.chargePools = data.chargePoolsBefore;
-          afterState.chargePools = data.chargePoolsAfter ?? data.chargePoolsBefore;
-          delete data.chargePoolsBefore;
-          delete data.chargePoolsAfter;
-        }
-      }
-      if (op.type === "shortRest") {
-        const data = eventData as Record<string, unknown>;
-        if (data.beforeResourceState !== undefined) {
-          beforeState.resources = data.beforeResourceState;
-          delete data.beforeResourceState;
-        }
-        // Warlock Pact slot restore (present only when the rester is a Warlock).
-        if (data.beforeSpellState !== undefined) {
-          const beforeSpell = data.beforeSpellState as Record<string, unknown>;
-          beforeState.spellcasting = beforeSpell;
-          afterState.spellcasting = {
-            slotsUsed: {},
-            arcanumUsed: beforeSpell?.arcanumUsed ?? {},
-            spells: beforeSpell?.spells ?? [],
-            concentratingOn: beforeSpell?.concentratingOn ?? null,
-          };
-          delete data.beforeSpellState;
-        }
-      }
+      // Phase 3: assemble the event's before/after snapshots (lifts rest-op
+      // snapshot keys out of result.eventData).
+      const { beforeState, afterState } = buildHpOpSnapshots(ctx, op, beforeHp, beforeHd, result.eventData);
 
-      await logEvent(tx, {
+      // Phase 4: emit the main hitPoints event — always FIRST in the batch,
+      // before any follow-on events.
+      await logHpOpEvent(tx, characterId, op, result, beforeState, afterState, batchId, sessionId);
+
+      // Phase 5: follow-on events (rest buff-clears + activated-use resets,
+      // while-active clears, damage-triggered concentration check).
+      const check = await applyHpOpFollowOns(
+        tx,
         characterId,
-        category: "hitPoints",
-        type: op.type,
-        summary,
-        before: beforeState,
-        after: afterState,
-        data: eventData,
+        op,
+        ctx.hp,
+        damageForConcentration,
         batchId,
         sessionId,
-      });
-
-      // A rest clears its matching "until-rest" durable buffs (#455). Long rest
-      // clears both short- and long-rest buffs; short rest only short.
-      if (op.type === "shortRest" || op.type === "longRest") {
-        const rest = op.type === "longRest" ? "long" : "short";
-        await clearBuffsForRestInTx(tx, characterId, rest, batchId, sessionId);
-        // Recharge item activatedEffect uses on the matching rest (#543).
-        await resetActivatedUsesForRestInTx(tx, characterId, rest, batchId, sessionId);
-      }
-
-      // A long rest or falling unconscious (0 HP) ends all "while-active" durable
-      // self-buffs (e.g. Rage) — the turn-hook covers the "no attack/no damage" case.
-      if (op.type === "longRest" || (op.type === "damage" && hp.current === 0)) {
-        await clearWhileActiveBuffsInTx(
-          tx,
-          characterId,
-          batchId,
-          sessionId,
-          op.type === "longRest" ? "long rest" : "unconscious",
-        );
-      }
-
-      // After the damage event is logged, resolve concentration (issue #41).
-      // Logged as a separate "spellcasting" event sharing this batchId so the
-      // CON save shows on the timeline and LIFO undo reverses HP + concentration
-      // together. `hp.current` here is the post-damage current HP.
-      if (damageForConcentration !== null) {
-        // `autoRollConcentration: false` (issue #76) defers the save: the check
-        // returns a `pending` result and the client follows up with a
-        // `concentrationSave` op. Omitted/true keeps today's server-side roll.
-        const autoRoll = op.type === "damage" ? op.autoRollConcentration !== false : true;
-        const check = await applyConcentrationCheckInTx(
-          tx,
-          characterId,
-          damageForConcentration,
-          hp.current,
-          batchId,
-          sessionId,
-          autoRoll,
-        );
-        if (check) concentrationChecks.push(check);
-      }
+      );
+      if (check) concentrationChecks.push(check);
     }
   });
 
