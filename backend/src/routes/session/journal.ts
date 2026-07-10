@@ -7,8 +7,8 @@ import type { Prisma, PrismaClient } from "@/generated/prisma/client.js";
 import { extractEntityIds, reconcileEntryRefs } from "@/lib/journal-refs.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { getActiveSessionId } from "@/lib/sessions.js";
-import { characterInclude } from "@/lib/character-include.js";
-import { serializeCharacter } from "@/lib/character-serialize.js";
+import { characterInclude } from "@/lib/character/character-include.js";
+import { serializeCharacter } from "@/lib/character/character-serialize.js";
 
 // Freeform campaign journal CRUD. Unlike inventory/HP/XP/spellcasting, journal
 // entries carry no mechanical effect, so these are PLAIN REST routes: no audit

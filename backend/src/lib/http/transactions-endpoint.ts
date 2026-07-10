@@ -7,8 +7,8 @@ import type { z } from "zod";
 
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { characterInclude } from "@/lib/character-include.js";
-import { serializeCharacter } from "@/lib/character-serialize.js";
+import { characterInclude } from "@/lib/character/character-include.js";
+import { serializeCharacter } from "@/lib/character/character-serialize.js";
 
 type DomainErrorClass = new (...args: never[]) => Error;
 type SerializedCharacter = ReturnType<typeof serializeCharacter>;

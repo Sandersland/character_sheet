@@ -13,7 +13,7 @@
 import { Prisma } from "@/generated/prisma/client.js";
 import { castAbilityInTx } from "./ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "./ability-cost.js";
-import { runCharacterTransaction } from "./character-transaction.js";
+import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { deriveResources } from "./class-features.js";
 import type { EffectSpec } from "./effects.js";
 import { logEvent } from "./events.js";

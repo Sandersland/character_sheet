@@ -11,10 +11,10 @@ vi.mock("@/lib/core/prisma.js", () => ({
 vi.mock("@/lib/auth/access.js", () => ({
   assertCharacterAccess: vi.fn(),
 }));
-vi.mock("@/lib/character-serialize.js", () => ({
+vi.mock("@/lib/character/character-serialize.js", () => ({
   serializeCharacter: vi.fn((row: { id: string }) => ({ id: row.id, serialized: true })),
 }));
-vi.mock("@/lib/character-include.js", () => ({ characterInclude: { marker: true } }));
+vi.mock("@/lib/character/character-include.js", () => ({ characterInclude: { marker: true } }));
 
 import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 import { prisma } from "@/lib/core/prisma.js";

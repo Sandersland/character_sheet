@@ -5,9 +5,9 @@ import {
   buildInventoryCreateFromCatalog,
   catalogItemDetailInclude,
   selectAutoEquip,
-} from "./inventory/inventory.js";
+} from "@/lib/inventory/inventory.js";
 import { ALIGNMENTS, deriveCreatedCharacter, isKnownTool } from "@/lib/srd/srd.js";
-import { STARTING_EQUIPMENT } from "./inventory/starting-equipment.js";
+import { STARTING_EQUIPMENT } from "@/lib/inventory/starting-equipment.js";
 import type { CreateCharacterBody } from "./character-schemas.js";
 
 // Discriminated result: return just the new id so the route re-fetches by id
