@@ -32,7 +32,10 @@ pre-commit:
         else
           BASE="origin/staging"
         fi
-        fallow audit --base "$BASE" --quiet --gate-marker pre-commit
+        # --no-cache: skip fallow's persistent base-snapshot git worktree
+        # (fallow-audit-base-cache-*). Those leak — they accumulate and exhaust
+        # the git worktree slot limit, which broke the autodev/antidote pipeline.
+        fallow audit --base "$BASE" --quiet --gate-marker pre-commit --no-cache
     lint-backend:
       root: "backend/"
       glob: "**/*.{ts,tsx}"
