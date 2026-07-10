@@ -15,7 +15,7 @@ import {
   GRANT_TYPES,
   GRANT_VALUE_KINDS,
   serializeCapability,
-} from "@/lib/capabilities.js";
+} from "@/lib/inventory/capabilities.js";
 import {
   awardCampaignItem,
   CampaignItemAwardError,
@@ -27,7 +27,7 @@ import {
   serializeArmorDetail,
   serializeConsumableDetail,
   serializeWeaponDetail,
-} from "@/lib/itemDetail.js";
+} from "@/lib/inventory/itemDetail.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ITEM_RARITY_KEYS } from "@/lib/srd/srd.js";
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isEquippable } from "@/lib/items.js";
+import { isEquippable } from "@/lib/inventory/items.js";
 
 describe("isEquippable", () => {
   it("treats weapons as equippable", () => {

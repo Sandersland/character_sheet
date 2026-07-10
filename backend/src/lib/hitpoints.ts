@@ -8,10 +8,10 @@ import {
   clearWhileActiveBuffsInTx,
   normalizeActiveEffectsMutable,
 } from "./active-effects.js";
-import { itemImmuneDamageTypes, itemResistedDamageTypes, type GrantItem } from "./capabilities.js";
+import { itemImmuneDamageTypes, itemResistedDamageTypes, type GrantItem } from "./inventory/capabilities.js";
 import { proficiencyBonusForLevel, levelForExperience } from "./experience.js";
 import { logEvent } from "./events.js";
-import { resetActivatedUsesForRestInTx } from "./item-recharge.js";
+import { resetActivatedUsesForRestInTx } from "./inventory/item-recharge.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { getActiveSessionId } from "./sessions.js";
 import {
@@ -32,7 +32,7 @@ import {
   chargeTriggerRechargesOn,
   readCapability,
   type CapabilityColumns,
-} from "./capabilities.js";
+} from "./inventory/capabilities.js";
 
 export class InvalidHitPointOperationError extends Error {}
 
@@ -1201,7 +1201,7 @@ async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
   const chargePools = await rechargeItemChargePoolsOnRest(ctx, "long");
 
   // Recharge limited-use consumables (#121): charged items (maxUses set) reset
-  // to full. Inlined here rather than in lib/inventory.ts to avoid an import
+  // to full. Inlined here rather than in lib/inventory/inventory.ts to avoid an import
   // cycle (inventory already imports this module).
   const chargedRows = await tx.inventoryConsumableDetail.findMany({
     where: { inventoryItem: { characterId }, maxUses: { not: null } },
@@ -1582,7 +1582,7 @@ export async function applyHitPointOperations(
   operations: HitPointOperation[]
 ): Promise<{ concentrationChecks: ConcentrationCheckResult[] }> {
   // One batchId groups all ops in this request on the activity timeline,
-  // same as inventory uses (lib/inventory.ts → applyInventoryOperations).
+  // same as inventory uses (lib/inventory/inventory.ts → applyInventoryOperations).
   const batchId = randomUUID();
   const sessionId = await getActiveSessionId(characterId);
 

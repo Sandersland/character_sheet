@@ -376,7 +376,7 @@ model CampaignItemConsumableDetail {
 }
 
 // Typed 1:N capability side-table (#545). Kind-discriminated with flat columns;
-// readCapability in lib/capabilities.ts is the adapter. Only passiveBonus is
+// readCapability in lib/inventory/capabilities.ts is the adapter. Only passiveBonus is
 // read today. Snapshotted to InventoryCapability on award (same column set).
 model CampaignItemCapability {
   id             String       @id @default(uuid())
