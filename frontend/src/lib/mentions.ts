@@ -68,7 +68,7 @@ export function parseMentionBody(body: string): MentionSegment[] {
 }
 
 // Fold a name/alias/query to a comparison key. MUST stay in parity with the
-// backend normalizeForMatch (lib/campaign/journal-refs.ts) so search matches identically.
+// backend normalizeForMatch (lib/activity/journal-refs.ts) so search matches identically.
 export function normalizeForMatch(s: string): string {
   return s
     .normalize("NFD")

@@ -15,7 +15,7 @@ import { appendActiveBuffInTx, clearBuffsForSourceInTx } from "@/lib/combat/acti
 import { assertCampaignMembership } from "@/lib/auth/access.js";
 import { AuthorizationError } from "@/lib/auth/errors.js";
 import { resolveBuffSpec, type EffectSpec } from "@/lib/combat/effects.js";
-import { logEvent, type EventType } from "@/lib/events.js";
+import { logEvent, type EventType } from "@/lib/activity/events.js";
 import { applyHealInTx, applyDamageInTx, applyTempHpInTx } from "@/lib/combat/hitpoints.js";
 import type { ConcentrationState, SpellcastingMutableState } from "./spell-state.js";
 

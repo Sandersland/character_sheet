@@ -31,7 +31,7 @@
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { proficiencyBonusForLevel } from "./experience.js";
-import { logEvent, type EventType } from "@/lib/events.js";
+import { logEvent, type EventType } from "@/lib/activity/events.js";
 import {
   normalizeResourcesMutable,
   serializeResourcesState,

@@ -138,7 +138,7 @@ In `backend/src/routes/characters.ts`, add a `Math.min`/`slice` clamp in the ser
 
 ### 4. New `EventType` (if needed)
 - Add the value to `CharacterEventType` enum in `backend/prisma/schema.prisma`.
-- Add it to the `EventType` union in `backend/src/lib/events.ts`.
+- Add it to the `EventType` union in `backend/src/lib/activity/events.ts`.
 - Migrate + regenerate:
   ```bash
   cd backend

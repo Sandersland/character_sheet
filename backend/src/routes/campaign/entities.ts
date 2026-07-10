@@ -2,9 +2,9 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
-import { collectMergedInIdentities, wouldCreateCycle } from "@/lib/campaign/entity-merges.js";
+import { collectMergedInIdentities, wouldCreateCycle } from "@/lib/activity/entity-merges.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
-import { normalizeForMatch } from "@/lib/campaign/journal-refs.js";
+import { normalizeForMatch } from "@/lib/activity/journal-refs.js";
 import { prisma } from "@/lib/core/prisma.js";
 
 // Campaign entity registry (#248): the shared wiki of NPCs/locations/factions/

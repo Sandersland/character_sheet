@@ -25,7 +25,7 @@ import {
   weaponDetailFields,
 } from "./detail-snapshot.js";
 import { rollDie } from "@/lib/core/dice.js";
-import { logEvent } from "@/lib/events.js";
+import { logEvent } from "@/lib/activity/events.js";
 import { applyHealInTx } from "@/lib/combat/hitpoints.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { getActiveSessionId } from "@/lib/session/sessions.js";

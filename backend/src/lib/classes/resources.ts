@@ -14,7 +14,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
-import { logEvent } from "../events.js";
+import { logEvent } from "@/lib/activity/events.js";
 import { deriveResources, type DerivedClassInfo } from "./class-features.js";
 import {
   toolsByCategory,

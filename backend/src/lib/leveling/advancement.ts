@@ -23,7 +23,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { levelForExperience, proficiencyBonusForLevel } from "./experience.js";
-import { logEvent } from "@/lib/events.js";
+import { logEvent } from "@/lib/activity/events.js";
 import { normalizeResourcesMutable, serializeResourcesState, type AdvancementEntry } from "@/lib/classes/resources.js";
 import { advancementSlotsForLevel, abilityModifier } from "@/lib/srd/srd.js";
 import { normalizeHitPoints, normalizeHitDice } from "@/lib/combat/hitpoints.js";

@@ -52,7 +52,7 @@ See `docs/development.md` for per-workspace commands, running outside Docker, an
 |---|---|
 | `backend/src/routes/*`, `app.ts` mounts | architecture.md router map |
 | `backend/src/lib/*` | architecture.md lib table (+ leveling.md if `level-reconciliation`/`experience*`; this file if `srd/srd.ts` rules) |
-| `schema.prisma` JSON cols / models / `CharacterEventType`; `lib/events.ts` `EventCategory` | architecture.md (JSON columns + audit log) |
+| `schema.prisma` JSON cols / models / `CharacterEventType`; `lib/activity/events.ts` `EventCategory` | architecture.md (JSON columns + audit log) |
 | `frontend/src/{features,pages,components/ui,lib}/*` | frontend.md |
 | new mutable domain / `…/transactions` endpoint | this file (non-negotiables) + architecture.md transaction pattern |
 | `Dockerfile*`, `docker-compose*`, env vars | deployment.md |

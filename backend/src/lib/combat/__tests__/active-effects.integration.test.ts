@@ -17,7 +17,7 @@ import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { clearBuffsForSourceInTx, normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
 import type { EffectSpec } from "@/lib/combat/effects.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
-import { revertBatch } from "@/lib/activity.js";
+import { revertBatch } from "@/lib/activity/activity.js";
 
 const OWNER_ID = "owner-active-effects";
 const FIXTURE_ID = "test-active-effects-character-1";
