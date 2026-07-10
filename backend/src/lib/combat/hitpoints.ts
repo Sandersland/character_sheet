@@ -25,7 +25,12 @@ import {
 } from "@/lib/srd/srd.js";
 import { rollDie } from "@/lib/core/dice.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
-import { normalizeResourcesMutable, serializeResourcesState } from "@/lib/classes/resources.js";
+import {
+  cloneResourceLists,
+  normalizeResourcesMutable,
+  serializeResourcesState,
+  type ResourcesMutableState,
+} from "@/lib/classes/resources.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import {
   castResourceRechargesOn,
@@ -1021,8 +1026,119 @@ async function rechargeItemChargePoolsOnRest(
   return { recharged, before, after };
 }
 
-async function applyShortRestOp(ctx: HpOpContext, op: ShortRestOperation): Promise<HpOpResult> {
-  const { tx, characterId, row, hp, hd, conMod, faces, effMax } = ctx;
+// ---- Rest phase helpers ----
+// applyShortRestOp / applyLongRestOp share the same anatomy: HP/hit-dice math,
+// then a series of independent restore phases (class resource pools, spell
+// slots, item resets), then eventData + summary assembly, then one
+// spellcasting/resources write. Each phase is a helper returning plain data;
+// the two ops differ only in which phases run and with which rest kind.
+
+/** Does a class-resource pool recharge on this rest? "short-or-long" fires on both. */
+function poolRechargesOn(recharge: string, rest: "short" | "long"): boolean {
+  if (recharge === "short-or-long") return true;
+  return recharge === (rest === "short" ? "shortRest" : "longRest");
+}
+
+/** Derive the primary class entry's resource pools (recharge schedule included). */
+function deriveRestPools(row: HpOpContext["row"]): ReturnType<typeof deriveResources> {
+  const level = levelForExperience(row.experiencePoints);
+  const classEntry = row.classEntries[0];
+  return deriveResources(
+    classEntry?.name ?? "",
+    classEntry?.subclass ?? undefined,
+    level,
+    row.abilityScores as Record<string, number>,
+    proficiencyBonusForLevel(level),
+  );
+}
+
+/**
+ * Reset class resource pools that recharge on this rest (e.g. Battle Master
+ * superiority dice on short, Rage on long; "short-or-long" fires on both).
+ * Mutates and returns the normalized state for the caller to serialize; the
+ * before-state deep-clone feeds the event snapshot that undo restores.
+ */
+function resetRestResources(
+  row: HpOpContext["row"],
+  rest: "short" | "long",
+): { state: ResourcesMutableState; beforeResourceState: Record<string, unknown>; resourcesRestored: number } {
+  const derivedRes = deriveRestPools(row);
+  const state = normalizeResourcesMutable(row.resources);
+  const beforeResourceState = { ...cloneResourceLists(state), fightingStyle: state.fightingStyle };
+  let resourcesRestored = 0;
+  for (const pool of derivedRes?.resources ?? []) {
+    if (poolRechargesOn(pool.recharge, rest)) {
+      resourcesRestored += state.used[pool.key] ?? 0;
+      state.used[pool.key] = 0;
+    }
+  }
+  return { state, beforeResourceState, resourcesRestored };
+}
+
+/** Deep-clone of the mutable spellcasting state for a rest event's before snapshot. */
+function cloneSpellStateForRest(spellState: ReturnType<typeof normalizeSpellcastingMutable>): Record<string, unknown> {
+  return {
+    slotsUsed: { ...spellState.slotsUsed },
+    arcanumUsed: { ...spellState.arcanumUsed },
+    spells: spellState.spells.map((s) => ({ ...s })),
+    concentratingOn: spellState.concentratingOn ? { ...spellState.concentratingOn } : null,
+  };
+}
+
+/**
+ * Warlock Pact Magic slots recharge on a short rest. A pure Warlock's only
+ * spell slots are Pact slots, so clearing slotsUsed is safe. Mystic Arcanum is
+ * long-rest only and concentration survives a short rest — both preserved.
+ * Returns null for non-Warlocks (no spellcasting write, no snapshot).
+ */
+function restoreWarlockPactSlots(row: HpOpContext["row"]): {
+  beforeSpellState: Record<string, unknown>;
+  slotsRestored: number;
+  spellcasting: Prisma.InputJsonValue;
+} | null {
+  const className = row.classEntries[0]?.name ?? "";
+  if (className.toLowerCase() !== "warlock") return null;
+  const spellState = normalizeSpellcastingMutable(row.spellcasting);
+  const beforeSpellState = cloneSpellStateForRest(spellState);
+  const slotsRestored = Object.values(spellState.slotsUsed).reduce((s, n) => s + n, 0);
+  spellState.slotsUsed = {};
+  return {
+    beforeSpellState,
+    slotsRestored,
+    spellcasting: {
+      slotsUsed: spellState.slotsUsed,
+      arcanumUsed: spellState.arcanumUsed,
+      spells: spellState.spells,
+      concentratingOn: spellState.concentratingOn,
+    } as unknown as Prisma.InputJsonValue,
+  };
+}
+
+/** The item resets every rest runs: castSpell use resets (#528) + charge pools (#555). */
+async function runItemRestResets(
+  ctx: Pick<HpOpContext, "tx" | "row">,
+  rest: "short" | "long",
+): Promise<{ itemSpellsRestored: number; chargePools: Awaited<ReturnType<typeof rechargeItemChargePoolsOnRest>> }> {
+  const itemSpellsRestored = await resetItemSpellUsesOnRest(ctx, rest);
+  const chargePools = await rechargeItemChargePoolsOnRest(ctx, rest);
+  return { itemSpellsRestored, chargePools };
+}
+
+/** The `...(cond ? {} : {})` charge-pool eventData fragment shared by both rests. */
+function chargePoolEventData(
+  chargePools: Awaited<ReturnType<typeof rechargeItemChargePoolsOnRest>>,
+): Record<string, unknown> {
+  return chargePools.recharged > 0
+    ? {
+        itemChargesRecharged: chargePools.recharged,
+        chargePoolsBefore: chargePools.before,
+        chargePoolsAfter: chargePools.after,
+      }
+    : {};
+}
+
+/** Validate a short rest's hit-die spend against availability and die size. */
+function validateHitDiceSpend(op: ShortRestOperation, hd: HitDice, faces: number): void {
   const available = hd.total - hd.spent;
   const spending = op.rolls.length;
   if (spending > available) {
@@ -1035,106 +1151,125 @@ async function applyShortRestOp(ctx: HpOpContext, op: ShortRestOperation): Promi
       `Hit die rolls must be between 1 and ${faces} (die: ${hd.die})`
     );
   }
+}
+
+/** "Short rest — spent N hit dice: +X HP, …" with the parts in fixed order. */
+function buildShortRestSummary(
+  spending: number,
+  totalGain: number,
+  slotsRestored: number,
+  resourcesRestored: number,
+  items: { itemSpellsRestored: number; chargePools: { recharged: number } },
+): string {
+  const restParts: string[] = [`+${totalGain} HP`];
+  if (slotsRestored > 0) restParts.push(`${slotsRestored} Pact slot${slotsRestored !== 1 ? "s" : ""} restored`);
+  if (resourcesRestored > 0) restParts.push(`resources restored`);
+  if (items.itemSpellsRestored > 0) restParts.push(`item spells restored`);
+  if (items.chargePools.recharged > 0) restParts.push(`item charges recharged`);
+  return `Short rest — spent ${spending} hit ${spending === 1 ? "die" : "dice"}: ${restParts.join(", ")}`;
+}
+
+async function applyShortRestOp(ctx: HpOpContext, op: ShortRestOperation): Promise<HpOpResult> {
+  const { tx, characterId, row, hp, hd, conMod, faces, effMax } = ctx;
+  validateHitDiceSpend(op, hd, faces);
+  const spending = op.rolls.length;
   const totalGain = op.rolls.reduce((sum, roll) => sum + hitDieHeal(roll, conMod), 0);
   hp.current = Math.min(effMax, hp.current + totalGain);
   hd.spent += spending;
 
-  // Reset subclass resources that recharge on short or short-or-long rest
-  // (e.g. Battle Master superiority dice recharge on a short rest).
-  const srAbilityScores = row.abilityScores as Record<string, number>;
-  const srLevel = levelForExperience(row.experiencePoints);
-  const srProfBonus = proficiencyBonusForLevel(srLevel);
-  const srClassEntry = row.classEntries[0];
-  const srDerivedRes = deriveResources(
-    srClassEntry?.name ?? "",
-    srClassEntry?.subclass ?? undefined,
-    srLevel,
-    srAbilityScores,
-    srProfBonus,
-  );
-  const srResourceState = normalizeResourcesMutable(row.resources);
-  const beforeSrResourceState = {
-    used: { ...srResourceState.used },
-    maneuversKnown: srResourceState.maneuversKnown.map((m) => ({ ...m })),
-    disciplinesKnown: srResourceState.disciplinesKnown.map((d) => ({ ...d })),
-    toolProficienciesKnown: srResourceState.toolProficienciesKnown.map((t) => ({ ...t })),
-    advancements: srResourceState.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
-    fightingStyle: srResourceState.fightingStyle,
-  };
-  let srResourcesRestored = 0;
-  if (srDerivedRes) {
-    for (const pool of srDerivedRes.resources) {
-      if (pool.recharge === "shortRest" || pool.recharge === "short-or-long") {
-        srResourcesRestored += srResourceState.used[pool.key] ?? 0;
-        srResourceState.used[pool.key] = 0;
-      }
-    }
-  }
-
-  // Warlock Pact Magic slots recharge on a short rest. A pure Warlock's only
-  // spell slots are Pact slots, so clearing slotsUsed is safe here.
-  // (Mystic Arcanum is long-rest only — leave arcanumUsed untouched.)
-  const srIsWarlock = (srClassEntry?.name ?? "").toLowerCase() === "warlock";
-  const srSpellUpdate: Record<string, unknown> = {
-    resources: serializeResourcesState(srResourceState),
-  };
-  let srSlotsRestored = 0;
-  let beforeSrSpellState: Record<string, unknown> | undefined;
-  if (srIsWarlock) {
-    const srSpellState = normalizeSpellcastingMutable(row.spellcasting);
-    beforeSrSpellState = {
-      slotsUsed: { ...srSpellState.slotsUsed },
-      arcanumUsed: { ...srSpellState.arcanumUsed },
-      spells: srSpellState.spells.map((s) => ({ ...s })),
-      concentratingOn: srSpellState.concentratingOn ? { ...srSpellState.concentratingOn } : null,
-    };
-    srSlotsRestored = Object.values(srSpellState.slotsUsed).reduce((s, n) => s + n, 0);
-    srSpellState.slotsUsed = {};
-    // A short rest does NOT end concentration — preserve it.
-    srSpellUpdate.spellcasting = {
-      slotsUsed: srSpellState.slotsUsed,
-      arcanumUsed: srSpellState.arcanumUsed,
-      spells: srSpellState.spells,
-      concentratingOn: srSpellState.concentratingOn,
-    } as unknown as Prisma.InputJsonValue;
-  }
-
-  const srItemSpellsRestored = await resetItemSpellUsesOnRest(ctx, "short");
-  const srChargePools = await rechargeItemChargePoolsOnRest(ctx, "short");
+  const resources = resetRestResources(row, "short");
+  const pact = restoreWarlockPactSlots(row);
+  const slotsRestored = pact?.slotsRestored ?? 0;
+  const items = await runItemRestResets(ctx, "short");
 
   const eventData: Record<string, unknown> = {
     rolls: op.rolls,
     totalGain,
     conMod,
-    resourcesRestored: srResourcesRestored,
-    slotsRestored: srSlotsRestored,
-    itemSpellsRestored: srItemSpellsRestored,
-    beforeResourceState: beforeSrResourceState,
-    ...(beforeSrSpellState ? { beforeSpellState: beforeSrSpellState } : {}),
-    ...(srChargePools.recharged > 0
-      ? {
-          itemChargesRecharged: srChargePools.recharged,
-          chargePoolsBefore: srChargePools.before,
-          chargePoolsAfter: srChargePools.after,
-        }
-      : {}),
+    resourcesRestored: resources.resourcesRestored,
+    slotsRestored,
+    itemSpellsRestored: items.itemSpellsRestored,
+    beforeResourceState: resources.beforeResourceState,
+    ...(pact ? { beforeSpellState: pact.beforeSpellState } : {}),
+    ...chargePoolEventData(items.chargePools),
   };
-  const restParts: string[] = [`+${totalGain} HP`];
-  if (srSlotsRestored > 0) restParts.push(`${srSlotsRestored} Pact slot${srSlotsRestored !== 1 ? "s" : ""} restored`);
-  if (srResourcesRestored > 0) restParts.push(`resources restored`);
-  if (srItemSpellsRestored > 0) restParts.push(`item spells restored`);
-  if (srChargePools.recharged > 0) restParts.push(`item charges recharged`);
-  const summary = `Short rest — spent ${spending} hit ${spending === 1 ? "die" : "dice"}: ${restParts.join(", ")}`;
+  const summary = buildShortRestSummary(spending, totalGain, slotsRestored, resources.resourcesRestored, items);
 
   // Write the resource reset (and any Pact slot restore) alongside HP in the
   // dispatcher's character.update below. Route resources through
   // serializeResourcesState so all keys round-trip — prevents silent data loss.
   await tx.character.update({
     where: { id: characterId },
-    data: srSpellUpdate as Prisma.CharacterUpdateInput,
+    data: {
+      resources: serializeResourcesState(resources.state),
+      ...(pact ? { spellcasting: pact.spellcasting } : {}),
+    },
   });
 
   return { summary, eventData };
+}
+
+/**
+ * Long-rest spell recovery: every caster's slots (including Warlock Pact) plus
+ * Mystic Arcanum charges reset, and any active concentration ends.
+ */
+function resetLongRestSpellcasting(row: HpOpContext["row"]): {
+  beforeSpellState: Record<string, unknown>;
+  slotsRestored: number;
+  spellcasting: Prisma.InputJsonValue;
+} {
+  const spellState = normalizeSpellcastingMutable(row.spellcasting);
+  const beforeSpellState = cloneSpellStateForRest(spellState);
+  const slotsRestored =
+    Object.values(spellState.slotsUsed).reduce((s, n) => s + n, 0) +
+    Object.values(spellState.arcanumUsed).reduce((s, n) => s + n, 0);
+  spellState.slotsUsed = {};
+  spellState.arcanumUsed = {};
+  spellState.concentratingOn = null;
+  return {
+    beforeSpellState,
+    slotsRestored,
+    spellcasting: {
+      slotsUsed: spellState.slotsUsed,
+      arcanumUsed: spellState.arcanumUsed,
+      spells: spellState.spells,
+      concentratingOn: null,
+    } as unknown as Prisma.InputJsonValue,
+  };
+}
+
+/**
+ * Recharge limited-use consumables (#121): charged items (maxUses set) reset
+ * to full. Lives here rather than in lib/inventory/inventory.ts to avoid an
+ * import cycle (inventory already imports this module).
+ */
+async function rechargeConsumables(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+): Promise<{
+  consumablesRecharged: number;
+  before: { inventoryItemId: string; usesRemaining: number | null }[];
+  after: { inventoryItemId: string; usesRemaining: number | null }[];
+}> {
+  const chargedRows = await tx.inventoryConsumableDetail.findMany({
+    where: { inventoryItem: { characterId }, maxUses: { not: null } },
+    select: { inventoryItemId: true, usesRemaining: true, maxUses: true },
+  });
+  const before: { inventoryItemId: string; usesRemaining: number | null }[] = [];
+  const after: { inventoryItemId: string; usesRemaining: number | null }[] = [];
+  let consumablesRecharged = 0;
+  for (const c of chargedRows) {
+    if (c.usesRemaining !== c.maxUses) {
+      before.push({ inventoryItemId: c.inventoryItemId, usesRemaining: c.usesRemaining });
+      after.push({ inventoryItemId: c.inventoryItemId, usesRemaining: c.maxUses });
+      await tx.inventoryConsumableDetail.update({
+        where: { inventoryItemId: c.inventoryItemId },
+        data: { usesRemaining: c.maxUses },
+      });
+      consumablesRecharged += 1;
+    }
+  }
+  return { consumablesRecharged, before, after };
 }
 
 async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
@@ -1147,120 +1282,46 @@ async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
   const recovered = Math.max(1, Math.floor(hd.total / 2));
   hd.spent = Math.max(0, hd.spent - recovered);
 
-  // Reset all spell slot used-counts (long-rest recovery for every caster,
-  // including Warlock Pact slots) and clear Warlock Mystic Arcanum charges.
-  const spellState = normalizeSpellcastingMutable(row.spellcasting);
-  const beforeSpellState = {
-    slotsUsed: { ...spellState.slotsUsed },
-    arcanumUsed: { ...spellState.arcanumUsed },
-    spells: spellState.spells.map((s) => ({ ...s })),
-    concentratingOn: spellState.concentratingOn ? { ...spellState.concentratingOn } : null,
-  };
-  const slotsRestored =
-    Object.values(spellState.slotsUsed).reduce((s, n) => s + n, 0) +
-    Object.values(spellState.arcanumUsed).reduce((s, n) => s + n, 0);
-  spellState.slotsUsed = {};
-  spellState.arcanumUsed = {};
-  // A long rest ends any active concentration.
-  spellState.concentratingOn = null;
-
-  // Reset subclass resources that recharge on a long rest or short-or-long rest.
-  const abilityScores = row.abilityScores as Record<string, number>;
-  const derivedLevel = levelForExperience(row.experiencePoints);
-  const profBonus = proficiencyBonusForLevel(derivedLevel);
-  const primaryClassEntry = row.classEntries[0];
-  const derivedRes = deriveResources(
-    primaryClassEntry?.name ?? "",
-    primaryClassEntry?.subclass ?? undefined,
-    derivedLevel,
-    abilityScores,
-    profBonus,
-  );
-  const resourceState = normalizeResourcesMutable(row.resources);
-  const beforeResourceState = {
-    used: { ...resourceState.used },
-    maneuversKnown: resourceState.maneuversKnown.map((m) => ({ ...m })),
-    disciplinesKnown: resourceState.disciplinesKnown.map((d) => ({ ...d })),
-    toolProficienciesKnown: resourceState.toolProficienciesKnown.map((t) => ({ ...t })),
-    advancements: resourceState.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
-    fightingStyle: resourceState.fightingStyle,
-  };
-  let resourcesRestored = 0;
-  if (derivedRes) {
-    for (const pool of derivedRes.resources) {
-      if (pool.recharge === "longRest" || pool.recharge === "short-or-long") {
-        resourcesRestored += resourceState.used[pool.key] ?? 0;
-        resourceState.used[pool.key] = 0;
-      }
-    }
-  }
-
-  const afterResourceState = serializeResourcesState(resourceState);
-
-  const itemSpellsRestored = await resetItemSpellUsesOnRest(ctx, "long");
-  const chargePools = await rechargeItemChargePoolsOnRest(ctx, "long");
-
-  // Recharge limited-use consumables (#121): charged items (maxUses set) reset
-  // to full. Inlined here rather than in lib/inventory/inventory.ts to avoid an import
-  // cycle (inventory already imports this module).
-  const chargedRows = await tx.inventoryConsumableDetail.findMany({
-    where: { inventoryItem: { characterId }, maxUses: { not: null } },
-    select: { inventoryItemId: true, usesRemaining: true, maxUses: true },
-  });
-  const consumableChargesBefore: { inventoryItemId: string; usesRemaining: number | null }[] = [];
-  const consumableChargesAfter: { inventoryItemId: string; usesRemaining: number | null }[] = [];
-  let consumablesRecharged = 0;
-  for (const c of chargedRows) {
-    if (c.usesRemaining !== c.maxUses) {
-      consumableChargesBefore.push({ inventoryItemId: c.inventoryItemId, usesRemaining: c.usesRemaining });
-      consumableChargesAfter.push({ inventoryItemId: c.inventoryItemId, usesRemaining: c.maxUses });
-      await tx.inventoryConsumableDetail.update({
-        where: { inventoryItemId: c.inventoryItemId },
-        data: { usesRemaining: c.maxUses },
-      });
-      consumablesRecharged += 1;
-    }
-  }
+  const spells = resetLongRestSpellcasting(row);
+  const resources = resetRestResources(row, "long");
+  const afterResourceState = serializeResourcesState(resources.state);
+  const items = await runItemRestResets(ctx, "long");
+  const consumables = await rechargeConsumables(tx, characterId);
 
   const hpRestored = effMax - prevCurrent;
-  const eventData: Record<string, unknown> = { recovered, hpRestored, slotsRestored, resourcesRestored, itemSpellsRestored };
-  if (consumablesRecharged > 0) {
-    eventData.consumablesRecharged = consumablesRecharged;
-    eventData.consumableChargesBefore = consumableChargesBefore;
-    eventData.consumableChargesAfter = consumableChargesAfter;
+  const eventData: Record<string, unknown> = {
+    recovered,
+    hpRestored,
+    slotsRestored: spells.slotsRestored,
+    resourcesRestored: resources.resourcesRestored,
+    itemSpellsRestored: items.itemSpellsRestored,
+  };
+  if (consumables.consumablesRecharged > 0) {
+    eventData.consumablesRecharged = consumables.consumablesRecharged;
+    eventData.consumableChargesBefore = consumables.before;
+    eventData.consumableChargesAfter = consumables.after;
   }
-  if (chargePools.recharged > 0) {
-    eventData.itemChargesRecharged = chargePools.recharged;
-    eventData.chargePoolsBefore = chargePools.before;
-    eventData.chargePoolsAfter = chargePools.after;
-  }
+  Object.assign(eventData, chargePoolEventData(items.chargePools));
+
   const parts: string[] = [];
   if (hpRestored > 0) parts.push(`+${hpRestored} HP`);
   else parts.push("HP already full");
-  if (slotsRestored > 0) parts.push(`${slotsRestored} slot${slotsRestored !== 1 ? "s" : ""} restored`);
-  if (resourcesRestored > 0) parts.push(`resources restored`);
-  if (itemSpellsRestored > 0) parts.push(`item spells restored`);
-  if (consumablesRecharged > 0) parts.push(`consumables recharged`);
-  if (chargePools.recharged > 0) parts.push(`item charges recharged`);
+  if (spells.slotsRestored > 0) parts.push(`${spells.slotsRestored} slot${spells.slotsRestored !== 1 ? "s" : ""} restored`);
+  if (resources.resourcesRestored > 0) parts.push(`resources restored`);
+  if (items.itemSpellsRestored > 0) parts.push(`item spells restored`);
+  if (consumables.consumablesRecharged > 0) parts.push(`consumables recharged`);
+  if (items.chargePools.recharged > 0) parts.push(`item charges recharged`);
   const summary = `Long rest — ${parts.join(", ")}`;
 
   // Write spellcasting + resources; the dispatcher writes HP separately below.
   await tx.character.update({
     where: { id: characterId },
-    data: {
-      spellcasting: {
-        slotsUsed: spellState.slotsUsed,
-        arcanumUsed: spellState.arcanumUsed,
-        spells: spellState.spells,
-        concentratingOn: null,
-      } as unknown as Prisma.InputJsonValue,
-      resources: afterResourceState,
-    },
+    data: { spellcasting: spells.spellcasting, resources: afterResourceState },
   });
 
   // Include spellcasting + resources in the before/after snapshot for undo.
-  eventData.beforeSpellState = beforeSpellState;
-  eventData.beforeResourceState = beforeResourceState;
+  eventData.beforeSpellState = spells.beforeSpellState;
+  eventData.beforeResourceState = resources.beforeResourceState;
   eventData.afterResourceState = afterResourceState;
   return { summary, eventData };
 }
