@@ -66,8 +66,9 @@ export default function EquipmentDoll({ character, pending, onSubmit }: Equipmen
   const inventory = character.inventory;
   const offHandLocked = isOffHandLocked(inventory);
   // The two-handed weapon that locks the off-hand — ghosted into the OFF_HAND
-  // tile, and the target the off-hand's focus jump lands on.
-  const mainHandItem = itemsInSlot(inventory, "MAIN_HAND")[0] ?? null;
+  // tile, and the target the off-hand's focus jump lands on. Only needed while
+  // the off-hand is locked, so it's computed only then.
+  const mainHandItem = offHandLocked ? (itemsInSlot(inventory, "MAIN_HAND")[0] ?? null) : null;
   const mainHandTriggerId = useId();
   const [toast, setToast] = useState<string | null>(null);
 

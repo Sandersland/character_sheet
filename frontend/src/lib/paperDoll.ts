@@ -121,11 +121,17 @@ export function isProficientWithItem(
 ): boolean {
   if (item.category === "weapon") {
     const weaponClass = item.weapon?.weaponClass;
+    // No class (e.g. a homebrew weapon with none set) means no derivable
+    // proficiency requirement — never warn, mirroring the armor branch's
+    // `!category` guard below.
+    if (!weaponClass) return true;
     const lcName = item.name.toLowerCase();
     return weaponProficiencies.some((grant) => {
       if (grant.name === "Simple Weapons" && weaponClass === "simple") return true;
       if (grant.name === "Martial Weapons" && weaponClass === "martial") return true;
-      // Specific weapon: grants are plural ("Longswords"), catalog names singular.
+      // Specific weapon: grants are plural ("Longswords"), catalog names
+      // singular — assumes SRD plurals formed by appending "s" (mirrors backend
+      // srd.ts isProficientWithWeapon).
       return grant.name.toLowerCase().replace(/s$/, "") === lcName;
     });
   }

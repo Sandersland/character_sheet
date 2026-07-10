@@ -16,6 +16,7 @@ interface EquipSlotCellProps {
   lockReason?: string;
   // The two-handed main-hand weapon that locks this (off-hand) slot, rendered
   // ghosted so the lock reads as "held by that weapon" rather than a dead tile.
+  // Travels as a pair with onFocusLockOwner (both set, or neither).
   lockedByItem?: InventoryItem | null;
   // Moves focus to the lock owner's tile (the main-hand Popover trigger).
   onFocusLockOwner?: () => void;

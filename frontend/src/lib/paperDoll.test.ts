@@ -179,6 +179,8 @@ describe("isProficientWithItem (#554)", () => {
   it("never warns on items that carry no proficiency requirement", () => {
     expect(isProficientWithItem(item(), [], [])).toBe(true); // gear
     expect(isProficientWithItem(item({ category: "consumable" }), [], [])).toBe(true);
+    // A weapon with no derivable class (e.g. homebrew) carries no requirement.
+    expect(isProficientWithItem(weapon(false), [], [])).toBe(true);
   });
 });
 
