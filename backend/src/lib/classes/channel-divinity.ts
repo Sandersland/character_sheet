@@ -11,6 +11,7 @@
  * from the catalog row.
  */
 
+import { Prisma } from "@/generated/prisma/client.js";
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import { appendActiveBuffInTx } from "@/lib/combat/active-effects.js";
@@ -192,6 +193,76 @@ function channelDivinityEffectSpec(kind: ChannelDivinityKind): EffectSpec {
  * (restored on revert); the resources-category castChannelDivinity event records
  * the use with its DC / reminder / derived numbers.
  */
+// Validate the requested Channel Divinity option against the catalog + gating +
+// cost rules, returning the resolved catalog row, gate, (pool) cost and derived
+// descriptor. Throws the same InvalidChannelDivinityOperationError messages as
+// before — extracted so applyOp reads as resolve → cast → side-effect → log.
+async function resolveChannelDivinityCast(
+  tx: Prisma.TransactionClient,
+  abilityId: string,
+  ctx: { entries: GateEntry[]; level: number; abilityScores: Record<string, number>; profBonus: number },
+) {
+  const catalog = await tx.grantedAbility.findUnique({ where: { id: abilityId } });
+  if (!catalog || catalog.source !== "channelDivinity") {
+    throw new InvalidChannelDivinityOperationError(`Channel Divinity option not found in catalog: ${abilityId}`);
+  }
+
+  const gate = CHANNEL_DIVINITY_OPTIONS[catalog.name];
+  if (!gate) {
+    throw new InvalidChannelDivinityOperationError(`Unknown Channel Divinity option: ${catalog.name}`);
+  }
+  if (!isEntitled(gate, ctx.entries, ctx.level)) {
+    throw new InvalidChannelDivinityOperationError(
+      `Not entitled to ${catalog.name} (requires ${gate.className}${gate.subclass ? ` — ${gate.subclass}` : ""} level ${gate.minLevel})`,
+    );
+  }
+
+  const cost = readAbilityCost(catalog);
+  if (cost.kind !== "pool") {
+    throw new InvalidChannelDivinityOperationError(`${catalog.name} has no Channel Divinity cost`);
+  }
+
+  // Effective level of the granting class (for Preserve Life's HP pool).
+  const descriptor = describeChannelDivinity(catalog, gate, {
+    abilityScores: ctx.abilityScores,
+    profBonus: ctx.profBonus,
+    classLevel: ctx.level,
+  });
+
+  return { catalog, gate, cost, descriptor };
+}
+
+// Per-kind real side effects (buff appends an active buff, invisible applies the
+// condition), sharing batchId for revert symmetry. No-op for the other kinds.
+async function applyChannelDivinitySideEffect(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  gate: ChannelDivinityGate,
+  catalog: { id: string; name: string; buffTarget: string | null },
+  abilityScores: Record<string, number>,
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  if (gate.kind === "buff") {
+    await appendActiveBuffInTx(
+      tx,
+      characterId,
+      {
+        key: catalog.id,
+        target: catalog.buffTarget ?? "attackRoll",
+        modifier: sacredWeaponBonus(abilityScores),
+        source: catalog.name,
+        sourceEntryId: catalog.id,
+        duration: "while-active",
+      },
+      batchId,
+      sessionId,
+    );
+  } else if (gate.kind === "invisible") {
+    await applyConditionInTx(tx, characterId, "invisible", catalog.name, batchId, sessionId);
+  }
+}
+
 export async function applyChannelDivinityOperations(
   characterId: string,
   operations: ChannelDivinityOperation[],
@@ -212,30 +283,13 @@ export async function applyChannelDivinityOperations(
       const level = levelForExperience(row.experiencePoints);
       const profBonus = proficiencyBonusForLevel(level);
       const abilityScores = row.abilityScores as Record<string, number>;
-      const entries: GateEntry[] = row.classEntries;
 
-      const catalog = await tx.grantedAbility.findUnique({ where: { id: op.abilityId } });
-      if (!catalog || catalog.source !== "channelDivinity") {
-        throw new InvalidChannelDivinityOperationError(`Channel Divinity option not found in catalog: ${op.abilityId}`);
-      }
-
-      const gate = CHANNEL_DIVINITY_OPTIONS[catalog.name];
-      if (!gate) {
-        throw new InvalidChannelDivinityOperationError(`Unknown Channel Divinity option: ${catalog.name}`);
-      }
-      if (!isEntitled(gate, entries, level)) {
-        throw new InvalidChannelDivinityOperationError(
-          `Not entitled to ${catalog.name} (requires ${gate.className}${gate.subclass ? ` — ${gate.subclass}` : ""} level ${gate.minLevel})`,
-        );
-      }
-
-      const cost = readAbilityCost(catalog);
-      if (cost.kind !== "pool") {
-        throw new InvalidChannelDivinityOperationError(`${catalog.name} has no Channel Divinity cost`);
-      }
-
-      // Effective level of the granting class (for Preserve Life's HP pool).
-      const descriptor = describeChannelDivinity(catalog, gate, { abilityScores, profBonus, classLevel: level });
+      const { catalog, gate, cost, descriptor } = await resolveChannelDivinityCast(tx, op.abilityId, {
+        entries: row.classEntries,
+        level,
+        abilityScores,
+        profBonus,
+      });
 
       const spellState = normalizeSpellcastingMutable(row.spellcasting);
       const costCtx: PayCostContext = { tx, characterId, batchId, sessionId };
@@ -253,25 +307,7 @@ export async function applyChannelDivinityOperations(
         },
       );
 
-      // Per-kind real side effects, sharing batchId for revert symmetry.
-      if (gate.kind === "buff") {
-        await appendActiveBuffInTx(
-          tx,
-          characterId,
-          {
-            key: catalog.id,
-            target: catalog.buffTarget ?? "attackRoll",
-            modifier: sacredWeaponBonus(abilityScores),
-            source: catalog.name,
-            sourceEntryId: catalog.id,
-            duration: "while-active",
-          },
-          batchId,
-          sessionId,
-        );
-      } else if (gate.kind === "invisible") {
-        await applyConditionInTx(tx, characterId, "invisible", catalog.name, batchId, sessionId);
-      }
+      await applyChannelDivinitySideEffect(tx, characterId, gate, catalog, abilityScores, batchId, sessionId);
 
       // The cast record itself restores nothing (CD refunded by the pool payer's
       // own spendResource event, buff/condition by their own events) — it records
