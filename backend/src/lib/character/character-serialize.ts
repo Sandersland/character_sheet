@@ -699,54 +699,68 @@ function buildResourcesView(
   const fightingStyle: FightingStyleKey | null =
     fightingStyleChoices > 0 ? storedFightingStyle : null;
 
-  let resources: object | undefined;
-  if (derivedRes) {
-    const stored = normalizeResourcesMutable(row.resources);
-    // Clamp level-gated lists to their derived cap (defense-in-depth for
-    // characters who haven't had a reconciling XP op since their level dropped).
-    const clampedManeuversKnown =
-      derivedRes.maneuverChoiceCount !== undefined
-        ? stored.maneuversKnown.slice(0, derivedRes.maneuverChoiceCount)
-        : stored.maneuversKnown;
-    const clampedToolProfsKnown =
-      derivedRes.toolProfChoiceCount !== undefined
-        ? stored.toolProficienciesKnown.slice(0, derivedRes.toolProfChoiceCount)
-        : stored.toolProficienciesKnown;
-    const clampedDisciplinesKnown =
-      derivedRes.disciplineChoiceCount !== undefined
-        ? stored.disciplinesKnown.slice(0, derivedRes.disciplineChoiceCount)
-        : stored.disciplinesKnown;
-    resources = {
-      features: derivedRes.features,
-      maneuverChoiceCount: derivedRes.maneuverChoiceCount,
-      maneuverSaveDC: derivedRes.maneuverSaveDC,
-      toolProfChoiceCount: derivedRes.toolProfChoiceCount,
-      disciplineChoiceCount: derivedRes.disciplineChoiceCount,
-      disciplineSaveDC: derivedRes.disciplineSaveDC,
-      shadowArtsAvailable: derivedRes.shadowArtsAvailable,
-      cloakOfShadowsAvailable: derivedRes.cloakOfShadowsAvailable,
-      pools: derivedRes.resources.map((pool) => ({
-        key: pool.key,
-        label: pool.label,
-        total: pool.total,
-        die: pool.die,
-        recharge: pool.recharge,
-        description: pool.description,
-        used: Math.min(pool.total, stored.used[pool.key] ?? 0),
-        remaining: pool.total - Math.min(pool.total, stored.used[pool.key] ?? 0),
-      })),
-      maneuversKnown: clampedManeuversKnown,
-      disciplinesKnown: clampedDisciplinesKnown,
-      toolProficienciesKnown: clampedToolProfsKnown,
-      // Fighting Style choice surface for the frontend picker. Choice count is
-      // level-gated (Fighter L1 -> 1); fightingStyle is already clamped to null
-      // when the character isn't entitled.
-      fightingStyleChoiceCount: fightingStyleChoices,
-      fightingStyle,
-    };
-  }
+  const resources = derivedRes
+    ? buildResourcesPayload(
+        derivedRes,
+        normalizeResourcesMutable(row.resources),
+        fightingStyle,
+        fightingStyleChoices,
+      )
+    : undefined;
 
   return { resources, fightingStyle, fightingStyleChoiceCount: fightingStyleChoices };
+}
+
+// Assemble the wire `resources` payload from the derived caps + stored mutable
+// state, clamping each level-gated list to its derived count (defense-in-depth
+// for characters who haven't had a reconciling XP op since their level dropped).
+// Byte-identical to the former inline construction (feeds the serialize oracle).
+function buildResourcesPayload(
+  derivedRes: NonNullable<ReturnType<typeof deriveResources>>,
+  stored: ReturnType<typeof normalizeResourcesMutable>,
+  fightingStyle: FightingStyleKey | null,
+  fightingStyleChoiceCount: number,
+): object {
+  const clampedManeuversKnown =
+    derivedRes.maneuverChoiceCount !== undefined
+      ? stored.maneuversKnown.slice(0, derivedRes.maneuverChoiceCount)
+      : stored.maneuversKnown;
+  const clampedToolProfsKnown =
+    derivedRes.toolProfChoiceCount !== undefined
+      ? stored.toolProficienciesKnown.slice(0, derivedRes.toolProfChoiceCount)
+      : stored.toolProficienciesKnown;
+  const clampedDisciplinesKnown =
+    derivedRes.disciplineChoiceCount !== undefined
+      ? stored.disciplinesKnown.slice(0, derivedRes.disciplineChoiceCount)
+      : stored.disciplinesKnown;
+  return {
+    features: derivedRes.features,
+    maneuverChoiceCount: derivedRes.maneuverChoiceCount,
+    maneuverSaveDC: derivedRes.maneuverSaveDC,
+    toolProfChoiceCount: derivedRes.toolProfChoiceCount,
+    disciplineChoiceCount: derivedRes.disciplineChoiceCount,
+    disciplineSaveDC: derivedRes.disciplineSaveDC,
+    shadowArtsAvailable: derivedRes.shadowArtsAvailable,
+    cloakOfShadowsAvailable: derivedRes.cloakOfShadowsAvailable,
+    pools: derivedRes.resources.map((pool) => ({
+      key: pool.key,
+      label: pool.label,
+      total: pool.total,
+      die: pool.die,
+      recharge: pool.recharge,
+      description: pool.description,
+      used: Math.min(pool.total, stored.used[pool.key] ?? 0),
+      remaining: pool.total - Math.min(pool.total, stored.used[pool.key] ?? 0),
+    })),
+    maneuversKnown: clampedManeuversKnown,
+    disciplinesKnown: clampedDisciplinesKnown,
+    toolProficienciesKnown: clampedToolProfsKnown,
+    // Fighting Style choice surface for the frontend picker. Choice count is
+    // level-gated (Fighter L1 -> 1); fightingStyle is already clamped to null
+    // when the character isn't entitled.
+    fightingStyleChoiceCount,
+    fightingStyle,
+  };
 }
 
 // Advancement clamp-on-read: mirrors reconcile-on-write in
