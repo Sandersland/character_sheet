@@ -13,6 +13,14 @@ const FOCUSABLE_SELECTOR =
  */
 export function useDialogChrome(onClose: () => void) {
   const panelRef = useRef<HTMLDivElement>(null);
+  // Keep the latest onClose in a ref so the effect below runs on mount/unmount
+  // ONLY. Call sites pass inline arrows (identity changes every render); if the
+  // effect depended on `onClose` it would re-run on every parent re-render —
+  // re-focusing the panel (stealing focus mid-keystroke, e.g. a text input in
+  // the sheet) and re-capturing `previouslyFocused` as the panel itself (so the
+  // trigger never regains focus on close).
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -23,7 +31,7 @@ export function useDialogChrome(onClose: () => void) {
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab" || !panelRef.current) return;
@@ -48,7 +56,7 @@ export function useDialogChrome(onClose: () => void) {
       document.body.style.overflow = originalOverflow;
       previouslyFocused?.focus();
     };
-  }, [onClose]);
+  }, []);
 
   return panelRef;
 }

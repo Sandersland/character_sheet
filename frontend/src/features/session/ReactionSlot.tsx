@@ -54,7 +54,7 @@ export default function ReactionSlot({
       <TurnSlotCard
         icon={GiCycle}
         title="Reaction"
-        preview={reactionUsed ? "used" : preview}
+        preview={preview}
         tone="arcane"
         used={reactionUsed}
         onUse={!reactionUsed ? () => setShowReactionMenu(true) : undefined}
