@@ -124,22 +124,8 @@ async function revertLevelUps(
   });
 }
 
-// ── Main handler ────────────────────────────────────────────────────────────
+// ── Op helpers ──────────────────────────────────────────────────────────────
 
-/**
- * Applies a batch of XP operations atomically. Each op writes a
- * `CharacterEvent` (category: "experience"). If the resulting XP drops the
- * derived level below the number of HP level-ups already applied
- * (hitDice.total), auto-reverses those HP gains in the same transaction —
- * fixing the stranded-HP bug described in the plan.
- *
- * `explicitSessionId` (optional) tags the resulting events to a SPECIFIC
- * session instead of the currently-active one. This powers the retroactive
- * "add XP to a past (ended) session" flow: when supplied, the targeted
- * session's stored `Session.summary` is recomputed + re-persisted in the same
- * transaction so its `xpGained` reflects the new award immediately. The session
- * must belong to the character (validated before any mutation).
- */
 /**
  * Resolves the target XP total + event type for one op. Award applies a signed
  * delta clamped at 0; set takes an exact non-negative value (rejects negatives).
@@ -228,6 +214,22 @@ async function applyExperienceOp(
   await reconcileLevelGatedState({ tx, characterId, newDerivedLevel, batchId });
 }
 
+// ── Main handler ────────────────────────────────────────────────────────────
+
+/**
+ * Applies a batch of XP operations atomically. Each op writes a
+ * `CharacterEvent` (category: "experience"). If the resulting XP drops the
+ * derived level below the number of HP level-ups already applied
+ * (hitDice.total), auto-reverses those HP gains in the same transaction —
+ * fixing the stranded-HP bug described in the plan.
+ *
+ * `explicitSessionId` (optional) tags the resulting events to a SPECIFIC
+ * session instead of the currently-active one. This powers the retroactive
+ * "add XP to a past (ended) session" flow: when supplied, the targeted
+ * session's stored `Session.summary` is recomputed + re-persisted in the same
+ * transaction so its `xpGained` reflects the new award immediately. The session
+ * must belong to the character (validated before any mutation).
+ */
 export async function applyExperienceOperations(
   characterId: string,
   operations: ExperienceOperation[],

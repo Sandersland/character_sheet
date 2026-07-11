@@ -242,19 +242,6 @@ export interface MulticlassSpellcastingInfo {
   arcana: Array<{ level: number; total: number }>;
 }
 
-/**
- * Derives merged spellcasting for a full (possibly multiclass) class list per
- * the PHB p. 164 multiclass rules: sum full levels, half of half-caster levels,
- * a third of third-caster levels, then read the combined caster level against
- * the multiclass slot table. Warlock Pact Magic (and Mystic Arcanum) is kept
- * separate — never merged into the combined pool.
- *
- * When exactly one class contributes to the combined pool, its own class table
- * is used (via deriveSpellcasting) so single-class output stays byte-for-byte
- * identical — the multiclass floor math only kicks in with two+ casters.
- *
- * Pure function — no DB access, safe to call in serializeCharacter.
- */
 /** One caster class after its per-entry save DC / attack bonus are resolved. */
 type CombinedEntry = { name: string; level: number; subclass?: string | null; fraction: CasterFraction };
 
@@ -282,6 +269,19 @@ function resolveCombinedSlotTotals(
   return [];
 }
 
+/**
+ * Derives merged spellcasting for a full (possibly multiclass) class list per
+ * the PHB p. 164 multiclass rules: sum full levels, half of half-caster levels,
+ * a third of third-caster levels, then read the combined caster level against
+ * the multiclass slot table. Warlock Pact Magic (and Mystic Arcanum) is kept
+ * separate — never merged into the combined pool.
+ *
+ * When exactly one class contributes to the combined pool, its own class table
+ * is used (via deriveSpellcasting) so single-class output stays byte-for-byte
+ * identical — the multiclass floor math only kicks in with two+ casters.
+ *
+ * Pure function — no DB access, safe to call in serializeCharacter.
+ */
 export function deriveMulticlassSpellcasting(
   classEntries: ReadonlyArray<{ name: string; level: number; subclass?: string | null }>,
   abilityScores: Record<string, number>,
