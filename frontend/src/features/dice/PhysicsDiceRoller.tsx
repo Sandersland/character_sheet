@@ -31,6 +31,33 @@ import { useDieFaceData } from "@/features/dice/useDieFaceData";
 // actually bind, but it guarantees the loop can't spin forever if it did.
 const INSTANT_RESOLVE_MAX_TICKS = 600;
 
+interface DicePhysics {
+  world: CANNON.World;
+  dice: PhysicsDie[];
+  resolver: ReturnType<typeof createRollResolver>;
+}
+
+// Builds this instance's cannon-es world + dice + resolver once (lazily). Kept
+// out of the component body so the render stays a thin mapping. Advantage/
+// disadvantage rolls two d20s and keeps one — mirror DiceRoller's dieCount guard
+// so the world spawns both dice (spec.count alone would silently drop advantage;
+// see usesAdvantage in dice.ts).
+function createDicePhysics(spec: DiceRollerProps["spec"], groups: FaceGroup[]): DicePhysics {
+  const dieCount = usesAdvantage(spec) ? 2 : spec.count;
+  const { world, diceMaterial } = createDiceWorld(dieCount);
+  const dice: PhysicsDie[] = Array.from({ length: dieCount }, (_, index) => {
+    const laneX = (index - (dieCount - 1) / 2) * DIE_GAP;
+    const body = createDieBody(diceMaterial);
+    // Rest in its tidy lane from the very first paint, same as the scripted
+    // roller's idle pose, rather than at the cannon body default of the world
+    // origin until the first roll throws it somewhere real.
+    body.position.set(laneX, FLOOR_Y + D6_SIZE / 2, 0);
+    world.addBody(body);
+    return { body, groups, laneX };
+  });
+  return { world, dice, resolver: createRollResolver(world, dice) };
+}
+
 interface PhysicsRigProps {
   dice: PhysicsDie[];
   resolver: ReturnType<typeof createRollResolver>;
@@ -150,28 +177,9 @@ export default function PhysicsDiceRoller({
   // orchestrators that mount this component, e.g. DiceRollSequence, keep one
   // instance alive across an entire multi-step sequence and only ever change
   // *which* roll via rollKey, never the spec shape).
-  const physicsRef = useRef<{
-    world: CANNON.World;
-    dice: PhysicsDie[];
-    resolver: ReturnType<typeof createRollResolver>;
-  } | null>(null);
+  const physicsRef = useRef<DicePhysics | null>(null);
   if (physicsRef.current === null) {
-    // Advantage/disadvantage rolls two d20s and keeps one — mirror DiceRoller's
-    // dieCount guard so the physics world spawns both dice (spec.count alone
-    // would silently drop advantage; see usesAdvantage in dice.ts).
-    const dieCount = usesAdvantage(spec) ? 2 : spec.count;
-    const { world, diceMaterial } = createDiceWorld(dieCount);
-    const dice: PhysicsDie[] = Array.from({ length: dieCount }, (_, index) => {
-      const laneX = (index - (dieCount - 1) / 2) * DIE_GAP;
-      const body = createDieBody(diceMaterial);
-      // Rest in its tidy lane from the very first paint, same as the
-      // scripted roller's idle pose, rather than at the cannon body default
-      // of the world origin until the first roll throws it somewhere real.
-      body.position.set(laneX, FLOOR_Y + D6_SIZE / 2, 0);
-      world.addBody(body);
-      return { body, groups, laneX };
-    });
-    physicsRef.current = { world, dice, resolver: createRollResolver(world, dice) };
+    physicsRef.current = createDicePhysics(spec, groups);
   }
   const { dice, resolver } = physicsRef.current;
 

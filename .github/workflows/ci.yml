@@ -99,13 +99,22 @@ jobs:
           !(github.event.pull_request.head.ref == 'staging' && github.event.pull_request.base.ref == 'main')
         run: npx --no-install fallow audit --base "origin/${{ github.event.pull_request.base.ref }}" --gate new-only --no-cache
 
-      # Phase 2 of #691 — repo-wide zero-CRITICAL ratchet, enabled 2026-07-11
-      # after the #692 stage-1 burn-down (#684-#689) cleared the CRITICAL tier.
-      # Fails if ANY function anywhere crosses the CRITICAL thresholds, not just
-      # in changed files. Runs on every event (incl. pushes to main/staging), so
-      # a direct push is gated too. --no-install/--no-cache mirror the audit step.
-      - name: fallow health (no CRITICAL findings repo-wide)
-        run: npx --no-install fallow health --min-severity critical --no-cache
+      # The repo-wide ratchet, expressed PER-WORKSPACE so each workspace's CRAP
+      # treatment can differ (#718, tightened from the old repo-wide
+      # `--min-severity critical` step). Together the frontend step here and the
+      # backend step below leave no HIGH/CRITICAL-severity function anywhere —
+      # the "critical->high" flip #692 aimed for. Both run on every event (incl.
+      # pushes to main/staging), so a direct push is gated too.
+      #
+      # FRONTEND: complexity-ceiling gate. --max-crap 999 drops the CRAP axis, so
+      # severity is driven purely by the cyclomatic/cognitive ceilings. Frontend
+      # vitest coverage is deliberately NOT wired in here: at ~69% coverage real
+      # CRAP would flag coverage debt, not complexity, exploding the tier to ~39
+      # findings. Enforcing frontend CRAP once coverage is raised is a tracked
+      # future issue (the frontend twin of #717). --production excludes
+      # test/e2e/story files (their complexity isn't gated).
+      - name: fallow health (no HIGH-complexity findings in frontend)
+        run: npx --no-install fallow health -w frontend --production --min-severity high --max-crap 999 --no-cache
 
       # #692 backend tightening, enabled 2026-07-11 after clearing the backend
       # cognitive-complexity tier. Plain mode = fails on ANY finding in scope, so
@@ -120,8 +129,8 @@ jobs:
       #     --production. This re-enables the pinned `maxCrap: 30` bar (#717).
       # The coverage artifact was generated in this same runner (identical
       # $GITHUB_WORKSPACE absolute paths across jobs), so no --coverage-root remap
-      # is needed. Repo-scoped severity gating (critical->high) stays blocked on
-      # the frontend HIGH tier and is NOT attempted here; this is backend-only.
+      # is needed. Plain mode (no --min-severity) is stricter than the frontend
+      # step's `high` bar: it fails on ANY backend production finding.
       - name: Download backend coverage (from the test job)
         uses: actions/download-artifact@v4
         with:
