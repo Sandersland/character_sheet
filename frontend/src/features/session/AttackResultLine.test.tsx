@@ -74,6 +74,35 @@ describe("AttackResultLine (#745)", () => {
     expect(screen.getByText(/\+maneuver/)).toBeInTheDocument();
   });
 
+  it("omits the modifier term when the modifier is zero", () => {
+    // Two dice so the total (7) is distinct from either face (1, 6).
+    const dmg: RollResult = {
+      dice: [
+        { value: 1, dropped: false },
+        { value: 6, dropped: false },
+      ],
+      modifier: 0,
+      total: 7,
+      spec: { count: 2, faces: 6, modifier: 0 },
+    };
+    render(<AttackResultLine result={dmg} kind="damage" damageType="bludgeoning" />);
+    expect(screen.getByText("7")).toBeInTheDocument();
+    // No "+ 0" / "− 0" noise.
+    expect(screen.queryByText(/[+−]\s*0/)).not.toBeInTheDocument();
+  });
+
+  it("renders a negative modifier with a minus sign", () => {
+    const dmg: RollResult = {
+      dice: [{ value: 5, dropped: false }],
+      modifier: -1,
+      total: 4,
+      spec: { count: 1, faces: 6, modifier: -1 },
+    };
+    render(<AttackResultLine result={dmg} kind="damage" damageType="slashing" />);
+    expect(screen.getByText(/−\s*1/)).toBeInTheDocument();
+    expect(screen.getByText("4")).toBeInTheDocument();
+  });
+
   it("tags a crit damage roll", () => {
     const crit: RollResult = {
       dice: [

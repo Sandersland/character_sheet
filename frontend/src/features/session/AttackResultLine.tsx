@@ -2,11 +2,8 @@
 // Attack / Damage / Critical, the 3D-dice animation + toast are transient — this
 // keeps the number on the row so they can read it back to their DM. Presentational
 // only: it takes the RollResult the attack sheet already holds; no rolling here.
-//
-// Matches the Attack Flow spec's die-box treatment: each kept die is a small box
-// (value over a `dN` caption), followed by the modifier, total, and — for damage —
-// the damage type. A maneuver-summed override total (Battle Master superiority die)
-// wins over the raw total when present.
+// A maneuver-summed override total (Battle Master superiority die) wins over the
+// raw total when present.
 
 import type { RollResult } from "@/lib/dice";
 
@@ -30,18 +27,19 @@ export default function AttackResultLine({
   const mod = result.modifier;
   const total = overrideTotal ?? result.total;
   // Arcane (magic-neutral) for the to-hit d20, garnet for weapon damage — per the
-  // palette intent in index.css.
-  const boxTone =
+  // palette intent in index.css. Box and total share one tone so an attack roll
+  // doesn't mix arcane boxes with a garnet total.
+  const tone =
     kind === "attack"
-      ? "border-arcane-400 bg-arcane-50 text-arcane-800"
-      : "border-garnet-300 bg-garnet-50 text-garnet-800";
+      ? { box: "border-arcane-400 bg-arcane-50 text-arcane-800", total: "text-arcane-800" }
+      : { box: "border-garnet-300 bg-garnet-50 text-garnet-800", total: "text-garnet-800" };
 
   return (
     <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-parchment-700">
       {keptDice.map((d, i) => (
         <span
           key={i}
-          className={`inline-flex flex-col items-center justify-center rounded-control border px-2 py-0.5 font-display leading-tight tabular-nums ${boxTone}`}
+          className={`inline-flex flex-col items-center justify-center rounded-control border px-2 py-0.5 font-display leading-tight tabular-nums ${tone.box}`}
         >
           <span className="text-sm font-semibold">{d.value}</span>
           <span className="text-[9px] font-normal uppercase tracking-wide opacity-70">
@@ -55,7 +53,7 @@ export default function AttackResultLine({
         </span>
       )}
       <span className="text-parchment-500">=</span>
-      <span className="font-display text-base font-semibold tabular-nums text-garnet-800">
+      <span className={`font-display text-base font-semibold tabular-nums ${tone.total}`}>
         {total}
       </span>
       {kind === "damage" && damageType && (
