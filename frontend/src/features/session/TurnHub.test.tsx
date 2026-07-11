@@ -104,8 +104,8 @@ function renderHub(character: Character = makeCharacter()) {
 
 // Drive the hub from "Not in Combat" through to an active turn.
 async function startTurn(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("button", { name: "Start Combat" }));
-  await user.click(screen.getByRole("button", { name: "Start Turn" }));
+  await user.click(screen.getByRole("button", { name: /Start combat/ }));
+  await user.click(screen.getByRole("button", { name: "Start my turn" }));
 }
 
 beforeEach(() => {
@@ -130,21 +130,21 @@ describe("TurnHub — combat lifecycle", () => {
     const user = userEvent.setup();
     renderHub();
 
-    await user.click(screen.getByRole("button", { name: "Start Combat" }));
+    await user.click(screen.getByRole("button", { name: /Start combat/ }));
 
     expect(startCombat).toHaveBeenCalledWith("char-1", "sess-1");
     expect(screen.getByText(/Round 1/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Start Turn" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start my turn" })).toBeInTheDocument();
   });
 
-  it("starts a turn: shows Your Turn with one action available", async () => {
+  it("starts a turn: shows Your turn with the action available", async () => {
     const user = userEvent.setup();
     renderHub();
 
     await startTurn(user);
 
-    expect(screen.getByText("Your Turn")).toBeInTheDocument();
-    expect(screen.getByText("1 available")).toBeInTheDocument();
+    expect(screen.getByText("Your turn")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Use Action" })).toBeInTheDocument();
   });
 
   it("ends the turn: advances the combat round to 2", async () => {
@@ -152,7 +152,7 @@ describe("TurnHub — combat lifecycle", () => {
     renderHub();
     await startTurn(user);
 
-    await user.click(screen.getByRole("button", { name: "End Turn" }));
+    await user.click(screen.getByRole("button", { name: "End turn" }));
 
     expect(advanceCombatRound).toHaveBeenCalledWith("char-1", "sess-1", 2);
     expect(screen.getByText(/Round 2/)).toBeInTheDocument();
@@ -204,7 +204,8 @@ describe("TurnHub — action economy", () => {
         { type: "executeAction", actionKey: "actionSurge" },
       ]),
     );
-    expect(screen.getByText("1 available")).toBeInTheDocument();
+    // The action slot's Use button returns once the surge refunds the slot.
+    expect(screen.getByRole("button", { name: "Use Action" })).toBeInTheDocument();
   });
 
   it("Lay on Hands opens the input and heals for the entered amount", async () => {
@@ -318,7 +319,7 @@ describe("TurnHub — Rage turn-hook (#457)", () => {
     const user = userEvent.setup();
     renderHub(ragingBarbarian());
     await startTurn(user);
-    await user.click(screen.getByRole("button", { name: "End Turn" }));
+    await user.click(screen.getByRole("button", { name: "End turn" }));
     await waitFor(() => {
       expect(applyActionTransactions).toHaveBeenCalledWith("char-1", [
         { type: "executeAction", actionKey: "endRage" },
@@ -330,7 +331,7 @@ describe("TurnHub — Rage turn-hook (#457)", () => {
     const user = userEvent.setup();
     renderHub(makeCharacter({ class: "Barbarian" }));
     await startTurn(user);
-    await user.click(screen.getByRole("button", { name: "End Turn" }));
+    await user.click(screen.getByRole("button", { name: "End turn" }));
     expect(applyActionTransactions).not.toHaveBeenCalledWith("char-1", [
       { type: "executeAction", actionKey: "endRage" },
     ]);

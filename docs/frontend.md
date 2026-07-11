@@ -7,7 +7,7 @@ Source of truth: `ls frontend/src/features` — regenerate if stale.
 ```
 frontend/src/
 ├── components/
-│   └── ui/              # domain-agnostic primitives (Card, Badge, MeterBar, Modal, Tabs, OverflowMenu, DropdownMenu, Popover, Avatar, ErrorBoundary, EmptyState, Spinner)
+│   └── ui/              # domain-agnostic primitives (Card, Badge, MeterBar, Modal, BottomSheet, Tabs, OverflowMenu, DropdownMenu, Popover, Avatar, ErrorBoundary, EmptyState, Spinner)
 ├── features/
 │   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable, ProficienciesCard, AbilityScoresPanel
 │   ├── advancement/     # AdvancementSection, AdvancementPanel (shell) → AsiFlow, FeatFlow,
@@ -223,6 +223,8 @@ Staying on-system is what keeps the UI from reading as generic. The `verify-fron
 
 When adding a new editing surface: **default to inline**. Reach for `Modal` only if the surface is read-only or a destructive confirmation. If you need an overlay for an editing surface, make the case explicitly.
 
+**Mobile turn UI exception — `BottomSheet` (#729).** The in-session turn economy (`features/session/`) is a mobile-first, thumb-driven surface: the Action/Bonus/Reaction slots are large tap targets that open a bottom-anchored `BottomSheet` picker ("nothing is spent until you choose"), and the attack/spell/item/heal resolution pickers render in a sheet too. `BottomSheet` and `Modal` share their focus-trap/Escape/scroll-lock machinery via `hooks/useDialogChrome.ts` — build any new overlay on that hook rather than re-hand-rolling the `keydown`/scroll-lock/focus-restore block. Keep `BottomSheet` scoped to the mobile turn surface; elsewhere the inline-vs-Modal rule above still holds.
+
 ## Primitive components
 
 These live in `src/components/ui/` and are intentionally domain-agnostic — they must not import from `@/features`, `@/api`, or `@/types/character`. They know nothing about D&D.
@@ -234,7 +236,8 @@ These live in `src/components/ui/` and are intentionally domain-agnostic — the
 | `Card` | Base parchment surface for every major section. Props: `title?`, `titleAccessory?`, `className?`, `headingLevel?` (`2`\|`3`, default `3` — set `2` when the card is a top-level page section directly under the page's `h1` so heading order doesn't skip). |
 | `Badge` | Soft-background pill. Prop `tone`: `garnet` / `arcane` / `gold` / `vitality` / `neutral`. |
 | `MeterBar` | Horizontal resource meter. Always pair with numeric text (e.g. `9/10 HP`) — never rely on color alone. Prop `tone`: `garnet` / `arcane` / `gold`. |
-| `Modal` | Overlay primitive. See inline-vs-modal rule above. |
+| `Modal` | Centered overlay primitive. See inline-vs-modal rule above. Shares focus/scroll machinery with `BottomSheet` via `hooks/useDialogChrome`. |
+| `BottomSheet` | Bottom-anchored slide-up sheet — the standard mobile picker for the turn UI (#729). Same parchment/`--shadow-raised` DNA as `Modal` (rounded top corners + grabber handle), same `useDialogChrome` behavior. Props: `title`, `subtitle?`, `onClose`, `children`. Scoped to `features/session/`'s turn surface. |
 | `Tabs` | Controlled segmented-control tab switcher (WAI-ARIA tablist, arrow-key nav, optional per-tab `badge`). Renders only the switcher; the caller renders the active panel below it. Props: `tabs`, `active`, `onChange`. |
 | `OverflowMenu` | Icon-only kebab (`MoreVertical`) menu-button (WAI-ARIA menu-button: `aria-haspopup`, roving tabindex, Arrow/Home/End/Esc nav, click-outside to close, focus returns to trigger). No portal — `relative`-anchored popup. Per-item `danger?` (garnet) / `separatorBefore?` (divider). Props: `items`, `label?` (trigger accessible name, default "More actions"), `className?`. |
 | `DropdownMenu` | Owned-trigger popup menu for **arbitrary** content (vs `OverflowMenu`'s fixed item array). Owns the `<button>` and takes the trigger as `trigger` content; `children` is a render-prop `(close) => ReactNode`. Keyboard nav (Arrow/Home/End + roving tabindex) is driven by a **live** `[role^="menuitem"]` DOM query (covers `menuitemradio`/`menuitemcheckbox`), so presentational rows carry no role and are skipped for free. `aria-haspopup`/`aria-expanded`, ArrowDown/Enter/Space opens, Esc + click-outside close, focus returns to trigger. No portal — `relative`-anchored. Props: `trigger`, `label` (trigger accessible name), `children`, `align?` (`right`\|`left`, default `right`), `className?`. |
