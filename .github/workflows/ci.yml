@@ -68,10 +68,12 @@ jobs:
       - name: fallow audit (new findings vs PR base)
         run: npx fallow audit --base "origin/${{ github.event.pull_request.base.ref }}" --gate new-only --no-cache
 
-      # Phase 2 of #691 — repo-wide zero-CRITICAL ratchet. Enable once the
-      # CRITICAL complexity tier is cleared (#684-#689, epic #692 stage 1).
-      # - name: fallow health (no CRITICAL findings repo-wide)
-      #   run: npx fallow health --min-severity critical
+      # Phase 2 of #691 — repo-wide zero-CRITICAL ratchet, enabled 2026-07-11
+      # after the #692 stage-1 burn-down (#684-#689) cleared the CRITICAL tier.
+      # Fails if ANY function anywhere crosses the CRITICAL thresholds, not
+      # just in changed files.
+      - name: fallow health (no CRITICAL findings repo-wide)
+        run: npx fallow health --min-severity critical
 
   build:
     # Production type-check + bundle. vitest transpiles via esbuild and does NOT
