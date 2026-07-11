@@ -1,16 +1,15 @@
 /**
  * ShadowArtRow — a single Way of Shadow Shadow Art with an expandable
- * description and a flat 2-ki cast affordance. Mirrors DisciplineRow, minus the
- * ki scaling (Shadow Arts are flat-cost, roll-less utility/buff spells).
+ * description and a flat 2-ki cast affordance. Renders through AbilityRowShell
+ * (shared with ManeuverRow/DisciplineRow); Shadow Arts are flat-cost,
+ * roll-less utility/buff spells, so there is no ki scaling here.
  */
 
-import { useState } from "react";
-
-import { skillLabel } from "@/lib/abilities";
+import AbilityRowShell, { CastAbilityButton } from "@/features/class/AbilityRowShell";
+import { shadowArtView } from "@/lib/shadowArts";
 import type {
   CastShadowArtOperation,
   CatalogShadowArt,
-  SkillName,
 } from "@/types/character";
 
 interface Props {
@@ -32,41 +31,22 @@ export default function ShadowArtRow({
   concentratingOnName,
   onCast,
 }: Props) {
-  const [expanded, setExpanded] = useState(false);
-
-  const kiCost = art.cost.kind === "pool" ? art.cost.base : 0;
-  const canAfford = kiAvailable >= kiCost;
-  const concentrates = art.effect.concentration ?? false;
-  const displayName = art.name.replace(/^Shadow Arts:\s*/, "");
-
-  // Pass without Trace's passive buff (+10 Stealth) — resolved through skillLabel.
-  const buffLabel =
-    art.effect.effectType === "buff" && art.effect.buffTarget
-      ? `${(art.effect.buffModifier ?? 0) >= 0 ? "+" : ""}${art.effect.buffModifier ?? 0} ${skillLabel(art.effect.buffTarget as SkillName)}`
-      : null;
-
-  // Warn that casting a new concentration art drops the current one.
-  const willReplace = concentrates && !isConcentrating && concentratingOnName;
+  const view = shadowArtView(art, kiAvailable, isConcentrating, concentratingOnName);
 
   function handleCast() {
-    if (busy || !canAfford) return;
+    if (busy || !view.canAfford) return;
     onCast({ type: "castShadowArt", shadowArtId: art.id });
   }
 
   return (
-    <li className="border-b border-parchment-200 py-2.5 last:border-0">
-      <div className="flex items-start justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="flex flex-1 items-baseline gap-1.5 text-left"
-          aria-expanded={expanded}
-        >
-          <span className="text-sm font-semibold text-parchment-900">{displayName}</span>
+    <AbilityRowShell
+      name={view.displayName}
+      chips={
+        <>
           <span className="text-[10px] text-gold-700" aria-hidden="true">
-            {kiCost} ki
+            {view.kiCost} ki
           </span>
-          {concentrates &&
+          {view.concentrates &&
             (isConcentrating ? (
               <span className="rounded-control bg-arcane-700 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-parchment-50">
                 concentrating
@@ -76,42 +56,33 @@ export default function ShadowArtRow({
                 conc
               </span>
             ))}
-          {buffLabel && (
+          {view.buffLabel && (
             <span className="rounded-control bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-700">
-              {buffLabel}
+              {view.buffLabel}
             </span>
           )}
-          <span className="text-[10px] text-parchment-400" aria-hidden="true">
-            {expanded ? "▲" : "▼"}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          disabled={busy || !canAfford}
+        </>
+      }
+      actions={
+        <CastAbilityButton
+          disabled={busy || !view.canAfford}
           onClick={handleCast}
-          className="shrink-0 rounded-control bg-gold-400 px-2.5 py-0.5 text-[11px] font-semibold text-ink hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
           title={
-            !canAfford
-              ? `Not enough ki (needs ${kiCost})`
-              : `Cast ${displayName} (${kiCost} ki)`
+            !view.canAfford
+              ? `Not enough ki (needs ${view.kiCost})`
+              : `Cast ${view.displayName} (${view.kiCost} ki)`
           }
-        >
-          Cast
-        </button>
-      </div>
-
-      {willReplace && (
-        <p className="mt-1 text-[11px] text-arcane-800" role="status">
-          Casting replaces concentration on {concentratingOnName}.
-        </p>
-      )}
-
-      {expanded && (
-        <div className="mt-1.5 pr-2">
-          <p className="text-xs leading-relaxed text-parchment-600">{art.description}</p>
-        </div>
-      )}
-    </li>
+        />
+      }
+      warning={
+        view.willReplace ? (
+          <p className="mt-1 text-[11px] text-arcane-800" role="status">
+            Casting replaces concentration on {concentratingOnName}.
+          </p>
+        ) : undefined
+      }
+    >
+      <p className="text-xs leading-relaxed text-parchment-600">{art.description}</p>
+    </AbilityRowShell>
   );
 }
