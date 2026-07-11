@@ -161,4 +161,38 @@ describe("OverflowMenu", () => {
     const { container } = render(<OverflowMenu items={items()} className="my-wrap" />);
     expect(container.firstChild).toHaveClass("my-wrap");
   });
+
+  it("a disabled item advertises aria-disabled and does not fire onSelect on click", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(
+      <OverflowMenu items={[{ label: "Leave", onSelect, disabled: true }]} />
+    );
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    const item = screen.getByRole("menuitem", { name: "Leave" });
+    expect(item).toHaveAttribute("aria-disabled", "true");
+    await user.click(item);
+    expect(onSelect).not.toHaveBeenCalled();
+    // menu stays open — a no-op click shouldn't dismiss it
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+  });
+
+  it("a disabled item does not fire onSelect on Enter and stays focusable for roving nav", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(
+      <OverflowMenu
+        items={[
+          { label: "Edit", onSelect: vi.fn() },
+          { label: "Leave", onSelect, disabled: true },
+        ]}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    // ArrowDown must still land on the disabled item (aria-disabled, not native disabled)
+    await user.keyboard("{ArrowDown}");
+    expect(document.activeElement).toBe(screen.getByRole("menuitem", { name: "Leave" }));
+    await user.keyboard("{Enter}");
+    expect(onSelect).not.toHaveBeenCalled();
+  });
 });

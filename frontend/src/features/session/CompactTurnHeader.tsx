@@ -16,6 +16,10 @@ interface CompactTurnHeaderProps {
   character: Character;
   /** turnState.round — the header only renders on the active turn, so this is ≥ 1. */
   round: number;
+  /** A leave is in flight — disables the Leave/End menu items (parity with SessionTopBar). */
+  leavePending: boolean;
+  /** An end-session is in flight — disables the Leave/End menu items. */
+  endPending: boolean;
   leaveError: string | null;
   onCapture: () => void;
   onLeave: () => void;
@@ -25,11 +29,14 @@ interface CompactTurnHeaderProps {
 export default function CompactTurnHeader({
   character,
   round,
+  leavePending,
+  endPending,
   leaveError,
   onCapture,
   onLeave,
   onEndClick,
 }: CompactTurnHeaderProps) {
+  const controlsBusy = endPending || leavePending;
   return (
     <div className="border-b border-parchment-200 bg-parchment-50">
       <div className="mx-auto flex max-w-4xl items-center gap-2 px-4 py-2.5">
@@ -57,8 +64,14 @@ export default function CompactTurnHeader({
           className="shrink-0"
           items={[
             { label: "＋ Note", onSelect: onCapture },
-            { label: "Leave Session", onSelect: onLeave },
-            { label: "End Session", onSelect: onEndClick, danger: true, separatorBefore: true },
+            { label: "Leave Session", onSelect: onLeave, disabled: controlsBusy },
+            {
+              label: "End Session",
+              onSelect: onEndClick,
+              danger: true,
+              separatorBefore: true,
+              disabled: controlsBusy,
+            },
           ]}
         />
       </div>

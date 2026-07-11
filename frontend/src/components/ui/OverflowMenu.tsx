@@ -8,6 +8,12 @@ interface OverflowMenuItem {
   onSelect: () => void;
   danger?: boolean;
   separatorBefore?: boolean;
+  /**
+   * When true the item is shown greyed and its activation is a no-op. Uses
+   * aria-disabled (not the native `disabled` attribute) so the item stays
+   * focusable and roving-focus keyboard nav still passes over it (WAI-ARIA).
+   */
+  disabled?: boolean;
 }
 
 interface OverflowMenuProps {
@@ -48,6 +54,7 @@ export default function OverflowMenu({ items, label, className = "" }: OverflowM
   });
 
   function select(item: OverflowMenuItem) {
+    if (item.disabled) return;
     item.onSelect();
     close();
   }
@@ -111,12 +118,16 @@ export default function OverflowMenu({ items, label, className = "" }: OverflowM
               key={item.label}
               type="button"
               role="menuitem"
+              aria-disabled={item.disabled || undefined}
               ref={(el) => { itemRefs.current[i] = el; }}
               tabIndex={i === activeIndex ? 0 : -1}
               onClick={() => select(item)}
               onKeyDown={(e) => handleItemKeyDown(e, i)}
               className={[
-                "block w-full px-3 py-1.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:bg-parchment-100 hover:bg-parchment-100",
+                "block w-full px-3 py-1.5 text-left text-sm transition-colors focus-visible:outline-none",
+                item.disabled
+                  ? "cursor-not-allowed opacity-50"
+                  : "focus-visible:bg-parchment-100 hover:bg-parchment-100",
                 item.separatorBefore ? "border-t border-parchment-200" : "",
                 item.danger ? "text-garnet-700" : "text-parchment-800",
               ].join(" ")}

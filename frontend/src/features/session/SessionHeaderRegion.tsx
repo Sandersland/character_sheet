@@ -59,6 +59,8 @@ export default function SessionHeaderRegion({
           <CompactTurnHeader
             character={character}
             round={round}
+            leavePending={leavePending}
+            endPending={endPending}
             leaveError={leaveError}
             onCapture={onCapture}
             onLeave={onLeave}

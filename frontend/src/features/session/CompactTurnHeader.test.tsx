@@ -29,6 +29,8 @@ function renderHeader(props: Partial<React.ComponentProps<typeof CompactTurnHead
       <CompactTurnHeader
         character={makeCharacter()}
         round={2}
+        leavePending={false}
+        endPending={false}
         leaveError={null}
         {...handlers}
         {...props}
@@ -78,5 +80,30 @@ describe("CompactTurnHeader", () => {
   it("surfaces a leave error when present", () => {
     renderHeader({ leaveError: "Could not leave" });
     expect(screen.getByText("Could not leave")).toBeInTheDocument();
+  });
+
+  it("disables Leave / End while a leave or end is in flight, but keeps Note usable", async () => {
+    const user = userEvent.setup();
+    const handlers = renderHeader({ leavePending: true });
+    await user.click(screen.getByRole("button", { name: "Session actions" }));
+
+    const leave = screen.getByRole("menuitem", { name: "Leave Session" });
+    const end = screen.getByRole("menuitem", { name: "End Session" });
+    expect(leave).toHaveAttribute("aria-disabled", "true");
+    expect(end).toHaveAttribute("aria-disabled", "true");
+
+    await user.click(leave);
+    expect(handlers.onLeave).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("menuitem", { name: "＋ Note" }));
+    expect(handlers.onCapture).toHaveBeenCalledOnce();
+  });
+
+  it("also disables Leave / End while an end is pending", async () => {
+    const user = userEvent.setup();
+    const handlers = renderHeader({ endPending: true });
+    await user.click(screen.getByRole("button", { name: "Session actions" }));
+    await user.click(screen.getByRole("menuitem", { name: "End Session" }));
+    expect(handlers.onEndClick).not.toHaveBeenCalled();
   });
 });
