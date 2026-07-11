@@ -419,12 +419,10 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     }));
   }, [mutate]);
 
-  const commitReactionSpell = useCallback(() => {
-    mutate((s) => {
-      if (s.reactionUsed) return s; // guard: already used → no history push
-      return { ...s, reactionUsed: true };
-    });
-  }, [mutate]);
+  // Committing a reaction-slot spell spends the reaction exactly like any other
+  // reaction — identical to consumeReaction, so alias it rather than duplicate
+  // the guarded mutation.
+  const commitReactionSpell = consumeReaction;
 
   const undo = useCallback(() => {
     setState((s) => {
