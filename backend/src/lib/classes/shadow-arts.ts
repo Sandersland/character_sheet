@@ -11,14 +11,13 @@
  * deriveResources() (class-features.ts).
  */
 
-import { Prisma } from "@/generated/prisma/client.js";
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { deriveResourcesForCharacterRow } from "./class-features.js";
 import type { EffectSpec } from "@/lib/combat/effects.js";
-import { logEvent } from "@/lib/activity/events.js";
-import { normalizeSpellcastingMutable, type SpellcastingMutableState } from "@/lib/spellcasting/spell-state.js";
+import { normalizeSpellcastingMutable, snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
+import { KI_CAST_CHARACTER_SELECT, emitKiCastEvents } from "./ki-cast.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 
@@ -58,6 +57,10 @@ export interface ShadowArtEffectRow {
  * Build a Shadow Art's EffectSpec directly: always flat (scaling.mode "none").
  * Pass without Trace is a buff (buffTarget/buffModifier map into the spec);
  * the rest are roll-less utility. Concentration is derived from the name set.
+ *
+ * Deliberately parallel to (not shared with) disciplines' `disciplineEffectSpec`
+ * + save-DC gate — only the ki-cast scaffolding is shared (lib/classes/ki-cast.ts).
+ * Unifying the divergent row→effect mapping is the declarative subclass engine (#416).
  */
 export function shadowArtEffectSpec(row: ShadowArtEffectRow): EffectSpec {
   const isBuff = row.effectKind === "buff";
@@ -71,18 +74,6 @@ export function shadowArtEffectSpec(row: ShadowArtEffectRow): EffectSpec {
     concentration: CONCENTRATION_SHADOW_ARTS.has(row.name),
     buffTarget: row.buffTarget ?? null,
     buffModifier: row.buffModifier ?? null,
-  };
-}
-
-// Deep-copy the spellcasting state for a before/after event snapshot.
-function snapshotSpellcasting(state: SpellcastingMutableState) {
-  return {
-    spellcasting: {
-      slotsUsed: { ...state.slotsUsed },
-      arcanumUsed: { ...state.arcanumUsed },
-      spells: [...state.spells],
-      concentratingOn: state.concentratingOn ? { ...state.concentratingOn } : null,
-    },
   };
 }
 
@@ -101,17 +92,7 @@ export async function applyShadowArtsOperations(
   operations: ShadowArtOperation[],
 ): Promise<void> {
   await runCharacterTransaction(characterId, operations, {
-    select: {
-      spellcasting: true,
-      resources: true,
-      experiencePoints: true,
-      abilityScores: true,
-      classEntries: {
-        orderBy: { position: "asc" as const },
-        take: 1,
-        select: { name: true, subclass: true },
-      },
-    },
+    select: KI_CAST_CHARACTER_SELECT,
     notFound: (id) => new InvalidShadowArtOperationError(`Character not found: ${id}`),
     applyOp: async ({ tx, row, op, batchId, sessionId }) => {
       const { derived } = deriveResourcesForCharacterRow(row);
@@ -154,45 +135,23 @@ export async function applyShadowArtsOperations(
         },
       );
 
-      // Persist + audit the concentration change under the spellcasting category
-      // so batch revert restores concentratingOn. Non-concentration Shadow Arts
-      // (Darkvision) leave spellcasting alone.
-      if (concentrates) {
-        await tx.character.update({
-          where: { id: characterId },
-          data: {
-            spellcasting: {
-              slotsUsed: spellState.slotsUsed,
-              arcanumUsed: spellState.arcanumUsed,
-              spells: spellState.spells,
-              concentratingOn: spellState.concentratingOn,
-            } as unknown as Prisma.InputJsonValue,
-          },
-        });
-        await logEvent(tx, {
-          characterId,
-          category: "spellcasting",
-          type: "castShadowArt",
-          summary: `Concentrating on ${catalog.name}`,
-          before: beforeSpell,
-          after: snapshotSpellcasting(spellState),
-          data: { shadowArtId: catalog.id, shadowArtName: catalog.name },
-          batchId,
-          sessionId,
-        });
-      }
-
-      // The cast record itself restores nothing (ki refunded by the pool payer's
-      // own spendResource event, concentration by the event above) — it just
-      // records the cast.
-      await logEvent(tx, {
+      // Shared ki-cast audit tail: when concentrating, persist the write-back +
+      // log the undoable spellcasting event (restores concentratingOn on revert;
+      // non-concentration Shadow Arts like Darkvision leave spellcasting alone).
+      // The resources cast record restores nothing (ki refunded by the pool
+      // payer's spendResource event, concentration by the event above).
+      await emitKiCastEvents(tx, {
         characterId,
-        category: "resources",
-        type: "castShadowArt",
-        summary: outcome.summary,
-        data: { shadowArtId: catalog.id, kiSpent: cost.base },
         batchId,
         sessionId,
+        eventType: "castShadowArt",
+        concentrates,
+        spellState,
+        beforeSpell,
+        concentrationName: catalog.name,
+        concentrationData: { shadowArtId: catalog.id, shadowArtName: catalog.name },
+        resourceSummary: outcome.summary,
+        resourceData: { shadowArtId: catalog.id, kiSpent: cost.base },
       });
     },
   });

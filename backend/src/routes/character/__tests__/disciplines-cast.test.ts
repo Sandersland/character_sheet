@@ -231,6 +231,42 @@ describe("Discipline cast endpoint", () => {
     expect((reverted!.spellcasting as { concentratingOn: unknown }).concentratingOn).toBeNull();
   });
 
+  // Byte-identical oracle for the shared ki-cast event tail (#642): pins the full
+  // castDiscipline event payloads (before/after/summary/data) so the extraction of
+  // snapshotSpellcasting + the event-emitting tail into a shared helper stays exact.
+  it("pins the castDiscipline event payloads exactly (before/after/summary/data)", async () => {
+    await createMonk(XP_L3);
+    await learn(galeSpiritsId);
+    const res = await cast([{ type: "castDiscipline", disciplineId: galeSpiritsId, kiSpent: 2, roll: 0 }]);
+    expect(res.status).toBe(200);
+
+    // Concentration (spellcasting-category) event — carries the before/after snapshot.
+    const concEvent = await prisma.characterEvent.findFirst({
+      where: { characterId: FIXTURE_ID, category: "spellcasting", type: "castDiscipline" },
+    });
+    expect(concEvent).not.toBeNull();
+    expect(concEvent!.summary).toBe("Concentrating on Rush of the Gale Spirits");
+    expect(concEvent!.before).toEqual({
+      spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+    });
+    expect(concEvent!.after).toEqual({
+      spellcasting: {
+        slotsUsed: {}, arcanumUsed: {}, spells: [],
+        concentratingOn: { entryId: galeSpiritsId, spellName: "Rush of the Gale Spirits" },
+      },
+    });
+    expect(concEvent!.data).toEqual({ disciplineId: galeSpiritsId, disciplineName: "Rush of the Gale Spirits" });
+
+    // Cast record (resources-category) event — no snapshot, carries the roll/DC data.
+    const castEvent = await prisma.characterEvent.findFirst({
+      where: { characterId: FIXTURE_ID, category: "resources", type: "castDiscipline" },
+    });
+    expect(castEvent).not.toBeNull();
+    expect(castEvent!.before).toBeNull();
+    expect(castEvent!.after).toBeNull();
+    expect(castEvent!.data).toEqual({ disciplineId: galeSpiritsId, kiSpent: 2, roll: 0, saveDc: 12 });
+  });
+
   it("logs an undoable castDiscipline batch (revert restores the spent ki)", async () => {
     await createMonk(XP_L3);
     await learn(waterWhipId);
