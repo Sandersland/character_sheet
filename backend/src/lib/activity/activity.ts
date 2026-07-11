@@ -410,10 +410,6 @@ async function reverseEvent(
   await handler({ tx, characterId, event, before });
 }
 
-// LIFO undo of one batch: validate it is the most-recent non-reverted batch,
-// reverse each event's before-state, mark the batch reverted, and append a
-// meta revert event. Returns a discriminated result so the route keeps HTTP
-// control (no res access here). Throws on unexpected errors.
 // Guard the LIFO-undo invariants before any reversal runs: the batch exists, is
 // not already reverted, is the most-recent non-reverted batch, and doesn't
 // belong to an ended (frozen) session. Returns an error RevertResult to abort,
@@ -518,6 +514,10 @@ async function applyBatchReversal(
   });
 }
 
+// LIFO undo of one batch: validate it is the most-recent non-reverted batch,
+// reverse each event's before-state, mark the batch reverted, and append a
+// meta revert event. Returns a discriminated result so the route keeps HTTP
+// control (no res access here). Throws on unexpected errors.
 export async function revertBatch(
   db: PrismaClient,
   characterId: string,
