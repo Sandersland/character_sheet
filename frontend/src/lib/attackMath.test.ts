@@ -4,6 +4,7 @@ import {
   attacksExhausted,
   buildAttackEntries,
   capabilitiesActive,
+  critDamageSpec,
   hasSuperiorityDice,
   unarmedDamageDisplay,
   weaponDamageRiders,
@@ -343,5 +344,32 @@ describe("weaponDamageRiders", () => {
 
   it("returns nothing for an item with no capabilities", () => {
     expect(weaponDamageRiders(invItem({ capabilities: undefined }))).toEqual([]);
+  });
+});
+
+describe("critDamageSpec", () => {
+  it("sets crit: true, leaving count and modifier unchanged (rollSpec doubles dice at roll-time)", () => {
+    expect(critDamageSpec({ count: 1, faces: 8, modifier: 3 })).toEqual({
+      count: 1,
+      faces: 8,
+      modifier: 3,
+      crit: true,
+    });
+  });
+
+  it("applies the same doubling rule to a damage rider's spec (Flame Tongue +2d6 → +4d6)", () => {
+    const rider = weaponDamageRiders(invItem({ capabilities: [diceCap()] }))[0];
+    expect(critDamageSpec(rider.spec)).toEqual({
+      count: 2,
+      faces: 6,
+      modifier: 0,
+      crit: true,
+    });
+  });
+
+  it("does not mutate the source spec", () => {
+    const spec = { count: 2, faces: 6, modifier: 1 };
+    critDamageSpec(spec);
+    expect(spec).toEqual({ count: 2, faces: 6, modifier: 1 });
   });
 });

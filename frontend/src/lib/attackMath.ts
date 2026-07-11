@@ -2,6 +2,7 @@
 // unarmed-strike, and improvised-weapon rows plus their roll/log label strings.
 
 import { formatRollSpec } from "@/lib/dice";
+import type { RollSpec } from "@/lib/dice";
 import type { Character, InventoryItem, WeaponDetail } from "@/types/character";
 
 export interface RollSpecTriple {
@@ -94,6 +95,16 @@ export function weaponDamageSpec(w: WeaponDetail): RollSpecTriple {
   return w.damage
     ? { count: w.damage.damageDiceCount, faces: w.damage.damageDiceFaces, modifier: w.damage.damageModifier }
     : { count: w.damageDiceCount, faces: w.damageDiceFaces, modifier: w.damageModifier };
+}
+
+// 5e critical hit: doubles the weapon damage **dice** only (`crit` flag →
+// dice.ts doubles `count`), leaving the flat `modifier` single. Reused for the
+// weapon's own damage spec and, consistently, for each dice-valued `DamageRider`
+// (Flame Tongue +2d6 → +4d6 on a crit) — both are plain count/faces/modifier
+// specs, so the same doubling rule applies. The Battle Master superiority die is
+// a flat add (ManeuverPrompt), not weapon dice, so it never routes through here.
+export function critDamageSpec(spec: RollSpec): RollSpec {
+  return { ...spec, crit: true };
 }
 
 // Grip-resolved damage type: server-derived first, legacy flat field as fallback.

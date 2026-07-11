@@ -200,3 +200,70 @@ describe("InlineAttackPicker — on-hit dice riders", () => {
     expect(screen.getAllByRole("button", { name: /Roll \+\dd\d/ })).toHaveLength(1);
   });
 });
+
+describe("InlineAttackPicker — critical damage button", () => {
+  it("logs a doubled-dice (crit) damage roll for an equipped weapon", async () => {
+    const onLogChanged = vi.fn();
+    renderPicker(
+      makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] }),
+      vi.fn(),
+      onLogChanged,
+    );
+
+    // Flame Tongue base weapon damage is 1d8 slashing; a crit rolls 2d8.
+    const critButton = screen.getAllByRole("button", { name: /^Critical$/ })[0];
+    await userEvent.click(critButton);
+
+    expect(vi.mocked(logRoll)).toHaveBeenCalledWith(
+      "char-1",
+      "sess-1",
+      expect.objectContaining({
+        kind: "damage",
+        source: "Flame Tongue",
+        damageType: "slashing",
+        specLabel: expect.stringContaining("(crit)"),
+      }),
+    );
+    const call = vi.mocked(logRoll).mock.calls[0][2];
+    expect(call.specLabel).toBe("2d8 (crit)");
+    expect(call.faces).toHaveLength(2);
+  });
+
+  it("doubles an on-hit dice rider on a crit (Flame Tongue +2d6 → +4d6)", async () => {
+    renderPicker(
+      makeCharacter({ inventory: [flameTongue()] as unknown as Character["inventory"] }),
+      vi.fn(),
+      vi.fn(),
+    );
+
+    // Crit the weapon first — marks the row as a crit, so its rider doubles too.
+    await userEvent.click(screen.getAllByRole("button", { name: /^Critical$/ })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /Roll \+2d6 fire/ }));
+
+    const riderCall = vi
+      .mocked(logRoll)
+      .mock.calls.map((c) => c[2])
+      .find((entry) => entry.damageType === "fire");
+    expect(riderCall).toBeDefined();
+    expect(riderCall!.specLabel).toBe("4d6 (crit)");
+    expect(riderCall!.faces).toHaveLength(4);
+  });
+
+  it("keeps a dice rider single when the weapon damage was rolled normally", async () => {
+    renderPicker(
+      makeCharacter({ inventory: [flameTongue()] as unknown as Character["inventory"] }),
+      vi.fn(),
+      vi.fn(),
+    );
+
+    await userEvent.click(screen.getAllByRole("button", { name: /^Damage$/ })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /Roll \+2d6 fire/ }));
+
+    const riderCall = vi
+      .mocked(logRoll)
+      .mock.calls.map((c) => c[2])
+      .find((entry) => entry.damageType === "fire");
+    expect(riderCall!.specLabel).toBe("2d6");
+    expect(riderCall!.faces).toHaveLength(2);
+  });
+});

@@ -30,6 +30,7 @@ import { formatRollSpec } from "@/lib/dice";
 import {
   attacksExhausted as computeAttacksExhausted,
   buildAttackEntries,
+  critDamageSpec,
   hasSuperiorityDice,
 } from "@/lib/attackMath";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
@@ -39,7 +40,7 @@ import EquipWeaponPanel from "@/features/session/EquipWeaponPanel";
 import type { AttackEntry, DamageRider } from "@/lib/attackMath";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character, ManeuverEntry } from "@/types/character";
-import type { RollResult } from "@/lib/dice";
+import type { RollResult, RollSpec } from "@/lib/dice";
 
 interface InlineAttackPickerProps {
   character: Character;
@@ -74,7 +75,7 @@ export default function InlineAttackPicker({
     kind: "attack" | "damage",
     source: string,
     result: RollResult,
-    spec: { count: number; faces: number; modifier: number },
+    spec: RollSpec,
     damageType?: string,
   ) {
     logRoll(character.id, sessionId, {
@@ -169,11 +170,28 @@ export default function InlineAttackPicker({
     setDamageTotals((prev) => ({ ...prev, [entry.id]: null }));
   }
 
+  // Roll critical damage for a row: same path as handleDamage but on the doubled
+  // (crit) weapon-dice spec, so the toast + Session Log read "(crit)" honestly.
+  function handleCritDamage(entry: AttackEntry) {
+    const spec = critDamageSpec(entry.damageSpec);
+    const result = roll(spec, entry.damageRollLabel);
+    logRollSafe("damage", entry.logSource, result, spec, entry.damageType);
+    setLastDamageRolls((prev) => ({ ...prev, [entry.id]: result }));
+    setDamageTotals((prev) => ({ ...prev, [entry.id]: null }));
+  }
+
   // Roll one on-hit dice rider (e.g. Flame Tongue +2d6 fire) as its own typed
   // damage term through the shared dice engine + Session Log, carrying its type.
+  // On a crit the rider's dice double too (Flame Tongue +2d6 → +4d6): mirror the
+  // parent row's last damage roll — if that was rolled on a crit spec, roll this
+  // rider on the crit spec as well, so the Critical button doubles ALL of the
+  // attack's damage dice, not just the weapon's.
   function handleDamageRider(rider: DamageRider) {
-    const result = roll(rider.spec, rider.rollLabel);
-    logRollSafe("damage", rider.logSource, result, rider.spec, rider.damageType);
+    const parent = attackEntries.find((e) => e.damageRiders.some((r) => r.id === rider.id));
+    const parentCrit = parent ? Boolean(lastDamageRolls[parent.id]?.spec.crit) : false;
+    const spec = parentCrit ? critDamageSpec(rider.spec) : rider.spec;
+    const result = roll(spec, rider.rollLabel);
+    logRollSafe("damage", rider.logSource, result, spec, rider.damageType);
     setRiderTotals((prev) => ({ ...prev, [rider.id]: result.total }));
   }
 
@@ -253,6 +271,7 @@ export default function InlineAttackPicker({
           riderTotals={riderTotals}
           onAttack={handleAttack}
           onDamage={handleDamage}
+          onCritDamage={handleCritDamage}
           onDamageRider={handleDamageRider}
           onRollsUpdated={makeOnRollsUpdated(entry.id)}
           onUpdate={onUpdate}
