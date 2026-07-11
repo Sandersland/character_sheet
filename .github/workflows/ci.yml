@@ -50,6 +50,12 @@ jobs:
     # "skipped" conclusion, which satisfies the required check (a workflow-level
     # filter would block merges instead).
     runs-on: ubuntu-latest
+    # `needs: test` so the backend health step can consume the vitest coverage
+    # artifact the test job uploads (#717): fallow reads Istanbul coverage for
+    # exact CRAP, and the coverage-producing run needs Postgres, which lives in
+    # the test job. The trade is that fallow's fast gates now wait on the test
+    # job — acceptable for an accurate hot-path-risk bar.
+    needs: test
     if: >-
       github.event_name != 'pull_request' ||
       github.event.pull_request.head.repo.full_name == github.repository
@@ -93,13 +99,22 @@ jobs:
           !(github.event.pull_request.head.ref == 'staging' && github.event.pull_request.base.ref == 'main')
         run: npx --no-install fallow audit --base "origin/${{ github.event.pull_request.base.ref }}" --gate new-only --no-cache
 
-      # Phase 2 of #691 — repo-wide zero-CRITICAL ratchet, enabled 2026-07-11
-      # after the #692 stage-1 burn-down (#684-#689) cleared the CRITICAL tier.
-      # Fails if ANY function anywhere crosses the CRITICAL thresholds, not just
-      # in changed files. Runs on every event (incl. pushes to main/staging), so
-      # a direct push is gated too. --no-install/--no-cache mirror the audit step.
-      - name: fallow health (no CRITICAL findings repo-wide)
-        run: npx --no-install fallow health --min-severity critical --no-cache
+      # The repo-wide ratchet, expressed PER-WORKSPACE so each workspace's CRAP
+      # treatment can differ (#718, tightened from the old repo-wide
+      # `--min-severity critical` step). Together the frontend step here and the
+      # backend step below leave no HIGH/CRITICAL-severity function anywhere —
+      # the "critical->high" flip #692 aimed for. Both run on every event (incl.
+      # pushes to main/staging), so a direct push is gated too.
+      #
+      # FRONTEND: complexity-ceiling gate. --max-crap 999 drops the CRAP axis, so
+      # severity is driven purely by the cyclomatic/cognitive ceilings. Frontend
+      # vitest coverage is deliberately NOT wired in here: at ~69% coverage real
+      # CRAP would flag coverage debt, not complexity, exploding the tier to ~39
+      # findings. Enforcing frontend CRAP once coverage is raised is a tracked
+      # future issue (the frontend twin of #717). --production excludes
+      # test/e2e/story files (their complexity isn't gated).
+      - name: fallow health (no HIGH-complexity findings in frontend)
+        run: npx --no-install fallow health -w frontend --production --min-severity high --max-crap 999 --no-cache
 
       # #692 backend tightening, enabled 2026-07-11 after clearing the backend
       # cognitive-complexity tier. Plain mode = fails on ANY finding in scope, so
@@ -108,13 +123,22 @@ jobs:
       # `audit --gate new-only` step above, which only inspects the PR diff (a
       # refactor that pushes an EXISTING function over the bar is caught here too).
       #   --production  excludes test/story files (test complexity isn't gated)
-      #   --max-crap 999 drops the estimated-CRAP axis, which is unreliable without
-      #     real coverage and inflates severity under --production. Re-enable a
-      #     meaningful CRAP bar by wiring vitest coverage via --coverage (#690-fu).
-      # Repo-scoped severity gating (critical->high) stays blocked on the frontend
-      # HIGH tier and is NOT attempted here; this is the backend-only ratchet.
-      - name: fallow health (no cyclo/cognitive breaches in backend production code)
-        run: npx --no-install fallow health -w backend --production --max-crap 999 --no-cache
+      #   --coverage    feeds fallow the vitest Istanbul coverage the test job
+      #     produced, so CRAP is exact (untested complexity → real high CRAP)
+      #     instead of the export-reference estimate that inflated under
+      #     --production. This re-enables the pinned `maxCrap: 30` bar (#717).
+      # The coverage artifact was generated in this same runner (identical
+      # $GITHUB_WORKSPACE absolute paths across jobs), so no --coverage-root remap
+      # is needed. Plain mode (no --min-severity) is stricter than the frontend
+      # step's `high` bar: it fails on ANY backend production finding.
+      - name: Download backend coverage (from the test job)
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage
+
+      - name: "fallow health (backend production: real CRAP via vitest coverage)"
+        run: npx --no-install fallow health -w backend --production --coverage backend/coverage/coverage-final.json --no-cache
 
   build:
     # Production type-check + bundle. vitest transpiles via esbuild and does NOT
@@ -187,7 +211,24 @@ jobs:
           npx prisma migrate deploy
           npx prisma db seed
 
-      - run: npm test
+      # Backend runs WITH coverage so the fallow job can gate real CRAP (#717);
+      # test:coverage IS the backend `vitest run` plus Istanbul instrumentation
+      # (no double run). Frontend keeps its plain test run.
+      - name: Backend tests (with coverage for the fallow CRAP gate)
+        run: npm run test:coverage --workspace backend
+
+      - name: Frontend tests
+        run: npm test --workspace frontend
+
+      - name: Upload backend coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage/coverage-final.json
+          retention-days: 1
+          # Fail loudly here if vitest didn't flush coverage, rather than letting
+          # the fallow job's download fail with a confusing "artifact not found".
+          if-no-files-found: error
 
   e2e:
     # Playwright smoke suite against a booted dev stack (same postgres service as

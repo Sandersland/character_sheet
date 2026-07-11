@@ -234,6 +234,17 @@ function ScriptedDie({
   );
 }
 
+// The `aria-live` summary: the settled dice + total once stopped, a "Rolling…"
+// announcement mid-tumble, or just the spec when idle. Pure — kept out of the
+// component body so the render stays a thin mapping.
+function describeRoll(spec: DiceRollerProps["spec"], rolling: boolean, settled: RollResult | null): string {
+  if (settled) {
+    const dice = settled.dice.map((die) => (die.dropped ? `${die.value} (dropped)` : `${die.value}`)).join(", ");
+    return `${formatRollSpec(spec)}: ${dice} — total ${settled.total}`;
+  }
+  return rolling ? `Rolling ${formatRollSpec(spec)}…` : formatRollSpec(spec);
+}
+
 /**
  * Animated, reusable 3D dice roller — real three.js polyhedra (via React
  * Three Fiber) that tumble and settle on a real roll from `lib/dice.ts`,
@@ -382,14 +393,7 @@ export default function DiceRoller({
   // the 3D dice receive `result` immediately so they know which face to
   // settle on, but that's not something a player can read off a spinning die.
   const settled = rolling ? null : result;
-
-  const ariaLabel = settled
-    ? `${formatRollSpec(spec)}: ${settled.dice
-        .map((die) => (die.dropped ? `${die.value} (dropped)` : `${die.value}`))
-        .join(", ")} — total ${settled.total}`
-    : rolling
-      ? `Rolling ${formatRollSpec(spec)}…`
-      : formatRollSpec(spec);
+  const ariaLabel = describeRoll(spec, rolling, settled);
 
   return (
     <DiceScene

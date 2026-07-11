@@ -192,6 +192,75 @@ export async function applyConditionInTx(
  *     for revert symmetry with the resources/spellcasting undo handler
  *   - state is re-read per op so a batch of multiple ops sees each prior result
  */
+// Validates + applies one condition op to `state` (mutated in place) and returns
+// the audit-event fields (type/summary/data) it produced. Splitting this off the
+// transaction closure keeps applyConditionsOperations a thin normalize → resolve
+// → persist → log pipeline; the strings/data here are byte-identical to before
+// (the audit payloads feed LIFO undo).
+type ConditionEventType = "conditionApplied" | "conditionRemoved" | "exhaustionSet";
+type ConditionResolution = { eventType: ConditionEventType; summary: string; eventData: Record<string, unknown> };
+
+function resolveApplyCondition(state: ConditionsMutableState, op: ApplyConditionOperation): ConditionResolution {
+  if (!isKnownCondition(op.key)) {
+    throw new InvalidConditionOperationError(`Unknown condition: ${op.key}`);
+  }
+  if (state.active.some((e) => e.key === op.key)) {
+    throw new InvalidConditionOperationError(`Condition already active: ${conditionLabel(op.key)}`);
+  }
+  const entry: ConditionEntry = { key: op.key, source: op.source, appliedAt: new Date().toISOString() };
+  state.active.push(entry);
+  return {
+    eventType: "conditionApplied",
+    summary: op.source
+      ? `Applied condition: ${conditionLabel(op.key)} (${op.source})`
+      : `Applied condition: ${conditionLabel(op.key)}`,
+    eventData: { key: op.key, source: op.source ?? null },
+  };
+}
+
+function resolveRemoveCondition(state: ConditionsMutableState, op: RemoveConditionOperation): ConditionResolution {
+  const idx = state.active.findIndex((e) => e.key === op.key);
+  if (idx === -1) {
+    throw new InvalidConditionOperationError(`Condition not active: ${conditionLabel(op.key)}`);
+  }
+  state.active.splice(idx, 1);
+  return {
+    eventType: "conditionRemoved",
+    summary: `Removed condition: ${conditionLabel(op.key)}`,
+    eventData: { key: op.key },
+  };
+}
+
+function resolveSetExhaustion(state: ConditionsMutableState, op: SetExhaustionOperation): ConditionResolution {
+  if (!Number.isInteger(op.level)) {
+    throw new InvalidConditionOperationError("setExhaustion: level must be an integer");
+  }
+  if (op.level < 0 || op.level > EXHAUSTION_MAX) {
+    throw new InvalidConditionOperationError(`setExhaustion: level must be between 0 and ${EXHAUSTION_MAX}`);
+  }
+  const previous = state.exhaustion;
+  state.exhaustion = op.level;
+  return {
+    eventType: "exhaustionSet",
+    summary: `Set exhaustion to level ${op.level}`,
+    eventData: { level: op.level, previous },
+  };
+}
+
+// Validates + applies one condition op to `state` (mutated in place) and returns
+// the audit-event fields it produced. One resolver per op-kind keeps each small;
+// the strings/data are byte-identical to before (the payloads feed LIFO undo).
+function resolveConditionOp(state: ConditionsMutableState, op: ConditionOperation): ConditionResolution {
+  switch (op.type) {
+    case "applyCondition":
+      return resolveApplyCondition(state, op);
+    case "removeCondition":
+      return resolveRemoveCondition(state, op);
+    case "setExhaustion":
+      return resolveSetExhaustion(state, op);
+  }
+}
+
 export async function applyConditionsOperations(
   characterId: string,
   operations: ConditionOperation[],
@@ -203,65 +272,7 @@ export async function applyConditionsOperations(
       const state = normalizeConditionsMutable(row.conditions);
       const beforeState = deepCopy(state);
 
-      let summary = "";
-      let eventType: "conditionApplied" | "conditionRemoved" | "exhaustionSet";
-      let eventData: Record<string, unknown> = {};
-
-      switch (op.type) {
-        case "applyCondition": {
-          if (!isKnownCondition(op.key)) {
-            throw new InvalidConditionOperationError(`Unknown condition: ${op.key}`);
-          }
-          if (state.active.some((e) => e.key === op.key)) {
-            throw new InvalidConditionOperationError(
-              `Condition already active: ${conditionLabel(op.key)}`,
-            );
-          }
-          const entry: ConditionEntry = {
-            key: op.key,
-            source: op.source,
-            appliedAt: new Date().toISOString(),
-          };
-          state.active.push(entry);
-          eventType = "conditionApplied";
-          summary = op.source
-            ? `Applied condition: ${conditionLabel(op.key)} (${op.source})`
-            : `Applied condition: ${conditionLabel(op.key)}`;
-          eventData = { key: op.key, source: op.source ?? null };
-          break;
-        }
-
-        case "removeCondition": {
-          const idx = state.active.findIndex((e) => e.key === op.key);
-          if (idx === -1) {
-            throw new InvalidConditionOperationError(
-              `Condition not active: ${conditionLabel(op.key)}`,
-            );
-          }
-          state.active.splice(idx, 1);
-          eventType = "conditionRemoved";
-          summary = `Removed condition: ${conditionLabel(op.key)}`;
-          eventData = { key: op.key };
-          break;
-        }
-
-        case "setExhaustion": {
-          if (!Number.isInteger(op.level)) {
-            throw new InvalidConditionOperationError("setExhaustion: level must be an integer");
-          }
-          if (op.level < 0 || op.level > EXHAUSTION_MAX) {
-            throw new InvalidConditionOperationError(
-              `setExhaustion: level must be between 0 and ${EXHAUSTION_MAX}`,
-            );
-          }
-          const previous = state.exhaustion;
-          state.exhaustion = op.level;
-          eventType = "exhaustionSet";
-          summary = `Set exhaustion to level ${op.level}`;
-          eventData = { level: op.level, previous };
-          break;
-        }
-      }
+      const { eventType, summary, eventData } = resolveConditionOp(state, op);
 
       await tx.character.update({
         where: { id: characterId },
@@ -273,8 +284,8 @@ export async function applyConditionsOperations(
       await logEvent(tx, {
         characterId,
         category: "conditions",
-        type: eventType!,
-        summary: summary!,
+        type: eventType,
+        summary,
         before: beforeState,
         after: afterState,
         data: eventData,

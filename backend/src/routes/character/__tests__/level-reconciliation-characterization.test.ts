@@ -89,7 +89,11 @@ async function postXp(characterId: string, body: object) {
 }
 
 // Raw event rows (not the serialized activity feed) so before/after are byte-exact.
-type ReconEventType = "maneuversReconciled" | "disciplinesReconciled" | "toolProficienciesReconciled";
+type ReconEventType =
+  | "maneuversReconciled"
+  | "disciplinesReconciled"
+  | "toolProficienciesReconciled"
+  | "advancementsReconciled";
 async function eventsByType(characterId: string, type: ReconEventType) {
   return prisma.characterEvent.findMany({
     where: { characterId, type },
@@ -187,6 +191,42 @@ async function createFourElementsMonk(id: string) {
       resources: { used: {}, disciplinesKnown: fourDisciplines() },
       classEntries: {
         create: [{ name: MONK_CLASS_NAME, classId: monkClassId, position: 0, level: 17, subclassId: feSubclassId, subclass: FE_SUBCLASS_NAME }],
+      },
+    },
+  });
+}
+
+// Two ASI/feat advancements with pure ability + init deltas (hpDelta 0), so the
+// reversal touches abilityScores + initiativeBonus — fields no OTHER reconciler
+// writes — and their before/after bytes are deterministic even though a
+// single-class level-down also recomputes HP in the same batch. The Fighter is
+// homebrew-named, so advancementSlotsForLevel uses the base 5-slot schedule
+// [4,8,12,16,19]: L17→4 allowed (legal), L6→1, L3→0.
+function twoAdvancements() {
+  return [
+    { id: "adv-asi-str", level: 4, kind: "asi" as const, abilityDeltas: { strength: 2 }, hpDelta: 0, initDelta: 0 },
+    { id: "adv-feat-init", level: 8, kind: "feat" as const, featName: "Test Alertness", abilityDeltas: { dexterity: 2 }, hpDelta: 0, initDelta: 1 },
+  ];
+}
+
+async function createAdvancedFighter(id: string) {
+  return prisma.character.create({
+    data: {
+      ...BASE_CHARACTER,
+      ownerId: OWNER_ID,
+      id,
+      name: `ReconChar ${id}`,
+      // Scores + init reflect the two advancements already applied.
+      abilityScores: { ...BASE_ABILITY_SCORES, strength: 12, dexterity: 12 },
+      initiativeBonus: 1,
+      experiencePoints: XP_LVL_17,
+      hitPoints: { current: 100, max: 100, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+      hitDice: { total: 17, die: "d10", spent: 0 },
+      spellcasting: Prisma.JsonNull,
+      resources: { used: {}, advancements: twoAdvancements() },
+      classEntries: {
+        // No subclass → no maneuver/tool reconcile noise; only advancements trim.
+        create: [{ name: FIGHTER_CLASS_NAME, classId: fighterClassId, position: 0, level: 17 }],
       },
     },
   });
@@ -314,5 +354,49 @@ describe("level-reconciliation characterization (#617)", () => {
         fightingStyle: null,
       },
     });
+  });
+
+  // ── advancements: partial trim (level cap reduced, not below first ASI) ───────
+  // Asserts the deterministic fields only: summary/data + the resources.advancements
+  // payload + abilityScores/initiativeBonus reversal. HP is intentionally NOT pinned
+  // — a single-class level-down recomputes it in the same batch (that coupling is
+  // out of scope here; this case exists to lock the advancement-reversal path).
+  it("advancementsReconciled: partial trim 2→1 on level 17→6", async () => {
+    await createAdvancedFighter("recon-adv-partial");
+    const res = await postXp("recon-adv-partial", { operations: [{ type: "set", value: XP_LVL_6 }] });
+    expect(res.status).toBe(200);
+
+    const [ev] = await eventsByType("recon-adv-partial", "advancementsReconciled");
+    expect(ev.category).toBe("advancement");
+    expect(ev.summary).toBe("1 advancement removed — level cap reduced to 1 (removed: Test Alertness)");
+    expect(ev.data).toEqual({ removedCount: 1, allowed: 1 });
+
+    const before = ev.before as { abilityScores: Record<string, number>; initiativeBonus: number; resources: { advancements: unknown[] } };
+    const after = ev.after as { abilityScores: Record<string, number>; initiativeBonus: number; resources: { advancements: unknown[] } };
+    // Before: both advancements present, scores/init reflect them.
+    expect(before.abilityScores).toMatchObject({ strength: 12, dexterity: 12 });
+    expect(before.initiativeBonus).toBe(1);
+    expect(before.resources.advancements).toEqual(twoAdvancements());
+    // After: the feat (tail) is reversed — dexterity −2, init −1; strength ASI kept.
+    expect(after.abilityScores).toMatchObject({ strength: 12, dexterity: 10 });
+    expect(after.initiativeBonus).toBe(0);
+    expect(after.resources.advancements).toEqual(twoAdvancements().slice(0, 1));
+  });
+
+  // ── advancements: full clear (level dropped below first ASI level) ───────────
+  it("advancementsReconciled: full clear on level 17→3 (below first ASI)", async () => {
+    await createAdvancedFighter("recon-adv-full");
+    const res = await postXp("recon-adv-full", { operations: [{ type: "set", value: XP_LVL_3 }] });
+    expect(res.status).toBe(200);
+
+    const [ev] = await eventsByType("recon-adv-full", "advancementsReconciled");
+    expect(ev.summary).toBe("2 advancements removed — level dropped below first ASI level");
+    expect(ev.data).toEqual({ removedCount: 2, allowed: 0 });
+
+    const after = ev.after as { abilityScores: Record<string, number>; initiativeBonus: number; resources: { advancements: unknown[] } };
+    // Both reversed: strength −2, dexterity −2, init −1 → back to base.
+    expect(after.abilityScores).toMatchObject({ strength: 10, dexterity: 10 });
+    expect(after.initiativeBonus).toBe(0);
+    expect(after.resources.advancements).toEqual([]);
   });
 });

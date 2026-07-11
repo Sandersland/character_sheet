@@ -9,6 +9,12 @@
   // pino-pretty is loaded by string as a pino transport target (backend/src/lib/logger.ts),
   // so import analysis can't see it.
   "ignoreDependencies": ["pino-pretty"],
+  // backend/scripts/* are dev/CI entrypoints (seed-verify), never shipped runtime
+  // and never exercised by vitest, so they carry no coverage. Without it fallow
+  // ESTIMATES their CRAP from export references, which inflates under the honest
+  // `maxCrap: 30` bar (#717) even though their cyclomatic/cognitive are trivial.
+  // Excluding them keeps the coverage-driven health gate scoped to real runtime.
+  "ignorePatterns": ["backend/scripts/**"],
   // Error classes carry a numeric `status` read duck-typed by the Express error
   // middleware (backend/src/lib/auth/errors.ts, lib/inventory/inventory.ts) — never a static reference.
   "usedClassMembers": ["status"],
