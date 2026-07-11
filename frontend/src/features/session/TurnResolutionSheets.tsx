@@ -5,6 +5,7 @@
 
 import BottomSheet from "@/components/ui/BottomSheet";
 import InlineAttackPicker from "@/features/session/InlineAttackPicker";
+import InlineOffHandPicker from "@/features/session/InlineOffHandPicker";
 import InlineItemPicker from "@/features/session/InlineItemPicker";
 import InlineSpellPicker from "@/features/session/InlineSpellPicker";
 import LayOnHandsInput from "@/features/session/LayOnHandsInput";
@@ -34,6 +35,7 @@ interface TurnResolutionSheetsProps {
   activeResolution: ActiveResolution | null;
   closeResolution: () => void;
   setShowActionMenu: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowBonusMenu: React.Dispatch<React.SetStateAction<boolean>>;
   onUpdate: (c: Character) => void;
   onLogChanged: () => void;
   allies: AllyOption[];
@@ -47,6 +49,7 @@ export default function TurnResolutionSheets({
   activeResolution,
   closeResolution,
   setShowActionMenu,
+  setShowBonusMenu,
   onUpdate,
   onLogChanged,
   allies,
@@ -76,6 +79,33 @@ export default function TurnResolutionSheets({
             turnState.cancelAttack();
             closeResolution();
             setShowActionMenu(true);
+          }}
+          onUpdate={onUpdate}
+          onLogChanged={onLogChanged}
+        />
+      </BottomSheet>
+    );
+  }
+
+  if (kind === "twf-picker") {
+    return (
+      <BottomSheet
+        title="Off-hand attack"
+        subtitle="Two-Weapon Fighting · bonus action"
+        onClose={() => {
+          turnState.cancelTwf();
+          closeResolution();
+        }}
+      >
+        <InlineOffHandPicker
+          character={character}
+          turnState={turnState}
+          sessionId={sessionId}
+          onClose={closeResolution}
+          onCancel={() => {
+            turnState.cancelTwf();
+            closeResolution();
+            setShowBonusMenu(true);
           }}
           onUpdate={onUpdate}
           onLogChanged={onLogChanged}

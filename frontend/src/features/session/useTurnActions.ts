@@ -144,9 +144,11 @@ export function useTurnActions({
     setShowActionMenu(false);
   }
 
-  // Special path for TWF off-hand — enterTwfMode opens the bonusAttack counter.
+  // Special path for TWF off-hand — enterTwfMode opens the bonusAttack counter
+  // and the twf-picker resolution sheet renders the off-hand roll surface (#732).
   function handleTwfAction() {
     enterTwfMode();
+    openResolution("twf");
     setShowBonusMenu(false);
   }
 

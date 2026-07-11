@@ -111,6 +111,14 @@ export interface WeaponDetail {
     damageDiceCount: number;
     damageDiceFaces: number;
     damageModifier: number;
+    /**
+     * The governing ability modifier component of `damageModifier` (before any
+     * melee-damage buff). Server-derived alongside `damageModifier`; used to
+     * implement the Two-Weapon Fighting off-hand rule client-side — an off-hand
+     * bonus attack omits the ability mod from damage unless the character has the
+     * Two-Weapon Fighting style (#732).
+     */
+    abilityModifier: number;
     damageType: string;
     grip: "one-handed" | "two-handed" | "versatile-two-handed";
   };

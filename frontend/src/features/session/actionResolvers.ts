@@ -31,6 +31,7 @@ import type { RollSpec } from "@/lib/dice";
  */
 export type ResolutionKind =
   | "attack-picker"
+  | "twf-picker"
   | "spell-picker"
   | "item-picker"
   | "heal-roll"
@@ -79,6 +80,8 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   ready:             { key: "ready",             kind: "simple-confirm", slot: "action",      serverEffect: false },
   grapple:           { key: "grapple",           kind: "simple-confirm", slot: "action",      serverEffect: false },
   opportunityAttack: { key: "opportunityAttack", kind: "attack-picker",  slot: "reaction",    serverEffect: false },
+  // Two-Weapon Fighting off-hand bonus attack (#732) — economy-only, like `attack`.
+  twf:               { key: "twf",               kind: "twf-picker",     slot: "bonusAction", serverEffect: false },
 
   // ── Barbarian ──────────────────────────────────────────────────────────────
   rage:              { key: "rage",              kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "rage" },

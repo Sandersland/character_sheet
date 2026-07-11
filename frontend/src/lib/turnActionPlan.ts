@@ -28,7 +28,10 @@ export function planActionClick(
   }
 
   switch (resolver.kind) {
+    // twf-picker has its own dedicated handler (handleTwfAction); it only appears
+    // here for exhaustiveness and shares the attack-picker plan shape.
     case "attack-picker":
+    case "twf-picker":
       return {
         consumeSlot: true,
         openResolution: true,

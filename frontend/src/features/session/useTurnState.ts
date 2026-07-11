@@ -132,6 +132,11 @@ export interface TurnStateActions {
   enterTwfMode: () => void;
   /** Record one TWF off-hand attack roll. */
   recordTwfAttack: () => void;
+  /**
+   * Cancel the off-hand attack if it hasn't been rolled yet — refunds the bonus
+   * action so the player can choose a different bonus action. Mirrors cancelAttack.
+   */
+  cancelTwf: () => void;
   /** Mark the reaction as used. Can be called at any time. */
   consumeReaction: () => void;
   /**
@@ -260,11 +265,11 @@ export function useTurnState(character: Character, sessionId: string): TurnState
       reactionUsed: false, // reaction resets at start of YOUR turn
       attack: null,
       bonusAttack: null,
-      twfAvailable: canTwoWeaponFight(character.inventory),
+      twfAvailable: canTwoWeaponFight(character.inventory, character.resources?.fightingStyle),
       spellCastThisTurn: {},
       history: [], // undo never reaches across turns
     }));
-  }, [character.inventory, currentHp]);
+  }, [character.inventory, character.resources?.fightingStyle, currentHp]);
 
   const endTurn = useCallback(() => {
     setState((s) => {
@@ -373,6 +378,16 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     });
   }, [mutate]);
 
+  const cancelTwf = useCallback(() => {
+    // Mirror cancelAttack for the off-hand: refund the bonus action only if the
+    // off-hand attack hasn't been rolled yet (bonusAttack still pending). Once
+    // recordTwfAttack has cleared it to null, the bonus action stays committed.
+    mutate((s) => {
+      if (!s.bonusAttack) return s;
+      return { ...s, bonusActionUsed: false, bonusAttack: null };
+    });
+  }, [mutate]);
+
   const consumeReaction = useCallback(() => {
     mutate((s) => {
       if (s.reactionUsed) return s; // guard: already used → no history push
@@ -435,6 +450,7 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     consumeBonusAction,
     enterTwfMode,
     recordTwfAttack,
+    cancelTwf,
     consumeReaction,
     grantExtraAction,
     commitActionSpell,

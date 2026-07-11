@@ -52,7 +52,7 @@ const versatileWeapon = (
       weaponClass: "martial",
       versatileDiceCount: 1,
       versatileDiceFaces: 10,
-      damage: { damageDiceCount: 1, damageDiceFaces: faces, damageModifier: 0, damageType: "slashing", grip },
+      damage: { damageDiceCount: 1, damageDiceFaces: faces, damageModifier: 0, abilityModifier: 0, damageType: "slashing", grip },
     },
     ...o,
   });

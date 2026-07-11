@@ -142,32 +142,70 @@ export function attacksExhausted(attack: { used: number; total: number } | null)
   return attack !== null && attack.used >= attack.total;
 }
 
-// Builds the ordered attack rows: equipped weapons, then unarmed, then improvised.
-export function buildAttackEntries(character: Character): AttackEntry[] {
-  const entries: AttackEntry[] = [];
+// One equipped-weapon attack row. Shared by buildAttackEntries and the off-hand
+// (TWF) builder so the two never drift.
+function buildWeaponEntry(item: InventoryItem): AttackEntry {
+  const w = item.weapon!;
+  const damageSpec = weaponDamageSpec(w);
+  const damageType = weaponDamageType(w);
+  const gripLabel = weaponGripLabel(w);
+  return {
+    id: item.id,
+    name: item.name,
+    attackLabel: `+${w.attackBonus ?? 0}`,
+    damageLabel: `${formatRollSpec(damageSpec)} ${damageType}${gripLabel}`,
+    attackSpec: weaponAttackSpec(w),
+    damageSpec,
+    damageType,
+    attackRollLabel: `${item.name} attack`,
+    damageRollLabel: `${item.name} damage (${damageType})`,
+    logSource: item.name,
+    damageRiders: weaponDamageRiders(item),
+  };
+}
 
-  const equippedWeapons = character.inventory.filter(
+function equippedWeapons(character: Character): InventoryItem[] {
+  return character.inventory.filter(
     (item) => item.category === "weapon" && item.equipped && item.weapon,
   );
-  for (const item of equippedWeapons) {
-    const w = item.weapon!;
-    const damageSpec = weaponDamageSpec(w);
-    const damageType = weaponDamageType(w);
-    const gripLabel = weaponGripLabel(w);
-    entries.push({
-      id: item.id,
-      name: item.name,
-      attackLabel: `+${w.attackBonus ?? 0}`,
-      damageLabel: `${formatRollSpec(damageSpec)} ${damageType}${gripLabel}`,
-      attackSpec: weaponAttackSpec(w),
-      damageSpec,
-      damageType,
-      attackRollLabel: `${item.name} attack`,
-      damageRollLabel: `${item.name} damage (${damageType})`,
-      logSource: item.name,
-      damageRiders: weaponDamageRiders(item),
-    });
-  }
+}
+
+/**
+ * The single off-hand attack row for Two-Weapon Fighting (#732), or null when
+ * the loadout can't dual-wield (< 2 equipped weapons). Prefers the weapon in the
+ * OFF_HAND paper-doll slot, falling back to the second equipped weapon.
+ *
+ * Off-hand damage omits the governing ability modifier (PHB p.195) UNLESS the
+ * character has the Two-Weapon Fighting style. We subtract `damage.abilityModifier`
+ * (the server-derived component) rather than recomputing the ability-selection
+ * rule on the client. `max(0, …)` keeps a negative modifier (RAW: only a positive
+ * ability mod is dropped), and any melee-damage buff folded into `damageModifier`
+ * (e.g. Rage) survives because only the ability component is removed.
+ */
+export function buildOffHandEntry(character: Character): AttackEntry | null {
+  const weapons = equippedWeapons(character);
+  if (weapons.length < 2) return null;
+  const offHand = weapons.find((i) => i.equippedSlot === "OFF_HAND") ?? weapons[1];
+
+  const entry = buildWeaponEntry(offHand);
+  const hasStyle = character.resources?.fightingStyle === "twoWeaponFighting";
+  const abilityMod = offHand.weapon!.damage?.abilityModifier ?? 0;
+  const modifier = hasStyle
+    ? entry.damageSpec.modifier
+    : entry.damageSpec.modifier - Math.max(0, abilityMod);
+  const damageSpec = { ...entry.damageSpec, modifier };
+  const gripLabel = weaponGripLabel(offHand.weapon!);
+
+  return {
+    ...entry,
+    damageSpec,
+    damageLabel: `${formatRollSpec(damageSpec)} ${entry.damageType}${gripLabel}`,
+  };
+}
+
+// Builds the ordered attack rows: equipped weapons, then unarmed, then improvised.
+export function buildAttackEntries(character: Character): AttackEntry[] {
+  const entries: AttackEntry[] = equippedWeapons(character).map(buildWeaponEntry);
 
   const { unarmedStrike, improvisedWeapon } = character;
 

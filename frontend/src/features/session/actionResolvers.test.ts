@@ -39,12 +39,20 @@ describe("actionResolvers", () => {
 
   it("all resolvers have a valid kind", () => {
     const VALID_KINDS = new Set([
-      "attack-picker", "spell-picker", "item-picker",
+      "attack-picker", "twf-picker", "spell-picker", "item-picker",
       "heal-roll", "heal-input", "simple-confirm",
     ]);
     for (const r of Object.values(ACTION_RESOLVERS)) {
       expect(VALID_KINDS.has(r.kind), `${r.key} has invalid kind: ${r.kind}`).toBe(true);
     }
+  });
+
+  it("the twf off-hand resolver is an economy-only bonus-action picker (#732)", () => {
+    const r = resolverFor("twf");
+    expect(r).toBeDefined();
+    expect(r!.kind).toBe("twf-picker");
+    expect(r!.slot).toBe("bonusAction");
+    expect(r!.serverEffect).toBe(false); // local roll, like `attack` — not in backend ACTION_EFFECT_FN
   });
 
   it("all resolvers have a valid slot", () => {

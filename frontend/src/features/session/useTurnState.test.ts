@@ -49,6 +49,27 @@ function lightWeapon(id: string): InventoryItem {
   } as unknown as InventoryItem;
 }
 
+/** A non-light (not TWF-eligible without the style) equipped weapon. */
+function heavyWeapon(id: string): InventoryItem {
+  return {
+    id,
+    name: "Longsword",
+    category: "weapon",
+    quantity: 1,
+    equipped: true,
+    weapon: {
+      damageDiceCount: 1,
+      damageDiceFaces: 8,
+      damageType: "slashing",
+      light: false,
+      finesse: false,
+      proficient: true,
+      attackBonus: 0,
+      damageModifier: 0,
+    },
+  } as unknown as InventoryItem;
+}
+
 const SESSION_ID = "test-session-abc";
 
 beforeEach(() => {
@@ -104,6 +125,30 @@ describe("combat lifecycle", () => {
 
   it("startTurn sets twfAvailable=false with empty inventory", () => {
     const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+
+    expect(result.current.twfAvailable).toBe(false);
+  });
+
+  it("startTurn sets twfAvailable=true for a non-light pair WITH the Two-Weapon Fighting style (#732)", () => {
+    const heavyPair = makeCharacter({ inventory: [heavyWeapon("h1"), heavyWeapon("h2")] });
+    const withStyle = {
+      ...heavyPair,
+      resources: { pools: [], fightingStyle: "twoWeaponFighting" },
+    } as unknown as Character;
+    const { result } = renderHook(() => useTurnState(withStyle, SESSION_ID));
+
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+
+    expect(result.current.twfAvailable).toBe(true);
+  });
+
+  it("startTurn keeps twfAvailable=false for a non-light pair WITHOUT the style", () => {
+    const character = makeCharacter({ inventory: [heavyWeapon("h1"), heavyWeapon("h2")] });
+    const { result } = renderHook(() => useTurnState(character, SESSION_ID));
 
     act(() => { result.current.startCombat(); });
     act(() => { result.current.startTurn(); });
@@ -292,6 +337,23 @@ describe("bonus action and TWF", () => {
     act(() => { result.current.enterTwfMode(); });
     act(() => { result.current.recordTwfAttack(); });
     expect(result.current.bonusAttack).toBeNull();
+  });
+
+  it("cancelTwf refunds the bonus action when the swing hasn't been rolled (#732)", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.enterTwfMode(); });
+    expect(result.current.bonusActionUsed).toBe(true);
+    act(() => { result.current.cancelTwf(); });
+    expect(result.current.bonusActionUsed).toBe(false);
+    expect(result.current.bonusAttack).toBeNull();
+  });
+
+  it("cancelTwf is a no-op once the off-hand swing was rolled (bonusAttack cleared)", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.enterTwfMode(); });
+    act(() => { result.current.recordTwfAttack(); }); // bonusAttack → null, action committed
+    act(() => { result.current.cancelTwf(); });
+    expect(result.current.bonusActionUsed).toBe(true); // stays spent
   });
 });
 
