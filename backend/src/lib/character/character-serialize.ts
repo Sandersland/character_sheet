@@ -137,51 +137,10 @@ interface InventoryItemContext {
   activeItemBuffKeys: Set<string>;
 }
 
-function serializeInventoryItem(
-  row: CharacterWithRelations["inventoryItems"][number],
-  context: InventoryItemContext,
-) {
-  let weapon:
-    | (ReturnType<typeof serializeWeaponDetail> & {
-        attackBonus: number;
-        damage: ReturnType<typeof deriveWeaponDamage>;
-      })
-    | undefined;
-  if (row.weaponDetail) {
-    weapon = {
-      ...serializeWeaponDetail(row.weaponDetail),
-      attackBonus: deriveWeaponAttackBonus(
-        {
-          name: row.name,
-          finesse: row.weaponDetail.finesse,
-          weaponClass: row.weaponDetail.weaponClass,
-          weaponRange: row.weaponDetail.weaponRange,
-        },
-        context.effectiveScores,
-        context.proficiencyBonus,
-        context.weaponGrants,
-        context.fightingStyle,
-        context.attackRollBonus,
-      ),
-      damage: deriveWeaponDamage(
-        {
-          name: row.name,
-          finesse: row.weaponDetail.finesse,
-          weaponRange: row.weaponDetail.weaponRange,
-          damageDiceCount: row.weaponDetail.damageDiceCount,
-          damageDiceFaces: row.weaponDetail.damageDiceFaces,
-          damageType: row.weaponDetail.damageType,
-          versatileDiceCount: row.weaponDetail.versatileDiceCount,
-          versatileDiceFaces: row.weaponDetail.versatileDiceFaces,
-          twoHanded: row.weaponDetail.twoHanded,
-        },
-        context.offHandBusy,
-        context.effectiveScores,
-        context.meleeDamageBonus,
-      ),
-    };
-  }
-
+// Catalog/description identity fields — the item-facts an inventory row
+// snapshots regardless of category (weapon/armor/consumable/gear all have
+// these; the category-specific detail block nests in separately below).
+function buildInventoryItemIdentity(row: CharacterWithRelations["inventoryItems"][number]) {
   return {
     id: row.id,
     itemId: row.itemId ?? undefined,
@@ -191,7 +150,13 @@ function serializeInventoryItem(
     weight: row.weight ?? undefined,
     cost: row.cost ?? undefined,
     description: row.description ?? undefined,
-    // `equipped` is DERIVED from placement (#565) — equippedSlot is the source of truth.
+  };
+}
+
+// Paper-doll placement (#565) + attunement (#545) state. `equipped` is
+// DERIVED from placement — equippedSlot is the source of truth.
+function buildInventoryItemPlacement(row: CharacterWithRelations["inventoryItems"][number]) {
+  return {
     equipped: row.equippedSlot != null,
     equippedSlot: row.equippedSlot ?? undefined,
     slot: row.slot ?? undefined,
@@ -201,7 +166,63 @@ function serializeInventoryItem(
     attunementPrereqKind: row.attunementPrereqKind ?? undefined,
     attunementPrereqValue: row.attunementPrereqValue ?? undefined,
     notes: row.notes ?? undefined,
-    weapon,
+  };
+}
+
+// The weapon sub-object (detail snapshot + derived attackBonus/damage), or
+// undefined for a non-weapon row.
+function buildInventoryWeaponView(
+  row: CharacterWithRelations["inventoryItems"][number],
+  context: InventoryItemContext,
+):
+  | (ReturnType<typeof serializeWeaponDetail> & {
+      attackBonus: number;
+      damage: ReturnType<typeof deriveWeaponDamage>;
+    })
+  | undefined {
+  if (!row.weaponDetail) return undefined;
+  return {
+    ...serializeWeaponDetail(row.weaponDetail),
+    attackBonus: deriveWeaponAttackBonus(
+      {
+        name: row.name,
+        finesse: row.weaponDetail.finesse,
+        weaponClass: row.weaponDetail.weaponClass,
+        weaponRange: row.weaponDetail.weaponRange,
+      },
+      context.effectiveScores,
+      context.proficiencyBonus,
+      context.weaponGrants,
+      context.fightingStyle,
+      context.attackRollBonus,
+    ),
+    damage: deriveWeaponDamage(
+      {
+        name: row.name,
+        finesse: row.weaponDetail.finesse,
+        weaponRange: row.weaponDetail.weaponRange,
+        damageDiceCount: row.weaponDetail.damageDiceCount,
+        damageDiceFaces: row.weaponDetail.damageDiceFaces,
+        damageType: row.weaponDetail.damageType,
+        versatileDiceCount: row.weaponDetail.versatileDiceCount,
+        versatileDiceFaces: row.weaponDetail.versatileDiceFaces,
+        twoHanded: row.weaponDetail.twoHanded,
+      },
+      context.offHandBusy,
+      context.effectiveScores,
+      context.meleeDamageBonus,
+    ),
+  };
+}
+
+function serializeInventoryItem(
+  row: CharacterWithRelations["inventoryItems"][number],
+  context: InventoryItemContext,
+) {
+  return {
+    ...buildInventoryItemIdentity(row),
+    ...buildInventoryItemPlacement(row),
+    weapon: buildInventoryWeaponView(row, context),
     armor: row.armorDetail ? serializeArmorDetail(row.armorDetail) : undefined,
     consumable: row.consumableDetail ? serializeConsumableDetail(row.consumableDetail) : undefined,
     capabilities: row.capabilities.length > 0 ? row.capabilities.map(serializeCapability) : undefined,

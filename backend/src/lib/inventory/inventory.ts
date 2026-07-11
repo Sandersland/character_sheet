@@ -374,6 +374,49 @@ async function nextPosition(tx: Prisma.TransactionClient, characterId: string): 
   return tx.inventoryItem.count({ where: { characterId } });
 }
 
+// Damage-roll fields of a weapon detail block, defaulted the same way as
+// their sibling groups below (see normalizeWeaponDetail).
+function normalizeWeaponDamageProfile(input: WeaponDetailInput) {
+  return {
+    damageDiceCount: input.damageDiceCount,
+    damageDiceFaces: input.damageDiceFaces,
+    damageModifier: input.damageModifier ?? 0,
+    damageType: input.damageType,
+    versatileDiceCount: input.versatileDiceCount ?? null,
+    versatileDiceFaces: input.versatileDiceFaces ?? null,
+  };
+}
+
+// Grip-related boolean properties (how the weapon is wielded).
+function normalizeWeaponGripProperties(input: WeaponDetailInput) {
+  return {
+    finesse: input.finesse ?? false,
+    light: input.light ?? false,
+    heavy: input.heavy ?? false,
+    twoHanded: input.twoHanded ?? false,
+  };
+}
+
+// Engagement-related boolean properties (how the weapon reaches its target).
+function normalizeWeaponEngagementProperties(input: WeaponDetailInput) {
+  return {
+    reach: input.reach ?? false,
+    thrown: input.thrown ?? false,
+    ammunition: input.ammunition ?? false,
+  };
+}
+
+// Range + open-pick classification fields (see WeaponClass/WeaponRange in
+// schema.prisma — nullable so homebrew weapons can omit classification).
+function normalizeWeaponClassification(input: WeaponDetailInput) {
+  return {
+    rangeNormal: input.rangeNormal ?? null,
+    rangeLong: input.rangeLong ?? null,
+    weaponClass: (input.weaponClass ?? null) as "simple" | "martial" | null,
+    weaponRange: (input.weaponRange ?? null) as "melee" | "ranged" | null,
+  };
+}
+
 // Fills in every optional field's default explicitly — a custom item's
 // detail block comes from a Zod-validated but otherwise free-form object
 // (`WeaponDetailInput` etc., all-optional past the required fields), and
@@ -382,23 +425,10 @@ async function nextPosition(tx: Prisma.TransactionClient, characterId: string): 
 // null (versatileDiceCount, rangeNormal, ...).
 function normalizeWeaponDetail(input: WeaponDetailInput) {
   return {
-    damageDiceCount: input.damageDiceCount,
-    damageDiceFaces: input.damageDiceFaces,
-    damageModifier: input.damageModifier ?? 0,
-    damageType: input.damageType,
-    versatileDiceCount: input.versatileDiceCount ?? null,
-    versatileDiceFaces: input.versatileDiceFaces ?? null,
-    finesse: input.finesse ?? false,
-    light: input.light ?? false,
-    heavy: input.heavy ?? false,
-    twoHanded: input.twoHanded ?? false,
-    reach: input.reach ?? false,
-    thrown: input.thrown ?? false,
-    ammunition: input.ammunition ?? false,
-    rangeNormal: input.rangeNormal ?? null,
-    rangeLong: input.rangeLong ?? null,
-    weaponClass: (input.weaponClass ?? null) as "simple" | "martial" | null,
-    weaponRange: (input.weaponRange ?? null) as "melee" | "ranged" | null,
+    ...normalizeWeaponDamageProfile(input),
+    ...normalizeWeaponGripProperties(input),
+    ...normalizeWeaponEngagementProperties(input),
+    ...normalizeWeaponClassification(input),
   };
 }
 
