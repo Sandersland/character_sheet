@@ -55,6 +55,19 @@ describe("itemDetailRows", () => {
     ]);
   });
 
+  it("versatile row uses the versatile dice COUNT, not a hardcoded 1d (review fix)", () => {
+    const rows = itemDetailRows(
+      item({
+        weapon: {
+          damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "slashing",
+          finesse: false, light: false, heavy: false, twoHanded: false, reach: false,
+          thrown: false, ammunition: false, versatileDiceCount: 2, versatileDiceFaces: 6,
+        },
+      }),
+    );
+    expect(rows).toContainEqual({ label: "Versatile", value: "2d6" });
+  });
+
   it("armor rows: AC and type always, stealth only on disadvantage", () => {
     expect(
       itemDetailRows(item({ armor: { armorCategory: "heavy", baseArmorClass: 20, dexModifierApplies: false, stealthDisadvantage: true } })),

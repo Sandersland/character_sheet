@@ -20,7 +20,8 @@ function weaponRows(weapon: NonNullable<CampaignItem["weapon"]>): ItemDetailRow[
   const dice = diceLabel(weapon.damageDiceCount, weapon.damageDiceFaces, weapon.damageModifier);
   if (dice) rows.push({ label: "Damage", value: `${dice} ${weapon.damageType}` });
   if (weapon.finesse) rows.push({ label: "Property", value: "Finesse" });
-  if (weapon.versatileDiceFaces) rows.push({ label: "Versatile", value: `1d${weapon.versatileDiceFaces}` });
+  if (weapon.versatileDiceFaces)
+    rows.push({ label: "Versatile", value: `${weapon.versatileDiceCount ?? 1}d${weapon.versatileDiceFaces}` });
   return rows;
 }
 
