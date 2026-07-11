@@ -11,12 +11,13 @@ interface BottomSheetProps {
 }
 
 /**
- * Bottom-anchored slide-up sheet — the standard mobile picker for the turn UI
- * (#729). Shares `Modal`'s focus-trap / Escape / body-scroll-lock machinery,
- * but slides up from the bottom edge (`items-end`), spans the full width, and
- * carries a grabber handle so it reads as a thumb-reachable sheet rather than a
- * centered dialog. Same parchment/`--radius-card`/`--shadow-raised` visual DNA
- * as `Modal`, rounded on the top corners only.
+ * The turn UI's picker surface (#729). Shares `Modal`'s focus-trap / Escape /
+ * body-scroll-lock machinery via `useDialogChrome`, and is **responsive** (#747):
+ * on mobile it's a bottom-anchored slide-up sheet (`items-end`, full width, top
+ * corners rounded, grabber handle — thumb-reachable); at `md`+ it presents as a
+ * centered dialog (`md:items-center`, all corners rounded, no grabber), matching
+ * `Modal`, since a full-width bottom drawer reads as awkward on a desktop screen.
+ * Same parchment / `--radius-card` / `--shadow-raised` visual DNA either way.
  */
 export default function BottomSheet({ title, subtitle, onClose, children }: BottomSheetProps) {
   const panelRef = useDialogChrome(onClose);
@@ -27,7 +28,7 @@ export default function BottomSheet({ title, subtitle, onClose, children }: Bott
       // Presentational scrim: mouse-down-to-close is a pointer convenience only —
       // closing is keyboard-accessible via the Escape handler above.
       role="presentation"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-backdrop backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-backdrop backdrop-blur-sm md:items-center md:p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -38,13 +39,15 @@ export default function BottomSheet({ title, subtitle, onClose, children }: Bott
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="flex max-h-[85vh] w-full max-w-[36rem] flex-col rounded-t-card border border-b-0 border-parchment-200 bg-parchment-50 shadow-raised"
+        className="flex max-h-[85vh] w-full max-w-[36rem] flex-col rounded-t-card border border-b-0 border-parchment-200 bg-parchment-50 shadow-raised md:max-h-[80vh] md:rounded-card md:border-b"
       >
         <span
           aria-hidden
-          className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-parchment-300"
+          className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-parchment-300 md:hidden"
         />
-        <div className="flex shrink-0 items-start justify-between gap-3 px-4 pb-3 pt-2">
+        {/* md:pt-3 restores Modal's header padding on desktop, where the
+            grabber (which fills the gap on mobile) is hidden. */}
+        <div className="flex shrink-0 items-start justify-between gap-3 px-4 pb-3 pt-2 md:pt-3">
           <div>
             <h2 id={titleId} className="font-display text-lg font-semibold text-parchment-900">
               {title}
