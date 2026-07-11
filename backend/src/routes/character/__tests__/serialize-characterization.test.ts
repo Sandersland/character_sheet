@@ -201,6 +201,34 @@ async function createMulticlassMonkFighter() {
   });
 }
 
+// Char E — Fighter L5 with a mixed inventory (weapon/armor/consumable/gear).
+// Pins serializeInventoryItem's + normalizeWeaponDetail's exact output ahead
+// of decomposing both (#690 wave 1C, cyclo 15 each — driven by the field-by-
+// field `??`/ternary fallbacks, not real branching). Must stay green UNEDITED
+// after the extraction.
+async function createInventoryFixture() {
+  return prisma.character.create({
+    data: {
+      id: "serial-char-e",
+      name: "SerialChar E",
+      ownerId: OWNER_ID,
+      alignment: "True Neutral",
+      experiencePoints: 6500, // level 5, proficiency +3
+      initiativeBonus: 0,
+      speed: 30,
+      abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 10 },
+      savingThrowProficiencies: [],
+      skills: [],
+      toolProficiencies: [],
+      currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+      hitPoints: { current: 40, max: 40, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+      hitDice: { total: 5, die: "d10", spent: 0 },
+      spellcasting: Prisma.JsonNull,
+      classEntries: { create: [{ id: "ce-e", name: FIGHTER_CLASS_NAME, classId: fighterClassId, position: 0, level: 5 }] },
+    },
+  });
+}
+
 describe("serializeCharacter derive/clamp characterization (#616)", () => {
   // ── Char A: Battle Master Fighter L5 — level/prof/AC/resources/conditions ────
   it("fighter: derives level, proficiency, unarmored AC, resources view + clamp", async () => {
@@ -307,5 +335,206 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     });
     expect(d.spellcasting.concentratingOn).toBeNull();
     expect(d.classes).toHaveLength(2);
+  });
+
+  // ── Char E: mixed inventory — serializeInventoryItem + normalizeWeaponDetail ─
+  it("acquiring a minimal custom weapon fills every optional weapon field with its normalized default", async () => {
+    await createInventoryFixture();
+    const acquireResponse = await supertest(app)
+      .post("/api/characters/serial-char-e/inventory/transactions")
+      .set("Cookie", COOKIE)
+      .send({
+        operations: [
+          {
+            type: "acquire",
+            custom: {
+              name: "Ancestral Longsword",
+              category: "weapon",
+              weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageType: "slashing" },
+            },
+            quantity: 1,
+            equipped: true,
+            notes: "Keep polished.",
+          },
+        ],
+      });
+    expect(acquireResponse.status).toBe(200);
+
+    const created = await prisma.inventoryItem.findFirstOrThrow({
+      where: { characterId: "serial-char-e", name: "Ancestral Longsword" },
+      include: { weaponDetail: true },
+    });
+    // Every optional field the minimal input omitted, pinned to its exact
+    // normalizeWeaponDetail default — the source of that function's cyclo 15
+    // (14 `??` fallbacks + 1).
+    expect(created.weaponDetail).toEqual({
+      id: expect.any(String),
+      inventoryItemId: created.id,
+      damageDiceCount: 1,
+      damageDiceFaces: 8,
+      damageModifier: 0,
+      damageType: "slashing",
+      versatileDiceCount: null,
+      versatileDiceFaces: null,
+      finesse: false,
+      light: false,
+      heavy: false,
+      twoHanded: false,
+      reach: false,
+      thrown: false,
+      ammunition: false,
+      rangeNormal: null,
+      rangeLong: null,
+      weaponClass: null,
+      weaponRange: null,
+    });
+  });
+
+  it("serializes a mixed inventory (weapon/gear/armor/consumable) byte-for-byte", async () => {
+    await createInventoryFixture();
+    await supertest(app)
+      .post("/api/characters/serial-char-e/inventory/transactions")
+      .set("Cookie", COOKIE)
+      .send({
+        operations: [
+          {
+            type: "acquire",
+            custom: {
+              name: "Ancestral Longsword",
+              category: "weapon",
+              weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageType: "slashing" },
+            },
+            quantity: 1,
+            equipped: true,
+            notes: "Keep polished.",
+          },
+        ],
+      });
+    const weapon = await prisma.inventoryItem.findFirstOrThrow({
+      where: { characterId: "serial-char-e", name: "Ancestral Longsword" },
+    });
+    // rarity/attunement/weight/cost/description aren't settable via acquire —
+    // set directly to pin serializeInventoryItem's remaining truthy branches
+    // (its own source of cyclo 15) below.
+    await prisma.inventoryItem.update({
+      where: { id: weapon.id },
+      data: {
+        weight: 3,
+        cost: { cp: 0, sp: 0, gp: 15, pp: 0 },
+        description: "A gleaming blade passed down through generations.",
+        rarity: "RARE",
+        attuned: true,
+        requiresAttunement: true,
+        attunementPrereqKind: "class",
+        attunementPrereqValue: "Fighter",
+      },
+    });
+    await prisma.inventoryCapability.create({
+      data: { inventoryItemId: weapon.id, kind: "passiveBonus", target: "skill", targetKey: "athletics", op: "add", value: 1 },
+    });
+
+    // Bag-only gear item (declares a wearable slot, unequipped) — the opposite
+    // branch of every optional field above, plus the `slot` fallback.
+    await prisma.inventoryItem.create({
+      data: { characterId: "serial-char-e", name: "Boots of Testing", category: "gear", slot: "FEET", position: 1 },
+    });
+    // Hits serializeInventoryItem's armorDetail branch.
+    await prisma.inventoryItem.create({
+      data: {
+        characterId: "serial-char-e",
+        name: "Traveler's Leather",
+        category: "armor",
+        position: 2,
+        armorDetail: { create: { armorCategory: "light", baseArmorClass: 11, dexModifierApplies: true } },
+      },
+    });
+    // Hits serializeInventoryItem's consumableDetail branch.
+    await prisma.inventoryItem.create({
+      data: {
+        characterId: "serial-char-e",
+        name: "Potion of Testing",
+        category: "consumable",
+        quantity: 3,
+        position: 3,
+        consumableDetail: {
+          create: { effectDiceCount: 2, effectDiceFaces: 4, effectModifier: 0, effectDescription: "Heals 2d4.", maxUses: 1, usesRemaining: 1 },
+        },
+      },
+    });
+
+    const e = (await getChar("serial-char-e")).body;
+    expect(e.inventory).toEqual([
+      {
+        id: weapon.id,
+        name: "Ancestral Longsword",
+        category: "weapon",
+        quantity: 1,
+        weight: 3,
+        cost: { cp: 0, sp: 0, gp: 15, pp: 0 },
+        description: "A gleaming blade passed down through generations.",
+        equipped: true,
+        equippedSlot: "MAIN_HAND",
+        rarity: "RARE",
+        attuned: true,
+        requiresAttunement: true,
+        attunementPrereqKind: "class",
+        attunementPrereqValue: "Fighter",
+        notes: "Keep polished.",
+        weapon: {
+          damageDiceCount: 1,
+          damageDiceFaces: 8,
+          damageModifier: 0,
+          damageType: "slashing",
+          finesse: false,
+          light: false,
+          heavy: false,
+          twoHanded: false,
+          reach: false,
+          thrown: false,
+          ammunition: false,
+          // STR mod +3 (16), not proficient (no matching weapon grant on this fixture).
+          attackBonus: 3,
+          damage: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 3, damageType: "slashing", grip: "one-handed" },
+        },
+        capabilities: [{ kind: "passiveBonus", target: "skill", targetKey: "athletics", op: "add", value: 1 }],
+      },
+      {
+        id: expect.any(String),
+        name: "Boots of Testing",
+        category: "gear",
+        quantity: 1,
+        equipped: false,
+        slot: "FEET",
+        attuned: false,
+        requiresAttunement: false,
+      },
+      {
+        id: expect.any(String),
+        name: "Traveler's Leather",
+        category: "armor",
+        quantity: 1,
+        equipped: false,
+        attuned: false,
+        requiresAttunement: false,
+        armor: { armorCategory: "light", baseArmorClass: 11, dexModifierApplies: true, stealthDisadvantage: false },
+      },
+      {
+        id: expect.any(String),
+        name: "Potion of Testing",
+        category: "consumable",
+        quantity: 3,
+        equipped: false,
+        attuned: false,
+        requiresAttunement: false,
+        consumable: {
+          effectDiceCount: 2,
+          effectDiceFaces: 4,
+          effectModifier: 0,
+          effectDescription: "Heals 2d4.",
+          maxUses: 1,
+          usesRemaining: 1,
+        },
+      },
+    ]);
   });
 });
