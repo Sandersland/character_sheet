@@ -60,7 +60,8 @@ frontend/src/
 │   ├── session/         # TurnHub (→ useTurnActions + TurnControls/ActionSlot/BonusActionSlot/
 │   │                    #   ReactionSlot/EffectManeuverStrip/LayOnHandsInput + TurnResolutionSheets;
 │   │                    #   decorative InitiativeRail behind turnFlags, #737;
-│   │                    #   read-only TurnConcentrationBanner #735),
+│   │                    #   read-only TurnConcentrationBanner #735,
+│   │                    #   inline TurnDeathSaves 0-HP death-save panel #736),
 │   │                    #   useTurnState (turn economy + turn-scoped LIFO undo #730), SessionLog,
 │   │                    #   SessionsModal, SessionSummaryModal (→ useSessionRecapDetail +
 │   │                    #   CampaignRecapSection/RecapFacts/RecapPrimitives/ParticipantRecapCard/
