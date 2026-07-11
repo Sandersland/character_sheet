@@ -20,6 +20,7 @@ import BonusActionSlot from "@/features/session/BonusActionSlot";
 import ReactionSlot from "@/features/session/ReactionSlot";
 import EffectManeuverStrip from "@/features/session/EffectManeuverStrip";
 import InitiativeRail from "@/features/session/InitiativeRail";
+import TurnConcentrationBanner from "@/features/session/TurnConcentrationBanner";
 import TurnResolutionSheets from "@/features/session/TurnResolutionSheets";
 import { showInitiative, showMovement } from "@/features/session/turnFlags";
 import type { AllyOption } from "@/lib/spellMeta";
@@ -138,6 +139,12 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
             <InitiativeRail youInitial={youInitial} active={false} />
           )}
 
+          <TurnConcentrationBanner
+            character={character}
+            onUpdate={onUpdate}
+            onLogChanged={onLogChanged}
+          />
+
           {/* Reaction is available between turns — render it in idle mode. */}
           <ReactionSlot
             reactionUsed={reactionUsed}
@@ -206,6 +213,12 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
       )}
 
       <div className="flex flex-col gap-3">
+        <TurnConcentrationBanner
+          character={character}
+          onUpdate={onUpdate}
+          onLogChanged={onLogChanged}
+        />
+
         {/* ── Action ──────────────────────────────────────────────────────── */}
         <ActionSlot
           actionsRemaining={actionsRemaining}
