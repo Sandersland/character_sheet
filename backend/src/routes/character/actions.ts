@@ -21,6 +21,7 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { assertCharacterAccess } from "@/lib/auth/access.js";
+import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { ACTION_EFFECT_FN, ACTION_CAST_FN, rageMeleeDamageBonus } from "@/lib/classes/actions.js";
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
@@ -53,6 +54,146 @@ const actionTransactionsSchema = z.object({
   operations: z.array(executeActionSchema).min(1),
 });
 
+type ExecuteActionOp = z.infer<typeof executeActionSchema>;
+
+/**
+ * Apply a single action op inside the shared transaction. A cast-core action
+ * (`ACTION_CAST_FN`) pays its pool cost + self-applies through the shared caster;
+ * otherwise `ACTION_EFFECT_FN` yields a list of primitive ops (spend / adjust /
+ * heal / buff) applied in order. Split out of the /transactions handler so the
+ * route stays a thin parse → validate → transaction → serialize shell.
+ */
+async function applyActionOpInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: ExecuteActionOp,
+  batchId: string,
+  sessionId: string | null,
+  rageDamageBonus: number,
+): Promise<void> {
+  const ctx = { roll: op.roll, inventoryItemId: op.inventoryItemId, rageDamageBonus };
+
+  // Cast-core actions (Second Wind #420): pay the pool cost + self-apply the
+  // heal through the shared caster. The OpOutcome is intentionally not logged —
+  // byte-parity keeps only the spend + heal events.
+  const castFn = ACTION_CAST_FN[op.actionKey];
+  if (castFn) {
+    const spec = castFn(ctx);
+    const cRow = await tx.character.findUnique({
+      where: { id: characterId },
+      select: { spellcasting: true },
+    });
+    if (!cRow) throw new Error(`Character not found: ${characterId}`);
+    const costCtx: PayCostContext = { tx, characterId, batchId, sessionId };
+    await castAbilityInTx(
+      { tx, characterId, batchId, sessionId, cost: costCtx, concentrationHost: normalizeSpellcastingMutable(cRow.spellcasting) },
+      {
+        name: spec.name,
+        entryId: op.actionKey,
+        cost: spec.cost,
+        effect: spec.effect,
+        roll: spec.apply?.amount ?? 0,
+        eventType: "castSpell", // discarded — see comment above
+        concentrates: false,
+        apply: spec.apply,
+      },
+    );
+    return;
+  }
+
+  const ops = ACTION_EFFECT_FN[op.actionKey](ctx);
+  for (const effect of ops) {
+    await applyActionEffectInTx(tx, characterId, effect, batchId, sessionId);
+  }
+}
+
+/** The primitive op types `ACTION_EFFECT_FN` yields for a non-cast action. */
+type ActionEffect = ReturnType<(typeof ACTION_EFFECT_FN)[string]>[number];
+
+/** Apply one primitive action effect (spend / adjust / heal / buff) in the tx. */
+async function applyActionEffectInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  effect: ActionEffect,
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  switch (effect.type) {
+    case "spendResource":
+      // Cast: SpendResourceOp is a structural subset of SpendResourceOperation
+      // (omits optional `roll`). Safe because applySpendResourceInTx treats
+      // roll as optional and defaults to undefined.
+      await applySpendResourceInTx(
+        tx, characterId, effect as SpendResourceOperation, batchId, sessionId
+      );
+      break;
+
+    case "adjustQuantity":
+      // Cast: AdjustQuantityOp is structurally identical to AdjustQuantityOperation.
+      await applyAdjustQuantity(
+        tx, characterId, effect as AdjustQuantityOperation, batchId, sessionId
+      );
+      break;
+
+    case "heal":
+      await applyHealInTx(tx, characterId, effect.amount, batchId, sessionId);
+      break;
+
+    case "applyBuff":
+      await appendActiveBuffInTx(tx, characterId, effect.buff, batchId, sessionId);
+      break;
+
+    case "clearBuff":
+      await clearBuffByKeyInTx(tx, characterId, effect.key, batchId, sessionId, effect.reason);
+      break;
+
+    default: {
+      // Exhaustive — ACTION_EFFECT_FN returns the five op types above.
+      const _never: never = effect;
+      throw new Error(`Unexpected op type in action effect: ${JSON.stringify(_never)}`);
+    }
+  }
+}
+
+/** Fail fast (400) on an op whose actionKey isn't in either dispatch table. */
+function assertKnownActionKeys(operations: ExecuteActionOp[]): void {
+  for (const op of operations) {
+    if (!ACTION_CAST_FN[op.actionKey] && !ACTION_EFFECT_FN[op.actionKey]) {
+      throw new Error(`Unknown action key: ${op.actionKey}`);
+    }
+  }
+}
+
+/**
+ * Level-derived Rage melee bonus, resolved before the transaction so the rage
+ * effect fn stays pure (no DB). Only hits the DB when a rage op is present.
+ */
+async function computeRageDamageBonus(operations: ExecuteActionOp[], characterId: string): Promise<number> {
+  if (!operations.some((op) => op.actionKey === "rage")) return 0;
+  const classRow = await prisma.character.findUnique({
+    where: { id: characterId },
+    select: { classEntries: { select: { name: true, level: true } } },
+  });
+  const barbarianLevel = classRow?.classEntries.find((e) => e.name.toLowerCase() === "barbarian")?.level ?? 0;
+  return rageMeleeDamageBonus(barbarianLevel);
+}
+
+/**
+ * Classify a transaction error as a client 400 (a known domain-validation
+ * message) vs a genuine 500. Pattern-matches the domain error strings.
+ */
+function isActionBadRequest(msg: string): boolean {
+  return (
+    msg.includes("not found on this character") ||
+    msg.includes("Cannot reduce") ||
+    msg.includes("below zero") ||
+    msg.includes("only ") ||
+    msg.includes("not available") ||
+    msg.includes("amount must be positive") ||
+    msg.includes("Unknown action key")
+  );
+}
+
 actionsRouter.post<{ id: string }>(
   "/transactions",
   async (req, res) => {
@@ -71,23 +212,9 @@ actionsRouter.post<{ id: string }>(
 
     try {
       // Fail fast on unknown keys BEFORE any DB work (400, not 500).
-      for (const op of operations) {
-        if (!ACTION_CAST_FN[op.actionKey] && !ACTION_EFFECT_FN[op.actionKey]) {
-          throw new Error(`Unknown action key: ${op.actionKey}`);
-        }
-      }
+      assertKnownActionKeys(operations);
 
-      // Level-derived Rage bonus, so the rage effect fn stays pure (no DB).
-      // Only fires when a rage op is actually present — other batches skip the round-trip.
-      let rageDamageBonus = 0;
-      if (operations.some((op) => op.actionKey === "rage")) {
-        const classRow = await prisma.character.findUnique({
-          where: { id: characterId },
-          select: { classEntries: { select: { name: true, level: true } } },
-        });
-        const barbarianLevel = classRow?.classEntries.find((e) => e.name.toLowerCase() === "barbarian")?.level ?? 0;
-        rageDamageBonus = rageMeleeDamageBonus(barbarianLevel);
-      }
+      const rageDamageBonus = await computeRageDamageBonus(operations, characterId);
       const batchId = randomUUID();
       const sessionId = await getActiveSessionId(characterId);
 
@@ -96,74 +223,7 @@ actionsRouter.post<{ id: string }>(
       // batch on the activity timeline and a single revertBatch undoes them all.
       await prisma.$transaction(async (tx) => {
         for (const op of operations) {
-          const ctx = { roll: op.roll, inventoryItemId: op.inventoryItemId, rageDamageBonus };
-
-          // Cast-core actions (Second Wind #420): pay the pool cost + self-apply
-          // the heal through the shared caster. The OpOutcome is intentionally
-          // not logged — byte-parity keeps only the spend + heal events.
-          const castFn = ACTION_CAST_FN[op.actionKey];
-          if (castFn) {
-            const spec = castFn(ctx);
-            const cRow = await tx.character.findUnique({
-              where: { id: characterId },
-              select: { spellcasting: true },
-            });
-            if (!cRow) throw new Error(`Character not found: ${characterId}`);
-            const costCtx: PayCostContext = { tx, characterId, batchId, sessionId };
-            await castAbilityInTx(
-              { tx, characterId, batchId, sessionId, cost: costCtx, concentrationHost: normalizeSpellcastingMutable(cRow.spellcasting) },
-              {
-                name: spec.name,
-                entryId: op.actionKey,
-                cost: spec.cost,
-                effect: spec.effect,
-                roll: spec.apply?.amount ?? 0,
-                eventType: "castSpell", // discarded — see comment above
-                concentrates: false,
-                apply: spec.apply,
-              },
-            );
-            continue;
-          }
-
-          const ops = ACTION_EFFECT_FN[op.actionKey](ctx);
-          for (const effect of ops) {
-            switch (effect.type) {
-              case "spendResource":
-                // Cast: SpendResourceOp is a structural subset of SpendResourceOperation
-                // (omits optional `roll`). Safe because applySpendResourceInTx treats
-                // roll as optional and defaults to undefined.
-                await applySpendResourceInTx(
-                  tx, characterId, effect as SpendResourceOperation, batchId, sessionId
-                );
-                break;
-
-              case "adjustQuantity":
-                // Cast: AdjustQuantityOp is structurally identical to AdjustQuantityOperation.
-                await applyAdjustQuantity(
-                  tx, characterId, effect as AdjustQuantityOperation, batchId, sessionId
-                );
-                break;
-
-              case "heal":
-                await applyHealInTx(tx, characterId, effect.amount, batchId, sessionId);
-                break;
-
-              case "applyBuff":
-                await appendActiveBuffInTx(tx, characterId, effect.buff, batchId, sessionId);
-                break;
-
-              case "clearBuff":
-                await clearBuffByKeyInTx(tx, characterId, effect.key, batchId, sessionId, effect.reason);
-                break;
-
-              default: {
-                // Exhaustive — ACTION_EFFECT_FN returns the five op types above.
-                const _never: never = effect;
-                throw new Error(`Unexpected op type in action effect: ${JSON.stringify(_never)}`);
-              }
-            }
-          }
+          await applyActionOpInTx(tx, characterId, op, batchId, sessionId, rageDamageBonus);
         }
       });
 
@@ -180,17 +240,7 @@ actionsRouter.post<{ id: string }>(
       res.json(serializeCharacter(row));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Action transaction failed";
-      // Distinguish bad-request errors (negative heal, unknown resource, etc.)
-      // from genuine 500s by checking for known domain error message patterns.
-      const isBadRequest =
-        msg.includes("not found on this character") ||
-        msg.includes("Cannot reduce") ||
-        msg.includes("below zero") ||
-        msg.includes("only ") ||
-        msg.includes("not available") ||
-        msg.includes("amount must be positive") ||
-        msg.includes("Unknown action key");
-      res.status(isBadRequest ? 400 : 500).json({ error: msg });
+      res.status(isActionBadRequest(msg) ? 400 : 500).json({ error: msg });
     }
   }
 );
