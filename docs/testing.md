@@ -20,9 +20,21 @@ npm run test -w backend
 # Single backend test file:
 cd backend && npx vitest run src/routes/__tests__/spellcasting.test.ts
 
+# Backend with coverage (Istanbul → backend/coverage/coverage-final.json).
+# This feeds the fallow CRAP gate (docs/development.md); CI's test job runs it.
+docker compose up db -d
+npm run test:coverage -w backend
+
 # Frontend (no DB needed):
 cd frontend && npx vitest run
 ```
+
+> **Coverage & the fallow gate**: `npm run test:coverage -w backend` writes an Istanbul
+> `coverage-final.json` that fallow reads for exact per-function CRAP (untested complexity
+> → real high CRAP). Config lives in `backend/vitest.config.ts` under `test.coverage`
+> (`provider: "istanbul"`, `all: true` so untested files still report their real 0%). If
+> you add a complex backend function, cover it or the `fallow health … --coverage` step
+> fails on `maxCrap > 30`. `coverage/` is gitignored.
 
 > **Local setup**: `backend/.env` must exist and contain `DATABASE_URL`. Copy it from
 > `.env.example` on a fresh clone: `cp .env.example backend/.env`. The vitest config
