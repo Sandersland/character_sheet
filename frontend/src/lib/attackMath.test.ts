@@ -348,7 +348,7 @@ describe("weaponDamageRiders", () => {
 });
 
 describe("critDamageSpec", () => {
-  it("doubles the dice count while leaving the flat modifier single", () => {
+  it("sets crit: true, leaving count and modifier unchanged (rollSpec doubles dice at roll-time)", () => {
     expect(critDamageSpec({ count: 1, faces: 8, modifier: 3 })).toEqual({
       count: 1,
       faces: 8,
