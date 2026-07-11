@@ -37,6 +37,7 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
     subclass: "Battle Master",
     level: 5,
     inventory: [],
+    hitPoints: { current: 44, max: 44, temp: 0, deathSaves: { successes: 0, failures: 0 } },
     unarmedStrike: {
       attackBonus: 2,
       damage: { count: 1, faces: 1, modifier: 0, damageType: "bludgeoning" },

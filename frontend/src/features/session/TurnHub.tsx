@@ -21,6 +21,7 @@ import ReactionSlot from "@/features/session/ReactionSlot";
 import EffectManeuverStrip from "@/features/session/EffectManeuverStrip";
 import InitiativeRail from "@/features/session/InitiativeRail";
 import TurnConcentrationBanner from "@/features/session/TurnConcentrationBanner";
+import TurnDeathSaves from "@/features/session/TurnDeathSaves";
 import TurnResolutionSheets from "@/features/session/TurnResolutionSheets";
 import { showInitiative, showMovement } from "@/features/session/turnFlags";
 import type { AllyOption } from "@/lib/spellMeta";
@@ -138,6 +139,8 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           {showInitiative && (
             <InitiativeRail youInitial={youInitial} active={false} />
           )}
+
+          <TurnDeathSaves character={character} onUpdate={onUpdate} />
 
           <TurnConcentrationBanner
             character={character}
