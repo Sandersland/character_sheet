@@ -452,6 +452,88 @@ function resolveConcentration(
   return null;
 }
 
+// Single-class caster view: derived stats (ability/DC/attack/slot totals),
+// layered with stored mutable state (slotsUsed, spells, concentration)
+// clamped to the derived caps.
+function buildCasterSpellcastingView(
+  row: CharacterWithRelations,
+  derivedSpell: NonNullable<ReturnType<typeof deriveSpellcasting>>,
+  granted: SpellEntry[],
+  itemSpells: SpellEntry[],
+): object {
+  const stored = normalizeSpellcastingMutable(row.spellcasting);
+  const spells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
+  return {
+    ability: derivedSpell.ability,
+    spellSaveDC: derivedSpell.spellSaveDC,
+    spellAttackBonus: derivedSpell.spellAttackBonus,
+    slots: derivedSpell.slotTotals.map(({ level: slotLevel, total }) => ({
+      level: slotLevel,
+      total,
+      // Clamp used to total in case stored value is stale (e.g. after a
+      // class change or long rest that wasn't captured in the old blob).
+      used: Math.min(total, stored.slotsUsed[String(slotLevel)] ?? 0),
+    })),
+    // Warlock Mystic Arcanum charges (empty for every other caster). Same
+    // clamp-on-read as slots.
+    arcana: derivedSpell.arcana.map(({ level: arcanumLevel, total }) => ({
+      level: arcanumLevel,
+      total,
+      used: Math.min(total, stored.arcanumUsed[String(arcanumLevel)] ?? 0),
+    })),
+    spells,
+    // Active concentration spell, or null. Clamp-on-read drops a stale entry
+    // (spellbook spell forgotten / Shadow Arts no longer available).
+    concentratingOn: resolveConcentration(stored.concentratingOn, spells),
+  };
+}
+
+// Non-caster class that nonetheless gets a subclass-granted spell (e.g. a Way
+// of Shadow monk's Minor Illusion). Slotless view so the grant renders; the
+// casting ability is derived per rule (Wisdom is the default).
+function buildGrantedOnlySpellcastingView(
+  row: CharacterWithRelations,
+  primaryClass: PrimaryClass,
+  abilityScores: Record<string, number>,
+  proficiencyBonus: number,
+  granted: SpellEntry[],
+  itemSpells: SpellEntry[],
+): object {
+  const stored = normalizeSpellcastingMutable(row.spellcasting);
+  const castingAbility = deriveGrantedCastingAbility(primaryClass?.subclass ?? undefined);
+  const abilMod = abilityModifier(abilityScores[castingAbility] ?? 10);
+  const grantedSpells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
+  return {
+    ability: castingAbility,
+    spellSaveDC: 8 + proficiencyBonus + abilMod,
+    spellAttackBonus: proficiencyBonus + abilMod,
+    slots: [],
+    arcana: [],
+    spells: grantedSpells,
+    // A cast concentration Shadow Art (catalog-id entry) surfaces here so the
+    // ShadowArtsSection handoff banner + concentrating badge can render.
+    concentratingOn: resolveConcentration(stored.concentratingOn, grantedSpells),
+  };
+}
+
+// Fallback only for an already well-formed serialized blob (has `slots`). The
+// compact mutable format ({ slotsUsed, spells }) that a non-caster or partial
+// caster may have persisted is NOT renderable — leave spellcasting undefined
+// so SpellsSection is skipped (Journal card renders instead of crashing with
+// slots.filter on undefined). Currently inert for real data (no Warlock/
+// Paladin/Ranger serialized blobs exist), but guards future half/third-caster
+// additions.
+function buildFallbackSpellcastingBlob(row: CharacterWithRelations): object | undefined {
+  if (
+    row.spellcasting !== null &&
+    row.spellcasting !== undefined &&
+    Array.isArray((row.spellcasting as { slots?: unknown }).slots)
+  ) {
+    return row.spellcasting as object;
+  }
+  return undefined;
+}
+
 // Spellcasting clamp-on-read: derive stats (ability/DC/attack/slot totals) from
 // class+level+scores, then layer the stored mutable state (slotsUsed, spells,
 // concentration) clamped to the derived caps. Same derive-don't-persist pattern
@@ -489,67 +571,12 @@ function buildSpellcastingView(
   const itemSpells = deriveItemSpellsFor(row);
 
   if (derivedSpell) {
-    const stored = normalizeSpellcastingMutable(row.spellcasting);
-    const spells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
-    return {
-      ability: derivedSpell.ability,
-      spellSaveDC: derivedSpell.spellSaveDC,
-      spellAttackBonus: derivedSpell.spellAttackBonus,
-      slots: derivedSpell.slotTotals.map(({ level: slotLevel, total }) => ({
-        level: slotLevel,
-        total,
-        // Clamp used to total in case stored value is stale (e.g. after a
-        // class change or long rest that wasn't captured in the old blob).
-        used: Math.min(total, stored.slotsUsed[String(slotLevel)] ?? 0),
-      })),
-      // Warlock Mystic Arcanum charges (empty for every other caster). Same
-      // clamp-on-read as slots.
-      arcana: derivedSpell.arcana.map(({ level: arcanumLevel, total }) => ({
-        level: arcanumLevel,
-        total,
-        used: Math.min(total, stored.arcanumUsed[String(arcanumLevel)] ?? 0),
-      })),
-      spells,
-      // Active concentration spell, or null. Clamp-on-read drops a stale entry
-      // (spellbook spell forgotten / Shadow Arts no longer available).
-      concentratingOn: resolveConcentration(stored.concentratingOn, spells),
-    };
+    return buildCasterSpellcastingView(row, derivedSpell, granted, itemSpells);
   }
-  // Non-caster class that nonetheless gets a subclass-granted spell (e.g. a Way
-  // of Shadow monk's Minor Illusion). Surface a slotless view so the grant
-  // renders; the casting ability is derived per rule (Wisdom is the default).
   if (granted.length > 0 || itemSpells.length > 0) {
-    const stored = normalizeSpellcastingMutable(row.spellcasting);
-    const castingAbility = deriveGrantedCastingAbility(primaryClass?.subclass ?? undefined);
-    const abilMod = abilityModifier(abilityScores[castingAbility] ?? 10);
-    const grantedSpells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
-    return {
-      ability: castingAbility,
-      spellSaveDC: 8 + proficiencyBonus + abilMod,
-      spellAttackBonus: proficiencyBonus + abilMod,
-      slots: [],
-      arcana: [],
-      spells: grantedSpells,
-      // A cast concentration Shadow Art (catalog-id entry) surfaces here so the
-      // ShadowArtsSection handoff banner + concentrating badge can render.
-      concentratingOn: resolveConcentration(stored.concentratingOn, grantedSpells),
-    };
+    return buildGrantedOnlySpellcastingView(row, primaryClass, abilityScores, proficiencyBonus, granted, itemSpells);
   }
-  if (
-    row.spellcasting !== null &&
-    row.spellcasting !== undefined &&
-    Array.isArray((row.spellcasting as { slots?: unknown }).slots)
-  ) {
-    // Fallback only for an already well-formed serialized blob (has `slots`).
-    // The compact mutable format ({ slotsUsed, spells }) that a non-caster or
-    // partial caster may have persisted is NOT renderable — leave spellcasting
-    // undefined so SpellsSection is skipped (Journal card renders instead of
-    // crashing with slots.filter on undefined).
-    // This branch is currently inert for real data (no Warlock/Paladin/Ranger
-    // serialized blobs exist), but guards future half/third-caster additions.
-    return row.spellcasting as object;
-  }
-  return undefined;
+  return buildFallbackSpellcastingBlob(row);
 }
 
 // Multiclass spellcasting view: combined slot pool + separate Pact Magic, built
