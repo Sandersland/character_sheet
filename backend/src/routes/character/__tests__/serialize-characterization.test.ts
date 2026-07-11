@@ -25,8 +25,13 @@ const app = createApp();
 
 const FIGHTER_CLASS_NAME = "Test Fighter (Serialize Suite)";
 const BM_SUBCLASS_NAME = "battle master";
+const WARLOCK_CLASS_NAME = "Test Warlock (Serialize Suite)";
+const MONK_CLASS_NAME = "Test Monk (Serialize Suite)";
+const SHADOW_SUBCLASS_NAME = "Way of Shadow";
 let fighterClassId: string;
 let bmSubclassId: string;
+let warlockClassId: string;
+let monkClassId: string;
 
 async function getChar(id: string) {
   return supertest(app).get(`/api/characters/${id}`).set("Cookie", COOKIE);
@@ -47,10 +52,30 @@ beforeAll(async () => {
     update: {},
   });
   bmSubclassId = bm.id;
+  const warlock = await prisma.characterClass.upsert({
+    where: { name: WARLOCK_CLASS_NAME },
+    create: { name: WARLOCK_CLASS_NAME, hitDie: "d8", savingThrows: ["wisdom", "charisma"], skillChoiceCount: 2, skillChoices: ["arcana", "deception"], isSpellcaster: true },
+    update: {},
+  });
+  warlockClassId = warlock.id;
+  const monk = await prisma.characterClass.upsert({
+    where: { name: MONK_CLASS_NAME },
+    create: { name: MONK_CLASS_NAME, hitDie: "d8", savingThrows: ["strength", "dexterity"], skillChoiceCount: 2, skillChoices: ["stealth"], isSpellcaster: false, subclassLevel: 3 },
+    update: { subclassLevel: 3 },
+  });
+  monkClassId = monk.id;
+  await prisma.subclass.upsert({
+    where: { classId_name: { classId: monk.id, name: SHADOW_SUBCLASS_NAME } },
+    create: { classId: monk.id, name: SHADOW_SUBCLASS_NAME, description: "Minor Illusion at 3." },
+    update: {},
+  });
 });
 afterAll(async () => {
   await prisma.subclass.deleteMany({ where: { classId: fighterClassId, name: BM_SUBCLASS_NAME } });
   await prisma.characterClass.deleteMany({ where: { name: FIGHTER_CLASS_NAME } });
+  await prisma.subclass.deleteMany({ where: { classId: monkClassId, name: SHADOW_SUBCLASS_NAME } });
+  await prisma.characterClass.deleteMany({ where: { name: WARLOCK_CLASS_NAME } });
+  await prisma.characterClass.deleteMany({ where: { name: MONK_CLASS_NAME } });
 });
 afterEach(async () => {
   await prisma.character.deleteMany({ where: { name: { startsWith: "SerialChar" } } });
@@ -110,6 +135,68 @@ async function createWizard() {
       hitDice: { total: 5, die: "d6", spent: 0 },
       spellcasting: { slotsUsed: { "1": 2, "2": 1 }, arcanumUsed: {}, spells: [], concentratingOn: null },
       classEntries: { create: [{ id: "ce-b", name: "wizard", position: 0, level: 5 }] },
+    },
+  });
+}
+
+// Char C — Warlock 11 / Fighter 1 multiclass (buildMulticlassSpellcastingView's
+// Pact Magic branch: combined pool empty since only the pact caster + a
+// non-caster are present, pact object populated + used-clamped separately).
+async function createMulticlassWarlockFighter() {
+  return prisma.character.create({
+    data: {
+      id: "serial-char-c",
+      name: "SerialChar C",
+      ownerId: OWNER_ID,
+      alignment: "Chaotic Neutral",
+      experiencePoints: 100000, // level 12 (warlock 11 + fighter 1), proficiency +4
+      initiativeBonus: 1,
+      speed: 30,
+      abilityScores: { strength: 10, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 18 },
+      savingThrowProficiencies: ["wisdom", "charisma"],
+      skills: [],
+      toolProficiencies: [],
+      currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+      hitPoints: { current: 60, max: 60, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+      hitDice: { total: 11, die: "d8", spent: 0 },
+      spellcasting: { slotsUsed: { "5": 1 }, arcanumUsed: { "6": 1 }, spells: [], concentratingOn: null },
+      classEntries: {
+        create: [
+          { id: "ce-c-1", name: "warlock", classId: warlockClassId, position: 0, level: 11 },
+          { id: "ce-c-2", name: FIGHTER_CLASS_NAME, classId: fighterClassId, position: 1, level: 1 },
+        ],
+      },
+    },
+  });
+}
+
+// Char D — Monk (Way of Shadow) 3 / Fighter 1 multiclass, no caster class in
+// the mix: buildMulticlassSpellcastingView's slotless granted-only branch
+// (multi.classes.length === 0, subclass-granted Minor Illusion surfaces).
+async function createMulticlassMonkFighter() {
+  return prisma.character.create({
+    data: {
+      id: "serial-char-d",
+      name: "SerialChar D",
+      ownerId: OWNER_ID,
+      alignment: "Lawful Neutral",
+      experiencePoints: 2700, // level 4, proficiency +2
+      initiativeBonus: 2,
+      speed: 40,
+      abilityScores: { strength: 10, dexterity: 16, constitution: 12, intelligence: 10, wisdom: 15, charisma: 8 },
+      savingThrowProficiencies: ["strength", "dexterity"],
+      skills: [],
+      toolProficiencies: [],
+      currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+      hitPoints: { current: 28, max: 28, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+      hitDice: { total: 4, die: "d8", spent: 0 },
+      spellcasting: Prisma.JsonNull,
+      classEntries: {
+        create: [
+          { id: "ce-d-1", name: "monk", classId: monkClassId, position: 0, level: 3, subclass: SHADOW_SUBCLASS_NAME },
+          { id: "ce-d-2", name: FIGHTER_CLASS_NAME, classId: fighterClassId, position: 1, level: 1 },
+        ],
+      },
     },
   });
 }
@@ -176,5 +263,49 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     // Single class, no subclass.
     expect(b.classes).toEqual([{ id: "ce-b", name: "wizard", level: 5 }]);
     expect(b.conditions).toEqual({ active: [], exhaustion: 0 });
+  });
+
+  // ── Char C: Warlock 11 / Fighter 1 — multiclass Pact Magic branch ───────────
+  it("warlock/fighter multiclass: combined pool empty, Pact Magic + arcana surfaced separately", async () => {
+    await createMulticlassWarlockFighter();
+    const c = (await getChar("serial-char-c")).body;
+
+    expect(c.level).toBe(12);
+    expect(c.proficiencyBonus).toBe(4);
+    expect(c.spellcasting.ability).toBe("charisma");
+    expect(c.spellcasting.spellSaveDC).toBe(16); // 8 + prof 4 + CHA mod 4
+    expect(c.spellcasting.spellAttackBonus).toBe(8);
+    // No full/half/third caster contributes to the combined pool.
+    expect(c.spellcasting.slots).toEqual([]);
+    expect(c.spellcasting.arcana).toEqual([{ level: 6, total: 1, used: 1 }]);
+    expect(c.spellcasting.pact).toEqual({
+      slotLevel: 5, count: 3, used: 1, spellSaveDC: 16, spellAttackBonus: 8,
+    });
+    expect(c.spellcasting.spells).toEqual([]);
+    expect(c.spellcasting.concentratingOn).toBeNull();
+    expect(c.classes).toHaveLength(2);
+  });
+
+  // ── Char D: Monk (Way of Shadow) 3 / Fighter 1 — multiclass granted-only ────
+  it("monk/fighter multiclass with no caster class: slotless granted-spell view", async () => {
+    await createMulticlassMonkFighter();
+    const d = (await getChar("serial-char-d")).body;
+
+    expect(d.level).toBe(4);
+    expect(d.proficiencyBonus).toBe(2);
+    expect(d.spellcasting.ability).toBe("wisdom");
+    expect(d.spellcasting.spellSaveDC).toBe(12); // 8 + prof 2 + WIS mod 2
+    expect(d.spellcasting.spellAttackBonus).toBe(4);
+    expect(d.spellcasting.slots).toEqual([]);
+    expect(d.spellcasting.arcana).toEqual([]);
+    expect(d.spellcasting.pact).toBeUndefined();
+    expect(d.spellcasting.spells).toHaveLength(1);
+    expect(d.spellcasting.spells[0]).toMatchObject({
+      id: "granted:way-of-shadow:minor-illusion",
+      name: "Minor Illusion",
+      source: "subclass",
+    });
+    expect(d.spellcasting.concentratingOn).toBeNull();
+    expect(d.classes).toHaveLength(2);
   });
 });
