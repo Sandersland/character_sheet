@@ -182,9 +182,16 @@ export default function InlineAttackPicker({
 
   // Roll one on-hit dice rider (e.g. Flame Tongue +2d6 fire) as its own typed
   // damage term through the shared dice engine + Session Log, carrying its type.
+  // On a crit the rider's dice double too (Flame Tongue +2d6 → +4d6): mirror the
+  // parent row's last damage roll — if that was rolled on a crit spec, roll this
+  // rider on the crit spec as well, so the Critical button doubles ALL of the
+  // attack's damage dice, not just the weapon's.
   function handleDamageRider(rider: DamageRider) {
-    const result = roll(rider.spec, rider.rollLabel);
-    logRollSafe("damage", rider.logSource, result, rider.spec, rider.damageType);
+    const parent = attackEntries.find((e) => e.damageRiders.some((r) => r.id === rider.id));
+    const parentCrit = parent ? Boolean(lastDamageRolls[parent.id]?.spec.crit) : false;
+    const spec = parentCrit ? critDamageSpec(rider.spec) : rider.spec;
+    const result = roll(spec, rider.rollLabel);
+    logRollSafe("damage", rider.logSource, result, spec, rider.damageType);
     setRiderTotals((prev) => ({ ...prev, [rider.id]: result.total }));
   }
 

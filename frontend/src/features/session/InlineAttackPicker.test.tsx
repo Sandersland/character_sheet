@@ -228,4 +228,42 @@ describe("InlineAttackPicker — critical damage button", () => {
     expect(call.specLabel).toBe("2d8 (crit)");
     expect(call.faces).toHaveLength(2);
   });
+
+  it("doubles an on-hit dice rider on a crit (Flame Tongue +2d6 → +4d6)", async () => {
+    renderPicker(
+      makeCharacter({ inventory: [flameTongue()] as unknown as Character["inventory"] }),
+      vi.fn(),
+      vi.fn(),
+    );
+
+    // Crit the weapon first — marks the row as a crit, so its rider doubles too.
+    await userEvent.click(screen.getAllByRole("button", { name: /^Critical$/ })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /Roll \+2d6 fire/ }));
+
+    const riderCall = vi
+      .mocked(logRoll)
+      .mock.calls.map((c) => c[2])
+      .find((entry) => entry.damageType === "fire");
+    expect(riderCall).toBeDefined();
+    expect(riderCall!.specLabel).toBe("4d6 (crit)");
+    expect(riderCall!.faces).toHaveLength(4);
+  });
+
+  it("keeps a dice rider single when the weapon damage was rolled normally", async () => {
+    renderPicker(
+      makeCharacter({ inventory: [flameTongue()] as unknown as Character["inventory"] }),
+      vi.fn(),
+      vi.fn(),
+    );
+
+    await userEvent.click(screen.getAllByRole("button", { name: /^Damage$/ })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /Roll \+2d6 fire/ }));
+
+    const riderCall = vi
+      .mocked(logRoll)
+      .mock.calls.map((c) => c[2])
+      .find((entry) => entry.damageType === "fire");
+    expect(riderCall!.specLabel).toBe("2d6");
+    expect(riderCall!.faces).toHaveLength(2);
+  });
 });
