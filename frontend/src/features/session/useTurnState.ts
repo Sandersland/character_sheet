@@ -72,7 +72,31 @@ export interface TurnState {
   attackedThisTurn: boolean;
   /** Took damage this turn — feeds the durable-buff turn-hook (#457). */
   tookDamageThisTurn: boolean;
+  /**
+   * Turn-scoped undo stack (#730): a snapshot of the economy is pushed before
+   * each consuming mutation and popped by `undo()`. Cleared on every turn/combat
+   * boundary so undo never reaches across turns.
+   */
+  history: EconomySnapshot[];
 }
+
+/**
+ * The turn-economy fields captured for undo. Deliberately EXCLUDES lifecycle
+ * (`inCombat`/`round`/`phase`) and the activity flags (`attackedThisTurn`/
+ * `tookDamageThisTurn`) — the latter are driven by `recordAttack` + the
+ * server-HP watcher, so reverting them would either fight the watcher or wrongly
+ * relax a durable-buff auto-end. Undo restores only what the player *spent*.
+ */
+export type EconomySnapshot = Pick<
+  TurnState,
+  | "actionsRemaining"
+  | "bonusActionUsed"
+  | "reactionUsed"
+  | "attack"
+  | "bonusAttack"
+  | "twfAvailable"
+  | "spellCastThisTurn"
+>;
 
 export interface TurnStateActions {
   /** Enter combat: sets inCombat=true, round=1, resets turn economy. */
@@ -128,6 +152,13 @@ export interface TurnStateActions {
    * Commit the reaction slot for a spell cast. Call on successful cast.
    */
   commitReactionSpell: () => void;
+  /**
+   * Undo the last consuming economy mutation this turn (#730) — pops the history
+   * stack and restores the prior economy snapshot. No-op when the stack is empty.
+   * LOCAL only: it does not reverse server-committed effects (a die spent, HP
+   * healed, a loadout swapped) — those carry an explicit refund at their surface.
+   */
+  undo: () => void;
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -146,6 +177,20 @@ function initialState(): TurnState {
     spellCastThisTurn: {},
     attackedThisTurn: false,
     tookDamageThisTurn: false,
+    history: [],
+  };
+}
+
+/** Snapshot the current economy fields for the undo stack (#730). */
+function economyOf(s: TurnState): EconomySnapshot {
+  return {
+    actionsRemaining: s.actionsRemaining,
+    bonusActionUsed: s.bonusActionUsed,
+    reactionUsed: s.reactionUsed,
+    attack: s.attack,
+    bonusAttack: s.bonusAttack,
+    twfAvailable: s.twfAvailable,
+    spellCastThisTurn: s.spellCastThisTurn,
   };
 }
 
@@ -193,6 +238,7 @@ export function useTurnState(character: Character, sessionId: string): TurnState
       spellCastThisTurn: {},
       attackedThisTurn: false,
       tookDamageThisTurn: false,
+      history: [],
     });
   }, []);
 
@@ -216,6 +262,7 @@ export function useTurnState(character: Character, sessionId: string): TurnState
       bonusAttack: null,
       twfAvailable: canTwoWeaponFight(character.inventory),
       spellCastThisTurn: {},
+      history: [], // undo never reaches across turns
     }));
   }, [character.inventory, currentHp]);
 
@@ -239,6 +286,7 @@ export function useTurnState(character: Character, sessionId: string): TurnState
           round: s.round + 1,
           attackedThisTurn: false,
           tookDamageThisTurn: false,
+          history: [],
         };
       }
       // Out-of-combat (shouldn't normally happen now, but safe fallback).
@@ -246,15 +294,26 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     });
   }, []);
 
-  const consumeAction = useCallback(() => {
+  // Wrap an economy mutation so a pre-mutation snapshot is pushed onto the undo
+  // stack (#730) — but only when the mutation actually changes state, so no-op
+  // guards (`return s`) push nothing.
+  const mutate = useCallback((fn: (s: TurnState) => TurnState) => {
     setState((s) => {
-      if (s.actionsRemaining <= 0) return s;
-      return { ...s, actionsRemaining: s.actionsRemaining - 1, attack: null };
+      const next = fn(s);
+      if (next === s) return s;
+      return { ...next, history: [...s.history, economyOf(s)] };
     });
   }, []);
 
+  const consumeAction = useCallback(() => {
+    mutate((s) => {
+      if (s.actionsRemaining <= 0) return s;
+      return { ...s, actionsRemaining: s.actionsRemaining - 1, attack: null };
+    });
+  }, [mutate]);
+
   const enterAttackMode = useCallback(() => {
-    setState((s) => {
+    mutate((s) => {
       if (s.actionsRemaining <= 0) return s;
       return {
         ...s,
@@ -262,85 +321,104 @@ export function useTurnState(character: Character, sessionId: string): TurnState
         attack: { total: attacksPerAction, used: 0 },
       };
     });
-  }, [attacksPerAction]);
+  }, [attacksPerAction, mutate]);
 
   const recordAttack = useCallback(() => {
-    setState((s) => {
+    mutate((s) => {
       if (!s.attack) return s;
       // Clamp at total — keep attack non-null so the picker stays open for damage rolls.
       // The picker is closed explicitly by the player via the "Done" button.
       const used = Math.min(s.attack.used + 1, s.attack.total);
       return { ...s, attack: { ...s.attack, used }, attackedThisTurn: true };
     });
-  }, []);
+  }, [mutate]);
 
   const cancelAttack = useCallback(() => {
     // Only refund if no attacks have been rolled yet — once rolled, the action
     // is committed per 5e rules.
-    setState((s) => {
+    mutate((s) => {
       if (!s.attack || s.attack.used > 0) return s;
       return { ...s, actionsRemaining: s.actionsRemaining + 1, attack: null };
     });
-  }, []);
+  }, [mutate]);
 
   const finishAttack = useCallback(() => {
     // Clear the attack counter (action stays spent). No-op when attack is null
     // (class pickers like Flurry that don't use the enterAttackMode path).
-    setState((s) => {
+    mutate((s) => {
       if (!s.attack) return s;
       return { ...s, attack: null };
     });
-  }, []);
+  }, [mutate]);
 
   const consumeBonusAction = useCallback(() => {
-    setState((s) => ({ ...s, bonusActionUsed: true, bonusAttack: null }));
-  }, []);
+    mutate((s) => {
+      if (s.bonusActionUsed) return s; // guard: already used → no history push
+      return { ...s, bonusActionUsed: true, bonusAttack: null };
+    });
+  }, [mutate]);
 
   const enterTwfMode = useCallback(() => {
-    setState((s) => {
+    mutate((s) => {
       if (s.bonusActionUsed) return s;
       // TWF off-hand is always exactly 1 attack.
       return { ...s, bonusActionUsed: true, bonusAttack: { total: 1, used: 0 } };
     });
-  }, []);
+  }, [mutate]);
 
   const recordTwfAttack = useCallback(() => {
-    setState((s) => {
+    mutate((s) => {
       if (!s.bonusAttack) return s;
       return { ...s, bonusAttack: null, attackedThisTurn: true }; // only 1 off-hand attack in TWF
     });
-  }, []);
+  }, [mutate]);
 
   const consumeReaction = useCallback(() => {
-    setState((s) => ({ ...s, reactionUsed: true }));
-  }, []);
+    mutate((s) => {
+      if (s.reactionUsed) return s; // guard: already used → no history push
+      return { ...s, reactionUsed: true };
+    });
+  }, [mutate]);
 
   const grantExtraAction = useCallback(() => {
-    setState((s) => ({ ...s, actionsRemaining: s.actionsRemaining + 1 }));
-  }, []);
+    mutate((s) => ({ ...s, actionsRemaining: s.actionsRemaining + 1 }));
+  }, [mutate]);
 
   const commitActionSpell = useCallback((spellLevel: number) => {
     const kind: SpellCastKind = spellLevel === 0 ? "cantrip" : "leveled";
-    setState((s) => ({
+    mutate((s) => ({
       ...s,
       actionsRemaining: Math.max(0, s.actionsRemaining - 1),
       attack: null,
       spellCastThisTurn: { ...s.spellCastThisTurn, action: kind },
     }));
-  }, []);
+  }, [mutate]);
 
   const commitBonusActionSpell = useCallback((spellLevel: number) => {
     const kind: SpellCastKind = spellLevel === 0 ? "cantrip" : "leveled";
-    setState((s) => ({
+    mutate((s) => ({
       ...s,
       bonusActionUsed: true,
       bonusAttack: null,
       spellCastThisTurn: { ...s.spellCastThisTurn, bonus: kind },
     }));
-  }, []);
+  }, [mutate]);
 
   const commitReactionSpell = useCallback(() => {
-    setState((s) => ({ ...s, reactionUsed: true }));
+    mutate((s) => {
+      if (s.reactionUsed) return s; // guard: already used → no history push
+      return { ...s, reactionUsed: true };
+    });
+  }, [mutate]);
+
+  const undo = useCallback(() => {
+    setState((s) => {
+      const prev = s.history[s.history.length - 1];
+      if (!prev) return s;
+      // Restore the prior economy snapshot; leave lifecycle + the activity flags
+      // (attackedThisTurn/tookDamageThisTurn) as they are (see EconomySnapshot).
+      return { ...s, ...prev, history: s.history.slice(0, -1) };
+    });
   }, []);
 
   return {
@@ -362,5 +440,6 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     commitActionSpell,
     commitBonusActionSpell,
     commitReactionSpell,
+    undo,
   };
 }

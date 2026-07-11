@@ -172,6 +172,25 @@ describe("TurnHub — action economy", () => {
     expect(screen.getByText("used")).toBeInTheDocument();
   });
 
+  it("Undo restores the action after a consuming click (#730)", async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await startTurn(user);
+
+    // No undo affordance until something is spent.
+    expect(screen.queryByRole("button", { name: /Undo/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Use Action/ }));
+    await user.click(screen.getByRole("button", { name: "Dodge" }));
+    expect(screen.getByText("used")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Undo/ }));
+
+    // Action available again; the undo affordance is gone.
+    expect(screen.getByRole("button", { name: "Use Action" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Undo/ })).not.toBeInTheDocument();
+  });
+
   it("executes a class action through applyActionTransactions", async () => {
     const user = userEvent.setup();
     renderHub();
