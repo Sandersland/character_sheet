@@ -259,62 +259,84 @@ export function serializeMentionDomBeforeCaret(root: HTMLElement): string {
   return serializeMentionDom(pre.cloneContents());
 }
 
+// Running state for the caret walk: how many body-string characters are left to
+// skip before the caret lands, plus whether it has been placed and whether any
+// content has been consumed yet (block elements only count a newline once inside).
+interface CaretWalkState {
+  remaining: number;
+  placed: boolean;
+  started: boolean;
+}
+
+// Runs `at()` to position the range, then marks the walk done.
+function landCaret(state: CaretWalkState, at: () => void): void {
+  at();
+  state.placed = true;
+}
+
+// Consume a text node: land inside it if the offset falls here, else subtract
+// its length and keep walking.
+function consumeTextNode(node: Node, state: CaretWalkState, range: Range): void {
+  const len = node.textContent?.length ?? 0;
+  if (state.remaining <= len) landCaret(state, () => range.setStart(node, state.remaining));
+  else {
+    state.remaining -= len;
+    state.started = true;
+  }
+}
+
+// Consume an element node. Mention chips and <br> are caret boundaries; a block
+// element only subtracts its implicit newline. Returns true to recurse into `el`.
+function consumeElement(el: HTMLElement, state: CaretWalkState, range: Range): boolean {
+  if (el.dataset.mentionId) {
+    const len = `@[${el.dataset.mentionId}]`.length;
+    if (state.remaining <= 0) landCaret(state, () => range.setStartBefore(el));
+    else if (state.remaining <= len) landCaret(state, () => range.setStartAfter(el));
+    else {
+      state.remaining -= len;
+      state.started = true;
+    }
+    return false;
+  }
+  if (el.tagName === "BR") {
+    if (state.remaining <= 0) landCaret(state, () => range.setStartBefore(el));
+    else {
+      state.remaining -= 1;
+      state.started = true;
+    }
+    return false;
+  }
+  // A block boundary counts as a single newline once content has started.
+  if ((el.tagName === "DIV" || el.tagName === "P") && state.started) state.remaining -= 1;
+  return true;
+}
+
+// Advances the caret walk across ONE child node, mutating `state` and setting
+// `range` when the caret lands inside `child`. Returns true when the caller
+// should recurse into `child` (a block/inline element that wasn't a boundary).
+function placeCaretInChild(child: Node, state: CaretWalkState, range: Range): boolean {
+  if (child.nodeType === Node.TEXT_NODE) {
+    consumeTextNode(child, state, range);
+    return false;
+  }
+  if (child.nodeType !== Node.ELEMENT_NODE) return false;
+  return consumeElement(child as HTMLElement, state, range);
+}
+
 // Place the caret at a body-string offset (chips count as their token length).
 export function placeCaretAtBodyOffset(root: HTMLElement, target: number): void {
   const sel = typeof window !== "undefined" ? window.getSelection() : null;
   if (!sel) return;
   const range = document.createRange();
-  let remaining = target;
-  let placed = false;
-  let started = false;
+  const state: CaretWalkState = { remaining: target, placed: false, started: false };
   const walk = (node: Node) => {
-    for (let i = 0; i < node.childNodes.length && !placed; i += 1) {
+    for (let i = 0; i < node.childNodes.length && !state.placed; i += 1) {
       const child = node.childNodes[i];
-      if (child.nodeType === Node.TEXT_NODE) {
-        const len = child.textContent?.length ?? 0;
-        if (remaining <= len) {
-          range.setStart(child, remaining);
-          placed = true;
-          return;
-        }
-        remaining -= len;
-        started = true;
-        continue;
-      }
-      if (child.nodeType !== Node.ELEMENT_NODE) continue;
-      const el = child as HTMLElement;
-      if (el.dataset.mentionId) {
-        const len = `@[${el.dataset.mentionId}]`.length;
-        if (remaining <= 0) {
-          range.setStartBefore(el);
-          placed = true;
-          return;
-        }
-        if (remaining <= len) {
-          range.setStartAfter(el);
-          placed = true;
-          return;
-        }
-        remaining -= len;
-        started = true;
-        continue;
-      }
-      if (el.tagName === "BR") {
-        if (remaining <= 0) {
-          range.setStartBefore(el);
-          placed = true;
-          return;
-        }
-        remaining -= 1;
-        started = true;
-        continue;
-      }
-      if ((el.tagName === "DIV" || el.tagName === "P") && started) remaining -= 1;
-      walk(el);
+      if (placeCaretInChild(child, state, range)) walk(child);
     }
   };
   walk(root);
-  if (!placed) {
+  if (!state.placed) {
     range.selectNodeContents(root);
     range.collapse(false);
   } else {
