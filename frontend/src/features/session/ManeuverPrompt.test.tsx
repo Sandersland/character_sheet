@@ -97,3 +97,130 @@ describe("ManeuverPrompt — die folds into the total", () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+// #689 gap pins — the placement-filtering / section-visibility / selection
+// branches the lib extraction most endangers. Green before the refactor;
+// unedited through it.
+describe("ManeuverPrompt — placement filtering and damage selection (#689)", () => {
+  type Maneuver = { id: string; name: string; description: string; placement?: string };
+
+  function characterWith(maneuvers: Maneuver[], remaining = 4): Character {
+    return {
+      id: "char-1",
+      resources: {
+        pools: [
+          { key: "superiorityDice", label: "Superiority Dice", die: "d8", total: 4, recharge: "shortRest", used: 4 - remaining, remaining },
+        ],
+        maneuversKnown: maneuvers,
+      },
+    } as unknown as Character;
+  }
+
+  function renderPrompt(character: Character, attack: number | null, damage: number | null) {
+    const onRollsUpdated = vi.fn();
+    const { container } = render(
+      <ManeuverPrompt
+        character={character}
+        lastAttackRoll={attack === null ? null : roll(attack)}
+        lastDamageRoll={damage === null ? null : roll(damage)}
+        onRollsUpdated={onRollsUpdated}
+        onUpdate={vi.fn()}
+      />,
+    );
+    return { container, onRollsUpdated };
+  }
+
+  it("excludes attackOption/reaction/effect maneuvers — renders nothing for them", () => {
+    const { container } = renderPrompt(
+      characterWith([
+        { id: "m-cmd", name: "Commander's Strike", description: "", placement: "attackOption" },
+        { id: "m-parry", name: "Parry", description: "", placement: "reaction" },
+        { id: "m-foot", name: "Evasive Footwork", description: "", placement: "effect" },
+      ]),
+      14,
+      9,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("a legacy maneuver without placement defaults to the damage section", () => {
+    renderPrompt(characterWith([{ id: "m-legacy", name: "Old Trip", description: "" }]), null, 9);
+    expect(screen.getByText("Add to Damage:")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Old Trip/ })).toBeInTheDocument();
+  });
+
+  it("hides the attack section when only damage maneuvers apply (and vice versa)", () => {
+    const { container } = renderPrompt(
+      characterWith([{ id: "m-trip", name: "Trip Attack", description: "", placement: "damageRoll" }]),
+      14,
+      null,
+    );
+    // Attack was rolled but no attackRoll maneuvers; damage not rolled → nothing.
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("renders nothing when the pool is exhausted", () => {
+    const { container } = renderPrompt(
+      characterWith([{ id: "m-trip", name: "Trip Attack", description: "", placement: "damageRoll" }], 0),
+      14,
+      9,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("multiple damage maneuvers: select + spend uses the chosen maneuver", async () => {
+    const user = userEvent.setup();
+    const { onRollsUpdated } = renderPrompt(
+      characterWith([
+        { id: "m-trip", name: "Trip Attack", description: "", placement: "damageRoll" },
+        { id: "m-menace", name: "Menacing Attack", description: "", placement: "damageRoll" },
+      ]),
+      null,
+      9,
+    );
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Select maneuver to add to damage" }), "Menacing Attack");
+    await user.click(screen.getByRole("button", { name: /Spend d8/ }));
+
+    await waitFor(() =>
+      expect(castManeuverTransaction).toHaveBeenCalledWith("char-1", [
+        { type: "castManeuver", entryId: "m-menace" },
+      ]),
+    );
+    expect(onRollsUpdated).toHaveBeenCalledWith(null, 9 + SERVER_ROLL);
+  });
+
+  it("falls back to the first damage maneuver when the selection is stale", async () => {
+    const user = userEvent.setup();
+    renderPrompt(
+      characterWith([
+        { id: "m-trip", name: "Trip Attack", description: "", placement: "damageRoll" },
+        { id: "m-menace", name: "Menacing Attack", description: "", placement: "damageRoll" },
+      ]),
+      null,
+      9,
+    );
+
+    // Untouched select shows the fallback (first maneuver) and spends it.
+    expect(screen.getByRole("combobox")).toHaveValue("Trip Attack");
+    await user.click(screen.getByRole("button", { name: /Spend d8/ }));
+    await waitFor(() =>
+      expect(castManeuverTransaction).toHaveBeenCalledWith("char-1", [
+        { type: "castManeuver", entryId: "m-trip" },
+      ]),
+    );
+  });
+
+  it("disables a single-damage-maneuver button after it has been spent", async () => {
+    const user = userEvent.setup();
+    renderPrompt(
+      characterWith([{ id: "m-trip", name: "Trip Attack", description: "", placement: "damageRoll" }]),
+      null,
+      9,
+    );
+
+    const btn = screen.getByRole("button", { name: /Trip Attack/ });
+    await user.click(btn);
+    await waitFor(() => expect(btn).toBeDisabled());
+  });
+});

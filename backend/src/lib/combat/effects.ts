@@ -55,48 +55,58 @@ export type EffectRow = EffectColumns & { level: number; concentration?: boolean
 // Resolves a class-die source key (e.g. "superiorityDice") to its die-face count.
 export type ClassDieResolver = (source: string) => number | null;
 
-// Adapter over the existing flat columns — no schema migration. Reproduces the
-// null-guard and scaling-mode selection from the old computeCastSpec. When a row
-// carries effectDieSource, `resolveDie` supplies the faces (superseding the fixed
-// effectDiceFaces); fixed-dice rows are unaffected.
-export function readEffectSpec(row: EffectRow, resolveDie?: ClassDieResolver): EffectSpec {
+// Die faces: a class-die reference (effectDieSource + resolveDie) supersedes
+// the fixed effectDiceFaces. (Frontend twin lacks this arm — its rows never
+// carry effectDieSource.)
+function resolveEffectDieFaces(row: EffectRow, resolveDie?: ClassDieResolver): number | null {
   const referencedFaces = row.effectDieSource ? resolveDie?.(row.effectDieSource) ?? null : null;
-  const faces = referencedFaces ?? row.effectDiceFaces ?? null;
+  return referencedFaces ?? row.effectDiceFaces ?? null;
+}
+
+// Dice resolution: a row without kind, count, or usable faces reads as dice-less.
+function resolveEffectDice(row: EffectRow, resolveDie?: ClassDieResolver): EffectSpec["dice"] {
+  const faces = resolveEffectDieFaces(row, resolveDie);
   const hasDice = Boolean(row.effectKind && row.effectDiceCount && faces);
-  const dice = hasDice
+  return hasDice
     ? {
         count: row.effectDiceCount as number,
         faces: faces as number,
         modifier: row.effectModifier ?? 0,
       }
     : undefined;
+}
 
-  let scaling: EffectScaling;
-  if (row.level === 0 && row.cantripScaling) {
-    scaling = { mode: "cantripLevel" };
-  } else if (row.level > 0 && row.upcastDicePerLevel) {
-    scaling = { mode: "slotUpcast", dicePerStep: row.upcastDicePerLevel };
-  } else {
-    scaling = { mode: "none" };
-  }
+// Scaling axis: cantrips (level 0) scale by character level; leveled rows with
+// upcast dice scale by slot step; everything else is fixed. The two arms are
+// mutually exclusive by `level` (0 vs >0), so only one can ever match and the
+// check order is immaterial — a level-0 row never reaches the upcast arm.
+function resolveEffectScaling(row: EffectRow): EffectScaling {
+  if (row.level === 0 && row.cantripScaling) return { mode: "cantripLevel" };
+  if (row.level > 0 && row.upcastDicePerLevel) return { mode: "slotUpcast", dicePerStep: row.upcastDicePerLevel };
+  return { mode: "none" };
+}
 
-  const effectType: EffectType =
-    row.effectKind === "heal"
-      ? "heal"
-      : row.effectKind === "damage"
-        ? "damage"
-        : row.effectKind === "buff"
-          ? "buff"
-          : "utility";
+// Effect kind → spec type ladder; anything unrecognized is roll-less "utility".
+function resolveEffectType(effectKind: string | null | undefined): EffectType {
+  if (effectKind === "heal") return "heal";
+  if (effectKind === "damage") return "damage";
+  if (effectKind === "buff") return "buff";
+  return "utility";
+}
 
+// Adapter over the existing flat columns — no schema migration. Reproduces the
+// null-guard and scaling-mode selection from the old computeCastSpec. When a row
+// carries effectDieSource, `resolveDie` supplies the faces (superseding the fixed
+// effectDiceFaces); fixed-dice rows are unaffected.
+export function readEffectSpec(row: EffectRow, resolveDie?: ClassDieResolver): EffectSpec {
   return {
-    effectType,
-    dice,
+    effectType: resolveEffectType(row.effectKind),
+    dice: resolveEffectDice(row, resolveDie),
     damageType: row.damageType ?? null,
     attackType: row.attackType ?? null,
     saveAbility: row.saveAbility ?? null,
     saveEffect: row.saveEffect ?? null,
-    scaling,
+    scaling: resolveEffectScaling(row),
     concentration: row.concentration,
     addAbilityModToHeal: row.effectKind === "heal",
     buffTarget: row.buffTarget ?? null,

@@ -24,8 +24,13 @@ import {
   multiclassPrerequisitesMet,
 } from "@/lib/srd/srd.js";
 import { rollDie } from "@/lib/core/dice.js";
-import { deriveResources } from "@/lib/classes/class-features.js";
-import { normalizeResourcesMutable, serializeResourcesState } from "@/lib/classes/resources.js";
+import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
+import {
+  cloneResourceLists,
+  normalizeResourcesMutable,
+  serializeResourcesState,
+  type ResourcesMutableState,
+} from "@/lib/classes/resources.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import {
   castResourceRechargesOn,
@@ -805,121 +810,143 @@ function applyStabilizeOp(ctx: HpOpContext): HpOpResult {
   return { summary: "Stabilized", eventData: {} };
 }
 
-async function applyLevelUpOp(ctx: HpOpContext, op: LevelUpOperation): Promise<HpOpResult> {
-  const { tx, characterId, row, hp, hd, conMod, faces, primaryEntry, beforeClassLevel } = ctx;
-  const derivedLevel = levelForExperience(row.experiencePoints);
-  if (hd.total >= derivedLevel) {
+// ---- Level-up helpers ----
+// applyLevelUpOp dispatches on the op's target: a NEW class (multiclass), an
+// EXISTING class entry, or the no-target position-0 self-heal. All three share
+// the roll validation + HP/hit-dice bump and the same eventData shape, which
+// stores enough to exactly reverse the level-up (Phase 4 undo, and the
+// auto-reverse in experience-ops.ts when XP is lowered).
+
+/**
+ * Validate the client roll against the CHOSEN class's die (may differ from
+ * the position-0 die stored in hd.die once multiclassing is in play).
+ */
+function requireLevelUpRoll(op: LevelUpOperation, dieFaces: number): void {
+  if (op.method === "roll" && (op.roll === undefined || op.roll < 1 || op.roll > dieFaces)) {
     throw new InvalidHitPointOperationError(
-      `No pending level-up: already at level ${hd.total} (XP derives level ${derivedLevel})`
+      `Roll for level-up must be between 1 and ${dieFaces} (got ${String(op.roll)})`
     );
   }
+}
 
-  // Validate the client roll against the CHOSEN class's die (may differ from
-  // the position-0 die stored in hd.die once multiclassing is in play).
-  const requireRoll = (dieFaces: number): void => {
-    if (op.method === "roll" && (op.roll === undefined || op.roll < 1 || op.roll > dieFaces)) {
-      throw new InvalidHitPointOperationError(
-        `Roll for level-up must be between 1 and ${dieFaces} (got ${String(op.roll)})`
-      );
-    }
+/** Apply the shared HP/hit-dice bump for a given die face count; returns the gain. */
+function bumpHpForLevelUp(ctx: HpOpContext, op: LevelUpOperation, dieFaces: number): number {
+  const gain = levelUpHpGain(dieFaces, ctx.conMod, op.method, op.roll);
+  ctx.hd.total += 1;
+  ctx.hp.max += gain;
+  ctx.hp.current += gain;
+  return gain;
+}
+
+/** The reversal-grade eventData every level-up variant shares. */
+function levelUpEventData(
+  op: LevelUpOperation,
+  conMod: number,
+  faces: number,
+  hpGain: number,
+  entry: { primaryEntryId: string | null; prevEntryLevel: number | null; newEntryLevel: number },
+): Record<string, unknown> {
+  return {
+    method: op.method,
+    roll: op.roll ?? null,
+    conMod,
+    faces,
+    hpGain,
+    ...entry,
   };
+}
 
-  // Apply the shared HP/hit-dice bump for a given die face count.
-  const bumpHp = (dieFaces: number): number => {
-    const gain = levelUpHpGain(dieFaces, conMod, op.method, op.roll);
-    hd.total += 1;
-    hp.max += gain;
-    hp.current += gain;
-    return gain;
-  };
-
-  const target = op.target;
-
-  // ── New class (multiclass) ───────────────────────────────────────────────
-  if (target?.kind === "new") {
-    const catalog = await tx.characterClass.findUnique({
-      where: { id: target.classId },
-      select: { id: true, name: true, hitDie: true },
-    });
-    if (!catalog) {
-      throw new InvalidHitPointOperationError(`Class not found: ${target.classId}`);
-    }
-    if (row.classEntries.some((e) => e.classId === catalog.id)) {
-      throw new InvalidHitPointOperationError(
-        `Character already has levels in ${catalog.name} — use an existing-class target`
-      );
-    }
-    const abilityScores = row.abilityScores as Record<string, number>;
-    const prereq = multiclassPrerequisitesMet(catalog.name, abilityScores);
-    if (!prereq.met) {
-      throw new InvalidHitPointOperationError(
-        `Cannot multiclass into ${catalog.name}: requires ${prereq.description}`
-      );
-    }
-    const newFaces = hitDieFace(catalog.hitDie);
-    requireRoll(newFaces);
-    const gain = bumpHp(newFaces);
-    const position = row.classEntries.reduce((max, e) => Math.max(max, e.position), -1) + 1;
-    const created = await tx.characterClassEntry.create({
-      data: { characterId, classId: catalog.id, name: catalog.name, level: 1, position },
-    });
-    return {
-      summary: `Multiclassed into ${catalog.name} (level 1, +${gain} HP)`,
-      eventData: {
-        method: op.method,
-        roll: op.roll ?? null,
-        conMod,
-        faces: newFaces,
-        hpGain: gain,
+/** Level up into a NEW class (multiclass): prereq-gated, creates a level-1 entry. */
+async function applyNewClassLevelUp(
+  ctx: HpOpContext,
+  op: LevelUpOperation,
+  target: { classId: string },
+): Promise<HpOpResult> {
+  const { tx, characterId, row, conMod } = ctx;
+  const catalog = await tx.characterClass.findUnique({
+    where: { id: target.classId },
+    select: { id: true, name: true, hitDie: true },
+  });
+  if (!catalog) {
+    throw new InvalidHitPointOperationError(`Class not found: ${target.classId}`);
+  }
+  if (row.classEntries.some((e) => e.classId === catalog.id)) {
+    throw new InvalidHitPointOperationError(
+      `Character already has levels in ${catalog.name} — use an existing-class target`
+    );
+  }
+  const abilityScores = row.abilityScores as Record<string, number>;
+  const prereq = multiclassPrerequisitesMet(catalog.name, abilityScores);
+  if (!prereq.met) {
+    throw new InvalidHitPointOperationError(
+      `Cannot multiclass into ${catalog.name}: requires ${prereq.description}`
+    );
+  }
+  const newFaces = hitDieFace(catalog.hitDie);
+  requireLevelUpRoll(op, newFaces);
+  const gain = bumpHpForLevelUp(ctx, op, newFaces);
+  const position = row.classEntries.reduce((max, e) => Math.max(max, e.position), -1) + 1;
+  const created = await tx.characterClassEntry.create({
+    data: { characterId, classId: catalog.id, name: catalog.name, level: 1, position },
+  });
+  return {
+    summary: `Multiclassed into ${catalog.name} (level 1, +${gain} HP)`,
+    eventData: {
+      ...levelUpEventData(op, conMod, newFaces, gain, {
         primaryEntryId: null,
-        createdClassEntryId: created.id,
         prevEntryLevel: null,
         newEntryLevel: 1,
-      },
-    };
-  }
+      }),
+      createdClassEntryId: created.id,
+    },
+  };
+}
 
-  // ── Existing class (chosen entry) ────────────────────────────────────────
-  if (target?.kind === "existing") {
-    const entry = row.classEntries.find((e) => e.id === target.classEntryId);
-    if (!entry) {
-      throw new InvalidHitPointOperationError(`Class entry not found: ${target.classEntryId}`);
-    }
-    const entryFaces = entry.class ? hitDieFace(entry.class.hitDie) : faces;
-    requireRoll(entryFaces);
-    const gain = bumpHp(entryFaces);
-    const newEntryLevel = entry.level + 1;
-    await tx.characterClassEntry.update({
-      where: { id: entry.id },
-      data: { level: newEntryLevel },
-    });
-    return {
-      summary: `Leveled up ${entry.name} to ${newEntryLevel} (+${gain} HP)`,
-      eventData: {
-        method: op.method,
-        roll: op.roll ?? null,
-        conMod,
-        faces: entryFaces,
-        hpGain: gain,
-        primaryEntryId: entry.id,
-        prevEntryLevel: entry.level,
-        newEntryLevel,
-      },
-    };
+/** Level up a CHOSEN existing class entry, rolling that entry's own die. */
+async function applyExistingClassLevelUp(
+  ctx: HpOpContext,
+  op: LevelUpOperation,
+  target: { classEntryId: string },
+): Promise<HpOpResult> {
+  const { tx, row, conMod, faces } = ctx;
+  const entry = row.classEntries.find((e) => e.id === target.classEntryId);
+  if (!entry) {
+    throw new InvalidHitPointOperationError(`Class entry not found: ${target.classEntryId}`);
   }
+  const entryFaces = entry.class ? hitDieFace(entry.class.hitDie) : faces;
+  requireLevelUpRoll(op, entryFaces);
+  const gain = bumpHpForLevelUp(ctx, op, entryFaces);
+  const newEntryLevel = entry.level + 1;
+  await tx.characterClassEntry.update({
+    where: { id: entry.id },
+    data: { level: newEntryLevel },
+  });
+  return {
+    summary: `Leveled up ${entry.name} to ${newEntryLevel} (+${gain} HP)`,
+    eventData: levelUpEventData(op, conMod, entryFaces, gain, {
+      primaryEntryId: entry.id,
+      prevEntryLevel: entry.level,
+      newEntryLevel,
+    }),
+  };
+}
 
-  // ── No target — position-0 self-heal (backward-compatible path) ──────────
-  // Only valid for single-class characters. A multiclass character has no
-  // unambiguous position-0 to self-heal: this path would set that entry's
-  // level to `hd.total` (the *total* character level), inflating it (#124).
-  // Require an explicit target instead.
+/**
+ * No target — position-0 self-heal (backward-compatible path). Only valid for
+ * single-class characters. A multiclass character has no unambiguous
+ * position-0 to self-heal: this path would set that entry's level to
+ * `hd.total` (the *total* character level), inflating it (#124). Callers with
+ * more than one entry must pass an explicit target instead.
+ */
+async function applySelfHealLevelUp(ctx: HpOpContext, op: LevelUpOperation): Promise<HpOpResult> {
+  const { tx, row, hd, conMod, faces, primaryEntry, beforeClassLevel } = ctx;
   if (row.classEntries.length > 1) {
     throw new InvalidHitPointOperationError(
       "Multiclass character requires an explicit level-up target (existing or new class)"
     );
   }
-  requireRoll(faces);
-  const gain = bumpHp(faces);
+  requireLevelUpRoll(op, faces);
+  const gain = bumpHpForLevelUp(ctx, op, faces);
 
   // Repair the position-0 class entry's `level` to match the newly-applied
   // total. The seed defaults all entries to level 1 even for level-7 chars;
@@ -931,21 +958,28 @@ async function applyLevelUpOp(ctx: HpOpContext, op: LevelUpOperation): Promise<H
     });
   }
 
-  // Store enough data to exactly reverse this level-up later (Phase 4 undo)
-  // or when XP is lowered (auto-reverse in experience-ops.ts).
   return {
     summary: `Leveled up to ${hd.total} (+${gain} HP)`,
-    eventData: {
-      method: op.method,
-      roll: op.roll ?? null,
-      conMod,
-      faces,
-      hpGain: gain,
+    eventData: levelUpEventData(op, conMod, faces, gain, {
       primaryEntryId: primaryEntry?.id ?? null,
       prevEntryLevel: beforeClassLevel,
       newEntryLevel: hd.total,
-    },
+    }),
   };
+}
+
+async function applyLevelUpOp(ctx: HpOpContext, op: LevelUpOperation): Promise<HpOpResult> {
+  const { hd, row } = ctx;
+  const derivedLevel = levelForExperience(row.experiencePoints);
+  if (hd.total >= derivedLevel) {
+    throw new InvalidHitPointOperationError(
+      `No pending level-up: already at level ${hd.total} (XP derives level ${derivedLevel})`
+    );
+  }
+  const target = op.target;
+  if (target?.kind === "new") return applyNewClassLevelUp(ctx, op, target);
+  if (target?.kind === "existing") return applyExistingClassLevelUp(ctx, op, target);
+  return applySelfHealLevelUp(ctx, op);
 }
 
 // Reset the per-capability `used` counter of any active item castSpell whose
@@ -1021,8 +1055,119 @@ async function rechargeItemChargePoolsOnRest(
   return { recharged, before, after };
 }
 
-async function applyShortRestOp(ctx: HpOpContext, op: ShortRestOperation): Promise<HpOpResult> {
-  const { tx, characterId, row, hp, hd, conMod, faces, effMax } = ctx;
+// ---- Rest phase helpers ----
+// applyShortRestOp / applyLongRestOp share the same anatomy: HP/hit-dice math,
+// then a series of independent restore phases (class resource pools, spell
+// slots, item resets), then eventData + summary assembly, then one
+// spellcasting/resources write. Each phase is a helper returning plain data;
+// the two ops differ only in which phases run and with which rest kind.
+
+/** Does a class-resource pool recharge on this rest? "short-or-long" fires on both. */
+function poolRechargesOn(recharge: string, rest: "short" | "long"): boolean {
+  if (recharge === "short-or-long") return true;
+  return recharge === (rest === "short" ? "shortRest" : "longRest");
+}
+
+/** Derive the primary class entry's resource pools (recharge schedule included). */
+function deriveRestPools(row: HpOpContext["row"]): DerivedClassInfo | null {
+  const level = levelForExperience(row.experiencePoints);
+  const classEntry = row.classEntries[0];
+  return deriveResources(
+    classEntry?.name ?? "",
+    classEntry?.subclass ?? undefined,
+    level,
+    row.abilityScores as Record<string, number>,
+    proficiencyBonusForLevel(level),
+  );
+}
+
+/**
+ * Reset class resource pools that recharge on this rest (e.g. Battle Master
+ * superiority dice on short, Rage on long; "short-or-long" fires on both).
+ * Mutates and returns the normalized state for the caller to serialize; the
+ * before-state deep-clone feeds the event snapshot that undo restores.
+ */
+function resetRestResources(
+  row: HpOpContext["row"],
+  rest: "short" | "long",
+): { state: ResourcesMutableState; beforeResourceState: Record<string, unknown>; resourcesRestored: number } {
+  const derivedRes = deriveRestPools(row);
+  const state = normalizeResourcesMutable(row.resources);
+  const beforeResourceState = { ...cloneResourceLists(state), fightingStyle: state.fightingStyle };
+  let resourcesRestored = 0;
+  for (const pool of derivedRes?.resources ?? []) {
+    if (poolRechargesOn(pool.recharge, rest)) {
+      resourcesRestored += state.used[pool.key] ?? 0;
+      state.used[pool.key] = 0;
+    }
+  }
+  return { state, beforeResourceState, resourcesRestored };
+}
+
+/** Deep-clone of the mutable spellcasting state for a rest event's before snapshot. */
+function cloneSpellStateForRest(spellState: ReturnType<typeof normalizeSpellcastingMutable>): Record<string, unknown> {
+  return {
+    slotsUsed: { ...spellState.slotsUsed },
+    arcanumUsed: { ...spellState.arcanumUsed },
+    spells: spellState.spells.map((s) => ({ ...s })),
+    concentratingOn: spellState.concentratingOn ? { ...spellState.concentratingOn } : null,
+  };
+}
+
+/**
+ * Warlock Pact Magic slots recharge on a short rest. A pure Warlock's only
+ * spell slots are Pact slots, so clearing slotsUsed is safe. Mystic Arcanum is
+ * long-rest only and concentration survives a short rest — both preserved.
+ * Returns null for non-Warlocks (no spellcasting write, no snapshot).
+ */
+function restoreWarlockPactSlots(row: HpOpContext["row"]): {
+  beforeSpellState: Record<string, unknown>;
+  slotsRestored: number;
+  spellcasting: Prisma.InputJsonValue;
+} | null {
+  const className = row.classEntries[0]?.name ?? "";
+  if (className.toLowerCase() !== "warlock") return null;
+  const spellState = normalizeSpellcastingMutable(row.spellcasting);
+  const beforeSpellState = cloneSpellStateForRest(spellState);
+  const slotsRestored = Object.values(spellState.slotsUsed).reduce((s, n) => s + n, 0);
+  spellState.slotsUsed = {};
+  return {
+    beforeSpellState,
+    slotsRestored,
+    spellcasting: {
+      slotsUsed: spellState.slotsUsed,
+      arcanumUsed: spellState.arcanumUsed,
+      spells: spellState.spells,
+      concentratingOn: spellState.concentratingOn,
+    } as unknown as Prisma.InputJsonValue,
+  };
+}
+
+/** The item resets every rest runs: castSpell use resets (#528) + charge pools (#555). */
+async function runItemRestResets(
+  ctx: Pick<HpOpContext, "tx" | "row">,
+  rest: "short" | "long",
+): Promise<{ itemSpellsRestored: number; chargePools: Awaited<ReturnType<typeof rechargeItemChargePoolsOnRest>> }> {
+  const itemSpellsRestored = await resetItemSpellUsesOnRest(ctx, rest);
+  const chargePools = await rechargeItemChargePoolsOnRest(ctx, rest);
+  return { itemSpellsRestored, chargePools };
+}
+
+/** The `...(cond ? {} : {})` charge-pool eventData fragment shared by both rests. */
+function chargePoolEventData(
+  chargePools: Awaited<ReturnType<typeof rechargeItemChargePoolsOnRest>>,
+): Record<string, unknown> {
+  return chargePools.recharged > 0
+    ? {
+        itemChargesRecharged: chargePools.recharged,
+        chargePoolsBefore: chargePools.before,
+        chargePoolsAfter: chargePools.after,
+      }
+    : {};
+}
+
+/** Validate a short rest's hit-die spend against availability and die size. */
+function validateHitDiceSpend(op: ShortRestOperation, hd: HitDice, faces: number): void {
   const available = hd.total - hd.spent;
   const spending = op.rolls.length;
   if (spending > available) {
@@ -1035,106 +1180,125 @@ async function applyShortRestOp(ctx: HpOpContext, op: ShortRestOperation): Promi
       `Hit die rolls must be between 1 and ${faces} (die: ${hd.die})`
     );
   }
+}
+
+/** "Short rest — spent N hit dice: +X HP, …" with the parts in fixed order. */
+function buildShortRestSummary(
+  spending: number,
+  totalGain: number,
+  slotsRestored: number,
+  resourcesRestored: number,
+  items: { itemSpellsRestored: number; chargePools: { recharged: number } },
+): string {
+  const restParts: string[] = [`+${totalGain} HP`];
+  if (slotsRestored > 0) restParts.push(`${slotsRestored} Pact slot${slotsRestored !== 1 ? "s" : ""} restored`);
+  if (resourcesRestored > 0) restParts.push(`resources restored`);
+  if (items.itemSpellsRestored > 0) restParts.push(`item spells restored`);
+  if (items.chargePools.recharged > 0) restParts.push(`item charges recharged`);
+  return `Short rest — spent ${spending} hit ${spending === 1 ? "die" : "dice"}: ${restParts.join(", ")}`;
+}
+
+async function applyShortRestOp(ctx: HpOpContext, op: ShortRestOperation): Promise<HpOpResult> {
+  const { tx, characterId, row, hp, hd, conMod, faces, effMax } = ctx;
+  validateHitDiceSpend(op, hd, faces);
+  const spending = op.rolls.length;
   const totalGain = op.rolls.reduce((sum, roll) => sum + hitDieHeal(roll, conMod), 0);
   hp.current = Math.min(effMax, hp.current + totalGain);
   hd.spent += spending;
 
-  // Reset subclass resources that recharge on short or short-or-long rest
-  // (e.g. Battle Master superiority dice recharge on a short rest).
-  const srAbilityScores = row.abilityScores as Record<string, number>;
-  const srLevel = levelForExperience(row.experiencePoints);
-  const srProfBonus = proficiencyBonusForLevel(srLevel);
-  const srClassEntry = row.classEntries[0];
-  const srDerivedRes = deriveResources(
-    srClassEntry?.name ?? "",
-    srClassEntry?.subclass ?? undefined,
-    srLevel,
-    srAbilityScores,
-    srProfBonus,
-  );
-  const srResourceState = normalizeResourcesMutable(row.resources);
-  const beforeSrResourceState = {
-    used: { ...srResourceState.used },
-    maneuversKnown: srResourceState.maneuversKnown.map((m) => ({ ...m })),
-    disciplinesKnown: srResourceState.disciplinesKnown.map((d) => ({ ...d })),
-    toolProficienciesKnown: srResourceState.toolProficienciesKnown.map((t) => ({ ...t })),
-    advancements: srResourceState.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
-    fightingStyle: srResourceState.fightingStyle,
-  };
-  let srResourcesRestored = 0;
-  if (srDerivedRes) {
-    for (const pool of srDerivedRes.resources) {
-      if (pool.recharge === "shortRest" || pool.recharge === "short-or-long") {
-        srResourcesRestored += srResourceState.used[pool.key] ?? 0;
-        srResourceState.used[pool.key] = 0;
-      }
-    }
-  }
-
-  // Warlock Pact Magic slots recharge on a short rest. A pure Warlock's only
-  // spell slots are Pact slots, so clearing slotsUsed is safe here.
-  // (Mystic Arcanum is long-rest only — leave arcanumUsed untouched.)
-  const srIsWarlock = (srClassEntry?.name ?? "").toLowerCase() === "warlock";
-  const srSpellUpdate: Record<string, unknown> = {
-    resources: serializeResourcesState(srResourceState),
-  };
-  let srSlotsRestored = 0;
-  let beforeSrSpellState: Record<string, unknown> | undefined;
-  if (srIsWarlock) {
-    const srSpellState = normalizeSpellcastingMutable(row.spellcasting);
-    beforeSrSpellState = {
-      slotsUsed: { ...srSpellState.slotsUsed },
-      arcanumUsed: { ...srSpellState.arcanumUsed },
-      spells: srSpellState.spells.map((s) => ({ ...s })),
-      concentratingOn: srSpellState.concentratingOn ? { ...srSpellState.concentratingOn } : null,
-    };
-    srSlotsRestored = Object.values(srSpellState.slotsUsed).reduce((s, n) => s + n, 0);
-    srSpellState.slotsUsed = {};
-    // A short rest does NOT end concentration — preserve it.
-    srSpellUpdate.spellcasting = {
-      slotsUsed: srSpellState.slotsUsed,
-      arcanumUsed: srSpellState.arcanumUsed,
-      spells: srSpellState.spells,
-      concentratingOn: srSpellState.concentratingOn,
-    } as unknown as Prisma.InputJsonValue;
-  }
-
-  const srItemSpellsRestored = await resetItemSpellUsesOnRest(ctx, "short");
-  const srChargePools = await rechargeItemChargePoolsOnRest(ctx, "short");
+  const resources = resetRestResources(row, "short");
+  const pact = restoreWarlockPactSlots(row);
+  const slotsRestored = pact?.slotsRestored ?? 0;
+  const items = await runItemRestResets(ctx, "short");
 
   const eventData: Record<string, unknown> = {
     rolls: op.rolls,
     totalGain,
     conMod,
-    resourcesRestored: srResourcesRestored,
-    slotsRestored: srSlotsRestored,
-    itemSpellsRestored: srItemSpellsRestored,
-    beforeResourceState: beforeSrResourceState,
-    ...(beforeSrSpellState ? { beforeSpellState: beforeSrSpellState } : {}),
-    ...(srChargePools.recharged > 0
-      ? {
-          itemChargesRecharged: srChargePools.recharged,
-          chargePoolsBefore: srChargePools.before,
-          chargePoolsAfter: srChargePools.after,
-        }
-      : {}),
+    resourcesRestored: resources.resourcesRestored,
+    slotsRestored,
+    itemSpellsRestored: items.itemSpellsRestored,
+    beforeResourceState: resources.beforeResourceState,
+    ...(pact ? { beforeSpellState: pact.beforeSpellState } : {}),
+    ...chargePoolEventData(items.chargePools),
   };
-  const restParts: string[] = [`+${totalGain} HP`];
-  if (srSlotsRestored > 0) restParts.push(`${srSlotsRestored} Pact slot${srSlotsRestored !== 1 ? "s" : ""} restored`);
-  if (srResourcesRestored > 0) restParts.push(`resources restored`);
-  if (srItemSpellsRestored > 0) restParts.push(`item spells restored`);
-  if (srChargePools.recharged > 0) restParts.push(`item charges recharged`);
-  const summary = `Short rest — spent ${spending} hit ${spending === 1 ? "die" : "dice"}: ${restParts.join(", ")}`;
+  const summary = buildShortRestSummary(spending, totalGain, slotsRestored, resources.resourcesRestored, items);
 
   // Write the resource reset (and any Pact slot restore) alongside HP in the
   // dispatcher's character.update below. Route resources through
   // serializeResourcesState so all keys round-trip — prevents silent data loss.
   await tx.character.update({
     where: { id: characterId },
-    data: srSpellUpdate as Prisma.CharacterUpdateInput,
+    data: {
+      resources: serializeResourcesState(resources.state),
+      ...(pact ? { spellcasting: pact.spellcasting } : {}),
+    },
   });
 
   return { summary, eventData };
+}
+
+/**
+ * Long-rest spell recovery: every caster's slots (including Warlock Pact) plus
+ * Mystic Arcanum charges reset, and any active concentration ends.
+ */
+function resetLongRestSpellcasting(row: HpOpContext["row"]): {
+  beforeSpellState: Record<string, unknown>;
+  slotsRestored: number;
+  spellcasting: Prisma.InputJsonValue;
+} {
+  const spellState = normalizeSpellcastingMutable(row.spellcasting);
+  const beforeSpellState = cloneSpellStateForRest(spellState);
+  const slotsRestored =
+    Object.values(spellState.slotsUsed).reduce((s, n) => s + n, 0) +
+    Object.values(spellState.arcanumUsed).reduce((s, n) => s + n, 0);
+  spellState.slotsUsed = {};
+  spellState.arcanumUsed = {};
+  spellState.concentratingOn = null;
+  return {
+    beforeSpellState,
+    slotsRestored,
+    spellcasting: {
+      slotsUsed: spellState.slotsUsed,
+      arcanumUsed: spellState.arcanumUsed,
+      spells: spellState.spells,
+      concentratingOn: null,
+    } as unknown as Prisma.InputJsonValue,
+  };
+}
+
+/**
+ * Recharge limited-use consumables (#121): charged items (maxUses set) reset
+ * to full. Lives here rather than in lib/inventory/inventory.ts to avoid an
+ * import cycle (inventory already imports this module).
+ */
+async function rechargeConsumables(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+): Promise<{
+  consumablesRecharged: number;
+  before: { inventoryItemId: string; usesRemaining: number | null }[];
+  after: { inventoryItemId: string; usesRemaining: number | null }[];
+}> {
+  const chargedRows = await tx.inventoryConsumableDetail.findMany({
+    where: { inventoryItem: { characterId }, maxUses: { not: null } },
+    select: { inventoryItemId: true, usesRemaining: true, maxUses: true },
+  });
+  const before: { inventoryItemId: string; usesRemaining: number | null }[] = [];
+  const after: { inventoryItemId: string; usesRemaining: number | null }[] = [];
+  let consumablesRecharged = 0;
+  for (const c of chargedRows) {
+    if (c.usesRemaining !== c.maxUses) {
+      before.push({ inventoryItemId: c.inventoryItemId, usesRemaining: c.usesRemaining });
+      after.push({ inventoryItemId: c.inventoryItemId, usesRemaining: c.maxUses });
+      await tx.inventoryConsumableDetail.update({
+        where: { inventoryItemId: c.inventoryItemId },
+        data: { usesRemaining: c.maxUses },
+      });
+      consumablesRecharged += 1;
+    }
+  }
+  return { consumablesRecharged, before, after };
 }
 
 async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
@@ -1147,120 +1311,46 @@ async function applyLongRestOp(ctx: HpOpContext): Promise<HpOpResult> {
   const recovered = Math.max(1, Math.floor(hd.total / 2));
   hd.spent = Math.max(0, hd.spent - recovered);
 
-  // Reset all spell slot used-counts (long-rest recovery for every caster,
-  // including Warlock Pact slots) and clear Warlock Mystic Arcanum charges.
-  const spellState = normalizeSpellcastingMutable(row.spellcasting);
-  const beforeSpellState = {
-    slotsUsed: { ...spellState.slotsUsed },
-    arcanumUsed: { ...spellState.arcanumUsed },
-    spells: spellState.spells.map((s) => ({ ...s })),
-    concentratingOn: spellState.concentratingOn ? { ...spellState.concentratingOn } : null,
-  };
-  const slotsRestored =
-    Object.values(spellState.slotsUsed).reduce((s, n) => s + n, 0) +
-    Object.values(spellState.arcanumUsed).reduce((s, n) => s + n, 0);
-  spellState.slotsUsed = {};
-  spellState.arcanumUsed = {};
-  // A long rest ends any active concentration.
-  spellState.concentratingOn = null;
-
-  // Reset subclass resources that recharge on a long rest or short-or-long rest.
-  const abilityScores = row.abilityScores as Record<string, number>;
-  const derivedLevel = levelForExperience(row.experiencePoints);
-  const profBonus = proficiencyBonusForLevel(derivedLevel);
-  const primaryClassEntry = row.classEntries[0];
-  const derivedRes = deriveResources(
-    primaryClassEntry?.name ?? "",
-    primaryClassEntry?.subclass ?? undefined,
-    derivedLevel,
-    abilityScores,
-    profBonus,
-  );
-  const resourceState = normalizeResourcesMutable(row.resources);
-  const beforeResourceState = {
-    used: { ...resourceState.used },
-    maneuversKnown: resourceState.maneuversKnown.map((m) => ({ ...m })),
-    disciplinesKnown: resourceState.disciplinesKnown.map((d) => ({ ...d })),
-    toolProficienciesKnown: resourceState.toolProficienciesKnown.map((t) => ({ ...t })),
-    advancements: resourceState.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
-    fightingStyle: resourceState.fightingStyle,
-  };
-  let resourcesRestored = 0;
-  if (derivedRes) {
-    for (const pool of derivedRes.resources) {
-      if (pool.recharge === "longRest" || pool.recharge === "short-or-long") {
-        resourcesRestored += resourceState.used[pool.key] ?? 0;
-        resourceState.used[pool.key] = 0;
-      }
-    }
-  }
-
-  const afterResourceState = serializeResourcesState(resourceState);
-
-  const itemSpellsRestored = await resetItemSpellUsesOnRest(ctx, "long");
-  const chargePools = await rechargeItemChargePoolsOnRest(ctx, "long");
-
-  // Recharge limited-use consumables (#121): charged items (maxUses set) reset
-  // to full. Inlined here rather than in lib/inventory/inventory.ts to avoid an import
-  // cycle (inventory already imports this module).
-  const chargedRows = await tx.inventoryConsumableDetail.findMany({
-    where: { inventoryItem: { characterId }, maxUses: { not: null } },
-    select: { inventoryItemId: true, usesRemaining: true, maxUses: true },
-  });
-  const consumableChargesBefore: { inventoryItemId: string; usesRemaining: number | null }[] = [];
-  const consumableChargesAfter: { inventoryItemId: string; usesRemaining: number | null }[] = [];
-  let consumablesRecharged = 0;
-  for (const c of chargedRows) {
-    if (c.usesRemaining !== c.maxUses) {
-      consumableChargesBefore.push({ inventoryItemId: c.inventoryItemId, usesRemaining: c.usesRemaining });
-      consumableChargesAfter.push({ inventoryItemId: c.inventoryItemId, usesRemaining: c.maxUses });
-      await tx.inventoryConsumableDetail.update({
-        where: { inventoryItemId: c.inventoryItemId },
-        data: { usesRemaining: c.maxUses },
-      });
-      consumablesRecharged += 1;
-    }
-  }
+  const spells = resetLongRestSpellcasting(row);
+  const resources = resetRestResources(row, "long");
+  const afterResourceState = serializeResourcesState(resources.state);
+  const items = await runItemRestResets(ctx, "long");
+  const consumables = await rechargeConsumables(tx, characterId);
 
   const hpRestored = effMax - prevCurrent;
-  const eventData: Record<string, unknown> = { recovered, hpRestored, slotsRestored, resourcesRestored, itemSpellsRestored };
-  if (consumablesRecharged > 0) {
-    eventData.consumablesRecharged = consumablesRecharged;
-    eventData.consumableChargesBefore = consumableChargesBefore;
-    eventData.consumableChargesAfter = consumableChargesAfter;
+  const eventData: Record<string, unknown> = {
+    recovered,
+    hpRestored,
+    slotsRestored: spells.slotsRestored,
+    resourcesRestored: resources.resourcesRestored,
+    itemSpellsRestored: items.itemSpellsRestored,
+  };
+  if (consumables.consumablesRecharged > 0) {
+    eventData.consumablesRecharged = consumables.consumablesRecharged;
+    eventData.consumableChargesBefore = consumables.before;
+    eventData.consumableChargesAfter = consumables.after;
   }
-  if (chargePools.recharged > 0) {
-    eventData.itemChargesRecharged = chargePools.recharged;
-    eventData.chargePoolsBefore = chargePools.before;
-    eventData.chargePoolsAfter = chargePools.after;
-  }
+  Object.assign(eventData, chargePoolEventData(items.chargePools));
+
   const parts: string[] = [];
   if (hpRestored > 0) parts.push(`+${hpRestored} HP`);
   else parts.push("HP already full");
-  if (slotsRestored > 0) parts.push(`${slotsRestored} slot${slotsRestored !== 1 ? "s" : ""} restored`);
-  if (resourcesRestored > 0) parts.push(`resources restored`);
-  if (itemSpellsRestored > 0) parts.push(`item spells restored`);
-  if (consumablesRecharged > 0) parts.push(`consumables recharged`);
-  if (chargePools.recharged > 0) parts.push(`item charges recharged`);
+  if (spells.slotsRestored > 0) parts.push(`${spells.slotsRestored} slot${spells.slotsRestored !== 1 ? "s" : ""} restored`);
+  if (resources.resourcesRestored > 0) parts.push(`resources restored`);
+  if (items.itemSpellsRestored > 0) parts.push(`item spells restored`);
+  if (consumables.consumablesRecharged > 0) parts.push(`consumables recharged`);
+  if (items.chargePools.recharged > 0) parts.push(`item charges recharged`);
   const summary = `Long rest — ${parts.join(", ")}`;
 
   // Write spellcasting + resources; the dispatcher writes HP separately below.
   await tx.character.update({
     where: { id: characterId },
-    data: {
-      spellcasting: {
-        slotsUsed: spellState.slotsUsed,
-        arcanumUsed: spellState.arcanumUsed,
-        spells: spellState.spells,
-        concentratingOn: null,
-      } as unknown as Prisma.InputJsonValue,
-      resources: afterResourceState,
-    },
+    data: { spellcasting: spells.spellcasting, resources: afterResourceState },
   });
 
   // Include spellcasting + resources in the before/after snapshot for undo.
-  eventData.beforeSpellState = beforeSpellState;
-  eventData.beforeResourceState = beforeResourceState;
+  eventData.beforeSpellState = spells.beforeSpellState;
+  eventData.beforeResourceState = resources.beforeResourceState;
   eventData.afterResourceState = afterResourceState;
   return { summary, eventData };
 }
@@ -1400,12 +1490,87 @@ async function dispatchHpOp(ctx: HpOpContext, op: HpStateOperation): Promise<HpO
   }
 }
 
+/** The mutable pair every snapshot lifter below appends to. */
+interface HpOpSnapshots {
+  beforeState: Record<string, unknown>;
+  afterState: Record<string, unknown>;
+}
+
 /**
- * Phase 3: build the before/after sub-state snapshots for the event. levelUp
- * also captures the class-entry level because the op mutates that outside the
- * JSON columns. longRest captures spellcasting so undoing it re-expends the
- * slots. Rest-op snapshot keys are lifted OUT of eventData (and deleted) so
- * they live in before/after rather than being duplicated in the data payload.
+ * levelUp: capture the class-entry level diff from the op result — it points
+ * at the CHOSEN entry (or is null for a new-class add), not always position-0.
+ */
+function liftLevelUpSnapshot(snaps: HpOpSnapshots, eventData: Record<string, unknown>): void {
+  snaps.beforeState.classEntryLevel = (eventData.prevEntryLevel as number | null) ?? null;
+  snaps.afterState.classEntryLevel = (eventData.newEntryLevel as number | null) ?? null;
+}
+
+/**
+ * longRest: spellcasting (so undo re-expends the slots), resources, and the
+ * consumable recharge (#121) snapshots. The after-spellcasting reflects the
+ * cleared state, preserving the known-spell list.
+ */
+function liftLongRestSnapshot(snaps: HpOpSnapshots, data: Record<string, unknown>): void {
+  const beforeSpell = data.beforeSpellState as Record<string, unknown>;
+  snaps.beforeState.spellcasting = beforeSpell;
+  snaps.afterState.spellcasting = { slotsUsed: {}, arcanumUsed: {}, spells: beforeSpell?.spells ?? [], concentratingOn: null };
+  delete data.beforeSpellState; // don't duplicate in eventData
+  if (data.beforeResourceState !== undefined) {
+    snaps.beforeState.resources = data.beforeResourceState;
+    snaps.afterState.resources = data.afterResourceState ?? data.beforeResourceState;
+    delete data.beforeResourceState;
+    delete data.afterResourceState;
+  }
+  if (data.consumableChargesBefore !== undefined) {
+    snaps.beforeState.consumableCharges = data.consumableChargesBefore;
+    snaps.afterState.consumableCharges = data.consumableChargesAfter ?? data.consumableChargesBefore;
+    delete data.consumableChargesBefore;
+    delete data.consumableChargesAfter;
+  }
+}
+
+/**
+ * shortRest: resources land in `before` ONLY (there is deliberately no
+ * after.resources key — undo restores from before), plus the Warlock Pact
+ * restore when present; a short rest preserves arcanum and concentration.
+ */
+function liftShortRestSnapshot(snaps: HpOpSnapshots, data: Record<string, unknown>): void {
+  if (data.beforeResourceState !== undefined) {
+    snaps.beforeState.resources = data.beforeResourceState;
+    delete data.beforeResourceState;
+  }
+  if (data.beforeSpellState !== undefined) {
+    const beforeSpell = data.beforeSpellState as Record<string, unknown>;
+    snaps.beforeState.spellcasting = beforeSpell;
+    snaps.afterState.spellcasting = {
+      slotsUsed: {},
+      arcanumUsed: beforeSpell?.arcanumUsed ?? {},
+      spells: beforeSpell?.spells ?? [],
+      concentratingOn: beforeSpell?.concentratingOn ?? null,
+    };
+    delete data.beforeSpellState;
+  }
+}
+
+/**
+ * Item charge-pool recharge (#555) — either rest can fire it (short-trigger
+ * pools recharge on short rests too); snapshot so undo re-expends the pool.
+ */
+function liftChargePoolSnapshot(snaps: HpOpSnapshots, data: Record<string, unknown>): void {
+  if (data.chargePoolsBefore !== undefined) {
+    snaps.beforeState.chargePools = data.chargePoolsBefore;
+    snaps.afterState.chargePools = data.chargePoolsAfter ?? data.chargePoolsBefore;
+    delete data.chargePoolsBefore;
+    delete data.chargePoolsAfter;
+  }
+}
+
+/**
+ * Phase 3: assemble the before/after sub-state snapshots for the event by
+ * running the per-op snapshot lifters above. Each lifter that touches a rest/
+ * level snapshot (see liftLevelUpSnapshot / liftLongRestSnapshot /
+ * liftShortRestSnapshot / liftChargePoolSnapshot) lifts its keys OUT of
+ * eventData into before/after rather than duplicating them in the data payload.
  *
  * @param eventData MUTATED: rest/level snapshot keys (beforeSpellState,
  *   beforeResourceState, chargePoolsBefore, consumableChargesBefore, …) are
@@ -1420,66 +1585,15 @@ function buildHpOpSnapshots(
   eventData: Record<string, unknown>,
 ): { beforeState: Record<string, unknown>; afterState: Record<string, unknown> } {
   const { hp, hd } = ctx;
-  const beforeState: Record<string, unknown> = { hitPoints: beforeHp, hitDice: beforeHd };
-  const afterState: Record<string, unknown> = { hitPoints: { ...hp }, hitDice: { ...hd } };
-  if (op.type === "levelUp") {
-    // Pull the class-entry level diff from the op result — it points at the
-    // CHOSEN entry (or is null for a new-class add), not always position-0.
-    beforeState.classEntryLevel = (eventData.prevEntryLevel as number | null) ?? null;
-    afterState.classEntryLevel = (eventData.newEntryLevel as number | null) ?? null;
-  }
-  if (op.type === "longRest") {
-    const data = eventData;
-    const beforeSpell = data.beforeSpellState as Record<string, unknown>;
-    beforeState.spellcasting = beforeSpell;
-    // Reflect the cleared state, preserving the known-spell list + arcanum keys.
-    afterState.spellcasting = { slotsUsed: {}, arcanumUsed: {}, spells: beforeSpell?.spells ?? [], concentratingOn: null };
-    delete data.beforeSpellState; // don't duplicate in eventData
-    if (data.beforeResourceState !== undefined) {
-      beforeState.resources = data.beforeResourceState;
-      afterState.resources = data.afterResourceState ?? data.beforeResourceState;
-      delete data.beforeResourceState;
-      delete data.afterResourceState;
-    }
-    // Consumable recharge (#121) — snapshot so undo re-expends the charges.
-    if (data.consumableChargesBefore !== undefined) {
-      beforeState.consumableCharges = data.consumableChargesBefore;
-      afterState.consumableCharges = data.consumableChargesAfter ?? data.consumableChargesBefore;
-      delete data.consumableChargesBefore;
-      delete data.consumableChargesAfter;
-    }
-  }
-  // Item charge-pool recharge (#555) — either rest can fire it (short-trigger
-  // pools recharge on short rests too); snapshot so undo re-expends the pool.
-  if (op.type === "shortRest" || op.type === "longRest") {
-    const data = eventData;
-    if (data.chargePoolsBefore !== undefined) {
-      beforeState.chargePools = data.chargePoolsBefore;
-      afterState.chargePools = data.chargePoolsAfter ?? data.chargePoolsBefore;
-      delete data.chargePoolsBefore;
-      delete data.chargePoolsAfter;
-    }
-  }
-  if (op.type === "shortRest") {
-    const data = eventData;
-    if (data.beforeResourceState !== undefined) {
-      beforeState.resources = data.beforeResourceState;
-      delete data.beforeResourceState;
-    }
-    // Warlock Pact slot restore (present only when the rester is a Warlock).
-    if (data.beforeSpellState !== undefined) {
-      const beforeSpell = data.beforeSpellState as Record<string, unknown>;
-      beforeState.spellcasting = beforeSpell;
-      afterState.spellcasting = {
-        slotsUsed: {},
-        arcanumUsed: beforeSpell?.arcanumUsed ?? {},
-        spells: beforeSpell?.spells ?? [],
-        concentratingOn: beforeSpell?.concentratingOn ?? null,
-      };
-      delete data.beforeSpellState;
-    }
-  }
-  return { beforeState, afterState };
+  const snaps: HpOpSnapshots = {
+    beforeState: { hitPoints: beforeHp, hitDice: beforeHd },
+    afterState: { hitPoints: { ...hp }, hitDice: { ...hd } },
+  };
+  if (op.type === "levelUp") liftLevelUpSnapshot(snaps, eventData);
+  if (op.type === "longRest") liftLongRestSnapshot(snaps, eventData);
+  if (op.type === "shortRest" || op.type === "longRest") liftChargePoolSnapshot(snaps, eventData);
+  if (op.type === "shortRest") liftShortRestSnapshot(snaps, eventData);
+  return snaps;
 }
 
 /**

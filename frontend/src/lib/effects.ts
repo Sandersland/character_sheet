@@ -51,44 +51,49 @@ export interface EffectColumns {
 // A row carrying effect columns plus the level that decides the scaling axis.
 export type EffectRow = EffectColumns & { level: number; concentration?: boolean };
 
-// Adapter over the existing flat columns — no schema migration. Reproduces the
-// null-guard and scaling-mode selection from the old computeCastSpec.
-export function readEffectSpec(row: EffectRow): EffectSpec {
+// Dice resolution: a row without kind, count, or faces reads as dice-less.
+// (The backend twin additionally resolves effectDieSource via a ClassDieResolver
+// — frontend rows never carry that column.)
+function resolveEffectDice(row: EffectRow): EffectSpec["dice"] {
   const hasDice = Boolean(row.effectKind && row.effectDiceCount && row.effectDiceFaces);
-  const dice = hasDice
+  return hasDice
     ? {
         count: row.effectDiceCount as number,
         faces: row.effectDiceFaces as number,
         modifier: row.effectModifier ?? 0,
       }
     : undefined;
+}
 
-  let scaling: EffectScaling;
-  if (row.level === 0 && row.cantripScaling) {
-    scaling = { mode: "cantripLevel" };
-  } else if (row.level > 0 && row.upcastDicePerLevel) {
-    scaling = { mode: "slotUpcast", dicePerStep: row.upcastDicePerLevel };
-  } else {
-    scaling = { mode: "none" };
-  }
+// Scaling axis: cantrips (level 0) scale by character level; leveled rows with
+// upcast dice scale by slot step; everything else is fixed. The two arms are
+// mutually exclusive by `level` (0 vs >0), so only one can ever match and the
+// check order is immaterial — a level-0 row never reaches the upcast arm.
+function resolveEffectScaling(row: EffectRow): EffectScaling {
+  if (row.level === 0 && row.cantripScaling) return { mode: "cantripLevel" };
+  if (row.level > 0 && row.upcastDicePerLevel) return { mode: "slotUpcast", dicePerStep: row.upcastDicePerLevel };
+  return { mode: "none" };
+}
 
-  const effectType: EffectType =
-    row.effectKind === "heal"
-      ? "heal"
-      : row.effectKind === "damage"
-        ? "damage"
-        : row.effectKind === "buff"
-          ? "buff"
-          : "utility";
+// Effect kind → spec type ladder; anything unrecognized is roll-less "utility".
+function resolveEffectType(effectKind: string | null | undefined): EffectType {
+  if (effectKind === "heal") return "heal";
+  if (effectKind === "damage") return "damage";
+  if (effectKind === "buff") return "buff";
+  return "utility";
+}
 
+// Adapter over the existing flat columns — no schema migration. Reproduces the
+// null-guard and scaling-mode selection from the old computeCastSpec.
+export function readEffectSpec(row: EffectRow): EffectSpec {
   return {
-    effectType,
-    dice,
+    effectType: resolveEffectType(row.effectKind),
+    dice: resolveEffectDice(row),
     damageType: row.damageType ?? null,
     attackType: row.attackType ?? null,
     saveAbility: row.saveAbility ?? null,
     saveEffect: row.saveEffect ?? null,
-    scaling,
+    scaling: resolveEffectScaling(row),
     concentration: row.concentration,
     addAbilityModToHeal: row.effectKind === "heal",
     buffTarget: row.buffTarget ?? null,

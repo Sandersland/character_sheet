@@ -185,6 +185,37 @@ export function serializeResourcesState(state: ResourcesMutableState): Prisma.In
   } as unknown as Prisma.InputJsonValue;
 }
 
+/**
+ * Deep-clones the resource lists for audit-event before/after snapshots —
+ * unlike serializeResourcesState this copies every entry, so mutating `state`
+ * in place after the capture can't retroactively alter the snapshot.
+ * fightingStyle (an immutable scalar) is intentionally excluded: domains whose
+ * event shape includes it append it themselves; the advancement snapshot
+ * (a stored-event compatibility contract) has never carried it.
+ */
+export function cloneResourceLists(state: ResourcesMutableState): {
+  used: Record<string, number>;
+  maneuversKnown: ManeuverEntry[];
+  disciplinesKnown: DisciplineEntry[];
+  toolProficienciesKnown: ToolProfEntry[];
+  advancements: AdvancementEntry[];
+} {
+  return {
+    used: { ...state.used },
+    maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
+    disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
+    toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
+    advancements: state.advancements.map((a) => ({
+      ...a,
+      abilityDeltas: { ...a.abilityDeltas },
+      // Shallow-copy the improvements array so a later mutation of state can't
+      // retroactively alter this snapshot; its FeatImprovement elements are
+      // treated as immutable snapshots.
+      improvements: a.improvements ? [...a.improvements] : undefined,
+    })),
+  };
+}
+
 // ── Operation types ───────────────────────────────────────────────────────────
 
 /** Spend one or more units of a trackable resource (e.g. a superiority die). */
@@ -662,14 +693,7 @@ export async function applyResourceOperations(
       const state = normalizeResourcesMutable(row.resources);
       // Deep-copy for before snapshot.
       const beforeState = {
-        resources: {
-          used: { ...state.used },
-          maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
-          disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
-          toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
-          advancements: state.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
-          fightingStyle: state.fightingStyle,
-        },
+        resources: { ...cloneResourceLists(state), fightingStyle: state.fightingStyle },
       };
 
       let audit: ResourceOpAudit;
@@ -721,14 +745,7 @@ export async function applyResourceOperations(
       });
 
       const afterState = {
-        resources: {
-          used: { ...state.used },
-          maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
-          disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
-          toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
-          advancements: state.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
-          fightingStyle: state.fightingStyle,
-        },
+        resources: { ...cloneResourceLists(state), fightingStyle: state.fightingStyle },
       };
 
       await logEvent(tx, {
@@ -785,14 +802,7 @@ export async function applySpendResourceInTx(
 
   const state = normalizeResourcesMutable(row.resources);
   const beforeState = {
-    resources: {
-      used: { ...state.used },
-      maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
-      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
-      toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
-      advancements: state.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
-      fightingStyle: state.fightingStyle,
-    },
+    resources: { ...cloneResourceLists(state), fightingStyle: state.fightingStyle },
   };
 
   const audit = applySpendResourceOp(state, op, derivedInfo);
@@ -803,14 +813,7 @@ export async function applySpendResourceInTx(
   });
 
   const afterState = {
-    resources: {
-      used: { ...state.used },
-      maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
-      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
-      toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
-      advancements: state.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
-      fightingStyle: state.fightingStyle,
-    },
+    resources: { ...cloneResourceLists(state), fightingStyle: state.fightingStyle },
   };
 
   await logEvent(tx, {

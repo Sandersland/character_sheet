@@ -15,17 +15,25 @@
 # `build` job. Pre-push catches them locally.
 #
 # Hooks install via the root `prepare` script on `npm install`.
-# Do NOT bypass with `--no-verify` — fix the failure instead.
+# Do NOT bypass with `--no-verify` — fix the failure instead. Since #691 the
+# fallow audit also runs server-side (CI `fallow` job, a required check), so a
+# bypassed hook is re-checked on the PR anyway; adjudicated exceptions belong
+# in the diff as `fallow-ignore-next-line` inline suppressions, not in a flag.
 
 pre-commit:
   parallel: true
   commands:
     # fallow audit on changed files: dead code, complexity, duplication.
-    # Baseline-aware (.fallowrc.jsonc + .fallow/baseline.json); skips silently
-    # if fallow isn't installed so the hook stays infra-free.
+    # Baseline-aware (.fallowrc.jsonc + .fallow/baseline.json). Runs the PINNED
+    # devDependency binary (#691) — same version as CI's `fallow` job — and
+    # fails loudly when it's missing (run `npm install`) instead of skipping.
     fallow:
       run: |
-        command -v fallow >/dev/null 2>&1 || exit 0
+        FALLOW="node_modules/.bin/fallow"
+        if [ ! -x "$FALLOW" ]; then
+          echo "fallow is not installed (node_modules/.bin/fallow missing) — run: npm install" >&2
+          exit 1
+        fi
         UPSTREAM="$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)"
         if [ -n "$UPSTREAM" ]; then
           BASE="$(git merge-base "$UPSTREAM" HEAD 2>/dev/null || echo "$UPSTREAM")"
@@ -35,7 +43,7 @@ pre-commit:
         # --no-cache: skip fallow's persistent base-snapshot git worktree
         # (fallow-audit-base-cache-*). Those leak — they accumulate and exhaust
         # the git worktree slot limit, which broke the autodev/antidote pipeline.
-        fallow audit --base "$BASE" --quiet --gate-marker pre-commit --no-cache
+        "$FALLOW" audit --base "$BASE" --quiet --gate-marker pre-commit --no-cache
     lint-backend:
       root: "backend/"
       glob: "**/*.{ts,tsx}"

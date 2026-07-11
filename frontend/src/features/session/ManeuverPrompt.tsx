@@ -18,6 +18,7 @@
 import { useState } from "react";
 
 import { useManeuverDie } from "@/features/session/useManeuverDie";
+import { canPromptManeuvers, planManeuverPrompt, resolveDamageSelection } from "@/lib/maneuverPrompt";
 import type { Character, ManeuverEntry } from "@/types/character";
 import type { RollResult } from "@/lib/dice";
 
@@ -48,37 +49,24 @@ export default function ManeuverPrompt({
   const [spentFor, setSpentFor] = useState<string | null>(null);
   const [selectedDamageManeuver, setSelectedDamageManeuver] = useState("");
 
-  // ── Derive maneuver lists ─────────────────────────────────────────────────
+  // ── Derive maneuver lists (pure planning in lib/maneuverPrompt.ts) ─────────
 
   const maneuversKnown = character.resources?.maneuversKnown ?? [];
 
   // Guard: only render when the character is a Battle Master with dice left.
-  if (!pool || pool.total === 0 || pool.remaining === 0 || maneuversKnown.length === 0) {
+  // (The explicit !pool check narrows the type; the helper owns the full rule.)
+  if (!pool || !canPromptManeuvers(pool, maneuversKnown)) {
     return null;
   }
 
-  // Show only maneuvers that belong in the weapon row. Placement travels on the
-  // known-maneuver entry (catalog snapshot); custom/legacy default to damageRoll.
-  const attackRollManeuvers = maneuversKnown.filter(
-    (m) => (m.placement ?? "damageRoll") === "attackRoll",
-  );
-  const damageRollManeuvers = maneuversKnown.filter(
-    (m) => (m.placement ?? "damageRoll") === "damageRoll",
-  );
-
-  // Show sections only when the relevant roll has been made.
-  const showAttackSection = lastAttackRoll !== null && attackRollManeuvers.length > 0;
-  const showDamageSection = lastDamageRoll !== null && damageRollManeuvers.length > 0;
-
-  if (!showAttackSection && !showDamageSection) {
+  const plan = planManeuverPrompt(maneuversKnown, lastAttackRoll !== null, lastDamageRoll !== null);
+  if (!plan.visible) {
     return null;
   }
+  const { attackRollManeuvers, damageRollManeuvers, showAttackSection, showDamageSection } = plan;
 
   // Resolved current damage maneuver selection — fall back to first if state is stale.
-  const activeDamageManeuver =
-    damageRollManeuvers.some((m) => m.name === selectedDamageManeuver)
-      ? selectedDamageManeuver
-      : (damageRollManeuvers[0]?.name ?? "");
+  const activeDamageManeuver = resolveDamageSelection(damageRollManeuvers, selectedDamageManeuver);
 
   // ── Spend handlers ────────────────────────────────────────────────────────
 
@@ -102,67 +90,106 @@ export default function ManeuverPrompt({
         Superiority Die ({dieLabel}, {pool.remaining} left)
       </p>
 
-      {/* ── Add to Attack ───────────────────────────────────────────────── */}
       {showAttackSection && (
         <div className="flex items-center gap-2">
           <span className="text-xs text-gold-800">Add to Attack:</span>
           {attackRollManeuvers.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              disabled={busy || spentFor === m.name}
-              onClick={() => handlePrecision(m)}
-              className="rounded-control border border-gold-300 bg-gold-100 px-2 py-0.5 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-200 disabled:cursor-not-allowed disabled:opacity-40"
-            >
+            <SpendButton key={m.id} disabled={busy || spentFor === m.name} onClick={() => handlePrecision(m)}>
               {m.name} +{dieLabel}
-            </button>
+            </SpendButton>
           ))}
         </div>
       )}
 
-      {/* ── Add to Damage ───────────────────────────────────────────────── */}
       {showDamageSection && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-gold-800">Add to Damage:</span>
-          {damageRollManeuvers.length === 1 ? (
-            <button
-              type="button"
-              disabled={busy || spentFor === damageRollManeuvers[0].name}
-              onClick={() => handleDamage(damageRollManeuvers[0])}
-              className="rounded-control border border-gold-300 bg-gold-100 px-2 py-0.5 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-200 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {damageRollManeuvers[0].name} +{dieLabel}
-            </button>
-          ) : (
-            <>
-              <select
-                value={activeDamageManeuver}
-                onChange={(e) => setSelectedDamageManeuver(e.target.value)}
-                disabled={busy}
-                className="rounded-control border border-gold-300 bg-parchment-50 px-1.5 py-0.5 text-xs text-parchment-800 focus:outline-none focus:ring-1 focus:ring-gold-400"
-                aria-label="Select maneuver to add to damage"
-              >
-                {damageRollManeuvers.map((m) => (
-                  <option key={m.id} value={m.name}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                disabled={busy || !activeDamageManeuver || spentFor === activeDamageManeuver}
-                onClick={() => {
-                  const m = damageRollManeuvers.find((d) => d.name === activeDamageManeuver);
-                  if (m) void handleDamage(m);
-                }}
-                className="rounded-control border border-gold-300 bg-gold-100 px-2 py-0.5 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-200 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Spend {dieLabel}
-              </button>
-            </>
-          )}
+          <DamageManeuverPicker
+            maneuvers={damageRollManeuvers}
+            dieLabel={dieLabel}
+            busy={busy}
+            spentFor={spentFor}
+            active={activeDamageManeuver}
+            onSelect={setSelectedDamageManeuver}
+            onSpend={handleDamage}
+          />
         </div>
       )}
     </div>
+  );
+}
+
+/** The gold-tinted spend affordance both sections share. */
+function SpendButton({
+  disabled,
+  onClick,
+  children,
+}: {
+  disabled: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="rounded-control border border-gold-300 bg-gold-100 px-2 py-0.5 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-200 disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      {children}
+    </button>
+  );
+}
+
+/** One damage maneuver → a direct button; several → a select + a Spend button. */
+function DamageManeuverPicker({
+  maneuvers,
+  dieLabel,
+  busy,
+  spentFor,
+  active,
+  onSelect,
+  onSpend,
+}: {
+  maneuvers: ManeuverEntry[];
+  dieLabel: string;
+  busy: boolean;
+  spentFor: string | null;
+  active: string;
+  onSelect: (name: string) => void;
+  onSpend: (m: ManeuverEntry) => void;
+}) {
+  if (maneuvers.length === 1) {
+    return (
+      <SpendButton disabled={busy || spentFor === maneuvers[0].name} onClick={() => onSpend(maneuvers[0])}>
+        {maneuvers[0].name} +{dieLabel}
+      </SpendButton>
+    );
+  }
+  return (
+    <>
+      <select
+        value={active}
+        onChange={(e) => onSelect(e.target.value)}
+        disabled={busy}
+        className="rounded-control border border-gold-300 bg-parchment-50 px-1.5 py-0.5 text-xs text-parchment-800 focus:outline-none focus:ring-1 focus:ring-gold-400"
+        aria-label="Select maneuver to add to damage"
+      >
+        {maneuvers.map((m) => (
+          <option key={m.id} value={m.name}>
+            {m.name}
+          </option>
+        ))}
+      </select>
+      <SpendButton
+        disabled={busy || !active || spentFor === active}
+        onClick={() => {
+          const m = maneuvers.find((d) => d.name === active);
+          if (m) void onSpend(m);
+        }}
+      >
+        Spend {dieLabel}
+      </SpendButton>
+    </>
   );
 }

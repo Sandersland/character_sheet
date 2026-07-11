@@ -71,4 +71,104 @@ describe("CampaignItemCard (#380)", () => {
     expect(screen.getByText("20")).toBeInTheDocument();
     expect(screen.getByText("Disadvantage")).toBeInTheDocument();
   });
+
+  // #687 gap pins — the branches the detail-row extraction most endangers.
+  it("renders a consumable's dice + description joined with an em dash", () => {
+    render(
+      <CampaignItemCard
+        item={item({
+          category: "consumable",
+          weapon: undefined,
+          consumable: { effectDiceCount: 2, effectDiceFaces: 4, effectModifier: 2, effectDescription: "Regain HP" },
+        })}
+        isOwner={false}
+      />,
+    );
+    expect(screen.getByText("Effect")).toBeInTheDocument();
+    expect(screen.getByText("2d4 + 2 — Regain HP")).toBeInTheDocument();
+  });
+
+  it("renders a description-only consumable effect (no dice)", () => {
+    render(
+      <CampaignItemCard
+        item={item({
+          category: "consumable",
+          weapon: undefined,
+          consumable: { effectDescription: "Cures poison" },
+        })}
+        isOwner={false}
+      />,
+    );
+    expect(screen.getByText("Cures poison")).toBeInTheDocument();
+  });
+
+  it("omits the Effect row for a consumable with neither dice nor description", () => {
+    render(
+      <CampaignItemCard
+        item={item({ category: "consumable", weapon: undefined, consumable: {} })}
+        isOwner={false}
+      />,
+    );
+    expect(screen.queryByText("Effect")).not.toBeInTheDocument();
+  });
+
+  it("renders weapon property rows: finesse, versatile, and a negative damage modifier", () => {
+    render(
+      <CampaignItemCard
+        item={item({
+          weapon: {
+            damageDiceCount: 1,
+            damageDiceFaces: 8,
+            damageModifier: -1,
+            damageType: "slashing",
+            finesse: true,
+            light: false,
+            heavy: false,
+            twoHanded: false,
+            reach: false,
+            thrown: false,
+            ammunition: false,
+            versatileDiceCount: 1,
+            versatileDiceFaces: 10,
+          },
+        })}
+        isOwner={false}
+      />,
+    );
+    expect(screen.getByText("1d8 - 1 slashing")).toBeInTheDocument();
+    expect(screen.getByText("Finesse")).toBeInTheDocument();
+    expect(screen.getByText("1d10")).toBeInTheDocument();
+  });
+
+  it("renders weight and value rows, and the Unique badge", () => {
+    render(<CampaignItemCard item={item({ isUnique: true })} isOwner={false} />);
+    expect(screen.getByText("Weight")).toBeInTheDocument();
+    expect(screen.getByText("3 lb")).toBeInTheDocument();
+    expect(screen.getByText("Value")).toBeInTheDocument();
+    expect(screen.getByText("5000 gp")).toBeInTheDocument();
+    expect(screen.getByText("Unique")).toBeInTheDocument();
+  });
+
+  it("renders a minimal item: category badge only, no detail rows, no optional sections", () => {
+    render(
+      <CampaignItemCard
+        item={item({
+          rarity: undefined,
+          requiresAttunement: false,
+          weight: undefined,
+          cost: undefined,
+          weapon: undefined,
+          description: undefined,
+          dmNotes: undefined,
+        })}
+        isOwner
+      />,
+    );
+    expect(screen.getByText("Weapons")).toBeInTheDocument(); // itemCategoryLabel is plural
+    expect(screen.queryByText("Weight")).not.toBeInTheDocument();
+    expect(screen.queryByText("Value")).not.toBeInTheDocument();
+    expect(screen.queryByText("Description")).not.toBeInTheDocument();
+    expect(screen.queryByText(/DM notes/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Held by")).not.toBeInTheDocument();
+  });
 });

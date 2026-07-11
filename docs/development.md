@@ -44,12 +44,14 @@ Both workspaces use a `@/*` → `src/*` path alias for cross-directory imports (
 
 | Hook | Runs | Why |
 |---|---|---|
-| `pre-commit` | `eslint --fix` on staged `*.{ts,tsx}`; `fallow audit` on changed files | catch + auto-fix lint before it lands; fallow gates NEW dead code / complexity / duplication (config `.fallowrc.jsonc`; skips silently when `fallow` isn't installed — `npm i -g fallow`) |
+| `pre-commit` | `eslint --fix` on staged `*.{ts,tsx}`; `fallow audit` on changed files | catch + auto-fix lint before it lands; fallow gates NEW dead code / complexity / duplication (config `.fallowrc.jsonc`, thresholds pinned there explicitly; runs the pinned `fallow` devDependency and fails loudly if `node_modules` is missing) |
 | `pre-push` | `tsc --noEmit` + (frontend) unit tests | the **tsc** gate is the key one — vitest transpiles via esbuild and does NOT type-check, so type-only errors otherwise only surface in CI's `build` job |
 
 Jobs are **scoped per workspace** via lefthook `root:` — a backend-only push runs `typecheck-backend` and skips the frontend jobs (and vice-versa), since the two workspaces share no types. The first push of a brand-new branch can't resolve a file range, so it skips (CI is the backstop); subsequent pushes gate normally.
 
 Backend vitest stays **CI-only** (it needs Postgres) so pre-push never blocks on a DB. **Do not bypass with `--no-verify`** — fix the failure. Run a hook manually with `npx lefthook run pre-commit` / `pre-push`.
+
+The fallow audit also runs **server-side**: CI's `fallow` job (a required check on PRs, #691) re-runs the same `fallow audit --gate new-only` against the PR base with the same pinned version, so a locally bypassed hook doesn't skip the boundary. When a finding is adjudicated as acceptable (e.g. an inherent validation ladder just over the bar), suppress it **inline** with `// fallow-ignore-next-line complexity` — the suppression lands in the diff where the PR review sees it, unlike a `--no-verify` bypass which leaves no trace. The job also runs a repo-wide `fallow health --min-severity critical` step (#691 phase 2, live since the #692 stage-1 burn-down): **zero CRITICAL-severity functions are allowed anywhere in the repo**, not just in changed files — a function that crosses the pinned thresholds (`.fallowrc.jsonc` `health` block) fails CI until it's decomposed or carries a reviewed inline suppression.
 
 ## Running outside Docker (faster iteration)
 

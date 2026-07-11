@@ -31,6 +31,63 @@ jobs:
 
       - run: npm run lint
 
+  fallow:
+    # Server-side twin of the lefthook pre-commit fallow gate (#691) — two gates
+    # in one job:
+    #   1. AUDIT (PR-only step): audits the PR diff for NEW dead code /
+    #      complexity / duplication against the PR base. The enforcement layer —
+    #      a locally bypassed hook (--no-verify) gets re-checked here, so
+    #      adjudicated exceptions must be inline `fallow-ignore-next-line`
+    #      suppressions, visible in the diff. Needs a base to diff against, so
+    #      the step runs on PR events only and is skipped on the staging->main
+    #      promote PR (every line in a promote was already audited on its
+    #      feature PR).
+    #   2. HEALTH (every event): the repo-wide zero-CRITICAL ratchet (#702).
+    #      Runs on pushes to main/staging too, so a direct push can't slip a
+    #      CRITICAL past the gate the way a PR-only job would.
+    #
+    # Fork PRs skip the WHOLE job at job level: a skipped job still reports a
+    # "skipped" conclusion, which satisfies the required check (a workflow-level
+    # filter would block merges instead).
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Full history: `fallow audit --base` needs the base branch and the
+          # merge-base commits, which the default shallow clone doesn't have.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm install -g npm@11  # align with npm 11 that generated package-lock.json (npm/cli#4828)
+
+      - run: npm ci --no-audit --no-fund
+
+      # PR-only + skip the staging->main promote PR. Guarding on the PR event
+      # here (rather than at job level) lets the health step below run on push
+      # events too. --no-install forces the locally-pinned binary (never a
+      # registry fallback), matching the lefthook hook's node_modules/.bin/fallow.
+      - name: fallow audit (new findings vs PR base)
+        if: >-
+          github.event_name == 'pull_request' &&
+          !(github.event.pull_request.head.ref == 'staging' && github.event.pull_request.base.ref == 'main')
+        run: npx --no-install fallow audit --base "origin/${{ github.event.pull_request.base.ref }}" --gate new-only --no-cache
+
+      # Phase 2 of #691 — repo-wide zero-CRITICAL ratchet, enabled 2026-07-11
+      # after the #692 stage-1 burn-down (#684-#689) cleared the CRITICAL tier.
+      # Fails if ANY function anywhere crosses the CRITICAL thresholds, not just
+      # in changed files. Runs on every event (incl. pushes to main/staging), so
+      # a direct push is gated too. --no-install/--no-cache mirror the audit step.
+      - name: fallow health (no CRITICAL findings repo-wide)
+        run: npx --no-install fallow health --min-severity critical --no-cache
+
   build:
     # Production type-check + bundle. vitest transpiles via esbuild and does NOT
     # type-check, so type-only errors slip past `test`/`lint` and only surface in

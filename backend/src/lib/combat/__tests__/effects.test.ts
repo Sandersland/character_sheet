@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { readEffectSpec, resolveEffectSpec, type EffectRow } from "@/lib/combat/effects.js";
+import { readEffectSpec, resolveBuffSpec, resolveEffectSpec, type EffectRow } from "@/lib/combat/effects.js";
 
 const fireball: EffectRow = {
   level: 3,
@@ -91,5 +91,78 @@ describe("resolveEffectSpec — golden byte-parity", () => {
 
   it("utility spell resolves to null", () => {
     expect(resolveEffectSpec(readEffectSpec(detectMagic), 0, { characterLevel: 1 })).toBeNull();
+  });
+});
+
+// #685 pins: the die-source resolution arm combined with the non-damage effect
+// kinds (class-die.test.ts covers die-source × damage only), plus a full-field
+// buff byte pin. Green before the reader decomposition; unedited through it.
+describe("readEffectSpec — die-source × heal/buff combos (#685)", () => {
+  const healFromClassDie: EffectRow = {
+    level: 1,
+    effectKind: "heal",
+    effectDiceCount: 2,
+    effectDieSource: "superiorityDice",
+  };
+
+  const blessBuff: EffectRow = {
+    level: 1,
+    effectKind: "buff",
+    buffTarget: "attackRolls",
+    buffModifier: 1,
+    concentration: true,
+  };
+
+  it("die-source × heal: resolver supplies the faces, heal semantics intact", () => {
+    const spec = readEffectSpec(healFromClassDie, () => 8);
+    expect(spec.effectType).toBe("heal");
+    expect(spec.dice).toEqual({ count: 2, faces: 8, modifier: 0 });
+    expect(spec.addAbilityModToHeal).toBe(true);
+  });
+
+  it("die-source × heal with no resolver and no fixed faces reads as dice-less", () => {
+    const spec = readEffectSpec(healFromClassDie);
+    expect(spec.dice).toBeUndefined();
+    expect(spec.effectType).toBe("heal");
+  });
+
+  it("die-source with a resolver that returns null falls back to fixed effectDiceFaces (#697)", () => {
+    // effectDieSource is set AND a fixed effectDiceFaces exists; the resolver
+    // resolves the source to null → dice fall back to the fixed faces.
+    const withFixedFallback: EffectRow = { ...healFromClassDie, effectDiceFaces: 6 };
+    const spec = readEffectSpec(withFixedFallback, () => null);
+    expect(spec.dice).toEqual({ count: 2, faces: 6, modifier: 0 });
+  });
+
+  it("dice-less buff: full spec byte pin + resolveBuffSpec descriptor", () => {
+    const spec = readEffectSpec(blessBuff);
+    expect(spec).toEqual({
+      effectType: "buff",
+      dice: undefined,
+      damageType: null,
+      attackType: null,
+      saveAbility: null,
+      saveEffect: null,
+      scaling: { mode: "none" },
+      concentration: true,
+      addAbilityModToHeal: false,
+      buffTarget: "attackRolls",
+      buffModifier: 1,
+    });
+    expect(resolveBuffSpec(spec)).toEqual({ target: "attackRolls", modifier: 1 });
+  });
+
+  it("die-source × buff: resolved faces attach dice without changing the buff payload", () => {
+    const spec = readEffectSpec({ ...blessBuff, effectDiceCount: 1, effectDieSource: "superiorityDice" }, () => 10);
+    expect(spec.effectType).toBe("buff");
+    expect(spec.dice).toEqual({ count: 1, faces: 10, modifier: 0 });
+    expect(resolveBuffSpec(spec)).toEqual({ target: "attackRolls", modifier: 1 });
+  });
+
+  it("resolveBuffSpec: null for non-buffs and target-less buffs; modifier defaults to 0", () => {
+    expect(resolveBuffSpec(readEffectSpec(fireball))).toBeNull();
+    expect(resolveBuffSpec(readEffectSpec({ level: 1, effectKind: "buff" }))).toBeNull();
+    expect(resolveBuffSpec(readEffectSpec({ level: 1, effectKind: "buff", buffTarget: "initiative" })))
+      .toEqual({ target: "initiative", modifier: 0 });
   });
 });

@@ -387,18 +387,9 @@ const itemInclude = {
 
 type ItemWithDetails = Prisma.CampaignItemGetPayload<{ include: typeof itemInclude }>;
 
-// Serialize for the wire. dmNotes is included ONLY when includeDmNotes is true —
-// the single guard behind "dmNotes never reaches a player-facing payload".
-// holders (derived from live InventoryItem rows) is player-safe: just who holds
-// how many, so it appears on both the owner list and the revealed Codex card.
-function serializeCampaignItem(
-  row: ItemWithDetails,
-  includeDmNotes: boolean,
-  holders: CampaignItemHolder[] = [],
-) {
-  const entity = row.link?.campaignEntity;
+// The scalar columns, null → undefined so unset fields vanish from the wire.
+function serializeItemBase(row: ItemWithDetails) {
   return {
-    holders,
     id: row.id,
     campaignId: row.campaignId,
     name: row.name,
@@ -412,11 +403,34 @@ function serializeCampaignItem(
     isUnique: row.isUnique,
     weight: row.weight ?? undefined,
     cost: row.cost ?? undefined,
-    capabilities: row.capabilities.length > 0 ? row.capabilities.map(serializeCapability) : undefined,
-    ...(includeDmNotes ? { dmNotes: row.dmNotes ?? undefined } : {}),
+  };
+}
+
+// The per-category detail blocks — at most one is present, keyed by category.
+function serializeItemDetails(row: ItemWithDetails) {
+  return {
     weapon: row.weaponDetail ? serializeWeaponDetail(row.weaponDetail) : undefined,
     armor: row.armorDetail ? serializeArmorDetail(row.armorDetail) : undefined,
     consumable: row.consumableDetail ? serializeConsumableDetail(row.consumableDetail) : undefined,
+  };
+}
+
+// Serialize for the wire. dmNotes is included ONLY when includeDmNotes is true —
+// the single guard behind "dmNotes never reaches a player-facing payload".
+// holders (derived from live InventoryItem rows) is player-safe: just who holds
+// how many, so it appears on both the owner list and the revealed Codex card.
+function serializeCampaignItem(
+  row: ItemWithDetails,
+  includeDmNotes: boolean,
+  holders: CampaignItemHolder[] = [],
+) {
+  const entity = row.link?.campaignEntity;
+  return {
+    holders,
+    ...serializeItemBase(row),
+    capabilities: row.capabilities.length > 0 ? row.capabilities.map(serializeCapability) : undefined,
+    ...(includeDmNotes ? { dmNotes: row.dmNotes ?? undefined } : {}),
+    ...serializeItemDetails(row),
     entity: entity ? { id: entity.id, name: entity.name, visibility: entity.visibility } : undefined,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -435,6 +449,68 @@ function detailCreate(data: z.infer<typeof createItemSchema>) {
     return { consumableDetail: { create: data.consumable } };
   }
   return {};
+}
+
+// The base columns a create persists, with the same defaults create always used.
+// orElse (not ??) for the same reason as the capability column builders above.
+function createItemColumns(campaignId: string, data: z.infer<typeof createItemSchema>) {
+  return {
+    campaignId,
+    name: data.name,
+    description: orElse(data.description, null),
+    category: data.category,
+    slot: orElse(data.slot, null),
+    rarity: orElse(data.rarity, null),
+    requiresAttunement: orElse(data.requiresAttunement, false),
+    attunementPrereqKind: orElse(data.attunementPrereqKind, null),
+    attunementPrereqValue: orElse(data.attunementPrereqValue, null),
+    isUnique: orElse(data.isUnique, false),
+    weight: orElse(data.weight, null),
+    cost: orElse<z.infer<typeof createItemSchema>["cost"] | typeof Prisma.DbNull>(data.cost, Prisma.DbNull),
+    dmNotes: orElse(data.dmNotes, null),
+  };
+}
+
+// Pick only the keys a PATCH actually sent — an undefined key must stay ABSENT
+// from the Prisma update input so the column is left untouched.
+function pickDefined<T extends object, K extends keyof T>(data: T, keys: K[]): Partial<Pick<T, K>> {
+  const out: Partial<Pick<T, K>> = {};
+  for (const key of keys) {
+    if (data[key] !== undefined) out[key] = data[key];
+  }
+  return out;
+}
+
+// Clear a stale slot when the item leaves gear; else persist an explicit slot send.
+function slotUpdate(data: z.infer<typeof updateItemSchema>) {
+  if (data.category !== undefined && data.category !== "gear") return { slot: null };
+  if (data.slot !== undefined) return { slot: data.slot };
+  return {};
+}
+
+// The per-category detail upserts a PATCH may carry (create-or-update — a
+// detail block may be patched onto an item created without one).
+function detailUpsert(data: z.infer<typeof updateItemSchema>) {
+  return {
+    ...(data.weapon !== undefined ? { weaponDetail: { upsert: { create: data.weapon, update: data.weapon } } } : {}),
+    ...(data.armor !== undefined ? { armorDetail: { upsert: { create: data.armor, update: data.armor } } } : {}),
+    ...(data.consumable !== undefined
+      ? { consumableDetail: { upsert: { create: data.consumable, update: data.consumable } } }
+      : {}),
+  };
+}
+
+// A rename is mirrored onto the fronting entity so the Codex stays consistent.
+async function syncLinkedEntityName(
+  tx: Prisma.TransactionClient,
+  existing: { link: { campaignEntityId: string } | null },
+  name: string | undefined,
+): Promise<void> {
+  if (name === undefined || !existing.link) return;
+  await tx.campaignEntity.update({
+    where: { id: existing.link.campaignEntityId },
+    data: { name },
+  });
 }
 
 // ── GET /api/campaigns/:id/items ─────────────────────────────────────────────
@@ -511,19 +587,7 @@ campaignItemsRouter.post("/campaigns/:id/items", async (req, res) => {
     });
     return tx.campaignItem.create({
       data: {
-        campaignId,
-        name: data.name,
-        description: data.description ?? null,
-        category: data.category,
-        slot: data.slot ?? null,
-        rarity: data.rarity ?? null,
-        requiresAttunement: data.requiresAttunement ?? false,
-        attunementPrereqKind: data.attunementPrereqKind ?? null,
-        attunementPrereqValue: data.attunementPrereqValue ?? null,
-        isUnique: data.isUnique ?? false,
-        weight: data.weight ?? null,
-        cost: data.cost ?? Prisma.DbNull,
-        dmNotes: data.dmNotes ?? null,
+        ...createItemColumns(campaignId, data),
         ...detailCreate(data),
         ...(data.capabilities && data.capabilities.length > 0
           ? { capabilities: { create: data.capabilities.map(capabilityCreate) } }
@@ -586,37 +650,17 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
   }
 
   const updated = await prisma.$transaction(async (tx) => {
-    if (data.name !== undefined && existing.link) {
-      await tx.campaignEntity.update({
-        where: { id: existing.link.campaignEntityId },
-        data: { name: data.name },
-      });
-    }
+    await syncLinkedEntityName(tx, existing, data.name);
     return tx.campaignItem.update({
       where: { id: existing.id },
       data: {
-        ...(data.name !== undefined ? { name: data.name } : {}),
-        ...(data.description !== undefined ? { description: data.description } : {}),
-        ...(data.category !== undefined ? { category: data.category } : {}),
-        // Clear a stale slot when the item leaves gear; else persist an explicit slot send.
-        ...(data.category !== undefined && data.category !== "gear"
-          ? { slot: null }
-          : data.slot !== undefined
-            ? { slot: data.slot }
-            : {}),
-        ...(data.rarity !== undefined ? { rarity: data.rarity } : {}),
-        ...(data.requiresAttunement !== undefined ? { requiresAttunement: data.requiresAttunement } : {}),
-        ...(data.attunementPrereqKind !== undefined ? { attunementPrereqKind: data.attunementPrereqKind } : {}),
-        ...(data.attunementPrereqValue !== undefined ? { attunementPrereqValue: data.attunementPrereqValue } : {}),
-        ...(data.isUnique !== undefined ? { isUnique: data.isUnique } : {}),
-        ...(data.weight !== undefined ? { weight: data.weight } : {}),
-        ...(data.cost !== undefined ? { cost: data.cost } : {}),
-        ...(data.dmNotes !== undefined ? { dmNotes: data.dmNotes } : {}),
-        ...(data.weapon ? { weaponDetail: { upsert: { create: data.weapon, update: data.weapon } } } : {}),
-        ...(data.armor ? { armorDetail: { upsert: { create: data.armor, update: data.armor } } } : {}),
-        ...(data.consumable
-          ? { consumableDetail: { upsert: { create: data.consumable, update: data.consumable } } }
-          : {}),
+        ...pickDefined(data, [
+          "name", "description", "category", "rarity", "requiresAttunement",
+          "attunementPrereqKind", "attunementPrereqValue", "isUnique",
+          "weight", "cost", "dmNotes",
+        ]),
+        ...slotUpdate(data),
+        ...detailUpsert(data),
         // Capabilities REPLACE on any send (including []): clear then recreate, so
         // an edit that drops a bonus removes its row rather than merging.
         ...(data.capabilities !== undefined
