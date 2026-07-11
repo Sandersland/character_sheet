@@ -318,6 +318,103 @@ describe("reaction", () => {
     act(() => { result.current.startTurn(); });
     expect(result.current.reactionUsed).toBe(false);
   });
+
+  // #738 — RAW regression guard (PHB p.190): a reaction spent OFF your turn
+  // (an opportunity attack during another creature's turn) persists through the
+  // waiting states between your turns, then refreshes at the START of your turn.
+  it("an off-turn reaction persists through waiting, then refreshes on your startTurn", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    act(() => { result.current.endTurn(); }); // now idle — others' turns
+
+    act(() => { result.current.consumeReaction(); }); // opportunity attack off-turn
+    expect(result.current.reactionUsed).toBe(true);
+    expect(result.current.phase).toBe("idle"); // still waiting — carries here
+
+    act(() => { result.current.startTurn(); }); // your turn begins
+    expect(result.current.reactionUsed).toBe(false); // refreshed
+  });
+});
+
+// ── Undo (#730) ───────────────────────────────────────────────────────────────
+
+describe("turn-scoped undo", () => {
+  function inActiveTurn(character = makeCharacter()) {
+    const hook = renderHook(() => useTurnState(character, SESSION_ID));
+    act(() => { hook.result.current.startCombat(); });
+    act(() => { hook.result.current.startTurn(); });
+    return hook;
+  }
+
+  it("undo restores the economy after a consuming mutation", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.consumeAction(); });
+    expect(result.current.actionsRemaining).toBe(0);
+
+    act(() => { result.current.undo(); });
+    expect(result.current.actionsRemaining).toBe(1);
+    expect(result.current.history).toHaveLength(0);
+  });
+
+  it("undo reverses enterAttackMode (refunds the action, clears the counter)", () => {
+    const { result } = inActiveTurn(makeCharacter({ attacksPerAction: 2 }));
+    act(() => { result.current.enterAttackMode(); });
+    expect(result.current.attack).toEqual({ total: 2, used: 0 });
+
+    act(() => { result.current.undo(); });
+    expect(result.current.attack).toBeNull();
+    expect(result.current.actionsRemaining).toBe(1);
+  });
+
+  it("undo pops LIFO across multiple mutations", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.grantExtraAction(); }); // 1 → 2
+    act(() => { result.current.consumeAction(); });    // 2 → 1
+    expect(result.current.actionsRemaining).toBe(1);
+
+    act(() => { result.current.undo(); }); // undo consumeAction → 2
+    expect(result.current.actionsRemaining).toBe(2);
+    act(() => { result.current.undo(); }); // undo grantExtraAction → 1
+    expect(result.current.actionsRemaining).toBe(1);
+  });
+
+  it("undo is a no-op with an empty history", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.undo(); });
+    expect(result.current.actionsRemaining).toBe(1);
+    expect(result.current.history).toHaveLength(0);
+  });
+
+  it("no-op guards push nothing onto the history (consumeAction at 0)", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.consumeAction(); }); // 1 → 0, one snapshot
+    act(() => { result.current.consumeAction(); }); // guard: no change, no snapshot
+    expect(result.current.history).toHaveLength(1);
+  });
+
+  it("startTurn clears the history — undo never reaches across turns", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.consumeAction(); });
+    expect(result.current.history).toHaveLength(1);
+    act(() => { result.current.endTurn(); });
+    act(() => { result.current.startTurn(); });
+    expect(result.current.history).toHaveLength(0);
+  });
+
+  it("undo does NOT revert tookDamageThisTurn (leaves the HP-watcher flag alone)", () => {
+    const { result, rerender } = renderHook((c: Character) => useTurnState(c, SESSION_ID), {
+      initialProps: withHp(20),
+    });
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    rerender(withHp(14)); // took damage → flag set
+    act(() => { result.current.consumeAction(); });
+    act(() => { result.current.undo(); });
+
+    expect(result.current.actionsRemaining).toBe(1); // economy restored
+    expect(result.current.tookDamageThisTurn).toBe(true); // flag untouched
+  });
 });
 
 // ── Spell commits ─────────────────────────────────────────────────────────────

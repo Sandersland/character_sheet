@@ -49,6 +49,8 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     bonusAttack,
     twfAvailable,
     consumeBonusAction,
+    history,
+    undo,
   } = turnState;
 
   const {
@@ -177,13 +179,24 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
             <p className="mt-0.5 text-xs text-parchment-600">Round {round}</p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={handleEndTurn}
-          className="rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-600 transition-colors hover:bg-parchment-100"
-        >
-          End turn
-        </button>
+        <div className="flex items-center gap-2">
+          {history.length > 0 && (
+            <button
+              type="button"
+              onClick={undo}
+              className="rounded-control border border-arcane-300 bg-arcane-50 px-3 py-1.5 text-xs font-semibold text-arcane-700 transition-colors hover:bg-arcane-100"
+            >
+              ↩ Undo
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleEndTurn}
+            className="rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-600 transition-colors hover:bg-parchment-100"
+          >
+            End turn
+          </button>
+        </div>
       </div>
 
       {showInitiative && (
