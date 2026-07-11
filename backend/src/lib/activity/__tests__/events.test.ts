@@ -45,4 +45,28 @@ describe("diffToFields", () => {
   it("returns an empty array when nothing changed", () => {
     expect(diffToFields({ hp: 10 }, { hp: 10 })).toEqual([]);
   });
+
+  it("treats a value replaced by a primitive as an atomic change (no recursion)", () => {
+    expect(diffToFields({ effect: { on: true } }, { effect: 3 })).toEqual([
+      { path: "effect", oldValue: { on: true }, newValue: 3 },
+    ]);
+  });
+
+  it("treats an object replaced by null as an atomic change", () => {
+    expect(diffToFields({ effect: { on: true } }, { effect: null })).toEqual([
+      { path: "effect", oldValue: { on: true }, newValue: null },
+    ]);
+    expect(diffToFields({ effect: null }, { effect: { on: true } })).toEqual([
+      { path: "effect", oldValue: null, newValue: { on: true } },
+    ]);
+  });
+
+  it("recurses through multiple levels of nesting", () => {
+    expect(
+      diffToFields(
+        { a: { b: { c: 1, d: 2 } } },
+        { a: { b: { c: 9, d: 2 } } },
+      ),
+    ).toEqual([{ path: "a.b.c", oldValue: 1, newValue: 9 }]);
+  });
 });

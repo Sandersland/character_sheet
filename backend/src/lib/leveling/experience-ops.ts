@@ -124,6 +124,96 @@ async function revertLevelUps(
   });
 }
 
+// ── Op helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Resolves the target XP total + event type for one op. Award applies a signed
+ * delta clamped at 0; set takes an exact non-negative value (rejects negatives).
+ */
+export function resolveXpChange(
+  op: ExperienceOperation,
+  prevXp: number,
+): { newXp: number; eventType: "xpAward" | "xpSet" } {
+  if (op.type === "award") {
+    return { newXp: Math.max(0, prevXp + op.amount), eventType: "xpAward" };
+  }
+  if (op.value < 0) {
+    throw new InvalidExperienceOperationError("XP value must be non-negative");
+  }
+  return { newXp: op.value, eventType: "xpSet" };
+}
+
+/** The undoable timeline summary for one XP event. */
+export function xpEventSummary(
+  eventType: "xpAward" | "xpSet",
+  prevXp: number,
+  newXp: number,
+): string {
+  if (eventType === "xpSet") {
+    return `XP set to ${newXp.toLocaleString()} (was ${prevXp.toLocaleString()})`;
+  }
+  const delta = newXp - prevXp;
+  return delta >= 0
+    ? `Awarded ${delta.toLocaleString()} XP (${prevXp.toLocaleString()} → ${newXp.toLocaleString()})`
+    : `Deducted ${Math.abs(delta).toLocaleString()} XP (${prevXp.toLocaleString()} → ${newXp.toLocaleString()})`;
+}
+
+/**
+ * Applies one XP op inside the batch transaction: persist the new total, log the
+ * undoable event, auto-reverse HP/hit-dice if the derived level dropped below the
+ * applied level, then reconcile all level-gated state. State is re-read per op so
+ * a multi-op batch sees each prior result.
+ */
+async function applyExperienceOp(
+  tx: Prisma.TransactionClient,
+  op: ExperienceOperation,
+  ctx: { characterId: string; batchId: string; sessionId: string | null },
+): Promise<void> {
+  const { characterId, batchId, sessionId } = ctx;
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: { experiencePoints: true, hitDice: true },
+  });
+  if (!row) {
+    throw new InvalidExperienceOperationError(`Character not found: ${characterId}`);
+  }
+
+  const prevXp = row.experiencePoints;
+  const hd = normalizeHitDice(row.hitDice);
+  const { newXp, eventType } = resolveXpChange(op, prevXp);
+
+  // Apply the XP change first.
+  await tx.character.update({
+    where: { id: characterId },
+    data: { experiencePoints: newXp },
+  });
+
+  await logEvent(tx, {
+    characterId,
+    category: "experience",
+    type: eventType,
+    summary: xpEventSummary(eventType, prevXp, newXp),
+    before: { experiencePoints: prevXp },
+    after: { experiencePoints: newXp },
+    data: op.type === "award" ? { amount: op.amount } : { value: op.value },
+    batchId,
+    sessionId,
+  });
+
+  // Auto-reverse HP if the new XP drops derived level below applied level.
+  // This fixes the stranded-HP bug: lowering XP now rolls HP/hit-dice back.
+  const newDerivedLevel = levelForExperience(newXp);
+  if (newDerivedLevel < hd.total) {
+    await revertLevelUps(tx, characterId, hd.total, newDerivedLevel, batchId, sessionId);
+  }
+
+  // Reconcile all level-gated state (subclass choice, maneuvers known, …) in the
+  // registered order. Runs unconditionally so it catches characters who gained a
+  // subclass via XP alone (no HP level-ups applied yet) and self-heals those
+  // already in an invalid state on their next XP op.
+  await reconcileLevelGatedState({ tx, characterId, newDerivedLevel, batchId });
+}
+
 // ── Main handler ────────────────────────────────────────────────────────────
 
 /**
@@ -167,72 +257,7 @@ export async function applyExperienceOperations(
 
   await prisma.$transaction(async (tx) => {
     for (const op of operations) {
-      const row = await tx.character.findUnique({
-        where: { id: characterId },
-        select: { experiencePoints: true, hitDice: true },
-      });
-      if (!row) {
-        throw new InvalidExperienceOperationError(`Character not found: ${characterId}`);
-      }
-
-      const prevXp = row.experiencePoints;
-      const hd = normalizeHitDice(row.hitDice);
-
-      let newXp: number;
-      let eventType: "xpAward" | "xpSet";
-
-      if (op.type === "award") {
-        newXp = Math.max(0, prevXp + op.amount);
-        eventType = "xpAward";
-      } else {
-        if (op.value < 0) {
-          throw new InvalidExperienceOperationError("XP value must be non-negative");
-        }
-        newXp = op.value;
-        eventType = "xpSet";
-      }
-
-      // Apply the XP change first.
-      await tx.character.update({
-        where: { id: characterId },
-        data: { experiencePoints: newXp },
-      });
-
-      // Build the XP event summary.
-      let summary: string;
-      if (eventType === "xpAward") {
-        const delta = newXp - prevXp;
-        summary = delta >= 0
-          ? `Awarded ${delta.toLocaleString()} XP (${prevXp.toLocaleString()} → ${newXp.toLocaleString()})`
-          : `Deducted ${Math.abs(delta).toLocaleString()} XP (${prevXp.toLocaleString()} → ${newXp.toLocaleString()})`;
-      } else {
-        summary = `XP set to ${newXp.toLocaleString()} (was ${prevXp.toLocaleString()})`;
-      }
-
-      await logEvent(tx, {
-        characterId,
-        category: "experience",
-        type: eventType,
-        summary,
-        before: { experiencePoints: prevXp },
-        after: { experiencePoints: newXp },
-        data: op.type === "award" ? { amount: op.amount } : { value: op.value },
-        batchId,
-        sessionId,
-      });
-
-      // Auto-reverse HP if the new XP drops derived level below applied level.
-      // This fixes the stranded-HP bug: lowering XP now rolls HP/hit-dice back.
-      const newDerivedLevel = levelForExperience(newXp);
-      if (newDerivedLevel < hd.total) {
-        await revertLevelUps(tx, characterId, hd.total, newDerivedLevel, batchId, sessionId);
-      }
-
-      // Reconcile all level-gated state (subclass choice, maneuvers known, …)
-      // in the registered order. Runs unconditionally so it catches characters
-      // who gained a subclass via XP alone (no HP level-ups applied yet) and
-      // self-heals those already in an invalid state on their next XP op.
-      await reconcileLevelGatedState({ tx, characterId, newDerivedLevel, batchId });
+      await applyExperienceOp(tx, op, { characterId, batchId, sessionId });
     }
 
     // Retroactive path: when XP was tagged to a SPECIFIC (already-ended) session

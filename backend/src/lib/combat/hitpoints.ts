@@ -982,6 +982,31 @@ async function applyLevelUpOp(ctx: HpOpContext, op: LevelUpOperation): Promise<H
   return applySelfHealLevelUp(ctx, op);
 }
 
+type InventoryItemRow = NonNullable<HpOpContext["row"]["inventoryItems"]>[number];
+
+// The active item castSpell capability columns whose resource recharges on this
+// rest, with the charges each would restore (#528). Inactive items (neither
+// equipped nor attuned, #565) contribute nothing.
+function itemSpellCapsToReset(
+  item: InventoryItemRow,
+  rest: "short" | "long",
+): { restored: number; ids: string[] } {
+  if (item.equippedSlot == null && !item.attuned) return { restored: 0, ids: [] };
+  let restored = 0;
+  const ids: string[] = [];
+  for (const col of item.capabilities) {
+    const cap = readCapability(col);
+    if (cap.kind !== "castSpell") continue;
+    if (!castResourceRechargesOn(cap.resource, rest)) continue;
+    const used = col.used ?? 0;
+    if (used > 0) {
+      restored += used;
+      ids.push(col.id);
+    }
+  }
+  return { restored, ids };
+}
+
 // Reset the per-capability `used` counter of any active item castSpell whose
 // resource recharges on this rest (#528). Returns how many charges were restored.
 async function resetItemSpellUsesOnRest(
@@ -991,17 +1016,9 @@ async function resetItemSpellUsesOnRest(
   let restored = 0;
   const ids: string[] = [];
   for (const item of ctx.row.inventoryItems ?? []) {
-    // #565: `equipped` is derived from equippedSlot (no persisted boolean).
-    if (item.equippedSlot == null && !item.attuned) continue;
-    for (const col of item.capabilities) {
-      const cap = readCapability(col);
-      if (cap.kind !== "castSpell") continue;
-      if (!castResourceRechargesOn(cap.resource, rest)) continue;
-      if ((col.used ?? 0) > 0) {
-        restored += col.used ?? 0;
-        ids.push(col.id);
-      }
-    }
+    const caps = itemSpellCapsToReset(item, rest);
+    restored += caps.restored;
+    ids.push(...caps.ids);
   }
   if (ids.length > 0) {
     await ctx.tx.inventoryCapability.updateMany({ where: { id: { in: ids } }, data: { used: 0 } });
