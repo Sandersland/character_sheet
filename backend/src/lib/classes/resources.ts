@@ -654,6 +654,53 @@ function applyForgetToolProficiencyOp(
   };
 }
 
+// ── applyOp dispatch ──────────────────────────────────────────────────────────
+// Shared per-op context (mirrors spellcasting.ts's SpellOpContext) + a
+// discriminant-keyed handler map, so the transaction handler's applyOp reduces
+// to "build context, dispatch, persist" instead of a growing switch.
+
+interface ResourceOpContext {
+  tx: Prisma.TransactionClient;
+  state: ResourcesMutableState;
+  derivedInfo: DerivedClassInfo | null;
+  level: number;
+}
+
+type ResourceOpResult = ResourceOpAudit | Promise<ResourceOpAudit>;
+
+const RESOURCE_OP_HANDLERS: {
+  [K in ResourceOperation["type"]]: (
+    ctx: ResourceOpContext,
+    op: Extract<ResourceOperation, { type: K }>,
+  ) => ResourceOpResult;
+} = {
+  spendResource: (ctx, op) => applySpendResourceOp(ctx.state, op, ctx.derivedInfo),
+  restoreResource: (ctx, op) => applyRestoreResourceOp(ctx.state, op, ctx.derivedInfo),
+  learnManeuver: (ctx, op) => applyLearnManeuverOp(ctx.tx, ctx.state, op, ctx.derivedInfo),
+  forgetManeuver: (ctx, op) => applyForgetManeuverOp(ctx.state, op),
+  learnDiscipline: (ctx, op) => applyLearnDisciplineOp(ctx.tx, ctx.state, op, ctx.derivedInfo, ctx.level),
+  forgetDiscipline: (ctx, op) => applyForgetDisciplineOp(ctx.state, op),
+  swapDiscipline: (ctx, op) => applySwapDisciplineOp(ctx.tx, ctx.state, op, ctx.level),
+  learnToolProficiency: (ctx, op) => applyLearnToolProficiencyOp(ctx.state, op, ctx.derivedInfo),
+  forgetToolProficiency: (ctx, op) => applyForgetToolProficiencyOp(ctx.state, op),
+};
+
+function dispatchResourceOp(ctx: ResourceOpContext, op: ResourceOperation): ResourceOpResult {
+  const handler = RESOURCE_OP_HANDLERS[op.type] as (
+    ctx: ResourceOpContext,
+    op: ResourceOperation,
+  ) => ResourceOpResult;
+  return handler(ctx, op);
+}
+
+// Shared before/after event snapshot shape — used by both the batch handler
+// and applySpendResourceInTx.
+function snapshotResourcesState(state: ResourcesMutableState): {
+  resources: ReturnType<typeof cloneResourceLists> & { fightingStyle: FightingStyleKey | null };
+} {
+  return { resources: { ...cloneResourceLists(state), fightingStyle: state.fightingStyle } };
+}
+
 // ── Transaction handler ───────────────────────────────────────────────────────
 
 /**
@@ -691,50 +738,9 @@ export async function applyResourceOperations(
       const derivedInfo = deriveResources(className, subclass, level, abilityScores, profBonus);
 
       const state = normalizeResourcesMutable(row.resources);
-      // Deep-copy for before snapshot.
-      const beforeState = {
-        resources: { ...cloneResourceLists(state), fightingStyle: state.fightingStyle },
-      };
+      const beforeState = snapshotResourcesState(state);
 
-      let audit: ResourceOpAudit;
-
-      switch (op.type) {
-        case "spendResource":
-          audit = applySpendResourceOp(state, op, derivedInfo);
-          break;
-
-        case "restoreResource":
-          audit = applyRestoreResourceOp(state, op, derivedInfo);
-          break;
-
-        case "learnManeuver":
-          audit = await applyLearnManeuverOp(tx, state, op, derivedInfo);
-          break;
-
-        case "forgetManeuver":
-          audit = applyForgetManeuverOp(state, op);
-          break;
-
-        case "learnDiscipline":
-          audit = await applyLearnDisciplineOp(tx, state, op, derivedInfo, level);
-          break;
-
-        case "forgetDiscipline":
-          audit = applyForgetDisciplineOp(state, op);
-          break;
-
-        case "swapDiscipline":
-          audit = await applySwapDisciplineOp(tx, state, op, level);
-          break;
-
-        case "learnToolProficiency":
-          audit = applyLearnToolProficiencyOp(state, op, derivedInfo);
-          break;
-
-        case "forgetToolProficiency":
-          audit = applyForgetToolProficiencyOp(state, op);
-          break;
-      }
+      const audit = await dispatchResourceOp({ tx, state, derivedInfo, level }, op);
 
       // Write the updated state back — always via serializeResourcesState so
       // all keys round-trip (prevents clobbering toolProficienciesKnown when
@@ -744,9 +750,7 @@ export async function applyResourceOperations(
         data: { resources: serializeResourcesState(state) },
       });
 
-      const afterState = {
-        resources: { ...cloneResourceLists(state), fightingStyle: state.fightingStyle },
-      };
+      const afterState = snapshotResourcesState(state);
 
       await logEvent(tx, {
         characterId,
@@ -801,9 +805,7 @@ export async function applySpendResourceInTx(
   const derivedInfo = deriveResources(className, subclass, level, abilityScores, profBonus);
 
   const state = normalizeResourcesMutable(row.resources);
-  const beforeState = {
-    resources: { ...cloneResourceLists(state), fightingStyle: state.fightingStyle },
-  };
+  const beforeState = snapshotResourcesState(state);
 
   const audit = applySpendResourceOp(state, op, derivedInfo);
 
@@ -812,9 +814,7 @@ export async function applySpendResourceInTx(
     data: { resources: serializeResourcesState(state) },
   });
 
-  const afterState = {
-    resources: { ...cloneResourceLists(state), fightingStyle: state.fightingStyle },
-  };
+  const afterState = snapshotResourcesState(state);
 
   await logEvent(tx, {
     characterId,
