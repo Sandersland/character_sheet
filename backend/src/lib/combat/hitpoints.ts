@@ -24,7 +24,7 @@ import {
   multiclassPrerequisitesMet,
 } from "@/lib/srd/srd.js";
 import { rollDie } from "@/lib/core/dice.js";
-import { deriveResources } from "@/lib/classes/class-features.js";
+import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import {
   cloneResourceLists,
   normalizeResourcesMutable,
@@ -1069,7 +1069,7 @@ function poolRechargesOn(recharge: string, rest: "short" | "long"): boolean {
 }
 
 /** Derive the primary class entry's resource pools (recharge schedule included). */
-function deriveRestPools(row: HpOpContext["row"]): ReturnType<typeof deriveResources> {
+function deriveRestPools(row: HpOpContext["row"]): DerivedClassInfo | null {
   const level = levelForExperience(row.experiencePoints);
   const classEntry = row.classEntries[0];
   return deriveResources(
@@ -1490,18 +1490,6 @@ async function dispatchHpOp(ctx: HpOpContext, op: HpStateOperation): Promise<HpO
   }
 }
 
-/**
- * Phase 3: build the before/after sub-state snapshots for the event. levelUp
- * also captures the class-entry level because the op mutates that outside the
- * JSON columns. longRest captures spellcasting so undoing it re-expends the
- * slots. Rest-op snapshot keys are lifted OUT of eventData (and deleted) so
- * they live in before/after rather than being duplicated in the data payload.
- *
- * @param eventData MUTATED: rest/level snapshot keys (beforeSpellState,
- *   beforeResourceState, chargePoolsBefore, consumableChargesBefore, …) are
- *   lifted into before/after and `delete`d here, so on return `eventData` holds
- *   only the fields that belong in the event's `data` payload.
- */
 /** The mutable pair every snapshot lifter below appends to. */
 interface HpOpSnapshots {
   beforeState: Record<string, unknown>;
@@ -1577,6 +1565,18 @@ function liftChargePoolSnapshot(snaps: HpOpSnapshots, data: Record<string, unkno
   }
 }
 
+/**
+ * Phase 3: assemble the before/after sub-state snapshots for the event by
+ * running the per-op snapshot lifters above. Each lifter that touches a rest/
+ * level snapshot (see liftLevelUpSnapshot / liftLongRestSnapshot /
+ * liftShortRestSnapshot / liftChargePoolSnapshot) lifts its keys OUT of
+ * eventData into before/after rather than duplicating them in the data payload.
+ *
+ * @param eventData MUTATED: rest/level snapshot keys (beforeSpellState,
+ *   beforeResourceState, chargePoolsBefore, consumableChargesBefore, …) are
+ *   lifted into before/after and `delete`d here, so on return `eventData` holds
+ *   only the fields that belong in the event's `data` payload.
+ */
 function buildHpOpSnapshots(
   ctx: HpOpContext,
   op: HpStateOperation,

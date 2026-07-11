@@ -185,7 +185,7 @@ function DamageManeuverPicker({
         disabled={busy || !active || spentFor === active}
         onClick={() => {
           const m = maneuvers.find((d) => d.name === active);
-          if (m) onSpend(m);
+          if (m) void onSpend(m);
         }}
       >
         Spend {dieLabel}

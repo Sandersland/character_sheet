@@ -66,7 +66,9 @@ function resolveEffectDice(row: EffectRow): EffectSpec["dice"] {
 }
 
 // Scaling axis: cantrips (level 0) scale by character level; leveled rows with
-// upcast dice scale by slot step; everything else is fixed.
+// upcast dice scale by slot step; everything else is fixed. The two arms are
+// mutually exclusive by `level` (0 vs >0), so only one can ever match and the
+// check order is immaterial — a level-0 row never reaches the upcast arm.
 function resolveEffectScaling(row: EffectRow): EffectScaling {
   if (row.level === 0 && row.cantripScaling) return { mode: "cantripLevel" };
   if (row.level > 0 && row.upcastDicePerLevel) return { mode: "slotUpcast", dicePerStep: row.upcastDicePerLevel };

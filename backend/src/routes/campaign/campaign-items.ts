@@ -492,9 +492,9 @@ function slotUpdate(data: z.infer<typeof updateItemSchema>) {
 // detail block may be patched onto an item created without one).
 function detailUpsert(data: z.infer<typeof updateItemSchema>) {
   return {
-    ...(data.weapon ? { weaponDetail: { upsert: { create: data.weapon, update: data.weapon } } } : {}),
-    ...(data.armor ? { armorDetail: { upsert: { create: data.armor, update: data.armor } } } : {}),
-    ...(data.consumable
+    ...(data.weapon !== undefined ? { weaponDetail: { upsert: { create: data.weapon, update: data.weapon } } } : {}),
+    ...(data.armor !== undefined ? { armorDetail: { upsert: { create: data.armor, update: data.armor } } } : {}),
+    ...(data.consumable !== undefined
       ? { consumableDetail: { upsert: { create: data.consumable, update: data.consumable } } }
       : {}),
   };

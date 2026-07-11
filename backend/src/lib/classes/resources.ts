@@ -205,7 +205,14 @@ export function cloneResourceLists(state: ResourcesMutableState): {
     maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
     disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
     toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
-    advancements: state.advancements.map((a) => ({ ...a, abilityDeltas: { ...a.abilityDeltas } })),
+    advancements: state.advancements.map((a) => ({
+      ...a,
+      abilityDeltas: { ...a.abilityDeltas },
+      // Shallow-copy the improvements array so a later mutation of state can't
+      // retroactively alter this snapshot; its FeatImprovement elements are
+      // treated as immutable snapshots.
+      improvements: a.improvements ? [...a.improvements] : undefined,
+    })),
   };
 }
 
