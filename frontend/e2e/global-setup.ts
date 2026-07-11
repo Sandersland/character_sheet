@@ -181,7 +181,10 @@ async function ensureCampaign(cookie: string, name: string): Promise<string> {
   return id;
 }
 
-async function createPersona(cookie: string, persona: Persona): Promise<void> {
+// Create the base character and return its id. Ability scores are fixed; every
+// level-gated extra is layered on afterward through the same transaction
+// endpoints the app uses, so derived state (slots, subclass eligibility) is exact.
+async function seedCharacterShell(cookie: string, persona: Persona): Promise<string> {
   const response = await api(cookie, "/api/characters", {
     method: "POST",
     body: JSON.stringify({
@@ -197,77 +200,93 @@ async function createPersona(cookie: string, persona: Persona): Promise<void> {
     throw new Error(`Failed to create ${persona.name}: ${response.status} ${await response.text()}`);
   }
   const { id } = (await response.json()) as { id: string };
+  return id;
+}
 
-  // XP goes through the transactions endpoint (not the create body) so the level
-  // — and thus spell slots / subclass eligibility — derive server-side exactly as
-  // they would in the app.
-  if (persona.experiencePoints) {
-    const xpResponse = await api(cookie, `/api/characters/${id}/experience`, {
-      method: "POST",
-      body: JSON.stringify({ operations: [{ type: "set", value: persona.experiencePoints }] }),
-    });
-    if (!xpResponse.ok) throw new Error(`Failed to set XP for ${persona.name}: ${xpResponse.status}`);
-  }
+// XP goes through the transactions endpoint (not the create body) so the level —
+// and thus spell slots / subclass eligibility — derive server-side as in the app.
+async function seedExperience(cookie: string, id: string, persona: Persona): Promise<void> {
+  if (!persona.experiencePoints) return;
+  const res = await api(cookie, `/api/characters/${id}/experience`, {
+    method: "POST",
+    body: JSON.stringify({ operations: [{ type: "set", value: persona.experiencePoints }] }),
+  });
+  if (!res.ok) throw new Error(`Failed to set XP for ${persona.name}: ${res.status}`);
+}
 
-  // Class-entry level tracks applied HP level-ups, not XP-derived level. Drive
-  // (classLevel - 1) average level-ups so level-gated features (Ki-Empowered
-  // Strikes) derive correctly.
-  if (persona.classLevel && persona.classLevel > 1) {
-    const levelUps = Array.from({ length: persona.classLevel - 1 }, () => ({
-      type: "levelUp",
-      method: "average",
-    }));
-    const hpResponse = await api(cookie, `/api/characters/${id}/hp`, {
-      method: "POST",
-      body: JSON.stringify({ operations: levelUps }),
-    });
-    if (!hpResponse.ok) throw new Error(`Failed to level up ${persona.name}: ${hpResponse.status}`);
-  }
+// Class-entry level tracks applied HP level-ups, not XP-derived level. Drive
+// (classLevel - 1) average level-ups so level-gated features (Ki-Empowered
+// Strikes) derive correctly.
+async function seedLevelUps(cookie: string, id: string, persona: Persona): Promise<void> {
+  if (!persona.classLevel || persona.classLevel <= 1) return;
+  const levelUps = Array.from({ length: persona.classLevel - 1 }, () => ({ type: "levelUp", method: "average" }));
+  const res = await api(cookie, `/api/characters/${id}/hp`, {
+    method: "POST",
+    body: JSON.stringify({ operations: levelUps }),
+  });
+  if (!res.ok) throw new Error(`Failed to level up ${persona.name}: ${res.status}`);
+}
 
-  // Subclass is chosen post-creation via the class transactions endpoint (Fighter
-  // grants it at L3, so the XP set above is a prerequisite).
-  if (persona.subclassName) {
-    const id_ = await subclassId(cookie, persona.className, persona.subclassName);
-    const subResponse = await api(cookie, `/api/characters/${id}/class/transactions`, {
-      method: "POST",
-      body: JSON.stringify({ operations: [{ type: "setSubclass", subclassId: id_ }] }),
-    });
-    if (!subResponse.ok) throw new Error(`Failed to set subclass for ${persona.name}: ${subResponse.status}`);
-  }
+// Subclass is chosen post-creation via the class transactions endpoint (Fighter
+// grants it at L3, so the XP set above is a prerequisite).
+async function seedSubclass(cookie: string, id: string, persona: Persona): Promise<void> {
+  if (!persona.subclassName) return;
+  const subclass = await subclassId(cookie, persona.className, persona.subclassName);
+  const res = await api(cookie, `/api/characters/${id}/class/transactions`, {
+    method: "POST",
+    body: JSON.stringify({ operations: [{ type: "setSubclass", subclassId: subclass }] }),
+  });
+  if (!res.ok) throw new Error(`Failed to set subclass for ${persona.name}: ${res.status}`);
+}
 
-  // Maneuvers are learned via the resource transactions endpoint.
-  if (persona.maneuverName) {
-    const mid = await maneuverId(cookie, persona.maneuverName);
-    const manResponse = await api(cookie, `/api/characters/${id}/resources/transactions`, {
-      method: "POST",
-      body: JSON.stringify({ operations: [{ type: "learnManeuver", maneuverId: mid }] }),
-    });
-    if (!manResponse.ok) throw new Error(`Failed to learn maneuver for ${persona.name}: ${manResponse.status}`);
-  }
+// Maneuvers are learned via the resource transactions endpoint.
+async function seedManeuver(cookie: string, id: string, persona: Persona): Promise<void> {
+  if (!persona.maneuverName) return;
+  const mid = await maneuverId(cookie, persona.maneuverName);
+  const res = await api(cookie, `/api/characters/${id}/resources/transactions`, {
+    method: "POST",
+    body: JSON.stringify({ operations: [{ type: "learnManeuver", maneuverId: mid }] }),
+  });
+  if (!res.ok) throw new Error(`Failed to learn maneuver for ${persona.name}: ${res.status}`);
+}
 
-  // Elemental disciplines are learned via the resource transactions endpoint.
-  if (persona.disciplineName) {
-    const dResponse = await api(cookie, "/api/disciplines");
-    if (!dResponse.ok) throw new Error(`Failed to load disciplines: ${dResponse.status}`);
-    const catalog = (await dResponse.json()) as { id: string; name: string }[];
-    const match = catalog.find((d) => d.name === persona.disciplineName);
-    if (!match) throw new Error(`Discipline not found: ${persona.disciplineName}`);
-    const learnResponse = await api(cookie, `/api/characters/${id}/resources/transactions`, {
-      method: "POST",
-      body: JSON.stringify({ operations: [{ type: "learnDiscipline", disciplineId: match.id }] }),
-    });
-    if (!learnResponse.ok) throw new Error(`Failed to learn discipline for ${persona.name}: ${learnResponse.status}`);
-  }
+// Elemental disciplines are learned via the resource transactions endpoint.
+async function seedDiscipline(cookie: string, id: string, persona: Persona): Promise<void> {
+  if (!persona.disciplineName) return;
+  const dResponse = await api(cookie, "/api/disciplines");
+  if (!dResponse.ok) throw new Error(`Failed to load disciplines: ${dResponse.status}`);
+  const catalog = (await dResponse.json()) as { id: string; name: string }[];
+  const match = catalog.find((d) => d.name === persona.disciplineName);
+  if (!match) throw new Error(`Discipline not found: ${persona.disciplineName}`);
+  const res = await api(cookie, `/api/characters/${id}/resources/transactions`, {
+    method: "POST",
+    body: JSON.stringify({ operations: [{ type: "learnDiscipline", disciplineId: match.id }] }),
+  });
+  if (!res.ok) throw new Error(`Failed to learn discipline for ${persona.name}: ${res.status}`);
+}
 
-  // Attach to a dedicated campaign so the persona can start a live session.
-  if (persona.campaignName) {
-    const campaignId = await ensureCampaign(cookie, persona.campaignName);
-    const attachResponse = await api(cookie, `/api/campaigns/${campaignId}/characters`, {
-      method: "POST",
-      body: JSON.stringify({ characterId: id }),
-    });
-    if (!attachResponse.ok) throw new Error(`Failed to attach ${persona.name} to campaign: ${attachResponse.status}`);
-  }
+// Attach to a dedicated campaign so the persona can start a live session.
+async function attachToCampaign(cookie: string, id: string, persona: Persona): Promise<void> {
+  if (!persona.campaignName) return;
+  const campaignId = await ensureCampaign(cookie, persona.campaignName);
+  const res = await api(cookie, `/api/campaigns/${campaignId}/characters`, {
+    method: "POST",
+    body: JSON.stringify({ characterId: id }),
+  });
+  if (!res.ok) throw new Error(`Failed to attach ${persona.name} to campaign: ${res.status}`);
+}
+
+// Seed one persona: create the shell, then layer on each level-gated extra in
+// dependency order (XP before subclass, etc.). Each step no-ops when the
+// persona doesn't declare it.
+async function createPersona(cookie: string, persona: Persona): Promise<void> {
+  const id = await seedCharacterShell(cookie, persona);
+  await seedExperience(cookie, id, persona);
+  await seedLevelUps(cookie, id, persona);
+  await seedSubclass(cookie, id, persona);
+  await seedManeuver(cookie, id, persona);
+  await seedDiscipline(cookie, id, persona);
+  await attachToCampaign(cookie, id, persona);
 }
 
 export default async function globalSetup(): Promise<void> {
