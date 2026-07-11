@@ -1,5 +1,6 @@
 // One attack row (equipped weapon, unarmed, or improvised) driven by an AttackEntry.
 
+import AttackResultLine from "@/features/session/AttackResultLine";
 import ManeuverPrompt from "@/features/session/ManeuverPrompt";
 import type { AttackEntry, DamageRider } from "@/lib/attackMath";
 import type { Character } from "@/types/character";
@@ -62,15 +63,18 @@ export default function AttackRow({
               <span className="ml-1 italic text-parchment-600">{entry.note}</span>
             )}
           </p>
-          {attackTotal !== null && attackTotal !== undefined && (
-            <p className="text-xs font-semibold text-gold-800">
-              Attack total: {attackTotal} <span className="font-normal opacity-70">(+maneuver)</span>
-            </p>
+          {/* Persistent roll results — the die box + total stay on the row after
+              the transient 3D-dice animation + toast fade. */}
+          {lastAttackRoll && (
+            <AttackResultLine result={lastAttackRoll} kind="attack" overrideTotal={attackTotal} />
           )}
-          {damageTotal !== null && damageTotal !== undefined && (
-            <p className="text-xs font-semibold text-gold-800">
-              Damage total: {damageTotal} <span className="font-normal opacity-70">(+maneuver)</span>
-            </p>
+          {lastDamageRoll && (
+            <AttackResultLine
+              result={lastDamageRoll}
+              kind="damage"
+              damageType={entry.damageType}
+              overrideTotal={damageTotal}
+            />
           )}
         </div>
         <div className="flex items-center gap-2">

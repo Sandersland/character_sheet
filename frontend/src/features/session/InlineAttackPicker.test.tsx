@@ -267,3 +267,32 @@ describe("InlineAttackPicker — critical damage button", () => {
     expect(riderCall!.faces).toHaveLength(2);
   });
 });
+
+describe("InlineAttackPicker — persistent inline roll result (#745)", () => {
+  it("shows the attack die box after rolling to hit", async () => {
+    renderPicker(
+      makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] }),
+    );
+
+    // No result visible until a roll happens.
+    expect(screen.queryByText("d20")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getAllByRole("button", { name: /^Attack$/ })[0]);
+
+    // The to-hit d20 die box now persists on the row (value is random; the
+    // caption is deterministic).
+    expect(screen.getByText("d20")).toBeInTheDocument();
+  });
+
+  it("shows the weapon damage die box after rolling damage", async () => {
+    renderPicker(
+      makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] }),
+    );
+
+    await userEvent.click(screen.getAllByRole("button", { name: /^Damage$/ })[0]);
+
+    // Flame Tongue base damage is 1d8 slashing.
+    expect(screen.getByText("d8")).toBeInTheDocument();
+    expect(screen.getByText("slashing")).toBeInTheDocument();
+  });
+});

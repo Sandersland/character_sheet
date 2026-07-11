@@ -66,7 +66,7 @@ frontend/src/
 │   │                    #   SessionsModal, SessionSummaryModal (→ useSessionRecapDetail +
 │   │                    #   CampaignRecapSection/RecapFacts/RecapPrimitives/ParticipantRecapCard/
 │   │                    #   SessionJournalList/SessionAddXpForm), Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
-│   │                    #   AttackRow, EquipWeaponPanel, AttackOptionRow,
+│   │                    #   AttackRow, AttackResultLine, EquipWeaponPanel, AttackOptionRow,
 │   │                    #   useSpellPicker + SpellPickerRow/SlotLevelSelector/SpellTargetToggle,
 │   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie,
 │   │                    #   useSessionButton (sheet-header Start/Join/Resume session state)
