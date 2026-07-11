@@ -126,7 +126,7 @@ export default function OverflowMenu({ items, label, className = "" }: OverflowM
               className={[
                 "block w-full px-3 py-1.5 text-left text-sm transition-colors focus-visible:outline-none",
                 item.disabled
-                  ? "cursor-not-allowed opacity-50"
+                  ? "cursor-not-allowed opacity-50 focus-visible:bg-parchment-100"
                   : "focus-visible:bg-parchment-100 hover:bg-parchment-100",
                 item.separatorBefore ? "border-t border-parchment-200" : "",
                 item.danger ? "text-garnet-700" : "text-parchment-800",

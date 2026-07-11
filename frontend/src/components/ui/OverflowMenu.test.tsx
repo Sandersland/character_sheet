@@ -171,6 +171,8 @@ describe("OverflowMenu", () => {
     await user.click(screen.getByRole("button", { name: "More actions" }));
     const item = screen.getByRole("menuitem", { name: "Leave" });
     expect(item).toHaveAttribute("aria-disabled", "true");
+    // Keep the keyboard focus cue so roving nav onto a disabled item is still visible.
+    expect(item.className).toContain("focus-visible:bg-parchment-100");
     await user.click(item);
     expect(onSelect).not.toHaveBeenCalled();
     // menu stays open — a no-op click shouldn't dismiss it
