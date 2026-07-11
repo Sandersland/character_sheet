@@ -63,8 +63,8 @@ export default function AttackRow({
               <span className="ml-1 italic text-parchment-600">{entry.note}</span>
             )}
           </p>
-          {/* Persistent roll results (#745) — supersede the old maneuver-only
-              total lines; the die box + total stays visible after the toast. */}
+          {/* Persistent roll results — the die box + total stay on the row after
+              the transient 3D-dice animation + toast fade. */}
           {lastAttackRoll && (
             <AttackResultLine result={lastAttackRoll} kind="attack" overrideTotal={attackTotal} />
           )}
