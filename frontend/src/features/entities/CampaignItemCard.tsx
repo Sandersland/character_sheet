@@ -1,6 +1,7 @@
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
 import { Lock } from "@/components/ui/icons";
+import { itemDetailRows } from "@/lib/itemCard";
 import { itemCategoryLabel } from "@/lib/items";
 import { rarityLabel, rarityTone } from "@/lib/rarity";
 import type { CampaignItem } from "@/types/character";
@@ -13,12 +14,6 @@ interface CampaignItemCardProps {
 
 const labelCls = "block text-xs font-semibold text-parchment-700";
 
-function diceLabel(count?: number, faces?: number, modifier?: number): string | null {
-  if (!count || !faces) return null;
-  const mod = modifier ? (modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`) : "";
-  return `${count}d${faces}${mod}`;
-}
-
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-4 py-1 text-sm">
@@ -29,15 +24,9 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 }
 
 // The Codex item card: badges (rarity/attunement/unique), category-specific
-// mechanical detail, description, and — owner only — the DM's private notes.
+// mechanical detail (rows derived in lib/itemCard.ts), description, and —
+// owner only — the DM's private notes.
 export default function CampaignItemCard({ item, isOwner }: CampaignItemCardProps) {
-  const weaponDice = item.weapon
-    ? diceLabel(item.weapon.damageDiceCount, item.weapon.damageDiceFaces, item.weapon.damageModifier)
-    : null;
-  const consumableDice = item.consumable
-    ? diceLabel(item.consumable.effectDiceCount, item.consumable.effectDiceFaces, item.consumable.effectModifier)
-    : null;
-
   return (
     <Card title="Item" headingLevel={2} className="p-4">
       <div className="flex flex-col gap-3 p-4">
@@ -49,36 +38,9 @@ export default function CampaignItemCard({ item, isOwner }: CampaignItemCardProp
         </div>
 
         <div className="rounded-control border border-parchment-200 bg-parchment-50 px-3 py-1">
-          {item.weight !== undefined && <DetailRow label="Weight" value={`${item.weight} lb`} />}
-          {item.cost?.gp !== undefined && <DetailRow label="Value" value={`${item.cost.gp} gp`} />}
-
-          {item.weapon && (
-            <>
-              {weaponDice && <DetailRow label="Damage" value={`${weaponDice} ${item.weapon.damageType}`} />}
-              {item.weapon.finesse && <DetailRow label="Property" value="Finesse" />}
-              {item.weapon.versatileDiceFaces && (
-                <DetailRow
-                  label="Versatile"
-                  value={`1d${item.weapon.versatileDiceFaces}`}
-                />
-              )}
-            </>
-          )}
-          {item.armor && (
-            <>
-              <DetailRow label="Armor class" value={`${item.armor.baseArmorClass}`} />
-              <DetailRow label="Armor type" value={item.armor.armorCategory} />
-              {item.armor.stealthDisadvantage && (
-                <DetailRow label="Stealth" value="Disadvantage" />
-              )}
-            </>
-          )}
-          {item.consumable && (consumableDice || item.consumable.effectDescription) && (
-            <DetailRow
-              label="Effect"
-              value={[consumableDice, item.consumable.effectDescription].filter(Boolean).join(" — ")}
-            />
-          )}
+          {itemDetailRows(item).map((row) => (
+            <DetailRow key={row.label} label={row.label} value={row.value} />
+          ))}
         </div>
 
         {item.description && (
