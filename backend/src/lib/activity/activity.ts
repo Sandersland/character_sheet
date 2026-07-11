@@ -98,54 +98,71 @@ interface RevertContext {
 
 type RevertHandler = (ctx: RevertContext) => Promise<void>;
 
-// Shared by `hitPoints` and `experience` (registered under both keys).
-async function revertHitPointsEvent(ctx: RevertContext): Promise<void> {
-  const { tx, characterId, event, before } = ctx;
-
-  // Restore hitPoints/hitDice from before snapshot.
+// Restore hitPoints/hitDice/experiencePoints from before snapshot. Long/short
+// rest also snapshot spellcasting + resources — restore them so undoing a
+// rest re-expends the slots/dice that were cleared.
+async function restoreHitPointColumns(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  before: Record<string, unknown>,
+): Promise<void> {
   const updateData: Record<string, unknown> = {};
   if (before.hitPoints !== undefined) updateData.hitPoints = before.hitPoints;
   if (before.hitDice !== undefined) updateData.hitDice = before.hitDice;
   if (before.experiencePoints !== undefined) updateData.experiencePoints = before.experiencePoints;
-  // Long/short rest also snapshot spellcasting + resources — restore them
-  // so undoing a rest re-expends the slots/dice that were cleared.
   if (before.spellcasting !== undefined) updateData.spellcasting = before.spellcasting;
   if (before.resources !== undefined) updateData.resources = before.resources;
-  if (Object.keys(updateData).length > 0) {
-    await tx.character.update({
-      where: { id: characterId },
-      data: updateData as Prisma.CharacterUpdateInput,
-    });
-  }
+  if (Object.keys(updateData).length === 0) return;
+  await tx.character.update({
+    where: { id: characterId },
+    data: updateData as Prisma.CharacterUpdateInput,
+  });
+}
 
-  // Undo a long-rest consumable recharge (#121): re-expend each charge.
+// Undo a long-rest consumable recharge (#121): re-expend each charge.
+async function restoreConsumableCharges(
+  tx: Prisma.TransactionClient,
+  before: Record<string, unknown>,
+): Promise<void> {
   const beforeCharges = before.consumableCharges as
     | { inventoryItemId: string; usesRemaining: number | null }[]
     | undefined;
-  if (beforeCharges) {
-    for (const c of beforeCharges) {
-      await tx.inventoryConsumableDetail.updateMany({
-        where: { inventoryItemId: c.inventoryItemId },
-        data: { usesRemaining: c.usesRemaining },
-      });
-    }
+  if (!beforeCharges) return;
+  for (const c of beforeCharges) {
+    await tx.inventoryConsumableDetail.updateMany({
+      where: { inventoryItemId: c.inventoryItemId },
+      data: { usesRemaining: c.usesRemaining },
+    });
   }
+}
 
-  // Undo a rest's item charge-pool recharge (#555): re-expend each pool.
-  // updateMany so a pool whose item was deleted after the rest is a no-op.
+// Undo a rest's item charge-pool recharge (#555): re-expend each pool.
+// updateMany so a pool whose item was deleted after the rest is a no-op.
+async function restoreChargePools(
+  tx: Prisma.TransactionClient,
+  before: Record<string, unknown>,
+): Promise<void> {
   const beforeChargePools = before.chargePools as
     | { capabilityId: string; used: number }[]
     | undefined;
-  if (beforeChargePools) {
-    for (const p of beforeChargePools) {
-      await tx.inventoryCapability.updateMany({
-        where: { id: p.capabilityId },
-        data: { used: p.used },
-      });
-    }
+  if (!beforeChargePools) return;
+  for (const p of beforeChargePools) {
+    await tx.inventoryCapability.updateMany({
+      where: { id: p.capabilityId },
+      data: { used: p.used },
+    });
   }
+}
 
-  // Restore class-entry level if the event touched it (levelUp/levelDown).
+// Restore class-entry level if the event touched it (levelUp/levelDown), and
+// delete any CharacterClassEntry a multiclass "new class" level-up created
+// (#124) — or a ghost entry survives the revert. deleteMany so a later
+// level-down that already removed it is a no-op.
+async function restoreLevelUpClassEntry(
+  tx: Prisma.TransactionClient,
+  event: CharacterEvent,
+  before: Record<string, unknown>,
+): Promise<void> {
   const data = event.data as Record<string, unknown> | null;
   if (data?.primaryEntryId && before.classEntryLevel !== undefined) {
     await tx.characterClassEntry.update({
@@ -153,14 +170,20 @@ async function revertHitPointsEvent(ctx: RevertContext): Promise<void> {
       data: { level: before.classEntryLevel as number },
     });
   }
-  // A multiclass "new class" level-up created a fresh CharacterClassEntry
-  // (#124). Undo must delete it, or a ghost entry survives the revert.
-  // deleteMany so a later level-down that already removed it is a no-op.
   if (data?.createdClassEntryId) {
     await tx.characterClassEntry.deleteMany({
       where: { id: data.createdClassEntryId as string },
     });
   }
+}
+
+// Shared by `hitPoints` and `experience` (registered under both keys).
+async function revertHitPointsEvent(ctx: RevertContext): Promise<void> {
+  const { tx, characterId, event, before } = ctx;
+  await restoreHitPointColumns(tx, characterId, before);
+  await restoreConsumableCharges(tx, before);
+  await restoreChargePools(tx, before);
+  await restoreLevelUpClassEntry(tx, event, before);
 }
 
 async function revertCurrencyEvent(ctx: RevertContext): Promise<void> {
