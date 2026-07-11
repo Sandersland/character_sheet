@@ -13,6 +13,7 @@
  */
 
 import Card from "@/components/ui/Card";
+import BottomSheet from "@/components/ui/BottomSheet";
 import { Zap } from "@/components/ui/icons";
 import { useTurnActions } from "@/features/session/useTurnActions";
 import ActionSlot from "@/features/session/ActionSlot";
@@ -101,19 +102,18 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     if (!inCombat) {
       return (
         <Card className="p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-parchment-800">Not in Combat</p>
-              <p className="mt-0.5 text-xs text-parchment-600">
-                When a combat encounter begins, start it here to track your turn.
-              </p>
-            </div>
+          <div className="flex flex-col items-center gap-3 py-2 text-center">
+            <p className="font-display text-lg font-semibold text-parchment-900">Not in combat</p>
+            <p className="max-w-xs text-xs text-parchment-600">
+              Explore, talk, rest. When the DM calls for initiative, start the encounter to track
+              your turn.
+            </p>
             <button
               type="button"
               onClick={handleStartCombat}
-              className="shrink-0 rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 shadow-sm transition-colors hover:bg-garnet-800"
+              className="mt-1 w-full rounded-control border border-garnet-300 bg-garnet-700 px-4 py-2.5 text-sm font-semibold text-parchment-50 shadow-sm transition-colors hover:bg-garnet-800"
             >
-              Start Combat
+              Roll initiative · Start combat
             </button>
           </div>
         </Card>
@@ -124,31 +124,17 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     return (
       <Card className="p-4">
         <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-parchment-800">
-                Combat — Round {round}
-              </p>
-              <p className="mt-0.5 text-xs text-parchment-600">
-                When the DM calls your turn, start tracking your action economy.
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                onClick={handleEndCombat}
-                className="rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-600 transition-colors hover:bg-parchment-100"
-              >
-                End Combat
-              </button>
-              <button
-                type="button"
-                onClick={handleStartTurn}
-                className="rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 shadow-sm transition-colors hover:bg-garnet-800"
-              >
-                Start Turn
-              </button>
-            </div>
+          <div className="flex items-center justify-between gap-3">
+            <p className="font-display text-base font-semibold text-parchment-900">
+              Combat — Round {round}
+            </p>
+            <button
+              type="button"
+              onClick={handleEndCombat}
+              className="shrink-0 rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-600 transition-colors hover:bg-parchment-100"
+            >
+              End combat
+            </button>
           </div>
 
           {/* Reaction is available between turns — render it in idle mode. */}
@@ -167,6 +153,14 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
             handleActionClick={handleActionClick}
             handleReactionManeuver={handleReactionManeuver}
           />
+
+          <button
+            type="button"
+            onClick={handleStartTurn}
+            className="w-full rounded-control border border-garnet-300 bg-garnet-700 px-4 py-2.5 text-sm font-semibold text-parchment-50 shadow-sm transition-colors hover:bg-garnet-800"
+          >
+            Start my turn
+          </button>
         </div>
       </Card>
     );
@@ -179,7 +173,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <p className="font-semibold text-parchment-800">Your Turn</p>
+          <p className="font-display text-lg font-semibold text-garnet-700">Your turn</p>
           {inCombat && (
             <p className="mt-0.5 text-xs text-parchment-600">Round {round}</p>
           )}
@@ -187,9 +181,9 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
         <button
           type="button"
           onClick={handleEndTurn}
-          className="rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1 text-xs font-semibold text-parchment-600 transition-colors hover:bg-parchment-100"
+          className="rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-600 transition-colors hover:bg-parchment-100"
         >
-          End Turn
+          End turn
         </button>
       </div>
 
@@ -253,12 +247,16 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           </button>
         )}
 
-        {/* ── Inline tool area ──────────────────────────────────────────────── */}
+        {/* ── Resolution sheets ─────────────────────────────────────────────── */}
         {activeResolution?.resolver.kind === "attack-picker" && (
-          <div className="rounded-card border border-parchment-200 bg-parchment-50 p-3">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
-              Select Attack
-            </p>
+          <BottomSheet
+            title="Attack"
+            subtitle="1 attack · no target AC tracked — read the roll to your DM"
+            onClose={() => {
+              cancelAttack();
+              closeResolution();
+            }}
+          >
             <InlineAttackPicker
               character={character}
               turnState={turnState}
@@ -275,28 +273,27 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
               onUpdate={onUpdate}
               onLogChanged={onLogChanged}
             />
-          </div>
+          </BottomSheet>
         )}
 
         {activeResolution?.resolver.kind === "item-picker" && (
-          <div className="rounded-card border border-parchment-200 bg-parchment-50 p-3">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
-              Use Item
-            </p>
+          <BottomSheet title="Use an item" onClose={closeResolution}>
             <InlineItemPicker
               character={character}
               onUpdate={onUpdate}
               onClose={closeResolution}
             />
-          </div>
+          </BottomSheet>
         )}
 
         {activeResolution?.resolver.kind === "heal-input" && (
-          <LayOnHandsInput
-            character={character}
-            onSend={send}
-            onClose={closeResolution}
-          />
+          <BottomSheet title="Lay on Hands" onClose={closeResolution}>
+            <LayOnHandsInput
+              character={character}
+              onSend={send}
+              onClose={closeResolution}
+            />
+          </BottomSheet>
         )}
 
         {activeResolution?.resolver.kind === "spell-picker" && character.spellcasting && (() => {
@@ -311,14 +308,16 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
             else commitReactionSpell();
           };
           return (
-            <div className="rounded-card border border-arcane-200 bg-arcane-50 p-3">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-arcane-700">
-                {spellSlot === "bonusAction"
+            <BottomSheet
+              title={
+                spellSlot === "bonusAction"
                   ? "Bonus-Action Spell"
                   : spellSlot === "reaction"
                     ? "Reaction Spell"
-                    : "Cast a Spell"}
-              </p>
+                    : "Cast a Spell"
+              }
+              onClose={closeResolution}
+            >
               <InlineSpellPicker
                 character={character}
                 sessionId={sessionId}
@@ -338,7 +337,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
                       : "1 action"
                 }
               />
-            </div>
+            </BottomSheet>
           );
         })()}
 

@@ -58,4 +58,6 @@ export const EQUIP_SLOT_ICONS: Record<EquipSlot, IconType> = {
 };
 
 export { GiQuillInk, GiKnapsack, GiSpellBook, GiHealthNormal, GiChestArmor } from "react-icons/gi";
+// Turn-economy slot glyphs (#729): Action / Bonus Action / Reaction.
+export { GiCrossedSwords, GiSparkles, GiCycle } from "react-icons/gi";
 export { Lock, Plus, Zap, VenetianMask, ChevronDown, Trash2, TriangleAlert, Link2 } from "lucide-react";
