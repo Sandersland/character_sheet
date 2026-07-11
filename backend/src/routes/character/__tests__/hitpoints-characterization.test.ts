@@ -684,3 +684,102 @@ describe("rest/level-up branch pins (#684)", () => {
     );
   });
 });
+
+/**
+ * revertHitPointsEvent + rechargeItemChargePoolsOnRest branch pins (#706).
+ *
+ * Both functions are decomposition targets (#690 wave 1A). The forward-path
+ * chargePools/consumableCharges snapshots are already pinned above (the
+ * "rest/level-up branch pins" block), but nothing exercised: (a) the
+ * full-refill charge-pool formula (no rechargeDice, no rechargeBonus), or
+ * (b) revertHitPointsEvent's consumableCharges/chargePools undo branches at
+ * the DB level (only the event before/after JSON was pinned, not the actual
+ * re-expend on revert). These three tests close those gaps so the
+ * decomposition of both functions is provably byte-identical.
+ */
+describe("revertHitPointsEvent + rechargeItemChargePoolsOnRest branch pins (#706)", () => {
+  async function revertBatch(id: string, batchId: string) {
+    return supertest(app).post(`/api/characters/${id}/events/${batchId}/revert`).set("Cookie", COOKIE).send();
+  }
+
+  it("shortRest recharges a full-refill charge pool (no rechargeDice/rechargeBonus) to 0", async () => {
+    await createPlain("hp706-full");
+    const item = await prisma.inventoryItem.create({
+      data: {
+        character: { connect: { id: "hp706-full" } },
+        name: "Test Baton (HP706)",
+        category: "gear",
+        quantity: 1,
+        capabilities: { create: [{ kind: "charges", maxCharges: 5, rechargeTrigger: "short", used: 3 }] },
+      },
+      include: { capabilities: true },
+    });
+    const capId = item.capabilities[0].id;
+    const res = await postHp("hp706-full", { operations: [{ type: "shortRest", rolls: [6] }] });
+    expect(res.status).toBe(200);
+
+    const [ev] = await events("hp706-full");
+    expect(ev.data).toMatchObject({ itemChargesRecharged: 3 });
+    expect((ev.before as Record<string, unknown>).chargePools).toEqual([
+      { capabilityId: capId, itemName: "Test Baton (HP706)", used: 3 },
+    ]);
+    expect((ev.after as Record<string, unknown>).chargePools).toEqual([
+      { capabilityId: capId, itemName: "Test Baton (HP706)", used: 0 },
+    ]);
+
+    const cap = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: capId } });
+    expect(cap.used).toBe(0);
+  });
+
+  it("revert of a rest that recharged a charge pool re-expends it (revertHitPointsEvent chargePools branch)", async () => {
+    await createPlain("hp706-revert-pool");
+    const item = await prisma.inventoryItem.create({
+      data: {
+        character: { connect: { id: "hp706-revert-pool" } },
+        name: "Test Rod (HP706 Revert)",
+        category: "gear",
+        quantity: 1,
+        capabilities: { create: [{ kind: "charges", maxCharges: 7, rechargeTrigger: "short", rechargeBonus: 2, used: 4 }] },
+      },
+      include: { capabilities: true },
+    });
+    const capId = item.capabilities[0].id;
+    const res = await postHp("hp706-revert-pool", { operations: [{ type: "shortRest", rolls: [6] }] });
+    expect(res.status).toBe(200);
+
+    const afterRest = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: capId } });
+    expect(afterRest.used).toBe(2); // 4 - 2 (fixed bonus)
+
+    const [ev] = await events("hp706-revert-pool");
+    const rev = await revertBatch("hp706-revert-pool", ev.batchId!);
+    expect(rev.status).toBe(200);
+
+    const afterRevert = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: capId } });
+    expect(afterRevert.used).toBe(4); // re-expended to the pre-rest value
+  });
+
+  it("revert of a longRest that recharged consumables re-expends them (revertHitPointsEvent consumableCharges branch)", async () => {
+    await createPlain("hp706-revert-cons");
+    const item = await prisma.inventoryItem.create({
+      data: {
+        character: { connect: { id: "hp706-revert-cons" } },
+        name: "Test Potion Flask (HP706 Revert)",
+        category: "consumable",
+        quantity: 1,
+        consumableDetail: { create: { maxUses: 3, usesRemaining: 1 } },
+      },
+    });
+    const res = await postHp("hp706-revert-cons", { operations: [{ type: "longRest" }] });
+    expect(res.status).toBe(200);
+
+    const afterRest = await prisma.inventoryConsumableDetail.findUniqueOrThrow({ where: { inventoryItemId: item.id } });
+    expect(afterRest.usesRemaining).toBe(3);
+
+    const [ev] = await events("hp706-revert-cons");
+    const rev = await revertBatch("hp706-revert-cons", ev.batchId!);
+    expect(rev.status).toBe(200);
+
+    const afterRevert = await prisma.inventoryConsumableDetail.findUniqueOrThrow({ where: { inventoryItemId: item.id } });
+    expect(afterRevert.usesRemaining).toBe(1); // re-expended to the pre-rest value
+  });
+});

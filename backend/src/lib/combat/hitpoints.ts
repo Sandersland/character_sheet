@@ -1016,6 +1016,46 @@ interface ChargePoolSnapshot {
   used: number;
 }
 
+// Charges regained by one pool's recharge formula: a dice roll (+ flat bonus),
+// a fixed bonus alone ("regains 1 charge daily at dawn"), or — when neither is
+// set — a full refill (`used`, so the pool always bottoms out at 0).
+function computeChargePoolRegain(
+  cap: { rechargeDice?: { count: number; faces: number } | null; rechargeBonus?: number | null },
+  used: number,
+): number {
+  if (cap.rechargeDice) {
+    let regained = cap.rechargeBonus ?? 0;
+    for (let i = 0; i < cap.rechargeDice.count; i++) regained += rollDie(cap.rechargeDice.faces);
+    return regained;
+  }
+  if (cap.rechargeBonus) return cap.rechargeBonus;
+  return used;
+}
+
+// Recharge one item's charge-pool capability if its trigger fires on this rest.
+// Returns null when the column isn't an active pool (wrong kind, already empty,
+// wrong trigger) or the regain wouldn't change `used`.
+async function rechargeOneChargePool(
+  tx: Prisma.TransactionClient,
+  itemName: string,
+  col: CapabilityColumns & { id: string; used?: number | null },
+  rest: "short" | "long",
+): Promise<{ before: ChargePoolSnapshot; after: ChargePoolSnapshot } | null> {
+  const cap = readCapability(col);
+  if (cap.kind !== "charges") return null;
+  const used = col.used ?? 0;
+  if (used <= 0) return null;
+  if (!chargeTriggerRechargesOn(cap.rechargeTrigger, rest)) return null;
+  const regained = computeChargePoolRegain(cap, used);
+  const nextUsed = Math.max(0, used - regained);
+  if (nextUsed === used) return null;
+  await tx.inventoryCapability.update({ where: { id: col.id }, data: { used: nextUsed } });
+  return {
+    before: { capabilityId: col.id, itemName, used },
+    after: { capabilityId: col.id, itemName, used: nextUsed },
+  };
+}
+
 // Recharge item charge pools (#555) whose trigger fires on this rest: regain the
 // server-rolled dice formula (dice-less + bonus-less = full refill) capped at max,
 // i.e. used = max(0, used − regained). Dawn/dusk approximate to a long rest (the
@@ -1030,26 +1070,11 @@ async function rechargeItemChargePoolsOnRest(
   let recharged = 0;
   for (const item of ctx.row.inventoryItems ?? []) {
     for (const col of item.capabilities) {
-      const cap = readCapability(col);
-      if (cap.kind !== "charges") continue;
-      const used = col.used ?? 0;
-      if (used <= 0) continue;
-      if (!chargeTriggerRechargesOn(cap.rechargeTrigger, rest)) continue;
-      let regained: number;
-      if (cap.rechargeDice) {
-        regained = cap.rechargeBonus ?? 0;
-        for (let i = 0; i < cap.rechargeDice.count; i++) regained += rollDie(cap.rechargeDice.faces);
-      } else if (cap.rechargeBonus) {
-        regained = cap.rechargeBonus; // fixed amount ("regains 1 charge daily at dawn")
-      } else {
-        regained = used; // no formula = full refill
-      }
-      const nextUsed = Math.max(0, used - regained);
-      if (nextUsed === used) continue;
-      before.push({ capabilityId: col.id, itemName: item.name, used });
-      after.push({ capabilityId: col.id, itemName: item.name, used: nextUsed });
-      await ctx.tx.inventoryCapability.update({ where: { id: col.id }, data: { used: nextUsed } });
-      recharged += used - nextUsed;
+      const result = await rechargeOneChargePool(ctx.tx, item.name, col, rest);
+      if (!result) continue;
+      before.push(result.before);
+      after.push(result.after);
+      recharged += result.before.used - result.after.used;
     }
   }
   return { recharged, before, after };
