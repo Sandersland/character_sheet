@@ -91,8 +91,12 @@ export function effectiveKiSelection(view: DisciplineCastView, selectedKi: numbe
 
 /** RollContext label for a cast: "Name — fire damage" / "Name — healing". */
 export function disciplineRollLabel(discipline: CatalogDiscipline): string {
-  const kind = discipline.effect.effectType === "heal" ? "healing" : `${discipline.effect.damageType ?? ""} damage`;
-  return `${discipline.name} — ${kind.trim()}`;
+  const { effectType, damageType } = discipline.effect;
+  if (effectType === "heal") return `${discipline.name} — healing`;
+  // Non-heal with no damage type (e.g. a utility/force effect with damageType
+  // unset): fall back to the bare name rather than a dangling "— damage".
+  if (!damageType) return discipline.name;
+  return `${discipline.name} — ${damageType} damage`;
 }
 
 /** Cast-button title: explains a disabled button, or names the spend. */

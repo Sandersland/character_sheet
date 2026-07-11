@@ -1,6 +1,4 @@
-// Pure detail-row derivation for the Codex item card — extracted from
-// features/entities/CampaignItemCard.tsx (#687). No JSX; the component maps
-// these rows to its DetailRow primitive.
+// Pure detail-row derivation for the Codex item card — no JSX; CampaignItemCard maps these rows to its DetailRow primitive (#687).
 import type { CampaignItem } from "@/types/character";
 
 export interface ItemDetailRow {

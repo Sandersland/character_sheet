@@ -126,6 +126,14 @@ describe("readEffectSpec — die-source × heal/buff combos (#685)", () => {
     expect(spec.effectType).toBe("heal");
   });
 
+  it("die-source with a resolver that returns null falls back to fixed effectDiceFaces (#697)", () => {
+    // effectDieSource is set AND a fixed effectDiceFaces exists; the resolver
+    // resolves the source to null → dice fall back to the fixed faces.
+    const withFixedFallback: EffectRow = { ...healFromClassDie, effectDiceFaces: 6 };
+    const spec = readEffectSpec(withFixedFallback, () => null);
+    expect(spec.dice).toEqual({ count: 2, faces: 6, modifier: 0 });
+  });
+
   it("dice-less buff: full spec byte pin + resolveBuffSpec descriptor", () => {
     const spec = readEffectSpec(blessBuff);
     expect(spec).toEqual({

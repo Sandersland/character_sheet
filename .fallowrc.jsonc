@@ -31,6 +31,10 @@
   // CI fallow job); inherited findings are reported but don't block. "all"
   // was rejected — file-scoped all-findings blocked mechanical refactors
   // during the #590 sweep.
+  //
+  // NOTE: CI is authoritative for the gate. The CI fallow job passes an explicit
+  // `--gate new-only` flag (.github/workflows/ci.yml), which OVERRIDES this
+  // config value — editing the gate here alone does not change what CI enforces.
   "audit": {
     "gate": "new-only"
   },

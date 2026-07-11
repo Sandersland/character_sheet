@@ -467,6 +467,10 @@ function dispatchAdvancementOp(
     case "takeAsi": return applyTakeAsi(ctx, op);
     case "takeFeat": return applyTakeFeat(ctx, op);
     case "removeAdvancement": return applyRemoveAdvancement(ctx, op);
+    default: {
+      const _exhaustive: never = op;
+      throw new InvalidAdvancementOperationError(`Unknown op type: ${(_exhaustive as { type: string }).type}`);
+    }
   }
 }
 

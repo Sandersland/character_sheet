@@ -5,10 +5,10 @@
 // weapon row (they augment THIS weapon's rolls). "attackOption" (Commander's
 // Strike), "reaction" (Parry/Riposte), and "effect" (Evasive Footwork) are
 // handled at the TurnHub / InlineAttackPicker level and never appear here.
-import type { ManeuverEntry } from "@/types/character";
+import type { ManeuverEntry, ManeuverPlacement } from "@/types/character";
 
 /** Placement of a known maneuver; custom/legacy entries default to damageRoll. */
-export function maneuverPlacement(m: ManeuverEntry): string {
+export function maneuverPlacement(m: ManeuverEntry): ManeuverPlacement {
   return m.placement ?? "damageRoll";
 }
 

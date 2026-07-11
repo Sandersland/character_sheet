@@ -261,6 +261,14 @@ describe("HP transaction event-stream characterization (#614)", () => {
 describe("rest/level-up branch pins (#684)", () => {
   const WIZ_CLASS = "Test Wizard (HP684 Suite)";
   let wizClassId: string;
+  // A real Warlock CharacterClass fixture so the shortRest Warlock entry carries
+  // a classId (mirroring production data), not just a bare name string. The
+  // fixture NAME is test-scoped to avoid clobbering the seeded "Warlock" class;
+  // the class *entry* keeps name "Warlock" so restoreWarlockPactSlots' current
+  // name-string detection still fires — and a future relation-based detection
+  // now has a class relation to read instead of silently skipping the branch.
+  const WARLOCK_CLASS = "Test Warlock (HP684 Suite)";
+  let warlockClassId: string;
 
   const EMPTY_RESOURCES = {
     used: {},
@@ -280,14 +288,20 @@ describe("rest/level-up branch pins (#684)", () => {
       update: {},
     });
     wizClassId = wiz.id;
+    const warlock = await prisma.characterClass.upsert({
+      where: { name: WARLOCK_CLASS },
+      create: { name: WARLOCK_CLASS, hitDie: "d8", savingThrows: ["wisdom", "charisma"], skillChoiceCount: 2, skillChoices: ["arcana"], isSpellcaster: true, subclassLevel: 1 },
+      update: {},
+    });
+    warlockClassId = warlock.id;
   });
   afterAll(async () => {
-    await prisma.characterClass.deleteMany({ where: { name: WIZ_CLASS } });
+    await prisma.characterClass.deleteMany({ where: { name: { in: [WIZ_CLASS, WARLOCK_CLASS] } } });
   });
 
   it("shortRest as Warlock: Pact slots cleared, arcanum + concentration preserved, before-only resources", async () => {
     await createPlain("hp684-wlk", {
-      classEntries: { create: [{ name: "Warlock", position: 0, level: 5 }] },
+      classEntries: { create: [{ name: "Warlock", classId: warlockClassId, position: 0, level: 5 }] },
       spellcasting: {
         slotsUsed: { "1": 2 },
         arcanumUsed: { "6": 1 },
@@ -461,6 +475,45 @@ describe("rest/level-up branch pins (#684)", () => {
     ]);
     expect((ev.after as Record<string, unknown>).chargePools).toEqual([
       { capabilityId: capId, itemName: "Test Wand (HP684)", used: 2 },
+    ]);
+
+    const cap = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: capId } });
+    expect(cap.used).toBe(2);
+  });
+
+  it("longRest recharges a dawn-trigger charge pool (#555), lifted into before/after", async () => {
+    // The short-rest pin above covers rechargeTrigger "short"; this pins the
+    // long-rest arm with a "dawn" trigger (chargeTriggerRechargesOn fires it on
+    // "long" but NOT on "short"), so a long rest recharges it through the full
+    // transaction path.
+    await createPlain("hp684-dawn");
+    const item = await prisma.inventoryItem.create({
+      data: {
+        character: { connect: { id: "hp684-dawn" } },
+        name: "Test Staff (HP684)",
+        category: "gear",
+        quantity: 1,
+        capabilities: {
+          create: [{ kind: "charges", maxCharges: 7, rechargeTrigger: "dawn", rechargeBonus: 2, used: 4 }],
+        },
+      },
+      include: { capabilities: true },
+    });
+    const capId = item.capabilities[0].id;
+    const res = await postHp("hp684-dawn", { operations: [{ type: "longRest" }] });
+    expect(res.status).toBe(200);
+
+    const [ev] = await events("hp684-dawn");
+    expect(ev.summary).toBe("Long rest — +34 HP, item charges recharged");
+    expect(ev.data).toEqual({
+      recovered: 2, hpRestored: 34, slotsRestored: 0, resourcesRestored: 0,
+      itemSpellsRestored: 0, itemChargesRecharged: 2,
+    });
+    expect((ev.before as Record<string, unknown>).chargePools).toEqual([
+      { capabilityId: capId, itemName: "Test Staff (HP684)", used: 4 },
+    ]);
+    expect((ev.after as Record<string, unknown>).chargePools).toEqual([
+      { capabilityId: capId, itemName: "Test Staff (HP684)", used: 2 },
     ]);
 
     const cap = await prisma.inventoryCapability.findUniqueOrThrow({ where: { id: capId } });
