@@ -186,7 +186,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
               onClick={undo}
               className="rounded-control border border-arcane-300 bg-arcane-50 px-3 py-1.5 text-xs font-semibold text-arcane-700 transition-colors hover:bg-arcane-100"
             >
-              ↩ Undo
+              <span aria-hidden="true">↩ </span>Undo
             </button>
           )}
           <button

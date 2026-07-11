@@ -393,6 +393,20 @@ describe("turn-scoped undo", () => {
     expect(result.current.history).toHaveLength(1);
   });
 
+  it("consumeBonusAction pushes nothing when the bonus action is already used", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.consumeBonusAction(); }); // used → one snapshot
+    act(() => { result.current.consumeBonusAction(); }); // guard: no snapshot
+    expect(result.current.history).toHaveLength(1);
+  });
+
+  it("consumeReaction pushes nothing when the reaction is already used", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.consumeReaction(); }); // used → one snapshot
+    act(() => { result.current.consumeReaction(); }); // guard: no snapshot
+    expect(result.current.history).toHaveLength(1);
+  });
+
   it("startTurn clears the history — undo never reaches across turns", () => {
     const { result } = inActiveTurn();
     act(() => { result.current.consumeAction(); });

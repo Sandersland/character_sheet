@@ -352,7 +352,10 @@ export function useTurnState(character: Character, sessionId: string): TurnState
   }, [mutate]);
 
   const consumeBonusAction = useCallback(() => {
-    mutate((s) => ({ ...s, bonusActionUsed: true, bonusAttack: null }));
+    mutate((s) => {
+      if (s.bonusActionUsed) return s; // guard: already used → no history push
+      return { ...s, bonusActionUsed: true, bonusAttack: null };
+    });
   }, [mutate]);
 
   const enterTwfMode = useCallback(() => {
@@ -371,7 +374,10 @@ export function useTurnState(character: Character, sessionId: string): TurnState
   }, [mutate]);
 
   const consumeReaction = useCallback(() => {
-    mutate((s) => ({ ...s, reactionUsed: true }));
+    mutate((s) => {
+      if (s.reactionUsed) return s; // guard: already used → no history push
+      return { ...s, reactionUsed: true };
+    });
   }, [mutate]);
 
   const grantExtraAction = useCallback(() => {
@@ -399,7 +405,10 @@ export function useTurnState(character: Character, sessionId: string): TurnState
   }, [mutate]);
 
   const commitReactionSpell = useCallback(() => {
-    mutate((s) => ({ ...s, reactionUsed: true }));
+    mutate((s) => {
+      if (s.reactionUsed) return s; // guard: already used → no history push
+      return { ...s, reactionUsed: true };
+    });
   }, [mutate]);
 
   const undo = useCallback(() => {
