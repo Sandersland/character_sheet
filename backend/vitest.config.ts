@@ -19,5 +19,24 @@ export default defineConfig(({ mode }) => ({
     // in parallel; isolation is by convention (docs/testing.md), not by
     // serializing the suite.
     setupFiles: ["./vitest.setup.ts"],
+    // Coverage feeds fallow's CRAP scoring (`npm run test:coverage` → the fallow
+    // CI job's `--coverage`). Istanbul format is what fallow reads; the `json`
+    // reporter emits coverage/coverage-final.json. `all: true` instruments every
+    // production source file even when no test touches it, so an untested complex
+    // function reports its real 0% coverage (→ honest high CRAP) instead of
+    // fallow falling back to an inflated export-reference estimate.
+    coverage: {
+      provider: "istanbul",
+      reporter: ["text-summary", "json"],
+      reportsDirectory: "./coverage",
+      all: true,
+      include: ["src/**/*.ts"],
+      exclude: [
+        "src/**/__tests__/**",
+        "src/**/*.test.ts",
+        "src/generated/**",
+        "src/index.ts",
+      ],
+    },
   },
 }));
