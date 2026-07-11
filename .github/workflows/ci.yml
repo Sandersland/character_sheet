@@ -128,7 +128,7 @@ jobs:
           name: backend-coverage
           path: backend/coverage
 
-      - name: fallow health (backend production: real CRAP via vitest coverage)
+      - name: "fallow health (backend production: real CRAP via vitest coverage)"
         run: npx --no-install fallow health -w backend --production --coverage backend/coverage/coverage-final.json --no-cache
 
   build:
@@ -217,6 +217,9 @@ jobs:
           name: backend-coverage
           path: backend/coverage/coverage-final.json
           retention-days: 1
+          # Fail loudly here if vitest didn't flush coverage, rather than letting
+          # the fallow job's download fail with a confusing "artifact not found".
+          if-no-files-found: error
 
   e2e:
     # Playwright smoke suite against a booted dev stack (same postgres service as
