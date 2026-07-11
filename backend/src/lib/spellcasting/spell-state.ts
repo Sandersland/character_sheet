@@ -145,3 +145,19 @@ function normalizeConcentration(value: unknown): ConcentrationState | null {
   if (typeof c.entryId !== "string" || c.entryId.length === 0) return null;
   return { entryId: c.entryId, spellName: typeof c.spellName === "string" ? c.spellName : "" };
 }
+
+/**
+ * Deep-copy the spellcasting state into a before/after event snapshot. Shared by
+ * the ki-cast handlers (disciplines, shadow-arts) so their audit-event snapshots
+ * are byte-identical (the payload feeds LIFO undo via activity.ts).
+ */
+export function snapshotSpellcasting(state: SpellcastingMutableState) {
+  return {
+    spellcasting: {
+      slotsUsed: { ...state.slotsUsed },
+      arcanumUsed: { ...state.arcanumUsed },
+      spells: [...state.spells],
+      concentratingOn: state.concentratingOn ? { ...state.concentratingOn } : null,
+    },
+  };
+}

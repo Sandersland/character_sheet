@@ -14,12 +14,11 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
-import { deriveResources } from "./class-features.js";
+import { deriveResourcesForCharacterRow } from "./class-features.js";
 import type { EffectSpec } from "@/lib/combat/effects.js";
-import { logEvent } from "@/lib/activity/events.js";
-import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { normalizeResourcesMutable } from "./resources.js";
-import { normalizeSpellcastingMutable, type SpellcastingMutableState } from "@/lib/spellcasting/spell-state.js";
+import { normalizeSpellcastingMutable, snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
+import { KI_CAST_CHARACTER_SELECT, emitKiCastEvents, type KiCastCharacterRow } from "./ki-cast.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 
@@ -77,6 +76,11 @@ export interface DisciplineEffectRow {
  * Build a discipline's EffectSpec directly (not via readEffectSpec): disciplines
  * scale by ki spent above the base cost, so scaling is always mode "ki" with
  * dicePerStep = costPerStep. Utility disciplines carry no dice.
+ *
+ * Deliberately parallel to (not shared with) shadow-arts' `shadowArtEffectSpec` +
+ * level gate: the mapped fields and gates genuinely differ. Only the ki-cast
+ * scaffolding is shared (lib/classes/ki-cast.ts); unifying the row→effect mapping
+ * is the declarative subclass engine's job (#416).
  */
 export function disciplineEffectSpec(row: DisciplineEffectRow): EffectSpec {
   const hasDice = Boolean(row.effectKind && row.effectDiceCount && row.effectDiceFaces);
@@ -96,16 +100,69 @@ export function disciplineEffectSpec(row: DisciplineEffectRow): EffectSpec {
   };
 }
 
-// Deep-copy the spellcasting state for a before/after event snapshot.
-function snapshotSpellcasting(state: SpellcastingMutableState) {
-  return {
-    spellcasting: {
-      slotsUsed: { ...state.slotsUsed },
-      arcanumUsed: { ...state.arcanumUsed },
-      spells: [...state.spells],
-      concentratingOn: state.concentratingOn ? { ...state.concentratingOn } : null,
-    },
-  };
+// ── Cast resolution (gate + catalog + cost validation) ─────────────────────────
+
+/**
+ * Validate the ki spent on a discipline: a pool-cost discipline must be within
+ * [base, per-cast cap]; a costless (utility) discipline must be cast for 0 ki.
+ */
+function assertDisciplineKiSpend(
+  disciplineName: string,
+  cost: ReturnType<typeof readAbilityCost>,
+  kiSpent: number,
+  level: number,
+): void {
+  if (cost.kind === "pool") {
+    const maxKi = maxKiPerDiscipline(level);
+    if (kiSpent < cost.base || kiSpent > maxKi) {
+      throw new InvalidDisciplineOperationError(
+        `${disciplineName} costs ${cost.base}–${maxKi} ki at monk level ${level} (got ${kiSpent})`,
+      );
+    }
+  } else if (kiSpent !== 0) {
+    throw new InvalidDisciplineOperationError(`${disciplineName} costs no ki`);
+  }
+}
+
+/**
+ * Resolve and validate a single discipline cast against the character row: the
+ * Four-Elements save-DC gate, the catalog lookup + source guard, the known-list
+ * check, and the ki-cost/per-cast-cap validation. Throws
+ * InvalidDisciplineOperationError on any failure; returns the pieces the cast
+ * needs on success. Kept separate from applyOp so the 5e validation rules read as
+ * one unit (and applyOp stays a thin apply/snapshot/emit body).
+ */
+async function resolveDisciplineCast(
+  tx: Prisma.TransactionClient,
+  row: KiCastCharacterRow,
+  op: CastDisciplineOperation,
+) {
+  const { derived, level } = deriveResourcesForCharacterRow(row);
+
+  // Gate: only a Four Elements monk of L3+ has a discipline save DC.
+  const saveDc = derived?.disciplineSaveDC;
+  if (saveDc === undefined) {
+    throw new InvalidDisciplineOperationError(
+      "Only a Way of the Four Elements monk (level 3+) can cast elemental disciplines",
+    );
+  }
+
+  const catalog = await tx.grantedAbility.findUnique({ where: { id: op.disciplineId } });
+  if (!catalog || catalog.source !== "discipline") {
+    throw new InvalidDisciplineOperationError(`Discipline not found in catalog: ${op.disciplineId}`);
+  }
+
+  // Must be an always-known discipline or one the monk has learned.
+  const resources = normalizeResourcesMutable(row.resources);
+  if (!catalog.alwaysKnown && !resources.disciplinesKnown.some((d) => d.disciplineId === catalog.id)) {
+    throw new InvalidDisciplineOperationError(`Discipline not known: ${catalog.name}`);
+  }
+
+  const cost = readAbilityCost(catalog);
+  assertDisciplineKiSpend(catalog.name, cost, op.kiSpent, level);
+
+  const effect = disciplineEffectSpec(catalog);
+  return { catalog, cost, effect, saveDc };
 }
 
 // ── Transaction handler ───────────────────────────────────────────────────────
@@ -123,57 +180,10 @@ export async function applyDisciplineOperations(
   operations: DisciplineOperation[],
 ): Promise<void> {
   await runCharacterTransaction(characterId, operations, {
-    select: {
-      spellcasting: true,
-      resources: true,
-      experiencePoints: true,
-      abilityScores: true,
-      classEntries: {
-        orderBy: { position: "asc" as const },
-        take: 1,
-        select: { name: true, subclass: true },
-      },
-    },
+    select: KI_CAST_CHARACTER_SELECT,
     notFound: (id) => new InvalidDisciplineOperationError(`Character not found: ${id}`),
     applyOp: async ({ tx, row, op, batchId, sessionId }) => {
-      const level = levelForExperience(row.experiencePoints);
-      const profBonus = proficiencyBonusForLevel(level);
-      const primaryEntry = row.classEntries[0];
-      const abilityScores = row.abilityScores as Record<string, number>;
-      const derived = deriveResources(primaryEntry?.name ?? "", primaryEntry?.subclass ?? undefined, level, abilityScores, profBonus);
-
-      // Gate: only a Four Elements monk of L3+ has a discipline save DC.
-      const saveDc = derived?.disciplineSaveDC;
-      if (saveDc === undefined) {
-        throw new InvalidDisciplineOperationError(
-          "Only a Way of the Four Elements monk (level 3+) can cast elemental disciplines",
-        );
-      }
-
-      const catalog = await tx.grantedAbility.findUnique({ where: { id: op.disciplineId } });
-      if (!catalog || catalog.source !== "discipline") {
-        throw new InvalidDisciplineOperationError(`Discipline not found in catalog: ${op.disciplineId}`);
-      }
-
-      // Must be an always-known discipline or one the monk has learned.
-      const resources = normalizeResourcesMutable(row.resources);
-      if (!catalog.alwaysKnown && !resources.disciplinesKnown.some((d) => d.disciplineId === catalog.id)) {
-        throw new InvalidDisciplineOperationError(`Discipline not known: ${catalog.name}`);
-      }
-
-      const cost = readAbilityCost(catalog);
-      const maxKi = maxKiPerDiscipline(level);
-      if (cost.kind === "pool") {
-        if (op.kiSpent < cost.base || op.kiSpent > maxKi) {
-          throw new InvalidDisciplineOperationError(
-            `${catalog.name} costs ${cost.base}–${maxKi} ki at monk level ${level} (got ${op.kiSpent})`,
-          );
-        }
-      } else if (op.kiSpent !== 0) {
-        throw new InvalidDisciplineOperationError(`${catalog.name} costs no ki`);
-      }
-
-      const effect = disciplineEffectSpec(catalog);
+      const { catalog, cost, effect, saveDc } = await resolveDisciplineCast(tx, row, op);
       const concentrates = effect.concentration ?? false;
 
       const spellState = normalizeSpellcastingMutable(row.spellcasting);
@@ -194,48 +204,26 @@ export async function applyDisciplineOperations(
         },
       );
 
-      // Persist + audit the concentration change under the spellcasting category
-      // so batch revert restores concentratingOn (whether it was null or a prior
-      // spell). castAbilityInTx leaves the write-back to the caller; a fresh
-      // concentration emits no concentrationDropped event, so this event is what
-      // makes it undoable. Non-concentration disciplines leave spellcasting alone.
-      if (concentrates) {
-        await tx.character.update({
-          where: { id: characterId },
-          data: {
-            spellcasting: {
-              slotsUsed: spellState.slotsUsed,
-              arcanumUsed: spellState.arcanumUsed,
-              spells: spellState.spells,
-              concentratingOn: spellState.concentratingOn,
-            } as unknown as Prisma.InputJsonValue,
-          },
-        });
-        await logEvent(tx, {
-          characterId,
-          category: "spellcasting",
-          type: "castDiscipline",
-          summary: `Concentrating on ${catalog.name}`,
-          before: beforeSpell,
-          after: snapshotSpellcasting(spellState),
-          data: { disciplineId: catalog.id, disciplineName: catalog.name },
-          batchId,
-          sessionId,
-        });
-      }
-
-      // The cast record itself restores nothing (ki is refunded by the pool
-      // payer's own spendResource event, concentration by the event above), so
-      // it carries no before/after snapshot — just the roll/DC data.
+      // Shared ki-cast audit tail: when concentrating, persist the write-back +
+      // log the undoable spellcasting event (restores concentratingOn on revert,
+      // whether it was null or a prior spell — castAbilityInTx leaves the
+      // write-back to the caller, and a fresh concentration emits no
+      // concentrationDropped event). The resources cast record restores nothing
+      // (ki refunded by the pool payer's spendResource event, concentration by
+      // the event above), so it carries only the roll/DC data.
       const summary = effect.saveAbility ? `${outcome.summary} (save DC ${saveDc})` : outcome.summary;
-      await logEvent(tx, {
+      await emitKiCastEvents(tx, {
         characterId,
-        category: "resources",
-        type: "castDiscipline",
-        summary,
-        data: { disciplineId: catalog.id, kiSpent: op.kiSpent, roll: op.roll, saveDc },
         batchId,
         sessionId,
+        eventType: "castDiscipline",
+        concentrates,
+        spellState,
+        beforeSpell,
+        concentrationName: catalog.name,
+        concentrationData: { disciplineId: catalog.id, disciplineName: catalog.name },
+        resourceSummary: summary,
+        resourceData: { disciplineId: catalog.id, kiSpent: op.kiSpent, roll: op.roll, saveDc },
       });
     },
   });

@@ -70,6 +70,19 @@ jobs:
 
       - run: npm ci --no-audit --no-fund
 
+      # The backend's `@/generated/prisma/*` client is gitignored, so without this
+      # step fallow can't resolve those imports and flags every NEW file that
+      # imports the client as an "unresolved import" (inherited ones are excluded
+      # by the new-only gate, so this only bites files a PR adds). Generating the
+      # client — as the build job does — makes fallow's import graph accurate.
+      # prisma.config.ts validates DATABASE_URL even for `generate` (never
+      # connects), so a dummy URL satisfies it without a Postgres.
+      - name: Prisma generate
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://unused:unused@localhost:5432/unused
+        run: npx prisma generate
+
       # PR-only + skip the staging->main promote PR. Guarding on the PR event
       # here (rather than at job level) lets the health step below run on push
       # events too. --no-install forces the locally-pinned binary (never a
@@ -87,6 +100,21 @@ jobs:
       # a direct push is gated too. --no-install/--no-cache mirror the audit step.
       - name: fallow health (no CRITICAL findings repo-wide)
         run: npx --no-install fallow health --min-severity critical --no-cache
+
+      # #692 backend tightening, enabled 2026-07-11 after clearing the backend
+      # cognitive-complexity tier. Plain mode = fails on ANY finding in scope, so
+      # this enforces the coverage-INDEPENDENT thresholds (cyclomatic <=20 AND
+      # cognitive <=15) in every backend PRODUCTION function — stricter than the
+      # `audit --gate new-only` step above, which only inspects the PR diff (a
+      # refactor that pushes an EXISTING function over the bar is caught here too).
+      #   --production  excludes test/story files (test complexity isn't gated)
+      #   --max-crap 999 drops the estimated-CRAP axis, which is unreliable without
+      #     real coverage and inflates severity under --production. Re-enable a
+      #     meaningful CRAP bar by wiring vitest coverage via --coverage (#690-fu).
+      # Repo-scoped severity gating (critical->high) stays blocked on the frontend
+      # HIGH tier and is NOT attempted here; this is the backend-only ratchet.
+      - name: fallow health (no cyclo/cognitive breaches in backend production code)
+        run: npx --no-install fallow health -w backend --production --max-crap 999 --no-cache
 
   build:
     # Production type-check + bundle. vitest transpiles via esbuild and does NOT

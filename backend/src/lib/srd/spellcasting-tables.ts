@@ -242,6 +242,33 @@ export interface MulticlassSpellcastingInfo {
   arcana: Array<{ level: number; total: number }>;
 }
 
+/** One caster class after its per-entry save DC / attack bonus are resolved. */
+type CombinedEntry = { name: string; level: number; subclass?: string | null; fraction: CasterFraction };
+
+/**
+ * The combined-pool slot totals. A lone contributing caster uses its own class
+ * table (odd-level half/third rows differ from the multiclass floor math) so
+ * single-class output stays byte-for-byte identical with deriveSpellcasting;
+ * two+ casters use the multiclass floor table keyed by combined caster level.
+ */
+function resolveCombinedSlotTotals(
+  combinedEntries: CombinedEntry[],
+  combinedCasterLevel: number,
+  abilityScores: Record<string, number>,
+  proficiencyBonus: number,
+): Array<{ level: number; total: number }> {
+  if (combinedEntries.length === 1) {
+    const only = combinedEntries[0];
+    return deriveSpellcasting(only.name, only.level, abilityScores, proficiencyBonus, only.subclass ?? undefined)?.slotTotals ?? [];
+  }
+  if (combinedEntries.length > 1 && combinedCasterLevel > 0) {
+    return Object.entries(MULTICLASS_SPELL_SLOTS[Math.min(20, combinedCasterLevel)] ?? {})
+      .map(([lvl, total]) => ({ level: Number(lvl), total }))
+      .sort((a, b) => a.level - b.level);
+  }
+  return [];
+}
+
 /**
  * Derives merged spellcasting for a full (possibly multiclass) class list per
  * the PHB p. 164 multiclass rules: sum full levels, half of half-caster levels,
@@ -261,7 +288,7 @@ export function deriveMulticlassSpellcasting(
   proficiencyBonus: number,
 ): MulticlassSpellcastingInfo {
   const classes: MulticlassCasterClass[] = [];
-  const combinedEntries: Array<{ name: string; level: number; subclass?: string | null; fraction: CasterFraction }> = [];
+  const combinedEntries: CombinedEntry[] = [];
   let combinedCasterLevel = 0;
   let pact: MulticlassSpellcastingInfo["pact"] = null;
   let arcana: Array<{ level: number; total: number }> = [];
@@ -284,6 +311,7 @@ export function deriveMulticlassSpellcasting(
     });
 
     if (profile.fraction === "pact") {
+      // Warlock Pact Magic stays separate from the combined pool.
       const p = PACT_MAGIC_SLOTS[Math.min(20, Math.max(1, entry.level))];
       if (p) pact = { slotLevel: p.slotLevel, count: p.count, spellSaveDC, spellAttackBonus };
       arcana = mysticArcanumLevels(entry.level).map((level) => ({ level, total: 1 }));
@@ -293,18 +321,7 @@ export function deriveMulticlassSpellcasting(
     }
   }
 
-  let slotTotals: Array<{ level: number; total: number }> = [];
-  if (combinedEntries.length === 1) {
-    // Single contributing caster: use its own class table (odd-level half/third
-    // rows differ from the multiclass floor math) — byte-for-byte deriveSpellcasting.
-    const only = combinedEntries[0];
-    slotTotals = deriveSpellcasting(only.name, only.level, abilityScores, proficiencyBonus, only.subclass ?? undefined)?.slotTotals ?? [];
-  } else if (combinedEntries.length > 1 && combinedCasterLevel > 0) {
-    slotTotals = Object.entries(MULTICLASS_SPELL_SLOTS[Math.min(20, combinedCasterLevel)] ?? {})
-      .map(([lvl, total]) => ({ level: Number(lvl), total }))
-      .sort((a, b) => a.level - b.level);
-  }
-
+  const slotTotals = resolveCombinedSlotTotals(combinedEntries, combinedCasterLevel, abilityScores, proficiencyBonus);
   return { combinedCasterLevel, slotTotals, classes, pact, arcana };
 }
 

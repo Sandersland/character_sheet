@@ -9,20 +9,25 @@ export function deriveAttacksPerAction(
   );
 }
 
+// Extra Attack progression by class (PHB), as (minLevel, attacks) tiers ordered
+// highest-first. A class absent from this table — or below its first tier —
+// makes 1 attack. Bard is special-cased below (subclass-gated), not tabled.
+const EXTRA_ATTACK_TIERS: Record<string, ReadonlyArray<readonly [number, number]>> = {
+  fighter: [[20, 4], [11, 3], [5, 2]],
+  barbarian: [[5, 2]],
+  monk: [[5, 2]],
+  paladin: [[5, 2]],
+  ranger: [[5, 2]],
+};
+
 function attacksForClass(name: string, level: number, subclass?: string | null): number {
   const cls = name.toLowerCase();
-  if (cls === "fighter") {
-    if (level >= 20) return 4;
-    if (level >= 11) return 3;
-    if (level >= 5) return 2;
-    return 1;
-  }
-  if (cls === "barbarian" || cls === "monk" || cls === "paladin" || cls === "ranger") {
-    return level >= 5 ? 2 : 1;
-  }
   // College of Valor bard gains Extra Attack at bard level 6.
-  if (cls === "bard" && level >= 6 && (subclass ?? "").toLowerCase().includes("valor")) {
-    return 2;
+  if (cls === "bard") {
+    return level >= 6 && (subclass ?? "").toLowerCase().includes("valor") ? 2 : 1;
+  }
+  for (const [minLevel, attacks] of EXTRA_ATTACK_TIERS[cls] ?? []) {
+    if (level >= minLevel) return attacks;
   }
   return 1;
 }

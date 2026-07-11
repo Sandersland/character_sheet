@@ -78,48 +78,68 @@ export async function payAbilityCostInTx(
   }
 }
 
+// Required slot/arcanum maps + totals a slot-cost payment mutates/reads —
+// narrowed out of the optional PayCostContext fields once by the caller.
+interface SlotPayState {
+  slotsUsed: Record<string, number>;
+  arcanumUsed: Record<string, number>;
+  slotTotals: Record<number, number>;
+  arcanaTotals: Record<number, number>;
+}
+
+function requireSlotPayState(ctx: PayCostContext): SlotPayState {
+  const { slotsUsed, arcanumUsed, slotTotals, arcanaTotals } = ctx;
+  if (!slotsUsed || !arcanumUsed || !slotTotals || !arcanaTotals) {
+    throw new Error("payAbilityCostInTx: slot cost requires slot/arcanum maps + totals");
+  }
+  return { slotsUsed, arcanumUsed, slotTotals, arcanaTotals };
+}
+
+// Spends one level-`slotLevel` spell slot, or throws if none remain.
+function spendSlot(state: SlotPayState, slotLevel: number, minLevel: number): string {
+  const used = state.slotsUsed[String(slotLevel)] ?? 0;
+  const total = state.slotTotals[slotLevel] ?? 0;
+  if (used >= total) {
+    throw new InvalidSpellcastingOperationError(`No level-${slotLevel} spell slots remaining`);
+  }
+  state.slotsUsed[String(slotLevel)] = used + 1;
+  const upcasting = slotLevel > minLevel;
+  return `L${slotLevel} slot${upcasting ? ` (upcast from L${minLevel})` : ""}`;
+}
+
+// Spends one level-`slotLevel` Mystic Arcanum charge, or throws if already used.
+function spendArcanum(state: SlotPayState, slotLevel: number): string {
+  const used = state.arcanumUsed[String(slotLevel)] ?? 0;
+  const total = state.arcanaTotals[slotLevel] ?? 0;
+  if (used >= total) {
+    throw new InvalidSpellcastingOperationError(
+      `Mystic Arcanum (level ${slotLevel}) already used — recharges on a long rest`
+    );
+  }
+  state.arcanumUsed[String(slotLevel)] = used + 1;
+  return `L${slotLevel} Mystic Arcanum`;
+}
+
 function paySlotCost(
   ctx: PayCostContext,
   cost: Extract<AbilityCost, { kind: "slot" }>,
   requested?: number,
 ): PaidCost {
-  const { slotsUsed, arcanumUsed, slotTotals, arcanaTotals } = ctx;
-  if (!slotsUsed || !arcanumUsed || !slotTotals || !arcanaTotals) {
-    throw new Error("payAbilityCostInTx: slot cost requires slot/arcanum maps + totals");
-  }
+  const state = requireSlotPayState(ctx);
   const slotLevel = requested ?? cost.minLevel;
   if (slotLevel < cost.minLevel) {
     throw new InvalidSpellcastingOperationError(
       `Cannot cast a level-${cost.minLevel} spell in a level-${slotLevel} slot`
     );
   }
-  const slotTotal = slotTotals[slotLevel] ?? 0;
-  const arcanumTotal = arcanaTotals[slotLevel] ?? 0;
-  const upcasting = slotLevel > cost.minLevel;
 
   let label: string;
-  if (slotTotal > 0) {
-    const used = slotsUsed[String(slotLevel)] ?? 0;
-    if (used >= slotTotal) {
-      throw new InvalidSpellcastingOperationError(
-        `No level-${slotLevel} spell slots remaining`
-      );
-    }
-    slotsUsed[String(slotLevel)] = used + 1;
-    label = `L${slotLevel} slot${upcasting ? ` (upcast from L${cost.minLevel})` : ""}`;
-  } else if (arcanumTotal > 0) {
-    const used = arcanumUsed[String(slotLevel)] ?? 0;
-    if (used >= arcanumTotal) {
-      throw new InvalidSpellcastingOperationError(
-        `Mystic Arcanum (level ${slotLevel}) already used — recharges on a long rest`
-      );
-    }
-    arcanumUsed[String(slotLevel)] = used + 1;
-    label = `L${slotLevel} Mystic Arcanum`;
+  if ((state.slotTotals[slotLevel] ?? 0) > 0) {
+    label = spendSlot(state, slotLevel, cost.minLevel);
+  } else if ((state.arcanaTotals[slotLevel] ?? 0) > 0) {
+    label = spendArcanum(state, slotLevel);
   } else {
-    throw new InvalidSpellcastingOperationError(
-      `No level-${slotLevel} spell slots remaining`
-    );
+    throw new InvalidSpellcastingOperationError(`No level-${slotLevel} spell slots remaining`);
   }
 
   return { label, effectiveStep: slotLevel - cost.minLevel };

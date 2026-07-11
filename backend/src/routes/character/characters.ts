@@ -76,6 +76,23 @@ charactersRouter.post("/characters", async (req, res) => {
   res.status(201).json(serializeCharacter(character));
 });
 
+/**
+ * One-line delta summary for a currencyAdjust event, e.g.
+ * "Currency adjusted (+5 gp, −2 sp)" — or a bare "Currency adjusted" when the
+ * patch left every denomination unchanged.
+ */
+export function currencyAdjustSummary(
+  oldCurrency: Record<string, number>,
+  newCurrency: Record<string, number>,
+): string {
+  const parts: string[] = [];
+  for (const denom of ["pp", "gp", "sp", "cp"] as const) {
+    const diff = (newCurrency[denom] ?? 0) - (oldCurrency[denom] ?? 0);
+    if (diff !== 0) parts.push(`${diff > 0 ? "+" : ""}${diff} ${denom}`);
+  }
+  return parts.length > 0 ? `Currency adjusted (${parts.join(", ")})` : "Currency adjusted";
+}
+
 charactersRouter.patch("/characters/:id", async (req, res) => {
   const parseResult = updateCharacterSchema.safeParse(req.body);
 
@@ -101,13 +118,7 @@ charactersRouter.patch("/characters/:id", async (req, res) => {
   if (parseResult.data.currency) {
     const oldCurrency = existing.currency as Record<string, number>;
     const newCurrency = parseResult.data.currency as Record<string, number>;
-    // Build a one-line delta summary, e.g. "+5 gp −2 sp"
-    const parts: string[] = [];
-    for (const denom of ["pp", "gp", "sp", "cp"] as const) {
-      const diff = (newCurrency[denom] ?? 0) - (oldCurrency[denom] ?? 0);
-      if (diff !== 0) parts.push(`${diff > 0 ? "+" : ""}${diff} ${denom}`);
-    }
-    const summary = parts.length > 0 ? `Currency adjusted (${parts.join(", ")})` : "Currency adjusted";
+    const summary = currencyAdjustSummary(oldCurrency, newCurrency);
 
     updated = await prisma.$transaction(async (tx) => {
       const result = await tx.character.update({

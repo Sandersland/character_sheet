@@ -982,6 +982,31 @@ async function applyLevelUpOp(ctx: HpOpContext, op: LevelUpOperation): Promise<H
   return applySelfHealLevelUp(ctx, op);
 }
 
+type InventoryItemRow = NonNullable<HpOpContext["row"]["inventoryItems"]>[number];
+
+// The active item castSpell capability columns whose resource recharges on this
+// rest, with the charges each would restore (#528). Inactive items (neither
+// equipped nor attuned, #565) contribute nothing.
+function itemSpellCapsToReset(
+  item: InventoryItemRow,
+  rest: "short" | "long",
+): { restored: number; ids: string[] } {
+  if (item.equippedSlot == null && !item.attuned) return { restored: 0, ids: [] };
+  let restored = 0;
+  const ids: string[] = [];
+  for (const col of item.capabilities) {
+    const cap = readCapability(col);
+    if (cap.kind !== "castSpell") continue;
+    if (!castResourceRechargesOn(cap.resource, rest)) continue;
+    const used = col.used ?? 0;
+    if (used > 0) {
+      restored += used;
+      ids.push(col.id);
+    }
+  }
+  return { restored, ids };
+}
+
 // Reset the per-capability `used` counter of any active item castSpell whose
 // resource recharges on this rest (#528). Returns how many charges were restored.
 async function resetItemSpellUsesOnRest(
@@ -991,17 +1016,9 @@ async function resetItemSpellUsesOnRest(
   let restored = 0;
   const ids: string[] = [];
   for (const item of ctx.row.inventoryItems ?? []) {
-    // #565: `equipped` is derived from equippedSlot (no persisted boolean).
-    if (item.equippedSlot == null && !item.attuned) continue;
-    for (const col of item.capabilities) {
-      const cap = readCapability(col);
-      if (cap.kind !== "castSpell") continue;
-      if (!castResourceRechargesOn(cap.resource, rest)) continue;
-      if ((col.used ?? 0) > 0) {
-        restored += col.used ?? 0;
-        ids.push(col.id);
-      }
-    }
+    const caps = itemSpellCapsToReset(item, rest);
+    restored += caps.restored;
+    ids.push(...caps.ids);
   }
   if (ids.length > 0) {
     await ctx.tx.inventoryCapability.updateMany({ where: { id: { in: ids } }, data: { used: 0 } });
@@ -1014,6 +1031,46 @@ interface ChargePoolSnapshot {
   capabilityId: string;
   itemName: string;
   used: number;
+}
+
+// Charges regained by one pool's recharge formula: a dice roll (+ flat bonus),
+// a fixed bonus alone ("regains 1 charge daily at dawn"), or — when neither is
+// set — a full refill (`used`, so the pool always bottoms out at 0).
+function computeChargePoolRegain(
+  cap: { rechargeDice?: { count: number; faces: number } | null; rechargeBonus?: number | null },
+  used: number,
+): number {
+  if (cap.rechargeDice) {
+    let regained = cap.rechargeBonus ?? 0;
+    for (let i = 0; i < cap.rechargeDice.count; i++) regained += rollDie(cap.rechargeDice.faces);
+    return regained;
+  }
+  if (cap.rechargeBonus) return cap.rechargeBonus;
+  return used;
+}
+
+// Recharge one item's charge-pool capability if its trigger fires on this rest.
+// Returns null when the column isn't an active pool (wrong kind, already empty,
+// wrong trigger) or the regain wouldn't change `used`.
+async function rechargeOneChargePool(
+  tx: Prisma.TransactionClient,
+  itemName: string,
+  col: CapabilityColumns & { id: string; used?: number | null },
+  rest: "short" | "long",
+): Promise<{ before: ChargePoolSnapshot; after: ChargePoolSnapshot } | null> {
+  const cap = readCapability(col);
+  if (cap.kind !== "charges") return null;
+  const used = col.used ?? 0;
+  if (used <= 0) return null;
+  if (!chargeTriggerRechargesOn(cap.rechargeTrigger, rest)) return null;
+  const regained = computeChargePoolRegain(cap, used);
+  const nextUsed = Math.max(0, used - regained);
+  if (nextUsed === used) return null;
+  await tx.inventoryCapability.update({ where: { id: col.id }, data: { used: nextUsed } });
+  return {
+    before: { capabilityId: col.id, itemName, used },
+    after: { capabilityId: col.id, itemName, used: nextUsed },
+  };
 }
 
 // Recharge item charge pools (#555) whose trigger fires on this rest: regain the
@@ -1030,26 +1087,11 @@ async function rechargeItemChargePoolsOnRest(
   let recharged = 0;
   for (const item of ctx.row.inventoryItems ?? []) {
     for (const col of item.capabilities) {
-      const cap = readCapability(col);
-      if (cap.kind !== "charges") continue;
-      const used = col.used ?? 0;
-      if (used <= 0) continue;
-      if (!chargeTriggerRechargesOn(cap.rechargeTrigger, rest)) continue;
-      let regained: number;
-      if (cap.rechargeDice) {
-        regained = cap.rechargeBonus ?? 0;
-        for (let i = 0; i < cap.rechargeDice.count; i++) regained += rollDie(cap.rechargeDice.faces);
-      } else if (cap.rechargeBonus) {
-        regained = cap.rechargeBonus; // fixed amount ("regains 1 charge daily at dawn")
-      } else {
-        regained = used; // no formula = full refill
-      }
-      const nextUsed = Math.max(0, used - regained);
-      if (nextUsed === used) continue;
-      before.push({ capabilityId: col.id, itemName: item.name, used });
-      after.push({ capabilityId: col.id, itemName: item.name, used: nextUsed });
-      await ctx.tx.inventoryCapability.update({ where: { id: col.id }, data: { used: nextUsed } });
-      recharged += used - nextUsed;
+      const result = await rechargeOneChargePool(ctx.tx, item.name, col, rest);
+      if (!result) continue;
+      before.push(result.before);
+      after.push(result.after);
+      recharged += result.before.used - result.after.used;
     }
   }
   return { recharged, before, after };
