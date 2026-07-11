@@ -1871,6 +1871,11 @@ export async function applyInventoryOperations(
   const batchId = randomUUID();
   const sessionId = await getActiveSessionId(characterId);
   const useResults: UseResult[] = [];
+  // Flat, exhaustive, type-narrowed op dispatch: high cyclomatic (one branch per
+  // op type) but trivially readable (cognitive 3). A dispatch map would trade the
+  // per-case type narrowing for casts and read worse, so this is adjudicated as an
+  // idiomatic switch rather than refactored (#690 opportunistic burn-down).
+  // fallow-ignore-next-line complexity
   await prisma.$transaction(async (tx) => {
     for (const op of operations) {
       switch (op.type) {
