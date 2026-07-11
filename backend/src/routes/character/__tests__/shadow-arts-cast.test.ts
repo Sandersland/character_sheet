@@ -161,6 +161,42 @@ describe("Shadow Arts cast endpoint", () => {
     expect(concentratingOn).toBeNull();
   });
 
+  // Byte-identical oracle for the shared ki-cast event tail (#642): pins the full
+  // castShadowArt event payloads (before/after/summary/data) so the extraction of
+  // snapshotSpellcasting + the event-emitting tail into a shared helper stays exact.
+  it("pins the castShadowArt event payloads exactly (before/after/summary/data)", async () => {
+    await createMonk(XP_L3, "way of shadow");
+    const res = await cast([{ type: "castShadowArt", shadowArtId: darknessId }]);
+    expect(res.status).toBe(200);
+    const prefixedDarkness = `${SHADOW_ART_CONCENTRATION_PREFIX}${darknessId}`;
+
+    // Concentration (spellcasting-category) event — carries the before/after snapshot.
+    const concEvent = await prisma.characterEvent.findFirst({
+      where: { characterId: FIXTURE_ID, category: "spellcasting", type: "castShadowArt" },
+    });
+    expect(concEvent).not.toBeNull();
+    expect(concEvent!.summary).toBe("Concentrating on Shadow Arts: Darkness");
+    expect(concEvent!.before).toEqual({
+      spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+    });
+    expect(concEvent!.after).toEqual({
+      spellcasting: {
+        slotsUsed: {}, arcanumUsed: {}, spells: [],
+        concentratingOn: { entryId: prefixedDarkness, spellName: "Shadow Arts: Darkness" },
+      },
+    });
+    expect(concEvent!.data).toEqual({ shadowArtId: darknessId, shadowArtName: "Shadow Arts: Darkness" });
+
+    // Cast record (resources-category) event — no snapshot, records the cast.
+    const castEvent = await prisma.characterEvent.findFirst({
+      where: { characterId: FIXTURE_ID, category: "resources", type: "castShadowArt" },
+    });
+    expect(castEvent).not.toBeNull();
+    expect(castEvent!.before).toBeNull();
+    expect(castEvent!.after).toBeNull();
+    expect(castEvent!.data).toEqual({ shadowArtId: darknessId, kiSpent: 2 });
+  });
+
   it("applies +10 Stealth buff for Pass without Trace and clears it on concentration break", async () => {
     await createMonk(XP_L3, "way of shadow");
     const res = await cast([{ type: "castShadowArt", shadowArtId: passWithoutTraceId }]);
