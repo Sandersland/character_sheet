@@ -13,10 +13,11 @@
   // middleware (backend/src/lib/auth/errors.ts, lib/inventory/inventory.ts) — never a static reference.
   "usedClassMembers": ["status"],
   "duplicates": {
-    // Hide pair-only clones; focus on widespread copy-paste
-    // worth refactoring. Lower to 2 to report every duplicate pair.
-    // (#691 phase 2 plans that lowering once the CRITICAL tier clears.)
-    "minOccurrences": 3
+    // Report every duplicate pair (#691 phase 2, 2026-07-11): pair-clones like
+    // the #642 disciplines/shadow-arts twin were invisible at 3. The audit
+    // gate is new-only, so inherited pairs (e.g. the INTENTIONAL
+    // backend/frontend type mirrors) report as context without blocking.
+    "minOccurrences": 2
   },
   // Complexity ceilings pinned to fallow 3.2.0's defaults (#691): the gate's
   // bar is OURS to move, not an upstream default a version bump can shift.
