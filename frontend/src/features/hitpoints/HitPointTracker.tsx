@@ -15,6 +15,7 @@ import Card from "@/components/ui/Card";
 import AdvancementCallout from "@/features/hitpoints/AdvancementCallout";
 import ConcentrationSaveModal from "@/features/hitpoints/ConcentrationSaveModal";
 import DeathSaveTracker from "@/features/hitpoints/DeathSaveTracker";
+import { useDeathSaves } from "@/features/hitpoints/useDeathSaves";
 import LevelUpCallout from "@/features/hitpoints/LevelUpCallout";
 import HpActionControl from "@/features/hitpoints/HpActionControl";
 import HpMeter from "@/features/hitpoints/HpMeter";
@@ -70,7 +71,8 @@ export default function HitPointTracker({
     prevAdvancementTotal.current = newTotal;
   }, [character.advancementSlots.total]);
 
-  const isDying = hitPoints.current === 0;
+  // Death-save controls (#736) — shared with the turn UI via useDeathSaves.
+  const deathSaveCtl = useDeathSaves(character, onUpdate);
 
   /** Build the player-facing text for a concentration check (issue #41). */
   function concentrationMessage(check: ConcentrationCheck): { text: string; held: boolean } {
@@ -187,15 +189,6 @@ export default function HitPointTracker({
     await submit([{ type: "longRest" }]);
   }
 
-  async function handleDeathSaveRoll() {
-    const roll = rollDie(20);
-    await submit([{ type: "deathSave", roll }]);
-  }
-
-  async function handleStabilize() {
-    await submit([{ type: "stabilize" }]);
-  }
-
   async function handleLevelUp(method: "average" | "roll", target: LevelUpTarget | undefined) {
     // Roll bounds follow the ADVANCING class's hit die, which may differ from the
     // primary (position-0) die once multiclassing is in play.
@@ -225,13 +218,18 @@ export default function HitPointTracker({
         />
 
         {/* ── Death save tracker (shown at 0 HP) ── */}
-        {isDying && (
-          <DeathSaveTracker
-            deathSaves={hitPoints.deathSaves}
-            pending={pending}
-            onRollDeathSave={handleDeathSaveRoll}
-            onStabilize={handleStabilize}
-          />
+        {deathSaveCtl.isDying && (
+          <div className="flex flex-col gap-2">
+            <DeathSaveTracker
+              deathSaves={deathSaveCtl.deathSaves}
+              pending={deathSaveCtl.pending}
+              onRollDeathSave={deathSaveCtl.onRollDeathSave}
+              onStabilize={deathSaveCtl.onStabilize}
+            />
+            {deathSaveCtl.error && (
+              <p className="text-xs font-semibold text-garnet-700">{deathSaveCtl.error}</p>
+            )}
+          </div>
         )}
 
         {/* ── HP action control (segmented mode + stepper + verb) ── */}

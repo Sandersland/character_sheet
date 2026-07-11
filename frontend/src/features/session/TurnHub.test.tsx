@@ -37,6 +37,7 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
     subclass: "Battle Master",
     level: 5,
     inventory: [],
+    hitPoints: { current: 44, max: 44, temp: 0, deathSaves: { successes: 0, failures: 0 } },
     unarmedStrike: {
       attackBonus: 2,
       damage: { count: 1, faces: 1, modifier: 0, damageType: "bludgeoning" },
@@ -296,6 +297,23 @@ describe("TurnHub — Battle Master maneuvers", () => {
       expect(screen.queryAllByText(/Superiority die spend failed\./i)).toHaveLength(0),
     );
     expect(screen.getByText(/add \+\d+ to your AC/i)).toBeInTheDocument();
+  });
+});
+
+describe("TurnHub — death saves (#736/#744)", () => {
+  const downed = () =>
+    makeCharacter({
+      hitPoints: { current: 0, max: 44, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+    } as unknown as Partial<Character>);
+
+  it("shows the death-save tracker in the active turn at 0 HP", async () => {
+    const user = userEvent.setup();
+    renderHub(downed());
+    await startTurn(user);
+
+    // The primary moment a downed player rolls a save is on their own turn.
+    expect(screen.getByText("Your turn")).toBeInTheDocument();
+    expect(screen.getByText(/Unconscious — Roll Death Saves/i)).toBeInTheDocument();
   });
 });
 
