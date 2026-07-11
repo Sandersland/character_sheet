@@ -138,6 +138,33 @@ export interface LogEventParams {
 
 // ── diffToFields ─────────────────────────────────────────────────────────────
 
+type DiffField = {
+  path: string;
+  oldValue: Prisma.InputJsonValue | null;
+  newValue: Prisma.InputJsonValue | null;
+};
+
+/** A recurse-able node: a non-null, non-array object whose keys we walk. */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Emit an atomic (non-recursed) change for one leaf, or nothing if unchanged.
+ * Covers primitives, arrays, and null; arrays compare deeply via JSON so a
+ * reordered/extended array reads as one change at its own path.
+ */
+function diffLeaf(path: string, oldVal: unknown, newVal: unknown): DiffField[] {
+  const normalizedOld = oldVal === undefined ? null : oldVal;
+  const normalizedNew = newVal === undefined ? null : newVal;
+  if (JSON.stringify(normalizedOld) === JSON.stringify(normalizedNew)) return [];
+  return [{
+    path,
+    oldValue: normalizedOld as Prisma.InputJsonValue | null,
+    newValue: normalizedNew as Prisma.InputJsonValue | null,
+  }];
+}
+
 /**
  * Recursively walks `before` and `after`, returning one entry per changed
  * leaf. Arrays are treated as atomic (compared as-is rather than element-
@@ -147,50 +174,20 @@ export function diffToFields(
   before: Record<string, unknown> | null | undefined,
   after: Record<string, unknown> | null | undefined,
   prefix = ""
-): Array<{ path: string; oldValue: Prisma.InputJsonValue | null; newValue: Prisma.InputJsonValue | null }> {
-  const result: Array<{
-    path: string;
-    oldValue: Prisma.InputJsonValue | null;
-    newValue: Prisma.InputJsonValue | null;
-  }> = [];
-
+): DiffField[] {
   const b = before ?? {};
   const a = after ?? {};
-  const allKeys = new Set([...Object.keys(b), ...Object.keys(a)]);
+  const result: DiffField[] = [];
 
-  for (const key of allKeys) {
+  for (const key of new Set([...Object.keys(b), ...Object.keys(a)])) {
     const path = prefix ? `${prefix}.${key}` : key;
     const oldVal = b[key];
     const newVal = a[key];
-
-    // Recurse into plain nested objects (not arrays, not null)
-    if (
-      oldVal !== null &&
-      typeof oldVal === "object" &&
-      !Array.isArray(oldVal) &&
-      newVal !== null &&
-      typeof newVal === "object" &&
-      !Array.isArray(newVal)
-    ) {
-      result.push(
-        ...diffToFields(
-          oldVal as Record<string, unknown>,
-          newVal as Record<string, unknown>,
-          path
-        )
-      );
+    // Recurse into plain nested objects; everything else is an atomic leaf.
+    if (isPlainObject(oldVal) && isPlainObject(newVal)) {
+      result.push(...diffToFields(oldVal, newVal, path));
     } else {
-      // Simple value comparison (covers primitives, arrays, null, undefined)
-      const normalizedOld = oldVal === undefined ? null : oldVal;
-      const normalizedNew = newVal === undefined ? null : newVal;
-      // JSON.stringify for deep equality on arrays / null
-      if (JSON.stringify(normalizedOld) !== JSON.stringify(normalizedNew)) {
-        result.push({
-          path,
-          oldValue: normalizedOld as Prisma.InputJsonValue | null,
-          newValue: normalizedNew as Prisma.InputJsonValue | null,
-        });
-      }
+      result.push(...diffLeaf(path, oldVal, newVal));
     }
   }
 

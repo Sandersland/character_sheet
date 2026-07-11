@@ -621,26 +621,36 @@ export interface PassiveBonusItem {
   capabilities: CapabilityColumns[];
 }
 
+// Resolve one capability column to a passive-bonus contribution, or null if it
+// isn't a scalar (non-dice) add-op passiveBonus with a known modifier channel —
+// setTo, dice-valued, and unchanneled targets are skipped this slice.
+function passiveBonusContribution(
+  col: CapabilityColumns,
+  itemName: string,
+): ItemPassiveContribution | null {
+  const cap = readCapability(col);
+  if (cap.kind !== "passiveBonus") return null;
+  if (cap.op !== "add") return null;
+  if (cap.dice) return null;
+  const channel = passiveBonusChannel(cap);
+  if (!channel) return null;
+  return {
+    target: channel,
+    modifier: cap.value,
+    source: itemName,
+    ...(cap.condition ? { condition: cap.condition } : {}),
+  };
+}
+
 // Gather scalar (non-dice) add-op passiveBonus capabilities from active items and
-// resolve each to its modifier channel. setTo, dice-valued, and unchanneled
-// targets are skipped this slice.
+// resolve each to its modifier channel.
 export function deriveItemPassiveBonuses(items: PassiveBonusItem[]): ItemPassiveContribution[] {
   const out: ItemPassiveContribution[] = [];
   for (const item of items) {
     if (!item.equipped && !item.attuned) continue;
     for (const col of item.capabilities) {
-      const cap = readCapability(col);
-      if (cap.kind !== "passiveBonus") continue;
-      if (cap.op !== "add") continue;
-      if (cap.dice) continue;
-      const channel = passiveBonusChannel(cap);
-      if (!channel) continue;
-      out.push({
-        target: channel,
-        modifier: cap.value,
-        source: item.name,
-        ...(cap.condition ? { condition: cap.condition } : {}),
-      });
+      const contribution = passiveBonusContribution(col, item.name);
+      if (contribution) out.push(contribution);
     }
   }
   return out;
