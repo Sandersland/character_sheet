@@ -200,3 +200,32 @@ describe("InlineAttackPicker — on-hit dice riders", () => {
     expect(screen.getAllByRole("button", { name: /Roll \+\dd\d/ })).toHaveLength(1);
   });
 });
+
+describe("InlineAttackPicker — critical damage button", () => {
+  it("logs a doubled-dice (crit) damage roll for an equipped weapon", async () => {
+    const onLogChanged = vi.fn();
+    renderPicker(
+      makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] }),
+      vi.fn(),
+      onLogChanged,
+    );
+
+    // Flame Tongue base weapon damage is 1d8 slashing; a crit rolls 2d8.
+    const critButton = screen.getAllByRole("button", { name: /^Critical$/ })[0];
+    await userEvent.click(critButton);
+
+    expect(vi.mocked(logRoll)).toHaveBeenCalledWith(
+      "char-1",
+      "sess-1",
+      expect.objectContaining({
+        kind: "damage",
+        source: "Flame Tongue",
+        damageType: "slashing",
+        specLabel: expect.stringContaining("(crit)"),
+      }),
+    );
+    const call = vi.mocked(logRoll).mock.calls[0][2];
+    expect(call.specLabel).toBe("2d8 (crit)");
+    expect(call.faces).toHaveLength(2);
+  });
+});

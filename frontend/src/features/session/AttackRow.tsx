@@ -18,6 +18,7 @@ interface AttackRowProps {
   riderTotals: Record<string, number>;
   onAttack: (entry: AttackEntry) => void;
   onDamage: (entry: AttackEntry) => void;
+  onCritDamage: (entry: AttackEntry) => void;
   onDamageRider: (rider: DamageRider) => void;
   onRollsUpdated: (newAttackTotal: number | null, newDamageTotal: number | null) => void;
   onUpdate: (c: Character) => void;
@@ -35,6 +36,7 @@ export default function AttackRow({
   riderTotals,
   onAttack,
   onDamage,
+  onCritDamage,
   onDamageRider,
   onRollsUpdated,
   onUpdate,
@@ -87,6 +89,14 @@ export default function AttackRow({
             className="rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
           >
             Damage
+          </button>
+          <button
+            type="button"
+            onClick={() => onCritDamage(entry)}
+            title="Critical hit — double the weapon damage dice"
+            className="rounded-control border border-garnet-300 bg-garnet-100 px-2.5 py-1 text-xs font-semibold text-garnet-800 transition-colors hover:bg-garnet-200"
+          >
+            Critical
           </button>
         </div>
       </div>
