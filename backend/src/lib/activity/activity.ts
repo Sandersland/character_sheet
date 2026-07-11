@@ -414,16 +414,16 @@ async function reverseEvent(
 // reverse each event's before-state, mark the batch reverted, and append a
 // meta revert event. Returns a discriminated result so the route keeps HTTP
 // control (no res access here). Throws on unexpected errors.
-export async function revertBatch(
+// Guard the LIFO-undo invariants before any reversal runs: the batch exists, is
+// not already reverted, is the most-recent non-reverted batch, and doesn't
+// belong to an ended (frozen) session. Returns an error RevertResult to abort,
+// or null to proceed. Error statuses/messages are byte-identical to before.
+async function revertPreflight(
   db: PrismaClient,
   characterId: string,
   batchId: string,
-): Promise<RevertResult> {
-  const batchEvents = await db.characterEvent.findMany({
-    where: { characterId, batchId },
-    orderBy: { createdAt: "asc" },
-  });
-
+  batchEvents: CharacterEvent[],
+): Promise<RevertResult | null> {
   if (!batchEvents.length) {
     return { ok: false, status: 404, error: "No events found for this batch" };
   }
@@ -480,35 +480,62 @@ export async function revertBatch(
     }
   }
 
+  return null;
+}
+
+// Inside one transaction: reverse each event (latest first), mark the whole
+// batch reverted, and append the meta `revert` timeline entry. Throws on an
+// unrevertable event (e.g. sale proceeds already spent) so the caller's catch
+// maps it to a 409 and the $transaction rolls back.
+async function applyBatchReversal(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  batchId: string,
+  reversed: CharacterEvent[],
+): Promise<void> {
+  for (const event of reversed) {
+    await reverseEvent(tx, characterId, event);
+  }
+
+  // Mark all events in the batch as reverted.
+  await tx.characterEvent.updateMany({
+    where: { characterId, batchId },
+    data: { reverted: true },
+  });
+
+  // Append a meta `revert` event so the timeline shows the undo.
+  await tx.characterEvent.create({
+    data: {
+      characterId,
+      category: reversed[reversed.length - 1]?.category ?? "hitPoints",
+      type: "revert",
+      summary: `Undid: ${reversed[reversed.length - 1]?.summary ?? "previous action"}`,
+      data: { revertedBatchId: batchId } as Prisma.InputJsonValue,
+      actor: "player",
+      reverted: false,
+      batchId: null,
+    },
+  });
+}
+
+export async function revertBatch(
+  db: PrismaClient,
+  characterId: string,
+  batchId: string,
+): Promise<RevertResult> {
+  const batchEvents = await db.characterEvent.findMany({
+    where: { characterId, batchId },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const blocked = await revertPreflight(db, characterId, batchId, batchEvents);
+  if (blocked) return blocked;
+
   // Apply reversals in reverse order (latest op in the batch first).
   const reversed = [...batchEvents].reverse();
 
   try {
-    await db.$transaction(async (tx) => {
-      for (const event of reversed) {
-        await reverseEvent(tx, characterId, event);
-      }
-
-      // Mark all events in the batch as reverted.
-      await tx.characterEvent.updateMany({
-        where: { characterId, batchId },
-        data: { reverted: true },
-      });
-
-      // Append a meta `revert` event so the timeline shows the undo.
-      await tx.characterEvent.create({
-        data: {
-          characterId,
-          category: reversed[reversed.length - 1]?.category ?? "hitPoints",
-          type: "revert",
-          summary: `Undid: ${reversed[reversed.length - 1]?.summary ?? "previous action"}`,
-          data: { revertedBatchId: batchId } as Prisma.InputJsonValue,
-          actor: "player",
-          reverted: false,
-          batchId: null,
-        },
-      });
-    });
+    await db.$transaction((tx) => applyBatchReversal(tx, characterId, batchId, reversed));
   } catch (error) {
     // A revert that can't be reversed cleanly (e.g. undoing a sale after the
     // proceeds were already spent) throws InsufficientCurrencyError from

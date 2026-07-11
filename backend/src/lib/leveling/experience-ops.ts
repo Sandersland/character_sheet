@@ -39,6 +39,49 @@ export type ExperienceOperation = XpAwardOperation | XpSetOperation;
  * average gain (fixedAverageForDie + conMod) for levels with no event record
  * (e.g. characters seeded before the event log existed).
  */
+// Compute the post-level-down HP/HD by subtracting each reversed level's HP gain
+// (exact from the levelUp event's `hpGain`, else the average-for-die fallback),
+// returning the mutated hp/hd plus their before-snapshots and the single-class
+// primary entry to repair. Pure — no writes; the caller persists + logs.
+function computeLevelDownState(
+  character: {
+    hitPoints: Prisma.JsonValue;
+    hitDice: Prisma.JsonValue;
+    abilityScores: Prisma.JsonValue;
+    classEntries: { id: string; level: number }[];
+  },
+  levelUpEvents: { data: Prisma.JsonValue }[],
+  levelsToReverse: number,
+) {
+  const hp = normalizeHitPoints(character.hitPoints);
+  const hd = normalizeHitDice(character.hitDice);
+  const abilityScores = character.abilityScores as Record<string, number>;
+  const conMod = abilityModifier(abilityScores.constitution ?? 10);
+  const faces = hitDieFace(hd.die);
+  // Only single-class characters get the position-0 self-heal here; multiclass
+  // per-entry levels reconcile via reconcileClassEntryLevels (the registry).
+  const primaryEntry = character.classEntries.length === 1 ? character.classEntries[0] : undefined;
+
+  const beforeHp = { ...hp };
+  const beforeHd = { ...hd };
+
+  for (let i = 0; i < levelsToReverse; i++) {
+    const event = levelUpEvents[i];
+    const eventData = (event?.data ?? {}) as Record<string, unknown>;
+    const hpGain =
+      typeof eventData.hpGain === "number"
+        ? eventData.hpGain
+        : Math.max(1, fixedAverageForDie(faces) + conMod); // best-effort fallback
+
+    hp.max = Math.max(1, hp.max - hpGain);
+    hp.current = Math.min(hp.current, hp.max);
+    hd.total = Math.max(0, hd.total - 1);
+    hd.spent = Math.min(hd.spent, hd.total);
+  }
+
+  return { hp, hd, beforeHp, beforeHd, primaryEntry };
+}
+
 async function revertLevelUps(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -69,31 +112,11 @@ async function revertLevelUps(
   });
   if (!character) throw new InvalidExperienceOperationError(`Character not found: ${characterId}`);
 
-  const hp = normalizeHitPoints(character.hitPoints);
-  const hd = normalizeHitDice(character.hitDice);
-  const abilityScores = character.abilityScores as Record<string, number>;
-  const conMod = abilityModifier(abilityScores.constitution ?? 10);
-  const faces = hitDieFace(hd.die);
-  // Only single-class characters get the position-0 self-heal here; multiclass
-  // per-entry levels reconcile via reconcileClassEntryLevels (the registry).
-  const primaryEntry = character.classEntries.length === 1 ? character.classEntries[0] : undefined;
-
-  const beforeHp = { ...hp };
-  const beforeHd = { ...hd };
-
-  for (let i = 0; i < levelsToReverse; i++) {
-    const event = levelUpEvents[i];
-    const eventData = (event?.data ?? {}) as Record<string, unknown>;
-    const hpGain =
-      typeof eventData.hpGain === "number"
-        ? eventData.hpGain
-        : Math.max(1, fixedAverageForDie(faces) + conMod); // best-effort fallback
-
-    hp.max = Math.max(1, hp.max - hpGain);
-    hp.current = Math.min(hp.current, hp.max);
-    hd.total = Math.max(0, hd.total - 1);
-    hd.spent = Math.min(hd.spent, hd.total);
-  }
+  const { hp, hd, beforeHp, beforeHd, primaryEntry } = computeLevelDownState(
+    character,
+    levelUpEvents,
+    levelsToReverse,
+  );
 
   // Repair the position-0 class entry's level to match the new hd.total.
   if (primaryEntry && primaryEntry.level !== hd.total) {
