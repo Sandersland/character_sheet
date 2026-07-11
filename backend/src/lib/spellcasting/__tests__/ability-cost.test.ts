@@ -70,6 +70,23 @@ describe("payAbilityCostInTx — slot branch", () => {
       payAbilityCostInTx(c, { kind: "slot", minLevel: 2 }, 1)
     ).rejects.toThrow(InvalidSpellcastingOperationError);
   });
+
+  it("omitted `requested` defaults to cost.minLevel (cast at the cheapest slot)", async () => {
+    const c = ctx({ slotTotals: { 2: 1 } });
+    const paid = await payAbilityCostInTx(c, { kind: "slot", minLevel: 2 });
+    expect(paid).toEqual({ label: "L2 slot", effectiveStep: 0 });
+    expect(c.slotsUsed!["2"]).toBe(1);
+  });
+
+  it("neither a slot column nor an arcanum column at that level throws 'No level-N spell slots remaining'", async () => {
+    const c = ctx({ slotTotals: { 1: 0 }, arcanaTotals: { 1: 0 } });
+    await expect(
+      payAbilityCostInTx(c, { kind: "slot", minLevel: 1 }, 1)
+    ).rejects.toThrow(InvalidSpellcastingOperationError);
+    await expect(
+      payAbilityCostInTx(c, { kind: "slot", minLevel: 1 }, 1)
+    ).rejects.toThrow("No level-1 spell slots remaining");
+  });
 });
 
 describe("payAbilityCostInTx — none branch", () => {
