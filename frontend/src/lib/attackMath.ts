@@ -189,10 +189,14 @@ export function buildOffHandEntry(character: Character): AttackEntry | null {
 
   const entry = buildWeaponEntry(offHand);
   const hasStyle = character.resources?.fightingStyle === "twoWeaponFighting";
-  const abilityMod = offHand.weapon!.damage?.abilityModifier ?? 0;
-  const modifier = hasStyle
-    ? entry.damageSpec.modifier
-    : entry.damageSpec.modifier - Math.max(0, abilityMod);
+  // Undefined only for a legacy weapon serialized before #732 (no ability-mod
+  // component) — skip the subtraction and show the full modifier, matching the
+  // pre-#732 behavior rather than silently dropping the wrong amount.
+  const abilityMod = offHand.weapon!.damage?.abilityModifier;
+  const modifier =
+    hasStyle || abilityMod === undefined
+      ? entry.damageSpec.modifier
+      : entry.damageSpec.modifier - Math.max(0, abilityMod);
   const damageSpec = { ...entry.damageSpec, modifier };
   const gripLabel = weaponGripLabel(offHand.weapon!);
 

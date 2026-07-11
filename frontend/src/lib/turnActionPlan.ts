@@ -28,8 +28,11 @@ export function planActionClick(
   }
 
   switch (resolver.kind) {
-    // twf-picker has its own dedicated handler (handleTwfAction); it only appears
-    // here for exhaustiveness and shares the attack-picker plan shape.
+    // twf-picker is never reached at runtime — the off-hand attack dispatches
+    // through handleTwfAction, not the generic handleActionClick → planActionClick
+    // path. It appears here only to keep this switch exhaustive over
+    // ResolutionKind (so adding a future kind is a compile error), and shares the
+    // attack-picker plan shape.
     case "attack-picker":
     case "twf-picker":
       return {

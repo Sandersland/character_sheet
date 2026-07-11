@@ -350,6 +350,19 @@ describe("buildOffHandEntry (#732)", () => {
     expect(buildOffHandEntry(character)!.damageSpec.modifier).toBe(-1);
   });
 
+  it("shows the full modifier for a legacy weapon whose damage lacks abilityModifier", () => {
+    // Pre-#732 serialization: damage present but no ability-mod component.
+    const legacyDamage = { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "piercing", grip: "one-handed" };
+    const character = makeCharacter({
+      inventory: [
+        { ...weaponItem({ light: true, damage: legacyDamage as never }, "A", "a"), equippedSlot: "MAIN_HAND" as const },
+        { ...weaponItem({ light: true, damage: legacyDamage as never }, "B", "off"), equippedSlot: "OFF_HAND" as const },
+      ] as unknown as Character["inventory"],
+    });
+    // No abilityModifier to subtract → the full modifier is kept (matches pre-#732 behavior).
+    expect(buildOffHandEntry(character)!.damageSpec.modifier).toBe(3);
+  });
+
   it("preserves a melee-damage buff (Rage) while dropping only the ability mod", () => {
     // damageModifier 5 = STR +3 folded with a +2 Rage buff; abilityModifier is the raw +3.
     const character = makeCharacter({
