@@ -25,8 +25,7 @@
 import { useState } from "react";
 
 import { useRoll } from "@/features/dice/RollContext";
-import { applyInventoryTransactions, logRoll } from "@/api/client";
-import { formatRollSpec } from "@/lib/dice";
+import { applyInventoryTransactions } from "@/api/client";
 import {
   attacksExhausted as computeAttacksExhausted,
   buildAttackEntries,
@@ -34,13 +33,14 @@ import {
   hasSuperiorityDice,
 } from "@/lib/attackMath";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
+import { useRollLogger } from "@/features/session/useRollLogger";
 import AttackRow from "@/features/session/AttackRow";
 import AttackOptionRow from "@/features/session/AttackOptionRow";
 import EquipWeaponPanel from "@/features/session/EquipWeaponPanel";
 import type { AttackEntry, DamageRider } from "@/lib/attackMath";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character, ManeuverEntry } from "@/types/character";
-import type { RollResult, RollSpec } from "@/lib/dice";
+import type { RollResult } from "@/lib/dice";
 
 interface InlineAttackPickerProps {
   character: Character;
@@ -69,26 +69,7 @@ export default function InlineAttackPicker({
   onLogChanged,
 }: InlineAttackPickerProps) {
   const { roll } = useRoll();
-
-  // Persist a roll to the Session Log (best-effort — never blocks play).
-  function logRollSafe(
-    kind: "attack" | "damage",
-    source: string,
-    result: RollResult,
-    spec: RollSpec,
-    damageType?: string,
-  ) {
-    logRoll(character.id, sessionId, {
-      kind,
-      source,
-      total: result.total,
-      specLabel: formatRollSpec(spec),
-      damageType,
-      faces: result.dice.filter((d) => !d.dropped).map((d) => d.value),
-    })
-      .then(onLogChanged)
-      .catch((e) => console.error("roll log failed", e));
-  }
+  const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
 
   const { pool, dieLabel, busy: dieBusy, spend } = useManeuverDie(character, onUpdate);
 

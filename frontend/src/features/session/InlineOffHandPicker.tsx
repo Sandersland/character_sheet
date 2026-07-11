@@ -14,14 +14,13 @@
 import { useState } from "react";
 
 import { useRoll } from "@/features/dice/RollContext";
-import { logRoll } from "@/api/client";
-import { formatRollSpec } from "@/lib/dice";
 import { buildOffHandEntry, critDamageSpec, hasSuperiorityDice } from "@/lib/attackMath";
 import AttackRow from "@/features/session/AttackRow";
+import { useRollLogger } from "@/features/session/useRollLogger";
 import type { AttackEntry, DamageRider } from "@/lib/attackMath";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
-import type { RollResult, RollSpec } from "@/lib/dice";
+import type { RollResult } from "@/lib/dice";
 
 interface InlineOffHandPickerProps {
   character: Character;
@@ -46,26 +45,7 @@ export default function InlineOffHandPicker({
   onLogChanged,
 }: InlineOffHandPickerProps) {
   const { roll } = useRoll();
-
-  // Persist a roll to the Session Log (best-effort — never blocks play).
-  function logRollSafe(
-    kind: "attack" | "damage",
-    source: string,
-    result: RollResult,
-    spec: RollSpec,
-    damageType?: string,
-  ) {
-    logRoll(character.id, sessionId, {
-      kind,
-      source,
-      total: result.total,
-      specLabel: formatRollSpec(spec),
-      damageType,
-      faces: result.dice.filter((d) => !d.dropped).map((d) => d.value),
-    })
-      .then(onLogChanged)
-      .catch((e) => console.error("roll log failed", e));
-  }
+  const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
 
   const [lastAttackRoll, setLastAttackRoll] = useState<RollResult | null>(null);
   const [lastDamageRoll, setLastDamageRoll] = useState<RollResult | null>(null);
