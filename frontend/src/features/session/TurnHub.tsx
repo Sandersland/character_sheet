@@ -13,17 +13,15 @@
  */
 
 import Card from "@/components/ui/Card";
-import BottomSheet from "@/components/ui/BottomSheet";
 import { Zap } from "@/components/ui/icons";
 import { useTurnActions } from "@/features/session/useTurnActions";
 import ActionSlot from "@/features/session/ActionSlot";
 import BonusActionSlot from "@/features/session/BonusActionSlot";
 import ReactionSlot from "@/features/session/ReactionSlot";
 import EffectManeuverStrip from "@/features/session/EffectManeuverStrip";
-import LayOnHandsInput from "@/features/session/LayOnHandsInput";
-import InlineAttackPicker from "@/features/session/InlineAttackPicker";
-import InlineItemPicker from "@/features/session/InlineItemPicker";
-import InlineSpellPicker from "@/features/session/InlineSpellPicker";
+import InitiativeRail from "@/features/session/InitiativeRail";
+import TurnResolutionSheets from "@/features/session/TurnResolutionSheets";
+import { showInitiative, showMovement } from "@/features/session/turnFlags";
 import type { AllyOption } from "@/lib/spellMeta";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
@@ -50,13 +48,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     attack,
     bonusAttack,
     twfAvailable,
-    spellCastThisTurn,
-    cancelAttack,
-    finishAttack,
     consumeBonusAction,
-    commitActionSpell,
-    commitBonusActionSpell,
-    commitReactionSpell,
   } = turnState;
 
   const {
@@ -95,6 +87,9 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     handleReactionManeuver,
     handleEffectManeuver,
   } = useTurnActions({ character, sessionId, turnState, onUpdate, onLogChanged });
+
+  // Decorative initiative rail's "you" marker (#737).
+  const youInitial = character.name?.[0]?.toUpperCase() ?? "?";
 
   // ── Idle state ─────────────────────────────────────────────────────────────
   if (phase === "idle") {
@@ -136,6 +131,10 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
               End combat
             </button>
           </div>
+
+          {showInitiative && (
+            <InitiativeRail youInitial={youInitial} active={false} />
+          )}
 
           {/* Reaction is available between turns — render it in idle mode. */}
           <ReactionSlot
@@ -186,6 +185,12 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           End turn
         </button>
       </div>
+
+      {showInitiative && (
+        <div className="mb-4">
+          <InitiativeRail youInitial={youInitial} active />
+        </div>
+      )}
 
       <div className="flex flex-col gap-3">
         {/* ── Action ──────────────────────────────────────────────────────── */}
@@ -248,98 +253,18 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
         )}
 
         {/* ── Resolution sheets ─────────────────────────────────────────────── */}
-        {activeResolution?.resolver.kind === "attack-picker" && (
-          <BottomSheet
-            title="Attack"
-            subtitle="1 attack · no target AC tracked — read the roll to your DM"
-            onClose={() => {
-              cancelAttack();
-              closeResolution();
-            }}
-          >
-            <InlineAttackPicker
-              character={character}
-              turnState={turnState}
-              sessionId={sessionId}
-              onClose={() => {
-                finishAttack();
-                closeResolution();
-              }}
-              onCancel={() => {
-                cancelAttack();
-                closeResolution();
-                setShowActionMenu(true);
-              }}
-              onUpdate={onUpdate}
-              onLogChanged={onLogChanged}
-            />
-          </BottomSheet>
-        )}
-
-        {activeResolution?.resolver.kind === "item-picker" && (
-          <BottomSheet title="Use an item" onClose={closeResolution}>
-            <InlineItemPicker
-              character={character}
-              onUpdate={onUpdate}
-              onClose={closeResolution}
-            />
-          </BottomSheet>
-        )}
-
-        {activeResolution?.resolver.kind === "heal-input" && (
-          <BottomSheet title="Lay on Hands" onClose={closeResolution}>
-            <LayOnHandsInput
-              character={character}
-              onSend={send}
-              onClose={closeResolution}
-            />
-          </BottomSheet>
-        )}
-
-        {activeResolution?.resolver.kind === "spell-picker" && character.spellcasting && (() => {
-          const spellSlot = activeResolution.resolver.slot as "action" | "bonusAction" | "reaction";
-          const slotAvailable =
-            spellSlot === "action" ? actionsRemaining > 0
-            : spellSlot === "bonusAction" ? !bonusActionUsed
-            : !reactionUsed;
-          const onCommitSlot = (spellLevel: number) => {
-            if (spellSlot === "action") commitActionSpell(spellLevel);
-            else if (spellSlot === "bonusAction") commitBonusActionSpell(spellLevel);
-            else commitReactionSpell();
-          };
-          return (
-            <BottomSheet
-              title={
-                spellSlot === "bonusAction"
-                  ? "Bonus-Action Spell"
-                  : spellSlot === "reaction"
-                    ? "Reaction Spell"
-                    : "Cast a Spell"
-              }
-              onClose={closeResolution}
-            >
-              <InlineSpellPicker
-                character={character}
-                sessionId={sessionId}
-                onUpdate={onUpdate}
-                onClose={closeResolution}
-                onLogChanged={onLogChanged}
-                slot={spellSlot}
-                slotAvailable={slotAvailable}
-                onCommitSlot={onCommitSlot}
-                spellCastThisTurn={spellCastThisTurn}
-                allies={allies}
-                castingTimeFilter={
-                  spellSlot === "bonusAction"
-                    ? "1 bonus action"
-                    : spellSlot === "reaction"
-                      ? "1 reaction"
-                      : "1 action"
-                }
-              />
-            </BottomSheet>
-          );
-        })()}
+        <TurnResolutionSheets
+          character={character}
+          sessionId={sessionId}
+          turnState={turnState}
+          activeResolution={activeResolution}
+          closeResolution={closeResolution}
+          setShowActionMenu={setShowActionMenu}
+          onUpdate={onUpdate}
+          onLogChanged={onLogChanged}
+          allies={allies}
+          send={send}
+        />
 
         {/* ── Effect maneuvers (no slot consumed) — e.g. Evasive Footwork ─────── */}
         <EffectManeuverStrip
@@ -372,10 +297,12 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           </p>
         ))}
 
-        {/* Note about movement */}
-        <p className="text-[11px] text-parchment-600 italic">
-          ⚑ Movement is not tracked here. Speed / difficult-terrain tracking is a future feature.
-        </p>
+        {/* Note about movement (gated: the movement system is a future feature) */}
+        {showMovement && (
+          <p className="text-[11px] text-parchment-600 italic">
+            ⚑ Movement is not tracked here. Speed / difficult-terrain tracking is a future feature.
+          </p>
+        )}
       </div>
     </Card>
   );

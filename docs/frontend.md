@@ -58,7 +58,8 @@ frontend/src/
 │   │                    #   StartingEquipmentEditor, EquipmentDoll (→ EquipSlotCell → SlotPickerPanel)
 │   ├── journal/         # CapturePalette (Cmd/Ctrl+J quick-capture NOTE overlay)
 │   ├── session/         # TurnHub (→ useTurnActions + TurnControls/ActionSlot/BonusActionSlot/
-│   │                    #   ReactionSlot/EffectManeuverStrip/LayOnHandsInput), useTurnState, SessionLog,
+│   │                    #   ReactionSlot/EffectManeuverStrip/LayOnHandsInput + TurnResolutionSheets;
+│   │                    #   decorative InitiativeRail behind turnFlags, #737), useTurnState, SessionLog,
 │   │                    #   SessionsModal, SessionSummaryModal (→ useSessionRecapDetail +
 │   │                    #   CampaignRecapSection/RecapFacts/RecapPrimitives/ParticipantRecapCard/
 │   │                    #   SessionJournalList/SessionAddXpForm), Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
