@@ -216,6 +216,10 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
       )}
 
       <div className="flex flex-col gap-3">
+        {/* Death saves surface on your own turn too — the primary moment a
+            downed player rolls a save (#736/#744). */}
+        <TurnDeathSaves character={character} onUpdate={onUpdate} />
+
         <TurnConcentrationBanner
           character={character}
           onUpdate={onUpdate}

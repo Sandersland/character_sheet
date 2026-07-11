@@ -300,6 +300,23 @@ describe("TurnHub — Battle Master maneuvers", () => {
   });
 });
 
+describe("TurnHub — death saves (#736/#744)", () => {
+  const downed = () =>
+    makeCharacter({
+      hitPoints: { current: 0, max: 44, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+    } as unknown as Partial<Character>);
+
+  it("shows the death-save tracker in the active turn at 0 HP", async () => {
+    const user = userEvent.setup();
+    renderHub(downed());
+    await startTurn(user);
+
+    // The primary moment a downed player rolls a save is on their own turn.
+    expect(screen.getByText("Your turn")).toBeInTheDocument();
+    expect(screen.getByText(/Unconscious — Roll Death Saves/i)).toBeInTheDocument();
+  });
+});
+
 describe("TurnHub — accessibility", () => {
   it("has no axe violations in the active turn", async () => {
     const user = userEvent.setup();

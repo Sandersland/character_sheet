@@ -219,12 +219,17 @@ export default function HitPointTracker({
 
         {/* ── Death save tracker (shown at 0 HP) ── */}
         {deathSaveCtl.isDying && (
-          <DeathSaveTracker
-            deathSaves={deathSaveCtl.deathSaves}
-            pending={deathSaveCtl.pending}
-            onRollDeathSave={deathSaveCtl.onRollDeathSave}
-            onStabilize={deathSaveCtl.onStabilize}
-          />
+          <div className="flex flex-col gap-2">
+            <DeathSaveTracker
+              deathSaves={deathSaveCtl.deathSaves}
+              pending={deathSaveCtl.pending}
+              onRollDeathSave={deathSaveCtl.onRollDeathSave}
+              onStabilize={deathSaveCtl.onStabilize}
+            />
+            {deathSaveCtl.error && (
+              <p className="text-xs font-semibold text-garnet-700">{deathSaveCtl.error}</p>
+            )}
+          </div>
         )}
 
         {/* ── HP action control (segmented mode + stepper + verb) ── */}

@@ -15,23 +15,23 @@ export default function TurnDeathSaves({
   character: Character;
   onUpdate: (c: Character) => void;
 }) {
-  const { isDying, deathSaves, pending, onRollDeathSave, onStabilize } = useDeathSaves(
+  const { isDying, deathSaves, pending, error, onRollDeathSave, onStabilize } = useDeathSaves(
     character,
     onUpdate,
   );
   if (!isDying) return null;
 
+  // DeathSaveTracker supplies its own garnet card + heading, so render it
+  // directly (no wrapping card) — the same way HitPointTracker does (#744).
   return (
-    <div className="rounded-card border border-garnet-300 bg-garnet-50 p-3">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-garnet-700">
-        Dying — death saves
-      </p>
+    <>
       <DeathSaveTracker
         deathSaves={deathSaves}
         pending={pending}
         onRollDeathSave={onRollDeathSave}
         onStabilize={onStabilize}
       />
-    </div>
+      {error && <p className="text-xs font-semibold text-garnet-700">{error}</p>}
+    </>
   );
 }
