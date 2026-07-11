@@ -45,7 +45,9 @@ export default function BottomSheet({ title, subtitle, onClose, children }: Bott
           aria-hidden
           className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-parchment-300 md:hidden"
         />
-        <div className="flex shrink-0 items-start justify-between gap-3 px-4 pb-3 pt-2">
+        {/* md:pt-3 restores Modal's header padding on desktop, where the
+            grabber (which fills the gap on mobile) is hidden. */}
+        <div className="flex shrink-0 items-start justify-between gap-3 px-4 pb-3 pt-2 md:pt-3">
           <div>
             <h2 id={titleId} className="font-display text-lg font-semibold text-parchment-900">
               {title}

@@ -38,6 +38,18 @@ describe("BottomSheet", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("closes when the scrim is clicked", async () => {
+    const onClose = vi.fn();
+    const { baseElement } = render(
+      <BottomSheet title="Action" onClose={onClose}>
+        <p>body</p>
+      </BottomSheet>,
+    );
+    const scrim = baseElement.querySelector('[role="presentation"]') as HTMLElement;
+    await userEvent.pointer({ target: scrim, keys: "[MouseLeft]" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("drops the grabber handle on desktop (md+) — it's a thumb-drag affordance", () => {
     const { baseElement } = render(
       <BottomSheet title="Action" onClose={vi.fn()}>
