@@ -59,7 +59,8 @@ frontend/src/
 │   ├── journal/         # CapturePalette (Cmd/Ctrl+J quick-capture NOTE overlay)
 │   ├── session/         # TurnHub (→ useTurnActions + TurnControls/ActionSlot/BonusActionSlot/
 │   │                    #   ReactionSlot/EffectManeuverStrip/LayOnHandsInput + TurnResolutionSheets;
-│   │                    #   decorative InitiativeRail behind turnFlags, #737),
+│   │                    #   decorative InitiativeRail behind turnFlags, #737;
+│   │                    #   read-only TurnConcentrationBanner #735),
 │   │                    #   useTurnState (turn economy + turn-scoped LIFO undo #730), SessionLog,
 │   │                    #   SessionsModal, SessionSummaryModal (→ useSessionRecapDetail +
 │   │                    #   CampaignRecapSection/RecapFacts/RecapPrimitives/ParticipantRecapCard/
