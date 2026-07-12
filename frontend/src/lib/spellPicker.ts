@@ -190,6 +190,6 @@ export function castCostBadge(spell: Spell): string {
       ? "reaction"
       : t.startsWith("1 action")
         ? "action"
-        : (spell.castingTime ?? "").toLowerCase();
+        : t;
   return `${spell.level === 0 ? "free" : "1 slot"} · ${costWord}`;
 }

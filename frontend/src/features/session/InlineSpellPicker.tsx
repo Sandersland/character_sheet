@@ -143,7 +143,7 @@ function GroupedSpellSections({
   return (
     <>
       {groupSpellsByLevel(picker.sortedSpells).map((group) => (
-        <div key={group.level} className="flex flex-col gap-0">
+        <div key={group.level} className="flex flex-col">
           <SpellLevelHeader level={group.level} slots={slots} />
           {group.spells.map((spell) => (
             <PickerRow key={spell.id} picker={picker} spell={spell} />
