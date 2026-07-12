@@ -1,7 +1,8 @@
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDialogChrome } from "@/hooks/useDialogChrome";
 import { useDragToDismiss } from "@/hooks/useDragToDismiss";
+import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 
 interface BottomSheetProps {
   title: string;
@@ -26,14 +27,7 @@ export default function BottomSheet({ title, subtitle, onClose, children }: Bott
   const titleId = useId();
 
   // Gate the gesture off at md+, matching the pure-CSS breakpoint.
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 768px)");
-    const sync = () => setIsMobile(!mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
+  const isMobile = useIsBelowMd();
 
   const { handleProps, contentProps } = useDragToDismiss(panelRef, {
     onDismiss: onClose,
