@@ -319,6 +319,21 @@ describe("Way of Shadow — Shadow Step / Opportunist (#440)", () => {
     expect(keys(deriveActions("Monk", "way of shadow", 6, []))).toContain("shadowStep");
   });
 
+  it("carry their rule text as a reminder for in-session surfacing", () => {
+    const l17 = deriveActions("monk", SHADOW, 17, []);
+    const shadowStep = l17.find((a) => a.key === "shadowStep");
+    const opportunist = l17.find((a) => a.key === "opportunist");
+    expect(shadowStep?.reminder).toMatch(/teleport/i);
+    expect(shadowStep?.reminder).toMatch(/dim light|darkness/i);
+    expect(opportunist?.reminder).toMatch(/reaction/i);
+    expect(opportunist?.reminder).toMatch(/5 ft/i);
+  });
+
+  it("resource-gated class actions carry no reminder (reminder is Shadow-only)", () => {
+    const flurry = deriveActions("monk", SHADOW, 17, []).find((a) => a.key === "flurryOfBlows");
+    expect(flurry?.reminder).toBeUndefined();
+  });
+
   it("are pure reminder actions — no server effect fn (no ACTION_EFFECT_FN/ACTION_CAST_FN)", () => {
     expect(ACTION_EFFECT_FN.shadowStep).toBeUndefined();
     expect(ACTION_CAST_FN.shadowStep).toBeUndefined();
