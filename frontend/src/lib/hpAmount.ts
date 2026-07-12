@@ -5,7 +5,7 @@ export type HpMode = "damage" | "heal" | "temp";
 const MAX_HP_AMOUNT = 999;
 
 // Accumulator chip steps offered beneath the amount readout.
-export const ACCUMULATOR_CHIPS = [1, 5, 10, 20] as const;
+export const ACCUMULATOR_CHIPS = [5, 10, 20] as const;
 
 export interface HpSnapshot {
   current: number;
@@ -52,18 +52,18 @@ export function deriveHpApply(
   };
 }
 
-/** Projected-result line for the active mode, mirroring what Apply will do. */
+/** Projected-result line for the active mode — the amount lives in the readout, not here. */
 export function projectHp(mode: HpMode, amount: number, hp: HpSnapshot): string {
   if (mode === "heal") {
     const next = Math.min(hp.max, hp.current + amount);
-    return `${amount} → ${next} / ${hp.max}`;
+    return `→ ${next} / ${hp.max}`;
   }
   if (mode === "temp") {
     const next = Math.max(hp.temp, amount);
-    return `Temp ${hp.temp} → ${next}`;
+    return `Temp → ${next}`;
   }
   // Damage: temp HP absorbs first, then current, floored at 0.
   const remaining = Math.max(0, amount - hp.temp);
   const next = Math.max(0, hp.current - remaining);
-  return `${amount} HP → ${next} / ${hp.max}`;
+  return `→ ${next} / ${hp.max}`;
 }

@@ -22,12 +22,12 @@ test("session HP sheet: tap the bar, apply damage, see it in the log", async ({ 
   const sheet = page.getByRole("dialog");
   await expect(sheet.getByRole("heading", { name: /hit points/i })).toBeVisible();
 
-  // One-hand flow (#787): build 17 via accumulator chips, no OS keyboard, then Apply.
+  // One-hand flow (#796): build 17 via +10 +5 chips and the ±1 stepper flanks, no OS keyboard.
   // exact:true — Playwright name matching is substring, so "Add 1" would also hit "Add 10".
   await sheet.getByRole("button", { name: "Add 10", exact: true }).click();
   await sheet.getByRole("button", { name: "Add 5", exact: true }).click();
-  await sheet.getByRole("button", { name: "Add 1", exact: true }).click();
-  await sheet.getByRole("button", { name: "Add 1", exact: true }).click();
+  await sheet.getByRole("button", { name: "Increase amount", exact: true }).click();
+  await sheet.getByRole("button", { name: "Increase amount", exact: true }).click();
   await sheet.getByRole("button", { name: /apply 17 damage/i }).click();
 
   // The bar reflects the new HP total; the sheet stays open/responsive.

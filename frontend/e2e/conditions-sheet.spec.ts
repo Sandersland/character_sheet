@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
+import { findCharacterByName, removeCondition } from "./helpers/api";
 import { collectConsoleErrors } from "./helpers/console";
 
 // Compact conditions strip on mobile (#769): the slim session strip opens a
@@ -10,6 +11,10 @@ test.use({ viewport: { width: 390, height: 844 } });
 
 test("session conditions strip (mobile): tap, apply a condition, see it reflect + log", async ({ page }) => {
   await login(page);
+
+  // Clear any leftover Poisoned on the shared persona so the apply flow is deterministic.
+  const fighterId = await findCharacterByName(page.request, "Session Fighter");
+  await removeCondition(page.request, fighterId, "poisoned");
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();

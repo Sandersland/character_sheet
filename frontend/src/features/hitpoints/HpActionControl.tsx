@@ -92,8 +92,9 @@ function AmountChips({
 }
 
 const STEP_BTN_CLS =
-  "flex h-9 w-9 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50";
+  "flex h-11 w-11 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50";
 
+// Display-size amount readout: one large tabular input flanked by −/+ stepper.
 function AmountStepper({
   pending,
   amount,
@@ -110,40 +111,38 @@ function AmountStepper({
   onEnter: () => void;
 }) {
   return (
-    <div className="flex justify-center">
-      <div className="inline-flex items-center rounded-control border border-parchment-300 bg-parchment-50">
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => onBump(-1)}
-          aria-label="Decrease amount"
-          className={STEP_BTN_CLS}
-        >
-          <Minus aria-hidden="true" className="h-4 w-4" />
-        </button>
-        <input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          step={1}
-          value={amount}
-          onChange={(e) => onAmountChange(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && onEnter()}
-          placeholder="0"
-          disabled={pending}
-          aria-label={fieldLabel}
-          className="w-16 border-0 bg-transparent text-center text-lg tabular-nums text-parchment-900 disabled:opacity-50"
-        />
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => onBump(1)}
-          aria-label="Increase amount"
-          className={STEP_BTN_CLS}
-        >
-          <Plus aria-hidden="true" className="h-4 w-4" />
-        </button>
-      </div>
+    <div className="flex items-center justify-center gap-2">
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => onBump(-1)}
+        aria-label="Decrease amount"
+        className={STEP_BTN_CLS}
+      >
+        <Minus aria-hidden="true" className="h-5 w-5" />
+      </button>
+      <input
+        type="number"
+        inputMode="numeric"
+        min={0}
+        step={1}
+        value={amount}
+        onChange={(e) => onAmountChange(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && onEnter()}
+        placeholder="0"
+        disabled={pending}
+        aria-label={fieldLabel}
+        className="w-24 border-0 bg-transparent text-center text-4xl font-bold tabular-nums text-parchment-900 placeholder:text-parchment-400 disabled:opacity-50"
+      />
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => onBump(1)}
+        aria-label="Increase amount"
+        className={STEP_BTN_CLS}
+      >
+        <Plus aria-hidden="true" className="h-5 w-5" />
+      </button>
     </div>
   );
 }
@@ -197,21 +196,7 @@ export default function HpActionControl({
         label="Hit point action"
       />
 
-      {/* Amount readout + projected result */}
-      <div className="flex flex-col items-center gap-1">
-        <span className="text-4xl font-bold tabular-nums text-parchment-900">{numericAmount}</span>
-        <p aria-live="polite" className="text-sm font-semibold text-parchment-600">
-          {projectHp(mode, effectiveAmount, hitPoints)}
-        </p>
-      </div>
-
-      <AmountChips
-        pending={pending}
-        amount={numericAmount}
-        onBump={bumpAmount}
-        onClear={() => setAmount("")}
-      />
-
+      {/* Editable amount readout flanked by the −/+ stepper */}
       <AmountStepper
         pending={pending}
         amount={amount}
@@ -219,6 +204,17 @@ export default function HpActionControl({
         onBump={bumpAmount}
         onAmountChange={setAmount}
         onEnter={() => !applyDisabled && apply()}
+      />
+
+      <p aria-live="polite" className="text-center text-sm font-semibold text-parchment-600">
+        {projectHp(mode, effectiveAmount, hitPoints)}
+      </p>
+
+      <AmountChips
+        pending={pending}
+        amount={numericAmount}
+        onBump={bumpAmount}
+        onClear={() => setAmount("")}
       />
 
       {/* Damage-type picker (damage mode only, optional) (#456) */}
