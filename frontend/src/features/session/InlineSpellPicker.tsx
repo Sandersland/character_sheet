@@ -80,6 +80,8 @@ function computeHiddenNote(
       castingTimeFilter,
       slotLevels: availableSlotLevels(spellcasting?.slots ?? []),
       arcanaLevels: availableArcanaLevels(spellcasting?.arcana ?? []),
+      // Deliberately NOT read from spellCastThisTurn: this footer only explains
+      // slot-based hiding; economy-rule blocking is surfaced by slotUsedHint.
       bonusActionBlockedByActionSpell: false,
       actionLimitedToCantrips: false,
     }),
@@ -155,6 +157,63 @@ function GroupedSpellSections({
   );
 }
 
+/** The non-empty picker body: restriction hint, focused row or grouped list, Done. */
+function PickerContent({
+  picker,
+  slots,
+  hiddenNote,
+  focusSpell,
+  onShowAll,
+  onClose,
+}: {
+  picker: UseSpellPicker;
+  slots: SpellSlots[];
+  hiddenNote: string | null;
+  focusSpell: Spell | undefined;
+  onShowAll: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-0">
+      {picker.slotUsedHint && (
+        <p className="mb-2 rounded bg-parchment-100 px-3 py-2 text-[11px] font-semibold text-parchment-600">
+          {picker.slotUsedHint}
+        </p>
+      )}
+
+      {focusSpell ? (
+        <>
+          <PickerRow picker={picker} spell={focusSpell} />
+          <button
+            type="button"
+            onClick={onShowAll}
+            className="self-start pt-2 text-xs font-semibold text-arcane-700 hover:text-arcane-800"
+          >
+            Show all spells
+          </button>
+        </>
+      ) : (
+        <GroupedSpellSections picker={picker} slots={slots} hiddenNote={hiddenNote} />
+      )}
+
+      {/* Empty state when the 5e rule blocks everything */}
+      {!picker.hasCastable && picker.slotUsedHint && (
+        <p className="py-2 text-sm text-parchment-600">No spells available.</p>
+      )}
+
+      <div className="pt-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function InlineSpellPicker({
   character,
   sessionId,
@@ -215,62 +274,5 @@ export default function InlineSpellPicker({
       onShowAll={() => setFocusId(null)}
       onClose={onClose}
     />
-  );
-}
-
-/** The non-empty picker body: restriction hint, focused row or grouped list, Done. */
-function PickerContent({
-  picker,
-  slots,
-  hiddenNote,
-  focusSpell,
-  onShowAll,
-  onClose,
-}: {
-  picker: UseSpellPicker;
-  slots: SpellSlots[];
-  hiddenNote: string | null;
-  focusSpell: Spell | undefined;
-  onShowAll: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="flex flex-col gap-0">
-      {picker.slotUsedHint && (
-        <p className="mb-2 rounded bg-parchment-100 px-3 py-2 text-[11px] font-semibold text-parchment-600">
-          {picker.slotUsedHint}
-        </p>
-      )}
-
-      {focusSpell ? (
-        <>
-          <PickerRow picker={picker} spell={focusSpell} />
-          <button
-            type="button"
-            onClick={onShowAll}
-            className="self-start pt-2 text-xs font-semibold text-arcane-700 hover:text-arcane-800"
-          >
-            Show all spells
-          </button>
-        </>
-      ) : (
-        <GroupedSpellSections picker={picker} slots={slots} hiddenNote={hiddenNote} />
-      )}
-
-      {/* Empty state when the 5e rule blocks everything */}
-      {!picker.hasCastable && picker.slotUsedHint && (
-        <p className="py-2 text-sm text-parchment-600">No spells available.</p>
-      )}
-
-      <div className="pt-3">
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-full rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
-        >
-          Done
-        </button>
-      </div>
-    </div>
   );
 }

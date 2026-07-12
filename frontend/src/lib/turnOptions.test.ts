@@ -318,6 +318,18 @@ describe("twfHint", () => {
     );
   });
 
+  it("does not naively pluralize an s-ending weapon name", () => {
+    const c = makeCharacter({
+      inventory: [
+        weaponItem({ id: "a", name: "Cutlass", equipped: false }, { light: true }),
+        weaponItem({ id: "b", name: "Cutlass", equipped: false }, { light: true }),
+      ],
+    } as Partial<Character>);
+    expect(twfHint(c)).toBe(
+      "Off-hand attack needs two light weapons — equip a pair of Cutlass to enable it.",
+    );
+  });
+
   it("generic fallback when fewer than two light weapons are owned", () => {
     const c = makeCharacter({ inventory: [weaponItem()] } as Partial<Character>);
     expect(twfHint(c)).toBe("Off-hand attack needs two light weapons equipped.");

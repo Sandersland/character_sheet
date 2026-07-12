@@ -170,7 +170,10 @@ export function twfHint(character: Character): string | null {
     return "Off-hand attack needs two light weapons equipped.";
   }
   const [first, second] = lightWeapons;
-  const pair = first.name === second.name ? `Two ${first.name}s` : `${first.name} & ${second.name}`;
+  // Same-name pair: "Two Shortswords" — but an s-ending name (custom items)
+  // can't take the naive plural, so fall back to "a pair of Cutlass".
+  const samePair = first.name.endsWith("s") ? `a pair of ${first.name}` : `Two ${first.name}s`;
+  const pair = first.name === second.name ? samePair : `${first.name} & ${second.name}`;
   return `Off-hand attack needs two light weapons — equip ${pair} to enable it.`;
 }
 
