@@ -82,7 +82,7 @@ async function applyDamage() {
   // Damage is the default segmented mode; type into its stepper field and apply.
   const damageInput = screen.getByRole("spinbutton", { name: /damage amount/i });
   await user.type(damageInput, "8");
-  await user.click(screen.getByRole("button", { name: /apply damage/i }));
+  await user.click(screen.getByRole("button", { name: /apply \d+ damage/i }));
 }
 
 beforeEach(() => {
@@ -125,7 +125,7 @@ describe("HitPointTracker segmented action control (issue #225)", () => {
 
     await user.click(screen.getByRole("radio", { name: /heal/i }));
     await user.type(screen.getByRole("spinbutton", { name: /heal amount/i }), "5");
-    await user.click(screen.getByRole("button", { name: /^heal$/i }));
+    await user.click(screen.getByRole("button", { name: /^heal \d+$/i }));
 
     const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
     expect(ops[0]).toEqual({ type: "heal", amount: 5 });
@@ -138,7 +138,7 @@ describe("HitPointTracker segmented action control (issue #225)", () => {
 
     await user.click(screen.getByRole("radio", { name: /temp hp/i }));
     await user.type(screen.getByRole("spinbutton", { name: /temporary hit points/i }), "7");
-    await user.click(screen.getByRole("button", { name: /set temp hp/i }));
+    await user.click(screen.getByRole("button", { name: /grant \d+ temp hp/i }));
 
     const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
     expect(ops[0]).toEqual({ type: "setTemp", amount: 7 });
@@ -320,7 +320,7 @@ describe("HitPointTracker damage type + resistance (#456)", () => {
 
     await user.type(screen.getByRole("spinbutton", { name: /damage amount/i }), "8");
     await user.selectOptions(screen.getByRole("combobox", { name: /damage type/i }), "fire");
-    await user.click(screen.getByRole("button", { name: /apply damage/i }));
+    await user.click(screen.getByRole("button", { name: /apply \d+ damage/i }));
 
     const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
     expect(ops[0]).toMatchObject({ type: "damage", amount: 8, damageType: "fire", applyResistance: true });
@@ -336,7 +336,7 @@ describe("HitPointTracker damage type + resistance (#456)", () => {
 
     expect(screen.getByRole("status")).toHaveTextContent(/halves to 6/i);
 
-    await user.click(screen.getByRole("button", { name: /apply damage/i }));
+    await user.click(screen.getByRole("button", { name: /apply \d+ damage/i }));
     const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
     expect(ops[0]).toMatchObject({ type: "damage", amount: 12, damageType: "slashing", applyResistance: true });
   });
@@ -350,7 +350,7 @@ describe("HitPointTracker damage type + resistance (#456)", () => {
     await user.selectOptions(screen.getByRole("combobox", { name: /damage type/i }), "slashing");
     // Uncheck the "apply resistance" toggle to take the full amount.
     await user.click(screen.getByRole("checkbox", { name: /resistant to slashing/i }));
-    await user.click(screen.getByRole("button", { name: /apply damage/i }));
+    await user.click(screen.getByRole("button", { name: /apply \d+ damage/i }));
 
     const [, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
     expect(ops[0]).toMatchObject({ type: "damage", amount: 12, damageType: "slashing", applyResistance: false });

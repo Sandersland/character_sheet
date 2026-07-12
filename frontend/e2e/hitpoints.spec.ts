@@ -37,13 +37,13 @@ test("HP: damage drops, heal restores, short rest spends a hit die", async ({ pa
   // Damage drops current HP.
   await page.getByRole("radio", { name: "Damage" }).click();
   await page.getByRole("spinbutton", { name: "Damage amount" }).fill("6");
-  await page.getByRole("button", { name: "Apply damage" }).click();
+  await page.getByRole("button", { name: /apply \d+ damage/i }).click();
   await expect.poll(() => hpNow(page)).toBe(max - 6);
 
   // Heal restores it.
   await page.getByRole("radio", { name: "Heal" }).click();
   await page.getByRole("spinbutton", { name: "Heal amount" }).fill("2");
-  await page.getByRole("button", { name: "Heal", exact: true }).click();
+  await page.getByRole("button", { name: /^heal \d+$/i }).click();
   await expect.poll(() => hpNow(page)).toBe(max - 4);
 
   // Short rest spends a hit die from the pool.

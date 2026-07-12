@@ -48,6 +48,7 @@ export default function HitPointTracker({
 
         <HpActionControl
           pending={hp.pending}
+          hitPoints={hitPoints}
           onApply={hp.handleApply}
           resistedTypes={[...activeResistedDamageTypes(character.activeEffects?.buffs ?? [])]}
         />

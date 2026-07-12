@@ -104,7 +104,7 @@ describe("CompactHpBar tap-to-manage sheet (#768)", () => {
     await user.click(screen.getByRole("button", { name: /manage hit points/i }));
     const dialog = await screen.findByRole("dialog");
     await user.type(within(dialog).getByRole("spinbutton", { name: /damage amount/i }), "7");
-    await user.click(within(dialog).getByRole("button", { name: /apply damage/i }));
+    await user.click(within(dialog).getByRole("button", { name: /apply \d+ damage/i }));
 
     const [id, ops] = vi.mocked(client.applyHitPointOperations).mock.calls[0];
     expect(id).toBe("char-1");
@@ -123,7 +123,7 @@ describe("CompactHpBar tap-to-manage sheet (#768)", () => {
     await user.click(screen.getByRole("button", { name: /manage hit points/i }));
     const dialog = await screen.findByRole("dialog");
     await user.type(within(dialog).getByRole("spinbutton", { name: /damage amount/i }), "7");
-    await user.click(within(dialog).getByRole("button", { name: /apply damage/i }));
+    await user.click(within(dialog).getByRole("button", { name: /apply \d+ damage/i }));
 
     const note = await screen.findByRole("status");
     expect(note).toHaveTextContent(/14 vs DC 12/);

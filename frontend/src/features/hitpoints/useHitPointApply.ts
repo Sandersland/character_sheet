@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { applyHitPointOperations } from "@/api/client";
 import type { Character, ConcentrationCheck, HitPointOperation } from "@/types/character";
-import type { HpMode } from "@/features/hitpoints/HpActionControl";
+import type { HpMode } from "@/lib/hpAmount";
 import type { PendingConcentrationSave } from "@/features/hitpoints/ConcentrationSaveModal";
 import { useAutoRollConcentrationPref } from "@/features/hitpoints/concentrationPreference";
 import { buildHpOps } from "@/lib/hitPointOps";

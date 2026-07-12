@@ -50,8 +50,12 @@ frontend/src/
 │   │                    #   HpDeathSaveBlock / HpNotices (level-up + advancement + concentration + error) /
 │   │                    #   HpTrackerModals (LevelUpModal + ConcentrationSaveModal), + useHitPointTrackerActions
 │   │                    #   (rest/level-up handlers + level-up/advancement state) (#779).
-│   │                    #   Sub-components: HpActionControl (damage/heal/temp + optional
-│   │                    #   damage-type picker + resistance auto-halve toggle, #456),
+│   │                    #   Sub-components: HpActionControl (vertical flow: full-width
+│   │                    #   Damage/Heal/Temp Segmented + big amount readout with an aria-live
+│   │                    #   projected-HP line + accumulator chips +1/+5/+10/+20/Clear + secondary
+│   │                    #   −/+ stepper & numeric entry + full-width Apply echoing the amount;
+│   │                    #   Damage-mode-only damage-type picker + resistance auto-halve toggle, #456/#787;
+│   │                    #   pure amount math — accumulate/clamp/project — in lib/hpAmount, #787),
 │   │                    #   HpMeter, RestControls, DeathSaveTracker, LevelUpCallout, AdvancementCallout;
 │   │                    #   CompactHpBar (session strip; tap → "Hit Points" BottomSheet → HpSheetBody, #768),
 │   │                    #   useHitPointApply (shared submit + concentration-check surfacing behind the
