@@ -214,8 +214,10 @@ function economyOf(s: TurnState): EconomySnapshot {
 
 export function useTurnState(character: Character, sessionId: string): TurnStateView {
   const [state, setState] = useState<TurnState>(() => {
-    // Lazily hydrate from localStorage on first mount.
-    return loadTurnState(sessionId) ?? initialState();
+    // Lazily hydrate; merge over defaults so a stale-schema snapshot missing a
+    // newer field (e.g. history, pre-#730) backfills its current default (#750).
+    const loaded = loadTurnState(sessionId);
+    return loaded ? { ...initialState(), ...loaded } : initialState();
   });
 
   // Derived (not persisted): TWF eligibility follows the LIVE loadout, so a
