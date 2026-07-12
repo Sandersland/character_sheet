@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import TurnHub from "@/features/session/TurnHub";
@@ -405,6 +405,69 @@ describe("TurnHub — Battle Master maneuvers", () => {
       expect(screen.queryAllByText(/Superiority die spend failed\./i)).toHaveLength(0),
     );
     expect(screen.getByText(/add \+\d+ to your AC/i)).toBeInTheDocument();
+  });
+});
+
+describe("TurnHub — live multi-attack counter (#757)", () => {
+  function extraAttackFighter(): Character {
+    return makeCharacter({
+      attacksPerAction: 2,
+      inventory: [
+        {
+          id: "inv-1",
+          name: "Longsword",
+          category: "weapon",
+          quantity: 1,
+          equipped: true,
+          weapon: {
+            damageDiceCount: 1,
+            damageDiceFaces: 8,
+            damageModifier: 3,
+            damageType: "slashing",
+            attackBonus: 6,
+          },
+        },
+      ] as unknown as Character["inventory"],
+    } as unknown as Partial<Character>);
+  }
+
+  async function openAttackPicker(user: ReturnType<typeof userEvent.setup>) {
+    await startTurn(user);
+    await user.click(screen.getByRole("button", { name: /Use Action/ }));
+    await user.click(screen.getByRole("button", { name: /^Attack/ }));
+  }
+
+  it("opens at 2 of 2, decrements on each Roll to hit, and disables at 0 of 2", async () => {
+    const user = userEvent.setup();
+    renderHub(extraAttackFighter());
+    await openAttackPicker(user);
+    // Scope to the picker sheet — the Action tile behind it shows its own counter.
+    const sheet = () => within(screen.getByRole("dialog"));
+
+    expect(sheet().getByText(/Attacks:\s*2 of 2 remaining/)).toBeInTheDocument();
+
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+    expect(sheet().getByText(/Attacks:\s*1 of 2 remaining/)).toBeInTheDocument();
+
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+    expect(sheet().getByText(/Attacks:\s*0 of 2 remaining/)).toBeInTheDocument();
+    expect(sheet().getByRole("button", { name: /Roll to hit/ })).toBeDisabled();
+    // Damage stays usable under the ungated trust model.
+    expect(sheet().getByRole("button", { name: /Roll damage/ })).not.toBeDisabled();
+  });
+
+  it("switches the footer from Cancel to Done after the first roll", async () => {
+    const user = userEvent.setup();
+    renderHub(extraAttackFighter());
+    await openAttackPicker(user);
+    const sheet = () => within(screen.getByRole("dialog"));
+
+    expect(sheet().getByRole("button", { name: /Cancel — refund action/ })).toBeInTheDocument();
+
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+
+    expect(sheet().getByRole("button", { name: /^Done$/ })).toBeInTheDocument();
+    expect(sheet().queryByRole("button", { name: /Cancel — refund action/ })).not.toBeInTheDocument();
   });
 });
 

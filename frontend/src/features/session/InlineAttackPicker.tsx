@@ -16,6 +16,7 @@ import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { useRollLogger } from "@/features/session/useRollLogger";
 import AttackRow from "@/features/session/AttackRow";
 import AttackOptionRow from "@/features/session/AttackOptionRow";
+import { AttackCounter } from "@/features/session/TurnControls";
 import InlineSpellAttackSection from "@/features/session/InlineSpellAttackSection";
 import WeaponAttackCard from "@/features/session/WeaponAttackCard";
 import WeaponDamageCard from "@/features/session/WeaponDamageCard";
@@ -175,12 +176,17 @@ export default function InlineAttackPicker({
 
   const preRoll = turnState.attack !== null && turnState.attack.used === 0;
 
+  // Live Extra-Attack count for this action, from the turn economy (falls back to
+  // the server-derived total when no Attack action is in progress).
+  const attackCount = turnState.attack?.total ?? character.attacksPerAction;
+
   return (
     <div className="flex flex-col gap-2">
-      {/* Extra Attack count for this Attack action (server-derived). */}
-      <p className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
-        Attacks: {character.attacksPerAction}
-      </p>
+      {/* Live Extra-Attack counter — pips + "N of M remaining". Hidden at total 1
+          (the kicker's "1 attack" is enough). */}
+      {turnState.attack !== null && turnState.attack.total > 1 && (
+        <AttackCounter total={turnState.attack.total} used={turnState.attack.used} label="Attacks" />
+      )}
 
       {weaponEntries.length === 0 && (
         <p className="text-sm text-parchment-600">
@@ -271,7 +277,8 @@ export default function InlineAttackPicker({
       {/* ── Cancel (pre-roll, refunds the action) / Done (post-roll) footer ────── */}
       <div className="flex flex-col gap-1.5 pt-1">
         <p className="text-[11px] text-parchment-500">
-          No target AC tracked — read the roll to your DM.
+          {attackCount} attack{attackCount === 1 ? "" : "s"} · no target AC tracked — read the roll
+          to your DM.
         </p>
         <button
           type="button"

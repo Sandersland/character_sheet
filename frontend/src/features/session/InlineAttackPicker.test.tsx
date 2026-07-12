@@ -130,9 +130,51 @@ describe("InlineAttackPicker — equipped-weapon cards", () => {
     expect(screen.getByText("Unarmed Strike")).toBeInTheDocument();
   });
 
-  it("shows the attacks-per-Attack-action count", () => {
-    renderPicker(makeCharacter({ attacksPerAction: 3 }));
-    expect(screen.getByText(/Attacks:\s*3/)).toBeInTheDocument();
+});
+
+describe("InlineAttackPicker — live attack counter (#757)", () => {
+  const attackState = (total: number, used: number) =>
+    ({ ...turnState, attack: { total, used } }) as unknown as TurnState & TurnStateActions;
+
+  function withWeapon(attacksPerAction: number) {
+    return makeCharacter({
+      attacksPerAction,
+      inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"],
+    });
+  }
+
+  it("renders the live pip counter for a multi-attack action (2 of 2 remaining)", () => {
+    renderPicker(withWeapon(2), vi.fn(), vi.fn(), { turnState: attackState(2, 0) });
+    expect(screen.getByText(/Attacks:\s*2 of 2 remaining/)).toBeInTheDocument();
+  });
+
+  it("shows the counter decremented after one recorded attack (1 of 2 remaining)", () => {
+    renderPicker(withWeapon(2), vi.fn(), vi.fn(), { turnState: attackState(2, 1) });
+    expect(screen.getByText(/Attacks:\s*1 of 2 remaining/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Roll to hit/ })).not.toBeDisabled();
+  });
+
+  it("disables all Roll-to-hit buttons when exhausted but leaves Damage/Critical usable", () => {
+    renderPicker(withWeapon(2), vi.fn(), vi.fn(), { turnState: attackState(2, 2) });
+    expect(screen.getByText(/Attacks:\s*0 of 2 remaining/)).toBeInTheDocument();
+    for (const btn of screen.getAllByRole("button", { name: /Roll to hit/ })) {
+      expect(btn).toBeDisabled();
+    }
+    expect(screen.getByRole("button", { name: /Roll damage/ })).not.toBeDisabled();
+    for (const crit of screen.getAllByRole("button", { name: /^Critical$/ })) {
+      expect(crit).not.toBeDisabled();
+    }
+  });
+
+  it("hides the pip counter for a single-attack action and reads '1 attack' in the kicker", () => {
+    renderPicker(withWeapon(1), vi.fn(), vi.fn(), { turnState: attackState(1, 0) });
+    expect(screen.queryByText(/of 1 remaining/)).not.toBeInTheDocument();
+    expect(screen.getByText(/^1 attack ·/)).toBeInTheDocument();
+  });
+
+  it("kicker reads '2 attacks' for a multi-attack action", () => {
+    renderPicker(withWeapon(2), vi.fn(), vi.fn(), { turnState: attackState(2, 0) });
+    expect(screen.getByText(/^2 attacks ·/)).toBeInTheDocument();
   });
 });
 
