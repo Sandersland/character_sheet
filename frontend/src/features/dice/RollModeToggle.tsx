@@ -20,7 +20,10 @@ export default function RollModeToggle() {
   const { mode, setMode } = useRoll();
 
   return (
-    <div className="pointer-events-auto fixed inset-x-0 bottom-0 z-50 flex justify-center border-t border-parchment-200 bg-parchment-50 px-2 pb-[env(safe-area-inset-bottom)] pt-2 md:inset-x-auto md:bottom-6 md:left-6 md:justify-start md:border-t-0 md:bg-transparent md:p-0">
+    <div
+      data-testid="roll-mode-bar"
+      className="pointer-events-auto fixed inset-x-0 bottom-0 z-50 flex justify-center border-t border-parchment-200 bg-parchment-50 px-2 pb-[env(safe-area-inset-bottom)] pt-2 md:inset-x-auto md:bottom-6 md:left-6 md:justify-start md:border-t-0 md:bg-transparent md:p-0"
+    >
       <div
         role="group"
         aria-label="Roll mode"

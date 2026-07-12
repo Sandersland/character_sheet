@@ -73,8 +73,10 @@ test("session: roll-mode toggle docks as a bottom bar on mobile", async ({ page 
   await expect(toggle).toBeVisible();
   await expect(toggle.getByRole("button", { name: /^advantage$/i })).toBeVisible();
 
-  // The docked bar spans (near) full width and sits at the bottom of the viewport.
-  const box = await toggle.boundingBox();
+  // The outer wrapper is the full-width docked bar; the role=group is the
+  // centered inner control, so measure the bar itself for the geometry.
+  const bar = page.getByTestId("roll-mode-bar");
+  const box = await bar.boundingBox();
   expect(box).not.toBeNull();
   if (box) {
     expect(box.x).toBeLessThan(40);
