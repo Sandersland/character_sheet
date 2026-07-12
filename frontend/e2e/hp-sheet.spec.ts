@@ -22,8 +22,12 @@ test("session HP sheet: tap the bar, apply damage, see it in the log", async ({ 
   const sheet = page.getByRole("dialog");
   await expect(sheet.getByRole("heading", { name: /hit points/i })).toBeVisible();
 
-  await sheet.getByRole("spinbutton", { name: /damage amount/i }).fill("7");
-  await sheet.getByRole("button", { name: /apply damage/i }).click();
+  // One-hand flow (#787): build 17 via accumulator chips, no OS keyboard, then Apply.
+  await sheet.getByRole("button", { name: "Add 10" }).click();
+  await sheet.getByRole("button", { name: "Add 5" }).click();
+  await sheet.getByRole("button", { name: "Add 1" }).click();
+  await sheet.getByRole("button", { name: "Add 1" }).click();
+  await sheet.getByRole("button", { name: /apply 17 damage/i }).click();
 
   // The bar reflects the new HP total; the sheet stays open/responsive.
   await expect(bar).not.toHaveText(before);

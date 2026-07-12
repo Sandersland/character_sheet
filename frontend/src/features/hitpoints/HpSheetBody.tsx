@@ -22,7 +22,12 @@ export default function HpSheetBody({ character, onUpdate }: HpSheetBodyProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <HpActionControl pending={hp.pending} onApply={hp.handleApply} resistedTypes={resistedTypes} />
+      <HpActionControl
+        pending={hp.pending}
+        hitPoints={character.hitPoints}
+        onApply={hp.handleApply}
+        resistedTypes={resistedTypes}
+      />
 
       {hp.isSpellcaster && (
         <AutoRollConcentrationToggle

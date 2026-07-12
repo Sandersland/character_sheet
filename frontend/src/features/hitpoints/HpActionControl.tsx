@@ -1,12 +1,17 @@
 import { useState } from "react";
-import { Minus, Plus, Shield } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import { GiBleedingWound, GiHealthPotion } from "react-icons/gi";
-import type { IconType } from "react-icons";
+import { Minus, Plus } from "lucide-react";
 
 import { DAMAGE_TYPES, damageTypeLabel } from "@/lib/damageTypes";
+import {
+  ACCUMULATOR_CHIPS,
+  accumulateAmount,
+  projectHp,
+  type HpMode,
+  type HpSnapshot,
+} from "@/lib/hpAmount";
+import Segmented from "@/components/ui/Segmented";
 
-export type HpMode = "damage" | "heal" | "temp";
+export type { HpMode };
 
 /** Optional metadata for a damage apply — the type and whether to auto-halve (#456). */
 export interface DamageMeta {
@@ -14,47 +19,44 @@ export interface DamageMeta {
   applyResistance?: boolean;
 }
 
-// Per-mode segment icon, verb, button tone, and field aria-label.
-const HP_MODES: {
-  mode: HpMode;
-  label: string;
-  icon: IconType | LucideIcon;
-  verb: string;
-  fieldLabel: string;
-  buttonClass: string;
-}[] = [
-  {
-    mode: "damage",
+// Per-mode field aria-label + Apply button tone/label.
+const HP_MODES: Record<
+  HpMode,
+  { label: string; fieldLabel: string; buttonClass: string; applyLabel: (n: number) => string }
+> = {
+  damage: {
     label: "Damage",
-    icon: GiBleedingWound,
-    verb: "Apply damage",
     fieldLabel: "Damage amount",
     buttonClass: "bg-garnet-700 text-parchment-50 hover:bg-garnet-800",
+    applyLabel: (n) => `Apply ${n} damage`,
   },
-  {
-    mode: "heal",
+  heal: {
     label: "Heal",
-    icon: GiHealthPotion,
-    verb: "Heal",
     fieldLabel: "Heal amount",
     buttonClass: "bg-vitality-700 text-parchment-50 hover:bg-vitality-800",
+    applyLabel: (n) => `Heal ${n}`,
   },
-  {
-    mode: "temp",
+  temp: {
     label: "Temp HP",
-    icon: Shield,
-    verb: "Set temp HP",
     fieldLabel: "Temporary hit points",
     buttonClass: "bg-gold-400 text-ink hover:bg-gold-500",
+    applyLabel: (n) => `Grant ${n} temp HP`,
   },
-];
+};
+
+const MODE_OPTIONS = (Object.keys(HP_MODES) as HpMode[]).map((mode) => ({
+  value: mode,
+  label: HP_MODES[mode].label,
+}));
 
 export default function HpActionControl({
   pending,
+  hitPoints,
   onApply,
   resistedTypes = [],
 }: {
   pending: boolean;
+  hitPoints: HpSnapshot;
   onApply: (mode: HpMode, value: number, damage?: DamageMeta) => Promise<boolean>;
   /** Damage types the character currently resists (drives the auto-halve preview) (#456). */
   resistedTypes?: string[];
@@ -69,103 +71,99 @@ export default function HpActionControl({
   const isResisted = mode === "damage" && damageType !== "" && resistedTypes.includes(damageType);
   const halved = Math.floor(numericAmount / 2);
 
+  const active = HP_MODES[mode];
+  const applyDisabled = pending || numericAmount <= 0;
+
   async function apply() {
     const damageMeta: DamageMeta | undefined =
-      mode === "damage"
-        ? { damageType: damageType || undefined, applyResistance }
-        : undefined;
-    const ok = await onApply(mode, parseInt(amount, 10), damageMeta);
+      mode === "damage" ? { damageType: damageType || undefined, applyResistance } : undefined;
+    const ok = await onApply(mode, numericAmount, damageMeta);
     if (ok) setAmount("");
   }
 
-  // Step the shared amount by ±1, clamped at 0.
-  function stepAmount(delta: number) {
-    const next = Math.max(0, (parseInt(amount, 10) || 0) + delta);
-    setAmount(String(next));
+  // Chips/stepper build the amount; clamped 0–999.
+  function bumpAmount(delta: number) {
+    setAmount(String(accumulateAmount(numericAmount, delta)));
   }
 
-  const activeMode = HP_MODES.find((m) => m.mode === mode)!;
-  const ApplyIcon = activeMode.icon;
-  // Temp HP accepts 0 (clears temp); damage/heal require a positive amount.
-  const applyDisabled =
-    pending || (mode === "temp" ? amount === "" : !amount || parseInt(amount, 10) <= 0);
-
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-3">
-      {/* Mode picker */}
-      <div
-        role="radiogroup"
-        aria-label="Hit point action"
-        className="inline-flex rounded-control bg-parchment-100 p-0.5"
-      >
-        {HP_MODES.map(({ mode: m, label, icon: SegIcon }) => {
-          const active = m === mode;
-          return (
-            <button
-              key={m}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              disabled={pending}
-              onClick={() => setMode(m)}
-              className={`inline-flex items-center gap-1.5 rounded-control px-3 py-1.5 text-sm font-semibold transition-colors disabled:opacity-50 ${
-                active
-                  ? "bg-parchment-50 text-parchment-900 shadow-card"
-                  : "text-parchment-600 hover:text-parchment-900"
-              }`}
-            >
-              <SegIcon aria-hidden="true" className="h-4 w-4" />
-              {label}
-            </button>
-          );
-        })}
+    <div className="flex flex-col gap-3">
+      <Segmented
+        options={MODE_OPTIONS}
+        value={mode}
+        onChange={setMode}
+        label="Hit point action"
+      />
+
+      {/* Amount readout + projected result */}
+      <div className="flex flex-col items-center gap-1">
+        <span className="text-4xl font-bold tabular-nums text-parchment-900">{numericAmount}</span>
+        <p aria-live="polite" className="text-sm font-semibold text-parchment-600">
+          {projectHp(mode, numericAmount, hitPoints)}
+        </p>
       </div>
 
-      {/* Stepper */}
-      <div className="inline-flex items-center rounded-control border border-parchment-300 bg-parchment-50">
+      {/* Accumulator chips */}
+      <div className="flex flex-wrap justify-center gap-2">
+        {ACCUMULATOR_CHIPS.map((step) => (
+          <button
+            key={step}
+            type="button"
+            disabled={pending}
+            onClick={() => bumpAmount(step)}
+            aria-label={`Add ${step}`}
+            className="min-w-12 rounded-full border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-base font-semibold text-parchment-800 transition-colors hover:bg-parchment-200 disabled:opacity-50"
+          >
+            +{step}
+          </button>
+        ))}
         <button
           type="button"
-          disabled={pending}
-          onClick={() => stepAmount(-1)}
-          aria-label="Decrease amount"
-          className="flex h-8 w-8 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50"
+          disabled={pending || numericAmount === 0}
+          onClick={() => setAmount("")}
+          aria-label="Clear amount"
+          className="min-w-12 rounded-full border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-base font-semibold text-parchment-600 transition-colors hover:bg-parchment-200 disabled:opacity-50"
         >
-          <Minus aria-hidden="true" className="h-4 w-4" />
-        </button>
-        <input
-          type="number"
-          min={0}
-          step={1}
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && apply()}
-          placeholder="0"
-          disabled={pending}
-          aria-label={activeMode.fieldLabel}
-          className="w-16 border-0 bg-transparent text-center text-lg tabular-nums text-parchment-900 disabled:opacity-50"
-        />
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => stepAmount(1)}
-          aria-label="Increase amount"
-          className="flex h-8 w-8 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50"
-        >
-          <Plus aria-hidden="true" className="h-4 w-4" />
+          Clear
         </button>
       </div>
 
-      {/* Contextual primary action */}
-      <button
-        type="button"
-        disabled={applyDisabled}
-        onClick={apply}
-        className={`inline-flex items-center gap-1.5 rounded-control px-3 py-1.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:bg-parchment-200 disabled:text-parchment-400 disabled:hover:bg-parchment-200 ${activeMode.buttonClass}`}
-      >
-        <ApplyIcon aria-hidden="true" className="h-4 w-4" />
-        {activeMode.verb}
-      </button>
+      {/* Secondary stepper + direct entry */}
+      <div className="flex justify-center">
+        <div className="inline-flex items-center rounded-control border border-parchment-300 bg-parchment-50">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => bumpAmount(-1)}
+            aria-label="Decrease amount"
+            className="flex h-9 w-9 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50"
+          >
+            <Minus aria-hidden="true" className="h-4 w-4" />
+          </button>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={1}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !applyDisabled && apply()}
+            placeholder="0"
+            disabled={pending}
+            aria-label={active.fieldLabel}
+            className="w-16 border-0 bg-transparent text-center text-lg tabular-nums text-parchment-900 disabled:opacity-50"
+          />
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => bumpAmount(1)}
+            aria-label="Increase amount"
+            className="flex h-9 w-9 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50"
+          >
+            <Plus aria-hidden="true" className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
 
       {/* Damage-type picker (damage mode only, optional) (#456) */}
       {mode === "damage" && (
@@ -174,7 +172,7 @@ export default function HpActionControl({
           onChange={(e) => setDamageType(e.target.value)}
           disabled={pending}
           aria-label="Damage type"
-          className="h-8 rounded-control border border-parchment-300 bg-parchment-50 px-2 text-sm text-parchment-900 disabled:opacity-50"
+          className="h-9 rounded-control border border-parchment-300 bg-parchment-50 px-2 text-base text-parchment-900 disabled:opacity-50"
         >
           <option value="">Typeless</option>
           {DAMAGE_TYPES.map((t) => (
@@ -184,7 +182,6 @@ export default function HpActionControl({
           ))}
         </select>
       )}
-      </div>
 
       {/* Resistance auto-halve preview + decline override (#456) */}
       {isResisted && (
@@ -203,6 +200,16 @@ export default function HpActionControl({
           </span>
         </label>
       )}
+
+      {/* Full-width primary action echoing the pending amount */}
+      <button
+        type="button"
+        disabled={applyDisabled}
+        onClick={apply}
+        className={`w-full rounded-control px-3 py-2.5 text-base font-semibold transition-colors disabled:cursor-not-allowed disabled:bg-parchment-200 disabled:text-parchment-400 disabled:hover:bg-parchment-200 ${active.buttonClass}`}
+      >
+        {active.applyLabel(numericAmount)}
+      </button>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 // Pure per-mode HP op builder — keeps handleApply's branching out of the hook.
 
 import type { HitPointOperation } from "@/types/character";
-import type { HpMode } from "@/features/hitpoints/HpActionControl";
+import type { HpMode } from "@/lib/hpAmount";
 
 export interface HpApplyMeta {
   damageType?: string;
