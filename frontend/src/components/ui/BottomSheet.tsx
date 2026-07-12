@@ -72,7 +72,7 @@ export default function BottomSheet({ title, subtitle, onClose, children }: Bott
         aria-labelledby={titleId}
         tabIndex={-1}
         style={panelMaxHeight ? { maxHeight: panelMaxHeight } : undefined}
-        className="flex max-h-[85vh] w-full max-w-[36rem] flex-col rounded-t-card border border-b-0 border-parchment-200 bg-parchment-50 shadow-raised md:max-h-[80vh] md:rounded-card md:border-b"
+        className="flex max-h-[85vh] w-full max-w-[36rem] flex-col rounded-t-card border border-b-0 border-parchment-200 bg-parchment-50 shadow-raised focus-visible:outline-none md:max-h-[80vh] md:rounded-card md:border-b"
       >
         {/* handleProps is spread on both grabber and header on purpose: a wide
             drag target. They're siblings, so the gesture never double-fires. */}

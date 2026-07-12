@@ -45,7 +45,7 @@ export default function Modal({ title, onClose, children }: ModalProps) {
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="flex max-h-[80vh] w-full max-w-[36rem] flex-col rounded-card border border-parchment-200 bg-parchment-50 shadow-raised"
+        className="flex max-h-[80vh] w-full max-w-[36rem] flex-col rounded-card border border-parchment-200 bg-parchment-50 shadow-raised focus-visible:outline-none"
       >
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-parchment-200 px-4 py-3">
           <h2 id={titleId} className="font-display text-lg font-semibold text-parchment-900">
