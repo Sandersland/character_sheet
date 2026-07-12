@@ -106,6 +106,9 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "ki", resourceAmount: 1 },
   { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "ki", resourceAmount: 1 },
   { key: "stunningStrike", name: "Stunning Strike", cost: "free", grantClass: "monk", grantLevel: 5, resourceKey: "ki", resourceAmount: 1 },
+  // Way of Shadow reminder actions (#440) — no resourceKey, no server effect.
+  { key: "shadowStep", name: "Shadow Step", cost: "bonusAction", grantClass: "monk", grantSubclass: "Shadow", grantLevel: 6 },
+  { key: "opportunist", name: "Opportunist", cost: "reaction", grantClass: "monk", grantSubclass: "Shadow", grantLevel: 17 },
 
   // ── Paladin ───────────────────────────────────────────────────────────────
   { key: "divineSense", name: "Divine Sense", cost: "action", grantClass: "paladin", grantLevel: 1, resourceKey: "divineSense", resourceAmount: 1 },

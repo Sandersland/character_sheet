@@ -271,6 +271,62 @@ describe("Monk Stunning Strike — combat feature wiring (#392)", () => {
   });
 });
 
+describe("Way of Shadow — Shadow Step / Opportunist (#440)", () => {
+  const SHADOW = "Way of Shadow";
+
+  it("Shadow monk gets shadowStep as a bonus action at L6, not at L5", () => {
+    expect(keys(deriveActions("monk", SHADOW, 5, []))).not.toContain("shadowStep");
+    const l6 = deriveActions("monk", SHADOW, 6, []);
+    const shadowStep = l6.find((a) => a.key === "shadowStep");
+    expect(shadowStep).toBeDefined();
+    expect(shadowStep?.cost).toBe("bonusAction");
+  });
+
+  it("Shadow monk gets opportunist as a reaction at L17, not at L16", () => {
+    expect(keys(deriveActions("monk", SHADOW, 16, []))).not.toContain("opportunist");
+    const l17 = deriveActions("monk", SHADOW, 17, []);
+    const opportunist = l17.find((a) => a.key === "opportunist");
+    expect(opportunist).toBeDefined();
+    expect(opportunist?.cost).toBe("reaction");
+  });
+
+  it("both are always enabled (no resourceKey gate)", () => {
+    const l17 = deriveActions("monk", SHADOW, 17, []);
+    const shadowStep = l17.find((a) => a.key === "shadowStep");
+    const opportunist = l17.find((a) => a.key === "opportunist");
+    expect(shadowStep?.enabled).toBe(true);
+    expect(shadowStep?.disabledReason).toBeUndefined();
+    expect(opportunist?.enabled).toBe(true);
+    expect(opportunist?.disabledReason).toBeUndefined();
+  });
+
+  it("subclass gate: a non-Shadow monk gets neither at L17", () => {
+    const openHand = keys(deriveActions("monk", "Way of the Open Hand", 17, []));
+    expect(openHand).not.toContain("shadowStep");
+    expect(openHand).not.toContain("opportunist");
+    const noSub = keys(deriveActions("monk", undefined, 17, []));
+    expect(noSub).not.toContain("shadowStep");
+    expect(noSub).not.toContain("opportunist");
+  });
+
+  it("class gate: a non-monk gets neither even with a Shadow-like subclass", () => {
+    const rogue = keys(deriveActions("rogue", SHADOW, 20, []));
+    expect(rogue).not.toContain("shadowStep");
+    expect(rogue).not.toContain("opportunist");
+  });
+
+  it("matches the subclass substring case-insensitively", () => {
+    expect(keys(deriveActions("Monk", "way of shadow", 6, []))).toContain("shadowStep");
+  });
+
+  it("are pure reminder actions — no server effect fn (no ACTION_EFFECT_FN/ACTION_CAST_FN)", () => {
+    expect(ACTION_EFFECT_FN.shadowStep).toBeUndefined();
+    expect(ACTION_CAST_FN.shadowStep).toBeUndefined();
+    expect(ACTION_EFFECT_FN.opportunist).toBeUndefined();
+    expect(ACTION_CAST_FN.opportunist).toBeUndefined();
+  });
+});
+
 describe("ACTION_CAST_FN — secondWind (#420)", () => {
   it("is a cast-core action, not an op-list action", () => {
     // The migration moved Second Wind off ACTION_EFFECT_FN onto the cast core.
