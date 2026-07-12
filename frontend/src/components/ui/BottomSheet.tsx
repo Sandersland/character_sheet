@@ -52,18 +52,20 @@ export default function BottomSheet({ title, subtitle, onClose, children }: Bott
         tabIndex={-1}
         className="flex max-h-[85vh] w-full max-w-[36rem] flex-col rounded-t-card border border-b-0 border-parchment-200 bg-parchment-50 shadow-raised md:max-h-[80vh] md:rounded-card md:border-b"
       >
+        {/* handleProps is spread on both grabber and header on purpose: a wide
+            drag target. They're siblings, so the gesture never double-fires. */}
         <button
           type="button"
           aria-label="Close"
           onClick={onClose}
           {...handleProps}
-          className="mx-auto mt-2 h-1 w-9 shrink-0 touch-none rounded-full bg-parchment-300 md:hidden"
+          className="mx-auto mt-2 h-1 w-9 shrink-0 touch-none rounded-full bg-parchment-300 md:hidden md:touch-auto"
         />
         {/* md:pt-3 restores Modal's header padding on desktop, where the
             grabber (which fills the gap on mobile) is hidden. */}
         <div
           {...handleProps}
-          className="flex shrink-0 touch-none items-start justify-between gap-3 px-4 pb-3 pt-2 md:pt-3"
+          className="flex shrink-0 touch-none items-start justify-between gap-3 px-4 pb-3 pt-2 md:touch-auto md:pt-3"
         >
           <div>
             <h2 id={titleId} className="font-display text-lg font-semibold text-parchment-900">
