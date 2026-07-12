@@ -1,7 +1,27 @@
 import { describe, it, expect } from "vitest";
 
-import { partyHealAllies } from "@/lib/spellMeta";
-import type { Session } from "@/types/character";
+import { isAttackCantrip, partyHealAllies } from "@/lib/spellMeta";
+import type { Session, Spell } from "@/types/character";
+
+describe("isAttackCantrip (#734)", () => {
+  const spell = (o: Partial<Spell>): Spell => ({ id: "s", name: "S", level: 0, ...o }) as Spell;
+
+  it("is true for an attack-roll cantrip (Fire Bolt)", () => {
+    expect(isAttackCantrip(spell({ level: 0, attackType: "attack" }))).toBe(true);
+  });
+
+  it("is false for a save cantrip (Sacred Flame)", () => {
+    expect(isAttackCantrip(spell({ level: 0, attackType: "save" }))).toBe(false);
+  });
+
+  it("is false for a leveled attack spell", () => {
+    expect(isAttackCantrip(spell({ level: 1, attackType: "attack" }))).toBe(false);
+  });
+
+  it("is false for a cantrip with no attack type", () => {
+    expect(isAttackCantrip(spell({ level: 0 }))).toBe(false);
+  });
+});
 
 function participant(
   characterId: string,
