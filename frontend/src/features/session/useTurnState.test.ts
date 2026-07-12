@@ -113,7 +113,7 @@ describe("combat lifecycle", () => {
     expect(result.current.reactionUsed).toBe(false);
   });
 
-  it("startTurn sets twfAvailable=true when inventory has two light weapons", () => {
+  it("twfAvailable is true when inventory has two light weapons", () => {
     const character = makeCharacter({ inventory: [lightWeapon("w1"), lightWeapon("w2")] });
     const { result } = renderHook(() => useTurnState(character, SESSION_ID));
 
@@ -123,7 +123,7 @@ describe("combat lifecycle", () => {
     expect(result.current.twfAvailable).toBe(true);
   });
 
-  it("startTurn sets twfAvailable=false with empty inventory", () => {
+  it("twfAvailable is false with empty inventory", () => {
     const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
 
     act(() => { result.current.startCombat(); });
@@ -132,7 +132,22 @@ describe("combat lifecycle", () => {
     expect(result.current.twfAvailable).toBe(false);
   });
 
-  it("startTurn sets twfAvailable=true for a non-light pair WITH the Two-Weapon Fighting style (#732)", () => {
+  it("twfAvailable updates LIVE when the loadout changes mid-turn — no new startTurn (#733)", () => {
+    const oneWeapon = makeCharacter({ inventory: [lightWeapon("w1")] });
+    const twoWeapons = makeCharacter({ inventory: [lightWeapon("w1"), lightWeapon("w2")] });
+    const { result, rerender } = renderHook(({ c }) => useTurnState(c, SESSION_ID), {
+      initialProps: { c: oneWeapon },
+    });
+
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    expect(result.current.twfAvailable).toBe(false); // one weapon → no off-hand
+
+    rerender({ c: twoWeapons }); // swap a second light weapon in mid-turn
+    expect(result.current.twfAvailable).toBe(true); // derived → updates without startTurn
+  });
+
+  it("twfAvailable is true for a non-light pair WITH the Two-Weapon Fighting style (#732)", () => {
     const heavyPair = makeCharacter({ inventory: [heavyWeapon("h1"), heavyWeapon("h2")] });
     const withStyle = {
       ...heavyPair,
@@ -146,7 +161,7 @@ describe("combat lifecycle", () => {
     expect(result.current.twfAvailable).toBe(true);
   });
 
-  it("startTurn keeps twfAvailable=false for a non-light pair WITHOUT the style", () => {
+  it("twfAvailable is false for a non-light pair WITHOUT the style", () => {
     const character = makeCharacter({ inventory: [heavyWeapon("h1"), heavyWeapon("h2")] });
     const { result } = renderHook(() => useTurnState(character, SESSION_ID));
 
@@ -213,6 +228,14 @@ describe("action slot consumption", () => {
     const { result } = inActiveTurn();
     act(() => { result.current.grantExtraAction(); });
     expect(result.current.actionsRemaining).toBe(2);
+  });
+
+  it("refundAction returns a spent action (loadout-swap refund, #733)", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.consumeAction(); }); // spend on a swap → 0
+    expect(result.current.actionsRemaining).toBe(0);
+    act(() => { result.current.refundAction(); }); // refund → 1
+    expect(result.current.actionsRemaining).toBe(1);
   });
 });
 

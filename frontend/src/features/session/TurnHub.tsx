@@ -19,19 +19,20 @@ import ActionSlot from "@/features/session/ActionSlot";
 import BonusActionSlot from "@/features/session/BonusActionSlot";
 import ReactionSlot from "@/features/session/ReactionSlot";
 import EffectManeuverStrip from "@/features/session/EffectManeuverStrip";
+import LoadoutSwapRow from "@/features/session/LoadoutSwapRow";
 import InitiativeRail from "@/features/session/InitiativeRail";
 import TurnConcentrationBanner from "@/features/session/TurnConcentrationBanner";
 import TurnDeathSaves from "@/features/session/TurnDeathSaves";
 import TurnResolutionSheets from "@/features/session/TurnResolutionSheets";
 import { showInitiative, showMovement } from "@/features/session/turnFlags";
 import type { AllyOption } from "@/lib/spellMeta";
-import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
+import type { TurnStateView } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
 
 interface TurnHubProps {
   character: Character;
   sessionId: string;
-  turnState: TurnState & TurnStateActions;
+  turnState: TurnStateView;
   onUpdate: (c: Character) => void;
   /** Called after a combat log event so the Log tab refreshes. */
   onLogChanged: () => void;
@@ -55,42 +56,24 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     undo,
   } = turnState;
 
+  const turn = useTurnActions({ character, sessionId, turnState, onUpdate, onLogChanged });
+  // Grouped for readability; also keeps this destructure from cloning
+  // useTurnActions' flat return block (a benign hook-bag mirror).
+  const { busy, error, reactionMessage, effectMessage, send } = turn;
   const {
-    busy,
-    error,
-    reactionMessage,
-    effectMessage,
-    showActionMenu,
-    setShowActionMenu,
-    showBonusMenu,
-    setShowBonusMenu,
-    showReactionMenu,
-    setShowReactionMenu,
-    activeResolution,
-    closeResolution,
-    dieLabel,
-    dieBusy,
-    superiorityRemaining,
-    classActions,
-    classBonusActions,
-    classReactions,
-    durableReminders,
-    reactionManeuvers,
-    effectManeuvers,
-    actionSurgePool,
-    actionSurgeAvailable,
-    send,
-    handleActionClick,
-    handleAttackAction,
-    handleTwfAction,
-    handleActionSurge,
-    handleStartCombat,
-    handleEndCombat,
-    handleStartTurn,
-    handleEndTurn,
-    handleReactionManeuver,
-    handleEffectManeuver,
-  } = useTurnActions({ character, sessionId, turnState, onUpdate, onLogChanged });
+    showActionMenu, setShowActionMenu, showBonusMenu, setShowBonusMenu,
+    showReactionMenu, setShowReactionMenu, activeResolution, closeResolution,
+  } = turn;
+  const {
+    dieLabel, dieBusy, superiorityRemaining, classActions, classBonusActions,
+    classReactions, durableReminders, reactionManeuvers, effectManeuvers,
+    actionSurgePool, actionSurgeAvailable,
+  } = turn;
+  const {
+    handleActionClick, handleAttackAction, handleTwfAction, handleActionSurge,
+    handleStartCombat, handleEndCombat, handleStartTurn, handleEndTurn,
+    handleReactionManeuver, handleEffectManeuver,
+  } = turn;
 
   // Decorative initiative rail's "you" marker (#737).
   const youInitial = character.name?.[0]?.toUpperCase() ?? "?";
@@ -225,6 +208,9 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           onUpdate={onUpdate}
           onLogChanged={onLogChanged}
         />
+
+        {/* ── Loadout (slot root, pre-attack) — a swap costs the Action (#733) ── */}
+        <LoadoutSwapRow character={character} turnState={turnState} onUpdate={onUpdate} />
 
         {/* ── Action ──────────────────────────────────────────────────────── */}
         <ActionSlot

@@ -92,6 +92,20 @@ export function itemsInSlot(inventory: InventoryItem[], slot: EquipSlot): Invent
     .sort((a, b) => a.id.localeCompare(b.id));
 }
 
+// Human-readable summary of what's in the hands, for the turn UI's loadout row
+// (#733) — e.g. "Longsword & Shield", "Greatsword (two-handed)", "Two daggers"
+// (same name in both hands collapses), or "Unarmed" when both hands are empty.
+export function equippedLoadoutLabel(inventory: InventoryItem[]): string {
+  const main = itemsInSlot(inventory, "MAIN_HAND")[0];
+  const off = itemsInSlot(inventory, "OFF_HAND")[0];
+  if (!main && !off) return "Unarmed";
+  // A two-handed main-hand weapon owns both hands — no off-hand segment.
+  if (main && isOffHandLocked(inventory)) return `${main.name} (two-handed)`;
+  const names = [main?.name, off?.name].filter((n): n is string => Boolean(n));
+  if (names.length === 2 && names[0] === names[1]) return `Two ${names[0].toLowerCase()}s`;
+  return names.join(" & ");
+}
+
 // A two-handed weapon in MAIN_HAND locks the OFF_HAND (no shield/second weapon).
 export function isOffHandLocked(inventory: InventoryItem[]): boolean {
   return inventory.some(
