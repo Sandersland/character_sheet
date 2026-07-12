@@ -4,7 +4,7 @@ import { rollDie } from "@/lib/dice";
 import type { Character, HitPointOperation } from "@/types/character";
 
 /**
- * Death-save controls shared by `HitPointTracker` (Rest & HP tab) and the turn
+ * Death-save controls shared by `HitPointTracker` (character sheet) and the turn
  * UI (#736). Rolling a death save (d20) and stabilizing both post through the HP
  * transaction endpoint. Extracted into a hook so both surfaces drive the same
  * ops instead of duplicating the handlers. Death-save ops deal no damage, so

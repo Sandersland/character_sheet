@@ -27,7 +27,7 @@ function concentrationMessage(check: ConcentrationCheck): ConcentrationNote {
  * The shared HP-apply engine behind both surfaces (#768): submits op batches
  * through applyHitPointOperations, swaps the character, and surfaces the
  * concentration check identically (auto-roll banner vs deferred roll modal).
- * The Rest tab (HitPointTracker) and the session HP sheet both consume this, so
+ * The HP tracker (HitPointTracker) and the session HP sheet both consume this, so
  * damage/heal/temp + concentration behave the same everywhere.
  */
 export function useHitPointApply(character: Character, onUpdate: (character: Character) => void) {
