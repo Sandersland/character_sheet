@@ -14,6 +14,7 @@ import { RollProvider } from "@/features/dice/RollContext";
 import RollResultToast from "@/features/dice/RollResultToast";
 import RollModeToggle from "@/features/dice/RollModeToggle";
 import CompactHpBar from "@/features/hitpoints/CompactHpBar";
+import CompactConditionsBar from "@/features/conditions/CompactConditionsBar";
 import ConditionsStrip from "@/features/conditions/ConditionsStrip";
 import TurnHub from "@/features/session/TurnHub";
 import SessionHeaderRegion from "@/features/session/SessionHeaderRegion";
@@ -65,8 +66,14 @@ export default function SessionContent({ character, session, reference, setChara
           {/* Compact HP strip — always visible; tap opens the HP sheet (#768). */}
           <CompactHpBar character={character} onUpdate={life.handleCharacterUpdate} />
 
-          {/* Active conditions + exhaustion. */}
-          <ConditionsStrip character={character} onUpdate={life.handleCharacterUpdate} />
+          {/* Active conditions + exhaustion. Compact strip on mobile (tap to
+              open the sheet), full card at md+ (#769). */}
+          <div className="md:hidden">
+            <CompactConditionsBar character={character} onUpdate={life.handleCharacterUpdate} />
+          </div>
+          <div className="hidden md:block">
+            <ConditionsStrip character={character} onUpdate={life.handleCharacterUpdate} />
+          </div>
 
           {/* Turn hub — primary surface; inline attack/item pickers live here. */}
           <TurnHub
