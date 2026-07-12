@@ -62,7 +62,7 @@ export default function SessionContent({ character, session, reference, setChara
           onEndClick={life.openEndPrompt}
         />
 
-        <main className="mx-auto flex max-w-4xl flex-col gap-4 px-6 py-6">
+        <main className="mx-auto flex max-w-4xl flex-col gap-4 px-6 pt-6 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-6">
           {/* Compact HP strip — always visible; tap opens the HP sheet (#768). */}
           <CompactHpBar character={character} onUpdate={life.handleCharacterUpdate} />
 
