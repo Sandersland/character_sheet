@@ -55,12 +55,32 @@ pre-commit:
       run: npx eslint --fix {staged_files}
       stage_fixed: true
 
+# Keep the generated Prisma client in sync with the checked-out schema (#433):
+# the client is a gitignored artifact, so branch switches / pulls that move
+# schema.prisma or migrations otherwise leave it stale (pre-push tsc errors on
+# "missing" models; runtime 500s on unknown enums). Both hooks share one
+# guarded script that no-ops when the schema didn't change between refs.
+post-checkout:
+  commands:
+    prisma-regen:
+      run: sh scripts/git-hooks/prisma-regen-if-schema-changed.sh checkout {0}
+
+post-merge:
+  commands:
+    prisma-regen:
+      run: sh scripts/git-hooks/prisma-regen-if-schema-changed.sh merge
+
 pre-push:
   parallel: true
   commands:
     typecheck-backend:
       root: "backend/"
       run: npx tsc --noEmit
+      fail_text: |
+        Backend tsc failed. If errors say a model/enum is missing on PrismaClient
+        (e.g. "Property 'x' does not exist"), the generated client is stale for
+        this branch's schema — run: cd backend && npx prisma generate
+        (see docs/development.md "Prisma workflow").
     typecheck-frontend:
       root: "frontend/"
       run: npx tsc --noEmit
