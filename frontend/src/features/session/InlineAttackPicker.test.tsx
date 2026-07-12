@@ -1,19 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import InlineAttackPicker from "@/features/session/InlineAttackPicker";
 import { RollProvider } from "@/features/dice/RollContext";
-import { applyInventoryTransactions, logRoll } from "@/api/client";
+import { logRoll } from "@/api/client";
 import type { Character } from "@/types/character";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 
 vi.mock("@/api/client", () => ({
   applyInventoryTransactions: vi.fn(),
+  applySpellcastingTransactions: vi.fn(),
   logRoll: vi.fn().mockResolvedValue(undefined),
 }));
-
-const mockApplyInventory = vi.mocked(applyInventoryTransactions);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -49,78 +48,110 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
   } as unknown as Character;
 }
 
-function renderPicker(character: Character, onUpdate = vi.fn(), onLogChanged = vi.fn()) {
-  return render(
+interface RenderOpts {
+  turnState?: TurnState & TurnStateActions;
+  onCancel?: ReturnType<typeof vi.fn>;
+  onClose?: ReturnType<typeof vi.fn>;
+}
+
+function renderPicker(
+  character: Character,
+  onUpdate = vi.fn(),
+  onLogChanged = vi.fn(),
+  opts: RenderOpts = {},
+) {
+  const onCancel = opts.onCancel ?? vi.fn();
+  const onClose = opts.onClose ?? vi.fn();
+  render(
     <RollProvider>
       <InlineAttackPicker
         character={character}
-        turnState={turnState}
+        turnState={opts.turnState ?? turnState}
         sessionId="sess-1"
-        onClose={vi.fn()}
-        onCancel={vi.fn()}
+        onClose={onClose}
+        onCancel={onCancel}
         onUpdate={onUpdate}
         onLogChanged={onLogChanged}
       />
     </RollProvider>,
   );
+  return { onCancel, onClose };
 }
 
-const unequippedWeapon = {
-  id: "inv-1",
-  name: "Longsword",
-  category: "weapon" as const,
-  quantity: 1,
-  equipped: false,
-  weapon: {
-    damageDiceCount: 1,
-    damageDiceFaces: 8,
-    damageModifier: 0,
-    damageType: "slashing",
-  },
-};
+function equippedWeapon(name: string, id: string, overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    name,
+    category: "weapon" as const,
+    quantity: 1,
+    equipped: true,
+    weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "slashing", attackBonus: 3 },
+    ...overrides,
+  };
+}
 
-describe("InlineAttackPicker — inline equip affordance", () => {
-  it("references the Inventory tab in the empty state, not the character sheet", () => {
-    renderPicker(makeCharacter({ inventory: [] }));
-    const empty = screen.getByText(/No weapons equipped/i);
-    expect(empty.textContent).toMatch(/Inventory tab/i);
-    expect(empty.textContent).not.toMatch(/character sheet/i);
-  });
-
-  it("renders an Equip button for an owned-but-unequipped weapon", () => {
-    renderPicker(makeCharacter({ inventory: [unequippedWeapon] as unknown as Character["inventory"] }));
-    expect(screen.getByText("Longsword")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Equip$/ })).toBeInTheDocument();
-  });
-
-  it("fires the setEquipped op and refreshes when Equip is clicked", async () => {
-    const onUpdate = vi.fn();
-    const equippedChar = makeCharacter({
-      inventory: [{ ...unequippedWeapon, equipped: true }] as unknown as Character["inventory"],
-    });
-    mockApplyInventory.mockResolvedValue(equippedChar);
-
+describe("InlineAttackPicker — equipped-weapon cards", () => {
+  it("collapses two same-name equipped weapons into a single weapon card", () => {
     renderPicker(
-      makeCharacter({ inventory: [unequippedWeapon] as unknown as Character["inventory"] }),
-      onUpdate,
+      makeCharacter({
+        inventory: [equippedWeapon("Dagger", "inv-1"), equippedWeapon("Dagger", "inv-2")] as unknown as Character["inventory"],
+      }),
     );
-
-    await userEvent.click(screen.getByRole("button", { name: /^Equip$/ }));
-
-    expect(mockApplyInventory).toHaveBeenCalledWith("char-1", [
-      { type: "setEquipped", inventoryItemId: "inv-1", equipped: true },
-    ]);
-    await waitFor(() => expect(onUpdate).toHaveBeenCalledWith(equippedChar));
+    expect(screen.getAllByRole("button", { name: /Roll to hit/ })).toHaveLength(1);
   });
 
-  it("does not show the equip affordance when there are no unequipped weapons", () => {
+  it("renders one weapon card per distinct equipped weapon", () => {
+    renderPicker(
+      makeCharacter({
+        inventory: [equippedWeapon("Longsword", "inv-1"), equippedWeapon("Dagger", "inv-2")] as unknown as Character["inventory"],
+      }),
+    );
+    expect(screen.getAllByRole("button", { name: /Roll to hit/ })).toHaveLength(2);
+    expect(screen.getByText("Longsword")).toBeInTheDocument();
+    expect(screen.getByText("Dagger")).toBeInTheDocument();
+  });
+
+  it("never surfaces an unequipped inventory weapon as a card", () => {
+    renderPicker(
+      makeCharacter({
+        inventory: [equippedWeapon("Longsword", "inv-1", { equipped: false })] as unknown as Character["inventory"],
+      }),
+    );
+    expect(screen.queryByText("Longsword")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Roll to hit/ })).not.toBeInTheDocument();
+  });
+
+  it("shows the turn-screen empty-state hint and Unarmed Strike when no weapon is equipped", () => {
     renderPicker(makeCharacter({ inventory: [] }));
-    expect(screen.queryByText("Equip a weapon")).not.toBeInTheDocument();
+    const hint = screen.getByText(/No weapon equipped/i);
+    expect(hint.textContent).toMatch(/Change/);
+    expect(hint.textContent).toMatch(/turn screen/i);
+    expect(screen.getByText("Unarmed Strike")).toBeInTheDocument();
   });
 
   it("shows the attacks-per-Attack-action count", () => {
     renderPicker(makeCharacter({ attacksPerAction: 3 }));
     expect(screen.getByText(/Attacks:\s*3/)).toBeInTheDocument();
+  });
+});
+
+describe("InlineAttackPicker — footer", () => {
+  it("offers Cancel — refund action before any attack is rolled, wired to onCancel", async () => {
+    const { onCancel } = renderPicker(makeCharacter({ inventory: [] }));
+    const cancel = screen.getByRole("button", { name: /Cancel — refund action/ });
+    await userEvent.click(cancel);
+    expect(onCancel).toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /^Done$/ })).not.toBeInTheDocument();
+  });
+
+  it("switches to Done once an attack has been rolled", () => {
+    const rolledTurnState = {
+      ...turnState,
+      attack: { total: 1, used: 1 },
+    } as unknown as TurnState & TurnStateActions;
+    renderPicker(makeCharacter({ inventory: [] }), vi.fn(), vi.fn(), { turnState: rolledTurnState });
+    expect(screen.getByRole("button", { name: /^Done$/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Cancel — refund action/ })).not.toBeInTheDocument();
   });
 });
 
@@ -256,7 +287,7 @@ describe("InlineAttackPicker — critical damage button", () => {
       vi.fn(),
     );
 
-    await userEvent.click(screen.getAllByRole("button", { name: /^Damage$/ })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /Roll damage/ }));
     await userEvent.click(screen.getByRole("button", { name: /Roll \+2d6 fire/ }));
 
     const riderCall = vi
@@ -277,7 +308,7 @@ describe("InlineAttackPicker — persistent inline roll result (#745)", () => {
     // No result visible until a roll happens.
     expect(screen.queryByText("d20")).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getAllByRole("button", { name: /^Attack$/ })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
 
     // The to-hit d20 die box now persists on the row (value is random; the
     // caption is deterministic).
@@ -289,7 +320,7 @@ describe("InlineAttackPicker — persistent inline roll result (#745)", () => {
       makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] }),
     );
 
-    await userEvent.click(screen.getAllByRole("button", { name: /^Damage$/ })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /Roll damage/ }));
 
     // Flame Tongue base damage is 1d8 slashing.
     expect(screen.getByText("d8")).toBeInTheDocument();
