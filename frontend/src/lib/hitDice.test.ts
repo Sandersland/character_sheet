@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
-import { averageHitPointGain, dieFaces, hitPointGainRange } from "@/lib/hitDice";
+import { advancingHitDie, averageHitPointGain, dieFaces, hitPointGainRange } from "@/lib/hitDice";
+import type { Character, ClassOption, LevelUpTarget } from "@/types/character";
 
 describe("dieFaces", () => {
   it("parses a hit-die string to its face count", () => {
@@ -34,5 +35,41 @@ describe("hitPointGainRange", () => {
 
   it("clamps both ends at a minimum of 1", () => {
     expect(hitPointGainRange(6, -5)).toEqual({ min: 1, max: 1 });
+  });
+});
+
+describe("advancingHitDie", () => {
+  const refs = [
+    { id: "cls-fighter", name: "Fighter", hitDie: "d10" },
+    { id: "cls-wizard", name: "Wizard", hitDie: "d6" },
+  ] as ClassOption[];
+
+  const character = {
+    hitDice: { die: "d10", total: 3, spent: 0 },
+    classes: [{ id: "entry-1", name: "Fighter" }],
+  } as unknown as Character;
+
+  it("resolves an existing class entry's die by its class name", () => {
+    const target: LevelUpTarget = { kind: "existing", classEntryId: "entry-1" };
+    expect(advancingHitDie(character, refs, target)).toBe("d10");
+  });
+
+  it("resolves a new multiclass die by the referenced class id", () => {
+    const target: LevelUpTarget = { kind: "new", classId: "cls-wizard" };
+    expect(advancingHitDie(character, refs, target)).toBe("d6");
+  });
+
+  it("falls back to the primary die when target is undefined", () => {
+    expect(advancingHitDie(character, refs, undefined)).toBe("d10");
+  });
+
+  it("falls back to the primary die when the class is not in the reference list", () => {
+    const target: LevelUpTarget = { kind: "new", classId: "cls-unknown" };
+    expect(advancingHitDie(character, refs, target)).toBe("d10");
+  });
+
+  it("falls back to the primary die when no reference classes are supplied", () => {
+    const target: LevelUpTarget = { kind: "existing", classEntryId: "entry-1" };
+    expect(advancingHitDie(character, [], target)).toBe("d10");
   });
 });
