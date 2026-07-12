@@ -275,7 +275,7 @@ describe("TurnHub — deferred item/heal commit (#765)", () => {
     renderHub(itemUser());
     await openItemPicker(user);
 
-    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Close" }));
+    await user.click(within(screen.getByRole("dialog")).getByText("Close"));
 
     expect(applyActionTransactions).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Use Action" })).toBeInTheDocument();
@@ -320,7 +320,7 @@ describe("TurnHub — deferred item/heal commit (#765)", () => {
 
     await user.click(screen.getByRole("button", { name: /Use Action/ }));
     await user.click(screen.getByRole("button", { name: "Lay on Hands" }));
-    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Close" }));
+    await user.click(within(screen.getByRole("dialog")).getByText("Close"));
 
     expect(applyActionTransactions).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Use Action" })).toBeInTheDocument();
