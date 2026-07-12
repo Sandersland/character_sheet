@@ -131,6 +131,13 @@ describe("POST /:id/actions/transactions — Second Wind via the cast core (#420
     expect(pool(res.body, "secondWind")).toMatchObject({ used: 1, remaining: 0 });
   });
 
+  it("response body carries the written batchId (matches the activity batch) — #758", async () => {
+    const res = await execute("secondWind", 4);
+    expect(res.status).toBe(200);
+    expect(typeof res.body.batchId).toBe("string");
+    expect(res.body.batchId).toBe(await latestBatchId());
+  });
+
   it("logs exactly a spendResource + heal event, and no cast event (history unchanged)", async () => {
     await execute("secondWind", 6);
     const batchId = await latestBatchId();

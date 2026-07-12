@@ -237,7 +237,9 @@ actionsRouter.post<{ id: string }>(
         return;
       }
 
-      res.json(serializeCharacter(row));
+      // batchId is additive alongside the serialized character so the client
+      // can revert this exact batch on turn undo (#758).
+      res.json({ ...serializeCharacter(row), batchId });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Action transaction failed";
       res.status(isActionBadRequest(msg) ? 400 : 500).json({ error: msg });
