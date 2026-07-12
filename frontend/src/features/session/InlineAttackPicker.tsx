@@ -71,6 +71,8 @@ export default function InlineAttackPicker({
     roll,
     logRollSafe,
     recordAttack: turnState.recordAttack,
+    setTallyDamage: turnState.setTallyDamage,
+    addTallyDamageRider: turnState.addTallyDamageRider,
   });
 
   const forms = buildAttackForms(character);
