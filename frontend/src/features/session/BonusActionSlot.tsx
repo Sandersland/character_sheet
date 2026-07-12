@@ -1,10 +1,12 @@
 import BottomSheet from "@/components/ui/BottomSheet";
 import { GiSparkles } from "@/components/ui/icons";
-import { TurnSlotCard, QuickBtn, AttackCounter } from "@/features/session/TurnControls";
+import BonusActionSheetBody from "@/features/session/BonusActionSheetBody";
+import { TurnSlotCard, AttackCounter } from "@/features/session/TurnControls";
 import type { AttackState } from "@/features/session/useTurnState";
+import type { BonusSheetModel } from "@/lib/turnOptions";
 import type { AvailableAction } from "@/types/character";
 
-/** The Bonus Action economy slot — TWF off-hand, class bonus actions, catch-all. */
+/** The Bonus Action economy slot — TWF off-hand, class bonus actions, spells, catch-all. */
 export default function BonusActionSlot({
   bonusActionUsed,
   bonusAttack,
@@ -12,9 +14,11 @@ export default function BonusActionSlot({
   setShowBonusMenu,
   twfAvailable,
   classBonusActions,
+  sheetModel,
   busy,
   handleTwfAction,
   handleActionClick,
+  handleBonusSpellCast,
   consumeBonusAction,
 }: {
   bonusActionUsed: boolean;
@@ -23,15 +27,18 @@ export default function BonusActionSlot({
   setShowBonusMenu: React.Dispatch<React.SetStateAction<boolean>>;
   twfAvailable: boolean;
   classBonusActions: AvailableAction[];
+  sheetModel: BonusSheetModel;
   busy: boolean;
   handleTwfAction: () => void;
   handleActionClick: (key: string, cost: "action" | "bonusAction" | "reaction") => void;
+  handleBonusSpellCast: (spellId: string) => void;
   consumeBonusAction: () => void;
 }) {
   const preview =
     [
       ...(twfAvailable ? ["Off-hand Attack"] : []),
       ...classBonusActions.map((a) => a.name),
+      ...sheetModel.bonusSpells.map((s) => s.name),
       "Other",
     ]
       .slice(0, 4)
@@ -60,32 +67,18 @@ export default function BonusActionSlot({
           subtitle="Pick one — nothing is spent until you choose"
           onClose={() => setShowBonusMenu(false)}
         >
-          <div className="flex flex-wrap gap-1.5">
-            {twfAvailable && (
-              <QuickBtn tone="garnet" onClick={handleTwfAction}>
-                Off-hand Attack (TWF)
-              </QuickBtn>
-            )}
-            {classBonusActions.map((a) => (
-              <QuickBtn
-                key={a.key}
-                tone={a.enabled ? "arcane" : "neutral"}
-                disabled={!a.enabled || busy}
-                onClick={() => handleActionClick(a.key, "bonusAction")}
-                title={a.disabledReason}
-              >
-                {a.name}
-              </QuickBtn>
-            ))}
-            <QuickBtn
-              onClick={() => {
-                consumeBonusAction();
-                setShowBonusMenu(false);
-              }}
-            >
-              Other Bonus Action
-            </QuickBtn>
-          </div>
+          <BonusActionSheetBody
+            model={sheetModel}
+            twfAvailable={twfAvailable}
+            busy={busy}
+            handleTwfAction={handleTwfAction}
+            handleActionClick={handleActionClick}
+            handleBonusSpellCast={handleBonusSpellCast}
+            onOther={() => {
+              consumeBonusAction();
+              setShowBonusMenu(false);
+            }}
+          />
         </BottomSheet>
       )}
     </>

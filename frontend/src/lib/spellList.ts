@@ -1,6 +1,7 @@
 // Pure spell-list derivation for SpellsSection — no JSX.
 import { isMulticlass } from "@/lib/multiclass";
-import type { ActiveBuff, Character, Spell, SpellSlots } from "@/types/character";
+import { availableArcanaLevels, availableSlotLevels } from "@/lib/spellPicker";
+import type { ActiveBuff, Character, Spell } from "@/types/character";
 
 export interface SpellListDerivation {
   availableSlotLevels: number[];
@@ -10,16 +11,6 @@ export interface SpellListDerivation {
   spellLevels: number[];
   dismissibleSpellBuffs: ActiveBuff[];
   slotsArePactMagic: boolean;
-}
-
-// Spell levels with at least one slot remaining, ascending.
-function slotLevelsWithRemaining(slots: SpellSlots[]): number[] {
-  return slots.filter((s) => s.used < s.total).map((s) => s.level).sort((a, b) => a - b);
-}
-
-// Mystic Arcanum spell levels with a charge remaining (Warlock 6th–9th).
-function arcanaLevelsWithRemaining(arcana: SpellSlots[]): number[] {
-  return arcana.filter((a) => a.used < a.total).map((a) => a.level);
 }
 
 export function deriveSpellList(character: Character): SpellListDerivation {
@@ -42,8 +33,8 @@ export function deriveSpellList(character: Character): SpellListDerivation {
   );
 
   return {
-    availableSlotLevels: slotLevelsWithRemaining(slots),
-    availableArcanaLevels: arcanaLevelsWithRemaining(arcana),
+    availableSlotLevels: availableSlotLevels(slots),
+    availableArcanaLevels: availableArcanaLevels(arcana),
     learnedSpellIds: new Set(spells.flatMap((s) => (s.spellId ? [s.spellId] : []))),
     sortedSpells,
     spellLevels: [...new Set(sortedSpells.map((s) => s.level))].sort((a, b) => a - b),
@@ -52,18 +43,3 @@ export function deriveSpellList(character: Character): SpellListDerivation {
   };
 }
 
-// Valid slot levels for casting a spell: levels >= spell.level with a remaining
-// slot, plus a matching Mystic Arcanum charge (the backend routes a same-level
-// cast to the arcanum since Pact slots cap at level 5).
-export function availableSlotsForSpell(
-  spell: Spell,
-  availableSlotLevels: number[],
-  availableArcanaLevels: number[],
-): number[] {
-  if (spell.level === 0) return [];
-  const levels = availableSlotLevels.filter((l) => l >= spell.level);
-  if (availableArcanaLevels.includes(spell.level) && !levels.includes(spell.level)) {
-    levels.push(spell.level);
-  }
-  return levels.sort((a, b) => a - b);
-}

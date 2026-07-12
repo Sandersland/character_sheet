@@ -138,10 +138,17 @@ export const UNIVERSAL_ACTIONS: TurnActionOption[] = [
   },
   {
     key: "grapple",
-    label: "Grapple / Shove",
+    label: "Grapple",
     cost: "action",
     description:
-      "Attempt to grapple a creature (Athletics vs. Athletics/Acrobatics) or shove it prone/away. Uses one of your attack-action attacks if you have Extra Attack.",
+      "Attempt to grapple a creature (Athletics vs. Athletics/Acrobatics). Uses one of your attack-action attacks if you have Extra Attack.",
+  },
+  {
+    key: "shove",
+    label: "Shove",
+    cost: "action",
+    description:
+      "Shove a creature prone or push it 5 feet away (Athletics vs. Athletics/Acrobatics). Uses one of your attack-action attacks if you have Extra Attack.",
   },
   {
     key: "opportunityAttack",

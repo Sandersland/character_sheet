@@ -12,6 +12,14 @@ import { useState } from "react";
 import { applyActionTransactions, startCombat, endCombat, advanceCombatRound } from "@/api/client";
 import { rollSpec } from "@/lib/dice";
 import { planActionClick } from "@/lib/turnActionPlan";
+import {
+  bonusSpellOptions,
+  classActionOption,
+  consumableCount,
+  mainWeaponSummary,
+  offHandSummary,
+  twfHint,
+} from "@/lib/turnOptions";
 import { buffsToAutoEnd, endActionKeyFor, endReminders } from "@/lib/turnHooks";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { resolverFor } from "@/features/session/actionResolvers";
@@ -85,6 +93,28 @@ export function useTurnActions({
   const actionSurgePool = character.resources?.pools?.find((p) => p.key === "actionSurge");
   const actionSurgeAvailable = (actionSurgePool?.remaining ?? 0) > 0;
 
+  // Render models for the option-card picker sheets (pure lib/turnOptions
+  // derivations) — built here so the slot components stay presentational and
+  // `character` never flows into them.
+  const enrich = (a: AvailableAction) => classActionOption(a, resolverFor(a.key), character);
+  const actionSheetModel = {
+    attackSummary: mainWeaponSummary(character),
+    consumableCount: consumableCount(character),
+    hasSpellcasting: character.spellcasting !== undefined,
+    classActionOptions: classActions.map(enrich),
+  };
+  const bonusSheetModel = {
+    classBonusOptions: classBonusActions.map(enrich),
+    bonusSpells: bonusSpellOptions(character, turnState.spellCastThisTurn),
+    twfHintText: twfHint(character),
+    offHandSummary: offHandSummary(character),
+  };
+  const reactionSheetModel = {
+    attackSummary: mainWeaponSummary(character),
+    hasSpellcasting: character.spellcasting !== undefined,
+    classReactionOptions: classReactions.map(enrich),
+  };
+
   // Partition known maneuvers by placement for the Reaction slot and effect strip.
   const maneuversKnown = character.resources?.maneuversKnown ?? [];
   const reactionManeuvers = maneuversKnown.filter(
@@ -150,6 +180,14 @@ export function useTurnActions({
     enterTwfMode();
     openResolution("twf");
     setShowBonusMenu(false);
+  }
+
+  // Bonus-spell card tap — open the cast sheet focused on that spell. Like the
+  // generic spell-picker plan, no slot is consumed here; it commits at cast
+  // time via onCommitSlot.
+  function handleBonusSpellCast(spellId: string) {
+    setShowBonusMenu(false);
+    openResolution("castSpellBonus", { spellId });
   }
 
   // Action Surge — server-confirms first, then grants the extra action slot.
@@ -300,6 +338,9 @@ export function useTurnActions({
     classActions,
     classBonusActions,
     classReactions,
+    actionSheetModel,
+    bonusSheetModel,
+    reactionSheetModel,
     durableReminders,
     reactionManeuvers,
     effectManeuvers,
@@ -309,6 +350,7 @@ export function useTurnActions({
     handleActionClick,
     handleAttackAction,
     handleTwfAction,
+    handleBonusSpellCast,
     handleActionSurge,
     handleStartCombat,
     handleEndCombat,

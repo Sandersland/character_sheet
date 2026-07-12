@@ -107,7 +107,7 @@ interface Spies {
 
 function renderPicker(
   character: Character,
-  opts: { castingTimeFilter?: string; slotAvailable?: boolean } = {},
+  opts: { castingTimeFilter?: string; slotAvailable?: boolean; focusSpellId?: string } = {},
 ): Spies {
   const spies: Spies = {
     onUpdate: vi.fn(),
@@ -129,6 +129,7 @@ function renderPicker(
         spellCastThisTurn={{}}
         allies={[]}
         castingTimeFilter={opts.castingTimeFilter ?? "1 action"}
+        focusSpellId={opts.focusSpellId}
       />
     </RollProvider>,
   );
@@ -223,5 +224,63 @@ describe("InlineSpellPicker — characterization", () => {
     const spies = renderPicker(makeCharacter());
     await userEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(spies.onClose).toHaveBeenCalled();
+  });
+});
+
+describe("InlineSpellPicker — level sections", () => {
+  it("groups spells under level headers with slot pips (sr-only, never color-only)", () => {
+    renderPicker(makeCharacter());
+
+    expect(screen.getByText("Cantrips · at will")).toBeInTheDocument();
+    expect(screen.getByText("Level 1")).toBeInTheDocument();
+    // Level-1 fixture: 2 of 2 slots remaining.
+    expect(screen.getByText("2 of 2 slots remaining")).toBeInTheDocument();
+    // No Level-2 spells prepared → no Level 2 section despite the L2 slot.
+    expect(screen.queryByText("Level 2")).not.toBeInTheDocument();
+  });
+
+  it("hides levels with no affordable slot and explains via the footer note", () => {
+    const spiritualWeapon: Spell = {
+      id: "sp-sw",
+      name: "Spiritual Weapon",
+      level: 2,
+      prepared: true,
+      school: "evocation",
+      castingTime: "1 action",
+      range: "60 feet",
+      duration: "1 minute",
+      description: "",
+    };
+    const character = makeCharacter([healSpell, spiritualWeapon]);
+    character.spellcasting!.slots = [{ level: 1, total: 2, used: 0 }];
+
+    renderPicker(character);
+
+    expect(screen.queryByText("Spiritual Weapon")).not.toBeInTheDocument();
+    expect(screen.getByText("Level 2+ hidden — no slots remaining")).toBeInTheDocument();
+  });
+});
+
+describe("InlineSpellPicker — focusSpellId pre-selection", () => {
+  it("renders only the focused spell with a Show-all escape hatch", async () => {
+    renderPicker(makeCharacter(), { focusSpellId: "sp-heal" });
+
+    expect(screen.getByText("Cure Wounds")).toBeInTheDocument();
+    expect(screen.queryByText("Sacred Flame")).not.toBeInTheDocument();
+    expect(screen.queryByText("Chromatic Orb")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Show all spells" }));
+
+    expect(screen.getByText("Sacred Flame")).toBeInTheDocument();
+    expect(screen.getByText("Chromatic Orb")).toBeInTheDocument();
+    expect(screen.getByText("Cure Wounds")).toBeInTheDocument();
+  });
+
+  it("falls back to the full list when the focused spell is not castable", () => {
+    renderPicker(makeCharacter(), { focusSpellId: "sp-unknown" });
+
+    expect(screen.getByText("Sacred Flame")).toBeInTheDocument();
+    expect(screen.getByText("Cure Wounds")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show all spells" })).not.toBeInTheDocument();
   });
 });

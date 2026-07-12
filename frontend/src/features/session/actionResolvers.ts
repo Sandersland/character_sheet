@@ -79,6 +79,7 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   search:            { key: "search",            kind: "simple-confirm", slot: "action",      serverEffect: false },
   ready:             { key: "ready",             kind: "simple-confirm", slot: "action",      serverEffect: false },
   grapple:           { key: "grapple",           kind: "simple-confirm", slot: "action",      serverEffect: false },
+  shove:             { key: "shove",             kind: "simple-confirm", slot: "action",      serverEffect: false },
   opportunityAttack: { key: "opportunityAttack", kind: "attack-picker",  slot: "reaction",    serverEffect: false },
   // Two-Weapon Fighting off-hand bonus attack (#732) — economy-only, like `attack`.
   twf:               { key: "twf",               kind: "twf-picker",     slot: "bonusAction", serverEffect: false },

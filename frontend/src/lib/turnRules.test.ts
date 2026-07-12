@@ -85,17 +85,17 @@ describe("canTwoWeaponFight", () => {
 // ── UNIVERSAL_ACTIONS + universalActionsForCost ───────────────────────────────
 
 describe("UNIVERSAL_ACTIONS", () => {
-  it("has exactly 14 entries (lock the list)", () => {
-    expect(UNIVERSAL_ACTIONS).toHaveLength(14);
+  it("has exactly 15 entries (lock the list)", () => {
+    expect(UNIVERSAL_ACTIONS).toHaveLength(15);
   });
 
-  it("cost distribution: 11 action, 1 bonusAction, 2 reaction, 0 free/special", () => {
+  it("cost distribution: 12 action, 1 bonusAction, 2 reaction, 0 free/special", () => {
     const byCost = UNIVERSAL_ACTIONS.reduce<Record<string, number>>((acc, a) => {
       acc[a.cost] = (acc[a.cost] ?? 0) + 1;
       return acc;
     }, {});
 
-    expect(byCost["action"]).toBe(11);
+    expect(byCost["action"]).toBe(12);
     expect(byCost["bonusAction"]).toBe(1);
     expect(byCost["reaction"]).toBe(2);
     expect(byCost["free"]).toBeUndefined();
@@ -115,7 +115,7 @@ describe("UNIVERSAL_ACTIONS", () => {
 describe("universalActionsForCost", () => {
   it("returns only entries for the requested cost", () => {
     const actions = universalActionsForCost("action");
-    expect(actions.length).toBe(11);
+    expect(actions.length).toBe(12);
     expect(actions.every((a) => a.cost === "action")).toBe(true);
   });
 

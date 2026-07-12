@@ -1,8 +1,10 @@
 import BottomSheet from "@/components/ui/BottomSheet";
 import { GiCrossedSwords } from "@/components/ui/icons";
 import { UNIVERSAL_ACTIONS } from "@/lib/turnRules";
-import { TurnSlotCard, QuickBtn, AttackCounter } from "@/features/session/TurnControls";
+import ActionSheetBody from "@/features/session/ActionSheetBody";
+import { TurnSlotCard, AttackCounter } from "@/features/session/TurnControls";
 import type { AttackState } from "@/features/session/useTurnState";
+import type { ActionSheetModel } from "@/lib/turnOptions";
 import type { AvailableAction } from "@/types/character";
 
 /** The Action economy slot — Attack path, class actions, and universal actions. */
@@ -12,6 +14,7 @@ export default function ActionSlot({
   showActionMenu,
   setShowActionMenu,
   classActions,
+  sheetModel,
   busy,
   handleAttackAction,
   handleActionClick,
@@ -21,6 +24,7 @@ export default function ActionSlot({
   showActionMenu: boolean;
   setShowActionMenu: React.Dispatch<React.SetStateAction<boolean>>;
   classActions: AvailableAction[];
+  sheetModel: ActionSheetModel;
   busy: boolean;
   handleAttackAction: () => void;
   handleActionClick: (key: string, cost: "action" | "bonusAction" | "reaction") => void;
@@ -56,34 +60,12 @@ export default function ActionSlot({
           subtitle="Pick one — nothing is spent until you choose"
           onClose={() => setShowActionMenu(false)}
         >
-          <div className="flex flex-wrap gap-1.5">
-            {/* Attack — special path through enterAttackMode. */}
-            <QuickBtn tone="garnet" onClick={handleAttackAction}>
-              Attack
-            </QuickBtn>
-            {/* Class-specific action abilities. */}
-            {classActions.map((a) => (
-              <QuickBtn
-                key={a.key}
-                tone={a.enabled ? "arcane" : "neutral"}
-                disabled={!a.enabled || busy}
-                onClick={() => handleActionClick(a.key, "action")}
-                title={a.disabledReason}
-              >
-                {a.name}
-              </QuickBtn>
-            ))}
-            {/* Universal actions (excluding Attack which is above). */}
-            {universalActions.map((u) => (
-              <QuickBtn
-                key={u.key}
-                onClick={() => handleActionClick(u.key, "action")}
-                title={u.description}
-              >
-                {u.label}
-              </QuickBtn>
-            ))}
-          </div>
+          <ActionSheetBody
+            model={sheetModel}
+            busy={busy}
+            handleAttackAction={handleAttackAction}
+            handleActionClick={handleActionClick}
+          />
         </BottomSheet>
       )}
     </>

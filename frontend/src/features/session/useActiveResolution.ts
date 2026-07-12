@@ -15,8 +15,15 @@
 import { useState, useCallback } from "react";
 import { resolverFor, type ActionResolver } from "@/features/session/actionResolvers";
 
+/** Optional payload carried into the resolution sheet (pre-selection etc.). */
+export interface ResolutionContext {
+  /** Focus the spell picker on this spellbook entry (bonus-spell cards). */
+  spellId?: string;
+}
+
 export interface ActiveResolution {
   resolver: ActionResolver;
+  context?: ResolutionContext;
 }
 
 export interface ActiveResolutionState {
@@ -27,7 +34,7 @@ export interface ActiveResolutionState {
    * unrecognized (simple-confirm actions don't use an inline tool, but
    * callers may still call this — it's filtered in TurnHub logic).
    */
-  openResolution: (key: string) => void;
+  openResolution: (key: string, context?: ResolutionContext) => void;
   /** Clear the active resolution (tool dismissed or completed). */
   closeResolution: () => void;
 }
@@ -35,10 +42,10 @@ export interface ActiveResolutionState {
 export function useActiveResolution(): ActiveResolutionState {
   const [activeResolution, setActiveResolution] = useState<ActiveResolution | null>(null);
 
-  const openResolution = useCallback((key: string) => {
+  const openResolution = useCallback((key: string, context?: ResolutionContext) => {
     const resolver = resolverFor(key);
     if (!resolver) return;
-    setActiveResolution({ resolver });
+    setActiveResolution(context ? { resolver, context } : { resolver });
   }, []);
 
   const closeResolution = useCallback(() => {

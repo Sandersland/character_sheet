@@ -137,6 +137,7 @@ export default function TurnResolutionSheets({
         sessionId={sessionId}
         turnState={turnState}
         slot={activeResolution!.resolver.slot as SpellSlot}
+        focusSpellId={activeResolution!.context?.spellId}
         closeResolution={closeResolution}
         onUpdate={onUpdate}
         onLogChanged={onLogChanged}
@@ -153,6 +154,7 @@ function SpellResolutionSheet({
   sessionId,
   turnState,
   slot,
+  focusSpellId,
   closeResolution,
   onUpdate,
   onLogChanged,
@@ -162,6 +164,8 @@ function SpellResolutionSheet({
   sessionId: string;
   turnState: TurnState & TurnStateActions;
   slot: SpellSlot;
+  /** Open focused on this spellbook entry (bonus-spell card pre-selection). */
+  focusSpellId?: string;
   closeResolution: () => void;
   onUpdate: (c: Character) => void;
   onLogChanged: () => void;
@@ -181,7 +185,11 @@ function SpellResolutionSheet({
   };
 
   return (
-    <BottomSheet title={SPELL_SHEET_TITLE[slot]} onClose={closeResolution}>
+    <BottomSheet
+      title={SPELL_SHEET_TITLE[slot]}
+      subtitle="Only what you can afford now"
+      onClose={closeResolution}
+    >
       <InlineSpellPicker
         character={character}
         sessionId={sessionId}
@@ -194,6 +202,7 @@ function SpellResolutionSheet({
         spellCastThisTurn={turnState.spellCastThisTurn}
         allies={allies}
         castingTimeFilter={SPELL_CASTING_TIME[slot]}
+        focusSpellId={focusSpellId}
       />
     </BottomSheet>
   );

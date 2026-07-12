@@ -10,6 +10,11 @@ import {
   slotRestrictionHint,
   filterCastableSpells,
   sortSpells,
+  groupSpellsByLevel,
+  hiddenSpellLevels,
+  slotPipsForLevel,
+  hiddenLevelsNote,
+  castCostBadge,
 } from "@/lib/spellPicker";
 import type { Spell, SpellSlots } from "@/types/character";
 
@@ -177,5 +182,108 @@ describe("sortSpells", () => {
       spell({ id: "a", name: "Arc", level: 1 }),
     ]);
     expect(out.map((s) => s.id)).toEqual(["c", "a", "b"]);
+  });
+});
+
+// ── Level-section grouping (rich cast sheet) ─────────────────────────────────
+
+describe("groupSpellsByLevel", () => {
+  it("groups a sorted list into contiguous level sections", () => {
+    const out = groupSpellsByLevel([
+      spell({ id: "c1", level: 0 }),
+      spell({ id: "c2", level: 0 }),
+      spell({ id: "a", level: 1 }),
+      spell({ id: "b", level: 3 }),
+    ]);
+    expect(out.map((g) => ({ level: g.level, ids: g.spells.map((s) => s.id) }))).toEqual([
+      { level: 0, ids: ["c1", "c2"] },
+      { level: 1, ids: ["a"] },
+      { level: 3, ids: ["b"] },
+    ]);
+  });
+
+  it("returns [] for no spells", () => {
+    expect(groupSpellsByLevel([])).toEqual([]);
+  });
+});
+
+describe("hiddenSpellLevels", () => {
+  const base = {
+    slotLevels: [1],
+    arcanaLevels: [] as number[],
+    bonusActionBlockedByActionSpell: false,
+    actionLimitedToCantrips: false,
+  };
+
+  it("reports prepared leveled spells whose level has no affordable slot", () => {
+    const out = hiddenSpellLevels(
+      [
+        spell({ id: "l1", level: 1, prepared: true }),
+        spell({ id: "l2", level: 2, prepared: true }),
+        spell({ id: "l3", level: 3, prepared: true }),
+      ],
+      base,
+    );
+    expect(out).toEqual([2, 3]);
+  });
+
+  it("ignores cantrips, unprepared spells, and casting-time mismatches", () => {
+    const out = hiddenSpellLevels(
+      [
+        spell({ id: "c", level: 0 }),
+        spell({ id: "u", level: 2, prepared: false }),
+        spell({ id: "b", level: 2, prepared: true, castingTime: "1 bonus action" }),
+      ],
+      { ...base, castingTimeFilter: "1 action" },
+    );
+    expect(out).toEqual([]);
+  });
+
+  it("an arcanum charge makes its level affordable", () => {
+    const out = hiddenSpellLevels(
+      [spell({ id: "l6", level: 6, prepared: true })],
+      { ...base, arcanaLevels: [6] },
+    );
+    expect(out).toEqual([]);
+  });
+});
+
+describe("slotPipsForLevel", () => {
+  it("returns the level's total/used, null for cantrips or missing levels", () => {
+    expect(slotPipsForLevel(slots, 1)).toEqual({ total: 2, used: 1 });
+    expect(slotPipsForLevel(slots, 0)).toBeNull();
+    expect(slotPipsForLevel(slots, 9)).toBeNull();
+  });
+});
+
+describe("hiddenLevelsNote", () => {
+  it("contiguous levels collapse to 'Level N+'", () => {
+    expect(hiddenLevelsNote([2, 3, 4])).toBe("Level 2+ hidden — no slots remaining");
+    expect(hiddenLevelsNote([2])).toBe("Level 2+ hidden — no slots remaining");
+  });
+
+  it("non-contiguous levels are listed", () => {
+    expect(hiddenLevelsNote([2, 4])).toBe("Levels 2, 4 hidden — no slots remaining");
+  });
+
+  it("null when nothing is hidden", () => {
+    expect(hiddenLevelsNote([])).toBeNull();
+  });
+});
+
+describe("castCostBadge", () => {
+  it("cantrips are free, leveled spells cost a slot", () => {
+    expect(castCostBadge(spell({ level: 0, castingTime: "1 action" }))).toBe("free · action");
+    expect(castCostBadge(spell({ level: 1, castingTime: "1 action" }))).toBe("1 slot · action");
+  });
+
+  it("derives the cost word from the casting time", () => {
+    expect(castCostBadge(spell({ level: 1, castingTime: "1 bonus action" }))).toBe(
+      "1 slot · bonus action",
+    );
+    expect(
+      castCostBadge(spell({ level: 1, castingTime: "1 reaction, which you take when you are hit" })),
+    ).toBe("1 slot · reaction");
+    expect(castCostBadge(spell({ level: 3, castingTime: "1 minute" }))).toBe("1 slot · 1 minute");
   });
 });
