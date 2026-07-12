@@ -104,6 +104,28 @@ export function useLoadoutSwap(
     }
   }
 
+  async function stow(slot: EquipSlot) {
+    if (busy) return;
+    const occupant = itemsInSlot(character.inventory, slot)[0];
+    if (!occupant) return;
+    // Stowing a held weapon is a free object interaction — no Action spent.
+    const ops: InventoryOperation[] = [{ type: "setEquipped", inventoryItemId: occupant.id, equipped: false }];
+    const inverseOps: InventoryOperation[] = [{ type: "equip", inventoryItemId: occupant.id, slot }];
+    const previousLabel = equippedLoadoutLabel(character.inventory);
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await applyInventoryTransactions(character.id, ops);
+      onUpdate(updated);
+      setLastSwap({ inverseOps, spentAction: false, previousLabel });
+    } catch (e) {
+      console.error("loadout stow failed", e);
+      setError("Stow failed — try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function refund() {
     if (busy || !lastSwap) return;
     setBusy(true);
@@ -121,5 +143,5 @@ export function useLoadoutSwap(
     }
   }
 
-  return { busy, error, lastSwap, swap, refund };
+  return { busy, error, lastSwap, swap, stow, refund };
 }
