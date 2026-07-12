@@ -89,6 +89,7 @@ export default function InlineAttackPicker({
     logRollSafe,
     recordAttack: turnState.recordAttack,
     setTallyDamage: turnState.setTallyDamage,
+    setTallyAttackTotal: turnState.setTallyAttackTotal,
     addTallyDamageRider: turnState.addTallyDamageRider,
   });
 

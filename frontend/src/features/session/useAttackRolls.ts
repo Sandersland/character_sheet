@@ -37,12 +37,14 @@ export function useAttackRolls({
   logRollSafe,
   recordAttack,
   setTallyDamage,
+  setTallyAttackTotal,
   addTallyDamageRider,
 }: {
   roll: ReturnType<typeof useRoll>["roll"];
   logRollSafe: ReturnType<typeof useRollLogger>;
   recordAttack: (recorded: RecordedAttack) => void;
   setTallyDamage: (damage: number) => void;
+  setTallyAttackTotal: (total: number) => void;
   addTallyDamageRider: (amount: number) => void;
 }) {
   // Per-row last roll results (keyed by weapon item.id, "unarmed", or "improvised").
@@ -116,6 +118,7 @@ export function useAttackRolls({
     return (newAtk: number | null, newDmg: number | null) => {
       if (newAtk !== null) {
         setAttackTotals((prev) => ({ ...prev, [rowId]: newAtk }));
+        setTallyAttackTotal(newAtk); // keep the tally row + DM banner on the boosted to-hit
       }
       if (newDmg !== null) {
         setDamageTotals((prev) => ({ ...prev, [rowId]: newDmg }));
