@@ -5,9 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import BottomSheet from "@/components/ui/BottomSheet";
-import { createJournalEntry, deleteJournalEntry, updateJournalEntry } from "@/api/client";
 import MentionAutocomplete from "@/features/journal/MentionAutocomplete";
 import MentionText from "@/features/journal/MentionText";
+import { useJournalMutations } from "@/features/journal/useJournalMutations";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import { formatJournalTime } from "@/lib/formatJournalDate";
@@ -30,9 +30,8 @@ export default function CapturePalette({
   const composerRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsBelowMd();
   const { byId } = useCampaignEntities(character.campaignId);
+  const { busy, error, create, update, remove } = useJournalMutations(character.id, onUpdate);
   const [value, setValue] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
@@ -69,24 +68,10 @@ export default function CapturePalette({
     };
   }, [isMobile]);
 
-  async function run(action: () => Promise<Character>): Promise<boolean> {
-    setBusy(true);
-    setError(null);
-    try {
-      onUpdate(await action());
-      return true;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function handleSave() {
     const body = value.trim();
     if (body === "" || busy) return;
-    const ok = await run(() => createJournalEntry(character.id, { kind: "NOTE", body, sessionId }));
+    const ok = await create({ kind: "NOTE", body, sessionId });
     if (ok) {
       setValue("");
       composerRef.current?.focus();
@@ -104,13 +89,11 @@ export default function CapturePalette({
   async function handleEditSave(entryId: string) {
     const body = editValue.trim();
     if (body === "") return;
-    const ok = await run(() => updateJournalEntry(character.id, entryId, { body }));
-    if (ok) setEditingId(null);
+    if (await update(entryId, body)) setEditingId(null);
   }
 
   async function handleDelete(entryId: string) {
-    const ok = await run(() => deleteJournalEntry(character.id, entryId));
-    if (ok) setConfirmingDeleteId(null);
+    if (await remove(entryId)) setConfirmingDeleteId(null);
   }
 
   // text-base at mobile widths keeps typed inputs ≥16px so iOS Safari doesn't auto-zoom on focus.
