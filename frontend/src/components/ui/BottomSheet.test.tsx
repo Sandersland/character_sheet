@@ -176,4 +176,42 @@ describe("BottomSheet", () => {
     expect(grabber).not.toBeNull();
     expect(grabber!.className).toContain("md:hidden");
   });
+
+  it("grabber carries no md: utility other than md:hidden", () => {
+    const { baseElement } = render(
+      <BottomSheet title="Action" onClose={vi.fn()}>
+        <p>body</p>
+      </BottomSheet>,
+    );
+    const grabber = baseElement.querySelector('button[aria-label="Close"]') as HTMLElement;
+    const mdClasses = grabber.className.split(/\s+/).filter((c) => c.startsWith("md:"));
+    expect(mdClasses).toEqual(["md:hidden"]);
+  });
+
+  it("mobile scrim carries the opacity-fade transition utilities", () => {
+    const { baseElement } = render(
+      <BottomSheet title="Action" onClose={vi.fn()}>
+        <p>body</p>
+      </BottomSheet>,
+    );
+    const scrim = baseElement.querySelector('[role="presentation"]') as HTMLElement;
+    expect(scrim.className).toContain("transition-opacity");
+    expect(scrim.className).toContain("duration-500");
+  });
+
+  it("desktop (md+) scrim carries no transition utilities — it closes instantly", () => {
+    stubDesktop();
+    try {
+      const { baseElement } = render(
+        <BottomSheet title="Action" onClose={vi.fn()}>
+          <p>body</p>
+        </BottomSheet>,
+      );
+      const scrim = baseElement.querySelector('[role="presentation"]') as HTMLElement;
+      expect(scrim.className).not.toContain("transition-opacity");
+      expect(scrim.className).not.toContain("duration-500");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

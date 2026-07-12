@@ -60,7 +60,7 @@ export default function BottomSheet({ title, subtitle, onClose, children }: Bott
       // Presentational scrim: mouse-down-to-close is a pointer convenience only —
       // closing is keyboard-accessible via the Escape handler above.
       role="presentation"
-      className={`fixed inset-0 z-50 flex items-end justify-center bg-backdrop backdrop-blur-sm transition-opacity duration-500 md:items-center md:p-4 ${closing ? "opacity-0" : ""}`}
+      className={`fixed inset-0 z-50 flex items-end justify-center bg-backdrop backdrop-blur-sm md:items-center md:p-4 ${isMobile ? "transition-opacity duration-500" : ""} ${closing ? "opacity-0" : ""}`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) requestClose();
       }}
@@ -81,7 +81,7 @@ export default function BottomSheet({ title, subtitle, onClose, children }: Bott
           aria-label="Close"
           onClick={requestClose}
           {...handleProps}
-          className="mx-auto mt-2 h-1 w-9 shrink-0 touch-none rounded-full bg-parchment-300 md:hidden md:touch-auto"
+          className="mx-auto mt-2 h-1 w-9 shrink-0 touch-none rounded-full bg-parchment-300 md:hidden"
         />
         {/* md:pt-3 restores Modal's header padding on desktop, where the
             grabber (which fills the gap on mobile) is hidden. */}

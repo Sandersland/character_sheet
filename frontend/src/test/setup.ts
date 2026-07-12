@@ -11,6 +11,19 @@ afterEach(() => cleanup());
 // `expect(await axe(container)).toHaveNoViolations()`. Imported via @/test/axe.
 expect.extend(toHaveNoViolations);
 
+// jsdom lacks PointerEvent; polyfill a minimal one over MouseEvent so gesture
+// tests dispatch real pointer events carrying pointerId.
+if (typeof globalThis.PointerEvent === "undefined") {
+  class PointerEventPolyfill extends MouseEvent {
+    pointerId: number;
+    constructor(type: string, params: PointerEventInit = {}) {
+      super(type, params);
+      this.pointerId = params.pointerId ?? 0;
+    }
+  }
+  globalThis.PointerEvent = PointerEventPolyfill as unknown as typeof PointerEvent;
+}
+
 // Default no-op matchMedia stub (jsdom lacks it); tests can override per-case.
 if (!window.matchMedia) {
   window.matchMedia = (query: string) =>
