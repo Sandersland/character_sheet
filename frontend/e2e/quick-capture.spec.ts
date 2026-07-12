@@ -8,8 +8,9 @@ import { collectConsoleErrors } from "./helpers/console";
 // the flow is viewport-independent (no reliance on a header button that may
 // reflow on mobile).
 test("Quick capture: top palette at md+, BottomSheet on mobile", async ({ page }) => {
-  const errors = collectConsoleErrors(page);
   await login(page);
+  // Collect after login so the pre-auth 401s from login()'s initial goto don't count.
+  const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Smoke Fighter/ }).click();
   await expect(page.getByRole("heading", { name: "Hit Points" })).toBeVisible();
 
