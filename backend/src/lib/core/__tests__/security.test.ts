@@ -45,6 +45,11 @@ describe("securityHeaders single-origin CSP", () => {
   it("allows the Cloudflare Web Analytics beacon POST in connect-src (#151)", () => {
     expect(csp).toContain("connect-src 'self' https://cloudflareinsights.com");
   });
+
+  it("permits Cloudflare Speed Brain's inline speculation rules — and nothing else inline", () => {
+    expect(csp).toContain("'inline-speculation-rules'");
+    expect(csp).not.toMatch(/script-src[^;]*'unsafe-inline'/);
+  });
 });
 
 describe("securityHeaders API-only mode", () => {
