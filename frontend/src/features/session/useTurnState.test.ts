@@ -342,6 +342,153 @@ describe("attack mode flow", () => {
   });
 });
 
+// ── Attack tally (#802) ───────────────────────────────────────────────────────
+
+describe("attack tally", () => {
+  function inAttack(attacksPerAction = 2) {
+    const hook = renderHook(() => useTurnState(makeCharacter({ attacksPerAction }), SESSION_ID));
+    act(() => { hook.result.current.startCombat(); });
+    act(() => { hook.result.current.startTurn(); });
+    act(() => { hook.result.current.enterAttackMode(); });
+    return hook;
+  }
+
+  function recorded(overrides: Partial<{ formId: string; formName: string; total: number; keptFace: number; nat20: boolean; nat1: boolean }> = {}) {
+    const { formId = "w1", formName = "Longsword", total = 17, keptFace = 14, nat20 = false, nat1 = false } = overrides;
+    return { formId, formName, attack: { total, keptFace, nat20, nat1 } };
+  }
+
+  it("recordAttack with a payload appends a tally row", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    expect(result.current.attackTally).toHaveLength(1);
+    expect(result.current.attackTally[0]).toMatchObject({ formId: "w1", formName: "Longsword" });
+    expect(result.current.attack?.used).toBe(1);
+  });
+
+  it("recordAttack without a payload increments the counter but appends no row", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(); });
+    expect(result.current.attack?.used).toBe(1);
+    expect(result.current.attackTally).toHaveLength(0);
+  });
+
+  it("a clamped over-click (used already at total) does not append a phantom row", () => {
+    const { result } = inAttack(1); // single attack
+    act(() => { result.current.recordAttack(recorded()); });
+    act(() => { result.current.recordAttack(recorded()); }); // over-click
+    expect(result.current.attack?.used).toBe(1);
+    expect(result.current.attackTally).toHaveLength(1);
+  });
+
+  it("auto-verdict: nat 20 → crit, nat 1 → miss, else unset", () => {
+    const { result } = inAttack(3);
+    act(() => { result.current.recordAttack(recorded({ nat20: true })); });
+    act(() => { result.current.recordAttack(recorded({ nat1: true })); });
+    act(() => { result.current.recordAttack(recorded()); });
+    expect(result.current.attackTally[0].verdict).toBe("crit");
+    expect(result.current.attackTally[1].verdict).toBe("miss");
+    expect(result.current.attackTally[2].verdict).toBeUndefined();
+  });
+
+  it("setTallyDamage replaces the last row's damage — never double-counts on re-roll", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    act(() => { result.current.setTallyDamage(9); });
+    expect(result.current.attackTally[0].damage).toBe(9);
+    act(() => { result.current.setTallyDamage(13); }); // re-roll
+    expect(result.current.attackTally[0].damage).toBe(13);
+  });
+
+  it("setTallyDamage targets the CURRENT (last) attack row", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded({ formId: "a" })); });
+    act(() => { result.current.setTallyDamage(5); });
+    act(() => { result.current.recordAttack(recorded({ formId: "b" })); });
+    act(() => { result.current.setTallyDamage(8); });
+    expect(result.current.attackTally.map((r) => r.damage)).toEqual([5, 8]);
+  });
+
+  it("addTallyDamageRider folds into the current row's slot", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    act(() => { result.current.setTallyDamage(9); });
+    act(() => { result.current.addTallyDamageRider(4); });
+    expect(result.current.attackTally[0].damage).toBe(13);
+  });
+
+  it("cycleTallyVerdict cycles a manual row unset→Hit→Miss→unset", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    act(() => { result.current.cycleTallyVerdict(0); });
+    expect(result.current.attackTally[0].verdict).toBe("hit");
+    act(() => { result.current.cycleTallyVerdict(0); });
+    expect(result.current.attackTally[0].verdict).toBe("miss");
+    act(() => { result.current.cycleTallyVerdict(0); });
+    expect(result.current.attackTally[0].verdict).toBeUndefined();
+  });
+
+  it("cycleTallyVerdict is locked for an auto (nat 20) row", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded({ nat20: true })); });
+    act(() => { result.current.cycleTallyVerdict(0); });
+    expect(result.current.attackTally[0].verdict).toBe("crit"); // unchanged
+  });
+
+  it("entering a NEW attack action clears the previous tally", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter({ attacksPerAction: 1 }), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    act(() => { result.current.grantExtraAction(); }); // two actions
+    act(() => { result.current.enterAttackMode(); });
+    act(() => { result.current.recordAttack(recorded()); });
+    act(() => { result.current.finishAttack(); });
+    expect(result.current.attackTally).toHaveLength(1); // survives finish (for the banner)
+    act(() => { result.current.enterAttackMode(); }); // new Attack action
+    expect(result.current.attackTally).toHaveLength(0);
+  });
+
+  it("finishAttack keeps the tally (Resume + DM banner rely on it)", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    act(() => { result.current.finishAttack(); });
+    expect(result.current.attack).toBeNull();
+    expect(result.current.attackTally).toHaveLength(1);
+  });
+
+  it("endTurn clears the tally", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    act(() => { result.current.endTurn(); });
+    expect(result.current.attackTally).toHaveLength(0);
+  });
+
+  it("clearAttackTally empties the tally (banner dismiss)", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    act(() => { result.current.clearAttackTally(); });
+    expect(result.current.attackTally).toHaveLength(0);
+  });
+
+  it("undo of recordAttack also removes its tally row", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded({ formId: "a" })); });
+    act(() => { result.current.recordAttack(recorded({ formId: "b" })); });
+    expect(result.current.attackTally).toHaveLength(2);
+    act(() => { result.current.undo(); }); // undo attack 2
+    expect(result.current.attackTally).toHaveLength(1);
+    expect(result.current.attackTally[0].formId).toBe("a");
+    expect(result.current.attack?.used).toBe(1); // counter restored
+  });
+
+  it("cancelAttack (pre-roll) leaves the tally empty", () => {
+    const { result } = inAttack();
+    act(() => { result.current.cancelAttack(); });
+    expect(result.current.attackTally).toHaveLength(0);
+    expect(result.current.attack).toBeNull();
+  });
+});
+
 // ── Bonus action / TWF ────────────────────────────────────────────────────────
 
 describe("bonus action and TWF", () => {
@@ -663,6 +810,41 @@ describe("localStorage persistence", () => {
     expect(result.current.bonusActionUsed).toBe(true);
   });
 
+  it("backfills attackTally on a stale pre-#802 snapshot (top-level + undo entries)", () => {
+    // Pre-tally schema: mid-attack economy plus an undo entry with no attackTally.
+    const stale = {
+      inCombat: true,
+      round: 2,
+      phase: "active",
+      actionsRemaining: 0,
+      bonusActionUsed: false,
+      reactionUsed: false,
+      attack: { total: 2, used: 1 },
+      bonusAttack: null,
+      spellCastThisTurn: {},
+      attackedThisTurn: true,
+      tookDamageThisTurn: false,
+      history: [
+        {
+          actionsRemaining: 1,
+          bonusActionUsed: false,
+          reactionUsed: false,
+          attack: null,
+          bonusAttack: null,
+          spellCastThisTurn: {},
+        },
+      ],
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stale));
+
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    expect(result.current.attackTally).toEqual([]);
+    // Undo must not restore `undefined` over the tally — the entry was backfilled.
+    act(() => { result.current.undo(); });
+    expect(result.current.attackTally).toEqual([]);
+    expect(result.current.actionsRemaining).toBe(1);
+  });
+
   it("rehydrates a well-formed current-schema entry unchanged (#750)", () => {
     const snapshot: EconomySnapshot = {
       actionsRemaining: 1,
@@ -671,6 +853,7 @@ describe("localStorage persistence", () => {
       attack: null,
       bonusAttack: null,
       spellCastThisTurn: {},
+      attackTally: [],
     };
     const current = {
       inCombat: true,
