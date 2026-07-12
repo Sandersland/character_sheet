@@ -41,6 +41,9 @@ services:
       # stacks, manual review) can mint a session without Google. Hard-disabled
       # when NODE_ENV=production regardless of this value; never set in prod.
       ALLOW_DEV_LOGIN: ${ALLOW_DEV_LOGIN:-true}
+      # Disables request rate limiting so back-to-back e2e/dev runs never hit 429s
+      # (the alphabetical-tail specs otherwise time out on throttled dev-logins).
+      RATE_LIMIT_DISABLED: ${RATE_LIMIT_DISABLED:-true}
     volumes:
       - ./backend:/app
       - backend_node_modules:/app/node_modules

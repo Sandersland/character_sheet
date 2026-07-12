@@ -232,6 +232,8 @@ The `e2e` service uses a pinned `mcr.microsoft.com/playwright` image on host net
 - **Battle Master** (Fighter L5 + subclass + Evasive Footwork maneuver, on a dedicated campaign) — in-session superiority-die spend.
 - **Session Fighter** (Fighter L1 on a dedicated campaign) — start/resume a live session in-spec.
 
+The stack runs the backend with `RATE_LIMIT_DISABLED=true` — the compose default (`docker-compose.yml`) and the CI e2e job both set it — so back-to-back e2e runs on a warm backend never trip the request limiter. Without it, the accumulated `dev-login` traffic drifts toward `RATE_LIMIT_MAX` (600) and the alphabetical-tail specs (shadow-arts, spellcasting, unarmed, visual, wizard-sheet) fail with 429-induced login timeouts; the flag makes local e2e deterministic across repeated runs.
+
 Personas that need a live session each get their own campaign (a campaign allows only one active session), and the config runs `workers: 1` serially so session-driving specs never contend. Per-spec state (throwaway characters, learned spells, awarded XP, resource restores) is created **inside each spec** through `e2e/helpers/api.ts` against the same REST endpoints the app uses — never in globalSetup — so every spec is independently runnable and the shared personas stay unmutated. Selectors are role/name-based (no `data-testid`); specs assert zero console errors via `e2e/helpers/console.ts`. Domain specs cover HP, inventory, spellcasting, maneuvers, session, guided creation, and level-up.
 
 ### Visual regression (`toHaveScreenshot`)

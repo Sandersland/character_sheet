@@ -287,6 +287,7 @@ jobs:
         env:
           PORT: "4000"
           ALLOW_DEV_LOGIN: "true"
+          RATE_LIMIT_DISABLED: "true"
         run: nohup npm run dev --workspace backend > /tmp/backend.log 2>&1 &
 
       - name: Build frontend
