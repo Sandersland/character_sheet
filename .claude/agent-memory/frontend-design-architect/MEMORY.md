@@ -1,1 +1,2 @@
 - [Design system](design_system.md) — fantasy-tactile parchment direction, color/font/component tokens, mock data layer conventions
+- [Attack sheet mockup](attack_sheet_mockup.md) — #811 APPROVED final spec in Claude Design ("Attack Sheet - Final Spec.dc.html" is authoritative; earlier files are history)
