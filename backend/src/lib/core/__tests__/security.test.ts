@@ -1,14 +1,31 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 import { securityHeaders } from "@/lib/core/security.js";
+
+// A fake served SPA dir with one inline script, standing in for the built
+// index.html (whose real inline snippet is the pre-paint theme apply).
+const INLINE_BODY = "console.log('theme');";
+const INLINE_HASH = createHash("sha256").update(INLINE_BODY).digest("base64");
+const fixtureStaticDir = mkdtempSync(join(tmpdir(), "csp-static-"));
+writeFileSync(
+  join(fixtureStaticDir, "index.html"),
+  `<!doctype html><html><head><script>${INLINE_BODY}</script>` +
+    `<script type="module" src="/src/main.tsx"></script></head><body></body></html>`,
+);
+afterAll(() => rmSync(fixtureStaticDir, { recursive: true, force: true }));
 
 // Pure middleware test — no Postgres. Runs the helmet handler against a fake
 // res and reads back the Content-Security-Policy header it sets. Guards the
 // single-origin CSP allowances (#149 avatars, #150 dice worker, #151 CF beacon)
 // that only bite in SERVE_STATIC_DIR mode and so never surface in local dev.
-function cspFor(servesStatic: boolean): string {
-  const handler = securityHeaders(servesStatic);
+// Pass a static dir (the fixture) for single-origin mode, undefined for API-only.
+function cspFor(staticDir: string | undefined): string {
+  const handler = securityHeaders(staticDir);
   const headers: Record<string, string> = {};
   const res = {
     setHeader(name: string, value: string) {
@@ -27,7 +44,7 @@ function cspFor(servesStatic: boolean): string {
 }
 
 describe("securityHeaders single-origin CSP", () => {
-  const csp = cspFor(true);
+  const csp = cspFor(fixtureStaticDir);
 
   it("allows Google profile avatars in img-src (#149)", () => {
     expect(csp).toContain("img-src 'self' data: https://lh3.googleusercontent.com");
@@ -57,17 +74,46 @@ describe("securityHeaders single-origin CSP", () => {
 
   it("mints a fresh nonce per response — no nonce reuse", () => {
     const nonceOf = (policy: string) => policy.match(/'nonce-([^']+)'/)?.[1];
-    const first = nonceOf(cspFor(true));
-    const second = nonceOf(cspFor(true));
+    const first = nonceOf(cspFor(fixtureStaticDir));
+    const second = nonceOf(cspFor(fixtureStaticDir));
     expect(first).toBeTruthy();
     expect(second).toBeTruthy();
     expect(first).not.toBe(second);
+  });
+
+  it("allowlists the served index.html's inline scripts by hash (theme pre-paint snippet)", () => {
+    expect(csp).toContain(`'sha256-${INLINE_HASH}'`);
+  });
+
+  it("does not emit hash sources for src-carrying script tags", () => {
+    // Exactly one sha256 source: the fixture's single inline body.
+    expect(csp.match(/'sha256-/g)).toHaveLength(1);
+  });
+
+  it("serves a hash-free policy when index.html is unreadable (no crash)", () => {
+    const handler = securityHeaders("/definitely/not/a/dir");
+    const headers: Record<string, string> = {};
+    const res = {
+      setHeader(name: string, value: string) {
+        headers[name.toLowerCase()] = String(value);
+      },
+      getHeader(name: string) {
+        return headers[name.toLowerCase()];
+      },
+      removeHeader(name: string) {
+        delete headers[name.toLowerCase()];
+      },
+    } as unknown as Response;
+    handler({ secure: true, headers: {} } as unknown as Request, res, () => {});
+    const policy = headers["content-security-policy"] ?? "";
+    expect(policy).toContain("script-src 'self'");
+    expect(policy).not.toContain("'sha256-");
   });
 });
 
 describe("securityHeaders API-only mode", () => {
   it("does not apply the single-origin third-party allowances", () => {
-    const csp = cspFor(false);
+    const csp = cspFor(undefined);
     expect(csp).not.toContain("lh3.googleusercontent.com");
     expect(csp).not.toContain("cloudflareinsights.com");
   });

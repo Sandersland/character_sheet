@@ -59,18 +59,26 @@ The backend applies `helmet` (HSTS, `nosniff`, `X-Frame-Options`, CSP, …) and
 `express-rate-limit` (the `RATE_LIMIT_*` knobs above). In single-origin mode
 (`SERVE_STATIC_DIR` set) the Content-Security-Policy is tuned to allow the
 Vite-built assets (self-hosted scripts, `'unsafe-inline'` styles, `data:`
-fonts/images) plus the Cloudflare injections observed on the live zone: the Web
-Analytics beacon (script + connect), Speed Brain's inline
-`<script type="speculationrules">` (allowed via the `'inline-speculation-rules'`
-keyword — declarative prefetch JSON only, not an inline-JS loosening), and
-**JavaScript Detections** (Bot Fight Mode), which injects a real inline snippet
-into every HTML page. That last one is covered by a **fresh per-request
-`script-src` nonce**: Cloudflare's documented CSP integration parses the
-response's CSP header and stamps the nonce onto the scripts it injects, so no
-`'unsafe-inline'` and no fragile hash-pinning (the snippet rotates). Our own
-HTML ships no inline scripts, so the nonce never has to be templated into
-markup. (Alternative for zones that don't want this: disable JS Detections
-under Security → Bots in the Cloudflare dashboard.) If a
+fonts/images). Inline scripts are handled by two complementary mechanisms:
+
+- **First-party inline scripts** (the pre-paint theme snippet in `index.html`
+  that prevents a dark-mode FOUC) are allowlisted by **hash, computed at boot
+  from the served `index.html`** (`inlineScriptHashes` in
+  `backend/src/lib/core/security.ts`) — the allowance can never drift from the
+  deployed markup, and editing the snippet needs no CSP change. Debugging note,
+  hard-won: an inline-script CSP violation with a **stable** hash across
+  requests is almost certainly a first-party static script; Cloudflare's
+  injected snippets embed per-request tokens, so their hashes churn. This exact
+  misread cost an afternoon of chasing Cloudflare.
+- **Cloudflare's edge injections** get a **fresh per-request `script-src`
+  nonce**: Cloudflare's documented CSP integration parses the response's CSP
+  header and stamps the nonce onto scripts it injects (verified live on the
+  auto-injected Web Analytics beacon).
+
+Additional Cloudflare allowances observed on the live zone: the Web Analytics
+beacon (script host + connect) and Speed Brain's inline
+`<script type="speculationrules">` (the `'inline-speculation-rules'` keyword —
+declarative prefetch JSON only, not an inline-JS loosening). If a
 future asset is blocked, adjust the directives in
 `backend/src/lib/core/security.ts`. Rate limiting is auto-disabled under test and can
 be turned off in any environment with `RATE_LIMIT_DISABLED=true`.
