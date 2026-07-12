@@ -158,6 +158,7 @@ function useAttackRolls({
   };
 }
 
+// fallow-ignore-next-line complexity -- #766 grew this past the gate; decomposition tracked in #778
 export default function InlineAttackPicker({
   character,
   turnState,

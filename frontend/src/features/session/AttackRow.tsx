@@ -30,6 +30,7 @@ interface AttackRowProps {
   onUpdate: (c: Character) => void;
 }
 
+// fallow-ignore-next-line complexity -- #766 grew this past the gate; decomposition tracked in #778
 export default function AttackRow({
   entry,
   attacksExhausted,
