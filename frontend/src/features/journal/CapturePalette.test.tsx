@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import CapturePalette from "@/features/journal/CapturePalette";
@@ -62,9 +62,38 @@ afterEach(() => {
 });
 
 describe("CapturePalette (#247)", () => {
-  it("auto-focuses the composer when opened", () => {
+  it("auto-focuses the composer when opened", async () => {
     render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
-    expect(screen.getByRole("textbox", { name: /quick note/i })).toHaveFocus();
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: /quick note/i })).toHaveFocus(),
+    );
+  });
+
+  it("focuses the composer with preventScroll to stop iOS reveal-scroll (#784)", async () => {
+    const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
+    render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
+    await waitFor(() => expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true }));
+    focusSpy.mockRestore();
+  });
+
+  it("pins the page back to the top if a reveal-scroll leaked through (#784)", async () => {
+    const scrollToSpy = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    Object.defineProperty(window, "scrollY", { value: 120, configurable: true });
+    render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
+    await waitFor(() => expect(scrollToSpy).toHaveBeenCalledWith(0, 0));
+    Object.defineProperty(window, "scrollY", { value: 0, configurable: true });
+    scrollToSpy.mockRestore();
+  });
+
+  it("does not force-scroll when the page is already at the top (#784)", async () => {
+    const scrollToSpy = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    Object.defineProperty(window, "scrollY", { value: 0, configurable: true });
+    render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: /quick note/i })).toHaveFocus(),
+    );
+    expect(scrollToSpy).not.toHaveBeenCalled();
+    scrollToSpy.mockRestore();
   });
 
   it("floors the composer font-size at text-base on mobile to kill iOS auto-zoom", () => {

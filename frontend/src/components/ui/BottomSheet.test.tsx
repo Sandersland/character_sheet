@@ -138,6 +138,34 @@ describe("BottomSheet", () => {
     expect(textClose.className).toContain("md:block");
   });
 
+  it("caps the mobile panel to the visible viewport height so the body clears the keyboard (#784)", () => {
+    vi.stubGlobal("visualViewport", { height: 420, addEventListener: vi.fn(), removeEventListener: vi.fn() });
+    try {
+      const { baseElement } = render(
+        <BottomSheet title="Action" onClose={vi.fn()}>
+          <p>body</p>
+        </BottomSheet>,
+      );
+      expect(panelOf(baseElement).style.maxHeight).toBe("min(85vh, 420px)");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("does not cap the panel height at md+ (desktop keeps its CSS max-height)", () => {
+    stubDesktop();
+    try {
+      const { baseElement } = render(
+        <BottomSheet title="Action" onClose={vi.fn()}>
+          <p>body</p>
+        </BottomSheet>,
+      );
+      expect(panelOf(baseElement).style.maxHeight).toBe("");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("drops the grabber handle on desktop (md+) — it's a thumb-drag affordance", () => {
     const { baseElement } = render(
       <BottomSheet title="Action" onClose={vi.fn()}>

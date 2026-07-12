@@ -24,7 +24,8 @@ export function useDialogChrome(onClose: () => void) {
 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
-    panelRef.current?.focus();
+    // preventScroll so iOS doesn't reveal-scroll the fixed sheet on focus (#784).
+    panelRef.current?.focus({ preventScroll: true });
 
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
