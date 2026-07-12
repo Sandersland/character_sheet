@@ -355,8 +355,8 @@ describe("buildOffHandEntry (#732)", () => {
     const legacyDamage = { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "piercing", grip: "one-handed" };
     const character = makeCharacter({
       inventory: [
-        { ...weaponItem({ light: true, damage: legacyDamage as never }, "A", "a"), equippedSlot: "MAIN_HAND" as const },
-        { ...weaponItem({ light: true, damage: legacyDamage as never }, "B", "off"), equippedSlot: "OFF_HAND" as const },
+        { ...weaponItem({ light: true, damage: legacyDamage }, "A", "a"), equippedSlot: "MAIN_HAND" as const },
+        { ...weaponItem({ light: true, damage: legacyDamage }, "B", "off"), equippedSlot: "OFF_HAND" as const },
       ] as unknown as Character["inventory"],
     });
     // No abilityModifier to subtract → the full modifier is kept (matches pre-#732 behavior).

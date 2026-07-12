@@ -118,7 +118,7 @@ export interface WeaponDetail {
      * bonus attack omits the ability mod from damage unless the character has the
      * Two-Weapon Fighting style (#732).
      */
-    abilityModifier: number;
+    abilityModifier?: number;
     damageType: string;
     grip: "one-handed" | "two-handed" | "versatile-two-handed";
   };
