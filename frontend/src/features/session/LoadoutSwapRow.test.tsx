@@ -60,7 +60,7 @@ async function openSheet(user: ReturnType<typeof userEvent.setup>) {
 /** Scope queries to one hand's card ("Main hand" / "Off hand"). */
 function handCard(dialog: ReturnType<typeof within>, heading: string) {
   const label = dialog.getByText(new RegExp(`^${heading}`));
-  return within(label.closest(".py-2") as HTMLElement);
+  return within(label.closest('[data-testid="hand-card"]') as HTMLElement);
 }
 
 describe("LoadoutSwapRow (#789)", () => {
@@ -77,7 +77,10 @@ describe("LoadoutSwapRow (#789)", () => {
     expect(screen.getByText("Change loadout")).toBeInTheDocument();
     // Main-hand card shows the current weapon; expanding it reveals the Dagger.
     const main = handCard(dialog, "Main hand");
-    await user.click(main.getByRole("button", { name: "Change" }));
+    const toggle = main.getByRole("button", { name: "Change" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(main.getAllByText("Dagger").length).toBeGreaterThan(0);
   });
 

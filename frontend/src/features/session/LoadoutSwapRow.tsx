@@ -19,6 +19,7 @@ import {
   handContext,
   handPickerOptions,
   noLegalMove,
+  NO_ACTION_REASON,
   type HandContext,
   type PickerOption,
 } from "@/lib/loadoutPicker";
@@ -55,7 +56,7 @@ function HandCard({ slot, current, ctx, inventory, busy, expanded, onToggle, onC
   const options = handPickerOptions(inventory, slot, ctx);
 
   return (
-    <div className="py-2">
+    <div data-testid="hand-card" className="py-2">
       <div className="flex items-center justify-between gap-2">
         <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-parchment-600">
           {equipSlotLabel(slot)}
@@ -64,6 +65,7 @@ function HandCard({ slot, current, ctx, inventory, busy, expanded, onToggle, onC
         <button
           type="button"
           onClick={onToggle}
+          aria-expanded={expanded}
           disabled={Boolean(buttonDisabled)}
           className="shrink-0 rounded-control px-2.5 py-1 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-50 disabled:cursor-not-allowed disabled:text-parchment-400 disabled:hover:bg-transparent"
         >
@@ -116,9 +118,7 @@ export default function LoadoutSwapRow({ character, turnState, onUpdate }: Loado
   const label = equippedLoadoutLabel(character.inventory);
   const offHandLocked = isOffHandLocked(character.inventory);
   const ctx = handContext(character.inventory, turnState.actionsRemaining);
-  const rowDisabledReason = noLegalMove(ctx, offHandLocked)
-    ? "No action left — swapping a held item costs your Action"
-    : null;
+  const rowDisabledReason = noLegalMove(ctx, offHandLocked) ? NO_ACTION_REASON : null;
 
   async function choose(slot: EquipSlot, opt: PickerOption) {
     if (opt.disabledReason) return;
