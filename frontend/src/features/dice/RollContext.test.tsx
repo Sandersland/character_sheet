@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 
 import { logRoll } from "@/api/client";
 import { RollProvider, useRoll, type RollLog } from "@/features/dice/RollContext";
@@ -67,10 +67,14 @@ describe("RollProvider — rollAnimated + logging", () => {
     // 3D roller mounted in an overlay dialog (lazy-loaded behind Suspense).
     expect(await screen.findByTestId("dice-roller")).toBeInTheDocument();
 
-    // Toast shows the total (17 + 5).
+    // The corner toast stays suppressed behind the open 3D modal (#801).
+    await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText("22")).not.toBeInTheDocument();
+
+    // After dismissing the modal, the toast shows the total (17 + 5).
+    fireEvent.click(await screen.findByText("Done"));
     await waitFor(() => expect(screen.getAllByText("22").length).toBeGreaterThan(0));
 
-    await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
     const [cid, sid, payload] = mockLogRoll.mock.calls[0];
     expect(cid).toBe("char-1");
     expect(sid).toBe("sess-1");

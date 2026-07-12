@@ -1,7 +1,28 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// Module-scoped count of mounted dialog surfaces (every Modal/BottomSheet calls
+// useDialogChrome, so each participates). Drives useAnyDialogOpen (#801).
+let openDialogCount = 0;
+const dialogListeners = new Set<() => void>();
+
+function emitDialogChange() {
+  dialogListeners.forEach((listener) => listener());
+}
+
+/** True while any Modal/BottomSheet is mounted; subscribes to the shared count. */
+export function useAnyDialogOpen(): boolean {
+  return useSyncExternalStore(
+    (listener) => {
+      dialogListeners.add(listener);
+      return () => dialogListeners.delete(listener);
+    },
+    () => openDialogCount > 0,
+    () => false,
+  );
+}
 
 /**
  * Shared overlay behavior for the app's dialog surfaces — `Modal` (centered)
@@ -26,6 +47,9 @@ export function useDialogChrome(onClose: () => void) {
     const previouslyFocused = document.activeElement as HTMLElement | null;
     // preventScroll so iOS doesn't reveal-scroll the fixed sheet on focus (#784).
     panelRef.current?.focus({ preventScroll: true });
+
+    openDialogCount += 1;
+    emitDialogChange();
 
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -55,6 +79,8 @@ export function useDialogChrome(onClose: () => void) {
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = originalOverflow;
+      openDialogCount = Math.max(0, openDialogCount - 1);
+      emitDialogChange();
       previouslyFocused?.focus();
     };
   }, []);
