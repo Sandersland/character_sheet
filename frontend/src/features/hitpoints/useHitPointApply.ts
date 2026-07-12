@@ -5,6 +5,7 @@ import type { Character, ConcentrationCheck, HitPointOperation } from "@/types/c
 import type { HpMode } from "@/features/hitpoints/HpActionControl";
 import type { PendingConcentrationSave } from "@/features/hitpoints/ConcentrationSaveModal";
 import { useAutoRollConcentrationPref } from "@/features/hitpoints/concentrationPreference";
+import { buildHpOps } from "@/lib/hitPointOps";
 
 export interface ConcentrationNote {
   text: string;
@@ -82,30 +83,14 @@ export function useHitPointApply(character: Character, onUpdate: (character: Cha
   }
 
   // Apply the active HP mode; returns true on success so the child clears its field.
-  // fallow-ignore-next-line complexity -- #768 grew this past the gate; decomposition tracked in #779
   async function handleApply(
     mode: HpMode,
     value: number,
     damage?: { damageType?: string; applyResistance?: boolean },
   ): Promise<boolean> {
-    if (mode === "damage") {
-      if (!value || value <= 0) return false;
-      return submit([
-        {
-          type: "damage",
-          amount: value,
-          damageType: damage?.damageType,
-          applyResistance: damage?.applyResistance,
-          autoRollConcentration,
-        },
-      ]);
-    }
-    if (mode === "heal") {
-      if (!value || value <= 0) return false;
-      return submit([{ type: "heal", amount: value }]);
-    }
-    if (isNaN(value) || value < 0) return false;
-    return submit([{ type: "setTemp", amount: value }]);
+    const ops = buildHpOps(mode, value, { ...damage, autoRollConcentration });
+    if (!ops) return false;
+    return submit(ops);
   }
 
   // The save die settled in the modal — persist it with the natural d20 (issue #76).

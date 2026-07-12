@@ -46,13 +46,17 @@ frontend/src/
 │   │                    #     → ~80-line orchestrator over EntityDetailHeader/EntityDetailsCard/EntityMentions/
 │   │                    #       EntityMergeCards + hooks useEntityDetail/useEntityMerges/useEntityBackTo (#605)
 │   ├── experience/      # ExperienceTracker
-│   ├── hitpoints/       # HitPointTracker orchestrator (inline Card; hosts LevelUpModal + ConcentrationSaveModal)
+│   ├── hitpoints/       # HitPointTracker orchestrator (inline Card) → presentational sections
+│   │                    #   HpDeathSaveBlock / HpNotices (level-up + advancement + concentration + error) /
+│   │                    #   HpTrackerModals (LevelUpModal + ConcentrationSaveModal), + useHitPointTrackerActions
+│   │                    #   (rest/level-up handlers + level-up/advancement state) (#779).
 │   │                    #   Sub-components: HpActionControl (damage/heal/temp + optional
 │   │                    #   damage-type picker + resistance auto-halve toggle, #456),
 │   │                    #   HpMeter, RestControls, DeathSaveTracker, LevelUpCallout, AdvancementCallout;
 │   │                    #   CompactHpBar (session strip; tap → "Hit Points" BottomSheet → HpSheetBody, #768),
 │   │                    #   useHitPointApply (shared submit + concentration-check surfacing behind the
-│   │                    #   Rest tab AND the session sheet), AutoRollConcentrationToggle + ConcentrationNoteBanner
+│   │                    #   Rest tab AND the session sheet; per-mode ops built by lib/hitPointOps buildHpOps, #779),
+│   │                    #   AutoRollConcentrationToggle + ConcentrationNoteBanner
 │   ├── inventory/       # InventoryList orchestrator (Bag ⇄ Worn toggle) → InventoryHeaderActions
 │   │                    #   (→ SellModeActions)/InventoryMeters/InventoryToolbar/
 │   │                    #   InventoryBody (→ InventoryContent → InventorySections)/
