@@ -2,7 +2,7 @@
 // attack form, auto-doubling the dice after a nat-20 to-hit. Inert until a hit is
 // rolled (`view` null); switching the attack-card selector only rebinds it on the
 // next Roll to hit (#786). Hosts the form's on-hit dice riders (Flame Tongue +2d6)
-// and its Battle Master prompt.
+// and its damage-roll maneuvers (attack-roll Precision moved to the attack card, #809).
 
 import { GiSwordWound } from "@/components/ui/icons";
 import AttackResultLine from "@/features/session/AttackResultLine";
@@ -100,6 +100,7 @@ export default function WeaponDamageCard({
       />
       {showManeuvers && (
         <ManeuverPrompt
+          section="damage"
           character={character}
           lastAttackRoll={lastAttackRoll}
           lastDamageRoll={lastDamageRoll}
