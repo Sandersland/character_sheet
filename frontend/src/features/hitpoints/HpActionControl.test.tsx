@@ -6,9 +6,16 @@ import HpActionControl from "@/features/hitpoints/HpActionControl";
 
 const HP = { current: 20, max: 40, temp: 0 };
 
-function setup(hitPoints = HP) {
+function setup(hitPoints = HP, resistedTypes: string[] = []) {
   const onApply = vi.fn().mockResolvedValue(true);
-  render(<HpActionControl pending={false} hitPoints={hitPoints} onApply={onApply} />);
+  render(
+    <HpActionControl
+      pending={false}
+      hitPoints={hitPoints}
+      onApply={onApply}
+      resistedTypes={resistedTypes}
+    />,
+  );
   return { onApply, user: userEvent.setup() };
 }
 
@@ -66,6 +73,28 @@ describe("HpActionControl projected-result line (#787)", () => {
     await user.click(screen.getByRole("radio", { name: /temp hp/i }));
     await user.click(screen.getByRole("button", { name: "Add 10" }));
     expect(screen.getByText("Temp 0 → 10")).toBeInTheDocument();
+  });
+
+  it("projects the halved amount when the damage type is resisted (#456)", async () => {
+    const { user } = setup(HP, ["slashing"]);
+    await user.click(screen.getByRole("button", { name: "Add 10" }));
+    await user.click(screen.getByRole("button", { name: "Add 1" }));
+    await user.click(screen.getByRole("button", { name: "Add 1" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: /damage type/i }), "slashing");
+
+    // 12 slashing halves to 6 → projection matches the applied damage, not the raw 12.
+    expect(screen.getByText("6 HP → 14 / 40")).toBeInTheDocument();
+  });
+
+  it("projects the full amount when the player declines resistance", async () => {
+    const { user } = setup(HP, ["slashing"]);
+    await user.click(screen.getByRole("button", { name: "Add 10" }));
+    await user.click(screen.getByRole("button", { name: "Add 1" }));
+    await user.click(screen.getByRole("button", { name: "Add 1" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: /damage type/i }), "slashing");
+    await user.click(screen.getByRole("checkbox", { name: /resistant to slashing/i }));
+
+    expect(screen.getByText("12 HP → 8 / 40")).toBeInTheDocument();
   });
 });
 

@@ -70,6 +70,8 @@ export default function HpActionControl({
   // A halve preview shows only when the chosen type is actively resisted (#456).
   const isResisted = mode === "damage" && damageType !== "" && resistedTypes.includes(damageType);
   const halved = Math.floor(numericAmount / 2);
+  // Project the damage the backend will actually apply after auto-halving (#456).
+  const effectiveAmount = isResisted && applyResistance ? halved : numericAmount;
 
   const active = HP_MODES[mode];
   const applyDisabled = pending || numericAmount <= 0;
@@ -99,7 +101,7 @@ export default function HpActionControl({
       <div className="flex flex-col items-center gap-1">
         <span className="text-4xl font-bold tabular-nums text-parchment-900">{numericAmount}</span>
         <p aria-live="polite" className="text-sm font-semibold text-parchment-600">
-          {projectHp(mode, numericAmount, hitPoints)}
+          {projectHp(mode, effectiveAmount, hitPoints)}
         </p>
       </div>
 
