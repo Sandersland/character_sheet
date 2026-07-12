@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useDialogChrome } from "@/hooks/useDialogChrome";
 import { useDragToDismiss } from "@/hooks/useDragToDismiss";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
+import { useVisualViewportHeight } from "@/hooks/useVisualViewportHeight";
 
 interface BottomSheetProps {
   title: string;
@@ -36,6 +37,12 @@ export default function BottomSheet({ title, subtitle, onClose, children }: Bott
   // Gate the gesture off at md+, matching the pure-CSS breakpoint.
   const isMobile = useIsBelowMd();
 
+  // On mobile cap the panel to the visible viewport so the body sits above the
+  // on-screen keyboard, not behind it (#784). min() keeps the 85vh scrim gap
+  // when no keyboard is up; the px value wins once the keyboard shrinks it.
+  const viewportHeight = useVisualViewportHeight();
+  const panelMaxHeight = isMobile ? `min(85vh, ${viewportHeight}px)` : undefined;
+
   const { handleProps, contentProps, beginExit } = useDragToDismiss(panelRef, {
     onDismiss: onClose,
     onExitStart: () => setClosing(true),
@@ -64,6 +71,7 @@ export default function BottomSheet({ title, subtitle, onClose, children }: Bott
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
+        style={panelMaxHeight ? { maxHeight: panelMaxHeight } : undefined}
         className="flex max-h-[85vh] w-full max-w-[36rem] flex-col rounded-t-card border border-b-0 border-parchment-200 bg-parchment-50 shadow-raised md:max-h-[80vh] md:rounded-card md:border-b"
       >
         {/* handleProps is spread on both grabber and header on purpose: a wide
