@@ -53,6 +53,33 @@ describe("canTwoWeaponFight", () => {
     const noDetail = { equipped: true, category: "weapon" as const, weapon: null };
     expect(canTwoWeaponFight([noDetail, noDetail])).toBe(false);
   });
+
+  // ── Two-Weapon Fighting style relaxes the light restriction (#732) ──────────
+  it("non-light pair → false without the Two-Weapon Fighting style", () => {
+    expect(canTwoWeaponFight([makeWeapon(false), makeWeapon(false)])).toBe(false);
+    // An unrelated style does not relax it either.
+    expect(canTwoWeaponFight([makeWeapon(false), makeWeapon(false)], "dueling")).toBe(false);
+  });
+
+  it("non-light pair → true WITH the Two-Weapon Fighting style", () => {
+    expect(
+      canTwoWeaponFight([makeWeapon(false), makeWeapon(false)], "twoWeaponFighting"),
+    ).toBe(true);
+    // A mixed pair also qualifies with the style.
+    expect(
+      canTwoWeaponFight([makeWeapon(true), makeWeapon(false)], "twoWeaponFighting"),
+    ).toBe(true);
+  });
+
+  it("the style still requires ≥2 equipped weapons", () => {
+    expect(canTwoWeaponFight([makeWeapon(false)], "twoWeaponFighting")).toBe(false);
+    expect(canTwoWeaponFight([], "twoWeaponFighting")).toBe(false);
+  });
+
+  it("two light weapons stay valid regardless of style (null / present)", () => {
+    expect(canTwoWeaponFight([makeWeapon(true), makeWeapon(true)], null)).toBe(true);
+    expect(canTwoWeaponFight([makeWeapon(true), makeWeapon(true)], "twoWeaponFighting")).toBe(true);
+  });
 });
 
 // ── UNIVERSAL_ACTIONS + universalActionsForCost ───────────────────────────────

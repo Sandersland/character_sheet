@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   attacksExhausted,
   buildAttackEntries,
+  buildOffHandEntry,
   capabilitiesActive,
   critDamageSpec,
   hasSuperiorityDice,
@@ -188,7 +189,7 @@ describe("buildAttackEntries", () => {
           damageDiceFaces: 8,
           damageModifier: 0,
           damageType: "slashing",
-          damage: { damageDiceCount: 1, damageDiceFaces: 10, damageModifier: 2, damageType: "slashing", grip: "versatile-two-handed" },
+          damage: { damageDiceCount: 1, damageDiceFaces: 10, damageModifier: 2, abilityModifier: 2, damageType: "slashing", grip: "versatile-two-handed" },
         }),
       ] as unknown as Character["inventory"],
     });
@@ -277,6 +278,101 @@ describe("buildAttackEntries", () => {
     const entries = buildAttackEntries(character);
     expect(entries.find((e) => e.id === "inv-1")!.damageRiders).toHaveLength(1);
     expect(entries.find((e) => e.id === "inv-2")!.damageRiders).toEqual([]);
+  });
+});
+
+describe("buildOffHandEntry (#732)", () => {
+  // Two equipped weapons: a main-hand and an OFF_HAND shortsword whose damage
+  // snapshot carries its ability-mod component (STR +3 folded into damageModifier).
+  function twoWeaponChar(overrides: Partial<Character> = {}) {
+    const mainHand = {
+      ...weaponItem(
+        { attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "slashing",
+          light: true,
+          damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, abilityModifier: 3, damageType: "slashing", grip: "one-handed" } },
+        "Shortsword",
+        "main",
+      ),
+      equippedSlot: "MAIN_HAND" as const,
+    };
+    const offHand = {
+      ...weaponItem(
+        { attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "piercing",
+          light: true,
+          damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, abilityModifier: 3, damageType: "piercing", grip: "one-handed" } },
+        "Dagger",
+        "off",
+      ),
+      equippedSlot: "OFF_HAND" as const,
+    };
+    return makeCharacter({
+      inventory: [mainHand, offHand] as unknown as Character["inventory"],
+      ...overrides,
+    });
+  }
+
+  it("returns null with fewer than two equipped weapons", () => {
+    const character = makeCharacter({
+      inventory: [weaponItem({ damageModifier: 3, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, abilityModifier: 3, damageType: "slashing", grip: "one-handed" } })] as unknown as Character["inventory"],
+    });
+    expect(buildOffHandEntry(character)).toBeNull();
+  });
+
+  it("scopes to the OFF_HAND weapon", () => {
+    const entry = buildOffHandEntry(twoWeaponChar())!;
+    expect(entry.id).toBe("off");
+    expect(entry.name).toBe("Dagger");
+  });
+
+  it("omits the ability modifier from off-hand damage WITHOUT the style", () => {
+    const entry = buildOffHandEntry(twoWeaponChar({ resources: { pools: [] } } as unknown as Partial<Character>))!;
+    // damageModifier 3 (= STR +3) minus the ability mod → 0.
+    expect(entry.damageSpec).toEqual({ count: 1, faces: 6, modifier: 0 });
+    expect(entry.damageLabel).toBe("1d6 piercing");
+  });
+
+  it("keeps the ability modifier WITH the Two-Weapon Fighting style", () => {
+    const entry = buildOffHandEntry(
+      twoWeaponChar({ resources: { pools: [], fightingStyle: "twoWeaponFighting" } } as unknown as Partial<Character>),
+    )!;
+    expect(entry.damageSpec).toEqual({ count: 1, faces: 6, modifier: 3 });
+    expect(entry.damageLabel).toBe("1d6 + 3 piercing");
+  });
+
+  it("keeps a negative ability modifier even without the style (RAW)", () => {
+    const character = makeCharacter({
+      inventory: [
+        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: -1, abilityModifier: -1, damageType: "slashing", grip: "one-handed" } }, "A", "a"), equippedSlot: "MAIN_HAND" as const },
+        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: -1, abilityModifier: -1, damageType: "piercing", grip: "one-handed" } }, "B", "off"), equippedSlot: "OFF_HAND" as const },
+      ] as unknown as Character["inventory"],
+    });
+    // max(0, -1) = 0 subtracted → the negative mod stays.
+    expect(buildOffHandEntry(character)!.damageSpec.modifier).toBe(-1);
+  });
+
+  it("shows the full modifier for a legacy weapon whose damage lacks abilityModifier", () => {
+    // Pre-#732 serialization: damage present but no ability-mod component.
+    const legacyDamage = { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "piercing", grip: "one-handed" as const };
+    const character = makeCharacter({
+      inventory: [
+        { ...weaponItem({ light: true, damage: legacyDamage }, "A", "a"), equippedSlot: "MAIN_HAND" as const },
+        { ...weaponItem({ light: true, damage: legacyDamage }, "B", "off"), equippedSlot: "OFF_HAND" as const },
+      ] as unknown as Character["inventory"],
+    });
+    // No abilityModifier to subtract → the full modifier is kept (matches pre-#732 behavior).
+    expect(buildOffHandEntry(character)!.damageSpec.modifier).toBe(3);
+  });
+
+  it("preserves a melee-damage buff (Rage) while dropping only the ability mod", () => {
+    // damageModifier 5 = STR +3 folded with a +2 Rage buff; abilityModifier is the raw +3.
+    const character = makeCharacter({
+      inventory: [
+        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 5, abilityModifier: 3, damageType: "slashing", grip: "one-handed" } }, "A", "a"), equippedSlot: "MAIN_HAND" as const },
+        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 5, abilityModifier: 3, damageType: "piercing", grip: "one-handed" } }, "B", "off"), equippedSlot: "OFF_HAND" as const },
+      ] as unknown as Character["inventory"],
+    });
+    // 5 − max(0,3) = 2 (the Rage buff survives).
+    expect(buildOffHandEntry(character)!.damageSpec.modifier).toBe(2);
   });
 });
 

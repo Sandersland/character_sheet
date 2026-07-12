@@ -9,15 +9,21 @@
  * tracking is flagged for a future phase.
  */
 
-import type { ActionCost } from "@/types/character";
+import type { ActionCost, FightingStyleKey } from "@/types/character";
 
 // ── Two-Weapon Fighting eligibility ──────────────────────────────────────────
 
 /**
  * Returns true when the character's equipped loadout allows a TWF bonus-action
- * off-hand attack: exactly two weapons equipped, both of which are light
- * (light property = true on the weapon detail). The off-hand attack does NOT
- * add the ability modifier to damage (handled client-side on roll).
+ * off-hand attack: at least two weapons equipped, both of which are light
+ * (light property = true on the weapon detail). The off-hand attack's damage
+ * omits the ability modifier unless the character has the Two-Weapon Fighting
+ * style — resolved from `weapon.damage.abilityModifier` in `buildOffHandEntry`.
+ *
+ * The **Two-Weapon Fighting fighting style** (PHB p.72) removes the light
+ * restriction, so when `fightingStyle === "twoWeaponFighting"` any two equipped
+ * weapons qualify. (The paper-doll already prevents equipping a two-handed
+ * weapon alongside an off-hand, so we don't re-check that here.)
  *
  * The existing `offHandBusy` field on the serialized character covers the
  * versatile-grip calculation but is a boolean that conflates "shield equipped"
@@ -26,15 +32,15 @@ import type { ActionCost } from "@/types/character";
  */
 export function canTwoWeaponFight(
   inventory: Array<{ equipped: boolean; category: string; weapon?: { light: boolean } | null }>,
+  fightingStyle?: FightingStyleKey | null,
 ): boolean {
   const equippedWeapons = inventory.filter(
     (i) => i.equipped && i.category === "weapon" && i.weapon,
   );
   if (equippedWeapons.length < 2) return false;
-  // Both held weapons must have the light property for baseline TWF.
-  // (The Two-Weapon Fighting fighting style removes the light restriction,
-  // but we don't have a structured "has this fighting style" flag yet —
-  // defaulting to light-only is the conservative/correct baseline.)
+  // The Two-Weapon Fighting style removes the light-weapon restriction.
+  if (fightingStyle === "twoWeaponFighting") return true;
+  // Baseline: both held weapons must have the light property.
   return equippedWeapons.slice(0, 2).every((i) => i.weapon?.light === true);
 }
 

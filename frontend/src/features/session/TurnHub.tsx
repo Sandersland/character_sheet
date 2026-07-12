@@ -293,6 +293,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           activeResolution={activeResolution}
           closeResolution={closeResolution}
           setShowActionMenu={setShowActionMenu}
+          setShowBonusMenu={setShowBonusMenu}
           onUpdate={onUpdate}
           onLogChanged={onLogChanged}
           allies={allies}
