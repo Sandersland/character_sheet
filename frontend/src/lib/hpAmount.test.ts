@@ -4,6 +4,7 @@ import {
   ACCUMULATOR_CHIPS,
   accumulateAmount,
   clampAmount,
+  deriveHpApply,
   projectHp,
 } from "@/lib/hpAmount";
 
@@ -33,6 +34,26 @@ describe("accumulateAmount", () => {
 
   it("exposes the +1/+5/+10/+20 chip steps", () => {
     expect(ACCUMULATOR_CHIPS).toEqual([1, 5, 10, 20]);
+  });
+});
+
+describe("deriveHpApply", () => {
+  it("parses the raw amount, empty string as 0", () => {
+    expect(deriveHpApply("damage", "17", "", [], true).numericAmount).toBe(17);
+    expect(deriveHpApply("damage", "", "", [], true).numericAmount).toBe(0);
+  });
+
+  it("halves only when the chosen type is resisted AND resistance is applied (#456)", () => {
+    const resisted = deriveHpApply("damage", "17", "fire", ["fire"], true);
+    expect(resisted).toEqual({ numericAmount: 17, isResisted: true, halved: 8, effectiveAmount: 8 });
+    expect(deriveHpApply("damage", "17", "fire", ["fire"], false).effectiveAmount).toBe(17);
+    expect(deriveHpApply("damage", "17", "cold", ["fire"], true).isResisted).toBe(false);
+    expect(deriveHpApply("damage", "17", "", ["fire"], true).isResisted).toBe(false);
+  });
+
+  it("never marks heal/temp as resisted", () => {
+    expect(deriveHpApply("heal", "17", "fire", ["fire"], true).isResisted).toBe(false);
+    expect(deriveHpApply("temp", "17", "fire", ["fire"], true).isResisted).toBe(false);
   });
 });
 

@@ -5,6 +5,7 @@ import { DAMAGE_TYPES, damageTypeLabel } from "@/lib/damageTypes";
 import {
   ACCUMULATOR_CHIPS,
   accumulateAmount,
+  deriveHpApply,
   projectHp,
   type HpMode,
   type HpSnapshot,
@@ -49,6 +50,104 @@ const MODE_OPTIONS = (Object.keys(HP_MODES) as HpMode[]).map((mode) => ({
   label: HP_MODES[mode].label,
 }));
 
+const CHIP_CLS =
+  "min-w-12 rounded-full border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-base font-semibold transition-colors hover:bg-parchment-200 disabled:opacity-50";
+
+function AmountChips({
+  pending,
+  amount,
+  onBump,
+  onClear,
+}: {
+  pending: boolean;
+  amount: number;
+  onBump: (delta: number) => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap justify-center gap-2">
+      {ACCUMULATOR_CHIPS.map((step) => (
+        <button
+          key={step}
+          type="button"
+          disabled={pending}
+          onClick={() => onBump(step)}
+          aria-label={`Add ${step}`}
+          className={`${CHIP_CLS} text-parchment-800`}
+        >
+          +{step}
+        </button>
+      ))}
+      <button
+        type="button"
+        disabled={pending || amount === 0}
+        onClick={onClear}
+        aria-label="Clear amount"
+        className={`${CHIP_CLS} text-parchment-600`}
+      >
+        Clear
+      </button>
+    </div>
+  );
+}
+
+const STEP_BTN_CLS =
+  "flex h-9 w-9 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50";
+
+function AmountStepper({
+  pending,
+  amount,
+  fieldLabel,
+  onBump,
+  onAmountChange,
+  onEnter,
+}: {
+  pending: boolean;
+  amount: string;
+  fieldLabel: string;
+  onBump: (delta: number) => void;
+  onAmountChange: (raw: string) => void;
+  onEnter: () => void;
+}) {
+  return (
+    <div className="flex justify-center">
+      <div className="inline-flex items-center rounded-control border border-parchment-300 bg-parchment-50">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => onBump(-1)}
+          aria-label="Decrease amount"
+          className={STEP_BTN_CLS}
+        >
+          <Minus aria-hidden="true" className="h-4 w-4" />
+        </button>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          step={1}
+          value={amount}
+          onChange={(e) => onAmountChange(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && onEnter()}
+          placeholder="0"
+          disabled={pending}
+          aria-label={fieldLabel}
+          className="w-16 border-0 bg-transparent text-center text-lg tabular-nums text-parchment-900 disabled:opacity-50"
+        />
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => onBump(1)}
+          aria-label="Increase amount"
+          className={STEP_BTN_CLS}
+        >
+          <Plus aria-hidden="true" className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function HpActionControl({
   pending,
   hitPoints,
@@ -66,12 +165,13 @@ export default function HpActionControl({
   const [damageType, setDamageType] = useState("");
   const [applyResistance, setApplyResistance] = useState(true);
 
-  const numericAmount = parseInt(amount, 10) || 0;
-  // A halve preview shows only when the chosen type is actively resisted (#456).
-  const isResisted = mode === "damage" && damageType !== "" && resistedTypes.includes(damageType);
-  const halved = Math.floor(numericAmount / 2);
-  // Project the damage the backend will actually apply after auto-halving (#456).
-  const effectiveAmount = isResisted && applyResistance ? halved : numericAmount;
+  const { numericAmount, isResisted, halved, effectiveAmount } = deriveHpApply(
+    mode,
+    amount,
+    damageType,
+    resistedTypes,
+    applyResistance,
+  );
 
   const active = HP_MODES[mode];
   const applyDisabled = pending || numericAmount <= 0;
@@ -105,67 +205,21 @@ export default function HpActionControl({
         </p>
       </div>
 
-      {/* Accumulator chips */}
-      <div className="flex flex-wrap justify-center gap-2">
-        {ACCUMULATOR_CHIPS.map((step) => (
-          <button
-            key={step}
-            type="button"
-            disabled={pending}
-            onClick={() => bumpAmount(step)}
-            aria-label={`Add ${step}`}
-            className="min-w-12 rounded-full border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-base font-semibold text-parchment-800 transition-colors hover:bg-parchment-200 disabled:opacity-50"
-          >
-            +{step}
-          </button>
-        ))}
-        <button
-          type="button"
-          disabled={pending || numericAmount === 0}
-          onClick={() => setAmount("")}
-          aria-label="Clear amount"
-          className="min-w-12 rounded-full border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-base font-semibold text-parchment-600 transition-colors hover:bg-parchment-200 disabled:opacity-50"
-        >
-          Clear
-        </button>
-      </div>
+      <AmountChips
+        pending={pending}
+        amount={numericAmount}
+        onBump={bumpAmount}
+        onClear={() => setAmount("")}
+      />
 
-      {/* Secondary stepper + direct entry */}
-      <div className="flex justify-center">
-        <div className="inline-flex items-center rounded-control border border-parchment-300 bg-parchment-50">
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => bumpAmount(-1)}
-            aria-label="Decrease amount"
-            className="flex h-9 w-9 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50"
-          >
-            <Minus aria-hidden="true" className="h-4 w-4" />
-          </button>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            step={1}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !applyDisabled && apply()}
-            placeholder="0"
-            disabled={pending}
-            aria-label={active.fieldLabel}
-            className="w-16 border-0 bg-transparent text-center text-lg tabular-nums text-parchment-900 disabled:opacity-50"
-          />
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => bumpAmount(1)}
-            aria-label="Increase amount"
-            className="flex h-9 w-9 items-center justify-center rounded-control text-parchment-600 transition-colors hover:bg-parchment-100 disabled:opacity-50"
-          >
-            <Plus aria-hidden="true" className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
+      <AmountStepper
+        pending={pending}
+        amount={amount}
+        fieldLabel={active.fieldLabel}
+        onBump={bumpAmount}
+        onAmountChange={setAmount}
+        onEnter={() => !applyDisabled && apply()}
+      />
 
       {/* Damage-type picker (damage mode only, optional) (#456) */}
       {mode === "damage" && (
