@@ -1,6 +1,10 @@
 // The @-tag autocomplete popover: entity matches + an optional create row (#609).
 // Presentation only — insert/create intent is delegated to the parent via
 // onSelect/onCreate; keyboard nav + open/close state live in useMentionEditor.
+// Two presentations (#785): an absolute top-full popover at md+, and an in-flow
+// keyboard-aware scroll list below md so it isn't clipped under the keyboard.
+
+import { useEffect, useRef } from "react";
 
 import Badge from "@/components/ui/Badge";
 import { Plus } from "@/components/ui/icons";
@@ -23,7 +27,16 @@ interface MentionSuggestionListProps {
   onSelect: (entityId: string) => void;
   onCreate: () => void;
   onHover: (index: number) => void;
+  /** Render in document flow (below md) instead of an absolute popover. */
+  inFlow?: boolean;
+  /** Cap for the in-flow scroll list, derived from the keyboard-aware height. */
+  maxHeight?: number;
 }
+
+const IN_FLOW_CLASS =
+  "mt-1 overflow-y-auto rounded-card border border-parchment-200 bg-parchment-50 py-1 shadow-raised";
+const POPOVER_CLASS =
+  "absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-card border border-parchment-200 bg-parchment-50 py-1 shadow-raised";
 
 export default function MentionSuggestionList({
   campaignId,
@@ -39,21 +52,31 @@ export default function MentionSuggestionList({
   onSelect,
   onCreate,
   onHover,
+  inFlow = false,
+  maxHeight,
 }: MentionSuggestionListProps) {
   const { merges } = useCampaignMerges(campaignId);
+  const activeRef = useRef<HTMLLIElement>(null);
+
+  // Keyboard-nav parity: keep the active option in view as the user arrows.
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex]);
 
   return (
     <ul
       id={listboxId}
       role="listbox"
       aria-label="Tag suggestions"
-      className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-card border border-parchment-200 bg-parchment-50 py-1 shadow-raised"
+      className={inFlow ? IN_FLOW_CLASS : POPOVER_CLASS}
+      style={inFlow && maxHeight != null ? { maxHeight } : undefined}
     >
       {matches.map((entity, index) => {
         const survivor = ultimateSurvivorName(merges, byId, entity.id);
         return (
           <li
             key={entity.id}
+            ref={index === activeIndex ? activeRef : undefined}
             id={optionId(index)}
             role="option"
             aria-selected={index === activeIndex}
@@ -78,6 +101,7 @@ export default function MentionSuggestionList({
       })}
       {showCreate && (
         <li
+          ref={activeIndex === matches.length ? activeRef : undefined}
           id={optionId(matches.length)}
           role="option"
           aria-selected={activeIndex === matches.length}

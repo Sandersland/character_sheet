@@ -11,6 +11,11 @@ afterEach(() => cleanup());
 // `expect(await axe(container)).toHaveNoViolations()`. Imported via @/test/axe.
 expect.extend(toHaveNoViolations);
 
+// jsdom lacks scrollIntoView; stub it so keyboard-nav scroll-into-view is a no-op.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}
+
 // Default no-op matchMedia stub (jsdom lacks it); tests can override per-case.
 if (!window.matchMedia) {
   window.matchMedia = (query: string) =>
