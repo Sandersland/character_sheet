@@ -467,11 +467,17 @@ export async function revertBatch(
 // in a single Prisma transaction with a shared batchId, so "drink potion" is
 // atomic and LIFO-undoable. Rolls (e.g. a potion's healing) are client-computed
 // and passed as `op.roll`; the server validates and records but does not re-roll.
+// batchId rides alongside the character (#758) so turn undo can revert this exact
+// batch server-side before restoring the local economy slot.
 export async function applyActionTransactions(
   characterId: string,
   operations: ActionOperation[]
-): Promise<Character> {
-  return postTransactions(characterId, "actions", operations, "Failed to apply action operations");
+): Promise<Character & { batchId?: string }> {
+  return request<Character & { batchId?: string }>(
+    `/characters/${characterId}/actions/transactions`,
+    jsonBody({ operations }),
+    "Failed to apply action operations",
+  );
 }
 
 // ── Campaigns (#246) ──────────────────────────────────────────────────────────

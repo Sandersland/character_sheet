@@ -9,7 +9,7 @@
 
 import { useState } from "react";
 
-import { applyActionTransactions, startCombat, endCombat, advanceCombatRound } from "@/api/client";
+import { applyActionTransactions, revertBatch, startCombat, endCombat, advanceCombatRound } from "@/api/client";
 import { rollSpec } from "@/lib/dice";
 import { planActionClick } from "@/lib/turnActionPlan";
 import {
@@ -55,6 +55,9 @@ export function useTurnActions({
     enterTwfMode,
     consumeReaction,
     grantExtraAction,
+    history,
+    attachBatchId,
+    undo,
   } = turnState;
 
   // Active durable (while-active) self-buffs — drive the turn-hook + End-buff UI.
@@ -125,7 +128,9 @@ export function useTurnActions({
   );
   const superiorityRemaining = superiorityPool?.remaining ?? 0;
 
-  // send() — fires applyActionTransactions then calls onUpdate.
+  // send() — fires applyActionTransactions then calls onUpdate. The returned
+  // batchId is tagged onto the just-pushed history entry so undo can revert this
+  // server effect (#758).
   async function send(actionKey: string, opts?: { roll?: number; inventoryItemId?: string }) {
     setBusy(true);
     setError(null);
@@ -134,8 +139,34 @@ export function useTurnActions({
         { type: "executeAction", actionKey, ...opts },
       ]);
       onUpdate(updated);
+      if (updated.batchId) attachBatchId(updated.batchId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // handleUndo() — undo the last turn mutation. A server-effect entry (Second
+  // Wind, Rage, …) carries a batchId: revert that batch server-side FIRST, then
+  // pop the local slot. A local-only entry (Dodge, attack-mode) just pops. On a
+  // failed revert (e.g. the batch isn't the latest) surface the error and leave
+  // the local slot consumed — never desync the client from the server (#758).
+  async function handleUndo() {
+    const top = history[history.length - 1];
+    if (!top) return;
+    if (!top.batchId) {
+      undo();
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const reverted = await revertBatch(character.id, top.batchId);
+      onUpdate(reverted);
+      undo();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Undo failed.");
     } finally {
       setBusy(false);
     }
@@ -347,6 +378,7 @@ export function useTurnActions({
     actionSurgePool,
     actionSurgeAvailable,
     send,
+    handleUndo,
     handleActionClick,
     handleAttackAction,
     handleTwfAction,

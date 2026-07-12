@@ -54,13 +54,12 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     consumeBonusAction,
     consumeReaction,
     history,
-    undo,
   } = turnState;
 
   const turn = useTurnActions({ character, sessionId, turnState, onUpdate, onLogChanged });
   // Grouped for readability; also keeps this destructure from cloning
   // useTurnActions' flat return block (a benign hook-bag mirror).
-  const { busy, error, reactionMessage, effectMessage, send } = turn;
+  const { busy, error, reactionMessage, effectMessage, send, handleUndo } = turn;
   const {
     showActionMenu, setShowActionMenu, showBonusMenu, setShowBonusMenu,
     showReactionMenu, setShowReactionMenu, activeResolution, closeResolution,
@@ -180,8 +179,9 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           {history.length > 0 && (
             <button
               type="button"
-              onClick={undo}
-              className="rounded-control border border-arcane-300 bg-arcane-50 px-3 py-1.5 text-xs font-semibold text-arcane-700 transition-colors hover:bg-arcane-100"
+              disabled={busy}
+              onClick={handleUndo}
+              className="rounded-control border border-arcane-300 bg-arcane-50 px-3 py-1.5 text-xs font-semibold text-arcane-700 transition-colors hover:bg-arcane-100 disabled:opacity-50"
             >
               <span aria-hidden="true">↩ </span>Undo
             </button>

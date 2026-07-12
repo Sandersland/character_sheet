@@ -75,7 +75,7 @@ export interface TurnState {
    * each consuming mutation and popped by `undo()`. Cleared on every turn/combat
    * boundary so undo never reaches across turns.
    */
-  history: EconomySnapshot[];
+  history: HistoryEntry[];
 }
 
 /**
@@ -94,6 +94,15 @@ export type EconomySnapshot = Pick<
   | "bonusAttack"
   | "spellCastThisTurn"
 >;
+
+/**
+ * An undo-stack entry: the pre-mutation economy snapshot plus, for a server-effect
+ * action (Second Wind, Rage, …), the audit batchId to revert on undo (#758). A
+ * local-only entry (Dodge, Dash, attack-mode) has no batchId.
+ */
+export interface HistoryEntry extends EconomySnapshot {
+  batchId?: string;
+}
 
 export interface TurnStateActions {
   /** Enter combat: sets inCombat=true, round=1, resets turn economy. */
@@ -161,10 +170,17 @@ export interface TurnStateActions {
    */
   commitReactionSpell: () => void;
   /**
+   * Tag the most-recent history entry with the audit batchId of the server effect
+   * a server-effect action just wrote (#758) — so a later `undo()` can revert that
+   * batch server-side. No-op when the history is empty.
+   */
+  attachBatchId: (batchId: string) => void;
+  /**
    * Undo the last consuming economy mutation this turn (#730) — pops the history
    * stack and restores the prior economy snapshot. No-op when the stack is empty.
-   * LOCAL only: it does not reverse server-committed effects (a die spent, HP
-   * healed, a loadout swapped) — those carry an explicit refund at their surface.
+   * LOCAL only: it does not reverse server-committed effects. A server-effect
+   * entry's batch is reverted by the useTurnActions `handleUndo` wrapper (#758)
+   * BEFORE this pop; other server effects (a loadout swap) refund at their surface.
    */
   undo: () => void;
 }
@@ -450,13 +466,28 @@ export function useTurnState(character: Character, sessionId: string): TurnState
   // the guarded mutation.
   const commitReactionSpell = consumeReaction;
 
+  // Tag the top history entry with the server batchId (#758). The click that
+  // consumed the slot pushed the entry synchronously, so the top entry is this
+  // action's; `busy` gates a concurrent second consuming click while send is in flight.
+  const attachBatchId = useCallback((batchId: string) => {
+    setState((s) => {
+      if (s.history.length === 0) return s;
+      const history = s.history.slice();
+      history[history.length - 1] = { ...history[history.length - 1], batchId };
+      return { ...s, history };
+    });
+  }, []);
+
   const undo = useCallback(() => {
     setState((s) => {
       const prev = s.history[s.history.length - 1];
       if (!prev) return s;
       // Restore the prior economy snapshot; leave lifecycle + the activity flags
       // (attackedThisTurn/tookDamageThisTurn) as they are (see EconomySnapshot).
-      return { ...s, ...prev, history: s.history.slice(0, -1) };
+      // Drop batchId so it never leaks onto the live state (#758).
+      const economy = { ...prev };
+      delete economy.batchId;
+      return { ...s, ...economy, history: s.history.slice(0, -1) };
     });
   }, []);
 
@@ -482,6 +513,7 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     commitActionSpell,
     commitBonusActionSpell,
     commitReactionSpell,
+    attachBatchId,
     undo,
   };
 }

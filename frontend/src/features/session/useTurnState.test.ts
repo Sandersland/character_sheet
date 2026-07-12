@@ -519,6 +519,24 @@ describe("turn-scoped undo", () => {
     expect(result.current.history).toHaveLength(0);
   });
 
+  it("attachBatchId tags the top history entry; undo strips it back off (#758)", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.consumeBonusAction(); });
+    act(() => { result.current.attachBatchId("batch-1"); });
+    expect(result.current.history[0].batchId).toBe("batch-1");
+
+    act(() => { result.current.undo(); });
+    // Slot restored and no stray batchId leaked onto the live state.
+    expect(result.current.bonusActionUsed).toBe(false);
+    expect((result.current as unknown as { batchId?: string }).batchId).toBeUndefined();
+  });
+
+  it("attachBatchId is a no-op against an empty history (#758)", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.attachBatchId("batch-1"); });
+    expect(result.current.history).toHaveLength(0);
+  });
+
   it("undo does NOT revert tookDamageThisTurn (leaves the HP-watcher flag alone)", () => {
     const { result, rerender } = renderHook((c: Character) => useTurnState(c, SESSION_ID), {
       initialProps: withHp(20),

@@ -9,6 +9,7 @@ import {
   applyActionTransactions,
   applyResourceTransactions,
   castManeuverTransaction,
+  revertBatch,
   startCombat,
   endCombat,
   advanceCombatRound,
@@ -22,6 +23,7 @@ vi.mock("@/api/client", () => ({
   applyActionTransactions: vi.fn(),
   applyResourceTransactions: vi.fn(),
   castManeuverTransaction: vi.fn(),
+  revertBatch: vi.fn(),
   startCombat: vi.fn(),
   endCombat: vi.fn(),
   advanceCombatRound: vi.fn(),
@@ -120,6 +122,7 @@ beforeEach(() => {
     results: [{ roll: 5, saveDc: null, summary: "used maneuver" }],
   });
   vi.mocked(applyInventoryTransactions).mockResolvedValue(updated);
+  vi.mocked(revertBatch).mockResolvedValue(updated);
   vi.mocked(startCombat).mockResolvedValue(undefined);
   vi.mocked(endCombat).mockResolvedValue(undefined);
   vi.mocked(advanceCombatRound).mockResolvedValue(undefined);
@@ -243,6 +246,71 @@ describe("TurnHub — action economy", () => {
         { type: "executeAction", actionKey: "layOnHands", roll: expect.any(Number) },
       ]),
     );
+  });
+});
+
+describe("TurnHub — server-effect undo (#758)", () => {
+  it("Undo of Second Wind reverts the batch server-side, then restores the slot", async () => {
+    const user = userEvent.setup();
+    vi.mocked(applyActionTransactions).mockResolvedValue({
+      ...makeCharacter(),
+      batchId: "batch-sw",
+    });
+    renderHub();
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Bonus" }));
+    await user.click(screen.getByRole("button", { name: "Second Wind" }));
+
+    await waitFor(() =>
+      expect(applyActionTransactions).toHaveBeenCalledWith("char-1", [
+        { type: "executeAction", actionKey: "secondWind", roll: expect.any(Number) },
+      ]),
+    );
+
+    await user.click(await screen.findByRole("button", { name: /Undo/ }));
+
+    // Reverts THIS batch server-side, then the bonus slot is available again.
+    await waitFor(() => expect(revertBatch).toHaveBeenCalledWith("char-1", "batch-sw"));
+    expect(await screen.findByRole("button", { name: "Use Bonus" })).toBeInTheDocument();
+  });
+
+  it("Undo of a local-only action (Dodge) makes no server revert (regression pin)", async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: /Use Action/ }));
+    await user.click(screen.getByRole("button", { name: "Dodge" }));
+    await user.click(screen.getByRole("button", { name: /Undo/ }));
+
+    expect(revertBatch).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Use Action" })).toBeInTheDocument();
+  });
+
+  it("a failed revert keeps the slot consumed and surfaces the error (no desync)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(applyActionTransactions).mockResolvedValue({
+      ...makeCharacter(),
+      batchId: "batch-sw",
+    });
+    vi.mocked(revertBatch).mockRejectedValue(
+      new Error("Only the most recent action can be undone."),
+    );
+    renderHub();
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Bonus" }));
+    await user.click(screen.getByRole("button", { name: "Second Wind" }));
+    await waitFor(() => expect(applyActionTransactions).toHaveBeenCalled());
+
+    await user.click(await screen.findByRole("button", { name: /Undo/ }));
+
+    expect(
+      (await screen.findAllByText(/Only the most recent action can be undone\./)).length,
+    ).toBeGreaterThan(0);
+    // Slot stays consumed — no local restore on a failed revert.
+    expect(screen.queryByRole("button", { name: "Use Bonus" })).not.toBeInTheDocument();
   });
 });
 
