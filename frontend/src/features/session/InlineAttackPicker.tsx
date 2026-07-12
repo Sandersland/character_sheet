@@ -15,6 +15,7 @@ import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { useRollLogger } from "@/features/session/useRollLogger";
 import { useAttackRolls } from "@/features/session/useAttackRolls";
 import AttackFormCard from "@/features/session/AttackFormCard";
+import AttackTallyStrip from "@/features/session/AttackTallyStrip";
 import AttackOptionSection from "@/features/session/AttackOptionSection";
 import AttackSheetFooter from "@/features/session/AttackSheetFooter";
 import WeaponDamageCard from "@/features/session/WeaponDamageCard";
@@ -85,6 +86,8 @@ export default function InlineAttackPicker({
   const showManeuvers = hasSuperiorityDice(character);
   const attacksExhausted = computeAttacksExhausted(turnState.attack);
   const preRoll = turnState.attack !== null && turnState.attack.used === 0;
+  const attacksRemain =
+    turnState.attack !== null && turnState.attack.used > 0 && turnState.attack.used < turnState.attack.total;
 
   // Roll to hit with the selected form and bind the Damage card to it.
   function handleRollToHit() {
@@ -105,6 +108,8 @@ export default function InlineAttackPicker({
           No weapon equipped — use Change on the turn screen.
         </p>
       )}
+
+      <AttackTallyStrip rows={turnState.attackTally} onCycleVerdict={turnState.cycleTallyVerdict} />
 
       <AttackFormCard
         forms={forms}
@@ -143,7 +148,12 @@ export default function InlineAttackPicker({
         onLogChanged={onLogChanged}
       />
 
-      <AttackSheetFooter preRoll={preRoll} onCancel={onCancel} onClose={onClose} />
+      <AttackSheetFooter
+        preRoll={preRoll}
+        attacksRemain={attacksRemain}
+        onCancel={onCancel}
+        onClose={onClose}
+      />
     </div>
   );
 }

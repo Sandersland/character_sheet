@@ -17,6 +17,7 @@ export default function ActionSlot({
   sheetModel,
   busy,
   handleAttackAction,
+  handleResumeAttack,
   handleActionClick,
 }: {
   actionsRemaining: number;
@@ -27,6 +28,7 @@ export default function ActionSlot({
   sheetModel: ActionSheetModel;
   busy: boolean;
   handleAttackAction: () => void;
+  handleResumeAttack: () => void;
   handleActionClick: (key: string, cost: "action" | "bonusAction" | "reaction") => void;
 }) {
   const universalActions = UNIVERSAL_ACTIONS.filter(
@@ -36,6 +38,9 @@ export default function ActionSlot({
     .slice(0, 4)
     .join(" · ");
   const available = actionsRemaining > 0;
+  // An Attack action closed with attacks still to spend (#802) — offer Resume
+  // without touching the action economy.
+  const resuming = attack !== null && attack.used > 0 && attack.used < attack.total;
 
   return (
     <>
@@ -44,13 +49,22 @@ export default function ActionSlot({
         title="Action"
         preview={preview}
         tone="garnet"
-        used={!available && attack === null}
+        used={!available && !resuming && attack === null}
         badge={actionsRemaining > 1 ? `×${actionsRemaining}` : undefined}
         onUse={available ? () => setShowActionMenu(true) : undefined}
         useLabel="Use Action"
       >
         {attack !== null && (
           <AttackCounter total={attack.total} used={attack.used} label="Attacks" />
+        )}
+        {resuming && (
+          <button
+            type="button"
+            onClick={handleResumeAttack}
+            className="mt-2 w-full rounded-control border border-garnet-300 bg-garnet-600 px-3 py-1.5 text-xs font-semibold text-parchment-50 transition-colors hover:bg-garnet-700"
+          >
+            Resume attack — {attack.total - attack.used} of {attack.total} remaining
+          </button>
         )}
       </TurnSlotCard>
 

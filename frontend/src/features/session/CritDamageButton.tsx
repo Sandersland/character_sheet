@@ -10,6 +10,8 @@ interface CritDamageButtonProps {
   manualCrit: boolean;
   /** Nat-1 to-hit — dims the button unless a crit overrides it. */
   miss: boolean;
+  /** Damage already rolled for this row → relabel to "Re-roll damage (N)" (#802). */
+  filledTotal?: number | null;
   onDamage: () => void;
   onToggleCrit: () => void;
 }
@@ -39,10 +41,13 @@ export default function CritDamageButton({
   isCrit,
   manualCrit,
   miss,
+  filledTotal,
   onDamage,
   onToggleCrit,
 }: CritDamageButtonProps) {
   const s = SIZE_STYLE[size];
+  const label =
+    filledTotal != null ? `Re-roll damage (${filledTotal})` : isCrit ? s.crit : s.damage;
   return (
     <div className={s.wrap}>
       <button
@@ -52,7 +57,7 @@ export default function CritDamageButton({
           isCrit ? CRIT_STYLE : s.idle
         } ${miss && !isCrit ? "opacity-50" : ""}`}
       >
-        {isCrit ? s.crit : s.damage}
+        {label}
       </button>
       <label className="flex items-center gap-1 text-[11px] text-parchment-500">
         <input

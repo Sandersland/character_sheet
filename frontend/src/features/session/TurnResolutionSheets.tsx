@@ -65,23 +65,26 @@ export default function TurnResolutionSheets({
   const kind = activeResolution?.resolver.kind;
 
   if (kind === "attack-picker") {
+    // Attacks all spent → finalize; attacks remain → leave the action LIVE so the
+    // Action slot can offer Resume (#802). cancelAttack still refunds pre-first-roll.
+    const attack = turnState.attack;
+    const exhausted = attack !== null && attack.used >= attack.total;
+    const closeAttackSheet = () => {
+      if (exhausted) turnState.finishAttack();
+      else turnState.cancelAttack();
+      closeResolution();
+    };
     return (
       <BottomSheet
         title="Attack"
         subtitle={attackKicker(turnState.attack)}
-        onClose={() => {
-          turnState.cancelAttack();
-          closeResolution();
-        }}
+        onClose={closeAttackSheet}
       >
         <InlineAttackPicker
           character={character}
           turnState={turnState}
           sessionId={sessionId}
-          onClose={() => {
-            turnState.finishAttack();
-            closeResolution();
-          }}
+          onClose={closeAttackSheet}
           onCancel={() => {
             turnState.cancelAttack();
             closeResolution();

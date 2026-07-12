@@ -23,6 +23,7 @@ import LoadoutSwapRow from "@/features/session/LoadoutSwapRow";
 import InitiativeRail from "@/features/session/InitiativeRail";
 import TurnConcentrationBanner from "@/features/session/TurnConcentrationBanner";
 import TurnDeathSaves from "@/features/session/TurnDeathSaves";
+import TurnDmBanner from "@/features/session/TurnDmBanner";
 import TurnResolutionSheets from "@/features/session/TurnResolutionSheets";
 import { showInitiative, showMovement } from "@/features/session/turnFlags";
 import type { AllyOption } from "@/lib/spellMeta";
@@ -50,6 +51,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     reactionUsed,
     attack,
     bonusAttack,
+    attackTally,
     twfAvailable,
     consumeBonusAction,
     consumeReaction,
@@ -71,7 +73,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     actionSheetModel, bonusSheetModel, reactionSheetModel,
   } = turn;
   const {
-    handleActionClick, handleAttackAction, handleTwfAction, handleActionSurge,
+    handleActionClick, handleAttackAction, handleResumeAttack, handleTwfAction, handleActionSurge,
     handleStartCombat, handleEndCombat, handleStartTurn, handleEndTurn,
     handleReactionManeuver, handleEffectManeuver, handleBonusSpellCast,
   } = turn;
@@ -226,6 +228,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           sheetModel={actionSheetModel}
           busy={busy}
           handleAttackAction={handleAttackAction}
+          handleResumeAttack={handleResumeAttack}
           handleActionClick={handleActionClick}
         />
 
@@ -263,6 +266,9 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           handleReactionManeuver={handleReactionManeuver}
           consumeReaction={consumeReaction}
         />
+
+        {/* ── "Tell your DM" banner — attack tally once the sheet is closed ── */}
+        {!activeResolution && <TurnDmBanner rows={attackTally} />}
 
         {/* ── Action Surge (Fighter) ─────────────────────────────────────── */}
         {actionSurgeAvailable && (
