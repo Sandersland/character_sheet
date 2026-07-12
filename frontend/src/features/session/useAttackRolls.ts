@@ -6,9 +6,10 @@
 import { useState } from "react";
 
 import { critDamageSpec } from "@/lib/attackMath";
-import { isNaturalTwenty } from "@/lib/dice";
+import { isNaturalOne, isNaturalTwenty, keptD20 } from "@/lib/dice";
 import type { useRoll } from "@/features/dice/RollContext";
 import type { useRollLogger } from "@/features/session/useRollLogger";
+import type { RecordedAttack } from "@/features/session/useTurnState";
 import type { AttackEntry, DamageRider } from "@/lib/attackMath";
 import type { RollResult } from "@/lib/dice";
 
@@ -35,10 +36,14 @@ export function useAttackRolls({
   roll,
   logRollSafe,
   recordAttack,
+  setTallyDamage,
+  addTallyDamageRider,
 }: {
   roll: ReturnType<typeof useRoll>["roll"];
   logRollSafe: ReturnType<typeof useRollLogger>;
-  recordAttack: () => void;
+  recordAttack: (recorded: RecordedAttack) => void;
+  setTallyDamage: (damage: number) => void;
+  addTallyDamageRider: (amount: number) => void;
 }) {
   // Per-row last roll results (keyed by weapon item.id, "unarmed", or "improvised").
   const [lastAttackRolls, setLastAttackRolls] = useState<Record<string, RollResult | null>>({});
@@ -63,22 +68,34 @@ export function useAttackRolls({
     setManualCrit((prev) => ({ ...prev, [rowId]: !prev[rowId] }));
   }
 
-  // Roll an attack for a row: log it, retain the result, clear any override, spend one attack.
+  // Roll an attack for a row: log it, retain the result, clear any override, spend
+  // one attack, and append the tally row for this action (#802).
   function handleAttack(entry: AttackEntry) {
     const result = roll(entry.attackSpec, entry.attackRollLabel);
     logRollSafe("attack", entry.logSource, result, entry.attackSpec);
     setLastAttackRolls((prev) => ({ ...prev, [entry.id]: result }));
     setAttackTotals((prev) => ({ ...prev, [entry.id]: null }));
-    recordAttack();
+    recordAttack({
+      formId: entry.id,
+      formName: entry.name,
+      attack: {
+        total: result.total,
+        keptFace: keptD20(result)?.value ?? null,
+        nat20: isNaturalTwenty(result),
+        nat1: isNaturalOne(result),
+      },
+    });
   }
 
-  // Roll damage for a row: auto-doubles the dice when the row is a crit (nat 20 or manual).
+  // Roll damage for a row: auto-doubles the dice when the row is a crit (nat 20 or
+  // manual). Writes/replaces the current tally row's damage slot (never appends).
   function handleDamage(entry: AttackEntry) {
     const spec = isRowCrit(entry.id) ? critDamageSpec(entry.damageSpec) : entry.damageSpec;
     const result = roll(spec, entry.damageRollLabel);
     logRollSafe("damage", entry.logSource, result, spec, entry.damageType);
     setLastDamageRolls((prev) => ({ ...prev, [entry.id]: result }));
     setDamageTotals((prev) => ({ ...prev, [entry.id]: null }));
+    setTallyDamage(result.total);
   }
 
   // Roll one on-hit dice rider (e.g. Flame Tongue +2d6 fire) as its own typed term.
@@ -91,6 +108,7 @@ export function useAttackRolls({
     const result = roll(spec, rider.rollLabel);
     logRollSafe("damage", rider.logSource, result, spec, rider.damageType);
     setRiderTotals((prev) => ({ ...prev, [rider.id]: result.total }));
+    addTallyDamageRider(result.total);
   }
 
   // Callback for ManeuverPrompt — stores auto-sum overrides per row.
@@ -101,6 +119,7 @@ export function useAttackRolls({
       }
       if (newDmg !== null) {
         setDamageTotals((prev) => ({ ...prev, [rowId]: newDmg }));
+        setTallyDamage(newDmg); // keep the tally slot in sync with a maneuver sum
       }
     };
   }

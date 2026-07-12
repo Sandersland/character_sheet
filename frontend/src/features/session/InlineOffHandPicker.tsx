@@ -43,10 +43,14 @@ export default function InlineOffHandPicker({
 }: InlineOffHandPickerProps) {
   const { roll } = useRoll();
   const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
+  // The off-hand swing is a bonus action, not part of the Attack-action tally —
+  // record via recordTwfAttack and no-op the tally writers so it never lands in it.
   const { riderTotals, viewFor } = useAttackRolls({
     roll,
     logRollSafe,
-    recordAttack: turnState.recordTwfAttack,
+    recordAttack: () => turnState.recordTwfAttack(),
+    setTallyDamage: () => {},
+    addTallyDamageRider: () => {},
   });
 
   const entry = buildOffHandEntry(character);

@@ -25,8 +25,19 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { canTwoWeaponFight } from "@/lib/turnRules";
+import { autoVerdict } from "@/lib/attackTallySummary";
 import { loadTurnState, saveTurnState } from "@/features/session/turnStatePersistence";
+import type { AttackTallyRow, TallyAttackRoll, TallyVerdict } from "@/lib/attackTallySummary";
 import type { Character } from "@/types/character";
+
+export type { AttackTallyRow, TallyAttackRoll } from "@/lib/attackTallySummary";
+
+/** Payload recordAttack appends to the tally: the form plus its kept-d20 snapshot. */
+export interface RecordedAttack {
+  formId: string;
+  formName: string;
+  attack: TallyAttackRoll;
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -59,6 +70,12 @@ export interface TurnState {
   attack: AttackState | null;
   /** Non-null while the bonus action is an off-hand TWF attack. */
   bonusAttack: AttackState | null;
+  /**
+   * Per-attack tally for the CURRENT Attack action (#802). One row per rolled
+   * attack; survives sheet close/reopen (Resume). Cleared by endTurn and on
+   * entering a NEW Attack action. Snapshotted for undo alongside the economy.
+   */
+  attackTally: AttackTallyRow[];
   /**
    * Tracks what was cast from each slot this turn (set when InlineSpellPicker
    * commits a cast). Used to enforce the 5e bonus-action spell restriction:
@@ -93,6 +110,7 @@ export type EconomySnapshot = Pick<
   | "attack"
   | "bonusAttack"
   | "spellCastThisTurn"
+  | "attackTally"
 >;
 
 /**
@@ -120,8 +138,19 @@ export interface TurnStateActions {
   consumeAction: () => void;
   /** Enter Attack mode: consume one action and open the Extra Attack counter. */
   enterAttackMode: () => void;
-  /** Record one attack roll during Attack mode (auto-decrements counter). */
-  recordAttack: () => void;
+  /**
+   * Record one attack roll during Attack mode (auto-increments counter). When a
+   * `RecordedAttack` payload is passed, a tally row is appended (#802).
+   */
+  recordAttack: (recorded?: RecordedAttack) => void;
+  /** Write/replace the damage slot on the most-recent tally row (#802). */
+  setTallyDamage: (damage: number) => void;
+  /** Fold an on-hit rider's total into the most-recent tally row's damage slot. */
+  addTallyDamageRider: (amount: number) => void;
+  /** Tap-cycle a manual row's verdict unset→Hit→Miss (auto rows are locked). */
+  cycleTallyVerdict: (index: number) => void;
+  /** Clear the attack tally (DM banner dismiss / new action). */
+  clearAttackTally: () => void;
   /**
    * Cancel the Attack action if no attacks have been rolled yet — refunds the
    * action so the player can choose a different action.
@@ -209,6 +238,7 @@ function initialState(): TurnState {
     reactionUsed: false,
     attack: null,
     bonusAttack: null,
+    attackTally: [],
     spellCastThisTurn: {},
     attackedThisTurn: false,
     tookDamageThisTurn: false,
@@ -225,6 +255,22 @@ function economyOf(s: TurnState): EconomySnapshot {
     attack: s.attack,
     bonusAttack: s.bonusAttack,
     spellCastThisTurn: s.spellCastThisTurn,
+    attackTally: s.attackTally,
+  };
+}
+
+/**
+ * Backfill a hydrated snapshot to the current schema (#750 reconciler pattern):
+ * merge over defaults for a missing top-level field, and backfill `attackTally`
+ * into every undo entry so a pre-#802 snapshot's `undo()` doesn't restore
+ * `undefined` over the tally.
+ */
+function hydrateTurnState(loaded: TurnState): TurnState {
+  const base = { ...initialState(), ...loaded };
+  return {
+    ...base,
+    attackTally: base.attackTally ?? [],
+    history: (base.history ?? []).map((h) => ({ ...h, attackTally: h.attackTally ?? [] })),
   };
 }
 
@@ -237,26 +283,87 @@ const consumeActionState = (s: TurnState): TurnState =>
 
 function enterAttackModeState(s: TurnState, attacksPerAction: number): TurnState {
   if (s.actionsRemaining <= 0) return s;
+  // A NEW Attack action clears the previous action's tally (#802).
   return {
     ...s,
     actionsRemaining: s.actionsRemaining - 1,
     attack: { total: attacksPerAction, used: 0 },
+    attackTally: [],
   };
 }
 
-function recordAttackState(s: TurnState): TurnState {
+function recordAttackState(s: TurnState, recorded?: RecordedAttack): TurnState {
   if (!s.attack) return s;
   // Clamp at total — keep attack non-null so the picker stays open for damage rolls.
   // The picker is closed explicitly by the player via the "Done" button.
+  const atCap = s.attack.used >= s.attack.total;
   const used = Math.min(s.attack.used + 1, s.attack.total);
-  return { ...s, attack: { ...s.attack, used }, attackedThisTurn: true };
+  // Append a tally row only for a genuinely new attack (not a clamped over-click).
+  const attackTally =
+    !atCap && recorded
+      ? [...s.attackTally, tallyRowFor(recorded)]
+      : s.attackTally;
+  return { ...s, attack: { ...s.attack, used }, attackedThisTurn: true, attackTally };
 }
+
+function tallyRowFor(recorded: RecordedAttack): AttackTallyRow {
+  const verdict = autoVerdict(recorded.attack);
+  return {
+    formId: recorded.formId,
+    formName: recorded.formName,
+    attack: recorded.attack,
+    ...(verdict ? { verdict } : {}),
+  };
+}
+
+// Write/replace the damage slot on the most-recent tally row — never appends, so
+// re-rolling attack N's damage replaces N's number rather than double-counting (#802).
+function setTallyDamageState(s: TurnState, damage: number): TurnState {
+  if (s.attackTally.length === 0) return s;
+  const attackTally = s.attackTally.slice();
+  const i = attackTally.length - 1;
+  attackTally[i] = { ...attackTally[i], damage };
+  return { ...s, attackTally };
+}
+
+// Fold a rider total into the current row's damage slot (breakdown add).
+function addTallyDamageRiderState(s: TurnState, amount: number): TurnState {
+  if (s.attackTally.length === 0) return s;
+  const attackTally = s.attackTally.slice();
+  const i = attackTally.length - 1;
+  attackTally[i] = { ...attackTally[i], damage: (attackTally[i].damage ?? 0) + amount };
+  return { ...s, attackTally };
+}
+
+// Cycle a manual row's verdict unset→Hit→Miss→unset. Auto (nat 20 / nat 1) rows
+// are locked and never cycle.
+const VERDICT_CYCLE: Record<"none" | TallyVerdict, TallyVerdict | undefined> = {
+  none: "hit",
+  hit: "miss",
+  miss: undefined,
+  crit: undefined,
+};
+
+function cycleTallyVerdictState(s: TurnState, index: number): TurnState {
+  const row = s.attackTally[index];
+  if (!row || row.attack.nat20 || row.attack.nat1) return s;
+  const next = VERDICT_CYCLE[row.verdict ?? "none"];
+  const attackTally = s.attackTally.slice();
+  const updated = { ...row };
+  if (next === undefined) delete updated.verdict;
+  else updated.verdict = next;
+  attackTally[index] = updated;
+  return { ...s, attackTally };
+}
+
+const clearAttackTallyState = (s: TurnState): TurnState =>
+  s.attackTally.length === 0 ? s : { ...s, attackTally: [] };
 
 function cancelAttackState(s: TurnState): TurnState {
   // Only refund if no attacks have been rolled yet — once rolled, the action
   // is committed per 5e rules.
   if (!s.attack || s.attack.used > 0) return s;
-  return { ...s, actionsRemaining: s.actionsRemaining + 1, attack: null };
+  return { ...s, actionsRemaining: s.actionsRemaining + 1, attack: null, attackTally: [] };
 }
 
 // Clear the attack counter (action stays spent). No-op when attack is null
@@ -316,6 +423,7 @@ function endTurnState(s: TurnState): TurnState {
     bonusActionUsed: false,
     attack: null,
     bonusAttack: null,
+    attackTally: [],
     spellCastThisTurn: {},
     round: s.round + 1,
     attackedThisTurn: false,
@@ -333,7 +441,7 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     // Lazily hydrate; merge over defaults so a stale-schema snapshot missing a
     // newer field (e.g. history, pre-#730) backfills its current default (#750).
     const loaded = loadTurnState(sessionId);
-    return loaded ? { ...initialState(), ...loaded } : initialState();
+    return loaded ? hydrateTurnState(loaded) : initialState();
   });
 
   // Derived (not persisted): TWF eligibility follows the LIVE loadout, so a
@@ -374,6 +482,7 @@ export function useTurnState(character: Character, sessionId: string): TurnState
       reactionUsed: false,
       attack: null,
       bonusAttack: null,
+      attackTally: [],
       spellCastThisTurn: {},
       attackedThisTurn: false,
       tookDamageThisTurn: false,
@@ -399,6 +508,7 @@ export function useTurnState(character: Character, sessionId: string): TurnState
       reactionUsed: false, // reaction resets at start of YOUR turn
       attack: null,
       bonusAttack: null,
+      attackTally: [],
       spellCastThisTurn: {},
       history: [], // undo never reaches across turns
     }));
@@ -427,9 +537,28 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     mutate((s) => enterAttackModeState(s, attacksPerAction));
   }, [attacksPerAction, mutate]);
 
-  const recordAttack = useCallback(() => {
-    mutate(recordAttackState);
+  const recordAttack = useCallback((recorded?: RecordedAttack) => {
+    mutate((s) => recordAttackState(s, recorded));
   }, [mutate]);
+
+  // Damage/verdict refinements are NOT undoable on their own — undoing the parent
+  // recordAttack drops the whole row (tally is in the economy snapshot), so these
+  // write directly rather than through `mutate`.
+  const setTallyDamage = useCallback((damage: number) => {
+    setState((s) => setTallyDamageState(s, damage));
+  }, []);
+
+  const addTallyDamageRider = useCallback((amount: number) => {
+    setState((s) => addTallyDamageRiderState(s, amount));
+  }, []);
+
+  const cycleTallyVerdict = useCallback((index: number) => {
+    setState((s) => cycleTallyVerdictState(s, index));
+  }, []);
+
+  const clearAttackTally = useCallback(() => {
+    setState(clearAttackTallyState);
+  }, []);
 
   const cancelAttack = useCallback(() => {
     mutate(cancelAttackState);
@@ -518,6 +647,10 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     consumeAction,
     enterAttackMode,
     recordAttack,
+    setTallyDamage,
+    addTallyDamageRider,
+    cycleTallyVerdict,
+    clearAttackTally,
     cancelAttack,
     finishAttack,
     consumeBonusAction,

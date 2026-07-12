@@ -205,6 +205,13 @@ export function useTurnActions({
     setShowActionMenu(false);
   }
 
+  // Resume a live Attack action left with unspent attacks (#802) — reopen the
+  // sheet WITHOUT spending another action (no enterAttackMode).
+  function handleResumeAttack() {
+    openResolution("attack");
+    setShowActionMenu(false);
+  }
+
   // Special path for TWF off-hand — enterTwfMode opens the bonusAttack counter
   // and the twf-picker resolution sheet renders the off-hand roll surface (#732).
   function handleTwfAction() {
@@ -381,6 +388,7 @@ export function useTurnActions({
     handleUndo,
     handleActionClick,
     handleAttackAction,
+    handleResumeAttack,
     handleTwfAction,
     handleBonusSpellCast,
     handleActionSurge,

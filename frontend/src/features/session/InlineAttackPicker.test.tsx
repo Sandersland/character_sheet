@@ -26,7 +26,11 @@ const turnState = {
   attack: { total: 1, used: 0 },
   bonusActionUsed: false,
   reactionUsed: false,
+  attackTally: [],
   recordAttack: vi.fn(),
+  setTallyDamage: vi.fn(),
+  addTallyDamageRider: vi.fn(),
+  cycleTallyVerdict: vi.fn(),
   consumeBonusAction: vi.fn(),
   consumeReaction: vi.fn(),
 } as unknown as TurnState & TurnStateActions;

@@ -69,6 +69,7 @@ const ROSTER: Persona[] = [
     background: "Soldier",
     className: "Fighter",
     experiencePoints: LEVEL_5_XP,
+    classLevel: 5, // apply the HP level-ups → Fighter L5 → Extra Attack (2 attacks)
     subclassName: "Battle Master",
     maneuverName: "Evasive Footwork",
     campaignName: "E2E Solo — Battle Master",

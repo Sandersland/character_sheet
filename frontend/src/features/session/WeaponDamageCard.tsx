@@ -80,6 +80,7 @@ export default function WeaponDamageCard({
           isCrit={isCrit}
           manualCrit={manualCrit}
           miss={miss}
+          filledTotal={lastDamageRoll ? damageTotal ?? lastDamageRoll.total : undefined}
           onDamage={view.onDamage}
           onToggleCrit={view.onToggleCrit}
         />

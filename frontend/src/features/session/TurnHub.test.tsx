@@ -637,7 +637,7 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     expect(sheet().getByRole("button", { name: /Roll (crit )?damage/ })).not.toBeDisabled();
   });
 
-  it("switches the footer from Cancel to Done after the first roll", async () => {
+  it("footer: Cancel → Close (attacks remain) → Done (all spent) (#802)", async () => {
     const user = userEvent.setup();
     renderHub(extraAttackFighter());
     await openAttackPicker(user);
@@ -646,9 +646,50 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     expect(sheet().getByRole("button", { name: /Cancel — refund action/ })).toBeInTheDocument();
 
     await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
-
-    expect(sheet().getByRole("button", { name: /^Done$/ })).toBeInTheDocument();
+    // One of two spent — the action stays live for Resume, so the footer reads Close.
+    const closeButtons = sheet().getAllByRole("button", { name: /^Close$/ });
+    expect(closeButtons.length).toBeGreaterThan(0);
     expect(sheet().queryByRole("button", { name: /Cancel — refund action/ })).not.toBeInTheDocument();
+
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+    // Both spent — now Done.
+    expect(sheet().getByRole("button", { name: /^Done$/ })).toBeInTheDocument();
+  });
+
+  it("Resume: closing with an attack unspent keeps the action live + shows Resume (#802)", async () => {
+    const user = userEvent.setup();
+    renderHub(extraAttackFighter());
+    await openAttackPicker(user);
+    const sheet = () => within(screen.getByRole("dialog"));
+
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ })); // 1 of 2
+    const closeBtns = sheet().getAllByRole("button", { name: /^Close$/ });
+    await user.click(closeBtns[closeBtns.length - 1]); // footer Close
+
+    // Sheet closed; the Action slot offers Resume for the remaining attack.
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const resume = screen.getByRole("button", { name: /Resume attack — 1 of 2 remaining/ });
+    expect(resume).toBeInTheDocument();
+
+    // Reopening shows the tally with attack 1 intact.
+    await user.click(resume);
+    expect(within(screen.getByRole("dialog")).getByText("This action")).toBeInTheDocument();
+  });
+
+  it("DM banner: appears with tally lines once the sheet is closed, dismissible (#802)", async () => {
+    const user = userEvent.setup();
+    renderHub(extraAttackFighter());
+    await openAttackPicker(user);
+    const sheet = () => within(screen.getByRole("dialog"));
+
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+    await user.click(sheet().getByRole("button", { name: /Roll (crit )?damage/ }));
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+    await user.click(sheet().getByRole("button", { name: /^Done$/ }));
+
+    expect(screen.getByText("Tell your DM")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Dismiss/ }));
+    expect(screen.queryByText("Tell your DM")).not.toBeInTheDocument();
   });
 });
 
