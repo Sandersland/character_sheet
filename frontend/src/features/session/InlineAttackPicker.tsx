@@ -203,6 +203,7 @@ export default function InlineAttackPicker({
 
       {activeEntry && (
         <WeaponDamageCard
+          key={activeEntry.id}
           entry={activeEntry}
           showManeuvers={showManeuvers}
           character={character}

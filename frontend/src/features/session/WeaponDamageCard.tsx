@@ -51,7 +51,7 @@ export default function WeaponDamageCard({
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-parchment-900">Damage</span>
           <span className="block truncate text-xs text-parchment-600">
-            Roll after you land the hit · {entry.damageLabel}
+            Roll damage for your hit · {entry.damageLabel}
           </span>
         </span>
         <div className="flex shrink-0 items-center gap-2">

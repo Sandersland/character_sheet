@@ -1,16 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import InlineAttackPicker from "@/features/session/InlineAttackPicker";
 import { RollProvider } from "@/features/dice/RollContext";
-import { logRoll } from "@/api/client";
+import { logRoll, castManeuverTransaction } from "@/api/client";
 import type { Character } from "@/types/character";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 
 vi.mock("@/api/client", () => ({
   applyInventoryTransactions: vi.fn(),
   applySpellcastingTransactions: vi.fn(),
+  castManeuverTransaction: vi.fn(),
   logRoll: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -296,6 +297,66 @@ describe("InlineAttackPicker — critical damage button", () => {
       .find((entry) => entry.damageType === "fire");
     expect(riderCall!.specLabel).toBe("2d6");
     expect(riderCall!.faces).toHaveLength(2);
+  });
+});
+
+describe("InlineAttackPicker — shared Damage card copy", () => {
+  it("labels the Damage card with ungated wording (not 'land the hit')", () => {
+    renderPicker(
+      makeCharacter({ inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"] }),
+    );
+    expect(screen.queryByText(/land the hit/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Roll damage for your hit/)).toBeInTheDocument();
+  });
+});
+
+describe("InlineAttackPicker — Damage card maneuver state resets on weapon switch (#756)", () => {
+  const SERVER_ROLL = 5;
+
+  function battleMaster(): Character {
+    return makeCharacter({
+      inventory: [
+        equippedWeapon("Longsword", "inv-1", {
+          weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "slashing", attackBonus: 5 },
+        }),
+        equippedWeapon("Dagger", "inv-2", {
+          weapon: { damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 0, damageType: "piercing", attackBonus: 5 },
+        }),
+      ] as unknown as Character["inventory"],
+      resources: {
+        pools: [
+          { key: "superiorityDice", label: "Superiority Dice", die: "d8", total: 4, recharge: "shortRest", used: 0, remaining: 4 },
+        ],
+        maneuversKnown: [
+          { id: "m-precision", name: "Precision Attack", description: "Add to the attack roll.", placement: "attackRoll" },
+        ],
+      },
+    } as unknown as Character);
+  }
+
+  it("re-enables the spend button on the newly active weapon after a die was spent on another", async () => {
+    const user = userEvent.setup();
+    vi.mocked(castManeuverTransaction).mockResolvedValue({
+      character: battleMaster(),
+      results: [{ roll: SERVER_ROLL, saveDc: 15, summary: "used Precision Attack" }],
+    } as unknown as Awaited<ReturnType<typeof castManeuverTransaction>>);
+
+    renderPicker(battleMaster());
+
+    // Roll to hit on the active (first) weapon so the attack maneuver section shows.
+    await user.click(screen.getAllByRole("button", { name: /Roll to hit/ })[0]);
+    const spend = await screen.findByRole("button", { name: /Precision Attack/ });
+    await user.click(spend);
+    // Spent on this weapon's context → button disabled.
+    await waitFor(() => expect(spend).toBeDisabled());
+
+    // Switch the active weapon to the Dagger, then roll to hit for it.
+    await user.click(screen.getByRole("button", { name: "Select Dagger" }));
+    await user.click(screen.getAllByRole("button", { name: /Roll to hit/ })[1]);
+
+    // A fresh Damage-card instance → no die spent in the Dagger's context yet.
+    const daggerSpend = await screen.findByRole("button", { name: /Precision Attack/ });
+    expect(daggerSpend).not.toBeDisabled();
   });
 });
 
