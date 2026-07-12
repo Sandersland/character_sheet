@@ -1,11 +1,12 @@
-// Neutral Damage card in the attack sheet: rolls damage (and a smaller Critical
-// affordance) for the active equipped weapon. Ungated on the attack roll — you
-// can roll damage before or after "Roll to hit". Hosts the active weapon's on-hit
-// dice riders (Flame Tongue +2d6) and its Battle Master maneuver prompt.
+// Neutral Damage card in the attack sheet: rolls damage for the active equipped
+// weapon, auto-doubling the dice after a nat-20 to-hit. Ungated on the attack
+// roll — you can roll damage before or after "Roll to hit". Hosts the active
+// weapon's on-hit dice riders (Flame Tongue +2d6) and its Battle Master prompt.
 
 import { GiSwordWound } from "@/components/ui/icons";
 import AttackResultLine from "@/features/session/AttackResultLine";
 import ManeuverPrompt from "@/features/session/ManeuverPrompt";
+import { isNaturalOne } from "@/lib/dice";
 import type { AttackEntry, DamageRider } from "@/lib/attackMath";
 import type { Character } from "@/types/character";
 import type { RollResult } from "@/lib/dice";
@@ -18,8 +19,12 @@ interface WeaponDamageCardProps {
   lastAttackRoll: RollResult | null;
   lastDamageRoll: RollResult | null;
   riderTotals: Record<string, number>;
+  /** Effective crit (nat-20 to-hit OR manual toggle) — flips the Damage roll to doubled dice. */
+  isCrit: boolean;
+  /** Manual DM-called crit toggle state. */
+  manualCrit: boolean;
   onDamage: (entry: AttackEntry) => void;
-  onCritDamage: (entry: AttackEntry) => void;
+  onToggleCrit: () => void;
   onDamageRider: (rider: DamageRider) => void;
   onRollsUpdated: (newAttackTotal: number | null, newDamageTotal: number | null) => void;
   onUpdate: (c: Character) => void;
@@ -33,12 +38,15 @@ export default function WeaponDamageCard({
   lastAttackRoll,
   lastDamageRoll,
   riderTotals,
+  isCrit,
+  manualCrit,
   onDamage,
-  onCritDamage,
+  onToggleCrit,
   onDamageRider,
   onRollsUpdated,
   onUpdate,
 }: WeaponDamageCardProps) {
+  const miss = isNaturalOne(lastAttackRoll);
   return (
     <div className="flex flex-col gap-1.5 rounded-card border border-parchment-300 bg-parchment-50 p-3">
       <div className="flex items-center gap-3">
@@ -54,22 +62,27 @@ export default function WeaponDamageCard({
             Roll damage for your hit · {entry.damageLabel}
           </span>
         </span>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-col items-end gap-1">
           <button
             type="button"
             onClick={() => onDamage(entry)}
-            className="rounded-control border border-parchment-300 bg-parchment-100 px-3 py-1.5 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-200"
+            className={`rounded-control border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              isCrit
+                ? "border-garnet-300 bg-garnet-100 text-garnet-800 hover:bg-garnet-200"
+                : "border-parchment-300 bg-parchment-100 text-parchment-700 hover:bg-parchment-200"
+            } ${miss && !isCrit ? "opacity-50" : ""}`}
           >
-            Roll damage
+            {isCrit ? "Roll crit damage" : "Roll damage"}
           </button>
-          <button
-            type="button"
-            onClick={() => onCritDamage(entry)}
-            title="Critical hit — double the weapon damage dice"
-            className="rounded-control border border-garnet-300 bg-garnet-100 px-2 py-1 text-[11px] font-semibold text-garnet-800 transition-colors hover:bg-garnet-200"
-          >
-            Critical
-          </button>
+          <label className="flex items-center gap-1 text-[11px] text-parchment-500">
+            <input
+              type="checkbox"
+              checked={manualCrit}
+              onChange={onToggleCrit}
+              className="h-3 w-3 accent-garnet-600"
+            />
+            Crit
+          </label>
         </div>
       </div>
       {lastDamageRoll && (
