@@ -51,10 +51,10 @@ export function planActionClick(
           }
         : { consumeSlot: true, openResolution: false, send: "none" };
 
+    // Slot is committed by the picker on use/cast/heal, not on open (#765) —
+    // closing the sheet without acting stays free, like the spell picker.
     case "heal-input":
     case "item-picker":
-      return { consumeSlot: true, openResolution: true, send: "none" };
-
     case "spell-picker":
       return { consumeSlot: false, openResolution: true, send: "none" };
 

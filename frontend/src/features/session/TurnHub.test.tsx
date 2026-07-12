@@ -249,6 +249,107 @@ describe("TurnHub — action economy", () => {
   });
 });
 
+describe("TurnHub — deferred item/heal commit (#765)", () => {
+  function itemUser(): Character {
+    return makeCharacter({
+      inventory: [
+        {
+          id: "inv-potion",
+          name: "Potion of Healing",
+          category: "consumable",
+          quantity: 2,
+          consumable: { effectDiceCount: 2, effectDiceFaces: 4, effectModifier: 2 },
+        },
+      ] as unknown as Character["inventory"],
+    } as unknown as Partial<Character>);
+  }
+
+  async function openItemPicker(user: ReturnType<typeof userEvent.setup>) {
+    await startTurn(user);
+    await user.click(screen.getByRole("button", { name: /Use Action/ }));
+    await user.click(screen.getByRole("button", { name: "Use an item" }));
+  }
+
+  it("Use an item → Close without using is free: no server call, action stays", async () => {
+    const user = userEvent.setup();
+    renderHub(itemUser());
+    await openItemPicker(user);
+
+    await user.click(within(screen.getByRole("dialog")).getByText("Close"));
+
+    expect(applyActionTransactions).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Use Action" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Undo/ })).not.toBeInTheDocument();
+  });
+
+  it("Using an item consumes it server-side and commits the action", async () => {
+    const user = userEvent.setup();
+    renderHub(itemUser());
+    await openItemPicker(user);
+
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Use" }));
+
+    await waitFor(() =>
+      expect(applyActionTransactions).toHaveBeenCalledWith("char-1", [
+        { type: "executeAction", actionKey: "useObject", inventoryItemId: "inv-potion", roll: expect.any(Number) },
+      ]),
+    );
+    // Action committed only now — the slot reads "used".
+    expect(screen.getByText("used")).toBeInTheDocument();
+  });
+
+  it("Undo of a used item reverts the batch server-side, then restores the action", async () => {
+    const user = userEvent.setup();
+    vi.mocked(applyActionTransactions).mockResolvedValue({ ...itemUser(), batchId: "batch-item" });
+    renderHub(itemUser());
+    await openItemPicker(user);
+
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Use" }));
+    await waitFor(() => expect(applyActionTransactions).toHaveBeenCalled());
+
+    await user.click(await screen.findByRole("button", { name: /Undo/ }));
+
+    await waitFor(() => expect(revertBatch).toHaveBeenCalledWith("char-1", "batch-item"));
+    expect(await screen.findByRole("button", { name: "Use Action" })).toBeInTheDocument();
+  });
+
+  it("Lay on Hands → Close without healing is free: no server call, action stays", async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: /Use Action/ }));
+    await user.click(screen.getByRole("button", { name: "Lay on Hands" }));
+    await user.click(within(screen.getByRole("dialog")).getByText("Close"));
+
+    expect(applyActionTransactions).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Use Action" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Undo/ })).not.toBeInTheDocument();
+  });
+
+  it("Undo of Lay on Hands reverts the batch server-side, then restores the action", async () => {
+    const user = userEvent.setup();
+    vi.mocked(applyActionTransactions).mockResolvedValue({ ...makeCharacter(), batchId: "batch-loh" });
+    renderHub();
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: /Use Action/ }));
+    await user.click(screen.getByRole("button", { name: "Lay on Hands" }));
+    await user.click(screen.getByRole("button", { name: "Heal" }));
+
+    await waitFor(() =>
+      expect(applyActionTransactions).toHaveBeenCalledWith("char-1", [
+        { type: "executeAction", actionKey: "layOnHands", roll: expect.any(Number) },
+      ]),
+    );
+
+    await user.click(await screen.findByRole("button", { name: /Undo/ }));
+
+    await waitFor(() => expect(revertBatch).toHaveBeenCalledWith("char-1", "batch-loh"));
+    expect(await screen.findByRole("button", { name: "Use Action" })).toBeInTheDocument();
+  });
+});
+
 describe("TurnHub — server-effect undo (#758)", () => {
   it("Undo of Second Wind reverts the batch server-side, then restores the slot", async () => {
     const user = userEvent.setup();

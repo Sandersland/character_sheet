@@ -14,12 +14,15 @@ import type { Character } from "@/types/character";
 interface InlineItemPickerProps {
   character: Character;
   onUpdate: (c: Character) => void;
+  /** Commit the action slot once an item is used (#765) — tag the batch for undo. */
+  onCommit: (batchId?: string) => void;
   onClose: () => void;
 }
 
 export default function InlineItemPicker({
   character,
   onUpdate,
+  onCommit,
   onClose,
 }: InlineItemPickerProps) {
   const [busy, setBusy] = useState(false);
@@ -53,6 +56,7 @@ export default function InlineItemPicker({
       ]);
 
       onUpdate(updated);
+      onCommit(updated.batchId);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to use item.");

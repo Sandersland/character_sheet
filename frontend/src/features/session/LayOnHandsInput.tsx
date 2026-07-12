@@ -7,10 +7,13 @@ import type { Character } from "@/types/character";
 export default function LayOnHandsInput({
   character,
   onSend,
+  onCommit,
   onClose,
 }: {
   character: Character;
   onSend: (actionKey: string, opts?: { roll?: number }) => Promise<void>;
+  /** Commit the action slot when the heal is applied (#765). */
+  onCommit: () => void;
   onClose: () => void;
 }) {
   const pool = character.resources?.pools?.find((p) => p.key === "layOnHands");
@@ -22,6 +25,8 @@ export default function LayOnHandsInput({
     if (amount <= 0 || amount > maxPool || busy) return;
     setBusy(true);
     try {
+      // Commit first so send's attachBatchId tags this entry (Second Wind order).
+      onCommit();
       await onSend("layOnHands", { roll: amount });
       onClose();
     } finally {
