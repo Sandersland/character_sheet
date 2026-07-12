@@ -122,6 +122,33 @@ export async function restoreResourcePool(
   expect(restoreResponse.ok(), `restore ${key}: ${restoreResponse.status()}`).toBeTruthy();
 }
 
+// Teach a shared persona a catalog maneuver by name (idempotent — skips if the
+// maneuver is already known), so a spec can drive an attackRoll/damageRoll
+// maneuver the seeded roster doesn't include. Mirrors global-setup's seedManeuver.
+export async function learnManeuver(
+  request: APIRequestContext,
+  characterId: string,
+  maneuverName: string,
+): Promise<void> {
+  const loaded = await request.get(`/api/characters/${characterId}`);
+  expect(loaded.ok(), `load character: ${loaded.status()}`).toBeTruthy();
+  const character = (await loaded.json()) as {
+    resources?: { maneuversKnown?: { name: string }[] };
+  };
+  if (character.resources?.maneuversKnown?.some((m) => m.name === maneuverName)) return;
+
+  const catalogResponse = await request.get("/api/maneuvers");
+  expect(catalogResponse.ok(), `list maneuvers: ${catalogResponse.status()}`).toBeTruthy();
+  const catalog = (await catalogResponse.json()) as { id: string; name: string }[];
+  const match = catalog.find((m) => m.name === maneuverName);
+  expect(match, `maneuver not in catalog: ${maneuverName}`).toBeTruthy();
+
+  const learnResponse = await request.post(`/api/characters/${characterId}/resources/transactions`, {
+    data: { operations: [{ type: "learnManeuver", maneuverId: match!.id }] },
+  });
+  expect(learnResponse.ok(), `learn ${maneuverName}: ${learnResponse.status()}`).toBeTruthy();
+}
+
 // Clear a status condition from a shared persona so its apply flow is
 // deterministic regardless of leftover state. No-op when the key isn't active
 // (removeCondition errors on an absent key), mirroring restoreResourcePool.
