@@ -1,6 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { renderHook } from "@testing-library/react";
+import type { RefObject } from "react";
 
-import { shouldDismissDrag } from "@/hooks/useDragToDismiss";
+import { shouldDismissDrag, useDragToDismiss } from "@/hooks/useDragToDismiss";
 
 const SHEET = 600;
 
@@ -31,5 +33,178 @@ describe("shouldDismissDrag", () => {
 
   it("does not divide-by-zero on a zero-height sheet — a downward drag dismisses", () => {
     expect(shouldDismissDrag({ dy: 1, sheetHeight: 0, velocity: 0 })).toBe(true);
+  });
+});
+
+// Stateful gesture-machine coverage: drive the returned pointer handlers with
+// real JSDOM PointerEvents against a live panel element and assert the CSS
+// mutations (transform follows the finger; spring-back restores translateY(0))
+// plus the dismiss verdict.
+describe("useDragToDismiss gesture machine", () => {
+  let panel: HTMLElement;
+  let handle: HTMLElement;
+  let content: HTMLElement;
+  let clock: number;
+
+  function stubMatchMedia(reduce: boolean) {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: reduce && query.includes("reduce"),
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+  }
+
+  beforeEach(() => {
+    clock = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => clock);
+    stubMatchMedia(false);
+
+    panel = document.createElement("div");
+    panel.getBoundingClientRect = () => ({ height: SHEET }) as DOMRect;
+    handle = document.createElement("button");
+    content = document.createElement("div");
+    document.body.append(panel, handle, content);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    panel.remove();
+    handle.remove();
+    content.remove();
+  });
+
+  type Handlers = Record<string, (e: unknown) => void>;
+
+  function attach(el: HTMLElement, props: Handlers) {
+    if (props.onPointerDown) el.addEventListener("pointerdown", props.onPointerDown as EventListener);
+    if (props.onPointerMove) el.addEventListener("pointermove", props.onPointerMove as EventListener);
+    if (props.onPointerUp) el.addEventListener("pointerup", props.onPointerUp as EventListener);
+    if (props.onPointerCancel) el.addEventListener("pointercancel", props.onPointerCancel as EventListener);
+  }
+
+  function fire(el: HTMLElement, type: string, clientY: number, at = clock) {
+    clock = at;
+    const e = new MouseEvent(type, { bubbles: true, clientY });
+    Object.defineProperty(e, "pointerId", { value: 1 });
+    el.dispatchEvent(e);
+  }
+
+  function render(enabled = true) {
+    const onDismiss = vi.fn();
+    const ref = { current: panel } as RefObject<HTMLElement>;
+    const { result } = renderHook(() => useDragToDismiss(ref, { onDismiss, enabled }));
+    attach(handle, result.current.handleProps as Handlers);
+    attach(content, result.current.contentProps as Handlers);
+    return { onDismiss };
+  }
+
+  it("follows the finger via a translateY transform while dragging the handle", () => {
+    render();
+    fire(handle, "pointerdown", 0, 0);
+    fire(handle, "pointermove", 100, 16);
+    expect(panel.style.transform).toBe("translateY(100px)");
+    expect(panel.style.transition).toBe("none");
+  });
+
+  it("springs back to translateY(0) on release below the threshold", () => {
+    const { onDismiss } = render();
+    fire(handle, "pointerdown", 0, 0);
+    fire(handle, "pointermove", 100, 400); // slow: dt large → no flick
+    fire(handle, "pointerup", 100, 500);
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(panel.style.transform).toBe("translateY(0)");
+    expect(panel.style.transition).toContain("transform");
+  });
+
+  it("dismisses on a downward flick — velocity feeds the verdict", () => {
+    const { onDismiss } = render();
+    fire(handle, "pointerdown", 0, 0);
+    fire(handle, "pointermove", 30, 10); // 30px in 10ms → 3 px/ms ≫ flick threshold
+    fire(handle, "pointerup", 30, 12);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("dismisses when dragged past ~1/3 the sheet height, even slowly", () => {
+    const { onDismiss } = render();
+    fire(handle, "pointerdown", 0, 0);
+    fire(handle, "pointermove", 250, 1000); // > 200px, slow → distance verdict
+    fire(handle, "pointerup", 250, 2000);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("content region: engages only at scrollTop 0 and on downward movement", () => {
+    render();
+    fire(content, "pointerdown", 0, 0);
+    fire(content, "pointermove", 80, 16);
+    expect(panel.style.transform).toBe("translateY(80px)");
+  });
+
+  it("content region: upward-while-armed is inert (no transform, no dismiss)", () => {
+    const { onDismiss } = render();
+    fire(content, "pointerdown", 100, 0);
+    fire(content, "pointermove", 40, 16); // moved up → armed stays, never engages
+    expect(panel.style.transform).toBe("");
+    fire(content, "pointerup", 40, 20);
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
+
+  it("content region: does not arm when already scrolled down", () => {
+    Object.defineProperty(content, "scrollTop", { value: 50, configurable: true });
+    render();
+    fire(content, "pointerdown", 0, 0);
+    fire(content, "pointermove", 200, 16);
+    expect(panel.style.transform).toBe("");
+  });
+
+  it("cancel always springs back — never dismisses, even after a dismiss-worthy flick", () => {
+    const { onDismiss } = render();
+    fire(handle, "pointerdown", 0, 0);
+    fire(handle, "pointermove", 300, 10); // fast + far: would dismiss on pointerup
+    fire(handle, "pointercancel", 300, 12);
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(panel.style.transform).toBe("translateY(0)");
+    expect(panel.style.transition).toContain("transform");
+  });
+
+  it("reduced motion: decides the verdict without following or springing", () => {
+    stubMatchMedia(true);
+    const { onDismiss } = render();
+    // No follow while dragging.
+    fire(handle, "pointerdown", 0, 0);
+    fire(handle, "pointermove", 250, 1000);
+    expect(panel.style.transform).toBe("");
+    // Spring-back path mutates nothing…
+    fire(handle, "pointerup", 250, 2000);
+    expect(panel.style.transform).toBe("");
+    // …but the dismiss verdict still fires.
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("reduced motion: a below-threshold release springs back without a transform", () => {
+    stubMatchMedia(true);
+    const { onDismiss } = render();
+    fire(handle, "pointerdown", 0, 0);
+    fire(handle, "pointermove", 50, 1000);
+    fire(handle, "pointerup", 50, 2000);
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(panel.style.transform).toBe("");
+    expect(panel.style.transition).toBe("");
+  });
+
+  it("disabled: returns empty prop objects", () => {
+    const { result } = renderHook(() =>
+      useDragToDismiss({ current: panel } as RefObject<HTMLElement>, {
+        onDismiss: vi.fn(),
+        enabled: false,
+      }),
+    );
+    expect(result.current.handleProps).toEqual({});
+    expect(result.current.contentProps).toEqual({});
   });
 });

@@ -100,12 +100,19 @@ export function useDragToDismiss(panelRef: RefObject<HTMLElement>, { onDismiss, 
     settle(shouldDismissDrag({ dy, sheetHeight, velocity: d.velocity }));
   }
 
+  // A cancelled pointer (e.g. OS gesture takeover) never dismisses — spring back.
+  function onCancel() {
+    const d = drag.current;
+    drag.current = null;
+    if (d?.active) settle(false);
+  }
+
   const handleProps = enabled
     ? {
         onPointerDown: (e: ReactPointerEvent) => begin(e, e.clientY),
         onPointerMove: onMove,
         onPointerUp: onUp,
-        onPointerCancel: onUp,
+        onPointerCancel: onCancel,
       }
     : {};
 
@@ -118,7 +125,7 @@ export function useDragToDismiss(panelRef: RefObject<HTMLElement>, { onDismiss, 
         },
         onPointerMove: onMove,
         onPointerUp: onUp,
-        onPointerCancel: onUp,
+        onPointerCancel: onCancel,
       }
     : {};
 
