@@ -266,6 +266,7 @@ export function useTurnActions({
   async function handleEndCombat() {
     endCombatState();
     closeResolution();
+    loadoutSwap.reset();
     setReactionMessage(null);
     setEffectMessage(null);
     setError(null);
@@ -300,6 +301,8 @@ export function useTurnActions({
     const nextRound = inCombat ? round + 1 : undefined;
     endTurn();
     closeResolution();
+    // Refund is bounded to the turn of the swap — drop it as the turn ends.
+    loadoutSwap.reset();
     for (const buffKey of expiring) {
       const actionKey = endActionKeyFor(buffKey);
       if (actionKey) await send(actionKey);

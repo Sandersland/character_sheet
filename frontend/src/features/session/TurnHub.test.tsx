@@ -767,3 +767,62 @@ describe("TurnHub — Rage turn-hook (#457)", () => {
     ]);
   });
 });
+
+describe("TurnHub — mid-turn weapon change (#815)", () => {
+  function weapon(over: Partial<Character["inventory"][number]>): Character["inventory"][number] {
+    return {
+      category: "weapon",
+      quantity: 1,
+      equipped: false,
+      weapon: { twoHanded: false, damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 0, damageType: "slashing" },
+      ...over,
+    } as unknown as Character["inventory"][number];
+  }
+
+  it("keeps free-hand weapon changes reachable after the Action is spent (0 actions)", async () => {
+    const user = userEvent.setup();
+    const dagger = weapon({ id: "dg", name: "Dagger" }); // bag, both hands empty
+    renderHub(makeCharacter({ inventory: [dagger] }));
+    await startTurn(user);
+
+    // Spend the Action — the full Action sheet is now gated shut.
+    await user.click(screen.getByRole("button", { name: /Use Action/ }));
+    await user.click(screen.getByRole("button", { name: "Dodge" }));
+    expect(screen.queryByRole("button", { name: "Use Action" })).not.toBeInTheDocument();
+
+    // The free-move weapon-change button remains, and a free draw still commits.
+    await user.click(screen.getByRole("button", { name: /Change weapons — free-hand/ }));
+    const sheet = within(screen.getByRole("dialog"));
+    const main = sheet.getByText(/^Main hand/).closest('[data-testid="hand-card"]') as HTMLElement;
+    await user.click(within(main).getByRole("button", { name: "Equip" })); // expand
+    await user.click(within(within(main).getByRole("list")).getByRole("button", { name: "Equip" }));
+
+    await waitFor(() =>
+      expect(applyInventoryTransactions).toHaveBeenCalledWith("char-1", [
+        { type: "equip", inventoryItemId: "dg", slot: "MAIN_HAND" },
+      ]),
+    );
+  });
+
+  it("clears the Refund affordance at end of turn (no cross-turn economy leak)", async () => {
+    const user = userEvent.setup();
+    const longsword = weapon({ id: "ls", name: "Longsword", equipped: true, equippedSlot: "MAIN_HAND" });
+    const dagger = weapon({ id: "dg", name: "Dagger" });
+    renderHub(makeCharacter({ inventory: [longsword, dagger] }));
+    await startTurn(user);
+
+    // Commit an Action-costing swap → Refund surfaces.
+    await user.click(screen.getByRole("button", { name: /Use Action/ }));
+    await user.click(screen.getByRole("button", { name: "Change weapons" }));
+    const sheet = within(screen.getByRole("dialog"));
+    const main = sheet.getByText(/^Main hand/).closest('[data-testid="hand-card"]') as HTMLElement;
+    await user.click(within(main).getByRole("button", { name: "Change" })); // expand
+    await user.click(within(main).getByRole("button", { name: "Swap in" }));
+    await waitFor(() => expect(screen.getAllByRole("button", { name: /Refund/ }).length).toBeGreaterThan(0));
+
+    // End the turn and start the next one — the Refund must not carry over.
+    await user.click(screen.getByRole("button", { name: "End turn" }));
+    await user.click(screen.getByRole("button", { name: "Start my turn" }));
+    expect(screen.queryByRole("button", { name: /Refund/ })).not.toBeInTheDocument();
+  });
+});

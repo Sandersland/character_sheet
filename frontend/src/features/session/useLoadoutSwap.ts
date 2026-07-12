@@ -128,6 +128,13 @@ export function useLoadoutSwap(
     }
   }
 
+  // Clear the committed-swap affordance — called at end of turn so the Refund
+  // is bounded to the turn of the swap (no cross-turn action-economy leak).
+  function reset() {
+    setLastSwap(null);
+    setError(null);
+  }
+
   async function refund() {
     if (busy || !lastSwap) return;
     setBusy(true);
@@ -145,5 +152,5 @@ export function useLoadoutSwap(
     }
   }
 
-  return { busy, error, lastSwap, swap, stow, refund };
+  return { busy, error, lastSwap, swap, stow, refund, reset };
 }
