@@ -188,6 +188,15 @@ describe("BottomSheet", () => {
     expect(mdClasses).toEqual(["md:hidden"]);
   });
 
+  it("suppresses the panel's focus-visible outline — dialog focus is an a11y anchor, not a nav position", () => {
+    const { baseElement } = render(
+      <BottomSheet title="Action" onClose={vi.fn()}>
+        <p>body</p>
+      </BottomSheet>,
+    );
+    expect(panelOf(baseElement).className).toContain("focus-visible:outline-none");
+  });
+
   it("mobile scrim carries the opacity-fade transition utilities", () => {
     const { baseElement } = render(
       <BottomSheet title="Action" onClose={vi.fn()}>
