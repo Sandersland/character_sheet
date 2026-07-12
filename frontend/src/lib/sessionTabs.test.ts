@@ -6,7 +6,12 @@ import type { Character, Session } from "@/types/character";
 describe("buildSessionTabs", () => {
   it("shows only the base tabs for a classless non-caster non-owner", () => {
     const tabs = buildSessionTabs({ isCaster: false, hasClass: false, isOwner: false });
-    expect(tabs.map((t) => t.id)).toEqual(["inventory", "rest", "log"]);
+    expect(tabs.map((t) => t.id)).toEqual(["inventory", "log"]);
+  });
+
+  it("no longer includes the removed Rest & HP tab", () => {
+    const tabs = buildSessionTabs({ isCaster: true, hasClass: true, isOwner: true });
+    expect(tabs.map((t) => t.id)).not.toContain("rest");
   });
 
   it("includes spells only when a caster", () => {
@@ -22,7 +27,7 @@ describe("buildSessionTabs", () => {
   it("includes the owner-only loot tab last", () => {
     const tabs = buildSessionTabs({ isCaster: true, hasClass: true, isOwner: true });
     expect(tabs.map((t) => t.id)).toEqual([
-      "inventory", "spells", "class", "rest", "log", "loot",
+      "inventory", "spells", "class", "log", "loot",
     ]);
   });
 });
@@ -67,10 +72,14 @@ describe("resolveActiveTab", () => {
   const tabs = buildSessionTabs({ isCaster: false, hasClass: false, isOwner: false });
 
   it("keeps the active tab when it's still present", () => {
-    expect(resolveActiveTab(tabs, "rest")).toBe("rest");
+    expect(resolveActiveTab(tabs, "log")).toBe("log");
   });
 
   it("falls back to inventory when the active tab was gated away", () => {
     expect(resolveActiveTab(tabs, "spells")).toBe("inventory");
+  });
+
+  it("falls back to inventory for a persisted 'rest' selection", () => {
+    expect(resolveActiveTab(tabs, "rest")).toBe("inventory");
   });
 });

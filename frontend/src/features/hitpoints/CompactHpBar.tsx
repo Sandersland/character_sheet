@@ -15,8 +15,8 @@ interface CompactHpBarProps {
  * Slim HP strip always visible at the top of the session page. Read-only content
  * (current/max HP, temp badge, MeterBar), but the whole strip is a button that
  * opens a "Hit Points" sheet with the full damage/heal/temp controls (#768) — so
- * HP is manageable mid-turn on mobile, where the reference tabs (and the Rest
- * tab's HitPointTracker) are hidden. Death saves stay on the turn screen.
+ * HP is manageable mid-turn on mobile without a dedicated tab (rest lives in the
+ * adjacent RestButton, #814). Death saves stay on the turn screen.
  */
 export default function CompactHpBar({ character, onUpdate }: CompactHpBarProps) {
   const [sheetOpen, setSheetOpen] = useState(false);

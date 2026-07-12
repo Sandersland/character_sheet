@@ -10,7 +10,6 @@ import Card from "@/components/ui/Card";
 import InventoryList from "@/features/inventory/InventoryList";
 import ClassFeaturesSection from "@/features/class/ClassFeaturesSection";
 import SpellsSection from "@/features/spells/SpellsSection";
-import HitPointTracker from "@/features/hitpoints/HitPointTracker";
 import SessionLog from "@/features/session/SessionLog";
 import SessionLootPanel from "@/features/session/SessionLootPanel";
 import type { LootRecipient } from "@/lib/sessionTabs";
@@ -53,7 +52,6 @@ export default function SessionTabPanel({
         />
       </Card>
     ),
-    rest: <HitPointTracker character={character} onUpdate={onUpdate} />,
     log: (
       <Card title="Session Log" className="p-4">
         <SessionLog characterId={character.id} sessionId={session.id} refreshKey={logRefresh} />
