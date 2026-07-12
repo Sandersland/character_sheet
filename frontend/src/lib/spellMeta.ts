@@ -158,6 +158,15 @@ export function componentsLabel(spell: Spell): string | null {
  * Attack-type line for the expand section.
  * Returns null for utility spells.
  */
+/**
+ * A cantrip that resolves via a spell **attack roll** (Fire Bolt), so it routes
+ * through the in-session attack sheet (#734). `attackType: "save"` cantrips
+ * (Sacred Flame) stay in the normal spell picker.
+ */
+export function isAttackCantrip(spell: Spell): boolean {
+  return spell.level === 0 && spell.attackType === "attack";
+}
+
 export function attackTypeLabel(spell: Spell): string | null {
   if (!spell.attackType) return null;
   if (spell.attackType === "attack") return "Ranged/melee spell attack";

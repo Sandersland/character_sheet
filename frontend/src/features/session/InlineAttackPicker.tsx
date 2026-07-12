@@ -36,6 +36,7 @@ import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { useRollLogger } from "@/features/session/useRollLogger";
 import AttackRow from "@/features/session/AttackRow";
 import AttackOptionRow from "@/features/session/AttackOptionRow";
+import InlineSpellAttackSection from "@/features/session/InlineSpellAttackSection";
 import EquipWeaponPanel from "@/features/session/EquipWeaponPanel";
 import type { AttackEntry, DamageRider } from "@/lib/attackMath";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
@@ -275,6 +276,15 @@ export default function InlineAttackPicker({
           />
         );
       })}
+
+      {/* ── Attack-roll cantrips (Fire Bolt) — single transactional cast (#734) ── */}
+      <InlineSpellAttackSection
+        character={character}
+        sessionId={sessionId}
+        turnState={turnState}
+        onUpdate={onUpdate}
+        onLogChanged={onLogChanged}
+      />
 
       {/* ── Back / Done footer ────────────────────────────────────────────────── */}
       {/*
