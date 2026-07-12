@@ -505,6 +505,17 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     await user.click(screen.getByRole("button", { name: /^Attack/ }));
   }
 
+  it("the sheet-header kicker reads the live count, not a static '1 attack'", async () => {
+    const user = userEvent.setup();
+    renderHub(extraAttackFighter());
+    await openAttackPicker(user);
+    const sheet = () => within(screen.getByRole("dialog"));
+
+    expect(
+      sheet().getByText(/2 attacks · no target AC tracked — read the roll to your DM/),
+    ).toBeInTheDocument();
+  });
+
   it("opens at 2 of 2, decrements on each Roll to hit, and disables at 0 of 2", async () => {
     const user = userEvent.setup();
     renderHub(extraAttackFighter());

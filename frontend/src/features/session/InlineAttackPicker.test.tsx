@@ -166,15 +166,14 @@ describe("InlineAttackPicker — live attack counter (#757)", () => {
     }
   });
 
-  it("hides the pip counter for a single-attack action and reads '1 attack' in the kicker", () => {
+  it("hides the pip counter for a single-attack action", () => {
     renderPicker(withWeapon(1), vi.fn(), vi.fn(), { turnState: attackState(1, 0) });
     expect(screen.queryByText(/of 1 remaining/)).not.toBeInTheDocument();
-    expect(screen.getByText(/^1 attack ·/)).toBeInTheDocument();
   });
 
-  it("kicker reads '2 attacks' for a multi-attack action", () => {
+  it("carries no kicker copy of its own — the sheet header owns it (TurnResolutionSheets)", () => {
     renderPicker(withWeapon(2), vi.fn(), vi.fn(), { turnState: attackState(2, 0) });
-    expect(screen.getByText(/^2 attacks ·/)).toBeInTheDocument();
+    expect(screen.queryByText(/no target AC tracked/)).not.toBeInTheDocument();
   });
 });
 

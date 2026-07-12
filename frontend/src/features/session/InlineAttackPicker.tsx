@@ -230,10 +230,6 @@ export default function InlineAttackPicker({
 
   const preRoll = turnState.attack !== null && turnState.attack.used === 0;
 
-  // Live Extra-Attack count for this action, from the turn economy (falls back to
-  // the server-derived total when no Attack action is in progress).
-  const attackCount = turnState.attack?.total ?? character.attacksPerAction;
-
   return (
     <div className="flex flex-col gap-2">
       {/* Live Extra-Attack counter — pips + "N of M remaining". Hidden at total 1
@@ -328,12 +324,10 @@ export default function InlineAttackPicker({
         onLogChanged={onLogChanged}
       />
 
-      {/* ── Cancel (pre-roll, refunds the action) / Done (post-roll) footer ────── */}
+      {/* ── Cancel (pre-roll, refunds the action) / Done (post-roll) footer ──────
+          The "N attacks · no target AC tracked" kicker lives in the sheet header
+          (TurnResolutionSheets), not here — one statement per mockup. */}
       <div className="flex flex-col gap-1.5 pt-1">
-        <p className="text-[11px] text-parchment-500">
-          {attackCount} attack{attackCount === 1 ? "" : "s"} · no target AC tracked — read the roll
-          to your DM.
-        </p>
         <button
           type="button"
           onClick={preRoll ? onCancel : onClose}

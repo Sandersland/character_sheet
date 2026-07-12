@@ -28,6 +28,13 @@ const SPELL_CASTING_TIME: Record<SpellSlot, string> = {
   reaction: "1 reaction",
 };
 
+/** Attack-sheet kicker with the live Extra-Attack count (no counter → 1, e.g.
+ *  opportunity attacks). The in-sheet footer deliberately carries no copy of it. */
+function attackKicker(attack: TurnState["attack"]): string {
+  const count = attack?.total ?? 1;
+  return `${count} attack${count === 1 ? "" : "s"} · no target AC tracked — read the roll to your DM`;
+}
+
 interface TurnResolutionSheetsProps {
   character: Character;
   sessionId: string;
@@ -61,7 +68,7 @@ export default function TurnResolutionSheets({
     return (
       <BottomSheet
         title="Attack"
-        subtitle="1 attack"
+        subtitle={attackKicker(turnState.attack)}
         onClose={() => {
           turnState.cancelAttack();
           closeResolution();
