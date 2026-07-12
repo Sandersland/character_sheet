@@ -53,6 +53,22 @@ export function rollDie(faces: number): number {
   return 1 + Math.floor(Math.random() * faces);
 }
 
+/** The kept (non-dropped) d20 of a roll, or null when the spec isn't a single-d20 roll. */
+export function keptD20(result: RollResult): DieRoll | null {
+  if (result.spec.faces !== 20) return null;
+  return result.dice.find((die) => !die.dropped) ?? null;
+}
+
+/** Kept-die natural 20 — a nat 20 on the DROPPED die (disadvantage) is not a crit. */
+export function isNaturalTwenty(result: RollResult | null | undefined): boolean {
+  return result ? keptD20(result)?.value === 20 : false;
+}
+
+/** Kept-die natural 1 — a miss on an attack roll. */
+export function isNaturalOne(result: RollResult | null | undefined): boolean {
+  return result ? keptD20(result)?.value === 1 : false;
+}
+
 /**
  * Whether a spec's advantage/disadvantage mode actually applies. Guard:
  * only a single d20 (checks, saves, attacks, initiative) — multi-die damage
