@@ -1,11 +1,9 @@
 // Persistent inline roll result for one attack row (#745). After a player taps
 // Attack / Damage / Critical, the 3D-dice animation + toast are transient — this
 // keeps the number on the row so they can read it back to their DM. Presentational
-// only: it takes the RollResult the attack sheet already holds; no rolling here.
-// A maneuver-summed override total (Battle Master superiority die) wins over the
-// raw total when present.
+// only: the crit/miss/total/tone derivation lives in lib/attackResult (#778).
 
-import { isNaturalOne, isNaturalTwenty } from "@/lib/dice";
+import { resultLineView } from "@/lib/attackResult";
 import type { RollResult } from "@/lib/dice";
 
 interface AttackResultLineProps {
@@ -17,27 +15,14 @@ interface AttackResultLineProps {
   overrideTotal?: number | null;
 }
 
-// fallow-ignore-next-line complexity -- #766 grew this past the gate; decomposition tracked in #778
 export default function AttackResultLine({
   result,
   kind,
   damageType,
   overrideTotal,
 }: AttackResultLineProps) {
-  const keptDice = result.dice.filter((d) => !d.dropped);
-  const { faces } = result.spec;
-  const mod = result.modifier;
-  const total = overrideTotal ?? result.total;
-  // Kept-die nat 20 / nat 1 drive the auto-crit + miss cues on the to-hit line.
-  const critHit = kind === "attack" && isNaturalTwenty(result);
-  const miss = kind === "attack" && isNaturalOne(result);
-  // Arcane (magic-neutral) for the to-hit d20, garnet for weapon damage — per the
-  // palette intent in index.css. Box and total share one tone so an attack roll
-  // doesn't mix arcane boxes with a garnet total.
-  const tone =
-    kind === "attack"
-      ? { box: "border-arcane-400 bg-arcane-50 text-arcane-800", total: "text-arcane-800" }
-      : { box: "border-garnet-300 bg-garnet-50 text-garnet-800", total: "text-garnet-800" };
+  const { keptDice, faces, modifier, total, critHit, miss, critSpec, hasOverride, tone } =
+    resultLineView(result, kind, overrideTotal);
 
   return (
     <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-parchment-700">
@@ -52,9 +37,9 @@ export default function AttackResultLine({
           </span>
         </span>
       ))}
-      {mod !== 0 && (
+      {modifier !== 0 && (
         <span className="tabular-nums text-parchment-600">
-          {mod > 0 ? "+" : "−"} {Math.abs(mod)}
+          {modifier > 0 ? "+" : "−"} {Math.abs(modifier)}
         </span>
       )}
       <span className="text-parchment-500">=</span>
@@ -64,7 +49,7 @@ export default function AttackResultLine({
       {kind === "damage" && damageType && (
         <span className="text-parchment-600">{damageType}</span>
       )}
-      {result.spec.crit && (
+      {critSpec && (
         <span className="rounded-control bg-gold-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold-800">
           crit
         </span>
@@ -79,7 +64,7 @@ export default function AttackResultLine({
           Miss
         </span>
       )}
-      {overrideTotal != null && (
+      {hasOverride && (
         <span className="text-xs text-parchment-500">(+maneuver)</span>
       )}
     </p>
