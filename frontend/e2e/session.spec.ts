@@ -98,3 +98,37 @@ test("session: roll-mode toggle docks as a bottom bar on mobile", async ({ page 
 
   expect(errors).toEqual([]);
 });
+
+// #801: rolling to hit inside the attack sheet must not surface the corner roll
+// toast behind the scrim; it reappears once the sheet closes.
+test("session: roll toast is suppressed while the attack sheet is open (mobile)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page);
+
+  const errors = collectConsoleErrors(page);
+  await page.getByRole("link", { name: /Session Fighter/ }).click();
+  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
+  await expect(page).toHaveURL(/\/session$/);
+
+  await page.getByRole("button", { name: /Start combat/i }).click();
+  await page.getByRole("button", { name: "Start my turn" }).click();
+  await page.getByRole("button", { name: /Use Action/ }).click();
+  await page.getByRole("button", { name: "Attack", exact: true }).click();
+
+  const sheet = page.getByRole("dialog");
+  const toast = page.locator('[role="status"].right-6');
+
+  await sheet.getByRole("button", { name: "Roll to hit" }).click();
+
+  // Result shows on the attack card; the corner toast stays hidden behind the scrim.
+  await expect(sheet.getByText("=").first()).toBeVisible();
+  await expect(toast).toHaveCount(0);
+
+  // Closing the sheet brings the toast back for the just-rolled result.
+  await sheet.getByRole("button", { name: "Close" }).click();
+  await expect(toast).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
