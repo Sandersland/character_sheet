@@ -16,6 +16,7 @@ import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { useRollLogger } from "@/features/session/useRollLogger";
 import AttackRow from "@/features/session/AttackRow";
 import AttackOptionRow from "@/features/session/AttackOptionRow";
+import { AttackCounter } from "@/features/session/TurnControls";
 import InlineSpellAttackSection from "@/features/session/InlineSpellAttackSection";
 import WeaponAttackCard from "@/features/session/WeaponAttackCard";
 import WeaponDamageCard from "@/features/session/WeaponDamageCard";
@@ -41,6 +42,115 @@ interface InlineAttackPickerProps {
   onLogChanged: () => void;
 }
 
+/** Whether an attackOption maneuver row's "Use" button is enabled, and why not. */
+function attackOptionEnabled(
+  m: ManeuverEntry,
+  pool: { remaining: number } | null | undefined,
+  exhausted: boolean,
+  bonusActionUsed: boolean,
+): { enabled: boolean; reason?: string } {
+  if (!pool || pool.remaining === 0) {
+    return { enabled: false, reason: "No superiority dice remaining." };
+  }
+  if (exhausted) {
+    return { enabled: false, reason: "No attacks remaining to forfeit." };
+  }
+  if (m.actionSlot === "bonusAction" && bonusActionUsed) {
+    return { enabled: false, reason: "Bonus action already used." };
+  }
+  return { enabled: true };
+}
+
+/**
+ * Owns the per-row roll state (last attack/damage results, rider totals,
+ * maneuver auto-sum overrides) and the roll handlers. Extracted from the
+ * component so its state cluster and branching are scored — and testable —
+ * as their own unit.
+ */
+function useAttackRolls({
+  roll,
+  logRollSafe,
+  recordAttack,
+}: {
+  roll: ReturnType<typeof useRoll>["roll"];
+  logRollSafe: ReturnType<typeof useRollLogger>;
+  recordAttack: () => void;
+}) {
+  // Per-row last roll results (keyed by weapon item.id, "unarmed", or "improvised").
+  const [lastAttackRolls, setLastAttackRolls] = useState<Record<string, RollResult | null>>({});
+  const [lastDamageRolls, setLastDamageRolls] = useState<Record<string, RollResult | null>>({});
+
+  // Last rolled total per on-hit rider id (Flame Tongue +2d6), shown inline.
+  const [riderTotals, setRiderTotals] = useState<Record<string, number>>({});
+
+  // Auto-summed override totals set by ManeuverPrompt after a die spend.
+  const [attackTotals, setAttackTotals] = useState<Record<string, number | null>>({});
+  const [damageTotals, setDamageTotals] = useState<Record<string, number | null>>({});
+
+  // Roll an attack for a row: log it, retain the result, clear any override, spend one attack.
+  function handleAttack(entry: AttackEntry) {
+    const result = roll(entry.attackSpec, entry.attackRollLabel);
+    logRollSafe("attack", entry.logSource, result, entry.attackSpec);
+    setLastAttackRolls((prev) => ({ ...prev, [entry.id]: result }));
+    setAttackTotals((prev) => ({ ...prev, [entry.id]: null }));
+    recordAttack();
+  }
+
+  // Roll damage for a row: log it, retain the result, clear any override.
+  function handleDamage(entry: AttackEntry) {
+    const result = roll(entry.damageSpec, entry.damageRollLabel);
+    logRollSafe("damage", entry.logSource, result, entry.damageSpec, entry.damageType);
+    setLastDamageRolls((prev) => ({ ...prev, [entry.id]: result }));
+    setDamageTotals((prev) => ({ ...prev, [entry.id]: null }));
+  }
+
+  // Roll critical damage for a row: same path as handleDamage but on the doubled spec.
+  function handleCritDamage(entry: AttackEntry) {
+    const spec = critDamageSpec(entry.damageSpec);
+    const result = roll(spec, entry.damageRollLabel);
+    logRollSafe("damage", entry.logSource, result, spec, entry.damageType);
+    setLastDamageRolls((prev) => ({ ...prev, [entry.id]: result }));
+    setDamageTotals((prev) => ({ ...prev, [entry.id]: null }));
+  }
+
+  // Roll one on-hit dice rider (e.g. Flame Tongue +2d6 fire) as its own typed term.
+  // On a crit the rider's dice double too — mirror the parent row's last damage roll.
+  function handleDamageRider(rider: DamageRider, parentEntryId: string | null) {
+    const parentCrit = parentEntryId
+      ? Boolean(lastDamageRolls[parentEntryId]?.spec.crit)
+      : false;
+    const spec = parentCrit ? critDamageSpec(rider.spec) : rider.spec;
+    const result = roll(spec, rider.rollLabel);
+    logRollSafe("damage", rider.logSource, result, spec, rider.damageType);
+    setRiderTotals((prev) => ({ ...prev, [rider.id]: result.total }));
+  }
+
+  // Callback for ManeuverPrompt — stores auto-sum overrides per row.
+  function makeOnRollsUpdated(rowId: string) {
+    return (newAtk: number | null, newDmg: number | null) => {
+      if (newAtk !== null) {
+        setAttackTotals((prev) => ({ ...prev, [rowId]: newAtk }));
+      }
+      if (newDmg !== null) {
+        setDamageTotals((prev) => ({ ...prev, [rowId]: newDmg }));
+      }
+    };
+  }
+
+  return {
+    lastAttackRolls,
+    lastDamageRolls,
+    riderTotals,
+    attackTotals,
+    damageTotals,
+    handleAttack,
+    handleDamage,
+    handleCritDamage,
+    handleDamageRider,
+    makeOnRollsUpdated,
+  };
+}
+
 export default function InlineAttackPicker({
   character,
   turnState,
@@ -55,16 +165,18 @@ export default function InlineAttackPicker({
 
   const { pool, dieLabel, busy: dieBusy, spend } = useManeuverDie(character, onUpdate);
 
-  // Per-row last roll results (keyed by weapon item.id, "unarmed", or "improvised").
-  const [lastAttackRolls, setLastAttackRolls] = useState<Record<string, RollResult | null>>({});
-  const [lastDamageRolls, setLastDamageRolls] = useState<Record<string, RollResult | null>>({});
-
-  // Last rolled total per on-hit rider id (Flame Tongue +2d6), shown inline.
-  const [riderTotals, setRiderTotals] = useState<Record<string, number>>({});
-
-  // Auto-summed override totals set by ManeuverPrompt after a die spend.
-  const [attackTotals, setAttackTotals] = useState<Record<string, number | null>>({});
-  const [damageTotals, setDamageTotals] = useState<Record<string, number | null>>({});
+  const rolls = useAttackRolls({ roll, logRollSafe, recordAttack: turnState.recordAttack });
+  const {
+    lastAttackRolls,
+    lastDamageRolls,
+    riderTotals,
+    attackTotals,
+    damageTotals,
+    handleAttack,
+    handleDamage,
+    handleCritDamage,
+    makeOnRollsUpdated,
+  } = rolls;
 
   // Per-maneuver reminder messages (keyed by maneuver name).
   const [maneuverMessages, setManeuverMessages] = useState<Record<string, string>>({});
@@ -88,58 +200,15 @@ export default function InlineAttackPicker({
       )
     : [];
 
-  // Roll an attack for a row: log it, retain the result, clear any override, spend one attack.
-  function handleAttack(entry: AttackEntry) {
-    const result = roll(entry.attackSpec, entry.attackRollLabel);
-    logRollSafe("attack", entry.logSource, result, entry.attackSpec);
-    setLastAttackRolls((prev) => ({ ...prev, [entry.id]: result }));
-    setAttackTotals((prev) => ({ ...prev, [entry.id]: null }));
-    turnState.recordAttack();
-  }
-
   // Roll to hit from a weapon card: make it the active weapon, then roll.
   function handleWeaponRollToHit(entry: AttackEntry) {
     setActiveWeaponId(entry.id);
     handleAttack(entry);
   }
 
-  // Roll damage for a row: log it, retain the result, clear any override.
-  function handleDamage(entry: AttackEntry) {
-    const result = roll(entry.damageSpec, entry.damageRollLabel);
-    logRollSafe("damage", entry.logSource, result, entry.damageSpec, entry.damageType);
-    setLastDamageRolls((prev) => ({ ...prev, [entry.id]: result }));
-    setDamageTotals((prev) => ({ ...prev, [entry.id]: null }));
-  }
-
-  // Roll critical damage for a row: same path as handleDamage but on the doubled spec.
-  function handleCritDamage(entry: AttackEntry) {
-    const spec = critDamageSpec(entry.damageSpec);
-    const result = roll(spec, entry.damageRollLabel);
-    logRollSafe("damage", entry.logSource, result, spec, entry.damageType);
-    setLastDamageRolls((prev) => ({ ...prev, [entry.id]: result }));
-    setDamageTotals((prev) => ({ ...prev, [entry.id]: null }));
-  }
-
-  // Roll one on-hit dice rider (e.g. Flame Tongue +2d6 fire) as its own typed term.
-  // On a crit the rider's dice double too — mirror the parent row's last damage roll.
+  // Rider rolls mirror the ACTIVE weapon's crit state (see useAttackRolls).
   function handleDamageRider(rider: DamageRider) {
-    const parentCrit = activeEntry ? Boolean(lastDamageRolls[activeEntry.id]?.spec.crit) : false;
-    const spec = parentCrit ? critDamageSpec(rider.spec) : rider.spec;
-    const result = roll(spec, rider.rollLabel);
-    logRollSafe("damage", rider.logSource, result, spec, rider.damageType);
-    setRiderTotals((prev) => ({ ...prev, [rider.id]: result.total }));
-  }
-
-  // Callback for ManeuverPrompt — stores auto-sum overrides per row.
-  function makeOnRollsUpdated(rowId: string) {
-    return (newAtk: number | null, newDmg: number | null) => {
-      if (newAtk !== null) {
-        setAttackTotals((prev) => ({ ...prev, [rowId]: newAtk }));
-      }
-      if (newDmg !== null) {
-        setDamageTotals((prev) => ({ ...prev, [rowId]: newDmg }));
-      }
-    };
+    rolls.handleDamageRider(rider, activeEntry?.id ?? null);
   }
 
   // Handler for "attackOption" maneuver rows (e.g. Commander's Strike).
@@ -159,28 +228,19 @@ export default function InlineAttackPicker({
     }));
   }
 
-  // Determine whether a given attackOption row's "Use" button is enabled.
-  function attackOptionEnabled(m: ManeuverEntry): { enabled: boolean; reason?: string } {
-    if (!pool || pool.remaining === 0) {
-      return { enabled: false, reason: "No superiority dice remaining." };
-    }
-    if (attacksExhausted) {
-      return { enabled: false, reason: "No attacks remaining to forfeit." };
-    }
-    if (m.actionSlot === "bonusAction" && turnState.bonusActionUsed) {
-      return { enabled: false, reason: "Bonus action already used." };
-    }
-    return { enabled: true };
-  }
-
   const preRoll = turnState.attack !== null && turnState.attack.used === 0;
+
+  // Live Extra-Attack count for this action, from the turn economy (falls back to
+  // the server-derived total when no Attack action is in progress).
+  const attackCount = turnState.attack?.total ?? character.attacksPerAction;
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Extra Attack count for this Attack action (server-derived). */}
-      <p className="text-xs font-semibold uppercase tracking-wide text-parchment-600">
-        Attacks: {character.attacksPerAction}
-      </p>
+      {/* Live Extra-Attack counter — pips + "N of M remaining". Hidden at total 1
+          (the kicker's "1 attack" is enough). */}
+      {turnState.attack !== null && turnState.attack.total > 1 && (
+        <AttackCounter total={turnState.attack.total} used={turnState.attack.used} label="Attacks" />
+      )}
 
       {weaponEntries.length === 0 && (
         <p className="text-sm text-parchment-600">
@@ -244,7 +304,7 @@ export default function InlineAttackPicker({
 
       {/* ── Attack-option maneuvers (e.g. Commander's Strike) ────────────────── */}
       {attackOptionManeuvers.map((m) => {
-        const { enabled, reason } = attackOptionEnabled(m);
+        const { enabled, reason } = attackOptionEnabled(m, pool, attacksExhausted, turnState.bonusActionUsed);
         return (
           <AttackOptionRow
             key={m.id}
@@ -271,7 +331,8 @@ export default function InlineAttackPicker({
       {/* ── Cancel (pre-roll, refunds the action) / Done (post-roll) footer ────── */}
       <div className="flex flex-col gap-1.5 pt-1">
         <p className="text-[11px] text-parchment-500">
-          No target AC tracked — read the roll to your DM.
+          {attackCount} attack{attackCount === 1 ? "" : "s"} · no target AC tracked — read the roll
+          to your DM.
         </p>
         <button
           type="button"
