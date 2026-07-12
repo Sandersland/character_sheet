@@ -632,8 +632,9 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
     expect(sheet().getByText(/Attacks:\s*0 of 2 remaining/)).toBeInTheDocument();
     expect(sheet().getByRole("button", { name: /Roll to hit/ })).toBeDisabled();
-    // Damage stays usable under the ungated trust model.
-    expect(sheet().getByRole("button", { name: /Roll damage/ })).not.toBeDisabled();
+    // The Damage card bound to the rolled form stays usable after the attacks
+    // run out (label flips to "Roll crit damage" on a nat-20 to-hit).
+    expect(sheet().getByRole("button", { name: /Roll (crit )?damage/ })).not.toBeDisabled();
   });
 
   it("switches the footer from Cancel to Done after the first roll", async () => {

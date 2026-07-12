@@ -90,8 +90,7 @@ describe("useDragToDismiss gesture machine", () => {
 
   function fire(el: HTMLElement, type: string, clientY: number, at = clock) {
     clock = at;
-    const e = new MouseEvent(type, { bubbles: true, clientY });
-    Object.defineProperty(e, "pointerId", { value: 1 });
+    const e = new PointerEvent(type, { bubbles: true, clientY, pointerId: 1 });
     el.dispatchEvent(e);
   }
 
@@ -105,10 +104,10 @@ describe("useDragToDismiss gesture machine", () => {
     const onDismiss = vi.fn();
     const onExitStart = vi.fn();
     const ref = { current: panel } as RefObject<HTMLElement>;
-    const { result } = renderHook(() => useDragToDismiss(ref, { onDismiss, onExitStart, enabled }));
+    const { result, unmount } = renderHook(() => useDragToDismiss(ref, { onDismiss, onExitStart, enabled }));
     attach(handle, result.current.handleProps as Handlers);
     attach(content, result.current.contentProps as Handlers);
-    return { onDismiss, onExitStart, result };
+    return { onDismiss, onExitStart, result, unmount };
   }
 
   it("follows the finger via a translateY transform while dragging the handle", () => {
@@ -290,6 +289,51 @@ describe("useDragToDismiss gesture machine", () => {
   it("exit: reduced motion dismisses immediately with no travel animation", () => {
     stubMatchMedia(true);
     const { onDismiss, result } = render();
+    result.current.beginExit();
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(panel.style.transform).toBe("");
+    expect(panel.style.transition).toBe("");
+  });
+
+  it("exit: unmounting mid-exit cancels the timer/listener and never dismisses after unmount", () => {
+    vi.useFakeTimers();
+    try {
+      const { onDismiss, result, unmount } = render();
+      result.current.beginExit();
+      expect(panel.style.transform).toBe("translateY(100%)");
+      unmount();
+      // The fallback timer is cleared…
+      vi.advanceTimersByTime(600);
+      expect(onDismiss).not.toHaveBeenCalled();
+      // …and a late transitionend after unmount is inert (listener removed).
+      fireTransitionEnd(panel, "transform");
+      expect(onDismiss).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("exit: a completed cycle resets exiting so a second drag dismisses again — no remount", () => {
+    const { onDismiss } = render();
+    fire(handle, "pointerdown", 0, 0);
+    fire(handle, "pointermove", 250, 1000);
+    fire(handle, "pointerup", 250, 2000);
+    fireTransitionEnd(panel, "transform");
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+
+    fire(handle, "pointerdown", 0, 3000);
+    fire(handle, "pointermove", 250, 4000);
+    fire(handle, "pointerup", 250, 5000);
+    expect(panel.style.transform).toBe("translateY(100%)");
+    fireTransitionEnd(panel, "transform");
+    expect(onDismiss).toHaveBeenCalledTimes(2);
+  });
+
+  it("disabled: beginExit dismisses immediately with no transform write", () => {
+    const onDismiss = vi.fn();
+    const { result } = renderHook(() =>
+      useDragToDismiss({ current: panel } as RefObject<HTMLElement>, { onDismiss, enabled: false }),
+    );
     result.current.beginExit();
     expect(onDismiss).toHaveBeenCalledTimes(1);
     expect(panel.style.transform).toBe("");

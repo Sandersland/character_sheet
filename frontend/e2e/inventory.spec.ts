@@ -5,9 +5,9 @@ import { collectConsoleErrors } from "./helpers/console";
 import { createCharacter, createSessionCharacter, uniqueName } from "./helpers/api";
 
 // A fresh, session-ready character keeps the inventory (and thus the in-session
-// attack row) unambiguous: exactly one weapon exists, so its equipped state maps
-// cleanly onto the attack row.
-test("inventory: add catalog item shows weight/qty; equip/unequip drives the attack row", async ({
+// attack-form selector) unambiguous: exactly one weapon exists, so its equipped
+// state maps cleanly onto the weapon segment.
+test("inventory: add catalog item shows weight/qty; equip/unequip drives the attack selector", async ({
   page,
 }) => {
   await login(page);
@@ -46,20 +46,22 @@ test("inventory: add catalog item shows weight/qty; equip/unequip drives the att
   await page.getByRole("button", { name: /Use Action/ }).click();
   await page.getByRole("button", { name: "Attack", exact: true }).click();
 
-  // Equipped → the Dagger is its own weapon card with a "Roll to hit" button.
+  // Equipped → the Dagger is a form segment in the "Attacking with" selector, and
+  // the attack card carries the single "Roll to hit" button (#786).
   await expect(page.getByText(/no target AC tracked/i)).toBeVisible();
-  await expect(page.getByText("Dagger").first()).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Dagger" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Roll to hit/ })).toBeVisible();
 
   // The attack picker is a modal bottom sheet (#729): close it, unequip from the
   // Inventory tab behind it, then reopen — with no weapon equipped the picker now
-  // shows the turn-screen empty-state hint. (Closing refunds the Attack action.)
+  // shows the turn-screen empty-state hint and the selector drops the Dagger
+  // segment (defaulting to Unarmed). (Closing refunds the Attack action.)
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Equipped", pressed: true }).click();
   await page.getByRole("button", { name: /Use Action/ }).click();
   await page.getByRole("button", { name: "Attack", exact: true }).click();
   await expect(page.getByText(/No weapon equipped/i)).toBeVisible();
-  await expect(page.getByRole("button", { name: /Roll to hit/ })).toHaveCount(0);
+  await expect(page.getByRole("radio", { name: "Dagger" })).toHaveCount(0);
 
   expect(errors).toEqual([]);
 });

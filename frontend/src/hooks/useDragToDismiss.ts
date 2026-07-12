@@ -47,6 +47,18 @@ export function useDragToDismiss(
 
   const exiting = useRef(false);
 
+  // beginExit's cancel-only teardown (clearTimeout + removeEventListener), run
+  // on unmount so a mid-exit sheet leaves no dangling timer/listener.
+  const teardown = useRef<(() => void) | null>(null);
+  useEffect(
+    () => () => {
+      teardown.current?.();
+      teardown.current = null;
+      exiting.current = false;
+    },
+    [],
+  );
+
   const drag = useRef<{
     active: boolean;
     armed: boolean;
@@ -77,8 +89,9 @@ export function useDragToDismiss(
     onExitStartRef.current?.();
 
     const panel = panelRef.current;
-    if (!panel || reducedMotion.current) {
+    if (!enabled || !panel || reducedMotion.current) {
       onDismissRef.current();
+      exiting.current = false;
       return;
     }
 
@@ -88,7 +101,9 @@ export function useDragToDismiss(
       done = true;
       clearTimeout(timer);
       panel.removeEventListener("transitionend", onEnd);
+      teardown.current = null;
       onDismissRef.current();
+      exiting.current = false;
     };
     const onEnd = (e: TransitionEvent) => {
       if (e.propertyName === "transform") finish();
@@ -99,6 +114,10 @@ export function useDragToDismiss(
     panel.style.transform = "translateY(100%)";
     panel.addEventListener("transitionend", onEnd);
     const timer = setTimeout(finish, EXIT_MS + 100);
+    teardown.current = () => {
+      clearTimeout(timer);
+      panel.removeEventListener("transitionend", onEnd);
+    };
   }
 
   function settle(dismiss: boolean) {

@@ -122,6 +122,26 @@ export async function restoreResourcePool(
   expect(restoreResponse.ok(), `restore ${key}: ${restoreResponse.status()}`).toBeTruthy();
 }
 
+// Clear a status condition from a shared persona so its apply flow is
+// deterministic regardless of leftover state. No-op when the key isn't active
+// (removeCondition errors on an absent key), mirroring restoreResourcePool.
+export async function removeCondition(
+  request: APIRequestContext,
+  characterId: string,
+  key: string,
+): Promise<void> {
+  const response = await request.get(`/api/characters/${characterId}`);
+  expect(response.ok(), `load character: ${response.status()}`).toBeTruthy();
+  const character = (await response.json()) as {
+    conditions?: { active?: { key: string }[] };
+  };
+  if (!character.conditions?.active?.some((c) => c.key === key)) return;
+  const removeResponse = await request.post(`/api/characters/${characterId}/conditions/transactions`, {
+    data: { operations: [{ type: "removeCondition", key }] },
+  });
+  expect(removeResponse.ok(), `remove condition ${key}: ${removeResponse.status()}`).toBeTruthy();
+}
+
 // Add the named catalog spells to a character's spellbook, prepared so they read
 // as castable. Returns nothing; the caller reloads the sheet to see them.
 export async function learnSpells(
