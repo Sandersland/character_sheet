@@ -59,8 +59,6 @@ export interface TurnState {
   attack: AttackState | null;
   /** Non-null while the bonus action is an off-hand TWF attack. */
   bonusAttack: AttackState | null;
-  /** Whether TWF is available for the bonus action (gates the affordance). */
-  twfAvailable: boolean;
   /**
    * Tracks what was cast from each slot this turn (set when InlineSpellPicker
    * commits a cast). Used to enforce the 5e bonus-action spell restriction:
@@ -94,7 +92,6 @@ export type EconomySnapshot = Pick<
   | "reactionUsed"
   | "attack"
   | "bonusAttack"
-  | "twfAvailable"
   | "spellCastThisTurn"
 >;
 
@@ -145,6 +142,12 @@ export interface TurnStateActions {
    */
   grantExtraAction: () => void;
   /**
+   * Return the action spent on a mid-turn loadout swap (#733, Decision #2) — the
+   * caller re-issues the inverse inventory ops at its surface. Mechanically a
+   * +1 to actionsRemaining, so it shares grantExtraAction's implementation.
+   */
+  refundAction: () => void;
+  /**
    * Commit the action slot for a spell cast (consumes the action and records the
    * spell kind for the 5e bonus-action restriction). Call on successful cast.
    */
@@ -166,6 +169,18 @@ export interface TurnStateActions {
   undo: () => void;
 }
 
+/**
+ * The full value returned by useTurnState: the persisted economy state, the
+ * action callbacks, plus `twfAvailable` — DERIVED from the live loadout (not
+ * persisted), so a mid-turn weapon swap updates the off-hand affordance
+ * immediately (#733). Components read this; the persisted slice is `TurnState`.
+ */
+export type TurnStateView = TurnState &
+  TurnStateActions & {
+    /** Whether TWF is available for the bonus action (gates the affordance). */
+    twfAvailable: boolean;
+  };
+
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
 function initialState(): TurnState {
@@ -178,7 +193,6 @@ function initialState(): TurnState {
     reactionUsed: false,
     attack: null,
     bonusAttack: null,
-    twfAvailable: false,
     spellCastThisTurn: {},
     attackedThisTurn: false,
     tookDamageThisTurn: false,
@@ -194,16 +208,19 @@ function economyOf(s: TurnState): EconomySnapshot {
     reactionUsed: s.reactionUsed,
     attack: s.attack,
     bonusAttack: s.bonusAttack,
-    twfAvailable: s.twfAvailable,
     spellCastThisTurn: s.spellCastThisTurn,
   };
 }
 
-export function useTurnState(character: Character, sessionId: string): TurnState & TurnStateActions {
+export function useTurnState(character: Character, sessionId: string): TurnStateView {
   const [state, setState] = useState<TurnState>(() => {
     // Lazily hydrate from localStorage on first mount.
     return loadTurnState(sessionId) ?? initialState();
   });
+
+  // Derived (not persisted): TWF eligibility follows the LIVE loadout, so a
+  // mid-turn weapon swap updates the off-hand affordance immediately (#733).
+  const twfAvailable = canTwoWeaponFight(character.inventory, character.resources?.fightingStyle);
 
   // Server-derived, multiclass-correct (max across classes); see srd.ts.
   const attacksPerAction = character.attacksPerAction;
@@ -239,7 +256,6 @@ export function useTurnState(character: Character, sessionId: string): TurnState
       reactionUsed: false,
       attack: null,
       bonusAttack: null,
-      twfAvailable: false,
       spellCastThisTurn: {},
       attackedThisTurn: false,
       tookDamageThisTurn: false,
@@ -265,11 +281,10 @@ export function useTurnState(character: Character, sessionId: string): TurnState
       reactionUsed: false, // reaction resets at start of YOUR turn
       attack: null,
       bonusAttack: null,
-      twfAvailable: canTwoWeaponFight(character.inventory, character.resources?.fightingStyle),
       spellCastThisTurn: {},
       history: [], // undo never reaches across turns
     }));
-  }, [character.inventory, character.resources?.fightingStyle, currentHp]);
+  }, [currentHp]);
 
   const endTurn = useCallback(() => {
     setState((s) => {
@@ -399,6 +414,15 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     mutate((s) => ({ ...s, actionsRemaining: s.actionsRemaining + 1 }));
   }, [mutate]);
 
+  // Refunding a mid-turn loadout swap returns the spent action (#733); the +1 is
+  // identical to granting an extra action, so alias it rather than duplicate.
+  // Note: like grantExtraAction it goes through `mutate`, so the +1 is pushed onto
+  // the undo history — a subsequent `undo()` can revert it while the server
+  // inventory stays swapped-back (undo is local-only, per its doc). Acceptable:
+  // only the rare swap→refund→undo sequence diverges, and the loadout Refund is
+  // the intended reversal surface, not undo.
+  const refundAction = grantExtraAction;
+
   const commitActionSpell = useCallback((spellLevel: number) => {
     const kind: SpellCastKind = spellLevel === 0 ? "cantrip" : "leveled";
     mutate((s) => ({
@@ -436,6 +460,7 @@ export function useTurnState(character: Character, sessionId: string): TurnState
 
   return {
     ...state,
+    twfAvailable,
     startCombat,
     endCombat,
     startTurn,
@@ -451,6 +476,7 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     cancelTwf,
     consumeReaction,
     grantExtraAction,
+    refundAction,
     commitActionSpell,
     commitBonusActionSpell,
     commitReactionSpell,

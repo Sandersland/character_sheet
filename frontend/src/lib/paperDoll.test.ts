@@ -4,6 +4,7 @@ import type { InventoryItem } from "@/types/character";
 import {
   allowedSlotsForItem,
   bagItemsForSlot,
+  equippedLoadoutLabel,
   equipSlotLabel,
   hasEquipSlots,
   isOffHandLocked,
@@ -57,6 +58,40 @@ describe("equipSlotLabel", () => {
   it("humanizes underscored slot keys", () => {
     expect(equipSlotLabel("MAIN_HAND")).toBe("Main hand");
     expect(equipSlotLabel("RING")).toBe("Ring");
+  });
+});
+
+describe("equippedLoadoutLabel (#733)", () => {
+  const inSlot = (slot: "MAIN_HAND" | "OFF_HAND", o: Partial<InventoryItem>) =>
+    ({ ...o, equipped: true, equippedSlot: slot }) as InventoryItem;
+
+  it("returns Unarmed when both hands are empty", () => {
+    expect(equippedLoadoutLabel([])).toBe("Unarmed");
+  });
+
+  it("joins main + off with an ampersand", () => {
+    const inv = [
+      inSlot("MAIN_HAND", weapon(false, { name: "Longsword" })),
+      inSlot("OFF_HAND", shield({ name: "Shield" })),
+    ];
+    expect(equippedLoadoutLabel(inv)).toBe("Longsword & Shield");
+  });
+
+  it("collapses two identical weapons", () => {
+    const inv = [
+      inSlot("MAIN_HAND", weapon(false, { name: "Dagger" })),
+      inSlot("OFF_HAND", weapon(false, { name: "Dagger" })),
+    ];
+    expect(equippedLoadoutLabel(inv)).toBe("Two daggers");
+  });
+
+  it("labels a two-handed weapon and omits the off-hand", () => {
+    const inv = [inSlot("MAIN_HAND", weapon(true, { name: "Greatsword" }))];
+    expect(equippedLoadoutLabel(inv)).toBe("Greatsword (two-handed)");
+  });
+
+  it("handles a lone main-hand weapon (empty off-hand)", () => {
+    expect(equippedLoadoutLabel([inSlot("MAIN_HAND", weapon(false, { name: "Rapier" }))])).toBe("Rapier");
   });
 });
 
