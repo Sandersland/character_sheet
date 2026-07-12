@@ -35,7 +35,7 @@ function InertDamageCard() {
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold text-parchment-900">Damage</span>
         <span className="block truncate text-xs text-parchment-600">
-          Roll to hit to roll damage for your hit
+          Roll to hit first — then roll damage
         </span>
       </span>
       <button

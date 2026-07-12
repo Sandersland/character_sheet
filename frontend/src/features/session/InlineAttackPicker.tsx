@@ -8,8 +8,8 @@ import { useRoll } from "@/features/dice/RollContext";
 import {
   attacksExhausted as computeAttacksExhausted,
   buildAttackForms,
-  buildEquippedWeaponEntries,
   hasSuperiorityDice,
+  type AttackEntry,
 } from "@/lib/attackMath";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { useRollLogger } from "@/features/session/useRollLogger";
@@ -22,6 +22,20 @@ import { AttackCounter } from "@/features/session/TurnControls";
 import InlineSpellAttackSection from "@/features/session/InlineSpellAttackSection";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
+
+// Selection state: the chosen form drives the attack card; the last-rolled form
+// binds the Damage card (RAW: damage belongs to the form that was declared and
+// rolled). Both resolve against the live `forms` list so a mid-open inventory
+// change falls back to a real, visibly checked option.
+function useAttackFormSelection(forms: AttackEntry[]) {
+  const [selectedId, setSelectedId] = useState<string>(forms[0].id);
+  const [lastRolledId, setLastRolledId] = useState<string | null>(null);
+  const selectedEntry = forms.find((f) => f.id === selectedId) ?? forms[0];
+  const lastRolledEntry = lastRolledId
+    ? forms.find((f) => f.id === lastRolledId) ?? null
+    : null;
+  return { selectedEntry, lastRolledEntry, setSelectedId, markRolled: setLastRolledId };
+}
 
 interface InlineAttackPickerProps {
   character: Character;
@@ -60,14 +74,11 @@ export default function InlineAttackPicker({
   });
 
   const forms = buildAttackForms(character);
-  const hasWeapon = buildEquippedWeaponEntries(character).length > 0;
+  // buildAttackForms always appends Unarmed + Improvised, so any other id is a weapon.
+  const hasWeapon = forms.some((f) => f.id !== "unarmed" && f.id !== "improvised");
 
-  // Selected form drives the attack card; last-rolled form drives the Damage card.
-  const [selectedId, setSelectedId] = useState<string>(forms[0].id);
-  const [lastRolledId, setLastRolledId] = useState<string | null>(null);
-
-  const selectedEntry = forms.find((f) => f.id === selectedId) ?? forms[0];
-  const lastRolledEntry = lastRolledId ? forms.find((f) => f.id === lastRolledId) ?? null : null;
+  const { selectedEntry, lastRolledEntry, setSelectedId, markRolled } =
+    useAttackFormSelection(forms);
 
   const showManeuvers = hasSuperiorityDice(character);
   const attacksExhausted = computeAttacksExhausted(turnState.attack);
@@ -75,7 +86,7 @@ export default function InlineAttackPicker({
 
   // Roll to hit with the selected form and bind the Damage card to it.
   function handleRollToHit() {
-    setLastRolledId(selectedEntry.id);
+    markRolled(selectedEntry.id);
     viewFor(selectedEntry).onAttack();
   }
 
@@ -95,7 +106,7 @@ export default function InlineAttackPicker({
 
       <AttackFormCard
         forms={forms}
-        selectedId={selectedId}
+        selectedId={selectedEntry.id}
         onSelect={setSelectedId}
         view={viewFor(selectedEntry)}
         attacksExhausted={attacksExhausted}

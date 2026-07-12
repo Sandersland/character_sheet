@@ -118,6 +118,48 @@ describe("InlineAttackPicker — attack form selector (#786)", () => {
     expect(screen.getAllByRole("button", { name: /Roll damage/ })).toHaveLength(1);
   });
 
+  it("keeps a visibly checked form when the selected weapon leaves the inventory", async () => {
+    const user = userEvent.setup();
+    const shared = {
+      turnState,
+      sessionId: "sess-1",
+      onClose: vi.fn(),
+      onCancel: vi.fn(),
+      onUpdate: vi.fn(),
+      onLogChanged: vi.fn(),
+    };
+    const { rerender } = render(
+      <RollProvider>
+        <InlineAttackPicker
+          character={makeCharacter({
+            inventory: [equippedWeapon("Longsword", "inv-1"), equippedWeapon("Dagger", "inv-2")] as unknown as Character["inventory"],
+          })}
+          {...shared}
+        />
+      </RollProvider>,
+    );
+    await user.click(screen.getByRole("radio", { name: "Dagger" }));
+    expect(screen.getByRole("radio", { name: "Dagger" })).toHaveAttribute("aria-checked", "true");
+
+    // The selected weapon disappears mid-open (live inventory change) — the
+    // selector must fall back to a visibly checked option, never nothing-selected.
+    rerender(
+      <RollProvider>
+        <InlineAttackPicker
+          character={makeCharacter({
+            inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"],
+          })}
+          {...shared}
+        />
+      </RollProvider>,
+    );
+    const checked = screen
+      .getAllByRole("radio")
+      .filter((r) => r.getAttribute("aria-checked") === "true");
+    expect(checked).toHaveLength(1);
+    expect(checked[0]).toHaveAccessibleName("Longsword");
+  });
+
   it("collapses two same-name equipped weapons into a single segment", () => {
     renderPicker(
       makeCharacter({
@@ -476,7 +518,7 @@ describe("InlineAttackPicker — Damage card copy (#786)", () => {
       makeCharacter({ inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"] }),
     );
     expect(screen.queryByText(/land the hit/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/Roll to hit to roll damage/)).toBeInTheDocument();
+    expect(screen.getByText(/Roll to hit first — then roll damage/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
     expect(screen.getByText(/Longsword · 1d8 slashing/)).toBeInTheDocument();

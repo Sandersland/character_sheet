@@ -221,7 +221,7 @@ export function buildEquippedWeaponEntries(character: Character): AttackEntry[] 
 }
 
 // The Unarmed Strike attack row — flat display when faces === 1 (baseline).
-export function buildUnarmedEntry(character: Character): AttackEntry {
+function buildUnarmedEntry(character: Character): AttackEntry {
   const { unarmedStrike } = character;
   const unarmedSpec: RollSpecTriple = {
     count: unarmedStrike.damage.count,
@@ -245,7 +245,7 @@ export function buildUnarmedEntry(character: Character): AttackEntry {
 }
 
 // The Improvised Weapon attack row — signed bonus, "(no proficiency)" note when unproficient.
-export function buildImprovisedEntry(character: Character): AttackEntry {
+function buildImprovisedEntry(character: Character): AttackEntry {
   const { improvisedWeapon } = character;
   const improvisedSpec: RollSpecTriple = {
     count: improvisedWeapon.damage.count,
