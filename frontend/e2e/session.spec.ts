@@ -71,7 +71,7 @@ test("session: roll-mode toggle docks as a bottom bar on mobile", async ({ page 
 
   const toggle = page.getByRole("group", { name: "Roll mode" });
   await expect(toggle).toBeVisible();
-  await expect(toggle.getByRole("button", { name: /^ADV$/ })).toBeVisible();
+  await expect(toggle.getByRole("button", { name: /^advantage$/i })).toBeVisible();
 
   // The docked bar spans (near) full width and sits at the bottom of the viewport.
   const box = await toggle.boundingBox();
@@ -83,7 +83,7 @@ test("session: roll-mode toggle docks as a bottom bar on mobile", async ({ page 
   }
 
   // Toggling advantage still flips the shared roll mode (aria-pressed).
-  const adv = toggle.getByRole("button", { name: /^ADV$/ });
+  const adv = toggle.getByRole("button", { name: /^advantage$/i });
   await adv.click();
   await expect(adv).toHaveAttribute("aria-pressed", "true");
 
