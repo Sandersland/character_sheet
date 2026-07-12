@@ -22,6 +22,8 @@ function inlineScriptHashes(staticDir: string): string[] {
   try {
     const html = readFileSync(join(staticDir, "index.html"), "utf8");
     const hashes: string[] = [];
+    // Non-greedy body match ends at the FIRST </script> — a script body that
+    // contains that token as a literal would hash truncated content.
     for (const match of html.matchAll(/<script(?![^>]*\bsrc\s*=)[^>]*>([\s\S]*?)<\/script>/gi)) {
       if (!match[1]) continue;
       hashes.push(`'sha256-${createHash("sha256").update(match[1]).digest("base64")}'`);
