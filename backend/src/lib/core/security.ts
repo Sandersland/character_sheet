@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import type { RequestHandler } from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -34,10 +35,19 @@ export function securityHeaders(servesStatic: boolean): RequestHandler {
             // (declarative prefetch JSON — it cannot execute code), so this is
             // not an 'unsafe-inline' loosening. Browsers that don't know the
             // keyword ignore it.
+            // Cloudflare JavaScript Detections (Bot Fight Mode) injects a real
+            // inline snippet into HTML responses. CF's documented CSP
+            // integration: it parses THIS response header and stamps its
+            // injected scripts with the nonce below — so the nonce exists for
+            // Cloudflare's injections, not for any first-party inline script
+            // (the Vite build ships none). A fresh nonce per request; host
+            // sources ('self', the beacon) stay honored alongside it because
+            // no 'strict-dynamic' is set.
             scriptSrc: [
               "'self'",
               "https://static.cloudflareinsights.com",
               "'inline-speculation-rules'",
+              () => `'nonce-${randomBytes(16).toString("base64")}'`,
             ],
             // The 3D dice roller (@react-three) spawns a Web Worker from a
             // blob: URL; without an explicit workerSrc it falls back to

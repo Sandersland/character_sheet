@@ -60,9 +60,17 @@ The backend applies `helmet` (HSTS, `nosniff`, `X-Frame-Options`, CSP, …) and
 (`SERVE_STATIC_DIR` set) the Content-Security-Policy is tuned to allow the
 Vite-built assets (self-hosted scripts, `'unsafe-inline'` styles, `data:`
 fonts/images) plus the Cloudflare injections observed on the live zone: the Web
-Analytics beacon (script + connect) and Speed Brain's inline
+Analytics beacon (script + connect), Speed Brain's inline
 `<script type="speculationrules">` (allowed via the `'inline-speculation-rules'`
-keyword — declarative prefetch JSON only, not an inline-JS loosening). If a
+keyword — declarative prefetch JSON only, not an inline-JS loosening), and
+**JavaScript Detections** (Bot Fight Mode), which injects a real inline snippet
+into every HTML page. That last one is covered by a **fresh per-request
+`script-src` nonce**: Cloudflare's documented CSP integration parses the
+response's CSP header and stamps the nonce onto the scripts it injects, so no
+`'unsafe-inline'` and no fragile hash-pinning (the snippet rotates). Our own
+HTML ships no inline scripts, so the nonce never has to be templated into
+markup. (Alternative for zones that don't want this: disable JS Detections
+under Security → Bots in the Cloudflare dashboard.) If a
 future asset is blocked, adjust the directives in
 `backend/src/lib/core/security.ts`. Rate limiting is auto-disabled under test and can
 be turned off in any environment with `RATE_LIMIT_DISABLED=true`.

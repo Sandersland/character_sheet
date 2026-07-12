@@ -50,6 +50,19 @@ describe("securityHeaders single-origin CSP", () => {
     expect(csp).toContain("'inline-speculation-rules'");
     expect(csp).not.toMatch(/script-src[^;]*'unsafe-inline'/);
   });
+
+  it("carries a script-src nonce for Cloudflare's injected inline snippets (JS Detections)", () => {
+    expect(csp).toMatch(/script-src[^;]*'nonce-[A-Za-z0-9+/]{22}=*'/);
+  });
+
+  it("mints a fresh nonce per response — no nonce reuse", () => {
+    const nonceOf = (policy: string) => policy.match(/'nonce-([^']+)'/)?.[1];
+    const first = nonceOf(cspFor(true));
+    const second = nonceOf(cspFor(true));
+    expect(first).toBeTruthy();
+    expect(second).toBeTruthy();
+    expect(first).not.toBe(second);
+  });
 });
 
 describe("securityHeaders API-only mode", () => {
