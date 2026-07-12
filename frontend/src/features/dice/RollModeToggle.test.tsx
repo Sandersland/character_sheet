@@ -70,7 +70,7 @@ describe("RollModeToggle", () => {
     expect(bar.className).toContain("inset-x-0");
     expect(bar.className).toContain("bottom-0");
     expect(bar.className).toContain("border-t");
-    expect(bar.className).toContain("env(safe-area-inset-bottom)");
+    expect(bar.className).toContain("pb-[env(safe-area-inset-bottom)]");
     // md+: floating bottom-6 left-6 pill (surface stripped back to the control).
     expect(bar.className).toContain("md:bottom-6");
     expect(bar.className).toContain("md:left-6");
