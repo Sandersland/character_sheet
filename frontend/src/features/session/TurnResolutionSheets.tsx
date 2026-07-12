@@ -61,7 +61,7 @@ export default function TurnResolutionSheets({
     return (
       <BottomSheet
         title="Attack"
-        subtitle="1 attack · no target AC tracked — read the roll to your DM"
+        subtitle="1 attack"
         onClose={() => {
           turnState.cancelAttack();
           closeResolution();

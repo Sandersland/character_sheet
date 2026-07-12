@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   attacksExhausted,
   buildAttackEntries,
+  buildEquippedWeaponEntries,
   buildOffHandEntry,
   capabilitiesActive,
   critDamageSpec,
@@ -148,6 +149,40 @@ describe("attacksExhausted", () => {
     expect(attacksExhausted({ used: 0, total: 1 })).toBe(false);
     expect(attacksExhausted({ used: 1, total: 1 })).toBe(true);
     expect(attacksExhausted({ used: 2, total: 1 })).toBe(true);
+  });
+});
+
+describe("buildEquippedWeaponEntries", () => {
+  it("collapses same-name equipped duplicates into one entry", () => {
+    const character = makeCharacter({
+      inventory: [
+        weaponItem({ attackBonus: 4, damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 2, damageType: "piercing" }, "Dagger", "inv-1"),
+        weaponItem({ attackBonus: 4, damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 2, damageType: "piercing" }, "Dagger", "inv-2"),
+      ] as unknown as Character["inventory"],
+    });
+    const entries = buildEquippedWeaponEntries(character);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].name).toBe("Dagger");
+    expect(entries[0].id).toBe("inv-1");
+  });
+
+  it("keeps one entry per distinct weapon name", () => {
+    const character = makeCharacter({
+      inventory: [
+        weaponItem({ attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 3, damageType: "slashing" }, "Longsword", "inv-1"),
+        weaponItem({ attackBonus: 4, damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 2, damageType: "piercing" }, "Dagger", "inv-2"),
+      ] as unknown as Character["inventory"],
+    });
+    expect(buildEquippedWeaponEntries(character).map((e) => e.name)).toEqual(["Longsword", "Dagger"]);
+  });
+
+  it("excludes unequipped weapons and non-weapons", () => {
+    const character = makeCharacter({
+      inventory: [
+        { ...weaponItem({ attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 3, damageType: "slashing" }, "Longsword", "inv-1"), equipped: false },
+      ] as unknown as Character["inventory"],
+    });
+    expect(buildEquippedWeaponEntries(character)).toEqual([]);
   });
 });
 

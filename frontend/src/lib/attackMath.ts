@@ -207,18 +207,28 @@ export function buildOffHandEntry(character: Character): AttackEntry | null {
   };
 }
 
-// Builds the ordered attack rows: equipped weapons, then unarmed, then improvised.
-export function buildAttackEntries(character: Character): AttackEntry[] {
-  const entries: AttackEntry[] = equippedWeapons(character).map(buildWeaponEntry);
+// Distinct equipped-weapon rows, collapsing same-name duplicates (two Daggers →
+// one entry). First occurrence wins so its attack/damage snapshot drives the card.
+export function buildEquippedWeaponEntries(character: Character): AttackEntry[] {
+  const seen = new Set<string>();
+  const entries: AttackEntry[] = [];
+  for (const item of equippedWeapons(character)) {
+    if (seen.has(item.name)) continue;
+    seen.add(item.name);
+    entries.push(buildWeaponEntry(item));
+  }
+  return entries;
+}
 
-  const { unarmedStrike, improvisedWeapon } = character;
-
+// The Unarmed Strike attack row — flat display when faces === 1 (baseline).
+export function buildUnarmedEntry(character: Character): AttackEntry {
+  const { unarmedStrike } = character;
   const unarmedSpec: RollSpecTriple = {
     count: unarmedStrike.damage.count,
     faces: unarmedStrike.damage.faces,
     modifier: unarmedStrike.damage.modifier,
   };
-  entries.push({
+  return {
     id: "unarmed",
     name: "Unarmed Strike",
     attackLabel: `+${unarmedStrike.attackBonus}`,
@@ -231,14 +241,18 @@ export function buildAttackEntries(character: Character): AttackEntry[] {
     damageRollLabel: "Unarmed strike damage (bludgeoning)",
     logSource: "Unarmed Strike",
     damageRiders: [],
-  });
+  };
+}
 
+// The Improvised Weapon attack row — signed bonus, "(no proficiency)" note when unproficient.
+export function buildImprovisedEntry(character: Character): AttackEntry {
+  const { improvisedWeapon } = character;
   const improvisedSpec: RollSpecTriple = {
     count: improvisedWeapon.damage.count,
     faces: improvisedWeapon.damage.faces,
     modifier: improvisedWeapon.damage.modifier,
   };
-  entries.push({
+  return {
     id: "improvised",
     name: "Improvised Weapon",
     attackLabel: `${improvisedWeapon.attackBonus >= 0 ? "+" : ""}${improvisedWeapon.attackBonus}`,
@@ -251,7 +265,14 @@ export function buildAttackEntries(character: Character): AttackEntry[] {
     damageRollLabel: "Improvised weapon damage (bludgeoning)",
     logSource: "Improvised Weapon",
     damageRiders: [],
-  });
+  };
+}
 
-  return entries;
+// Builds the ordered attack rows: equipped weapons (raw, un-deduped), then unarmed, then improvised.
+export function buildAttackEntries(character: Character): AttackEntry[] {
+  return [
+    ...equippedWeapons(character).map(buildWeaponEntry),
+    buildUnarmedEntry(character),
+    buildImprovisedEntry(character),
+  ];
 }
