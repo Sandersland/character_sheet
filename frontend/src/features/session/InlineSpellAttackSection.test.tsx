@@ -37,7 +37,11 @@ function makeCharacter(spells: Spell[]): Character {
 }
 
 function makeTurnState(): TurnState & TurnStateActions {
-  return { commitActionSpell: vi.fn() } as unknown as TurnState & TurnStateActions;
+  return {
+    grantExtraAction: vi.fn(),
+    commitActionSpell: vi.fn(),
+    recordAttack: vi.fn(),
+  } as unknown as TurnState & TurnStateActions;
 }
 
 function renderSection(character: Character, turnState = makeTurnState(), onUpdate = vi.fn()) {
@@ -86,7 +90,7 @@ describe("InlineSpellAttackSection (#734)", () => {
     expect(screen.getByRole("button", { name: "Cast" })).toBeEnabled();
   });
 
-  it("Attack rolls a d20 spell attack and logs it (no recordAttack)", async () => {
+  it("Attack rolls a d20 spell attack, logs it, and locks the commitment via recordAttack", async () => {
     const user = userEvent.setup();
     const turnState = makeTurnState();
     renderSection(makeCharacter([fireBolt]), turnState);
@@ -96,11 +100,11 @@ describe("InlineSpellAttackSection (#734)", () => {
       "sess-1",
       expect.objectContaining({ kind: "attack", source: "Fire Bolt" }),
     );
-    // A spell attack must never touch the weapon Extra-Attack counter.
-    expect((turnState as unknown as { recordAttack?: unknown }).recordAttack).toBeUndefined();
+    // Marks an attack made so the "Back" refund is no longer offered (no peek-and-cancel).
+    expect(turnState.recordAttack).toHaveBeenCalledOnce();
   });
 
-  it("Cast rolls damage, posts the cantrip castSpell op, and commits the action spell", async () => {
+  it("Cast rolls damage, posts the cantrip castSpell op, and commits via commitAttackModeCantrip (no double-spend)", async () => {
     const user = userEvent.setup();
     const { turnState, onUpdate } = renderSection(makeCharacter([fireBolt]));
     mockCast.mockResolvedValue(makeCharacter([fireBolt]));
@@ -116,6 +120,8 @@ describe("InlineSpellAttackSection (#734)", () => {
     // Cantrip op omits slotLevel.
     expect(mockCast.mock.calls[0][1][0]).not.toHaveProperty("slotLevel");
     expect(onUpdate).toHaveBeenCalled();
+    // Grant-then-commit nets to zero action decrement (no double-spend on Action Surge).
+    expect(turnState.grantExtraAction).toHaveBeenCalledOnce();
     expect(turnState.commitActionSpell).toHaveBeenCalledWith(0);
     expect(vi.mocked(logRoll)).toHaveBeenCalledWith(
       "char-1",

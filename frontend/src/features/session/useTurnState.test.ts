@@ -254,6 +254,23 @@ describe("attack mode flow", () => {
     expect(result.current.attack).toEqual({ total: 2, used: 0 });
   });
 
+  it("attack-sheet cantrip cast (grantExtraAction + commitActionSpell) nets to no double-spend (#734)", () => {
+    // Action Surge: 2 actions. Enter attack mode (spends 1 → 1 remaining), then
+    // cast a cantrip from the sheet — the grant-then-commit combo must NOT burn
+    // the second action.
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    act(() => { result.current.grantExtraAction(); }); // Action Surge → 2
+    act(() => { result.current.enterAttackMode(); });   // → 1, attack set
+    expect(result.current.actionsRemaining).toBe(1);
+
+    act(() => { result.current.grantExtraAction(); result.current.commitActionSpell(0); });
+    expect(result.current.actionsRemaining).toBe(1); // +1 then −1 → unchanged
+    expect(result.current.attack).toBeNull();
+    expect(result.current.spellCastThisTurn.action).toBe("cantrip");
+  });
+
   it("enterAttackMode is a no-op when actionsRemaining is 0", () => {
     const character = makeCharacter({ attacksPerAction: 2 });
     const { result } = renderHook(() => useTurnState(character, SESSION_ID));

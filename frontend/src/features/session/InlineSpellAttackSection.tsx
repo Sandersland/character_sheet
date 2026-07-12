@@ -66,6 +66,10 @@ export default function InlineSpellAttackSection({
     logRollSafe("attack", spell.name, result, spec);
     setLastAttack((prev) => ({ ...prev, [spell.id]: result }));
     setAttackRolled((prev) => ({ ...prev, [spell.id]: true }));
+    // Lock in the commitment: mark an attack made this turn so the sheet's
+    // "Back" (action refund) is no longer offered — otherwise the player could
+    // peek the spell-attack d20 and cancel for free (same guard weapons get).
+    turnState.recordAttack();
   }
 
   // Roll the cantrip's damage (if any), returning the total to send to the server.
@@ -88,8 +92,12 @@ export default function InlineSpellAttackSection({
         { type: "castSpell", entryId: spell.id, roll: damageTotal },
       ]);
       onUpdate(updated);
-      // Single transactional cast — spends the action, tears down attack mode,
-      // and records the cantrip for the leveled-spell interlock (never recordAttack).
+      // The Attack action was already spent when the sheet opened (enterAttackMode).
+      // grantExtraAction refunds that pre-commit so commitActionSpell's own
+      // decrement nets to ZERO — recording the cantrip + tearing down attack mode
+      // without a double-spend on Action-Surge turns (a plain commitActionSpell
+      // here would burn two actions for one cantrip).
+      turnState.grantExtraAction();
       turnState.commitActionSpell(0);
       setAttackRolled((prev) => ({ ...prev, [spell.id]: false }));
     } catch (e) {
