@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   attacksExhausted,
   buildAttackEntries,
+  buildAttackForms,
   buildEquippedWeaponEntries,
   buildOffHandEntry,
   capabilitiesActive,
@@ -313,6 +314,34 @@ describe("buildAttackEntries", () => {
     const entries = buildAttackEntries(character);
     expect(entries.find((e) => e.id === "inv-1")!.damageRiders).toHaveLength(1);
     expect(entries.find((e) => e.id === "inv-2")!.damageRiders).toEqual([]);
+  });
+});
+
+describe("buildAttackForms (#786)", () => {
+  it("dedupes equipped weapons, then appends Unarmed then Improvised", () => {
+    const character = makeCharacter({
+      inventory: [
+        weaponItem({ attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 0, damageType: "piercing" }, "Dagger", "inv-1"),
+        weaponItem({ attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 0, damageType: "piercing" }, "Dagger", "inv-2"),
+      ] as unknown as Character["inventory"],
+    });
+    const forms = buildAttackForms(character);
+    expect(forms.map((f) => f.name)).toEqual(["Dagger", "Unarmed Strike", "Improvised Weapon"]);
+  });
+
+  it("defaults to Unarmed as the first form when no weapon is equipped", () => {
+    const forms = buildAttackForms(makeCharacter());
+    expect(forms.map((f) => f.id)).toEqual(["unarmed", "improvised"]);
+    expect(forms[0].name).toBe("Unarmed Strike");
+  });
+
+  it("puts the main-hand weapon first so it is the default selection", () => {
+    const character = makeCharacter({
+      inventory: [
+        weaponItem({ attackBonus: 6, damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 3, damageType: "slashing" }, "Longsword", "inv-1"),
+      ] as unknown as Character["inventory"],
+    });
+    expect(buildAttackForms(character)[0].name).toBe("Longsword");
   });
 });
 

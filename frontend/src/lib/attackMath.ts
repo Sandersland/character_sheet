@@ -276,3 +276,14 @@ export function buildAttackEntries(character: Character): AttackEntry[] {
     buildImprovisedEntry(character),
   ];
 }
+
+// The "Attacking with" form options for the single attack card (#786): deduped
+// equipped weapons, then Unarmed Strike, then Improvised Weapon. The first row is
+// the main-hand weapon (or Unarmed when nothing is equipped) — the default form.
+export function buildAttackForms(character: Character): AttackEntry[] {
+  return [
+    ...buildEquippedWeaponEntries(character),
+    buildUnarmedEntry(character),
+    buildImprovisedEntry(character),
+  ];
+}
