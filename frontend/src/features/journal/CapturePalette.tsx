@@ -48,12 +48,30 @@ export default function CapturePalette({
   // On mobile BottomSheet owns the chrome (scroll-lock/Escape/focus-trap); here
   // we only place initial focus. At md+ the top overlay supplies its own chrome.
   useEffect(() => {
+    // Defer focus past first paint (double rAF) so the overlay lays out before the
+    // keyboard animates, focus with preventScroll, then undo any residual reveal-
+    // scroll — together these stop iOS offsetting the fixed sheet on open (#784).
+    let raf1 = 0;
+    let raf2 = 0;
+    const deferredFocus = () => {
+      raf1 = requestAnimationFrame(() => {
+        raf2 = requestAnimationFrame(() => {
+          composerRef.current?.focus({ preventScroll: true });
+          if (window.scrollY !== 0) window.scrollTo(0, 0);
+        });
+      });
+    };
+    const cancelFocus = () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+
     if (isMobile) {
-      composerRef.current?.focus();
-      return;
+      deferredFocus();
+      return cancelFocus;
     }
     const previouslyFocused = document.activeElement as HTMLElement | null;
-    composerRef.current?.focus();
+    deferredFocus();
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
@@ -62,6 +80,7 @@ export default function CapturePalette({
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => {
+      cancelFocus();
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = originalOverflow;
       previouslyFocused?.focus();
@@ -74,7 +93,7 @@ export default function CapturePalette({
     const ok = await create({ kind: "NOTE", body, sessionId });
     if (ok) {
       setValue("");
-      composerRef.current?.focus();
+      composerRef.current?.focus({ preventScroll: true });
     }
   }
 
