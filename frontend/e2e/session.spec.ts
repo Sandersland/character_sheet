@@ -132,3 +132,32 @@ test("session: roll toast is suppressed while the attack sheet is open (mobile)"
 
   expect(errors).toEqual([]);
 });
+
+// #789: the mid-turn loadout row opens a per-hand picker (Main/Off cards) at
+// mobile width. The Session Fighter is Unarmed (empty hands, empty bag), so this
+// asserts the redesigned shell renders + opens cleanly; the gating/free-draw
+// permutations are covered by the LoadoutSwapRow + loadoutPicker unit suites.
+test("session: loadout Change opens the per-hand picker on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page);
+
+  const errors = collectConsoleErrors(page);
+  await page.getByRole("link", { name: /Session Fighter/ }).click();
+  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
+  await expect(page).toHaveURL(/\/session$/);
+
+  await page.getByRole("button", { name: /Start combat/i }).click();
+  await page.getByRole("button", { name: "Start my turn" }).click();
+
+  // The loadout row shows the current equipped label + a Change button.
+  await expect(page.getByText(/Equipped ·/)).toBeVisible();
+  await page.getByRole("button", { name: "Change" }).click();
+
+  // The picker is the per-hand card layout, not a flat candidate list.
+  const sheet = page.getByRole("dialog");
+  await expect(sheet.getByText("Change loadout")).toBeVisible();
+  await expect(sheet.getByText(/Main hand/)).toBeVisible();
+  await expect(sheet.getByText(/Off hand/)).toBeVisible();
+
+  expect(errors).toEqual([]);
+});

@@ -59,8 +59,12 @@ The backend applies `helmet` (HSTS, `nosniff`, `X-Frame-Options`, CSP, …) and
 `express-rate-limit` (the `RATE_LIMIT_*` knobs above). In single-origin mode
 (`SERVE_STATIC_DIR` set) the Content-Security-Policy is tuned to allow the
 Vite-built assets (self-hosted scripts, `'unsafe-inline'` styles, `data:`
-fonts/images); if a future asset is blocked, adjust the directives in
-`backend/src/lib/security.ts`. Rate limiting is auto-disabled under test and can
+fonts/images) plus the Cloudflare injections observed on the live zone: the Web
+Analytics beacon (script + connect) and Speed Brain's inline
+`<script type="speculationrules">` (allowed via the `'inline-speculation-rules'`
+keyword — declarative prefetch JSON only, not an inline-JS loosening). If a
+future asset is blocked, adjust the directives in
+`backend/src/lib/core/security.ts`. Rate limiting is auto-disabled under test and can
 be turned off in any environment with `RATE_LIMIT_DISABLED=true`.
 
 ## Local production smoke test

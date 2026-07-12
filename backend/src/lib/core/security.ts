@@ -28,7 +28,17 @@ export function securityHeaders(servesStatic: boolean): RequestHandler {
             // static.cloudflareinsights.com; allow it here. Workers are NOT
             // covered by scriptSrc — they get their own workerSrc below so we
             // don't have to loosen script execution to permit the dice worker.
-            scriptSrc: ["'self'", "https://static.cloudflareinsights.com"],
+            // Cloudflare Speed Brain additionally injects an inline
+            // <script type="speculationrules"> into HTML responses; the CSP3
+            // 'inline-speculation-rules' keyword permits ONLY that script type
+            // (declarative prefetch JSON — it cannot execute code), so this is
+            // not an 'unsafe-inline' loosening. Browsers that don't know the
+            // keyword ignore it.
+            scriptSrc: [
+              "'self'",
+              "https://static.cloudflareinsights.com",
+              "'inline-speculation-rules'",
+            ],
             // The 3D dice roller (@react-three) spawns a Web Worker from a
             // blob: URL; without an explicit workerSrc it falls back to
             // scriptSrc and gets blocked in single-origin mode.
