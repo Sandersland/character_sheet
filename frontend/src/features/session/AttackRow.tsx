@@ -2,6 +2,7 @@
 
 import AttackResultLine from "@/features/session/AttackResultLine";
 import ManeuverPrompt from "@/features/session/ManeuverPrompt";
+import { isNaturalOne } from "@/lib/dice";
 import type { AttackEntry, DamageRider } from "@/lib/attackMath";
 import type { Character } from "@/types/character";
 import type { RollResult } from "@/lib/dice";
@@ -17,14 +18,19 @@ interface AttackRowProps {
   lastDamageRoll: RollResult | null;
   /** Last rolled total per rider id (from InlineAttackPicker), shown inline. */
   riderTotals: Record<string, number>;
+  /** Effective crit (nat-20 to-hit OR manual toggle) — flips the Damage roll to doubled dice. */
+  isCrit: boolean;
+  /** Manual DM-called crit toggle state. */
+  manualCrit: boolean;
   onAttack: (entry: AttackEntry) => void;
   onDamage: (entry: AttackEntry) => void;
-  onCritDamage: (entry: AttackEntry) => void;
+  onToggleCrit: () => void;
   onDamageRider: (rider: DamageRider) => void;
   onRollsUpdated: (newAttackTotal: number | null, newDamageTotal: number | null) => void;
   onUpdate: (c: Character) => void;
 }
 
+// fallow-ignore-next-line complexity -- #766 grew this past the gate; decomposition tracked in #778
 export default function AttackRow({
   entry,
   attacksExhausted,
@@ -35,13 +41,16 @@ export default function AttackRow({
   lastAttackRoll,
   lastDamageRoll,
   riderTotals,
+  isCrit,
+  manualCrit,
   onAttack,
   onDamage,
-  onCritDamage,
+  onToggleCrit,
   onDamageRider,
   onRollsUpdated,
   onUpdate,
 }: AttackRowProps) {
+  const miss = isNaturalOne(lastAttackRoll);
   return (
     <div className="flex flex-col gap-1.5 py-3">
       <div className="flex items-center justify-between">
@@ -87,21 +96,28 @@ export default function AttackRow({
           >
             Attack
           </button>
-          <button
-            type="button"
-            onClick={() => onDamage(entry)}
-            className="rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
-          >
-            Damage
-          </button>
-          <button
-            type="button"
-            onClick={() => onCritDamage(entry)}
-            title="Critical hit — double the weapon damage dice"
-            className="rounded-control border border-garnet-300 bg-garnet-100 px-2.5 py-1 text-xs font-semibold text-garnet-800 transition-colors hover:bg-garnet-200"
-          >
-            Critical
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              type="button"
+              onClick={() => onDamage(entry)}
+              className={`rounded-control border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                isCrit
+                  ? "border-garnet-300 bg-garnet-100 text-garnet-800 hover:bg-garnet-200"
+                  : "border-parchment-300 bg-parchment-50 text-parchment-700 hover:bg-parchment-100"
+              } ${miss && !isCrit ? "opacity-50" : ""}`}
+            >
+              {isCrit ? "Crit damage" : "Damage"}
+            </button>
+            <label className="flex items-center gap-1 text-[11px] text-parchment-500">
+              <input
+                type="checkbox"
+                checked={manualCrit}
+                onChange={onToggleCrit}
+                className="h-3 w-3 accent-garnet-600"
+              />
+              Crit
+            </label>
+          </div>
         </div>
       </div>
       {/* On-hit dice riders (Flame Tongue +2d6 fire): each a separate typed term. */}

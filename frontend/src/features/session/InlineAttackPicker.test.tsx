@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -17,6 +17,8 @@ vi.mock("@/api/client", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Re-establish the resolved value — a per-describe restoreAllMocks resets it.
+  vi.mocked(logRoll).mockResolvedValue(undefined);
 });
 
 // Minimal turn state: an Attack action in progress with one attack available.
@@ -154,16 +156,15 @@ describe("InlineAttackPicker — live attack counter (#757)", () => {
     expect(screen.getByRole("button", { name: /Roll to hit/ })).not.toBeDisabled();
   });
 
-  it("disables all Roll-to-hit buttons when exhausted but leaves Damage/Critical usable", () => {
+  it("disables all Roll-to-hit buttons when exhausted but leaves Damage usable", () => {
     renderPicker(withWeapon(2), vi.fn(), vi.fn(), { turnState: attackState(2, 2) });
     expect(screen.getByText(/Attacks:\s*0 of 2 remaining/)).toBeInTheDocument();
     for (const btn of screen.getAllByRole("button", { name: /Roll to hit/ })) {
       expect(btn).toBeDisabled();
     }
     expect(screen.getByRole("button", { name: /Roll damage/ })).not.toBeDisabled();
-    for (const crit of screen.getAllByRole("button", { name: /^Critical$/ })) {
-      expect(crit).not.toBeDisabled();
-    }
+    // The standalone Critical buttons were removed (#766) — crit is auto/toggle now.
+    expect(screen.queryByRole("button", { name: /^Critical$/ })).not.toBeInTheDocument();
   });
 
   it("hides the pip counter for a single-attack action", () => {
@@ -274,59 +275,70 @@ describe("InlineAttackPicker — on-hit dice riders", () => {
   });
 });
 
-describe("InlineAttackPicker — critical damage button", () => {
-  it("logs a doubled-dice (crit) damage roll for an equipped weapon", async () => {
-    const onLogChanged = vi.fn();
-    renderPicker(
-      makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] }),
-      vi.fn(),
-      onLogChanged,
-    );
-
-    // Flame Tongue base weapon damage is 1d8 slashing; a crit rolls 2d8.
-    const critButton = screen.getAllByRole("button", { name: /^Critical$/ })[0];
-    await userEvent.click(critButton);
-
-    expect(vi.mocked(logRoll)).toHaveBeenCalledWith(
-      "char-1",
-      "sess-1",
-      expect.objectContaining({
-        kind: "damage",
-        source: "Flame Tongue",
-        damageType: "slashing",
-        specLabel: expect.stringContaining("(crit)"),
-      }),
-    );
-    const call = vi.mocked(logRoll).mock.calls[0][2];
-    expect(call.specLabel).toBe("2d8 (crit)");
-    expect(call.faces).toHaveLength(2);
+describe("InlineAttackPicker — auto-crit on a natural 20 (#766)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it("doubles an on-hit dice rider on a crit (Flame Tongue +2d6 → +4d6)", async () => {
+  // 0.95 → 1 + floor(0.95 * faces): a natural 20 on a d20, and the top face elsewhere.
+  const seedTopFace = () => vi.spyOn(Math, "random").mockReturnValue(0.95);
+  // 0 → 1 + floor(0): a natural 1 on a d20.
+  const seedNat1 = () => vi.spyOn(Math, "random").mockReturnValue(0);
+
+  const findDamageCall = () =>
+    vi.mocked(logRoll).mock.calls.map((c) => c[2]).find((e) => e.kind === "damage");
+
+  it("shows 'Critical hit!' and auto-rolls doubled damage after a nat-20 to-hit", async () => {
+    seedTopFace();
     renderPicker(
-      makeCharacter({ inventory: [flameTongue()] as unknown as Character["inventory"] }),
-      vi.fn(),
-      vi.fn(),
+      makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] }),
     );
 
-    // Crit the weapon first — marks the row as a crit, so its rider doubles too.
-    await userEvent.click(screen.getAllByRole("button", { name: /^Critical$/ })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    expect(screen.getByText(/Critical hit!/)).toBeInTheDocument();
+
+    // The Damage button flipped its label — no separate button press to crit.
+    const dmg = screen.getByRole("button", { name: /Roll crit damage/ });
+    await userEvent.click(dmg);
+
+    const call = findDamageCall();
+    expect(call!.specLabel).toBe("2d8 (crit)"); // 1d8 slashing → doubled dice
+    expect(call!.faces).toHaveLength(2);
+  });
+
+  it("doubles the on-hit dice rider automatically under the auto-crit flow", async () => {
+    seedTopFace();
+    renderPicker(
+      makeCharacter({ inventory: [flameTongue()] as unknown as Character["inventory"] }),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Roll crit damage/ }));
     await userEvent.click(screen.getByRole("button", { name: /Roll \+2d6 fire/ }));
 
     const riderCall = vi
       .mocked(logRoll)
       .mock.calls.map((c) => c[2])
       .find((entry) => entry.damageType === "fire");
-    expect(riderCall).toBeDefined();
     expect(riderCall!.specLabel).toBe("4d6 (crit)");
     expect(riderCall!.faces).toHaveLength(4);
+  });
+
+  it("shows a Miss indicator on a natural 1 and leaves damage rollable (non-crit)", async () => {
+    seedNat1();
+    renderPicker(
+      makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] }),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    expect(screen.getByText(/^Miss$/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Roll damage$/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Roll crit damage/ })).not.toBeInTheDocument();
   });
 
   it("keeps a dice rider single when the weapon damage was rolled normally", async () => {
     renderPicker(
       makeCharacter({ inventory: [flameTongue()] as unknown as Character["inventory"] }),
-      vi.fn(),
-      vi.fn(),
     );
 
     await userEvent.click(screen.getByRole("button", { name: /Roll damage/ }));
@@ -338,6 +350,29 @@ describe("InlineAttackPicker — critical damage button", () => {
       .find((entry) => entry.damageType === "fire");
     expect(riderCall!.specLabel).toBe("2d6");
     expect(riderCall!.faces).toHaveLength(2);
+  });
+});
+
+describe("InlineAttackPicker — manual crit toggle (#766)", () => {
+  it("has no standalone 'Critical' button in the sheet", () => {
+    renderPicker(
+      makeCharacter({ inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"] }),
+    );
+    expect(screen.queryByRole("button", { name: /^Critical$/ })).not.toBeInTheDocument();
+  });
+
+  it("flips the next damage roll to doubled dice when the Crit toggle is on (no attack roll)", async () => {
+    renderPicker(
+      makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] }),
+    );
+
+    // The Damage card's crit toggle is the first "Crit" checkbox.
+    await userEvent.click(screen.getAllByLabelText("Crit")[0]);
+    await userEvent.click(screen.getByRole("button", { name: /Roll crit damage/ }));
+
+    const call = vi.mocked(logRoll).mock.calls.map((c) => c[2]).find((e) => e.kind === "damage");
+    expect(call!.specLabel).toBe("2d8 (crit)");
+    expect(call!.faces).toHaveLength(2);
   });
 });
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -16,6 +16,7 @@ const mockCast = vi.mocked(applySpellcastingTransactions);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(logRoll).mockResolvedValue(undefined);
 });
 
 const fireBolt = {
@@ -128,5 +129,32 @@ describe("InlineSpellAttackSection (#734)", () => {
       "sess-1",
       expect.objectContaining({ kind: "damage", source: "Fire Bolt" }),
     );
+  });
+});
+
+describe("InlineSpellAttackSection — nat-20 auto-crit (#766)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("shows 'Critical hit!' and doubles the cantrip damage dice on a nat-20 to-hit", async () => {
+    const user = userEvent.setup();
+    // 0.95 → nat 20 on the d20 to-hit, top face on the 1d10 damage.
+    vi.spyOn(Math, "random").mockReturnValue(0.95);
+    const { onUpdate } = renderSection(makeCharacter([fireBolt]));
+    mockCast.mockResolvedValue(makeCharacter([fireBolt]));
+
+    await user.click(screen.getByRole("button", { name: /^Attack/ }));
+    expect(screen.getByText(/Critical hit!/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Cast" }));
+    await waitFor(() => expect(onUpdate).toHaveBeenCalled());
+
+    const damageCall = vi
+      .mocked(logRoll)
+      .mock.calls.map((c) => c[2])
+      .find((e) => e.kind === "damage");
+    expect(damageCall!.specLabel).toBe("2d10 (crit)"); // 1d10 fire → doubled dice
+    expect(damageCall!.faces).toHaveLength(2);
   });
 });

@@ -22,6 +22,7 @@ import WeaponAttackCard from "@/features/session/WeaponAttackCard";
 import WeaponDamageCard from "@/features/session/WeaponDamageCard";
 import type { AttackEntry, DamageRider } from "@/lib/attackMath";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
+import { isNaturalTwenty } from "@/lib/dice";
 import type { Character, ManeuverEntry } from "@/types/character";
 import type { RollResult } from "@/lib/dice";
 
@@ -87,6 +88,18 @@ function useAttackRolls({
   const [attackTotals, setAttackTotals] = useState<Record<string, number | null>>({});
   const [damageTotals, setDamageTotals] = useState<Record<string, number | null>>({});
 
+  // DM-called / expanded-crit-range override per row — OR'd with the auto nat-20.
+  const [manualCrit, setManualCrit] = useState<Record<string, boolean>>({});
+
+  // A row rolls crit damage when its to-hit kept a nat 20 OR the manual toggle is on.
+  function isRowCrit(rowId: string): boolean {
+    return Boolean(manualCrit[rowId]) || isNaturalTwenty(lastAttackRolls[rowId]);
+  }
+
+  function toggleManualCrit(rowId: string) {
+    setManualCrit((prev) => ({ ...prev, [rowId]: !prev[rowId] }));
+  }
+
   // Roll an attack for a row: log it, retain the result, clear any override, spend one attack.
   function handleAttack(entry: AttackEntry) {
     const result = roll(entry.attackSpec, entry.attackRollLabel);
@@ -96,17 +109,9 @@ function useAttackRolls({
     recordAttack();
   }
 
-  // Roll damage for a row: log it, retain the result, clear any override.
+  // Roll damage for a row: auto-doubles the dice when the row is a crit (nat 20 or manual).
   function handleDamage(entry: AttackEntry) {
-    const result = roll(entry.damageSpec, entry.damageRollLabel);
-    logRollSafe("damage", entry.logSource, result, entry.damageSpec, entry.damageType);
-    setLastDamageRolls((prev) => ({ ...prev, [entry.id]: result }));
-    setDamageTotals((prev) => ({ ...prev, [entry.id]: null }));
-  }
-
-  // Roll critical damage for a row: same path as handleDamage but on the doubled spec.
-  function handleCritDamage(entry: AttackEntry) {
-    const spec = critDamageSpec(entry.damageSpec);
+    const spec = isRowCrit(entry.id) ? critDamageSpec(entry.damageSpec) : entry.damageSpec;
     const result = roll(spec, entry.damageRollLabel);
     logRollSafe("damage", entry.logSource, result, spec, entry.damageType);
     setLastDamageRolls((prev) => ({ ...prev, [entry.id]: result }));
@@ -114,10 +119,10 @@ function useAttackRolls({
   }
 
   // Roll one on-hit dice rider (e.g. Flame Tongue +2d6 fire) as its own typed term.
-  // On a crit the rider's dice double too — mirror the parent row's last damage roll.
+  // On a crit the rider's dice double too — mirror the parent row's crit state.
   function handleDamageRider(rider: DamageRider, parentEntryId: string | null) {
     const parentCrit = parentEntryId
-      ? Boolean(lastDamageRolls[parentEntryId]?.spec.crit)
+      ? isRowCrit(parentEntryId) || Boolean(lastDamageRolls[parentEntryId]?.spec.crit)
       : false;
     const spec = parentCrit ? critDamageSpec(rider.spec) : rider.spec;
     const result = roll(spec, rider.rollLabel);
@@ -143,14 +148,17 @@ function useAttackRolls({
     riderTotals,
     attackTotals,
     damageTotals,
+    manualCrit,
+    isRowCrit,
+    toggleManualCrit,
     handleAttack,
     handleDamage,
-    handleCritDamage,
     handleDamageRider,
     makeOnRollsUpdated,
   };
 }
 
+// fallow-ignore-next-line complexity -- #766 grew this past the gate; decomposition tracked in #778
 export default function InlineAttackPicker({
   character,
   turnState,
@@ -172,9 +180,11 @@ export default function InlineAttackPicker({
     riderTotals,
     attackTotals,
     damageTotals,
+    manualCrit,
+    isRowCrit,
+    toggleManualCrit,
     handleAttack,
     handleDamage,
-    handleCritDamage,
     makeOnRollsUpdated,
   } = rolls;
 
@@ -267,8 +277,10 @@ export default function InlineAttackPicker({
           lastAttackRoll={lastAttackRolls[activeEntry.id] ?? null}
           lastDamageRoll={lastDamageRolls[activeEntry.id] ?? null}
           riderTotals={riderTotals}
+          isCrit={isRowCrit(activeEntry.id)}
+          manualCrit={Boolean(manualCrit[activeEntry.id])}
           onDamage={handleDamage}
-          onCritDamage={handleCritDamage}
+          onToggleCrit={() => toggleManualCrit(activeEntry.id)}
           onDamageRider={handleDamageRider}
           onRollsUpdated={makeOnRollsUpdated(activeEntry.id)}
           onUpdate={onUpdate}
@@ -288,9 +300,11 @@ export default function InlineAttackPicker({
             lastAttackRoll={lastAttackRolls[entry.id] ?? null}
             lastDamageRoll={lastDamageRolls[entry.id] ?? null}
             riderTotals={riderTotals}
+            isCrit={isRowCrit(entry.id)}
+            manualCrit={Boolean(manualCrit[entry.id])}
             onAttack={handleAttack}
             onDamage={handleDamage}
-            onCritDamage={handleCritDamage}
+            onToggleCrit={() => toggleManualCrit(entry.id)}
             onDamageRider={handleDamageRider}
             onRollsUpdated={makeOnRollsUpdated(entry.id)}
             onUpdate={onUpdate}

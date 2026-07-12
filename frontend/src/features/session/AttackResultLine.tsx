@@ -5,6 +5,7 @@
 // A maneuver-summed override total (Battle Master superiority die) wins over the
 // raw total when present.
 
+import { isNaturalOne, isNaturalTwenty } from "@/lib/dice";
 import type { RollResult } from "@/lib/dice";
 
 interface AttackResultLineProps {
@@ -16,6 +17,7 @@ interface AttackResultLineProps {
   overrideTotal?: number | null;
 }
 
+// fallow-ignore-next-line complexity -- #766 grew this past the gate; decomposition tracked in #778
 export default function AttackResultLine({
   result,
   kind,
@@ -26,6 +28,9 @@ export default function AttackResultLine({
   const { faces } = result.spec;
   const mod = result.modifier;
   const total = overrideTotal ?? result.total;
+  // Kept-die nat 20 / nat 1 drive the auto-crit + miss cues on the to-hit line.
+  const critHit = kind === "attack" && isNaturalTwenty(result);
+  const miss = kind === "attack" && isNaturalOne(result);
   // Arcane (magic-neutral) for the to-hit d20, garnet for weapon damage — per the
   // palette intent in index.css. Box and total share one tone so an attack roll
   // doesn't mix arcane boxes with a garnet total.
@@ -62,6 +67,16 @@ export default function AttackResultLine({
       {result.spec.crit && (
         <span className="rounded-control bg-gold-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold-800">
           crit
+        </span>
+      )}
+      {critHit && (
+        <span className="rounded-control bg-garnet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-garnet-800">
+          Critical hit!
+        </span>
+      )}
+      {miss && (
+        <span className="rounded-control bg-parchment-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-parchment-600">
+          Miss
         </span>
       )}
       {overrideTotal != null && (
