@@ -64,17 +64,25 @@ test("damage riders: attuned Flame Tongue adds a typed +2d6 fire term to its att
   await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
   await expect(page).toHaveURL(/\/session$/);
 
-  await page.getByRole("button", { name: "Start Combat" }).click();
-  await page.getByRole("button", { name: "Start Turn" }).click();
+  await page.getByRole("button", { name: /Start combat/i }).click();
+  await page.getByRole("button", { name: "Start my turn" }).click();
   await page.getByRole("button", { name: /Use Action/ }).click();
   await page.getByRole("button", { name: "Attack", exact: true }).click();
 
-  // The weapon row exposes a typed on-hit rider button; rolling it logs a fire
-  // damage roll. The rider only shows because the item is attuned + equipped.
+  // The Damage card (which hosts the on-hit riders) is inert until the first
+  // Roll to hit binds it to the selected form — the default is the equipped
+  // Flame Tongue (#786).
+  await page.getByRole("button", { name: /Roll to hit/ }).click();
+
+  // The bound Damage card exposes a typed on-hit rider button; rolling it logs a
+  // fire damage roll. The rider only shows because the item is attuned + equipped.
   const rider = page.getByRole("button", { name: /Roll \+2d6 fire/ });
   await expect(rider).toBeVisible();
   await rider.click();
 
+  // The attack picker is a modal bottom sheet (#729) — dismiss it before
+  // reaching the Log tab behind the scrim.
+  await page.keyboard.press("Escape");
   await page.getByRole("tab", { name: /Log/ }).click();
   await expect(page.getByText(/fire/i).first()).toBeVisible();
 

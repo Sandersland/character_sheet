@@ -4,8 +4,8 @@
  * localStorage initializer works and no fallback character object is needed).
  *
  * Thin render: async state + handlers live in useSessionLifecycle; the turn
- * state in useTurnState. Composes SessionTopBar, the turn hub, the reference
- * tabs, and the overlay layer.
+ * state in useTurnState. Composes SessionHeaderRegion (which swaps in the #746
+ * mobile turn shell), the turn hub, the reference tabs, and the overlay layer.
  */
 
 import type { useNavigate } from "react-router-dom";
@@ -14,9 +14,10 @@ import { RollProvider } from "@/features/dice/RollContext";
 import RollResultToast from "@/features/dice/RollResultToast";
 import RollModeToggle from "@/features/dice/RollModeToggle";
 import CompactHpBar from "@/features/hitpoints/CompactHpBar";
+import CompactConditionsBar from "@/features/conditions/CompactConditionsBar";
 import ConditionsStrip from "@/features/conditions/ConditionsStrip";
 import TurnHub from "@/features/session/TurnHub";
-import SessionTopBar from "@/features/session/SessionTopBar";
+import SessionHeaderRegion from "@/features/session/SessionHeaderRegion";
 import SessionReferenceTabs from "@/features/session/SessionReferenceTabs";
 import SessionOverlays from "@/features/session/SessionOverlays";
 import { useTurnState } from "@/features/session/useTurnState";
@@ -40,12 +41,19 @@ export default function SessionContent({ character, session, reference, setChara
   // Cmd/Ctrl+J opens the quick-capture palette during live play.
   useGlobalKeyboard(life.openCapture);
 
+  // Mobile turn shell (#746): during the player's active turn on a mobile
+  // viewport, swap the full SessionTopBar for a compact header and hide the
+  // reference tabs. Pure CSS md: toggles gated on this flag — no breakpoint hook.
+  const isActiveTurn = turnState.phase === "active";
+
   return (
     <RollProvider characterId={character.id} sessionId={session.id} onRollLogged={life.bumpLog}>
       <div className="min-h-screen bg-parchment-100">
-        <SessionTopBar
+        <SessionHeaderRegion
           character={character}
           session={session}
+          isActiveTurn={isActiveTurn}
+          round={turnState.round}
           leavePending={life.leavePending}
           endPending={life.endPending}
           leaveError={life.leaveError}
@@ -54,12 +62,18 @@ export default function SessionContent({ character, session, reference, setChara
           onEndClick={life.openEndPrompt}
         />
 
-        <main className="mx-auto flex max-w-4xl flex-col gap-4 px-6 py-6">
-          {/* Compact HP strip — always visible, slim. */}
-          <CompactHpBar character={character} />
+        <main className="mx-auto flex max-w-4xl flex-col gap-4 px-6 pt-6 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-6">
+          {/* Compact HP strip — always visible; tap opens the HP sheet (#768). */}
+          <CompactHpBar character={character} onUpdate={life.handleCharacterUpdate} />
 
-          {/* Active conditions + exhaustion. */}
-          <ConditionsStrip character={character} onUpdate={life.handleCharacterUpdate} />
+          {/* Active conditions + exhaustion. Compact strip on mobile (tap to
+              open the sheet), full card at md+ (#769). */}
+          <div className="md:hidden">
+            <CompactConditionsBar character={character} onUpdate={life.handleCharacterUpdate} />
+          </div>
+          <div className="hidden md:block">
+            <ConditionsStrip character={character} onUpdate={life.handleCharacterUpdate} />
+          </div>
 
           {/* Turn hub — primary surface; inline attack/item pickers live here. */}
           <TurnHub
@@ -71,18 +85,20 @@ export default function SessionContent({ character, session, reference, setChara
             allies={partyHealAllies(session, character.id)}
           />
 
-          {/* Reference tabs — secondary content. */}
-          <SessionReferenceTabs
-            character={character}
-            session={session}
-            reference={reference}
-            isOwner={life.isOwner}
-            activeTab={life.activeTab}
-            onTabChange={life.setActiveTab}
-            logRefresh={life.logRefresh}
-            onLogRefresh={life.bumpLog}
-            onUpdate={life.handleCharacterUpdate}
-          />
+          {/* Reference tabs — secondary content; hidden on mobile during the active turn. */}
+          <div className={isActiveTurn ? "hidden md:block" : undefined}>
+            <SessionReferenceTabs
+              character={character}
+              session={session}
+              reference={reference}
+              isOwner={life.isOwner}
+              activeTab={life.activeTab}
+              onTabChange={life.setActiveTab}
+              logRefresh={life.logRefresh}
+              onLogRefresh={life.bumpLog}
+              onUpdate={life.handleCharacterUpdate}
+            />
+          </div>
         </main>
 
         <SessionOverlays

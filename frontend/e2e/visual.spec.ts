@@ -162,7 +162,7 @@ test("visual: session / turn view", async ({ page }) => {
   await page.goto(`/characters/${id}`);
   await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
   await expect(page).toHaveURL(/\/session$/);
-  await expect(page.getByRole("button", { name: "Start Combat" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Start combat/i })).toBeVisible();
   await ready(page);
 
   // <main> excludes the title bar (character name), so this is name-free.

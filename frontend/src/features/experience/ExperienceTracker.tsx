@@ -110,7 +110,7 @@ export default function ExperienceTracker({
             onKeyDown={(e) => e.key === "Enter" && submitAward(Number(awardValue))}
             placeholder="e.g. 450"
             aria-label="XP to award"
-            className="w-28 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm tabular-nums text-parchment-900"
+            className="w-28 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-base md:text-sm tabular-nums text-parchment-900"
           />
           <button
             type="button"
@@ -142,7 +142,7 @@ export default function ExperienceTracker({
               onChange={(e) => setSetValue(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submitSet(Number(setValue))}
               aria-label="Exact XP total"
-              className="w-28 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-sm tabular-nums text-parchment-900"
+              className="w-28 rounded-control border border-parchment-300 bg-parchment-50 px-2 py-1 text-base md:text-sm tabular-nums text-parchment-900"
             />
             <button
               type="button"

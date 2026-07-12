@@ -5,7 +5,8 @@
  * the presentational subcomponents (overview, spellbook list, add-spell panel).
  */
 
-import { availableSlotsForSpell, deriveSpellList } from "@/lib/spellList";
+import { deriveSpellList } from "@/lib/spellList";
+import { availableSlotsForSpell } from "@/lib/spellPicker";
 import type { Character, Spell } from "@/types/character";
 import AddSpellPanel from "@/features/spells/AddSpellPanel";
 import SpellbookList from "@/features/spells/SpellbookList";

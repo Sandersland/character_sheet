@@ -46,3 +46,21 @@ describe("deriveWeaponDamage — meleeDamage buff", () => {
     expect(deriveWeaponDamage(custom, false, scores, 2).damageModifier).toBe(3);
   });
 });
+
+describe("deriveWeaponDamage — abilityModifier component (#732)", () => {
+  it("exposes the governing ability modifier, excluding the melee buff", () => {
+    const raged = deriveWeaponDamage(melee, false, scores, 2);
+    // damageModifier folds the buff in, abilityModifier stays the raw STR mod.
+    expect(raged.damageModifier).toBe(5);
+    expect(raged.abilityModifier).toBe(3);
+  });
+
+  it("uses DEX for a ranged weapon", () => {
+    expect(deriveWeaponDamage(ranged, false, scores).abilityModifier).toBe(1);
+  });
+
+  it("uses the better of STR/DEX for a finesse weapon", () => {
+    const finesse = { ...melee, finesse: true, twoHanded: false };
+    expect(deriveWeaponDamage(finesse, true, scores).abilityModifier).toBe(3); // STR 16 > DEX 12
+  });
+});

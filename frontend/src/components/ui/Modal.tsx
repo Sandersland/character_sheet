@@ -1,14 +1,12 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useDialogChrome } from "@/hooks/useDialogChrome";
 
 interface ModalProps {
   title: string;
   onClose: () => void;
   children: ReactNode;
 }
-
-const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
  * This app's overlay primitive — most "extra" surfaces (Add Item, Edit) are
@@ -27,44 +25,8 @@ const FOCUSABLE_SELECTOR =
  * things at once.
  */
 export default function Modal({ title, onClose, children }: ModalProps) {
-  const panelRef = useRef<HTMLDivElement>(null);
+  const panelRef = useDialogChrome(onClose);
   const titleId = useId();
-
-  useEffect(() => {
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    panelRef.current?.focus();
-
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onClose();
-        return;
-      }
-      if (event.key !== "Tab" || !panelRef.current) return;
-
-      const focusable = panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = originalOverflow;
-      previouslyFocused?.focus();
-    };
-  }, [onClose]);
 
   return createPortal(
     <div
@@ -83,7 +45,7 @@ export default function Modal({ title, onClose, children }: ModalProps) {
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="flex max-h-[80vh] w-full max-w-[36rem] flex-col rounded-card border border-parchment-200 bg-parchment-50 shadow-raised"
+        className="flex max-h-[80vh] w-full max-w-[36rem] flex-col rounded-card border border-parchment-200 bg-parchment-50 shadow-raised focus-visible:outline-none"
       >
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-parchment-200 px-4 py-3">
           <h2 id={titleId} className="font-display text-lg font-semibold text-parchment-900">

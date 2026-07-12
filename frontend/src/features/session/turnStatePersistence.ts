@@ -4,7 +4,8 @@
  * Key per session: `cs:turn:<sessionId>` — JSON-encoded TurnState.
  * All operations are guarded with try/catch so a corrupted or missing
  * localStorage entry degrades gracefully to `initialState()` without
- * crashing the page.
+ * crashing the page. Stale-schema snapshots (an older shape missing a newer
+ * field) are backfilled at the hydration site by merging over `initialState()`.
  */
 
 import type { TurnState } from "@/features/session/useTurnState";

@@ -28,7 +28,13 @@ export function planActionClick(
   }
 
   switch (resolver.kind) {
+    // twf-picker is never reached at runtime — the off-hand attack dispatches
+    // through handleTwfAction, not the generic handleActionClick → planActionClick
+    // path. It appears here only to keep this switch exhaustive over
+    // ResolutionKind (so adding a future kind is a compile error), and shares the
+    // attack-picker plan shape.
     case "attack-picker":
+    case "twf-picker":
       return {
         consumeSlot: true,
         openResolution: true,
@@ -45,10 +51,10 @@ export function planActionClick(
           }
         : { consumeSlot: true, openResolution: false, send: "none" };
 
+    // Slot is committed by the picker on use/cast/heal, not on open (#765) —
+    // closing the sheet without acting stays free, like the spell picker.
     case "heal-input":
     case "item-picker":
-      return { consumeSlot: true, openResolution: true, send: "none" };
-
     case "spell-picker":
       return { consumeSlot: false, openResolution: true, send: "none" };
 

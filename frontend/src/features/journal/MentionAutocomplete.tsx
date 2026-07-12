@@ -10,6 +10,8 @@ import { Link } from "react-router-dom";
 
 import MentionSuggestionList from "@/features/journal/MentionSuggestionList";
 import { useMentionEditor } from "@/features/journal/useMentionEditor";
+import { useIsBelowMd } from "@/hooks/useIsBelowMd";
+import { useVisualViewportHeight } from "@/hooks/useVisualViewportHeight";
 
 interface MentionAutocompleteProps {
   value: string;
@@ -32,6 +34,11 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
   ) {
     const editor = useMentionEditor({ value, onChange, campaignId, onKeyDown });
     const { innerRef } = editor;
+    // Below md the suggestions render in-flow, capped to a share of the
+    // keyboard-aware viewport so they clear the on-screen keyboard (#785).
+    const isMobile = useIsBelowMd();
+    const viewportHeight = useVisualViewportHeight();
+    const suggestionMaxHeight = Math.round(viewportHeight * 0.4);
 
     function setRef(el: HTMLDivElement | null) {
       innerRef.current = el;
@@ -67,7 +74,7 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
         {placeholder && value === "" && (
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute left-0 top-0 px-2.5 py-1.5 text-sm text-parchment-400"
+            className="pointer-events-none absolute left-0 top-0 px-2.5 py-1.5 text-base md:text-sm text-parchment-400"
           >
             {placeholder}
           </span>
@@ -97,6 +104,8 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
             onSelect={editor.insertToken}
             onCreate={editor.handleCreate}
             onHover={editor.setActiveIndex}
+            inFlow={isMobile}
+            maxHeight={suggestionMaxHeight}
           />
         )}
 

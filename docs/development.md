@@ -107,6 +107,8 @@ npx prisma db seed
 
 `schema.prisma` lives at `backend/prisma/schema.prisma`. The `prisma.config.ts` at the backend root tells the CLI where to find it.
 
+**Stale-client auto-repair (#433).** The generated client is gitignored, so a `git checkout`/`pull` that moves the schema would otherwise leave it stale — the tell is pre-push `tsc` failing with `Property 'x' does not exist on type 'PrismaClient'` (or runtime 500s on a new enum value) when your diff never touched the backend. Two lefthook hooks (`post-checkout`, `post-merge`) now run `scripts/git-hooks/prisma-regen-if-schema-changed.sh`, which regenerates the client **only when** `schema.prisma` or `migrations/**` changed between the refs — schema-untouched branch switches cost nothing. If you hit the tsc symptom anyway (hooks not installed, `--no-verify` checkout tooling), the manual fix is the same as ever: `cd backend && npx prisma generate`. New hook types activate via `npx lefthook install` (the root `prepare` script runs it on every `npm install`).
+
 ## Verification data (`seed:verify`)
 
 The catalog seed creates no users/characters, and OAuth can't complete headless or on a worktree port. `npm run seed:verify` bridges that gap for UI verification: against a **running** stack it mints a session via the guarded `POST /api/auth/dev-login` endpoint and builds a representative character ("Verify Dummy" — equippable weapon + armor, trinkets, a bulk sale) through the real API endpoints, then prints the `cs_session` cookie + frontend URL. It's idempotent (reuses an existing "Verify Dummy").

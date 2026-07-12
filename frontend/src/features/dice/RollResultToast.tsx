@@ -4,12 +4,18 @@
  * the display immediately. Highlights natural 20 (crit) and natural 1 (fumble)
  * for single-d20 rolls (checks, saves, attacks, initiative).
  *
+ * Portaled to document.body so its stacking is deterministic. Suppressed
+ * everywhere while any dialog is open (#801): mobile sheets and desktop
+ * modals both draw a full-screen backdrop-blur scrim that would occlude the
+ * corner toast, and in-dialog rolls already show their result on the sheet.
  * Mount once inside `RollProvider`, at the `CharacterSheetPage` level.
  */
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { usesAdvantage } from "@/lib/dice";
+import { useAnyDialogOpen } from "@/hooks/useDialogChrome";
 import { useRoll, type RollEntry } from "@/features/dice/RollContext";
 
 const DISMISS_MS = 3500;
@@ -20,6 +26,7 @@ function modifierSuffix(modifier: number): string {
 
 export default function RollResultToast() {
   const { lastRoll } = useRoll();
+  const anyDialogOpen = useAnyDialogOpen();
   const [visible, setVisible] = useState(false);
   // Hold a snapshot so the toast can fade out without losing its content.
   const [displayed, setDisplayed] = useState<RollEntry | null>(null);
@@ -32,7 +39,7 @@ export default function RollResultToast() {
     return () => clearTimeout(timer);
   }, [lastRoll?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!displayed) return null;
+  if (!displayed || anyDialogOpen) return null;
 
   const { label, result } = displayed;
   const { total, dice, spec, modifier } = result;
@@ -46,7 +53,7 @@ export default function RollResultToast() {
   const isCrit = naturalRoll === 20;
   const isFumble = naturalRoll === 1;
 
-  return (
+  return createPortal(
     <div
       role="status"
       aria-live="polite"
@@ -111,6 +118,7 @@ export default function RollResultToast() {
           ){modifierSuffix(modifier)}
         </p>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

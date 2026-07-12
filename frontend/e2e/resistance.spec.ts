@@ -42,7 +42,7 @@ test("resistance: raging Barbarian halves matching damage, full for others", asy
   await page.getByRole("spinbutton", { name: "Damage amount" }).fill("12");
   await page.getByRole("combobox", { name: "Damage type" }).selectOption("slashing");
   await expect(page.getByRole("status")).toHaveText(/halves to 6/i);
-  await page.getByRole("button", { name: "Apply damage" }).click();
+  await page.getByRole("button", { name: /apply \d+ damage/i }).click();
   await expect.poll(() => hpNow(page)).toBe(start - 6);
 
   // 8 fire is not resisted (no preview) → HP drops by the full 8.
@@ -50,7 +50,7 @@ test("resistance: raging Barbarian halves matching damage, full for others", asy
   await page.getByRole("spinbutton", { name: "Damage amount" }).fill("8");
   await page.getByRole("combobox", { name: "Damage type" }).selectOption("fire");
   await expect(page.getByRole("status")).toHaveCount(0);
-  await page.getByRole("button", { name: "Apply damage" }).click();
+  await page.getByRole("button", { name: /apply \d+ damage/i }).click();
   await expect.poll(() => hpNow(page)).toBe(afterSlash - 8);
 
   expect(errors).toEqual([]);

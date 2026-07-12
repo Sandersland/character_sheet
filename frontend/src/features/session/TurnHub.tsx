@@ -19,23 +19,245 @@ import ActionSlot from "@/features/session/ActionSlot";
 import BonusActionSlot from "@/features/session/BonusActionSlot";
 import ReactionSlot from "@/features/session/ReactionSlot";
 import EffectManeuverStrip from "@/features/session/EffectManeuverStrip";
-import LayOnHandsInput from "@/features/session/LayOnHandsInput";
-import InlineAttackPicker from "@/features/session/InlineAttackPicker";
-import InlineItemPicker from "@/features/session/InlineItemPicker";
-import InlineSpellPicker from "@/features/session/InlineSpellPicker";
+import LoadoutSwapRow from "@/features/session/LoadoutSwapRow";
+import InitiativeRail from "@/features/session/InitiativeRail";
+import TurnConcentrationBanner from "@/features/session/TurnConcentrationBanner";
+import TurnDeathSaves from "@/features/session/TurnDeathSaves";
+import TurnDmBanner from "@/features/session/TurnDmBanner";
+import TurnResolutionSheets from "@/features/session/TurnResolutionSheets";
+import { showInitiative, showMovement } from "@/features/session/turnFlags";
 import type { AllyOption } from "@/lib/spellMeta";
-import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
+import type { TurnStateView } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
 
 interface TurnHubProps {
   character: Character;
   sessionId: string;
-  turnState: TurnState & TurnStateActions;
+  turnState: TurnStateView;
   onUpdate: (c: Character) => void;
   /** Called after a combat log event so the Log tab refreshes. */
   onLogChanged: () => void;
   /** Opted-in party members a healing cast can target on their sheet (#462). */
   allies: AllyOption[];
+}
+
+// Idle-phase presentation: the Start-Combat gate (not in combat) or the
+// between-turns card (round header, death saves, concentration, Reaction —
+// which fires on other creatures' turns — and Start-my-turn). Takes the whole
+// hook bags rather than ~18 loose props; TurnHub stays the orchestrator.
+function TurnHubIdle({
+  character,
+  onUpdate,
+  onLogChanged,
+  youInitial,
+  turnState,
+  turn,
+}: {
+  character: Character;
+  onUpdate: (c: Character) => void;
+  onLogChanged: () => void;
+  youInitial: string;
+  turnState: TurnStateView;
+  turn: ReturnType<typeof useTurnActions>;
+}) {
+  const { inCombat, round, reactionUsed, consumeReaction } = turnState;
+  const {
+    busy, error, reactionMessage,
+    showReactionMenu, setShowReactionMenu,
+    dieLabel, dieBusy, superiorityRemaining, classReactions, reactionManeuvers,
+    reactionSheetModel,
+    handleActionClick, handleReactionManeuver,
+    handleStartCombat, handleEndCombat, handleStartTurn,
+  } = turn;
+
+  // Not in combat — show only the Start Combat gate.
+  if (!inCombat) {
+    return (
+      <Card className="p-4">
+        <div className="flex flex-col items-center gap-3 py-2 text-center">
+          <p className="font-display text-lg font-semibold text-parchment-900">Not in combat</p>
+          <p className="max-w-xs text-xs text-parchment-600">
+            Explore, talk, rest. When the DM calls for initiative, start the encounter to track
+            your turn.
+          </p>
+          <button
+            type="button"
+            onClick={handleStartCombat}
+            className="mt-1 w-full rounded-control border border-garnet-300 bg-garnet-700 px-4 py-2.5 text-sm font-semibold text-parchment-50 shadow-sm transition-colors hover:bg-garnet-800"
+          >
+            Roll initiative · Start combat
+          </button>
+        </div>
+      </Card>
+    );
+  }
+
+  // In combat but between turns — round indicator, Start Turn, End Combat, Reaction.
+  return (
+    <Card className="p-4">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="font-display text-base font-semibold text-parchment-900">
+            Combat — Round {round}
+          </p>
+          <button
+            type="button"
+            onClick={handleEndCombat}
+            className="shrink-0 rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-600 transition-colors hover:bg-parchment-100"
+          >
+            End combat
+          </button>
+        </div>
+
+        {showInitiative && (
+          <InitiativeRail youInitial={youInitial} active={false} />
+        )}
+
+        <TurnDeathSaves character={character} onUpdate={onUpdate} />
+
+        <TurnConcentrationBanner
+          character={character}
+          onUpdate={onUpdate}
+          onLogChanged={onLogChanged}
+        />
+
+        {/* Reaction is available between turns — render it in idle mode. */}
+        <ReactionSlot
+          reactionUsed={reactionUsed}
+          showReactionMenu={showReactionMenu}
+          setShowReactionMenu={setShowReactionMenu}
+          classReactions={classReactions}
+          sheetModel={reactionSheetModel}
+          reactionManeuvers={reactionManeuvers}
+          superiorityRemaining={superiorityRemaining}
+          dieLabel={dieLabel}
+          dieBusy={dieBusy}
+          busy={busy}
+          reactionMessage={reactionMessage}
+          error={error}
+          handleActionClick={handleActionClick}
+          handleReactionManeuver={handleReactionManeuver}
+          consumeReaction={consumeReaction}
+        />
+
+        <button
+          type="button"
+          onClick={handleStartTurn}
+          className="w-full rounded-control border border-garnet-300 bg-garnet-700 px-4 py-2.5 text-sm font-semibold text-parchment-50 shadow-sm transition-colors hover:bg-garnet-800"
+        >
+          Start my turn
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+// Active-turn header: title, round chip, Undo (only once history exists), End turn.
+function TurnHubHeader({
+  inCombat,
+  round,
+  busy,
+  canUndo,
+  onUndo,
+  onEndTurn,
+}: {
+  inCombat: boolean;
+  round: number;
+  busy: boolean;
+  canUndo: boolean;
+  onUndo: () => void;
+  onEndTurn: () => void;
+}) {
+  return (
+    <div className="mb-4 flex items-center justify-between">
+      <div>
+        <p className="font-display text-lg font-semibold text-garnet-700">Your turn</p>
+        {inCombat && <p className="mt-0.5 text-xs text-parchment-600">Round {round}</p>}
+      </div>
+      <div className="flex items-center gap-2">
+        {canUndo && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onUndo}
+            className="rounded-control border border-arcane-300 bg-arcane-50 px-3 py-1.5 text-xs font-semibold text-arcane-700 transition-colors hover:bg-arcane-100 disabled:opacity-50"
+          >
+            <span aria-hidden="true">↩ </span>Undo
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onEndTurn}
+          className="rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-600 transition-colors hover:bg-parchment-100"
+        >
+          End turn
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Action Surge (Fighter) — self-gating: renders nothing when unavailable.
+function ActionSurgeButton({
+  available,
+  pool,
+  busy,
+  onSurge,
+}: {
+  available: boolean;
+  pool: { remaining: number } | null | undefined;
+  busy: boolean;
+  onSurge: () => void;
+}) {
+  if (!available) return null;
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={onSurge}
+      className="flex items-center justify-center gap-1.5 rounded-control border border-gold-300 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800 shadow-sm transition-colors hover:bg-gold-100 disabled:opacity-50"
+    >
+      <Zap aria-hidden="true" className="h-3.5 w-3.5" />
+      <span>Action Surge</span>
+      {pool && pool.remaining > 1 && <span className="text-gold-800">({pool.remaining} left)</span>}
+    </button>
+  );
+}
+
+// Trailing message strips: send() errors, effect-maneuver info, durable-buff
+// end reminders (e.g. Rage), and the movement-not-tracked note.
+function TurnMessages({
+  error,
+  effectMessage,
+  durableReminders,
+}: {
+  error: string | null;
+  effectMessage: string | null;
+  durableReminders: { key: string; reminder: string }[];
+}) {
+  return (
+    <>
+      {error && <p className="text-xs font-semibold text-garnet-700">{error}</p>}
+      {effectMessage && (
+        <p className="rounded-control border border-gold-200 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800">
+          {effectMessage}
+        </p>
+      )}
+      {durableReminders.map((r) => (
+        <p
+          key={r.key}
+          className="rounded-control border border-garnet-200 bg-garnet-50 px-3 py-2 text-xs font-semibold text-garnet-800"
+        >
+          {r.reminder}
+        </p>
+      ))}
+      {showMovement && (
+        <p className="text-[11px] text-parchment-600 italic">
+          ⚑ Movement is not tracked here. Speed / difficult-terrain tracking is a future feature.
+        </p>
+      )}
+    </>
+  );
 }
 
 export default function TurnHub({ character, sessionId, turnState, onUpdate, onLogChanged, allies }: TurnHubProps) {
@@ -48,127 +270,46 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     reactionUsed,
     attack,
     bonusAttack,
+    attackTally,
     twfAvailable,
-    spellCastThisTurn,
-    cancelAttack,
-    finishAttack,
     consumeBonusAction,
-    commitActionSpell,
-    commitBonusActionSpell,
-    commitReactionSpell,
+    consumeReaction,
+    history,
   } = turnState;
 
+  const turn = useTurnActions({ character, sessionId, turnState, onUpdate, onLogChanged });
+  // Grouped for readability; also keeps this destructure from cloning
+  // useTurnActions' flat return block (a benign hook-bag mirror).
+  const { busy, error, reactionMessage, effectMessage, send, handleUndo } = turn;
   const {
-    busy,
-    error,
-    reactionMessage,
-    effectMessage,
-    showActionMenu,
-    setShowActionMenu,
-    showBonusMenu,
-    setShowBonusMenu,
-    showReactionMenu,
-    setShowReactionMenu,
-    activeResolution,
-    closeResolution,
-    dieLabel,
-    dieBusy,
-    superiorityRemaining,
-    classActions,
-    classBonusActions,
-    classReactions,
-    durableReminders,
-    reactionManeuvers,
-    effectManeuvers,
-    actionSurgePool,
-    actionSurgeAvailable,
-    send,
-    handleActionClick,
-    handleAttackAction,
-    handleTwfAction,
-    handleActionSurge,
-    handleStartCombat,
-    handleEndCombat,
-    handleStartTurn,
-    handleEndTurn,
-    handleReactionManeuver,
-    handleEffectManeuver,
-  } = useTurnActions({ character, sessionId, turnState, onUpdate, onLogChanged });
+    showActionMenu, setShowActionMenu, showBonusMenu, setShowBonusMenu,
+    showReactionMenu, setShowReactionMenu, activeResolution, closeResolution,
+  } = turn;
+  const {
+    dieLabel, dieBusy, superiorityRemaining, classActions, classBonusActions,
+    classReactions, durableReminders, reactionManeuvers, effectManeuvers,
+    actionSurgePool, actionSurgeAvailable,
+    actionSheetModel, bonusSheetModel, reactionSheetModel,
+  } = turn;
+  const {
+    handleActionClick, handleAttackAction, handleResumeAttack, handleTwfAction, handleActionSurge,
+    handleEndTurn, handleReactionManeuver, handleEffectManeuver, handleBonusSpellCast,
+  } = turn;
+
+  // Decorative initiative rail's "you" marker (#737).
+  const youInitial = character.name?.[0]?.toUpperCase() ?? "?";
 
   // ── Idle state ─────────────────────────────────────────────────────────────
   if (phase === "idle") {
-    // Not in combat — show only the Start Combat gate.
-    if (!inCombat) {
-      return (
-        <Card className="p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-parchment-800">Not in Combat</p>
-              <p className="mt-0.5 text-xs text-parchment-600">
-                When a combat encounter begins, start it here to track your turn.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleStartCombat}
-              className="shrink-0 rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 shadow-sm transition-colors hover:bg-garnet-800"
-            >
-              Start Combat
-            </button>
-          </div>
-        </Card>
-      );
-    }
-
-    // In combat but between turns — show round indicator, Start Turn, End Combat, Reaction.
     return (
-      <Card className="p-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-parchment-800">
-                Combat — Round {round}
-              </p>
-              <p className="mt-0.5 text-xs text-parchment-600">
-                When the DM calls your turn, start tracking your action economy.
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                onClick={handleEndCombat}
-                className="rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-600 transition-colors hover:bg-parchment-100"
-              >
-                End Combat
-              </button>
-              <button
-                type="button"
-                onClick={handleStartTurn}
-                className="rounded-control border border-garnet-300 bg-garnet-700 px-3 py-1.5 text-xs font-semibold text-parchment-50 shadow-sm transition-colors hover:bg-garnet-800"
-              >
-                Start Turn
-              </button>
-            </div>
-          </div>
-
-          {/* Reaction is available between turns — render it in idle mode. */}
-          <ReactionSlot
-            reactionUsed={reactionUsed}
-            showReactionMenu={showReactionMenu}
-            setShowReactionMenu={setShowReactionMenu}
-            classReactions={classReactions}
-            reactionManeuvers={reactionManeuvers}
-            superiorityRemaining={superiorityRemaining}
-            dieLabel={dieLabel}
-            dieBusy={dieBusy}
-            busy={busy}
-            reactionMessage={reactionMessage}
-            error={error}
-            handleActionClick={handleActionClick}
-            handleReactionManeuver={handleReactionManeuver}
-          />
-        </div>
-      </Card>
+      <TurnHubIdle
+        character={character}
+        onUpdate={onUpdate}
+        onLogChanged={onLogChanged}
+        youInitial={youInitial}
+        turnState={turnState}
+        turn={turn}
+      />
     );
   }
 
@@ -176,24 +317,35 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
 
   return (
     <Card className="p-4">
-      {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <p className="font-semibold text-parchment-800">Your Turn</p>
-          {inCombat && (
-            <p className="mt-0.5 text-xs text-parchment-600">Round {round}</p>
-          )}
+      <TurnHubHeader
+        inCombat={inCombat}
+        round={round}
+        busy={busy}
+        canUndo={history.length > 0}
+        onUndo={handleUndo}
+        onEndTurn={handleEndTurn}
+      />
+
+      {showInitiative && (
+        <div className="mb-4">
+          <InitiativeRail youInitial={youInitial} active />
         </div>
-        <button
-          type="button"
-          onClick={handleEndTurn}
-          className="rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1 text-xs font-semibold text-parchment-600 transition-colors hover:bg-parchment-100"
-        >
-          End Turn
-        </button>
-      </div>
+      )}
 
       <div className="flex flex-col gap-3">
+        {/* Death saves surface on your own turn too — the primary moment a
+            downed player rolls a save (#736/#744). */}
+        <TurnDeathSaves character={character} onUpdate={onUpdate} />
+
+        <TurnConcentrationBanner
+          character={character}
+          onUpdate={onUpdate}
+          onLogChanged={onLogChanged}
+        />
+
+        {/* ── Loadout (slot root, pre-attack) — a swap costs the Action (#733) ── */}
+        <LoadoutSwapRow character={character} turnState={turnState} onUpdate={onUpdate} />
+
         {/* ── Action ──────────────────────────────────────────────────────── */}
         <ActionSlot
           actionsRemaining={actionsRemaining}
@@ -201,8 +353,10 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           showActionMenu={showActionMenu}
           setShowActionMenu={setShowActionMenu}
           classActions={classActions}
+          sheetModel={actionSheetModel}
           busy={busy}
           handleAttackAction={handleAttackAction}
+          handleResumeAttack={handleResumeAttack}
           handleActionClick={handleActionClick}
         />
 
@@ -214,9 +368,11 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           setShowBonusMenu={setShowBonusMenu}
           twfAvailable={twfAvailable}
           classBonusActions={classBonusActions}
+          sheetModel={bonusSheetModel}
           busy={busy}
           handleTwfAction={handleTwfAction}
           handleActionClick={handleActionClick}
+          handleBonusSpellCast={handleBonusSpellCast}
           consumeBonusAction={consumeBonusAction}
         />
 
@@ -226,6 +382,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           showReactionMenu={showReactionMenu}
           setShowReactionMenu={setShowReactionMenu}
           classReactions={classReactions}
+          sheetModel={reactionSheetModel}
           reactionManeuvers={reactionManeuvers}
           superiorityRemaining={superiorityRemaining}
           dieLabel={dieLabel}
@@ -235,112 +392,34 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           error={error}
           handleActionClick={handleActionClick}
           handleReactionManeuver={handleReactionManeuver}
+          consumeReaction={consumeReaction}
         />
 
+        {/* ── "Tell your DM" banner — attack tally once the sheet is closed ── */}
+        {!activeResolution && <TurnDmBanner rows={attackTally} />}
+
         {/* ── Action Surge (Fighter) ─────────────────────────────────────── */}
-        {actionSurgeAvailable && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={handleActionSurge}
-            className="flex items-center justify-center gap-1.5 rounded-control border border-gold-300 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800 shadow-sm transition-colors hover:bg-gold-100 disabled:opacity-50"
-          >
-            <Zap aria-hidden="true" className="h-3.5 w-3.5" />
-            <span>Action Surge</span>
-            {actionSurgePool && actionSurgePool.remaining > 1 && (
-              <span className="text-gold-800">({actionSurgePool.remaining} left)</span>
-            )}
-          </button>
-        )}
+        <ActionSurgeButton
+          available={actionSurgeAvailable}
+          pool={actionSurgePool}
+          busy={busy}
+          onSurge={handleActionSurge}
+        />
 
-        {/* ── Inline tool area ──────────────────────────────────────────────── */}
-        {activeResolution?.resolver.kind === "attack-picker" && (
-          <div className="rounded-card border border-parchment-200 bg-parchment-50 p-3">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
-              Select Attack
-            </p>
-            <InlineAttackPicker
-              character={character}
-              turnState={turnState}
-              sessionId={sessionId}
-              onClose={() => {
-                finishAttack();
-                closeResolution();
-              }}
-              onCancel={() => {
-                cancelAttack();
-                closeResolution();
-                setShowActionMenu(true);
-              }}
-              onUpdate={onUpdate}
-              onLogChanged={onLogChanged}
-            />
-          </div>
-        )}
-
-        {activeResolution?.resolver.kind === "item-picker" && (
-          <div className="rounded-card border border-parchment-200 bg-parchment-50 p-3">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
-              Use Item
-            </p>
-            <InlineItemPicker
-              character={character}
-              onUpdate={onUpdate}
-              onClose={closeResolution}
-            />
-          </div>
-        )}
-
-        {activeResolution?.resolver.kind === "heal-input" && (
-          <LayOnHandsInput
-            character={character}
-            onSend={send}
-            onClose={closeResolution}
-          />
-        )}
-
-        {activeResolution?.resolver.kind === "spell-picker" && character.spellcasting && (() => {
-          const spellSlot = activeResolution.resolver.slot as "action" | "bonusAction" | "reaction";
-          const slotAvailable =
-            spellSlot === "action" ? actionsRemaining > 0
-            : spellSlot === "bonusAction" ? !bonusActionUsed
-            : !reactionUsed;
-          const onCommitSlot = (spellLevel: number) => {
-            if (spellSlot === "action") commitActionSpell(spellLevel);
-            else if (spellSlot === "bonusAction") commitBonusActionSpell(spellLevel);
-            else commitReactionSpell();
-          };
-          return (
-            <div className="rounded-card border border-arcane-200 bg-arcane-50 p-3">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-arcane-700">
-                {spellSlot === "bonusAction"
-                  ? "Bonus-Action Spell"
-                  : spellSlot === "reaction"
-                    ? "Reaction Spell"
-                    : "Cast a Spell"}
-              </p>
-              <InlineSpellPicker
-                character={character}
-                sessionId={sessionId}
-                onUpdate={onUpdate}
-                onClose={closeResolution}
-                onLogChanged={onLogChanged}
-                slot={spellSlot}
-                slotAvailable={slotAvailable}
-                onCommitSlot={onCommitSlot}
-                spellCastThisTurn={spellCastThisTurn}
-                allies={allies}
-                castingTimeFilter={
-                  spellSlot === "bonusAction"
-                    ? "1 bonus action"
-                    : spellSlot === "reaction"
-                      ? "1 reaction"
-                      : "1 action"
-                }
-              />
-            </div>
-          );
-        })()}
+        {/* ── Resolution sheets ─────────────────────────────────────────────── */}
+        <TurnResolutionSheets
+          character={character}
+          sessionId={sessionId}
+          turnState={turnState}
+          activeResolution={activeResolution}
+          closeResolution={closeResolution}
+          setShowActionMenu={setShowActionMenu}
+          setShowBonusMenu={setShowBonusMenu}
+          onUpdate={onUpdate}
+          onLogChanged={onLogChanged}
+          allies={allies}
+          send={send}
+        />
 
         {/* ── Effect maneuvers (no slot consumed) — e.g. Evasive Footwork ─────── */}
         <EffectManeuverStrip
@@ -351,32 +430,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           handleEffectManeuver={handleEffectManeuver}
         />
 
-        {/* General error display (covers send() failures: Action Surge, Second Wind, etc.) */}
-        {error && (
-          <p className="text-xs font-semibold text-garnet-700">{error}</p>
-        )}
-
-        {/* Info strip for effect maneuvers (turn-scoped: Evasive Footwork, etc.) */}
-        {effectMessage && (
-          <p className="rounded-control border border-gold-200 bg-gold-50 px-3 py-2 text-xs font-semibold text-gold-800">
-            {effectMessage}
-          </p>
-        )}
-
-        {/* Durable-buff end reminders (e.g. Rage) — when/why the buff will end. */}
-        {durableReminders.map((r) => (
-          <p
-            key={r.key}
-            className="rounded-control border border-garnet-200 bg-garnet-50 px-3 py-2 text-xs font-semibold text-garnet-800"
-          >
-            {r.reminder}
-          </p>
-        ))}
-
-        {/* Note about movement */}
-        <p className="text-[11px] text-parchment-600 italic">
-          ⚑ Movement is not tracked here. Speed / difficult-terrain tracking is a future feature.
-        </p>
+        <TurnMessages error={error} effectMessage={effectMessage} durableReminders={durableReminders} />
       </div>
     </Card>
   );

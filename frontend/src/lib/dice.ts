@@ -22,6 +22,14 @@ export interface RollSpec {
   dropLowest?: number;
   /** Advantage/disadvantage — honored only for a single d20 (see `usesAdvantage`). */
   mode?: RollMode;
+  /**
+   * 5e critical hit: doubles the number of damage **dice** rolled (`count`),
+   * leaving `modifier` single. Off by default so every existing d20/ability/save
+   * spec is unchanged. Never combines with the advantage-d20 path — a crit spec
+   * is a multi-die damage spec, so `usesAdvantage` already excludes it, and the
+   * advantage branch wins if both are somehow set (crit is ignored there).
+   */
+  crit?: boolean;
 }
 
 /** One rolled die, in original roll order, flagged if it was dropped from the total. */
@@ -43,6 +51,22 @@ export interface RollResult {
 /** Rolls a single die with the given number of faces. The only place Math.random is read. */
 export function rollDie(faces: number): number {
   return 1 + Math.floor(Math.random() * faces);
+}
+
+/** The kept (non-dropped) d20 of a roll, or null when the spec isn't a single-d20 roll. */
+export function keptD20(result: RollResult): DieRoll | null {
+  if (result.spec.faces !== 20) return null;
+  return result.dice.find((die) => !die.dropped) ?? null;
+}
+
+/** Kept-die natural 20 — a nat 20 on the DROPPED die (disadvantage) is not a crit. */
+export function isNaturalTwenty(result: RollResult | null | undefined): boolean {
+  return result ? keptD20(result)?.value === 20 : false;
+}
+
+/** Kept-die natural 1 — a miss on an attack roll. */
+export function isNaturalOne(result: RollResult | null | undefined): boolean {
+  return result ? keptD20(result)?.value === 1 : false;
 }
 
 /**
@@ -97,17 +121,27 @@ export function summarizeRoll(values: number[], spec: RollSpec): RollResult {
   return { dice, modifier, total, spec };
 }
 
+/**
+ * How many dice `rollSpec` actually rolls: 2 for an advantage d20, double
+ * `count` for a crit damage spec, else `count`. The advantage guard is checked
+ * first so a crit never routes through the advantage branch (see `RollSpec.crit`).
+ */
+function critCount(spec: RollSpec): number {
+  return spec.crit ? spec.count * 2 : spec.count;
+}
+
 /** Rolls a full `RollSpec`, dropping the lowest `dropLowest` dice (or the un-taken advantage die). */
 export function rollSpec(spec: RollSpec): RollResult {
-  const count = usesAdvantage(spec) ? 2 : spec.count;
+  const count = usesAdvantage(spec) ? 2 : critCount(spec);
   const values = Array.from({ length: count }, () => rollDie(spec.faces));
   return summarizeRoll(values, spec);
 }
 
 /** Human-readable label for a roll spec, e.g. "4d6 drop lowest", "1d8 + 3". */
 export function formatRollSpec(spec: RollSpec): string {
-  const { count, faces, modifier = 0, dropLowest = 0 } = spec;
-  let label = `${count}d${faces}`;
+  const { faces, modifier = 0, dropLowest = 0 } = spec;
+  // Show the doubled dice count on a crit so the Session Log reads honestly.
+  let label = `${critCount(spec)}d${faces}`;
   if (dropLowest > 0) {
     label += dropLowest === 1 ? " drop lowest" : ` drop lowest ${dropLowest}`;
   }
@@ -118,6 +152,9 @@ export function formatRollSpec(spec: RollSpec): string {
   }
   if (usesAdvantage(spec)) {
     label += ` (${spec.mode})`;
+  }
+  if (spec.crit) {
+    label += " (crit)";
   }
   return label;
 }

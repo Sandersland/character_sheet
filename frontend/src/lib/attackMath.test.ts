@@ -3,7 +3,11 @@ import { describe, it, expect } from "vitest";
 import {
   attacksExhausted,
   buildAttackEntries,
+  buildAttackForms,
+  buildEquippedWeaponEntries,
+  buildOffHandEntry,
   capabilitiesActive,
+  critDamageSpec,
   hasSuperiorityDice,
   unarmedDamageDisplay,
   weaponDamageRiders,
@@ -149,6 +153,40 @@ describe("attacksExhausted", () => {
   });
 });
 
+describe("buildEquippedWeaponEntries", () => {
+  it("collapses same-name equipped duplicates into one entry", () => {
+    const character = makeCharacter({
+      inventory: [
+        weaponItem({ attackBonus: 4, damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 2, damageType: "piercing" }, "Dagger", "inv-1"),
+        weaponItem({ attackBonus: 4, damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 2, damageType: "piercing" }, "Dagger", "inv-2"),
+      ] as unknown as Character["inventory"],
+    });
+    const entries = buildEquippedWeaponEntries(character);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].name).toBe("Dagger");
+    expect(entries[0].id).toBe("inv-1");
+  });
+
+  it("keeps one entry per distinct weapon name", () => {
+    const character = makeCharacter({
+      inventory: [
+        weaponItem({ attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 3, damageType: "slashing" }, "Longsword", "inv-1"),
+        weaponItem({ attackBonus: 4, damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 2, damageType: "piercing" }, "Dagger", "inv-2"),
+      ] as unknown as Character["inventory"],
+    });
+    expect(buildEquippedWeaponEntries(character).map((e) => e.name)).toEqual(["Longsword", "Dagger"]);
+  });
+
+  it("excludes unequipped weapons and non-weapons", () => {
+    const character = makeCharacter({
+      inventory: [
+        { ...weaponItem({ attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 3, damageType: "slashing" }, "Longsword", "inv-1"), equipped: false },
+      ] as unknown as Character["inventory"],
+    });
+    expect(buildEquippedWeaponEntries(character)).toEqual([]);
+  });
+});
+
 describe("buildAttackEntries", () => {
   it("orders equipped weapons, then unarmed, then improvised", () => {
     const character = makeCharacter({
@@ -187,7 +225,7 @@ describe("buildAttackEntries", () => {
           damageDiceFaces: 8,
           damageModifier: 0,
           damageType: "slashing",
-          damage: { damageDiceCount: 1, damageDiceFaces: 10, damageModifier: 2, damageType: "slashing", grip: "versatile-two-handed" },
+          damage: { damageDiceCount: 1, damageDiceFaces: 10, damageModifier: 2, abilityModifier: 2, damageType: "slashing", grip: "versatile-two-handed" },
         }),
       ] as unknown as Character["inventory"],
     });
@@ -279,6 +317,129 @@ describe("buildAttackEntries", () => {
   });
 });
 
+describe("buildAttackForms (#786)", () => {
+  it("dedupes equipped weapons, then appends Unarmed then Improvised", () => {
+    const character = makeCharacter({
+      inventory: [
+        weaponItem({ attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 0, damageType: "piercing" }, "Dagger", "inv-1"),
+        weaponItem({ attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 4, damageModifier: 0, damageType: "piercing" }, "Dagger", "inv-2"),
+      ] as unknown as Character["inventory"],
+    });
+    const forms = buildAttackForms(character);
+    expect(forms.map((f) => f.name)).toEqual(["Dagger", "Unarmed Strike", "Improvised Weapon"]);
+  });
+
+  it("defaults to Unarmed as the first form when no weapon is equipped", () => {
+    const forms = buildAttackForms(makeCharacter());
+    expect(forms.map((f) => f.id)).toEqual(["unarmed", "improvised"]);
+    expect(forms[0].name).toBe("Unarmed Strike");
+  });
+
+  it("puts the main-hand weapon first so it is the default selection", () => {
+    const character = makeCharacter({
+      inventory: [
+        weaponItem({ attackBonus: 6, damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 3, damageType: "slashing" }, "Longsword", "inv-1"),
+      ] as unknown as Character["inventory"],
+    });
+    expect(buildAttackForms(character)[0].name).toBe("Longsword");
+  });
+});
+
+describe("buildOffHandEntry (#732)", () => {
+  // Two equipped weapons: a main-hand and an OFF_HAND shortsword whose damage
+  // snapshot carries its ability-mod component (STR +3 folded into damageModifier).
+  function twoWeaponChar(overrides: Partial<Character> = {}) {
+    const mainHand = {
+      ...weaponItem(
+        { attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "slashing",
+          light: true,
+          damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, abilityModifier: 3, damageType: "slashing", grip: "one-handed" } },
+        "Shortsword",
+        "main",
+      ),
+      equippedSlot: "MAIN_HAND" as const,
+    };
+    const offHand = {
+      ...weaponItem(
+        { attackBonus: 5, damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "piercing",
+          light: true,
+          damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, abilityModifier: 3, damageType: "piercing", grip: "one-handed" } },
+        "Dagger",
+        "off",
+      ),
+      equippedSlot: "OFF_HAND" as const,
+    };
+    return makeCharacter({
+      inventory: [mainHand, offHand] as unknown as Character["inventory"],
+      ...overrides,
+    });
+  }
+
+  it("returns null with fewer than two equipped weapons", () => {
+    const character = makeCharacter({
+      inventory: [weaponItem({ damageModifier: 3, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, abilityModifier: 3, damageType: "slashing", grip: "one-handed" } })] as unknown as Character["inventory"],
+    });
+    expect(buildOffHandEntry(character)).toBeNull();
+  });
+
+  it("scopes to the OFF_HAND weapon", () => {
+    const entry = buildOffHandEntry(twoWeaponChar())!;
+    expect(entry.id).toBe("off");
+    expect(entry.name).toBe("Dagger");
+  });
+
+  it("omits the ability modifier from off-hand damage WITHOUT the style", () => {
+    const entry = buildOffHandEntry(twoWeaponChar({ resources: { pools: [] } } as unknown as Partial<Character>))!;
+    // damageModifier 3 (= STR +3) minus the ability mod → 0.
+    expect(entry.damageSpec).toEqual({ count: 1, faces: 6, modifier: 0 });
+    expect(entry.damageLabel).toBe("1d6 piercing");
+  });
+
+  it("keeps the ability modifier WITH the Two-Weapon Fighting style", () => {
+    const entry = buildOffHandEntry(
+      twoWeaponChar({ resources: { pools: [], fightingStyle: "twoWeaponFighting" } } as unknown as Partial<Character>),
+    )!;
+    expect(entry.damageSpec).toEqual({ count: 1, faces: 6, modifier: 3 });
+    expect(entry.damageLabel).toBe("1d6 + 3 piercing");
+  });
+
+  it("keeps a negative ability modifier even without the style (RAW)", () => {
+    const character = makeCharacter({
+      inventory: [
+        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: -1, abilityModifier: -1, damageType: "slashing", grip: "one-handed" } }, "A", "a"), equippedSlot: "MAIN_HAND" as const },
+        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: -1, abilityModifier: -1, damageType: "piercing", grip: "one-handed" } }, "B", "off"), equippedSlot: "OFF_HAND" as const },
+      ] as unknown as Character["inventory"],
+    });
+    // max(0, -1) = 0 subtracted → the negative mod stays.
+    expect(buildOffHandEntry(character)!.damageSpec.modifier).toBe(-1);
+  });
+
+  it("shows the full modifier for a legacy weapon whose damage lacks abilityModifier", () => {
+    // Pre-#732 serialization: damage present but no ability-mod component.
+    const legacyDamage = { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "piercing", grip: "one-handed" as const };
+    const character = makeCharacter({
+      inventory: [
+        { ...weaponItem({ light: true, damage: legacyDamage }, "A", "a"), equippedSlot: "MAIN_HAND" as const },
+        { ...weaponItem({ light: true, damage: legacyDamage }, "B", "off"), equippedSlot: "OFF_HAND" as const },
+      ] as unknown as Character["inventory"],
+    });
+    // No abilityModifier to subtract → the full modifier is kept (matches pre-#732 behavior).
+    expect(buildOffHandEntry(character)!.damageSpec.modifier).toBe(3);
+  });
+
+  it("preserves a melee-damage buff (Rage) while dropping only the ability mod", () => {
+    // damageModifier 5 = STR +3 folded with a +2 Rage buff; abilityModifier is the raw +3.
+    const character = makeCharacter({
+      inventory: [
+        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 5, abilityModifier: 3, damageType: "slashing", grip: "one-handed" } }, "A", "a"), equippedSlot: "MAIN_HAND" as const },
+        { ...weaponItem({ light: true, damage: { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 5, abilityModifier: 3, damageType: "piercing", grip: "one-handed" } }, "B", "off"), equippedSlot: "OFF_HAND" as const },
+      ] as unknown as Character["inventory"],
+    });
+    // 5 − max(0,3) = 2 (the Rage buff survives).
+    expect(buildOffHandEntry(character)!.damageSpec.modifier).toBe(2);
+  });
+});
+
 describe("capabilitiesActive", () => {
   it("gates an attunement-required item on attunement (not mere equip)", () => {
     expect(capabilitiesActive({ equipped: true, attuned: true, requiresAttunement: true })).toBe(true);
@@ -343,5 +504,32 @@ describe("weaponDamageRiders", () => {
 
   it("returns nothing for an item with no capabilities", () => {
     expect(weaponDamageRiders(invItem({ capabilities: undefined }))).toEqual([]);
+  });
+});
+
+describe("critDamageSpec", () => {
+  it("sets crit: true, leaving count and modifier unchanged (rollSpec doubles dice at roll-time)", () => {
+    expect(critDamageSpec({ count: 1, faces: 8, modifier: 3 })).toEqual({
+      count: 1,
+      faces: 8,
+      modifier: 3,
+      crit: true,
+    });
+  });
+
+  it("applies the same doubling rule to a damage rider's spec (Flame Tongue +2d6 → +4d6)", () => {
+    const rider = weaponDamageRiders(invItem({ capabilities: [diceCap()] }))[0];
+    expect(critDamageSpec(rider.spec)).toEqual({
+      count: 2,
+      faces: 6,
+      modifier: 0,
+      crit: true,
+    });
+  });
+
+  it("does not mutate the source spec", () => {
+    const spec = { count: 2, faces: 6, modifier: 1 };
+    critDamageSpec(spec);
+    expect(spec).toEqual({ count: 2, faces: 6, modifier: 1 });
   });
 });

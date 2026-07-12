@@ -58,6 +58,11 @@ describe("Modal", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("suppresses the panel's focus-visible outline — dialog focus is an a11y anchor, not a nav position", () => {
+    render(<Modal title="Test" onClose={() => {}}>content</Modal>);
+    expect(screen.getByRole("dialog").className).toContain("focus-visible:outline-none");
+  });
+
   it("sets body overflow to hidden on mount and restores on unmount", () => {
     const { unmount } = render(<Modal title="Test" onClose={() => {}}>content</Modal>);
     expect(document.body.style.overflow).toBe("hidden");

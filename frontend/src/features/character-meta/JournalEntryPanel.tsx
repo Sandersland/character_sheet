@@ -45,8 +45,9 @@ export default function JournalEntryPanel({
     onSubmit({ kind: "NOTE", body: body.trim() });
   }
 
+  // text-base at mobile widths keeps the note field ≥16px so iOS Safari doesn't auto-zoom on focus.
   const inputCls =
-    "w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
+    "w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-base md:text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
   const labelCls = "block text-xs font-semibold text-parchment-700";
 
   return (

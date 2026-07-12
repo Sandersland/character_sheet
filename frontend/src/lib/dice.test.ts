@@ -3,6 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   formatRollBreakdown,
   formatRollSpec,
+  isNaturalOne,
+  isNaturalTwenty,
+  keptD20,
   rollDie,
   rollSpec,
   summarizeRoll,
@@ -93,6 +96,60 @@ describe("rollSpec", () => {
 
     expect(result.dice).toEqual([{ value: 4, dropped: false }]);
     expect(result.total).toBe(4);
+  });
+});
+
+describe("crit (5e critical hit — double the dice)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("doubles the number of dice rolled while leaving the modifier single", () => {
+    // 1d8 + 3 crit → rolls 2d8, both faces 5, modifier stays +3.
+    vi.spyOn(Math, "random").mockReturnValue((5 - 1) / 8);
+
+    const result = rollSpec({ count: 1, faces: 8, modifier: 3, crit: true });
+
+    expect(result.dice).toEqual([
+      { value: 5, dropped: false },
+      { value: 5, dropped: false },
+    ]);
+    expect(result.modifier).toBe(3);
+    expect(result.total).toBe(13); // 5 + 5 + 3, the modifier is NOT doubled
+  });
+
+  it("keeps dropLowest working on a crit spec (drops the lowest of the doubled dice)", () => {
+    // 2d6 crit → rolls 4d6 in order 6, 1, 4, 2; dropLowest 1 drops the single 1.
+    const sequence = [(6 - 1) / 6, (1 - 1) / 6, (4 - 1) / 6, (2 - 1) / 6];
+    let call = 0;
+    vi.spyOn(Math, "random").mockImplementation(() => sequence[call++]);
+
+    const result = rollSpec({ count: 2, faces: 6, dropLowest: 1, crit: true });
+
+    expect(result.dice).toHaveLength(4);
+    expect(result.dice.filter((die) => die.dropped)).toHaveLength(1);
+    expect(result.total).toBe(12); // 6 + 4 + 2, the lowest (1) dropped
+  });
+
+  it("reflects the doubled dice count and a (crit) suffix in the label", () => {
+    expect(formatRollSpec({ count: 1, faces: 8, modifier: 3, crit: true })).toBe("2d8 + 3 (crit)");
+    expect(formatRollSpec({ count: 2, faces: 6, crit: true })).toBe("4d6 (crit)");
+  });
+
+  it("a non-crit spec is byte-identical to before (roll + label)", () => {
+    const sequence = [(4 - 1) / 6, (2 - 1) / 6];
+    let call = 0;
+    vi.spyOn(Math, "random").mockImplementation(() => sequence[call++]);
+
+    const spec = { count: 2, faces: 6, modifier: 1 };
+    const result = rollSpec(spec);
+
+    expect(result.dice).toEqual([
+      { value: 4, dropped: false },
+      { value: 2, dropped: false },
+    ]);
+    expect(result.total).toBe(7); // 4 + 2 + 1
+    expect(formatRollSpec(spec)).toBe("2d6 + 1");
   });
 });
 
@@ -254,6 +311,56 @@ describe("formatRollSpec", () => {
 
   it("formats a negative modifier", () => {
     expect(formatRollSpec({ count: 2, faces: 4, modifier: -1 })).toBe("2d4 - 1");
+  });
+});
+
+describe("keptD20 / isNaturalTwenty / isNaturalOne", () => {
+  it("reads the kept face off a plain d20 roll", () => {
+    const result = summarizeRoll([20], { count: 1, faces: 20, modifier: 5 });
+    expect(keptD20(result)?.value).toBe(20);
+    expect(isNaturalTwenty(result)).toBe(true);
+    expect(isNaturalOne(result)).toBe(false);
+  });
+
+  it("flags a natural 1 on the kept die", () => {
+    const result = summarizeRoll([1], { count: 1, faces: 20 });
+    expect(isNaturalOne(result)).toBe(true);
+    expect(isNaturalTwenty(result)).toBe(false);
+  });
+
+  it("treats a kept 20 under advantage as a crit", () => {
+    const result = summarizeRoll([20, 3], { count: 1, faces: 20, mode: "advantage" });
+    expect(keptD20(result)?.value).toBe(20);
+    expect(isNaturalTwenty(result)).toBe(true);
+  });
+
+  it("does NOT crit on a natural 20 that was dropped under disadvantage", () => {
+    const result = summarizeRoll([20, 3], { count: 1, faces: 20, mode: "disadvantage" });
+    expect(keptD20(result)?.value).toBe(3);
+    expect(isNaturalTwenty(result)).toBe(false);
+  });
+
+  it("crits under advantage only when the KEPT (higher) die is 20", () => {
+    const nat20Kept = summarizeRoll([2, 20], { count: 1, faces: 20, mode: "advantage" });
+    expect(isNaturalTwenty(nat20Kept)).toBe(true);
+  });
+
+  it("does not miss on a natural 1 that was dropped under advantage", () => {
+    const result = summarizeRoll([1, 15], { count: 1, faces: 20, mode: "advantage" });
+    expect(keptD20(result)?.value).toBe(15);
+    expect(isNaturalOne(result)).toBe(false);
+  });
+
+  it("returns null / false for a non-d20 (damage) roll", () => {
+    const result = summarizeRoll([8, 8], { count: 2, faces: 8, crit: true });
+    expect(keptD20(result)).toBeNull();
+    expect(isNaturalTwenty(result)).toBe(false);
+    expect(isNaturalOne(result)).toBe(false);
+  });
+
+  it("treats null/undefined results as no crit and no miss", () => {
+    expect(isNaturalTwenty(null)).toBe(false);
+    expect(isNaturalOne(undefined)).toBe(false);
   });
 });
 

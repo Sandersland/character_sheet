@@ -17,6 +17,13 @@ export type WeaponGrip = "one-handed" | "two-handed" | "versatile-two-handed";
  * Damage modifier follows the same ability-selection rule as attackBonus
  * (ranged → DEX, finesse → max(STR, DEX), else STR) so attack and damage stay
  * consistent and we never duplicate that rule.
+ *
+ * `abilityModifier` is returned as a separate component (the governing ability
+ * mod, before the melee buff) so the client can implement the Two-Weapon
+ * Fighting off-hand rule — an off-hand bonus attack omits the ability modifier
+ * from its damage unless the character has the Two-Weapon Fighting style (#732).
+ * Exposing it here keeps the ability-selection rule server-side rather than
+ * duplicating it on the frontend.
  */
 export function deriveWeaponDamage(
   weapon: {
@@ -39,11 +46,13 @@ export function deriveWeaponDamage(
   damageDiceCount: number;
   damageDiceFaces: number;
   damageModifier: number;
+  abilityModifier: number;
   damageType: string;
   grip: WeaponGrip;
 } {
   const isMelee = weapon.weaponRange === "melee";
-  const damageModifier = weaponAbilityMod(weapon, effectiveScores) + (isMelee ? meleeDamageBonus : 0);
+  const abilityMod = weaponAbilityMod(weapon, effectiveScores);
+  const damageModifier = abilityMod + (isMelee ? meleeDamageBonus : 0);
 
   // Resolve grip and choose dice.
   const isVersatile =
@@ -63,7 +72,14 @@ export function deriveWeaponDamage(
       ? "versatile-two-handed"
       : "one-handed";
 
-  return { damageDiceCount, damageDiceFaces, damageModifier, damageType: weapon.damageType, grip };
+  return {
+    damageDiceCount,
+    damageDiceFaces,
+    damageModifier,
+    abilityModifier: abilityMod,
+    damageType: weapon.damageType,
+    grip,
+  };
 }
 
 // ── Unarmed strike + improvised weapon derivation ─────────────────────────────

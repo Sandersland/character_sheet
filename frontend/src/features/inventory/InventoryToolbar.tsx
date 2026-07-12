@@ -29,7 +29,7 @@ export default function InventoryToolbar({
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search items…"
           aria-label="Search items"
-          className="w-full rounded-control border border-parchment-300 bg-parchment-50 pl-8 pr-2.5 py-1 text-sm"
+          className="w-full rounded-control border border-parchment-300 bg-parchment-50 pl-8 pr-2.5 py-1 text-base md:text-sm"
         />
       </div>
       <div role="group" aria-label="Filter items" className="flex flex-wrap gap-1.5">

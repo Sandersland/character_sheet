@@ -60,8 +60,9 @@ export default function SessionAddXpForm({
     );
   }
 
+  // text-base at mobile widths keeps the XP field ≥16px so iOS Safari doesn't auto-zoom on focus.
   const inputCls =
-    "w-28 rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
+    "w-28 rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-base md:text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
 
   return (
     <div className="flex flex-col gap-1.5">

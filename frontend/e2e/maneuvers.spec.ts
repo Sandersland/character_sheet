@@ -24,8 +24,8 @@ test("maneuvers: spending an effect maneuver decrements a superiority die", asyn
   await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
   await expect(page).toHaveURL(/\/session$/);
 
-  await page.getByRole("button", { name: "Start Combat" }).click();
-  await page.getByRole("button", { name: "Start Turn" }).click();
+  await page.getByRole("button", { name: /Start combat/i }).click();
+  await page.getByRole("button", { name: "Start my turn" }).click();
 
   // The gold effect-maneuver strip appears once in-turn with dice remaining.
   const evasive = page.getByRole("button", { name: /Evasive Footwork/ });

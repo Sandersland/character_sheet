@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
-import { useEffect } from "react";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { useEffect, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { RollSpec } from "@/lib/dice";
+import { useDialogChrome } from "@/hooks/useDialogChrome";
 import { RollProvider, useRoll } from "@/features/dice/RollContext";
 import RollResultToast from "@/features/dice/RollResultToast";
 
@@ -51,5 +52,64 @@ describe("RollResultToast advantage/disadvantage", () => {
     rollWith([20, 5], { count: 1, faces: 20, mode: "advantage" });
 
     expect(screen.getByText(/Natural 20 — Critical!/i)).toBeInTheDocument();
+  });
+});
+
+function DialogHost() {
+  const panelRef = useDialogChrome(() => {});
+  return <div ref={panelRef} tabIndex={-1} />;
+}
+
+function SuppressionHarness() {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const { roll } = useRoll();
+  return (
+    <>
+      <button type="button" onClick={() => roll({ count: 1, faces: 20, modifier: 5 }, "Initiative")}>
+        fire-roll
+      </button>
+      <button type="button" onClick={() => setDialogOpen(true)}>
+        open-dialog
+      </button>
+      <button type="button" onClick={() => setDialogOpen(false)}>
+        close-dialog
+      </button>
+      {dialogOpen && <DialogHost />}
+      <RollResultToast />
+    </>
+  );
+}
+
+describe("RollResultToast dialog suppression", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("hides the toast while a dialog (BottomSheet/Modal) is mounted", () => {
+    render(
+      <RollProvider>
+        <SuppressionHarness />
+      </RollProvider>,
+    );
+
+    fireEvent.click(screen.getByText("open-dialog"));
+    fireEvent.click(screen.getByText("fire-roll"));
+
+    expect(screen.queryByText("Initiative")).not.toBeInTheDocument();
+  });
+
+  it("shows the toast for a fresh roll after the dialog closes", () => {
+    render(
+      <RollProvider>
+        <SuppressionHarness />
+      </RollProvider>,
+    );
+
+    fireEvent.click(screen.getByText("open-dialog"));
+    fireEvent.click(screen.getByText("close-dialog"));
+    fireEvent.click(screen.getByText("fire-roll"));
+
+    expect(screen.getByText("Initiative")).toBeInTheDocument();
   });
 });

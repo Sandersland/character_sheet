@@ -53,22 +53,49 @@ describe("canTwoWeaponFight", () => {
     const noDetail = { equipped: true, category: "weapon" as const, weapon: null };
     expect(canTwoWeaponFight([noDetail, noDetail])).toBe(false);
   });
+
+  // ── Two-Weapon Fighting style relaxes the light restriction (#732) ──────────
+  it("non-light pair → false without the Two-Weapon Fighting style", () => {
+    expect(canTwoWeaponFight([makeWeapon(false), makeWeapon(false)])).toBe(false);
+    // An unrelated style does not relax it either.
+    expect(canTwoWeaponFight([makeWeapon(false), makeWeapon(false)], "dueling")).toBe(false);
+  });
+
+  it("non-light pair → true WITH the Two-Weapon Fighting style", () => {
+    expect(
+      canTwoWeaponFight([makeWeapon(false), makeWeapon(false)], "twoWeaponFighting"),
+    ).toBe(true);
+    // A mixed pair also qualifies with the style.
+    expect(
+      canTwoWeaponFight([makeWeapon(true), makeWeapon(false)], "twoWeaponFighting"),
+    ).toBe(true);
+  });
+
+  it("the style still requires ≥2 equipped weapons", () => {
+    expect(canTwoWeaponFight([makeWeapon(false)], "twoWeaponFighting")).toBe(false);
+    expect(canTwoWeaponFight([], "twoWeaponFighting")).toBe(false);
+  });
+
+  it("two light weapons stay valid regardless of style (null / present)", () => {
+    expect(canTwoWeaponFight([makeWeapon(true), makeWeapon(true)], null)).toBe(true);
+    expect(canTwoWeaponFight([makeWeapon(true), makeWeapon(true)], "twoWeaponFighting")).toBe(true);
+  });
 });
 
 // ── UNIVERSAL_ACTIONS + universalActionsForCost ───────────────────────────────
 
 describe("UNIVERSAL_ACTIONS", () => {
-  it("has exactly 14 entries (lock the list)", () => {
-    expect(UNIVERSAL_ACTIONS).toHaveLength(14);
+  it("has exactly 15 entries (lock the list)", () => {
+    expect(UNIVERSAL_ACTIONS).toHaveLength(15);
   });
 
-  it("cost distribution: 11 action, 1 bonusAction, 2 reaction, 0 free/special", () => {
+  it("cost distribution: 12 action, 1 bonusAction, 2 reaction, 0 free/special", () => {
     const byCost = UNIVERSAL_ACTIONS.reduce<Record<string, number>>((acc, a) => {
       acc[a.cost] = (acc[a.cost] ?? 0) + 1;
       return acc;
     }, {});
 
-    expect(byCost["action"]).toBe(11);
+    expect(byCost["action"]).toBe(12);
     expect(byCost["bonusAction"]).toBe(1);
     expect(byCost["reaction"]).toBe(2);
     expect(byCost["free"]).toBeUndefined();
@@ -88,7 +115,7 @@ describe("UNIVERSAL_ACTIONS", () => {
 describe("universalActionsForCost", () => {
   it("returns only entries for the requested cost", () => {
     const actions = universalActionsForCost("action");
-    expect(actions.length).toBe(11);
+    expect(actions.length).toBe(12);
     expect(actions.every((a) => a.cost === "action")).toBe(true);
   });
 

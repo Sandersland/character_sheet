@@ -1,45 +1,58 @@
-/**
- * InlineAttackPicker — inline weapon list for the TurnHub's attack resolution.
- *
- * Renders equipped weapons, Unarmed Strike, Improvised Weapon, and any
- * "attackOption" maneuvers (e.g. Commander's Strike) that consume one of the
- * Attack action's attacks. Each weapon row has Attack and Damage roll buttons.
- *
- * The panel no longer auto-closes when the last attack is recorded. Instead,
- * Attack buttons disable at 0 remaining so the player can still roll damage and
- * spend superiority dice. An explicit "Done" button closes the panel.
- *
- * Maneuvers whose placement is "attackRoll" or "damageRoll" are shown inline
- * beneath their weapon row (ManeuverPrompt). "attackOption" maneuvers are shown
- * as their own rows at the bottom of the list. "reaction" and "effect" maneuvers
- * are handled in TurnHub (Reaction menu and standalone Maneuvers strip).
- *
- * Retains the last attack and damage RollResult per weapon row in local state
- * so ManeuverPrompt can receive them as props. Auto-summed maneuver totals
- * override the displayed roll total when a Battle Master spends a superiority die.
- *
- * Style: matches the existing AttacksPanel aesthetic — divide-y rows,
- * garnet attack buttons, parchment damage buttons.
- */
+// Attack sheet: one attack card with an "Attacking with" form selector (equipped
+// weapons + Unarmed + Improvised) and one Damage card bound to the last-rolled
+// form, then attack-option maneuvers and attack cantrips (#734/#786).
 
 import { useState } from "react";
 
 import { useRoll } from "@/features/dice/RollContext";
-import { applyInventoryTransactions, logRoll } from "@/api/client";
-import { formatRollSpec } from "@/lib/dice";
 import {
   attacksExhausted as computeAttacksExhausted,
-  buildAttackEntries,
+  buildAttackForms,
   hasSuperiorityDice,
+  type AttackEntry,
 } from "@/lib/attackMath";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
-import AttackRow from "@/features/session/AttackRow";
-import AttackOptionRow from "@/features/session/AttackOptionRow";
-import EquipWeaponPanel from "@/features/session/EquipWeaponPanel";
-import type { AttackEntry, DamageRider } from "@/lib/attackMath";
+import { useRollLogger } from "@/features/session/useRollLogger";
+import { useAttackRolls } from "@/features/session/useAttackRolls";
+import AttackFormCard from "@/features/session/AttackFormCard";
+import AttackTallyStrip from "@/features/session/AttackTallyStrip";
+import AttackOptionSection from "@/features/session/AttackOptionSection";
+import AttackSheetFooter from "@/features/session/AttackSheetFooter";
+import WeaponDamageCard from "@/features/session/WeaponDamageCard";
+import { AttackCounter } from "@/features/session/TurnControls";
+import InlineSpellAttackSection from "@/features/session/InlineSpellAttackSection";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
-import type { Character, ManeuverEntry } from "@/types/character";
-import type { RollResult } from "@/lib/dice";
+import type { Character } from "@/types/character";
+
+// Selection state: the chosen form drives the attack card; the last-rolled form
+// binds the Damage card (RAW: damage belongs to the form that was declared and
+// rolled). Both resolve against the live `forms` list so a mid-open inventory
+// change falls back to a real, visibly checked option.
+function useAttackFormSelection(forms: AttackEntry[]) {
+  const [selectedId, setSelectedId] = useState<string>(forms[0].id);
+  const [lastRolledId, setLastRolledId] = useState<string | null>(null);
+  const selectedEntry = forms.find((f) => f.id === selectedId) ?? forms[0];
+  const lastRolledEntry = lastRolledId
+    ? forms.find((f) => f.id === lastRolledId) ?? null
+    : null;
+  return { selectedEntry, lastRolledEntry, setSelectedId, markRolled: setLastRolledId };
+}
+
+// Pure per-render derivations for the picker shell, extracted so the component
+// stays a composition layer. The counter is prebuilt (or null) so the JSX needs
+// no attack-null re-narrowing; it hides at total 1 (the kicker's "1 attack" is
+// enough).
+function pickerView(character: Character, attack: TurnState["attack"], forms: AttackEntry[]) {
+  return {
+    // buildAttackForms always appends Unarmed + Improvised, so any other id is a weapon.
+    hasWeapon: forms.some((f) => f.id !== "unarmed" && f.id !== "improvised"),
+    showManeuvers: hasSuperiorityDice(character),
+    attacksExhausted: computeAttacksExhausted(attack),
+    preRoll: attack !== null && attack.used === 0,
+    attacksRemain: attack !== null && attack.used > 0 && attack.used < attack.total,
+    counter: attack !== null && attack.total > 1 ? { total: attack.total, used: attack.used } : null,
+  };
+}
 
 interface InlineAttackPickerProps {
   character: Character;
@@ -68,240 +81,90 @@ export default function InlineAttackPicker({
   onLogChanged,
 }: InlineAttackPickerProps) {
   const { roll } = useRoll();
+  const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
+  const die = useManeuverDie(character, onUpdate);
 
-  // Persist a roll to the Session Log (best-effort — never blocks play).
-  function logRollSafe(
-    kind: "attack" | "damage",
-    source: string,
-    result: RollResult,
-    spec: { count: number; faces: number; modifier: number },
-    damageType?: string,
-  ) {
-    logRoll(character.id, sessionId, {
-      kind,
-      source,
-      total: result.total,
-      specLabel: formatRollSpec(spec),
-      damageType,
-      faces: result.dice.filter((d) => !d.dropped).map((d) => d.value),
-    })
-      .then(onLogChanged)
-      .catch((e) => console.error("roll log failed", e));
-  }
+  const { riderTotals, viewFor } = useAttackRolls({
+    roll,
+    logRollSafe,
+    recordAttack: turnState.recordAttack,
+    setTallyDamage: turnState.setTallyDamage,
+    setTallyAttackTotal: turnState.setTallyAttackTotal,
+    addTallyDamageRider: turnState.addTallyDamageRider,
+  });
 
-  const { pool, dieLabel, busy: dieBusy, spend } = useManeuverDie(character, onUpdate);
+  const forms = buildAttackForms(character);
+  const view = pickerView(character, turnState.attack, forms);
 
-  // Per-weapon last roll results (keyed by item.id, "unarmed", or "improvised").
-  const [lastAttackRolls, setLastAttackRolls] = useState<Record<string, RollResult | null>>({});
-  const [lastDamageRolls, setLastDamageRolls] = useState<Record<string, RollResult | null>>({});
+  const { selectedEntry, lastRolledEntry, setSelectedId, markRolled } =
+    useAttackFormSelection(forms);
 
-  // Last rolled total per on-hit rider id (Flame Tongue +2d6), shown inline.
-  const [riderTotals, setRiderTotals] = useState<Record<string, number>>({});
-
-  // Auto-summed override totals set by ManeuverPrompt after a die spend.
-  // When non-null, displayed instead of the raw roll total.
-  const [attackTotals, setAttackTotals] = useState<Record<string, number | null>>({});
-  const [damageTotals, setDamageTotals] = useState<Record<string, number | null>>({});
-
-  // Per-maneuver reminder messages (keyed by maneuver name).
-  const [maneuverMessages, setManeuverMessages] = useState<Record<string, string>>({});
-
-  const equippedWeapons = character.inventory.filter(
-    (item) => item.category === "weapon" && item.equipped && item.weapon,
-  );
-
-  // Weapons the player owns but hasn't equipped — surfaced inline so a freshly
-  // created (or just-unequipped) character can arm up without leaving the
-  // attack flow for the Inventory tab.
-  const unequippedWeapons = character.inventory.filter(
-    (item) => item.category === "weapon" && !item.equipped && item.weapon,
-  );
-
-  // Tracks the inventoryItemId currently being equipped (disables its button).
-  const [equipping, setEquipping] = useState<string | null>(null);
-
-  // Equip a weapon through the same audited setEquipped op the Inventory tab
-  // uses; the returned character refreshes the picker so the weapon appears
-  // in the equipped list immediately.
-  async function handleEquip(inventoryItemId: string) {
-    if (equipping) return;
-    setEquipping(inventoryItemId);
-    try {
-      const updated = await applyInventoryTransactions(character.id, [
-        { type: "setEquipped", inventoryItemId, equipped: true },
-      ]);
-      onUpdate(updated);
-      onLogChanged();
-    } catch (e) {
-      console.error("equip failed", e);
-    } finally {
-      setEquipping(null);
-    }
-  }
-
-  const showManeuvers = hasSuperiorityDice(character);
-
-  const attacksExhausted = computeAttacksExhausted(turnState.attack);
-
-  const attackEntries = buildAttackEntries(character);
-
-  // "attackOption" maneuvers (Commander's Strike, etc.) — shown when in attack context.
-  const attackOptionManeuvers = showManeuvers && turnState.attack !== null
-    ? (character.resources?.maneuversKnown ?? []).filter(
-        (m) => (m.placement ?? "damageRoll") === "attackOption",
-      )
-    : [];
-
-  // Roll an attack for a row: log it, retain the result, clear any override, spend one attack.
-  function handleAttack(entry: AttackEntry) {
-    const result = roll(entry.attackSpec, entry.attackRollLabel);
-    logRollSafe("attack", entry.logSource, result, entry.attackSpec);
-    setLastAttackRolls((prev) => ({ ...prev, [entry.id]: result }));
-    setAttackTotals((prev) => ({ ...prev, [entry.id]: null }));
-    turnState.recordAttack();
-  }
-
-  // Roll damage for a row: log it, retain the result, clear any override.
-  function handleDamage(entry: AttackEntry) {
-    const result = roll(entry.damageSpec, entry.damageRollLabel);
-    logRollSafe("damage", entry.logSource, result, entry.damageSpec, entry.damageType);
-    setLastDamageRolls((prev) => ({ ...prev, [entry.id]: result }));
-    setDamageTotals((prev) => ({ ...prev, [entry.id]: null }));
-  }
-
-  // Roll one on-hit dice rider (e.g. Flame Tongue +2d6 fire) as its own typed
-  // damage term through the shared dice engine + Session Log, carrying its type.
-  function handleDamageRider(rider: DamageRider) {
-    const result = roll(rider.spec, rider.rollLabel);
-    logRollSafe("damage", rider.logSource, result, rider.spec, rider.damageType);
-    setRiderTotals((prev) => ({ ...prev, [rider.id]: result.total }));
-  }
-
-  // Callback for ManeuverPrompt — stores auto-sum overrides per weapon.
-  function makeOnRollsUpdated(weaponId: string) {
-    return (newAtk: number | null, newDmg: number | null) => {
-      if (newAtk !== null) {
-        setAttackTotals((prev) => ({ ...prev, [weaponId]: newAtk }));
-      }
-      if (newDmg !== null) {
-        setDamageTotals((prev) => ({ ...prev, [weaponId]: newDmg }));
-      }
-    };
-  }
-
-  // Handler for "attackOption" maneuver rows (e.g. Commander's Strike). The
-  // action slot the maneuver consumes travels on the entry (catalog snapshot).
-  async function handleAttackOption(m: ManeuverEntry) {
-    if (dieBusy || attacksExhausted || !pool || pool.remaining === 0) return;
-    const dieResult = await spend(m.id);
-    if (m.actionSlot === "bonusAction" && !turnState.bonusActionUsed) {
-      turnState.consumeBonusAction();
-    } else if (m.actionSlot === "reaction" && !turnState.reactionUsed) {
-      turnState.consumeReaction();
-    }
-    // Forfeit one of the Attack action's attacks.
-    turnState.recordAttack();
-    setManeuverMessages((prev) => ({
-      ...prev,
-      [m.name]: `${m.name} — tell an ally to use their reaction to make an attack, adding +${dieResult} (${dieLabel}) to the damage roll.`,
-    }));
-  }
-
-  // Determine whether a given attackOption row's "Use" button is enabled.
-  function attackOptionEnabled(m: ManeuverEntry): { enabled: boolean; reason?: string } {
-    if (!pool || pool.remaining === 0) {
-      return { enabled: false, reason: "No superiority dice remaining." };
-    }
-    if (attacksExhausted) {
-      return { enabled: false, reason: "No attacks remaining to forfeit." };
-    }
-    if (m.actionSlot === "bonusAction" && turnState.bonusActionUsed) {
-      return { enabled: false, reason: "Bonus action already used." };
-    }
-    return { enabled: true };
+  // Roll to hit with the selected form and bind the Damage card to it.
+  function handleRollToHit() {
+    markRolled(selectedEntry.id);
+    viewFor(selectedEntry).onAttack();
   }
 
   return (
-    <div className="flex flex-col divide-y divide-parchment-200">
-      {/* Extra Attack count for this Attack action (server-derived). */}
-      <p className="pb-2 text-xs font-semibold uppercase tracking-wide text-parchment-600">
-        Attacks: {character.attacksPerAction}
-      </p>
+    <div className="flex flex-col gap-2">
+      {view.counter && (
+        <AttackCounter total={view.counter.total} used={view.counter.used} label="Attacks" />
+      )}
 
-      {equippedWeapons.length === 0 && attackOptionManeuvers.length === 0 && (
-        <p className="pb-3 text-sm text-parchment-600">
-          {unequippedWeapons.length > 0
-            ? "No weapons equipped. Equip one below, or use the Inventory tab."
-            : "No weapons equipped. Add a weapon from the Inventory tab, then equip it here."}
+      {!view.hasWeapon && (
+        <p className="text-sm text-parchment-600">
+          No weapon equipped — use Change on the turn screen.
         </p>
       )}
 
-      {/* ── Equip an owned-but-unequipped weapon, inline ─────────────────────── */}
-      <EquipWeaponPanel weapons={unequippedWeapons} equipping={equipping} onEquip={handleEquip} />
+      <AttackTallyStrip rows={turnState.attackTally} onCycleVerdict={turnState.cycleTallyVerdict} />
 
-      {attackEntries.map((entry) => (
-        <AttackRow
-          key={entry.id}
-          entry={entry}
-          attacksExhausted={attacksExhausted}
-          showManeuvers={showManeuvers}
-          character={character}
-          attackTotal={attackTotals[entry.id]}
-          damageTotal={damageTotals[entry.id]}
-          lastAttackRoll={lastAttackRolls[entry.id] ?? null}
-          lastDamageRoll={lastDamageRolls[entry.id] ?? null}
-          riderTotals={riderTotals}
-          onAttack={handleAttack}
-          onDamage={handleDamage}
-          onDamageRider={handleDamageRider}
-          onRollsUpdated={makeOnRollsUpdated(entry.id)}
-          onUpdate={onUpdate}
-        />
-      ))}
+      <AttackFormCard
+        forms={forms}
+        selectedId={selectedEntry.id}
+        onSelect={setSelectedId}
+        view={viewFor(selectedEntry)}
+        attacksExhausted={view.attacksExhausted}
+        onRollToHit={handleRollToHit}
+        showManeuvers={view.showManeuvers}
+        character={character}
+        onUpdate={onUpdate}
+      />
 
-      {/* ── Attack-option maneuvers (e.g. Commander's Strike) ────────────────── */}
-      {attackOptionManeuvers.map((m) => {
-        const { enabled, reason } = attackOptionEnabled(m);
-        return (
-          <AttackOptionRow
-            key={m.id}
-            name={m.name}
-            enabled={enabled}
-            reason={reason}
-            message={maneuverMessages[m.name]}
-            dieLabel={dieLabel}
-            dieBusy={dieBusy}
-            onUse={() => handleAttackOption(m)}
-          />
-        );
-      })}
+      {/* Keyed on the last-rolled form so switching forms remounts the card and
+          resets the ManeuverPrompt spend state (#756). */}
+      <WeaponDamageCard
+        key={lastRolledEntry?.id ?? "inert"}
+        view={lastRolledEntry ? viewFor(lastRolledEntry) : null}
+        showManeuvers={view.showManeuvers}
+        character={character}
+        riderTotals={riderTotals}
+        onUpdate={onUpdate}
+      />
 
-      {/* ── Back / Done footer ────────────────────────────────────────────────── */}
-      {/*
-        Back is shown when no attack has been rolled yet — pressing it refunds
-        the action so the player can choose a different one.
-        Done is shown once at least one attack roll has been recorded — at that
-        point the action is committed and cannot be returned.
-      */}
-      <div className="pt-3">
-        {turnState.attack !== null && turnState.attack.used === 0 ? (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="w-full rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
-          >
-            ← Back
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full rounded-control border border-parchment-300 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
-          >
-            Done
-          </button>
-        )}
-      </div>
+      <AttackOptionSection
+        character={character}
+        turnState={turnState}
+        showManeuvers={view.showManeuvers}
+        attacksExhausted={view.attacksExhausted}
+        die={die}
+      />
+
+      {/* Attack-roll cantrips (Fire Bolt) — single transactional cast (#734). */}
+      <InlineSpellAttackSection
+        character={character}
+        sessionId={sessionId}
+        turnState={turnState}
+        onUpdate={onUpdate}
+        onLogChanged={onLogChanged}
+      />
+
+      <AttackSheetFooter
+        preRoll={view.preRoll}
+        attacksRemain={view.attacksRemain}
+        onCancel={onCancel}
+        onClose={onClose}
+      />
     </div>
   );
 }
