@@ -228,6 +228,106 @@ function economyOf(s: TurnState): EconomySnapshot {
   };
 }
 
+// ── Pure state transitions ────────────────────────────────────────────────────
+// Module-scope, one per economy mutation. A `return s` no-op means `mutate`
+// pushes nothing onto the undo stack (guards stay history-free).
+
+const consumeActionState = (s: TurnState): TurnState =>
+  s.actionsRemaining <= 0 ? s : { ...s, actionsRemaining: s.actionsRemaining - 1, attack: null };
+
+function enterAttackModeState(s: TurnState, attacksPerAction: number): TurnState {
+  if (s.actionsRemaining <= 0) return s;
+  return {
+    ...s,
+    actionsRemaining: s.actionsRemaining - 1,
+    attack: { total: attacksPerAction, used: 0 },
+  };
+}
+
+function recordAttackState(s: TurnState): TurnState {
+  if (!s.attack) return s;
+  // Clamp at total — keep attack non-null so the picker stays open for damage rolls.
+  // The picker is closed explicitly by the player via the "Done" button.
+  const used = Math.min(s.attack.used + 1, s.attack.total);
+  return { ...s, attack: { ...s.attack, used }, attackedThisTurn: true };
+}
+
+function cancelAttackState(s: TurnState): TurnState {
+  // Only refund if no attacks have been rolled yet — once rolled, the action
+  // is committed per 5e rules.
+  if (!s.attack || s.attack.used > 0) return s;
+  return { ...s, actionsRemaining: s.actionsRemaining + 1, attack: null };
+}
+
+// Clear the attack counter (action stays spent). No-op when attack is null
+// (class pickers like Flurry that don't use the enterAttackMode path).
+const finishAttackState = (s: TurnState): TurnState => (s.attack ? { ...s, attack: null } : s);
+
+const consumeBonusActionState = (s: TurnState): TurnState =>
+  s.bonusActionUsed ? s : { ...s, bonusActionUsed: true, bonusAttack: null };
+
+// TWF off-hand is always exactly 1 attack.
+const enterTwfModeState = (s: TurnState): TurnState =>
+  s.bonusActionUsed ? s : { ...s, bonusActionUsed: true, bonusAttack: { total: 1, used: 0 } };
+
+const recordTwfAttackState = (s: TurnState): TurnState =>
+  s.bonusAttack ? { ...s, bonusAttack: null, attackedThisTurn: true } : s;
+
+// Mirror cancelAttack for the off-hand: refund the bonus action only if the
+// off-hand attack hasn't been rolled yet (bonusAttack still pending). Once
+// recordTwfAttack has cleared it to null, the bonus action stays committed.
+const cancelTwfState = (s: TurnState): TurnState =>
+  s.bonusAttack ? { ...s, bonusActionUsed: false, bonusAttack: null } : s;
+
+const consumeReactionState = (s: TurnState): TurnState =>
+  s.reactionUsed ? s : { ...s, reactionUsed: true };
+
+function attachBatchIdState(s: TurnState, batchId: string): TurnState {
+  if (s.history.length === 0) return s;
+  const history = s.history.slice();
+  history[history.length - 1] = { ...history[history.length - 1], batchId };
+  return { ...s, history };
+}
+
+function undoState(s: TurnState): TurnState {
+  const prev = s.history[s.history.length - 1];
+  if (!prev) return s;
+  // Restore the prior economy snapshot; leave lifecycle + the activity flags
+  // (attackedThisTurn/tookDamageThisTurn) as they are (see EconomySnapshot).
+  // Drop batchId so it never leaks onto the live state (#758).
+  const economy = { ...prev };
+  delete economy.batchId;
+  return { ...s, ...economy, history: s.history.slice(0, -1) };
+}
+
+function endTurnState(s: TurnState): TurnState {
+  // Out-of-combat (shouldn't normally happen now, but safe fallback).
+  if (!s.inCombat) return initialState();
+  // Stay in combat — return to idle within the same encounter, advancing the
+  // round counter. The round log event is fired by TurnHub. Reset the activity
+  // window HERE (not in startTurn): handleEndTurn has already evaluated the
+  // durable-buff auto-end against these flags, so clearing them now opens a
+  // fresh window that still captures damage/attacks taken before the next
+  // startTurn (out-of-turn / enemy turns).
+  return {
+    ...s,
+    phase: "idle",
+    actionsRemaining: 0,
+    bonusActionUsed: false,
+    attack: null,
+    bonusAttack: null,
+    spellCastThisTurn: {},
+    round: s.round + 1,
+    attackedThisTurn: false,
+    tookDamageThisTurn: false,
+    history: [],
+  };
+}
+
+// The cognitive score here counts the hook's ~24 delegating useCallback closures,
+// one per TurnStateActions member — all real branching lives in the module-level
+// pure transition functions above (each individually under the ceilings).
+// fallow-ignore-next-line complexity
 export function useTurnState(character: Character, sessionId: string): TurnStateView {
   const [state, setState] = useState<TurnState>(() => {
     // Lazily hydrate; merge over defaults so a stale-schema snapshot missing a
@@ -305,31 +405,7 @@ export function useTurnState(character: Character, sessionId: string): TurnState
   }, [currentHp]);
 
   const endTurn = useCallback(() => {
-    setState((s) => {
-      if (s.inCombat) {
-        // Stay in combat — return to idle within the same encounter,
-        // advancing the round counter. The round log event is fired by TurnHub.
-        // Reset the activity window HERE (not in startTurn): handleEndTurn has
-        // already evaluated the durable-buff auto-end against these flags, so
-        // clearing them now opens a fresh window that still captures damage/
-        // attacks taken before the next startTurn (out-of-turn / enemy turns).
-        return {
-          ...s,
-          phase: "idle",
-          actionsRemaining: 0,
-          bonusActionUsed: false,
-          attack: null,
-          bonusAttack: null,
-          spellCastThisTurn: {},
-          round: s.round + 1,
-          attackedThisTurn: false,
-          tookDamageThisTurn: false,
-          history: [],
-        };
-      }
-      // Out-of-combat (shouldn't normally happen now, but safe fallback).
-      return initialState();
-    });
+    setState(endTurnState);
   }, []);
 
   // Wrap an economy mutation so a pre-mutation snapshot is pushed onto the undo
@@ -344,88 +420,43 @@ export function useTurnState(character: Character, sessionId: string): TurnState
   }, []);
 
   const consumeAction = useCallback(() => {
-    mutate((s) => {
-      if (s.actionsRemaining <= 0) return s;
-      return { ...s, actionsRemaining: s.actionsRemaining - 1, attack: null };
-    });
+    mutate(consumeActionState);
   }, [mutate]);
 
   const enterAttackMode = useCallback(() => {
-    mutate((s) => {
-      if (s.actionsRemaining <= 0) return s;
-      return {
-        ...s,
-        actionsRemaining: s.actionsRemaining - 1,
-        attack: { total: attacksPerAction, used: 0 },
-      };
-    });
+    mutate((s) => enterAttackModeState(s, attacksPerAction));
   }, [attacksPerAction, mutate]);
 
   const recordAttack = useCallback(() => {
-    mutate((s) => {
-      if (!s.attack) return s;
-      // Clamp at total — keep attack non-null so the picker stays open for damage rolls.
-      // The picker is closed explicitly by the player via the "Done" button.
-      const used = Math.min(s.attack.used + 1, s.attack.total);
-      return { ...s, attack: { ...s.attack, used }, attackedThisTurn: true };
-    });
+    mutate(recordAttackState);
   }, [mutate]);
 
   const cancelAttack = useCallback(() => {
-    // Only refund if no attacks have been rolled yet — once rolled, the action
-    // is committed per 5e rules.
-    mutate((s) => {
-      if (!s.attack || s.attack.used > 0) return s;
-      return { ...s, actionsRemaining: s.actionsRemaining + 1, attack: null };
-    });
+    mutate(cancelAttackState);
   }, [mutate]);
 
   const finishAttack = useCallback(() => {
-    // Clear the attack counter (action stays spent). No-op when attack is null
-    // (class pickers like Flurry that don't use the enterAttackMode path).
-    mutate((s) => {
-      if (!s.attack) return s;
-      return { ...s, attack: null };
-    });
+    mutate(finishAttackState);
   }, [mutate]);
 
   const consumeBonusAction = useCallback(() => {
-    mutate((s) => {
-      if (s.bonusActionUsed) return s; // guard: already used → no history push
-      return { ...s, bonusActionUsed: true, bonusAttack: null };
-    });
+    mutate(consumeBonusActionState);
   }, [mutate]);
 
   const enterTwfMode = useCallback(() => {
-    mutate((s) => {
-      if (s.bonusActionUsed) return s;
-      // TWF off-hand is always exactly 1 attack.
-      return { ...s, bonusActionUsed: true, bonusAttack: { total: 1, used: 0 } };
-    });
+    mutate(enterTwfModeState);
   }, [mutate]);
 
   const recordTwfAttack = useCallback(() => {
-    mutate((s) => {
-      if (!s.bonusAttack) return s;
-      return { ...s, bonusAttack: null, attackedThisTurn: true }; // only 1 off-hand attack in TWF
-    });
+    mutate(recordTwfAttackState);
   }, [mutate]);
 
   const cancelTwf = useCallback(() => {
-    // Mirror cancelAttack for the off-hand: refund the bonus action only if the
-    // off-hand attack hasn't been rolled yet (bonusAttack still pending). Once
-    // recordTwfAttack has cleared it to null, the bonus action stays committed.
-    mutate((s) => {
-      if (!s.bonusAttack) return s;
-      return { ...s, bonusActionUsed: false, bonusAttack: null };
-    });
+    mutate(cancelTwfState);
   }, [mutate]);
 
   const consumeReaction = useCallback(() => {
-    mutate((s) => {
-      if (s.reactionUsed) return s; // guard: already used → no history push
-      return { ...s, reactionUsed: true };
-    });
+    mutate(consumeReactionState);
   }, [mutate]);
 
   const grantExtraAction = useCallback(() => {
@@ -470,25 +501,11 @@ export function useTurnState(character: Character, sessionId: string): TurnState
   // consumed the slot pushed the entry synchronously, so the top entry is this
   // action's; `busy` gates a concurrent second consuming click while send is in flight.
   const attachBatchId = useCallback((batchId: string) => {
-    setState((s) => {
-      if (s.history.length === 0) return s;
-      const history = s.history.slice();
-      history[history.length - 1] = { ...history[history.length - 1], batchId };
-      return { ...s, history };
-    });
+    setState((s) => attachBatchIdState(s, batchId));
   }, []);
 
   const undo = useCallback(() => {
-    setState((s) => {
-      const prev = s.history[s.history.length - 1];
-      if (!prev) return s;
-      // Restore the prior economy snapshot; leave lifecycle + the activity flags
-      // (attackedThisTurn/tookDamageThisTurn) as they are (see EconomySnapshot).
-      // Drop batchId so it never leaks onto the live state (#758).
-      const economy = { ...prev };
-      delete economy.batchId;
-      return { ...s, ...economy, history: s.history.slice(0, -1) };
-    });
+    setState(undoState);
   }, []);
 
   return {
