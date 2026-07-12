@@ -82,6 +82,7 @@ export function useHitPointApply(character: Character, onUpdate: (character: Cha
   }
 
   // Apply the active HP mode; returns true on success so the child clears its field.
+  // fallow-ignore-next-line complexity -- #768 grew this past the gate; decomposition tracked in #779
   async function handleApply(
     mode: HpMode,
     value: number,

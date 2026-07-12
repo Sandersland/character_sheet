@@ -25,6 +25,7 @@ interface HitPointTrackerProps {
   onUpdate: (character: Character) => void;
 }
 
+// fallow-ignore-next-line complexity -- #768 grew this past the gate; decomposition tracked in #779
 export default function HitPointTracker({
   character,
   referenceClasses = [],
