@@ -1,14 +1,29 @@
+import { createHash } from "node:crypto";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 import { securityHeaders } from "@/lib/core/security.js";
+
+// A fake served SPA dir with one inline script, standing in for the built
+// index.html (whose real inline snippet is the pre-paint theme apply).
+const INLINE_BODY = "console.log('theme');";
+const INLINE_HASH = createHash("sha256").update(INLINE_BODY).digest("base64");
+const staticDir = mkdtempSync(join(tmpdir(), "csp-static-"));
+writeFileSync(
+  join(staticDir, "index.html"),
+  `<!doctype html><html><head><script>${INLINE_BODY}</script>` +
+    `<script type="module" src="/src/main.tsx"></script></head><body></body></html>`,
+);
 
 // Pure middleware test — no Postgres. Runs the helmet handler against a fake
 // res and reads back the Content-Security-Policy header it sets. Guards the
 // single-origin CSP allowances (#149 avatars, #150 dice worker, #151 CF beacon)
 // that only bite in SERVE_STATIC_DIR mode and so never surface in local dev.
 function cspFor(servesStatic: boolean): string {
-  const handler = securityHeaders(servesStatic);
+  const handler = securityHeaders(servesStatic ? staticDir : undefined);
   const headers: Record<string, string> = {};
   const res = {
     setHeader(name: string, value: string) {
@@ -62,6 +77,35 @@ describe("securityHeaders single-origin CSP", () => {
     expect(first).toBeTruthy();
     expect(second).toBeTruthy();
     expect(first).not.toBe(second);
+  });
+
+  it("allowlists the served index.html's inline scripts by hash (theme pre-paint snippet)", () => {
+    expect(csp).toContain(`'sha256-${INLINE_HASH}'`);
+  });
+
+  it("does not emit hash sources for src-carrying script tags", () => {
+    // Exactly one sha256 source: the fixture's single inline body.
+    expect(csp.match(/'sha256-/g)).toHaveLength(1);
+  });
+
+  it("serves a hash-free policy when index.html is unreadable (no crash)", () => {
+    const handler = securityHeaders("/definitely/not/a/dir");
+    const headers: Record<string, string> = {};
+    const res = {
+      setHeader(name: string, value: string) {
+        headers[name.toLowerCase()] = String(value);
+      },
+      getHeader(name: string) {
+        return headers[name.toLowerCase()];
+      },
+      removeHeader(name: string) {
+        delete headers[name.toLowerCase()];
+      },
+    } as unknown as Response;
+    handler({ secure: true, headers: {} } as unknown as Request, res, () => {});
+    const policy = headers["content-security-policy"] ?? "";
+    expect(policy).toContain("script-src 'self'");
+    expect(policy).not.toContain("'sha256-");
   });
 });
 

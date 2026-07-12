@@ -1,4 +1,6 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { RequestHandler } from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -8,6 +10,28 @@ import rateLimit from "express-rate-limit";
 // and the CSP can be relaxed if a single-origin deployment needs it.
 
 const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
+
+// The SPA's index.html deliberately keeps inline scripts (the pre-paint theme
+// apply that prevents a dark-mode FOUC) — a strict CSP blocks them unless each
+// is allowlisted by hash. Hash whatever the SERVED file actually contains at
+// boot, so the allowance can never drift from the deployed markup (this bit us
+// on staging: the theme snippet's stable sha256 violation was misattributed to
+// Cloudflare injections for an afternoon). Scripts WITH src are excluded —
+// hash sources only cover inline bodies.
+function inlineScriptHashes(staticDir: string): string[] {
+  try {
+    const html = readFileSync(join(staticDir, "index.html"), "utf8");
+    const hashes: string[] = [];
+    for (const match of html.matchAll(/<script(?![^>]*\bsrc\s*=)[^>]*>([\s\S]*?)<\/script>/gi)) {
+      if (!match[1]) continue;
+      hashes.push(`'sha256-${createHash("sha256").update(match[1]).digest("base64")}'`);
+    }
+    return hashes;
+  } catch {
+    // No readable index.html (misconfigured dir, tests) — no inline allowances.
+    return [];
+  }
+}
 
 // helmet sets HSTS, X-Content-Type-Options, X-Frame-Options, a restrictive CSP,
 // etc. When the SPA is served from this same origin (SERVE_STATIC_DIR set), the
@@ -19,9 +43,9 @@ const isTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
 // (img), the 3D dice roller's blob: Web Worker (worker), and Cloudflare Web
 // Analytics' beacon (script + connect). In API-only mode the responses are JSON,
 // so CSP is moot — but a tuned policy is harmless and keeps one code path.
-export function securityHeaders(servesStatic: boolean): RequestHandler {
+export function securityHeaders(staticDir: string | undefined): RequestHandler {
   return helmet({
-    contentSecurityPolicy: servesStatic
+    contentSecurityPolicy: staticDir
       ? {
           directives: {
             defaultSrc: ["'self'"],
@@ -35,18 +59,17 @@ export function securityHeaders(servesStatic: boolean): RequestHandler {
             // (declarative prefetch JSON — it cannot execute code), so this is
             // not an 'unsafe-inline' loosening. Browsers that don't know the
             // keyword ignore it.
-            // Cloudflare JavaScript Detections (Bot Fight Mode) injects a real
-            // inline snippet into HTML responses. CF's documented CSP
-            // integration: it parses THIS response header and stamps its
-            // injected scripts with the nonce below — so the nonce exists for
-            // Cloudflare's injections, not for any first-party inline script
-            // (the Vite build ships none). A fresh nonce per request; host
-            // sources ('self', the beacon) stay honored alongside it because
-            // no 'strict-dynamic' is set.
+            // Cloudflare's edge (JS Detections, the auto-injected beacon)
+            // stamps ITS injected scripts with the nonce below by parsing this
+            // response header — verified live. First-party inline scripts (the
+            // theme pre-paint snippet) are static HTML and can't carry a
+            // per-request nonce, so they're allowlisted by served-content hash
+            // instead. Host sources stay honored (no 'strict-dynamic').
             scriptSrc: [
               "'self'",
               "https://static.cloudflareinsights.com",
               "'inline-speculation-rules'",
+              ...inlineScriptHashes(staticDir),
               () => `'nonce-${randomBytes(16).toString("base64")}'`,
             ],
             // The 3D dice roller (@react-three) spawns a Web Worker from a
