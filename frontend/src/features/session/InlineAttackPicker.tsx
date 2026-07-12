@@ -1,23 +1,25 @@
-// Attack sheet: equipped-weapon cards (deduped by name) + a shared Damage card,
-// then Unarmed/Improvised rows, attack-option maneuvers, and attack cantrips (#734).
+// Attack sheet: one attack card with an "Attacking with" form selector (equipped
+// weapons + Unarmed + Improvised) and one Damage card bound to the last-rolled
+// form, then attack-option maneuvers and attack cantrips (#734/#786).
 
 import { useState } from "react";
 
 import { useRoll } from "@/features/dice/RollContext";
 import {
   attacksExhausted as computeAttacksExhausted,
+  buildAttackForms,
   buildEquippedWeaponEntries,
   hasSuperiorityDice,
 } from "@/lib/attackMath";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { useRollLogger } from "@/features/session/useRollLogger";
 import { useAttackRolls } from "@/features/session/useAttackRolls";
+import AttackFormCard from "@/features/session/AttackFormCard";
 import AttackOptionSection from "@/features/session/AttackOptionSection";
 import AttackSheetFooter from "@/features/session/AttackSheetFooter";
-import BasicAttackRows from "@/features/session/BasicAttackRows";
+import WeaponDamageCard from "@/features/session/WeaponDamageCard";
 import { AttackCounter } from "@/features/session/TurnControls";
 import InlineSpellAttackSection from "@/features/session/InlineSpellAttackSection";
-import WeaponAttackList from "@/features/session/WeaponAttackList";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
 
@@ -57,16 +59,25 @@ export default function InlineAttackPicker({
     recordAttack: turnState.recordAttack,
   });
 
-  const weaponEntries = buildEquippedWeaponEntries(character);
+  const forms = buildAttackForms(character);
+  const hasWeapon = buildEquippedWeaponEntries(character).length > 0;
 
-  // The weapon the Damage card rolls for — last weapon rolled/selected, default first.
-  const [activeWeaponId, setActiveWeaponId] = useState<string | null>(null);
-  const activeEntry =
-    weaponEntries.find((e) => e.id === activeWeaponId) ?? weaponEntries[0] ?? null;
+  // Selected form drives the attack card; last-rolled form drives the Damage card.
+  const [selectedId, setSelectedId] = useState<string>(forms[0].id);
+  const [lastRolledId, setLastRolledId] = useState<string | null>(null);
+
+  const selectedEntry = forms.find((f) => f.id === selectedId) ?? forms[0];
+  const lastRolledEntry = lastRolledId ? forms.find((f) => f.id === lastRolledId) ?? null : null;
 
   const showManeuvers = hasSuperiorityDice(character);
   const attacksExhausted = computeAttacksExhausted(turnState.attack);
   const preRoll = turnState.attack !== null && turnState.attack.used === 0;
+
+  // Roll to hit with the selected form and bind the Damage card to it.
+  function handleRollToHit() {
+    setLastRolledId(selectedEntry.id);
+    viewFor(selectedEntry).onAttack();
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -76,23 +87,28 @@ export default function InlineAttackPicker({
         <AttackCounter total={turnState.attack.total} used={turnState.attack.used} label="Attacks" />
       )}
 
-      <WeaponAttackList
-        weaponEntries={weaponEntries}
-        activeEntry={activeEntry}
-        onSelectWeapon={setActiveWeaponId}
+      {!hasWeapon && (
+        <p className="text-sm text-parchment-600">
+          No weapon equipped — use Change on the turn screen.
+        </p>
+      )}
+
+      <AttackFormCard
+        forms={forms}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        view={viewFor(selectedEntry)}
         attacksExhausted={attacksExhausted}
-        viewFor={viewFor}
-        riderTotals={riderTotals}
-        showManeuvers={showManeuvers}
-        character={character}
-        onUpdate={onUpdate}
+        onRollToHit={handleRollToHit}
       />
 
-      <BasicAttackRows
-        character={character}
-        viewFor={viewFor}
-        attacksExhausted={attacksExhausted}
+      {/* Keyed on the last-rolled form so switching forms remounts the card and
+          resets the ManeuverPrompt spend state (#756). */}
+      <WeaponDamageCard
+        key={lastRolledEntry?.id ?? "inert"}
+        view={lastRolledEntry ? viewFor(lastRolledEntry) : null}
         showManeuvers={showManeuvers}
+        character={character}
         riderTotals={riderTotals}
         onUpdate={onUpdate}
       />

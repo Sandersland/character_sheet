@@ -1,7 +1,8 @@
-// Neutral Damage card in the attack sheet: rolls damage for the active equipped
-// weapon, auto-doubling the dice after a nat-20 to-hit. Ungated on the attack
-// roll — you can roll damage before or after "Roll to hit". Hosts the active
-// weapon's on-hit dice riders (Flame Tongue +2d6) and its Battle Master prompt.
+// Neutral Damage card in the attack sheet: rolls damage for the LAST ROLLED
+// attack form, auto-doubling the dice after a nat-20 to-hit. Inert until a hit is
+// rolled (`view` null); switching the attack-card selector only rebinds it on the
+// next Roll to hit (#786). Hosts the form's on-hit dice riders (Flame Tongue +2d6)
+// and its Battle Master prompt.
 
 import { GiSwordWound } from "@/components/ui/icons";
 import AttackResultLine from "@/features/session/AttackResultLine";
@@ -13,11 +14,39 @@ import type { AttackEntryView } from "@/features/session/useAttackRolls";
 import type { Character } from "@/types/character";
 
 interface WeaponDamageCardProps {
-  view: AttackEntryView;
+  /** Last-rolled form's view, or null before any Roll to hit (inert state). */
+  view: AttackEntryView | null;
   showManeuvers: boolean;
   character: Character;
   riderTotals: Record<string, number>;
   onUpdate: (c: Character) => void;
+}
+
+// Inert Damage card shown until the first Roll to hit picks a form to roll for.
+function InertDamageCard() {
+  return (
+    <div className="flex items-center gap-3 rounded-card border border-parchment-300 bg-parchment-50 p-3 opacity-60">
+      <span
+        aria-hidden
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-parchment-200 text-parchment-600"
+      >
+        <GiSwordWound className="h-5 w-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold text-parchment-900">Damage</span>
+        <span className="block truncate text-xs text-parchment-600">
+          Roll to hit to roll damage for your hit
+        </span>
+      </span>
+      <button
+        type="button"
+        disabled
+        className="shrink-0 cursor-not-allowed rounded-control border border-parchment-300 bg-parchment-100 px-3 py-1.5 text-xs font-semibold text-parchment-700 opacity-50"
+      >
+        Roll damage
+      </button>
+    </div>
+  );
 }
 
 export default function WeaponDamageCard({
@@ -27,6 +56,8 @@ export default function WeaponDamageCard({
   riderTotals,
   onUpdate,
 }: WeaponDamageCardProps) {
+  if (!view) return <InertDamageCard />;
+
   const { entry, lastAttackRoll, lastDamageRoll, damageTotal, isCrit, manualCrit } = view;
   const miss = isNaturalOne(lastAttackRoll);
   return (
@@ -41,7 +72,7 @@ export default function WeaponDamageCard({
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-parchment-900">Damage</span>
           <span className="block truncate text-xs text-parchment-600">
-            Roll damage for your hit · {entry.damageLabel}
+            {entry.name} · {entry.damageLabel}
           </span>
         </span>
         <CritDamageButton

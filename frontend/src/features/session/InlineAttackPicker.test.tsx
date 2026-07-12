@@ -93,45 +93,106 @@ function equippedWeapon(name: string, id: string, overrides: Record<string, unkn
   };
 }
 
-describe("InlineAttackPicker — equipped-weapon cards", () => {
-  it("collapses two same-name equipped weapons into a single weapon card", () => {
-    renderPicker(
-      makeCharacter({
-        inventory: [equippedWeapon("Dagger", "inv-1"), equippedWeapon("Dagger", "inv-2")] as unknown as Character["inventory"],
-      }),
-    );
-    expect(screen.getAllByRole("button", { name: /Roll to hit/ })).toHaveLength(1);
-  });
-
-  it("renders one weapon card per distinct equipped weapon", () => {
+describe("InlineAttackPicker — attack form selector (#786)", () => {
+  it("renders one segment per distinct equipped weapon plus Unarmed and Improvised", () => {
     renderPicker(
       makeCharacter({
         inventory: [equippedWeapon("Longsword", "inv-1"), equippedWeapon("Dagger", "inv-2")] as unknown as Character["inventory"],
       }),
     );
-    expect(screen.getAllByRole("button", { name: /Roll to hit/ })).toHaveLength(2);
-    expect(screen.getByText("Longsword")).toBeInTheDocument();
-    expect(screen.getByText("Dagger")).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: /Attacking with/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("radio")).toHaveLength(4);
+    expect(screen.getByRole("radio", { name: "Longsword" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Dagger" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Unarmed Strike" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Improvised Weapon" })).toBeInTheDocument();
   });
 
-  it("never surfaces an unequipped inventory weapon as a card", () => {
+  it("shows exactly one attack card (one Roll to hit) and one damage card", () => {
+    renderPicker(
+      makeCharacter({
+        inventory: [equippedWeapon("Longsword", "inv-1"), equippedWeapon("Dagger", "inv-2")] as unknown as Character["inventory"],
+      }),
+    );
+    expect(screen.getAllByRole("button", { name: /Roll to hit/ })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /Roll damage/ })).toHaveLength(1);
+  });
+
+  it("collapses two same-name equipped weapons into a single segment", () => {
+    renderPicker(
+      makeCharacter({
+        inventory: [equippedWeapon("Dagger", "inv-1"), equippedWeapon("Dagger", "inv-2")] as unknown as Character["inventory"],
+      }),
+    );
+    expect(screen.getAllByRole("radio", { name: "Dagger" })).toHaveLength(1);
+    expect(screen.getAllByRole("radio")).toHaveLength(3);
+  });
+
+  it("defaults the selection to the main-hand weapon", () => {
+    renderPicker(
+      makeCharacter({
+        inventory: [equippedWeapon("Longsword", "inv-1"), equippedWeapon("Dagger", "inv-2")] as unknown as Character["inventory"],
+      }),
+    );
+    expect(screen.getByRole("radio", { name: "Longsword" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Dagger" })).not.toBeChecked();
+  });
+
+  it("never surfaces an unequipped inventory weapon as a segment", () => {
     renderPicker(
       makeCharacter({
         inventory: [equippedWeapon("Longsword", "inv-1", { equipped: false })] as unknown as Character["inventory"],
       }),
     );
-    expect(screen.queryByText("Longsword")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Roll to hit/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Longsword" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("radio")).toHaveLength(2);
   });
 
-  it("shows the turn-screen empty-state hint and Unarmed Strike when no weapon is equipped", () => {
+  it("shows the turn-screen empty-state hint and defaults to Unarmed when no weapon is equipped", () => {
     renderPicker(makeCharacter({ inventory: [] }));
     const hint = screen.getByText(/No weapon equipped/i);
     expect(hint.textContent).toMatch(/Change/);
     expect(hint.textContent).toMatch(/turn screen/i);
-    expect(screen.getByText("Unarmed Strike")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Unarmed Strike" })).toBeChecked();
+  });
+});
+
+describe("InlineAttackPicker — selecting a form updates the card (#786)", () => {
+  it("selecting Improvised shows its signed bonus and the no-proficiency note", async () => {
+    renderPicker(
+      makeCharacter({
+        inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"],
+      }),
+    );
+    await userEvent.click(screen.getByRole("radio", { name: "Improvised Weapon" }));
+    expect(screen.getByText(/\+2 to hit · 1d4 bludgeoning/)).toBeInTheDocument();
+    expect(screen.getByText(/\(no proficiency\)/)).toBeInTheDocument();
   });
 
+  it("selecting Unarmed shows its bonus and flat bludgeoning damage preview", async () => {
+    renderPicker(
+      makeCharacter({
+        inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"],
+      }),
+    );
+    await userEvent.click(screen.getByRole("radio", { name: "Unarmed Strike" }));
+    expect(screen.getByText(/\+2 to hit · 1 bludgeoning/)).toBeInTheDocument();
+  });
+
+  it("rolls to hit with the selected form (logs the Improvised source)", async () => {
+    renderPicker(
+      makeCharacter({
+        inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"],
+      }),
+    );
+    await userEvent.click(screen.getByRole("radio", { name: "Improvised Weapon" }));
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    expect(vi.mocked(logRoll)).toHaveBeenCalledWith(
+      "char-1",
+      "sess-1",
+      expect.objectContaining({ kind: "attack", source: "Improvised Weapon" }),
+    );
+  });
 });
 
 describe("InlineAttackPicker — live attack counter (#757)", () => {
@@ -156,13 +217,10 @@ describe("InlineAttackPicker — live attack counter (#757)", () => {
     expect(screen.getByRole("button", { name: /Roll to hit/ })).not.toBeDisabled();
   });
 
-  it("disables all Roll-to-hit buttons when exhausted but leaves Damage usable", () => {
+  it("disables the single Roll-to-hit button when attacks are exhausted", () => {
     renderPicker(withWeapon(2), vi.fn(), vi.fn(), { turnState: attackState(2, 2) });
     expect(screen.getByText(/Attacks:\s*0 of 2 remaining/)).toBeInTheDocument();
-    for (const btn of screen.getAllByRole("button", { name: /Roll to hit/ })) {
-      expect(btn).toBeDisabled();
-    }
-    expect(screen.getByRole("button", { name: /Roll damage/ })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: /Roll to hit/ })).toBeDisabled();
     // The standalone Critical buttons were removed (#766) — crit is auto/toggle now.
     expect(screen.queryByRole("button", { name: /^Critical$/ })).not.toBeInTheDocument();
   });
@@ -175,6 +233,26 @@ describe("InlineAttackPicker — live attack counter (#757)", () => {
   it("carries no kicker copy of its own — the sheet header owns it (TurnResolutionSheets)", () => {
     renderPicker(withWeapon(2), vi.fn(), vi.fn(), { turnState: attackState(2, 0) });
     expect(screen.queryByText(/no target AC tracked/)).not.toBeInTheDocument();
+  });
+});
+
+describe("InlineAttackPicker — Damage card is inert until a hit is rolled (#786)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("disables Roll damage until a to-hit roll binds a form, then enables it", async () => {
+    // Mid-face seed → a non-crit to-hit so the button stays labelled "Roll damage".
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    renderPicker(
+      makeCharacter({ inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"] }),
+    );
+
+    expect(screen.getByRole("button", { name: /Roll damage/ })).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+
+    expect(screen.getByRole("button", { name: /Roll damage/ })).not.toBeDisabled();
   });
 });
 
@@ -215,13 +293,16 @@ function flameTongue(overrides: Record<string, unknown> = {}) {
 }
 
 describe("InlineAttackPicker — on-hit dice riders", () => {
-  it("renders a typed rider button for an attuned Flame Tongue and rolls it with the fire type", async () => {
+  it("renders a typed rider button for an attuned Flame Tongue after a hit and rolls it with the fire type", async () => {
     const onLogChanged = vi.fn();
     renderPicker(
       makeCharacter({ inventory: [flameTongue()] as unknown as Character["inventory"] }),
       vi.fn(),
       onLogChanged,
     );
+
+    // The Damage card (with its riders) is inert until a form is rolled to hit.
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
 
     const riderButton = screen.getByRole("button", { name: /Roll \+2d6 fire/ });
     expect(riderButton).toBeInTheDocument();
@@ -235,14 +316,15 @@ describe("InlineAttackPicker — on-hit dice riders", () => {
     );
   });
 
-  it("hides the rider when the attunement-required weapon is unattuned", () => {
+  it("hides the rider when the attunement-required weapon is unattuned", async () => {
     renderPicker(
       makeCharacter({ inventory: [flameTongue({ attuned: false })] as unknown as Character["inventory"] }),
     );
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
     expect(screen.queryByRole("button", { name: /Roll \+2d6 fire/ })).not.toBeInTheDocument();
   });
 
-  it("shows a conditional rider's condition as reminder text", () => {
+  it("shows a conditional rider's condition as reminder text", async () => {
     renderPicker(
       makeCharacter({
         inventory: [
@@ -253,10 +335,11 @@ describe("InlineAttackPicker — on-hit dice riders", () => {
         ] as unknown as Character["inventory"],
       }),
     );
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
     expect(screen.getByText(/vs dragons/)).toBeInTheDocument();
   });
 
-  it("does not leak one weapon's rider onto another equipped weapon", () => {
+  it("only shows the last-rolled form's rider — a second weapon's is not on the card", async () => {
     const plainSword = {
       id: "inv-plain",
       name: "Longsword",
@@ -270,7 +353,8 @@ describe("InlineAttackPicker — on-hit dice riders", () => {
     renderPicker(
       makeCharacter({ inventory: [flameTongue(), plainSword] as unknown as Character["inventory"] }),
     );
-    // Exactly one rider button in the whole picker — the Flame Tongue's.
+    // Default form is the main-hand Flame Tongue — roll to hit binds the Damage card to it.
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
     expect(screen.getAllByRole("button", { name: /Roll \+\dd\d/ })).toHaveLength(1);
   });
 });
@@ -284,6 +368,8 @@ describe("InlineAttackPicker — auto-crit on a natural 20 (#766)", () => {
   const seedTopFace = () => vi.spyOn(Math, "random").mockReturnValue(0.95);
   // 0 → 1 + floor(0): a natural 1 on a d20.
   const seedNat1 = () => vi.spyOn(Math, "random").mockReturnValue(0);
+  // Mid face → a non-crit, non-miss to-hit.
+  const seedMid = () => vi.spyOn(Math, "random").mockReturnValue(0.5);
 
   const findDamageCall = () =>
     vi.mocked(logRoll).mock.calls.map((c) => c[2]).find((e) => e.kind === "damage");
@@ -337,11 +423,13 @@ describe("InlineAttackPicker — auto-crit on a natural 20 (#766)", () => {
   });
 
   it("keeps a dice rider single when the weapon damage was rolled normally", async () => {
+    seedMid();
     renderPicker(
       makeCharacter({ inventory: [flameTongue()] as unknown as Character["inventory"] }),
     );
 
-    await userEvent.click(screen.getByRole("button", { name: /Roll damage/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
     await userEvent.click(screen.getByRole("button", { name: /Roll \+2d6 fire/ }));
 
     const riderCall = vi
@@ -354,6 +442,10 @@ describe("InlineAttackPicker — auto-crit on a natural 20 (#766)", () => {
 });
 
 describe("InlineAttackPicker — manual crit toggle (#766)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("has no standalone 'Critical' button in the sheet", () => {
     renderPicker(
       makeCharacter({ inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"] }),
@@ -361,13 +453,14 @@ describe("InlineAttackPicker — manual crit toggle (#766)", () => {
     expect(screen.queryByRole("button", { name: /^Critical$/ })).not.toBeInTheDocument();
   });
 
-  it("flips the next damage roll to doubled dice when the Crit toggle is on (no attack roll)", async () => {
+  it("flips the next damage roll to doubled dice when the Crit toggle is on (after a hit)", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5); // non-crit to-hit
     renderPicker(
       makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] }),
     );
 
-    // The Damage card's crit toggle is the first "Crit" checkbox.
-    await userEvent.click(screen.getAllByLabelText("Crit")[0]);
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByLabelText("Crit"));
     await userEvent.click(screen.getByRole("button", { name: /Roll crit damage/ }));
 
     const call = vi.mocked(logRoll).mock.calls.map((c) => c[2]).find((e) => e.kind === "damage");
@@ -376,17 +469,22 @@ describe("InlineAttackPicker — manual crit toggle (#766)", () => {
   });
 });
 
-describe("InlineAttackPicker — shared Damage card copy", () => {
-  it("labels the Damage card with ungated wording (not 'land the hit')", () => {
+describe("InlineAttackPicker — Damage card copy (#786)", () => {
+  it("labels the inert Damage card by prompt and names the form once a hit is rolled", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
     renderPicker(
       makeCharacter({ inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"] }),
     );
     expect(screen.queryByText(/land the hit/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/Roll damage for your hit/)).toBeInTheDocument();
+    expect(screen.getByText(/Roll to hit to roll damage/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    expect(screen.getByText(/Longsword · 1d8 slashing/)).toBeInTheDocument();
+    vi.restoreAllMocks();
   });
 });
 
-describe("InlineAttackPicker — Damage card maneuver state resets on weapon switch (#756)", () => {
+describe("InlineAttackPicker — Damage card maneuver state resets on form switch (#756)", () => {
   const SERVER_ROLL = 5;
 
   function battleMaster(): Character {
@@ -410,7 +508,7 @@ describe("InlineAttackPicker — Damage card maneuver state resets on weapon swi
     } as unknown as Character);
   }
 
-  it("re-enables the spend button on the newly active weapon after a die was spent on another", async () => {
+  it("re-enables the spend button on the newly rolled form after a die was spent on another", async () => {
     const user = userEvent.setup();
     vi.mocked(castManeuverTransaction).mockResolvedValue({
       character: battleMaster(),
@@ -419,16 +517,16 @@ describe("InlineAttackPicker — Damage card maneuver state resets on weapon swi
 
     renderPicker(battleMaster());
 
-    // Roll to hit on the active (first) weapon so the attack maneuver section shows.
-    await user.click(screen.getAllByRole("button", { name: /Roll to hit/ })[0]);
+    // Roll to hit with the default (Longsword) form so the attack maneuver shows.
+    await user.click(screen.getByRole("button", { name: /Roll to hit/ }));
     const spend = await screen.findByRole("button", { name: /Precision Attack/ });
     await user.click(spend);
-    // Spent on this weapon's context → button disabled.
+    // Spent in this form's context → button disabled.
     await waitFor(() => expect(spend).toBeDisabled());
 
-    // Switch the active weapon to the Dagger, then roll to hit for it.
-    await user.click(screen.getByRole("button", { name: "Select Dagger" }));
-    await user.click(screen.getAllByRole("button", { name: /Roll to hit/ })[1]);
+    // Switch the selected form to the Dagger, then roll to hit for it.
+    await user.click(screen.getByRole("radio", { name: "Dagger" }));
+    await user.click(screen.getByRole("button", { name: /Roll to hit/ }));
 
     // A fresh Damage-card instance → no die spent in the Dagger's context yet.
     const daggerSpend = await screen.findByRole("button", { name: /Precision Attack/ });
@@ -437,6 +535,10 @@ describe("InlineAttackPicker — Damage card maneuver state resets on weapon swi
 });
 
 describe("InlineAttackPicker — persistent inline roll result (#745)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("shows the attack die box after rolling to hit", async () => {
     renderPicker(
       makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] }),
@@ -447,17 +549,19 @@ describe("InlineAttackPicker — persistent inline roll result (#745)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
 
-    // The to-hit d20 die box now persists on the row (value is random; the
+    // The to-hit d20 die box now persists on the card (value is random; the
     // caption is deterministic).
     expect(screen.getByText("d20")).toBeInTheDocument();
   });
 
-  it("shows the weapon damage die box after rolling damage", async () => {
+  it("shows the weapon damage die box after rolling to hit then damage", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5); // non-crit → a single d8 box
     renderPicker(
       makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] }),
     );
 
-    await userEvent.click(screen.getByRole("button", { name: /Roll damage/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
 
     // Flame Tongue base damage is 1d8 slashing.
     expect(screen.getByText("d8")).toBeInTheDocument();

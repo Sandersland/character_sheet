@@ -80,11 +80,13 @@ frontend/src/
 │   │                    #   SessionsModal, SessionSummaryModal (→ useSessionRecapDetail +
 │   │                    #   CampaignRecapSection/RecapFacts/RecapPrimitives/ParticipantRecapCard/
 │   │                    #   SessionJournalList/SessionAddXpForm), Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
-│   │                    #   attack sheet (#778): InlineAttackPicker orchestrates WeaponAttackList
-│   │                    #   (WeaponAttackCard/WeaponDamageCard, deduped #756) + BasicAttackRows
-│   │                    #   (Unarmed/Improvised AttackRow) + AttackOptionSection + AttackSheetFooter;
-│   │                    #   per-entry roll state + AttackEntryView from useAttackRolls; shared
-│   │                    #   CritDamageButton/DamageRiderList/AttackRowInfo; AttackResultLine renders
+│   │                    #   attack sheet (#786): InlineAttackPicker orchestrates one AttackFormCard
+│   │                    #   (Segmented "Attacking with" selector over buildAttackForms: deduped weapons +
+│   │                    #   Unarmed + Improvised; default = main-hand) + one WeaponDamageCard bound to the
+│   │                    #   LAST-ROLLED form (inert until a hit, rebinds on the next Roll to hit) +
+│   │                    #   AttackOptionSection + AttackSheetFooter; off-hand/TWF still uses AttackRow
+│   │                    #   (InlineOffHandPicker); per-entry roll state + AttackEntryView from useAttackRolls;
+│   │                    #   shared CritDamageButton/DamageRiderList/AttackRowInfo; AttackResultLine renders
 │   │                    #   lib/attackResult (nat-20 auto-crit + nat-1 miss cues #766), AttackOptionRow,
 │   │                    #   useSpellPicker + SpellPickerRow/SlotLevelSelector/SpellTargetToggle,
 │   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie,
