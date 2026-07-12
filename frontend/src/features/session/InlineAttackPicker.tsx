@@ -38,6 +38,22 @@ function useAttackFormSelection(forms: AttackEntry[]) {
   return { selectedEntry, lastRolledEntry, setSelectedId, markRolled: setLastRolledId };
 }
 
+// Pure per-render derivations for the picker shell, extracted so the component
+// stays a composition layer. The counter is prebuilt (or null) so the JSX needs
+// no attack-null re-narrowing; it hides at total 1 (the kicker's "1 attack" is
+// enough).
+function pickerView(character: Character, attack: TurnState["attack"], forms: AttackEntry[]) {
+  return {
+    // buildAttackForms always appends Unarmed + Improvised, so any other id is a weapon.
+    hasWeapon: forms.some((f) => f.id !== "unarmed" && f.id !== "improvised"),
+    showManeuvers: hasSuperiorityDice(character),
+    attacksExhausted: computeAttacksExhausted(attack),
+    preRoll: attack !== null && attack.used === 0,
+    attacksRemain: attack !== null && attack.used > 0 && attack.used < attack.total,
+    counter: attack !== null && attack.total > 1 ? { total: attack.total, used: attack.used } : null,
+  };
+}
+
 interface InlineAttackPickerProps {
   character: Character;
   turnState: TurnState & TurnStateActions;
@@ -77,17 +93,10 @@ export default function InlineAttackPicker({
   });
 
   const forms = buildAttackForms(character);
-  // buildAttackForms always appends Unarmed + Improvised, so any other id is a weapon.
-  const hasWeapon = forms.some((f) => f.id !== "unarmed" && f.id !== "improvised");
+  const view = pickerView(character, turnState.attack, forms);
 
   const { selectedEntry, lastRolledEntry, setSelectedId, markRolled } =
     useAttackFormSelection(forms);
-
-  const showManeuvers = hasSuperiorityDice(character);
-  const attacksExhausted = computeAttacksExhausted(turnState.attack);
-  const preRoll = turnState.attack !== null && turnState.attack.used === 0;
-  const attacksRemain =
-    turnState.attack !== null && turnState.attack.used > 0 && turnState.attack.used < turnState.attack.total;
 
   // Roll to hit with the selected form and bind the Damage card to it.
   function handleRollToHit() {
@@ -97,13 +106,11 @@ export default function InlineAttackPicker({
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Live Extra-Attack counter — pips + "N of M remaining". Hidden at total 1
-          (the kicker's "1 attack" is enough). */}
-      {turnState.attack !== null && turnState.attack.total > 1 && (
-        <AttackCounter total={turnState.attack.total} used={turnState.attack.used} label="Attacks" />
+      {view.counter && (
+        <AttackCounter total={view.counter.total} used={view.counter.used} label="Attacks" />
       )}
 
-      {!hasWeapon && (
+      {!view.hasWeapon && (
         <p className="text-sm text-parchment-600">
           No weapon equipped — use Change on the turn screen.
         </p>
@@ -116,7 +123,7 @@ export default function InlineAttackPicker({
         selectedId={selectedEntry.id}
         onSelect={setSelectedId}
         view={viewFor(selectedEntry)}
-        attacksExhausted={attacksExhausted}
+        attacksExhausted={view.attacksExhausted}
         onRollToHit={handleRollToHit}
       />
 
@@ -125,7 +132,7 @@ export default function InlineAttackPicker({
       <WeaponDamageCard
         key={lastRolledEntry?.id ?? "inert"}
         view={lastRolledEntry ? viewFor(lastRolledEntry) : null}
-        showManeuvers={showManeuvers}
+        showManeuvers={view.showManeuvers}
         character={character}
         riderTotals={riderTotals}
         onUpdate={onUpdate}
@@ -134,8 +141,8 @@ export default function InlineAttackPicker({
       <AttackOptionSection
         character={character}
         turnState={turnState}
-        showManeuvers={showManeuvers}
-        attacksExhausted={attacksExhausted}
+        showManeuvers={view.showManeuvers}
+        attacksExhausted={view.attacksExhausted}
         die={die}
       />
 
@@ -149,8 +156,8 @@ export default function InlineAttackPicker({
       />
 
       <AttackSheetFooter
-        preRoll={preRoll}
-        attacksRemain={attacksRemain}
+        preRoll={view.preRoll}
+        attacksRemain={view.attacksRemain}
         onCancel={onCancel}
         onClose={onClose}
       />

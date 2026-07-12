@@ -30,7 +30,7 @@ import { loadTurnState, saveTurnState } from "@/features/session/turnStatePersis
 import type { AttackTallyRow, TallyAttackRoll, TallyVerdict } from "@/lib/attackTallySummary";
 import type { Character } from "@/types/character";
 
-export type { AttackTallyRow, TallyAttackRoll, TallyVerdict } from "@/lib/attackTallySummary";
+export type { AttackTallyRow, TallyAttackRoll } from "@/lib/attackTallySummary";
 
 /** Payload recordAttack appends to the tally: the form plus its kept-d20 snapshot. */
 export interface RecordedAttack {
@@ -265,7 +265,7 @@ function economyOf(s: TurnState): EconomySnapshot {
  * into every undo entry so a pre-#802 snapshot's `undo()` doesn't restore
  * `undefined` over the tally.
  */
-export function hydrateTurnState(loaded: TurnState): TurnState {
+function hydrateTurnState(loaded: TurnState): TurnState {
   const base = { ...initialState(), ...loaded };
   return {
     ...base,
