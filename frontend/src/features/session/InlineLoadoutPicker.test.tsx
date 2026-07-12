@@ -2,10 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import LoadoutSwapRow from "@/features/session/LoadoutSwapRow";
+import InlineLoadoutPicker from "@/features/session/InlineLoadoutPicker";
+import { useLoadoutSwap } from "@/features/session/useLoadoutSwap";
 import { applyInventoryTransactions } from "@/api/client";
 import type { Character, InventoryItem } from "@/types/character";
-import type { TurnStateView } from "@/features/session/useTurnState";
+import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 
 vi.mock("@/api/client", () => ({
   applyInventoryTransactions: vi.fn(),
@@ -38,45 +39,53 @@ function makeChar(inventory: InventoryItem[]): Character {
   return { id: "c1", inventory } as unknown as Character;
 }
 
-function makeTurnState(actionsRemaining: number): TurnStateView {
+function makeTurnState(actionsRemaining: number): TurnState & TurnStateActions {
   return {
     actionsRemaining,
     consumeAction: vi.fn(),
     refundAction: vi.fn(),
-  } as unknown as TurnStateView;
+  } as unknown as TurnState & TurnStateActions;
 }
 
-function renderRow(character: Character, turnState: TurnStateView, onUpdate = vi.fn()) {
+// Hosts the picker with the real useLoadoutSwap hook — the same swap economy the
+// production Action-sheet resolution wires, so the ops/consume/refund assertions
+// carry over from the old LoadoutSwapRow test.
+function Harness({
+  character,
+  turnState,
+  onUpdate,
+}: {
+  character: Character;
+  turnState: TurnState & TurnStateActions;
+  onUpdate: (c: Character) => void;
+}) {
+  const loadout = useLoadoutSwap(character, turnState, onUpdate);
+  return <InlineLoadoutPicker character={character} turnState={turnState} loadout={loadout} />;
+}
+
+function renderPicker(character: Character, turnState: TurnState & TurnStateActions, onUpdate = vi.fn()) {
   mockApply.mockResolvedValue(character); // returned char isn't asserted here
-  return render(<LoadoutSwapRow character={character} turnState={turnState} onUpdate={onUpdate} />);
-}
-
-/** Open the picker sheet via the row-level Change (unique before the sheet opens). */
-async function openSheet(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("button", { name: "Change" }));
-  return within(screen.getByRole("dialog"));
+  return render(<Harness character={character} turnState={turnState} onUpdate={onUpdate} />);
 }
 
 /** Scope queries to one hand's card ("Main hand" / "Off hand"). */
-function handCard(dialog: ReturnType<typeof within>, heading: string) {
-  const label = dialog.getByText(new RegExp(`^${heading}`));
+function handCard(heading: string) {
+  const label = screen.getByText(new RegExp(`^${heading}`));
   return within(label.closest('[data-testid="hand-card"]') as HTMLElement);
 }
 
-describe("LoadoutSwapRow (#789)", () => {
-  it("shows the current loadout label", () => {
-    renderRow(makeChar([longsword, dagger]), makeTurnState(1));
-    expect(screen.getByText("Longsword")).toBeInTheDocument();
-    expect(screen.getByText(/Equipped ·/)).toBeInTheDocument();
+describe("InlineLoadoutPicker (#815)", () => {
+  it("shows the current loadout label and per-hand occupants", () => {
+    renderPicker(makeChar([longsword, dagger]), makeTurnState(1));
+    expect(screen.getByText(/Now wielding/)).toBeInTheDocument();
+    // Longsword appears in the summary line + the Main-hand card header.
+    expect(screen.getAllByText("Longsword").length).toBeGreaterThan(0);
   });
 
-  it("Change opens per-hand cards; expanding a hand lists its bag candidates", async () => {
+  it("expanding a hand lists its bag candidates", async () => {
     const user = userEvent.setup();
-    renderRow(makeChar([longsword, dagger]), makeTurnState(1));
-    const dialog = await openSheet(user);
-    expect(screen.getByText("Change loadout")).toBeInTheDocument();
-    // Main-hand card shows the current weapon; expanding it reveals the Dagger.
-    const main = handCard(dialog, "Main hand");
+    renderPicker(makeChar([longsword, dagger]), makeTurnState(1));
+    const main = handCard("Main hand");
     const toggle = main.getByRole("button", { name: "Change" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     await user.click(toggle);
@@ -88,10 +97,9 @@ describe("LoadoutSwapRow (#789)", () => {
     const user = userEvent.setup();
     const turnState = makeTurnState(1);
     const onUpdate = vi.fn();
-    renderRow(makeChar([longsword, dagger]), turnState, onUpdate);
+    renderPicker(makeChar([longsword, dagger]), turnState, onUpdate);
 
-    const dialog = await openSheet(user);
-    const main = handCard(dialog, "Main hand");
+    const main = handCard("Main hand");
     await user.click(main.getByRole("button", { name: "Change" })); // expand main hand
     await user.click(main.getByRole("button", { name: "Swap in" }));
 
@@ -105,32 +113,27 @@ describe("LoadoutSwapRow (#789)", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /Refund/ })).toBeInTheDocument());
   });
 
-  it("disables the row Change (with a hint) when both hands are occupied at 0 actions", async () => {
-    const user = userEvent.setup();
-    renderRow(makeChar([longsword, shield, dagger]), makeTurnState(0));
-
-    expect(screen.getByRole("button", { name: "Change" })).toBeDisabled();
-    expect(screen.getByText(/No action left/)).toBeInTheDocument();
-    // The disabled row can't be opened, so no swap affordance renders anywhere.
-    await user.click(screen.getByRole("button", { name: "Change" }));
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  it("at 0 actions with both hands occupied: both hands disabled with a reason, no swap reachable", async () => {
+    renderPicker(makeChar([longsword, shield, dagger]), makeTurnState(0));
+    // Both hand toggles disabled with the text reason — a held swap needs the Action.
+    expect(handCard("Main hand").getByRole("button", { name: "Change" })).toBeDisabled();
+    expect(handCard("Off hand").getByRole("button", { name: "Change" })).toBeDisabled();
+    expect(screen.getAllByText(/No action left/).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Swap in" })).not.toBeInTheDocument();
   });
 
-  it("at 0 actions with one hand free: occupied hand disabled with reason, free hand draws for free", async () => {
+  it("at 0 actions with one hand free: occupied hand disabled, free hand draws for free", async () => {
     const user = userEvent.setup();
     const turnState = makeTurnState(0);
     // Longsword in main, off hand empty, a bag dagger that fits the off hand.
-    renderRow(makeChar([longsword, dagger]), turnState);
+    renderPicker(makeChar([longsword, dagger]), turnState);
 
-    const dialog = await openSheet(user);
-    // Occupied main-hand Change is disabled with a *text* reason (not title-only).
-    const main = handCard(dialog, "Main hand");
+    const main = handCard("Main hand");
     expect(main.getByRole("button", { name: "Change" })).toBeDisabled();
     expect(main.getByText(/No action left — swapping a held item costs your Action/)).toBeInTheDocument();
 
     // Free off-hand Equip works: draws the dagger for free.
-    const off = handCard(dialog, "Off hand");
+    const off = handCard("Off hand");
     await user.click(off.getByRole("button", { name: "Equip" })); // expand off hand
     await user.click(within(off.getByRole("list")).getByRole("button", { name: "Equip" })); // the dagger option
     await waitFor(() =>
@@ -142,10 +145,9 @@ describe("LoadoutSwapRow (#789)", () => {
   it("filling an EMPTY hand is free (no Action spent)", async () => {
     const user = userEvent.setup();
     const turnState = makeTurnState(1);
-    renderRow(makeChar([dagger]), turnState); // both hands empty
+    renderPicker(makeChar([dagger]), turnState); // both hands empty
 
-    const dialog = await openSheet(user);
-    const main = handCard(dialog, "Main hand");
+    const main = handCard("Main hand");
     await user.click(main.getByRole("button", { name: "Equip" })); // expand main hand
     await user.click(within(main.getByRole("list")).getByRole("button", { name: "Equip" })); // the dagger option
 
@@ -160,10 +162,9 @@ describe("LoadoutSwapRow (#789)", () => {
     const turnState = makeTurnState(1);
     const offDagger = weapon({ id: "off", name: "Dagger", equipped: true, equippedSlot: "OFF_HAND" });
     const greataxe = weapon({ id: "ga", name: "Greataxe" }, true);
-    renderRow(makeChar([longsword, offDagger, greataxe]), turnState);
+    renderPicker(makeChar([longsword, offDagger, greataxe]), turnState);
 
-    const dialog = await openSheet(user);
-    const main = handCard(dialog, "Main hand");
+    const main = handCard("Main hand");
     await user.click(main.getByRole("button", { name: "Change" })); // expand main hand
     await user.click(main.getByRole("button", { name: "Swap in" })); // Greataxe
 
@@ -180,23 +181,22 @@ describe("LoadoutSwapRow (#789)", () => {
   it("dedupes duplicate weapons into one row with a ×N badge", async () => {
     const user = userEvent.setup();
     const dagger2 = weapon({ id: "dg2", name: "Dagger" });
-    renderRow(makeChar([longsword, dagger, dagger2]), makeTurnState(1));
+    renderPicker(makeChar([longsword, dagger, dagger2]), makeTurnState(1));
 
-    const dialog = await openSheet(user);
-    await user.click(dialog.getByRole("button", { name: "Change" })); // expand main hand
-    // One Dagger label, one ×2 badge — not two rows.
-    expect(dialog.getAllByText("Dagger")).toHaveLength(1);
-    expect(dialog.getByText("×2")).toBeInTheDocument();
+    const main = handCard("Main hand");
+    await user.click(main.getByRole("button", { name: "Change" })); // expand main hand
+    expect(main.getAllByText("Dagger")).toHaveLength(1);
+    expect(main.getByText("×2")).toBeInTheDocument();
   });
 
   it("Stow empties the hand for free", async () => {
     const user = userEvent.setup();
     const turnState = makeTurnState(1);
-    renderRow(makeChar([longsword]), turnState);
+    renderPicker(makeChar([longsword]), turnState);
 
-    const dialog = await openSheet(user);
-    await user.click(dialog.getByRole("button", { name: "Change" })); // expand main hand
-    await user.click(dialog.getByRole("button", { name: "Stow" }));
+    const main = handCard("Main hand");
+    await user.click(main.getByRole("button", { name: "Change" })); // expand main hand
+    await user.click(main.getByRole("button", { name: "Stow" }));
 
     await waitFor(() =>
       expect(mockApply).toHaveBeenCalledWith("c1", [{ type: "setEquipped", inventoryItemId: "ls", equipped: false }]),
@@ -207,11 +207,11 @@ describe("LoadoutSwapRow (#789)", () => {
   it("refund reverses the swap and returns the Action", async () => {
     const user = userEvent.setup();
     const turnState = makeTurnState(1);
-    renderRow(makeChar([longsword, dagger]), turnState);
+    renderPicker(makeChar([longsword, dagger]), turnState);
 
-    const dialog = await openSheet(user);
-    await user.click(dialog.getByRole("button", { name: "Change" }));
-    await user.click(dialog.getByRole("button", { name: "Swap in" }));
+    const main = handCard("Main hand");
+    await user.click(main.getByRole("button", { name: "Change" }));
+    await user.click(main.getByRole("button", { name: "Swap in" }));
     await waitFor(() => expect(screen.getByRole("button", { name: /Refund/ })).toBeInTheDocument());
 
     mockApply.mockClear();

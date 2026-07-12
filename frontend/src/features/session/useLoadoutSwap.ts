@@ -17,7 +17,7 @@ import { useState } from "react";
 
 import { applyInventoryTransactions } from "@/api/client";
 import { equippedLoadoutLabel, itemsInSlot } from "@/lib/paperDoll";
-import type { TurnStateView } from "@/features/session/useTurnState";
+import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character, EquipSlot, InventoryItem, InventoryOperation } from "@/types/character";
 
 /** A committed swap this turn, retained so the refund can reverse it exactly. */
@@ -64,9 +64,11 @@ function buildSwapOps(
   return { ops, inverseOps, costsAction: toStow.length > 0 };
 }
 
+export type LoadoutSwapControls = ReturnType<typeof useLoadoutSwap>;
+
 export function useLoadoutSwap(
   character: Character,
-  turnState: TurnStateView,
+  turnState: TurnState & TurnStateActions,
   onUpdate: (c: Character) => void,
 ) {
   const [busy, setBusy] = useState(false);

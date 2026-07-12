@@ -5,11 +5,13 @@
 
 import BottomSheet from "@/components/ui/BottomSheet";
 import InlineAttackPicker from "@/features/session/InlineAttackPicker";
+import InlineLoadoutPicker from "@/features/session/InlineLoadoutPicker";
 import InlineOffHandPicker from "@/features/session/InlineOffHandPicker";
 import InlineItemPicker from "@/features/session/InlineItemPicker";
 import InlineSpellPicker from "@/features/session/InlineSpellPicker";
 import LayOnHandsInput from "@/features/session/LayOnHandsInput";
 import type { ActiveResolution } from "@/features/session/useActiveResolution";
+import type { LoadoutSwapControls } from "@/features/session/useLoadoutSwap";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { AllyOption } from "@/lib/spellMeta";
 import type { Character } from "@/types/character";
@@ -47,6 +49,7 @@ interface TurnResolutionSheetsProps {
   onLogChanged: () => void;
   allies: AllyOption[];
   send: React.ComponentProps<typeof LayOnHandsInput>["onSend"];
+  loadoutSwap: LoadoutSwapControls;
 }
 
 export default function TurnResolutionSheets({
@@ -61,8 +64,21 @@ export default function TurnResolutionSheets({
   onLogChanged,
   allies,
   send,
+  loadoutSwap,
 }: TurnResolutionSheetsProps) {
   const kind = activeResolution?.resolver.kind;
+
+  if (kind === "loadout-picker") {
+    return (
+      <BottomSheet
+        title="Change weapons"
+        subtitle="Swapping a held weapon costs your Action — drawing into a free hand or stowing is free."
+        onClose={closeResolution}
+      >
+        <InlineLoadoutPicker character={character} turnState={turnState} loadout={loadoutSwap} />
+      </BottomSheet>
+    );
+  }
 
   if (kind === "attack-picker") {
     // Attacks all spent → finalize; attacks remain → leave the action LIVE so the
