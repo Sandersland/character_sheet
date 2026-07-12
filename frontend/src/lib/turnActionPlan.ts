@@ -52,10 +52,13 @@ export function planActionClick(
         : { consumeSlot: true, openResolution: false, send: "none" };
 
     // Slot is committed by the picker on use/cast/heal, not on open (#765) —
-    // closing the sheet without acting stays free, like the spell picker.
+    // closing the sheet without acting stays free, like the spell picker. The
+    // loadout picker (#815) likewise owns the Action itself — a held-item swap
+    // spends it, a free-hand draw/stow is free.
     case "heal-input":
     case "item-picker":
     case "spell-picker":
+    case "loadout-picker":
       return { consumeSlot: false, openResolution: true, send: "none" };
 
     case "simple-confirm":
