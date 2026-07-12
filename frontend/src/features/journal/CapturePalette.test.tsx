@@ -1,10 +1,27 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import CapturePalette from "@/features/journal/CapturePalette";
 import * as client from "@/api/client";
+import { axe } from "@/test/axe";
 import type { Character } from "@/types/character";
+
+// The default setup stub reports matches:false → below md → BottomSheet. Flip to
+// md+ (top palette) for the desktop-presentation cases; afterEach restores it.
+function useDesktopViewport() {
+  window.matchMedia = ((query: string) =>
+    ({
+      matches: query.includes("min-width: 768px"),
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList) as typeof window.matchMedia;
+}
 
 vi.mock("@/api/client", () => ({
   createJournalEntry: vi.fn(),
@@ -32,16 +49,29 @@ function makeCharacterWithNote(): Character {
   } as unknown as Character;
 }
 
+const defaultMatchMedia = window.matchMedia;
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(client.createJournalEntry).mockResolvedValue(makeCharacter());
   vi.mocked(client.deleteJournalEntry).mockResolvedValue(makeCharacter());
 });
 
+afterEach(() => {
+  window.matchMedia = defaultMatchMedia;
+});
+
 describe("CapturePalette (#247)", () => {
   it("auto-focuses the composer when opened", () => {
     render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
     expect(screen.getByRole("textbox", { name: /quick note/i })).toHaveFocus();
+  });
+
+  it("floors the composer font-size at text-base on mobile to kill iOS auto-zoom", () => {
+    render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
+    const composer = screen.getByRole("textbox", { name: /quick note/i });
+    expect(composer.className).toContain("text-base");
+    expect(composer.className).toContain("md:text-sm");
   });
 
   it("Enter saves a NOTE via createJournalEntry and propagates the update", async () => {
@@ -123,5 +153,42 @@ describe("CapturePalette (#247)", () => {
 
     expect(client.deleteJournalEntry).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: /^delete$/i })).toBeInTheDocument();
+  });
+
+  describe("per-breakpoint presentation (#771)", () => {
+    it("mobile: renders inside a BottomSheet with a grabber, short placeholder, no keyboard hint", () => {
+      const { baseElement } = render(
+        <CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />,
+      );
+      // The BottomSheet grabber is a real button whose accessible name is "Close".
+      expect(baseElement.querySelector('button[aria-label="Close"]')).not.toBeNull();
+      expect(screen.getByText("Jot a note… @ to tag")).toBeInTheDocument();
+      expect(screen.queryByText(/Enter to save/i)).toBeNull();
+    });
+
+    it("md+: renders the top palette with the Enter/Shift+Enter hint and no grabber", () => {
+      useDesktopViewport();
+      const { baseElement } = render(
+        <CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />,
+      );
+      expect(screen.getByRole("dialog", { name: /quick capture/i })).toBeInTheDocument();
+      expect(screen.getByText(/Enter to save · Shift\+Enter/i)).toBeInTheDocument();
+      expect(baseElement.querySelector('button[aria-label="Close"]')).toBeNull();
+    });
+
+    it("has no axe violations on mobile", async () => {
+      const { baseElement } = render(
+        <CapturePalette character={makeCharacterWithNote()} onClose={vi.fn()} onUpdate={vi.fn()} />,
+      );
+      expect(await axe(baseElement)).toHaveNoViolations();
+    });
+
+    it("has no axe violations at md+", async () => {
+      useDesktopViewport();
+      const { baseElement } = render(
+        <CapturePalette character={makeCharacterWithNote()} onClose={vi.fn()} onUpdate={vi.fn()} />,
+      );
+      expect(await axe(baseElement)).toHaveNoViolations();
+    });
   });
 });

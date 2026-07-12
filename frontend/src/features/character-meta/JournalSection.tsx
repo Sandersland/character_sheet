@@ -1,7 +1,8 @@
 /**
  * JournalSection — interactive campaign-journal orchestrator. Owns its Card and
- * local state (busy/error/add/edit/delete) and wires the plain-REST journal CRUD
- * client functions, mirroring how InventoryList/SpellsSection own their surface.
+ * local UI state (add/edit/delete rows); the busy/error pair and the plain-REST
+ * journal CRUD calls live in the shared useJournalMutations hook (also used by
+ * CapturePalette), mirroring how InventoryList/SpellsSection own their surface.
  * Journal entries carry no mechanical effect, so there's no transaction/audit
  * pattern here — each call returns the full updated Character via onUpdate.
  *
@@ -11,11 +12,6 @@
 
 import { useState } from "react";
 
-import {
-  createJournalEntry,
-  updateJournalEntry,
-  deleteJournalEntry,
-} from "@/api/client";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import { GiQuillInk } from "@/components/ui/icons";
@@ -23,6 +19,7 @@ import JournalEntryPanel, {
   type JournalEntryDraft,
 } from "@/features/character-meta/JournalEntryPanel";
 import MentionText from "@/features/journal/MentionText";
+import { useJournalMutations } from "@/features/journal/useJournalMutations";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { formatJournalDate } from "@/lib/formatJournalDate";
 import type { Character } from "@/types/character";
@@ -38,8 +35,7 @@ export default function JournalSection({ character, onUpdate, sessionId }: Journ
   const entries = character.journal;
   const { byId } = useCampaignEntities(character.campaignId);
 
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, create, update, remove } = useJournalMutations(character.id, onUpdate);
   const [addPanelOpen, setAddPanelOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -51,38 +47,16 @@ export default function JournalSection({ character, onUpdate, sessionId }: Journ
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   );
 
-  async function run(action: () => Promise<Character>) {
-    setBusy(true);
-    setError(null);
-    try {
-      const updated = await action();
-      onUpdate(updated);
-      return true;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function handleAdd(draft: JournalEntryDraft) {
-    const ok = await run(() =>
-      createJournalEntry(character.id, { ...draft, sessionId }),
-    );
-    if (ok) setAddPanelOpen(false);
+    if (await create({ ...draft, sessionId })) setAddPanelOpen(false);
   }
 
   async function handleEdit(entryId: string, draft: JournalEntryDraft) {
-    const ok = await run(() =>
-      updateJournalEntry(character.id, entryId, { body: draft.body }),
-    );
-    if (ok) setEditingId(null);
+    if (await update(entryId, draft.body)) setEditingId(null);
   }
 
   async function handleDelete(entryId: string) {
-    const ok = await run(() => deleteJournalEntry(character.id, entryId));
-    if (ok) setConfirmDeleteId(null);
+    if (await remove(entryId)) setConfirmDeleteId(null);
   }
 
   return (
