@@ -2,14 +2,23 @@ import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
+import { createSessionCharacter, uniqueName } from "./helpers/api";
 
 // Session rest button (#814): the Rest & HP tab is gone; rests now live behind an
-// always-visible campfire button beside the HP strip.
+// always-visible campfire button beside the HP strip. A fresh session character
+// gives a deterministic full hit-die pool the shared roster can't guarantee.
 test("session rest button: short rest spends a hit die, long rest is available", async ({ page }) => {
   await login(page);
-
   const errors = collectConsoleErrors(page);
-  await page.getByRole("link", { name: /Session Fighter/ }).click();
+
+  const id = await createSessionCharacter(page.request, {
+    name: uniqueName("Rest Fighter"),
+    className: "Fighter",
+    race: "Human",
+    background: "Soldier",
+  });
+
+  await page.goto(`/characters/${id}`);
   await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
   await expect(page).toHaveURL(/\/session$/);
 
