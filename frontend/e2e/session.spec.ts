@@ -30,3 +30,30 @@ test("session: start combat, take an action, and see it in the log", async ({ pa
 
   expect(errors).toEqual([]);
 });
+
+// #765: opening the item picker and closing it without using anything must not
+// spend the Action — the slot commits only on use.
+test("session: opening Use-an-item then closing leaves the action available", async ({ page }) => {
+  await login(page);
+
+  const errors = collectConsoleErrors(page);
+  await page.getByRole("link", { name: /Session Fighter/ }).click();
+  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
+  await expect(page).toHaveURL(/\/session$/);
+
+  await page.getByRole("button", { name: /Start combat/i }).click();
+  await page.getByRole("button", { name: "Start my turn" }).click();
+
+  await page.getByRole("button", { name: /Use Action/ }).click();
+  await page.getByRole("button", { name: "Use an item" }).click();
+
+  const sheet = page.getByRole("dialog");
+  await expect(sheet.getByText(/Nothing is spent until you use an item/)).toBeVisible();
+  await sheet.getByRole("button", { name: "Close" }).click();
+
+  // Action untouched — no commit, no undo affordance.
+  await expect(page.getByRole("button", { name: "Use Action" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Undo/ })).toHaveCount(0);
+
+  expect(errors).toEqual([]);
+});

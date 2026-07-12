@@ -35,14 +35,14 @@ describe("planActionClick", () => {
     });
   });
 
-  it("heal-input consumes the slot and opens the numeric input (Lay on Hands)", () => {
+  it("heal-input does NOT consume the slot (committed on heal, #765)", () => {
     const plan = planActionClick(resolverFor("layOnHands"), character);
-    expect(plan).toEqual({ consumeSlot: true, openResolution: true, send: "none" });
+    expect(plan).toEqual({ consumeSlot: false, openResolution: true, send: "none" });
   });
 
-  it("item-picker consumes the slot and opens the picker (Use Object)", () => {
+  it("item-picker does NOT consume the slot (committed on use, #765)", () => {
     const plan = planActionClick(resolverFor("useObject"), character);
-    expect(plan).toEqual({ consumeSlot: true, openResolution: true, send: "none" });
+    expect(plan).toEqual({ consumeSlot: false, openResolution: true, send: "none" });
   });
 
   it("spell-picker does NOT consume the slot (committed on cast)", () => {

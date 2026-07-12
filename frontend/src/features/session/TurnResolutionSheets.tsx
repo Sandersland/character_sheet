@@ -123,16 +123,37 @@ export default function TurnResolutionSheets({
 
   if (kind === "item-picker") {
     return (
-      <BottomSheet title="Use an item" onClose={closeResolution}>
-        <InlineItemPicker character={character} onUpdate={onUpdate} onClose={closeResolution} />
+      <BottomSheet
+        title="Use an item"
+        subtitle="Nothing is spent until you use an item"
+        onClose={closeResolution}
+      >
+        <InlineItemPicker
+          character={character}
+          onUpdate={onUpdate}
+          onCommit={(batchId) => {
+            turnState.consumeAction();
+            if (batchId) turnState.attachBatchId(batchId);
+          }}
+          onClose={closeResolution}
+        />
       </BottomSheet>
     );
   }
 
   if (kind === "heal-input") {
     return (
-      <BottomSheet title="Lay on Hands" onClose={closeResolution}>
-        <LayOnHandsInput character={character} onSend={send} onClose={closeResolution} />
+      <BottomSheet
+        title="Lay on Hands"
+        subtitle="Nothing is spent until you heal"
+        onClose={closeResolution}
+      >
+        <LayOnHandsInput
+          character={character}
+          onSend={send}
+          onCommit={turnState.consumeAction}
+          onClose={closeResolution}
+        />
       </BottomSheet>
     );
   }
