@@ -72,7 +72,8 @@ frontend/src/
 │   │                    #   CampaignRecapSection/RecapFacts/RecapPrimitives/ParticipantRecapCard/
 │   │                    #   SessionJournalList/SessionAddXpForm), Inline{Attack,Item,Spell}Picker, ManeuverPrompt,
 │   │                    #   WeaponAttackCard/WeaponDamageCard (deduped equipped-weapon cards #756),
-│   │                    #   AttackRow (Unarmed/Improvised), AttackResultLine, AttackOptionRow,
+│   │                    #   AttackRow (Unarmed/Improvised), AttackResultLine (nat-20 auto-crit +
+│   │                    #   nat-1 miss cues #766; Damage auto-doubles, manual Crit toggle), AttackOptionRow,
 │   │                    #   useSpellPicker + SpellPickerRow/SlotLevelSelector/SpellTargetToggle,
 │   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie,
 │   │                    #   useSessionButton (sheet-header Start/Join/Resume session state)
@@ -111,7 +112,7 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 
 | File | Purpose |
 |---|---|
-| `dice.ts` | The sole `Math.random` dice site — `rollDie`/`rollSpec`/`summarizeRoll`/`formatRollSpec` (see Dice engine below). `RollSpec.crit` (#731) doubles the damage **dice** (`count`), never the modifier. |
+| `dice.ts` | The sole `Math.random` dice site — `rollDie`/`rollSpec`/`summarizeRoll`/`formatRollSpec` (see Dice engine below). `RollSpec.crit` (#731) doubles the damage **dice** (`count`), never the modifier. Kept-die readers `keptD20`/`isNaturalTwenty`/`isNaturalOne` (#766) drive the attack sheet's nat-20 auto-crit + nat-1 miss — a nat 20 on the *dropped* die (disadvantage) is not a crit. |
 | `abilities.ts` | Ability/skill/save labels + `abilityModifier` math; resolve all display keys through here. `skillBonus` takes an optional `tempModifier` for active buffs. |
 | `items.ts` | `isEquippable(category)` + `EQUIPPABLE_CATEGORIES` — equippability rule (weapon/armor yes, consumable/gear no). Mirror of backend `lib/inventory/items.ts`; gate the Equip control through here, never inline-check `category`. Also `itemCategoryLabel` + `ITEM_CATEGORY_LABELS`/`ITEM_CATEGORY_ORDER`/`ITEM_CATEGORY_OPTIONS` — resolve category display through here, never a raw key. |
 | `events.ts` | Activity-log display lookups — `eventTypeLabel`/`categoryLabel`/`categoryTone` (tolerant `Partial<Record>` maps, raw-key fallback) + `INVENTORY_EVENT_TYPES` for the filter chips. Resolve all event type/category keys through here, never inline-capitalize. |
