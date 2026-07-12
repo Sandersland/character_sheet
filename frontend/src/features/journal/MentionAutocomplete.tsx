@@ -67,7 +67,7 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
         {placeholder && value === "" && (
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute left-0 top-0 px-2.5 py-1.5 text-sm text-parchment-400"
+            className="pointer-events-none absolute left-0 top-0 px-2.5 py-1.5 text-base md:text-sm text-parchment-400"
           >
             {placeholder}
           </span>

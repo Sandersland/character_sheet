@@ -44,6 +44,13 @@ describe("CapturePalette (#247)", () => {
     expect(screen.getByRole("textbox", { name: /quick note/i })).toHaveFocus();
   });
 
+  it("floors the composer font-size at text-base on mobile to kill iOS auto-zoom", () => {
+    render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
+    const composer = screen.getByRole("textbox", { name: /quick note/i });
+    expect(composer.className).toContain("text-base");
+    expect(composer.className).toContain("md:text-sm");
+  });
+
   it("Enter saves a NOTE via createJournalEntry and propagates the update", async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();

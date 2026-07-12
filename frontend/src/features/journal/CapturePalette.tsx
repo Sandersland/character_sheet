@@ -100,8 +100,9 @@ export default function CapturePalette({
     if (ok) setConfirmingDeleteId(null);
   }
 
+  // text-base at mobile widths keeps typed inputs ≥16px so iOS Safari doesn't auto-zoom on focus.
   const inputCls =
-    "w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
+    "w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-base md:text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
 
   return createPortal(
     <div
