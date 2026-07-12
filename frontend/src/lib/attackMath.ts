@@ -221,7 +221,7 @@ export function buildEquippedWeaponEntries(character: Character): AttackEntry[] 
 }
 
 // The Unarmed Strike attack row — flat display when faces === 1 (baseline).
-export function buildUnarmedEntry(character: Character): AttackEntry {
+function buildUnarmedEntry(character: Character): AttackEntry {
   const { unarmedStrike } = character;
   const unarmedSpec: RollSpecTriple = {
     count: unarmedStrike.damage.count,
@@ -245,7 +245,7 @@ export function buildUnarmedEntry(character: Character): AttackEntry {
 }
 
 // The Improvised Weapon attack row — signed bonus, "(no proficiency)" note when unproficient.
-export function buildImprovisedEntry(character: Character): AttackEntry {
+function buildImprovisedEntry(character: Character): AttackEntry {
   const { improvisedWeapon } = character;
   const improvisedSpec: RollSpecTriple = {
     count: improvisedWeapon.damage.count,
@@ -272,6 +272,17 @@ export function buildImprovisedEntry(character: Character): AttackEntry {
 export function buildAttackEntries(character: Character): AttackEntry[] {
   return [
     ...equippedWeapons(character).map(buildWeaponEntry),
+    buildUnarmedEntry(character),
+    buildImprovisedEntry(character),
+  ];
+}
+
+// The "Attacking with" form options for the single attack card (#786): deduped
+// equipped weapons, then Unarmed Strike, then Improvised Weapon. The first row is
+// the main-hand weapon (or Unarmed when nothing is equipped) — the default form.
+export function buildAttackForms(character: Character): AttackEntry[] {
+  return [
+    ...buildEquippedWeaponEntries(character),
     buildUnarmedEntry(character),
     buildImprovisedEntry(character),
   ];
