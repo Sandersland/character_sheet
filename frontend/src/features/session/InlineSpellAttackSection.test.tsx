@@ -104,7 +104,7 @@ describe("InlineSpellAttackSection (#734)", () => {
     expect(turnState.recordAttack).toHaveBeenCalledOnce();
   });
 
-  it("Cast rolls damage, posts the cantrip castSpell op, and commits via commitAttackModeCantrip (no double-spend)", async () => {
+  it("Cast rolls damage, posts the cantrip castSpell op, and grants-then-commits so the action nets to −1 (no double-spend)", async () => {
     const user = userEvent.setup();
     const { turnState, onUpdate } = renderSection(makeCharacter([fireBolt]));
     mockCast.mockResolvedValue(makeCharacter([fireBolt]));
