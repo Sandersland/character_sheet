@@ -19,19 +19,52 @@ function setup(hitPoints = HP, resistedTypes: string[] = []) {
   return { onApply, user: userEvent.setup() };
 }
 
-describe("HpActionControl accumulator chips (#787)", () => {
-  it("builds the amount via chips and applies it in ≤ a couple taps, no typing", async () => {
+describe("HpActionControl accumulator chips (#796)", () => {
+  it("builds the amount via chips + ±1 flanks and applies it, no typing", async () => {
     const { onApply, user } = setup();
 
-    // +10 +5 +1 +1 = 17 damage, then Apply.
+    // +10 +5 then two Increase-amount taps = 17 damage, then Apply.
     await user.click(screen.getByRole("button", { name: "Add 10" }));
     await user.click(screen.getByRole("button", { name: "Add 5" }));
-    await user.click(screen.getByRole("button", { name: "Add 1" }));
-    await user.click(screen.getByRole("button", { name: "Add 1" }));
+    await user.click(screen.getByRole("button", { name: "Increase amount" }));
+    await user.click(screen.getByRole("button", { name: "Increase amount" }));
 
     await user.click(screen.getByRole("button", { name: "Apply 17 damage" }));
 
     expect(onApply).toHaveBeenCalledWith("damage", 17, {
+      damageType: undefined,
+      applyResistance: true,
+    });
+  });
+
+  it("drops the +1 chip; +5/+10/+20/Clear remain", () => {
+    setup();
+    expect(screen.queryByRole("button", { name: "Add 1" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add 5" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add 10" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add 20" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear amount" })).toBeInTheDocument();
+  });
+
+  it("the −/+ flanks step the amount by exactly 1", async () => {
+    const { user } = setup();
+    await user.click(screen.getByRole("button", { name: "Add 5" }));
+    await user.click(screen.getByRole("button", { name: "Increase amount" }));
+    expect(screen.getByRole("spinbutton", { name: /damage amount/i })).toHaveValue(6);
+    await user.click(screen.getByRole("button", { name: "Decrease amount" }));
+    expect(screen.getByRole("spinbutton", { name: /damage amount/i })).toHaveValue(5);
+  });
+
+  it("has a single readout-size amount input", () => {
+    setup();
+    expect(screen.getAllByRole("spinbutton", { name: /damage amount/i })).toHaveLength(1);
+  });
+
+  it("accepts keyboard entry and Enter-to-apply", async () => {
+    const { onApply, user } = setup();
+    const input = screen.getByRole("spinbutton", { name: /damage amount/i });
+    await user.type(input, "22{Enter}");
+    expect(onApply).toHaveBeenCalledWith("damage", 22, {
       damageType: undefined,
       applyResistance: true,
     });
@@ -52,11 +85,11 @@ describe("HpActionControl accumulator chips (#787)", () => {
   });
 });
 
-describe("HpActionControl projected-result line (#787)", () => {
-  it("damage projects the resulting current / max", async () => {
+describe("HpActionControl projected-result line (#796)", () => {
+  it("damage projects the resulting current / max without an amount prefix", async () => {
     const { user } = setup();
     await user.click(screen.getByRole("button", { name: "Add 5" }));
-    expect(screen.getByText("5 HP → 15 / 40")).toBeInTheDocument();
+    expect(screen.getByText("→ 15 / 40")).toBeInTheDocument();
   });
 
   it("heal caps the projection at max HP", async () => {
@@ -65,36 +98,36 @@ describe("HpActionControl projected-result line (#787)", () => {
     await user.click(screen.getByRole("button", { name: "Add 20" }));
     await user.click(screen.getByRole("button", { name: "Add 20" }));
     // 20 current + 40 chips = 60, capped to 40.
-    expect(screen.getByText("40 → 40 / 40")).toBeInTheDocument();
+    expect(screen.getByText("→ 40 / 40")).toBeInTheDocument();
   });
 
   it("temp projects the replacing-if-higher value", async () => {
     const { user } = setup();
     await user.click(screen.getByRole("radio", { name: /temp hp/i }));
     await user.click(screen.getByRole("button", { name: "Add 10" }));
-    expect(screen.getByText("Temp 0 → 10")).toBeInTheDocument();
+    expect(screen.getByText("Temp → 10")).toBeInTheDocument();
   });
 
   it("projects the halved amount when the damage type is resisted (#456)", async () => {
     const { user } = setup(HP, ["slashing"]);
     await user.click(screen.getByRole("button", { name: "Add 10" }));
-    await user.click(screen.getByRole("button", { name: "Add 1" }));
-    await user.click(screen.getByRole("button", { name: "Add 1" }));
+    await user.click(screen.getByRole("button", { name: "Increase amount" }));
+    await user.click(screen.getByRole("button", { name: "Increase amount" }));
     await user.selectOptions(screen.getByRole("combobox", { name: /damage type/i }), "slashing");
 
     // 12 slashing halves to 6 → projection matches the applied damage, not the raw 12.
-    expect(screen.getByText("6 HP → 14 / 40")).toBeInTheDocument();
+    expect(screen.getByText("→ 14 / 40")).toBeInTheDocument();
   });
 
   it("projects the full amount when the player declines resistance", async () => {
     const { user } = setup(HP, ["slashing"]);
     await user.click(screen.getByRole("button", { name: "Add 10" }));
-    await user.click(screen.getByRole("button", { name: "Add 1" }));
-    await user.click(screen.getByRole("button", { name: "Add 1" }));
+    await user.click(screen.getByRole("button", { name: "Increase amount" }));
+    await user.click(screen.getByRole("button", { name: "Increase amount" }));
     await user.selectOptions(screen.getByRole("combobox", { name: /damage type/i }), "slashing");
     await user.click(screen.getByRole("checkbox", { name: /resistant to slashing/i }));
 
-    expect(screen.getByText("12 HP → 8 / 40")).toBeInTheDocument();
+    expect(screen.getByText("→ 8 / 40")).toBeInTheDocument();
   });
 });
 

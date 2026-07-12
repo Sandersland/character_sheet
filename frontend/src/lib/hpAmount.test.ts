@@ -32,8 +32,8 @@ describe("accumulateAmount", () => {
     expect(accumulateAmount(0, -1)).toBe(0);
   });
 
-  it("exposes the +1/+5/+10/+20 chip steps", () => {
-    expect(ACCUMULATOR_CHIPS).toEqual([1, 5, 10, 20]);
+  it("exposes the +5/+10/+20 chip steps", () => {
+    expect(ACCUMULATOR_CHIPS).toEqual([5, 10, 20]);
   });
 });
 
@@ -60,28 +60,28 @@ describe("deriveHpApply", () => {
 describe("projectHp", () => {
   const hp = { current: 20, max: 40, temp: 0 };
 
-  it("damage: subtracts from current and shows current / max", () => {
-    expect(projectHp("damage", 3, hp)).toBe("3 HP → 17 / 40");
+  it("damage: subtracts from current and shows current / max, no amount prefix", () => {
+    expect(projectHp("damage", 3, hp)).toBe("→ 17 / 40");
   });
 
   it("damage: floors at 0 for lethal amounts", () => {
-    expect(projectHp("damage", 100, hp)).toBe("100 HP → 0 / 40");
+    expect(projectHp("damage", 100, hp)).toBe("→ 0 / 40");
   });
 
   it("damage: temp HP absorbs first", () => {
-    expect(projectHp("damage", 15, { current: 20, max: 40, temp: 10 })).toBe("15 HP → 15 / 40");
+    expect(projectHp("damage", 15, { current: 20, max: 40, temp: 10 })).toBe("→ 15 / 40");
   });
 
   it("heal: caps at max HP", () => {
-    expect(projectHp("heal", 34, hp)).toBe("34 → 40 / 40");
+    expect(projectHp("heal", 34, hp)).toBe("→ 40 / 40");
   });
 
   it("heal: below max adds normally", () => {
-    expect(projectHp("heal", 10, { current: 6, max: 40, temp: 0 })).toBe("10 → 16 / 40");
+    expect(projectHp("heal", 10, { current: 6, max: 40, temp: 0 })).toBe("→ 16 / 40");
   });
 
   it("temp: replaces when higher, keeps when lower (no stacking)", () => {
-    expect(projectHp("temp", 12, hp)).toBe("Temp 0 → 12");
-    expect(projectHp("temp", 5, { current: 20, max: 40, temp: 8 })).toBe("Temp 8 → 8");
+    expect(projectHp("temp", 12, hp)).toBe("Temp → 12");
+    expect(projectHp("temp", 5, { current: 20, max: 40, temp: 8 })).toBe("Temp → 8");
   });
 });
