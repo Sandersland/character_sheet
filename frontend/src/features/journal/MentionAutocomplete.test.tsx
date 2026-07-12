@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -248,6 +248,78 @@ describe("MentionAutocomplete combobox ARIA (#273)", () => {
     expect(editor).toHaveAttribute("aria-activedescendant", ids[1]);
     await user.keyboard("{ArrowUp}");
     expect(editor).toHaveAttribute("aria-activedescendant", ids[0]);
+  });
+});
+
+describe("MentionAutocomplete per-breakpoint suggestions (#785)", () => {
+  const realMatchMedia = window.matchMedia;
+  afterEach(() => {
+    window.matchMedia = realMatchMedia;
+  });
+
+  function setViewport(matchesMinMd: boolean) {
+    window.matchMedia = ((query: string) =>
+      ({
+        matches: query.includes("min-width: 768px") ? matchesMinMd : false,
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList) as typeof window.matchMedia;
+  }
+
+  it("renders an in-flow, height-capped list below md (not an absolute popover)", async () => {
+    setViewport(false);
+    const user = userEvent.setup({ delay: null });
+    render(<Harness campaignId="camp-1" />);
+    await user.type(screen.getByLabelText("Note body"), "@gob");
+
+    const listbox = await screen.findByRole("listbox");
+    expect(listbox.className).not.toContain("absolute");
+    expect(listbox.className).not.toContain("top-full");
+    expect(listbox.className).toContain("overflow-y-auto");
+    expect(listbox.style.maxHeight).not.toBe("");
+  });
+
+  it("keeps the absolute top-full popover at md+", async () => {
+    setViewport(true);
+    const user = userEvent.setup({ delay: null });
+    render(<Harness campaignId="camp-1" />);
+    await user.type(screen.getByLabelText("Note body"), "@gob");
+
+    const listbox = await screen.findByRole("listbox");
+    expect(listbox.className).toContain("absolute");
+    expect(listbox.className).toContain("top-full");
+    expect(listbox.style.maxHeight).toBe("");
+  });
+
+  it("keeps the create row reachable as the last option in the in-flow list", async () => {
+    setViewport(false);
+    const user = userEvent.setup({ delay: null });
+    render(<Harness campaignId="camp-1" />);
+    await user.type(screen.getByLabelText("Note body"), "@gob");
+
+    await screen.findByRole("option", { name: /Goblin Chief/ });
+    const options = screen.getAllByRole("option");
+    expect(options[options.length - 1]).toHaveAccessibleName(/Create NPC/);
+  });
+
+  it("scrolls the active option into view while arrowing", async () => {
+    setViewport(false);
+    const spy = vi.spyOn(Element.prototype, "scrollIntoView");
+    const user = userEvent.setup({ delay: null });
+    render(<Harness campaignId="camp-1" />);
+    const editor = screen.getByLabelText("Note body");
+    await user.type(editor, "@");
+    await screen.findByRole("listbox");
+
+    spy.mockClear();
+    await user.keyboard("{ArrowDown}");
+    expect(spy).toHaveBeenCalledWith({ block: "nearest" });
+    spy.mockRestore();
   });
 });
 

@@ -11,6 +11,11 @@ afterEach(() => cleanup());
 // `expect(await axe(container)).toHaveNoViolations()`. Imported via @/test/axe.
 expect.extend(toHaveNoViolations);
 
+// jsdom lacks scrollIntoView; stub it so keyboard-nav scroll-into-view is a no-op.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}
+
 // jsdom lacks PointerEvent; polyfill a minimal one over MouseEvent so gesture
 // tests dispatch real pointer events carrying pointerId.
 if (typeof globalThis.PointerEvent === "undefined") {
