@@ -352,7 +352,7 @@ describe("buildOffHandEntry (#732)", () => {
 
   it("shows the full modifier for a legacy weapon whose damage lacks abilityModifier", () => {
     // Pre-#732 serialization: damage present but no ability-mod component.
-    const legacyDamage = { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "piercing", grip: "one-handed" };
+    const legacyDamage = { damageDiceCount: 1, damageDiceFaces: 6, damageModifier: 3, damageType: "piercing", grip: "one-handed" as const };
     const character = makeCharacter({
       inventory: [
         { ...weaponItem({ light: true, damage: legacyDamage }, "A", "a"), equippedSlot: "MAIN_HAND" as const },
