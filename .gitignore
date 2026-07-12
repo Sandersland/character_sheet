@@ -24,3 +24,4 @@ driver.mjs
 backend/package-lock.json
 frontend/package-lock.json
 .fallow/
+lefthook-local.yml
