@@ -5,8 +5,10 @@
 import Segmented from "@/components/ui/Segmented";
 import { GiCrossedSwords } from "@/components/ui/icons";
 import AttackResultLine from "@/features/session/AttackResultLine";
+import ManeuverPrompt from "@/features/session/ManeuverPrompt";
 import type { AttackEntryView } from "@/features/session/useAttackRolls";
 import type { AttackEntry } from "@/lib/attackMath";
+import type { Character } from "@/types/character";
 
 interface AttackFormCardProps {
   forms: AttackEntry[];
@@ -17,6 +19,10 @@ interface AttackFormCardProps {
   attacksExhausted: boolean;
   /** Rolls to hit with the selected form and binds the Damage card to it. */
   onRollToHit: () => void;
+  /** Gates the Precision Attack prompt (Battle Master with dice left). */
+  showManeuvers: boolean;
+  character: Character;
+  onUpdate: (c: Character) => void;
 }
 
 export default function AttackFormCard({
@@ -26,6 +32,9 @@ export default function AttackFormCard({
   view,
   attacksExhausted,
   onRollToHit,
+  showManeuvers,
+  character,
+  onUpdate,
 }: AttackFormCardProps) {
   const { entry, attackTotal, lastAttackRoll } = view;
   const options = forms.map((f) => ({ value: f.id, label: f.name }));
@@ -73,6 +82,19 @@ export default function AttackFormCard({
       </div>
       {lastAttackRoll && (
         <AttackResultLine result={lastAttackRoll} kind="attack" overrideTotal={attackTotal} />
+      )}
+      {showManeuvers && (
+        // Keyed on the selected form so switching forms remounts the prompt and
+        // resets its spend state (#756).
+        <ManeuverPrompt
+          key={entry.id}
+          section="attack"
+          character={character}
+          lastAttackRoll={lastAttackRoll}
+          lastDamageRoll={view.lastDamageRoll}
+          onRollsUpdated={view.onRollsUpdated}
+          onUpdate={onUpdate}
+        />
       )}
     </div>
   );

@@ -1,16 +1,16 @@
 /**
- * ManeuverPrompt — inline Battle Master maneuver die spend, rendered inside
- * each weapon row of InlineAttackPicker.
+ * ManeuverPrompt — inline Battle Master maneuver die spend, hosted per card of
+ * the attack sheet (#809). `section` selects which half renders:
+ *   - "attack" → Precision Attack, mounted under AttackFormCard once a to-hit
+ *      roll exists for the selected form.
+ *   - "damage" → damage-roll maneuvers (Trip/Menacing…), mounted under
+ *      WeaponDamageCard once a damage roll exists.
  *
- * Only shows maneuvers whose placement is "attackRoll" or "damageRoll" (i.e.
- * those that genuinely augment *this* weapon's attack or damage roll). Maneuvers
- * routed to "attackOption" (Commander's Strike), "reaction" (Parry/Riposte), or
- * "effect" (Evasive Footwork) are handled at the TurnHub / InlineAttackPicker
- * level and do NOT appear here.
- *
- * Two sections:
- *   1. Add to Attack (Precision Attack) — shown after an attack roll is made.
- *   2. Add to Damage — shown after a damage roll; lists applicable maneuvers.
+ * Both mounts share the pure `planManeuverPrompt` split; each renders only its
+ * own section so a maneuver never appears on both cards. Maneuvers routed to
+ * "attackOption" (Commander's Strike), "reaction" (Parry/Riposte), or "effect"
+ * (Evasive Footwork) are handled at the TurnHub / InlineAttackPicker level and
+ * do NOT appear here.
  *
  * Styling: compact gold-tinted strip — gold = resources in the design system.
  */
@@ -24,6 +24,8 @@ import type { RollResult } from "@/lib/dice";
 
 interface ManeuverPromptProps {
   character: Character;
+  /** Which half to render: attack-roll (Precision) or damage-roll maneuvers. */
+  section: "attack" | "damage";
   /** The last attack roll result for this weapon row (null = not yet rolled). */
   lastAttackRoll: RollResult | null;
   /** The last damage roll result for this weapon row (null = not yet rolled). */
@@ -38,6 +40,7 @@ interface ManeuverPromptProps {
 
 export default function ManeuverPrompt({
   character,
+  section,
   lastAttackRoll,
   lastDamageRoll,
   onRollsUpdated,
@@ -60,13 +63,13 @@ export default function ManeuverPrompt({
   }
 
   const plan = planManeuverPrompt(maneuversKnown, lastAttackRoll !== null, lastDamageRoll !== null);
-  if (!plan.visible) {
+  const show = section === "attack" ? plan.showAttackSection : plan.showDamageSection;
+  if (!show) {
     return null;
   }
-  const { attackRollManeuvers, damageRollManeuvers, showAttackSection, showDamageSection } = plan;
 
   // Resolved current damage maneuver selection — fall back to first if state is stale.
-  const activeDamageManeuver = resolveDamageSelection(damageRollManeuvers, selectedDamageManeuver);
+  const activeDamageManeuver = resolveDamageSelection(plan.damageRollManeuvers, selectedDamageManeuver);
 
   // ── Spend handlers ────────────────────────────────────────────────────────
 
@@ -90,22 +93,19 @@ export default function ManeuverPrompt({
         Superiority Die ({dieLabel}, {pool.remaining} left)
       </p>
 
-      {showAttackSection && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gold-800">Add to Attack:</span>
-          {attackRollManeuvers.map((m) => (
-            <SpendButton key={m.id} disabled={busy || spentFor === m.name} onClick={() => handlePrecision(m)}>
-              {m.name} +{dieLabel}
-            </SpendButton>
-          ))}
-        </div>
-      )}
-
-      {showDamageSection && (
+      {section === "attack" ? (
+        <AttackManeuverSection
+          maneuvers={plan.attackRollManeuvers}
+          dieLabel={dieLabel}
+          busy={busy}
+          spentFor={spentFor}
+          onSpend={handlePrecision}
+        />
+      ) : (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-gold-800">Add to Damage:</span>
           <DamageManeuverPicker
-            maneuvers={damageRollManeuvers}
+            maneuvers={plan.damageRollManeuvers}
             dieLabel={dieLabel}
             busy={busy}
             spentFor={spentFor}
@@ -115,6 +115,32 @@ export default function ManeuverPrompt({
           />
         </div>
       )}
+    </div>
+  );
+}
+
+/** Precision Attack (and any attackRoll maneuver): one direct spend button each. */
+function AttackManeuverSection({
+  maneuvers,
+  dieLabel,
+  busy,
+  spentFor,
+  onSpend,
+}: {
+  maneuvers: ManeuverEntry[];
+  dieLabel: string;
+  busy: boolean;
+  spentFor: string | null;
+  onSpend: (m: ManeuverEntry) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-gold-800">Add to Attack:</span>
+      {maneuvers.map((m) => (
+        <SpendButton key={m.id} disabled={busy || spentFor === m.name} onClick={() => onSpend(m)}>
+          {m.name} +{dieLabel}
+        </SpendButton>
+      ))}
     </div>
   );
 }

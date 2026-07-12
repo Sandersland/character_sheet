@@ -50,6 +50,7 @@ export default function InlineOffHandPicker({
     logRollSafe,
     recordAttack: () => turnState.recordTwfAttack(),
     setTallyDamage: () => {},
+    setTallyAttackTotal: () => {},
     addTallyDamageRider: () => {},
   });
 

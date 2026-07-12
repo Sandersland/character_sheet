@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { useEffect } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import InlineAttackPicker from "@/features/session/InlineAttackPicker";
 import { RollProvider } from "@/features/dice/RollContext";
+import { useTurnState } from "@/features/session/useTurnState";
 import { logRoll, castManeuverTransaction } from "@/api/client";
 import type { Character } from "@/types/character";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
@@ -29,6 +31,7 @@ const turnState = {
   attackTally: [],
   recordAttack: vi.fn(),
   setTallyDamage: vi.fn(),
+  setTallyAttackTotal: vi.fn(),
   addTallyDamageRider: vi.fn(),
   cycleTallyVerdict: vi.fn(),
   consumeBonusAction: vi.fn(),
@@ -612,5 +615,85 @@ describe("InlineAttackPicker — persistent inline roll result (#745)", () => {
     // Flame Tongue base damage is 1d8 slashing.
     expect(screen.getByText("d8")).toBeInTheDocument();
     expect(screen.getByText("slashing")).toBeInTheDocument();
+  });
+});
+
+// #809 — the Precision Attack affordance is hosted under the ATTACK card, and a
+// spend after a to-hit roll boosts the on-card result line AND the #802 tally row
+// (via a real useTurnState — the tally lives there). SERVER_ROLL adds 5.
+describe("InlineAttackPicker — Precision Attack under the attack card (#809)", () => {
+  const SERVER_ROLL = 5;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    window.localStorage.clear();
+  });
+
+  function battleMaster(): Character {
+    return makeCharacter({
+      inventory: [
+        equippedWeapon("Longsword", "inv-1", {
+          weapon: { damageDiceCount: 1, damageDiceFaces: 8, damageModifier: 0, damageType: "slashing", attackBonus: 5 },
+        }),
+      ] as unknown as Character["inventory"],
+      resources: {
+        pools: [
+          { key: "superiorityDice", label: "Superiority Dice", die: "d8", total: 4, recharge: "shortRest", used: 0, remaining: 4 },
+        ],
+        maneuversKnown: [
+          { id: "m-precision", name: "Precision Attack", description: "Add to the attack roll.", placement: "attackRoll" },
+        ],
+      },
+    } as unknown as Character);
+  }
+
+  // Drives a live useTurnState into an in-progress Attack action so the tally is real.
+  function Harness({ character }: { character: Character }) {
+    const turnState = useTurnState(character, "sess-precision");
+    useEffect(() => {
+      turnState.startCombat();
+      turnState.startTurn();
+      turnState.enterAttackMode();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    return (
+      <RollProvider>
+        <InlineAttackPicker
+          character={character}
+          turnState={turnState}
+          sessionId="sess-precision"
+          onClose={vi.fn()}
+          onCancel={vi.fn()}
+          onUpdate={vi.fn()}
+          onLogChanged={vi.fn()}
+        />
+      </RollProvider>
+    );
+  }
+
+  it("spending Precision after a to-hit boosts the result line and the tally row", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(Math, "random").mockReturnValue(0.5); // d20 face 11 → non-crit, non-miss
+    vi.mocked(castManeuverTransaction).mockResolvedValue({
+      character: battleMaster(),
+      results: [{ roll: SERVER_ROLL, saveDc: 15, summary: "used Precision Attack" }],
+    } as unknown as Awaited<ReturnType<typeof castManeuverTransaction>>);
+
+    render(<Harness character={battleMaster()} />);
+
+    // 11 (d20) + 5 (attackBonus) = 16 to hit. The tally row and result line agree.
+    await user.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    expect(screen.getAllByText("16").length).toBeGreaterThanOrEqual(1);
+
+    // The Precision affordance appears (hosted on the attack card) — no damage roll yet.
+    expect(screen.getByText("Add to Attack:")).toBeInTheDocument();
+    expect(screen.queryByText("Add to Damage:")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Precision Attack/ }));
+
+    // 16 + 5 (superiority die) = 21 everywhere; the old 16 is gone.
+    await waitFor(() => expect(screen.getAllByText("21").length).toBeGreaterThanOrEqual(2));
+    expect(screen.queryByText("16")).not.toBeInTheDocument();
+    expect(screen.getByText("(+maneuver)")).toBeInTheDocument();
   });
 });

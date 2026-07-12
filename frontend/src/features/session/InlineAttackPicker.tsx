@@ -89,6 +89,7 @@ export default function InlineAttackPicker({
     logRollSafe,
     recordAttack: turnState.recordAttack,
     setTallyDamage: turnState.setTallyDamage,
+    setTallyAttackTotal: turnState.setTallyAttackTotal,
     addTallyDamageRider: turnState.addTallyDamageRider,
   });
 
@@ -125,6 +126,9 @@ export default function InlineAttackPicker({
         view={viewFor(selectedEntry)}
         attacksExhausted={view.attacksExhausted}
         onRollToHit={handleRollToHit}
+        showManeuvers={view.showManeuvers}
+        character={character}
+        onUpdate={onUpdate}
       />
 
       {/* Keyed on the last-rolled form so switching forms remounts the card and

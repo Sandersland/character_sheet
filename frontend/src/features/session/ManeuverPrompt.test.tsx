@@ -46,6 +46,7 @@ describe("ManeuverPrompt — die folds into the total", () => {
     render(
       <ManeuverPrompt
         character={makeCharacter()}
+        section="attack"
         lastAttackRoll={roll(14)}
         lastDamageRoll={null}
         onRollsUpdated={onRollsUpdated}
@@ -70,6 +71,7 @@ describe("ManeuverPrompt — die folds into the total", () => {
     render(
       <ManeuverPrompt
         character={makeCharacter()}
+        section="damage"
         lastAttackRoll={null}
         lastDamageRoll={roll(9)}
         onRollsUpdated={onRollsUpdated}
@@ -88,7 +90,70 @@ describe("ManeuverPrompt — die folds into the total", () => {
     const { container } = render(
       <ManeuverPrompt
         character={makeCharacter()}
+        section="attack"
         lastAttackRoll={null}
+        lastDamageRoll={null}
+        onRollsUpdated={vi.fn()}
+        onUpdate={vi.fn()}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
+// #809 — each mount renders ONLY its own section, so a maneuver never appears on
+// both cards. The attack card hosts section="attack" (Precision), the damage card
+// hosts section="damage".
+describe("ManeuverPrompt — per-card section hosting (#809)", () => {
+  function renderSection(section: "attack" | "damage") {
+    return render(
+      <ManeuverPrompt
+        character={makeCharacter()}
+        section={section}
+        lastAttackRoll={roll(14)}
+        lastDamageRoll={roll(9)}
+        onRollsUpdated={vi.fn()}
+        onUpdate={vi.fn()}
+      />,
+    );
+  }
+
+  it("section=attack shows only the attack half (Precision), never the damage half", () => {
+    renderSection("attack");
+    expect(screen.getByText("Add to Attack:")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Precision Attack/ })).toBeInTheDocument();
+    expect(screen.queryByText("Add to Damage:")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Trip Attack/ })).not.toBeInTheDocument();
+  });
+
+  it("section=damage shows only the damage half, never the attack half", () => {
+    renderSection("damage");
+    expect(screen.getByText("Add to Damage:")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Trip Attack/ })).toBeInTheDocument();
+    expect(screen.queryByText("Add to Attack:")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Precision Attack/ })).not.toBeInTheDocument();
+  });
+
+  it("section=attack stays empty when only a damage roll exists (no to-hit yet)", () => {
+    const { container } = render(
+      <ManeuverPrompt
+        character={makeCharacter()}
+        section="attack"
+        lastAttackRoll={null}
+        lastDamageRoll={roll(9)}
+        onRollsUpdated={vi.fn()}
+        onUpdate={vi.fn()}
+      />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("section=damage stays empty when only an attack roll exists (no damage yet)", () => {
+    const { container } = render(
+      <ManeuverPrompt
+        character={makeCharacter()}
+        section="damage"
+        lastAttackRoll={roll(14)}
         lastDamageRoll={null}
         onRollsUpdated={vi.fn()}
         onUpdate={vi.fn()}
@@ -116,11 +181,17 @@ describe("ManeuverPrompt — placement filtering and damage selection (#689)", (
     } as unknown as Character;
   }
 
-  function renderPrompt(character: Character, attack: number | null, damage: number | null) {
+  function renderPrompt(
+    character: Character,
+    section: "attack" | "damage",
+    attack: number | null,
+    damage: number | null,
+  ) {
     const onRollsUpdated = vi.fn();
     const { container } = render(
       <ManeuverPrompt
         character={character}
+        section={section}
         lastAttackRoll={attack === null ? null : roll(attack)}
         lastDamageRoll={damage === null ? null : roll(damage)}
         onRollsUpdated={onRollsUpdated}
@@ -137,6 +208,7 @@ describe("ManeuverPrompt — placement filtering and damage selection (#689)", (
         { id: "m-parry", name: "Parry", description: "", placement: "reaction" },
         { id: "m-foot", name: "Evasive Footwork", description: "", placement: "effect" },
       ]),
+      "damage",
       14,
       9,
     );
@@ -144,24 +216,26 @@ describe("ManeuverPrompt — placement filtering and damage selection (#689)", (
   });
 
   it("a legacy maneuver without placement defaults to the damage section", () => {
-    renderPrompt(characterWith([{ id: "m-legacy", name: "Old Trip", description: "" }]), null, 9);
+    renderPrompt(characterWith([{ id: "m-legacy", name: "Old Trip", description: "" }]), "damage", null, 9);
     expect(screen.getByText("Add to Damage:")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Old Trip/ })).toBeInTheDocument();
   });
 
-  it("hides the attack section when only damage maneuvers apply (and vice versa)", () => {
+  it("hides the attack section when only damage maneuvers apply", () => {
     const { container } = renderPrompt(
       characterWith([{ id: "m-trip", name: "Trip Attack", description: "", placement: "damageRoll" }]),
+      "attack",
       14,
       null,
     );
-    // Attack was rolled but no attackRoll maneuvers; damage not rolled → nothing.
+    // Attack was rolled but no attackRoll maneuvers → the attack card stays empty.
     expect(container).toBeEmptyDOMElement();
   });
 
   it("renders nothing when the pool is exhausted", () => {
     const { container } = renderPrompt(
       characterWith([{ id: "m-trip", name: "Trip Attack", description: "", placement: "damageRoll" }], 0),
+      "damage",
       14,
       9,
     );
@@ -175,6 +249,7 @@ describe("ManeuverPrompt — placement filtering and damage selection (#689)", (
         { id: "m-trip", name: "Trip Attack", description: "", placement: "damageRoll" },
         { id: "m-menace", name: "Menacing Attack", description: "", placement: "damageRoll" },
       ]),
+      "damage",
       null,
       9,
     );
@@ -197,6 +272,7 @@ describe("ManeuverPrompt — placement filtering and damage selection (#689)", (
         { id: "m-trip", name: "Trip Attack", description: "", placement: "damageRoll" },
         { id: "m-menace", name: "Menacing Attack", description: "", placement: "damageRoll" },
       ]),
+      "damage",
       null,
       9,
     );
@@ -215,6 +291,7 @@ describe("ManeuverPrompt — placement filtering and damage selection (#689)", (
     const user = userEvent.setup();
     renderPrompt(
       characterWith([{ id: "m-trip", name: "Trip Attack", description: "", placement: "damageRoll" }]),
+      "damage",
       null,
       9,
     );

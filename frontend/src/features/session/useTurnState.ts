@@ -145,6 +145,12 @@ export interface TurnStateActions {
   recordAttack: (recorded?: RecordedAttack) => void;
   /** Write/replace the damage slot on the most-recent tally row (#802). */
   setTallyDamage: (damage: number) => void;
+  /**
+   * Override the to-hit total on the most-recent tally row after a Precision
+   * Attack die is added (#809). Touches only `attack.total` — the kept-d20 face
+   * and nat-20/nat-1 flags (which decide crit/miss) stay put.
+   */
+  setTallyAttackTotal: (total: number) => void;
   /** Fold an on-hit rider's total into the most-recent tally row's damage slot. */
   addTallyDamageRider: (amount: number) => void;
   /** Tap-cycle a manual row's verdict unset→Hit→Miss (auto rows are locked). */
@@ -323,6 +329,17 @@ function setTallyDamageState(s: TurnState, damage: number): TurnState {
   const attackTally = s.attackTally.slice();
   const i = attackTally.length - 1;
   attackTally[i] = { ...attackTally[i], damage };
+  return { ...s, attackTally };
+}
+
+// Override the to-hit total on the current row after a superiority die is added
+// (#809). Only `attack.total` changes — keptFace + nat flags stay so the verdict
+// (crit/miss) reads the die face, never the boosted total.
+function setTallyAttackTotalState(s: TurnState, total: number): TurnState {
+  if (s.attackTally.length === 0) return s;
+  const attackTally = s.attackTally.slice();
+  const i = attackTally.length - 1;
+  attackTally[i] = { ...attackTally[i], attack: { ...attackTally[i].attack, total } };
   return { ...s, attackTally };
 }
 
@@ -548,6 +565,10 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     setState((s) => setTallyDamageState(s, damage));
   }, []);
 
+  const setTallyAttackTotal = useCallback((total: number) => {
+    setState((s) => setTallyAttackTotalState(s, total));
+  }, []);
+
   const addTallyDamageRider = useCallback((amount: number) => {
     setState((s) => addTallyDamageRiderState(s, amount));
   }, []);
@@ -648,6 +669,7 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     enterAttackMode,
     recordAttack,
     setTallyDamage,
+    setTallyAttackTotal,
     addTallyDamageRider,
     cycleTallyVerdict,
     clearAttackTally,

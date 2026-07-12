@@ -66,13 +66,25 @@ export default function AttackRow({
         onDamageRider={view.onDamageRider}
       />
       {showManeuvers && (
-        <ManeuverPrompt
-          character={character}
-          lastAttackRoll={lastAttackRoll}
-          lastDamageRoll={lastDamageRoll}
-          onRollsUpdated={view.onRollsUpdated}
-          onUpdate={onUpdate}
-        />
+        // A single combined row (off-hand TWF) hosts both maneuver halves (#809).
+        <>
+          <ManeuverPrompt
+            section="attack"
+            character={character}
+            lastAttackRoll={lastAttackRoll}
+            lastDamageRoll={lastDamageRoll}
+            onRollsUpdated={view.onRollsUpdated}
+            onUpdate={onUpdate}
+          />
+          <ManeuverPrompt
+            section="damage"
+            character={character}
+            lastAttackRoll={lastAttackRoll}
+            lastDamageRoll={lastDamageRoll}
+            onRollsUpdated={view.onRollsUpdated}
+            onUpdate={onUpdate}
+          />
+        </>
       )}
     </div>
   );

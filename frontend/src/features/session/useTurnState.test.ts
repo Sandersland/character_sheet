@@ -409,6 +409,37 @@ describe("attack tally", () => {
     expect(result.current.attackTally.map((r) => r.damage)).toEqual([5, 8]);
   });
 
+  it("setTallyAttackTotal overrides the last row's to-hit total, preserving nat flags + verdict", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded({ total: 14, keptFace: 12 })); });
+    act(() => { result.current.setTallyAttackTotal(19); }); // +5 superiority die
+    expect(result.current.attackTally[0].attack.total).toBe(19);
+    // The kept-d20 face + nat flags decide the verdict — they must not move.
+    expect(result.current.attackTally[0].attack.keptFace).toBe(12);
+    expect(result.current.attackTally[0].attack.nat20).toBe(false);
+    expect(result.current.attackTally[0].attack.nat1).toBe(false);
+  });
+
+  it("setTallyAttackTotal does not convert a nat-1 miss (verdict reads the face, not the total)", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded({ total: 1, keptFace: 1, nat1: true })); });
+    expect(result.current.attackTally[0].verdict).toBe("miss");
+    act(() => { result.current.setTallyAttackTotal(6); }); // die added to a nat-1
+    expect(result.current.attackTally[0].attack.total).toBe(6);
+    expect(result.current.attackTally[0].attack.nat1).toBe(true);
+    expect(result.current.attackTally[0].verdict).toBe("miss"); // still a miss
+  });
+
+  it("setTallyAttackTotal targets the CURRENT (last) row and no-ops on an empty tally", () => {
+    const { result } = inAttack();
+    act(() => { result.current.setTallyAttackTotal(19); }); // empty → no-op
+    expect(result.current.attackTally).toHaveLength(0);
+    act(() => { result.current.recordAttack(recorded({ formId: "a", total: 10 })); });
+    act(() => { result.current.recordAttack(recorded({ formId: "b", total: 12 })); });
+    act(() => { result.current.setTallyAttackTotal(17); });
+    expect(result.current.attackTally.map((r) => r.attack.total)).toEqual([10, 17]);
+  });
+
   it("addTallyDamageRider folds into the current row's slot", () => {
     const { result } = inAttack();
     act(() => { result.current.recordAttack(recorded()); });
