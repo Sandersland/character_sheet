@@ -42,7 +42,7 @@ export default function CharacterSheetPage() {
       characterId={character.id}
       sessionId={session.inActiveSession ? session.activeSessionId : null}
     >
-      <div className="min-h-screen bg-parchment-100">
+      <div className="min-h-screen bg-parchment-100 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
         <CharacterSheetHeader
           character={character}
           session={session}
