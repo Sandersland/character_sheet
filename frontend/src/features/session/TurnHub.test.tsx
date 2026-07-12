@@ -246,6 +246,114 @@ describe("TurnHub — action economy", () => {
   });
 });
 
+describe("TurnHub — More-actions disclosure", () => {
+  it("keeps the long tail collapsed until expanded, then a tile consumes the slot", async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: /Use Action/ }));
+
+    // Collapsed: the tail actions are not rendered yet.
+    expect(screen.queryByRole("button", { name: "Hide" })).not.toBeInTheDocument();
+    const disclosure = screen.getByRole("button", { name: /More actions/ });
+    expect(disclosure).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(disclosure);
+    expect(screen.getByRole("button", { name: /More actions/ })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Hide" }));
+
+    // Universal action: slot consumed locally, no server call.
+    expect(applyActionTransactions).not.toHaveBeenCalled();
+    expect(screen.getByText("used")).toBeInTheDocument();
+  });
+
+  it("renders Grapple and Shove as separate tiles", async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: /Use Action/ }));
+    await user.click(screen.getByRole("button", { name: /More actions/ }));
+
+    expect(screen.getByRole("button", { name: "Grapple" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Shove" })).toBeInTheDocument();
+  });
+});
+
+describe("TurnHub — bonus-spell cards", () => {
+  function caster(): Character {
+    return makeCharacter({
+      class: "Cleric",
+      availableActions: [],
+      abilityScores: {
+        strength: 10, dexterity: 10, constitution: 10,
+        intelligence: 10, wisdom: 16, charisma: 10,
+      },
+      spellcasting: {
+        ability: "wisdom",
+        spellSaveDC: 13,
+        spellAttackBonus: 5,
+        slots: [
+          { level: 1, total: 3, used: 0 },
+          { level: 2, total: 2, used: 0 },
+        ],
+        arcana: [],
+        spells: [
+          {
+            id: "sp-hw", name: "Healing Word", level: 1, school: "evocation", prepared: true,
+            castingTime: "1 bonus action", range: "60 feet", duration: "Instantaneous",
+            description: "", effectKind: "heal", effectDiceCount: 1, effectDiceFaces: 4,
+          },
+          {
+            id: "sp-sw", name: "Spiritual Weapon", level: 2, school: "evocation", prepared: true,
+            castingTime: "1 bonus action", range: "60 feet", duration: "1 minute",
+            description: "",
+          },
+        ],
+      },
+    } as unknown as Partial<Character>);
+  }
+
+  it("lists castable bonus-action spells as cards and pre-selects the tapped spell", async () => {
+    const user = userEvent.setup();
+    renderHub(caster());
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Bonus" }));
+    expect(screen.getByRole("button", { name: "Spiritual Weapon" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Healing Word" }));
+
+    // The cast sheet opens focused on the tapped spell only.
+    expect(screen.getByText("Bonus-Action Spell")).toBeInTheDocument();
+    expect(screen.getByText("Healing Word")).toBeInTheDocument();
+    expect(screen.queryByText("Spiritual Weapon")).not.toBeInTheDocument();
+
+    // The escape hatch reveals the full grouped list.
+    await user.click(screen.getByRole("button", { name: "Show all spells" }));
+    expect(screen.getByText("Spiritual Weapon")).toBeInTheDocument();
+  });
+});
+
+describe("TurnHub — Other reaction catch-all", () => {
+  it("consumes the reaction without a server call", async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: /Use Reaction/ }));
+    await user.click(screen.getByRole("button", { name: "Other reaction" }));
+
+    expect(applyActionTransactions).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Use Reaction" })).not.toBeInTheDocument();
+  });
+});
+
 describe("TurnHub — Battle Master maneuvers", () => {
   it("routes a reaction maneuver by its entry placement and casts via the server", async () => {
     const user = userEvent.setup();

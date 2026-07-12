@@ -52,6 +52,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     bonusAttack,
     twfAvailable,
     consumeBonusAction,
+    consumeReaction,
     history,
     undo,
   } = turnState;
@@ -68,11 +69,12 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     dieLabel, dieBusy, superiorityRemaining, classActions, classBonusActions,
     classReactions, durableReminders, reactionManeuvers, effectManeuvers,
     actionSurgePool, actionSurgeAvailable,
+    actionSheetModel, bonusSheetModel, reactionSheetModel,
   } = turn;
   const {
     handleActionClick, handleAttackAction, handleTwfAction, handleActionSurge,
     handleStartCombat, handleEndCombat, handleStartTurn, handleEndTurn,
-    handleReactionManeuver, handleEffectManeuver,
+    handleReactionManeuver, handleEffectManeuver, handleBonusSpellCast,
   } = turn;
 
   // Decorative initiative rail's "you" marker (#737).
@@ -137,6 +139,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
             showReactionMenu={showReactionMenu}
             setShowReactionMenu={setShowReactionMenu}
             classReactions={classReactions}
+            sheetModel={reactionSheetModel}
             reactionManeuvers={reactionManeuvers}
             superiorityRemaining={superiorityRemaining}
             dieLabel={dieLabel}
@@ -146,6 +149,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
             error={error}
             handleActionClick={handleActionClick}
             handleReactionManeuver={handleReactionManeuver}
+            consumeReaction={consumeReaction}
           />
 
           <button
@@ -219,6 +223,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           showActionMenu={showActionMenu}
           setShowActionMenu={setShowActionMenu}
           classActions={classActions}
+          sheetModel={actionSheetModel}
           busy={busy}
           handleAttackAction={handleAttackAction}
           handleActionClick={handleActionClick}
@@ -232,9 +237,11 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           setShowBonusMenu={setShowBonusMenu}
           twfAvailable={twfAvailable}
           classBonusActions={classBonusActions}
+          sheetModel={bonusSheetModel}
           busy={busy}
           handleTwfAction={handleTwfAction}
           handleActionClick={handleActionClick}
+          handleBonusSpellCast={handleBonusSpellCast}
           consumeBonusAction={consumeBonusAction}
         />
 
@@ -244,6 +251,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           showReactionMenu={showReactionMenu}
           setShowReactionMenu={setShowReactionMenu}
           classReactions={classReactions}
+          sheetModel={reactionSheetModel}
           reactionManeuvers={reactionManeuvers}
           superiorityRemaining={superiorityRemaining}
           dieLabel={dieLabel}
@@ -253,6 +261,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           error={error}
           handleActionClick={handleActionClick}
           handleReactionManeuver={handleReactionManeuver}
+          consumeReaction={consumeReaction}
         />
 
         {/* ── Action Surge (Fighter) ─────────────────────────────────────── */}

@@ -119,3 +119,77 @@ export function filterCastableSpells(spells: Spell[], opts: CastableFilter): Spe
 export function sortSpells(spells: Spell[]): Spell[] {
   return [...spells].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
 }
+
+// ── Level-section grouping (rich cast sheet) ─────────────────────────────────
+
+/** One spell-level section of the cast sheet. Input must already be sorted
+ *  (sortSpells) so sections and rows come out in display order. */
+export interface SpellLevelGroup {
+  level: number;
+  spells: Spell[];
+}
+
+/** Group a sorted spell list into level sections (cantrips = level 0 first). */
+export function groupSpellsByLevel(spells: Spell[]): SpellLevelGroup[] {
+  const groups: SpellLevelGroup[] = [];
+  for (const spell of spells) {
+    const last = groups[groups.length - 1];
+    if (last && last.level === spell.level) last.spells.push(spell);
+    else groups.push({ level: spell.level, spells: [spell] });
+  }
+  return groups;
+}
+
+/**
+ * Spell levels that are entirely hidden from the cast sheet: prepared spells
+ * that match the casting-time filter but were dropped by filterCastableSpells
+ * for lack of an affordable slot. Drives the "Level 2+ hidden" footer so the
+ * existing slot-gating filter is visible instead of silent.
+ */
+export function hiddenSpellLevels(spells: Spell[], opts: CastableFilter): number[] {
+  const levels = new Set<number>();
+  for (const spell of spells) {
+    if (spell.level === 0 || (!spell.prepared && spell.level > 0)) continue;
+    if (
+      opts.castingTimeFilter &&
+      !spell.castingTime?.toLowerCase().startsWith(opts.castingTimeFilter.toLowerCase())
+    ) {
+      continue;
+    }
+    const affordable =
+      opts.slotLevels.some((l) => l >= spell.level) || isArcanumLevel(spell.level, opts.arcanaLevels);
+    if (!affordable) levels.add(spell.level);
+  }
+  return [...levels].sort((a, b) => a - b);
+}
+
+/** Slot pips for a level-section header, or null for cantrips / no such slots. */
+export function slotPipsForLevel(
+  slots: SpellSlots[],
+  level: number,
+): { total: number; used: number } | null {
+  if (level === 0) return null;
+  const slot = slots.find((s) => s.level === level);
+  return slot ? { total: slot.total, used: slot.used } : null;
+}
+
+/** Footer note for hidden levels: "Level 2+ hidden — no slots remaining". */
+export function hiddenLevelsNote(levels: number[]): string | null {
+  if (levels.length === 0) return null;
+  const contiguous = levels.every((l, i) => i === 0 || l === levels[i - 1] + 1);
+  const label = contiguous ? `Level ${levels[0]}+` : `Levels ${levels.join(", ")}`;
+  return `${label} hidden — no slots remaining`;
+}
+
+/** Right-aligned cost badge for a spell row: "free · action", "1 slot · bonus action". */
+export function castCostBadge(spell: Spell): string {
+  const t = (spell.castingTime ?? "").toLowerCase();
+  const costWord = t.startsWith("1 bonus action")
+    ? "bonus action"
+    : t.startsWith("1 reaction")
+      ? "reaction"
+      : t.startsWith("1 action")
+        ? "action"
+        : (spell.castingTime ?? "").toLowerCase();
+  return `${spell.level === 0 ? "free" : "1 slot"} · ${costWord}`;
+}

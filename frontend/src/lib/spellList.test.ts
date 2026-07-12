@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
-import { deriveSpellList, availableSlotsForSpell } from "@/lib/spellList";
+import { deriveSpellList } from "@/lib/spellList";
+import { availableSlotsForSpell } from "@/lib/spellPicker";
 import type { Character, Spell } from "@/types/character";
 
 function spell(over: Partial<Spell> & { id: string; name: string; level: number }): Spell {
