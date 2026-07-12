@@ -118,9 +118,22 @@ function CreateRow({ index, active, creating, createName, createType, activeRef,
   );
 }
 
-export default function MentionSuggestionList({
-  campaignId,
-  listboxId,
+// Keyboard-nav parity: keep the active option in view as the user arrows
+// (both variants — the md+ popover scrolls long match lists too).
+function useActiveOptionScroll(activeIndex: number) {
+  const activeRef = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex]);
+  return activeRef;
+}
+
+type SuggestionOptionsProps = Omit<MentionSuggestionListProps, "listboxId" | "inFlow" | "maxHeight"> & {
+  merges: ReturnType<typeof useCampaignMerges>["merges"];
+  activeRef: Ref<HTMLLIElement>;
+};
+
+function SuggestionOptions({
   matches,
   byId,
   activeIndex,
@@ -132,26 +145,11 @@ export default function MentionSuggestionList({
   onSelect,
   onCreate,
   onHover,
-  inFlow = false,
-  maxHeight,
-}: MentionSuggestionListProps) {
-  const { merges } = useCampaignMerges(campaignId);
-  const activeRef = useRef<HTMLLIElement>(null);
-
-  // Keyboard-nav parity: keep the active option in view as the user arrows
-  // (both variants — the md+ popover scrolls long match lists too).
-  useEffect(() => {
-    activeRef.current?.scrollIntoView({ block: "nearest" });
-  }, [activeIndex]);
-
+  merges,
+  activeRef,
+}: SuggestionOptionsProps) {
   return (
-    <ul
-      id={listboxId}
-      role="listbox"
-      aria-label="Tag suggestions"
-      className={inFlow ? IN_FLOW_CLASS : POPOVER_CLASS}
-      style={inFlow && maxHeight != null ? { maxHeight } : undefined}
-    >
+    <>
       {matches.map((entity, index) => (
         <MatchRow
           key={entity.id}
@@ -178,6 +176,24 @@ export default function MentionSuggestionList({
           onHover={onHover}
         />
       )}
+    </>
+  );
+}
+
+export default function MentionSuggestionList(props: MentionSuggestionListProps) {
+  const { campaignId, listboxId, inFlow = false, maxHeight } = props;
+  const { merges } = useCampaignMerges(campaignId);
+  const activeRef = useActiveOptionScroll(props.activeIndex);
+
+  return (
+    <ul
+      id={listboxId}
+      role="listbox"
+      aria-label="Tag suggestions"
+      className={inFlow ? IN_FLOW_CLASS : POPOVER_CLASS}
+      style={inFlow && maxHeight != null ? { maxHeight } : undefined}
+    >
+      <SuggestionOptions {...props} merges={merges} activeRef={activeRef} />
     </ul>
   );
 }
