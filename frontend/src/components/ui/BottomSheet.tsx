@@ -1,6 +1,7 @@
-import { useId, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDialogChrome } from "@/hooks/useDialogChrome";
+import { useDragToDismiss } from "@/hooks/useDragToDismiss";
 
 interface BottomSheetProps {
   title: string;
@@ -17,11 +18,27 @@ interface BottomSheetProps {
  * corners rounded, grabber handle — thumb-reachable); at `md`+ it presents as a
  * centered dialog (`md:items-center`, all corners rounded, no grabber), matching
  * `Modal`, since a full-width bottom drawer reads as awkward on a desktop screen.
- * Same parchment / `--radius-card` / `--shadow-raised` visual DNA either way.
+ * On mobile the grabber is a real Close button and the sheet drags down to
+ * dismiss (#767); both are inert at `md`+, where the text Close button returns.
  */
 export default function BottomSheet({ title, subtitle, onClose, children }: BottomSheetProps) {
   const panelRef = useDialogChrome(onClose);
   const titleId = useId();
+
+  // Gate the gesture off at md+, matching the pure-CSS breakpoint.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const sync = () => setIsMobile(!mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  const { handleProps, contentProps } = useDragToDismiss(panelRef, {
+    onDismiss: onClose,
+    enabled: isMobile,
+  });
 
   return createPortal(
     <div
@@ -41,13 +58,19 @@ export default function BottomSheet({ title, subtitle, onClose, children }: Bott
         tabIndex={-1}
         className="flex max-h-[85vh] w-full max-w-[36rem] flex-col rounded-t-card border border-b-0 border-parchment-200 bg-parchment-50 shadow-raised md:max-h-[80vh] md:rounded-card md:border-b"
       >
-        <span
-          aria-hidden
-          className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-parchment-300 md:hidden"
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+          {...handleProps}
+          className="mx-auto mt-2 h-1 w-9 shrink-0 touch-none rounded-full bg-parchment-300 md:hidden"
         />
         {/* md:pt-3 restores Modal's header padding on desktop, where the
             grabber (which fills the gap on mobile) is hidden. */}
-        <div className="flex shrink-0 items-start justify-between gap-3 px-4 pb-3 pt-2 md:pt-3">
+        <div
+          {...handleProps}
+          className="flex shrink-0 touch-none items-start justify-between gap-3 px-4 pb-3 pt-2 md:pt-3"
+        >
           <div>
             <h2 id={titleId} className="font-display text-lg font-semibold text-parchment-900">
               {title}
@@ -61,12 +84,15 @@ export default function BottomSheet({ title, subtitle, onClose, children }: Bott
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 pt-1 text-xs font-semibold text-garnet-700 hover:underline"
+            className="hidden shrink-0 pt-1 text-xs font-semibold text-garnet-700 hover:underline md:block"
           >
             Close
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-1">
+        <div
+          {...contentProps}
+          className="flex-1 overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-1"
+        >
           {children}
         </div>
       </div>

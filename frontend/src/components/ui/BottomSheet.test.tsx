@@ -27,15 +27,29 @@ describe("BottomSheet", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("closes when the Close button is clicked", async () => {
+  it("closes when the grabber (accessible name 'Close') is tapped", async () => {
     const onClose = vi.fn();
-    render(
+    const { baseElement } = render(
       <BottomSheet title="Action" onClose={onClose}>
         <p>body</p>
       </BottomSheet>,
     );
-    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    const grabber = baseElement.querySelector('button[aria-label="Close"]') as HTMLElement;
+    expect(grabber.tagName).toBe("BUTTON");
+    await userEvent.click(grabber);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a desktop-only text Close button (hidden below md, shown at md+)", () => {
+    render(
+      <BottomSheet title="Action" onClose={vi.fn()}>
+        <p>body</p>
+      </BottomSheet>,
+    );
+    const textClose = screen.getByText("Close");
+    expect(textClose.tagName).toBe("BUTTON");
+    expect(textClose.className).toContain("hidden");
+    expect(textClose.className).toContain("md:block");
   });
 
   it("closes when the scrim is clicked", async () => {
@@ -56,7 +70,7 @@ describe("BottomSheet", () => {
         <p>body</p>
       </BottomSheet>,
     );
-    const grabber = baseElement.querySelector('span[aria-hidden="true"]');
+    const grabber = baseElement.querySelector('button[aria-label="Close"]');
     expect(grabber).not.toBeNull();
     expect(grabber!.className).toContain("md:hidden");
   });

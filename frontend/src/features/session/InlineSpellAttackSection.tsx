@@ -15,7 +15,7 @@ import { useState } from "react";
 
 import { useRoll } from "@/features/dice/RollContext";
 import { applySpellcastingTransactions } from "@/api/client";
-import { formatRollSpec } from "@/lib/dice";
+import { formatRollSpec, isNaturalTwenty } from "@/lib/dice";
 import { computeCastSpec } from "@/lib/spellCast";
 import { isAttackCantrip } from "@/lib/spellMeta";
 import { useRollLogger } from "@/features/session/useRollLogger";
@@ -73,9 +73,11 @@ export default function InlineSpellAttackSection({
   }
 
   // Roll the cantrip's damage (if any), returning the total to send to the server.
+  // A nat-20 to-hit auto-doubles the damage dice, mirroring the weapon attack sheet.
   function rollDamage(spell: Spell): number {
-    const spec = computeCastSpec(spell, character, 0);
-    if (!spec) return 0;
+    const base = computeCastSpec(spell, character, 0);
+    if (!base) return 0;
+    const spec = isNaturalTwenty(lastAttack[spell.id]) ? { ...base, crit: true } : base;
     const result = roll(spec, `${spell.name} — damage`);
     logRollSafe("damage", spell.name, result, spec, spell.damageType ?? undefined);
     setLastDamage((prev) => ({ ...prev, [spell.id]: result }));
