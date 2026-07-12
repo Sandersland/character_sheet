@@ -416,6 +416,11 @@ export function useTurnState(character: Character, sessionId: string): TurnState
 
   // Refunding a mid-turn loadout swap returns the spent action (#733); the +1 is
   // identical to granting an extra action, so alias it rather than duplicate.
+  // Note: like grantExtraAction it goes through `mutate`, so the +1 is pushed onto
+  // the undo history — a subsequent `undo()` can revert it while the server
+  // inventory stays swapped-back (undo is local-only, per its doc). Acceptable:
+  // only the rare swap→refund→undo sequence diverges, and the loadout Refund is
+  // the intended reversal surface, not undo.
   const refundAction = grantExtraAction;
 
   const commitActionSpell = useCallback((spellLevel: number) => {

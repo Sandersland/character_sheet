@@ -49,9 +49,11 @@ export default function LoadoutSwapRow({ character, turnState, onUpdate }: Loado
               type="button"
               onClick={refund}
               disabled={busy}
+              title={`Refund to ${lastSwap.previousLabel}`}
               className="rounded-control border border-arcane-300 bg-arcane-50 px-2.5 py-1 text-xs font-semibold text-arcane-700 transition-colors hover:bg-arcane-100 disabled:opacity-50"
             >
               <span aria-hidden="true">↩ </span>Refund
+              <span className="sr-only"> to {lastSwap.previousLabel}</span>
             </button>
           )}
           <button
