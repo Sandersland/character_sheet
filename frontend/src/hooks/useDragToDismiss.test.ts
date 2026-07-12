@@ -95,13 +95,20 @@ describe("useDragToDismiss gesture machine", () => {
     el.dispatchEvent(e);
   }
 
+  function fireTransitionEnd(el: HTMLElement, propertyName: string) {
+    const e = new Event("transitionend", { bubbles: true });
+    Object.defineProperty(e, "propertyName", { value: propertyName });
+    el.dispatchEvent(e);
+  }
+
   function render(enabled = true) {
     const onDismiss = vi.fn();
+    const onExitStart = vi.fn();
     const ref = { current: panel } as RefObject<HTMLElement>;
-    const { result } = renderHook(() => useDragToDismiss(ref, { onDismiss, enabled }));
+    const { result } = renderHook(() => useDragToDismiss(ref, { onDismiss, onExitStart, enabled }));
     attach(handle, result.current.handleProps as Handlers);
     attach(content, result.current.contentProps as Handlers);
-    return { onDismiss };
+    return { onDismiss, onExitStart, result };
   }
 
   it("follows the finger via a translateY transform while dragging the handle", () => {
@@ -122,19 +129,26 @@ describe("useDragToDismiss gesture machine", () => {
     expect(panel.style.transition).toContain("transform");
   });
 
-  it("dismisses on a downward flick — velocity feeds the verdict", () => {
+  it("dismisses on a downward flick — velocity feeds the verdict (deferred to exit)", () => {
     const { onDismiss } = render();
     fire(handle, "pointerdown", 0, 0);
     fire(handle, "pointermove", 30, 10); // 30px in 10ms → 3 px/ms ≫ flick threshold
     fire(handle, "pointerup", 30, 12);
+    // The dismiss now animates out first; onDismiss fires on the exit's transitionend.
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(panel.style.transform).toBe("translateY(100%)");
+    fireTransitionEnd(panel, "transform");
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
-  it("dismisses when dragged past ~1/3 the sheet height, even slowly", () => {
+  it("dismisses when dragged past ~1/3 the sheet height, even slowly (deferred to exit)", () => {
     const { onDismiss } = render();
     fire(handle, "pointerdown", 0, 0);
     fire(handle, "pointermove", 250, 1000); // > 200px, slow → distance verdict
     fire(handle, "pointerup", 250, 2000);
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(panel.style.transform).toBe("translateY(100%)");
+    fireTransitionEnd(panel, "transform");
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
@@ -193,6 +207,91 @@ describe("useDragToDismiss gesture machine", () => {
     fire(handle, "pointermove", 50, 1000);
     fire(handle, "pointerup", 50, 2000);
     expect(onDismiss).not.toHaveBeenCalled();
+    expect(panel.style.transform).toBe("");
+    expect(panel.style.transition).toBe("");
+  });
+
+  it("exit: a dismiss-worthy release animates translateY(100%) with the iOS curve and defers onDismiss", () => {
+    const { onDismiss, onExitStart } = render();
+    fire(handle, "pointerdown", 0, 0);
+    fire(handle, "pointermove", 250, 1000);
+    fire(handle, "pointerup", 250, 2000);
+    expect(onExitStart).toHaveBeenCalledTimes(1);
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(panel.style.transform).toBe("translateY(100%)");
+    expect(panel.style.transition).toContain("cubic-bezier(0.32,0.72,0,1)");
+    expect(panel.style.transition).toContain("500ms");
+    expect(panel.style.pointerEvents).toBe("none");
+  });
+
+  it("exit: ignores a transitionend for a non-transform property, fires on transform", () => {
+    const { onDismiss } = render();
+    fire(handle, "pointerdown", 0, 0);
+    fire(handle, "pointermove", 250, 1000);
+    fire(handle, "pointerup", 250, 2000);
+    fireTransitionEnd(panel, "opacity");
+    expect(onDismiss).not.toHaveBeenCalled();
+    fireTransitionEnd(panel, "transform");
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("exit: a setTimeout fallback fires onDismiss when transitionend never arrives", () => {
+    vi.useFakeTimers();
+    try {
+      const { onDismiss } = render();
+      fire(handle, "pointerdown", 0, 0);
+      fire(handle, "pointermove", 250, 1000);
+      fire(handle, "pointerup", 250, 2000);
+      expect(onDismiss).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(600);
+      expect(onDismiss).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("exit: transitionend + fallback both firing dismisses exactly once", () => {
+    vi.useFakeTimers();
+    try {
+      const { onDismiss } = render();
+      fire(handle, "pointerdown", 0, 0);
+      fire(handle, "pointermove", 250, 1000);
+      fire(handle, "pointerup", 250, 2000);
+      fireTransitionEnd(panel, "transform");
+      vi.advanceTimersByTime(600);
+      expect(onDismiss).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("exit: beginExit is exposed for non-drag closes and animates out", () => {
+    const { onDismiss, onExitStart, result } = render();
+    result.current.beginExit();
+    expect(onExitStart).toHaveBeenCalledTimes(1);
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(panel.style.transform).toBe("translateY(100%)");
+    fireTransitionEnd(panel, "transform");
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("exit: pointer input during the exit is inert and never restarts a drag", () => {
+    const { onDismiss, result } = render();
+    result.current.beginExit();
+    fire(handle, "pointerdown", 0, 0);
+    fire(handle, "pointermove", 300, 16);
+    // Still parked at the exit transform — the drag never engaged.
+    expect(panel.style.transform).toBe("translateY(100%)");
+    expect(onDismiss).not.toHaveBeenCalled();
+    fireTransitionEnd(panel, "transform");
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("exit: reduced motion dismisses immediately with no travel animation", () => {
+    stubMatchMedia(true);
+    const { onDismiss, result } = render();
+    result.current.beginExit();
+    expect(onDismiss).toHaveBeenCalledTimes(1);
     expect(panel.style.transform).toBe("");
     expect(panel.style.transition).toBe("");
   });

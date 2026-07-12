@@ -3,6 +3,8 @@ import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type RefObje
 const DISMISS_DISTANCE_RATIO = 1 / 3;
 const FLICK_VELOCITY = 0.5;
 const SPRING_MS = 220;
+const EXIT_MS = 500;
+const EXIT_EASE = "cubic-bezier(0.32,0.72,0,1)";
 
 export interface DragDecisionInput {
   dy: number;
@@ -19,6 +21,7 @@ export function shouldDismissDrag({ dy, sheetHeight, velocity }: DragDecisionInp
 
 interface Options {
   onDismiss: () => void;
+  onExitStart?: () => void;
   enabled?: boolean;
 }
 
@@ -29,10 +32,20 @@ interface Options {
  * for an always-draggable region (grabber/header) and a content region that
  * only engages when scrolled to the top and dragged downward. Honors
  * prefers-reduced-motion by deciding the same verdict without the follow/spring.
+ * A dismiss animates the panel off the bottom edge (iOS-style) and defers
+ * onDismiss to the exit's transitionend; beginExit is returned so non-drag
+ * closes reuse the same slide-out.
  */
-export function useDragToDismiss(panelRef: RefObject<HTMLElement>, { onDismiss, enabled = true }: Options) {
+export function useDragToDismiss(
+  panelRef: RefObject<HTMLElement>,
+  { onDismiss, onExitStart, enabled = true }: Options,
+) {
   const onDismissRef = useRef(onDismiss);
   onDismissRef.current = onDismiss;
+  const onExitStartRef = useRef(onExitStart);
+  onExitStartRef.current = onExitStart;
+
+  const exiting = useRef(false);
 
   const drag = useRef<{
     active: boolean;
@@ -55,23 +68,58 @@ export function useDragToDismiss(panelRef: RefObject<HTMLElement>, { onDismiss, 
     panel.style.transform = `translateY(${Math.max(0, dy)}px)`;
   }
 
-  function settle(dismiss: boolean) {
+  // Slide the panel off the bottom edge, then dismiss on its transitionend
+  // (with a timeout fallback); guarded so onDismiss fires exactly once.
+  function beginExit() {
+    if (exiting.current) return;
+    exiting.current = true;
+    drag.current = null;
+    onExitStartRef.current?.();
+
     const panel = panelRef.current;
-    if (dismiss) {
+    if (!panel || reducedMotion.current) {
       onDismissRef.current();
       return;
     }
+
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      panel.removeEventListener("transitionend", onEnd);
+      onDismissRef.current();
+    };
+    const onEnd = (e: TransitionEvent) => {
+      if (e.propertyName === "transform") finish();
+    };
+
+    panel.style.pointerEvents = "none";
+    panel.style.transition = `transform ${EXIT_MS}ms ${EXIT_EASE}`;
+    panel.style.transform = "translateY(100%)";
+    panel.addEventListener("transitionend", onEnd);
+    const timer = setTimeout(finish, EXIT_MS + 100);
+  }
+
+  function settle(dismiss: boolean) {
+    if (dismiss) {
+      beginExit();
+      return;
+    }
+    const panel = panelRef.current;
     if (!panel || reducedMotion.current) return;
     panel.style.transition = `transform ${SPRING_MS}ms ease-out`;
     panel.style.transform = "translateY(0)";
   }
 
   function begin(e: ReactPointerEvent, y: number) {
+    if (exiting.current) return;
     drag.current = { active: true, armed: false, startY: y, lastY: y, lastT: performance.now(), velocity: 0 };
     e.currentTarget.setPointerCapture?.(e.pointerId);
   }
 
   function onMove(e: ReactPointerEvent) {
+    if (exiting.current) return;
     const d = drag.current;
     if (!d) return;
     const dy = e.clientY - d.startY;
@@ -119,6 +167,7 @@ export function useDragToDismiss(panelRef: RefObject<HTMLElement>, { onDismiss, 
   const contentProps = enabled
     ? {
         onPointerDown: (e: ReactPointerEvent<HTMLElement>) => {
+          if (exiting.current) return;
           if (e.currentTarget.scrollTop > 0) return;
           const y = e.clientY;
           drag.current = { active: false, armed: true, startY: y, lastY: y, lastT: performance.now(), velocity: 0 };
@@ -129,5 +178,5 @@ export function useDragToDismiss(panelRef: RefObject<HTMLElement>, { onDismiss, 
       }
     : {};
 
-  return { handleProps, contentProps };
+  return { handleProps, contentProps, beginExit };
 }

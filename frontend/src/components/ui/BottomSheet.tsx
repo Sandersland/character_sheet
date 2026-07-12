@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDialogChrome } from "@/hooks/useDialogChrome";
 import { useDragToDismiss } from "@/hooks/useDragToDismiss";
@@ -21,27 +21,41 @@ interface BottomSheetProps {
  * `Modal`, since a full-width bottom drawer reads as awkward on a desktop screen.
  * On mobile the grabber is a real Close button and the sheet drags down to
  * dismiss (#767); both are inert at `md`+, where the text Close button returns.
+ * On mobile every close path (grabber/Escape/scrim/drag) slides the sheet off
+ * the bottom edge and fades the scrim in sync before onClose fires (#782); at
+ * `md`+ the centered dialog keeps today's instant close.
  */
 export default function BottomSheet({ title, subtitle, onClose, children }: BottomSheetProps) {
-  const panelRef = useDialogChrome(onClose);
+  // Escape routes through the same close path; indirection keeps useDialogChrome
+  // stable while requestClose is defined below (it needs beginExit first).
+  const closeRef = useRef<() => void>(() => {});
+  const panelRef = useDialogChrome(() => closeRef.current());
   const titleId = useId();
+  const [closing, setClosing] = useState(false);
 
   // Gate the gesture off at md+, matching the pure-CSS breakpoint.
   const isMobile = useIsBelowMd();
 
-  const { handleProps, contentProps } = useDragToDismiss(panelRef, {
+  const { handleProps, contentProps, beginExit } = useDragToDismiss(panelRef, {
     onDismiss: onClose,
+    onExitStart: () => setClosing(true),
     enabled: isMobile,
   });
+
+  function requestClose() {
+    if (isMobile) beginExit();
+    else onClose();
+  }
+  closeRef.current = requestClose;
 
   return createPortal(
     <div
       // Presentational scrim: mouse-down-to-close is a pointer convenience only —
       // closing is keyboard-accessible via the Escape handler above.
       role="presentation"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-backdrop backdrop-blur-sm md:items-center md:p-4"
+      className={`fixed inset-0 z-50 flex items-end justify-center bg-backdrop backdrop-blur-sm transition-opacity duration-500 md:items-center md:p-4 ${closing ? "opacity-0" : ""}`}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) requestClose();
       }}
     >
       <div
@@ -57,7 +71,7 @@ export default function BottomSheet({ title, subtitle, onClose, children }: Bott
         <button
           type="button"
           aria-label="Close"
-          onClick={onClose}
+          onClick={requestClose}
           {...handleProps}
           className="mx-auto mt-2 h-1 w-9 shrink-0 touch-none rounded-full bg-parchment-300 md:hidden md:touch-auto"
         />
@@ -79,7 +93,7 @@ export default function BottomSheet({ title, subtitle, onClose, children }: Bott
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="hidden shrink-0 pt-1 text-xs font-semibold text-garnet-700 hover:underline md:block"
           >
             Close
