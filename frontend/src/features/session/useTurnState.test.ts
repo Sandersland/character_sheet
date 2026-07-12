@@ -12,6 +12,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 
 import { useTurnState } from "@/features/session/useTurnState";
+import type { EconomySnapshot } from "@/features/session/useTurnState";
 import type { Character, InventoryItem } from "@/types/character";
 
 // ── Minimal character fixture ─────────────────────────────────────────────────
@@ -614,6 +615,75 @@ describe("localStorage persistence", () => {
     const second = renderHook(() => useTurnState(makeCharacter(), "different-session"));
     expect(second.result.current.inCombat).toBe(false);
     expect(second.result.current.round).toBe(0);
+  });
+
+  it("backfills history on a stale pre-#730 snapshot without crashing (#750)", () => {
+    // Old-schema entry: mid-combat economy state with no `history` field.
+    const stale = {
+      inCombat: true,
+      round: 2,
+      phase: "active",
+      actionsRemaining: 1,
+      bonusActionUsed: true,
+      reactionUsed: false,
+      attack: null,
+      bonusAttack: null,
+      spellCastThisTurn: {},
+      attackedThisTurn: false,
+      tookDamageThisTurn: false,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stale));
+
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    // Persisted economy survives, and the missing field defaults to [].
+    expect(result.current.inCombat).toBe(true);
+    expect(result.current.round).toBe(2);
+    expect(result.current.bonusActionUsed).toBe(true);
+    expect(result.current.history).toEqual([]);
+    // undo is a safe no-op against the defaulted empty history.
+    act(() => { result.current.undo(); });
+    expect(result.current.bonusActionUsed).toBe(true);
+  });
+
+  it("rehydrates a well-formed current-schema entry unchanged (#750)", () => {
+    const snapshot: EconomySnapshot = {
+      actionsRemaining: 1,
+      bonusActionUsed: false,
+      reactionUsed: false,
+      attack: null,
+      bonusAttack: null,
+      spellCastThisTurn: {},
+    };
+    const current = {
+      inCombat: true,
+      round: 3,
+      phase: "active",
+      actionsRemaining: 0,
+      bonusActionUsed: true,
+      reactionUsed: true,
+      attack: null,
+      bonusAttack: null,
+      spellCastThisTurn: { action: "leveled" as const },
+      attackedThisTurn: true,
+      tookDamageThisTurn: false,
+      history: [snapshot],
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    expect(result.current.round).toBe(3);
+    expect(result.current.reactionUsed).toBe(true);
+    expect(result.current.spellCastThisTurn).toEqual({ action: "leveled" });
+    expect(result.current.history).toEqual([snapshot]);
+  });
+
+  it("falls back to initialState on a corrupted entry (#750)", () => {
+    localStorage.setItem(STORAGE_KEY, "{ not valid json");
+
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    expect(result.current.inCombat).toBe(false);
+    expect(result.current.round).toBe(0);
+    expect(result.current.history).toEqual([]);
   });
 });
 
