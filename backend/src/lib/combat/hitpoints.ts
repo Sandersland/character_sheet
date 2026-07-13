@@ -26,7 +26,7 @@ import {
 import { rollDie } from "@/lib/core/dice.js";
 import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import {
-  cloneResourceLists,
+  snapshotResources,
   normalizeResourcesMutable,
   serializeResourcesState,
   type ResourcesMutableState,
@@ -1119,7 +1119,7 @@ function resetRestResources(
 ): { state: ResourcesMutableState; beforeResourceState: Record<string, unknown>; resourcesRestored: number } {
   const derivedRes = deriveRestPools(row);
   const state = normalizeResourcesMutable(row.resources);
-  const beforeResourceState = { ...cloneResourceLists(state), fightingStyle: state.fightingStyle };
+  const beforeResourceState = snapshotResources(state);
   let resourcesRestored = 0;
   for (const pool of derivedRes?.resources ?? []) {
     if (poolRechargesOn(pool.recharge, rest)) {

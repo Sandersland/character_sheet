@@ -186,19 +186,19 @@ export function serializeResourcesState(state: ResourcesMutableState): Prisma.In
 }
 
 /**
- * Deep-clones the resource lists for audit-event before/after snapshots —
- * unlike serializeResourcesState this copies every entry, so mutating `state`
- * in place after the capture can't retroactively alter the snapshot.
- * fightingStyle (an immutable scalar) is intentionally excluded: domains whose
- * event shape includes it append it themselves; the advancement snapshot
- * (a stored-event compatibility contract) has never carried it.
+ * Canonical deep-clone of the COMPLETE resources audit-snapshot shape — the one
+ * source of truth for every before/after event snapshot, so no field can be
+ * omitted per-site (the undo handlers restore before.resources wholesale, so an
+ * omitted key silently wipes on revert). Copies every entry, so mutating `state`
+ * after capture can't retroactively alter the snapshot.
  */
-export function cloneResourceLists(state: ResourcesMutableState): {
+export function snapshotResources(state: ResourcesMutableState): {
   used: Record<string, number>;
   maneuversKnown: ManeuverEntry[];
   disciplinesKnown: DisciplineEntry[];
   toolProficienciesKnown: ToolProfEntry[];
   advancements: AdvancementEntry[];
+  fightingStyle: FightingStyleKey | null;
 } {
   return {
     used: { ...state.used },
@@ -213,6 +213,7 @@ export function cloneResourceLists(state: ResourcesMutableState): {
       // treated as immutable snapshots.
       improvements: a.improvements ? [...a.improvements] : undefined,
     })),
+    fightingStyle: state.fightingStyle,
   };
 }
 
@@ -696,9 +697,9 @@ function dispatchResourceOp(ctx: ResourceOpContext, op: ResourceOperation): Reso
 // Shared before/after event snapshot shape — used by both the batch handler
 // and applySpendResourceInTx.
 function snapshotResourcesState(state: ResourcesMutableState): {
-  resources: ReturnType<typeof cloneResourceLists> & { fightingStyle: FightingStyleKey | null };
+  resources: ReturnType<typeof snapshotResources>;
 } {
-  return { resources: { ...cloneResourceLists(state), fightingStyle: state.fightingStyle } };
+  return { resources: snapshotResources(state) };
 }
 
 // ── Transaction handler ───────────────────────────────────────────────────────
