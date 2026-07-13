@@ -1,11 +1,13 @@
 import { useMemo, useRef, useState } from "react";
 
+import BottomSheet from "@/components/ui/BottomSheet";
 import EmptyState from "@/components/ui/EmptyState";
-import { GiSpellBook } from "@/components/ui/icons";
+import { GiSpellBook, Plus } from "@/components/ui/icons";
 import CodexLedger from "@/features/entities/CodexLedger";
 import CodexRail from "@/features/entities/CodexRail";
 import EntityCreateForm from "@/features/entities/EntityCreateForm";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
+import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import { groupByInitial, typeCounts, type CodexSort } from "@/lib/codexLedger";
 import { matchEntitiesDetailed } from "@/lib/mentions";
 import type { CampaignRole, EntityType } from "@/types/character";
@@ -25,8 +27,10 @@ export default function CampaignCodex({ campaignId, role, campaignName }: Campai
   const [typeFilter, setTypeFilter] = useState<EntityType | "ALL">("ALL");
   const [sort, setSort] = useState<CodexSort>("alpha");
   const [creating, setCreating] = useState(false);
+  // One ref serves both toggles — the rail button and FAB never coexist.
   const toggleRef = useRef<HTMLButtonElement>(null);
   const isOwner = role === "OWNER";
+  const isMobile = useIsBelowMd();
 
   const matches = useMemo(
     () =>
@@ -64,8 +68,9 @@ export default function CampaignCodex({ campaignId, role, campaignName }: Campai
         creating={creating}
         onToggleCreate={() => (creating ? closeForm() : setCreating(true))}
         toggleRef={toggleRef}
+        showCreateToggle={!isMobile}
       >
-        {creating && (
+        {creating && !isMobile && (
           <EntityCreateForm campaignId={campaignId} isOwner={isOwner} onClose={closeForm} />
         )}
       </CodexRail>
@@ -91,6 +96,25 @@ export default function CampaignCodex({ campaignId, role, campaignName }: Campai
           />
         )}
       </div>
+      {isMobile && (
+        <>
+          <button
+            ref={toggleRef}
+            type="button"
+            aria-expanded={creating}
+            onClick={() => (creating ? closeForm() : setCreating(true))}
+            className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-1.5 rounded-full bg-garnet-700 px-4 py-3 text-sm font-semibold text-parchment-50 shadow-raised transition-colors hover:bg-garnet-800"
+          >
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            New entry
+          </button>
+          {creating && (
+            <BottomSheet title="New entry" onClose={closeForm}>
+              <EntityCreateForm campaignId={campaignId} isOwner={isOwner} onClose={closeForm} />
+            </BottomSheet>
+          )}
+        </>
+      )}
     </div>
   );
 }

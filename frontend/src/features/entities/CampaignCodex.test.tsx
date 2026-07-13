@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -62,9 +62,28 @@ function renderCodex(role?: "OWNER" | "PLAYER") {
   );
 }
 
+// The rail/FAB split keys off useIsBelowMd's "(min-width: 768px)" query.
+function stubViewport(desktop: boolean) {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: desktop,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  }));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  stubViewport(true);
   mockEntities(ENTITIES);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe("CampaignCodex ledger (#840)", () => {
@@ -335,6 +354,61 @@ describe("CampaignCodex create flow (#367)", () => {
     expect(screen.getByRole("button", { name: /new entry/i })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /create your first entry/i }));
     expect(screen.getByRole("button", { name: /create entity/i })).toBeInTheDocument();
+  });
+});
+
+describe("CampaignCodex mobile (#840)", () => {
+  beforeEach(() => stubViewport(false));
+
+  it("replaces the rail toggle with a single fixed FAB", () => {
+    renderCodex();
+    const toggles = screen.getAllByRole("button", { name: /new entry/i });
+    expect(toggles).toHaveLength(1);
+    expect(toggles[0].className).toContain("fixed");
+  });
+
+  it("opens the create form in a bottom sheet from the FAB and creates", async () => {
+    const user = userEvent.setup();
+    vi.mocked(client.createEntity).mockResolvedValue(entity({ id: "ent-new", name: "Sildar" }));
+    renderCodex();
+
+    await user.click(screen.getByRole("button", { name: /new entry/i }));
+    const sheet = screen.getByRole("dialog", { name: /new entry/i });
+    await user.type(within(sheet).getByLabelText(/name/i), "Sildar");
+    await user.click(within(sheet).getByRole("button", { name: /create entity/i }));
+
+    expect(vi.mocked(client.createEntity)).toHaveBeenCalledWith(CAMPAIGN_ID, {
+      type: "NPC",
+      name: "Sildar",
+      aliases: [],
+      notes: undefined,
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("closes the sheet on Escape", async () => {
+    const user = userEvent.setup();
+    renderCodex();
+    await user.click(screen.getByRole("button", { name: /new entry/i }));
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("renders the type filters as a horizontally scrollable chip row", () => {
+    renderCodex();
+    const group = screen.getByRole("group", { name: /filter by type/i });
+    expect(group.className).toContain("overflow-x-auto");
+    expect(within(group).getAllByRole("button").every((b) => b.hasAttribute("aria-pressed"))).toBe(
+      true,
+    );
+  });
+
+  it("keeps create reachable when the campaign has no entities", async () => {
+    const user = userEvent.setup();
+    mockEntities([]);
+    renderCodex();
+    await user.click(screen.getByRole("button", { name: /new entry/i }));
+    expect(screen.getByRole("dialog", { name: /new entry/i })).toBeInTheDocument();
   });
 });
 

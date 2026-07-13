@@ -19,13 +19,16 @@ interface CodexRailProps {
   creating: boolean;
   onToggleCreate: () => void;
   toggleRef: RefObject<HTMLButtonElement>;
+  // The mobile FAB replaces the rail toggle below md.
+  showCreateToggle: boolean;
   children?: ReactNode;
 }
 
 const filterBase =
-  "flex w-full items-center gap-2 rounded-control px-2.5 py-1.5 text-left text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600";
+  "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 py-2 text-left text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600 lg:w-full lg:rounded-control lg:px-2.5 lg:py-1.5";
 const filterOn = "bg-garnet-700 text-parchment-50";
-const filterOff = "text-parchment-700 hover:bg-parchment-100 hover:text-parchment-900";
+const filterOff =
+  "bg-parchment-200/60 text-parchment-700 hover:bg-parchment-200 hover:text-parchment-900 lg:bg-transparent lg:hover:bg-parchment-100";
 
 // The codex browse rail (#840): title block, search, type filter list with tone
 // dots + counts, sort control, and the create toggle. Fully controlled — all
@@ -43,11 +46,12 @@ export default function CodexRail({
   creating,
   onToggleCreate,
   toggleRef,
+  showCreateToggle,
   children,
 }: CodexRailProps) {
   return (
-    <aside className="flex flex-col gap-4 lg:sticky lg:top-6 lg:self-start">
-      <div>
+    <aside className="flex flex-col gap-3 lg:sticky lg:top-6 lg:gap-4 lg:self-start">
+      <div className="hidden lg:block">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-parchment-500">
           {campaignName ?? "Campaign"}
         </p>
@@ -56,15 +60,22 @@ export default function CodexRail({
           {entryCount} {entryCount === 1 ? "entry" : "entries"}
         </p>
       </div>
-      <input
-        type="search"
-        aria-label="Search entities"
-        placeholder="Search name, alias or description…"
-        value={query}
-        onChange={(e) => onQueryChange(e.target.value)}
-        className="w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none"
-      />
-      <div className="flex flex-col gap-0.5" role="group" aria-label="Filter by type">
+      {/* Below lg the search bar sticks under the viewport top while the list scrolls. */}
+      <div className="sticky top-0 z-10 -my-1 bg-parchment-100 py-1 lg:static lg:my-0 lg:bg-transparent lg:py-0">
+        <input
+          type="search"
+          aria-label="Search entities"
+          placeholder="Search name, alias or description…"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          className="w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none"
+        />
+      </div>
+      <div
+        className="flex gap-1.5 overflow-x-auto pb-1 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0"
+        role="group"
+        aria-label="Filter by type"
+      >
         <button
           type="button"
           aria-pressed={typeFilter === "ALL"}
@@ -91,7 +102,7 @@ export default function CodexRail({
           </button>
         ))}
       </div>
-      <div>
+      <div className="hidden lg:block">
         <label
           className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-parchment-500"
           htmlFor="codex-sort"
@@ -110,16 +121,18 @@ export default function CodexRail({
           ))}
         </Select>
       </div>
-      <button
-        ref={toggleRef}
-        type="button"
-        aria-expanded={creating}
-        onClick={onToggleCreate}
-        className="inline-flex items-center justify-center gap-1.5 rounded-control bg-garnet-700 px-3 py-2 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800"
-      >
-        <Plus aria-hidden="true" className="h-4 w-4" />
-        New entry
-      </button>
+      {showCreateToggle && (
+        <button
+          ref={toggleRef}
+          type="button"
+          aria-expanded={creating}
+          onClick={onToggleCreate}
+          className="inline-flex items-center justify-center gap-1.5 rounded-control bg-garnet-700 px-3 py-2 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-800"
+        >
+          <Plus aria-hidden="true" className="h-4 w-4" />
+          New entry
+        </button>
+      )}
       {children}
     </aside>
   );
