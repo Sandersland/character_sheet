@@ -201,6 +201,101 @@ entitiesRouter.get("/campaigns/:id/entities", async (req, res) => {
   );
 });
 
+// ── GET /api/campaigns/:id/entities/activity ─────────────────────────────────
+// Campaign-wide Codex activity (#839): the newest visible mention refs merged
+// with entity-created events, newest-first. Registered before the generic
+// :entityId routes so the /activity segment can't be shadowed.
+
+type ActivitySortable = { sortKey: [number, number, number] };
+
+function activitySortKey(date: Date, loggedAt?: Date, createdAt?: Date): [number, number, number] {
+  return [date.getTime(), (loggedAt ?? date).getTime(), (createdAt ?? date).getTime()];
+}
+
+function compareActivityDesc(a: ActivitySortable, b: ActivitySortable): number {
+  return (
+    b.sortKey[0] - a.sortKey[0] || b.sortKey[1] - a.sortKey[1] || b.sortKey[2] - a.sortKey[2]
+  );
+}
+
+entitiesRouter.get("/campaigns/:id/entities/activity", async (req, res) => {
+  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
+  const isOwner = role === "OWNER";
+
+  const rawLimit = Number(req.query.limit);
+  const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 50) : 20;
+
+  // Two bounded streams (each pre-sorted + capped at N) merged in memory.
+  const [refs, createdEntities, ctx] = await Promise.all([
+    prisma.journalEntryRef.findMany({
+      where: {
+        entity: {
+          campaignId: req.params.id,
+          ...(isOwner ? {} : { visibility: "REVEALED" }),
+        },
+        entry: visibleEntryWhere(req.user!.id, req.params.id),
+      },
+      select: {
+        entity: { select: { id: true, name: true, type: true } },
+        entry: {
+          select: {
+            sessionId: true,
+            date: true,
+            loggedAt: true,
+            createdAt: true,
+            character: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: [
+        { entry: { date: "desc" } },
+        { entry: { loggedAt: "desc" } },
+        { entry: { createdAt: "desc" } },
+      ],
+      take: limit,
+    }),
+    prisma.campaignEntity.findMany({
+      where: {
+        campaignId: req.params.id,
+        ...(isOwner ? {} : { visibility: "REVEALED" }),
+      },
+      select: { id: true, name: true, type: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    }),
+    loadSessionContext(req.params.id),
+  ]);
+
+  const items = [
+    ...refs.map((ref) => ({
+      sortKey: activitySortKey(ref.entry.date, ref.entry.loggedAt, ref.entry.createdAt),
+      item: {
+        kind: "mention" as const,
+        characterName: ref.entry.character.name,
+        entity: ref.entity,
+        sessionOrdinal:
+          (ref.entry.sessionId ? ctx.ordinals.get(ref.entry.sessionId) : null) ?? null,
+        date: ref.entry.date,
+      },
+    })),
+    ...createdEntities.map((e) => ({
+      sortKey: activitySortKey(e.createdAt),
+      item: {
+        kind: "created" as const,
+        entity: { id: e.id, name: e.name, type: e.type },
+        date: e.createdAt,
+      },
+    })),
+  ];
+
+  res.json(
+    items
+      .sort(compareActivityDesc)
+      .slice(0, limit)
+      .map(({ item }) => item),
+  );
+});
+
 // ── POST /api/campaigns/:id/entities ─────────────────────────────────────────
 // Create an entity. Any member may create.
 
