@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
 import { collectMergedInIdentities, wouldCreateCycle } from "@/lib/activity/entity-merges.js";
+import { visibleEntryWhere } from "@/lib/activity/entity-stats.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { normalizeForMatch } from "@/lib/activity/journal-refs.js";
 import { prisma } from "@/lib/core/prisma.js";
@@ -380,12 +381,7 @@ entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, re
       entityId: { in: entityIds },
       // Own entries, or CAMPAIGN-shared ones from characters still in this
       // campaign (refs survive a character leaving; the share must not).
-      entry: {
-        OR: [
-          { authorUserId: req.user!.id },
-          { visibility: "CAMPAIGN", character: { campaignId: req.params.id } },
-        ],
-      },
+      entry: visibleEntryWhere(req.user!.id, req.params.id),
     },
     include: {
       entity: { select: { id: true, name: true } },
