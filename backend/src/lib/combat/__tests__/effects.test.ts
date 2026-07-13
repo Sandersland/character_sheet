@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { readEffectSpec, resolveBuffSpec, resolveEffectSpec, type EffectRow } from "@/lib/combat/effects.js";
+import {
+  catalogEffectSpec,
+  readEffectSpec,
+  resolveBuffSpec,
+  resolveEffectSpec,
+  type EffectRow,
+  type EffectScaling,
+} from "@/lib/combat/effects.js";
 
 const fireball: EffectRow = {
   level: 3,
@@ -91,6 +98,96 @@ describe("resolveEffectSpec — golden byte-parity", () => {
 
   it("utility spell resolves to null", () => {
     expect(resolveEffectSpec(readEffectSpec(detectMagic), 0, { characterLevel: 1 })).toBeNull();
+  });
+});
+
+// #817 pins: the shared catalog-row→EffectSpec builder consumed by both the
+// disciplineEffectSpec (ki scaling) and shadowArtEffectSpec (flat) wrappers.
+describe("catalogEffectSpec — shared ki-cast row→spec builder (#817)", () => {
+  const kiScaling: EffectScaling = { mode: "ki", dicePerStep: 2 };
+
+  it("maps a ki-scaled damage row with dice (discipline shape)", () => {
+    const spec = catalogEffectSpec(
+      {
+        name: "Flames of the Phoenix",
+        effectKind: "damage",
+        effectDiceCount: 8,
+        effectDiceFaces: 6,
+        effectModifier: 0,
+        damageType: "fire",
+        attackType: "save",
+        saveAbility: "dexterity",
+        saveEffect: "half",
+      },
+      { scaling: kiScaling, concentrates: () => false },
+    );
+    expect(spec).toEqual({
+      effectType: "damage",
+      dice: { count: 8, faces: 6, modifier: 0 },
+      damageType: "fire",
+      attackType: "save",
+      saveAbility: "dexterity",
+      saveEffect: "half",
+      scaling: { mode: "ki", dicePerStep: 2 },
+      concentration: false,
+      buffTarget: null,
+      buffModifier: null,
+    });
+  });
+
+  it("leaves dice undefined for a utility row and honors the concentration predicate", () => {
+    const spec = catalogEffectSpec(
+      { name: "Mist Stance" },
+      { scaling: { mode: "ki", dicePerStep: 0 }, concentrates: (name) => name === "Mist Stance" },
+    );
+    expect(spec.dice).toBeUndefined();
+    expect(spec.effectType).toBe("utility");
+    expect(spec.concentration).toBe(true);
+  });
+
+  it("maps a flat buff row (shadow-art shape) with buff fields and no dice/save", () => {
+    const spec = catalogEffectSpec(
+      { name: "Shadow Arts: Pass without Trace", effectKind: "buff", buffTarget: "stealth", buffModifier: 10 },
+      { scaling: { mode: "none" }, concentrates: () => true },
+    );
+    expect(spec).toEqual({
+      effectType: "buff",
+      dice: undefined,
+      damageType: null,
+      attackType: null,
+      saveAbility: null,
+      saveEffect: null,
+      scaling: { mode: "none" },
+      concentration: true,
+      buffTarget: "stealth",
+      buffModifier: 10,
+    });
+  });
+
+  it("treats a missing/unknown effectKind as roll-less utility with null buff fields", () => {
+    const spec = catalogEffectSpec(
+      { name: "Shadow Arts: Darkvision" },
+      { scaling: { mode: "none" }, concentrates: () => false },
+    );
+    expect(spec.effectType).toBe("utility");
+    expect(spec.buffTarget).toBeNull();
+    expect(spec.buffModifier).toBeNull();
+    expect(spec.concentration).toBe(false);
+  });
+
+  it("maps a heal row to heal but never adds the ability modifier (ki abilities roll flat)", () => {
+    const spec = catalogEffectSpec(
+      { name: "H", effectKind: "heal", effectDiceCount: 1, effectDiceFaces: 8 },
+      { scaling: { mode: "ki", dicePerStep: 1 }, concentrates: () => false },
+    );
+    expect(spec.effectType).toBe("heal");
+    expect(spec.addAbilityModToHeal).toBeUndefined();
+  });
+
+  it("reads dice-less when either the count or the faces is missing", () => {
+    const cfg = { scaling: kiScaling, concentrates: () => false };
+    expect(catalogEffectSpec({ name: "X", effectKind: "damage", effectDiceCount: 8 }, cfg).dice).toBeUndefined();
+    expect(catalogEffectSpec({ name: "X", effectKind: "damage", effectDiceFaces: 6 }, cfg).dice).toBeUndefined();
   });
 });
 
