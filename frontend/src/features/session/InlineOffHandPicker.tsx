@@ -44,7 +44,9 @@ export default function InlineOffHandPicker({
   const { roll } = useRoll();
   const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
   // The off-hand swing is a bonus action, not part of the Attack-action tally —
-  // record via recordTwfAttack and no-op the tally writers so it never lands in it.
+  // record via recordTwfAttack and no-op the tally writers so it never lands in
+  // it. currentRow is null for the same reason: with no tally row there is no
+  // verdict, so only a nat-20 crits here until #813 adopts the verdict flow.
   const { riderTotals, viewFor } = useAttackRolls({
     roll,
     logRollSafe,
@@ -52,6 +54,7 @@ export default function InlineOffHandPicker({
     setTallyDamage: () => {},
     setTallyAttackTotal: () => {},
     addTallyDamageRider: () => {},
+    currentRow: null,
   });
 
   const entry = buildOffHandEntry(character);

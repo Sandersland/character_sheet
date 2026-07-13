@@ -24,6 +24,7 @@ import InitiativeRail from "@/features/session/InitiativeRail";
 import TurnConcentrationBanner from "@/features/session/TurnConcentrationBanner";
 import TurnDeathSaves from "@/features/session/TurnDeathSaves";
 import TurnSummaryBanner from "@/features/session/TurnSummaryBanner";
+import { useTallyResolve } from "@/features/session/useTallyResolve";
 import TurnResolutionSheets from "@/features/session/TurnResolutionSheets";
 import { showInitiative, showMovement } from "@/features/session/turnFlags";
 import type { AllyOption } from "@/lib/spellMeta";
@@ -297,6 +298,16 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     handleEndTurn, handleReactionManeuver, handleEffectManeuver, handleBonusSpellCast,
   } = turn;
 
+  // Inline banner resolve (#811): verdict writes + on-line damage rolls for
+  // skipped attacks, shared-shaped with the in-sheet strip's rule.
+  const tallyResolve = useTallyResolve({
+    character,
+    sessionId,
+    setTallyVerdict: turnState.setTallyVerdict,
+    setTallyDamageAt: turnState.setTallyDamageAt,
+    onLogChanged,
+  });
+
   // Decorative initiative rail's "you" marker (#737).
   const youInitial = character.name?.[0]?.toUpperCase() ?? "?";
 
@@ -396,8 +407,11 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           consumeReaction={consumeReaction}
         />
 
-        {/* ── "Turn summary" banner — attack tally once the sheet is closed ── */}
-        {!activeResolution && <TurnSummaryBanner rows={attackTally} onDismiss={clearAttackTally} />}
+        {/* ── "Turn summary" banner — attack tally once the sheet is closed;
+            unresolved lines resolve inline, resolved lines offer quiet Change (#811) ── */}
+        {!activeResolution && (
+          <TurnSummaryBanner rows={attackTally} onDismiss={clearAttackTally} resolve={tallyResolve} />
+        )}
 
         {/* ── Action Surge (Fighter) ─────────────────────────────────────── */}
         <ActionSurgeButton

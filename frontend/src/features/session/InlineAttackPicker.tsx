@@ -1,8 +1,14 @@
-// Attack sheet: one attack card with an "Attacking with" form selector (equipped
-// weapons + Unarmed + Improvised) and one Damage card bound to the last-rolled
-// form, then attack-option maneuvers and attack cantrips (#734/#786).
+// Attack sheet (#811): one step-rail card (Roll to hit → Call it → Damage) with
+// an "Attacking with" form selector, the "This action" tally strip, a collapsed
+// Battle Master maneuvers disclosure, and attack cantrips (#734/#786). At md+
+// the sheet widens (~42rem) and the counter + tally + maneuvers + cantrips move
+// into a right rail beside the step card so the step column never scrolls —
+// placement switches via useIsBelowMd (single mount per widget, like
+// BottomSheet's own breakpoint gating).
 
 import { useState } from "react";
+
+import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 
 import { useRoll } from "@/features/dice/RollContext";
 import {
@@ -14,18 +20,16 @@ import {
 import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { useRollLogger } from "@/features/session/useRollLogger";
 import { useAttackRolls } from "@/features/session/useAttackRolls";
-import AttackFormCard from "@/features/session/AttackFormCard";
+import AttackStepCard, { AttackKickerPips } from "@/features/session/AttackStepCard";
 import AttackTallyStrip from "@/features/session/AttackTallyStrip";
-import AttackOptionSection from "@/features/session/AttackOptionSection";
 import AttackSheetFooter from "@/features/session/AttackSheetFooter";
-import WeaponDamageCard from "@/features/session/WeaponDamageCard";
-import { AttackCounter } from "@/features/session/TurnControls";
+import ManeuversDisclosure from "@/features/session/ManeuversDisclosure";
 import InlineSpellAttackSection from "@/features/session/InlineSpellAttackSection";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
 
-// Selection state: the chosen form drives the attack card; the last-rolled form
-// binds the Damage card (RAW: damage belongs to the form that was declared and
+// Selection state: the chosen form drives the roll button; the last-rolled form
+// binds steps 2–3 (RAW: damage belongs to the form that was declared and
 // rolled). Both resolve against the live `forms` list so a mid-open inventory
 // change falls back to a real, visibly checked option.
 function useAttackFormSelection(forms: AttackEntry[]) {
@@ -39,9 +43,7 @@ function useAttackFormSelection(forms: AttackEntry[]) {
 }
 
 // Pure per-render derivations for the picker shell, extracted so the component
-// stays a composition layer. The counter is prebuilt (or null) so the JSX needs
-// no attack-null re-narrowing; it hides at total 1 (the kicker's "1 attack" is
-// enough).
+// stays a composition layer (the pre-#811 pattern, kept).
 function pickerView(character: Character, attack: TurnState["attack"], forms: AttackEntry[]) {
   return {
     // buildAttackForms always appends Unarmed + Improvised, so any other id is a weapon.
@@ -50,7 +52,6 @@ function pickerView(character: Character, attack: TurnState["attack"], forms: At
     attacksExhausted: computeAttacksExhausted(attack),
     preRoll: attack !== null && attack.used === 0,
     attacksRemain: attack !== null && attack.used > 0 && attack.used < attack.total,
-    counter: attack !== null && attack.total > 1 ? { total: attack.total, used: attack.used } : null,
   };
 }
 
@@ -84,6 +85,9 @@ export default function InlineAttackPicker({
   const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
   const die = useManeuverDie(character, onUpdate);
 
+  const currentRow = turnState.attackTally.at(-1) ?? null;
+  const currentRowIndex = turnState.attackTally.length - 1;
+
   const { riderTotals, viewFor } = useAttackRolls({
     roll,
     logRollSafe,
@@ -91,6 +95,7 @@ export default function InlineAttackPicker({
     setTallyDamage: turnState.setTallyDamage,
     setTallyAttackTotal: turnState.setTallyAttackTotal,
     addTallyDamageRider: turnState.addTallyDamageRider,
+    currentRow,
   });
 
   const forms = buildAttackForms(character);
@@ -99,72 +104,114 @@ export default function InlineAttackPicker({
   const { selectedEntry, lastRolledEntry, setSelectedId, markRolled } =
     useAttackFormSelection(forms);
 
-  // Roll to hit with the selected form and bind the Damage card to it.
+  // Roll to hit with the selected form and bind steps 2–3 to it.
   function handleRollToHit() {
     markRolled(selectedEntry.id);
     viewFor(selectedEntry).onAttack();
   }
 
+  // "it Missed" — one tap: verdict written, row dims into the tally, the card
+  // resets so the next attack is armed (#811).
+  function handleCallMiss() {
+    turnState.setTallyVerdict(currentRowIndex, "miss");
+    markRolled(null);
+  }
+
+  function handleCallCrit() {
+    turnState.setTallyVerdict(currentRowIndex, "crit");
+  }
+
+  // Quiet skip — the ungated path that produces an unresolved row.
+  function handleSkip() {
+    markRolled(null);
+  }
+
+  const boundView = lastRolledEntry ? viewFor(lastRolledEntry) : null;
+  const isMobile = useIsBelowMd();
+
+  const tallyStrip = (
+    <AttackTallyStrip rows={turnState.attackTally} onSetVerdict={turnState.setTallyVerdict} />
+  );
+  const maneuversDisclosure = view.showManeuvers && (
+    <ManeuversDisclosure
+      character={character}
+      turnState={turnState}
+      view={boundView}
+      attacksExhausted={view.attacksExhausted}
+      die={die}
+      onUpdate={onUpdate}
+    />
+  );
+  const spellAttacks = (
+    <InlineSpellAttackSection
+      character={character}
+      sessionId={sessionId}
+      turnState={turnState}
+      onUpdate={onUpdate}
+      onLogChanged={onLogChanged}
+    />
+  );
+  const stepCard = (
+    <AttackStepCard
+      forms={forms}
+      selectedId={selectedEntry.id}
+      onSelect={setSelectedId}
+      selectedView={viewFor(selectedEntry)}
+      boundView={boundView}
+      currentRow={currentRow}
+      attack={turnState.attack}
+      attacksExhausted={view.attacksExhausted}
+      onRollToHit={handleRollToHit}
+      onCallMiss={handleCallMiss}
+      onCallCrit={handleCallCrit}
+      onSkip={handleSkip}
+      riderTotals={riderTotals}
+      showKicker={isMobile}
+    />
+  );
+  const footer = (
+    <AttackSheetFooter
+      preRoll={view.preRoll}
+      attacksRemain={view.attacksRemain}
+      onCancel={onCancel}
+      onClose={onClose}
+    />
+  );
+  const emptyHint = !view.hasWeapon && (
+    <p className="text-sm text-parchment-600">
+      No weapon equipped — use Change on the turn screen.
+    </p>
+  );
+
+  // Mobile: one column in journey order. md+: the step card keeps the left
+  // column and the counter/tally/maneuvers/cantrips form the right rail
+  // (final-spec frame 12) so the step column never scrolls.
+  if (isMobile) {
+    return (
+      <div className="flex flex-col gap-2">
+        {emptyHint}
+        {tallyStrip}
+        {stepCard}
+        {maneuversDisclosure}
+        {spellAttacks}
+        {footer}
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-2">
-      {view.counter && (
-        <AttackCounter total={view.counter.total} used={view.counter.used} label="Attacks" />
-      )}
-
-      {!view.hasWeapon && (
-        <p className="text-sm text-parchment-600">
-          No weapon equipped — use Change on the turn screen.
-        </p>
-      )}
-
-      <AttackTallyStrip rows={turnState.attackTally} onCycleVerdict={turnState.cycleTallyVerdict} />
-
-      <AttackFormCard
-        forms={forms}
-        selectedId={selectedEntry.id}
-        onSelect={setSelectedId}
-        view={viewFor(selectedEntry)}
-        attacksExhausted={view.attacksExhausted}
-        onRollToHit={handleRollToHit}
-        showManeuvers={view.showManeuvers}
-        character={character}
-        onUpdate={onUpdate}
-      />
-
-      {/* Keyed on the last-rolled form so switching forms remounts the card and
-          resets the ManeuverPrompt spend state (#756). */}
-      <WeaponDamageCard
-        key={lastRolledEntry?.id ?? "inert"}
-        view={lastRolledEntry ? viewFor(lastRolledEntry) : null}
-        showManeuvers={view.showManeuvers}
-        character={character}
-        riderTotals={riderTotals}
-        onUpdate={onUpdate}
-      />
-
-      <AttackOptionSection
-        character={character}
-        turnState={turnState}
-        showManeuvers={view.showManeuvers}
-        attacksExhausted={view.attacksExhausted}
-        die={die}
-      />
-
-      {/* Attack-roll cantrips (Fire Bolt) — single transactional cast (#734). */}
-      <InlineSpellAttackSection
-        character={character}
-        sessionId={sessionId}
-        turnState={turnState}
-        onUpdate={onUpdate}
-        onLogChanged={onLogChanged}
-      />
-
-      <AttackSheetFooter
-        preRoll={view.preRoll}
-        attacksRemain={view.attacksRemain}
-        onCancel={onCancel}
-        onClose={onClose}
-      />
+    <div className="flex items-start gap-4">
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        {emptyHint}
+        {stepCard}
+        {footer}
+      </div>
+      <div className="flex w-60 shrink-0 flex-col gap-2">
+        <AttackKickerPips attack={turnState.attack} />
+        {tallyStrip}
+        {maneuversDisclosure}
+        {spellAttacks}
+      </div>
     </div>
   );
 }

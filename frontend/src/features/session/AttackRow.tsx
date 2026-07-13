@@ -2,7 +2,6 @@
 // AttackEntryView bundle from useAttackRolls.
 
 import AttackRowInfo from "@/features/session/AttackRowInfo";
-import CritDamageButton from "@/features/session/CritDamageButton";
 import DamageRiderList from "@/features/session/DamageRiderList";
 import ManeuverPrompt from "@/features/session/ManeuverPrompt";
 import { isNaturalOne } from "@/lib/dice";
@@ -19,6 +18,29 @@ interface AttackRowProps {
   onUpdate: (c: Character) => void;
 }
 
+/** Plain damage button — the Crit checkbox is gone (#811): a nat 20 auto-doubles;
+ *  manual crit calls live in the main sheet's verdict flow. */
+function RowDamageButton({ view }: { view: AttackEntryView }) {
+  const { lastAttackRoll, lastDamageRoll, damageTotal, isCrit } = view;
+  const miss = isNaturalOne(lastAttackRoll);
+  const filledTotal = lastDamageRoll ? damageTotal ?? lastDamageRoll.total : undefined;
+  const label =
+    filledTotal != null ? `Re-roll damage (${filledTotal})` : isCrit ? "Crit damage" : "Damage";
+  return (
+    <button
+      type="button"
+      onClick={view.onDamage}
+      className={`rounded-control border px-2.5 py-1 text-xs font-semibold transition-colors ${
+        isCrit
+          ? "border-garnet-300 bg-garnet-100 text-garnet-800 hover:bg-garnet-200"
+          : "border-parchment-300 bg-parchment-50 text-parchment-700 hover:bg-parchment-100"
+      } ${miss && !isCrit ? "opacity-50" : ""}`}
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function AttackRow({
   view,
   attacksExhausted,
@@ -27,9 +49,7 @@ export default function AttackRow({
   riderTotals,
   onUpdate,
 }: AttackRowProps) {
-  const { entry, lastAttackRoll, lastDamageRoll, attackTotal, damageTotal, isCrit, manualCrit } =
-    view;
-  const miss = isNaturalOne(lastAttackRoll);
+  const { entry, lastAttackRoll, lastDamageRoll, attackTotal, damageTotal } = view;
   return (
     <div className="flex flex-col gap-1.5 py-3">
       <div className="flex items-center justify-between">
@@ -50,14 +70,7 @@ export default function AttackRow({
           >
             Attack
           </button>
-          <CritDamageButton
-            size="sm"
-            isCrit={isCrit}
-            manualCrit={manualCrit}
-            miss={miss}
-            onDamage={view.onDamage}
-            onToggleCrit={view.onToggleCrit}
-          />
+          <RowDamageButton view={view} />
         </div>
       </div>
       <DamageRiderList

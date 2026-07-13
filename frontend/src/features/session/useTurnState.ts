@@ -145,6 +145,8 @@ export interface TurnStateActions {
   recordAttack: (recorded?: RecordedAttack) => void;
   /** Write/replace the damage slot on the most-recent tally row (#802). */
   setTallyDamage: (damage: number) => void;
+  /** Write/replace the damage slot on row `index` — banner inline resolve (#811). */
+  setTallyDamageAt: (index: number, damage: number) => void;
   /**
    * Override the to-hit total on the most-recent tally row after a Precision
    * Attack die is added (#809). Touches only `attack.total` — the kept-d20 face
@@ -153,8 +155,8 @@ export interface TurnStateActions {
   setTallyAttackTotal: (total: number) => void;
   /** Fold an on-hit rider's total into the most-recent tally row's damage slot. */
   addTallyDamageRider: (amount: number) => void;
-  /** Tap-cycle a manual row's verdict unset→Hit→Miss (auto rows are locked). */
-  cycleTallyVerdict: (index: number) => void;
+  /** Set a row's verdict directly; nat-locked rows refuse (#811). */
+  setTallyVerdict: (index: number, verdict: TallyVerdict | undefined) => void;
   /** Clear the attack tally (Turn-summary banner dismiss / new action). */
   clearAttackTally: () => void;
   /**
@@ -322,55 +324,70 @@ function tallyRowFor(recorded: RecordedAttack): AttackTallyRow {
   };
 }
 
-// Write/replace the damage slot on the most-recent tally row — never appends, so
-// re-rolling attack N's damage replaces N's number rather than double-counting (#802).
-function setTallyDamageState(s: TurnState, damage: number): TurnState {
-  if (s.attackTally.length === 0) return s;
+// Rolling damage is an implicit hit call (#811): an unset verdict resolves to
+// "hit" the moment damage lands on the row. Explicit verdicts (miss/crit/nat-
+// locked) are never overwritten.
+function withAutoHit(row: AttackTallyRow): AttackTallyRow {
+  return row.verdict ? row : { ...row, verdict: "hit" };
+}
+
+// Shared shell for the "rewrite one tally row" writers: no-op when the row is
+// out of range (empty tally / bad index), otherwise replace it immutably.
+function updateTallyRow(
+  s: TurnState,
+  index: number,
+  update: (row: AttackTallyRow) => AttackTallyRow,
+): TurnState {
+  const row = s.attackTally[index];
+  if (!row) return s;
   const attackTally = s.attackTally.slice();
-  const i = attackTally.length - 1;
-  attackTally[i] = { ...attackTally[i], damage };
+  attackTally[index] = update(row);
   return { ...s, attackTally };
 }
+
+// Write/replace the damage slot on the most-recent tally row — never appends, so
+// re-rolling attack N's damage replaces N's number rather than double-counting (#802).
+const setTallyDamageState = (s: TurnState, damage: number): TurnState =>
+  setTallyDamageAtState(s, s.attackTally.length - 1, damage);
+
+// Write/replace the damage slot on an arbitrary row — the Turn-summary banner's
+// inline resolve rolls damage for skipped rows after the action ended (#811).
+const setTallyDamageAtState = (s: TurnState, index: number, damage: number): TurnState =>
+  updateTallyRow(s, index, (row) => withAutoHit({ ...row, damage }));
 
 // Override the to-hit total on the current row after a superiority die is added
 // (#809). Only `attack.total` changes — keptFace + nat flags stay so the verdict
 // (crit/miss) reads the die face, never the boosted total.
-function setTallyAttackTotalState(s: TurnState, total: number): TurnState {
-  if (s.attackTally.length === 0) return s;
-  const attackTally = s.attackTally.slice();
-  const i = attackTally.length - 1;
-  attackTally[i] = { ...attackTally[i], attack: { ...attackTally[i].attack, total } };
-  return { ...s, attackTally };
-}
+const setTallyAttackTotalState = (s: TurnState, total: number): TurnState =>
+  updateTallyRow(s, s.attackTally.length - 1, (row) => ({
+    ...row,
+    attack: { ...row.attack, total },
+  }));
 
-// Fold a rider total into the current row's damage slot (breakdown add).
-function addTallyDamageRiderState(s: TurnState, amount: number): TurnState {
-  if (s.attackTally.length === 0) return s;
-  const attackTally = s.attackTally.slice();
-  const i = attackTally.length - 1;
-  attackTally[i] = { ...attackTally[i], damage: (attackTally[i].damage ?? 0) + amount };
-  return { ...s, attackTally };
-}
+// Fold a rider total into the current row's damage slot (breakdown add). A
+// rider roll is a damage roll, so it also resolves an unset verdict to hit.
+const addTallyDamageRiderState = (s: TurnState, amount: number): TurnState =>
+  updateTallyRow(s, s.attackTally.length - 1, (row) =>
+    withAutoHit({ ...row, damage: (row.damage ?? 0) + amount }),
+  );
 
-// Cycle a manual row's verdict unset→Hit→Miss→unset. Auto (nat 20 / nat 1) rows
-// are locked and never cycle.
-const VERDICT_CYCLE: Record<"none" | TallyVerdict, TallyVerdict | undefined> = {
-  none: "hit",
-  hit: "miss",
-  miss: undefined,
-  crit: undefined,
-};
-
-function cycleTallyVerdictState(s: TurnState, index: number): TurnState {
-  const row = s.attackTally[index];
-  if (!row || row.attack.nat20 || row.attack.nat1) return s;
-  const next = VERDICT_CYCLE[row.verdict ?? "none"];
-  const attackTally = s.attackTally.slice();
-  const updated = { ...row };
-  if (next === undefined) delete updated.verdict;
-  else updated.verdict = next;
-  attackTally[index] = updated;
-  return { ...s, attackTally };
+// Set a row's verdict directly (#811 — replaces the old unset→Hit→Miss cycle).
+// Nat-locked rows (nat 20 / nat 1) refuse: the die already decided. Switching
+// to miss drops the row's damage — a missed attack dealt none.
+function setTallyVerdictState(
+  s: TurnState,
+  index: number,
+  verdict: TallyVerdict | undefined,
+): TurnState {
+  const target = s.attackTally[index];
+  if (!target || target.attack.nat20 || target.attack.nat1) return s;
+  return updateTallyRow(s, index, (row) => {
+    const updated = { ...row };
+    if (verdict === undefined) delete updated.verdict;
+    else updated.verdict = verdict;
+    if (verdict === "miss") delete updated.damage;
+    return updated;
+  });
 }
 
 // Banner dismissal (#812): clearing the tally must be durable — history
@@ -574,6 +591,10 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     setState((s) => setTallyDamageState(s, damage));
   }, []);
 
+  const setTallyDamageAt = useCallback((index: number, damage: number) => {
+    setState((s) => setTallyDamageAtState(s, index, damage));
+  }, []);
+
   const setTallyAttackTotal = useCallback((total: number) => {
     setState((s) => setTallyAttackTotalState(s, total));
   }, []);
@@ -582,8 +603,8 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     setState((s) => addTallyDamageRiderState(s, amount));
   }, []);
 
-  const cycleTallyVerdict = useCallback((index: number) => {
-    setState((s) => cycleTallyVerdictState(s, index));
+  const setTallyVerdict = useCallback((index: number, verdict: TallyVerdict | undefined) => {
+    setState((s) => setTallyVerdictState(s, index, verdict));
   }, []);
 
   const clearAttackTally = useCallback(() => {
@@ -678,9 +699,10 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     enterAttackMode,
     recordAttack,
     setTallyDamage,
+    setTallyDamageAt,
     setTallyAttackTotal,
     addTallyDamageRider,
-    cycleTallyVerdict,
+    setTallyVerdict,
     clearAttackTally,
     cancelAttack,
     finishAttack,

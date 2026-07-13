@@ -2,18 +2,24 @@
 // bundle each row/card renders from (mirrors the ActionSheetModel pattern in
 // lib/turnOptions). Extracted from InlineAttackPicker so its state cluster and
 // branching are scored — and testable — as their own unit (#778).
+//
+// Crit authority (#811): the current tally row's VERDICT is the only crit
+// source — nat-20 auto-verdicts at record time, "Crit!" sets it manually. The
+// old `manualCrit` checkbox state is gone; damage doubling reads the verdict.
 
 import { useState } from "react";
 
 import { critDamageSpec } from "@/lib/attackMath";
+import { isCritRow } from "@/lib/attackTallySummary";
 import { isNaturalOne, isNaturalTwenty, keptD20 } from "@/lib/dice";
 import type { useRoll } from "@/features/dice/RollContext";
 import type { useRollLogger } from "@/features/session/useRollLogger";
 import type { RecordedAttack } from "@/features/session/useTurnState";
+import type { AttackTallyRow } from "@/lib/attackTallySummary";
 import type { AttackEntry, DamageRider } from "@/lib/attackMath";
 import type { RollResult } from "@/lib/dice";
 
-// Everything one AttackRow / WeaponDamageCard needs, bundled per entry so the
+// Everything one AttackRow / AttackStepCard needs, bundled per entry so the
 // components take a single `view` prop instead of the full state surface.
 export interface AttackEntryView {
   entry: AttackEntry;
@@ -21,13 +27,10 @@ export interface AttackEntryView {
   damageTotal: number | null | undefined;
   lastAttackRoll: RollResult | null;
   lastDamageRoll: RollResult | null;
-  /** Effective crit (nat-20 to-hit OR manual toggle). */
+  /** Effective crit — the current tally row's verdict is `crit` (#811). */
   isCrit: boolean;
-  /** Manual DM-called crit toggle state. */
-  manualCrit: boolean;
   onAttack: () => void;
   onDamage: () => void;
-  onToggleCrit: () => void;
   onDamageRider: (rider: DamageRider) => void;
   onRollsUpdated: (newAttackTotal: number | null, newDamageTotal: number | null) => void;
 }
@@ -39,6 +42,7 @@ export function useAttackRolls({
   setTallyDamage,
   setTallyAttackTotal,
   addTallyDamageRider,
+  currentRow,
 }: {
   roll: ReturnType<typeof useRoll>["roll"];
   logRollSafe: ReturnType<typeof useRollLogger>;
@@ -46,6 +50,8 @@ export function useAttackRolls({
   setTallyDamage: (damage: number) => void;
   setTallyAttackTotal: (total: number) => void;
   addTallyDamageRider: (amount: number) => void;
+  /** The most-recent tally row — its verdict drives crit damage doubling (#811). */
+  currentRow: AttackTallyRow | null;
 }) {
   // Per-row last roll results (keyed by weapon item.id, "unarmed", or "improvised").
   const [lastAttackRolls, setLastAttackRolls] = useState<Record<string, RollResult | null>>({});
@@ -58,16 +64,13 @@ export function useAttackRolls({
   const [attackTotals, setAttackTotals] = useState<Record<string, number | null>>({});
   const [damageTotals, setDamageTotals] = useState<Record<string, number | null>>({});
 
-  // DM-called / expanded-crit-range override per row — OR'd with the auto nat-20.
-  const [manualCrit, setManualCrit] = useState<Record<string, boolean>>({});
-
-  // A row rolls crit damage when its to-hit kept a nat 20 OR the manual toggle is on.
+  // A row rolls crit damage when it IS the current tally row and that row's
+  // verdict is crit (nat-20 auto or manual "Crit!"). The direct nat-20 check
+  // covers tally-less surfaces (the off-hand sheet passes currentRow: null
+  // until #813) — for tallied rows it's redundant with the auto-verdict.
   function isRowCrit(rowId: string): boolean {
-    return Boolean(manualCrit[rowId]) || isNaturalTwenty(lastAttackRolls[rowId]);
-  }
-
-  function toggleManualCrit(rowId: string) {
-    setManualCrit((prev) => ({ ...prev, [rowId]: !prev[rowId] }));
+    if (isNaturalTwenty(lastAttackRolls[rowId])) return true;
+    return currentRow !== null && currentRow.formId === rowId && isCritRow(currentRow);
   }
 
   // Roll an attack for a row: log it, retain the result, clear any override, spend
@@ -89,8 +92,9 @@ export function useAttackRolls({
     });
   }
 
-  // Roll damage for a row: auto-doubles the dice when the row is a crit (nat 20 or
-  // manual). Writes/replaces the current tally row's damage slot (never appends).
+  // Roll damage for a row: auto-doubles the dice when the row is a crit. Writes/
+  // replaces the current tally row's damage slot (never appends) — which also
+  // resolves an unset verdict to hit (#811, implicit hit).
   function handleDamage(entry: AttackEntry) {
     const spec = isRowCrit(entry.id) ? critDamageSpec(entry.damageSpec) : entry.damageSpec;
     const result = roll(spec, entry.damageRollLabel);
@@ -118,7 +122,7 @@ export function useAttackRolls({
     return (newAtk: number | null, newDmg: number | null) => {
       if (newAtk !== null) {
         setAttackTotals((prev) => ({ ...prev, [rowId]: newAtk }));
-        setTallyAttackTotal(newAtk); // keep the tally row + DM banner on the boosted to-hit
+        setTallyAttackTotal(newAtk); // keep the tally row + Turn-summary banner on the boosted to-hit
       }
       if (newDmg !== null) {
         setDamageTotals((prev) => ({ ...prev, [rowId]: newDmg }));
@@ -128,7 +132,7 @@ export function useAttackRolls({
   }
 
   // Bundle one entry's state + handlers into the view the row/card renders.
-  // Rider rolls mirror THIS entry's crit state (the Damage card only shows for
+  // Rider rolls mirror THIS entry's crit state (the damage step only shows for
   // the active weapon, so binding to entry.id matches the active-weapon binding).
   function viewFor(entry: AttackEntry): AttackEntryView {
     return {
@@ -138,10 +142,8 @@ export function useAttackRolls({
       lastAttackRoll: lastAttackRolls[entry.id] ?? null,
       lastDamageRoll: lastDamageRolls[entry.id] ?? null,
       isCrit: isRowCrit(entry.id),
-      manualCrit: Boolean(manualCrit[entry.id]),
       onAttack: () => handleAttack(entry),
       onDamage: () => handleDamage(entry),
-      onToggleCrit: () => toggleManualCrit(entry.id),
       onDamageRider: (rider) => handleDamageRider(rider, entry.id),
       onRollsUpdated: makeOnRollsUpdated(entry.id),
     };

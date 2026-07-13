@@ -79,6 +79,16 @@ describe("attackTallyLine", () => {
     expect(line).toBe("Longsword: hit — to-hit 17 — roll damage");
   });
 
+  it("an unresolved row asks the question — never claims a hit (#811)", () => {
+    const line = attackTallyLine(row({}));
+    expect(line).toBe("Longsword: to-hit 17 — hit or miss?");
+  });
+
+  it("an unresolved row with damage recorded still asks (damage does not imply hit here — state auto-resolves it upstream)", () => {
+    const line = attackTallyLine(row({ damage: 9 }));
+    expect(line).toBe("Longsword: to-hit 17 — hit or miss?");
+  });
+
   it("attackTallyLines maps one line per row", () => {
     const lines = attackTallyLines([
       row({ verdict: "hit", damage: 8 }),
