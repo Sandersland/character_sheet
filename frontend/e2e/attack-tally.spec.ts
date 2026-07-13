@@ -101,3 +101,32 @@ test("banner inline resolve: Hit grows an on-line damage roll (mobile)", async (
 
   expect(errors).toEqual([]);
 });
+
+// #834: a resolved attack's continue button reads "Next" and re-arms step 1
+// instead of instantly re-rolling — the player gets a beat to re-orient (e.g.
+// switch attack forms) before committing to the next roll.
+test("resolved attack: Next re-arms step 1 for a two-tap next roll (mobile)", async ({ page }) => {
+  const { errors, sheet } = await openAttackSheet(page);
+
+  // Resolve attack 1 (damage = implicit hit).
+  await sheet.getByRole("button", { name: "Roll to hit" }).click();
+  await sheet.getByRole("button", { name: "Roll damage", exact: true }).click();
+  await expect(sheet.getByText("✓ Hit")).toBeVisible();
+
+  // The continue affordance is a plain "Next" — no instant re-roll button.
+  await expect(
+    sheet.getByRole("button", { name: /Roll to hit — attack 2 of 2/ }),
+  ).toHaveCount(0);
+  const next = sheet.getByRole("button", { name: "Next" });
+  await expect(next).toBeVisible();
+  await next.click();
+
+  // Card resets to step 1 — armed with the right ordinal, not an already-rolled attack 2.
+  await expect(sheet.getByText("✓ Hit")).toHaveCount(0);
+  const rollAttack2 = sheet.getByRole("button", { name: /Roll to hit — attack 2 of 2/ });
+  await expect(rollAttack2).toBeVisible();
+  await rollAttack2.click();
+  await expect(sheet.getByText(/Ask your DM/)).toBeVisible();
+
+  expect(errors).toEqual([]);
+});

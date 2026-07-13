@@ -570,6 +570,36 @@ describe("InlineAttackPicker — manual crit via verdict (#766/#811)", () => {
     expect(screen.getByRole("button", { name: "hit or miss?" })).toBeInTheDocument();
   });
 
+  it("a resolved attack's continue button reads 'Next' and re-arms step 1 for a two-tap next roll (#834)", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    render(
+      <LiveHarness
+        character={makeCharacter({
+          attacksPerAction: 2,
+          inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"],
+        })}
+      />,
+    );
+
+    // Resolve attack 1 (damage = implicit hit).
+    await userEvent.click(screen.getByRole("button", { name: "Roll to hit" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    expect(screen.getByText("✓ Hit")).toBeInTheDocument();
+
+    // The continue affordance is a plain "Next" — no instant re-roll button.
+    expect(
+      screen.queryByRole("button", { name: /Roll to hit — attack 2 of 2/ }),
+    ).not.toBeInTheDocument();
+    const next = screen.getByRole("button", { name: "Next" });
+
+    await userEvent.click(next);
+
+    // Card resets to step 1, still armed with the right ordinal — not an
+    // already-rolled attack 2.
+    expect(screen.getByRole("button", { name: "Roll to hit — attack 2 of 2" })).toBeInTheDocument();
+    expect(screen.queryByText("✓ Hit")).not.toBeInTheDocument();
+  });
+
   it("rolling damage marks the current row hit (implicit hit) with Crit! still offered", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     render(
@@ -645,7 +675,9 @@ describe("InlineAttackPicker — Damage card maneuver state resets on form switc
     // Spent in this form's context → button disabled.
     await waitFor(() => expect(spend).toBeDisabled());
 
-    // Switch the selected form to the Dagger, then roll to hit for it.
+    // "Next" re-arms step 1 (#834) — then switch the selected form to the
+    // Dagger and roll to hit for it.
+    await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("radio", { name: "Dagger" }));
     await user.click(screen.getByRole("button", { name: /Roll to hit/ }));
 

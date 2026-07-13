@@ -129,6 +129,12 @@ export default function InlineAttackPicker({
     markRolled(null);
   }
 
+  // "Next" — re-arms step 1 after a resolved attack so the player can
+  // re-orient (switch forms) before rolling, instead of an instant re-roll (#834).
+  function handleNext() {
+    markRolled(null);
+  }
+
   const boundView = lastRolledEntry ? viewFor(lastRolledEntry) : null;
   const isMobile = useIsBelowMd();
 
@@ -172,6 +178,7 @@ export default function InlineAttackPicker({
       onCallMiss={handleCallMiss}
       onCallCrit={handleCallCrit}
       onSkip={handleSkip}
+      onNext={handleNext}
       riderTotals={riderTotals}
       showKicker={isMobile}
     />
