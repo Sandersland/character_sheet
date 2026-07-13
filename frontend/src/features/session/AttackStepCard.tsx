@@ -16,6 +16,7 @@ import type { AttackEntryView } from "@/features/session/useAttackRolls";
 import type { AttackState } from "@/features/session/useTurnState";
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
 import type { AttackEntry } from "@/lib/attackMath";
+import type { RollMode } from "@/lib/dice";
 
 interface AttackStepCardProps {
   forms: AttackEntry[];
@@ -146,12 +147,56 @@ function CritButton({ onCallCrit, tall = false }: { onCallCrit: () => void; tall
   );
 }
 
+/** Selected-form summary: name + magical badge, to-hit/damage labels, and the
+ *  state-driven roll-mode chip (#486) — colored by the resolved mode. */
+function SelectedFormSummary({
+  selected,
+  chip,
+  mode,
+}: {
+  selected: AttackEntry;
+  chip: string;
+  mode: RollMode;
+}) {
+  const chipColor =
+    mode === "advantage" ? "text-gold-600" : mode === "disadvantage" ? "text-garnet-600" : "text-parchment-500";
+  return (
+    <span className="min-w-0 flex-1">
+      <span className="flex items-center gap-1.5 truncate text-sm font-semibold text-parchment-900">
+        {selected.name}
+        {selected.magical && (
+          <span
+            title="Counts as magical for overcoming resistance to nonmagical damage"
+            className="rounded-control bg-gold-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold-800"
+          >
+            Magical
+          </span>
+        )}
+      </span>
+      <span className="block truncate text-xs text-parchment-600">
+        {selected.attackLabel} to hit · {selected.damageLabel}
+        {selected.note && <span className="ml-1 italic">{selected.note}</span>}
+      </span>
+      {chip && (
+        <span
+          data-testid="attack-roll-mode-chip"
+          className={`mt-0.5 block text-[10px] font-semibold uppercase tracking-wide ${chipColor}`}
+        >
+          {chip}
+        </span>
+      )}
+    </span>
+  );
+}
+
 /** Step 1 content: form selector, selected-form summary, roll button, result line. */
 function RollToHitStep({
   forms,
   selectedId,
   onSelect,
   selected,
+  chip,
+  mode,
   boundView,
   attack,
   attacksExhausted,
@@ -161,6 +206,8 @@ function RollToHitStep({
   selectedId: string;
   onSelect: (id: string) => void;
   selected: AttackEntry;
+  chip: string;
+  mode: RollMode;
   boundView: AttackEntryView | null;
   attack: AttackState | null;
   attacksExhausted: boolean;
@@ -173,23 +220,7 @@ function RollToHitStep({
         <Segmented label="Attacking with" options={options} value={selectedId} onChange={onSelect} />
       )}
       <div className="flex items-center gap-2">
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5 truncate text-sm font-semibold text-parchment-900">
-            {selected.name}
-            {selected.magical && (
-              <span
-                title="Counts as magical for overcoming resistance to nonmagical damage"
-                className="rounded-control bg-gold-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold-800"
-              >
-                Magical
-              </span>
-            )}
-          </span>
-          <span className="block truncate text-xs text-parchment-600">
-            {selected.attackLabel} to hit · {selected.damageLabel}
-            {selected.note && <span className="ml-1 italic">{selected.note}</span>}
-          </span>
-        </span>
+        <SelectedFormSummary selected={selected} chip={chip} mode={mode} />
         {!boundView && (
           <button
             type="button"
@@ -423,6 +454,8 @@ export default function AttackStepCard({
             selectedId={selectedId}
             onSelect={onSelect}
             selected={selectedView.entry}
+            chip={selectedView.attackChip}
+            mode={selectedView.attackMode}
             boundView={boundView}
             attack={attack}
             attacksExhausted={attacksExhausted}

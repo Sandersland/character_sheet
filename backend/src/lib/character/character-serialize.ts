@@ -36,8 +36,14 @@ import {
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { deriveActions, type AvailableAction } from "@/lib/classes/actions.js";
 import { normalizeResourcesMutable, type AdvancementEntry, type ToolProfEntry } from "@/lib/classes/resources.js";
-import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
-import { buffsByTarget, normalizeActiveEffectsMutable, type ActiveBuff } from "@/lib/combat/active-effects.js";
+import { normalizeConditionsMutable, type ConditionsMutableState } from "@/lib/combat/conditions.js";
+import {
+  buffsByTarget,
+  normalizeActiveEffectsMutable,
+  type ActiveBuff,
+  type ActiveEffectsMutableState,
+} from "@/lib/combat/active-effects.js";
+import { CONDITIONS, type RollModifier } from "@/lib/srd/srd.js";
 import {
   activatedMaxUses,
   chargePoolOf,
@@ -900,6 +906,26 @@ function buildTargetModifiers(
   return mergeTargetModifiers(buffsByTarget(activeEffects), itemPassiveBonuses);
 }
 
+// State-driven roll modifiers (#486): advantage/disadvantage grants from active
+// conditions (5e rules data in srd) merged with active-effect buffs (e.g. Rage).
+// Derived on read — the frontend resolves the effective mode per roll via
+// lib/rollMode.ts (adv + disadv from different sources cancel to normal, RAW).
+export function buildRollModifiers(
+  conditions: ConditionsMutableState,
+  activeEffects: ActiveEffectsMutableState,
+): RollModifier[] {
+  const out: RollModifier[] = [];
+  for (const entry of conditions.active) {
+    const def = CONDITIONS.find((c) => c.key === entry.key);
+    if (!def) continue;
+    for (const effect of def.rollEffects ?? []) out.push({ ...effect, source: def.label });
+  }
+  for (const buff of activeEffects.buffs) {
+    for (const effect of buff.rollEffects ?? []) out.push({ ...effect, source: buff.source });
+  }
+  return out;
+}
+
 // Item-granted traits (#529): resistances/immunities/conditionImmunities/
 // advantages/proficiencies from active (equipped or attuned-when-required)
 // items. Derived on read — nothing here is persisted. resistances also feed
@@ -1284,6 +1310,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     featProficiencies.weapons,
   );
   const activeEffects = normalizeActiveEffectsMutable(row.activeEffects);
+  const conditions = normalizeConditionsMutable(row.conditions);
   const buffTargets = buildTargetModifiers(row, activeEffects);
   const { itemGrants, itemSkillProfs, itemSaveProfs } = buildItemGrantsView(row);
   const inventoryContext = buildInventoryContext(
@@ -1389,10 +1416,13 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // Active status conditions + exhaustion level. Normalized on read (unknown
     // keys dropped, deduped by key, exhaustion clamped 0–6) — mutate via
     // POST /characters/:id/conditions/transactions, never PATCH.
-    conditions: normalizeConditionsMutable(row.conditions),
+    conditions,
     // Active cast-granted passive modifiers (buffs). Normalized on read; each is
     // also summed into its target skill/stat's tempModifier above.
     activeEffects,
+    // State-driven advantage/disadvantage grants (#486), derived from active
+    // conditions + buffs. The frontend resolves the effective mode per roll.
+    rollModifiers: buildRollModifiers(conditions, activeEffects),
 
     // Item-granted traits (#529), derived from active items — no persisted
     // columns. resistances also feed the #456 auto-halve at damage-apply time;

@@ -12,12 +12,13 @@ import { useState } from "react";
 import { critDamageSpec } from "@/lib/attackMath";
 import { isCritRow } from "@/lib/attackTallySummary";
 import { isNaturalOne, isNaturalTwenty, keptD20 } from "@/lib/dice";
-import type { useRoll } from "@/features/dice/RollContext";
+import { resolveRollMode, rollModeChip } from "@/lib/rollMode";
+import { useRoll } from "@/features/dice/RollContext";
 import type { useRollLogger } from "@/features/session/useRollLogger";
 import type { RecordedAttack } from "@/features/session/useTurnState";
 import type { AttackTallyRow, TallyRowSource } from "@/lib/attackTallySummary";
 import type { AttackEntry, DamageRider } from "@/lib/attackMath";
-import type { RollResult } from "@/lib/dice";
+import type { RollMode, RollResult } from "@/lib/dice";
 
 // Everything one AttackStepCard needs, bundled per entry so the component takes
 // a single `view` prop instead of the full state surface.
@@ -29,6 +30,10 @@ export interface AttackEntryView {
   lastDamageRoll: RollResult | null;
   /** Effective crit — the current tally row's verdict is `crit` (#811). */
   isCrit: boolean;
+  /** State-driven "why" chip for the attack roll (#486), e.g. "disadvantage — Poisoned"; "" when none. */
+  attackChip: string;
+  /** The resolved mode behind the chip — color by this, never by parsing the chip text. */
+  attackMode: RollMode;
   onAttack: () => void;
   onDamage: () => void;
   onDamageRider: (rider: DamageRider) => void;
@@ -56,6 +61,13 @@ export function useAttackRolls({
   /** Which economy slot these rolls record into — `action` (default) or `bonusAction` for the off-hand (#813). */
   source?: TallyRowSource;
 }) {
+  // State-driven advantage/disadvantage on attack rolls (#486, e.g. Poisoned)
+  // merged with the manual toggle; resolved once per attack in handleAttack.
+  const { mode: manualMode, rollModifiers } = useRoll();
+  // Attacks aren't ability-scoped, so the resolved mode is the same for every row.
+  const resolvedAttack = resolveRollMode(rollModifiers, { kind: "attack" }, manualMode);
+  const attackChip = rollModeChip(resolvedAttack);
+
   // Per-row last roll results (keyed by weapon item.id, "unarmed", or "improvised").
   const [lastAttackRolls, setLastAttackRolls] = useState<Record<string, RollResult | null>>({});
   const [lastDamageRolls, setLastDamageRolls] = useState<Record<string, RollResult | null>>({});
@@ -79,7 +91,8 @@ export function useAttackRolls({
   // Roll an attack for a row: log it, retain the result, clear any override, spend
   // one attack, and append the tally row for this action (#802).
   function handleAttack(entry: AttackEntry) {
-    const result = roll(entry.attackSpec, entry.attackRollLabel);
+    // Pin the state-resolved mode (Poisoned disadvantage, manual override, RAW cancel).
+    const result = roll({ ...entry.attackSpec, mode: resolvedAttack.mode }, entry.attackRollLabel);
     logRollSafe("attack", entry.logSource, result, entry.attackSpec);
     setLastAttackRolls((prev) => ({ ...prev, [entry.id]: result }));
     setAttackTotals((prev) => ({ ...prev, [entry.id]: null }));
@@ -148,6 +161,8 @@ export function useAttackRolls({
       lastAttackRoll: lastAttackRolls[entry.id] ?? null,
       lastDamageRoll: lastDamageRolls[entry.id] ?? null,
       isCrit: isRowCrit(entry.id),
+      attackChip,
+      attackMode: resolvedAttack.mode,
       onAttack: () => handleAttack(entry),
       onDamage: () => handleDamage(entry),
       onDamageRider: (rider) => handleDamageRider(rider, entry.id),

@@ -1136,6 +1136,11 @@ export interface Character {
    * read). Each is also summed into its target skill/stat's tempModifier.
    */
   activeEffects: ActiveEffectsState;
+  /**
+   * State-driven advantage/disadvantage grants (#486), derived from active
+   * conditions + buffs. Resolved per roll via lib/rollMode.ts. Always present.
+   */
+  rollModifiers: RollModifier[];
 
   // Item-granted traits (#529), derived from active items. resistances also feed
   // the #456 auto-halve at damage-apply; all render as item-sourced sheet flags.
@@ -1698,10 +1703,28 @@ export interface ActiveBuff {
   restType?: "short" | "long";
   // Damage types this buff makes the character resistant to (halved on take) (#456).
   resistDamageTypes?: string[];
+  // State-driven advantage/disadvantage grants (#486), e.g. Rage's advantage on Strength checks & saves.
+  rollEffects?: RollEffect[];
 }
 
 export interface ActiveEffectsState {
   buffs: ActiveBuff[];
+}
+
+// ── State-driven roll modifiers (#486) — mirror of backend/src/lib/srd/roll-effects.ts ─
+// The four d20 roll categories a state can bind advantage/disadvantage to.
+export type RollModeKind = "attack" | "check" | "save" | "initiative";
+
+/** One advantage/disadvantage grant; `ability` (lowercase key) narrows it to a single ability. */
+export interface RollEffect {
+  mode: "advantage" | "disadvantage";
+  kind: RollModeKind;
+  ability?: string;
+}
+
+/** A RollEffect resolved with its provenance label (e.g. "Rage", "Poisoned"). Derived on read. */
+export interface RollModifier extends RollEffect {
+  source: string;
 }
 
 export interface ApplyConditionOperation { type: "applyCondition"; key: ConditionKey; source?: string }

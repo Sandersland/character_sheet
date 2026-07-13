@@ -259,6 +259,10 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
         source: "Rage",
         duration: "while-active",
         resistDamageTypes: ["bludgeoning", "piercing", "slashing"],
+        rollEffects: [
+          { mode: "advantage", kind: "check", ability: "strength" },
+          { mode: "advantage", kind: "save", ability: "strength" },
+        ],
       },
     },
     { type: "spendResource", key: "rage" },

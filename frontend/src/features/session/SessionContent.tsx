@@ -48,7 +48,7 @@ export default function SessionContent({ character, session, reference, setChara
   const isActiveTurn = turnState.phase === "active";
 
   return (
-    <RollProvider characterId={character.id} sessionId={session.id} onRollLogged={life.bumpLog}>
+    <RollProvider characterId={character.id} sessionId={session.id} onRollLogged={life.bumpLog} rollModifiers={character.rollModifiers}>
       <div className="min-h-screen bg-parchment-100">
         <SessionHeaderRegion
           character={character}

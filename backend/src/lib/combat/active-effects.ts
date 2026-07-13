@@ -18,6 +18,7 @@ import { randomUUID } from "node:crypto";
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
+import type { RollEffect, RollModeKind } from "@/lib/srd/roll-effects.js";
 
 // ── Canonical mutable state shape ─────────────────────────────────────────────
 
@@ -49,6 +50,8 @@ export interface ActiveBuff {
   restType?: "short" | "long";
   /** Damage types this buff makes the character resistant to (halved on take), e.g. Rage's b/p/s (#456). */
   resistDamageTypes?: string[];
+  /** State-driven advantage/disadvantage grants (#486), e.g. Rage's advantage on Strength checks & saves. */
+  rollEffects?: RollEffect[];
 }
 
 export interface ActiveEffectsMutableState {
@@ -73,10 +76,34 @@ function parseResistDamageTypes(value: unknown): string[] | undefined {
   return types.length > 0 ? types : undefined;
 }
 
+const ROLL_MODE_KINDS: RollModeKind[] = ["attack", "check", "save", "initiative"];
+
+// One state-driven roll grant (#486); null when the entry is malformed.
+function parseRollEffect(raw: unknown): RollEffect | null {
+  if (!raw || typeof raw !== "object") return null;
+  const entry = raw as Record<string, unknown>;
+  if (entry.mode !== "advantage" && entry.mode !== "disadvantage") return null;
+  if (!ROLL_MODE_KINDS.includes(entry.kind as RollModeKind)) return null;
+  return {
+    mode: entry.mode,
+    kind: entry.kind as RollModeKind,
+    ...(typeof entry.ability === "string" ? { ability: entry.ability } : {}),
+  };
+}
+
+// Parse the state-driven roll grants (#486). Drops malformed entries; returns
+// undefined when none survive (byte-parity with buffs that predate the axis).
+function parseRollEffects(value: unknown): RollEffect[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const effects = value.map(parseRollEffect).filter((e): e is RollEffect => e !== null);
+  return effects.length > 0 ? effects : undefined;
+}
+
 // Build a valid ActiveBuff from a validated entry (key/target are strings, modifier finite).
 function buildBuff(entry: Record<string, unknown>, key: string, target: string, modifier: number): ActiveBuff {
   const restType = parseRestType(entry.restType);
   const resistDamageTypes = parseResistDamageTypes(entry.resistDamageTypes);
+  const rollEffects = parseRollEffects(entry.rollEffects);
   return {
     id: typeof entry.id === "string" ? entry.id : randomUUID(),
     key,
@@ -87,6 +114,7 @@ function buildBuff(entry: Record<string, unknown>, key: string, target: string, 
     duration: parseBuffDuration(entry.duration),
     ...(restType ? { restType } : {}),
     ...(resistDamageTypes ? { resistDamageTypes } : {}),
+    ...(rollEffects ? { rollEffects } : {}),
   };
 }
 
@@ -132,6 +160,7 @@ export function serializeActiveEffectsState(state: ActiveEffectsMutableState): P
       ...(b.duration !== "concentration" ? { duration: b.duration } : {}),
       ...(b.restType ? { restType: b.restType } : {}),
       ...(b.resistDamageTypes && b.resistDamageTypes.length > 0 ? { resistDamageTypes: b.resistDamageTypes } : {}),
+      ...(b.rollEffects && b.rollEffects.length > 0 ? { rollEffects: b.rollEffects } : {}),
     })),
   } as unknown as Prisma.InputJsonValue;
 }
