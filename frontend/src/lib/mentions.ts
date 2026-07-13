@@ -93,6 +93,31 @@ export function matchEntities(
   );
 }
 
+export interface EntityMatch {
+  entity: CampaignEntity;
+  matchedInNotesOnly: boolean;
+}
+
+// Codex-search variant of matchEntities (#840): name/alias hits stay primary,
+// but notes text also matches, flagged so the UI can mark it as secondary.
+// The @-autocomplete keeps using matchEntities — it must never match notes.
+export function matchEntitiesDetailed(
+  entities: CampaignEntity[],
+  query: string,
+): EntityMatch[] {
+  const q = normalizeForMatch(query);
+  if (!q) return entities.map((entity) => ({ entity, matchedInNotesOnly: false }));
+  const matches: EntityMatch[] = [];
+  for (const entity of entities) {
+    if ([entity.name, ...entity.aliases].some((s) => normalizeForMatch(s).includes(q))) {
+      matches.push({ entity, matchedInNotesOnly: false });
+    } else if (entity.notes && normalizeForMatch(entity.notes).includes(q)) {
+      matches.push({ entity, matchedInNotesOnly: true });
+    }
+  }
+  return matches;
+}
+
 export interface MentionTrigger {
   active: true;
   typeFilter?: EntityType;
@@ -145,6 +170,26 @@ const MENTION_CHIP_TONE_CLASS: Record<EntityType, string> = {
   ITEM: "bg-gold-50 text-gold-800",
   PC: "bg-garnet-50 text-garnet-800",
   OTHER: "bg-parchment-100 text-parchment-700",
+};
+
+// Filter-rail tone dot per type — same hue family as the chip/badge tones.
+export const ENTITY_TYPE_DOT_CLASS: Record<EntityType, string> = {
+  NPC: "bg-garnet-500",
+  LOCATION: "bg-vitality-500",
+  FACTION: "bg-arcane-500",
+  ITEM: "bg-gold-500",
+  PC: "bg-garnet-500",
+  OTHER: "bg-parchment-400",
+};
+
+// Ledger monogram tile tint per type — soft bg + accessible accent text.
+export const ENTITY_TYPE_MONOGRAM_CLASS: Record<EntityType, string> = {
+  NPC: "bg-garnet-50 text-garnet-700",
+  LOCATION: "bg-vitality-50 text-vitality-800",
+  FACTION: "bg-arcane-50 text-arcane-700",
+  ITEM: "bg-gold-50 text-gold-800",
+  PC: "bg-garnet-50 text-garnet-700",
+  OTHER: "bg-parchment-100 text-parchment-600",
 };
 
 // An atomic, non-editable @Name chip carrying its uuid in data-mention-id.
