@@ -1487,8 +1487,9 @@ model SessionParticipant {
 
 // kind distinguishes the two capture surfaces sharing this table: full ENTRY
 // rows (date/body form) vs. fast NOTE rows (one-line in-session capture, date
-// defaults to today). EntryVisibility ships private-by-default; the CAMPAIGN
-// share toggle is deferred but needs no schema change to enable later.
+// defaults to today). EntryVisibility: new entries default CAMPAIGN inside a
+// campaign (author can opt out to PRIVATE); campaign-less writes are PRIVATE.
+// The column default stays PRIVATE so pre-#838 rows remain unshared.
 enum JournalEntryKind {
   NOTE
   ENTRY
@@ -1507,7 +1508,7 @@ enum EntryVisibility {
 // the player assigns to the entry; `createdAt` is the system write time used
 // for stable newest-first ordering. `loggedAt` is the capture timestamp shown
 // on NOTE rows. `authorUserId` denormalizes the writing user so visibleEntries
-// can filter private-by-default without a join.
+// and the backlinks visibility filter can gate by author without a join.
 model JournalEntry {
   id           String           @id @default(uuid())
   characterId  String
