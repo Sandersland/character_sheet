@@ -15,7 +15,7 @@ import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { deriveResourcesForCharacterRow } from "./class-features.js";
-import type { EffectSpec } from "@/lib/combat/effects.js";
+import { catalogEffectSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { normalizeSpellcastingMutable, snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
 import { KI_CAST_CHARACTER_SELECT, emitKiCastEvents } from "./ki-cast.js";
 
@@ -54,27 +54,17 @@ export interface ShadowArtEffectRow {
 }
 
 /**
- * Build a Shadow Art's EffectSpec directly: always flat (scaling.mode "none").
- * Pass without Trace is a buff (buffTarget/buffModifier map into the spec);
- * the rest are roll-less utility. Concentration is derived from the name set.
- *
- * Deliberately parallel to (not shared with) disciplines' `disciplineEffectSpec`
- * + save-DC gate — only the ki-cast scaffolding is shared (lib/classes/ki-cast.ts).
- * Unifying the divergent row→effect mapping is the declarative subclass engine (#416).
+ * Build a Shadow Art's EffectSpec via the shared catalogEffectSpec builder:
+ * always flat (scaling.mode "none"), concentration from the name set. Pass without
+ * Trace is a buff (buffTarget/buffModifier map into the spec); the rest are
+ * roll-less utility. The scaling/concentration axes differ from disciplines; the
+ * shared row→spec mapping lives in lib/combat/effects.ts (#817).
  */
 export function shadowArtEffectSpec(row: ShadowArtEffectRow): EffectSpec {
-  const isBuff = row.effectKind === "buff";
-  return {
-    effectType: isBuff ? "buff" : "utility",
-    damageType: null,
-    attackType: null,
-    saveAbility: null,
-    saveEffect: null,
+  return catalogEffectSpec(row, {
     scaling: { mode: "none" },
-    concentration: CONCENTRATION_SHADOW_ARTS.has(row.name),
-    buffTarget: row.buffTarget ?? null,
-    buffModifier: row.buffModifier ?? null,
-  };
+    concentrates: (name) => CONCENTRATION_SHADOW_ARTS.has(name),
+  });
 }
 
 // ── Transaction handler ───────────────────────────────────────────────────────

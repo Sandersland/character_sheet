@@ -15,7 +15,7 @@ import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import { readAbilityCost, type PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { deriveResourcesForCharacterRow } from "./class-features.js";
-import type { EffectSpec } from "@/lib/combat/effects.js";
+import { catalogEffectSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { normalizeResourcesMutable } from "./resources.js";
 import { normalizeSpellcastingMutable, snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
 import { KI_CAST_CHARACTER_SELECT, emitKiCastEvents, type KiCastCharacterRow } from "./ki-cast.js";
@@ -73,31 +73,17 @@ export interface DisciplineEffectRow {
 }
 
 /**
- * Build a discipline's EffectSpec directly (not via readEffectSpec): disciplines
- * scale by ki spent above the base cost, so scaling is always mode "ki" with
- * dicePerStep = costPerStep. Utility disciplines carry no dice.
- *
- * Deliberately parallel to (not shared with) shadow-arts' `shadowArtEffectSpec` +
- * level gate: the mapped fields and gates genuinely differ. Only the ki-cast
- * scaffolding is shared (lib/classes/ki-cast.ts); unifying the row→effect mapping
- * is the declarative subclass engine's job (#416).
+ * Build a discipline's EffectSpec via the shared catalogEffectSpec builder:
+ * disciplines scale by ki spent above the base cost, so scaling is always mode
+ * "ki" with dicePerStep = costPerStep, and concentration is the name-set check.
+ * The scaling/concentration axes differ from shadow-arts; the shared row→spec
+ * mapping lives in lib/combat/effects.ts (#817).
  */
 export function disciplineEffectSpec(row: DisciplineEffectRow): EffectSpec {
-  const hasDice = Boolean(row.effectKind && row.effectDiceCount && row.effectDiceFaces);
-  const dice = hasDice
-    ? { count: row.effectDiceCount as number, faces: row.effectDiceFaces as number, modifier: row.effectModifier ?? 0 }
-    : undefined;
-  const effectType = row.effectKind === "heal" ? "heal" : row.effectKind === "damage" ? "damage" : "utility";
-  return {
-    effectType,
-    dice,
-    damageType: row.damageType ?? null,
-    attackType: row.attackType ?? null,
-    saveAbility: row.saveAbility ?? null,
-    saveEffect: row.saveEffect ?? null,
+  return catalogEffectSpec(row, {
     scaling: { mode: "ki", dicePerStep: row.costPerStep ?? 0 },
-    concentration: CONCENTRATION_DISCIPLINES.has(row.name),
-  };
+    concentrates: (name) => CONCENTRATION_DISCIPLINES.has(name),
+  });
 }
 
 // ── Cast resolution (gate + catalog + cost validation) ─────────────────────────

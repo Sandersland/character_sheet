@@ -114,6 +114,53 @@ export function readEffectSpec(row: EffectRow, resolveDie?: ClassDieResolver): E
   };
 }
 
+// Catalog columns a ki-fuelled ability (discipline, Shadow Art) maps to an
+// EffectSpec. The row carries the dice/damage/save fields OR the buff fields; the
+// caller supplies the two genuine per-subclass differences via CatalogEffectConfig.
+export interface CatalogEffectRow {
+  name: string;
+  effectKind?: string | null;
+  effectDiceCount?: number | null;
+  effectDiceFaces?: number | null;
+  effectModifier?: number | null;
+  damageType?: string | null;
+  attackType?: string | null;
+  saveAbility?: string | null;
+  saveEffect?: string | null;
+  buffTarget?: string | null;
+  buffModifier?: number | null;
+}
+
+// The genuine differences between ki-cast subclasses: how the effect scales (ki
+// vs flat) and which ability names concentrate (a per-name set membership test).
+export interface CatalogEffectConfig {
+  scaling: EffectScaling;
+  concentrates: (name: string) => boolean;
+}
+
+// Build a ki-fuelled ability's EffectSpec from its catalog row. Disciplines pass
+// { mode: "ki", dicePerStep } + their concentration set; Shadow Arts pass
+// { mode: "none" } + theirs. Kept deliberately thin — the declarative subclass
+// engine (#416) will subsume this row→spec mapping.
+export function catalogEffectSpec(row: CatalogEffectRow, config: CatalogEffectConfig): EffectSpec {
+  const hasDice = Boolean(row.effectKind && row.effectDiceCount && row.effectDiceFaces);
+  const dice = hasDice
+    ? { count: row.effectDiceCount as number, faces: row.effectDiceFaces as number, modifier: row.effectModifier ?? 0 }
+    : undefined;
+  return {
+    effectType: resolveEffectType(row.effectKind),
+    dice,
+    damageType: row.damageType ?? null,
+    attackType: row.attackType ?? null,
+    saveAbility: row.saveAbility ?? null,
+    saveEffect: row.saveEffect ?? null,
+    scaling: config.scaling,
+    concentration: config.concentrates(row.name),
+    buffTarget: row.buffTarget ?? null,
+    buffModifier: row.buffModifier ?? null,
+  };
+}
+
 /** A concrete passive-modifier descriptor resolved from a buff EffectSpec. */
 export interface BuffDescriptor {
   target: string;
