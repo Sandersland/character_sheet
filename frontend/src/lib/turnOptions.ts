@@ -218,6 +218,8 @@ export interface ActionSheetModel {
   consumableCount: number;
   hasSpellcasting: boolean;
   classActionOptions: ClassActionOption[];
+  /** Current hands summary for the "Change weapons" card (#815). */
+  loadoutLabel: string;
 }
 
 export interface BonusSheetModel {

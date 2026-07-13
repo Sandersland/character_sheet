@@ -1,5 +1,5 @@
 import BottomSheet from "@/components/ui/BottomSheet";
-import { GiCrossedSwords } from "@/components/ui/icons";
+import { GiCrossedSwords, GiCycle } from "@/components/ui/icons";
 import { UNIVERSAL_ACTIONS } from "@/lib/turnRules";
 import ActionSheetBody from "@/features/session/ActionSheetBody";
 import { TurnSlotCard, AttackCounter } from "@/features/session/TurnControls";
@@ -84,6 +84,19 @@ export default function ActionSlot({
           <ResumeAttackButton attack={attack} onResume={handleResumeAttack} />
         )}
       </TurnSlotCard>
+
+      {/* With the Action spent, the full sheet is gated shut — keep the free
+          weapon-change (draw into / stow from a free hand) reachable (#815). */}
+      {!view.available && (
+        <button
+          type="button"
+          onClick={() => handleActionClick("changeWeapons", "action")}
+          className="flex w-full items-center justify-center gap-1.5 rounded-control border border-dashed border-parchment-300 bg-parchment-50 px-3 py-2 text-xs font-semibold text-parchment-700 transition-colors hover:bg-parchment-100"
+        >
+          <GiCycle aria-hidden className="h-4 w-4" />
+          Change weapons — free-hand draw or stow
+        </button>
+      )}
 
       {showActionMenu && view.available && (
         <BottomSheet
