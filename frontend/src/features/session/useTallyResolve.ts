@@ -12,7 +12,7 @@ import { useCallback } from "react";
 
 import { useRoll } from "@/features/dice/RollContext";
 import { useRollLogger } from "@/features/session/useRollLogger";
-import { buildAttackForms, critDamageSpec } from "@/lib/attackMath";
+import { buildAttackForms, buildOffHandEntry, critDamageSpec } from "@/lib/attackMath";
 import { isCritRow } from "@/lib/attackTallySummary";
 import type { AttackTallyRow, TallyVerdict } from "@/lib/attackTallySummary";
 import type { Character } from "@/types/character";
@@ -42,8 +42,16 @@ export function useTallyResolve({
   const { roll } = useRoll();
   const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
 
+  // A bonusAction row resolves against the off-hand entry (no ability mod unless
+  // the TWF style) — never the main-hand form of the same weapon id (#813).
   const formFor = useCallback(
-    (row: AttackTallyRow) => buildAttackForms(character).find((f) => f.id === row.formId) ?? null,
+    (row: AttackTallyRow) => {
+      if (row.source === "bonusAction") {
+        const off = buildOffHandEntry(character);
+        return off && off.id === row.formId ? off : null;
+      }
+      return buildAttackForms(character).find((f) => f.id === row.formId) ?? null;
+    },
     [character],
   );
 

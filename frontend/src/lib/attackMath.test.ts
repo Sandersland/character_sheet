@@ -385,7 +385,7 @@ describe("buildOffHandEntry (#732)", () => {
   it("scopes to the OFF_HAND weapon", () => {
     const entry = buildOffHandEntry(twoWeaponChar())!;
     expect(entry.id).toBe("off");
-    expect(entry.name).toBe("Dagger");
+    expect(entry.name).toBe("Dagger (off-hand)");
   });
 
   it("omits the ability modifier from off-hand damage WITHOUT the style", () => {

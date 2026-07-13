@@ -157,6 +157,7 @@ function TwfResolutionSheet({
     <BottomSheet
       title="Off-hand attack"
       subtitle="Two-Weapon Fighting · bonus action"
+      wide
       onClose={() => {
         turnState.cancelTwf();
         closeResolution();

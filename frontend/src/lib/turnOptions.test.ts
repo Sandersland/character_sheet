@@ -123,7 +123,7 @@ describe("offHandSummary", () => {
       ],
     } as Partial<Character>);
     // Off-hand drops the +3 ability modifier (no TWF style) → 1d4 piercing.
-    expect(offHandSummary(c)).toBe("Dagger · +5 to hit · 1d4 piercing");
+    expect(offHandSummary(c)).toBe("Dagger (off-hand) · +5 to hit · 1d4 piercing");
   });
 
   it("returns null when the loadout can't dual-wield", () => {

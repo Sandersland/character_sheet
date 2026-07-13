@@ -16,7 +16,7 @@ function roll(overrides: Partial<TallyAttackRoll> = {}): TallyAttackRoll {
 }
 
 function row(overrides: Partial<AttackTallyRow> = {}): AttackTallyRow {
-  return { formId: "w1", formName: "Longsword", attack: roll(), ...overrides };
+  return { id: "r1", source: "action", formId: "w1", formName: "Longsword", attack: roll(), ...overrides };
 }
 
 describe("autoVerdict", () => {

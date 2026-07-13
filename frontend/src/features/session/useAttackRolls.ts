@@ -15,12 +15,12 @@ import { isNaturalOne, isNaturalTwenty, keptD20 } from "@/lib/dice";
 import type { useRoll } from "@/features/dice/RollContext";
 import type { useRollLogger } from "@/features/session/useRollLogger";
 import type { RecordedAttack } from "@/features/session/useTurnState";
-import type { AttackTallyRow } from "@/lib/attackTallySummary";
+import type { AttackTallyRow, TallyRowSource } from "@/lib/attackTallySummary";
 import type { AttackEntry, DamageRider } from "@/lib/attackMath";
 import type { RollResult } from "@/lib/dice";
 
-// Everything one AttackRow / AttackStepCard needs, bundled per entry so the
-// components take a single `view` prop instead of the full state surface.
+// Everything one AttackStepCard needs, bundled per entry so the component takes
+// a single `view` prop instead of the full state surface.
 export interface AttackEntryView {
   entry: AttackEntry;
   attackTotal: number | null | undefined;
@@ -43,15 +43,18 @@ export function useAttackRolls({
   setTallyAttackTotal,
   addTallyDamageRider,
   currentRow,
+  source = "action",
 }: {
   roll: ReturnType<typeof useRoll>["roll"];
   logRollSafe: ReturnType<typeof useRollLogger>;
   recordAttack: (recorded: RecordedAttack) => void;
-  setTallyDamage: (damage: number) => void;
-  setTallyAttackTotal: (total: number) => void;
-  addTallyDamageRider: (amount: number) => void;
-  /** The most-recent tally row — its verdict drives crit damage doubling (#811). */
+  setTallyDamage: (rowId: string, damage: number) => void;
+  setTallyAttackTotal: (rowId: string, total: number) => void;
+  addTallyDamageRider: (rowId: string, amount: number) => void;
+  /** The most-recent tally row for THIS source — its verdict drives crit doubling and its id targets writes (#811/#813). */
   currentRow: AttackTallyRow | null;
+  /** Which economy slot these rolls record into — `action` (default) or `bonusAction` for the off-hand (#813). */
+  source?: TallyRowSource;
 }) {
   // Per-row last roll results (keyed by weapon item.id, "unarmed", or "improvised").
   const [lastAttackRolls, setLastAttackRolls] = useState<Record<string, RollResult | null>>({});
@@ -83,6 +86,7 @@ export function useAttackRolls({
     recordAttack({
       formId: entry.id,
       formName: entry.name,
+      source,
       attack: {
         total: result.total,
         keptFace: keptD20(result)?.value ?? null,
@@ -101,7 +105,7 @@ export function useAttackRolls({
     logRollSafe("damage", entry.logSource, result, spec, entry.damageType);
     setLastDamageRolls((prev) => ({ ...prev, [entry.id]: result }));
     setDamageTotals((prev) => ({ ...prev, [entry.id]: null }));
-    setTallyDamage(result.total);
+    if (currentRow) setTallyDamage(currentRow.id, result.total);
   }
 
   // Roll one on-hit dice rider (e.g. Flame Tongue +2d6 fire) as its own typed term.
@@ -114,19 +118,21 @@ export function useAttackRolls({
     const result = roll(spec, rider.rollLabel);
     logRollSafe("damage", rider.logSource, result, spec, rider.damageType);
     setRiderTotals((prev) => ({ ...prev, [rider.id]: result.total }));
-    addTallyDamageRider(result.total);
+    if (currentRow) addTallyDamageRider(currentRow.id, result.total);
   }
 
-  // Callback for ManeuverPrompt — stores auto-sum overrides per row.
-  function makeOnRollsUpdated(rowId: string) {
+  // Callback for ManeuverPrompt — stores auto-sum overrides per entry, and folds
+  // the boosted totals into THIS source's current tally row (targeted by id, so a
+  // second interleaved source never gets the override — #813).
+  function makeOnRollsUpdated(entryId: string) {
     return (newAtk: number | null, newDmg: number | null) => {
       if (newAtk !== null) {
-        setAttackTotals((prev) => ({ ...prev, [rowId]: newAtk }));
-        setTallyAttackTotal(newAtk); // keep the tally row + Turn-summary banner on the boosted to-hit
+        setAttackTotals((prev) => ({ ...prev, [entryId]: newAtk }));
+        if (currentRow) setTallyAttackTotal(currentRow.id, newAtk);
       }
       if (newDmg !== null) {
-        setDamageTotals((prev) => ({ ...prev, [rowId]: newDmg }));
-        setTallyDamage(newDmg); // keep the tally slot in sync with a maneuver sum
+        setDamageTotals((prev) => ({ ...prev, [entryId]: newDmg }));
+        if (currentRow) setTallyDamage(currentRow.id, newDmg);
       }
     };
   }

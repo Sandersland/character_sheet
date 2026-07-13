@@ -1,6 +1,5 @@
-// On-hit dice riders (Flame Tongue +2d6 fire) for an attack row/card: each a
-// separate typed term with its own Roll button. Shared by AttackRow and
-// WeaponDamageCard so the two never drift (#778).
+// On-hit dice riders (Flame Tongue +2d6 fire) for the attack card's Damage step:
+// each a separate typed term with its own Roll button. Consumed by AttackStepCard.
 
 import type { DamageRider } from "@/lib/attackMath";
 
