@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import CapturePalette from "@/features/journal/CapturePalette";
@@ -59,6 +59,7 @@ const defaultMatchMedia = window.matchMedia;
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(client.createJournalEntry).mockResolvedValue(makeCharacter());
+  vi.mocked(client.updateJournalEntry).mockResolvedValue(makeCharacter());
   vi.mocked(client.deleteJournalEntry).mockResolvedValue(makeCharacter());
   vi.mocked(client.fetchEntities).mockResolvedValue([]);
 });
@@ -217,6 +218,58 @@ describe("CapturePalette (#247)", () => {
 
       const [, entry] = vi.mocked(client.createJournalEntry).mock.calls[0];
       expect(entry).toMatchObject({ visibility: "PRIVATE" });
+    });
+
+    it("resets the toggle to shared after a successful save (privacy never leaks forward)", async () => {
+      const user = userEvent.setup();
+      render(
+        <CapturePalette character={makeCampaignCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />,
+      );
+
+      await user.click(screen.getByRole("checkbox", { name: /private/i }));
+      await user.type(screen.getByRole("textbox", { name: /quick note/i }), "one-off secret");
+      await user.keyboard("{Enter}");
+
+      expect(vi.mocked(client.createJournalEntry).mock.calls[0][1]).toMatchObject({
+        visibility: "PRIVATE",
+      });
+      expect(screen.getByRole("checkbox", { name: /private/i })).not.toBeChecked();
+
+      await user.type(screen.getByRole("textbox", { name: /quick note/i }), "back to shared");
+      await user.keyboard("{Enter}");
+
+      expect(client.createJournalEntry).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(client.createJournalEntry).mock.calls[1][1]).not.toHaveProperty(
+        "visibility",
+      );
+    });
+
+    it("lets the inline editor toggle a note's visibility", async () => {
+      const user = userEvent.setup();
+      const character = makeCampaignCharacter([
+        {
+          id: "note-1",
+          kind: "NOTE",
+          date: "2026-07-01T00:00:00.000Z",
+          loggedAt: "2026-07-01T20:00:00.000Z",
+          body: "table knowledge",
+          visibility: "CAMPAIGN",
+        },
+      ]);
+      render(<CapturePalette character={character} onClose={vi.fn()} onUpdate={vi.fn()} />);
+
+      await user.click(screen.getByRole("button", { name: /^edit$/i }));
+      // Scope to the editor row — the composer renders its own Private toggle.
+      const editorRow = screen.getByRole("textbox", { name: /edit note/i }).closest("li")!;
+      const editorToggle = within(editorRow).getByRole("checkbox", { name: /private/i });
+      expect(editorToggle).not.toBeChecked();
+      await user.click(editorToggle);
+      await user.click(within(editorRow).getByRole("button", { name: /^save$/i }));
+
+      expect(client.updateJournalEntry).toHaveBeenCalledWith("char-1", "note-1", {
+        body: "table knowledge",
+        visibility: "PRIVATE",
+      });
     });
 
     it("hides the Private toggle for a campaign-less character", () => {
