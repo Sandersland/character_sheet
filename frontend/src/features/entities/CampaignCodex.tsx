@@ -1,206 +1,120 @@
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
-import Card from "@/components/ui/Card";
+import BottomSheet from "@/components/ui/BottomSheet";
 import EmptyState from "@/components/ui/EmptyState";
 import { GiSpellBook, Plus } from "@/components/ui/icons";
-import { createEntity } from "@/api/client";
-import EntityList from "@/features/entities/EntityList";
-import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
-import { ENTITY_TYPE_OPTIONS } from "@/lib/mentions";
+import CodexLedger from "@/features/entities/CodexLedger";
+import CodexRail from "@/features/entities/CodexRail";
+import EntityCreateForm from "@/features/entities/EntityCreateForm";
+import { useCampaignEntities } from "@/hooks/useCampaignEntities";
+import { useIsBelowMd } from "@/hooks/useIsBelowMd";
+import { groupByInitial, typeCounts, type CodexSort } from "@/lib/codexLedger";
+import { matchEntitiesDetailed } from "@/lib/mentions";
 import type { CampaignRole, EntityType } from "@/types/character";
 
 interface CampaignCodexProps {
   campaignId: string;
   role?: CampaignRole;
+  campaignName?: string;
 }
 
-const inputCls =
-  "w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
-const labelCls = "block text-xs font-semibold text-parchment-700";
-
-// Codex tab: the single entity list for all roles (#523) — browse/search/filter
-// via EntityList plus create. Rows link to EntityDetailPage, which owns
-// edit/delete/reveal. Members see only revealed entities (server-filtered); the
-// owner also sees HIDDEN ones (Hidden badge) and can create one hidden.
-export default function CampaignCodex({ campaignId, role }: CampaignCodexProps) {
+// Codex browse shell (#840): orchestrates the filter rail + chronicle ledger.
+// Rows link to EntityDetailPage, which owns edit/delete/reveal. Members see
+// only revealed entities (server-filtered); the owner also sees HIDDEN ones.
+export default function CampaignCodex({ campaignId, role, campaignName }: CampaignCodexProps) {
   const { entities } = useCampaignEntities(campaignId);
-
+  const [query, setQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<EntityType | "ALL">("ALL");
+  const [sort, setSort] = useState<CodexSort>("alpha");
   const [creating, setCreating] = useState(false);
+  // One ref serves both toggles — the rail button and FAB never coexist.
   const toggleRef = useRef<HTMLButtonElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [type, setType] = useState<EntityType>("NPC");
-  const [name, setName] = useState("");
-  const [aliases, setAliases] = useState("");
-  const [notes, setNotes] = useState("");
-  const [startHidden, setStartHidden] = useState(false);
+  const isOwner = role === "OWNER";
+  const isMobile = useIsBelowMd();
 
-  // Escape dismisses the open create panel (document-level, same pattern as DropdownMenu).
-  useEffect(() => {
-    if (!creating) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeForm();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [creating]);
+  const matches = useMemo(
+    () =>
+      matchEntitiesDetailed(entities, query).filter(
+        (m) => typeFilter === "ALL" || m.entity.type === typeFilter,
+      ),
+    [entities, query, typeFilter],
+  );
+  const groups = useMemo(() => groupByInitial(matches.map((m) => m.entity)), [matches]);
+  const matchedInNotesIds = useMemo(
+    () => new Set(matches.filter((m) => m.matchedInNotesOnly).map((m) => m.entity.id)),
+    [matches],
+  );
+  const counts = useMemo(() => typeCounts(entities), [entities]);
 
   function closeForm() {
     setCreating(false);
-    setFormError(null);
-    setType("NPC");
-    setName("");
-    setAliases("");
-    setNotes("");
-    setStartHidden(false);
     // The panel unmounts, so return keyboard focus to the toggle (same pattern as Popover).
     toggleRef.current?.focus();
   }
 
-  const isOwner = role === "OWNER";
-
-  async function handleCreate() {
-    if (name.trim() === "") return;
-    setBusy(true);
-    setFormError(null);
-    try {
-      const created = await createEntity(campaignId, {
-        type,
-        name: name.trim(),
-        aliases: aliases
-          .split(",")
-          .map((a) => a.trim())
-          .filter(Boolean),
-        notes: notes.trim() === "" ? undefined : notes.trim(),
-        // Only the owner may seed visibility; the backend gates it anyway.
-        ...(isOwner && startHidden ? { visibility: "HIDDEN" as const } : {}),
-      });
-      // Prime the shared cache so the list and journal @-chips update at once.
-      primeCampaignEntities(campaignId, [...entities, created]);
-      closeForm();
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Failed to create entity.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
+  // The lg grid keeps a seam for the activity column (#841): [rail | ledger | activity].
   return (
-    <Card
-      title="Codex"
-      headingLevel={2}
-      titleAccessory={
-        <button
-          ref={toggleRef}
-          type="button"
-          aria-expanded={creating}
-          onClick={() => (creating ? closeForm() : setCreating(true))}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-garnet-700 hover:underline"
-        >
-          <Plus aria-hidden="true" className="h-3.5 w-3.5" />
-          New entity
-        </button>
-      }
-      className="p-4"
-    >
-      <div className="flex flex-col gap-3 p-4">
-        {creating && (
-          <div className="flex flex-col gap-3 rounded-control border border-parchment-200 bg-parchment-100 p-3">
-            {formError && (
-              <p className="rounded-control bg-garnet-50 px-3 py-2 text-sm font-semibold text-garnet-700">
-                {formError}
-              </p>
-            )}
-            <div>
-              <label className={labelCls} htmlFor="codex-entity-name">
-                Name *
-              </label>
-              <input
-                id="codex-entity-name"
-                className={inputCls}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className={labelCls} htmlFor="codex-entity-type">
-                Type
-              </label>
-              <select
-                id="codex-entity-type"
-                className={inputCls}
-                value={type}
-                onChange={(e) => setType(e.target.value as EntityType)}
-              >
-                {ENTITY_TYPE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls} htmlFor="codex-entity-aliases">
-                Aliases (comma-separated)
-              </label>
-              <input
-                id="codex-entity-aliases"
-                className={inputCls}
-                value={aliases}
-                onChange={(e) => setAliases(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className={labelCls} htmlFor="codex-entity-notes">
-                Notes
-              </label>
-              <textarea
-                id="codex-entity-notes"
-                rows={3}
-                className={`${inputCls} resize-y`}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </div>
-            {isOwner && (
-              <label className="flex items-center gap-2 text-xs font-semibold text-parchment-700">
-                <input
-                  type="checkbox"
-                  checked={startHidden}
-                  onChange={(e) => setStartHidden(e.target.checked)}
-                />
-                Start hidden from players
-              </label>
-            )}
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={closeForm}
-                className="rounded-control px-3 py-1.5 text-xs font-semibold text-parchment-600 hover:text-parchment-900"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={busy || name.trim() === ""}
-                onClick={handleCreate}
-                className="rounded-control bg-garnet-600 px-3 py-1.5 text-xs font-semibold text-parchment-50 hover:bg-garnet-700 disabled:opacity-40"
-              >
-                {busy ? "Creating…" : "Create entity"}
-              </button>
-            </div>
-          </div>
+    <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start lg:gap-8">
+      <CodexRail
+        campaignName={campaignName}
+        entryCount={entities.length}
+        query={query}
+        onQueryChange={setQuery}
+        typeFilter={typeFilter}
+        onTypeFilterChange={setTypeFilter}
+        counts={counts}
+        sort={sort}
+        onSortChange={setSort}
+        creating={creating}
+        onToggleCreate={() => (creating ? closeForm() : setCreating(true))}
+        toggleRef={toggleRef}
+        showCreateToggle={!isMobile}
+      >
+        {creating && !isMobile && (
+          <EntityCreateForm campaignId={campaignId} isOwner={isOwner} onClose={closeForm} />
         )}
+      </CodexRail>
+      <div className="min-w-0">
         {entities.length === 0 ? (
           <EmptyState
             icon={<GiSpellBook />}
             title="No entities yet"
             description="NPCs, locations, factions and more appear here once created or @-mentioned in a journal note."
+            action={{ label: "Create your first entry", onClick: () => setCreating(true) }}
           />
+        ) : matches.length === 0 ? (
+          <p className="py-4 text-center text-sm text-parchment-600">
+            No entities match your search.
+          </p>
         ) : (
-          <EntityList campaignId={campaignId} entities={entities} role={role} />
+          <CodexLedger
+            campaignId={campaignId}
+            groups={groups}
+            matchedInNotesIds={matchedInNotesIds}
+            role={role}
+            sort={sort}
+          />
         )}
       </div>
-    </Card>
+      {isMobile && (
+        <>
+          <button
+            ref={toggleRef}
+            type="button"
+            aria-expanded={creating}
+            onClick={() => (creating ? closeForm() : setCreating(true))}
+            className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-1.5 rounded-full bg-garnet-700 px-4 py-3 text-sm font-semibold text-parchment-50 shadow-raised transition-colors hover:bg-garnet-800"
+          >
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            New entry
+          </button>
+          {creating && (
+            <BottomSheet title="New entry" onClose={closeForm}>
+              <EntityCreateForm campaignId={campaignId} isOwner={isOwner} onClose={closeForm} />
+            </BottomSheet>
+          )}
+        </>
+      )}
+    </div>
   );
 }

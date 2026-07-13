@@ -25,7 +25,7 @@ test("owner creates a hidden entity from the Codex and reveals it from the detai
 
   await page.goto(`/campaigns/${campaignId}/codex`);
 
-  await page.getByRole("button", { name: /new entity/i }).click();
+  await page.getByRole("button", { name: /new entry/i }).click();
   await page.getByLabel("Name *").fill(entityName);
   await page.getByLabel(/start hidden from players/i).check();
   await page.getByRole("button", { name: /create entity/i }).click();
@@ -57,7 +57,7 @@ test("the Manage tab keeps Identity merges but lists no entities", async ({ page
 
   await expect(page.getByRole("heading", { name: /identity merges/i })).toBeVisible();
   await expect(page.getByRole("searchbox", { name: /search entities/i })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /new entity/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /new entry/i })).toHaveCount(0);
 
   expect(errors).toEqual([]);
 });
