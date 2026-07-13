@@ -9,6 +9,8 @@ interface BottomSheetProps {
   title: string;
   /** Optional muted line under the title (e.g. "Pick one — nothing is spent until you choose"). */
   subtitle?: string;
+  /** Widen the md+ centered dialog to 42rem for two-column bodies (#811). Mobile is unaffected. */
+  wide?: boolean;
   onClose: () => void;
   children: ReactNode;
 }
@@ -26,7 +28,7 @@ interface BottomSheetProps {
  * the bottom edge and fades the scrim in sync before onClose fires (#782); at
  * `md`+ the centered dialog keeps today's instant close.
  */
-export default function BottomSheet({ title, subtitle, onClose, children }: BottomSheetProps) {
+export default function BottomSheet({ title, subtitle, wide = false, onClose, children }: BottomSheetProps) {
   // Escape routes through the same close path; indirection keeps useDialogChrome
   // stable while requestClose is defined below (it needs beginExit first).
   const closeRef = useRef<() => void>(() => {});
@@ -72,7 +74,7 @@ export default function BottomSheet({ title, subtitle, onClose, children }: Bott
         aria-labelledby={titleId}
         tabIndex={-1}
         style={panelMaxHeight ? { maxHeight: panelMaxHeight } : undefined}
-        className="flex max-h-[85vh] w-full max-w-[36rem] flex-col rounded-t-card border border-b-0 border-parchment-200 bg-parchment-50 shadow-raised focus-visible:outline-none md:max-h-[80vh] md:rounded-card md:border-b"
+        className={`flex max-h-[85vh] w-full flex-col rounded-t-card border border-b-0 border-parchment-200 bg-parchment-50 shadow-raised focus-visible:outline-none md:max-h-[80vh] md:rounded-card md:border-b ${wide ? "max-w-[36rem] md:max-w-2xl" : "max-w-[36rem]"}`}
       >
         {/* handleProps is spread on both grabber and header on purpose: a wide
             drag target. They're siblings, so the gesture never double-fires. */}
