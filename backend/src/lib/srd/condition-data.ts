@@ -22,10 +22,14 @@ export type ConditionKey =
   | "stunned"
   | "unconscious";
 
+import type { RollEffect } from "./roll-effects.js";
+
 export interface ConditionDefinition {
   key: ConditionKey;
   label: string;
   description: string;
+  /** State-driven advantage/disadvantage grants (#486). Merged into rollModifiers on read. */
+  rollEffects?: RollEffect[];
 }
 
 export const CONDITIONS: readonly ConditionDefinition[] = [
@@ -85,6 +89,10 @@ export const CONDITIONS: readonly ConditionDefinition[] = [
     key: "poisoned",
     label: "Poisoned",
     description: "Has disadvantage on attack rolls and ability checks.",
+    rollEffects: [
+      { mode: "disadvantage", kind: "attack" },
+      { mode: "disadvantage", kind: "check" },
+    ],
   },
   {
     key: "prone",
