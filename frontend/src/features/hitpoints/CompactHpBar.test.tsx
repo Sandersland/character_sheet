@@ -139,3 +139,24 @@ describe("CompactHpBar tap-to-manage sheet (#768)", () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 });
+
+describe("CompactHpBar mobile overflow guard (#827)", () => {
+  it("keeps the tap hint on one line so it can't wrap and squeeze the bar", () => {
+    render(<CompactHpBar character={makeCharacter()} onUpdate={vi.fn()} />);
+    const hint = screen.getByText(/^tap$/i);
+    expect(hint.className).toMatch(/whitespace-nowrap/);
+    expect(hint.className).toMatch(/sm:hidden/);
+  });
+
+  it("lets the Hit Points label truncate instead of forcing width", () => {
+    render(<CompactHpBar character={makeCharacter()} onUpdate={vi.fn()} />);
+    expect(screen.getByText(/hit points/i).className).toMatch(/truncate/);
+  });
+
+  it("narrows the meter on mobile but restores full width at md+", () => {
+    const { container } = render(<CompactHpBar character={makeCharacter()} onUpdate={vi.fn()} />);
+    const meter = container.querySelector(".sm\\:w-32");
+    expect(meter).not.toBeNull();
+    expect(meter?.className).toMatch(/\bw-20\b/);
+  });
+});
