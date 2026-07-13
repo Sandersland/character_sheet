@@ -27,6 +27,7 @@ import type {
   EntityBacklink,
   EntityType,
   EntityVisibility,
+  EntryVisibility,
   ExperienceOperation,
   HitPointOperation,
   JournalEntryKind,
@@ -303,7 +304,13 @@ export async function deleteCharacter(id: string): Promise<void> {
 // kind defaults to ENTRY; NOTE omits date (server fills it with today).
 export async function createJournalEntry(
   characterId: string,
-  entry: { kind?: JournalEntryKind; date?: string; body: string; sessionId?: string }
+  entry: {
+    kind?: JournalEntryKind;
+    date?: string;
+    body: string;
+    sessionId?: string;
+    visibility?: EntryVisibility;
+  }
 ): Promise<Character> {
   return request<Character>(
     `/characters/${characterId}/journal`,
@@ -315,7 +322,7 @@ export async function createJournalEntry(
 export async function updateJournalEntry(
   characterId: string,
   entryId: string,
-  patch: { date?: string; body?: string }
+  patch: { date?: string; body?: string; visibility?: EntryVisibility }
 ): Promise<Character> {
   return request<Character>(
     `/characters/${characterId}/journal/${entryId}`,
