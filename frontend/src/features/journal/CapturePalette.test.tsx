@@ -27,10 +27,15 @@ vi.mock("@/api/client", () => ({
   createJournalEntry: vi.fn(),
   updateJournalEntry: vi.fn(),
   deleteJournalEntry: vi.fn(),
+  fetchEntities: vi.fn(),
 }));
 
 function makeCharacter(): Character {
   return { id: "char-1", journal: [] } as unknown as Character;
+}
+
+function makeCampaignCharacter(journal: unknown[] = []): Character {
+  return { id: "char-1", campaignId: "camp-1", journal } as unknown as Character;
 }
 
 function makeCharacterWithNote(): Character {
@@ -55,6 +60,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(client.createJournalEntry).mockResolvedValue(makeCharacter());
   vi.mocked(client.deleteJournalEntry).mockResolvedValue(makeCharacter());
+  vi.mocked(client.fetchEntities).mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -182,6 +188,83 @@ describe("CapturePalette (#247)", () => {
 
     expect(client.deleteJournalEntry).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: /^delete$/i })).toBeInTheDocument();
+  });
+
+  describe("visibility (#838)", () => {
+    it("omits visibility on a default save (shared) for a campaign character", async () => {
+      const user = userEvent.setup();
+      render(
+        <CapturePalette character={makeCampaignCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />,
+      );
+
+      expect(screen.getByRole("checkbox", { name: /private/i })).not.toBeChecked();
+      await user.type(screen.getByRole("textbox", { name: /quick note/i }), "shared note");
+      await user.keyboard("{Enter}");
+
+      const [, entry] = vi.mocked(client.createJournalEntry).mock.calls[0];
+      expect(entry).not.toHaveProperty("visibility");
+    });
+
+    it("sends visibility PRIVATE when the Private toggle is on", async () => {
+      const user = userEvent.setup();
+      render(
+        <CapturePalette character={makeCampaignCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />,
+      );
+
+      await user.click(screen.getByRole("checkbox", { name: /private/i }));
+      await user.type(screen.getByRole("textbox", { name: /quick note/i }), "secret note");
+      await user.keyboard("{Enter}");
+
+      const [, entry] = vi.mocked(client.createJournalEntry).mock.calls[0];
+      expect(entry).toMatchObject({ visibility: "PRIVATE" });
+    });
+
+    it("hides the Private toggle for a campaign-less character", () => {
+      render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
+      expect(screen.queryByRole("checkbox", { name: /private/i })).toBeNull();
+    });
+
+    it("shows a lock only on PRIVATE rows", () => {
+      const character = makeCampaignCharacter([
+        {
+          id: "note-1",
+          kind: "NOTE",
+          date: "2026-07-01T00:00:00.000Z",
+          loggedAt: "2026-07-01T20:00:00.000Z",
+          body: "my secret",
+          visibility: "PRIVATE",
+        },
+        {
+          id: "note-2",
+          kind: "NOTE",
+          date: "2026-07-01T00:00:00.000Z",
+          loggedAt: "2026-07-01T20:05:00.000Z",
+          body: "table knowledge",
+          visibility: "CAMPAIGN",
+        },
+      ]);
+      render(<CapturePalette character={character} onClose={vi.fn()} onUpdate={vi.fn()} />);
+
+      const locks = screen.getAllByRole("img", { name: /private note/i });
+      expect(locks).toHaveLength(1);
+    });
+
+    it("has no axe violations with the toggle and lock visible", async () => {
+      const character = makeCampaignCharacter([
+        {
+          id: "note-1",
+          kind: "NOTE",
+          date: "2026-07-01T00:00:00.000Z",
+          loggedAt: "2026-07-01T20:00:00.000Z",
+          body: "my secret",
+          visibility: "PRIVATE",
+        },
+      ]);
+      const { baseElement } = render(
+        <CapturePalette character={character} onClose={vi.fn()} onUpdate={vi.fn()} />,
+      );
+      expect(await axe(baseElement)).toHaveNoViolations();
+    });
   });
 
   describe("per-breakpoint presentation (#771)", () => {

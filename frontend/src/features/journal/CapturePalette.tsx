@@ -5,13 +5,14 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import BottomSheet from "@/components/ui/BottomSheet";
+import { Lock } from "@/components/ui/icons";
 import MentionAutocomplete from "@/features/journal/MentionAutocomplete";
 import MentionText from "@/features/journal/MentionText";
 import { useJournalMutations } from "@/features/journal/useJournalMutations";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import { formatJournalTime } from "@/lib/formatJournalDate";
-import type { Character } from "@/types/character";
+import type { CampaignEntity, Character, JournalEntry } from "@/types/character";
 
 interface CapturePaletteProps {
   character: Character;
@@ -20,6 +21,10 @@ interface CapturePaletteProps {
   onClose: () => void;
   onUpdate: (character: Character) => void;
 }
+
+// text-base at mobile widths keeps typed inputs ≥16px so iOS Safari doesn't auto-zoom on focus.
+const inputCls =
+  "w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-base md:text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
 
 export default function CapturePalette({
   character,
@@ -32,8 +37,8 @@ export default function CapturePalette({
   const { byId } = useCampaignEntities(character.campaignId);
   const { busy, error, create, update, remove } = useJournalMutations(character.id, onUpdate);
   const [value, setValue] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
   // The NOTE feed: newest-first, scoped to the active session when one is given.
@@ -90,7 +95,13 @@ export default function CapturePalette({
   async function handleSave() {
     const body = value.trim();
     if (body === "" || busy) return;
-    const ok = await create({ kind: "NOTE", body, sessionId });
+    // Shared (the in-campaign default) omits visibility; only the opt-out is sent.
+    const ok = await create({
+      kind: "NOTE",
+      body,
+      sessionId,
+      ...(isPrivate ? { visibility: "PRIVATE" as const } : {}),
+    });
     if (ok) {
       setValue("");
       composerRef.current?.focus({ preventScroll: true });
@@ -105,19 +116,13 @@ export default function CapturePalette({
     }
   }
 
-  async function handleEditSave(entryId: string) {
-    const body = editValue.trim();
-    if (body === "") return;
-    if (await update(entryId, body)) setEditingId(null);
+  async function handleEditSave(entryId: string, body: string) {
+    if (await update(entryId, { body })) setEditingId(null);
   }
 
   async function handleDelete(entryId: string) {
     if (await remove(entryId)) setConfirmingDeleteId(null);
   }
-
-  // text-base at mobile widths keeps typed inputs ≥16px so iOS Safari doesn't auto-zoom on focus.
-  const inputCls =
-    "w-full min-w-0 box-border rounded-control border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-base md:text-sm text-parchment-900 placeholder:text-parchment-400 focus:border-garnet-500 focus:outline-none";
 
   const composer = (
     <>
@@ -132,6 +137,17 @@ export default function CapturePalette({
         onChange={setValue}
         onKeyDown={handleComposerKeyDown}
       />
+      {character.campaignId && (
+        <label className="flex w-fit items-center gap-1.5 text-xs text-parchment-600">
+          <input
+            type="checkbox"
+            checked={isPrivate}
+            onChange={(e) => setIsPrivate(e.target.checked)}
+            className="h-3.5 w-3.5 accent-garnet-600"
+          />
+          Private (only you can see this note)
+        </label>
+      )}
       {!isMobile && (
         <p className="text-xs text-parchment-500">Enter to save · Shift+Enter for a new line</p>
       )}
@@ -146,90 +162,33 @@ export default function CapturePalette({
       <ul className="flex flex-col divide-y divide-parchment-200">
         {notes.map((note) =>
           editingId === note.id ? (
-            <li key={note.id} className="py-2">
-              <textarea
-                rows={isMobile ? 3 : 2}
-                aria-label="Edit note"
-                className={`${inputCls} resize-y`}
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-              />
-              <div className="mt-1 flex gap-3 text-xs">
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => handleEditSave(note.id)}
-                  className="font-semibold text-garnet-700 hover:underline disabled:opacity-40"
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditingId(null)}
-                  className="font-semibold text-parchment-600 hover:underline"
-                >
-                  Cancel
-                </button>
-              </div>
-            </li>
+            <NoteEditor
+              key={note.id}
+              note={note}
+              isMobile={isMobile}
+              busy={busy}
+              onSave={(body) => handleEditSave(note.id, body)}
+              onCancel={() => setEditingId(null)}
+            />
           ) : (
-            <li key={note.id} className="flex items-start justify-between gap-3 py-2">
-              <MentionText
-                body={note.body}
-                entities={byId}
-                campaignId={character.campaignId}
-                className="min-w-0 flex-1 whitespace-pre-wrap text-sm text-parchment-800"
-              />
-              <div className="flex shrink-0 items-center gap-3">
-                <span className="whitespace-nowrap text-xs text-parchment-500">
-                  {formatJournalTime(note.loggedAt)}
-                </span>
-                {confirmingDeleteId === note.id ? (
-                  <>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => handleDelete(note.id)}
-                      className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
-                    >
-                      Delete?
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmingDeleteId(null)}
-                      className="text-xs font-semibold text-parchment-600 hover:underline"
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setConfirmingDeleteId(null);
-                        setEditingId(note.id);
-                        setEditValue(note.body);
-                      }}
-                      className="text-xs font-semibold text-garnet-700 hover:underline"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => {
-                        setEditingId(null);
-                        setConfirmingDeleteId(note.id);
-                      }}
-                      className="text-xs font-semibold text-parchment-600 hover:underline disabled:opacity-40"
-                    >
-                      Delete
-                    </button>
-                  </>
-                )}
-              </div>
-            </li>
+            <NoteRow
+              key={note.id}
+              note={note}
+              entities={byId}
+              campaignId={character.campaignId}
+              busy={busy}
+              confirmingDelete={confirmingDeleteId === note.id}
+              onDelete={() => handleDelete(note.id)}
+              onDeleteStart={() => {
+                setEditingId(null);
+                setConfirmingDeleteId(note.id);
+              }}
+              onDeleteCancel={() => setConfirmingDeleteId(null)}
+              onEditStart={() => {
+                setConfirmingDeleteId(null);
+                setEditingId(note.id);
+              }}
+            />
           ),
         )}
       </ul>
@@ -279,5 +238,140 @@ export default function CapturePalette({
       </div>
     </div>,
     document.body,
+  );
+}
+
+// Inline editor for one feed note; keyed by note id so it mounts fresh per edit.
+function NoteEditor({
+  note,
+  isMobile,
+  busy,
+  onSave,
+  onCancel,
+}: {
+  note: JournalEntry;
+  isMobile: boolean;
+  busy: boolean;
+  onSave: (body: string) => void;
+  onCancel: () => void;
+}) {
+  const [editValue, setEditValue] = useState(note.body);
+
+  function handleSave() {
+    const body = editValue.trim();
+    if (body === "") return;
+    onSave(body);
+  }
+
+  return (
+    <li className="py-2">
+      <textarea
+        rows={isMobile ? 3 : 2}
+        aria-label="Edit note"
+        className={`${inputCls} resize-y`}
+        value={editValue}
+        onChange={(e) => setEditValue(e.target.value)}
+      />
+      <div className="mt-1 flex gap-3 text-xs">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={handleSave}
+          className="font-semibold text-garnet-700 hover:underline disabled:opacity-40"
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="font-semibold text-parchment-600 hover:underline"
+        >
+          Cancel
+        </button>
+      </div>
+    </li>
+  );
+}
+
+// One display row of the feed: body, private lock, timestamp, edit/delete actions.
+function NoteRow({
+  note,
+  entities,
+  campaignId,
+  busy,
+  confirmingDelete,
+  onDelete,
+  onDeleteStart,
+  onDeleteCancel,
+  onEditStart,
+}: {
+  note: JournalEntry;
+  entities: Map<string, CampaignEntity>;
+  campaignId?: string | null;
+  busy: boolean;
+  confirmingDelete: boolean;
+  onDelete: () => void;
+  onDeleteStart: () => void;
+  onDeleteCancel: () => void;
+  onEditStart: () => void;
+}) {
+  return (
+    <li className="flex items-start justify-between gap-3 py-2">
+      <MentionText
+        body={note.body}
+        entities={entities}
+        campaignId={campaignId}
+        className="min-w-0 flex-1 whitespace-pre-wrap text-sm text-parchment-800"
+      />
+      <div className="flex shrink-0 items-center gap-3">
+        {note.visibility === "PRIVATE" && (
+          <Lock
+            role="img"
+            aria-label="Private note"
+            className="h-3.5 w-3.5 shrink-0 text-parchment-500"
+          />
+        )}
+        <span className="whitespace-nowrap text-xs text-parchment-500">
+          {formatJournalTime(note.loggedAt)}
+        </span>
+        {confirmingDelete ? (
+          <>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onDelete}
+              className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
+            >
+              Delete?
+            </button>
+            <button
+              type="button"
+              onClick={onDeleteCancel}
+              className="text-xs font-semibold text-parchment-600 hover:underline"
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={onEditStart}
+              className="text-xs font-semibold text-garnet-700 hover:underline"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onDeleteStart}
+              className="text-xs font-semibold text-parchment-600 hover:underline disabled:opacity-40"
+            >
+              Delete
+            </button>
+          </>
+        )}
+      </div>
+    </li>
   );
 }

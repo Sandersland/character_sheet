@@ -9,11 +9,13 @@
 import { useState } from "react";
 
 import MentionAutocomplete from "@/features/journal/MentionAutocomplete";
-import type { JournalEntry } from "@/types/character";
+import type { EntryVisibility, JournalEntry } from "@/types/character";
 
 export interface JournalEntryDraft {
   kind: "NOTE";
   body: string;
+  /** Set only for campaign characters; campaign-less writes are always PRIVATE. */
+  visibility?: EntryVisibility;
 }
 
 interface JournalEntryPanelProps {
@@ -36,13 +38,18 @@ export default function JournalEntryPanel({
   onClose,
 }: JournalEntryPanelProps) {
   const [body, setBody] = useState(initial?.body ?? "");
+  const [isPrivate, setIsPrivate] = useState(initial?.visibility === "PRIVATE");
 
   const canSubmit = body.trim() !== "" && !busy;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
-    onSubmit({ kind: "NOTE", body: body.trim() });
+    onSubmit({
+      kind: "NOTE",
+      body: body.trim(),
+      ...(campaignId ? { visibility: (isPrivate ? "PRIVATE" : "CAMPAIGN") as EntryVisibility } : {}),
+    });
   }
 
   // text-base at mobile widths keeps the note field ≥16px so iOS Safari doesn't auto-zoom on focus.
@@ -85,6 +92,18 @@ export default function JournalEntryPanel({
           placeholder="What happened? Use @ to tag people, places and things"
         />
       </div>
+
+      {campaignId && (
+        <label className="flex w-fit items-center gap-1.5 text-xs text-parchment-700">
+          <input
+            type="checkbox"
+            checked={isPrivate}
+            onChange={(e) => setIsPrivate(e.target.checked)}
+            className="h-3.5 w-3.5 accent-garnet-600"
+          />
+          Private (only you can see this note)
+        </label>
+      )}
 
       <div className="flex justify-end gap-2">
         <button

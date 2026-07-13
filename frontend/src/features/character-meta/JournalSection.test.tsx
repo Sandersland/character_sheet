@@ -12,6 +12,7 @@ vi.mock("@/api/client", () => ({
   createJournalEntry: vi.fn(),
   updateJournalEntry: vi.fn(),
   deleteJournalEntry: vi.fn(),
+  fetchEntities: vi.fn().mockResolvedValue([]),
 }));
 
 // A legacy ENTRY still renders as a dated note row (body + date).
@@ -138,6 +139,67 @@ describe("JournalSection", () => {
 
     expect(client.deleteJournalEntry).toHaveBeenCalledWith("char-1", "entry-1");
     expect(onUpdate).toHaveBeenCalled();
+  });
+
+  describe("visibility (#838)", () => {
+    function makeCampaignCharacter(journal: JournalEntry[]): Character {
+      return { id: "char-1", campaignId: "camp-1", journal } as unknown as Character;
+    }
+
+    const CAMPAIGN_ENTRY: JournalEntry = {
+      ...ENTRY,
+      id: "entry-2",
+      body: "Shared with the table.",
+      visibility: "CAMPAIGN",
+    };
+
+    it("shows a lock only on PRIVATE rows", () => {
+      render(
+        <JournalSection
+          character={makeCampaignCharacter([ENTRY, CAMPAIGN_ENTRY])}
+          onUpdate={vi.fn()}
+        />,
+      );
+      expect(screen.getAllByRole("img", { name: /private note/i })).toHaveLength(1);
+    });
+
+    it("passes the draft visibility through on add", async () => {
+      const user = userEvent.setup();
+      vi.mocked(client.createJournalEntry).mockResolvedValue(makeCharacter([]));
+
+      render(<JournalSection character={makeCampaignCharacter([])} onUpdate={vi.fn()} />);
+
+      await user.click(screen.getAllByRole("button", { name: "+ Add entry" })[0]);
+      await user.click(screen.getByRole("checkbox", { name: /private/i }));
+      await user.type(screen.getByLabelText(/Note/), "keep this quiet");
+      await user.click(screen.getByRole("button", { name: "Add note" }));
+
+      expect(client.createJournalEntry).toHaveBeenCalledWith(
+        "char-1",
+        expect.objectContaining({ visibility: "PRIVATE" }),
+      );
+    });
+
+    it("passes the draft visibility through on edit", async () => {
+      const user = userEvent.setup();
+      vi.mocked(client.updateJournalEntry).mockResolvedValue(makeCharacter([ENTRY]));
+
+      render(<JournalSection character={makeCampaignCharacter([ENTRY])} onUpdate={vi.fn()} />);
+
+      await user.click(screen.getByRole("button", { name: "Edit" }));
+      // ENTRY is PRIVATE, so the checkbox starts checked; untick to share it.
+      await user.click(screen.getByRole("checkbox", { name: /private/i }));
+      await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+      expect(client.updateJournalEntry).toHaveBeenCalledWith(
+        "char-1",
+        "entry-1",
+        expect.objectContaining({
+          body: "Found three waterlogged tomes.",
+          visibility: "CAMPAIGN",
+        }),
+      );
+    });
   });
 
   it("surfaces an error when a call fails", async () => {
