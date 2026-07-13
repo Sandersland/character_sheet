@@ -238,10 +238,9 @@ interface KnownListConfig {
    * before the trim and once after. MUST return a freshly-constructed object
    * (not `state` itself): the same function runs twice on the same mutable
    * object, so returning a live reference would yield identical before/after
-   * payloads. The shapes intentionally diverge per reconciler (maneuvers/tool
-   * profs persist a hand-cloned 4-key object; disciplines the full
-   * serializeResourcesState blob); do not normalize them — the persisted event
-   * payloads are load-bearing for undo.
+   * payloads. Since #818 all reconcilers emit the unified 6-key snapshot via
+   * snapshotResources() — the persisted payload is load-bearing for wholesale
+   * undo, so it must stay the full canonical shape (never a partial subset).
    */
   snapshot: (state: ResourcesMutableState) => Record<string, unknown>;
 }
