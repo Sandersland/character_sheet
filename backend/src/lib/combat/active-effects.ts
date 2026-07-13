@@ -78,22 +78,24 @@ function parseResistDamageTypes(value: unknown): string[] | undefined {
 
 const ROLL_MODE_KINDS: RollModeKind[] = ["attack", "check", "save", "initiative"];
 
+// One state-driven roll grant (#486); null when the entry is malformed.
+function parseRollEffect(raw: unknown): RollEffect | null {
+  if (!raw || typeof raw !== "object") return null;
+  const entry = raw as Record<string, unknown>;
+  if (entry.mode !== "advantage" && entry.mode !== "disadvantage") return null;
+  if (!ROLL_MODE_KINDS.includes(entry.kind as RollModeKind)) return null;
+  return {
+    mode: entry.mode,
+    kind: entry.kind as RollModeKind,
+    ...(typeof entry.ability === "string" ? { ability: entry.ability } : {}),
+  };
+}
+
 // Parse the state-driven roll grants (#486). Drops malformed entries; returns
 // undefined when none survive (byte-parity with buffs that predate the axis).
 function parseRollEffects(value: unknown): RollEffect[] | undefined {
   if (!Array.isArray(value)) return undefined;
-  const effects: RollEffect[] = [];
-  for (const raw of value) {
-    if (!raw || typeof raw !== "object") continue;
-    const entry = raw as Record<string, unknown>;
-    if (entry.mode !== "advantage" && entry.mode !== "disadvantage") continue;
-    if (!ROLL_MODE_KINDS.includes(entry.kind as RollModeKind)) continue;
-    effects.push({
-      mode: entry.mode,
-      kind: entry.kind as RollModeKind,
-      ...(typeof entry.ability === "string" ? { ability: entry.ability } : {}),
-    });
-  }
+  const effects = value.map(parseRollEffect).filter((e): e is RollEffect => e !== null);
   return effects.length > 0 ? effects : undefined;
 }
 
