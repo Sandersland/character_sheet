@@ -295,4 +295,97 @@ describe("campaign entities (#248)", () => {
     expect(ownerBodies.some((b) => b.includes("Bribed"))).toBe(false);
     expect((ownerView.body as { characterName: string }[])[0].characterName).toBe(`Char ${CHAR_OWNER}`);
   });
+
+  it("shares CAMPAIGN notes across members but keeps PRIVATE notes author-only, even from the OWNER (#838)", async () => {
+    await prisma.character.update({ where: { id: CHAR_OWNER }, data: { campaignId } });
+    await prisma.character.update({ where: { id: CHAR_PLAYER }, data: { campaignId } });
+
+    const entity = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities`)
+      .set("Cookie", cookieOwner)
+      .send({ type: "NPC", name: "Shared Target" });
+    const entityId = entity.body.id as string;
+
+    async function seedEntry(characterId: string, authorUserId: string, body: string, visibility: "PRIVATE" | "CAMPAIGN") {
+      const entry = await prisma.journalEntry.create({
+        data: {
+          characterId,
+          kind: "NOTE",
+          date: new Date("2026-07-01T00:00:00.000Z"),
+          body,
+          visibility,
+          authorUserId,
+        },
+      });
+      await prisma.journalEntryRef.create({ data: { entryId: entry.id, entityId } });
+    }
+
+    await seedEntry(CHAR_PLAYER, PLAYER, "player shared note", "CAMPAIGN");
+    await seedEntry(CHAR_PLAYER, PLAYER, "player secret note", "PRIVATE");
+    await seedEntry(CHAR_OWNER, OWNER, "owner shared note", "CAMPAIGN");
+    await seedEntry(CHAR_OWNER, OWNER, "owner secret note", "PRIVATE");
+
+    async function bodiesFor(cookie: string) {
+      const res = await supertest(app)
+        .get(`/api/campaigns/${campaignId}/entities/${entityId}/backlinks`)
+        .set("Cookie", cookie);
+      expect(res.status).toBe(200);
+      return (res.body as { entry: { body: string } }[]).map((b) => b.entry.body);
+    }
+
+    // Player sees the owner's CAMPAIGN note plus everything they authored.
+    const playerBodies = await bodiesFor(cookiePlayer);
+    expect(playerBodies).toContain("owner shared note");
+    expect(playerBodies).toContain("player shared note");
+    expect(playerBodies).toContain("player secret note");
+    expect(playerBodies).not.toContain("owner secret note");
+
+    // The OWNER/DM has no bypass: another member's PRIVATE note stays invisible.
+    const ownerBodies = await bodiesFor(cookieOwner);
+    expect(ownerBodies).toContain("player shared note");
+    expect(ownerBodies).toContain("owner shared note");
+    expect(ownerBodies).toContain("owner secret note");
+    expect(ownerBodies).not.toContain("player secret note");
+  });
+
+  it("drops a CAMPAIGN note from backlinks once its character leaves the campaign (#838)", async () => {
+    await prisma.character.update({ where: { id: CHAR_OWNER }, data: { campaignId } });
+    await prisma.character.update({ where: { id: CHAR_PLAYER }, data: { campaignId } });
+
+    const entity = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities`)
+      .set("Cookie", cookieOwner)
+      .send({ type: "NPC", name: "Departed Target" });
+    const entityId = entity.body.id as string;
+
+    const entry = await prisma.journalEntry.create({
+      data: {
+        characterId: CHAR_PLAYER,
+        kind: "NOTE",
+        date: new Date("2026-07-01T00:00:00.000Z"),
+        body: "shared, then departed",
+        visibility: "CAMPAIGN",
+        authorUserId: PLAYER,
+      },
+    });
+    await prisma.journalEntryRef.create({ data: { entryId: entry.id, entityId } });
+
+    // Refs survive the character leaving; the share must not.
+    await prisma.character.update({ where: { id: CHAR_PLAYER }, data: { campaignId: null } });
+
+    const ownerView = await supertest(app)
+      .get(`/api/campaigns/${campaignId}/entities/${entityId}/backlinks`)
+      .set("Cookie", cookieOwner);
+    expect(ownerView.status).toBe(200);
+    const bodies = (ownerView.body as { entry: { body: string } }[]).map((b) => b.entry.body);
+    expect(bodies).not.toContain("shared, then departed");
+
+    // The author still sees their own entry regardless of campaign membership.
+    const playerView = await supertest(app)
+      .get(`/api/campaigns/${campaignId}/entities/${entityId}/backlinks`)
+      .set("Cookie", cookiePlayer);
+    expect(playerView.status).toBe(200);
+    const playerBodies = (playerView.body as { entry: { body: string } }[]).map((b) => b.entry.body);
+    expect(playerBodies).toContain("shared, then departed");
+  });
 });
