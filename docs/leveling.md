@@ -97,7 +97,7 @@ It runs unconditionally on every XP op (cheap — one indexed read). This means:
 
 **Undo:** reconciliation events ride the same LIFO `batchId` as the XP event. Because they use standard `category/type` event shapes that already have undo branches in `backend/src/routes/activity.ts`, no new revert code is needed:
 - `class` category → restores `subclassId`/`subclass` from `before` via `data.classEntryId`
-- `resources` category → restores full `before.resources` JSON (used counts + `maneuversKnown`, `disciplinesKnown`, `toolProficienciesKnown`)
+- `resources` category → restores `before.resources` wholesale — the canonical 6-key `snapshotResources()` shape (`used`, `maneuversKnown`, `disciplinesKnown`, `toolProficienciesKnown`, `advancements`, `fightingStyle`); since #818 no key can be silently wiped on revert
 
 ### Layer 2 — Clamp-on-read (non-destructive, defense-in-depth)
 
