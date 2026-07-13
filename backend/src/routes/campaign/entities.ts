@@ -2,7 +2,11 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
-import { collectMergedInIdentities, wouldCreateCycle } from "@/lib/activity/entity-merges.js";
+import {
+  collectMergedInIdentities,
+  resolveSurvivorChain,
+  wouldCreateCycle,
+} from "@/lib/activity/entity-merges.js";
 import {
   aggregateEntityStats,
   buildSessionOrdinalMap,
@@ -535,4 +539,97 @@ entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, re
       identity: { id: ref.entity.id, name: ref.entity.name },
     })),
   );
+});
+
+// ── GET /api/campaigns/:id/entities/:entityId/connections ────────────────────
+// Co-mention graph (#839): entities sharing a visible entry with this one,
+// merge-resolved to survivors, counted by distinct entries, sorted desc.
+
+entitiesRouter.get("/campaigns/:id/entities/:entityId/connections", async (req, res) => {
+  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
+  const isOwner = role === "OWNER";
+
+  const target = await prisma.campaignEntity.findUnique({
+    where: { id: req.params.entityId },
+    select: { id: true, campaignId: true, visibility: true },
+  });
+  // Hidden entities are invisible to non-owners: 404 rather than leak existence.
+  if (
+    !target ||
+    target.campaignId !== req.params.id ||
+    (target.visibility === "HIDDEN" && !isOwner)
+  ) {
+    res.status(404).json({ error: "Entity not found" });
+    return;
+  }
+
+  const rawLimit = Number(req.query.limit);
+  const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 50) : 10;
+
+  const [edges, allEntities] = await Promise.all([
+    prisma.campaignEntityMerge.findMany({
+      where: { campaignId: req.params.id },
+      select: { mergedEntityId: true, survivorEntityId: true, status: true },
+    }),
+    prisma.campaignEntity.findMany({
+      where: { campaignId: req.params.id },
+      select: { id: true, name: true, type: true, visibility: true },
+    }),
+  ]);
+  const entityById = new Map(allEntities.map((e) => [e.id, e]));
+  const revealedIds = new Set(
+    allEntities.filter((e) => e.visibility === "REVEALED").map((e) => e.id),
+  );
+  const targetIds = new Set([
+    req.params.entityId,
+    ...resolveVisibleMergeUnion(edges, [req.params.entityId], revealedIds, isOwner).get(
+      req.params.entityId,
+    )!,
+  ]);
+
+  const targetRefs = await prisma.journalEntryRef.findMany({
+    where: {
+      entityId: { in: [...targetIds] },
+      entry: visibleEntryWhere(req.user!.id, req.params.id),
+    },
+    select: { entryId: true },
+  });
+  const entryIds = [...new Set(targetRefs.map((r) => r.entryId))];
+
+  const coRefs =
+    entryIds.length === 0
+      ? []
+      : await prisma.journalEntryRef.findMany({
+          where: { entryId: { in: entryIds } },
+          select: { entryId: true, entityId: true },
+        });
+
+  // Count distinct entries per ultimate survivor; scrub HIDDEN for non-owners.
+  const entriesBySurvivor = new Map<string, Set<string>>();
+  for (const ref of coRefs) {
+    if (targetIds.has(ref.entityId)) continue;
+    const tagged = entityById.get(ref.entityId);
+    if (!tagged || (!isOwner && tagged.visibility === "HIDDEN")) continue;
+    const chain = resolveSurvivorChain(edges, ref.entityId, { executedOnly: true });
+    const survivorId = chain.length > 0 ? chain[chain.length - 1] : ref.entityId;
+    if (targetIds.has(survivorId)) continue;
+    const survivor = entityById.get(survivorId);
+    if (!survivor || (!isOwner && survivor.visibility === "HIDDEN")) continue;
+    let entries = entriesBySurvivor.get(survivorId);
+    if (!entries) {
+      entries = new Set();
+      entriesBySurvivor.set(survivorId, entries);
+    }
+    entries.add(ref.entryId);
+  }
+
+  const connections = [...entriesBySurvivor.entries()]
+    .map(([survivorId, entries]) => {
+      const e = entityById.get(survivorId)!;
+      return { entity: { id: e.id, name: e.name, type: e.type }, count: entries.size };
+    })
+    .sort((a, b) => b.count - a.count || a.entity.name.localeCompare(b.entity.name))
+    .slice(0, limit);
+
+  res.json(connections);
 });
