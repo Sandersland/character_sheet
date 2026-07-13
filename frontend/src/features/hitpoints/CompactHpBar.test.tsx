@@ -159,4 +159,16 @@ describe("CompactHpBar mobile overflow guard (#827)", () => {
     expect(meter).not.toBeNull();
     expect(meter?.className).toMatch(/\bw-16\b/);
   });
+
+  it("lets the HP label/number group absorb remaining space so the number isn't clipped", () => {
+    render(<CompactHpBar character={makeCharacter()} onUpdate={vi.fn()} />);
+    const group = screen.getByText(/hit points/i).parentElement;
+    expect(group?.className).toMatch(/\bflex-1\b/);
+  });
+
+  it("lets the meter shrink so a 3-digit HP number wins the space at 320px", () => {
+    const { container } = render(<CompactHpBar character={makeCharacter()} onUpdate={vi.fn()} />);
+    const meter = container.querySelector(".sm\\:w-32");
+    expect(meter?.className).not.toMatch(/\bshrink-0\b/);
+  });
 });
