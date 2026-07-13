@@ -44,6 +44,7 @@ import {
   type ActiveEffectsMutableState,
 } from "@/lib/combat/active-effects.js";
 import { CONDITIONS, type RollModifier } from "@/lib/srd/srd.js";
+import { exhaustionRollEffects } from "@/lib/srd/condition-data.js";
 import {
   activatedMaxUses,
   chargePoolOf,
@@ -919,6 +920,9 @@ export function buildRollModifiers(
     const def = CONDITIONS.find((c) => c.key === entry.key);
     if (!def) continue;
     for (const effect of def.rollEffects ?? []) out.push({ ...effect, source: def.label });
+  }
+  for (const effect of exhaustionRollEffects(conditions.exhaustion)) {
+    out.push({ ...effect, source: "Exhaustion" });
   }
   for (const buff of activeEffects.buffs) {
     for (const effect of buff.rollEffects ?? []) out.push({ ...effect, source: buff.source });
