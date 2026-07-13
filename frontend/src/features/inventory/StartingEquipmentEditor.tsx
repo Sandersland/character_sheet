@@ -7,7 +7,12 @@ import {
   rollGold,
   type EquipmentDraft,
 } from "@/lib/startingEquipment";
-import type { ClassStartingEquipment, EquipmentBundle, Item } from "@/types/character";
+import type {
+  ClassStartingEquipment,
+  EquipmentBundle,
+  Item,
+  OpenWeaponPick,
+} from "@/types/character";
 
 interface StartingEquipmentEditorProps {
   /** The selected class's starting-equipment definition (null → skip rendering). */
@@ -27,6 +32,79 @@ function bundleFixedSummary(bundle: EquipmentBundle): string {
       return qty > 1 ? `${item.catalogName} ×${qty}` : item.catalogName;
     })
     .join(", ");
+}
+
+interface OpenPickSelectProps {
+  pick: OpenWeaponPick;
+  catalog: Item[];
+  currentPick: string;
+  onPick: (itemName: string) => void;
+}
+
+/** A single open-pick dropdown, filtered to the pick's weapon-class/range constraint. */
+function OpenPickSelect({ pick, catalog, currentPick, onPick }: OpenPickSelectProps) {
+  const matchingItems = catalog.filter(
+    (item) =>
+      item.category === "weapon" &&
+      item.weapon !== undefined &&
+      (!pick.filter.weaponClass || item.weapon.weaponClass === pick.filter.weaponClass) &&
+      (!pick.filter.range || item.weapon.weaponRange === pick.filter.range)
+  );
+  const unfilled = !currentPick;
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs text-parchment-600">
+        {pick.label}
+        {unfilled && (
+          <span className="ml-1 font-semibold text-red-600">
+            (required)
+          </span>
+        )}
+      </span>
+      <select
+        value={currentPick}
+        aria-invalid={unfilled}
+        onChange={(e) => onPick(e.target.value)}
+        className={`rounded-control border bg-parchment-50 px-2 py-1.5 text-sm text-parchment-900 focus:outline-none ${
+          unfilled
+            ? "border-red-400 focus:border-red-500"
+            : "border-parchment-300 focus:border-arcane-500"
+        }`}
+      >
+        <option value="">— choose —</option>
+        {matchingItems.map((item) => (
+          <option key={item.id} value={item.name}>
+            {item.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+interface OpenPickListProps {
+  bundle: EquipmentBundle;
+  catalog: Item[];
+  currentPicks: string[] | undefined;
+  onPick: (pickIdx: number, itemName: string) => void;
+}
+
+/** Renders a bundle's open-pick dropdowns (may be none). */
+function OpenPickList({ bundle, catalog, currentPicks, onPick }: OpenPickListProps) {
+  if (!bundle.openPicks?.length) return null;
+  return (
+    <>
+      {bundle.openPicks.map((pick, pickIdx) => (
+        <OpenPickSelect
+          key={pickIdx}
+          pick={pick}
+          catalog={catalog}
+          currentPick={currentPicks?.[pickIdx] ?? ""}
+          onPick={(itemName) => onPick(pickIdx, itemName)}
+        />
+      ))}
+    </>
+  );
 }
 
 export default function StartingEquipmentEditor({
@@ -158,50 +236,14 @@ export default function StartingEquipmentEditor({
                           {/* Open picks — only shown when this option is selected */}
                           {isChosen && (option.openPicks?.length ?? 0) > 0 && (
                             <div className="ml-5 flex flex-col gap-2">
-                              {option.openPicks!.map((pick, pickIdx) => {
-                                const matchingItems = catalog.filter(
-                                  (item) =>
-                                    item.category === "weapon" &&
-                                    item.weapon !== undefined &&
-                                    (!pick.filter.weaponClass ||
-                                      item.weapon.weaponClass === pick.filter.weaponClass) &&
-                                    (!pick.filter.range ||
-                                      item.weapon.weaponRange === pick.filter.range)
-                                );
-                                const currentPick = sel?.openPicks?.[pickIdx] ?? "";
-                                const unfilled = !currentPick;
-                                return (
-                                  <div key={pickIdx} className="flex flex-col gap-1">
-                                    <span className="text-xs text-parchment-600">
-                                      {pick.label}
-                                      {unfilled && (
-                                        <span className="ml-1 font-semibold text-red-600">
-                                          (required)
-                                        </span>
-                                      )}
-                                    </span>
-                                    <select
-                                      value={currentPick}
-                                      aria-invalid={unfilled}
-                                      onChange={(e) =>
-                                        setOpenPick(groupIdx, pickIdx, e.target.value)
-                                      }
-                                      className={`rounded-control border bg-parchment-50 px-2 py-1.5 text-sm text-parchment-900 focus:outline-none ${
-                                        unfilled
-                                          ? "border-red-400 focus:border-red-500"
-                                          : "border-parchment-300 focus:border-arcane-500"
-                                      }`}
-                                    >
-                                      <option value="">— choose —</option>
-                                      {matchingItems.map((item) => (
-                                        <option key={item.id} value={item.name}>
-                                          {item.name}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                );
-                              })}
+                              <OpenPickList
+                                bundle={option}
+                                catalog={catalog}
+                                currentPicks={sel?.openPicks}
+                                onPick={(pickIdx, itemName) =>
+                                  setOpenPick(groupIdx, pickIdx, itemName)
+                                }
+                              />
                             </div>
                           )}
 
@@ -218,51 +260,14 @@ export default function StartingEquipmentEditor({
                 )}
 
                 {/* Open picks on an auto-granted bundle (rare but possible) */}
-                {isAutoGrant &&
-                  chosenBundle &&
-                  (chosenBundle.openPicks?.length ?? 0) > 0 &&
-                  chosenBundle.openPicks!.map((pick, pickIdx) => {
-                    const matchingItems = catalog.filter(
-                      (item) =>
-                        item.category === "weapon" &&
-                        item.weapon !== undefined &&
-                        (!pick.filter.weaponClass ||
-                          item.weapon.weaponClass === pick.filter.weaponClass) &&
-                        (!pick.filter.range ||
-                          item.weapon.weaponRange === pick.filter.range)
-                    );
-                    const currentPick = sel?.openPicks?.[pickIdx] ?? "";
-                    const unfilled = !currentPick;
-                    return (
-                      <div key={pickIdx} className="flex flex-col gap-1">
-                        <span className="text-xs text-parchment-600">
-                          {pick.label}
-                          {unfilled && (
-                            <span className="ml-1 font-semibold text-red-600">
-                              (required)
-                            </span>
-                          )}
-                        </span>
-                        <select
-                          value={currentPick}
-                          aria-invalid={unfilled}
-                          onChange={(e) => setOpenPick(groupIdx, pickIdx, e.target.value)}
-                          className={`rounded-control border bg-parchment-50 px-2 py-1.5 text-sm text-parchment-900 focus:outline-none ${
-                            unfilled
-                              ? "border-red-400 focus:border-red-500"
-                              : "border-parchment-300 focus:border-arcane-500"
-                          }`}
-                        >
-                          <option value="">— choose —</option>
-                          {matchingItems.map((item) => (
-                            <option key={item.id} value={item.name}>
-                              {item.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    );
-                  })}
+                {isAutoGrant && chosenBundle && (
+                  <OpenPickList
+                    bundle={chosenBundle}
+                    catalog={catalog}
+                    currentPicks={sel?.openPicks}
+                    onPick={(pickIdx, itemName) => setOpenPick(groupIdx, pickIdx, itemName)}
+                  />
+                )}
               </div>
             );
           })}
