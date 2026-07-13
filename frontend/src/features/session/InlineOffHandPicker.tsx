@@ -78,7 +78,13 @@ export default function InlineOffHandPicker({
   const isMobile = useIsBelowMd();
 
   const footer = (
-    <AttackSheetFooter preRoll={!rolled} attacksRemain={false} onCancel={onCancel} onClose={onClose} />
+    <AttackSheetFooter
+      preRoll={!rolled}
+      attacksRemain={false}
+      onCancel={onCancel}
+      onClose={onClose}
+      refundLabel="Cancel — refund bonus action"
+    />
   );
 
   if (!entry) {

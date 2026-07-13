@@ -19,8 +19,8 @@ import type { AttackTallyRow, TallyRowSource } from "@/lib/attackTallySummary";
 import type { AttackEntry, DamageRider } from "@/lib/attackMath";
 import type { RollResult } from "@/lib/dice";
 
-// Everything one AttackRow / AttackStepCard needs, bundled per entry so the
-// components take a single `view` prop instead of the full state surface.
+// Everything one AttackStepCard needs, bundled per entry so the component takes
+// a single `view` prop instead of the full state surface.
 export interface AttackEntryView {
   entry: AttackEntry;
   attackTotal: number | null | undefined;

@@ -135,10 +135,10 @@ describe("InlineOffHandPicker (#813 redesign)", () => {
     );
   });
 
-  it("shows Cancel (refund) before the swing is rolled", () => {
+  it("shows Cancel — refund bonus action before the swing is rolled", () => {
     const onCancel = vi.fn();
     renderPicker(twoWeaponCharacter(), makeTurnState({ total: 1, used: 0 }), { onCancel });
-    expect(screen.getByRole("button", { name: /Cancel — refund action/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Cancel — refund bonus action/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Done$/ })).not.toBeInTheDocument();
   });
 
