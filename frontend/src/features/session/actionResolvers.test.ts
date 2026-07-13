@@ -55,6 +55,20 @@ describe("actionResolvers", () => {
     expect(r!.serverEffect).toBe(false); // local roll, like `attack` — not in backend ACTION_EFFECT_FN
   });
 
+  it("Shadow Step / Opportunist are economy-only simple-confirm reminders (#440)", () => {
+    const step = resolverFor("shadowStep");
+    expect(step).toBeDefined();
+    expect(step!.kind).toBe("simple-confirm");
+    expect(step!.slot).toBe("bonusAction");
+    expect(step!.serverEffect).toBe(false); // reminder only — no backend ACTION_EFFECT_FN
+
+    const opp = resolverFor("opportunist");
+    expect(opp).toBeDefined();
+    expect(opp!.kind).toBe("simple-confirm");
+    expect(opp!.slot).toBe("reaction");
+    expect(opp!.serverEffect).toBe(false);
+  });
+
   it("all resolvers have a valid slot", () => {
     const VALID_SLOTS = new Set(["action", "bonusAction", "reaction", "free", "special"]);
     for (const r of Object.values(ACTION_RESOLVERS)) {

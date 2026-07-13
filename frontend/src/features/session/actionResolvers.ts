@@ -114,6 +114,9 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   patientDefense:    { key: "patientDefense",    kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "ki" },
   stepOfTheWind:     { key: "stepOfTheWind",     kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "ki" },
   stunningStrike:    { key: "stunningStrike",    kind: "simple-confirm", slot: "free",        serverEffect: true,  resourceKey: "ki" },
+  // Way of Shadow reminder actions (#440) — economy-only, like twf; no backend effect fn.
+  shadowStep:        { key: "shadowStep",        kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
+  opportunist:       { key: "opportunist",       kind: "simple-confirm", slot: "reaction",    serverEffect: false },
 
   // ── Paladin ────────────────────────────────────────────────────────────────
   divineSense:       { key: "divineSense",       kind: "simple-confirm", slot: "action",      serverEffect: true,  resourceKey: "divineSense" },

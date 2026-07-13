@@ -214,6 +214,21 @@ describe("classActionOption", () => {
     expect(option).toEqual({ key: "cunningAction", title: "Cunning Action", enabled: true, heal: false });
   });
 
+  it("surfaces a reminder action's rule text as the subtitle (#440)", () => {
+    const option = classActionOption(
+      available({ key: "shadowStep", name: "Shadow Step", cost: "bonusAction", reminder: "Teleport up to 60 ft between dim light or darkness." }),
+      resolverFor("shadowStep"),
+      makeCharacter(),
+    );
+    expect(option).toEqual({
+      key: "shadowStep",
+      title: "Shadow Step",
+      enabled: true,
+      subtitle: "Teleport up to 60 ft between dim light or darkness.",
+      heal: false,
+    });
+  });
+
   it("passes through disabled + reason", () => {
     const option = classActionOption(
       available({ enabled: false, disabledReason: "No uses remaining" }),
