@@ -220,6 +220,8 @@ export interface ActionSheetModel {
   classActionOptions: ClassActionOption[];
   /** Current hands summary for the "Change weapons" card (#815). */
   loadoutLabel: string;
+  /** Gates the "Change weapons" card — false when nothing can be held or stowed. */
+  hasEquippableItems: boolean;
 }
 
 export interface BonusSheetModel {

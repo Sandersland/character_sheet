@@ -21,6 +21,7 @@ import {
   twfHint,
 } from "@/lib/turnOptions";
 import { buffsToAutoEnd, endActionKeyFor, endReminders } from "@/lib/turnHooks";
+import { hasLoadoutOptions } from "@/lib/loadoutPicker";
 import { equippedLoadoutLabel } from "@/lib/paperDoll";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { resolverFor } from "@/features/session/actionResolvers";
@@ -111,6 +112,7 @@ export function useTurnActions({
     hasSpellcasting: character.spellcasting !== undefined,
     classActionOptions: classActions.map(enrich),
     loadoutLabel: equippedLoadoutLabel(character.inventory),
+    hasEquippableItems: hasLoadoutOptions(character.inventory),
   };
   const bonusSheetModel = {
     classBonusOptions: classBonusActions.map(enrich),

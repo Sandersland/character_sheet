@@ -5,6 +5,7 @@ import {
   handContext,
   handButtonDisabledReason,
   handPickerOptions,
+  hasLoadoutOptions,
 } from "@/lib/loadoutPicker";
 import type { InventoryItem } from "@/types/character";
 
@@ -115,6 +116,30 @@ describe("loadoutPicker", () => {
     it("leaves a free hand enabled even at 0 actions", () => {
       const ctx = handContext([longsword], 0);
       expect(handButtonDisabledReason("OFF_HAND", ctx)).toBeNull();
+    });
+  });
+
+  describe("hasLoadoutOptions", () => {
+    const potion = {
+      id: "po",
+      name: "Potion of Healing",
+      category: "consumable",
+      quantity: 1,
+      equipped: false,
+    } as unknown as InventoryItem;
+
+    it("is false with empty hands and nothing hand-equippable in the bag", () => {
+      expect(hasLoadoutOptions([])).toBe(false);
+      expect(hasLoadoutOptions([potion])).toBe(false);
+    });
+
+    it("is true when a hand is occupied (a free Stow is on offer)", () => {
+      expect(hasLoadoutOptions([longsword])).toBe(true);
+      expect(hasLoadoutOptions([shield])).toBe(true);
+    });
+
+    it("is true when the bag holds a hand-equippable candidate", () => {
+      expect(hasLoadoutOptions([bagDagger1])).toBe(true);
     });
   });
 });

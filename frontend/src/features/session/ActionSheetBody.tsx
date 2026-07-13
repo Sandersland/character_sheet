@@ -115,13 +115,15 @@ export default function ActionSheetBody({
         onClick={() => handleActionClick("useObject", "action")}
       />
 
-      <OptionCard
-        icon={GiCycle}
-        title="Change weapons"
-        subtitle={`${model.loadoutLabel} · only a held-weapon swap costs the Action; a free-hand draw or stow is free`}
-        tone="neutral"
-        onClick={() => handleActionClick("changeWeapons", "action")}
-      />
+      {model.hasEquippableItems && (
+        <OptionCard
+          icon={GiCycle}
+          title="Change weapons"
+          subtitle={`${model.loadoutLabel} · only a held-weapon swap costs the Action; a free-hand draw or stow is free`}
+          tone="neutral"
+          onClick={() => handleActionClick("changeWeapons", "action")}
+        />
+      )}
 
       {model.classActionOptions.map((option) => (
         <ClassActionCard
