@@ -34,8 +34,8 @@ export function useJournalMutations(
     error,
     create: (input: Parameters<typeof createJournalEntry>[1]) =>
       run(() => createJournalEntry(characterId, input)),
-    update: (entryId: string, body: string) =>
-      run(() => updateJournalEntry(characterId, entryId, { body })),
+    update: (entryId: string, patch: Parameters<typeof updateJournalEntry>[2]) =>
+      run(() => updateJournalEntry(characterId, entryId, patch)),
     remove: (entryId: string) => run(() => deleteJournalEntry(characterId, entryId)),
   };
 }

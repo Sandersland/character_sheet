@@ -20,8 +20,9 @@ import { serializeCharacter } from "@/lib/character/character-serialize.js";
 //
 // Two kinds share the table: full ENTRY rows (date/body form) and fast NOTE rows
 // (one-line in-session capture). Both are date + body; NOTE defaults its date to
-// today. Entries are private by default (authorUserId + visibility) so sharing
-// can be switched on later.
+// today. Entries default to CAMPAIGN visibility inside a campaign (author can
+// opt out via visibility: "PRIVATE"); campaign-less characters always write
+// PRIVATE. Sharing surfaces on entity backlinks (entities.ts), not here.
 
 export const journalRouter = Router();
 
@@ -51,6 +52,7 @@ const createJournalSchema = z
     date: dateSchema.optional(),
     body: z.string().min(1),
     sessionId: z.string().optional(),
+    visibility: z.enum(["PRIVATE", "CAMPAIGN"]).optional(),
   })
   .strict()
   .refine((d) => d.kind !== "ENTRY" || d.date !== undefined, {
@@ -62,13 +64,29 @@ const updateJournalSchema = z
   .object({
     date: dateSchema,
     body: z.string().min(1),
+    visibility: z.enum(["PRIVATE", "CAMPAIGN"]),
   })
   .partial()
   .strict();
 
-// The journal entries `userId` may read on `character`. v1 == private-by-default:
-// only the author's own entries. Routing reads through one helper means the
-// deferred campaign-sharing slice has a single seam to widen.
+// Effective visibility for a write: outside a campaign there is nothing to
+// share into, so coerce to PRIVATE (never error); inside one, default CAMPAIGN.
+async function effectiveVisibility(
+  characterId: string,
+  requested: "PRIVATE" | "CAMPAIGN" | undefined,
+): Promise<"PRIVATE" | "CAMPAIGN"> {
+  const character = await prisma.character.findUnique({
+    where: { id: characterId },
+    select: { campaignId: true },
+  });
+  if (!character?.campaignId) return "PRIVATE";
+  return requested ?? "CAMPAIGN";
+}
+
+// The journal entries `userId` may read on `character`: the author's own
+// entries only — a character's journal page never shows other members' notes.
+// CAMPAIGN-visible entries surface elsewhere, on entity backlinks (the OR
+// filter in routes/campaign/entities.ts GET …/backlinks).
 export async function visibleEntries(
   db: Db,
   userId: string,
@@ -77,8 +95,7 @@ export async function visibleEntries(
   return db.journalEntry.findMany({
     where: {
       characterId: character.id,
-      // Private-by-default: own entries only. CAMPAIGN-visible branch (inert): a
-      // later slice OR-s in { visibility: "CAMPAIGN", character: { campaignId } }.
+      // Own entries only by design — sharing happens on entity backlinks.
       authorUserId: userId,
     },
     orderBy: [{ date: "desc" }, { loggedAt: "desc" }, { createdAt: "desc" }],
@@ -156,6 +173,8 @@ journalRouter.post("/characters/:id/journal", async (req, res) => {
     sessionId = await getActiveSessionId(req.params.id);
   }
 
+  const visibility = await effectiveVisibility(req.params.id, data.visibility);
+
   await prisma.$transaction(async (tx) => {
     const entry = await tx.journalEntry.create({
       data: {
@@ -163,7 +182,7 @@ journalRouter.post("/characters/:id/journal", async (req, res) => {
         kind: data.kind,
         date: data.date ?? utcMidnightToday(),
         body: data.body,
-        visibility: "PRIVATE",
+        visibility,
         authorUserId: req.user!.id,
         sessionId,
       },
@@ -185,11 +204,20 @@ journalRouter.patch("/characters/:id/journal/:entryId", async (req, res) => {
 
   const entry = await prisma.journalEntry.findUnique({
     where: { id: req.params.entryId },
-    select: { id: true, characterId: true },
+    select: { id: true, characterId: true, authorUserId: true },
   });
   if (!entry || entry.characterId !== req.params.id) {
     res.status(404).json({ error: "Journal entry not found" });
     return;
+  }
+
+  // Only the author may re-share or hide their note.
+  if (data.visibility !== undefined && entry.authorUserId !== req.user!.id) {
+    res.status(403).json({ error: "Only the author may change an entry's visibility" });
+    return;
+  }
+  if (data.visibility !== undefined) {
+    data.visibility = await effectiveVisibility(req.params.id, data.visibility);
   }
 
   await prisma.$transaction(async (tx) => {

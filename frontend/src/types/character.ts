@@ -722,7 +722,7 @@ export interface JournalEntry {
   /** ISO-8601 capture timestamp shown on NOTE rows (JournalEntry.loggedAt). */
   loggedAt: string;
   body: string;
-  /** Private-by-default; the CAMPAIGN share toggle ships in a later slice. */
+  /** CAMPAIGN notes surface on entity backlinks; PRIVATE is author-only (#838). */
   visibility: EntryVisibility;
   /** Provenance: the session this entry was written during, if any. */
   sessionId?: string;

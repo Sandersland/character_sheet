@@ -3,11 +3,8 @@ import { Link, useMatch, useNavigate, useParams } from "react-router-dom";
 
 import Badge from "@/components/ui/Badge";
 import Spinner from "@/components/ui/Spinner";
-import Tabs from "@/components/ui/Tabs";
-import CampaignOverviewPanel from "@/features/campaign/CampaignOverviewPanel";
-import CampaignCodex from "@/features/entities/CampaignCodex";
-import CampaignItemsPanel from "@/features/entities/CampaignItemsPanel";
-import CampaignManagePanel from "@/features/entities/CampaignManagePanel";
+import CampaignTabPanels from "@/features/campaign/CampaignTabPanels";
+import CampaignTabs from "@/features/campaign/CampaignTabs";
 import { fetchCampaign } from "@/api/client";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import type { Campaign } from "@/types/character";
@@ -23,6 +20,7 @@ export default function CampaignDetailPage() {
   const [campaign, setCampaign] = useState<Campaign | null | undefined>(undefined);
   const { entities } = useCampaignEntities(id);
   const isOwner = campaign?.role === "OWNER";
+  const activeTab = onManage && isOwner ? "manage" : onCodex ? "codex" : "overview";
 
   useEffect(() => {
     if (!id) return;
@@ -80,37 +78,17 @@ export default function CampaignDetailPage() {
         </div>
       </div>
 
-      <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-8">
-        <Tabs
-          tabs={[
-            { id: "overview", label: "Overview" },
-            // Hidden at 0 so a cold cache doesn't flash "Codex 0" before the fetch resolves.
-            { id: "codex", label: "Codex", badge: entities.length > 0 ? entities.length : undefined },
-            // Manage is the DM's private admin surface — owners only.
-            ...(isOwner ? [{ id: "manage", label: "Manage" }] : []),
-          ]}
-          active={onManage && isOwner ? "manage" : onCodex ? "codex" : "overview"}
-          onChange={(tab) =>
-            navigate(
-              tab === "codex"
-                ? `/campaigns/${id}/codex`
-                : tab === "manage"
-                  ? `/campaigns/${id}/manage`
-                  : `/campaigns/${id}`,
-            )
-          }
-        />
-
-        {onManage && isOwner ? (
-          <>
-            <CampaignManagePanel campaignId={campaign.id} />
-            <CampaignItemsPanel campaignId={campaign.id} characters={campaign.characters ?? []} />
-          </>
-        ) : onCodex ? (
-          <CampaignCodex campaignId={campaign.id} role={campaign.role} />
-        ) : (
-          <CampaignOverviewPanel campaign={campaign} onCampaignChange={setCampaign} />
-        )}
+      {/* The codex tab is full-width (#840); the tab strip stays centered via its own wrapper. */}
+      <main className={`mx-auto flex flex-col gap-6 px-6 py-8${onCodex ? "" : " max-w-4xl"}`}>
+        <div className="mx-auto w-full max-w-4xl">
+          <CampaignTabs
+            campaignId={campaign.id}
+            isOwner={isOwner}
+            entityCount={entities.length}
+            active={activeTab}
+          />
+        </div>
+        <CampaignTabPanels campaign={campaign} active={activeTab} onCampaignChange={setCampaign} />
       </main>
     </div>
   );

@@ -336,9 +336,9 @@ entitiesRouter.delete("/campaigns/:id/entities/:entityId", async (req, res) => {
 });
 
 // ── GET /api/campaigns/:id/entities/:entityId/backlinks ──────────────────────
-// Notes that @-tag this entity, newest-first. CRITICAL: filtered through the
-// SAME private-by-default rule as journal.visibleEntries — only the caller's
-// own entries, so another member's PRIVATE notes never leak here.
+// Notes that @-tag this entity, newest-first. This is THE sharing surface
+// (#838): the caller's own entries plus other members' CAMPAIGN-visible ones.
+// A PRIVATE note is visible only to its author — no owner/DM bypass.
 
 entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
@@ -378,8 +378,14 @@ entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, re
   const refs = await prisma.journalEntryRef.findMany({
     where: {
       entityId: { in: entityIds },
-      // Private-by-default: only the caller's own entries (mirrors visibleEntries).
-      entry: { authorUserId: req.user!.id },
+      // Own entries, or CAMPAIGN-shared ones from characters still in this
+      // campaign (refs survive a character leaving; the share must not).
+      entry: {
+        OR: [
+          { authorUserId: req.user!.id },
+          { visibility: "CAMPAIGN", character: { campaignId: req.params.id } },
+        ],
+      },
     },
     include: {
       entity: { select: { id: true, name: true } },

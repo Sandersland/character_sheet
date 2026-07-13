@@ -186,7 +186,135 @@ describe("POST /api/characters/:id/journal — capture NOTE rows", () => {
   });
 });
 
-// ── visibleEntries (private-by-default read path) ─────────────────────────────
+// ── Visibility (#838) ─────────────────────────────────────────────────────────
+
+describe("journal entry visibility", () => {
+  async function attachToCampaign() {
+    const campaign = await prisma.campaign.create({
+      data: {
+        name: "Visibility Campaign",
+        ownerId: OWNER_ID,
+        inviteCode: randomUUID(),
+        members: { create: { userId: OWNER_ID, role: "OWNER" } },
+      },
+    });
+    await prisma.character.update({
+      where: { id: FIXTURE_ID },
+      data: { campaignId: campaign.id },
+    });
+    return campaign.id;
+  }
+
+  afterEach(async () => {
+    await prisma.campaign.deleteMany({ where: { name: "Visibility Campaign" } });
+  });
+
+  it("defaults a new entry to CAMPAIGN when the character is in a campaign", async () => {
+    await attachToCampaign();
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ date: "2026-07-01", body: "shared by default" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.journal[0].visibility).toBe("CAMPAIGN");
+    const rows = await prisma.journalEntry.findMany({ where: { characterId: FIXTURE_ID } });
+    expect(rows[0].visibility).toBe("CAMPAIGN");
+  });
+
+  it("honors an explicit PRIVATE opt-out in a campaign", async () => {
+    await attachToCampaign();
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ date: "2026-07-01", body: "my secret", visibility: "PRIVATE" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.journal[0].visibility).toBe("PRIVATE");
+  });
+
+  it("stays PRIVATE for a campaign-less character (no visibility sent)", async () => {
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ date: "2026-07-01", body: "solo note" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.journal[0].visibility).toBe("PRIVATE");
+  });
+
+  it("coerces a requested CAMPAIGN to PRIVATE for a campaign-less character (201, no error)", async () => {
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ date: "2026-07-01", body: "nowhere to share", visibility: "CAMPAIGN" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.journal[0].visibility).toBe("PRIVATE");
+  });
+
+  it("400s on an invalid visibility value", async () => {
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ date: "2026-07-01", body: "x", visibility: "FRIENDS" });
+    expect(res.status).toBe(400);
+  });
+
+  it("PATCH toggles visibility CAMPAIGN → PRIVATE → CAMPAIGN", async () => {
+    await attachToCampaign();
+    const created = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ date: "2026-07-01", body: "toggle me" });
+    const entryId = created.body.journal[0].id as string;
+    expect(created.body.journal[0].visibility).toBe("CAMPAIGN");
+
+    const toPrivate = await supertest.agent(app).set("Cookie", COOKIE)
+      .patch(journalUrl(`/${entryId}`))
+      .send({ visibility: "PRIVATE" });
+    expect(toPrivate.status).toBe(200);
+    expect(toPrivate.body.journal[0].visibility).toBe("PRIVATE");
+
+    const backToCampaign = await supertest.agent(app).set("Cookie", COOKIE)
+      .patch(journalUrl(`/${entryId}`))
+      .send({ visibility: "CAMPAIGN" });
+    expect(backToCampaign.status).toBe(200);
+    expect(backToCampaign.body.journal[0].visibility).toBe("CAMPAIGN");
+  });
+
+  it("PATCH coerces CAMPAIGN to PRIVATE when the character has no campaign", async () => {
+    const created = await supertest.agent(app).set("Cookie", COOKIE)
+      .post(journalUrl())
+      .send({ date: "2026-07-01", body: "solo toggle" });
+    const entryId = created.body.journal[0].id as string;
+
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .patch(journalUrl(`/${entryId}`))
+      .send({ visibility: "CAMPAIGN" });
+    expect(res.status).toBe(200);
+    expect(res.body.journal[0].visibility).toBe("PRIVATE");
+  });
+
+  it("403s when a non-author tries to change visibility", async () => {
+    const entry = await prisma.journalEntry.create({
+      data: {
+        characterId: FIXTURE_ID,
+        kind: "NOTE",
+        date: new Date("2026-07-01T00:00:00.000Z"),
+        body: "authored by someone else",
+        authorUserId: "other-user",
+      },
+    });
+
+    const res = await supertest.agent(app).set("Cookie", COOKIE)
+      .patch(journalUrl(`/${entry.id}`))
+      .send({ visibility: "PRIVATE" });
+    expect(res.status).toBe(403);
+
+    // A body-only edit by the character owner is still allowed.
+    const bodyOnly = await supertest.agent(app).set("Cookie", COOKIE)
+      .patch(journalUrl(`/${entry.id}`))
+      .send({ body: "owner edited the text" });
+    expect(bodyOnly.status).toBe(200);
+  });
+});
+
+// ── visibleEntries (own-entries read path) ────────────────────────────────────
 
 describe("visibleEntries", () => {
   it("returns only the author's own entries", async () => {
