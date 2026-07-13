@@ -23,7 +23,7 @@ import LoadoutSwapRow from "@/features/session/LoadoutSwapRow";
 import InitiativeRail from "@/features/session/InitiativeRail";
 import TurnConcentrationBanner from "@/features/session/TurnConcentrationBanner";
 import TurnDeathSaves from "@/features/session/TurnDeathSaves";
-import TurnDmBanner from "@/features/session/TurnDmBanner";
+import TurnSummaryBanner from "@/features/session/TurnSummaryBanner";
 import TurnResolutionSheets from "@/features/session/TurnResolutionSheets";
 import { showInitiative, showMovement } from "@/features/session/turnFlags";
 import type { AllyOption } from "@/lib/spellMeta";
@@ -274,6 +274,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     twfAvailable,
     consumeBonusAction,
     consumeReaction,
+    clearAttackTally,
     history,
   } = turnState;
 
@@ -395,8 +396,8 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           consumeReaction={consumeReaction}
         />
 
-        {/* ── "Tell your DM" banner — attack tally once the sheet is closed ── */}
-        {!activeResolution && <TurnDmBanner rows={attackTally} />}
+        {/* ── "Turn summary" banner — attack tally once the sheet is closed ── */}
+        {!activeResolution && <TurnSummaryBanner rows={attackTally} onDismiss={clearAttackTally} />}
 
         {/* ── Action Surge (Fighter) ─────────────────────────────────────── */}
         <ActionSurgeButton

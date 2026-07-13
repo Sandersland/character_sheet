@@ -676,7 +676,7 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     expect(within(screen.getByRole("dialog")).getByText("This action")).toBeInTheDocument();
   });
 
-  it("DM banner: appears with tally lines once the sheet is closed, dismissible (#802)", async () => {
+  it("Turn-summary banner: appears with tally lines once the sheet is closed, dismissible (#802/#812)", async () => {
     const user = userEvent.setup();
     renderHub(extraAttackFighter());
     await openAttackPicker(user);
@@ -687,9 +687,14 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
     await user.click(sheet().getByRole("button", { name: /^Done$/ }));
 
-    expect(screen.getByText("Tell your DM")).toBeInTheDocument();
+    expect(screen.getByText("Turn summary")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Dismiss/ }));
-    expect(screen.queryByText("Tell your DM")).not.toBeInTheDocument();
+    expect(screen.queryByText("Turn summary")).not.toBeInTheDocument();
+
+    // Dismiss is durable against undo (#812): popping the last recordAttack
+    // restores the economy but must not resurrect stale banner rows.
+    await user.click(screen.getByRole("button", { name: /Undo/ }));
+    expect(screen.queryByText("Turn summary")).not.toBeInTheDocument();
   });
 });
 

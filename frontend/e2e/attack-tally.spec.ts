@@ -6,8 +6,8 @@ import { findCharacterByName } from "./helpers/api";
 
 // #802: a two-attack (Extra Attack) turn records a per-attack tally, keeps the
 // action live for Resume when closed with an attack unspent, and surfaces the
-// "Tell your DM" banner once every attack is spent. The Battle Master persona is
-// Fighter L5 (Extra Attack → 2 attacks per Attack action).
+// "Turn summary" banner once every attack is spent (#812). The Battle Master
+// persona is Fighter L5 (Extra Attack → 2 attacks per Attack action).
 test("attack tally: two-attack turn — tally, Resume, then DM banner (mobile)", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page);
@@ -48,10 +48,16 @@ test("attack tally: two-attack turn — tally, Resume, then DM banner (mobile)",
   await sheet.getByRole("button", { name: /^Done$/ }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // DM banner surfaces with the tally lines; dismiss clears it.
-  await expect(page.getByText("Tell your DM")).toBeVisible();
+  // Turn-summary banner surfaces with the tally lines; dismiss clears it.
+  await expect(page.getByText("Turn summary")).toBeVisible();
   await page.getByRole("button", { name: /Dismiss/ }).click();
-  await expect(page.getByText("Tell your DM")).toHaveCount(0);
+  await expect(page.getByText("Turn summary")).toHaveCount(0);
+
+  // Dismiss clears the persisted tally (#812) — a reload mid-turn must not
+  // resurrect the banner from the localStorage turn snapshot.
+  await page.reload();
+  await expect(page.getByRole("button", { name: "End turn" })).toBeVisible();
+  await expect(page.getByText("Turn summary")).toHaveCount(0);
 
   expect(errors).toEqual([]);
 });

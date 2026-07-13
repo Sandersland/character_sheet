@@ -1,7 +1,7 @@
 // Pure model + formatting for the multi-attack tally (#802): the per-attack rows
 // the attack sheet records, the auto-verdict rule (nat 20 → crit, nat 1 → miss),
-// and the "Tell your DM" banner lines. No JSX — rendered by AttackTallyStrip and
-// TurnDmBanner, recorded by useTurnState.
+// and the "Turn summary" banner lines. No JSX — rendered by AttackTallyStrip and
+// TurnSummaryBanner, recorded by useTurnState.
 
 export type TallyVerdict = "hit" | "miss" | "crit";
 
@@ -44,7 +44,7 @@ export function isCritRow(row: AttackTallyRow): boolean {
   return row.verdict === "crit" || row.attack.nat20;
 }
 
-// One "Tell your DM" banner line. Miss rows drop damage; crit rows say so.
+// One "Turn summary" banner line. Miss rows drop damage; crit rows say so.
 export function attackTallyLine(row: AttackTallyRow): string {
   const name = row.formName;
   if (isMissRow(row)) {
