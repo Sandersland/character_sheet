@@ -3,9 +3,15 @@ import { z } from "zod";
 
 import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
 import { collectMergedInIdentities, wouldCreateCycle } from "@/lib/activity/entity-merges.js";
-import { visibleEntryWhere } from "@/lib/activity/entity-stats.js";
+import {
+  aggregateEntityStats,
+  buildSessionOrdinalMap,
+  matchEntityQuery,
+  resolveVisibleMergeUnion,
+  visibleEntryWhere,
+  type StatRef,
+} from "@/lib/activity/entity-stats.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
-import { normalizeForMatch } from "@/lib/activity/journal-refs.js";
 import { prisma } from "@/lib/core/prisma.js";
 
 // Campaign entity registry (#248): the shared wiki of NPCs/locations/factions/
@@ -44,13 +50,41 @@ const updateEntitySchema = z
   .partial()
   .strict();
 
-// ── GET /api/campaigns/:id/entities?q=&type= ─────────────────────────────────
+// ── GET /api/campaigns/:id/entities?q=&type=&include=stats ───────────────────
 // List/search the campaign's entities. The campaign-scoped volume is small, so
-// we fetch (optionally narrowed by a valid type) and match in memory via the
-// same normalized key on both name and aliases. An invalid type is ignored.
+// we fetch (optionally narrowed by a valid type) and match in memory on name,
+// aliases, and notes (#839), labeling each hit's field. An invalid type is
+// ignored. ?include=stats attaches derived mention stats (computed at read; a
+// fixed number of queries regardless of result size).
+
+// Session context resolver for mention refs: title + startedAt-ordinal (#839).
+async function loadSessionContext(campaignId: string) {
+  const sessions = await prisma.session.findMany({
+    where: { campaignId },
+    orderBy: { startedAt: "asc" },
+    select: { id: true, title: true },
+  });
+  return {
+    ordinals: buildSessionOrdinalMap(sessions),
+    titles: new Map(sessions.map((s) => [s.id, s.title])),
+  };
+}
+
+type SessionContext = Awaited<ReturnType<typeof loadSessionContext>>;
+
+function mentionRef(ref: StatRef | null, ctx: SessionContext) {
+  if (!ref) return null;
+  return {
+    sessionId: ref.sessionId,
+    sessionTitle: (ref.sessionId ? ctx.titles.get(ref.sessionId) : null) ?? null,
+    sessionOrdinal: (ref.sessionId ? ctx.ordinals.get(ref.sessionId) : null) ?? null,
+    date: ref.date,
+  };
+}
 
 entitiesRouter.get("/campaigns/:id/entities", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
+  const isOwner = role === "OWNER";
 
   const typeParam = typeof req.query.type === "string" ? req.query.type : undefined;
   const type = (ENTITY_TYPES as readonly string[]).includes(typeParam ?? "")
@@ -62,19 +96,105 @@ entitiesRouter.get("/campaigns/:id/entities", async (req, res) => {
       campaignId: req.params.id,
       ...(type ? { type } : {}),
       // Non-owners see only revealed entities (#379); the owner sees all.
-      ...(role === "OWNER" ? {} : { visibility: "REVEALED" }),
+      ...(isOwner ? {} : { visibility: "REVEALED" }),
     },
     orderBy: { name: "asc" },
   });
 
-  const q = typeof req.query.q === "string" ? normalizeForMatch(req.query.q) : "";
+  const q = typeof req.query.q === "string" ? req.query.q : "";
   const matched = q
-    ? entities.filter((e) =>
-        [e.name, ...e.aliases].some((s) => normalizeForMatch(s).includes(q)),
-      )
+    ? entities.flatMap((e) => {
+        const matchedIn = matchEntityQuery(e, q);
+        return matchedIn ? [{ ...e, matchedIn }] : [];
+      })
     : entities;
 
-  res.json(matched);
+  const includeStats =
+    typeof req.query.include === "string" && req.query.include.split(",").includes("stats");
+  if (!includeStats) {
+    res.json(matched);
+    return;
+  }
+
+  const listedIds = matched.map((e) => e.id);
+  const [edges, allEntities, ctx] = await Promise.all([
+    prisma.campaignEntityMerge.findMany({
+      where: { campaignId: req.params.id },
+      select: { mergedEntityId: true, survivorEntityId: true, status: true },
+    }),
+    // A type-filtered list may miss merged identities of other types; the scrub
+    // needs every entity's visibility.
+    prisma.campaignEntity.findMany({
+      where: { campaignId: req.params.id },
+      select: { id: true, visibility: true },
+    }),
+    loadSessionContext(req.params.id),
+  ]);
+  const revealedIds = new Set(
+    allEntities.filter((e) => e.visibility === "REVEALED").map((e) => e.id),
+  );
+  const union = resolveVisibleMergeUnion(edges, listedIds, revealedIds, isOwner);
+
+  // Refs tagging a merged-in identity attribute to every listed survivor above it.
+  const attributeTo = new Map<string, string[]>();
+  for (const [listedId, mergedIn] of union) {
+    for (const id of [listedId, ...mergedIn]) {
+      const survivors = attributeTo.get(id) ?? [];
+      survivors.push(listedId);
+      attributeTo.set(id, survivors);
+    }
+  }
+
+  const refRows =
+    attributeTo.size === 0
+      ? []
+      : await prisma.journalEntryRef.findMany({
+          where: {
+            entityId: { in: [...attributeTo.keys()] },
+            entry: visibleEntryWhere(req.user!.id, req.params.id),
+          },
+          select: {
+            entityId: true,
+            entryId: true,
+            entry: {
+              select: {
+                sessionId: true,
+                date: true,
+                loggedAt: true,
+                createdAt: true,
+                character: { select: { name: true } },
+              },
+            },
+          },
+        });
+  const statRefs: StatRef[] = refRows.flatMap((row) =>
+    (attributeTo.get(row.entityId) ?? []).map((survivor) => ({
+      entityId: survivor,
+      entryId: row.entryId,
+      characterName: row.entry.character.name,
+      sessionId: row.entry.sessionId,
+      date: row.entry.date,
+      loggedAt: row.entry.loggedAt,
+      createdAt: row.entry.createdAt,
+    })),
+  );
+  const stats = aggregateEntityStats(statRefs);
+
+  res.json(
+    matched.map((e) => {
+      const agg = stats.get(e.id);
+      return {
+        ...e,
+        stats: {
+          mentionCount: agg?.mentionCount ?? 0,
+          firstMentioned: mentionRef(agg?.firstMentioned ?? null, ctx),
+          lastMentioned: mentionRef(agg?.lastMentioned ?? null, ctx),
+          chroniclers: agg?.chroniclers ?? [],
+          hasDescription: (e.notes ?? "").trim().length > 0,
+        },
+      };
+    }),
+  );
 });
 
 // ── POST /api/campaigns/:id/entities ─────────────────────────────────────────
@@ -376,23 +496,26 @@ entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, re
   }
   const entityIds = [req.params.entityId, ...mergedIn];
 
-  const refs = await prisma.journalEntryRef.findMany({
-    where: {
-      entityId: { in: entityIds },
-      // Own entries, or CAMPAIGN-shared ones from characters still in this
-      // campaign (refs survive a character leaving; the share must not).
-      entry: visibleEntryWhere(req.user!.id, req.params.id),
-    },
-    include: {
-      entity: { select: { id: true, name: true } },
-      entry: { include: { character: { select: { name: true } } } },
-    },
-    orderBy: [
-      { entry: { date: "desc" } },
-      { entry: { loggedAt: "desc" } },
-      { entry: { createdAt: "desc" } },
-    ],
-  });
+  const [refs, ctx] = await Promise.all([
+    prisma.journalEntryRef.findMany({
+      where: {
+        entityId: { in: entityIds },
+        // Own entries, or CAMPAIGN-shared ones from characters still in this
+        // campaign (refs survive a character leaving; the share must not).
+        entry: visibleEntryWhere(req.user!.id, req.params.id),
+      },
+      include: {
+        entity: { select: { id: true, name: true } },
+        entry: { include: { character: { select: { name: true } } } },
+      },
+      orderBy: [
+        { entry: { date: "desc" } },
+        { entry: { loggedAt: "desc" } },
+        { entry: { createdAt: "desc" } },
+      ],
+    }),
+    loadSessionContext(req.params.id),
+  ]);
 
   res.json(
     refs.map((ref) => ({
@@ -400,6 +523,9 @@ entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, re
         id: ref.entry.id,
         characterId: ref.entry.characterId,
         sessionId: ref.entry.sessionId,
+        sessionTitle: (ref.entry.sessionId ? ctx.titles.get(ref.entry.sessionId) : null) ?? null,
+        sessionOrdinal:
+          (ref.entry.sessionId ? ctx.ordinals.get(ref.entry.sessionId) : null) ?? null,
         kind: ref.entry.kind,
         date: ref.entry.date,
         loggedAt: ref.entry.loggedAt,
