@@ -1,0 +1,72 @@
+import type { ReactNode } from "react";
+import { describe, it, expect, vi } from "vitest";
+import { renderHook } from "@testing-library/react";
+
+import { RollProvider } from "@/features/dice/RollContext";
+import { useAttackRolls } from "@/features/session/useAttackRolls";
+import type { AttackEntry } from "@/lib/attackMath";
+import type { RollResult } from "@/lib/dice";
+import type { RollModifier } from "@/types/character";
+
+vi.mock("@/api/client", () => ({ logRoll: vi.fn().mockResolvedValue(undefined) }));
+
+const poisoned: RollModifier[] = [
+  { mode: "disadvantage", kind: "attack", source: "Poisoned" },
+  { mode: "disadvantage", kind: "check", source: "Poisoned" },
+];
+
+const entry: AttackEntry = {
+  id: "longsword",
+  name: "Longsword",
+  attackLabel: "+5",
+  damageLabel: "1d8 + 3 slashing",
+  attackSpec: { count: 1, faces: 20, modifier: 5 },
+  damageSpec: { count: 1, faces: 8, modifier: 3 },
+  damageType: "slashing",
+  attackRollLabel: "Longsword attack",
+  damageRollLabel: "Longsword damage",
+  logSource: "Longsword",
+  damageRiders: [],
+};
+
+function setup(rollModifiers: RollModifier[]) {
+  const roll = vi.fn((spec): RollResult => ({ dice: [{ value: 10, dropped: false }], modifier: spec.modifier ?? 0, total: 10, spec }));
+  const noop = vi.fn();
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <RollProvider characterId="c1" sessionId="s1" rollModifiers={rollModifiers}>
+      {children}
+    </RollProvider>
+  );
+  const { result } = renderHook(
+    () =>
+      useAttackRolls({
+        roll,
+        logRollSafe: noop,
+        recordAttack: noop,
+        setTallyDamage: noop,
+        setTallyAttackTotal: noop,
+        addTallyDamageRider: noop,
+        currentRow: null,
+      }),
+    { wrapper },
+  );
+  return { result, roll };
+}
+
+describe("useAttackRolls state-driven roll mode (#486)", () => {
+  it("surfaces a disadvantage chip and pins the mode while Poisoned", () => {
+    const { result, roll } = setup(poisoned);
+    expect(result.current.viewFor(entry).attackChip).toBe("disadvantage — Poisoned");
+
+    result.current.viewFor(entry).onAttack();
+    expect(roll.mock.calls[0][0]).toMatchObject({ mode: "disadvantage" });
+  });
+
+  it("shows no chip and rolls normally with no state", () => {
+    const { result, roll } = setup([]);
+    expect(result.current.viewFor(entry).attackChip).toBe("");
+
+    result.current.viewFor(entry).onAttack();
+    expect(roll.mock.calls[0][0]).toMatchObject({ mode: "normal" });
+  });
+});

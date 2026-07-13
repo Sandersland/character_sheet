@@ -152,6 +152,7 @@ function RollToHitStep({
   selectedId,
   onSelect,
   selected,
+  chip,
   boundView,
   attack,
   attacksExhausted,
@@ -161,6 +162,7 @@ function RollToHitStep({
   selectedId: string;
   onSelect: (id: string) => void;
   selected: AttackEntry;
+  chip: string;
   boundView: AttackEntryView | null;
   attack: AttackState | null;
   attacksExhausted: boolean;
@@ -189,6 +191,20 @@ function RollToHitStep({
             {selected.attackLabel} to hit · {selected.damageLabel}
             {selected.note && <span className="ml-1 italic">{selected.note}</span>}
           </span>
+          {chip && (
+            <span
+              data-testid="attack-roll-mode-chip"
+              className={`mt-0.5 block text-[10px] font-semibold uppercase tracking-wide ${
+                chip.startsWith("advantage")
+                  ? "text-gold-600"
+                  : chip.startsWith("disadvantage")
+                    ? "text-garnet-600"
+                    : "text-parchment-500"
+              }`}
+            >
+              {chip}
+            </span>
+          )}
         </span>
         {!boundView && (
           <button
@@ -423,6 +439,7 @@ export default function AttackStepCard({
             selectedId={selectedId}
             onSelect={onSelect}
             selected={selectedView.entry}
+            chip={selectedView.attackChip}
             boundView={boundView}
             attack={attack}
             attacksExhausted={attacksExhausted}

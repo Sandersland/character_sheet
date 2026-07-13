@@ -41,6 +41,7 @@ export default function CharacterSheetPage() {
     <RollProvider
       characterId={character.id}
       sessionId={session.inActiveSession ? session.activeSessionId : null}
+      rollModifiers={character.rollModifiers}
     >
       <div className="min-h-screen bg-parchment-100 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
         <CharacterSheetHeader

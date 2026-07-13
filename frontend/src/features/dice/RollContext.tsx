@@ -35,6 +35,7 @@ import {
   type RollResult,
   type RollSpec,
 } from "@/lib/dice";
+import type { RollModifier } from "@/types/character";
 
 // Lazy so the 3D dice stack (three/@react-three/cannon-es) stays out of the
 // initial chunk — it loads only when a roll actually animates.
@@ -84,6 +85,8 @@ interface RollContextValue {
   /** Sticky manual advantage/disadvantage applied to eligible d20 rolls. */
   mode: RollMode;
   setMode: (mode: RollMode) => void;
+  /** State-driven advantage/disadvantage grants (#486) for resolveRollMode. */
+  rollModifiers: RollModifier[];
 }
 
 const RollContext = createContext<RollContextValue | null>(null);
@@ -96,10 +99,12 @@ interface RollProviderProps {
   sessionId?: string | null;
   /** Fired after a roll is logged so a Session Log view can refresh. */
   onRollLogged?: () => void;
+  /** State-driven advantage/disadvantage grants (#486); resolved per roll by consumers. */
+  rollModifiers?: RollModifier[];
 }
 
 /** Mount once at page level to enable `useRoll` in all children. */
-export function RollProvider({ children, characterId, sessionId, onRollLogged }: RollProviderProps) {
+export function RollProvider({ children, characterId, sessionId, onRollLogged, rollModifiers = [] }: RollProviderProps) {
   const [lastRoll, setLastRoll] = useState<RollEntry | null>(null);
   const [mode, setMode] = useState<RollMode>("normal");
   // The active animated roll awaiting its 3D tumble (null when no overlay is open).
@@ -167,7 +172,7 @@ export function RollProvider({ children, characterId, sessionId, onRollLogged }:
   }, [logSessionRoll]);
 
   return (
-    <RollContext.Provider value={{ lastRoll, roll, rollAnimated, logSessionRoll, mode, setMode }}>
+    <RollContext.Provider value={{ lastRoll, roll, rollAnimated, logSessionRoll, mode, setMode, rollModifiers }}>
       {children}
       {pending && (
         <Suspense fallback={null}>
