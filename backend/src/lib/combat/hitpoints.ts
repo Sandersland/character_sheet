@@ -1116,7 +1116,7 @@ function deriveRestPools(row: HpOpContext["row"]): DerivedClassInfo | null {
 function resetRestResources(
   row: HpOpContext["row"],
   rest: "short" | "long",
-): { state: ResourcesMutableState; beforeResourceState: Record<string, unknown>; resourcesRestored: number } {
+): { state: ResourcesMutableState; beforeResourceState: ResourcesMutableState; resourcesRestored: number } {
   const derivedRes = deriveRestPools(row);
   const state = normalizeResourcesMutable(row.resources);
   const beforeResourceState = snapshotResources(state);

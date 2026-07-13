@@ -192,14 +192,7 @@ export function serializeResourcesState(state: ResourcesMutableState): Prisma.In
  * omitted key silently wipes on revert). Copies every entry, so mutating `state`
  * after capture can't retroactively alter the snapshot.
  */
-export function snapshotResources(state: ResourcesMutableState): {
-  used: Record<string, number>;
-  maneuversKnown: ManeuverEntry[];
-  disciplinesKnown: DisciplineEntry[];
-  toolProficienciesKnown: ToolProfEntry[];
-  advancements: AdvancementEntry[];
-  fightingStyle: FightingStyleKey | null;
-} {
+export function snapshotResources(state: ResourcesMutableState): ResourcesMutableState {
   return {
     used: { ...state.used },
     maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
