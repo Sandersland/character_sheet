@@ -676,7 +676,7 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     expect(within(screen.getByRole("dialog")).getByText("This action")).toBeInTheDocument();
   });
 
-  it("DM banner: appears with tally lines once the sheet is closed, dismissible (#802)", async () => {
+  it("Turn-summary banner: appears with tally lines once the sheet is closed, dismissible (#802/#812)", async () => {
     const user = userEvent.setup();
     renderHub(extraAttackFighter());
     await openAttackPicker(user);
@@ -687,9 +687,14 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
     await user.click(sheet().getByRole("button", { name: /^Done$/ }));
 
-    expect(screen.getByText("Tell your DM")).toBeInTheDocument();
+    expect(screen.getByText("Turn summary")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Dismiss/ }));
-    expect(screen.queryByText("Tell your DM")).not.toBeInTheDocument();
+    expect(screen.queryByText("Turn summary")).not.toBeInTheDocument();
+
+    // Dismiss is durable against undo (#812): popping the last recordAttack
+    // restores the economy but must not resurrect stale banner rows.
+    await user.click(screen.getByRole("button", { name: /Undo/ }));
+    expect(screen.queryByText("Turn summary")).not.toBeInTheDocument();
   });
 });
 
@@ -824,5 +829,61 @@ describe("TurnHub — mid-turn weapon change (#815)", () => {
     await user.click(screen.getByRole("button", { name: "End turn" }));
     await user.click(screen.getByRole("button", { name: "Start my turn" }));
     expect(screen.queryByRole("button", { name: /Refund/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("TurnHub — Way of Shadow reminder actions (#440)", () => {
+  function shadowMonk(): Character {
+    return makeCharacter({
+      class: "Monk",
+      subclass: "Way of Shadow",
+      level: 17,
+      availableActions: [
+        {
+          key: "shadowStep",
+          name: "Shadow Step",
+          cost: "bonusAction",
+          enabled: true,
+          reminder: "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn.",
+        },
+        {
+          key: "opportunist",
+          name: "Opportunist",
+          cost: "reaction",
+          enabled: true,
+          reminder: "When a creature within 5 ft of you is hit by another creature's attack, make a melee attack against it as your reaction.",
+        },
+      ],
+    } as unknown as Partial<Character>);
+  }
+
+  it("Shadow Step shows its reminder in the Bonus sheet and on use, and spends no server effect", async () => {
+    const user = userEvent.setup();
+    renderHub(shadowMonk());
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Bonus" }));
+    // Reminder is surfaced as the card caption.
+    expect(screen.getByText(/Teleport up to 60 ft/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Shadow Step" }));
+    // Bonus consumed + reminder surfaced on use; no backend effect fires.
+    expect(screen.queryByRole("button", { name: "Use Bonus" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Teleport up to 60 ft/i)).toBeInTheDocument();
+    expect(applyActionTransactions).not.toHaveBeenCalled();
+  });
+
+  it("Opportunist shows its reminder in the Reaction sheet and after use", async () => {
+    const user = userEvent.setup();
+    renderHub(shadowMonk());
+    await startTurn(user);
+
+    await user.click(screen.getByRole("button", { name: "Use Reaction" }));
+    expect(screen.getByText(/within 5 ft of you is hit/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Opportunist" }));
+    expect(screen.getByText("Reaction used")).toBeInTheDocument();
+    expect(screen.getByText(/within 5 ft of you is hit/i)).toBeInTheDocument();
+    expect(applyActionTransactions).not.toHaveBeenCalled();
   });
 });

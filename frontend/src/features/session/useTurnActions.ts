@@ -202,6 +202,13 @@ export function useTurnActions({
       void send(key, { roll: rollSpec(plan.healRoll).total });
     }
     if (plan.openResolution) openResolution(key);
+    // No-server-effect reminder actions (Shadow Step, Opportunist): the rule
+    // text is the whole deliverable, so surface it on use.
+    const reminder = availableActions.find((a) => a.key === key)?.reminder;
+    if (reminder) {
+      if (cost === "reaction") setReactionMessage(reminder);
+      else setEffectMessage(reminder);
+    }
   }
 
   // Special path for Attack action — must use enterAttackMode, not consumeAction.

@@ -2,16 +2,17 @@ import { useEffect, useRef, useState } from "react";
 
 import { rollDie } from "@/lib/dice";
 import { advancingHitDie, dieFaces } from "@/lib/hitDice";
+import { useRestActions } from "@/features/hitpoints/useRestActions";
 import type { Character, ClassOption, HitPointOperation, LevelUpTarget } from "@/types/character";
 
-// Rest + level-up handlers and level-up/advancement UI state for HitPointTracker.
+// Level-up handlers and level-up/advancement UI state for HitPointTracker; rest
+// ops come from the shared useRestActions hook.
 export function useHitPointTrackerActions(
   character: Character,
   referenceClasses: ClassOption[],
   submit: (ops: HitPointOperation[]) => Promise<boolean>,
 ) {
-  const { hitDice } = character;
-  const availableDice = hitDice.total - hitDice.spent;
+  const { availableDice, shortRest, longRest } = useRestActions(character, submit);
   const [levelUpOpen, setLevelUpOpen] = useState(false);
   const [advancementCallout, setAdvancementCallout] = useState(false);
 
@@ -22,16 +23,6 @@ export function useHitPointTrackerActions(
     if (newTotal > prevAdvancementTotal.current) setAdvancementCallout(true);
     prevAdvancementTotal.current = newTotal;
   }, [character.advancementSlots.total]);
-
-  async function shortRest(n: number) {
-    if (!n || n < 1 || n > availableDice) return;
-    const rolls = Array.from({ length: n }, () => rollDie(dieFaces(hitDice.die)));
-    await submit([{ type: "shortRest", rolls }]);
-  }
-
-  async function longRest() {
-    await submit([{ type: "longRest" }]);
-  }
 
   async function levelUp(method: "average" | "roll", target: LevelUpTarget | undefined) {
     // Roll bounds follow the advancing class's hit die, not always the primary.

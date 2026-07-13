@@ -246,6 +246,28 @@ export const ACTIONS: ActionSeed[] = [
       "After hitting with a melee weapon attack, spend 1 ki to force the target to make a Constitution save or be stunned until end of your next turn.",
   },
 
+  // ── Subclass: Way of Shadow monk ─────────────────────────────────────────
+  {
+    key: "shadowStep",
+    name: "Shadow Step",
+    cost: "bonusAction",
+    grantClass: "monk",
+    grantSubclass: "Shadow",
+    grantLevel: 6,
+    description:
+      "When in dim light or darkness, teleport up to 60 ft as a bonus action to an unoccupied space you can see that is also in dim light or darkness. You have advantage on the first melee attack you make before the end of this turn.",
+  },
+  {
+    key: "opportunist",
+    name: "Opportunist",
+    cost: "reaction",
+    grantClass: "monk",
+    grantSubclass: "Shadow",
+    grantLevel: 17,
+    description:
+      "When a creature within 5 ft of you is hit by an attack made by another creature, use your reaction to make a melee attack against that creature.",
+  },
+
   // ── Class: Paladin ──────────────────────────────────────────────────────
   {
     key: "divineSense",
