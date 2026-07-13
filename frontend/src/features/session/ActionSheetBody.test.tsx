@@ -11,7 +11,6 @@ function model(over: Partial<ActionSheetModel> = {}): ActionSheetModel {
     hasSpellcasting: false,
     classActionOptions: [],
     loadoutLabel: "Unarmed",
-    hasEquippableItems: true,
     ...over,
   };
 }
@@ -28,13 +27,19 @@ function renderBody(m: ActionSheetModel) {
 }
 
 describe("ActionSheetBody (#815)", () => {
-  it("offers Change weapons when there is anything to hold or stow", () => {
+  // Deliberate (PR #824 review finding 2, declined): the card stays visible even
+  // unarmed with an empty bag — cards are stable, the picker owns its empty state
+  // (same convention as "Use an item" at zero consumables). The session e2e
+  // exercises exactly this persona.
+  it("offers Change weapons even when unarmed with an empty bag", () => {
     renderBody(model());
     expect(screen.getByText("Change weapons")).toBeInTheDocument();
   });
 
-  it("hides Change weapons with empty hands and an empty bag", () => {
-    renderBody(model({ hasEquippableItems: false }));
-    expect(screen.queryByText("Change weapons")).toBeNull();
+  it("hides Cast a spell for non-casters", () => {
+    renderBody(model());
+    expect(screen.queryByText("Cast a spell")).toBeNull();
+    renderBody(model({ hasSpellcasting: true }));
+    expect(screen.getByText("Cast a spell")).toBeInTheDocument();
   });
 });

@@ -80,17 +80,6 @@ export function handPickerOptions(
   return options;
 }
 
-/** Whether the Change-weapons affordance has anything to offer: an occupied
- *  hand (free Stow) or a bag candidate that fits either hand. Gates the
- *  Action-sheet card so an unarmed, empty-bag character never opens an
- *  option-less picker. */
-export function hasLoadoutOptions(inventory: InventoryItem[]): boolean {
-  const HANDS: EquipSlot[] = ["MAIN_HAND", "OFF_HAND"];
-  return HANDS.some(
-    (slot) => itemsInSlot(inventory, slot).length > 0 || bagItemsForSlot(inventory, slot).length > 0,
-  );
-}
-
 /** Why a hand's Change button is disabled: an occupied hand needs the Action. */
 export function handButtonDisabledReason(slot: EquipSlot, ctx: HandContext): string | null {
   const occupied = Boolean(slot === "MAIN_HAND" ? ctx.mainOcc : ctx.offOcc);
