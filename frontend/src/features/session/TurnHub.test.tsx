@@ -655,8 +655,10 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     expect(closeButtons.length).toBeGreaterThan(0);
     expect(sheet().queryByRole("button", { name: /Cancel — refund action/ })).not.toBeInTheDocument();
 
-    // Resolve attack 1 (damage = implicit hit) → the full-width continue button appears.
+    // Resolve attack 1 (damage = implicit hit) → the full-width "Next" button
+    // appears, re-arming step 1 for the two-tap next roll (#834).
     await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
+    await user.click(sheet().getByRole("button", { name: "Next" }));
     await user.click(sheet().getByRole("button", { name: /Roll to hit — attack 2 of 2/ }));
     // Both spent — now Done.
     expect(sheet().getByRole("button", { name: /^Done$/ })).toBeInTheDocument();
@@ -692,6 +694,7 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
 
     await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
     await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
+    await user.click(sheet().getByRole("button", { name: "Next" }));
     await user.click(sheet().getByRole("button", { name: /Roll to hit — attack 2 of 2/ }));
     await user.click(sheet().getByRole("button", { name: /^Done$/ }));
 

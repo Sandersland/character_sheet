@@ -37,6 +37,8 @@ interface AttackStepCardProps {
   onCallCrit: () => void;
   /** Quiet skip — leaves the current row unresolved and re-arms the next attack. */
   onSkip: () => void;
+  /** "Next" — re-arms step 1 after a resolved attack, without rolling. */
+  onNext: () => void;
   /** Last rolled total per on-hit rider id (from useAttackRolls), shown inline. */
   riderTotals: Record<string, number>;
   /** Kicker + pips in-card (mobile); the md+ layout hosts them in the rail instead. */
@@ -356,16 +358,16 @@ function DamageStep({
   );
 }
 
-/** Post-roll continuation: quiet Skip while unresolved, full-width continue once called. */
+/** Post-roll continuation: quiet Skip while unresolved, full-width Next once
+ *  called — Next re-arms step 1 rather than instant-rolling, so the player can
+ *  re-orient (switch forms, check the tally) before the next roll (#834). */
 function ContinueOrSkip({
   unresolved,
-  attack,
-  onRollToHit,
+  onNext,
   onSkip,
 }: {
   unresolved: boolean;
-  attack: AttackState | null;
-  onRollToHit: () => void;
+  onNext: () => void;
   onSkip: () => void;
 }) {
   if (unresolved) {
@@ -382,10 +384,10 @@ function ContinueOrSkip({
   return (
     <button
       type="button"
-      onClick={onRollToHit}
+      onClick={onNext}
       className="min-h-11 w-full rounded-control bg-garnet-600 px-3 text-sm font-semibold text-parchment-50 transition-colors hover:bg-garnet-700"
     >
-      {attackOrdinalLabel(attack)}
+      Next
     </button>
   );
 }
@@ -435,6 +437,7 @@ export default function AttackStepCard({
   onCallMiss,
   onCallCrit,
   onSkip,
+  onNext,
   riderTotals,
   showKicker,
 }: AttackStepCardProps) {
@@ -488,12 +491,7 @@ export default function AttackStepCard({
       </div>
 
       {boundView && !attacksExhausted && (
-        <ContinueOrSkip
-          unresolved={unresolved}
-          attack={attack}
-          onRollToHit={onRollToHit}
-          onSkip={onSkip}
-        />
+        <ContinueOrSkip unresolved={unresolved} onNext={onNext} onSkip={onSkip} />
       )}
     </div>
   );

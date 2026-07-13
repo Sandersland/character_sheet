@@ -120,6 +120,13 @@ export default function InlineOffHandPicker({
     setRolledId(null);
   }
 
+  // "Next" — re-arms step 1 after a resolved swing (#834). The bonus action is
+  // a single swing, so ContinueOrSkip never renders once it's spent, but the
+  // prop is still required by AttackStepCard's interface.
+  function handleNext() {
+    setRolledId(null);
+  }
+
   const tallyStrip = (
     <AttackTallyStrip
       rows={turnState.attackTally}
@@ -152,6 +159,7 @@ export default function InlineOffHandPicker({
       onCallMiss={handleCallMiss}
       onCallCrit={handleCallCrit}
       onSkip={handleSkip}
+      onNext={handleNext}
       riderTotals={riderTotals}
       showKicker={false}
     />
