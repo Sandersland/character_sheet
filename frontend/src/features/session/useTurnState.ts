@@ -155,7 +155,7 @@ export interface TurnStateActions {
   addTallyDamageRider: (amount: number) => void;
   /** Tap-cycle a manual row's verdict unset→Hit→Miss (auto rows are locked). */
   cycleTallyVerdict: (index: number) => void;
-  /** Clear the attack tally (DM banner dismiss / new action). */
+  /** Clear the attack tally (Turn-summary banner dismiss / new action). */
   clearAttackTally: () => void;
   /**
    * Cancel the Attack action if no attacks have been rolled yet — refunds the
@@ -373,8 +373,17 @@ function cycleTallyVerdictState(s: TurnState, index: number): TurnState {
   return { ...s, attackTally };
 }
 
-const clearAttackTallyState = (s: TurnState): TurnState =>
-  s.attackTally.length === 0 ? s : { ...s, attackTally: [] };
+// Banner dismissal (#812): clearing the tally must be durable — history
+// snapshots also drop their tally rows so a later undo can't resurrect a
+// dismissed banner with stale lines (the economy fields still restore).
+const clearAttackTallyState = (s: TurnState): TurnState => {
+  if (s.attackTally.length === 0 && s.history.every((h) => h.attackTally.length === 0)) return s;
+  return {
+    ...s,
+    attackTally: [],
+    history: s.history.map((h) => (h.attackTally.length === 0 ? h : { ...h, attackTally: [] })),
+  };
+};
 
 function cancelAttackState(s: TurnState): TurnState {
   // Only refund if no attacks have been rolled yet — once rolled, the action
