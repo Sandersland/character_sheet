@@ -57,6 +57,7 @@ describe("useAttackRolls state-driven roll mode (#486)", () => {
   it("surfaces a disadvantage chip and pins the mode while Poisoned", () => {
     const { result, roll } = setup(poisoned);
     expect(result.current.viewFor(entry).attackChip).toBe("disadvantage — Poisoned");
+    expect(result.current.viewFor(entry).attackMode).toBe("disadvantage");
 
     result.current.viewFor(entry).onAttack();
     expect(roll.mock.calls[0][0]).toMatchObject({ mode: "disadvantage" });
@@ -65,6 +66,7 @@ describe("useAttackRolls state-driven roll mode (#486)", () => {
   it("shows no chip and rolls normally with no state", () => {
     const { result, roll } = setup([]);
     expect(result.current.viewFor(entry).attackChip).toBe("");
+    expect(result.current.viewFor(entry).attackMode).toBe("normal");
 
     result.current.viewFor(entry).onAttack();
     expect(roll.mock.calls[0][0]).toMatchObject({ mode: "normal" });

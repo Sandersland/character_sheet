@@ -52,7 +52,7 @@ export function resolveRollMode(
 }
 
 // Short "why" text for the resolved chip, e.g. "disadvantage — Poisoned" or,
-// when adv + disadv cancel, "normal — Rage vs Poisoned". Empty when nothing applied.
+// when adv + disadv cancel, "normal — Rage, Poisoned". Empty when nothing applied.
 export function rollModeChip(resolved: ResolvedRollMode): string {
   if (resolved.sources.length === 0) return "";
   const names = [...new Set(resolved.sources.map((s) => s.source))].join(", ");

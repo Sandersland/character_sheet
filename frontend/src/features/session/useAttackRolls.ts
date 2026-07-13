@@ -18,7 +18,7 @@ import type { useRollLogger } from "@/features/session/useRollLogger";
 import type { RecordedAttack } from "@/features/session/useTurnState";
 import type { AttackTallyRow, TallyRowSource } from "@/lib/attackTallySummary";
 import type { AttackEntry, DamageRider } from "@/lib/attackMath";
-import type { RollResult } from "@/lib/dice";
+import type { RollMode, RollResult } from "@/lib/dice";
 
 // Everything one AttackStepCard needs, bundled per entry so the component takes
 // a single `view` prop instead of the full state surface.
@@ -32,6 +32,8 @@ export interface AttackEntryView {
   isCrit: boolean;
   /** State-driven "why" chip for the attack roll (#486), e.g. "disadvantage — Poisoned"; "" when none. */
   attackChip: string;
+  /** The resolved mode behind the chip — color by this, never by parsing the chip text. */
+  attackMode: RollMode;
   onAttack: () => void;
   onDamage: () => void;
   onDamageRider: (rider: DamageRider) => void;
@@ -160,6 +162,7 @@ export function useAttackRolls({
       lastDamageRoll: lastDamageRolls[entry.id] ?? null,
       isCrit: isRowCrit(entry.id),
       attackChip,
+      attackMode: resolvedAttack.mode,
       onAttack: () => handleAttack(entry),
       onDamage: () => handleDamage(entry),
       onDamageRider: (rider) => handleDamageRider(rider, entry.id),
