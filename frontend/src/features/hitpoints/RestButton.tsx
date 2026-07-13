@@ -29,7 +29,7 @@ export default function RestButton({ character, onUpdate }: RestButtonProps) {
         type="button"
         aria-label="Rest"
         onClick={() => setSheetOpen(true)}
-        className="group flex shrink-0 flex-col items-center justify-center gap-1 rounded-card border border-parchment-200 bg-parchment-50 px-4 py-3 shadow-card transition-colors hover:border-parchment-300 hover:bg-parchment-100 active:bg-parchment-200"
+        className="group flex shrink-0 flex-col items-center justify-center gap-1 rounded-card border border-parchment-200 bg-parchment-50 px-3 py-2 shadow-card transition-colors hover:border-parchment-300 hover:bg-parchment-100 active:bg-parchment-200 sm:px-4 sm:py-3"
       >
         <span className="flex items-center gap-1">
           <Flame aria-hidden="true" className="h-4 w-4 text-garnet-600" />

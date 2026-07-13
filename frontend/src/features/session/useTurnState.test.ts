@@ -448,22 +448,67 @@ describe("attack tally", () => {
     expect(result.current.attackTally[0].damage).toBe(13);
   });
 
-  it("cycleTallyVerdict cycles a manual row unset→Hit→Miss→unset", () => {
+  it("setTallyVerdict writes a manual row's verdict directly (#811)", () => {
     const { result } = inAttack();
     act(() => { result.current.recordAttack(recorded()); });
-    act(() => { result.current.cycleTallyVerdict(0); });
+    act(() => { result.current.setTallyVerdict(0, "hit"); });
     expect(result.current.attackTally[0].verdict).toBe("hit");
-    act(() => { result.current.cycleTallyVerdict(0); });
-    expect(result.current.attackTally[0].verdict).toBe("miss");
-    act(() => { result.current.cycleTallyVerdict(0); });
+    act(() => { result.current.setTallyVerdict(0, "crit"); });
+    expect(result.current.attackTally[0].verdict).toBe("crit");
+    act(() => { result.current.setTallyVerdict(0, undefined); });
     expect(result.current.attackTally[0].verdict).toBeUndefined();
   });
 
-  it("cycleTallyVerdict is locked for an auto (nat 20) row", () => {
+  it("setTallyVerdict is refused on a nat-locked row", () => {
     const { result } = inAttack();
     act(() => { result.current.recordAttack(recorded({ nat20: true })); });
-    act(() => { result.current.cycleTallyVerdict(0); });
+    act(() => { result.current.setTallyVerdict(0, "miss"); });
     expect(result.current.attackTally[0].verdict).toBe("crit"); // unchanged
+  });
+
+  it("switching a row to miss drops its damage (#811)", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    act(() => { result.current.setTallyDamage(9); });
+    act(() => { result.current.setTallyVerdict(0, "miss"); });
+    expect(result.current.attackTally[0].verdict).toBe("miss");
+    expect(result.current.attackTally[0].damage).toBeUndefined();
+  });
+
+  it("rolling damage auto-resolves an unset verdict to hit — implicit hit (#811)", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    expect(result.current.attackTally[0].verdict).toBeUndefined();
+    act(() => { result.current.setTallyDamage(9); });
+    expect(result.current.attackTally[0].verdict).toBe("hit");
+  });
+
+  it("a rider roll also auto-resolves an unset verdict to hit", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    act(() => { result.current.addTallyDamageRider(4); });
+    expect(result.current.attackTally[0].verdict).toBe("hit");
+    expect(result.current.attackTally[0].damage).toBe(4);
+  });
+
+  it("damage writes never overwrite an explicit crit verdict", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    act(() => { result.current.setTallyVerdict(0, "crit"); });
+    act(() => { result.current.setTallyDamage(22); });
+    expect(result.current.attackTally[0].verdict).toBe("crit");
+  });
+
+  it("setTallyDamageAt writes an arbitrary row's damage — banner inline resolve (#811)", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded({ formId: "a" })); });
+    act(() => { result.current.recordAttack(recorded({ formId: "b" })); });
+    act(() => { result.current.setTallyDamageAt(0, 7); });
+    expect(result.current.attackTally[0].damage).toBe(7);
+    expect(result.current.attackTally[0].verdict).toBe("hit"); // implicit hit
+    expect(result.current.attackTally[1].damage).toBeUndefined();
+    act(() => { result.current.setTallyDamageAt(5, 9); }); // out of range → no-op
+    expect(result.current.attackTally).toHaveLength(2);
   });
 
   it("entering a NEW attack action clears the previous tally", () => {

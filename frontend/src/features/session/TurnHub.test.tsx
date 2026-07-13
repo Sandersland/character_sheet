@@ -617,27 +617,31 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     ).toBeInTheDocument();
   });
 
-  it("opens at 2 of 2, decrements on each Roll to hit, and disables at 0 of 2", async () => {
+  it("opens at 2 of 2, decrements per attack (skip path), and exhausts at 0 of 2", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5); // deterministic: no nat 20/1 auto-verdicts
     const user = userEvent.setup();
     renderHub(extraAttackFighter());
     await openAttackPicker(user);
     // Scope to the picker sheet — the Action tile behind it shows its own counter.
     const sheet = () => within(screen.getByRole("dialog"));
 
-    expect(sheet().getByText(/Attacks:\s*2 of 2 remaining/)).toBeInTheDocument();
+    expect(sheet().getByText(/Attacks · 2 of 2 remaining/)).toBeInTheDocument();
 
     await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
-    expect(sheet().getByText(/Attacks:\s*1 of 2 remaining/)).toBeInTheDocument();
+    expect(sheet().getByText(/Attacks · 1 of 2 remaining/)).toBeInTheDocument();
 
-    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
-    expect(sheet().getByText(/Attacks:\s*0 of 2 remaining/)).toBeInTheDocument();
-    expect(sheet().getByRole("button", { name: /Roll to hit/ })).toBeDisabled();
-    // The Damage card bound to the rolled form stays usable after the attacks
-    // run out (label flips to "Roll crit damage" on a nat-20 to-hit).
+    // The unresolved row's ungated path to the next attack is the quiet Skip link (#811).
+    await user.click(sheet().getByRole("button", { name: /Skip — roll next attack/ }));
+    await user.click(sheet().getByRole("button", { name: /Roll to hit — attack 2 of 2/ }));
+    expect(sheet().getByText(/Attacks · 0 of 2 remaining/)).toBeInTheDocument();
+    // Exhausted: no further Roll-to-hit affordance; the bound row's damage stays rollable.
+    expect(sheet().queryByRole("button", { name: /Roll to hit/ })).not.toBeInTheDocument();
     expect(sheet().getByRole("button", { name: /Roll (crit )?damage/ })).not.toBeDisabled();
+    vi.restoreAllMocks();
   });
 
   it("footer: Cancel → Close (attacks remain) → Done (all spent) (#802)", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
     const user = userEvent.setup();
     renderHub(extraAttackFighter());
     await openAttackPicker(user);
@@ -651,9 +655,12 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     expect(closeButtons.length).toBeGreaterThan(0);
     expect(sheet().queryByRole("button", { name: /Cancel — refund action/ })).not.toBeInTheDocument();
 
-    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+    // Resolve attack 1 (damage = implicit hit) → the full-width continue button appears.
+    await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
+    await user.click(sheet().getByRole("button", { name: /Roll to hit — attack 2 of 2/ }));
     // Both spent — now Done.
     expect(sheet().getByRole("button", { name: /^Done$/ })).toBeInTheDocument();
+    vi.restoreAllMocks();
   });
 
   it("Resume: closing with an attack unspent keeps the action live + shows Resume (#802)", async () => {
@@ -677,14 +684,15 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
   });
 
   it("Turn-summary banner: appears with tally lines once the sheet is closed, dismissible (#802/#812)", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
     const user = userEvent.setup();
     renderHub(extraAttackFighter());
     await openAttackPicker(user);
     const sheet = () => within(screen.getByRole("dialog"));
 
     await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
-    await user.click(sheet().getByRole("button", { name: /Roll (crit )?damage/ }));
-    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+    await user.click(sheet().getByRole("button", { name: /^Roll damage$/ }));
+    await user.click(sheet().getByRole("button", { name: /Roll to hit — attack 2 of 2/ }));
     await user.click(sheet().getByRole("button", { name: /^Done$/ }));
 
     expect(screen.getByText("Turn summary")).toBeInTheDocument();
@@ -695,6 +703,53 @@ describe("TurnHub — live multi-attack counter (#757)", () => {
     // restores the economy but must not resurrect stale banner rows.
     await user.click(screen.getByRole("button", { name: /Undo/ }));
     expect(screen.queryByText("Turn summary")).not.toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+
+  it("banner inline resolve (#811): a skipped attack asks 'hit or miss?', Hit grows Roll damage on the line", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5); // d20 face 11 → 11+6 = 17 to hit; d8 face 5
+    const user = userEvent.setup();
+    renderHub(extraAttackFighter());
+    await openAttackPicker(user);
+    const sheet = () => within(screen.getByRole("dialog"));
+
+    // Roll both attacks without resolving either (skip path), then close.
+    await user.click(sheet().getByRole("button", { name: /Roll to hit/ }));
+    await user.click(sheet().getByRole("button", { name: /Skip — roll next attack/ }));
+    await user.click(sheet().getByRole("button", { name: /Roll to hit — attack 2 of 2/ }));
+    await user.click(sheet().getByRole("button", { name: /^Done$/ }));
+
+    // The banner never claims a hit for an unresolved row (#811).
+    const banner = screen.getByText("Turn summary").closest("div")!.parentElement!;
+    expect(within(banner).queryByText(/: hit/)).not.toBeInTheDocument();
+    const questions = screen.getAllByRole("button", { name: "hit or miss?" });
+    expect(questions).toHaveLength(2);
+
+    // Resolve line 1 as a Hit → an inline Roll-damage button grows on the line.
+    await user.click(questions[0]);
+    await user.click(screen.getByRole("button", { name: /^Hit — / }));
+    const rollDamage = screen.getByRole("button", { name: /^Roll damage — / });
+    await user.click(rollDamage);
+
+    // Damage landed on the line (d8 face 5 + modifier 3 → "8 damage"), logged to the session.
+    expect(screen.getByText(/17 — 8 damage/)).toBeInTheDocument();
+    expect(vi.mocked(logRoll)).toHaveBeenCalledWith(
+      "char-1",
+      "sess-1",
+      expect.objectContaining({ kind: "damage" }),
+    );
+
+    // Resolve line 2 as a Miss → reads as a miss, no damage affordance.
+    await user.click(screen.getByRole("button", { name: "hit or miss?" }));
+    await user.click(screen.getByRole("button", { name: /^Miss — / }));
+    expect(screen.getByText(/miss \(to-hit 17\)/)).toBeInTheDocument();
+
+    // Mistaken-verdict recovery: tapping the resolved miss line reveals the quiet
+    // Change row (both lines are resolved now — take the miss line, rendered last).
+    const changeTargets = screen.getAllByRole("button", { name: /Change verdict — / });
+    await user.click(changeTargets[changeTargets.length - 1]);
+    expect(screen.getByText(/Change ·/)).toBeInTheDocument();
+    vi.restoreAllMocks();
   });
 });
 

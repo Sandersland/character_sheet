@@ -87,4 +87,13 @@ describe("RestButton (#814)", () => {
     await screen.findByRole("dialog");
     expect(await axe(container)).toHaveNoViolations();
   });
+
+  it("stays compact on mobile yet keeps its accessible label (#827)", () => {
+    render(<RestButton character={makeCharacter()} onUpdate={vi.fn()} />);
+    const btn = screen.getByRole("button", { name: "Rest" });
+    expect(btn).toHaveAttribute("aria-label", "Rest");
+    // Tighter padding under sm, full padding restored at sm+.
+    expect(btn.className).toMatch(/\bpx-3\b/);
+    expect(btn.className).toMatch(/sm:px-4/);
+  });
 });

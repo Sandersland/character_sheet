@@ -67,7 +67,7 @@ export default function SessionContent({ character, session, reference, setChara
           {/* Compact HP strip + rest button — always visible; tap opens the HP
               sheet (#768) / rest sheet (#814). */}
           <div className="flex items-stretch gap-2">
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               <CompactHpBar character={character} onUpdate={life.handleCharacterUpdate} />
             </div>
             <RestButton character={character} onUpdate={life.handleCharacterUpdate} />

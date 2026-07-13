@@ -94,6 +94,7 @@ export default function TurnResolutionSheets({
       <BottomSheet
         title="Attack"
         subtitle={attackKicker(turnState.attack)}
+        wide
         onClose={closeAttackSheet}
       >
         <InlineAttackPicker

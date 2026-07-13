@@ -30,9 +30,7 @@ import {
 import {
   normalizeResourcesMutable,
   serializeResourcesState,
-  type ManeuverEntry,
-  type ToolProfEntry,
-  type AdvancementEntry,
+  snapshotResources,
 } from "./resources.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
@@ -199,19 +197,7 @@ async function applySetFightingStyle(ctx: ClassOpContext, op: SetFightingStyleOp
   const state = normalizeResourcesMutable(character.resources);
   // Deep-copy the full resources state for before/after snapshots so the
   // `resources` undo branch in activity.ts restores everything wholesale.
-  const snapshot = (s: typeof state) => ({
-    resources: {
-      used: { ...s.used },
-      maneuversKnown: s.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
-      disciplinesKnown: s.disciplinesKnown.map((d) => ({ ...d })),
-      toolProficienciesKnown: s.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
-      advancements: s.advancements.map((a: AdvancementEntry) => ({
-        ...a,
-        abilityDeltas: { ...a.abilityDeltas },
-      })),
-      fightingStyle: s.fightingStyle,
-    },
-  });
+  const snapshot = (s: typeof state) => ({ resources: snapshotResources(s) });
 
   const beforeFs = snapshot(state);
   state.fightingStyle = op.key;

@@ -35,7 +35,7 @@ import { logEvent, type EventType } from "@/lib/activity/events.js";
 import {
   normalizeResourcesMutable,
   serializeResourcesState,
-  type AdvancementEntry,
+  snapshotResources,
   type DisciplineEntry,
   type ManeuverEntry,
   type ResourcesMutableState,
@@ -238,10 +238,9 @@ interface KnownListConfig {
    * before the trim and once after. MUST return a freshly-constructed object
    * (not `state` itself): the same function runs twice on the same mutable
    * object, so returning a live reference would yield identical before/after
-   * payloads. The shapes intentionally diverge per reconciler (maneuvers/tool
-   * profs persist a hand-cloned 4-key object; disciplines the full
-   * serializeResourcesState blob); do not normalize them — the persisted event
-   * payloads are load-bearing for undo.
+   * payloads. Since #818 all reconcilers emit the unified 6-key snapshot via
+   * snapshotResources() — the persisted payload is load-bearing for wholesale
+   * undo, so it must stay the full canonical shape (never a partial subset).
    */
   snapshot: (state: ResourcesMutableState) => Record<string, unknown>;
 }
@@ -323,14 +322,7 @@ async function reconcileManeuvers(ctx: ReconcileContext): Promise<void> {
       allowed === 0
         ? `All ${removedCount} maneuver${removedCount > 1 ? "s" : ""} removed — subclass no longer available`
         : `${removedCount} maneuver${removedCount > 1 ? "s" : ""} removed — level cap reduced to ${allowed}`,
-    snapshot: (state) => ({
-      resources: {
-        used: { ...state.used },
-        maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
-        disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
-        toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
-      },
-    }),
+    snapshot: (state) => ({ resources: snapshotResources(state) }),
   });
 }
 
@@ -347,7 +339,7 @@ async function reconcileDisciplines(ctx: ReconcileContext): Promise<void> {
       allowed === 0
         ? `All ${removedCount} elemental discipline${removedCount > 1 ? "s" : ""} removed — subclass no longer available`
         : `${removedCount} elemental discipline${removedCount > 1 ? "s" : ""} removed — level cap reduced to ${allowed}`,
-    snapshot: (state) => ({ resources: serializeResourcesState(state) }),
+    snapshot: (state) => ({ resources: snapshotResources(state) }),
   });
 }
 
@@ -366,14 +358,7 @@ async function reconcileToolProficiencies(ctx: ReconcileContext): Promise<void> 
       allowed === 0
         ? `${removedCount} tool proficiency choice${removedCount > 1 ? "s" : ""} removed — subclass no longer available`
         : `${removedCount} tool proficiency choice${removedCount > 1 ? "s" : ""} removed — level cap reduced to ${allowed}`,
-    snapshot: (state) => ({
-      resources: {
-        used: { ...state.used },
-        maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
-        disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
-        toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
-      },
-    }),
+    snapshot: (state) => ({ resources: snapshotResources(state) }),
   });
 }
 
@@ -410,15 +395,7 @@ async function reconcileFightingStyle(ctx: ReconcileContext): Promise<void> {
   const allowed = fightingStyleChoiceCount(className, newDerivedLevel);
   if (allowed > 0) return; // still entitled — keep the choice
 
-  const before = {
-    resources: {
-      used: { ...state.used },
-      maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
-      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
-      toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
-      fightingStyle: state.fightingStyle,
-    },
-  };
+  const before = { resources: snapshotResources(state) };
 
   const removedKey = state.fightingStyle;
   const removedLabel = FIGHTING_STYLES.find((s) => s.key === removedKey)?.label ?? removedKey;
@@ -429,15 +406,7 @@ async function reconcileFightingStyle(ctx: ReconcileContext): Promise<void> {
     data: { resources: serializeResourcesState(state) },
   });
 
-  const after = {
-    resources: {
-      used: { ...state.used },
-      maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
-      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
-      toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
-      fightingStyle: null,
-    },
-  };
+  const after = { resources: snapshotResources(state) };
 
   await logEvent(tx, {
     characterId,
@@ -502,16 +471,7 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
     abilityScores: { ...scores },
     hitPoints: { ...hp, deathSaves: { ...hp.deathSaves } },
     initiativeBonus: initBonus,
-    resources: {
-      used: { ...state.used },
-      maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
-      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
-      toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
-      advancements: state.advancements.map((a: AdvancementEntry) => ({
-        ...a,
-        abilityDeltas: { ...a.abilityDeltas },
-      })),
-    },
+    resources: snapshotResources(state),
   };
 
   // LIFO: reverse the tail entries (those beyond the new cap).
@@ -540,16 +500,7 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
     abilityScores: { ...reversed.scores },
     hitPoints: { ...newHp, deathSaves: { ...newHp.deathSaves } },
     initiativeBonus: reversed.initiativeBonus,
-    resources: {
-      used: { ...state.used },
-      maneuversKnown: state.maneuversKnown.map((m: ManeuverEntry) => ({ ...m })),
-      disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
-      toolProficienciesKnown: state.toolProficienciesKnown.map((t: ToolProfEntry) => ({ ...t })),
-      advancements: state.advancements.map((a: AdvancementEntry) => ({
-        ...a,
-        abilityDeltas: { ...a.abilityDeltas },
-      })),
-    },
+    resources: snapshotResources(state),
   };
 
   const removedLabels = toRemove

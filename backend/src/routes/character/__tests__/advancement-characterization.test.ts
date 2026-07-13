@@ -13,8 +13,8 @@
  *
  * The load-bearing risks it guards:
  *  - the 4-key before/after shape (abilityScores / hitPoints / initiativeBonus
- *    / resources) — note resources here is the 5-key hand-built sub-object
- *    WITHOUT fightingStyle, unlike the HP long-rest snapshot;
+ *    / resources) — since #818 resources is the canonical 6-key snapshotResources
+ *    blob (incl. fightingStyle) so wholesale revert can't wipe it;
  *  - the AdvancementEntry field set written into resources.advancements
  *    (id/level/kind/abilityDeltas/hpDelta/initDelta + feat fields), which
  *    reverseAdvancementEffects and level reconciliation replay;
@@ -130,6 +130,7 @@ const EMPTY_RESOURCES = {
   disciplinesKnown: [],
   toolProficienciesKnown: [],
   advancements: [],
+  fightingStyle: null,
 };
 
 describe("advancement transaction event-stream characterization (#682)", () => {
