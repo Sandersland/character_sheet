@@ -133,11 +133,12 @@ test("session: roll toast is suppressed while the attack sheet is open (mobile)"
   expect(errors).toEqual([]);
 });
 
-// #789: the mid-turn loadout row opens a per-hand picker (Main/Off cards) at
-// mobile width. The Session Fighter is Unarmed (empty hands, empty bag), so this
-// asserts the redesigned shell renders + opens cleanly; the gating/free-draw
-// permutations are covered by the LoadoutSwapRow + loadoutPicker unit suites.
-test("session: loadout Change opens the per-hand picker on mobile", async ({ page }) => {
+// #815: the mid-turn weapon change lives inside the Action sheet ("Change
+// weapons" card), no longer a slot-root row. The Session Fighter is Unarmed
+// (empty hands, empty bag), so this asserts the card opens the per-hand picker
+// cleanly; the gating/free-draw permutations are covered by the
+// InlineLoadoutPicker + loadoutPicker unit suites.
+test("session: Change weapons in the Action sheet opens the per-hand picker on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page);
 
@@ -149,13 +150,17 @@ test("session: loadout Change opens the per-hand picker on mobile", async ({ pag
   await page.getByRole("button", { name: /Start combat/i }).click();
   await page.getByRole("button", { name: "Start my turn" }).click();
 
-  // The loadout row shows the current equipped label + a Change button.
-  await expect(page.getByText(/Equipped ·/)).toBeVisible();
-  await page.getByRole("button", { name: "Change" }).click();
+  // There is no slot-root loadout row anymore.
+  await expect(page.getByText(/Equipped ·/)).toHaveCount(0);
+
+  // Open the Action sheet, then the "Change weapons" card.
+  await page.getByRole("button", { name: "Use Action" }).click();
+  const actionSheet = page.getByRole("dialog");
+  await actionSheet.getByRole("button", { name: "Change weapons" }).click();
 
   // The picker is the per-hand card layout, not a flat candidate list.
   const sheet = page.getByRole("dialog");
-  await expect(sheet.getByText("Change loadout")).toBeVisible();
+  await expect(sheet.getByText(/Now wielding/)).toBeVisible();
   await expect(sheet.getByText(/Main hand/)).toBeVisible();
   await expect(sheet.getByText(/Off hand/)).toBeVisible();
 

@@ -1,5 +1,5 @@
 /**
- * Loadout picker rules (#789) — the JSX-free core of LoadoutSwapRow's per-hand
+ * Loadout picker rules (#789) — the JSX-free core of InlineLoadoutPicker's per-hand
  * cards. Deduped bag candidates per hand (with ×N counts + a free Stow option)
  * and up-front action-cost gating, mirroring useLoadoutSwap's buildSwapOps: a
  * swap costs the Action when it stows a held item (the target hand, or — for a
@@ -80,16 +80,19 @@ export function handPickerOptions(
   return options;
 }
 
+/** Whether the Change-weapons affordance has anything to offer: an occupied
+ *  hand (free Stow) or a bag candidate that fits either hand. Gates the
+ *  Action-sheet card so an unarmed, empty-bag character never opens an
+ *  option-less picker. */
+export function hasLoadoutOptions(inventory: InventoryItem[]): boolean {
+  const HANDS: EquipSlot[] = ["MAIN_HAND", "OFF_HAND"];
+  return HANDS.some(
+    (slot) => itemsInSlot(inventory, slot).length > 0 || bagItemsForSlot(inventory, slot).length > 0,
+  );
+}
+
 /** Why a hand's Change button is disabled: an occupied hand needs the Action. */
 export function handButtonDisabledReason(slot: EquipSlot, ctx: HandContext): string | null {
   const occupied = Boolean(slot === "MAIN_HAND" ? ctx.mainOcc : ctx.offOcc);
   return occupied && ctx.actionsRemaining <= 0 ? NO_ACTION_REASON : null;
-}
-
-/** No legal loadout move at all: both hands occupied (or off-hand locked) and 0 actions. */
-export function noLegalMove(ctx: HandContext, offHandLocked: boolean): boolean {
-  if (ctx.actionsRemaining > 0) return false;
-  const mainOpen = !ctx.mainOcc;
-  const offOpen = !ctx.offOcc && !offHandLocked;
-  return !mainOpen && !offOpen;
 }

@@ -19,7 +19,7 @@ import ActionSlot from "@/features/session/ActionSlot";
 import BonusActionSlot from "@/features/session/BonusActionSlot";
 import ReactionSlot from "@/features/session/ReactionSlot";
 import EffectManeuverStrip from "@/features/session/EffectManeuverStrip";
-import LoadoutSwapRow from "@/features/session/LoadoutSwapRow";
+import LoadoutRefundStrip from "@/features/session/LoadoutRefundStrip";
 import InitiativeRail from "@/features/session/InitiativeRail";
 import TurnConcentrationBanner from "@/features/session/TurnConcentrationBanner";
 import TurnDeathSaves from "@/features/session/TurnDeathSaves";
@@ -286,6 +286,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
   const {
     showActionMenu, setShowActionMenu, showBonusMenu, setShowBonusMenu,
     showReactionMenu, setShowReactionMenu, activeResolution, closeResolution,
+    loadoutSwap,
   } = turn;
   const {
     dieLabel, dieBusy, superiorityRemaining, classActions, classBonusActions,
@@ -355,9 +356,6 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           onLogChanged={onLogChanged}
         />
 
-        {/* ── Loadout (slot root, pre-attack) — a swap costs the Action (#733) ── */}
-        <LoadoutSwapRow character={character} turnState={turnState} onUpdate={onUpdate} />
-
         {/* ── Action ──────────────────────────────────────────────────────── */}
         <ActionSlot
           actionsRemaining={actionsRemaining}
@@ -407,6 +405,9 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           consumeReaction={consumeReaction}
         />
 
+        {/* ── Weapon-change Refund — persists until refunded or turn end (#815) ── */}
+        <LoadoutRefundStrip loadout={loadoutSwap} />
+
         {/* ── "Turn summary" banner — attack tally once the sheet is closed;
             unresolved lines resolve inline, resolved lines offer quiet Change (#811) ── */}
         {!activeResolution && (
@@ -434,6 +435,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           onLogChanged={onLogChanged}
           allies={allies}
           send={send}
+          loadoutSwap={loadoutSwap}
         />
 
         {/* ── Effect maneuvers (no slot consumed) — e.g. Evasive Footwork ─────── */}

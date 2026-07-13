@@ -5,7 +5,7 @@ import {
   handContext,
   handButtonDisabledReason,
   handPickerOptions,
-  noLegalMove,
+  hasLoadoutOptions,
 } from "@/lib/loadoutPicker";
 import type { InventoryItem } from "@/types/character";
 
@@ -119,26 +119,27 @@ describe("loadoutPicker", () => {
     });
   });
 
-  describe("noLegalMove", () => {
-    it("is true when both hands are occupied and no action remains", () => {
-      const ctx = handContext([longsword, shield], 0);
-      expect(noLegalMove(ctx, false)).toBe(true);
+  describe("hasLoadoutOptions", () => {
+    const potion = {
+      id: "po",
+      name: "Potion of Healing",
+      category: "consumable",
+      quantity: 1,
+      equipped: false,
+    } as unknown as InventoryItem;
+
+    it("is false with empty hands and nothing hand-equippable in the bag", () => {
+      expect(hasLoadoutOptions([])).toBe(false);
+      expect(hasLoadoutOptions([potion])).toBe(false);
     });
 
-    it("is false when a hand is free (free draw is legal)", () => {
-      const ctx = handContext([longsword], 0);
-      expect(noLegalMove(ctx, false)).toBe(false);
+    it("is true when a hand is occupied (a free Stow is on offer)", () => {
+      expect(hasLoadoutOptions([longsword])).toBe(true);
+      expect(hasLoadoutOptions([shield])).toBe(true);
     });
 
-    it("is false whenever an action remains", () => {
-      const ctx = handContext([longsword, shield], 1);
-      expect(noLegalMove(ctx, false)).toBe(false);
-    });
-
-    it("treats a locked off-hand (two-handed main) as occupied", () => {
-      const greatOcc = weapon({ id: "gx", name: "Greataxe", equipped: true, equippedSlot: "MAIN_HAND" }, true);
-      const ctx = handContext([greatOcc], 0);
-      expect(noLegalMove(ctx, true)).toBe(true);
+    it("is true when the bag holds a hand-equippable candidate", () => {
+      expect(hasLoadoutOptions([bagDagger1])).toBe(true);
     });
   });
 });

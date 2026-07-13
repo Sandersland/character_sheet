@@ -1,15 +1,18 @@
 // The active-turn resolution sheets (#737 extraction, no behavior change):
 // when an action opens a resolver, the matching picker renders in a BottomSheet.
 // Pulled out of TurnHub so that monolith stays under the complexity gate as the
-// turn surface grows (undo, concentration, death saves, …).
+// turn surface grows (undo, concentration, death saves, …). One component per
+// resolver kind; TurnResolutionSheets itself is only the kind → sheet dispatch.
 
 import BottomSheet from "@/components/ui/BottomSheet";
 import InlineAttackPicker from "@/features/session/InlineAttackPicker";
+import InlineLoadoutPicker from "@/features/session/InlineLoadoutPicker";
 import InlineOffHandPicker from "@/features/session/InlineOffHandPicker";
 import InlineItemPicker from "@/features/session/InlineItemPicker";
 import InlineSpellPicker from "@/features/session/InlineSpellPicker";
 import LayOnHandsInput from "@/features/session/LayOnHandsInput";
 import type { ActiveResolution } from "@/features/session/useActiveResolution";
+import type { LoadoutSwapControls } from "@/features/session/useLoadoutSwap";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { AllyOption } from "@/lib/spellMeta";
 import type { Character } from "@/types/character";
@@ -47,162 +50,199 @@ interface TurnResolutionSheetsProps {
   onLogChanged: () => void;
   allies: AllyOption[];
   send: React.ComponentProps<typeof LayOnHandsInput>["onSend"];
+  loadoutSwap: LoadoutSwapControls;
 }
 
-export default function TurnResolutionSheets({
+export default function TurnResolutionSheets(props: TurnResolutionSheetsProps) {
+  switch (props.activeResolution?.resolver.kind) {
+    case "loadout-picker":
+      return <LoadoutResolutionSheet {...props} />;
+    case "attack-picker":
+      return <AttackResolutionSheet {...props} />;
+    case "twf-picker":
+      return <TwfResolutionSheet {...props} />;
+    case "item-picker":
+      return <ItemResolutionSheet {...props} />;
+    case "heal-input":
+      return <HealResolutionSheet {...props} />;
+    case "spell-picker":
+      return props.character.spellcasting ? <SpellResolutionSheet {...props} /> : null;
+    default:
+      return null;
+  }
+}
+
+function LoadoutResolutionSheet({
+  character,
+  turnState,
+  loadoutSwap,
+  closeResolution,
+}: Pick<TurnResolutionSheetsProps, "character" | "turnState" | "loadoutSwap" | "closeResolution">) {
+  return (
+    <BottomSheet
+      title="Change weapons"
+      subtitle="Swapping a held weapon costs your Action — drawing into a free hand or stowing is free."
+      onClose={closeResolution}
+    >
+      <InlineLoadoutPicker character={character} turnState={turnState} loadout={loadoutSwap} />
+    </BottomSheet>
+  );
+}
+
+function AttackResolutionSheet({
   character,
   sessionId,
   turnState,
-  activeResolution,
   closeResolution,
   setShowActionMenu,
+  onUpdate,
+  onLogChanged,
+}: Pick<
+  TurnResolutionSheetsProps,
+  | "character"
+  | "sessionId"
+  | "turnState"
+  | "closeResolution"
+  | "setShowActionMenu"
+  | "onUpdate"
+  | "onLogChanged"
+>) {
+  // Attacks all spent → finalize; attacks remain → leave the action LIVE so the
+  // Action slot can offer Resume (#802). cancelAttack still refunds pre-first-roll.
+  const attack = turnState.attack;
+  const exhausted = attack !== null && attack.used >= attack.total;
+  const closeAttackSheet = () => {
+    if (exhausted) turnState.finishAttack();
+    else turnState.cancelAttack();
+    closeResolution();
+  };
+  return (
+    <BottomSheet title="Attack" subtitle={attackKicker(turnState.attack)} wide onClose={closeAttackSheet}>
+      <InlineAttackPicker
+        character={character}
+        turnState={turnState}
+        sessionId={sessionId}
+        onClose={closeAttackSheet}
+        onCancel={() => {
+          turnState.cancelAttack();
+          closeResolution();
+          setShowActionMenu(true);
+        }}
+        onUpdate={onUpdate}
+        onLogChanged={onLogChanged}
+      />
+    </BottomSheet>
+  );
+}
+
+function TwfResolutionSheet({
+  character,
+  sessionId,
+  turnState,
+  closeResolution,
   setShowBonusMenu,
   onUpdate,
   onLogChanged,
-  allies,
-  send,
-}: TurnResolutionSheetsProps) {
-  const kind = activeResolution?.resolver.kind;
-
-  if (kind === "attack-picker") {
-    // Attacks all spent → finalize; attacks remain → leave the action LIVE so the
-    // Action slot can offer Resume (#802). cancelAttack still refunds pre-first-roll.
-    const attack = turnState.attack;
-    const exhausted = attack !== null && attack.used >= attack.total;
-    const closeAttackSheet = () => {
-      if (exhausted) turnState.finishAttack();
-      else turnState.cancelAttack();
-      closeResolution();
-    };
-    return (
-      <BottomSheet
-        title="Attack"
-        subtitle={attackKicker(turnState.attack)}
-        wide
-        onClose={closeAttackSheet}
-      >
-        <InlineAttackPicker
-          character={character}
-          turnState={turnState}
-          sessionId={sessionId}
-          onClose={closeAttackSheet}
-          onCancel={() => {
-            turnState.cancelAttack();
-            closeResolution();
-            setShowActionMenu(true);
-          }}
-          onUpdate={onUpdate}
-          onLogChanged={onLogChanged}
-        />
-      </BottomSheet>
-    );
-  }
-
-  if (kind === "twf-picker") {
-    return (
-      <BottomSheet
-        title="Off-hand attack"
-        subtitle="Two-Weapon Fighting · bonus action"
-        onClose={() => {
+}: Pick<
+  TurnResolutionSheetsProps,
+  | "character"
+  | "sessionId"
+  | "turnState"
+  | "closeResolution"
+  | "setShowBonusMenu"
+  | "onUpdate"
+  | "onLogChanged"
+>) {
+  return (
+    <BottomSheet
+      title="Off-hand attack"
+      subtitle="Two-Weapon Fighting · bonus action"
+      onClose={() => {
+        turnState.cancelTwf();
+        closeResolution();
+      }}
+    >
+      <InlineOffHandPicker
+        character={character}
+        turnState={turnState}
+        sessionId={sessionId}
+        onClose={closeResolution}
+        onCancel={() => {
           turnState.cancelTwf();
           closeResolution();
+          setShowBonusMenu(true);
         }}
-      >
-        <InlineOffHandPicker
-          character={character}
-          turnState={turnState}
-          sessionId={sessionId}
-          onClose={closeResolution}
-          onCancel={() => {
-            turnState.cancelTwf();
-            closeResolution();
-            setShowBonusMenu(true);
-          }}
-          onUpdate={onUpdate}
-          onLogChanged={onLogChanged}
-        />
-      </BottomSheet>
-    );
-  }
-
-  if (kind === "item-picker") {
-    return (
-      <BottomSheet
-        title="Use an item"
-        subtitle="Nothing is spent until you use an item"
-        onClose={closeResolution}
-      >
-        <InlineItemPicker
-          character={character}
-          onUpdate={onUpdate}
-          onCommit={(batchId) => {
-            turnState.consumeAction();
-            if (batchId) turnState.attachBatchId(batchId);
-          }}
-          onClose={closeResolution}
-        />
-      </BottomSheet>
-    );
-  }
-
-  if (kind === "heal-input") {
-    return (
-      <BottomSheet
-        title="Lay on Hands"
-        subtitle="Nothing is spent until you heal"
-        onClose={closeResolution}
-      >
-        <LayOnHandsInput
-          character={character}
-          onSend={send}
-          onCommit={turnState.consumeAction}
-          onClose={closeResolution}
-        />
-      </BottomSheet>
-    );
-  }
-
-  if (kind === "spell-picker" && character.spellcasting) {
-    return (
-      <SpellResolutionSheet
-        character={character}
-        sessionId={sessionId}
-        turnState={turnState}
-        slot={activeResolution!.resolver.slot as SpellSlot}
-        focusSpellId={activeResolution!.context?.spellId}
-        closeResolution={closeResolution}
         onUpdate={onUpdate}
         onLogChanged={onLogChanged}
-        allies={allies}
       />
-    );
-  }
+    </BottomSheet>
+  );
+}
 
-  return null;
+function ItemResolutionSheet({
+  character,
+  turnState,
+  closeResolution,
+  onUpdate,
+}: Pick<TurnResolutionSheetsProps, "character" | "turnState" | "closeResolution" | "onUpdate">) {
+  return (
+    <BottomSheet title="Use an item" subtitle="Nothing is spent until you use an item" onClose={closeResolution}>
+      <InlineItemPicker
+        character={character}
+        onUpdate={onUpdate}
+        onCommit={(batchId) => {
+          turnState.consumeAction();
+          if (batchId) turnState.attachBatchId(batchId);
+        }}
+        onClose={closeResolution}
+      />
+    </BottomSheet>
+  );
+}
+
+function HealResolutionSheet({
+  character,
+  turnState,
+  closeResolution,
+  send,
+}: Pick<TurnResolutionSheetsProps, "character" | "turnState" | "closeResolution" | "send">) {
+  return (
+    <BottomSheet title="Lay on Hands" subtitle="Nothing is spent until you heal" onClose={closeResolution}>
+      <LayOnHandsInput
+        character={character}
+        onSend={send}
+        onCommit={turnState.consumeAction}
+        onClose={closeResolution}
+      />
+    </BottomSheet>
+  );
 }
 
 function SpellResolutionSheet({
   character,
   sessionId,
   turnState,
-  slot,
-  focusSpellId,
+  activeResolution,
   closeResolution,
   onUpdate,
   onLogChanged,
   allies,
-}: {
-  character: Character;
-  sessionId: string;
-  turnState: TurnState & TurnStateActions;
-  slot: SpellSlot;
-  /** Open focused on this spellbook entry (bonus-spell card pre-selection). */
-  focusSpellId?: string;
-  closeResolution: () => void;
-  onUpdate: (c: Character) => void;
-  onLogChanged: () => void;
-  allies: AllyOption[];
-}) {
+}: Pick<
+  TurnResolutionSheetsProps,
+  | "character"
+  | "sessionId"
+  | "turnState"
+  | "activeResolution"
+  | "closeResolution"
+  | "onUpdate"
+  | "onLogChanged"
+  | "allies"
+>) {
+  // Only rendered for the spell-picker kind, so the resolution is present.
+  const slot = activeResolution!.resolver.slot as SpellSlot;
+  // Open focused on this spellbook entry (bonus-spell card pre-selection).
+  const focusSpellId = activeResolution!.context?.spellId;
+
   const slotAvailable =
     slot === "action"
       ? turnState.actionsRemaining > 0
@@ -217,11 +257,7 @@ function SpellResolutionSheet({
   };
 
   return (
-    <BottomSheet
-      title={SPELL_SHEET_TITLE[slot]}
-      subtitle="Only what you can afford now"
-      onClose={closeResolution}
-    >
+    <BottomSheet title={SPELL_SHEET_TITLE[slot]} subtitle="Only what you can afford now" onClose={closeResolution}>
       <InlineSpellPicker
         character={character}
         sessionId={sessionId}
