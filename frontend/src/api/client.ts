@@ -595,6 +595,8 @@ export async function fetchEntityBacklinks(
   );
 }
 
+// Consumed by the Codex browse/detail slices of #837 (built after this API slice).
+// fallow-ignore-next-line unused-export
 export async function fetchEntityConnections(
   campaignId: string,
   entityId: string,
@@ -608,6 +610,7 @@ export async function fetchEntityConnections(
   );
 }
 
+// fallow-ignore-next-line unused-export
 export async function fetchEntityActivity(
   campaignId: string,
   opts?: { limit?: number },

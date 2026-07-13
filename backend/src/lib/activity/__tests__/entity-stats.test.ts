@@ -6,6 +6,7 @@ import {
   buildSessionOrdinalMap,
   matchEntityQuery,
   resolveVisibleMergeUnion,
+  tallyCoMentions,
   visibleEntryWhere,
   type StatRef,
 } from "@/lib/activity/entity-stats.js";
@@ -118,6 +119,48 @@ describe("resolveVisibleMergeUnion", () => {
   it("scrubs HIDDEN merged identities for non-owners", () => {
     const union = resolveVisibleMergeUnion(edges, ["vecna"], new Set(["jenkins"]), false);
     expect(union.get("vecna")).toEqual(["jenkins"]);
+  });
+});
+
+describe("tallyCoMentions", () => {
+  const edges: MergeEdge[] = [
+    { mergedEntityId: "old", survivorEntityId: "true-id", status: "EXECUTED" },
+  ];
+  const entityById = new Map([
+    ["target", { id: "target", name: "Target", visibility: "REVEALED" }],
+    ["old", { id: "old", name: "Old", visibility: "REVEALED" }],
+    ["true-id", { id: "true-id", name: "True", visibility: "REVEALED" }],
+    ["ally", { id: "ally", name: "Ally", visibility: "REVEALED" }],
+    ["ghost", { id: "ghost", name: "Ghost", visibility: "HIDDEN" }],
+  ]);
+  const targetIds = new Set(["target"]);
+
+  it("counts distinct entries per survivor sorted desc, excluding the target", () => {
+    const tally = tallyCoMentions(
+      [
+        { entryId: "e-1", entityId: "target" },
+        { entryId: "e-1", entityId: "ally" },
+        { entryId: "e-2", entityId: "ally" },
+        { entryId: "e-1", entityId: "old" },
+        { entryId: "e-1", entityId: "true-id" },
+      ],
+      { edges, entityById, targetIds, isOwner: true },
+    );
+    expect(tally.map((t) => [t.entity.id, t.count])).toEqual([
+      ["ally", 2],
+      ["true-id", 1],
+    ]);
+  });
+
+  it("scrubs HIDDEN co-mentions for non-owners but keeps them for the owner", () => {
+    const refs = [
+      { entryId: "e-1", entityId: "target" },
+      { entryId: "e-1", entityId: "ghost" },
+    ];
+    expect(tallyCoMentions(refs, { edges, entityById, targetIds, isOwner: false })).toEqual([]);
+    expect(
+      tallyCoMentions(refs, { edges, entityById, targetIds, isOwner: true })[0].entity.id,
+    ).toBe("ghost");
   });
 });
 
