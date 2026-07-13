@@ -33,7 +33,7 @@ export default function CompactHpBar({ character, onUpdate }: CompactHpBarProps)
         className="group w-full rounded-card border border-parchment-200 bg-parchment-50 px-4 py-3 text-left shadow-card transition-colors hover:border-parchment-300 hover:bg-parchment-100 active:bg-parchment-200"
       >
         <div className="flex items-center justify-between gap-2 sm:gap-4">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <div className="flex min-w-0 items-center gap-2 overflow-hidden sm:gap-3">
             <span className="truncate font-sans text-xs font-semibold uppercase tracking-wide text-parchment-600">
               Hit Points
             </span>
@@ -62,7 +62,7 @@ export default function CompactHpBar({ character, onUpdate }: CompactHpBarProps)
             )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <div className="w-20 shrink-0 sm:w-32">
+            <div className="w-16 shrink-0 sm:w-32">
               <MeterBar current={current} max={max} tone="garnet" label={`${current} of ${max} HP`} />
             </div>
             <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-parchment-500 sm:hidden">

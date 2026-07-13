@@ -157,6 +157,6 @@ describe("CompactHpBar mobile overflow guard (#827)", () => {
     const { container } = render(<CompactHpBar character={makeCharacter()} onUpdate={vi.fn()} />);
     const meter = container.querySelector(".sm\\:w-32");
     expect(meter).not.toBeNull();
-    expect(meter?.className).toMatch(/\bw-20\b/);
+    expect(meter?.className).toMatch(/\bw-16\b/);
   });
 });
