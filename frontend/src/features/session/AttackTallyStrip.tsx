@@ -8,7 +8,7 @@
 import { useState } from "react";
 
 import { isCritRow, isMissRow, isUnresolvedRow } from "@/lib/attackTallySummary";
-import type { AttackTallyRow, TallyVerdict } from "@/lib/attackTallySummary";
+import type { AttackTallyRow, TallyRowSource, TallyVerdict } from "@/lib/attackTallySummary";
 
 const VERDICT_LABEL: Record<TallyVerdict, string> = { hit: "Hit", miss: "Miss", crit: "Crit" };
 
@@ -123,19 +123,28 @@ function TallyRow({
 export default function AttackTallyStrip({
   rows,
   onSetVerdict,
+  source,
+  heading = "This action",
 }: {
   rows: AttackTallyRow[];
   onSetVerdict: (index: number, verdict: TallyVerdict | undefined) => void;
+  /** Show only rows from this slot; verdict writes still carry the GLOBAL index (#813). */
+  source?: TallyRowSource;
+  heading?: string;
 }) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
-  if (rows.length === 0) return null;
+  // Keep each row's global index so onSetVerdict targets the right tally entry.
+  const shown = rows
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => source === undefined || row.source === source);
+  if (shown.length === 0) return null;
   return (
     <div className="flex flex-col gap-1.5 rounded-card border border-parchment-300 bg-parchment-100/60 p-2.5">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">This action</p>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">{heading}</p>
       <ul className="flex flex-col gap-1">
-        {rows.map((row, index) => (
+        {shown.map(({ row, index }) => (
           <TallyRow
-            key={index}
+            key={row.id}
             row={row}
             expanded={expandedIndex === index}
             onExpand={() => setExpandedIndex(index)}

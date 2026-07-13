@@ -85,8 +85,10 @@ export default function InlineAttackPicker({
   const logRollSafe = useRollLogger(character.id, sessionId, onLogChanged);
   const die = useManeuverDie(character, onUpdate);
 
-  const currentRow = turnState.attackTally.at(-1) ?? null;
-  const currentRowIndex = turnState.attackTally.length - 1;
+  // Scope to the Attack action's own rows — the tally now also holds off-hand
+  // (bonusAction) rows, and steps 2–3 must bind to the last ACTION row (#813).
+  const currentRowIndex = turnState.attackTally.map((r) => r.source).lastIndexOf("action");
+  const currentRow = currentRowIndex >= 0 ? turnState.attackTally[currentRowIndex] : null;
 
   const { riderTotals, viewFor } = useAttackRolls({
     roll,
@@ -96,6 +98,7 @@ export default function InlineAttackPicker({
     setTallyAttackTotal: turnState.setTallyAttackTotal,
     addTallyDamageRider: turnState.addTallyDamageRider,
     currentRow,
+    source: "action",
   });
 
   const forms = buildAttackForms(character);
@@ -130,7 +133,11 @@ export default function InlineAttackPicker({
   const isMobile = useIsBelowMd();
 
   const tallyStrip = (
-    <AttackTallyStrip rows={turnState.attackTally} onSetVerdict={turnState.setTallyVerdict} />
+    <AttackTallyStrip
+      rows={turnState.attackTally}
+      onSetVerdict={turnState.setTallyVerdict}
+      source="action"
+    />
   );
   const maneuversDisclosure = view.showManeuvers && (
     <ManeuversDisclosure

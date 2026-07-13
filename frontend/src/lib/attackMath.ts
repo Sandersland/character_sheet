@@ -202,6 +202,9 @@ export function buildOffHandEntry(character: Character): AttackEntry | null {
 
   return {
     ...entry,
+    // "(off-hand)" tags the form header, tally strip, and turn-summary banner line
+    // so a two-weapon swing reads distinctly from a main-hand attack (#813).
+    name: `${entry.name} (off-hand)`,
     damageSpec,
     damageLabel: `${formatRollSpec(damageSpec)} ${entry.damageType}${gripLabel}`,
   };

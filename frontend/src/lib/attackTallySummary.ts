@@ -5,6 +5,9 @@
 
 export type TallyVerdict = "hit" | "miss" | "crit";
 
+/** Which economy slot a tally row came from — the Attack action or the TWF bonus action (#813). */
+export type TallyRowSource = "action" | "bonusAction";
+
 /** The kept-d20 snapshot for one recorded attack roll. */
 export interface TallyAttackRoll {
   total: number;
@@ -13,8 +16,12 @@ export interface TallyAttackRoll {
   nat1: boolean;
 }
 
-/** One recorded attack this action: the roll, an optional damage slot, a verdict. */
+/** One recorded attack this turn: the roll, an optional damage slot, a verdict. */
 export interface AttackTallyRow {
+  /** Stable per-row id — damage/rider/override writes target it, not "the last row" (#813). */
+  id: string;
+  /** Which slot recorded it — `action` (Attack) or `bonusAction` (off-hand TWF). */
+  source: TallyRowSource;
   formId: string;
   formName: string;
   attack: TallyAttackRoll;

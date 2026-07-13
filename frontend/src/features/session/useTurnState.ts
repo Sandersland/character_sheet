@@ -27,7 +27,12 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { canTwoWeaponFight } from "@/lib/turnRules";
 import { autoVerdict } from "@/lib/attackTallySummary";
 import { loadTurnState, saveTurnState } from "@/features/session/turnStatePersistence";
-import type { AttackTallyRow, TallyAttackRoll, TallyVerdict } from "@/lib/attackTallySummary";
+import type {
+  AttackTallyRow,
+  TallyAttackRoll,
+  TallyRowSource,
+  TallyVerdict,
+} from "@/lib/attackTallySummary";
 import type { Character } from "@/types/character";
 
 export type { AttackTallyRow, TallyAttackRoll } from "@/lib/attackTallySummary";
@@ -37,6 +42,15 @@ export interface RecordedAttack {
   formId: string;
   formName: string;
   attack: TallyAttackRoll;
+  /** Which economy slot recorded it (#813). Defaults to `action` when omitted. */
+  source?: TallyRowSource;
+}
+
+let rowIdSeq = 0;
+/** Monotonic per-load row id — collision-free within a session; rehydrated rows keep their stored id. */
+function nextRowId(): string {
+  rowIdSeq += 1;
+  return `tally-${Date.now().toString(36)}-${rowIdSeq}`;
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -143,18 +157,18 @@ export interface TurnStateActions {
    * `RecordedAttack` payload is passed, a tally row is appended (#802).
    */
   recordAttack: (recorded?: RecordedAttack) => void;
-  /** Write/replace the damage slot on the most-recent tally row (#802). */
-  setTallyDamage: (damage: number) => void;
+  /** Write/replace the damage slot on tally row `rowId` (#802, by-id since #813). */
+  setTallyDamage: (rowId: string, damage: number) => void;
   /** Write/replace the damage slot on row `index` — banner inline resolve (#811). */
   setTallyDamageAt: (index: number, damage: number) => void;
   /**
-   * Override the to-hit total on the most-recent tally row after a Precision
-   * Attack die is added (#809). Touches only `attack.total` — the kept-d20 face
-   * and nat-20/nat-1 flags (which decide crit/miss) stay put.
+   * Override the to-hit total on tally row `rowId` after a Precision Attack die
+   * is added (#809). Touches only `attack.total` — the kept-d20 face and
+   * nat-20/nat-1 flags (which decide crit/miss) stay put.
    */
-  setTallyAttackTotal: (total: number) => void;
-  /** Fold an on-hit rider's total into the most-recent tally row's damage slot. */
-  addTallyDamageRider: (amount: number) => void;
+  setTallyAttackTotal: (rowId: string, total: number) => void;
+  /** Fold an on-hit rider's total into tally row `rowId`'s damage slot. */
+  addTallyDamageRider: (rowId: string, amount: number) => void;
   /** Set a row's verdict directly; nat-locked rows refuse (#811). */
   setTallyVerdict: (index: number, verdict: TallyVerdict | undefined) => void;
   /** Clear the attack tally (Turn-summary banner dismiss / new action). */
@@ -173,8 +187,12 @@ export interface TurnStateActions {
   consumeBonusAction: () => void;
   /** Enter TWF bonus-attack mode: consume the bonus action and open the TWF counter. */
   enterTwfMode: () => void;
-  /** Record one TWF off-hand attack roll. */
-  recordTwfAttack: () => void;
+  /**
+   * Record the TWF off-hand attack roll: spends the bonus attack and, when a
+   * `RecordedAttack` payload is passed, appends a `bonusAction`-source tally
+   * row so the swing lands in the turn-summary banner (#813).
+   */
+  recordTwfAttack: (recorded?: RecordedAttack) => void;
   /**
    * Cancel the off-hand attack if it hasn't been rolled yet — refunds the bonus
    * action so the player can choose a different bonus action. Mirrors cancelAttack.
@@ -277,9 +295,16 @@ function hydrateTurnState(loaded: TurnState): TurnState {
   const base = { ...initialState(), ...loaded };
   return {
     ...base,
-    attackTally: base.attackTally ?? [],
-    history: (base.history ?? []).map((h) => ({ ...h, attackTally: h.attackTally ?? [] })),
+    attackTally: backfillRows(base.attackTally),
+    history: (base.history ?? []).map((h) => ({ ...h, attackTally: backfillRows(h.attackTally) })),
   };
+}
+
+// Pre-#802/pre-#813 rows lack `id`/`source`: mint an id and default the source
+// to `action` (the only kind before the off-hand adopted the tally) so hydrated
+// snapshots resolve, target, and clear like freshly-recorded rows (#813).
+function backfillRows(rows: AttackTallyRow[] | undefined): AttackTallyRow[] {
+  return (rows ?? []).map((r) => ({ ...r, id: r.id ?? nextRowId(), source: r.source ?? "action" }));
 }
 
 // ── Pure state transitions ────────────────────────────────────────────────────
@@ -291,12 +316,13 @@ const consumeActionState = (s: TurnState): TurnState =>
 
 function enterAttackModeState(s: TurnState, attacksPerAction: number): TurnState {
   if (s.actionsRemaining <= 0) return s;
-  // A NEW Attack action clears the previous action's tally (#802).
+  // A NEW Attack action clears the previous action's rows only — a bonus-action
+  // off-hand row from earlier this turn stays in the banner (#813).
   return {
     ...s,
     actionsRemaining: s.actionsRemaining - 1,
     attack: { total: attacksPerAction, used: 0 },
-    attackTally: [],
+    attackTally: s.attackTally.filter((r) => r.source !== "action"),
   };
 }
 
@@ -309,14 +335,16 @@ function recordAttackState(s: TurnState, recorded?: RecordedAttack): TurnState {
   // Append a tally row only for a genuinely new attack (not a clamped over-click).
   const attackTally =
     !atCap && recorded
-      ? [...s.attackTally, tallyRowFor(recorded)]
+      ? [...s.attackTally, tallyRowFor(recorded, "action")]
       : s.attackTally;
   return { ...s, attack: { ...s.attack, used }, attackedThisTurn: true, attackTally };
 }
 
-function tallyRowFor(recorded: RecordedAttack): AttackTallyRow {
+function tallyRowFor(recorded: RecordedAttack, fallbackSource: TallyRowSource): AttackTallyRow {
   const verdict = autoVerdict(recorded.attack);
   return {
+    id: nextRowId(),
+    source: recorded.source ?? fallbackSource,
     formId: recorded.formId,
     formName: recorded.formName,
     attack: recorded.attack,
@@ -345,29 +373,40 @@ function updateTallyRow(
   return { ...s, attackTally };
 }
 
-// Write/replace the damage slot on the most-recent tally row — never appends, so
-// re-rolling attack N's damage replaces N's number rather than double-counting (#802).
-const setTallyDamageState = (s: TurnState, damage: number): TurnState =>
-  setTallyDamageAtState(s, s.attackTally.length - 1, damage);
+// By-id sibling of updateTallyRow: targets a specific row so two interleaved
+// sources (action + off-hand bonus action) never misattribute a damage/override
+// write to "the last row" (#813). No-op when the id isn't present.
+function updateTallyRowById(
+  s: TurnState,
+  rowId: string,
+  update: (row: AttackTallyRow) => AttackTallyRow,
+): TurnState {
+  return updateTallyRow(s, s.attackTally.findIndex((r) => r.id === rowId), update);
+}
 
-// Write/replace the damage slot on an arbitrary row — the Turn-summary banner's
-// inline resolve rolls damage for skipped rows after the action ended (#811).
+// Write/replace the damage slot on tally row `rowId` — never appends, so
+// re-rolling attack N's damage replaces N's number rather than double-counting (#802).
+const setTallyDamageState = (s: TurnState, rowId: string, damage: number): TurnState =>
+  updateTallyRowById(s, rowId, (row) => withAutoHit({ ...row, damage }));
+
+// Write/replace the damage slot on an arbitrary row by index — the Turn-summary
+// banner's inline resolve rolls damage for skipped rows after the action ended (#811).
 const setTallyDamageAtState = (s: TurnState, index: number, damage: number): TurnState =>
   updateTallyRow(s, index, (row) => withAutoHit({ ...row, damage }));
 
-// Override the to-hit total on the current row after a superiority die is added
+// Override the to-hit total on row `rowId` after a superiority die is added
 // (#809). Only `attack.total` changes — keptFace + nat flags stay so the verdict
 // (crit/miss) reads the die face, never the boosted total.
-const setTallyAttackTotalState = (s: TurnState, total: number): TurnState =>
-  updateTallyRow(s, s.attackTally.length - 1, (row) => ({
+const setTallyAttackTotalState = (s: TurnState, rowId: string, total: number): TurnState =>
+  updateTallyRowById(s, rowId, (row) => ({
     ...row,
     attack: { ...row.attack, total },
   }));
 
-// Fold a rider total into the current row's damage slot (breakdown add). A
-// rider roll is a damage roll, so it also resolves an unset verdict to hit.
-const addTallyDamageRiderState = (s: TurnState, amount: number): TurnState =>
-  updateTallyRow(s, s.attackTally.length - 1, (row) =>
+// Fold a rider total into row `rowId`'s damage slot (breakdown add). A rider roll
+// is a damage roll, so it also resolves an unset verdict to hit.
+const addTallyDamageRiderState = (s: TurnState, rowId: string, amount: number): TurnState =>
+  updateTallyRowById(s, rowId, (row) =>
     withAutoHit({ ...row, damage: (row.damage ?? 0) + amount }),
   );
 
@@ -404,9 +443,15 @@ const clearAttackTallyState = (s: TurnState): TurnState => {
 
 function cancelAttackState(s: TurnState): TurnState {
   // Only refund if no attacks have been rolled yet — once rolled, the action
-  // is committed per 5e rules.
+  // is committed per 5e rules. Drop only this action's rows so an earlier
+  // off-hand (bonusAction) row survives the refund (#813).
   if (!s.attack || s.attack.used > 0) return s;
-  return { ...s, actionsRemaining: s.actionsRemaining + 1, attack: null, attackTally: [] };
+  return {
+    ...s,
+    actionsRemaining: s.actionsRemaining + 1,
+    attack: null,
+    attackTally: s.attackTally.filter((r) => r.source !== "action"),
+  };
 }
 
 // Clear the attack counter (action stays spent). No-op when attack is null
@@ -416,12 +461,27 @@ const finishAttackState = (s: TurnState): TurnState => (s.attack ? { ...s, attac
 const consumeBonusActionState = (s: TurnState): TurnState =>
   s.bonusActionUsed ? s : { ...s, bonusActionUsed: true, bonusAttack: null };
 
-// TWF off-hand is always exactly 1 attack.
+// TWF off-hand is always exactly 1 attack. Entering it clears any prior
+// bonus-action row so the swing's own row is the only one this slot owns (#813).
 const enterTwfModeState = (s: TurnState): TurnState =>
-  s.bonusActionUsed ? s : { ...s, bonusActionUsed: true, bonusAttack: { total: 1, used: 0 } };
+  s.bonusActionUsed
+    ? s
+    : {
+        ...s,
+        bonusActionUsed: true,
+        bonusAttack: { total: 1, used: 0 },
+        attackTally: s.attackTally.filter((r) => r.source !== "bonusAction"),
+      };
 
-const recordTwfAttackState = (s: TurnState): TurnState =>
-  s.bonusAttack ? { ...s, bonusAttack: null, attackedThisTurn: true } : s;
+// Spend the off-hand swing and append its bonusAction-source row (when recorded)
+// so it lands in the turn-summary banner alongside the Attack-action rows (#813).
+function recordTwfAttackState(s: TurnState, recorded?: RecordedAttack): TurnState {
+  if (!s.bonusAttack) return s;
+  const attackTally = recorded
+    ? [...s.attackTally, tallyRowFor(recorded, "bonusAction")]
+    : s.attackTally;
+  return { ...s, bonusAttack: null, attackedThisTurn: true, attackTally };
+}
 
 // Mirror cancelAttack for the off-hand: refund the bonus action only if the
 // off-hand attack hasn't been rolled yet (bonusAttack still pending). Once
@@ -587,20 +647,20 @@ export function useTurnState(character: Character, sessionId: string): TurnState
   // Damage/verdict refinements are NOT undoable on their own — undoing the parent
   // recordAttack drops the whole row (tally is in the economy snapshot), so these
   // write directly rather than through `mutate`.
-  const setTallyDamage = useCallback((damage: number) => {
-    setState((s) => setTallyDamageState(s, damage));
+  const setTallyDamage = useCallback((rowId: string, damage: number) => {
+    setState((s) => setTallyDamageState(s, rowId, damage));
   }, []);
 
   const setTallyDamageAt = useCallback((index: number, damage: number) => {
     setState((s) => setTallyDamageAtState(s, index, damage));
   }, []);
 
-  const setTallyAttackTotal = useCallback((total: number) => {
-    setState((s) => setTallyAttackTotalState(s, total));
+  const setTallyAttackTotal = useCallback((rowId: string, total: number) => {
+    setState((s) => setTallyAttackTotalState(s, rowId, total));
   }, []);
 
-  const addTallyDamageRider = useCallback((amount: number) => {
-    setState((s) => addTallyDamageRiderState(s, amount));
+  const addTallyDamageRider = useCallback((rowId: string, amount: number) => {
+    setState((s) => addTallyDamageRiderState(s, rowId, amount));
   }, []);
 
   const setTallyVerdict = useCallback((index: number, verdict: TallyVerdict | undefined) => {
@@ -627,8 +687,8 @@ export function useTurnState(character: Character, sessionId: string): TurnState
     mutate(enterTwfModeState);
   }, [mutate]);
 
-  const recordTwfAttack = useCallback(() => {
-    mutate(recordTwfAttackState);
+  const recordTwfAttack = useCallback((recorded?: RecordedAttack) => {
+    mutate((s) => recordTwfAttackState(s, recorded));
   }, [mutate]);
 
   const cancelTwf = useCallback(() => {
