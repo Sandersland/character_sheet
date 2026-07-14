@@ -78,6 +78,7 @@ export {
   GiPush,
 } from "react-icons/gi";
 export {
+  ArrowUp,
   Lock,
   Plus,
   Zap,

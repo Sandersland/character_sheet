@@ -24,7 +24,7 @@ import SessionOverlays from "@/features/session/SessionOverlays";
 import { useTurnState } from "@/features/session/useTurnState";
 import { useSessionLifecycle } from "@/features/session/useSessionLifecycle";
 import { partyHealAllies } from "@/lib/spellMeta";
-import { useGlobalKeyboard } from "@/hooks/useGlobalKeyboard";
+import { useCaptureHotkey } from "@/hooks/useCaptureHotkey";
 import type { Character, Session, ReferenceData } from "@/types/character";
 
 interface SessionContentProps {
@@ -39,8 +39,8 @@ export default function SessionContent({ character, session, reference, setChara
   const life = useSessionLifecycle({ character, session, setCharacter, navigate });
   const turnState = useTurnState(character, session.id);
 
-  // Cmd/Ctrl+J opens the quick-capture palette during live play.
-  useGlobalKeyboard(life.openCapture);
+  // Cmd/Ctrl+J toggles the quick-capture dock during live play.
+  useCaptureHotkey(life.toggleCapture);
 
   // Mobile turn shell (#746): during the player's active turn on a mobile
   // viewport, swap the full SessionTopBar for a compact header and hide the

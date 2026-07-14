@@ -55,6 +55,7 @@ export function useSessionButton(
     sessionPending,
     sessionReady: activeSession !== undefined,
     inActiveSession,
+    activeSession: activeSession ?? null,
     activeSessionId: activeSession?.id,
     sessionError,
     handleSessionButton,

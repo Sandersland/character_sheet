@@ -3,11 +3,11 @@ import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
 
-// The Quick-capture palette presents per-breakpoint (#771): the top command
-// palette at md+, the slide-up BottomSheet below md. Opened with Cmd/Ctrl+J so
+// The Quick-capture surface presents per-breakpoint (#771): the non-modal margin
+// dock at md+ (#865), the slide-up BottomSheet below md. Opened with Cmd/Ctrl+J so
 // the flow is viewport-independent (no reliance on a header button that may
 // reflow on mobile).
-test("Quick capture: top palette at md+, BottomSheet on mobile", async ({ page }) => {
+test("Quick capture: margin dock at md+, BottomSheet on mobile", async ({ page }) => {
   await login(page);
   // Collect after login so the pre-auth 401s from login()'s initial goto don't count.
   const errors = collectConsoleErrors(page);
@@ -15,12 +15,19 @@ test("Quick capture: top palette at md+, BottomSheet on mobile", async ({ page }
   await expect(page.getByRole("heading", { name: "Hit Points" })).toBeVisible();
 
   const grabber = page.locator('button[aria-label="Close"]');
-  const enterHint = page.getByText(/Enter to save · Shift\+Enter/);
+  const enterHint = page.getByText(/↵ save · shift\+↵ new line/);
 
-  // md+ (the config's 1280×800 default): top palette with the keyboard hint, no
-  // mobile grabber handle.
+  // md+ (the config's 1280×800 default): the non-modal margin dock (#865). The
+  // note field is focused, the dock shows its "Close · ⌘J" affordance and the
+  // ↵/shift keyboard hint, and there's no mobile grabber handle. It's non-modal
+  // (no aria-modal), so the sheet behind stays interactive — its own Close
+  // control carries no aria-label, so the mobile grabber locator stays exclusive.
   await page.keyboard.press("Control+j");
   await expect(page.getByRole("textbox", { name: /quick note/i })).toBeFocused();
+  const dock = page.locator("[data-capture-dock]");
+  await expect(dock).toBeVisible();
+  await expect(dock).not.toHaveAttribute("aria-modal", "true");
+  await expect(page.getByRole("button", { name: /close · ⌘j/i })).toBeVisible();
   await expect(enterHint).toBeVisible();
   await expect(grabber).toHaveCount(0);
   await page.keyboard.press("Escape");

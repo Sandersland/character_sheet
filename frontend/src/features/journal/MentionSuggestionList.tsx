@@ -34,14 +34,20 @@ interface MentionSuggestionListProps {
   inFlow?: boolean;
   /** Cap for the in-flow scroll list, derived from the keyboard-aware height. */
   maxHeight?: number;
+  /** Anchor the absolute popover above the field (dock composer) vs. below (default). */
+  placement?: "above" | "below";
 }
 
 // max-h-[40vh] is the self-defending fallback — the caller normally caps via the
 // inline maxHeight style, but the list must stay bounded even without it.
 const IN_FLOW_CLASS =
   "mt-1 max-h-[40vh] overflow-y-auto rounded-card border border-parchment-200 bg-parchment-50 py-1 shadow-raised";
-const POPOVER_CLASS =
-  "absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-card border border-parchment-200 bg-parchment-50 py-1 shadow-raised";
+const POPOVER_BASE =
+  "absolute left-0 right-0 z-50 max-h-60 overflow-y-auto rounded-card border border-parchment-200 bg-parchment-50 py-1 shadow-raised";
+// Anchor below the field (default) or above it (dock composer, whose field sits at
+// the panel's bottom edge — a below-anchored list would spill off-screen).
+const POPOVER_BELOW = `${POPOVER_BASE} top-full mt-1`;
+const POPOVER_ABOVE = `${POPOVER_BASE} bottom-full mb-1`;
 
 interface MatchRowProps {
   entity: CampaignEntity;
@@ -192,16 +198,17 @@ function SuggestionOptions({
 }
 
 export default function MentionSuggestionList(props: MentionSuggestionListProps) {
-  const { campaignId, listboxId, inFlow = false, maxHeight } = props;
+  const { campaignId, listboxId, inFlow = false, maxHeight, placement = "below" } = props;
   const { merges } = useCampaignMerges(campaignId);
   const activeRef = useActiveOptionScroll(props.activeIndex);
+  const popoverClass = placement === "above" ? POPOVER_ABOVE : POPOVER_BELOW;
 
   return (
     <ul
       id={listboxId}
       role="listbox"
       aria-label="Tag suggestions"
-      className={inFlow ? IN_FLOW_CLASS : POPOVER_CLASS}
+      className={inFlow ? IN_FLOW_CLASS : popoverClass}
       style={inFlow && maxHeight != null ? { maxHeight } : undefined}
     >
       <SuggestionOptions {...props} merges={merges} activeRef={activeRef} />

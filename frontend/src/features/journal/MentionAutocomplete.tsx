@@ -19,9 +19,13 @@ interface MentionAutocompleteProps {
   campaignId?: string | null;
   rows?: number;
   className?: string;
+  /** Extra inline styles merged onto the editor (e.g. a max-height cap). */
+  style?: React.CSSProperties;
   placeholder?: string;
   id?: string;
   required?: boolean;
+  /** Anchor the @-suggestion popover above the field vs. below (default). */
+  popoverPlacement?: "above" | "below";
   "aria-label"?: string;
   "aria-labelledby"?: string;
   onKeyDown?: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
@@ -29,7 +33,7 @@ interface MentionAutocompleteProps {
 
 const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>(
   function MentionAutocomplete(
-    { value, onChange, campaignId, rows = 2, className = "", placeholder, id, required, onKeyDown, ...rest },
+    { value, onChange, campaignId, rows = 2, className = "", style, placeholder, id, required, popoverPlacement = "below", onKeyDown, ...rest },
     forwardedRef,
   ) {
     const editor = useMentionEditor({ value, onChange, campaignId, onKeyDown });
@@ -47,7 +51,7 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
     }
 
     return (
-      <div className="relative">
+      <div className="relative w-full min-w-0">
         <div
           ref={setRef}
           id={id}
@@ -62,7 +66,7 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
           contentEditable
           suppressContentEditableWarning
           className={`whitespace-pre-wrap break-words ${className}`}
-          style={{ minHeight: `${Math.max(rows, 1) * 1.6}em` }}
+          style={{ minHeight: `${Math.max(rows, 1) * 1.6}em`, ...style }}
           onInput={editor.handleInput}
           onKeyUp={editor.handleKeyUp}
           onClick={editor.syncTrigger}
@@ -106,6 +110,7 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
             onHover={editor.setActiveIndex}
             inFlow={isMobile}
             maxHeight={suggestionMaxHeight}
+            placement={popoverPlacement}
           />
         )}
 

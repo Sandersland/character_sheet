@@ -2,12 +2,13 @@ import ActivityModal from "@/features/character-meta/ActivityModal";
 import DeleteCharacterModal from "@/features/character-meta/DeleteCharacterModal";
 import SessionsModal from "@/features/session/SessionsModal";
 import CapturePalette from "@/features/journal/CapturePalette";
-import type { Character } from "@/types/character";
+import type { Character, Session } from "@/types/character";
 
 interface CharacterSheetModalsProps {
   character: Character;
   onUpdate: (c: Character) => void;
   captureSessionId?: string;
+  captureSession?: Session | null;
   deleteOpen: boolean;
   activityOpen: boolean;
   sessionsOpen: boolean;
@@ -22,6 +23,7 @@ export default function CharacterSheetModals({
   character,
   onUpdate,
   captureSessionId,
+  captureSession,
   deleteOpen,
   activityOpen,
   sessionsOpen,
@@ -61,6 +63,7 @@ export default function CharacterSheetModals({
         <CapturePalette
           character={character}
           sessionId={captureSessionId}
+          session={captureSession}
           onClose={onCloseCapture}
           onUpdate={onUpdate}
         />

@@ -107,7 +107,7 @@ describe("CapturePalette (#247)", () => {
     render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
     const composer = screen.getByRole("textbox", { name: /quick note/i });
     expect(composer.className).toContain("text-base");
-    expect(composer.className).toContain("md:text-sm");
+    expect(composer.className).toContain("md:text-[15px]");
   });
 
   it("Enter saves a NOTE via createJournalEntry and propagates the update", async () => {
@@ -331,14 +331,28 @@ describe("CapturePalette (#247)", () => {
       expect(screen.queryByText(/Enter to save/i)).toBeNull();
     });
 
-    it("md+: renders the top palette with the Enter/Shift+Enter hint and no grabber", () => {
+    it("md+: renders the non-modal margin dock with the ↵/shift hint and no grabber", () => {
       useDesktopViewport();
       const { baseElement } = render(
         <CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />,
       );
-      expect(screen.getByRole("dialog", { name: /quick capture/i })).toBeInTheDocument();
-      expect(screen.getByText(/Enter to save · Shift\+Enter/i)).toBeInTheDocument();
+      const dock = screen.getByRole("dialog", { name: /quick capture/i });
+      expect(dock).toBeInTheDocument();
+      // Non-modal: the sheet behind stays interactive (no aria-modal, no scrim).
+      expect(dock).not.toHaveAttribute("aria-modal");
+      expect(dock.closest("[data-capture-dock]")).not.toBeNull();
+      expect(screen.getByText(/↵ save · shift/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /close · ⌘j/i })).toBeInTheDocument();
       expect(baseElement.querySelector('button[aria-label="Close"]')).toBeNull();
+    });
+
+    it("md+: dock feed shows the day divider and the Close · ⌘J affordance", () => {
+      useDesktopViewport();
+      render(
+        <CapturePalette character={makeCharacterWithNote()} onClose={vi.fn()} onUpdate={vi.fn()} />,
+      );
+      expect(screen.getByText("Ambushed by goblins")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /close · ⌘j/i })).toBeInTheDocument();
     });
 
     it("has no axe violations on mobile", async () => {

@@ -25,7 +25,7 @@ vi.mock("@/api/client", () => ({
 
 vi.mock("@/hooks/useCharacter", () => ({ useCharacter: vi.fn() }));
 vi.mock("@/hooks/useReferenceData", () => ({ useReferenceData: () => ({ reference: null }) }));
-vi.mock("@/hooks/useGlobalKeyboard", () => ({ useGlobalKeyboard: () => {} }));
+vi.mock("@/hooks/useCaptureHotkey", () => ({ useCaptureHotkey: () => {} }));
 
 vi.mock("@/features/abilities/AbilityScoreBox", () => ({ default: () => null }));
 vi.mock("@/features/dice/RollResultToast", () => ({ default: () => null }));
