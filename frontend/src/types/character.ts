@@ -1225,7 +1225,53 @@ export interface CampaignEntity {
   visibility: EntityVisibility;
   createdAt: string;
   updatedAt: string;
+  /** Linked character for PC entities (#842); null elsewhere, list-route only. */
+  characterId?: string | null;
+  /** Which field a `q=` search hit (#839); present only on searched lists. */
+  matchedIn?: EntityMatchField;
+  /** Derived mention stats (#839); present only with `?include=stats`. */
+  stats?: EntityStats;
 }
+
+export type EntityMatchField = "name" | "alias" | "notes";
+
+/** Session context of a first/last mention; ordinal derived from startedAt order (#839). */
+export interface EntityMentionRef {
+  sessionId: string | null;
+  sessionTitle: string | null;
+  sessionOrdinal: number | null;
+  date: string;
+}
+
+/** Per-entity derived mention stats (#839), visibility-filtered server-side. */
+export interface EntityStats {
+  mentionCount: number;
+  firstMentioned: EntityMentionRef | null;
+  lastMentioned: EntityMentionRef | null;
+  chroniclers: string[];
+  hasDescription: boolean;
+}
+
+/** One co-mentioned entity with its distinct-entry count (#839). */
+export interface EntityConnection {
+  entity: { id: string; name: string; type: EntityType };
+  count: number;
+}
+
+/** One campaign-wide Codex activity item (#839), newest-first. */
+export type CodexActivityItem =
+  | {
+      kind: "mention";
+      characterName: string;
+      entity: { id: string; name: string; type: EntityType };
+      sessionOrdinal: number | null;
+      date: string;
+    }
+  | {
+      kind: "created";
+      entity: { id: string; name: string; type: EntityType };
+      date: string;
+    };
 
 /** One current holder of an awarded campaign item (#381). */
 export interface CampaignItemHolder {
@@ -1303,6 +1349,9 @@ export interface EntityBacklink {
     id: string;
     characterId: string;
     sessionId?: string | null;
+    /** Session context (#839): title + startedAt-derived ordinal, null off-session. */
+    sessionTitle?: string | null;
+    sessionOrdinal?: number | null;
     kind: JournalEntryKind;
     title: string | null;
     date: string;

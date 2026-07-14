@@ -163,7 +163,7 @@ export interface MentionResolved {
 }
 
 // Chip background/text per type — mirrors ENTITY_TYPE_TONE + Badge's TONE_CLASSES.
-const MENTION_CHIP_TONE_CLASS: Record<EntityType, string> = {
+export const MENTION_CHIP_TONE_CLASS: Record<EntityType, string> = {
   NPC: "bg-garnet-50 text-garnet-800",
   LOCATION: "bg-vitality-50 text-vitality-800",
   FACTION: "bg-arcane-50 text-arcane-800",
@@ -254,41 +254,48 @@ export function resolveAdjacentChip(range: Range, forward: boolean): HTMLElement
   return chip as HTMLElement;
 }
 
-// Walk editor DOM back into a @[<uuid>] body string. Chips emit their token;
-// <br> and block elements (DIV/P) emit newlines; trailing placeholder <br>s drop.
+// Running state for the serialize walk: accumulated body + whether content started.
+interface SerializeState {
+  out: string;
+  started: boolean;
+}
+
+// Serialize one element: chips emit their token; <br> and block elements (DIV/P)
+// emit newlines (trailing placeholder <br>s drop); anything else recurses.
+function serializeElement(el: HTMLElement, state: SerializeState, walk: (n: Node) => void): void {
+  if (el.dataset.mentionId) {
+    state.out += `@[${el.dataset.mentionId}]`;
+    state.started = true;
+    return;
+  }
+  if (el.tagName === "BR") {
+    if (el.nextSibling) state.out += "\n";
+    return;
+  }
+  if (el.tagName === "DIV" || el.tagName === "P") {
+    if (state.started) state.out += "\n";
+    walk(el);
+    state.started = true;
+    return;
+  }
+  walk(el);
+}
+
+// Walk editor DOM back into a @[<uuid>] body string.
 export function serializeMentionDom(root: Node): string {
-  let out = "";
-  let started = false;
+  const state: SerializeState = { out: "", started: false };
   const walk = (node: Node) => {
     node.childNodes.forEach((child) => {
       if (child.nodeType === Node.TEXT_NODE) {
-        out += child.textContent ?? "";
-        if (child.textContent) started = true;
+        state.out += child.textContent ?? "";
+        if (child.textContent) state.started = true;
         return;
       }
-      if (child.nodeType !== Node.ELEMENT_NODE) return;
-      const el = child as HTMLElement;
-      if (el.dataset.mentionId) {
-        out += `@[${el.dataset.mentionId}]`;
-        started = true;
-        return;
-      }
-      if (el.tagName === "BR") {
-        if (!child.nextSibling) return;
-        out += "\n";
-        return;
-      }
-      if (el.tagName === "DIV" || el.tagName === "P") {
-        if (started) out += "\n";
-        walk(el);
-        started = true;
-        return;
-      }
-      walk(el);
+      if (child.nodeType === Node.ELEMENT_NODE) serializeElement(child as HTMLElement, state, walk);
     });
   };
   walk(root);
-  return out;
+  return state.out;
 }
 
 // Serialize only the content left of the collapsed caret (for parseTrigger).

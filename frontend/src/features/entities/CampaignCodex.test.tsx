@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
 import CampaignCodex from "@/features/entities/CampaignCodex";
+import { useCodexActivity } from "@/features/entities/useCodexActivity";
 import * as client from "@/api/client";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
 import type { CampaignEntity } from "@/types/character";
@@ -16,6 +17,10 @@ vi.mock("@/api/client", () => ({
 vi.mock("@/hooks/useCampaignEntities", () => ({
   useCampaignEntities: vi.fn(),
   primeCampaignEntities: vi.fn(),
+}));
+
+vi.mock("@/features/entities/useCodexActivity", () => ({
+  useCodexActivity: vi.fn(),
 }));
 
 const CAMPAIGN_ID = "camp-1";
@@ -76,10 +81,15 @@ function stubViewport(desktop: boolean) {
   }));
 }
 
+function mockActivity(statsEntities: CampaignEntity[] = []) {
+  vi.mocked(useCodexActivity).mockReturnValue({ statsEntities, activity: [], loaded: true });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   stubViewport(true);
   mockEntities(ENTITIES);
+  mockActivity();
 });
 
 afterEach(() => {
@@ -239,6 +249,42 @@ describe("CampaignCodex rail filters (#840)", () => {
   it("has no axe violations", async () => {
     const { container } = renderCodex();
     expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+describe("CampaignCodex activity rail (#841)", () => {
+  it("renders the activity rail alongside the ledger", () => {
+    renderCodex();
+    expect(screen.getByRole("complementary", { name: /codex activity/i })).toBeInTheDocument();
+  });
+
+  it("keeps the rail rendered when search has no matches", async () => {
+    const user = userEvent.setup();
+    renderCodex();
+    await user.type(screen.getByRole("searchbox", { name: /search/i }), "zzz");
+    expect(screen.getByText(/no entities match/i)).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: /codex activity/i })).toBeInTheDocument();
+  });
+
+  it("renders the needs-chronicling banner above the ledger when entities lack descriptions", () => {
+    mockActivity([
+      {
+        ...GOBLIN,
+        stats: {
+          mentionCount: 3,
+          firstMentioned: null,
+          lastMentioned: null,
+          chroniclers: [],
+          hasDescription: false,
+        },
+      },
+    ]);
+    renderCodex();
+    // Banner + desktop gold card both render it — breakpoints split them in CSS.
+    expect(screen.getAllByText(/1 entry has been mentioned/)).toHaveLength(2);
+    for (const cta of screen.getAllByRole("link", { name: /^Add what you know/ })) {
+      expect(cta).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/entities/ent-npc?edit=1`);
+    }
   });
 });
 

@@ -3,8 +3,17 @@ import { z } from "zod";
 
 import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
 import { collectMergedInIdentities, wouldCreateCycle } from "@/lib/activity/entity-merges.js";
+import {
+  aggregateEntityStats,
+  buildSessionOrdinalMap,
+  matchEntityQuery,
+  resolveVisibleMergeUnion,
+  tallyCoMentions,
+  visibleEntryWhere,
+  type EntityStatsAggregate,
+  type StatRef,
+} from "@/lib/activity/entity-stats.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
-import { normalizeForMatch } from "@/lib/activity/journal-refs.js";
 import { prisma } from "@/lib/core/prisma.js";
 
 // Campaign entity registry (#248): the shared wiki of NPCs/locations/factions/
@@ -43,37 +52,305 @@ const updateEntitySchema = z
   .partial()
   .strict();
 
-// ── GET /api/campaigns/:id/entities?q=&type= ─────────────────────────────────
+// ── GET /api/campaigns/:id/entities?q=&type=&include=stats ───────────────────
 // List/search the campaign's entities. The campaign-scoped volume is small, so
-// we fetch (optionally narrowed by a valid type) and match in memory via the
-// same normalized key on both name and aliases. An invalid type is ignored.
+// we fetch (optionally narrowed by a valid type) and match in memory on name,
+// aliases, and notes (#839), labeling each hit's field. An invalid type is
+// ignored. ?include=stats attaches derived mention stats (computed at read; a
+// fixed number of queries regardless of result size).
+
+// Session context resolver for mention refs: title + startedAt-ordinal (#839).
+async function loadSessionContext(campaignId: string) {
+  const sessions = await prisma.session.findMany({
+    where: { campaignId },
+    orderBy: { startedAt: "asc" },
+    select: { id: true, title: true },
+  });
+  return {
+    ordinals: buildSessionOrdinalMap(sessions),
+    titles: new Map(sessions.map((s) => [s.id, s.title])),
+  };
+}
+
+type SessionContext = Awaited<ReturnType<typeof loadSessionContext>>;
+
+function mentionRef(ref: StatRef | null, ctx: SessionContext) {
+  if (!ref) return null;
+  return {
+    sessionId: ref.sessionId,
+    sessionTitle: (ref.sessionId ? ctx.titles.get(ref.sessionId) : null) ?? null,
+    sessionOrdinal: (ref.sessionId ? ctx.ordinals.get(ref.sessionId) : null) ?? null,
+    date: ref.date,
+  };
+}
+
+function parseLimit(raw: unknown, fallback: number): number {
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? Math.min(n, 50) : fallback;
+}
+
+// Invalid or absent ?type= means "all types".
+function parseEntityType(raw: unknown): (typeof ENTITY_TYPES)[number] | undefined {
+  return (ENTITY_TYPES as readonly string[]).includes(raw as string)
+    ? (raw as (typeof ENTITY_TYPES)[number])
+    : undefined;
+}
+
+// Hidden entities are invisible to non-owners: null → 404 rather than leak existence.
+async function findViewableEntity(entityId: string, campaignId: string, isOwner: boolean) {
+  const entity = await prisma.campaignEntity.findUnique({
+    where: { id: entityId },
+    select: { id: true, campaignId: true, visibility: true },
+  });
+  if (!entity || entity.campaignId !== campaignId) return null;
+  return isOwner || entity.visibility !== "HIDDEN" ? entity : null;
+}
+
+type ListedEntity = { id: string; notes: string | null };
+
+const EMPTY_AGGREGATE: EntityStatsAggregate = {
+  mentionCount: 0,
+  firstMentioned: null,
+  lastMentioned: null,
+  chroniclers: [],
+};
+
+function statsPayload(
+  agg: EntityStatsAggregate | undefined,
+  notes: string | null,
+  ctx: SessionContext,
+) {
+  const a = agg ?? EMPTY_AGGREGATE;
+  return {
+    mentionCount: a.mentionCount,
+    firstMentioned: mentionRef(a.firstMentioned, ctx),
+    lastMentioned: mentionRef(a.lastMentioned, ctx),
+    chroniclers: a.chroniclers,
+    hasDescription: (notes ?? "").trim().length > 0,
+  };
+}
+
+// Refs tagging a merged-in identity attribute to every listed survivor above it.
+function buildAttributionIndex(union: Map<string, string[]>): Map<string, string[]> {
+  const attributeTo = new Map<string, string[]>();
+  for (const [listedId, mergedIn] of union) {
+    for (const id of [listedId, ...mergedIn]) {
+      getOrPush(attributeTo, id, listedId);
+    }
+  }
+  return attributeTo;
+}
+
+function getOrPush(map: Map<string, string[]>, key: string, value: string): void {
+  const existing = map.get(key);
+  if (existing) {
+    existing.push(value);
+    return;
+  }
+  map.set(key, [value]);
+}
+
+async function fetchVisibleStatRefs(
+  campaignId: string,
+  userId: string,
+  attributeTo: Map<string, string[]>,
+): Promise<StatRef[]> {
+  if (attributeTo.size === 0) return [];
+  const refRows = await prisma.journalEntryRef.findMany({
+    where: {
+      entityId: { in: [...attributeTo.keys()] },
+      entry: visibleEntryWhere(userId, campaignId),
+    },
+    select: {
+      entityId: true,
+      entryId: true,
+      entry: {
+        select: {
+          sessionId: true,
+          date: true,
+          loggedAt: true,
+          createdAt: true,
+          character: { select: { name: true } },
+        },
+      },
+    },
+  });
+  return refRows.flatMap((row) =>
+    (attributeTo.get(row.entityId) ?? []).map((survivor) => ({
+      entityId: survivor,
+      entryId: row.entryId,
+      characterName: row.entry.character.name,
+      sessionId: row.entry.sessionId,
+      date: row.entry.date,
+      loggedAt: row.entry.loggedAt,
+      createdAt: row.entry.createdAt,
+    })),
+  );
+}
+
+// Stats block for the list route (#839): fixed query count regardless of N.
+async function withEntityStats<E extends ListedEntity>(
+  campaignId: string,
+  userId: string,
+  isOwner: boolean,
+  matched: E[],
+) {
+  const [edges, allEntities, ctx] = await Promise.all([
+    prisma.campaignEntityMerge.findMany({
+      where: { campaignId },
+      select: { mergedEntityId: true, survivorEntityId: true, status: true },
+    }),
+    // A type-filtered list may miss merged identities of other types; the scrub
+    // needs every entity's visibility.
+    prisma.campaignEntity.findMany({
+      where: { campaignId },
+      select: { id: true, visibility: true },
+    }),
+    loadSessionContext(campaignId),
+  ]);
+  const revealedIds = new Set(
+    allEntities.filter((e) => e.visibility === "REVEALED").map((e) => e.id),
+  );
+  const listedIds = matched.map((e) => e.id);
+  const union = resolveVisibleMergeUnion(edges, listedIds, revealedIds, isOwner);
+  const attributeTo = buildAttributionIndex(union);
+  const statRefs = await fetchVisibleStatRefs(campaignId, userId, attributeTo);
+  const stats = aggregateEntityStats(statRefs);
+  return matched.map((e) => ({ ...e, stats: statsPayload(stats.get(e.id), e.notes, ctx) }));
+}
 
 entitiesRouter.get("/campaigns/:id/entities", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
+  const isOwner = role === "OWNER";
 
-  const typeParam = typeof req.query.type === "string" ? req.query.type : undefined;
-  const type = (ENTITY_TYPES as readonly string[]).includes(typeParam ?? "")
-    ? (typeParam as (typeof ENTITY_TYPES)[number])
-    : undefined;
+  const type = parseEntityType(req.query.type);
 
-  const entities = await prisma.campaignEntity.findMany({
+  const rows = await prisma.campaignEntity.findMany({
     where: {
       campaignId: req.params.id,
       ...(type ? { type } : {}),
       // Non-owners see only revealed entities (#379); the owner sees all.
-      ...(role === "OWNER" ? {} : { visibility: "REVEALED" }),
+      ...(isOwner ? {} : { visibility: "REVEALED" }),
     },
+    include: { characterLink: { select: { characterId: true } } },
     orderBy: { name: "asc" },
   });
+  // Flatten the PC link (#842): characterId, never the nested relation object.
+  const entities = rows.map(({ characterLink, ...e }) => ({
+    ...e,
+    characterId: characterLink?.characterId ?? null,
+  }));
 
-  const q = typeof req.query.q === "string" ? normalizeForMatch(req.query.q) : "";
+  const q = typeof req.query.q === "string" ? req.query.q : "";
   const matched = q
-    ? entities.filter((e) =>
-        [e.name, ...e.aliases].some((s) => normalizeForMatch(s).includes(q)),
-      )
+    ? entities.flatMap((e) => {
+        const matchedIn = matchEntityQuery(e, q);
+        return matchedIn ? [{ ...e, matchedIn }] : [];
+      })
     : entities;
 
-  res.json(matched);
+  const includeStats =
+    typeof req.query.include === "string" && req.query.include.split(",").includes("stats");
+  if (!includeStats) {
+    res.json(matched);
+    return;
+  }
+
+  res.json(await withEntityStats(req.params.id, req.user!.id, isOwner, matched));
+});
+
+// ── GET /api/campaigns/:id/entities/activity ─────────────────────────────────
+// Campaign-wide Codex activity (#839): the newest visible mention refs merged
+// with entity-created events, newest-first. Registered before the generic
+// :entityId routes so the /activity segment can't be shadowed.
+
+type ActivitySortable = { sortKey: [number, number, number] };
+
+function activitySortKey(date: Date, loggedAt?: Date, createdAt?: Date): [number, number, number] {
+  return [date.getTime(), (loggedAt ?? date).getTime(), (createdAt ?? date).getTime()];
+}
+
+function compareActivityDesc(a: ActivitySortable, b: ActivitySortable): number {
+  return (
+    b.sortKey[0] - a.sortKey[0] || b.sortKey[1] - a.sortKey[1] || b.sortKey[2] - a.sortKey[2]
+  );
+}
+
+entitiesRouter.get("/campaigns/:id/entities/activity", async (req, res) => {
+  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
+  const isOwner = role === "OWNER";
+
+  const limit = parseLimit(req.query.limit, 20);
+
+  // Two bounded streams (each pre-sorted + capped at N) merged in memory.
+  const [refs, createdEntities, ctx] = await Promise.all([
+    prisma.journalEntryRef.findMany({
+      where: {
+        entity: {
+          campaignId: req.params.id,
+          ...(isOwner ? {} : { visibility: "REVEALED" }),
+        },
+        entry: visibleEntryWhere(req.user!.id, req.params.id),
+      },
+      select: {
+        entity: { select: { id: true, name: true, type: true } },
+        entry: {
+          select: {
+            sessionId: true,
+            date: true,
+            loggedAt: true,
+            createdAt: true,
+            character: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: [
+        { entry: { date: "desc" } },
+        { entry: { loggedAt: "desc" } },
+        { entry: { createdAt: "desc" } },
+      ],
+      take: limit,
+    }),
+    prisma.campaignEntity.findMany({
+      where: {
+        campaignId: req.params.id,
+        ...(isOwner ? {} : { visibility: "REVEALED" }),
+      },
+      select: { id: true, name: true, type: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    }),
+    loadSessionContext(req.params.id),
+  ]);
+
+  const items = [
+    ...refs.map((ref) => ({
+      sortKey: activitySortKey(ref.entry.date, ref.entry.loggedAt, ref.entry.createdAt),
+      item: {
+        kind: "mention" as const,
+        characterName: ref.entry.character.name,
+        entity: ref.entity,
+        sessionOrdinal:
+          (ref.entry.sessionId ? ctx.ordinals.get(ref.entry.sessionId) : null) ?? null,
+        date: ref.entry.date,
+      },
+    })),
+    ...createdEntities.map((e) => ({
+      sortKey: activitySortKey(e.createdAt),
+      item: {
+        kind: "created" as const,
+        entity: { id: e.id, name: e.name, type: e.type },
+        date: e.createdAt,
+      },
+    })),
+  ];
+
+  res.json(
+    items
+      .sort(compareActivityDesc)
+      .slice(0, limit)
+      .map(({ item }) => item),
+  );
 });
 
 // ── POST /api/campaigns/:id/entities ─────────────────────────────────────────
@@ -343,16 +620,8 @@ entitiesRouter.delete("/campaigns/:id/entities/:entityId", async (req, res) => {
 entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
 
-  const entity = await prisma.campaignEntity.findUnique({
-    where: { id: req.params.entityId },
-    select: { id: true, campaignId: true, visibility: true },
-  });
-  // Hidden entities are invisible to non-owners: 404 rather than leak existence.
-  if (
-    !entity ||
-    entity.campaignId !== req.params.id ||
-    (entity.visibility === "HIDDEN" && role !== "OWNER")
-  ) {
+  const entity = await findViewableEntity(req.params.entityId, req.params.id, role === "OWNER");
+  if (!entity) {
     res.status(404).json({ error: "Entity not found" });
     return;
   }
@@ -375,28 +644,26 @@ entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, re
   }
   const entityIds = [req.params.entityId, ...mergedIn];
 
-  const refs = await prisma.journalEntryRef.findMany({
-    where: {
-      entityId: { in: entityIds },
-      // Own entries, or CAMPAIGN-shared ones from characters still in this
-      // campaign (refs survive a character leaving; the share must not).
-      entry: {
-        OR: [
-          { authorUserId: req.user!.id },
-          { visibility: "CAMPAIGN", character: { campaignId: req.params.id } },
-        ],
+  const [refs, ctx] = await Promise.all([
+    prisma.journalEntryRef.findMany({
+      where: {
+        entityId: { in: entityIds },
+        // Own entries, or CAMPAIGN-shared ones from characters still in this
+        // campaign (refs survive a character leaving; the share must not).
+        entry: visibleEntryWhere(req.user!.id, req.params.id),
       },
-    },
-    include: {
-      entity: { select: { id: true, name: true } },
-      entry: { include: { character: { select: { name: true } } } },
-    },
-    orderBy: [
-      { entry: { date: "desc" } },
-      { entry: { loggedAt: "desc" } },
-      { entry: { createdAt: "desc" } },
-    ],
-  });
+      include: {
+        entity: { select: { id: true, name: true } },
+        entry: { include: { character: { select: { name: true } } } },
+      },
+      orderBy: [
+        { entry: { date: "desc" } },
+        { entry: { loggedAt: "desc" } },
+        { entry: { createdAt: "desc" } },
+      ],
+    }),
+    loadSessionContext(req.params.id),
+  ]);
 
   res.json(
     refs.map((ref) => ({
@@ -404,6 +671,9 @@ entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, re
         id: ref.entry.id,
         characterId: ref.entry.characterId,
         sessionId: ref.entry.sessionId,
+        sessionTitle: (ref.entry.sessionId ? ctx.titles.get(ref.entry.sessionId) : null) ?? null,
+        sessionOrdinal:
+          (ref.entry.sessionId ? ctx.ordinals.get(ref.entry.sessionId) : null) ?? null,
         kind: ref.entry.kind,
         date: ref.entry.date,
         loggedAt: ref.entry.loggedAt,
@@ -412,5 +682,67 @@ entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, re
       characterName: ref.entry.character.name,
       identity: { id: ref.entity.id, name: ref.entity.name },
     })),
+  );
+});
+
+// ── GET /api/campaigns/:id/entities/:entityId/connections ────────────────────
+// Co-mention graph (#839): entities sharing a visible entry with this one,
+// merge-resolved to survivors, counted by distinct entries, sorted desc.
+
+entitiesRouter.get("/campaigns/:id/entities/:entityId/connections", async (req, res) => {
+  const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
+  const isOwner = role === "OWNER";
+
+  const target = await findViewableEntity(req.params.entityId, req.params.id, isOwner);
+  if (!target) {
+    res.status(404).json({ error: "Entity not found" });
+    return;
+  }
+
+  const limit = parseLimit(req.query.limit, 10);
+
+  const [edges, allEntities] = await Promise.all([
+    prisma.campaignEntityMerge.findMany({
+      where: { campaignId: req.params.id },
+      select: { mergedEntityId: true, survivorEntityId: true, status: true },
+    }),
+    prisma.campaignEntity.findMany({
+      where: { campaignId: req.params.id },
+      select: { id: true, name: true, type: true, visibility: true },
+    }),
+  ]);
+  const entityById = new Map(allEntities.map((e) => [e.id, e]));
+  const revealedIds = new Set(
+    allEntities.filter((e) => e.visibility === "REVEALED").map((e) => e.id),
+  );
+  const targetIds = new Set([
+    target.id,
+    ...resolveVisibleMergeUnion(edges, [target.id], revealedIds, isOwner).get(target.id)!,
+  ]);
+
+  const targetRefs = await prisma.journalEntryRef.findMany({
+    where: {
+      entityId: { in: [...targetIds] },
+      entry: visibleEntryWhere(req.user!.id, req.params.id),
+    },
+    select: { entryId: true },
+  });
+  const entryIds = [...new Set(targetRefs.map((r) => r.entryId))];
+
+  const coRefs =
+    entryIds.length === 0
+      ? []
+      : await prisma.journalEntryRef.findMany({
+          where: { entryId: { in: entryIds } },
+          select: { entryId: true, entityId: true },
+        });
+
+  res.json(
+    tallyCoMentions(coRefs, { edges, entityById, targetIds, isOwner })
+      .slice(0, limit)
+      .map(({ entity, count }) => ({
+        entity: { id: entity.id, name: entity.name, type: entity.type },
+        count,
+      })),
   );
 });

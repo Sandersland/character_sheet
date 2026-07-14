@@ -1,5 +1,5 @@
 import { normalizeForMatch } from "@/lib/mentions";
-import type { CampaignEntity, EntityType } from "@/types/character";
+import type { CampaignEntity, EntityStats, EntityType } from "@/types/character";
 
 // Pure helpers for the codex ledger browse surface (#840) — no JSX, no DOM.
 
@@ -60,4 +60,28 @@ export function notesSnippet(notes: string | null): string | null {
 
 export function monogram(name: string): string {
   return name.trim().charAt(0).toUpperCase() || "?";
+}
+
+// An entity from a `?include=stats` list, with stats guaranteed present.
+export type StatsEntity = CampaignEntity & { stats: EntityStats };
+
+function withStats(entities: CampaignEntity[]): StatsEntity[] {
+  return entities.filter((e): e is StatsEntity => e.stats !== undefined);
+}
+
+// Mentioned-but-descriptionless entities for the "Needs chronicling" card, most-mentioned first.
+export function needsChronicling(entities: CampaignEntity[]): StatsEntity[] {
+  return withStats(entities)
+    .filter((e) => e.stats.mentionCount > 0 && !e.stats.hasDescription)
+    .sort((a, b) => b.stats.mentionCount - a.stats.mentionCount);
+}
+
+// Top-n leaderboard by mention count (name tiebreak); zero-mention entities drop out.
+export function mostMentioned(entities: CampaignEntity[], n = 3): StatsEntity[] {
+  return withStats(entities)
+    .filter((e) => e.stats.mentionCount > 0)
+    .sort(
+      (a, b) => b.stats.mentionCount - a.stats.mentionCount || a.name.localeCompare(b.name),
+    )
+    .slice(0, n);
 }
