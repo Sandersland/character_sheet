@@ -107,7 +107,7 @@ describe("CapturePalette (#247)", () => {
     render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
     const composer = screen.getByRole("textbox", { name: /quick note/i });
     expect(composer.className).toContain("text-base");
-    expect(composer.className).toContain("md:text-sm");
+    expect(composer.className).toContain("md:text-[15px]");
   });
 
   it("Enter saves a NOTE via createJournalEntry and propagates the update", async () => {
@@ -198,7 +198,11 @@ describe("CapturePalette (#247)", () => {
         <CapturePalette character={makeCampaignCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />,
       );
 
-      expect(screen.getByRole("checkbox", { name: /private/i })).not.toBeChecked();
+      // Mobile lock is a compact icon toggle (aria-pressed), not a checkbox (#866).
+      expect(screen.getByRole("button", { name: /private/i })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
       await user.type(screen.getByRole("textbox", { name: /quick note/i }), "shared note");
       await user.keyboard("{Enter}");
 
@@ -206,13 +210,13 @@ describe("CapturePalette (#247)", () => {
       expect(entry).not.toHaveProperty("visibility");
     });
 
-    it("sends visibility PRIVATE when the Private toggle is on", async () => {
+    it("sends visibility PRIVATE when the Private lock is on", async () => {
       const user = userEvent.setup();
       render(
         <CapturePalette character={makeCampaignCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />,
       );
 
-      await user.click(screen.getByRole("checkbox", { name: /private/i }));
+      await user.click(screen.getByRole("button", { name: /private/i }));
       await user.type(screen.getByRole("textbox", { name: /quick note/i }), "secret note");
       await user.keyboard("{Enter}");
 
@@ -220,20 +224,23 @@ describe("CapturePalette (#247)", () => {
       expect(entry).toMatchObject({ visibility: "PRIVATE" });
     });
 
-    it("resets the toggle to shared after a successful save (privacy never leaks forward)", async () => {
+    it("resets the lock to shared after a successful save (privacy never leaks forward)", async () => {
       const user = userEvent.setup();
       render(
         <CapturePalette character={makeCampaignCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />,
       );
 
-      await user.click(screen.getByRole("checkbox", { name: /private/i }));
+      await user.click(screen.getByRole("button", { name: /private/i }));
       await user.type(screen.getByRole("textbox", { name: /quick note/i }), "one-off secret");
       await user.keyboard("{Enter}");
 
       expect(vi.mocked(client.createJournalEntry).mock.calls[0][1]).toMatchObject({
         visibility: "PRIVATE",
       });
-      expect(screen.getByRole("checkbox", { name: /private/i })).not.toBeChecked();
+      expect(screen.getByRole("button", { name: /private/i })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
 
       await user.type(screen.getByRole("textbox", { name: /quick note/i }), "back to shared");
       await user.keyboard("{Enter}");
@@ -259,8 +266,10 @@ describe("CapturePalette (#247)", () => {
       render(<CapturePalette character={character} onClose={vi.fn()} onUpdate={vi.fn()} />);
 
       await user.click(screen.getByRole("button", { name: /^edit$/i }));
-      // Scope to the editor row — the composer renders its own Private toggle.
-      const editorRow = screen.getByRole("textbox", { name: /edit note/i }).closest("li")!;
+      // Scope to the editor row (its nearest wrapping div) — the composer's own
+      // Private control is a lock button, not a checkbox, so the editor's
+      // checkbox is unambiguous either way.
+      const editorRow = screen.getByRole("textbox", { name: /edit note/i }).closest("div")!;
       const editorToggle = within(editorRow).getByRole("checkbox", { name: /private/i });
       expect(editorToggle).not.toBeChecked();
       await user.click(editorToggle);
@@ -272,9 +281,9 @@ describe("CapturePalette (#247)", () => {
       });
     });
 
-    it("hides the Private toggle for a campaign-less character", () => {
+    it("hides the Private lock for a campaign-less character", () => {
       render(<CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />);
-      expect(screen.queryByRole("checkbox", { name: /private/i })).toBeNull();
+      expect(screen.queryByRole("button", { name: /private/i })).toBeNull();
     });
 
     it("shows a lock only on PRIVATE rows", () => {
@@ -320,25 +329,77 @@ describe("CapturePalette (#247)", () => {
     });
   });
 
-  describe("per-breakpoint presentation (#771)", () => {
-    it("mobile: renders inside a BottomSheet with a grabber, short placeholder, no keyboard hint", () => {
+  describe("per-breakpoint presentation (#771, #866)", () => {
+    it("mobile: renders the full-height chat surface — Done, placeholder, no keyboard hint, no grabber", () => {
       const { baseElement } = render(
         <CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />,
       );
-      // The BottomSheet grabber is a real button whose accessible name is "Close".
-      expect(baseElement.querySelector('button[aria-label="Close"]')).not.toBeNull();
+      // The keyboard-pinned capture is a modal dialog with a "Done" close button —
+      // the old BottomSheet grabber (aria-label="Close") is gone (#866).
+      const surface = screen.getByRole("dialog", { name: /quick capture/i });
+      expect(surface).toHaveAttribute("aria-modal", "true");
+      expect(screen.getByRole("button", { name: /^done$/i })).toBeInTheDocument();
+      expect(baseElement.querySelector('button[aria-label="Close"]')).toBeNull();
       expect(screen.getByText("Jot a note… @ to tag")).toBeInTheDocument();
-      expect(screen.queryByText(/Enter to save/i)).toBeNull();
+      expect(screen.queryByText(/↵ save/i)).toBeNull();
     });
 
-    it("md+: renders the top palette with the Enter/Shift+Enter hint and no grabber", () => {
+    it("mobile: the feed reads oldest→newest downward (newest adjacent to the composer)", () => {
+      const character = makeCampaignCharacter([
+        {
+          id: "older",
+          kind: "NOTE",
+          date: "2026-07-01T00:00:00.000Z",
+          loggedAt: "2026-07-01T20:00:00.000Z",
+          body: "older note",
+          visibility: "CAMPAIGN",
+        },
+        {
+          id: "newer",
+          kind: "NOTE",
+          date: "2026-07-01T00:00:00.000Z",
+          loggedAt: "2026-07-01T20:30:00.000Z",
+          body: "newer note",
+          visibility: "CAMPAIGN",
+        },
+      ]);
+      render(<CapturePalette character={character} onClose={vi.fn()} onUpdate={vi.fn()} />);
+      const older = screen.getByText("older note");
+      const newer = screen.getByText("newer note");
+      // Ascending order downward: the older note precedes the newer one in the DOM.
+      expect(older.compareDocumentPosition(newer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("mobile: the Done button closes the surface", async () => {
+      const user = userEvent.setup();
+      const onClose = vi.fn();
+      render(<CapturePalette character={makeCharacter()} onClose={onClose} onUpdate={vi.fn()} />);
+      await user.click(screen.getByRole("button", { name: /^done$/i }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("md+: renders the non-modal margin dock with the ↵/shift hint and no grabber", () => {
       useDesktopViewport();
       const { baseElement } = render(
         <CapturePalette character={makeCharacter()} onClose={vi.fn()} onUpdate={vi.fn()} />,
       );
-      expect(screen.getByRole("dialog", { name: /quick capture/i })).toBeInTheDocument();
-      expect(screen.getByText(/Enter to save · Shift\+Enter/i)).toBeInTheDocument();
+      const dock = screen.getByRole("dialog", { name: /quick capture/i });
+      expect(dock).toBeInTheDocument();
+      // Non-modal: the sheet behind stays interactive (no aria-modal, no scrim).
+      expect(dock).not.toHaveAttribute("aria-modal");
+      expect(dock.closest("[data-capture-dock]")).not.toBeNull();
+      expect(screen.getByText(/↵ save · shift/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /close · ⌘j/i })).toBeInTheDocument();
       expect(baseElement.querySelector('button[aria-label="Close"]')).toBeNull();
+    });
+
+    it("md+: dock feed shows the day divider and the Close · ⌘J affordance", () => {
+      useDesktopViewport();
+      render(
+        <CapturePalette character={makeCharacterWithNote()} onClose={vi.fn()} onUpdate={vi.fn()} />,
+      );
+      expect(screen.getByText("Ambushed by goblins")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /close · ⌘j/i })).toBeInTheDocument();
     });
 
     it("has no axe violations on mobile", async () => {

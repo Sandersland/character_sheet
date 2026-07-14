@@ -11,7 +11,7 @@ import CharacterLoadError from "@/features/character-meta/CharacterLoadError";
 import Spinner from "@/components/ui/Spinner";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
-import { useGlobalKeyboard } from "@/hooks/useGlobalKeyboard";
+import { useCaptureDock } from "@/hooks/useCaptureDock";
 import { useReferenceData } from "@/hooks/useReferenceData";
 import { useSessionButton } from "@/features/session/useSessionButton";
 
@@ -22,12 +22,10 @@ export default function CharacterSheetPage() {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(false);
-  const [captureOpen, setCaptureOpen] = useState(false);
+  // Cmd/Ctrl+J toggles the quick-capture dock from anywhere on the sheet.
+  const { captureOpen, openCapture, closeCapture } = useCaptureDock();
   const showSpinner = useDelayedFlag(character === undefined && !error);
   const session = useSessionButton(id, character);
-
-  // Cmd/Ctrl+J opens the quick-capture palette from anywhere on the sheet.
-  useGlobalKeyboard(() => setCaptureOpen(true));
 
   if (error) return <CharacterLoadError variant="error" />;
 
@@ -47,7 +45,7 @@ export default function CharacterSheetPage() {
         <CharacterSheetHeader
           character={character}
           session={session}
-          onOpenCapture={() => setCaptureOpen(true)}
+          onOpenCapture={openCapture}
           onOpenSessions={() => setSessionsOpen(true)}
           onOpenActivity={() => setActivityOpen(true)}
           onOpenDelete={() => setConfirmDeleteOpen(true)}
@@ -57,6 +55,7 @@ export default function CharacterSheetPage() {
           character={character}
           onUpdate={setCharacter}
           captureSessionId={session.activeSessionId}
+          captureSession={session.inActiveSession ? session.activeSession : null}
           deleteOpen={confirmDeleteOpen}
           activityOpen={activityOpen}
           sessionsOpen={sessionsOpen}
@@ -64,15 +63,10 @@ export default function CharacterSheetPage() {
           onCloseDelete={() => setConfirmDeleteOpen(false)}
           onCloseActivity={() => setActivityOpen(false)}
           onCloseSessions={() => setSessionsOpen(false)}
-          onCloseCapture={() => setCaptureOpen(false)}
+          onCloseCapture={closeCapture}
         />
 
-        <CharacterSheetBody
-          character={character}
-          reference={reference}
-          onUpdate={setCharacter}
-          journalSessionId={session.inActiveSession ? session.activeSessionId : undefined}
-        />
+        <CharacterSheetBody character={character} reference={reference} onUpdate={setCharacter} />
         <RollModeToggle />
         <RollResultToast />
       </div>

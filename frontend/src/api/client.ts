@@ -5,6 +5,7 @@ import type {
   CampaignItem,
   CampaignItemHolder,
   CampaignItemInput,
+  CampaignArc,
   CampaignPreferences,
   CatalogFeat,
   CatalogDiscipline,
@@ -17,6 +18,7 @@ import type {
   ShadowArtOperation,
   ChannelDivinityOperation,
   CharacterEvent,
+  ChronicleSession,
   ConcentrationCheck,
   CharacterSummary,
   ClassOperation,
@@ -800,6 +802,49 @@ export async function fetchCampaignSessions(campaignId: string): Promise<Session
 /** List sessions a character participated in (newest first) — activity filter. */
 export async function fetchSessions(characterId: string): Promise<Session[]> {
   return request<Session[]>(`/characters/${characterId}/sessions`, undefined, "Failed to fetch sessions");
+}
+
+// ── Journal chronicle (#863/#864) ─────────────────────────────────────────────
+// The read model behind the field-chronicle page: the campaign's arcs ("parts")
+// and its sessions ("chapters") with derived sessionNumber + this character's
+// per-session noteCount. A member sees every session of their campaign; passing a
+// characterId that isn't the caller's own 403s server-side.
+
+/** The campaign's arcs / "parts", ordered by position asc (story order). */
+export async function fetchCampaignArcs(campaignId: string): Promise<CampaignArc[]> {
+  return request<CampaignArc[]>(
+    `/campaigns/${campaignId}/arcs`,
+    undefined,
+    "Failed to fetch campaign arcs",
+  );
+}
+
+/** The chronicle session list (newest first) for a character — chapters + parts. */
+export async function fetchChronicleSessions(
+  campaignId: string,
+  characterId: string,
+): Promise<ChronicleSession[]> {
+  return request<ChronicleSession[]>(
+    `/campaigns/${campaignId}/sessions?characterId=${encodeURIComponent(characterId)}`,
+    undefined,
+    "Failed to fetch chronicle sessions",
+  );
+}
+
+/**
+ * Set (or clear) a session's chapter title. Any session PARTICIPANT may edit it
+ * after the fact (#863); a non-participant 403s. Returns the updated session.
+ */
+export async function updateSessionTitle(
+  campaignId: string,
+  sessionId: string,
+  title: string | null,
+): Promise<Session> {
+  return request<Session>(
+    `/campaigns/${campaignId}/sessions/${sessionId}`,
+    jsonBody({ title }, "PATCH"),
+    "Failed to update session title",
+  );
 }
 
 /** Get the currently-active session, or null if none is active. */

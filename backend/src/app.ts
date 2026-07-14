@@ -16,6 +16,7 @@ import { actionsRouter } from "@/routes/character/actions.js";
 import { activityRouter } from "@/routes/character/activity.js";
 import { authRouter } from "@/routes/platform/auth.js";
 import { advancementRouter } from "@/routes/character/advancement.js";
+import { arcsRouter } from "@/routes/campaign/arcs.js";
 import { campaignItemsRouter } from "@/routes/campaign/campaign-items.js";
 import { campaignsRouter } from "@/routes/campaign/campaigns.js";
 import { classRouter } from "@/routes/character/class.js";
@@ -119,6 +120,7 @@ export function createApp() {
   app.use("/api", campaignsRouter);
   app.use("/api", entitiesRouter);
   app.use("/api", campaignItemsRouter);
+  app.use("/api", arcsRouter);
 
   // Optional single-origin mode: when SERVE_STATIC_DIR points at a built SPA,
   // serve it from this same server so the frontend and API share one origin

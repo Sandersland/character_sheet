@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
@@ -91,6 +91,20 @@ describe("MentionAutocomplete (#248)", () => {
 
     expect(await screen.findByRole("option", { name: /Goblin Chief/ })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /Sword of Truth/ })).not.toBeInTheDocument();
+  });
+
+  it("renders a suggestion row as an inked small-caps name, not a pill badge (#862)", async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<Harness campaignId="camp-1" />);
+    await user.type(screen.getByLabelText("Note body"), "@gob");
+
+    const option = await screen.findByRole("option", { name: /Goblin Chief/ });
+    const inked = within(option).getByText("Goblin Chief");
+    expect(inked).toHaveClass("text-garnet-800", "font-semibold");
+    expect(inked.className).toContain("[font-variant-caps:small-caps]");
+    // The type diamond is present; the old rounded-full badge pill is gone.
+    expect(option.querySelector(".rotate-45")).not.toBeNull();
+    expect(option.querySelector(".rounded-full")).toBeNull();
   });
 
   it("excludes a hidden entity from mention suggestions (#534)", async () => {
@@ -209,6 +223,19 @@ describe("MentionAutocomplete (#248)", () => {
   it("has no axe violations", async () => {
     const { container } = render(<Harness campaignId="camp-1" />);
     expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+describe("MentionAutocomplete input attributes (#879)", () => {
+  it("marks the editor as a prose field and opts out of iOS AutoFill", () => {
+    render(<Harness campaignId="camp-1" />);
+    const editor = screen.getByLabelText("Note body");
+    // autoComplete renders via spread (not in React's div prop types); the rest
+    // are standard. Together they hint iOS this is free-text, not a fillable form.
+    expect(editor).toHaveAttribute("autocomplete", "off");
+    expect(editor).toHaveAttribute("autocapitalize", "sentences");
+    expect(editor).toHaveAttribute("autocorrect", "on");
+    expect(editor).toHaveAttribute("spellcheck", "true");
   });
 });
 

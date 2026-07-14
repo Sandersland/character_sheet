@@ -115,6 +115,7 @@ export function useSessionLifecycle({
     bumpLog,
     openCapture: () => setCaptureOpen(true),
     closeCapture: () => setCaptureOpen(false),
+    toggleCapture: () => setCaptureOpen((open) => !open),
     openEndPrompt,
     closeEndPrompt: () => {
       setEndError(null);

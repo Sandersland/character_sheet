@@ -19,24 +19,35 @@ interface MentionAutocompleteProps {
   campaignId?: string | null;
   rows?: number;
   className?: string;
+  /** Extra inline styles merged onto the editor (e.g. a max-height cap). */
+  style?: React.CSSProperties;
   placeholder?: string;
   id?: string;
   required?: boolean;
+  /** Anchor the @-suggestion popover above the field vs. below (default). */
+  popoverPlacement?: "above" | "below";
   "aria-label"?: string;
   "aria-labelledby"?: string;
   onKeyDown?: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
 }
 
+// Below md the suggestions render in-flow, capped to a share of the keyboard-aware
+// viewport so they clear the on-screen keyboard (#785). The exception is an
+// "above"-anchored field — the keyboard-docked composers (dock #865, mobile
+// capture #866) sit flush above the keyboard, so a popover anchored above opens up
+// into the visible feed (never clipped) and keeps the absolute popover on mobile.
+function renderSuggestionsInFlow(isMobile: boolean, placement: "above" | "below"): boolean {
+  return isMobile && placement !== "above";
+}
+
 const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>(
   function MentionAutocomplete(
-    { value, onChange, campaignId, rows = 2, className = "", placeholder, id, required, onKeyDown, ...rest },
+    { value, onChange, campaignId, rows = 2, className = "", style, placeholder, id, required, popoverPlacement = "below", onKeyDown, ...rest },
     forwardedRef,
   ) {
     const editor = useMentionEditor({ value, onChange, campaignId, onKeyDown });
     const { innerRef } = editor;
-    // Below md the suggestions render in-flow, capped to a share of the
-    // keyboard-aware viewport so they clear the on-screen keyboard (#785).
-    const isMobile = useIsBelowMd();
+    const inFlow = renderSuggestionsInFlow(useIsBelowMd(), popoverPlacement);
     const viewportHeight = useVisualViewportHeight();
     const suggestionMaxHeight = Math.round(viewportHeight * 0.4);
 
@@ -47,7 +58,7 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
     }
 
     return (
-      <div className="relative">
+      <div className="relative w-full min-w-0">
         <div
           ref={setRef}
           id={id}
@@ -61,8 +72,17 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
           aria-activedescendant={editor.activeOptionId}
           contentEditable
           suppressContentEditableWarning
+          // Prose-note input hints; autoComplete="off" asks iOS not to offer the
+          // Passwords/Cards/Contacts AutoFill toolbar over this free-text editor
+          // (#879) — WebKit treats the role="textbox" contenteditable as a fillable
+          // field. Best-effort: Safari may still show it, so this is device-verified.
+          // (autoComplete isn't in React's div prop types but renders at runtime.)
+          autoCapitalize="sentences"
+          autoCorrect="on"
+          spellCheck
+          {...({ autoComplete: "off" } as Record<string, string>)}
           className={`whitespace-pre-wrap break-words ${className}`}
-          style={{ minHeight: `${Math.max(rows, 1) * 1.6}em` }}
+          style={{ minHeight: `${Math.max(rows, 1) * 1.6}em`, ...style }}
           onInput={editor.handleInput}
           onKeyUp={editor.handleKeyUp}
           onClick={editor.syncTrigger}
@@ -104,8 +124,9 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
             onSelect={editor.insertToken}
             onCreate={editor.handleCreate}
             onHover={editor.setActiveIndex}
-            inFlow={isMobile}
+            inFlow={inFlow}
             maxHeight={suggestionMaxHeight}
+            placement={popoverPlacement}
           />
         )}
 

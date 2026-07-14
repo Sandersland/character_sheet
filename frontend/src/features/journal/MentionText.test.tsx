@@ -110,6 +110,43 @@ describe("MentionText (#248)", () => {
   });
 });
 
+describe("MentionText inked-name styling (#862)", () => {
+  const INK: [CampaignEntity["type"], string][] = [
+    ["NPC", "text-garnet-800"],
+    ["PC", "text-garnet-800"],
+    ["LOCATION", "text-vitality-800"],
+    ["ITEM", "text-gold-800"],
+    ["FACTION", "text-arcane-800"],
+    ["OTHER", "text-parchment-800"],
+  ];
+
+  it.each(INK)("renders a %s mention as inked small-caps in %s with a dotted underline", (type, inkClass) => {
+    renderText(`@[${A}]`, map([[A, chief({ type })]]));
+    const link = screen.getByRole("link", { name: /Goblin Chief/ });
+    expect(link).toHaveClass(inkClass);
+    expect(link.className).toContain("[font-variant-caps:small-caps]");
+    expect(link).toHaveClass("font-semibold", "border-b", "border-dotted");
+    // No pill: never a rounded background chip.
+    expect(link.className).not.toMatch(/\brounded-full\b/);
+    expect(link.className).not.toMatch(/\bbg-/);
+  });
+
+  it("inks the no-campaignId (inert) mention with the same recipe, still no link", () => {
+    renderText(`@[${A}]`, map([[A, chief({ type: "ITEM" })]]), null);
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    const ink = screen.getByText(/Goblin Chief/);
+    expect(ink).toHaveClass("text-gold-800", "border-dotted", "font-semibold");
+    expect(ink.className).not.toMatch(/\bbg-/);
+  });
+
+  it("renders the redacted (hidden) fallback without a pill background", () => {
+    renderText(`Saw @[${B}]`, map([]));
+    const hidden = screen.getByLabelText("Hidden entity");
+    expect(hidden.className).not.toMatch(/\brounded-full\b/);
+    expect(hidden.className).not.toMatch(/\bbg-/);
+  });
+});
+
 describe("MentionText hover preview (#843)", () => {
   beforeEach(() => {
     vi.useFakeTimers();
