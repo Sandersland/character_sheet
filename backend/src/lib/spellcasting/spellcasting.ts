@@ -26,7 +26,7 @@ import { readEffectSpec } from "@/lib/combat/effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { normalizeSpellcastingMutable } from "./spell-state.js";
-import { deriveGrantedSpells, deriveItemSpells } from "./granted-spells.js";
+import { deriveGrantedSpells, deriveItemSpells, type GrantedSpellSource } from "./granted-spells.js";
 import type { ItemSpellSourceItem } from "./granted-spells.js";
 import type {
   SpellEntry,
@@ -668,12 +668,11 @@ function computeSlotTables(
 // again before persist (persistSpellState) — they live only in the read view.
 function injectDerivedSpells(
   state: SpellcastingMutableState,
-  className: string,
-  subclass: string | undefined,
+  subclassRef: GrantedSpellSource | null | undefined,
   level: number,
   itemSources: ItemSpellSourceItem[],
 ): void {
-  const granted = deriveGrantedSpells(className, subclass, level);
+  const granted = deriveGrantedSpells(subclassRef, level);
   if (granted.length > 0) {
     const names = new Set(state.spells.map((s) => s.name.toLowerCase()));
     for (const g of granted) if (!names.has(g.name.toLowerCase())) state.spells.push(g);
@@ -818,7 +817,11 @@ export async function applySpellcastingOperations(
       classEntries: {
         orderBy: { position: "asc" as const },
         take: 1,
-        select: { name: true, subclass: true },
+        select: {
+          name: true,
+          // Subclass-granted spells (#898) injected into the working view below.
+          subclassRef: { include: { grantedSpells: { include: { spell: true } } } },
+        },
       },
       inventoryItems: {
         select: { id: true, name: true, equippedSlot: true, attuned: true, capabilities: true },
@@ -840,8 +843,7 @@ export async function applySpellcastingOperations(
 
       injectDerivedSpells(
         state,
-        className,
-        row.classEntries[0]?.subclass ?? undefined,
+        row.classEntries[0]?.subclassRef,
         level,
         row.inventoryItems.map((i) => ({
           id: i.id,

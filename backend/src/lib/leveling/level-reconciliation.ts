@@ -129,7 +129,13 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
       spellcasting: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        select: { name: true, subclass: true, level: true },
+        select: {
+          level: true,
+          // Subclass-granted spells (#898): the valid-grant set is re-derived from
+          // these loaded catalog rows (reconcileSubclass ran first, so a cleared
+          // subclass yields subclassRef = null → an empty valid set).
+          subclassRef: { include: { grantedSpells: { include: { spell: true } } } },
+        },
       },
     },
   });
@@ -144,9 +150,7 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
   const singleClass = row.classEntries.length <= 1;
   const validIds = new Set(
     row.classEntries
-      .flatMap((e) =>
-        deriveGrantedSpells(e.name, e.subclass ?? undefined, singleClass ? newDerivedLevel : e.level),
-      )
+      .flatMap((e) => deriveGrantedSpells(e.subclassRef, singleClass ? newDerivedLevel : e.level))
       .map((s) => s.id),
   );
 

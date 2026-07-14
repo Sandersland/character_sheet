@@ -70,6 +70,14 @@ let passWithoutTraceId: string; // concentration, buff +10 stealth
 let darkvisionId: string;    // no concentration, utility
 
 async function createMonk(experiencePoints: number, subclass: string | null) {
+  // Link the subclass FK (#898) case-insensitively so granted spells resolve for a
+  // "way of shadow" entry; a non-shadow name finds no row (subclassId stays null).
+  const sub = subclass
+    ? await prisma.subclass.findFirst({
+        where: { classId, name: { equals: subclass, mode: "insensitive" } },
+        select: { id: true },
+      })
+    : null;
   await prisma.character.create({
     data: {
       ...FIXTURE_BASE,
@@ -77,7 +85,7 @@ async function createMonk(experiencePoints: number, subclass: string | null) {
       ownerId: OWNER_ID,
       resources: Prisma.JsonNull,
       classEntries: {
-        create: [{ name: "monk", subclass, classId, position: 0 }],
+        create: [{ name: "monk", subclass, subclassId: sub?.id, classId, position: 0 }],
       },
     },
   });
@@ -91,6 +99,23 @@ describe("Shadow Arts cast endpoint", () => {
       update: {},
     });
     classId = cls.id;
+
+    // Way of Shadow grants Minor Illusion at L3 as data (#898) — this is what gives
+    // a pure (non-caster) Shadow monk a serialized spellcasting view at all, so the
+    // cast Shadow Art's concentration can surface on it.
+    const shadow = await prisma.subclass.upsert({
+      where: { classId_name: { classId, name: "Way of Shadow" } },
+      create: { classId, name: "Way of Shadow", description: "Test subclass" },
+      update: {},
+    });
+    const minorIllusion = await prisma.spell.findUnique({ where: { name: "Minor Illusion" }, select: { id: true } });
+    if (minorIllusion) {
+      await prisma.subclassGrantedSpell.upsert({
+        where: { subclassId_spellId: { subclassId: shadow.id, spellId: minorIllusion.id } },
+        create: { subclassId: shadow.id, spellId: minorIllusion.id, gateLevel: 3, castingAbility: "wisdom" },
+        update: { gateLevel: 3, castingAbility: "wisdom" },
+      });
+    }
 
     const [dk, sl, pwt, dv] = await Promise.all([
       prisma.grantedAbility.findUnique({ where: { name: "Shadow Arts: Darkness" } }),

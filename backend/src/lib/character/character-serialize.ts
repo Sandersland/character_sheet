@@ -436,7 +436,7 @@ function mergeGrantedSpells(stored: SpellEntry[], granted: SpellEntry[]): SpellE
 
 // Subclass-granted spells across every class entry (each gated by its own level).
 function collectGrantedSpells(entries: CharacterWithRelations["classEntries"]): SpellEntry[] {
-  return entries.flatMap((e) => deriveGrantedSpells(e.name, e.subclass ?? undefined, e.level));
+  return entries.flatMap((e) => deriveGrantedSpells(e.subclassRef, e.level));
 }
 
 // Item-granted spells (#528) for a holder's active items. Appended after learned
@@ -457,10 +457,8 @@ function deriveItemSpellsFor(row: CharacterWithRelations): SpellEntry[] {
 // Casting ability for the slotless multiclass view — from the first entry that
 // actually grants a spell (defaults to Wisdom when none do).
 function collectGrantedCastingAbility(entries: CharacterWithRelations["classEntries"]): keyof AbilityScores {
-  const granting = entries.find(
-    (e) => deriveGrantedSpells(e.name, e.subclass ?? undefined, e.level).length > 0,
-  );
-  return deriveGrantedCastingAbility(granting?.subclass ?? undefined);
+  const granting = entries.find((e) => deriveGrantedSpells(e.subclassRef, e.level).length > 0);
+  return deriveGrantedCastingAbility(granting?.subclassRef);
 }
 
 // Clamp-on-read for concentration: surface the stored entry when it's a current
@@ -528,7 +526,7 @@ function buildGrantedOnlySpellcastingView(
   itemSpells: SpellEntry[],
 ): object {
   const stored = normalizeSpellcastingMutable(row.spellcasting);
-  const castingAbility = deriveGrantedCastingAbility(primaryClass?.subclass ?? undefined);
+  const castingAbility = deriveGrantedCastingAbility(primaryClass?.subclassRef);
   const abilMod = abilityModifier(abilityScores[castingAbility] ?? 10);
   const grantedSpells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
   return {
@@ -590,11 +588,7 @@ function buildSpellcastingView(
 
   // Subclass-granted spells (derived, never persisted). Single-class uses the
   // XP-derived level since the per-class column can be stale.
-  const granted = deriveGrantedSpells(
-    primaryClass?.name ?? "",
-    primaryClass?.subclass ?? undefined,
-    level,
-  );
+  const granted = deriveGrantedSpells(primaryClass?.subclassRef, level);
   // Item-granted spells (#528) — surfaced for any holder, caster or not.
   const itemSpells = deriveItemSpellsFor(row);
 

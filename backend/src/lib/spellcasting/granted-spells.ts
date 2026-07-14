@@ -1,9 +1,12 @@
-// 5e rules data: cantrips/spells a subclass grants for free (no player choice).
-// These are pure-derived at serialize time and never persisted — the derived id
-// scheme `granted:<subclass>:<spell>` is the seam a future side-table would key
-// on if a stateful granted spell ever appears. Snapshotting granted content is a
-// Phase-D versioning concern (introduced uniformly with spells/items), not by
-// persisting grants ad-hoc.
+// Cantrips/spells a subclass grants for free (no player choice). The mapping
+// (which subclass grants which spells) is DATA — seeded `SubclassGrantedSpell`
+// rows that REFERENCE the shared Spell catalog by FK (#898) — and the spell's
+// content is resolved live from that catalog here, never snapshotted. Callers
+// load the class entry's `subclassRef` (catalog Subclass + its grantedSpells +
+// each grant's Spell) and pass it in; this stays pure over the loaded rows and
+// never persists. The derived id scheme `granted:<subclass>:<spell>` is the
+// disjoint id space cast/undo/concentration key on. A homebrew subclass (no
+// catalog Subclass row yet, #911) resolves to null here and grants nothing.
 
 import {
   castUsesTotal,
@@ -14,7 +17,8 @@ import {
   type CastStatMode,
   type ChargesCapability,
 } from "@/lib/inventory/capabilities.js";
-import type { SpellEntry } from "./spell-state.js";
+import type { EffectColumns } from "@/lib/combat/effects.js";
+import type { SpellEntry, SpellComponents } from "./spell-state.js";
 
 // The six ability scores, lowercase — the shape of Character.abilityScores.
 export type AbilityScores = Record<
@@ -22,52 +26,105 @@ export type AbilityScores = Record<
   number
 >;
 
-// A subclass-granted spell, keyed by lowercase subclass name. Each descriptor is
-// a full SpellEntry snapshot (matching the catalog row shape) plus a stable id.
-interface GrantedSpellRule {
+// The loaded shape the resolver consumes: a catalog Subclass with its granted
+// spells joined to the Spell catalog. `spell` carries the catalog row fields the
+// derived SpellEntry needs (a `include: { grantedSpells: { include: { spell: true } } }`
+// on the character's subclassRef supplies exactly this).
+// Display fields + the shared flat `EffectColumns` (roll data), so a damage grant
+// carries its catalog roll through with no re-declared column list (#820 mirror).
+export interface GrantedSpellCatalogSpell extends EffectColumns {
+  name: string;
+  level: number;
+  school: string;
+  castingTime: string;
+  range: string;
+  duration: string;
+  description: string;
+  concentration: boolean;
+  ritual: boolean;
+  components: unknown;
+}
+export interface GrantedSpellRow {
   gateLevel: number;
-  spells: SpellEntry[];
-  // Casting ability the granted spells use for save DC / attack bonus.
-  castingAbility: keyof AbilityScores;
+  castingAbility: string;
+  spell: GrantedSpellCatalogSpell;
+}
+export interface GrantedSpellSource {
+  /** Subclass name — builds the stable `granted:<subclass>:<spell>` derived id. */
+  name: string;
+  grantedSpells: GrantedSpellRow[];
 }
 
-const MINOR_ILLUSION: SpellEntry = {
-  id: "granted:way-of-shadow:minor-illusion",
-  name: "Minor Illusion",
-  level: 0,
-  school: "illusion",
-  prepared: true,
-  source: "subclass",
-  castingTime: "1 action",
-  range: "30 ft",
-  duration: "1 minute",
-  description:
-    "Create a sound or an image of an object within range that lasts for the duration. The illusion ends if you dismiss it or cast this spell again. A creature that uses its action to examine the illusion can determine it is illusory with a successful Investigation check against your spell save DC.",
-  components: { verbal: true, somatic: true, material: true, materialDescription: "a bit of fleece" },
-};
+// "Way of Shadow" -> "way-of-shadow": the stable derived-id key.
+function slug(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
 
-const SUBCLASS_GRANTED_SPELLS: Record<string, GrantedSpellRule> = {
-  "way of shadow": { gateLevel: 3, spells: [MINOR_ILLUSION], castingAbility: "wisdom" },
-};
+// Independent components clone per call (prior contract: callers may mutate the
+// returned entry's nested components without affecting a later call).
+function cloneComponents(components: unknown): SpellComponents | undefined {
+  if (!components || typeof components !== "object") return undefined;
+  return { ...(components as SpellComponents) };
+}
 
-// Pure function: the spells a (subclass, level) grants for free. Below the gate
-// level, or for a subclass with no grants, returns []. className is accepted for
-// signature symmetry with the other derivers; the subclass key is unambiguous.
+// Only carry non-default optionals, so a utility grant (Minor Illusion) yields the
+// same fields it did as an in-code snapshot, while a damage grant carries its roll
+// data (from the catalog) so cast-time auto-rolling works with no extra code.
+function optionalSpellFields(s: GrantedSpellCatalogSpell): Partial<SpellEntry> {
+  const out: Partial<SpellEntry> = {};
+  if (s.concentration) out.concentration = true;
+  if (s.ritual) out.ritual = true;
+  if (s.effectKind) {
+    out.effectKind = s.effectKind;
+    out.effectDiceCount = s.effectDiceCount;
+    out.effectDiceFaces = s.effectDiceFaces;
+    out.effectModifier = s.effectModifier;
+    out.damageType = s.damageType;
+    out.attackType = s.attackType;
+    out.saveAbility = s.saveAbility;
+    out.saveEffect = s.saveEffect;
+    out.upcastDicePerLevel = s.upcastDicePerLevel;
+    if (s.cantripScaling) out.cantripScaling = true;
+    out.buffTarget = s.buffTarget;
+    out.buffModifier = s.buffModifier;
+  }
+  return out;
+}
+
+// The spells a subclass grants for free at this character level, resolved live
+// from the loaded catalog rows. Below a grant's gate level it is omitted; a null
+// source (no subclass, or homebrew without a catalog row) grants nothing. Never
+// persisted — re-derived on every read.
 export function deriveGrantedSpells(
-  _className: string,
-  subclass: string | undefined,
+  source: GrantedSpellSource | null | undefined,
   level: number,
 ): SpellEntry[] {
-  if (!subclass) return [];
-  const rule = SUBCLASS_GRANTED_SPELLS[subclass.toLowerCase()];
-  if (!rule || level < rule.gateLevel) return [];
-  return rule.spells.map((s) => ({ ...s, components: s.components ? { ...s.components } : s.components }));
+  if (!source) return [];
+  return source.grantedSpells
+    .filter((g) => level >= g.gateLevel)
+    .map((g) => ({
+      id: `granted:${slug(source.name)}:${slug(g.spell.name)}`,
+      name: g.spell.name,
+      level: g.spell.level,
+      school: g.spell.school,
+      prepared: true,
+      source: "subclass" as const,
+      castingTime: g.spell.castingTime,
+      range: g.spell.range,
+      duration: g.spell.duration,
+      description: g.spell.description,
+      components: cloneComponents(g.spell.components),
+      ...optionalSpellFields(g.spell),
+    }));
 }
 
-// The casting ability a subclass's granted spells use (default Wisdom).
-export function deriveGrantedCastingAbility(subclass: string | undefined): keyof AbilityScores {
-  if (!subclass) return "wisdom";
-  return SUBCLASS_GRANTED_SPELLS[subclass.toLowerCase()]?.castingAbility ?? "wisdom";
+// The ability a subclass's granted spells use for save DC / attack bonus
+// (default Wisdom when the subclass grants nothing).
+export function deriveGrantedCastingAbility(
+  source: GrantedSpellSource | null | undefined,
+): keyof AbilityScores {
+  const ability = source?.grantedSpells[0]?.castingAbility;
+  return (ability as keyof AbilityScores) ?? "wisdom";
 }
 
 // The minimal inventory-item shape item-spell derivation needs: an item is a

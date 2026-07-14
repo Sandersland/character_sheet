@@ -14,6 +14,7 @@ import { SHADOW_ARTS } from "./seed/shadow-arts.js";
 import { CHANNEL_DIVINITIES } from "./seed/channel-divinity.js";
 import { FEATS } from "./seed/feats.js";
 import { SPELLS } from "./seed/spells.js";
+import { SUBCLASS_GRANTED_SPELLS } from "./seed/subclass-granted-spells.js";
 import { PACKS } from "./seed/packs.js";
 import { assertUniqueGrantedAbilityNames } from "./seed/guards.js";
 
@@ -77,6 +78,29 @@ async function seedSubclasses(prisma: PrismaClient, classIds: Map<string, string
       where: { classId_name: { classId, name: sub.name } },
       create: { classId, name: sub.name, description: sub.description },
       update: { description: sub.description },
+    });
+  }
+}
+
+// Subclass-granted spells (#898): resolve each seed row's subclass + catalog
+// spell to ids, then upsert the grant. Runs after subclasses AND spells are
+// seeded. A missing subclass/spell is a hard seed error (mirrors the other
+// catalogs' fail-fast on unknown references).
+async function seedSubclassGrantedSpells(prisma: PrismaClient, classIds: Map<string, string>) {
+  for (const g of SUBCLASS_GRANTED_SPELLS) {
+    const classId = classIds.get(g.className);
+    if (!classId) throw new Error(`Seed error: unknown class "${g.className}" in SUBCLASS_GRANTED_SPELLS`);
+    const subclass = await prisma.subclass.findUnique({
+      where: { classId_name: { classId, name: g.subclassName } },
+      select: { id: true },
+    });
+    if (!subclass) throw new Error(`Seed error: unknown subclass "${g.subclassName}" for ${g.className}`);
+    const spell = await prisma.spell.findUnique({ where: { name: g.spellName }, select: { id: true } });
+    if (!spell) throw new Error(`Seed error: granted spell "${g.spellName}" not in the Spell catalog`);
+    await prisma.subclassGrantedSpell.upsert({
+      where: { subclassId_spellId: { subclassId: subclass.id, spellId: spell.id } },
+      create: { subclassId: subclass.id, spellId: spell.id, gateLevel: g.gateLevel, castingAbility: g.castingAbility },
+      update: { gateLevel: g.gateLevel, castingAbility: g.castingAbility },
     });
   }
 }
@@ -297,6 +321,7 @@ async function main() {
   await seedFeats(prisma);
   await seedBackgrounds(prisma);
   await seedSpells(prisma);
+  await seedSubclassGrantedSpells(prisma, classIds);
   const itemIdsByName = await seedItems(prisma);
   await seedPacks(prisma, itemIdsByName);
 }
