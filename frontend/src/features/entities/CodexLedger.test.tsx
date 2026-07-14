@@ -188,4 +188,14 @@ describe("CodexLedger hover preview (#843)", () => {
       `/campaigns/${CAMPAIGN_ID}/entities/ent-npc`,
     );
   });
+
+  it("shows a portrait thumbnail when set and the monogram when null (#844)", () => {
+    const url = "https://example.com/goblin.png";
+    renderLedger([{ ...GOBLIN, portraitUrl: url }, GATE]);
+    const withPortrait = screen.getByRole("link", { name: /Goblin Chief/ });
+    expect(withPortrait.querySelector("img")).toHaveAttribute("src", url);
+    const withMonogram = screen.getByRole("link", { name: /Baldur's Gate/ });
+    expect(withMonogram.querySelector("img")).toBeNull();
+    expect(withMonogram).toHaveTextContent("B");
+  });
 });

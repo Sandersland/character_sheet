@@ -35,6 +35,7 @@ const createEntitySchema = z
     name: z.string().min(1),
     aliases: z.array(z.string()).optional(),
     notes: z.string().optional(),
+    portraitUrl: z.url().nullable().optional(),
     // Owner-only (#379): a non-owner supplying this is rejected at the route.
     visibility: z.enum(VISIBILITIES).optional(),
   })
@@ -46,6 +47,7 @@ const updateEntitySchema = z
     name: z.string().min(1),
     aliases: z.array(z.string()),
     notes: z.string().nullable(),
+    portraitUrl: z.url().nullable(),
     // Owner-only (#379); presence in a non-owner PATCH is rejected at the route.
     visibility: z.enum(VISIBILITIES),
   })
@@ -374,6 +376,7 @@ entitiesRouter.post("/campaigns/:id/entities", async (req, res) => {
       name: data.name,
       aliases: data.aliases ?? [],
       notes: data.notes ?? null,
+      portraitUrl: data.portraitUrl ?? null,
       visibility: data.visibility ?? "REVEALED",
     },
   });

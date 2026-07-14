@@ -148,6 +148,7 @@ function EntityArticle({
           busy={detail.busy}
           onToggleVisibility={detail.handleToggleVisibility}
           onDelete={detail.handleDelete}
+          onEdit={detail.startEdit}
         />
         <ArticleBody
           detail={detail}

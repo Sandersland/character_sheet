@@ -13,7 +13,7 @@ import type { CampaignEntity, EntityConnection, EntityStats } from "@/types/char
 
 export type PreviewEntity = Pick<
   CampaignEntity,
-  "id" | "name" | "type" | "aliases" | "notes" | "visibility"
+  "id" | "name" | "type" | "aliases" | "notes" | "portraitUrl" | "visibility"
 >;
 
 export interface EntityPreview {

@@ -549,6 +549,7 @@ export async function createEntity(
     name: string;
     aliases?: string[];
     notes?: string;
+    portraitUrl?: string | null;
     visibility?: EntityVisibility;
   },
 ): Promise<CampaignEntity> {
@@ -567,6 +568,7 @@ export async function updateEntity(
     name?: string;
     aliases?: string[];
     notes?: string | null;
+    portraitUrl?: string | null;
     visibility?: EntityVisibility;
   },
 ): Promise<CampaignEntity> {

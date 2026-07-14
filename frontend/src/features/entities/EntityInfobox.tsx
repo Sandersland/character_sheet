@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import { monogram } from "@/lib/codexLedger";
+import EntityPortrait from "@/features/entities/EntityPortrait";
 import { formatJournalDate } from "@/lib/formatJournalDate";
-import { ENTITY_TYPE_LABELS, ENTITY_TYPE_MONOGRAM_CLASS } from "@/lib/mentions";
+import { ENTITY_TYPE_LABELS } from "@/lib/mentions";
 import type { CampaignEntity, CampaignRole, EntityBacklink } from "@/types/character";
 
 function firstMentionedLabel(entity: CampaignEntity): string {
@@ -82,6 +82,7 @@ export default function EntityInfobox({
   busy,
   onToggleVisibility,
   onDelete,
+  onEdit,
 }: {
   entity: CampaignEntity;
   role?: CampaignRole;
@@ -91,6 +92,7 @@ export default function EntityInfobox({
   busy: boolean;
   onToggleVisibility: () => void;
   onDelete: () => void;
+  onEdit: () => void;
 }) {
   const sheetPath = ownedSheetPath(entity, characters, viewerId);
 
@@ -99,13 +101,21 @@ export default function EntityInfobox({
       aria-label="Entity facts"
       className="rounded-card border border-parchment-200 bg-parchment-50 p-4"
     >
-      {/* Monogram portrait slot — swaps for an uploaded image when #844 lands. */}
-      <div
-        aria-hidden="true"
-        className={`flex h-24 w-24 items-center justify-center rounded-card font-display text-4xl font-semibold ${ENTITY_TYPE_MONOGRAM_CLASS[entity.type]}`}
-      >
-        {monogram(entity.name)}
-      </div>
+      <EntityPortrait
+        name={entity.name}
+        type={entity.type}
+        portraitUrl={entity.portraitUrl}
+        className="h-24 w-24 text-4xl"
+      />
+      {role === "OWNER" && !entity.portraitUrl && (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="mt-2 text-xs font-semibold text-garnet-700 hover:underline"
+        >
+          ＋ Add a portrait
+        </button>
+      )}
       <dl className="mt-3 flex flex-col divide-y divide-parchment-200">
         <FactRow label="Type">{ENTITY_TYPE_LABELS[entity.type]}</FactRow>
         <FactRow label="First mentioned">{firstMentionedLabel(entity)}</FactRow>
