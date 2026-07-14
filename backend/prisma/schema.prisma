@@ -204,6 +204,8 @@ model CampaignEntity {
   name       String
   aliases    String[]         @default([])
   notes      String?
+  // Content state like Character.portraitUrl (#844): persisted, not derivable.
+  portraitUrl String?
   visibility EntityVisibility @default(REVEALED)
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
