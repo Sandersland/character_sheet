@@ -99,4 +99,36 @@ describe("GrowingComposer (#865)", () => {
     setup({ showHints: false });
     expect(screen.queryByText(/↵ save/i)).toBeNull();
   });
+
+  describe("mobile variant (#866)", () => {
+    it("renders the lock as an aria-pressed icon button and sends PRIVATE", async () => {
+      const user = userEvent.setup();
+      const { onSave } = setup({ variant: "mobile", campaignId: "camp-1" });
+      // No checkbox — the lock is a compact toggle button beside the field.
+      expect(screen.queryByRole("checkbox", { name: /private/i })).toBeNull();
+      const lock = screen.getByRole("button", { name: /private/i });
+      expect(lock).toHaveAttribute("aria-pressed", "false");
+
+      await user.click(lock);
+      expect(lock).toHaveAttribute("aria-pressed", "true");
+      await user.type(screen.getByRole("textbox", { name: /quick note/i }), "secret");
+      await user.keyboard("{Enter}");
+      expect(onSave).toHaveBeenCalledWith("secret", "PRIVATE");
+      // Privacy never leaks forward — the lock resets after a successful save.
+      expect(lock).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("hides the lock button for a campaign-less character", () => {
+      setup({ variant: "mobile" });
+      expect(screen.queryByRole("button", { name: /private/i })).toBeNull();
+    });
+
+    it("uses a ≥44px circular send button", () => {
+      setup({ variant: "mobile" });
+      const send = screen.getByRole("button", { name: /save note/i });
+      expect(send.className).toContain("h-11");
+      expect(send.className).toContain("w-11");
+      expect(send.className).toContain("rounded-full");
+    });
+  });
 });

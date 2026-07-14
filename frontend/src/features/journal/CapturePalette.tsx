@@ -1,14 +1,15 @@
 // Fast in-session note capture over a per-session NOTE feed with inline edit/delete.
-// Per-breakpoint presentation: a slide-up BottomSheet on mobile (#771; rewritten in
-// #866), and a non-modal margin dock at md+ (#865). Both share the same NOTE feed,
-// journal mutations, and the growing composer; only the shell + feed layout differ.
+// Per-breakpoint presentation: a full-height, keyboard-pinned chat-style surface on
+// mobile (#866), and a non-modal margin dock at md+ (#865). Both share the same NOTE
+// feed, journal mutations, and the growing composer; only the shell + feed layout
+// (and the composer's lock/send arrangement) differ.
 
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 
-import BottomSheet from "@/components/ui/BottomSheet";
 import CaptureDock from "@/features/journal/CaptureDock";
 import GrowingComposer from "@/features/journal/GrowingComposer";
-import { DockFeed, NoteFeed } from "@/features/journal/NoteFeed";
+import MobileCaptureSheet from "@/features/journal/MobileCaptureSheet";
+import { DockFeed, MobileFeed } from "@/features/journal/NoteFeed";
 import { useJournalMutations } from "@/features/journal/useJournalMutations";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
@@ -45,24 +46,17 @@ export default function CapturePalette({
     return create({ kind: "NOTE", body, sessionId, ...(visibility ? { visibility } : {}) });
   }
 
-  const composer = (
-    <GrowingComposer
-      composerRef={composerRef}
-      campaignId={character.campaignId}
-      busy={busy}
-      error={error}
-      onSave={handleSave}
-      showHints={!isMobile}
-    />
-  );
-
-  // Mobile: the shared slide-up sheet (grabber, safe-area padding, useDialogChrome).
+  // Mobile: the full-height keyboard-pinned chat surface (#866) with the mobile
+  // composer variant (lock icon-button · field · circular send).
   if (isMobile) {
     return (
-      <MobileCapture onClose={onClose} composerRef={composerRef}>
-        <div className="flex flex-col gap-1.5">{composer}</div>
-        <div className="mt-4">
-          <NoteFeed
+      <MobileCaptureSheet
+        session={session}
+        composerRef={composerRef}
+        onClose={onClose}
+        anchorKey={notes.length}
+        feed={
+          <MobileFeed
             notes={notes}
             entities={byId}
             campaignId={character.campaignId}
@@ -70,8 +64,18 @@ export default function CapturePalette({
             onEditSave={update}
             onDelete={remove}
           />
-        </div>
-      </MobileCapture>
+        }
+        composer={
+          <GrowingComposer
+            composerRef={composerRef}
+            campaignId={character.campaignId}
+            busy={busy}
+            error={error}
+            onSave={handleSave}
+            variant="mobile"
+          />
+        }
+      />
     );
   }
 
@@ -80,7 +84,16 @@ export default function CapturePalette({
       session={session}
       composerRef={composerRef}
       onClose={onClose}
-      composer={composer}
+      composer={
+        <GrowingComposer
+          composerRef={composerRef}
+          campaignId={character.campaignId}
+          busy={busy}
+          error={error}
+          onSave={handleSave}
+          showHints
+        />
+      }
       feed={
         <DockFeed
           notes={notes}
@@ -92,40 +105,5 @@ export default function CapturePalette({
         />
       }
     />
-  );
-}
-
-// Mobile BottomSheet shell + deferred initial focus. The sheet owns the rest of its
-// chrome (scroll-lock / Escape / focus-trap via useDialogChrome). Focus is deferred
-// past first paint (double rAF) with preventScroll so iOS doesn't offset the fixed
-// sheet as the keyboard animates in (#784).
-function MobileCapture({
-  onClose,
-  composerRef,
-  children,
-}: {
-  onClose: () => void;
-  composerRef: React.RefObject<HTMLDivElement | null>;
-  children: React.ReactNode;
-}) {
-  useEffect(() => {
-    let raf1 = 0;
-    let raf2 = 0;
-    raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => {
-        composerRef.current?.focus({ preventScroll: true });
-        if (window.scrollY !== 0) window.scrollTo(0, 0);
-      });
-    });
-    return () => {
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-    };
-  }, [composerRef]);
-
-  return (
-    <BottomSheet title="Quick capture" onClose={onClose}>
-      {children}
-    </BottomSheet>
   );
 }

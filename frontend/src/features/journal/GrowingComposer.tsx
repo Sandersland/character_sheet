@@ -14,7 +14,7 @@ import type { MutableRefObject } from "react";
 
 import { ArrowUp } from "@/components/ui/icons";
 import MentionAutocomplete from "@/features/journal/MentionAutocomplete";
-import { PrivateToggle } from "@/features/journal/NoteFeed";
+import { PrivateLockButton, PrivateToggle } from "@/features/journal/NoteFeed";
 import type { EntryVisibility } from "@/types/character";
 
 const LINE_PX = 27; // ruled-line rhythm; also the editor line-height.
@@ -32,6 +32,13 @@ export interface GrowingComposerProps {
   showHints?: boolean;
   /** Grow to this many lines before scrolling internally (default 8). */
   maxLines?: number;
+  /**
+   * Presentation: "dock" (default) stacks the field over a control row with the
+   * Private checkbox + hint + send. "mobile" (#866) lays the field between a
+   * compact lock icon-button and a larger circular send in one keyboard-docked
+   * row — the ≥44px chat-composer arrangement.
+   */
+  variant?: "dock" | "mobile";
 }
 
 const FIELD_BASE =
@@ -91,6 +98,7 @@ export default function GrowingComposer({
   placeholder = "Jot a note… @ to tag",
   showHints = true,
   maxLines = 8,
+  variant = "dock",
 }: GrowingComposerProps) {
   const [value, setValue] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
@@ -123,41 +131,108 @@ export default function GrowingComposer({
     }
   }
 
+  const field = (
+    <div className={grown ? FIELD_CARD : FIELD_PILL}>
+      <MentionAutocomplete
+        ref={setRef}
+        rows={1}
+        aria-label="Quick note"
+        campaignId={campaignId}
+        className={grown ? EDITOR_CARD : EDITOR_PILL}
+        style={maxHeight != null ? { maxHeight } : undefined}
+        placeholder={placeholder}
+        popoverPlacement="above"
+        value={value}
+        onChange={setValue}
+        onKeyDown={handleKeyDown}
+      />
+    </div>
+  );
+
+  const layout = { field, campaignId, isPrivate, setIsPrivate, canSave, error, onSave: handleSave };
+  return variant === "mobile" ? (
+    <MobileComposerLayout {...layout} />
+  ) : (
+    <DockComposerLayout {...layout} showHints={showHints} />
+  );
+}
+
+interface ComposerLayoutProps {
+  field: React.ReactNode;
+  campaignId?: string | null;
+  isPrivate: boolean;
+  setIsPrivate: (checked: boolean) => void;
+  canSave: boolean;
+  error: string | null;
+  onSave: () => void;
+}
+
+// Mobile (#866): lock icon-button · growing field · circular send, docked in one
+// row above the keyboard. The field grows upward; items-end keeps the controls
+// pinned to the composing line.
+function MobileComposerLayout({ field, campaignId, isPrivate, setIsPrivate, canSave, error, onSave }: ComposerLayoutProps) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-end gap-2">
+        {campaignId && <PrivateLockButton checked={isPrivate} onChange={setIsPrivate} />}
+        <div className="min-w-0 flex-1">{field}</div>
+        <SendButton size="lg" disabled={!canSave} onClick={onSave} />
+      </div>
+      {error && <p className="text-xs font-semibold text-garnet-700">{error}</p>}
+    </div>
+  );
+}
+
+// Dock/desktop (#865): field stacked over a control row (Private checkbox +
+// keyboard hint + compact send).
+function DockComposerLayout({
+  field,
+  campaignId,
+  isPrivate,
+  setIsPrivate,
+  canSave,
+  error,
+  onSave,
+  showHints,
+}: ComposerLayoutProps & { showHints: boolean }) {
   return (
     <div className="flex flex-col gap-2.5">
-      <div className={grown ? FIELD_CARD : FIELD_PILL}>
-        <MentionAutocomplete
-          ref={setRef}
-          rows={1}
-          aria-label="Quick note"
-          campaignId={campaignId}
-          className={grown ? EDITOR_CARD : EDITOR_PILL}
-          style={maxHeight != null ? { maxHeight } : undefined}
-          placeholder={placeholder}
-          popoverPlacement="above"
-          value={value}
-          onChange={setValue}
-          onKeyDown={handleKeyDown}
-        />
-      </div>
+      {field}
 
       <div className="flex items-center gap-3">
         {campaignId && <PrivateToggle checked={isPrivate} onChange={setIsPrivate} label="Private" />}
-        {showHints && (
-          <p className="text-[11.5px] text-parchment-400">↵ save · shift+↵ new line</p>
-        )}
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={!canSave}
-          aria-label="Save note"
-          className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-garnet-700 text-parchment-50 transition-opacity hover:bg-garnet-800 disabled:opacity-40"
-        >
-          <ArrowUp aria-hidden="true" className="h-4 w-4" strokeWidth={2.5} />
-        </button>
+        {showHints && <p className="text-[11.5px] text-parchment-400">↵ save · shift+↵ new line</p>}
+        <SendButton size="sm" className="ml-auto" disabled={!canSave} onClick={onSave} />
       </div>
 
       {error && <p className="text-xs font-semibold text-garnet-700">{error}</p>}
     </div>
+  );
+}
+
+// The circular save button, shared by both variants (the mobile row uses the
+// larger ≥44px hit target; the dock row the compact 36px control).
+function SendButton({
+  size,
+  disabled,
+  onClick,
+  className = "",
+}: {
+  size: "sm" | "lg";
+  disabled: boolean;
+  onClick: () => void;
+  className?: string;
+}) {
+  const dim = size === "lg" ? "h-11 w-11" : "h-9 w-9";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label="Save note"
+      className={`flex ${dim} shrink-0 items-center justify-center rounded-full bg-garnet-700 text-parchment-50 transition-opacity hover:bg-garnet-800 disabled:opacity-40 ${className}`}
+    >
+      <ArrowUp aria-hidden="true" className="h-4 w-4" strokeWidth={2.5} />
+    </button>
   );
 }
