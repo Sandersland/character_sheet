@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import Spinner from "@/components/ui/Spinner";
@@ -10,12 +11,14 @@ import EntityContributeBand from "@/features/entities/EntityContributeBand";
 import EntityEditForm from "@/features/entities/EntityEditForm";
 import EntityInfobox from "@/features/entities/EntityInfobox";
 import { FormerIdentitiesCard, SurvivorBanner } from "@/features/entities/EntityMergeCards";
+import EntityPaneRail from "@/features/entities/EntityPaneRail";
 import { useEntityBackTo } from "@/features/entities/useEntityBackTo";
 import { useEntityDetail } from "@/features/entities/useEntityDetail";
 import { useEntityMerges } from "@/features/entities/useEntityMerges";
 
-// Wiki-article entity page (#842): masthead + lead, derived-facts infobox,
-// session-grouped chronicle, co-mention connections, and a contribute band.
+// Wiki-article entity page (#842): a desktop split view — sibling-list rail +
+// reading pane — that collapses to a full-page article on mobile. Loading and
+// not-found render inside the pane so the rail keeps its state across row nav.
 export default function EntityDetailPage() {
   const { id: campaignId, entityId } = useParams();
   const backTo = useEntityBackTo(campaignId);
@@ -24,11 +27,12 @@ export default function EntityDetailPage() {
   const { user } = useAuth();
   const { survivorChain, formerIdentityIds, nameFor } = useEntityMerges(campaignId, entityId, byId);
 
-  if (entity === undefined) return <Spinner variant="page" />;
-
-  if (entity === null) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-parchment-100 px-6 text-center">
+  let pane: ReactNode;
+  if (entity === undefined) {
+    pane = <Spinner variant="page" />;
+  } else if (entity === null) {
+    pane = (
+      <div className="flex flex-col items-center justify-center gap-4 px-6 py-24 text-center">
         <h1 className="font-display text-2xl font-semibold text-parchment-900">Entity not found</h1>
         <Link
           to={backTo}
@@ -38,11 +42,9 @@ export default function EntityDetailPage() {
         </Link>
       </div>
     );
-  }
-
-  return (
-    <div className="min-h-screen bg-parchment-100">
-      <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+  } else {
+    pane = (
+      <div className="flex min-w-0 flex-col gap-6">
         <SurvivorBanner
           entity={entity}
           survivorChain={survivorChain}
@@ -76,7 +78,7 @@ export default function EntityDetailPage() {
             onToggleVisibility={detail.handleToggleVisibility}
             onDelete={detail.handleDelete}
           />
-          <article className="flex flex-col gap-6 xl:order-first">
+          <article className="flex min-w-0 flex-col gap-6 xl:order-first">
             {detail.editing ? (
               <EntityEditForm
                 form={detail.form}
@@ -116,6 +118,19 @@ export default function EntityDetailPage() {
             )}
           </article>
         </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-parchment-100">
+      <main className="mx-auto flex max-w-6xl flex-col px-4 py-6 sm:px-6 sm:py-8 lg:grid lg:grid-cols-[300px_minmax(0,1fr)] lg:items-start lg:gap-8">
+        <EntityPaneRail
+          campaignId={campaignId ?? ""}
+          entities={detail.listed}
+          currentEntityId={entityId}
+        />
+        <div className="min-w-0">{pane}</div>
       </main>
     </div>
   );

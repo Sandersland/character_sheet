@@ -19,7 +19,7 @@ export default function EntityArticleHeader({
 }) {
   return (
     <header className="flex flex-col gap-1.5">
-      <Link to={backTo} className="text-xs font-semibold text-garnet-700 hover:underline">
+      <Link to={backTo} className="text-xs font-semibold text-garnet-700 hover:underline lg:hidden">
         ← Codex
       </Link>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">

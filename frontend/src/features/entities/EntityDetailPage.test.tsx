@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
@@ -407,6 +407,74 @@ describe("EntityDetailPage (#248)", () => {
     renderPage({ pathname: ENTITY_PATH, search: "?from=manage" });
     const back = await screen.findByRole("link", { name: "← Codex" });
     expect(back).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/manage`);
+  });
+
+  describe("pane rail (#842)", () => {
+    const stats = (mentionCount: number) => ({
+      mentionCount,
+      firstMentioned: null,
+      lastMentioned: null,
+      chroniclers: [],
+      hasDescription: true,
+    });
+    const FIRST: CampaignEntity = { ...ENTITY, stats: stats(5) };
+    const SECOND: CampaignEntity = {
+      ...ENTITY,
+      id: "ent-2",
+      name: "Cragmaw Hideout",
+      type: "LOCATION",
+      aliases: [],
+      notes: "A cave.",
+      stats: stats(4),
+    };
+
+    beforeEach(() => {
+      vi.mocked(client.fetchEntities).mockResolvedValue([FIRST, SECOND]);
+    });
+
+    it("lists sibling entities with mention counts and marks the current row", async () => {
+      renderPage();
+      const rail = await screen.findByRole("navigation", { name: /codex entries/i });
+      const current = within(rail).getByRole("link", { current: "page" });
+      expect(current).toHaveTextContent("Goblin Chief");
+      expect(current).toHaveTextContent("5");
+      const sibling = within(rail).getByRole("link", { name: /Cragmaw Hideout/ });
+      expect(sibling).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/entities/ent-2`);
+      expect(sibling).not.toHaveAttribute("aria-current");
+      expect(sibling).toHaveTextContent("4");
+    });
+
+    it("filters rail rows by search and type chips", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      const rail = await screen.findByRole("navigation", { name: /codex entries/i });
+
+      await user.type(within(rail).getByRole("searchbox", { name: /search entities/i }), "crag");
+      expect(within(rail).queryByRole("link", { name: /Goblin Chief/ })).not.toBeInTheDocument();
+      expect(within(rail).getByRole("link", { name: /Cragmaw Hideout/ })).toBeInTheDocument();
+
+      await user.clear(within(rail).getByRole("searchbox", { name: /search entities/i }));
+      await user.click(within(rail).getByRole("button", { name: /NPC/ }));
+      expect(within(rail).getByRole("link", { name: /Goblin Chief/ })).toBeInTheDocument();
+      expect(within(rail).queryByRole("link", { name: /Cragmaw Hideout/ })).not.toBeInTheDocument();
+    });
+
+    it("swaps only the pane on row navigation, fetching the new entity's data", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      const rail = await screen.findByRole("navigation", { name: /codex entries/i });
+
+      await user.click(within(rail).getByRole("link", { name: /Cragmaw Hideout/ }));
+      await waitFor(() =>
+        expect(vi.mocked(client.fetchEntityBacklinks)).toHaveBeenCalledWith(CAMPAIGN_ID, "ent-2"),
+      );
+      expect(await screen.findByRole("heading", { name: /Cragmaw Hideout/ })).toBeInTheDocument();
+      expect(
+        within(screen.getByRole("navigation", { name: /codex entries/i })).getByRole("link", {
+          current: "page",
+        }),
+      ).toHaveTextContent("Cragmaw Hideout");
+    });
   });
 
   it("honors the Manage origin on the not-found back affordance (#489)", async () => {
