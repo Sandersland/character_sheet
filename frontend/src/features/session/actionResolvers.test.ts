@@ -40,7 +40,7 @@ describe("actionResolvers", () => {
   it("all resolvers have a valid kind", () => {
     const VALID_KINDS = new Set([
       "attack-picker", "twf-picker", "spell-picker", "item-picker",
-      "heal-roll", "heal-input", "simple-confirm",
+      "heal-roll", "heal-input", "simple-confirm", "loadout-picker",
     ]);
     for (const r of Object.values(ACTION_RESOLVERS)) {
       expect(VALID_KINDS.has(r.kind), `${r.key} has invalid kind: ${r.kind}`).toBe(true);
@@ -53,6 +53,27 @@ describe("actionResolvers", () => {
     expect(r!.kind).toBe("twf-picker");
     expect(r!.slot).toBe("bonusAction");
     expect(r!.serverEffect).toBe(false); // local roll, like `attack` — not in backend ACTION_EFFECT_FN
+  });
+
+  it("the changeWeapons resolver is a local loadout-picker (no backend effect, #815)", () => {
+    const r = resolverFor("changeWeapons");
+    expect(r).toBeDefined();
+    expect(r!.kind).toBe("loadout-picker");
+    expect(r!.serverEffect).toBe(false); // the swap posts inventory transactions, not applyActionTransactions
+  });
+
+  it("Shadow Step / Opportunist are economy-only simple-confirm reminders (#440)", () => {
+    const step = resolverFor("shadowStep");
+    expect(step).toBeDefined();
+    expect(step!.kind).toBe("simple-confirm");
+    expect(step!.slot).toBe("bonusAction");
+    expect(step!.serverEffect).toBe(false); // reminder only — no backend ACTION_EFFECT_FN
+
+    const opp = resolverFor("opportunist");
+    expect(opp).toBeDefined();
+    expect(opp!.kind).toBe("simple-confirm");
+    expect(opp!.slot).toBe("reaction");
+    expect(opp!.serverEffect).toBe(false);
   });
 
   it("all resolvers have a valid slot", () => {

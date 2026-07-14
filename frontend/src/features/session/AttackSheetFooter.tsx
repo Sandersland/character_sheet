@@ -8,6 +8,8 @@ interface AttackSheetFooterProps {
   attacksRemain: boolean;
   onCancel: () => void;
   onClose: () => void;
+  /** Pre-roll cancel copy — off-hand refunds the BONUS action, not the action (#813). */
+  refundLabel?: string;
 }
 
 export default function AttackSheetFooter({
@@ -15,8 +17,9 @@ export default function AttackSheetFooter({
   attacksRemain,
   onCancel,
   onClose,
+  refundLabel = "Cancel — refund action",
 }: AttackSheetFooterProps) {
-  const label = preRoll ? "Cancel — refund action" : attacksRemain ? "Close" : "Done";
+  const label = preRoll ? refundLabel : attacksRemain ? "Close" : "Done";
   return (
     <div className="flex flex-col gap-1.5 pt-1">
       <button

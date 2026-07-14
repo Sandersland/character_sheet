@@ -21,9 +21,11 @@ import {
   twfHint,
 } from "@/lib/turnOptions";
 import { buffsToAutoEnd, endActionKeyFor, endReminders } from "@/lib/turnHooks";
+import { equippedLoadoutLabel } from "@/lib/paperDoll";
 import { useManeuverDie } from "@/features/session/useManeuverDie";
 import { resolverFor } from "@/features/session/actionResolvers";
 import { useActiveResolution } from "@/features/session/useActiveResolution";
+import { useLoadoutSwap } from "@/features/session/useLoadoutSwap";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character, AvailableAction } from "@/types/character";
 
@@ -67,6 +69,9 @@ export function useTurnActions({
   const durableReminders = endReminders(activeDurableBuffKeys);
 
   const { activeResolution, openResolution, closeResolution } = useActiveResolution();
+  // Mid-turn weapon change (#815) — hoisted here so both the resolution sheet
+  // and the persistent under-slot Refund strip read one committed-swap state.
+  const loadoutSwap = useLoadoutSwap(character, turnState, onUpdate);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +110,7 @@ export function useTurnActions({
     consumableCount: consumableCount(character),
     hasSpellcasting: character.spellcasting !== undefined,
     classActionOptions: classActions.map(enrich),
+    loadoutLabel: equippedLoadoutLabel(character.inventory),
   };
   const bonusSheetModel = {
     classBonusOptions: classBonusActions.map(enrich),
@@ -196,6 +202,13 @@ export function useTurnActions({
       void send(key, { roll: rollSpec(plan.healRoll).total });
     }
     if (plan.openResolution) openResolution(key);
+    // No-server-effect reminder actions (Shadow Step, Opportunist): the rule
+    // text is the whole deliverable, so surface it on use.
+    const reminder = availableActions.find((a) => a.key === key)?.reminder;
+    if (reminder) {
+      if (cost === "reaction") setReactionMessage(reminder);
+      else setEffectMessage(reminder);
+    }
   }
 
   // Special path for Attack action — must use enterAttackMode, not consumeAction.
@@ -260,6 +273,7 @@ export function useTurnActions({
   async function handleEndCombat() {
     endCombatState();
     closeResolution();
+    loadoutSwap.reset();
     setReactionMessage(null);
     setEffectMessage(null);
     setError(null);
@@ -294,6 +308,8 @@ export function useTurnActions({
     const nextRound = inCombat ? round + 1 : undefined;
     endTurn();
     closeResolution();
+    // Refund is bounded to the turn of the swap — drop it as the turn ends.
+    loadoutSwap.reset();
     for (const buffKey of expiring) {
       const actionKey = endActionKeyFor(buffKey);
       if (actionKey) await send(actionKey);
@@ -370,6 +386,7 @@ export function useTurnActions({
     setShowReactionMenu,
     activeResolution,
     closeResolution,
+    loadoutSwap,
     dieLabel,
     dieBusy,
     superiorityRemaining,

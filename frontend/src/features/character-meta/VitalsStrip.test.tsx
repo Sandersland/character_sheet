@@ -50,6 +50,7 @@ const mockCharacter: Character = {
   currency: { cp: 0, sp: 0, gp: 25, pp: 0 },
   conditions: { active: [], exhaustion: 0 },
   activeEffects: { buffs: [] },
+  rollModifiers: [],
   unarmedStrike: {
     attackBonus: 3,
     damage: { count: 1, faces: 1, modifier: 1, damageType: "bludgeoning" },

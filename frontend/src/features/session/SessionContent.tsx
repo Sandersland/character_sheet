@@ -14,6 +14,7 @@ import { RollProvider } from "@/features/dice/RollContext";
 import RollResultToast from "@/features/dice/RollResultToast";
 import RollModeToggle from "@/features/dice/RollModeToggle";
 import CompactHpBar from "@/features/hitpoints/CompactHpBar";
+import RestButton from "@/features/hitpoints/RestButton";
 import CompactConditionsBar from "@/features/conditions/CompactConditionsBar";
 import ConditionsStrip from "@/features/conditions/ConditionsStrip";
 import TurnHub from "@/features/session/TurnHub";
@@ -47,7 +48,7 @@ export default function SessionContent({ character, session, reference, setChara
   const isActiveTurn = turnState.phase === "active";
 
   return (
-    <RollProvider characterId={character.id} sessionId={session.id} onRollLogged={life.bumpLog}>
+    <RollProvider characterId={character.id} sessionId={session.id} onRollLogged={life.bumpLog} rollModifiers={character.rollModifiers}>
       <div className="min-h-screen bg-parchment-100">
         <SessionHeaderRegion
           character={character}
@@ -63,8 +64,14 @@ export default function SessionContent({ character, session, reference, setChara
         />
 
         <main className="mx-auto flex max-w-4xl flex-col gap-4 px-6 pt-6 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-6">
-          {/* Compact HP strip — always visible; tap opens the HP sheet (#768). */}
-          <CompactHpBar character={character} onUpdate={life.handleCharacterUpdate} />
+          {/* Compact HP strip + rest button — always visible; tap opens the HP
+              sheet (#768) / rest sheet (#814). */}
+          <div className="flex items-stretch gap-2">
+            <div className="min-w-0 flex-1">
+              <CompactHpBar character={character} onUpdate={life.handleCharacterUpdate} />
+            </div>
+            <RestButton character={character} onUpdate={life.handleCharacterUpdate} />
+          </div>
 
           {/* Active conditions + exhaustion. Compact strip on mobile (tap to
               open the sheet), full card at md+ (#769). */}

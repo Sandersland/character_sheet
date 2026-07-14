@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { CampaignEntity } from "@/types/character";
 import {
   matchEntities,
+  matchEntitiesDetailed,
   mentionBodyToFragment,
   normalizeForMatch,
   parseMentionBody,
@@ -79,6 +80,51 @@ describe("matchEntities", () => {
 
   it("returns all for an empty query", () => {
     expect(matchEntities(entities, "")).toHaveLength(2);
+  });
+});
+
+describe("matchEntitiesDetailed", () => {
+  const entities = [
+    entity({ id: A, name: "Goblin Chief", aliases: ["Grik"], notes: "Leads the Cragmaw tribe." }),
+    entity({ id: B, name: "Café", notes: "Serves Baldur's finest goblin stew." }),
+  ];
+
+  it("flags a match found only in notes", () => {
+    expect(matchEntitiesDetailed(entities, "cragmaw")).toEqual([
+      { entity: entities[0], matchedInNotesOnly: true },
+    ]);
+  });
+
+  it("keeps a name hit primary even when notes also match", () => {
+    const result = matchEntitiesDetailed(entities, "goblin");
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ entity: entities[0], matchedInNotesOnly: false });
+    expect(result[1]).toEqual({ entity: entities[1], matchedInNotesOnly: true });
+  });
+
+  it("treats an alias hit as primary", () => {
+    expect(matchEntitiesDetailed(entities, "grik")).toEqual([
+      { entity: entities[0], matchedInNotesOnly: false },
+    ]);
+  });
+
+  it("normalizes notes text like names (apostrophes, case)", () => {
+    expect(matchEntitiesDetailed(entities, "BALDURS finest")).toEqual([
+      { entity: entities[1], matchedInNotesOnly: true },
+    ]);
+  });
+
+  it("returns every entity unflagged for an empty query", () => {
+    expect(matchEntitiesDetailed(entities, "")).toEqual([
+      { entity: entities[0], matchedInNotesOnly: false },
+      { entity: entities[1], matchedInNotesOnly: false },
+    ]);
+  });
+
+  it("stays in normalization parity with matchEntities on names", () => {
+    expect(matchEntitiesDetailed(entities, "cafe").map((m) => m.entity.id)).toEqual(
+      matchEntities(entities, "cafe").map((e) => e.id),
+    );
   });
 });
 

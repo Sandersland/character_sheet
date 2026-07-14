@@ -27,6 +27,7 @@ import type { RollSpec } from "@/lib/dice";
  *  item-picker    — consumable inventory items with heal rolls.
  *  heal-roll      — single self-heal dice roll (Second Wind: 1d10+level).
  *  heal-input     — numeric pool draw (Lay on Hands: choose amount up to pool).
+ *  loadout-picker — per-hand weapon-swap picker (a held swap costs the Action).
  *  simple-confirm — no tool; just consume the slot (Dodge, Dash, Rage, etc.).
  */
 export type ResolutionKind =
@@ -36,6 +37,7 @@ export type ResolutionKind =
   | "item-picker"
   | "heal-roll"
   | "heal-input"
+  | "loadout-picker"
   | "simple-confirm";
 
 export type SlotCost = "action" | "bonusAction" | "reaction" | "free" | "special";
@@ -71,6 +73,10 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   castSpellBonus:    { key: "castSpellBonus",    kind: "spell-picker",   slot: "bonusAction", serverEffect: false },
   castSpellReaction: { key: "castSpellReaction", kind: "spell-picker",   slot: "reaction",    serverEffect: false },
   useObject:         { key: "useObject",         kind: "item-picker",    slot: "action",      serverEffect: true  },
+  // Mid-turn weapon change (#815) — the picker itself owns the Action economy
+  // (a held-item swap spends it; a free-hand draw/stow is free), so no slot is
+  // consumed on open and no server executeAction fires.
+  changeWeapons:     { key: "changeWeapons",     kind: "loadout-picker", slot: "action",      serverEffect: false },
   dodge:             { key: "dodge",             kind: "simple-confirm", slot: "action",      serverEffect: false },
   dash:              { key: "dash",              kind: "simple-confirm", slot: "action",      serverEffect: false },
   disengage:         { key: "disengage",         kind: "simple-confirm", slot: "action",      serverEffect: false },
@@ -114,6 +120,9 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   patientDefense:    { key: "patientDefense",    kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "ki" },
   stepOfTheWind:     { key: "stepOfTheWind",     kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "ki" },
   stunningStrike:    { key: "stunningStrike",    kind: "simple-confirm", slot: "free",        serverEffect: true,  resourceKey: "ki" },
+  // Way of Shadow reminder actions (#440) — economy-only, like twf; no backend effect fn.
+  shadowStep:        { key: "shadowStep",        kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
+  opportunist:       { key: "opportunist",       kind: "simple-confirm", slot: "reaction",    serverEffect: false },
 
   // ── Paladin ────────────────────────────────────────────────────────────────
   divineSense:       { key: "divineSense",       kind: "simple-confirm", slot: "action",      serverEffect: true,  resourceKey: "divineSense" },

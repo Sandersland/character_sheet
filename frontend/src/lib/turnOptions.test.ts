@@ -123,7 +123,7 @@ describe("offHandSummary", () => {
       ],
     } as Partial<Character>);
     // Off-hand drops the +3 ability modifier (no TWF style) → 1d4 piercing.
-    expect(offHandSummary(c)).toBe("Dagger · +5 to hit · 1d4 piercing");
+    expect(offHandSummary(c)).toBe("Dagger (off-hand) · +5 to hit · 1d4 piercing");
   });
 
   it("returns null when the loadout can't dual-wield", () => {
@@ -212,6 +212,21 @@ describe("classActionOption", () => {
       c,
     );
     expect(option).toEqual({ key: "cunningAction", title: "Cunning Action", enabled: true, heal: false });
+  });
+
+  it("surfaces a reminder action's rule text as the subtitle (#440)", () => {
+    const option = classActionOption(
+      available({ key: "shadowStep", name: "Shadow Step", cost: "bonusAction", reminder: "Teleport up to 60 ft between dim light or darkness." }),
+      resolverFor("shadowStep"),
+      makeCharacter(),
+    );
+    expect(option).toEqual({
+      key: "shadowStep",
+      title: "Shadow Step",
+      enabled: true,
+      subtitle: "Teleport up to 60 ft between dim light or darkness.",
+      heal: false,
+    });
   });
 
   it("passes through disabled + reason", () => {

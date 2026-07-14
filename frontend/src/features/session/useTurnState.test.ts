@@ -391,28 +391,40 @@ describe("attack tally", () => {
     expect(result.current.attackTally[2].verdict).toBeUndefined();
   });
 
-  it("setTallyDamage replaces the last row's damage — never double-counts on re-roll", () => {
+  it("setTallyDamage replaces a row's damage by id — never double-counts on re-roll", () => {
     const { result } = inAttack();
     act(() => { result.current.recordAttack(recorded()); });
-    act(() => { result.current.setTallyDamage(9); });
+    const id = result.current.attackTally[0].id;
+    act(() => { result.current.setTallyDamage(id, 9); });
     expect(result.current.attackTally[0].damage).toBe(9);
-    act(() => { result.current.setTallyDamage(13); }); // re-roll
+    act(() => { result.current.setTallyDamage(id, 13); }); // re-roll
     expect(result.current.attackTally[0].damage).toBe(13);
   });
 
-  it("setTallyDamage targets the CURRENT (last) attack row", () => {
+  it("setTallyDamage targets the row named by id, not 'the last row' (#813)", () => {
     const { result } = inAttack();
     act(() => { result.current.recordAttack(recorded({ formId: "a" })); });
-    act(() => { result.current.setTallyDamage(5); });
+    const idA = result.current.attackTally[0].id;
     act(() => { result.current.recordAttack(recorded({ formId: "b" })); });
-    act(() => { result.current.setTallyDamage(8); });
+    const idB = result.current.attackTally[1].id;
+    // Write the EARLIER row after the later one exists — the id keeps it correct.
+    act(() => { result.current.setTallyDamage(idB, 8); });
+    act(() => { result.current.setTallyDamage(idA, 5); });
     expect(result.current.attackTally.map((r) => r.damage)).toEqual([5, 8]);
   });
 
-  it("setTallyAttackTotal overrides the last row's to-hit total, preserving nat flags + verdict", () => {
+  it("setTallyDamage no-ops on an unknown row id", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    act(() => { result.current.setTallyDamage("nope", 9); });
+    expect(result.current.attackTally[0].damage).toBeUndefined();
+  });
+
+  it("setTallyAttackTotal overrides a row's to-hit total by id, preserving nat flags + verdict", () => {
     const { result } = inAttack();
     act(() => { result.current.recordAttack(recorded({ total: 14, keptFace: 12 })); });
-    act(() => { result.current.setTallyAttackTotal(19); }); // +5 superiority die
+    const id = result.current.attackTally[0].id;
+    act(() => { result.current.setTallyAttackTotal(id, 19); }); // +5 superiority die
     expect(result.current.attackTally[0].attack.total).toBe(19);
     // The kept-d20 face + nat flags decide the verdict — they must not move.
     expect(result.current.attackTally[0].attack.keptFace).toBe(12);
@@ -423,47 +435,99 @@ describe("attack tally", () => {
   it("setTallyAttackTotal does not convert a nat-1 miss (verdict reads the face, not the total)", () => {
     const { result } = inAttack();
     act(() => { result.current.recordAttack(recorded({ total: 1, keptFace: 1, nat1: true })); });
+    const id = result.current.attackTally[0].id;
     expect(result.current.attackTally[0].verdict).toBe("miss");
-    act(() => { result.current.setTallyAttackTotal(6); }); // die added to a nat-1
+    act(() => { result.current.setTallyAttackTotal(id, 6); }); // die added to a nat-1
     expect(result.current.attackTally[0].attack.total).toBe(6);
     expect(result.current.attackTally[0].attack.nat1).toBe(true);
     expect(result.current.attackTally[0].verdict).toBe("miss"); // still a miss
   });
 
-  it("setTallyAttackTotal targets the CURRENT (last) row and no-ops on an empty tally", () => {
+  it("setTallyAttackTotal targets the named row and no-ops on an empty tally", () => {
     const { result } = inAttack();
-    act(() => { result.current.setTallyAttackTotal(19); }); // empty → no-op
+    act(() => { result.current.setTallyAttackTotal("x", 19); }); // empty → no-op
     expect(result.current.attackTally).toHaveLength(0);
     act(() => { result.current.recordAttack(recorded({ formId: "a", total: 10 })); });
     act(() => { result.current.recordAttack(recorded({ formId: "b", total: 12 })); });
-    act(() => { result.current.setTallyAttackTotal(17); });
+    const idB = result.current.attackTally[1].id;
+    act(() => { result.current.setTallyAttackTotal(idB, 17); });
     expect(result.current.attackTally.map((r) => r.attack.total)).toEqual([10, 17]);
   });
 
-  it("addTallyDamageRider folds into the current row's slot", () => {
+  it("addTallyDamageRider folds into the named row's slot", () => {
     const { result } = inAttack();
     act(() => { result.current.recordAttack(recorded()); });
-    act(() => { result.current.setTallyDamage(9); });
-    act(() => { result.current.addTallyDamageRider(4); });
+    const id = result.current.attackTally[0].id;
+    act(() => { result.current.setTallyDamage(id, 9); });
+    act(() => { result.current.addTallyDamageRider(id, 4); });
     expect(result.current.attackTally[0].damage).toBe(13);
   });
 
-  it("cycleTallyVerdict cycles a manual row unset→Hit→Miss→unset", () => {
+  it("setTallyVerdict writes a manual row's verdict directly (#811)", () => {
     const { result } = inAttack();
     act(() => { result.current.recordAttack(recorded()); });
-    act(() => { result.current.cycleTallyVerdict(0); });
+    act(() => { result.current.setTallyVerdict(0, "hit"); });
     expect(result.current.attackTally[0].verdict).toBe("hit");
-    act(() => { result.current.cycleTallyVerdict(0); });
-    expect(result.current.attackTally[0].verdict).toBe("miss");
-    act(() => { result.current.cycleTallyVerdict(0); });
+    act(() => { result.current.setTallyVerdict(0, "crit"); });
+    expect(result.current.attackTally[0].verdict).toBe("crit");
+    act(() => { result.current.setTallyVerdict(0, undefined); });
     expect(result.current.attackTally[0].verdict).toBeUndefined();
   });
 
-  it("cycleTallyVerdict is locked for an auto (nat 20) row", () => {
+  it("setTallyVerdict is refused on a nat-locked row", () => {
     const { result } = inAttack();
     act(() => { result.current.recordAttack(recorded({ nat20: true })); });
-    act(() => { result.current.cycleTallyVerdict(0); });
+    act(() => { result.current.setTallyVerdict(0, "miss"); });
     expect(result.current.attackTally[0].verdict).toBe("crit"); // unchanged
+  });
+
+  it("switching a row to miss drops its damage (#811)", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    const id = result.current.attackTally[0].id;
+    act(() => { result.current.setTallyDamage(id, 9); });
+    act(() => { result.current.setTallyVerdict(0, "miss"); });
+    expect(result.current.attackTally[0].verdict).toBe("miss");
+    expect(result.current.attackTally[0].damage).toBeUndefined();
+  });
+
+  it("rolling damage auto-resolves an unset verdict to hit — implicit hit (#811)", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    const id = result.current.attackTally[0].id;
+    expect(result.current.attackTally[0].verdict).toBeUndefined();
+    act(() => { result.current.setTallyDamage(id, 9); });
+    expect(result.current.attackTally[0].verdict).toBe("hit");
+  });
+
+  it("a rider roll also auto-resolves an unset verdict to hit", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    const id = result.current.attackTally[0].id;
+    act(() => { result.current.addTallyDamageRider(id, 4); });
+    expect(result.current.attackTally[0].verdict).toBe("hit");
+    expect(result.current.attackTally[0].damage).toBe(4);
+  });
+
+  it("damage writes never overwrite an explicit crit verdict", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    const id = result.current.attackTally[0].id;
+    act(() => { result.current.setTallyVerdict(0, "crit"); });
+    act(() => { result.current.setTallyDamage(id, 22); });
+    expect(result.current.attackTally[0].verdict).toBe("crit");
+  });
+
+  it("setTallyDamageAt writes an arbitrary row's damage — banner inline resolve (#811)", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded({ formId: "a" })); });
+    act(() => { result.current.recordAttack(recorded({ formId: "b" })); });
+    act(() => { result.current.setTallyDamageAt(0, 7); });
+    expect(result.current.attackTally[0].damage).toBe(7);
+    expect(result.current.attackTally[0].verdict).toBe("hit"); // implicit hit
+    expect(result.current.attackTally[1].damage).toBeUndefined();
+    act(() => { result.current.setTallyDamageAt(5, 9); }); // out of range → no-op
+    expect(result.current.attackTally).toHaveLength(2);
   });
 
   it("entering a NEW attack action clears the previous tally", () => {
@@ -520,6 +584,55 @@ describe("attack tally", () => {
   });
 });
 
+// ── Per-source tally clearing (#813) ──────────────────────────────────────────
+// action + bonusAction rows coexist in one tally; entering each mode clears only
+// its own rows, endTurn clears both.
+
+describe("per-source tally clearing (#813)", () => {
+  const OFF = { formId: "off", formName: "Dagger (off-hand)", attack: { total: 14, keptFace: 9, nat20: false, nat1: false } };
+  const MAIN = { formId: "w1", formName: "Longsword", attack: { total: 17, keptFace: 14, nat20: false, nat1: false } };
+
+  function turnWithBoth() {
+    const hook = renderHook(() => useTurnState(makeCharacter({ attacksPerAction: 1 }), SESSION_ID));
+    act(() => { hook.result.current.startCombat(); });
+    act(() => { hook.result.current.startTurn(); });
+    // Off-hand bonus swing first, then an Attack action swing.
+    act(() => { hook.result.current.enterTwfMode(); });
+    act(() => { hook.result.current.recordTwfAttack(OFF); });
+    act(() => { hook.result.current.enterAttackMode(); });
+    act(() => { hook.result.current.recordAttack(MAIN); });
+    return hook;
+  }
+
+  it("both rows coexist, tagged by source", () => {
+    const { result } = turnWithBoth();
+    expect(result.current.attackTally.map((r) => r.source)).toEqual(["bonusAction", "action"]);
+  });
+
+  it("entering a NEW Attack action clears only action rows — the off-hand row stays", () => {
+    const { result } = turnWithBoth();
+    act(() => { result.current.grantExtraAction(); });
+    act(() => { result.current.enterAttackMode(); }); // second Attack action
+    expect(result.current.attackTally.map((r) => r.source)).toEqual(["bonusAction"]);
+  });
+
+  it("endTurn clears BOTH sources", () => {
+    const { result } = turnWithBoth();
+    act(() => { result.current.endTurn(); });
+    expect(result.current.attackTally).toHaveLength(0);
+  });
+
+  it("enterTwfMode drops a prior bonusAction row while keeping action rows", () => {
+    const hook = renderHook(() => useTurnState(makeCharacter({ attacksPerAction: 1 }), SESSION_ID));
+    act(() => { hook.result.current.startCombat(); });
+    act(() => { hook.result.current.startTurn(); });
+    act(() => { hook.result.current.enterAttackMode(); });
+    act(() => { hook.result.current.recordAttack(MAIN); });
+    act(() => { hook.result.current.enterTwfMode(); }); // opens the bonus swing
+    expect(hook.result.current.attackTally.map((r) => r.source)).toEqual(["action"]);
+  });
+});
+
 // ── Bonus action / TWF ────────────────────────────────────────────────────────
 
 describe("bonus action and TWF", () => {
@@ -556,6 +669,47 @@ describe("bonus action and TWF", () => {
     act(() => { result.current.enterTwfMode(); });
     act(() => { result.current.recordTwfAttack(); });
     expect(result.current.bonusAttack).toBeNull();
+  });
+
+  it("recordTwfAttack with a payload appends a bonusAction-source tally row (#813)", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.enterTwfMode(); });
+    act(() => {
+      result.current.recordTwfAttack({
+        formId: "off",
+        formName: "Dagger (off-hand)",
+        attack: { total: 14, keptFace: 9, nat20: false, nat1: false },
+      });
+    });
+    expect(result.current.attackTally).toHaveLength(1);
+    expect(result.current.attackTally[0]).toMatchObject({
+      source: "bonusAction",
+      formName: "Dagger (off-hand)",
+    });
+    expect(result.current.bonusAttack).toBeNull();
+  });
+
+  it("recordTwfAttack without a payload appends no row (guarded like recordAttack)", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.enterTwfMode(); });
+    act(() => { result.current.recordTwfAttack(); });
+    expect(result.current.attackTally).toHaveLength(0);
+  });
+
+  it("undo of the off-hand swing removes its tally row and restores bonusAttack (#813)", () => {
+    const { result } = inActiveTurn();
+    act(() => { result.current.enterTwfMode(); });
+    act(() => {
+      result.current.recordTwfAttack({
+        formId: "off",
+        formName: "Dagger (off-hand)",
+        attack: { total: 14, keptFace: 9, nat20: false, nat1: false },
+      });
+    });
+    expect(result.current.attackTally).toHaveLength(1);
+    act(() => { result.current.undo(); });
+    expect(result.current.attackTally).toHaveLength(0);
+    expect(result.current.bonusAttack).toEqual({ total: 1, used: 0 });
   });
 
   it("cancelTwf refunds the bonus action when the swing hasn't been rolled (#732)", () => {
@@ -874,6 +1028,46 @@ describe("localStorage persistence", () => {
     act(() => { result.current.undo(); });
     expect(result.current.attackTally).toEqual([]);
     expect(result.current.actionsRemaining).toBe(1);
+  });
+
+  it("backfills id + source on a pre-#813 tally row (top-level + undo entries)", () => {
+    // Pre-#813 rows carry no `id`/`source` (only `action` existed then).
+    const legacyRow = { formId: "w1", formName: "Longsword", attack: { total: 17, keptFace: 14, nat20: false, nat1: false }, verdict: "hit", damage: 9 };
+    const stale = {
+      inCombat: true,
+      round: 2,
+      phase: "active",
+      actionsRemaining: 0,
+      bonusActionUsed: false,
+      reactionUsed: false,
+      attack: { total: 1, used: 1 },
+      bonusAttack: null,
+      attackTally: [legacyRow],
+      spellCastThisTurn: {},
+      attackedThisTurn: true,
+      tookDamageThisTurn: false,
+      history: [
+        {
+          actionsRemaining: 1,
+          bonusActionUsed: false,
+          reactionUsed: false,
+          attack: null,
+          bonusAttack: null,
+          spellCastThisTurn: {},
+          attackTally: [legacyRow],
+        },
+      ],
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stale));
+
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    expect(result.current.attackTally[0].source).toBe("action");
+    expect(typeof result.current.attackTally[0].id).toBe("string");
+    expect(result.current.attackTally[0].id).toBeTruthy();
+    // The backfilled row still targets by id (writer resolves it).
+    const id = result.current.attackTally[0].id;
+    act(() => { result.current.setTallyDamage(id, 12); });
+    expect(result.current.attackTally[0].damage).toBe(12);
   });
 
   it("rehydrates a well-formed current-schema entry unchanged (#750)", () => {

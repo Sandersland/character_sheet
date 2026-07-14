@@ -15,8 +15,8 @@ interface CompactHpBarProps {
  * Slim HP strip always visible at the top of the session page. Read-only content
  * (current/max HP, temp badge, MeterBar), but the whole strip is a button that
  * opens a "Hit Points" sheet with the full damage/heal/temp controls (#768) — so
- * HP is manageable mid-turn on mobile, where the reference tabs (and the Rest
- * tab's HitPointTracker) are hidden. Death saves stay on the turn screen.
+ * HP is manageable mid-turn on mobile without a dedicated tab (rest lives in the
+ * adjacent RestButton, #814). Death saves stay on the turn screen.
  */
 export default function CompactHpBar({ character, onUpdate }: CompactHpBarProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -32,14 +32,14 @@ export default function CompactHpBar({ character, onUpdate }: CompactHpBarProps)
         onClick={() => setSheetOpen(true)}
         className="group w-full rounded-card border border-parchment-200 bg-parchment-50 px-4 py-3 text-left shadow-card transition-colors hover:border-parchment-300 hover:bg-parchment-100 active:bg-parchment-200"
       >
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span className="font-sans text-xs font-semibold uppercase tracking-wide text-parchment-600">
+        <div className="flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden sm:gap-3">
+            <span className="truncate font-sans text-xs font-semibold uppercase tracking-wide text-parchment-600">
               Hit Points
             </span>
             <span
               className={[
-                "font-sans text-sm font-bold",
+                "shrink-0 whitespace-nowrap font-sans text-sm font-bold",
                 isDown
                   ? "text-garnet-700"
                   : isLow
@@ -51,22 +51,23 @@ export default function CompactHpBar({ character, onUpdate }: CompactHpBarProps)
               <span className="font-normal text-parchment-600"> / {max}</span>
             </span>
             {temp > 0 && (
-              <span className="rounded-control bg-arcane-50 px-2 py-0.5 text-xs font-semibold text-arcane-700">
+              <span className="shrink-0 rounded-control bg-arcane-50 px-2 py-0.5 text-xs font-semibold text-arcane-700">
                 +{temp} temp
               </span>
             )}
             {isDown && (
-              <span className="rounded-control bg-garnet-50 px-2 py-0.5 text-xs font-semibold text-garnet-700">
+              <span className="shrink-0 rounded-control bg-garnet-50 px-2 py-0.5 text-xs font-semibold text-garnet-700">
                 Down
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-32 shrink-0">
+          <div className="flex min-w-0 items-center gap-2">
+            {/* Meter yields before the HP number so a 3-digit total stays visible at 320px. */}
+            <div className="w-16 min-w-0 sm:w-32">
               <MeterBar current={current} max={max} tone="garnet" label={`${current} of ${max} HP`} />
             </div>
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-parchment-500 sm:hidden">
-              Tap to manage
+            <span className="shrink-0 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-parchment-500 sm:hidden">
+              Tap
             </span>
             <ChevronRight
               aria-hidden="true"

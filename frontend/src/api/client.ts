@@ -23,10 +23,13 @@ import type {
   ConditionOperation,
   CampaignEntity,
   CampaignEntityMerge,
+  CodexActivityItem,
   CreateCharacterInput,
   EntityBacklink,
+  EntityConnection,
   EntityType,
   EntityVisibility,
+  EntryVisibility,
   ExperienceOperation,
   HitPointOperation,
   JournalEntryKind,
@@ -303,7 +306,13 @@ export async function deleteCharacter(id: string): Promise<void> {
 // kind defaults to ENTRY; NOTE omits date (server fills it with today).
 export async function createJournalEntry(
   characterId: string,
-  entry: { kind?: JournalEntryKind; date?: string; body: string; sessionId?: string }
+  entry: {
+    kind?: JournalEntryKind;
+    date?: string;
+    body: string;
+    sessionId?: string;
+    visibility?: EntryVisibility;
+  }
 ): Promise<Character> {
   return request<Character>(
     `/characters/${characterId}/journal`,
@@ -315,7 +324,7 @@ export async function createJournalEntry(
 export async function updateJournalEntry(
   characterId: string,
   entryId: string,
-  patch: { date?: string; body?: string }
+  patch: { date?: string; body?: string; visibility?: EntryVisibility }
 ): Promise<Character> {
   return request<Character>(
     `/characters/${characterId}/journal/${entryId}`,
@@ -513,16 +522,18 @@ export async function addCharacterToCampaign(
 
 // ── Campaign entities & @-tagging (#248) ───────────────────────────────────────
 // Plain REST. Search/list is campaign-scoped; create/edit are any-member; delete
-// is OWNER-only (server-enforced). Backlinks come pre-filtered to the caller's
-// own notes (private-by-default), so no client-side visibility logic is needed.
+// is OWNER-only (server-enforced). Backlinks come pre-filtered server-side to the
+// caller's own notes plus other members' CAMPAIGN-shared ones (#838), so no
+// client-side visibility logic is needed.
 
 export async function fetchEntities(
   campaignId: string,
-  opts?: { q?: string; type?: EntityType },
+  opts?: { q?: string; type?: EntityType; includeStats?: boolean },
 ): Promise<CampaignEntity[]> {
   const params = new URLSearchParams();
   if (opts?.q) params.set("q", opts.q);
   if (opts?.type) params.set("type", opts.type);
+  if (opts?.includeStats) params.set("include", "stats");
   const query = params.toString() ? `?${params.toString()}` : "";
   return request<CampaignEntity[]>(
     `/campaigns/${campaignId}/entities${query}`,
@@ -538,6 +549,7 @@ export async function createEntity(
     name: string;
     aliases?: string[];
     notes?: string;
+    portraitUrl?: string | null;
     visibility?: EntityVisibility;
   },
 ): Promise<CampaignEntity> {
@@ -556,6 +568,7 @@ export async function updateEntity(
     name?: string;
     aliases?: string[];
     notes?: string | null;
+    portraitUrl?: string | null;
     visibility?: EntityVisibility;
   },
 ): Promise<CampaignEntity> {
@@ -582,6 +595,31 @@ export async function fetchEntityBacklinks(
     `/campaigns/${campaignId}/entities/${entityId}/backlinks`,
     undefined,
     "Failed to fetch entity backlinks",
+  );
+}
+
+export async function fetchEntityConnections(
+  campaignId: string,
+  entityId: string,
+  opts?: { limit?: number },
+): Promise<EntityConnection[]> {
+  const query = opts?.limit ? `?limit=${opts.limit}` : "";
+  return request<EntityConnection[]>(
+    `/campaigns/${campaignId}/entities/${entityId}/connections${query}`,
+    undefined,
+    "Failed to fetch entity connections",
+  );
+}
+
+export async function fetchEntityActivity(
+  campaignId: string,
+  opts?: { limit?: number },
+): Promise<CodexActivityItem[]> {
+  const query = opts?.limit ? `?limit=${opts.limit}` : "";
+  return request<CodexActivityItem[]>(
+    `/campaigns/${campaignId}/entities/activity${query}`,
+    undefined,
+    "Failed to fetch codex activity",
   );
 }
 

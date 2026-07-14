@@ -3,18 +3,13 @@
  *
  * Asserts the EXACT bytes (summary strings, event `data`, and before/after
  * `resources` payloads) that maneuvers/disciplines/tool-proficiency
- * reconciliation emits on the current code, so the `reconcileKnownList` helper
- * extraction is provably byte-identical. It is the byte-parity oracle for that
- * refactor: it must be green now and stay green — UNEDITED — after the three
- * reconcilers become thin configs over the shared helper.
+ * reconciliation emits.
  *
- * Two payload SHAPES are deliberately locked because they currently differ:
- *   - maneuvers & toolProfs → hand-built 4-key
- *       { used, maneuversKnown, disciplinesKnown, toolProficienciesKnown }
- *   - disciplines           → full serializeResourcesState blob (6 keys, adds
- *       advancements + fightingStyle)
- * Preserving this divergence is intentional; unifying it is a separate,
- * out-of-scope payload change (see #617).
+ * Since #818 every reconciler snapshots the SAME canonical 6-key resources shape
+ * via snapshotResources(): { used, maneuversKnown, disciplinesKnown,
+ * toolProficienciesKnown, advancements, fightingStyle }. The former per-site
+ * divergence (maneuvers/toolProfs emitted a partial 4-key object) was an
+ * undo-correctness bug — an omitted key wiped on wholesale revert — now fixed.
  *
  * Also locks the registry ORDER interaction: reconcileManeuvers runs before
  * reconcileToolProficiencies, so in a full subclass-clear the tool-prof event's
@@ -249,6 +244,8 @@ describe("level-reconciliation characterization (#617)", () => {
         maneuversKnown: fiveManeuvers(),
         disciplinesKnown: [],
         toolProficienciesKnown: oneToolProf(),
+        advancements: [],
+        fightingStyle: null,
       },
     });
     expect(ev.after).toEqual({
@@ -257,6 +254,8 @@ describe("level-reconciliation characterization (#617)", () => {
         maneuversKnown: fiveManeuvers().slice(0, 3),
         disciplinesKnown: [],
         toolProficienciesKnown: oneToolProf(),
+        advancements: [],
+        fightingStyle: null,
       },
     });
     // Tool profs untouched at level 3 (Student of War still grants 1).
@@ -273,10 +272,10 @@ describe("level-reconciliation characterization (#617)", () => {
     expect(man.summary).toBe("All 5 maneuvers removed — subclass no longer available");
     expect(man.data).toEqual({ removedCount: 5, allowed: 0 });
     expect(man.before).toEqual({
-      resources: { used: {}, maneuversKnown: fiveManeuvers(), disciplinesKnown: [], toolProficienciesKnown: oneToolProf() },
+      resources: { used: {}, maneuversKnown: fiveManeuvers(), disciplinesKnown: [], toolProficienciesKnown: oneToolProf(), advancements: [], fightingStyle: null },
     });
     expect(man.after).toEqual({
-      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: oneToolProf() },
+      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: oneToolProf(), advancements: [], fightingStyle: null },
     });
 
     const [tool] = await eventsByType("recon-full", "toolProficienciesReconciled");
@@ -285,10 +284,10 @@ describe("level-reconciliation characterization (#617)", () => {
     expect(tool.data).toEqual({ removedCount: 1, allowed: 0 });
     // Ordering interaction: maneuvers already trimmed → maneuversKnown is [] here.
     expect(tool.before).toEqual({
-      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: oneToolProf() },
+      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: oneToolProf(), advancements: [], fightingStyle: null },
     });
     expect(tool.after).toEqual({
-      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: [] },
+      resources: { used: {}, maneuversKnown: [], disciplinesKnown: [], toolProficienciesKnown: [], advancements: [], fightingStyle: null },
     });
 
     // Registry order: maneuvers event precedes toolProfs event within the batch.

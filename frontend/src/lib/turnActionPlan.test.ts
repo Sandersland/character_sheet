@@ -59,4 +59,9 @@ describe("planActionClick", () => {
     const plan = planActionClick(resolverFor("dodge"), character);
     expect(plan).toEqual({ consumeSlot: true, openResolution: false, send: "none" });
   });
+
+  it("loadout-picker opens the picker without spending the slot (the swap owns the Action)", () => {
+    const plan = planActionClick(resolverFor("changeWeapons"), character);
+    expect(plan).toEqual({ consumeSlot: false, openResolution: true, send: "none" });
+  });
 });

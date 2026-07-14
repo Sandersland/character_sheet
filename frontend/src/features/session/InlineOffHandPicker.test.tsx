@@ -10,6 +10,7 @@ import type { TurnState, TurnStateActions } from "@/features/session/useTurnStat
 
 vi.mock("@/api/client", () => ({
   logRoll: vi.fn().mockResolvedValue(undefined),
+  castManeuverTransaction: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -20,8 +21,13 @@ function makeTurnState(bonusAttack: { total: number; used: number } | null) {
   return {
     bonusAttack,
     bonusActionUsed: true,
+    attackTally: [],
     recordTwfAttack: vi.fn(),
     cancelTwf: vi.fn(),
+    setTallyDamage: vi.fn(),
+    setTallyAttackTotal: vi.fn(),
+    addTallyDamageRider: vi.fn(),
+    setTallyVerdict: vi.fn(),
   } as unknown as TurnState & TurnStateActions;
 }
 
@@ -87,10 +93,10 @@ function renderPicker(
   );
 }
 
-describe("InlineOffHandPicker (#732)", () => {
-  it("renders the OFF_HAND weapon row, with the ability mod dropped from damage (no style)", () => {
+describe("InlineOffHandPicker (#813 redesign)", () => {
+  it("renders the off-hand form with the '(off-hand)' tag and the ability mod dropped (no style)", () => {
     renderPicker(twoWeaponCharacter(), makeTurnState({ total: 1, used: 0 }));
-    expect(screen.getByText("Dagger")).toBeInTheDocument();
+    expect(screen.getByText("Dagger (off-hand)")).toBeInTheDocument();
     // STR +3 dropped → 1d6 piercing (no modifier shown).
     expect(screen.getByText(/1d6 piercing/)).toBeInTheDocument();
     expect(screen.queryByText(/1d6 \+ 3/)).not.toBeInTheDocument();
@@ -104,13 +110,24 @@ describe("InlineOffHandPicker (#732)", () => {
     expect(screen.getByText(/1d6 \+ 3 piercing/)).toBeInTheDocument();
   });
 
+  it("uses the same step-rail shell as the main sheet (Roll to hit → Damage, one swing)", () => {
+    renderPicker(twoWeaponCharacter(), makeTurnState({ total: 1, used: 0 }));
+    expect(screen.getByRole("button", { name: /Roll to hit/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Roll damage/ })).toBeInTheDocument();
+    // Single form → no "Attacking with" selector.
+    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+  });
+
   it("spends the bonus action and logs an attack roll when the off-hand swing is rolled", async () => {
     const turnState = makeTurnState({ total: 1, used: 0 });
     renderPicker(twoWeaponCharacter(), turnState);
 
-    await userEvent.click(screen.getByRole("button", { name: /^Attack$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
 
     expect(turnState.recordTwfAttack).toHaveBeenCalledOnce();
+    expect(turnState.recordTwfAttack).toHaveBeenCalledWith(
+      expect.objectContaining({ source: "bonusAction", formName: "Dagger (off-hand)" }),
+    );
     expect(vi.mocked(logRoll)).toHaveBeenCalledWith(
       "char-1",
       "sess-1",
@@ -118,17 +135,30 @@ describe("InlineOffHandPicker (#732)", () => {
     );
   });
 
-  it("shows Back (refund) before the swing is rolled", () => {
+  it("shows Cancel — refund bonus action before the swing is rolled", () => {
     const onCancel = vi.fn();
     renderPicker(twoWeaponCharacter(), makeTurnState({ total: 1, used: 0 }), { onCancel });
-    expect(screen.getByRole("button", { name: /Back/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Cancel — refund bonus action/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Done$/ })).not.toBeInTheDocument();
   });
 
-  it("shows Done and disables Attack once the swing is spent (bonusAttack cleared)", () => {
+  it("shows Done and disables Roll to hit once the swing is spent (bonusAttack cleared)", () => {
     renderPicker(twoWeaponCharacter(), makeTurnState(null));
     expect(screen.getByRole("button", { name: /^Done$/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Attack$/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Roll to hit/ })).toBeDisabled();
+  });
+
+  it("offers the Battle Master maneuvers disclosure on the off-hand swing (RAW)", () => {
+    const bm = twoWeaponCharacter({
+      resources: {
+        pools: [
+          { key: "superiorityDice", label: "Superiority Dice", die: "d8", total: 4, recharge: "shortRest", used: 0, remaining: 4 },
+        ],
+        maneuversKnown: [],
+      },
+    } as unknown as Partial<Character>);
+    renderPicker(bm, makeTurnState({ total: 1, used: 0 }));
+    expect(screen.getByRole("button", { name: /Battle Master maneuvers/ })).toBeInTheDocument();
   });
 
   it("falls back to a helpful message when no off-hand weapon is equipped", () => {

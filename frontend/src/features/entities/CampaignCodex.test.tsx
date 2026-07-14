@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
 import CampaignCodex from "@/features/entities/CampaignCodex";
+import { useCodexActivity } from "@/features/entities/useCodexActivity";
 import * as client from "@/api/client";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
 import type { CampaignEntity } from "@/types/character";
@@ -16,6 +17,10 @@ vi.mock("@/api/client", () => ({
 vi.mock("@/hooks/useCampaignEntities", () => ({
   useCampaignEntities: vi.fn(),
   primeCampaignEntities: vi.fn(),
+}));
+
+vi.mock("@/features/entities/useCodexActivity", () => ({
+  useCodexActivity: vi.fn(),
 }));
 
 const CAMPAIGN_ID = "camp-1";
@@ -35,9 +40,16 @@ function entity(overrides: Partial<CampaignEntity>): CampaignEntity {
   };
 }
 
-const GOBLIN = entity({ id: "ent-npc", type: "NPC", name: "Goblin Chief", aliases: ["Grik"] });
+const GOBLIN = entity({
+  id: "ent-npc",
+  type: "NPC",
+  name: "Goblin Chief",
+  aliases: ["Grik"],
+  notes: "Leads the Cragmaw tribe.\nSworn enemy of the party.",
+});
 const GATE = entity({ id: "ent-loc", type: "LOCATION", name: "Baldur's Gate" });
 const THORDAK = entity({ id: "ent-pc", type: "PC", name: "Thordak" });
+const SECRET = entity({ id: "ent-hid", type: "NPC", name: "Secret Cult", visibility: "HIDDEN" });
 const ENTITIES = [THORDAK, GOBLIN, GATE];
 
 function mockEntities(list: CampaignEntity[]) {
@@ -50,18 +62,42 @@ function mockEntities(list: CampaignEntity[]) {
 function renderCodex(role?: "OWNER" | "PLAYER") {
   return render(
     <MemoryRouter>
-      <CampaignCodex campaignId={CAMPAIGN_ID} role={role} />
+      <CampaignCodex campaignId={CAMPAIGN_ID} role={role} campaignName="The Sunless Citadel" />
     </MemoryRouter>,
   );
 }
 
+// The rail/FAB split keys off useIsBelowMd's "(min-width: 768px)" query.
+function stubViewport(desktop: boolean) {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: desktop,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  }));
+}
+
+function mockActivity(statsEntities: CampaignEntity[] = []) {
+  vi.mocked(useCodexActivity).mockReturnValue({ statsEntities, activity: [], loaded: true });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  stubViewport(true);
   mockEntities(ENTITIES);
+  mockActivity();
 });
 
-describe("CampaignCodex (#367)", () => {
-  it("lists all entities sorted by name with type badges", () => {
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("CampaignCodex ledger (#840)", () => {
+  it("lists all entities sorted by name, linking to the detail page", () => {
     renderCodex();
     const links = screen.getAllByRole("link");
     expect(links.map((l) => l.textContent)).toEqual([
@@ -69,28 +105,71 @@ describe("CampaignCodex (#367)", () => {
       expect.stringContaining("Goblin Chief"),
       expect.stringContaining("Thordak"),
     ]);
-    // Type labels also appear as filter chips — scope badge checks to the list.
-    const list = screen.getByRole("list");
-    expect(within(list).getByText("Location")).toBeInTheDocument();
-    expect(within(list).getByText("NPC")).toBeInTheDocument();
-    expect(within(list).getByText("PC")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Goblin Chief/ })).toHaveAttribute(
+      "href",
+      `/campaigns/${CAMPAIGN_ID}/entities/ent-npc`,
+    );
   });
 
-  it("shows an alias hint on rows that have aliases", () => {
+  it("groups rows under ordered letter dividers", () => {
     renderCodex();
-    expect(screen.getByText(/Grik/)).toBeInTheDocument();
+    const sections = screen.getAllByRole("region");
+    expect(sections.map((s) => s.getAttribute("aria-label"))).toEqual([
+      "Entries starting with B",
+      "Entries starting with G",
+      "Entries starting with T",
+    ]);
+    expect(within(sections[1]).getByRole("link", { name: /Goblin Chief/ })).toBeInTheDocument();
   });
 
-  it("links each row to the entity detail page", () => {
+  it("shows a type badge on each row", () => {
     renderCodex();
-    const link = screen.getByRole("link", { name: /Goblin Chief/ });
-    expect(link).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/entities/ent-npc`);
+    expect(
+      within(screen.getByRole("link", { name: /Baldur's Gate/ })).getByText("Location"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("link", { name: /Thordak/ })).getByText("PC"),
+    ).toBeInTheDocument();
   });
 
-  it("narrows by type chip", async () => {
+  it("shows monogram, italic alias and first-line snippet on a row", () => {
+    renderCodex();
+    const row = screen.getByRole("link", { name: /Goblin Chief/ });
+    expect(within(row).getByText("G")).toBeInTheDocument();
+    expect(within(row).getByText(/Grik/)).toBeInTheDocument();
+    expect(within(row).getByText("Leads the Cragmaw tribe.")).toBeInTheDocument();
+    expect(within(row).queryByText(/Sworn enemy/)).not.toBeInTheDocument();
+  });
+
+  it("shows the no-description fallback when notes are empty", () => {
+    renderCodex();
+    const row = screen.getByRole("link", { name: /Thordak/ });
+    expect(within(row).getByText(/no description yet/i)).toBeInTheDocument();
+  });
+
+  it("renders an alphabet jump rail with only present letters enabled", () => {
+    renderCodex();
+    const rail = screen.getByRole("navigation", { name: /jump to letter/i });
+    expect(within(rail).getByRole("button", { name: "B" })).toBeEnabled();
+    expect(within(rail).getByRole("button", { name: "G" })).toBeEnabled();
+    expect(within(rail).getByRole("button", { name: "Z" })).toBeDisabled();
+  });
+});
+
+describe("CampaignCodex rail filters (#840)", () => {
+  it("shows per-type counts in the filter list", () => {
+    renderCodex();
+    const filters = screen.getByRole("group", { name: /filter by type/i });
+    expect(within(filters).getByRole("button", { name: /All entries 3/ })).toBeInTheDocument();
+    expect(within(filters).getByRole("button", { name: /NPC 1/ })).toBeInTheDocument();
+    expect(within(filters).getByRole("button", { name: /Location 1/ })).toBeInTheDocument();
+    expect(within(filters).getByRole("button", { name: /Faction 0/ })).toBeInTheDocument();
+  });
+
+  it("narrows by type filter", async () => {
     const user = userEvent.setup();
     renderCodex();
-    await user.click(screen.getByRole("button", { name: "NPC" }));
+    await user.click(screen.getByRole("button", { name: /NPC/ }));
     expect(screen.getByRole("link", { name: /Goblin Chief/ })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Thordak/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Baldur's Gate/ })).not.toBeInTheDocument();
@@ -120,12 +199,37 @@ describe("CampaignCodex (#367)", () => {
     expect(screen.queryByRole("link", { name: /Goblin Chief/ })).not.toBeInTheDocument();
   });
 
+  it("flags a row that only matched in its description", async () => {
+    const user = userEvent.setup();
+    renderCodex();
+    await user.type(screen.getByRole("searchbox", { name: /search/i }), "cragmaw");
+    const row = screen.getByRole("link", { name: /Goblin Chief/ });
+    expect(within(row).getByText(/matched in description/i)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Thordak/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps a name/alias hit unflagged even when notes also match", async () => {
+    const user = userEvent.setup();
+    renderCodex();
+    await user.type(screen.getByRole("searchbox", { name: /search/i }), "grik");
+    expect(screen.queryByText(/matched in description/i)).not.toBeInTheDocument();
+  });
+
   it("composes search with the type filter", async () => {
     const user = userEvent.setup();
     renderCodex();
-    await user.click(screen.getByRole("button", { name: "Location" }));
+    await user.click(screen.getByRole("button", { name: /Location/ }));
     await user.type(screen.getByRole("searchbox", { name: /search/i }), "goblin");
     expect(screen.queryAllByRole("link")).toHaveLength(0);
+  });
+
+  it("offers all three sorts enabled, defaulting to A→Z", () => {
+    renderCodex();
+    const sortSelect = screen.getByLabelText("Sort");
+    expect(sortSelect).toHaveValue("alpha");
+    expect(screen.getByRole("option", { name: "A → Z" })).toBeEnabled();
+    expect(screen.getByRole("option", { name: "Recently mentioned" })).toBeEnabled();
+    expect(screen.getByRole("option", { name: "Most mentioned" })).toBeEnabled();
   });
 
   it("shows the empty state when the campaign has no entities", () => {
@@ -148,6 +252,167 @@ describe("CampaignCodex (#367)", () => {
   });
 });
 
+function stats(partial: Partial<NonNullable<CampaignEntity["stats"]>>) {
+  return {
+    mentionCount: 0,
+    firstMentioned: null,
+    lastMentioned: null,
+    chroniclers: [],
+    hasDescription: true,
+    ...partial,
+  };
+}
+
+// GOBLIN is most mentioned; THORDAK mentioned most recently; GATE has no stats.
+const STATS_ENTITIES = [
+  {
+    ...GOBLIN,
+    stats: stats({
+      mentionCount: 7,
+      lastMentioned: { sessionId: "s3", sessionTitle: null, sessionOrdinal: 3, date: "2026-07-01" },
+    }),
+  },
+  {
+    ...THORDAK,
+    stats: stats({
+      mentionCount: 2,
+      lastMentioned: { sessionId: "s5", sessionTitle: null, sessionOrdinal: 5, date: "2026-07-10" },
+    }),
+  },
+];
+
+// The activity rail also links stats entities, so scope ledger assertions outside it.
+function ledgerLinks() {
+  const rail = screen.queryByRole("complementary", { name: /codex activity/i });
+  return screen.getAllByRole("link").filter((l) => !rail?.contains(l));
+}
+
+function ledgerRow(name: RegExp) {
+  const row = ledgerLinks().find((l) => name.test(l.textContent ?? ""));
+  if (!row) throw new Error(`No ledger row matching ${name}`);
+  return row;
+}
+
+describe("CampaignCodex mention sorts (#853)", () => {
+  beforeEach(() => mockActivity(STATS_ENTITIES));
+
+  it("renders a flat ranked list for Most mentioned, without dividers or the jump rail", async () => {
+    const user = userEvent.setup();
+    renderCodex();
+    await user.selectOptions(screen.getByLabelText("Sort"), "mentions");
+    expect(ledgerLinks().map((l) => l.textContent)).toEqual([
+      expect.stringContaining("Goblin Chief"),
+      expect.stringContaining("Thordak"),
+      expect.stringContaining("Baldur's Gate"),
+    ]);
+    expect(screen.queryAllByRole("region")).toHaveLength(0);
+    expect(screen.queryByRole("navigation", { name: /jump to letter/i })).not.toBeInTheDocument();
+  });
+
+  it("orders Recently mentioned by lastMentioned, never-mentioned last", async () => {
+    const user = userEvent.setup();
+    renderCodex();
+    await user.selectOptions(screen.getByLabelText("Sort"), "recent");
+    expect(ledgerLinks().map((l) => l.textContent)).toEqual([
+      expect.stringContaining("Thordak"),
+      expect.stringContaining("Goblin Chief"),
+      expect.stringContaining("Baldur's Gate"),
+    ]);
+  });
+
+  it("restores letter dividers and the jump rail when switching back to A→Z", async () => {
+    const user = userEvent.setup();
+    renderCodex();
+    await user.selectOptions(screen.getByLabelText("Sort"), "mentions");
+    await user.selectOptions(screen.getByLabelText("Sort"), "alpha");
+    expect(screen.getAllByRole("region")).toHaveLength(3);
+    expect(screen.getByRole("navigation", { name: /jump to letter/i })).toBeInTheDocument();
+  });
+
+  it("composes mention sorts with the type filter", async () => {
+    const user = userEvent.setup();
+    renderCodex();
+    await user.selectOptions(screen.getByLabelText("Sort"), "mentions");
+    await user.click(screen.getByRole("button", { name: /NPC/ }));
+    expect(ledgerLinks().map((l) => l.textContent)).toEqual([
+      expect.stringContaining("Goblin Chief"),
+    ]);
+  });
+
+  it("shows mention-count and last-session meta on rows with stats", () => {
+    renderCodex();
+    const row = ledgerRow(/Goblin Chief/);
+    expect(within(row).getByText("7 ✎ · Session 3")).toBeInTheDocument();
+  });
+
+  it("omits the session part when lastMentioned is null", () => {
+    mockActivity([{ ...GOBLIN, stats: stats({ mentionCount: 0 }) }]);
+    renderCodex();
+    const row = ledgerRow(/Goblin Chief/);
+    expect(within(row).getByText("0 ✎")).toBeInTheDocument();
+    expect(within(row).queryByText(/Session/)).not.toBeInTheDocument();
+  });
+
+  it("degrades to badge-only meta on rows without stats", () => {
+    renderCodex();
+    const row = ledgerRow(/Baldur's Gate/);
+    expect(within(row).getByText("Location")).toBeInTheDocument();
+    expect(within(row).queryByText(/✎/)).not.toBeInTheDocument();
+  });
+});
+
+describe("CampaignCodex activity rail (#841)", () => {
+  it("renders the activity rail alongside the ledger", () => {
+    renderCodex();
+    expect(screen.getByRole("complementary", { name: /codex activity/i })).toBeInTheDocument();
+  });
+
+  it("keeps the rail rendered when search has no matches", async () => {
+    const user = userEvent.setup();
+    renderCodex();
+    await user.type(screen.getByRole("searchbox", { name: /search/i }), "zzz");
+    expect(screen.getByText(/no entities match/i)).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: /codex activity/i })).toBeInTheDocument();
+  });
+
+  it("renders the needs-chronicling banner above the ledger when entities lack descriptions", () => {
+    mockActivity([
+      {
+        ...GOBLIN,
+        stats: {
+          mentionCount: 3,
+          firstMentioned: null,
+          lastMentioned: null,
+          chroniclers: [],
+          hasDescription: false,
+        },
+      },
+    ]);
+    renderCodex();
+    // Banner + desktop gold card both render it — breakpoints split them in CSS.
+    expect(screen.getAllByText(/1 entry has been mentioned/)).toHaveLength(2);
+    for (const cta of screen.getAllByRole("link", { name: /^Add what you know/ })) {
+      expect(cta).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/entities/ent-npc?edit=1`);
+    }
+  });
+});
+
+describe("CampaignCodex hidden entities (#523)", () => {
+  it("shows a Hidden lock badge to the owner only", () => {
+    mockEntities([GOBLIN, SECRET]);
+    renderCodex("OWNER");
+    const row = screen.getByRole("link", { name: /Secret Cult/ });
+    expect(within(row).getByText(/Hidden/)).toBeInTheDocument();
+    expect(row.className).toContain("opacity-60");
+  });
+
+  it("never marks rows Hidden for a player", () => {
+    mockEntities([GOBLIN, SECRET]);
+    renderCodex("PLAYER");
+    expect(screen.queryByText(/Hidden/)).not.toBeInTheDocument();
+  });
+});
+
 describe("CampaignCodex create flow (#367)", () => {
   it("creates an entity and primes the shared cache", async () => {
     const user = userEvent.setup();
@@ -155,10 +420,11 @@ describe("CampaignCodex create flow (#367)", () => {
     vi.mocked(client.createEntity).mockResolvedValue(created);
     renderCodex();
 
-    await user.click(screen.getByRole("button", { name: /new entity/i }));
+    await user.click(screen.getByRole("button", { name: /new entry/i }));
     await user.selectOptions(screen.getByLabelText("Type"), "NPC");
     await user.type(screen.getByLabelText(/name/i), "  Sildar Hallwinter  ");
     await user.type(screen.getByLabelText(/aliases/i), "Sil, the Knight");
+    await user.type(screen.getByLabelText(/portrait url/i), "https://example.com/sildar.png");
     await user.type(screen.getByLabelText(/notes/i), "Rescued near Phandalin.");
     await user.click(screen.getByRole("button", { name: /create entity/i }));
 
@@ -166,6 +432,7 @@ describe("CampaignCodex create flow (#367)", () => {
       type: "NPC",
       name: "Sildar Hallwinter",
       aliases: ["Sil", "the Knight"],
+      portraitUrl: "https://example.com/sildar.png",
       notes: "Rescued near Phandalin.",
     });
     expect(vi.mocked(primeCampaignEntities)).toHaveBeenCalledWith(
@@ -181,7 +448,7 @@ describe("CampaignCodex create flow (#367)", () => {
     vi.mocked(client.createEntity).mockResolvedValue(entity({ id: "ent-new", name: "Sildar" }));
     renderCodex();
 
-    await user.click(screen.getByRole("button", { name: /new entity/i }));
+    await user.click(screen.getByRole("button", { name: /new entry/i }));
     await user.type(screen.getByLabelText(/name/i), "Sildar");
     await user.click(screen.getByRole("button", { name: /create entity/i }));
 
@@ -196,7 +463,7 @@ describe("CampaignCodex create flow (#367)", () => {
   it("disables submit while the name is blank", async () => {
     const user = userEvent.setup();
     renderCodex();
-    await user.click(screen.getByRole("button", { name: /new entity/i }));
+    await user.click(screen.getByRole("button", { name: /new entry/i }));
     expect(screen.getByRole("button", { name: /create entity/i })).toBeDisabled();
   });
 
@@ -205,7 +472,7 @@ describe("CampaignCodex create flow (#367)", () => {
     vi.mocked(client.createEntity).mockRejectedValue(new Error("Entity already exists"));
     renderCodex();
 
-    await user.click(screen.getByRole("button", { name: /new entity/i }));
+    await user.click(screen.getByRole("button", { name: /new entry/i }));
     await user.type(screen.getByLabelText(/name/i), "Sildar");
     await user.click(screen.getByRole("button", { name: /create entity/i }));
 
@@ -217,7 +484,7 @@ describe("CampaignCodex create flow (#367)", () => {
     const user = userEvent.setup();
     renderCodex();
 
-    const toggle = screen.getByRole("button", { name: /new entity/i });
+    const toggle = screen.getByRole("button", { name: /new entry/i });
     await user.click(toggle);
     await user.type(screen.getByLabelText(/name/i), "Sildar");
     await user.keyboard("{Escape}");
@@ -230,17 +497,75 @@ describe("CampaignCodex create flow (#367)", () => {
     const user = userEvent.setup();
     renderCodex();
 
-    const toggle = screen.getByRole("button", { name: /new entity/i });
+    const toggle = screen.getByRole("button", { name: /new entry/i });
     await user.click(toggle);
     await user.click(screen.getByRole("button", { name: /cancel/i }));
 
     expect(document.activeElement).toBe(toggle);
   });
 
-  it("offers the create toggle even when the campaign has no entities", () => {
+  it("offers the create toggle and an empty-state CTA when the campaign has no entities", async () => {
+    const user = userEvent.setup();
     mockEntities([]);
     renderCodex();
-    expect(screen.getByRole("button", { name: /new entity/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /new entry/i })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /create your first entry/i }));
+    expect(screen.getByRole("button", { name: /create entity/i })).toBeInTheDocument();
+  });
+});
+
+describe("CampaignCodex mobile (#840)", () => {
+  beforeEach(() => stubViewport(false));
+
+  it("replaces the rail toggle with a single fixed FAB", () => {
+    renderCodex();
+    const toggles = screen.getAllByRole("button", { name: /new entry/i });
+    expect(toggles).toHaveLength(1);
+    expect(toggles[0].className).toContain("fixed");
+  });
+
+  it("opens the create form in a bottom sheet from the FAB and creates", async () => {
+    const user = userEvent.setup();
+    vi.mocked(client.createEntity).mockResolvedValue(entity({ id: "ent-new", name: "Sildar" }));
+    renderCodex();
+
+    await user.click(screen.getByRole("button", { name: /new entry/i }));
+    const sheet = screen.getByRole("dialog", { name: /new entry/i });
+    await user.type(within(sheet).getByLabelText(/name/i), "Sildar");
+    await user.click(within(sheet).getByRole("button", { name: /create entity/i }));
+
+    expect(vi.mocked(client.createEntity)).toHaveBeenCalledWith(CAMPAIGN_ID, {
+      type: "NPC",
+      name: "Sildar",
+      aliases: [],
+      notes: undefined,
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("closes the sheet on Escape", async () => {
+    const user = userEvent.setup();
+    renderCodex();
+    await user.click(screen.getByRole("button", { name: /new entry/i }));
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("renders the type filters as a horizontally scrollable chip row", () => {
+    renderCodex();
+    const group = screen.getByRole("group", { name: /filter by type/i });
+    expect(group.className).toContain("overflow-x-auto");
+    expect(within(group).getAllByRole("button").every((b) => b.hasAttribute("aria-pressed"))).toBe(
+      true,
+    );
+  });
+
+  it("keeps create reachable when the campaign has no entities", async () => {
+    const user = userEvent.setup();
+    mockEntities([]);
+    renderCodex();
+    await user.click(screen.getByRole("button", { name: /new entry/i }));
+    expect(screen.getByRole("dialog", { name: /new entry/i })).toBeInTheDocument();
   });
 });
 
@@ -252,7 +577,7 @@ describe("CampaignCodex owner start-hidden (#523)", () => {
     );
     renderCodex("OWNER");
 
-    await user.click(screen.getByRole("button", { name: /new entity/i }));
+    await user.click(screen.getByRole("button", { name: /new entry/i }));
     await user.type(screen.getByLabelText(/name/i), "Big Bad");
     await user.click(screen.getByLabelText(/start hidden/i));
     await user.click(screen.getByRole("button", { name: /create entity/i }));
@@ -271,7 +596,7 @@ describe("CampaignCodex owner start-hidden (#523)", () => {
     vi.mocked(client.createEntity).mockResolvedValue(entity({ id: "ent-new", name: "Barkeep" }));
     renderCodex("OWNER");
 
-    await user.click(screen.getByRole("button", { name: /new entity/i }));
+    await user.click(screen.getByRole("button", { name: /new entry/i }));
     await user.type(screen.getByLabelText(/name/i), "Barkeep");
     await user.click(screen.getByRole("button", { name: /create entity/i }));
 
@@ -286,7 +611,7 @@ describe("CampaignCodex owner start-hidden (#523)", () => {
   it("hides the 'Start hidden' option from a player", async () => {
     const user = userEvent.setup();
     renderCodex("PLAYER");
-    await user.click(screen.getByRole("button", { name: /new entity/i }));
+    await user.click(screen.getByRole("button", { name: /new entry/i }));
     expect(screen.queryByLabelText(/start hidden/i)).not.toBeInTheDocument();
   });
 });

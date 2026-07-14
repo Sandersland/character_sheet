@@ -16,6 +16,7 @@
 export * from "@/lib/srd/alignments.js";
 export * from "@/lib/srd/tools.js";
 export * from "@/lib/srd/condition-data.js";
+export * from "@/lib/srd/roll-effects.js";
 export * from "@/lib/srd/item-rarity.js";
 export * from "@/lib/srd/fighting-styles.js";
 export * from "@/lib/srd/armor-class.js";

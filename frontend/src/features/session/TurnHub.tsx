@@ -19,11 +19,12 @@ import ActionSlot from "@/features/session/ActionSlot";
 import BonusActionSlot from "@/features/session/BonusActionSlot";
 import ReactionSlot from "@/features/session/ReactionSlot";
 import EffectManeuverStrip from "@/features/session/EffectManeuverStrip";
-import LoadoutSwapRow from "@/features/session/LoadoutSwapRow";
+import LoadoutRefundStrip from "@/features/session/LoadoutRefundStrip";
 import InitiativeRail from "@/features/session/InitiativeRail";
 import TurnConcentrationBanner from "@/features/session/TurnConcentrationBanner";
 import TurnDeathSaves from "@/features/session/TurnDeathSaves";
-import TurnDmBanner from "@/features/session/TurnDmBanner";
+import TurnSummaryBanner from "@/features/session/TurnSummaryBanner";
+import { useTallyResolve } from "@/features/session/useTallyResolve";
 import TurnResolutionSheets from "@/features/session/TurnResolutionSheets";
 import { showInitiative, showMovement } from "@/features/session/turnFlags";
 import type { AllyOption } from "@/lib/spellMeta";
@@ -274,6 +275,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     twfAvailable,
     consumeBonusAction,
     consumeReaction,
+    clearAttackTally,
     history,
   } = turnState;
 
@@ -284,6 +286,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
   const {
     showActionMenu, setShowActionMenu, showBonusMenu, setShowBonusMenu,
     showReactionMenu, setShowReactionMenu, activeResolution, closeResolution,
+    loadoutSwap,
   } = turn;
   const {
     dieLabel, dieBusy, superiorityRemaining, classActions, classBonusActions,
@@ -295,6 +298,16 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     handleActionClick, handleAttackAction, handleResumeAttack, handleTwfAction, handleActionSurge,
     handleEndTurn, handleReactionManeuver, handleEffectManeuver, handleBonusSpellCast,
   } = turn;
+
+  // Inline banner resolve (#811): verdict writes + on-line damage rolls for
+  // skipped attacks, shared-shaped with the in-sheet strip's rule.
+  const tallyResolve = useTallyResolve({
+    character,
+    sessionId,
+    setTallyVerdict: turnState.setTallyVerdict,
+    setTallyDamageAt: turnState.setTallyDamageAt,
+    onLogChanged,
+  });
 
   // Decorative initiative rail's "you" marker (#737).
   const youInitial = character.name?.[0]?.toUpperCase() ?? "?";
@@ -342,9 +355,6 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           onUpdate={onUpdate}
           onLogChanged={onLogChanged}
         />
-
-        {/* ── Loadout (slot root, pre-attack) — a swap costs the Action (#733) ── */}
-        <LoadoutSwapRow character={character} turnState={turnState} onUpdate={onUpdate} />
 
         {/* ── Action ──────────────────────────────────────────────────────── */}
         <ActionSlot
@@ -395,8 +405,14 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           consumeReaction={consumeReaction}
         />
 
-        {/* ── "Tell your DM" banner — attack tally once the sheet is closed ── */}
-        {!activeResolution && <TurnDmBanner rows={attackTally} />}
+        {/* ── Weapon-change Refund — persists until refunded or turn end (#815) ── */}
+        <LoadoutRefundStrip loadout={loadoutSwap} />
+
+        {/* ── "Turn summary" banner — attack tally once the sheet is closed;
+            unresolved lines resolve inline, resolved lines offer quiet Change (#811) ── */}
+        {!activeResolution && (
+          <TurnSummaryBanner rows={attackTally} onDismiss={clearAttackTally} resolve={tallyResolve} />
+        )}
 
         {/* ── Action Surge (Fighter) ─────────────────────────────────────── */}
         <ActionSurgeButton
@@ -419,6 +435,7 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
           onLogChanged={onLogChanged}
           allies={allies}
           send={send}
+          loadoutSwap={loadoutSwap}
         />
 
         {/* ── Effect maneuvers (no slot consumed) — e.g. Evasive Footwork ─────── */}

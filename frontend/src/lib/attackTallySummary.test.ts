@@ -16,7 +16,7 @@ function roll(overrides: Partial<TallyAttackRoll> = {}): TallyAttackRoll {
 }
 
 function row(overrides: Partial<AttackTallyRow> = {}): AttackTallyRow {
-  return { formId: "w1", formName: "Longsword", attack: roll(), ...overrides };
+  return { id: "r1", source: "action", formId: "w1", formName: "Longsword", attack: roll(), ...overrides };
 }
 
 describe("autoVerdict", () => {
@@ -77,6 +77,16 @@ describe("attackTallyLine", () => {
   it("hit with no damage yet prompts to roll damage", () => {
     const line = attackTallyLine(row({ verdict: "hit" }));
     expect(line).toBe("Longsword: hit — to-hit 17 — roll damage");
+  });
+
+  it("an unresolved row asks the question — never claims a hit (#811)", () => {
+    const line = attackTallyLine(row({}));
+    expect(line).toBe("Longsword: to-hit 17 — hit or miss?");
+  });
+
+  it("an unresolved row with damage recorded still asks (damage does not imply hit here — state auto-resolves it upstream)", () => {
+    const line = attackTallyLine(row({ damage: 9 }));
+    expect(line).toBe("Longsword: to-hit 17 — hit or miss?");
   });
 
   it("attackTallyLines maps one line per row", () => {

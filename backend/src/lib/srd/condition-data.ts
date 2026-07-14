@@ -22,10 +22,14 @@ export type ConditionKey =
   | "stunned"
   | "unconscious";
 
+import type { RollEffect } from "./roll-effects.js";
+
 export interface ConditionDefinition {
   key: ConditionKey;
   label: string;
   description: string;
+  /** State-driven advantage/disadvantage grants (#486). Merged into rollModifiers on read. */
+  rollEffects?: RollEffect[];
 }
 
 export const CONDITIONS: readonly ConditionDefinition[] = [
@@ -34,6 +38,7 @@ export const CONDITIONS: readonly ConditionDefinition[] = [
     label: "Blinded",
     description:
       "Can't see and automatically fails any ability check that requires sight. Attack rolls against the creature have advantage, and its attack rolls have disadvantage.",
+    rollEffects: [{ mode: "disadvantage", kind: "attack" }],
   },
   {
     key: "charmed",
@@ -51,6 +56,10 @@ export const CONDITIONS: readonly ConditionDefinition[] = [
     label: "Frightened",
     description:
       "Has disadvantage on ability checks and attack rolls while the source of its fear is within line of sight. Can't willingly move closer to the source of its fear.",
+    rollEffects: [
+      { mode: "disadvantage", kind: "attack" },
+      { mode: "disadvantage", kind: "check" },
+    ],
   },
   {
     key: "grappled",
@@ -85,18 +94,27 @@ export const CONDITIONS: readonly ConditionDefinition[] = [
     key: "poisoned",
     label: "Poisoned",
     description: "Has disadvantage on attack rolls and ability checks.",
+    rollEffects: [
+      { mode: "disadvantage", kind: "attack" },
+      { mode: "disadvantage", kind: "check" },
+    ],
   },
   {
     key: "prone",
     label: "Prone",
     description:
       "Can only crawl unless it stands up. Has disadvantage on attack rolls. An attack roll against it has advantage if the attacker is within 5 feet; otherwise the attack roll has disadvantage.",
+    rollEffects: [{ mode: "disadvantage", kind: "attack" }],
   },
   {
     key: "restrained",
     label: "Restrained",
     description:
       "Speed becomes 0, and it can't benefit from any bonus to its speed. Attack rolls against it have advantage, and its attack rolls have disadvantage. Has disadvantage on Dexterity saving throws.",
+    rollEffects: [
+      { mode: "disadvantage", kind: "attack" },
+      { mode: "disadvantage", kind: "save", ability: "dexterity" },
+    ],
   },
   {
     key: "stunned",
@@ -118,4 +136,25 @@ export const EXHAUSTION_MAX = 6;
 /** Returns true if `key` is a known standard condition key. */
 export function isKnownCondition(key: string): key is ConditionKey {
   return CONDITIONS.some((c) => c.key === key);
+}
+
+/**
+ * Synthetic roll-effect grants for a given exhaustion level (#846), mirroring
+ * the standard conditions' `rollEffects` shape without a `ConditionDefinition`
+ * entry of its own (exhaustion is a numeric level, not a boolean condition —
+ * see the module comment above). PHB Appendix A: level 1 grants disadvantage
+ * on ability checks; level 3 additionally grants disadvantage on attack rolls
+ * and saving throws (cumulative with level 1's effect). Levels 2/4/5/6 (speed
+ * halved, hp max halved, speed 0, death) don't affect d20 rolls, so they have
+ * no representation here — their text lives in the frontend's
+ * lib/conditions.ts exhaustionEffect().
+ */
+export function exhaustionRollEffects(level: number): RollEffect[] {
+  if (level < 1) return [];
+  const effects: RollEffect[] = [{ mode: "disadvantage", kind: "check" }];
+  if (level >= 3) {
+    effects.push({ mode: "disadvantage", kind: "attack" });
+    effects.push({ mode: "disadvantage", kind: "save" });
+  }
+  return effects;
 }

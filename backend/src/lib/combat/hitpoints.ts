@@ -26,7 +26,7 @@ import {
 import { rollDie } from "@/lib/core/dice.js";
 import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import {
-  cloneResourceLists,
+  snapshotResources,
   normalizeResourcesMutable,
   serializeResourcesState,
   type ResourcesMutableState,
@@ -350,6 +350,59 @@ function computeConcentrationSave(
   return { saveBonus, dc: concentrationSaveDC(damage) };
 }
 
+// Re-read the character + concentration state inside the tx; null when the row
+// is gone or the character is not concentrating.
+async function readConcentratingStateInTx(tx: Prisma.TransactionClient, characterId: string) {
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: {
+      spellcasting: true,
+      abilityScores: true,
+      experiencePoints: true,
+      savingThrowProficiencies: true,
+      resources: true,
+      classEntries: {
+        orderBy: { position: "asc" as const },
+        take: 1,
+        select: { name: true },
+      },
+    },
+  });
+  if (!row) return null;
+
+  const state = normalizeSpellcastingMutable(row.spellcasting);
+  const prior = state.concentratingOn;
+  if (!prior) return null;
+  return { row, state, prior };
+}
+
+// Clear concentration and persist it; returns the after-snapshot for the event log.
+async function dropConcentrationInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  state: ReturnType<typeof normalizeSpellcastingMutable>,
+) {
+  state.concentratingOn = null;
+  await tx.character.update({
+    where: { id: characterId },
+    data: {
+      spellcasting: {
+        slotsUsed: state.slotsUsed,
+        arcanumUsed: state.arcanumUsed,
+        spells: state.spells,
+        concentratingOn: null,
+      } as unknown as Prisma.InputJsonValue,
+    },
+  });
+
+  return {
+    slotsUsed: { ...state.slotsUsed },
+    arcanumUsed: { ...state.arcanumUsed },
+    spells: state.spells.map((s) => ({ ...s })),
+    concentratingOn: null,
+  };
+}
+
 /**
  * If the character is concentrating, resolve the 5e "concentration on damage"
  * rule for one instance of damage and, on a drop, clear `concentratingOn` and
@@ -388,26 +441,9 @@ async function applyConcentrationCheckInTx(
   sessionId: string | null,
   autoRoll = true,
 ): Promise<ConcentrationCheckResult | null> {
-  const row = await tx.character.findUnique({
-    where: { id: characterId },
-    select: {
-      spellcasting: true,
-      abilityScores: true,
-      experiencePoints: true,
-      savingThrowProficiencies: true,
-      resources: true,
-      classEntries: {
-        orderBy: { position: "asc" as const },
-        take: 1,
-        select: { name: true },
-      },
-    },
-  });
-  if (!row) return null;
-
-  const state = normalizeSpellcastingMutable(row.spellcasting);
-  const prior = state.concentratingOn;
-  if (!prior) return null;
+  const concentration = await readConcentratingStateInTx(tx, characterId);
+  if (!concentration) return null;
+  const { row, state, prior } = concentration;
 
   const beforeSpellcasting = {
     slotsUsed: { ...state.slotsUsed },
@@ -478,25 +514,7 @@ async function applyConcentrationCheckInTx(
   }
 
   // Drop concentration (failed save, or 0-HP/death path).
-  state.concentratingOn = null;
-  await tx.character.update({
-    where: { id: characterId },
-    data: {
-      spellcasting: {
-        slotsUsed: state.slotsUsed,
-        arcanumUsed: state.arcanumUsed,
-        spells: state.spells,
-        concentratingOn: null,
-      } as unknown as Prisma.InputJsonValue,
-    },
-  });
-
-  const afterSpellcasting = {
-    slotsUsed: { ...state.slotsUsed },
-    arcanumUsed: { ...state.arcanumUsed },
-    spells: state.spells.map((s) => ({ ...s })),
-    concentratingOn: null,
-  };
+  const afterSpellcasting = await dropConcentrationInTx(tx, characterId, state);
 
   const summary = droppedByDeath
     ? `Concentration on ${prior.spellName} dropped (dropped to 0 HP)`
@@ -553,27 +571,11 @@ async function applyConcentrationSaveInTx(
   batchId: string,
   sessionId: string | null,
 ): Promise<ConcentrationCheckResult | null> {
-  const row = await tx.character.findUnique({
-    where: { id: characterId },
-    select: {
-      spellcasting: true,
-      abilityScores: true,
-      experiencePoints: true,
-      savingThrowProficiencies: true,
-      resources: true,
-      classEntries: {
-        orderBy: { position: "asc" as const },
-        take: 1,
-        select: { name: true },
-      },
-    },
-  });
-  if (!row) return null;
-
-  const state = normalizeSpellcastingMutable(row.spellcasting);
-  const prior = state.concentratingOn;
-  // Stale no-op: not concentrating, or concentrating on a different spell now.
-  if (!prior || prior.entryId !== entryId) return null;
+  const concentration = await readConcentratingStateInTx(tx, characterId);
+  if (!concentration) return null;
+  const { row, state, prior } = concentration;
+  // Stale no-op: concentrating on a different spell now.
+  if (prior.entryId !== entryId) return null;
 
   const { saveBonus, dc } = computeConcentrationSave(row, damage);
   const total = roll + saveBonus;
@@ -604,25 +606,7 @@ async function applyConcentrationSaveInTx(
     concentratingOn: { ...prior },
   };
 
-  state.concentratingOn = null;
-  await tx.character.update({
-    where: { id: characterId },
-    data: {
-      spellcasting: {
-        slotsUsed: state.slotsUsed,
-        arcanumUsed: state.arcanumUsed,
-        spells: state.spells,
-        concentratingOn: null,
-      } as unknown as Prisma.InputJsonValue,
-    },
-  });
-
-  const afterSpellcasting = {
-    slotsUsed: { ...state.slotsUsed },
-    arcanumUsed: { ...state.arcanumUsed },
-    spells: state.spells.map((s) => ({ ...s })),
-    concentratingOn: null,
-  };
+  const afterSpellcasting = await dropConcentrationInTx(tx, characterId, state);
 
   await logEvent(tx, {
     characterId,
@@ -1132,10 +1116,10 @@ function deriveRestPools(row: HpOpContext["row"]): DerivedClassInfo | null {
 function resetRestResources(
   row: HpOpContext["row"],
   rest: "short" | "long",
-): { state: ResourcesMutableState; beforeResourceState: Record<string, unknown>; resourcesRestored: number } {
+): { state: ResourcesMutableState; beforeResourceState: ResourcesMutableState; resourcesRestored: number } {
   const derivedRes = deriveRestPools(row);
   const state = normalizeResourcesMutable(row.resources);
-  const beforeResourceState = { ...cloneResourceLists(state), fightingStyle: state.fightingStyle };
+  const beforeResourceState = snapshotResources(state);
   let resourcesRestored = 0;
   for (const pool of derivedRes?.resources ?? []) {
     if (poolRechargesOn(pool.recharge, rest)) {
@@ -1893,6 +1877,41 @@ export async function applyHealInTx(
   });
 }
 
+// Validate + fetch + apply an in-place HP mutation, persisting it; shared by the
+// exported in-tx appliers. `amountLabel` shapes the positive-amount error message.
+async function mutateHitPointsInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  amount: number,
+  amountLabel: string,
+  mutate: (hp: HitPoints) => void,
+): Promise<{ hp: HitPoints; hd: HitDice; beforeHp: HitPoints }> {
+  if (amount <= 0) {
+    throw new InvalidHitPointOperationError(`${amountLabel} amount must be positive`);
+  }
+
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: { hitPoints: true, hitDice: true },
+  });
+  if (!row) {
+    throw new InvalidHitPointOperationError(`Character not found: ${characterId}`);
+  }
+
+  const hp = normalizeHitPoints(row.hitPoints);
+  const hd = normalizeHitDice(row.hitDice);
+  const beforeHp = { ...hp };
+
+  mutate(hp);
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: { hitPoints: hp as unknown as Prisma.InputJsonValue },
+  });
+
+  return { hp, hd, beforeHp };
+}
+
 /**
  * Apply damage to a character's HP inside an existing transaction, mirroring
  * the `case "damage"` branch of applyHitPointOperations.
@@ -1909,30 +1928,11 @@ export async function applyDamageInTx(
   batchId: string,
   sessionId: string | null,
 ): Promise<ConcentrationCheckResult | null> {
-  if (amount <= 0) {
-    throw new InvalidHitPointOperationError("damage amount must be positive");
-  }
-
-  const row = await tx.character.findUnique({
-    where: { id: characterId },
-    select: { hitPoints: true, hitDice: true },
-  });
-  if (!row) {
-    throw new InvalidHitPointOperationError(`Character not found: ${characterId}`);
-  }
-
-  const hp = normalizeHitPoints(row.hitPoints);
-  const hd = normalizeHitDice(row.hitDice);
-  const beforeHp = { ...hp };
-
   // Temp HP absorbs first, then current. Both floor at 0.
-  const absorbed = Math.min(hp.temp, amount);
-  hp.temp -= absorbed;
-  hp.current = Math.max(0, hp.current - (amount - absorbed));
-
-  await tx.character.update({
-    where: { id: characterId },
-    data: { hitPoints: hp as unknown as Prisma.InputJsonValue },
+  const { hp, hd, beforeHp } = await mutateHitPointsInTx(tx, characterId, amount, "damage", (hp) => {
+    const absorbed = Math.min(hp.temp, amount);
+    hp.temp -= absorbed;
+    hp.current = Math.max(0, hp.current - (amount - absorbed));
   });
 
   await logEvent(tx, {
@@ -1963,27 +1963,8 @@ export async function applyTempHpInTx(
   batchId: string,
   sessionId: string | null,
 ): Promise<void> {
-  if (amount <= 0) {
-    throw new InvalidHitPointOperationError("temp HP amount must be positive");
-  }
-
-  const row = await tx.character.findUnique({
-    where: { id: characterId },
-    select: { hitPoints: true, hitDice: true },
-  });
-  if (!row) {
-    throw new InvalidHitPointOperationError(`Character not found: ${characterId}`);
-  }
-
-  const hp = normalizeHitPoints(row.hitPoints);
-  const hd = normalizeHitDice(row.hitDice);
-  const beforeHp = { ...hp };
-
-  hp.temp = Math.max(hp.temp, amount);
-
-  await tx.character.update({
-    where: { id: characterId },
-    data: { hitPoints: hp as unknown as Prisma.InputJsonValue },
+  const { hp, hd, beforeHp } = await mutateHitPointsInTx(tx, characterId, amount, "temp HP", (hp) => {
+    hp.temp = Math.max(hp.temp, amount);
   });
 
   await logEvent(tx, {

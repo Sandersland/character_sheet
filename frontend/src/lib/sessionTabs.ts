@@ -41,7 +41,6 @@ export function buildSessionTabs(opts: {
     { id: "inventory", label: "Inventory" },
     ...(opts.isCaster ? [{ id: "spells", label: "Spells" }] : []),
     ...(opts.hasClass ? [{ id: "class", label: "Class" }] : []),
-    { id: "rest", label: "Rest & HP" },
     { id: "log", label: "Log" },
     ...(opts.isOwner ? [{ id: "loot", label: "Loot" }] : []),
   ];

@@ -54,6 +54,7 @@ interface DerivedActionRecord {
   grantLevel?: number;   // min level for this action
   resourceKey?: string;  // pool key to check for `enabled`
   resourceAmount?: number; // pool units required
+  reminder?: string;     // in-play rule text for no-server-effect reminder actions
 }
 
 /** Available action shape serialized onto the character. */
@@ -65,6 +66,8 @@ export interface AvailableAction {
   enabled: boolean;
   /** Human-readable reason the action is disabled, if `enabled` is false. */
   disabledReason?: string;
+  /** In-play rule text surfaced as the card subtitle + on-use reminder. */
+  reminder?: string;
 }
 
 /** Resource pool shape — typed subset of what serializeCharacter builds. */
@@ -106,6 +109,9 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "ki", resourceAmount: 1 },
   { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "ki", resourceAmount: 1 },
   { key: "stunningStrike", name: "Stunning Strike", cost: "free", grantClass: "monk", grantLevel: 5, resourceKey: "ki", resourceAmount: 1 },
+  // Way of Shadow reminder actions (#440) — no resourceKey, no server effect; reminder is the deliverable.
+  { key: "shadowStep", name: "Shadow Step", cost: "bonusAction", grantClass: "monk", grantSubclass: "Shadow", grantLevel: 6, reminder: "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn." },
+  { key: "opportunist", name: "Opportunist", cost: "reaction", grantClass: "monk", grantSubclass: "Shadow", grantLevel: 17, reminder: "When a creature within 5 ft of you is hit by another creature's attack, make a melee attack against it as your reaction." },
 
   // ── Paladin ───────────────────────────────────────────────────────────────
   { key: "divineSense", name: "Divine Sense", cost: "action", grantClass: "paladin", grantLevel: 1, resourceKey: "divineSense", resourceAmount: 1 },
@@ -179,6 +185,7 @@ export function deriveActions(
         cost: a.cost,
         enabled,
         ...(disabledReason ? { disabledReason } : {}),
+        ...(a.reminder ? { reminder: a.reminder } : {}),
       };
     });
 }
@@ -252,6 +259,10 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
         source: "Rage",
         duration: "while-active",
         resistDamageTypes: ["bludgeoning", "piercing", "slashing"],
+        rollEffects: [
+          { mode: "advantage", kind: "check", ability: "strength" },
+          { mode: "advantage", kind: "save", ability: "strength" },
+        ],
       },
     },
     { type: "spendResource", key: "rage" },

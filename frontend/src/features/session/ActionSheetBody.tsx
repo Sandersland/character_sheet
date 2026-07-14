@@ -12,6 +12,7 @@ import { useState } from "react";
 import {
   ChevronDown,
   GiCrossedSwords,
+  GiCycle,
   GiDodging,
   GiGrab,
   GiHealthNormal,
@@ -112,6 +113,14 @@ export default function ActionSheetBody({
         badge={model.consumableCount > 0 ? `×${model.consumableCount}` : undefined}
         tone="gold"
         onClick={() => handleActionClick("useObject", "action")}
+      />
+
+      <OptionCard
+        icon={GiCycle}
+        title="Change weapons"
+        subtitle={`${model.loadoutLabel} · only a held-weapon swap costs the Action; a free-hand draw or stow is free`}
+        tone="neutral"
+        onClick={() => handleActionClick("changeWeapons", "action")}
       />
 
       {model.classActionOptions.map((option) => (

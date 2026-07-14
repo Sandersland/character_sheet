@@ -14,6 +14,7 @@ vi.mock("@/api/client", () => ({
   fetchCharacters: vi.fn(),
   addCharacterToCampaign: vi.fn(),
   fetchEntities: vi.fn(),
+  fetchEntityActivity: vi.fn(),
   createEntity: vi.fn(),
   updateEntity: vi.fn(),
   deleteEntity: vi.fn(),
@@ -75,6 +76,7 @@ beforeEach(() => {
   __resetCampaignEntitiesCacheForTests();
   __resetCampaignMergesCacheForTests();
   vi.mocked(client.fetchEntities).mockResolvedValue([]);
+  vi.mocked(client.fetchEntityActivity).mockResolvedValue([]);
   vi.mocked(client.fetchEntityMerges).mockResolvedValue([]);
   vi.mocked(client.fetchCampaignItems).mockResolvedValue([]);
   vi.mocked(client.fetchItems).mockResolvedValue([]);
@@ -205,13 +207,26 @@ describe("CampaignDetailPage tabs (#367)", () => {
   it("deep-links to the Codex tab at /campaigns/:id/codex", async () => {
     renderDetail("/campaigns/camp-1/codex");
 
-    await screen.findByText("The Sunless Citadel");
+    // The campaign name also appears in the codex rail eyebrow — query the heading.
+    await screen.findByRole("heading", { name: /The Sunless Citadel/ });
     expect(screen.getByRole("tab", { name: /codex/i })).toHaveAttribute(
       "aria-selected",
       "true",
     );
     expect(screen.queryByText("Roster")).not.toBeInTheDocument();
     expect(screen.queryByDisplayValue(/\/join\/abc123$/)).not.toBeInTheDocument();
+  });
+
+  it("renders the codex tab full-width and keeps the overview boxed", async () => {
+    const { unmount } = renderDetail("/campaigns/camp-1/codex");
+
+    await screen.findByRole("heading", { name: /The Sunless Citadel/ });
+    expect(document.querySelector("main")).not.toHaveClass("max-w-4xl");
+    unmount();
+
+    renderDetail();
+    await screen.findByText("The Sunless Citadel");
+    expect(document.querySelector("main")).toHaveClass("max-w-4xl");
   });
 
   it("clicking the Codex tab updates the URL and swaps panels", async () => {

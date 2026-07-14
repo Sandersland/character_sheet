@@ -1,9 +1,12 @@
 // Pure model + formatting for the multi-attack tally (#802): the per-attack rows
 // the attack sheet records, the auto-verdict rule (nat 20 → crit, nat 1 → miss),
-// and the "Tell your DM" banner lines. No JSX — rendered by AttackTallyStrip and
-// TurnDmBanner, recorded by useTurnState.
+// and the "Turn summary" banner lines. No JSX — rendered by AttackTallyStrip and
+// TurnSummaryBanner, recorded by useTurnState.
 
 export type TallyVerdict = "hit" | "miss" | "crit";
+
+/** Which economy slot a tally row came from — the Attack action or the TWF bonus action (#813). */
+export type TallyRowSource = "action" | "bonusAction";
 
 /** The kept-d20 snapshot for one recorded attack roll. */
 export interface TallyAttackRoll {
@@ -13,8 +16,12 @@ export interface TallyAttackRoll {
   nat1: boolean;
 }
 
-/** One recorded attack this action: the roll, an optional damage slot, a verdict. */
+/** One recorded attack this turn: the roll, an optional damage slot, a verdict. */
 export interface AttackTallyRow {
+  /** Stable per-row id — damage/rider/override writes target it, not "the last row" (#813). */
+  id: string;
+  /** Which slot recorded it — `action` (Attack) or `bonusAction` (off-hand TWF). */
+  source: TallyRowSource;
   formId: string;
   formName: string;
   attack: TallyAttackRoll;
@@ -30,12 +37,12 @@ export function autoVerdict(attack: TallyAttackRoll): TallyVerdict | undefined {
   return undefined;
 }
 
-// A row is locked (no manual cycling) when the die auto-decided it.
+// A row is locked (no manual verdict changes) when the die auto-decided it.
 export function isVerdictLocked(row: AttackTallyRow): boolean {
   return row.attack.nat20 || row.attack.nat1;
 }
 
-// Explicit-miss only — an unset verdict is treated as a hit ("no verdict gates anything").
+// Explicit-miss only — an unresolved row is undecided, never a miss.
 export function isMissRow(row: AttackTallyRow): boolean {
   return row.verdict === "miss";
 }
@@ -44,9 +51,19 @@ export function isCritRow(row: AttackTallyRow): boolean {
   return row.verdict === "crit" || row.attack.nat20;
 }
 
-// One "Tell your DM" banner line. Miss rows drop damage; crit rows say so.
+// No verdict yet — the attack was rolled but never called hit or miss (#811).
+// Unresolved rows are tappable everywhere they render; resolved rows are final.
+export function isUnresolvedRow(row: AttackTallyRow): boolean {
+  return row.verdict === undefined;
+}
+
+// One "Turn summary" banner line. An unresolved row asks the question instead of
+// claiming a hit (#811); miss rows drop damage; crit rows say so.
 export function attackTallyLine(row: AttackTallyRow): string {
   const name = row.formName;
+  if (isUnresolvedRow(row)) {
+    return `${name}: to-hit ${row.attack.total} — hit or miss?`;
+  }
   if (isMissRow(row)) {
     return row.attack.nat1 ? `${name}: nat 1 — miss` : `${name}: miss (to-hit ${row.attack.total})`;
   }

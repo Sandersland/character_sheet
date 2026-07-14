@@ -25,7 +25,7 @@ import { runCharacterTransaction } from "@/lib/character/character-transaction.j
 import { levelForExperience, proficiencyBonusForLevel } from "./experience.js";
 import { logEvent } from "@/lib/activity/events.js";
 import {
-  cloneResourceLists,
+  snapshotResources,
   normalizeResourcesMutable,
   serializeResourcesState,
   type AdvancementEntry,
@@ -196,9 +196,8 @@ function snapshotAdvancementState(
     abilityScores: { ...scores },
     hitPoints: { ...hp, deathSaves: { ...hp.deathSaves } },
     initiativeBonus: initBonus,
-    // No fightingStyle here (unlike the resources-domain events) — the
-    // advancement event shape has never carried it.
-    resources: cloneResourceLists(state),
+    // Full resources snapshot (incl. fightingStyle) so revert can't wipe it (#818).
+    resources: snapshotResources(state),
   };
 }
 

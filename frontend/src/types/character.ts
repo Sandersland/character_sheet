@@ -722,7 +722,7 @@ export interface JournalEntry {
   /** ISO-8601 capture timestamp shown on NOTE rows (JournalEntry.loggedAt). */
   loggedAt: string;
   body: string;
-  /** Private-by-default; the CAMPAIGN share toggle ships in a later slice. */
+  /** CAMPAIGN notes surface on entity backlinks; PRIVATE is author-only (#838). */
   visibility: EntryVisibility;
   /** Provenance: the session this entry was written during, if any. */
   sessionId?: string;
@@ -1001,6 +1001,8 @@ export interface AvailableAction {
   enabled: boolean;
   /** Human-readable reason why `enabled` is false; absent when enabled. */
   disabledReason?: string;
+  /** In-play rule text for no-server-effect reminder actions (Shadow Step, Opportunist). */
+  reminder?: string;
 }
 
 // ── Subclass option (from GET /api/reference) ─────────────────────────────────
@@ -1134,6 +1136,11 @@ export interface Character {
    * read). Each is also summed into its target skill/stat's tempModifier.
    */
   activeEffects: ActiveEffectsState;
+  /**
+   * State-driven advantage/disadvantage grants (#486), derived from active
+   * conditions + buffs. Resolved per roll via lib/rollMode.ts. Always present.
+   */
+  rollModifiers: RollModifier[];
 
   // Item-granted traits (#529), derived from active items. resistances also feed
   // the #456 auto-halve at damage-apply; all render as item-sourced sheet flags.
@@ -1215,10 +1222,58 @@ export interface CampaignEntity {
   name: string;
   aliases: string[];
   notes: string | null;
+  /** Optional portrait image URL (#844); monogram fallback when null/absent. */
+  portraitUrl?: string | null;
   visibility: EntityVisibility;
   createdAt: string;
   updatedAt: string;
+  /** Linked character for PC entities (#842); null elsewhere, list-route only. */
+  characterId?: string | null;
+  /** Which field a `q=` search hit (#839); present only on searched lists. */
+  matchedIn?: EntityMatchField;
+  /** Derived mention stats (#839); present only with `?include=stats`. */
+  stats?: EntityStats;
 }
+
+export type EntityMatchField = "name" | "alias" | "notes";
+
+/** Session context of a first/last mention; ordinal derived from startedAt order (#839). */
+export interface EntityMentionRef {
+  sessionId: string | null;
+  sessionTitle: string | null;
+  sessionOrdinal: number | null;
+  date: string;
+}
+
+/** Per-entity derived mention stats (#839), visibility-filtered server-side. */
+export interface EntityStats {
+  mentionCount: number;
+  firstMentioned: EntityMentionRef | null;
+  lastMentioned: EntityMentionRef | null;
+  chroniclers: string[];
+  hasDescription: boolean;
+}
+
+/** One co-mentioned entity with its distinct-entry count (#839). */
+export interface EntityConnection {
+  entity: { id: string; name: string; type: EntityType };
+  count: number;
+}
+
+/** One campaign-wide Codex activity item (#839), newest-first. */
+export type CodexActivityItem =
+  | {
+      kind: "mention";
+      characterName: string;
+      entity: { id: string; name: string; type: EntityType };
+      sessionOrdinal: number | null;
+      date: string;
+    }
+  | {
+      kind: "created";
+      entity: { id: string; name: string; type: EntityType };
+      date: string;
+    };
 
 /** One current holder of an awarded campaign item (#381). */
 export interface CampaignItemHolder {
@@ -1296,6 +1351,9 @@ export interface EntityBacklink {
     id: string;
     characterId: string;
     sessionId?: string | null;
+    /** Session context (#839): title + startedAt-derived ordinal, null off-session. */
+    sessionTitle?: string | null;
+    sessionOrdinal?: number | null;
     kind: JournalEntryKind;
     title: string | null;
     date: string;
@@ -1696,10 +1754,28 @@ export interface ActiveBuff {
   restType?: "short" | "long";
   // Damage types this buff makes the character resistant to (halved on take) (#456).
   resistDamageTypes?: string[];
+  // State-driven advantage/disadvantage grants (#486), e.g. Rage's advantage on Strength checks & saves.
+  rollEffects?: RollEffect[];
 }
 
 export interface ActiveEffectsState {
   buffs: ActiveBuff[];
+}
+
+// ── State-driven roll modifiers (#486) — mirror of backend/src/lib/srd/roll-effects.ts ─
+// The four d20 roll categories a state can bind advantage/disadvantage to.
+export type RollModeKind = "attack" | "check" | "save" | "initiative";
+
+/** One advantage/disadvantage grant; `ability` (lowercase key) narrows it to a single ability. */
+export interface RollEffect {
+  mode: "advantage" | "disadvantage";
+  kind: RollModeKind;
+  ability?: string;
+}
+
+/** A RollEffect resolved with its provenance label (e.g. "Rage", "Poisoned"). Derived on read. */
+export interface RollModifier extends RollEffect {
+  source: string;
 }
 
 export interface ApplyConditionOperation { type: "applyCondition"; key: ConditionKey; source?: string }

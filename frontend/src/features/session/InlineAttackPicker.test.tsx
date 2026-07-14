@@ -257,20 +257,20 @@ describe("InlineAttackPicker — live attack counter (#757)", () => {
 
   it("renders the live pip counter for a multi-attack action (2 of 2 remaining)", () => {
     renderPicker(withWeapon(2), vi.fn(), vi.fn(), { turnState: attackState(2, 0) });
-    expect(screen.getByText(/Attacks:\s*2 of 2 remaining/)).toBeInTheDocument();
+    expect(screen.getByText(/Attacks · 2 of 2 remaining/)).toBeInTheDocument();
   });
 
   it("shows the counter decremented after one recorded attack (1 of 2 remaining)", () => {
     renderPicker(withWeapon(2), vi.fn(), vi.fn(), { turnState: attackState(2, 1) });
-    expect(screen.getByText(/Attacks:\s*1 of 2 remaining/)).toBeInTheDocument();
+    expect(screen.getByText(/Attacks · 1 of 2 remaining/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Roll to hit/ })).not.toBeDisabled();
   });
 
   it("disables the single Roll-to-hit button when attacks are exhausted", () => {
     renderPicker(withWeapon(2), vi.fn(), vi.fn(), { turnState: attackState(2, 2) });
-    expect(screen.getByText(/Attacks:\s*0 of 2 remaining/)).toBeInTheDocument();
+    expect(screen.getByText(/Attacks · 0 of 2 remaining/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Roll to hit/ })).toBeDisabled();
-    // The standalone Critical buttons were removed (#766) — crit is auto/toggle now.
+    // The standalone Critical buttons were removed (#766) — crit is auto/verdict now.
     expect(screen.queryByRole("button", { name: /^Critical$/ })).not.toBeInTheDocument();
   });
 
@@ -490,31 +490,131 @@ describe("InlineAttackPicker — auto-crit on a natural 20 (#766)", () => {
   });
 });
 
-describe("InlineAttackPicker — manual crit toggle (#766)", () => {
+describe("InlineAttackPicker — manual crit via verdict (#766/#811)", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    window.localStorage.clear();
   });
 
-  it("has no standalone 'Critical' button in the sheet", () => {
+  it("has no standalone 'Critical' button and no Crit checkbox in the sheet", () => {
     renderPicker(
       makeCharacter({ inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"] }),
     );
     expect(screen.queryByRole("button", { name: /^Critical$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
 
-  it("flips the next damage roll to doubled dice when the Crit toggle is on (after a hit)", async () => {
+  // Live turn state — the verdict is the crit authority, and it lives in the tally.
+  function LiveHarness({ character }: { character: Character }) {
+    const liveTurnState = useTurnState(character, "sess-crit");
+    useEffect(() => {
+      liveTurnState.startCombat();
+      liveTurnState.startTurn();
+      liveTurnState.enterAttackMode();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    return (
+      <RollProvider>
+        <InlineAttackPicker
+          character={character}
+          turnState={liveTurnState}
+          sessionId="sess-crit"
+          onClose={vi.fn()}
+          onCancel={vi.fn()}
+          onUpdate={vi.fn()}
+          onLogChanged={vi.fn()}
+        />
+      </RollProvider>
+    );
+  }
+
+  it("calling Crit! flips the damage roll to doubled dice (verdict is the crit authority)", async () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5); // non-crit to-hit
-    renderPicker(
-      makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] }),
+    render(
+      <LiveHarness
+        character={makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] })}
+      />,
     );
 
     await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
-    await userEvent.click(screen.getByLabelText("Crit"));
+    await userEvent.click(screen.getByRole("button", { name: /^Crit!$/ }));
     await userEvent.click(screen.getByRole("button", { name: /Roll crit damage/ }));
 
     const call = vi.mocked(logRoll).mock.calls.map((c) => c[2]).find((e) => e.kind === "damage");
     expect(call!.specLabel).toBe("2d8 (crit)");
     expect(call!.faces).toHaveLength(2);
+  });
+
+  it("'it Missed' re-arms the next attack; skip leaves the row unresolved", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    render(
+      <LiveHarness
+        character={makeCharacter({
+          attacksPerAction: 3,
+          inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"],
+        })}
+      />,
+    );
+
+    // Attack 1 → call it a miss: the row dims into the tally (Miss chip) and
+    // the card resets with the next attack armed.
+    await userEvent.click(screen.getByRole("button", { name: "Roll to hit" }));
+    await userEvent.click(screen.getByRole("button", { name: "it Missed" }));
+    expect(screen.getByRole("button", { name: /Roll to hit — attack 2 of 3/ })).toBeInTheDocument();
+    expect(screen.getByText("Miss")).toBeInTheDocument(); // tally chip
+
+    // Attack 2 → skip (attacks remain): the row stays unresolved and the tally
+    // asks the question instead of claiming a hit.
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit — attack 2 of 3/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Skip — roll next attack/ }));
+    expect(screen.getByRole("button", { name: "hit or miss?" })).toBeInTheDocument();
+  });
+
+  it("a resolved attack's continue button reads 'Next' and re-arms step 1 for a two-tap next roll (#834)", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    render(
+      <LiveHarness
+        character={makeCharacter({
+          attacksPerAction: 2,
+          inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"],
+        })}
+      />,
+    );
+
+    // Resolve attack 1 (damage = implicit hit).
+    await userEvent.click(screen.getByRole("button", { name: "Roll to hit" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+    expect(screen.getByText("✓ Hit")).toBeInTheDocument();
+
+    // The continue affordance is a plain "Next" — no instant re-roll button.
+    expect(
+      screen.queryByRole("button", { name: /Roll to hit — attack 2 of 2/ }),
+    ).not.toBeInTheDocument();
+    const next = screen.getByRole("button", { name: "Next" });
+
+    await userEvent.click(next);
+
+    // Card resets to step 1, still armed with the right ordinal — not an
+    // already-rolled attack 2.
+    expect(screen.getByRole("button", { name: "Roll to hit — attack 2 of 2" })).toBeInTheDocument();
+    expect(screen.queryByText("✓ Hit")).not.toBeInTheDocument();
+  });
+
+  it("rolling damage marks the current row hit (implicit hit) with Crit! still offered", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    render(
+      <LiveHarness
+        character={makeCharacter({ inventory: [flameTongue({ capabilities: [] })] as unknown as Character["inventory"] })}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    expect(screen.getByText(/Ask your DM/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Roll damage$/ }));
+
+    expect(screen.getByText("✓ Hit")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Crit!$/ })).toBeInTheDocument();
+    expect(screen.queryByText(/hit or miss\?/)).not.toBeInTheDocument();
   });
 });
 
@@ -566,18 +666,22 @@ describe("InlineAttackPicker — Damage card maneuver state resets on form switc
 
     renderPicker(battleMaster());
 
-    // Roll to hit with the default (Longsword) form so the attack maneuver shows.
+    // Roll to hit with the default (Longsword) form, then open the maneuvers
+    // disclosure (#811 — collapsed by default) so the attack maneuver shows.
     await user.click(screen.getByRole("button", { name: /Roll to hit/ }));
+    await user.click(screen.getByRole("button", { name: /Battle Master maneuvers/ }));
     const spend = await screen.findByRole("button", { name: /Precision Attack/ });
     await user.click(spend);
     // Spent in this form's context → button disabled.
     await waitFor(() => expect(spend).toBeDisabled());
 
-    // Switch the selected form to the Dagger, then roll to hit for it.
+    // "Next" re-arms step 1 (#834) — then switch the selected form to the
+    // Dagger and roll to hit for it.
+    await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("radio", { name: "Dagger" }));
     await user.click(screen.getByRole("button", { name: /Roll to hit/ }));
 
-    // A fresh Damage-card instance → no die spent in the Dagger's context yet.
+    // A fresh prompt instance for the new form → no die spent in its context yet.
     const daggerSpend = await screen.findByRole("button", { name: /Precision Attack/ });
     expect(daggerSpend).not.toBeDisabled();
   });
@@ -685,7 +789,9 @@ describe("InlineAttackPicker — Precision Attack under the attack card (#809)",
     await user.click(screen.getByRole("button", { name: /Roll to hit/ }));
     expect(screen.getAllByText("16").length).toBeGreaterThanOrEqual(1);
 
-    // The Precision affordance appears (hosted on the attack card) — no damage roll yet.
+    // The Precision affordance lives behind the maneuvers disclosure (#811) —
+    // attack section only, no damage roll yet.
+    await user.click(screen.getByRole("button", { name: /Battle Master maneuvers/ }));
     expect(screen.getByText("Add to Attack:")).toBeInTheDocument();
     expect(screen.queryByText("Add to Damage:")).not.toBeInTheDocument();
 

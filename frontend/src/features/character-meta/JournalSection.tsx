@@ -14,7 +14,7 @@ import { useState } from "react";
 
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
-import { GiQuillInk } from "@/components/ui/icons";
+import { GiQuillInk, Lock } from "@/components/ui/icons";
 import JournalEntryPanel, {
   type JournalEntryDraft,
 } from "@/features/character-meta/JournalEntryPanel";
@@ -52,7 +52,8 @@ export default function JournalSection({ character, onUpdate, sessionId }: Journ
   }
 
   async function handleEdit(entryId: string, draft: JournalEntryDraft) {
-    if (await update(entryId, draft.body)) setEditingId(null);
+    if (await update(entryId, { body: draft.body, visibility: draft.visibility }))
+      setEditingId(null);
   }
 
   async function handleDelete(entryId: string) {
@@ -124,7 +125,14 @@ export default function JournalSection({ character, onUpdate, sessionId }: Journ
                       campaignId={character.campaignId}
                       className="min-w-0 flex-1 whitespace-pre-wrap text-sm text-parchment-800"
                     />
-                    <span className="whitespace-nowrap text-xs text-parchment-600">
+                    <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-parchment-600">
+                      {entry.visibility === "PRIVATE" && (
+                        <Lock
+                          role="img"
+                          aria-label="Private note"
+                          className="h-3.5 w-3.5 text-parchment-500"
+                        />
+                      )}
                       {formatJournalDate(entry.date)}
                     </span>
                   </div>
