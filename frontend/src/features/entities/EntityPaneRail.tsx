@@ -1,13 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { monogram, typeCounts } from "@/lib/codexLedger";
-import {
-  ENTITY_TYPE_DOT_CLASS,
-  ENTITY_TYPE_MONOGRAM_CLASS,
-  ENTITY_TYPE_OPTIONS,
-  matchEntities,
-} from "@/lib/mentions";
+import EntityPortrait from "@/features/entities/EntityPortrait";
+import { typeCounts } from "@/lib/codexLedger";
+import { ENTITY_TYPE_DOT_CLASS, ENTITY_TYPE_OPTIONS, matchEntities } from "@/lib/mentions";
 import type { CampaignEntity, EntityType } from "@/types/character";
 
 const chipBase =
@@ -83,12 +79,12 @@ export default function EntityPaneRail({
                 e.id === currentEntityId ? "bg-parchment-200/70" : ""
               }`}
             >
-              <span
-                aria-hidden="true"
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-card font-display text-sm font-semibold ${ENTITY_TYPE_MONOGRAM_CLASS[e.type]}`}
-              >
-                {monogram(e.name)}
-              </span>
+              <EntityPortrait
+                name={e.name}
+                type={e.type}
+                portraitUrl={e.portraitUrl}
+                className="h-8 w-8 text-sm"
+              />
               <span className="min-w-0 grow truncate text-sm font-semibold text-parchment-900">
                 {e.name}
               </span>

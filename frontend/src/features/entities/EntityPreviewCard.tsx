@@ -2,12 +2,8 @@ import { createPortal } from "react-dom";
 
 import Badge from "@/components/ui/Badge";
 import { Lock } from "@/components/ui/icons";
-import { monogram } from "@/lib/codexLedger";
-import {
-  ENTITY_TYPE_LABELS,
-  ENTITY_TYPE_MONOGRAM_CLASS,
-  ENTITY_TYPE_TONE,
-} from "@/lib/mentions";
+import EntityPortrait from "@/features/entities/EntityPortrait";
+import { ENTITY_TYPE_LABELS, ENTITY_TYPE_TONE } from "@/lib/mentions";
 import type { EntityPreview } from "@/features/entities/useEntityPreview";
 
 const CARD_WIDTH = 304;
@@ -50,11 +46,12 @@ export default function EntityPreviewCard({ preview }: { preview: EntityPreview 
       className="pointer-events-none fixed z-50 overflow-hidden rounded-card border border-parchment-200 bg-parchment-50 p-4 shadow-raised"
     >
       <div className="flex items-start gap-3">
-        <span
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-card font-display text-lg font-semibold ${ENTITY_TYPE_MONOGRAM_CLASS[entity.type]}`}
-        >
-          {monogram(entity.name)}
-        </span>
+        <EntityPortrait
+          name={entity.name}
+          type={entity.type}
+          portraitUrl={entity.portraitUrl}
+          className="h-11 w-11 text-lg"
+        />
         <span className="flex min-w-0 grow flex-col">
           <span className="truncate font-display text-base font-semibold text-parchment-900">
             {entity.name}
