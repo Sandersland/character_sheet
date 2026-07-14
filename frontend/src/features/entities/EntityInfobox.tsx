@@ -18,11 +18,55 @@ function mentionsLabel(entity: CampaignEntity, backlinks: EntityBacklink[]): str
   return `${count} across ${sessions} ${sessions === 1 ? "session" : "sessions"}`;
 }
 
+// Sheets are owner-only views today: link only the viewer's own character (#842).
+function ownedSheetPath(
+  entity: CampaignEntity,
+  characters: { id: string; ownerId: string }[],
+  viewerId?: string,
+): string | null {
+  if (!entity.characterId || !viewerId) return null;
+  const linked = characters.find((c) => c.id === entity.characterId);
+  return linked && linked.ownerId === viewerId ? `/characters/${entity.characterId}` : null;
+}
+
 function FactRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1.5">
       <dt className="text-xs font-semibold text-parchment-500">{label}</dt>
       <dd className="text-right text-xs text-parchment-800">{children}</dd>
+    </div>
+  );
+}
+
+function OwnerQuietLinks({
+  entity,
+  busy,
+  onToggleVisibility,
+  onDelete,
+}: {
+  entity: CampaignEntity;
+  busy: boolean;
+  onToggleVisibility: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="mt-3 flex items-center gap-4 border-t border-parchment-200 pt-3">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={onToggleVisibility}
+        className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
+      >
+        {entity.visibility === "HIDDEN" ? "Reveal to players" : "Hide from players"}
+      </button>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={onDelete}
+        className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
+      >
+        Delete entity
+      </button>
     </div>
   );
 }
@@ -48,11 +92,7 @@ export default function EntityInfobox({
   onToggleVisibility: () => void;
   onDelete: () => void;
 }) {
-  // Sheets are owner-only views today: link only the viewer's own character (#842).
-  const linkedCharacter = entity.characterId
-    ? characters.find((c) => c.id === entity.characterId)
-    : undefined;
-  const showSheetLink = !!linkedCharacter && !!viewerId && linkedCharacter.ownerId === viewerId;
+  const sheetPath = ownedSheetPath(entity, characters, viewerId);
 
   return (
     <aside
@@ -76,36 +116,21 @@ export default function EntityInfobox({
         <FactRow label="Visibility">
           {entity.visibility === "HIDDEN" ? "Hidden from players" : "Visible to all"}
         </FactRow>
-        {showSheetLink && (
+        {sheetPath && (
           <FactRow label="Character">
-            <Link
-              to={`/characters/${entity.characterId}`}
-              className="font-semibold text-garnet-700 hover:underline"
-            >
+            <Link to={sheetPath} className="font-semibold text-garnet-700 hover:underline">
               Character sheet →
             </Link>
           </FactRow>
         )}
       </dl>
       {role === "OWNER" && (
-        <div className="mt-3 flex items-center gap-4 border-t border-parchment-200 pt-3">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onToggleVisibility}
-            className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
-          >
-            {entity.visibility === "HIDDEN" ? "Reveal to players" : "Hide from players"}
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onDelete}
-            className="text-xs font-semibold text-garnet-700 hover:underline disabled:opacity-40"
-          >
-            Delete entity
-          </button>
-        </div>
+        <OwnerQuietLinks
+          entity={entity}
+          busy={busy}
+          onToggleVisibility={onToggleVisibility}
+          onDelete={onDelete}
+        />
       )}
     </aside>
   );

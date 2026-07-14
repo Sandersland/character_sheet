@@ -59,29 +59,24 @@ const ENTITY: CampaignEntity = {
   updatedAt: "",
 };
 
-function backlink(overrides?: {
-  id?: string;
-  sessionId?: string | null;
-  sessionTitle?: string | null;
-  sessionOrdinal?: number | null;
-  body?: string;
-  identity?: { id: string; name: string };
-}): EntityBacklink {
+function backlink(overrides: Partial<EntityBacklink["entry"] & { identity: EntityBacklink["identity"] }> = {}): EntityBacklink {
+  const { identity, ...entry } = overrides;
   return {
     entry: {
-      id: overrides?.id ?? "entry-1",
+      id: "entry-1",
       characterId: "char-9",
-      sessionId: overrides?.sessionId ?? null,
-      sessionTitle: overrides?.sessionTitle ?? null,
-      sessionOrdinal: overrides?.sessionOrdinal ?? null,
+      sessionId: null,
+      sessionTitle: null,
+      sessionOrdinal: null,
       kind: "NOTE",
       title: "Ambush",
       date: "2026-06-22T00:00:00.000Z",
       loggedAt: "2026-06-22T00:00:00.000Z",
-      body: overrides?.body ?? "We fought the goblin chief at the bridge.",
+      body: "We fought the goblin chief at the bridge.",
+      ...entry,
     },
     characterName: "Thorne",
-    identity: overrides?.identity ?? { id: ENTITY_ID, name: "Goblin Chief" },
+    identity: identity ?? { id: ENTITY_ID, name: "Goblin Chief" },
   };
 }
 
