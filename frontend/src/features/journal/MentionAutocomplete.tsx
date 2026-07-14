@@ -72,6 +72,15 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
           aria-activedescendant={editor.activeOptionId}
           contentEditable
           suppressContentEditableWarning
+          // Prose-note input hints; autoComplete="off" asks iOS not to offer the
+          // Passwords/Cards/Contacts AutoFill toolbar over this free-text editor
+          // (#879) — WebKit treats the role="textbox" contenteditable as a fillable
+          // field. Best-effort: Safari may still show it, so this is device-verified.
+          // (autoComplete isn't in React's div prop types but renders at runtime.)
+          autoCapitalize="sentences"
+          autoCorrect="on"
+          spellCheck
+          {...({ autoComplete: "off" } as Record<string, string>)}
           className={`whitespace-pre-wrap break-words ${className}`}
           style={{ minHeight: `${Math.max(rows, 1) * 1.6}em`, ...style }}
           onInput={editor.handleInput}
