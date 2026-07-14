@@ -18,6 +18,10 @@ vi.mock("@/hooks/useCampaignEntities", () => ({
   primeCampaignEntities: vi.fn(),
 }));
 
+vi.mock("@/features/entities/useCodexActivity", () => ({
+  useCodexActivity: vi.fn(() => ({ statsEntities: [], activity: [], loaded: true })),
+}));
+
 const CAMPAIGN_ID = "camp-1";
 
 function entity(overrides: Partial<CampaignEntity>): CampaignEntity {
@@ -239,6 +243,21 @@ describe("CampaignCodex rail filters (#840)", () => {
   it("has no axe violations", async () => {
     const { container } = renderCodex();
     expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+describe("CampaignCodex activity rail (#841)", () => {
+  it("renders the activity rail alongside the ledger", () => {
+    renderCodex();
+    expect(screen.getByRole("complementary", { name: /codex activity/i })).toBeInTheDocument();
+  });
+
+  it("keeps the rail rendered when search has no matches", async () => {
+    const user = userEvent.setup();
+    renderCodex();
+    await user.type(screen.getByRole("searchbox", { name: /search/i }), "zzz");
+    expect(screen.getByText(/no entities match/i)).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: /codex activity/i })).toBeInTheDocument();
   });
 });
 
