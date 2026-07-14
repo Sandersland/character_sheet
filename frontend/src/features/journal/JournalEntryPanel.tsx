@@ -4,7 +4,7 @@
  * review surfaces (see CLAUDE.md). Reused for add and edit via `mode` + `initial`,
  * and for both journal kinds via `kind`:
  *   • "NOTE" (default) — the fast, body-only, date-less capture used by
- *     JournalSection and the chronicle chapter's quick add.
+ *     the chronicle chapter's quick add.
  *   • "ENTRY" — the long-form flow behind the chronicle's "＋ New entry": adds a
  *     calendar date (required server-side for an ENTRY), rendered as prose with a
  *     drop cap on the manuscript page.

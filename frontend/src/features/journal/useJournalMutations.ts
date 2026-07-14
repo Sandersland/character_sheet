@@ -1,4 +1,4 @@
-// Shared journal CRUD state machine for the two journal surfaces (JournalSection,
+// Shared journal CRUD state machine for the journal-page surfaces (ManuscriptPage,
 // CapturePalette): one busy/error pair around the plain-REST client calls, with the
 // updated Character flowing out through onUpdate. Callers keep their own UI state
 // (which row is editing/confirming) and clear it on a truthy result.

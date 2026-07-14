@@ -5,7 +5,7 @@ import ExperienceTracker from "@/features/experience/ExperienceTracker";
 import HitPointTracker from "@/features/hitpoints/HitPointTracker";
 import InventoryList from "@/features/inventory/InventoryList";
 import CampaignPreferencesPanel from "@/features/campaign/CampaignPreferencesPanel";
-import JournalSection from "@/features/character-meta/JournalSection";
+import JournalDoorway from "@/features/journal/JournalDoorway";
 import SpellsSection from "@/features/spells/SpellsSection";
 import ProficienciesCard from "@/features/abilities/ProficienciesCard";
 import VitalsStrip from "@/features/character-meta/VitalsStrip";
@@ -19,14 +19,12 @@ interface CharacterSheetBodyProps {
   character: Character;
   reference: ReferenceData | null;
   onUpdate: (c: Character) => void;
-  journalSessionId?: string;
 }
 
 export default function CharacterSheetBody({
   character,
   reference,
   onUpdate,
-  journalSessionId,
 }: CharacterSheetBodyProps) {
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
@@ -86,30 +84,21 @@ export default function CharacterSheetBody({
       )}
 
       {/* ── Equipment · Spells ─────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <InventoryList character={character} onUpdate={onUpdate} />
-
-        {character.spellcasting ? (
+      {character.spellcasting ? (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <InventoryList character={character} onUpdate={onUpdate} />
           <Card title="Spells" className="p-4">
             <SpellsSection character={character} onUpdate={onUpdate} />
           </Card>
-        ) : (
-          <JournalSection
-            character={character}
-            onUpdate={onUpdate}
-            sessionId={journalSessionId}
-          />
-        )}
-      </div>
-
-      {/* Campaign Journal: spellcasters only — the 2-col row above uses the right column for Spells. */}
-      {character.spellcasting && (
-        <JournalSection
-          character={character}
-          onUpdate={onUpdate}
-          sessionId={journalSessionId}
-        />
+        </div>
+      ) : (
+        <InventoryList character={character} onUpdate={onUpdate} />
       )}
+
+      {/* ── Journal doorway (#867) ─────────────────────────────────── */}
+      {/* The journal lives on its own page now; the sheet keeps just this
+          closed-book card that opens it — no editing surface here. */}
+      <JournalDoorway character={character} />
 
       {/* ── Campaign preferences ────────────────────────────────────── */}
       {/* Campaign-attached characters only (#537). */}
