@@ -13,6 +13,7 @@ import type { MutableRefObject, ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { useDialogChrome } from "@/hooks/useDialogChrome";
+import { useMobileScrollLock } from "@/hooks/useMobileScrollLock";
 import { useVisualViewport } from "@/hooks/useVisualViewport";
 import type { Session } from "@/types/character";
 
@@ -36,6 +37,10 @@ export default function MobileCaptureSheet({
   composer,
   anchorKey,
 }: MobileCaptureSheetProps) {
+  // Body scroll-lock (#877) — before useDialogChrome so its scroll-restore cleanup
+  // runs after the dialog's focus-restore (reverse mount order), else the opener
+  // refocus could reveal-scroll the page back off-origin on close.
+  useMobileScrollLock();
   const panelRef = useDialogChrome(onClose);
   const feedRef = useRef<HTMLDivElement>(null);
   const { height, offsetTop } = useVisualViewport();
@@ -50,8 +55,9 @@ export default function MobileCaptureSheet({
   }, [anchorKey, height]);
 
   return createPortal(
-    // Full-screen backdrop in the surface colour so no gap shows while the
-    // keyboard animates the pinned panel; the capture itself is the dialog.
+    // Opaque safety net behind the pinned panel: any region the panel doesn't
+    // cover shows parchment, never the sheet (reliable once the body-lock pins
+    // the layout viewport — #877).
     <div role="presentation" className="fixed inset-0 z-50 bg-parchment-50">
       <div
         ref={panelRef}
