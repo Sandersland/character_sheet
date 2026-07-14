@@ -22,7 +22,7 @@ frontend/src/
 │   │                    #   ToolProficiencySection + useToolProficiencyChoices,
 │   │                    #   StartingEquipmentSection, PreviewSection, CreateActions
 │   │                    #   (CharacterCreatePage step frames; orchestrated by hooks/useCharacterCreation)
-│   ├── character-meta/  # CharacterCard, VitalsStrip, JournalSection, JournalEntryPanel,
+│   ├── character-meta/  # CharacterCard, VitalsStrip, JournalSection (sheet card; retires in #867),
 │   │                    #   ActivityModal, DeleteCharacterModal, BackendStatus,
 │   │                    #   CharacterSheet{Header,Body,Modals}, CharacterLoadError (sheet-page sections)
 │   │                    #   VitalsStrip's AC tile is read-only: a Popover disclosing the
@@ -78,7 +78,15 @@ frontend/src/
 │   │                    #   InventoryRow (→ InventoryEditForm/EquipToggle/AttuneToggle/ItemSummary/
 │   │                    #   ItemProse), AddItemPanel, SellPanel,
 │   │                    #   StartingEquipmentEditor, EquipmentDoll (→ EquipSlotCell → SlotPickerPanel)
-│   ├── journal/         # CapturePalette (Cmd/Ctrl+J quick-capture NOTE — BottomSheet on mobile, top palette at md+)
+│   ├── journal/         # Field-chronicle page cluster (#864): JournalPage's ChronicleSpine (chapter
+│   │                    #   spine — sessions as chapters grouped by CampaignArc "parts"; flat list when
+│   │                    #   no arcs) + ManuscriptPage (serif prose ENTRY rows w/ drop cap, "Field notes"
+│   │                    #   NOTE list, inline composer + "＋ New entry", in-place chapter-title rename).
+│   │                    #   Pure spine model in chronicle.ts (buildChronicleSpine/defaultChapterId/
+│   │                    #   findChapter/partIdForChapter/filterSpine); data via useChronicle (arcs +
+│   │                    #   chronicle sessions). JournalEntryPanel (NOTE default / ENTRY kind long-form),
+│   │                    #   MentionText/MentionAutocomplete (inked @-mentions), useJournalMutations
+│   │                    #   (shared REST CRUD), CapturePalette (Cmd/Ctrl+J + mobile ✎ Note quick-capture)
 │   ├── session/         # TurnHub (→ useTurnActions + TurnControls/ActionSlot/BonusActionSlot/
 │   │                    #   ReactionSlot/EffectManeuverStrip/LayOnHandsInput + LoadoutRefundStrip (#815)
 │   │                    #   + OptionCard (row/half/tile picker cards) →
@@ -119,7 +127,8 @@ frontend/src/
 ├── lib/                 # pure TS logic — NO React/JSX (dice, abilities, timeline, startingEquipment,
 │   │                    #   entityBacklinks chronicle grouping #842, …)
 ├── pages/               # route-level views (CharacterListPage, CharacterSheetPage,
-│   │                    #   CharacterCreatePage, SessionPage, LoginPage, AboutPage)
+│   │                    #   CharacterCreatePage, SessionPage, JournalPage (/characters/:id/journal —
+│   │                    #   field chronicle, #864), LoginPage, AboutPage)
 ├── api/
 │   └── client.ts        # the only fetch() call site (apiFetch wrapper: credentials + 401)
 ├── types/

@@ -60,7 +60,10 @@ export const EQUIP_SLOT_ICONS: Record<EquipSlot, IconType> = {
 export { GiQuillInk, GiKnapsack, GiSpellBook, GiHealthNormal, GiHealthPotion, GiChestArmor } from "react-icons/gi";
 // Turn-economy slot glyphs (#729): Action / Bonus Action / Reaction.
 export { GiCrossedSwords, GiSparkles, GiCycle } from "react-icons/gi";
-// Attack-sheet damage-card glyph (#756).
+// Attack-sheet damage-card glyph (#756). Pre-existing barrel re-export with no
+// current importer — surfaced only because #864 touched this file; keep the
+// public glyph available for the attack sheet.
+// fallow-ignore-next-line unused-exports
 export { GiSwordWound } from "react-icons/gi";
 // Turn-picker option-card glyphs: universal actions on the Action sheet.
 export {
@@ -80,6 +83,8 @@ export {
   Zap,
   VenetianMask,
   ChevronDown,
+  ChevronRight,
+  ArrowLeft,
   MoreHorizontal,
   Trash2,
   TriangleAlert,
