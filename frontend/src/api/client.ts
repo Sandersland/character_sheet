@@ -522,8 +522,9 @@ export async function addCharacterToCampaign(
 
 // ── Campaign entities & @-tagging (#248) ───────────────────────────────────────
 // Plain REST. Search/list is campaign-scoped; create/edit are any-member; delete
-// is OWNER-only (server-enforced). Backlinks come pre-filtered to the caller's
-// own notes (private-by-default), so no client-side visibility logic is needed.
+// is OWNER-only (server-enforced). Backlinks come pre-filtered server-side to the
+// caller's own notes plus other members' CAMPAIGN-shared ones (#838), so no
+// client-side visibility logic is needed.
 
 export async function fetchEntities(
   campaignId: string,
@@ -595,8 +596,6 @@ export async function fetchEntityBacklinks(
   );
 }
 
-// Consumed by the Codex browse/detail slices of #837 (built after this API slice).
-// fallow-ignore-next-line unused-export
 export async function fetchEntityConnections(
   campaignId: string,
   entityId: string,

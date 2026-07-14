@@ -348,6 +348,38 @@ describe("campaign entities (#248)", () => {
     expect(ownerBodies).not.toContain("player secret note");
   });
 
+  it("exposes the linked characterId on PC entities and null elsewhere (#842)", async () => {
+    await prisma.character.update({ where: { id: CHAR_PLAYER }, data: { campaignId: null } });
+    const attach = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/characters`)
+      .set("Cookie", cookiePlayer)
+      .send({ characterId: CHAR_PLAYER });
+    expect(attach.status).toBe(200);
+
+    const list = await supertest(app)
+      .get(`/api/campaigns/${campaignId}/entities`)
+      .set("Cookie", cookiePlayer);
+    expect(list.status).toBe(200);
+    const rows = list.body as { type: string; name: string; characterId: string | null }[];
+    const pc = rows.find((e) => e.type === "PC" && e.name === `Char ${CHAR_PLAYER}`);
+    expect(pc).toBeDefined();
+    expect(pc?.characterId).toBe(CHAR_PLAYER);
+    expect(pc).not.toHaveProperty("characterLink");
+    const npc = rows.find((e) => e.name === "Goblin Chief");
+    expect(npc?.characterId).toBeNull();
+  });
+
+  it("keeps characterId present alongside ?include=stats (#842)", async () => {
+    const list = await supertest(app)
+      .get(`/api/campaigns/${campaignId}/entities?include=stats`)
+      .set("Cookie", cookiePlayer);
+    expect(list.status).toBe(200);
+    const rows = list.body as { type: string; characterId: string | null; stats?: unknown }[];
+    const pc = rows.find((e) => e.type === "PC");
+    expect(pc?.characterId).toBe(CHAR_PLAYER);
+    expect(pc?.stats).toBeDefined();
+  });
+
   it("drops a CAMPAIGN note from backlinks once its character leaves the campaign (#838)", async () => {
     await prisma.character.update({ where: { id: CHAR_OWNER }, data: { campaignId } });
     await prisma.character.update({ where: { id: CHAR_PLAYER }, data: { campaignId } });

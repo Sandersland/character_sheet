@@ -225,15 +225,21 @@ entitiesRouter.get("/campaigns/:id/entities", async (req, res) => {
 
   const type = parseEntityType(req.query.type);
 
-  const entities = await prisma.campaignEntity.findMany({
+  const rows = await prisma.campaignEntity.findMany({
     where: {
       campaignId: req.params.id,
       ...(type ? { type } : {}),
       // Non-owners see only revealed entities (#379); the owner sees all.
       ...(isOwner ? {} : { visibility: "REVEALED" }),
     },
+    include: { characterLink: { select: { characterId: true } } },
     orderBy: { name: "asc" },
   });
+  // Flatten the PC link (#842): characterId, never the nested relation object.
+  const entities = rows.map(({ characterLink, ...e }) => ({
+    ...e,
+    characterId: characterLink?.characterId ?? null,
+  }));
 
   const q = typeof req.query.q === "string" ? req.query.q : "";
   const matched = q
