@@ -158,8 +158,8 @@ function BackLink({ character }: { character: Character }) {
 // ── Desktop: fixed spine + manuscript, side by side ────────────────────────────
 function JournalDesktopView(props: JournalViewProps) {
   const { character, onUpdate, spine, effectiveId, filter, onFilterChange, onSelect, error, manuscript } = props;
-  // useCaptureDock (not a bare useState) so ⌘J/Ctrl+J toggles the dock on the
-  // journal page too, matching the sheet and session surfaces (#865 AC).
+  // useCaptureDock (not a bare useState) so ⌘J/Ctrl+J toggles the dock here too,
+  // matching the sheet and session surfaces.
   const { captureOpen, openCapture, closeCapture } = useCaptureDock();
 
   return (
