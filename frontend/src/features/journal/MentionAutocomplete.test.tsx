@@ -226,6 +226,19 @@ describe("MentionAutocomplete (#248)", () => {
   });
 });
 
+describe("MentionAutocomplete input attributes (#879)", () => {
+  it("marks the editor as a prose field and opts out of iOS AutoFill", () => {
+    render(<Harness campaignId="camp-1" />);
+    const editor = screen.getByLabelText("Note body");
+    // autoComplete renders via spread (not in React's div prop types); the rest
+    // are standard. Together they hint iOS this is free-text, not a fillable form.
+    expect(editor).toHaveAttribute("autocomplete", "off");
+    expect(editor).toHaveAttribute("autocapitalize", "sentences");
+    expect(editor).toHaveAttribute("autocorrect", "on");
+    expect(editor).toHaveAttribute("spellcheck", "true");
+  });
+});
+
 describe("MentionAutocomplete combobox ARIA (#273)", () => {
   it("wires aria-controls to the listbox and aria-activedescendant to the active option", async () => {
     const user = userEvent.setup({ delay: null });
