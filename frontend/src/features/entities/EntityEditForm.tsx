@@ -30,7 +30,7 @@ export default function EntityEditForm({
   onCancel: () => void;
 }) {
   return (
-    <Card title="Edit entry" headingLevel={2} className="p-4">
+    <Card title="Edit entry" headingLevel={2}>
       <div className="flex flex-col gap-3 p-4">
         <div>
           <label className={labelCls} htmlFor="entity-name">

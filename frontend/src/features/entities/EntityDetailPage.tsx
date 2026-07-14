@@ -38,6 +38,7 @@ function ArticleBody({
   entity,
   campaignId,
   entityId,
+  viewerId,
   formerIdentityIds,
   nameFor,
 }: {
@@ -45,6 +46,7 @@ function ArticleBody({
   entity: CampaignEntity;
   campaignId?: string;
   entityId?: string;
+  viewerId?: string;
   formerIdentityIds: string[];
   nameFor: (id: string) => string;
 }) {
@@ -80,6 +82,8 @@ function ArticleBody({
         entityId={entityId}
         byId={detail.byId}
         campaignId={campaignId}
+        characters={detail.characters}
+        viewerId={viewerId}
       />
 
       <EntityConnections connections={detail.connections} campaignId={campaignId} />
@@ -150,6 +154,7 @@ function EntityArticle({
           entity={entity}
           campaignId={campaignId}
           entityId={entityId}
+          viewerId={viewerId}
           formerIdentityIds={formerIdentityIds}
           nameFor={nameFor}
         />

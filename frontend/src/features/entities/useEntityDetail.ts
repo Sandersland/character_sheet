@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import {
@@ -198,6 +198,9 @@ export function useEntityDetail(campaignId?: string, entityId?: string) {
   const { entities, byId } = useCampaignEntities(campaignId);
   const [searchParams] = useSearchParams();
   const wantsEdit = searchParams.get("edit") === "1";
+  // Ref mirror so the load effect reads the latest value without re-running on ?edit flips.
+  const wantsEditRef = useRef(wantsEdit);
+  wantsEditRef.current = wantsEdit;
 
   const [entity, setEntity] = useState<CampaignEntity | null | undefined>(undefined);
   const [listed, setListed] = useState<CampaignEntity[]>([]);
@@ -216,7 +219,7 @@ export function useEntityDetail(campaignId?: string, entityId?: string) {
     setEntity(undefined);
     setBacklinks([]);
     setConnections([]);
-    setEditing(wantsEdit);
+    setEditing(wantsEditRef.current);
     return loadEntityDetail(campaignId, entityId, {
       role: setRole,
       characters: setCharacters,
@@ -226,7 +229,7 @@ export function useEntityDetail(campaignId?: string, entityId?: string) {
       backlinks: setBacklinks,
       connections: setConnections,
     });
-  }, [campaignId, entityId, wantsEdit, fill]);
+  }, [campaignId, entityId, fill]);
 
   // ITEM entities front a DM-authored CampaignItem — load its card data. The
   // by-entity read 404s for a non-owner while the entity is hidden (setItem null).

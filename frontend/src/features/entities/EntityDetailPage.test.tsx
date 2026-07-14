@@ -340,6 +340,26 @@ describe("EntityDetailPage (#248)", () => {
     expect(screen.queryByRole("link", { name: /character sheet/i })).not.toBeInTheDocument();
   });
 
+  it("links the chronicler name to the sheet only on the viewer's own note (#842)", async () => {
+    vi.mocked(client.fetchCampaign).mockResolvedValue(
+      campaign("PLAYER", [{ id: "char-9", name: "Thorne", ownerId: "u1" }]),
+    );
+    renderPage();
+    expect(await screen.findByRole("link", { name: "Thorne" })).toHaveAttribute(
+      "href",
+      "/characters/char-9",
+    );
+  });
+
+  it("renders another member's chronicler name as plain text — sheets are owner-only (#842)", async () => {
+    vi.mocked(client.fetchCampaign).mockResolvedValue(
+      campaign("PLAYER", [{ id: "char-9", name: "Thorne", ownerId: "someone-else" }]),
+    );
+    renderPage();
+    expect(await screen.findByText("Thorne")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Thorne" })).not.toBeInTheDocument();
+  });
+
   it("renders co-mention connection chips linking to their entities (#842)", async () => {
     vi.mocked(client.fetchEntityConnections).mockResolvedValue([
       { entity: { id: "ent-9", name: "Sildar", type: "NPC" }, count: 3 },

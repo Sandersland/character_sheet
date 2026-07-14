@@ -14,16 +14,29 @@ function groupHeading(group: ChronicleGroup): string {
   return group.sessionTitle ? `${label} — ${group.sessionTitle}` : label;
 }
 
+// Sheets are owner-only views: only the viewer's own character gets a link (#842).
+function ownsCharacter(
+  characters: { id: string; ownerId: string }[],
+  characterId: string,
+  viewerId?: string,
+): boolean {
+  return !!viewerId && characters.some((c) => c.id === characterId && c.ownerId === viewerId);
+}
+
 function ChronicleEntry({
   link,
   entityId,
   byId,
   campaignId,
+  characters,
+  viewerId,
 }: {
   link: EntityBacklink;
   entityId?: string;
   byId: Map<string, CampaignEntity>;
   campaignId?: string;
+  characters: { id: string; ownerId: string }[];
+  viewerId?: string;
 }) {
   return (
     <li className="relative">
@@ -38,12 +51,16 @@ function ChronicleEntry({
         className="whitespace-pre-wrap text-sm text-parchment-800"
       />
       <p className="mt-0.5 text-xs text-parchment-500">
-        <Link
-          to={`/characters/${link.entry.characterId}`}
-          className="font-semibold text-garnet-700 hover:underline"
-        >
-          {link.characterName}
-        </Link>{" "}
+        {ownsCharacter(characters, link.entry.characterId, viewerId) ? (
+          <Link
+            to={`/characters/${link.entry.characterId}`}
+            className="font-semibold text-garnet-700 hover:underline"
+          >
+            {link.characterName}
+          </Link>
+        ) : (
+          <span className="font-semibold text-parchment-700">{link.characterName}</span>
+        )}{" "}
         · {formatJournalDate(link.entry.date)}
         {link.identity.id !== entityId && (
           <span className="italic">
@@ -69,11 +86,15 @@ export default function EntityChronicle({
   entityId,
   byId,
   campaignId,
+  characters,
+  viewerId,
 }: {
   backlinks: EntityBacklink[];
   entityId?: string;
   byId: Map<string, CampaignEntity>;
   campaignId?: string;
+  characters: { id: string; ownerId: string }[];
+  viewerId?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const groups = chronicleGroups(backlinks);
@@ -111,6 +132,8 @@ export default function EntityChronicle({
                     entityId={entityId}
                     byId={byId}
                     campaignId={campaignId}
+                    characters={characters}
+                    viewerId={viewerId}
                   />
                 ))}
               </ol>
