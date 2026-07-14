@@ -96,6 +96,7 @@ interface EntityFormValues {
   name: string;
   aliases: string;
   notes: string;
+  portraitUrl: string;
 }
 
 function buildEntityPatch(form: EntityFormValues) {
@@ -107,6 +108,7 @@ function buildEntityPatch(form: EntityFormValues) {
       .map((a) => a.trim())
       .filter(Boolean),
     notes: form.notes.trim() === "" ? null : form.notes.trim(),
+    portraitUrl: form.portraitUrl.trim() === "" ? null : form.portraitUrl.trim(),
   };
 }
 
@@ -133,14 +135,28 @@ function useEntityForm() {
   const [name, setName] = useState("");
   const [aliases, setAliases] = useState("");
   const [notes, setNotes] = useState("");
+  const [portraitUrl, setPortraitUrl] = useState("");
   // Stable so the load effect can depend on it without re-running per render.
   const fill = useCallback((found: CampaignEntity) => {
     setType(found.type);
     setName(found.name);
     setAliases(found.aliases.join(", "));
     setNotes(found.notes ?? "");
+    setPortraitUrl(found.portraitUrl ?? "");
   }, []);
-  return { type, setType, name, setName, aliases, setAliases, notes, setNotes, fill };
+  return {
+    type,
+    setType,
+    name,
+    setName,
+    aliases,
+    setAliases,
+    notes,
+    setNotes,
+    portraitUrl,
+    setPortraitUrl,
+    fill,
+  };
 }
 
 // Mutation surface (save/delete/reveal-hide + busy/error), split from the data

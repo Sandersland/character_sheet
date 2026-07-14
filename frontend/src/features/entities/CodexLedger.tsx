@@ -3,14 +3,11 @@ import { Link } from "react-router-dom";
 
 import Badge from "@/components/ui/Badge";
 import { Lock } from "@/components/ui/icons";
+import EntityPortrait from "@/features/entities/EntityPortrait";
 import EntityPreviewCard from "@/features/entities/EntityPreviewCard";
 import { useEntityPreview, type PreviewEntity } from "@/features/entities/useEntityPreview";
-import { monogram, notesSnippet, type CodexSort, type LetterGroup } from "@/lib/codexLedger";
-import {
-  ENTITY_TYPE_LABELS,
-  ENTITY_TYPE_MONOGRAM_CLASS,
-  ENTITY_TYPE_TONE,
-} from "@/lib/mentions";
+import { notesSnippet, type CodexSort, type LetterGroup } from "@/lib/codexLedger";
+import { ENTITY_TYPE_LABELS, ENTITY_TYPE_TONE } from "@/lib/mentions";
 import type { CampaignEntity, CampaignRole } from "@/types/character";
 
 interface CodexLedgerProps {
@@ -48,12 +45,12 @@ function EntityRow({
           hidden ? "opacity-60" : ""
         }`}
       >
-        <span
-          aria-hidden="true"
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-card font-display text-lg font-semibold ${ENTITY_TYPE_MONOGRAM_CLASS[entity.type]}`}
-        >
-          {monogram(entity.name)}
-        </span>
+        <EntityPortrait
+          name={entity.name}
+          type={entity.type}
+          portraitUrl={entity.portraitUrl}
+          className="h-11 w-11 text-lg"
+        />
         <span className="flex min-w-0 grow flex-col">
           <span className="flex min-w-0 items-baseline gap-2">
             <span className="truncate font-display text-sm font-semibold text-parchment-900">

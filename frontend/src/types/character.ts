@@ -1222,6 +1222,8 @@ export interface CampaignEntity {
   name: string;
   aliases: string[];
   notes: string | null;
+  /** Optional portrait image URL (#844); monogram fallback when null/absent. */
+  portraitUrl?: string | null;
   visibility: EntityVisibility;
   createdAt: string;
   updatedAt: string;

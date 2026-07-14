@@ -388,6 +388,63 @@ describe("EntityDetailPage (#248)", () => {
     expect(screen.getByLabelText(/Name/)).toHaveValue("Goblin Chief");
   });
 
+  it("saves a trimmed portraitUrl from the edit form (#844)", async () => {
+    const user = userEvent.setup();
+    const url = "https://example.com/goblin.png";
+    vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("OWNER"));
+    vi.mocked(client.updateEntity).mockResolvedValue({ ...ENTITY, portraitUrl: url });
+
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "Edit entry" }));
+    await user.type(screen.getByLabelText(/Portrait URL/), `  ${url}  `);
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() =>
+      expect(vi.mocked(client.updateEntity)).toHaveBeenCalledWith(
+        CAMPAIGN_ID,
+        ENTITY_ID,
+        expect.objectContaining({ portraitUrl: url }),
+      ),
+    );
+  });
+
+  it("clears the portrait by saving an emptied field as null (#844)", async () => {
+    const user = userEvent.setup();
+    const withPortrait: CampaignEntity = { ...ENTITY, portraitUrl: "https://example.com/old.png" };
+    vi.mocked(client.fetchEntities).mockResolvedValue([withPortrait]);
+    vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("OWNER"));
+    vi.mocked(client.updateEntity).mockResolvedValue({ ...ENTITY, portraitUrl: null });
+
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "Edit entry" }));
+    const field = screen.getByLabelText(/Portrait URL/);
+    expect(field).toHaveValue("https://example.com/old.png");
+    await user.clear(field);
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() =>
+      expect(vi.mocked(client.updateEntity)).toHaveBeenCalledWith(
+        CAMPAIGN_ID,
+        ENTITY_ID,
+        expect.objectContaining({ portraitUrl: null }),
+      ),
+    );
+  });
+
+  it("shows the owner an Add-a-portrait affordance that opens the edit form (#844)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(client.fetchCampaign).mockResolvedValue(campaign("OWNER"));
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: /add a portrait/i }));
+    expect(screen.getByLabelText(/Portrait URL/)).toBeInTheDocument();
+  });
+
+  it("hides the Add-a-portrait affordance from a PLAYER (#844)", async () => {
+    renderPage();
+    await screen.findByRole("heading", { name: /Goblin Chief/ });
+    expect(screen.queryByRole("button", { name: /add a portrait/i })).not.toBeInTheDocument();
+  });
+
   it("shows a zero-state when there are no backlinks", async () => {
     vi.mocked(client.fetchEntityBacklinks).mockResolvedValue([]);
     renderPage();

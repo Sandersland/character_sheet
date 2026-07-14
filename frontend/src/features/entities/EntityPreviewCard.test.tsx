@@ -70,6 +70,20 @@ describe("EntityPreviewCard (#843)", () => {
     expect(screen.getByText("Hidden")).toBeInTheDocument();
   });
 
+  it("shows a portrait thumbnail when set and the monogram when absent (#844)", () => {
+    const url = "https://example.com/goblin.png";
+    const p = preview();
+    p.entity = { ...p.entity, portraitUrl: url };
+    render(<EntityPreviewCard preview={p} />);
+    const card = screen.getByTestId("entity-preview-card");
+    expect(card.querySelector("img")).toHaveAttribute("src", url);
+
+    render(<EntityPreviewCard preview={preview()} />);
+    const cards = screen.getAllByTestId("entity-preview-card");
+    expect(cards[1].querySelector("img")).toBeNull();
+    expect(cards[1]).toHaveTextContent("G");
+  });
+
   it("omits the lock for a revealed entity", () => {
     render(<EntityPreviewCard preview={preview()} />);
     expect(screen.queryByText("Hidden")).not.toBeInTheDocument();

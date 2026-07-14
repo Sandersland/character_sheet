@@ -15,6 +15,8 @@ interface EntityForm {
   setAliases: (v: string) => void;
   notes: string;
   setNotes: (v: string) => void;
+  portraitUrl: string;
+  setPortraitUrl: (v: string) => void;
 }
 
 // The article's inline edit state (#842) — swaps in for the header + lead.
@@ -69,6 +71,19 @@ export default function EntityEditForm({
             className={inputCls}
             value={form.aliases}
             onChange={(e) => form.setAliases(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className={labelCls} htmlFor="entity-portrait-url">
+            Portrait URL
+          </label>
+          <input
+            id="entity-portrait-url"
+            type="url"
+            placeholder="https://…"
+            className={inputCls}
+            value={form.portraitUrl}
+            onChange={(e) => form.setPortraitUrl(e.target.value)}
           />
         </div>
         <div>

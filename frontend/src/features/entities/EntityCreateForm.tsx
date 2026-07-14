@@ -24,6 +24,7 @@ export default function EntityCreateForm({ campaignId, isOwner, onClose }: Entit
   const [type, setType] = useState<EntityType>("NPC");
   const [name, setName] = useState("");
   const [aliases, setAliases] = useState("");
+  const [portraitUrl, setPortraitUrl] = useState("");
   const [notes, setNotes] = useState("");
   const [startHidden, setStartHidden] = useState(false);
 
@@ -49,6 +50,7 @@ export default function EntityCreateForm({ campaignId, isOwner, onClose }: Entit
           .map((a) => a.trim())
           .filter(Boolean),
         notes: notes.trim() === "" ? undefined : notes.trim(),
+        ...(portraitUrl.trim() === "" ? {} : { portraitUrl: portraitUrl.trim() }),
         // Only the owner may seed visibility; the backend gates it anyway.
         ...(isOwner && startHidden ? { visibility: "HIDDEN" as const } : {}),
       });
@@ -106,6 +108,19 @@ export default function EntityCreateForm({ campaignId, isOwner, onClose }: Entit
           className={inputCls}
           value={aliases}
           onChange={(e) => setAliases(e.target.value)}
+        />
+      </div>
+      <div>
+        <label className={labelCls} htmlFor="codex-entity-portrait-url">
+          Portrait URL
+        </label>
+        <input
+          id="codex-entity-portrait-url"
+          type="url"
+          placeholder="https://…"
+          className={inputCls}
+          value={portraitUrl}
+          onChange={(e) => setPortraitUrl(e.target.value)}
         />
       </div>
       <div>

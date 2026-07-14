@@ -348,6 +348,82 @@ describe("campaign entities (#248)", () => {
     expect(ownerBodies).not.toContain("player secret note");
   });
 
+  it("accepts portraitUrl on create and includes it in the list (#844)", async () => {
+    const url = "https://example.com/portraits/goblin.png";
+    const created = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities`)
+      .set("Cookie", cookiePlayer)
+      .send({ type: "NPC", name: "Portrait NPC", portraitUrl: url });
+    expect(created.status).toBe(201);
+    expect(created.body.portraitUrl).toBe(url);
+
+    const list = await supertest(app)
+      .get(`/api/campaigns/${campaignId}/entities`)
+      .set("Cookie", cookieOwner);
+    const row = (list.body as { name: string; portraitUrl: string | null }[]).find(
+      (e) => e.name === "Portrait NPC",
+    );
+    expect(row?.portraitUrl).toBe(url);
+  });
+
+  it("round-trips portraitUrl via PATCH: set then clear to null (#844)", async () => {
+    const created = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities`)
+      .set("Cookie", cookieOwner)
+      .send({ type: "NPC", name: "Portrait Patch Target" });
+    expect(created.body.portraitUrl).toBeNull();
+    const id = created.body.id as string;
+
+    const url = "https://example.com/portraits/leosin.jpg";
+    const set = await supertest(app)
+      .patch(`/api/campaigns/${campaignId}/entities/${id}`)
+      .set("Cookie", cookieOwner)
+      .send({ portraitUrl: url });
+    expect(set.status).toBe(200);
+    expect(set.body.portraitUrl).toBe(url);
+
+    const cleared = await supertest(app)
+      .patch(`/api/campaigns/${campaignId}/entities/${id}`)
+      .set("Cookie", cookieOwner)
+      .send({ portraitUrl: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.portraitUrl).toBeNull();
+  });
+
+  it("400s an invalid portraitUrl (#844)", async () => {
+    const created = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities`)
+      .set("Cookie", cookieOwner)
+      .send({ type: "NPC", name: "Bad Portrait Target" });
+    const id = created.body.id as string;
+
+    const res = await supertest(app)
+      .patch(`/api/campaigns/${campaignId}/entities/${id}`)
+      .set("Cookie", cookieOwner)
+      .send({ portraitUrl: "not-a-url" });
+    expect(res.status).toBe(400);
+
+    const badCreate = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities`)
+      .set("Cookie", cookieOwner)
+      .send({ type: "NPC", name: "Bad Portrait Create", portraitUrl: "not-a-url" });
+    expect(badCreate.status).toBe(400);
+  });
+
+  it("404s a non-owner setting portraitUrl on a HIDDEN entity (#844)", async () => {
+    const created = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities`)
+      .set("Cookie", cookieOwner)
+      .send({ type: "NPC", name: "Hidden Portrait", visibility: "HIDDEN" });
+    const id = created.body.id as string;
+
+    const res = await supertest(app)
+      .patch(`/api/campaigns/${campaignId}/entities/${id}`)
+      .set("Cookie", cookiePlayer)
+      .send({ portraitUrl: "https://example.com/sneak.png" });
+    expect(res.status).toBe(404);
+  });
+
   it("exposes the linked characterId on PC entities and null elsewhere (#842)", async () => {
     await prisma.character.update({ where: { id: CHAR_PLAYER }, data: { campaignId: null } });
     const attach = await supertest(app)
