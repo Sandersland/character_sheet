@@ -3,9 +3,11 @@ import { useMemo, useRef, useState } from "react";
 import BottomSheet from "@/components/ui/BottomSheet";
 import EmptyState from "@/components/ui/EmptyState";
 import { GiSpellBook, Plus } from "@/components/ui/icons";
+import CodexActivityRail, { NeedsChroniclingBanner } from "@/features/entities/CodexActivityRail";
 import CodexLedger from "@/features/entities/CodexLedger";
 import CodexRail from "@/features/entities/CodexRail";
 import EntityCreateForm from "@/features/entities/EntityCreateForm";
+import { useCodexActivity } from "@/features/entities/useCodexActivity";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import { groupByInitial, typeCounts, type CodexSort } from "@/lib/codexLedger";
@@ -23,6 +25,7 @@ interface CampaignCodexProps {
 // only revealed entities (server-filtered); the owner also sees HIDDEN ones.
 export default function CampaignCodex({ campaignId, role, campaignName }: CampaignCodexProps) {
   const { entities } = useCampaignEntities(campaignId);
+  const { statsEntities, activity, loaded } = useCodexActivity(campaignId);
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<EntityType | "ALL">("ALL");
   const [sort, setSort] = useState<CodexSort>("alpha");
@@ -52,9 +55,9 @@ export default function CampaignCodex({ campaignId, role, campaignName }: Campai
     toggleRef.current?.focus();
   }
 
-  // The lg grid keeps a seam for the activity column (#841): [rail | ledger | activity].
+  // lg grid: [filter rail | ledger]; the activity rail (#841) joins at xl.
   return (
-    <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start lg:gap-8">
+    <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start lg:gap-8 xl:grid-cols-[280px_minmax(0,1fr)_280px]">
       <CodexRail
         campaignName={campaignName}
         entryCount={entities.length}
@@ -75,6 +78,7 @@ export default function CampaignCodex({ campaignId, role, campaignName }: Campai
         )}
       </CodexRail>
       <div className="min-w-0">
+        {loaded && <NeedsChroniclingBanner campaignId={campaignId} statsEntities={statsEntities} />}
         {entities.length === 0 ? (
           <EmptyState
             icon={<GiSpellBook />}
@@ -96,6 +100,13 @@ export default function CampaignCodex({ campaignId, role, campaignName }: Campai
           />
         )}
       </div>
+      {loaded && (
+        <CodexActivityRail
+          campaignId={campaignId}
+          statsEntities={statsEntities}
+          activity={activity}
+        />
+      )}
       {isMobile && (
         <>
           <button
