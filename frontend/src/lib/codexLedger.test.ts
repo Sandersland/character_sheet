@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import type { CampaignEntity, EntityStats } from "@/types/character";
+import type { CampaignEntity, EntityMentionRef, EntityStats } from "@/types/character";
 import {
+  buildLedgerGroups,
   CODEX_SORT_OPTIONS,
+  compareByMentionCount,
+  compareByRecentMention,
   groupByInitial,
+  mergeEntityStats,
   monogram,
   mostMentioned,
   needsChronicling,
@@ -158,9 +162,106 @@ describe("mostMentioned", () => {
 });
 
 describe("CODEX_SORT_OPTIONS", () => {
-  it("enables only the alphabetical sort until mention stats land", () => {
-    const enabled = CODEX_SORT_OPTIONS.filter((o) => !o.disabled).map((o) => o.value);
-    expect(enabled).toEqual(["alpha"]);
+  it("offers all three sorts", () => {
     expect(CODEX_SORT_OPTIONS.map((o) => o.value)).toEqual(["alpha", "recent", "mentions"]);
+  });
+});
+
+function mention(partial: Partial<EntityMentionRef>): EntityMentionRef {
+  return { sessionId: null, sessionTitle: null, sessionOrdinal: null, date: "", ...partial };
+}
+
+describe("compareByRecentMention", () => {
+  it("orders the latest lastMentioned date first", () => {
+    const list = [
+      entity({ id: "1", name: "Old", stats: stats({ lastMentioned: mention({ date: "2026-07-01" }) }) }),
+      entity({ id: "2", name: "New", stats: stats({ lastMentioned: mention({ date: "2026-07-10" }) }) }),
+    ];
+    expect([...list].sort(compareByRecentMention).map((e) => e.id)).toEqual(["2", "1"]);
+  });
+
+  it("breaks same-date ties by session ordinal, descending", () => {
+    const list = [
+      entity({
+        id: "1",
+        name: "Early",
+        stats: stats({ lastMentioned: mention({ date: "2026-07-10", sessionOrdinal: 2 }) }),
+      }),
+      entity({
+        id: "2",
+        name: "Late",
+        stats: stats({ lastMentioned: mention({ date: "2026-07-10", sessionOrdinal: 5 }) }),
+      }),
+    ];
+    expect([...list].sort(compareByRecentMention).map((e) => e.id)).toEqual(["2", "1"]);
+  });
+
+  it("sorts never-mentioned and statless entities last, alphabetically", () => {
+    const list = [
+      entity({ id: "1", name: "Zeta no stats" }),
+      entity({ id: "2", name: "Alpha unmentioned", stats: stats({}) }),
+      entity({ id: "3", name: "Seen", stats: stats({ lastMentioned: mention({ date: "2026-07-01" }) }) }),
+    ];
+    expect([...list].sort(compareByRecentMention).map((e) => e.id)).toEqual(["3", "2", "1"]);
+  });
+
+  it("falls back to name order on fully tied mentions", () => {
+    const ref = mention({ date: "2026-07-10", sessionOrdinal: 3 });
+    const list = [
+      entity({ id: "1", name: "Zeph", stats: stats({ lastMentioned: ref }) }),
+      entity({ id: "2", name: "Aldric", stats: stats({ lastMentioned: ref }) }),
+    ];
+    expect([...list].sort(compareByRecentMention).map((e) => e.id)).toEqual(["2", "1"]);
+  });
+});
+
+describe("mergeEntityStats", () => {
+  it("attaches stats by id, leaving unmatched entities statless", () => {
+    const goblin = entity({ id: "1", name: "Goblin" });
+    const gate = entity({ id: "2", name: "Gate" });
+    const merged = mergeEntityStats(
+      [goblin, gate],
+      [{ ...goblin, stats: stats({ mentionCount: 3 }) }],
+    );
+    expect(merged[0].stats?.mentionCount).toBe(3);
+    expect(merged[1].stats).toBeUndefined();
+  });
+});
+
+describe("buildLedgerGroups", () => {
+  const list = [
+    entity({ id: "1", name: "Aldric", stats: stats({ mentionCount: 1 }) }),
+    entity({ id: "2", name: "Zeph", stats: stats({ mentionCount: 5 }) }),
+  ];
+
+  it("returns letter groups for the alpha sort", () => {
+    expect(buildLedgerGroups(list, "alpha").map((g) => g.letter)).toEqual(["A", "Z"]);
+  });
+
+  it("returns one ranked pseudo-group for mention sorts", () => {
+    const groups = buildLedgerGroups(list, "mentions");
+    expect(groups).toHaveLength(1);
+    expect(groups[0].letter).toBe("");
+    expect(groups[0].entities.map((e) => e.id)).toEqual(["2", "1"]);
+  });
+});
+
+describe("compareByMentionCount", () => {
+  it("orders by count descending, statless entities counting as zero", () => {
+    const list = [
+      entity({ id: "1", name: "None" }),
+      entity({ id: "2", name: "Few", stats: stats({ mentionCount: 2 }) }),
+      entity({ id: "3", name: "Many", stats: stats({ mentionCount: 7 }) }),
+    ];
+    expect([...list].sort(compareByMentionCount).map((e) => e.id)).toEqual(["3", "2", "1"]);
+  });
+
+  it("breaks count ties by normalized name", () => {
+    const list = [
+      entity({ id: "1", name: "Zeph", stats: stats({ mentionCount: 2 }) }),
+      entity({ id: "2", name: "Élise", stats: stats({ mentionCount: 2 }) }),
+      entity({ id: "3", name: "Aldric", stats: stats({ mentionCount: 2 }) }),
+    ];
+    expect([...list].sort(compareByMentionCount).map((e) => e.id)).toEqual(["3", "2", "1"]);
   });
 });

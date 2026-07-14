@@ -115,7 +115,7 @@ export default function CodexRail({
           onChange={(e) => onSortChange(e.target.value as CodexSort)}
         >
           {CODEX_SORT_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value} disabled={o.disabled}>
+            <option key={o.value} value={o.value}>
               {o.label}
             </option>
           ))}

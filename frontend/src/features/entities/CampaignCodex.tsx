@@ -10,7 +10,12 @@ import EntityCreateForm from "@/features/entities/EntityCreateForm";
 import { useCodexActivity } from "@/features/entities/useCodexActivity";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
-import { groupByInitial, typeCounts, type CodexSort } from "@/lib/codexLedger";
+import {
+  buildLedgerGroups,
+  mergeEntityStats,
+  typeCounts,
+  type CodexSort,
+} from "@/lib/codexLedger";
 import { matchEntitiesDetailed } from "@/lib/mentions";
 import type { CampaignRole, EntityType } from "@/types/character";
 
@@ -42,7 +47,18 @@ export default function CampaignCodex({ campaignId, role, campaignName }: Campai
       ),
     [entities, query, typeFilter],
   );
-  const groups = useMemo(() => groupByInitial(matches.map((m) => m.entity)), [matches]);
+  // Rows carry mention stats (#853) from the activity fetch when available.
+  const groups = useMemo(
+    () =>
+      buildLedgerGroups(
+        mergeEntityStats(
+          matches.map((m) => m.entity),
+          statsEntities,
+        ),
+        sort,
+      ),
+    [matches, statsEntities, sort],
+  );
   const matchedInNotesIds = useMemo(
     () => new Set(matches.filter((m) => m.matchedInNotesOnly).map((m) => m.entity.id)),
     [matches],

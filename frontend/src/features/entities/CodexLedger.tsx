@@ -15,11 +15,34 @@ interface CodexLedgerProps {
   groups: LetterGroup[];
   matchedInNotesIds: ReadonlySet<string>;
   role?: CampaignRole;
-  // Mention-based sorts (#839) will render a flat ranked list instead of letter groups.
+  // Mention sorts (#853) receive one ranked pseudo-group and render it flat.
   sort: CodexSort;
 }
 
 const ALPHABET = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ", "#"];
+
+// The row's right meta: badges over the "N ✎ · Session M" mention line (#853).
+function RowMeta({ entity, isOwner }: { entity: CampaignEntity; isOwner: boolean }) {
+  const ordinal = entity.stats?.lastMentioned?.sessionOrdinal;
+  return (
+    <span className="flex shrink-0 flex-col items-end gap-1">
+      <span className="flex items-center gap-1.5">
+        {isOwner && entity.visibility === "HIDDEN" && (
+          <Badge tone="neutral">
+            <Lock aria-hidden="true" className="h-3 w-3" />
+            Hidden
+          </Badge>
+        )}
+        <Badge tone={ENTITY_TYPE_TONE[entity.type]}>{ENTITY_TYPE_LABELS[entity.type]}</Badge>
+      </span>
+      {entity.stats && (
+        <span className="text-[10px] tabular-nums text-parchment-500">
+          {`${entity.stats.mentionCount} ✎${ordinal != null ? ` · Session ${ordinal}` : ""}`}
+        </span>
+      )}
+    </span>
+  );
+}
 
 function EntityRow({
   campaignId,
@@ -73,15 +96,7 @@ function EntityRow({
             </span>
           )}
         </span>
-        <span className="flex shrink-0 items-center gap-1.5">
-          {isOwner && hidden && (
-            <Badge tone="neutral">
-              <Lock aria-hidden="true" className="h-3 w-3" />
-              Hidden
-            </Badge>
-          )}
-          <Badge tone={ENTITY_TYPE_TONE[entity.type]}>{ENTITY_TYPE_LABELS[entity.type]}</Badge>
-        </span>
+        <RowMeta entity={entity} isOwner={isOwner} />
       </Link>
     </li>
   );
@@ -94,10 +109,12 @@ export default function CodexLedger({
   groups,
   matchedInNotesIds,
   role,
+  sort,
 }: CodexLedgerProps) {
   const sectionRefs = useRef(new Map<string, HTMLElement>());
   const present = new Set(groups.map((g) => g.letter));
   const isOwner = role === "OWNER";
+  const isAlpha = sort === "alpha";
   // One shared hover-preview controller for every row (#843).
   const preview = useEntityPreview(campaignId);
 
@@ -114,23 +131,11 @@ export default function CodexLedger({
   return (
     <div className="flex min-w-0 grow items-start gap-2">
       <div className="min-w-0 grow">
-        {groups.map((group) => (
-          <section
-            key={group.letter}
-            aria-label={`Entries starting with ${group.letter}`}
-            ref={(el) => {
-              if (el) sectionRefs.current.set(group.letter, el);
-              else sectionRefs.current.delete(group.letter);
-            }}
-          >
-            <div className="flex items-center gap-3 pb-1 pt-4 first:pt-0">
-              <span className="font-display text-lg font-semibold text-garnet-700">
-                {group.letter}
-              </span>
-              <span aria-hidden="true" className="h-px grow bg-parchment-200" />
-            </div>
-            <ul className="flex flex-col divide-y divide-parchment-200">
-              {group.entities.map((e) => (
+        {!isAlpha ? (
+          <ul className="flex flex-col divide-y divide-parchment-200">
+            {groups
+              .flatMap((g) => g.entities)
+              .map((e) => (
                 <EntityRow
                   key={e.id}
                   campaignId={campaignId}
@@ -140,30 +145,61 @@ export default function CodexLedger({
                   previewTriggerProps={preview.triggerProps}
                 />
               ))}
-            </ul>
-          </section>
-        ))}
+          </ul>
+        ) : (
+          groups.map((group) => (
+            <section
+              key={group.letter}
+              aria-label={`Entries starting with ${group.letter}`}
+              ref={(el) => {
+                if (el) sectionRefs.current.set(group.letter, el);
+                else sectionRefs.current.delete(group.letter);
+              }}
+            >
+              <div className="flex items-center gap-3 pb-1 pt-4 first:pt-0">
+                <span className="font-display text-lg font-semibold text-garnet-700">
+                  {group.letter}
+                </span>
+                <span aria-hidden="true" className="h-px grow bg-parchment-200" />
+              </div>
+              <ul className="flex flex-col divide-y divide-parchment-200">
+                {group.entities.map((e) => (
+                  <EntityRow
+                    key={e.id}
+                    campaignId={campaignId}
+                    entity={e}
+                    matchedInNotes={matchedInNotesIds.has(e.id)}
+                    isOwner={isOwner}
+                    previewTriggerProps={preview.triggerProps}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))
+        )}
       </div>
-      <nav
-        aria-label="Jump to letter"
-        className="sticky top-6 hidden shrink-0 flex-col items-center sm:flex"
-      >
-        {ALPHABET.map((letter) => (
-          <button
-            key={letter}
-            type="button"
-            disabled={!present.has(letter)}
-            onClick={() => jumpTo(letter)}
-            className={`px-1 text-[10px] font-semibold leading-4 ${
-              present.has(letter)
-                ? "text-garnet-700 hover:text-garnet-800"
-                : "cursor-default text-parchment-300"
-            }`}
-          >
-            {letter}
-          </button>
-        ))}
-      </nav>
+      {isAlpha && (
+        <nav
+          aria-label="Jump to letter"
+          className="sticky top-6 hidden shrink-0 flex-col items-center sm:flex"
+        >
+          {ALPHABET.map((letter) => (
+            <button
+              key={letter}
+              type="button"
+              disabled={!present.has(letter)}
+              onClick={() => jumpTo(letter)}
+              className={`px-1 text-[10px] font-semibold leading-4 ${
+                present.has(letter)
+                  ? "text-garnet-700 hover:text-garnet-800"
+                  : "cursor-default text-parchment-300"
+              }`}
+            >
+              {letter}
+            </button>
+          ))}
+        </nav>
+      )}
       <EntityPreviewCard preview={preview.open} />
     </div>
   );
