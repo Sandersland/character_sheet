@@ -23,8 +23,10 @@ import type {
   ConditionOperation,
   CampaignEntity,
   CampaignEntityMerge,
+  CodexActivityItem,
   CreateCharacterInput,
   EntityBacklink,
+  EntityConnection,
   EntityType,
   EntityVisibility,
   EntryVisibility,
@@ -525,11 +527,12 @@ export async function addCharacterToCampaign(
 
 export async function fetchEntities(
   campaignId: string,
-  opts?: { q?: string; type?: EntityType },
+  opts?: { q?: string; type?: EntityType; includeStats?: boolean },
 ): Promise<CampaignEntity[]> {
   const params = new URLSearchParams();
   if (opts?.q) params.set("q", opts.q);
   if (opts?.type) params.set("type", opts.type);
+  if (opts?.includeStats) params.set("include", "stats");
   const query = params.toString() ? `?${params.toString()}` : "";
   return request<CampaignEntity[]>(
     `/campaigns/${campaignId}/entities${query}`,
@@ -589,6 +592,34 @@ export async function fetchEntityBacklinks(
     `/campaigns/${campaignId}/entities/${entityId}/backlinks`,
     undefined,
     "Failed to fetch entity backlinks",
+  );
+}
+
+// Consumed by the Codex browse/detail slices of #837 (built after this API slice).
+// fallow-ignore-next-line unused-export
+export async function fetchEntityConnections(
+  campaignId: string,
+  entityId: string,
+  opts?: { limit?: number },
+): Promise<EntityConnection[]> {
+  const query = opts?.limit ? `?limit=${opts.limit}` : "";
+  return request<EntityConnection[]>(
+    `/campaigns/${campaignId}/entities/${entityId}/connections${query}`,
+    undefined,
+    "Failed to fetch entity connections",
+  );
+}
+
+// fallow-ignore-next-line unused-export
+export async function fetchEntityActivity(
+  campaignId: string,
+  opts?: { limit?: number },
+): Promise<CodexActivityItem[]> {
+  const query = opts?.limit ? `?limit=${opts.limit}` : "";
+  return request<CodexActivityItem[]>(
+    `/campaigns/${campaignId}/entities/activity${query}`,
+    undefined,
+    "Failed to fetch codex activity",
   );
 }
 
