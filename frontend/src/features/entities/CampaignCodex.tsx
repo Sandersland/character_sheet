@@ -3,7 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import BottomSheet from "@/components/ui/BottomSheet";
 import EmptyState from "@/components/ui/EmptyState";
 import { GiSpellBook, Plus } from "@/components/ui/icons";
-import CodexActivityRail from "@/features/entities/CodexActivityRail";
+import CodexActivityRail, { NeedsChroniclingBanner } from "@/features/entities/CodexActivityRail";
 import CodexLedger from "@/features/entities/CodexLedger";
 import CodexRail from "@/features/entities/CodexRail";
 import EntityCreateForm from "@/features/entities/EntityCreateForm";
@@ -78,6 +78,7 @@ export default function CampaignCodex({ campaignId, role, campaignName }: Campai
         )}
       </CodexRail>
       <div className="min-w-0">
+        {loaded && <NeedsChroniclingBanner campaignId={campaignId} statsEntities={statsEntities} />}
         {entities.length === 0 ? (
           <EmptyState
             icon={<GiSpellBook />}

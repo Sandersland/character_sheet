@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
-import CodexActivityRail from "@/features/entities/CodexActivityRail";
+import CodexActivityRail, {
+  NeedsChroniclingBanner,
+} from "@/features/entities/CodexActivityRail";
 import type { CampaignEntity, CodexActivityItem, EntityStats } from "@/types/character";
 import { axe } from "@/test/axe";
 
@@ -184,6 +186,39 @@ describe("CodexActivityRail — Most mentioned (#841)", () => {
       statsEntities: [entity({ id: "e1", name: "Quiet", stats: stats({ mentionCount: 0 }) })],
     });
     expect(screen.queryByRole("heading", { name: /most mentioned/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("NeedsChroniclingBanner (#841)", () => {
+  it("shows the count sentence and an ?edit=1 CTA on the top entity", () => {
+    render(
+      <MemoryRouter>
+        <NeedsChroniclingBanner campaignId={CAMPAIGN_ID} statsEntities={[LEOSIN, MASK, KEEP]} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/2 entries have been mentioned/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /add what you know/i })).toHaveAttribute(
+      "href",
+      `/campaigns/${CAMPAIGN_ID}/entities/ent-leosin?edit=1`,
+    );
+  });
+
+  it("is the exact breakpoint complement of the xl-gated rail", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <NeedsChroniclingBanner campaignId={CAMPAIGN_ID} statsEntities={[LEOSIN]} />
+      </MemoryRouter>,
+    );
+    expect(container.firstElementChild?.className).toContain("xl:hidden");
+  });
+
+  it("renders nothing when no entity needs chronicling", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <NeedsChroniclingBanner campaignId={CAMPAIGN_ID} statsEntities={[MASK]} />
+      </MemoryRouter>,
+    );
+    expect(container).toBeEmptyDOMElement();
   });
 });
 

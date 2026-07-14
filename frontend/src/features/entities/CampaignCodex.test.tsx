@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
 import CampaignCodex from "@/features/entities/CampaignCodex";
+import { useCodexActivity } from "@/features/entities/useCodexActivity";
 import * as client from "@/api/client";
 import { primeCampaignEntities, useCampaignEntities } from "@/hooks/useCampaignEntities";
 import type { CampaignEntity } from "@/types/character";
@@ -19,7 +20,7 @@ vi.mock("@/hooks/useCampaignEntities", () => ({
 }));
 
 vi.mock("@/features/entities/useCodexActivity", () => ({
-  useCodexActivity: vi.fn(() => ({ statsEntities: [], activity: [], loaded: true })),
+  useCodexActivity: vi.fn(),
 }));
 
 const CAMPAIGN_ID = "camp-1";
@@ -80,10 +81,15 @@ function stubViewport(desktop: boolean) {
   }));
 }
 
+function mockActivity(statsEntities: CampaignEntity[] = []) {
+  vi.mocked(useCodexActivity).mockReturnValue({ statsEntities, activity: [], loaded: true });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   stubViewport(true);
   mockEntities(ENTITIES);
+  mockActivity();
 });
 
 afterEach(() => {
@@ -258,6 +264,27 @@ describe("CampaignCodex activity rail (#841)", () => {
     await user.type(screen.getByRole("searchbox", { name: /search/i }), "zzz");
     expect(screen.getByText(/no entities match/i)).toBeInTheDocument();
     expect(screen.getByRole("complementary", { name: /codex activity/i })).toBeInTheDocument();
+  });
+
+  it("renders the needs-chronicling banner above the ledger when entities lack descriptions", () => {
+    mockActivity([
+      {
+        ...GOBLIN,
+        stats: {
+          mentionCount: 3,
+          firstMentioned: null,
+          lastMentioned: null,
+          chroniclers: [],
+          hasDescription: false,
+        },
+      },
+    ]);
+    renderCodex();
+    // Banner + desktop gold card both render it — breakpoints split them in CSS.
+    expect(screen.getAllByText(/1 entry has been mentioned/)).toHaveLength(2);
+    for (const cta of screen.getAllByRole("link", { name: /^Add what you know/ })) {
+      expect(cta).toHaveAttribute("href", `/campaigns/${CAMPAIGN_ID}/entities/ent-npc?edit=1`);
+    }
   });
 });
 

@@ -129,6 +129,29 @@ export function NeedsChroniclingCard({
   );
 }
 
+// Mobile/lg complement of the xl rail: one-line gold banner above the ledger.
+export function NeedsChroniclingBanner({
+  campaignId,
+  statsEntities,
+}: {
+  campaignId: string;
+  statsEntities: CampaignEntity[];
+}) {
+  const needs = needsChronicling(statsEntities);
+  if (needs.length === 0) return null;
+  return (
+    <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-card border border-gold-200 bg-gold-50 px-3 py-2 shadow-card xl:hidden">
+      <p className="text-sm text-gold-800">{needsSentence(needs.length)}</p>
+      <Link
+        to={`/campaigns/${campaignId}/entities/${needs[0].id}?edit=1`}
+        className="text-sm font-semibold text-gold-800 hover:text-gold-700"
+      >
+        Add what you know →
+      </Link>
+    </div>
+  );
+}
+
 function MostMentioned({ campaignId, top }: { campaignId: string; top: StatsEntity[] }) {
   if (top.length === 0) return null;
   return (
