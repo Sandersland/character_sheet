@@ -66,12 +66,7 @@ export default function CharacterSheetPage() {
           onCloseCapture={closeCapture}
         />
 
-        <CharacterSheetBody
-          character={character}
-          reference={reference}
-          onUpdate={setCharacter}
-          journalSessionId={session.inActiveSession ? session.activeSessionId : undefined}
-        />
+        <CharacterSheetBody character={character} reference={reference} onUpdate={setCharacter} />
         <RollModeToggle />
         <RollResultToast />
       </div>

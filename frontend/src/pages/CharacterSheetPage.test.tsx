@@ -40,7 +40,7 @@ vi.mock("@/features/character-meta/DeleteCharacterModal", () => ({ default: () =
 vi.mock("@/features/experience/ExperienceTracker", () => ({ default: () => null }));
 vi.mock("@/features/hitpoints/HitPointTracker", () => ({ default: () => null }));
 vi.mock("@/features/inventory/InventoryList", () => ({ default: () => null }));
-vi.mock("@/features/character-meta/JournalSection", () => ({ default: () => null }));
+vi.mock("@/features/journal/JournalDoorway", () => ({ default: () => null }));
 vi.mock("@/features/journal/CapturePalette", () => ({
   default: () => <div>capture-palette-open</div>,
 }));
