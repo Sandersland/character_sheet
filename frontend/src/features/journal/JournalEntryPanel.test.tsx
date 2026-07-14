@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import JournalEntryPanel from "@/features/character-meta/JournalEntryPanel";
+import JournalEntryPanel from "@/features/journal/JournalEntryPanel";
 import type { JournalEntry } from "@/types/character";
 
 vi.mock("@/api/client", () => ({

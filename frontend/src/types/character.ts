@@ -1208,6 +1208,20 @@ export interface Campaign {
   role?: CampaignRole;
 }
 
+/**
+ * Campaign arc / "part" (#863): a named grouping the journal page files sessions
+ * ("chapters") under so a long campaign stays navigable. Ordered by `position`
+ * (story order → roman numeral I, II, III on the spine). Mirrors the backend
+ * `serializeArc` shape from `routes/campaign/arcs.ts`.
+ */
+export interface CampaignArc {
+  id: string;
+  campaignId: string;
+  name: string;
+  position: number;
+  createdAt: string;
+}
+
 // ── Campaign entity registry & @-tagging (#248) ───────────────────────────────
 
 export type EntityType = "NPC" | "LOCATION" | "FACTION" | "ITEM" | "PC" | "OTHER";
@@ -2041,4 +2055,26 @@ export interface Session {
    * single-session GET; surfaced read-only in the recap.
    */
   journalEntries?: JournalEntry[];
+}
+
+/**
+ * A session row from the journal "chronicle" read model (#863):
+ * `GET /api/campaigns/:id/sessions?characterId=<id>`. Extends the session with a
+ * DERIVED 1-based `sessionNumber` (by startedAt ascending — never a persisted
+ * column), the `arcId` it's filed under (nullable), and this character's
+ * `noteCount` for the session. `title` is nullable (fallback "Session N").
+ */
+export interface ChronicleSession {
+  id: string;
+  campaignId: string;
+  status: SessionStatus;
+  startedAt: string; // ISO 8601
+  endedAt?: string | null;
+  title?: string | null;
+  arcId?: string | null;
+  /** DERIVED 1-based chapter number (startedAt ascending within the campaign). */
+  sessionNumber: number;
+  /** This character's journal entries in the session (0 when none). */
+  noteCount: number;
+  participants?: SessionParticipant[];
 }

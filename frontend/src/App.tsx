@@ -18,6 +18,7 @@ import CharacterSheetPage from "@/pages/CharacterSheetPage";
 // session (the latter drags in the whole session/turn-tracking cluster).
 const CharacterCreatePage = lazy(() => import("@/pages/CharacterCreatePage"));
 const SessionPage = lazy(() => import("@/pages/SessionPage"));
+const JournalPage = lazy(() => import("@/pages/JournalPage"));
 
 export default function App() {
   return (
@@ -40,6 +41,8 @@ export default function App() {
                     can never be swallowed by it. */}
                 <Route path="/characters/new" element={<CharacterCreatePage />} />
                 <Route path="/characters/:id" element={<CharacterSheetPage />} />
+                {/* Field-chronicle journal page (#864) */}
+                <Route path="/characters/:id/journal" element={<JournalPage />} />
                 {/* Session (live-play) mode — focused action-first UI */}
                 <Route path="/characters/:id/session" element={<SessionPage />} />
                 {/* Shared campaigns (#246) */}

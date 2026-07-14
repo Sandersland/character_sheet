@@ -17,7 +17,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { GiQuillInk, Lock } from "@/components/ui/icons";
 import JournalEntryPanel, {
   type JournalEntryDraft,
-} from "@/features/character-meta/JournalEntryPanel";
+} from "@/features/journal/JournalEntryPanel";
 import MentionText from "@/features/journal/MentionText";
 import { useJournalMutations } from "@/features/journal/useJournalMutations";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
