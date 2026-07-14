@@ -2,26 +2,33 @@
 // Plain text is verbatim; a known id becomes a Badge-styled chip linking to the
 // entity detail page (name resolved AT RENDER so a rename reflects instantly).
 // An unresolved id — a now-hidden entity a non-owner can't see (#379), or a
-// deleted one — renders as a neutral redacted chip, never the raw token.
+// deleted one — renders as a redacted chip (no link, no preview), never the raw
+// token. Chips carry the shared desktop hover preview (#843), hover-lazy so a
+// long session log costs zero fetches to render.
 
 import { Fragment } from "react";
 import { Link } from "react-router-dom";
 
 import Badge from "@/components/ui/Badge";
 import { Lock } from "@/components/ui/icons";
+import EntityPreviewCard from "@/features/entities/EntityPreviewCard";
+import { useEntityPreview } from "@/features/entities/useEntityPreview";
 import { ENTITY_TYPE_TONE, parseMentionBody } from "@/lib/mentions";
 import type { CampaignEntity } from "@/types/character";
+
+type MentionEntity = Pick<CampaignEntity, "name" | "type" | "aliases" | "notes" | "visibility">;
 
 interface MentionTextProps {
   body: string;
   /** id→entity lookup (from useCampaignEntities). */
-  entities: Map<string, Pick<CampaignEntity, "name" | "type">>;
+  entities: Map<string, MentionEntity>;
   campaignId?: string | null;
   className?: string;
 }
 
 export default function MentionText({ body, entities, campaignId, className }: MentionTextProps) {
   const segments = parseMentionBody(body);
+  const preview = useEntityPreview(campaignId);
 
   return (
     <p className={className}>
@@ -45,6 +52,7 @@ export default function MentionText({ body, entities, campaignId, className }: M
           <Link
             key={index}
             to={`/campaigns/${campaignId}/entities/${segment.id}`}
+            {...preview.triggerProps({ id: segment.id, ...entity })}
             className="rounded-full hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-garnet-400"
           >
             {chip}
@@ -53,6 +61,7 @@ export default function MentionText({ body, entities, campaignId, className }: M
           <Fragment key={index}>{chip}</Fragment>
         );
       })}
+      <EntityPreviewCard preview={preview.open} />
     </p>
   );
 }

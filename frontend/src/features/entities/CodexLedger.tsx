@@ -1,8 +1,10 @@
-import { useRef } from "react";
+import { useRef, type DOMAttributes } from "react";
 import { Link } from "react-router-dom";
 
 import Badge from "@/components/ui/Badge";
 import { Lock } from "@/components/ui/icons";
+import EntityPreviewCard from "@/features/entities/EntityPreviewCard";
+import { useEntityPreview, type PreviewEntity } from "@/features/entities/useEntityPreview";
 import { monogram, notesSnippet, type CodexSort, type LetterGroup } from "@/lib/codexLedger";
 import {
   ENTITY_TYPE_LABELS,
@@ -27,11 +29,13 @@ function EntityRow({
   entity,
   matchedInNotes,
   isOwner,
+  previewTriggerProps,
 }: {
   campaignId: string;
   entity: CampaignEntity;
   matchedInNotes: boolean;
   isOwner: boolean;
+  previewTriggerProps: (entity: PreviewEntity) => DOMAttributes<HTMLElement>;
 }) {
   const hidden = entity.visibility === "HIDDEN";
   const snippet = notesSnippet(entity.notes);
@@ -39,6 +43,7 @@ function EntityRow({
     <li>
       <Link
         to={`/campaigns/${campaignId}/entities/${entity.id}`}
+        {...previewTriggerProps(entity)}
         className={`flex items-center gap-3 rounded-control px-1 py-2 hover:bg-parchment-100 ${
           hidden ? "opacity-60" : ""
         }`}
@@ -96,6 +101,8 @@ export default function CodexLedger({
   const sectionRefs = useRef(new Map<string, HTMLElement>());
   const present = new Set(groups.map((g) => g.letter));
   const isOwner = role === "OWNER";
+  // One shared hover-preview controller for every row (#843).
+  const preview = useEntityPreview(campaignId);
 
   // scrollIntoView is banned here; compute the target offset ourselves.
   function jumpTo(letter: string) {
@@ -133,6 +140,7 @@ export default function CodexLedger({
                   entity={e}
                   matchedInNotes={matchedInNotesIds.has(e.id)}
                   isOwner={isOwner}
+                  previewTriggerProps={preview.triggerProps}
                 />
               ))}
             </ul>
@@ -159,6 +167,7 @@ export default function CodexLedger({
           </button>
         ))}
       </nav>
+      <EntityPreviewCard preview={preview.open} />
     </div>
   );
 }
