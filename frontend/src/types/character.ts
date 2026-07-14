@@ -1225,6 +1225,8 @@ export interface CampaignEntity {
   visibility: EntityVisibility;
   createdAt: string;
   updatedAt: string;
+  /** Linked character for PC entities (#842); null elsewhere, list-route only. */
+  characterId?: string | null;
   /** Which field a `q=` search hit (#839); present only on searched lists. */
   matchedIn?: EntityMatchField;
   /** Derived mention stats (#839); present only with `?include=stats`. */
