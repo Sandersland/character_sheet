@@ -15,12 +15,23 @@ export function useVisualViewport(): VisualViewportRect {
   const [rect, setRect] = useState<VisualViewportRect>(() => readViewportRect());
   useEffect(() => {
     const vv = typeof window !== "undefined" ? window.visualViewport : undefined;
-    const sync = () => setRect(readViewportRect());
-    sync();
+    // The keyboard animation fires a burst of resize+scroll events; coalesce them
+    // to one rAF-aligned setRect so the pinned panel re-lays-out in step with the
+    // paint instead of thrashing state per event (#877).
+    let raf = 0;
+    const sync = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        setRect(readViewportRect());
+      });
+    };
+    setRect(readViewportRect());
     if (!vv) return;
     vv.addEventListener("resize", sync);
     vv.addEventListener("scroll", sync);
     return () => {
+      if (raf) cancelAnimationFrame(raf);
       vv.removeEventListener("resize", sync);
       vv.removeEventListener("scroll", sync);
     };
