@@ -22,6 +22,7 @@ import {
 } from "@/features/journal/chronicle";
 import { useChronicle } from "@/features/journal/useChronicle";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
+import { useCaptureDock } from "@/hooks/useCaptureDock";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
@@ -157,7 +158,9 @@ function BackLink({ character }: { character: Character }) {
 // ── Desktop: fixed spine + manuscript, side by side ────────────────────────────
 function JournalDesktopView(props: JournalViewProps) {
   const { character, onUpdate, spine, effectiveId, filter, onFilterChange, onSelect, error, manuscript } = props;
-  const [captureOpen, setCaptureOpen] = useState(false);
+  // useCaptureDock (not a bare useState) so ⌘J/Ctrl+J toggles the dock here too,
+  // matching the sheet and session surfaces.
+  const { captureOpen, openCapture, closeCapture } = useCaptureDock();
 
   return (
     <div className="min-h-screen bg-parchment-100">
@@ -166,7 +169,7 @@ function JournalDesktopView(props: JournalViewProps) {
           <BackLink character={character} />
           <button
             type="button"
-            onClick={() => setCaptureOpen(true)}
+            onClick={openCapture}
             className="rounded-control border border-parchment-200 bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-parchment-600 hover:text-parchment-900"
           >
             Quick capture
@@ -188,7 +191,7 @@ function JournalDesktopView(props: JournalViewProps) {
         <CapturePalette
           character={character}
           sessionId={props.selectedSessionId}
-          onClose={() => setCaptureOpen(false)}
+          onClose={closeCapture}
           onUpdate={onUpdate}
         />
       )}
