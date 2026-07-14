@@ -1,13 +1,14 @@
-// The NOTE feed rows shared by both quick-capture surfaces (#865). Two layouts:
-//   - NoteFeed: the mobile BottomSheet list — newest-first, divided rows.
-//   - DockFeed: the desktop margin dock — newest at BOTTOM, grouped under day
-//     dividers, serif body to match the ruled writing register.
+// The NOTE feed rows shared by both quick-capture surfaces (#865, #866). Two
+// layouts, both newest at the BOTTOM, grouped under day dividers with a serif
+// ink body to match the ruled writing register:
+//   - MobileFeed: the full-height mobile capture (#866) — "Tonight ·" divider.
+//   - DockFeed: the desktop margin dock (#865).
 // Both reuse NoteRow/NoteEditor + a single edit/delete state machine so inline
 // edit and confirm-in-place delete behave identically across surfaces.
 
 import { useState } from "react";
 
-import { Lock } from "@/components/ui/icons";
+import { Lock, Unlock } from "@/components/ui/icons";
 import MentionText from "@/features/journal/MentionText";
 import { formatJournalTime } from "@/lib/formatJournalDate";
 import type { CampaignEntity, EntryVisibility, JournalEntry } from "@/types/character";
@@ -38,6 +39,35 @@ export function PrivateToggle({
       />
       {label}
     </label>
+  );
+}
+
+// The visibility opt-out as a compact icon toggle — the mobile composer's lock
+// button (#866), sitting beside the field in place of the checkbox+label row.
+// A closed lock reads "private"; an open lock reads "shared" (the campaign
+// default). ≥44px hit target; state announced via aria-pressed.
+export function PrivateLockButton({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  const Icon = checked ? Lock : Unlock;
+  return (
+    <button
+      type="button"
+      aria-label="Private"
+      aria-pressed={checked}
+      onClick={() => onChange(!checked)}
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border transition-colors ${
+        checked
+          ? "border-garnet-400 bg-garnet-50 text-garnet-700"
+          : "border-parchment-300 bg-parchment-50 text-parchment-500"
+      }`}
+    >
+      <Icon aria-hidden="true" className="h-4 w-4" />
+    </button>
   );
 }
 
@@ -274,21 +304,6 @@ function renderRow(
   );
 }
 
-// Mobile BottomSheet list: newest-first, hairline-divided sans rows.
-export function NoteFeed(props: FeedProps) {
-  const rowState = useFeedRowState();
-  if (props.notes.length === 0) {
-    return <p className="text-sm text-parchment-500">No notes captured yet.</p>;
-  }
-  return (
-    <ul className="flex flex-col divide-y divide-parchment-200">
-      {props.notes.map((note) => (
-        <li key={note.id}>{renderRow(note, props, rowState, "text-sm text-parchment-800", 3)}</li>
-      ))}
-    </ul>
-  );
-}
-
 // Local-calendar day key/label for the dock's day dividers. loggedAt is a real
 // timestamp (unlike the UTC-midnight `date`), so group by the LOCAL day.
 function dayKey(iso: string): string {
@@ -322,9 +337,11 @@ function DayDivider({ label }: { label: string }) {
   );
 }
 
+type DayGroup = { key: string; label: string; notes: JournalEntry[] };
+
 // Group ascending notes under their day, so each divider precedes that day's rows.
-function groupByDay(notes: JournalEntry[]): { key: string; label: string; notes: JournalEntry[] }[] {
-  const groups: { key: string; label: string; notes: JournalEntry[] }[] = [];
+function groupByDay(notes: JournalEntry[]): DayGroup[] {
+  const groups: DayGroup[] = [];
   for (const note of notes) {
     const key = dayKey(note.loggedAt);
     const last = groups[groups.length - 1];
@@ -334,9 +351,67 @@ function groupByDay(notes: JournalEntry[]): { key: string; label: string; notes:
   return groups;
 }
 
-// Desktop margin dock: newest at the BOTTOM, grouped under day dividers, serif body.
-export function DockFeed(props: FeedProps) {
+// Mobile capture divider label: the current day reads "Tonight · {Mon D}" (notes
+// are jotted during an evening session); earlier days fall back to the shared
+// Today/Yesterday/absolute labels.
+function mobileDayLabel(iso: string): string {
+  const base = dayLabel(iso);
+  if (base !== "Today") return base;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return base;
+  return `Tonight · ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+}
+
+// The newest-at-bottom body shared by both surfaces (#865, #866): props.notes
+// arrives newest-first, so reverse to oldest-first (newest lands last), group
+// under day dividers, and render each row via the shared machinery. The caller
+// supplies the divider labeller (dock = plain day; mobile = "Tonight ·") and the
+// serif body class for its register.
+function GroupedNoteFeed({
+  props,
+  bodyClassName,
+  labelFor,
+}: {
+  props: FeedProps;
+  bodyClassName: string;
+  labelFor: (group: DayGroup) => string;
+}) {
   const rowState = useFeedRowState();
+  const ascending = [...props.notes].reverse();
+  return (
+    <div className="flex flex-col">
+      {groupByDay(ascending).map((group) => (
+        <div key={group.key} className="flex flex-col">
+          <DayDivider label={labelFor(group)} />
+          {group.notes.map((note) => (
+            <div key={note.id}>{renderRow(note, props, rowState, bodyClassName, 3)}</div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Mobile capture surface (#866): serif ink body, "Tonight ·" divider.
+export function MobileFeed(props: FeedProps) {
+  if (props.notes.length === 0) {
+    return (
+      <p className="py-4 text-center font-display text-[15px] italic text-parchment-500">
+        No notes yet — jot the first below.
+      </p>
+    );
+  }
+  return (
+    <GroupedNoteFeed
+      props={props}
+      bodyClassName="font-display text-base leading-[1.45] text-parchment-900"
+      labelFor={(group) => mobileDayLabel(group.notes[0].loggedAt)}
+    />
+  );
+}
+
+// Desktop margin dock (#865): serif body, plain day dividers.
+export function DockFeed(props: FeedProps) {
   if (props.notes.length === 0) {
     return (
       <p className="py-2 font-display text-[15px] italic text-parchment-500">
@@ -344,20 +419,11 @@ export function DockFeed(props: FeedProps) {
       </p>
     );
   }
-  // props.notes arrives newest-first; reverse to oldest-first so newest lands last.
-  const ascending = [...props.notes].reverse();
   return (
-    <div className="flex flex-col">
-      {groupByDay(ascending).map((group) => (
-        <div key={group.key} className="flex flex-col">
-          <DayDivider label={group.label} />
-          {group.notes.map((note) => (
-            <div key={note.id}>
-              {renderRow(note, props, rowState, "font-display text-[15px] leading-snug text-parchment-800", 3)}
-            </div>
-          ))}
-        </div>
-      ))}
-    </div>
+    <GroupedNoteFeed
+      props={props}
+      bodyClassName="font-display text-[15px] leading-snug text-parchment-800"
+      labelFor={(group) => group.label}
+    />
   );
 }

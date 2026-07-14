@@ -31,6 +31,15 @@ interface MentionAutocompleteProps {
   onKeyDown?: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
 }
 
+// Below md the suggestions render in-flow, capped to a share of the keyboard-aware
+// viewport so they clear the on-screen keyboard (#785). The exception is an
+// "above"-anchored field — the keyboard-docked composers (dock #865, mobile
+// capture #866) sit flush above the keyboard, so a popover anchored above opens up
+// into the visible feed (never clipped) and keeps the absolute popover on mobile.
+function renderSuggestionsInFlow(isMobile: boolean, placement: "above" | "below"): boolean {
+  return isMobile && placement !== "above";
+}
+
 const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>(
   function MentionAutocomplete(
     { value, onChange, campaignId, rows = 2, className = "", style, placeholder, id, required, popoverPlacement = "below", onKeyDown, ...rest },
@@ -38,9 +47,7 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
   ) {
     const editor = useMentionEditor({ value, onChange, campaignId, onKeyDown });
     const { innerRef } = editor;
-    // Below md the suggestions render in-flow, capped to a share of the
-    // keyboard-aware viewport so they clear the on-screen keyboard (#785).
-    const isMobile = useIsBelowMd();
+    const inFlow = renderSuggestionsInFlow(useIsBelowMd(), popoverPlacement);
     const viewportHeight = useVisualViewportHeight();
     const suggestionMaxHeight = Math.round(viewportHeight * 0.4);
 
@@ -108,7 +115,7 @@ const MentionAutocomplete = forwardRef<HTMLDivElement, MentionAutocompleteProps>
             onSelect={editor.insertToken}
             onCreate={editor.handleCreate}
             onHover={editor.setActiveIndex}
-            inFlow={isMobile}
+            inFlow={inFlow}
             maxHeight={suggestionMaxHeight}
             placement={popoverPlacement}
           />

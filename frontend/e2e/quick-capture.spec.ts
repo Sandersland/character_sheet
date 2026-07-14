@@ -3,11 +3,11 @@ import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
 
-// The Quick-capture surface presents per-breakpoint (#771): the non-modal margin
-// dock at md+ (#865), the slide-up BottomSheet below md. Opened with Cmd/Ctrl+J so
-// the flow is viewport-independent (no reliance on a header button that may
-// reflow on mobile).
-test("Quick capture: margin dock at md+, BottomSheet on mobile", async ({ page }) => {
+// The Quick-capture surface presents per-breakpoint: the non-modal margin dock at
+// md+ (#865), and a full-height, keyboard-pinned chat surface below md (#866).
+// Opened with Cmd/Ctrl+J so the flow is viewport-independent (no reliance on a
+// header button that may reflow on mobile).
+test("Quick capture: margin dock at md+, chat surface on mobile", async ({ page }) => {
   await login(page);
   // Collect after login so the pre-auth 401s from login()'s initial goto don't count.
   const errors = collectConsoleErrors(page);
@@ -33,13 +33,21 @@ test("Quick capture: margin dock at md+, BottomSheet on mobile", async ({ page }
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: /quick capture/i })).toHaveCount(0);
 
-  // Below md: BottomSheet with a grabber and no keyboard hint.
+  // Below md: the full-height chat surface (#866) — a modal dialog with the
+  // composer focused, a "Done" close button, the composer placeholder, and no
+  // keyboard hint or BottomSheet grabber. "Done" closes it.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.keyboard.press("Control+j");
-  await expect(page.getByRole("dialog", { name: /quick capture/i })).toBeVisible();
-  await expect(grabber).toBeVisible();
+  const mobileSurface = page.getByRole("dialog", { name: /quick capture/i });
+  await expect(mobileSurface).toBeVisible();
+  await expect(mobileSurface).toHaveAttribute("aria-modal", "true");
+  await expect(page.getByRole("textbox", { name: /quick note/i })).toBeFocused();
+  await expect(page.getByRole("button", { name: /^done$/i })).toBeVisible();
   await expect(page.getByText("Jot a note… @ to tag")).toBeVisible();
   await expect(enterHint).toHaveCount(0);
+  await expect(grabber).toHaveCount(0);
+  await page.getByRole("button", { name: /^done$/i }).click();
+  await expect(page.getByRole("dialog", { name: /quick capture/i })).toHaveCount(0);
 
   expect(errors).toEqual([]);
 });

@@ -63,7 +63,7 @@ export { GiCrossedSwords, GiSparkles, GiCycle } from "react-icons/gi";
 // Attack-sheet damage-card glyph (#756). Pre-existing barrel re-export with no
 // current importer — surfaced only because #864 touched this file; keep the
 // public glyph available for the attack sheet.
-// fallow-ignore-next-line unused-exports
+// fallow-ignore-next-line unused-export
 export { GiSwordWound } from "react-icons/gi";
 // Turn-picker option-card glyphs: universal actions on the Action sheet.
 export {
@@ -80,6 +80,7 @@ export {
 export {
   ArrowUp,
   Lock,
+  Unlock,
   Plus,
   Zap,
   VenetianMask,

@@ -257,3 +257,15 @@
     animation: none;
   }
 }
+
+/* Mobile quick-capture (#866): the "Campfire" register. In dark mode a faint
+   gold firelight warms the base of the feed — no new colours, just what dark
+   mode should give. Dark-only, so it lives here rather than in a `dark:`
+   utility (the app has no dark variant configured; tokens flip instead). */
+[data-theme="dark"] [data-mobile-capture-feed] {
+  background-image: radial-gradient(
+    ellipse 90% 55% at 50% 105%,
+    rgba(218, 180, 58, 0.1),
+    transparent 70%
+  );
+}
