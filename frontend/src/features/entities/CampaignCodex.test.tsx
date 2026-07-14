@@ -252,6 +252,115 @@ describe("CampaignCodex rail filters (#840)", () => {
   });
 });
 
+function stats(partial: Partial<NonNullable<CampaignEntity["stats"]>>) {
+  return {
+    mentionCount: 0,
+    firstMentioned: null,
+    lastMentioned: null,
+    chroniclers: [],
+    hasDescription: true,
+    ...partial,
+  };
+}
+
+// GOBLIN is most mentioned; THORDAK mentioned most recently; GATE has no stats.
+const STATS_ENTITIES = [
+  {
+    ...GOBLIN,
+    stats: stats({
+      mentionCount: 7,
+      lastMentioned: { sessionId: "s3", sessionTitle: null, sessionOrdinal: 3, date: "2026-07-01" },
+    }),
+  },
+  {
+    ...THORDAK,
+    stats: stats({
+      mentionCount: 2,
+      lastMentioned: { sessionId: "s5", sessionTitle: null, sessionOrdinal: 5, date: "2026-07-10" },
+    }),
+  },
+];
+
+// The activity rail also links stats entities, so scope ledger assertions outside it.
+function ledgerLinks() {
+  const rail = screen.queryByRole("complementary", { name: /codex activity/i });
+  return screen.getAllByRole("link").filter((l) => !rail?.contains(l));
+}
+
+function ledgerRow(name: RegExp) {
+  const row = ledgerLinks().find((l) => name.test(l.textContent ?? ""));
+  if (!row) throw new Error(`No ledger row matching ${name}`);
+  return row;
+}
+
+describe("CampaignCodex mention sorts (#853)", () => {
+  beforeEach(() => mockActivity(STATS_ENTITIES));
+
+  it("renders a flat ranked list for Most mentioned, without dividers or the jump rail", async () => {
+    const user = userEvent.setup();
+    renderCodex();
+    await user.selectOptions(screen.getByLabelText("Sort"), "mentions");
+    expect(ledgerLinks().map((l) => l.textContent)).toEqual([
+      expect.stringContaining("Goblin Chief"),
+      expect.stringContaining("Thordak"),
+      expect.stringContaining("Baldur's Gate"),
+    ]);
+    expect(screen.queryAllByRole("region")).toHaveLength(0);
+    expect(screen.queryByRole("navigation", { name: /jump to letter/i })).not.toBeInTheDocument();
+  });
+
+  it("orders Recently mentioned by lastMentioned, never-mentioned last", async () => {
+    const user = userEvent.setup();
+    renderCodex();
+    await user.selectOptions(screen.getByLabelText("Sort"), "recent");
+    expect(ledgerLinks().map((l) => l.textContent)).toEqual([
+      expect.stringContaining("Thordak"),
+      expect.stringContaining("Goblin Chief"),
+      expect.stringContaining("Baldur's Gate"),
+    ]);
+  });
+
+  it("restores letter dividers and the jump rail when switching back to A→Z", async () => {
+    const user = userEvent.setup();
+    renderCodex();
+    await user.selectOptions(screen.getByLabelText("Sort"), "mentions");
+    await user.selectOptions(screen.getByLabelText("Sort"), "alpha");
+    expect(screen.getAllByRole("region")).toHaveLength(3);
+    expect(screen.getByRole("navigation", { name: /jump to letter/i })).toBeInTheDocument();
+  });
+
+  it("composes mention sorts with the type filter", async () => {
+    const user = userEvent.setup();
+    renderCodex();
+    await user.selectOptions(screen.getByLabelText("Sort"), "mentions");
+    await user.click(screen.getByRole("button", { name: /NPC/ }));
+    expect(ledgerLinks().map((l) => l.textContent)).toEqual([
+      expect.stringContaining("Goblin Chief"),
+    ]);
+  });
+
+  it("shows mention-count and last-session meta on rows with stats", () => {
+    renderCodex();
+    const row = ledgerRow(/Goblin Chief/);
+    expect(within(row).getByText("7 ✎ · Session 3")).toBeInTheDocument();
+  });
+
+  it("omits the session part when lastMentioned is null", () => {
+    mockActivity([{ ...GOBLIN, stats: stats({ mentionCount: 0 }) }]);
+    renderCodex();
+    const row = ledgerRow(/Goblin Chief/);
+    expect(within(row).getByText("0 ✎")).toBeInTheDocument();
+    expect(within(row).queryByText(/Session/)).not.toBeInTheDocument();
+  });
+
+  it("degrades to badge-only meta on rows without stats", () => {
+    renderCodex();
+    const row = ledgerRow(/Baldur's Gate/);
+    expect(within(row).getByText("Location")).toBeInTheDocument();
+    expect(within(row).queryByText(/✎/)).not.toBeInTheDocument();
+  });
+});
+
 describe("CampaignCodex activity rail (#841)", () => {
   it("renders the activity rail alongside the ledger", () => {
     renderCodex();
