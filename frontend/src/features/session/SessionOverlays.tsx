@@ -62,6 +62,7 @@ export default function SessionOverlays({
         <CapturePalette
           character={character}
           sessionId={session.id}
+          session={session}
           onClose={onCaptureClose}
           onUpdate={onUpdate}
         />
