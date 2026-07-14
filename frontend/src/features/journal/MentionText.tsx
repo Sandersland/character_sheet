@@ -1,19 +1,25 @@
-// Renders a stored note body with @[<uuid>] tokens as entity chips (#248).
-// Plain text is verbatim; a known id becomes a Badge-styled chip linking to the
+// Renders a stored note body with @[<uuid>] tokens as inked entity names (#248,
+// restyled #862). Plain text is verbatim; a known id becomes a scribe-inked
+// name — small-caps, entity-colored, dotted underline, no pill — linking to the
 // entity detail page (name resolved AT RENDER so a rename reflects instantly).
-// An unresolved id — a now-hidden entity a non-owner can't see (#379), or a
-// deleted one — renders as a redacted chip (no link, no preview), never the raw
-// token. Chips carry the shared desktop hover preview (#843), hover-lazy so a
-// long session log costs zero fetches to render.
+// The ink inherits its font family from context (serif in journal prose, sans
+// elsewhere). An unresolved id — a now-hidden entity a non-owner can't see
+// (#379), or a deleted one — renders redacted (no link, no preview), never the
+// raw token. Mentions carry the shared desktop hover preview (#843), hover-lazy
+// so a long session log costs zero fetches to render.
 
 import { Fragment } from "react";
 import { Link } from "react-router-dom";
 
-import Badge from "@/components/ui/Badge";
 import { Lock } from "@/components/ui/icons";
 import EntityPreviewCard from "@/features/entities/EntityPreviewCard";
 import { useEntityPreview } from "@/features/entities/useEntityPreview";
-import { ENTITY_TYPE_TONE, parseMentionBody } from "@/lib/mentions";
+import {
+  ENTITY_TYPE_INK_BORDER_CLASS,
+  ENTITY_TYPE_INK_TEXT_CLASS,
+  MENTION_INK_BASE_CLASS,
+  parseMentionBody,
+} from "@/lib/mentions";
 import type { CampaignEntity } from "@/types/character";
 
 type MentionEntity = Pick<CampaignEntity, "name" | "type" | "aliases" | "notes" | "visibility">;
@@ -39,26 +45,30 @@ export default function MentionText({ body, entities, campaignId, className }: M
         const entity = entities.get(segment.id);
         if (!entity) {
           return (
-            <Badge key={index} tone="neutral">
-              <span aria-label="Hidden entity" className="inline-flex items-center gap-1">
-                <Lock aria-hidden="true" className="h-3 w-3" />
-                Hidden
-              </span>
-            </Badge>
+            <span
+              key={index}
+              aria-label="Hidden entity"
+              className={`inline-flex items-baseline gap-1 font-semibold text-parchment-500 [font-variant-caps:small-caps]`}
+            >
+              <Lock aria-hidden="true" className="h-3 w-3 self-center" />
+              Hidden
+            </span>
           );
         }
-        const chip = <Badge tone={ENTITY_TYPE_TONE[entity.type]}>@{entity.name}</Badge>;
+        const inkClass = `${MENTION_INK_BASE_CLASS} ${ENTITY_TYPE_INK_TEXT_CLASS[entity.type]} ${ENTITY_TYPE_INK_BORDER_CLASS[entity.type]}`;
         return campaignId ? (
           <Link
             key={index}
             to={`/campaigns/${campaignId}/entities/${segment.id}`}
             {...preview.triggerProps({ id: segment.id, ...entity })}
-            className="rounded-full hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-garnet-400"
+            className={`${inkClass} hover:opacity-80 focus:outline-none focus-visible:rounded-xs focus-visible:ring-2 focus-visible:ring-garnet-400`}
           >
-            {chip}
+            {entity.name}
           </Link>
         ) : (
-          <Fragment key={index}>{chip}</Fragment>
+          <span key={index} className={inkClass}>
+            {entity.name}
+          </span>
         );
       })}
       <EntityPreviewCard preview={preview.open} />

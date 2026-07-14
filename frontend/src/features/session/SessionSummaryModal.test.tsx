@@ -180,8 +180,9 @@ describe("SessionSummaryModal", () => {
 
     // The note body is visible immediately — no title, no collapse (#278 regression).
     expect(screen.getByText(/Slew the/)).toBeInTheDocument();
-    // The @[<uuid>] token resolves to the entity's name chip once entities load.
-    expect(await screen.findByText("@Dragon")).toBeInTheDocument();
+    // The @[<uuid>] token resolves to the entity's inked name once entities load
+    // (inked-name mentions drop the leading @ sigil, #862).
+    expect(await screen.findByText("Dragon")).toBeInTheDocument();
     // The raw token never leaks through as text.
     expect(screen.queryByText(new RegExp(DRAGON_ID))).not.toBeInTheDocument();
   });

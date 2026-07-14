@@ -6,10 +6,13 @@
 
 import { useEffect, useRef, type Ref } from "react";
 
-import Badge from "@/components/ui/Badge";
 import { Plus } from "@/components/ui/icons";
 import { useCampaignMerges } from "@/hooks/useCampaignMerges";
-import { ENTITY_TYPE_LABELS, ENTITY_TYPE_TONE } from "@/lib/mentions";
+import {
+  ENTITY_TYPE_DOT_CLASS,
+  ENTITY_TYPE_INK_TEXT_CLASS,
+  ENTITY_TYPE_LABELS,
+} from "@/lib/mentions";
 import { ultimateSurvivorName } from "@/lib/merges";
 import type { CampaignEntity, EntityType } from "@/types/character";
 
@@ -58,8 +61,8 @@ function MatchRow({ entity, index, active, survivor, activeRef, optionId, onSele
       id={optionId(index)}
       role="option"
       aria-selected={active}
-      className={`flex cursor-pointer items-center justify-between gap-2 px-3 py-1.5 text-sm ${
-        active ? "bg-garnet-50 text-garnet-900" : "text-parchment-800"
+      className={`flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm ${
+        active ? "bg-garnet-50" : ""
       }`}
       onMouseDown={(e) => {
         e.preventDefault();
@@ -67,13 +70,21 @@ function MatchRow({ entity, index, active, survivor, activeRef, optionId, onSele
       }}
       onMouseEnter={() => onHover(index)}
     >
+      {/* Type-colored diamond: the ink identity, without the pill. The type
+          stays announced to screen readers via the sr-only label. */}
+      <span
+        aria-hidden="true"
+        className={`h-1.5 w-1.5 shrink-0 rotate-45 ${ENTITY_TYPE_DOT_CLASS[entity.type]}`}
+      />
       <span className="min-w-0 truncate">
-        {entity.name}
+        <span className={`font-semibold [font-variant-caps:small-caps] ${ENTITY_TYPE_INK_TEXT_CLASS[entity.type]}`}>
+          {entity.name}
+        </span>
+        <span className="sr-only"> ({ENTITY_TYPE_LABELS[entity.type]})</span>
         {survivor ? (
           <span className="ml-1 text-xs font-normal text-parchment-500">→ {survivor}</span>
         ) : null}
       </span>
-      <Badge tone={ENTITY_TYPE_TONE[entity.type]}>{ENTITY_TYPE_LABELS[entity.type]}</Badge>
     </li>
   );
 }
