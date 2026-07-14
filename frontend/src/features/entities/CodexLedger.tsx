@@ -21,6 +21,29 @@ interface CodexLedgerProps {
 
 const ALPHABET = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ", "#"];
 
+// The row's right meta: badges over the "N ✎ · Session M" mention line (#853).
+function RowMeta({ entity, isOwner }: { entity: CampaignEntity; isOwner: boolean }) {
+  const ordinal = entity.stats?.lastMentioned?.sessionOrdinal;
+  return (
+    <span className="flex shrink-0 flex-col items-end gap-1">
+      <span className="flex items-center gap-1.5">
+        {isOwner && entity.visibility === "HIDDEN" && (
+          <Badge tone="neutral">
+            <Lock aria-hidden="true" className="h-3 w-3" />
+            Hidden
+          </Badge>
+        )}
+        <Badge tone={ENTITY_TYPE_TONE[entity.type]}>{ENTITY_TYPE_LABELS[entity.type]}</Badge>
+      </span>
+      {entity.stats && (
+        <span className="text-[10px] tabular-nums text-parchment-500">
+          {`${entity.stats.mentionCount} ✎${ordinal != null ? ` · Session ${ordinal}` : ""}`}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function EntityRow({
   campaignId,
   entity,
@@ -36,7 +59,6 @@ function EntityRow({
 }) {
   const hidden = entity.visibility === "HIDDEN";
   const snippet = notesSnippet(entity.notes);
-  const ordinal = entity.stats?.lastMentioned?.sessionOrdinal;
   return (
     <li>
       <Link
@@ -74,22 +96,7 @@ function EntityRow({
             </span>
           )}
         </span>
-        <span className="flex shrink-0 flex-col items-end gap-1">
-          <span className="flex items-center gap-1.5">
-            {isOwner && hidden && (
-              <Badge tone="neutral">
-                <Lock aria-hidden="true" className="h-3 w-3" />
-                Hidden
-              </Badge>
-            )}
-            <Badge tone={ENTITY_TYPE_TONE[entity.type]}>{ENTITY_TYPE_LABELS[entity.type]}</Badge>
-          </span>
-          {entity.stats && (
-            <span className="text-[10px] tabular-nums text-parchment-500">
-              {`${entity.stats.mentionCount} ✎${ordinal != null ? ` · Session ${ordinal}` : ""}`}
-            </span>
-          )}
-        </span>
+        <RowMeta entity={entity} isOwner={isOwner} />
       </Link>
     </li>
   );

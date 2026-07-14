@@ -37,6 +37,22 @@ export interface LetterGroup {
   entities: CampaignEntity[];
 }
 
+// Stats-merged ledger rows (#853); entities missing from the stats list degrade.
+export function mergeEntityStats(
+  entities: CampaignEntity[],
+  statsEntities: CampaignEntity[],
+): CampaignEntity[] {
+  const statsById = new Map(statsEntities.map((e) => [e.id, e.stats]));
+  return entities.map((e) => ({ ...e, stats: statsById.get(e.id) }));
+}
+
+// Ledger groups for a sort: A→Z letter groups, or one ranked pseudo-group for mention sorts.
+export function buildLedgerGroups(entities: CampaignEntity[], sort: CodexSort): LetterGroup[] {
+  if (sort === "alpha") return groupByInitial(entities);
+  const cmp = sort === "recent" ? compareByRecentMention : compareByMentionCount;
+  return [{ letter: "", entities: [...entities].sort(cmp) }];
+}
+
 // Divider letter for a name: normalized initial A–Z, else the "#" bucket.
 function initialOf(name: string): string {
   const first = normalizeForMatch(name).charAt(0);

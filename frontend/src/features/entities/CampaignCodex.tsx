@@ -11,9 +11,8 @@ import { useCodexActivity } from "@/features/entities/useCodexActivity";
 import { useCampaignEntities } from "@/hooks/useCampaignEntities";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import {
-  compareByMentionCount,
-  compareByRecentMention,
-  groupByInitial,
+  buildLedgerGroups,
+  mergeEntityStats,
   typeCounts,
   type CodexSort,
 } from "@/lib/codexLedger";
@@ -49,16 +48,17 @@ export default function CampaignCodex({ campaignId, role, campaignName }: Campai
     [entities, query, typeFilter],
   );
   // Rows carry mention stats (#853) from the activity fetch when available.
-  const rows = useMemo(() => {
-    const statsById = new Map(statsEntities.map((e) => [e.id, e.stats]));
-    return matches.map((m) => ({ ...m.entity, stats: statsById.get(m.entity.id) }));
-  }, [matches, statsEntities]);
-  // Mention sorts pass one ranked pseudo-group; CodexLedger renders it flat (#853).
-  const groups = useMemo(() => {
-    if (sort === "alpha") return groupByInitial(rows);
-    const cmp = sort === "recent" ? compareByRecentMention : compareByMentionCount;
-    return [{ letter: "", entities: [...rows].sort(cmp) }];
-  }, [rows, sort]);
+  const groups = useMemo(
+    () =>
+      buildLedgerGroups(
+        mergeEntityStats(
+          matches.map((m) => m.entity),
+          statsEntities,
+        ),
+        sort,
+      ),
+    [matches, statsEntities, sort],
+  );
   const matchedInNotesIds = useMemo(
     () => new Set(matches.filter((m) => m.matchedInNotesOnly).map((m) => m.entity.id)),
     [matches],

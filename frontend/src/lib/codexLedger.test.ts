@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import type { CampaignEntity, EntityMentionRef, EntityStats } from "@/types/character";
 import {
+  buildLedgerGroups,
   CODEX_SORT_OPTIONS,
   compareByMentionCount,
   compareByRecentMention,
   groupByInitial,
+  mergeEntityStats,
   monogram,
   mostMentioned,
   needsChronicling,
@@ -210,6 +212,37 @@ describe("compareByRecentMention", () => {
       entity({ id: "2", name: "Aldric", stats: stats({ lastMentioned: ref }) }),
     ];
     expect([...list].sort(compareByRecentMention).map((e) => e.id)).toEqual(["2", "1"]);
+  });
+});
+
+describe("mergeEntityStats", () => {
+  it("attaches stats by id, leaving unmatched entities statless", () => {
+    const goblin = entity({ id: "1", name: "Goblin" });
+    const gate = entity({ id: "2", name: "Gate" });
+    const merged = mergeEntityStats(
+      [goblin, gate],
+      [{ ...goblin, stats: stats({ mentionCount: 3 }) }],
+    );
+    expect(merged[0].stats?.mentionCount).toBe(3);
+    expect(merged[1].stats).toBeUndefined();
+  });
+});
+
+describe("buildLedgerGroups", () => {
+  const list = [
+    entity({ id: "1", name: "Aldric", stats: stats({ mentionCount: 1 }) }),
+    entity({ id: "2", name: "Zeph", stats: stats({ mentionCount: 5 }) }),
+  ];
+
+  it("returns letter groups for the alpha sort", () => {
+    expect(buildLedgerGroups(list, "alpha").map((g) => g.letter)).toEqual(["A", "Z"]);
+  });
+
+  it("returns one ranked pseudo-group for mention sorts", () => {
+    const groups = buildLedgerGroups(list, "mentions");
+    expect(groups).toHaveLength(1);
+    expect(groups[0].letter).toBe("");
+    expect(groups[0].entities.map((e) => e.id)).toEqual(["2", "1"]);
   });
 });
 
