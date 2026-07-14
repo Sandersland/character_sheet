@@ -151,6 +151,30 @@ model Campaign {
   sessions   Session[]
   // Per-character play preferences scoped to this campaign (#537).
   characterPreferences CampaignCharacterPreference[]
+  // Named parts/arcs the journal groups sessions under (#863). Campaign-level
+  // (one shared story spine), DM-curated.
+  arcs       CampaignArc[]
+}
+
+// A named part/arc of a campaign's story (#863): the journal page groups
+// sessions ("chapters") under these so a long campaign stays navigable. Arcs
+// are campaign-level (one shared spine for the whole party) and DM-only to
+// curate — plain REST CRUD (like entities/journal), NOT the audit/transaction
+// pattern, since they carry no character-sheet mechanical effect. `position`
+// is an explicit ordering column the owner reorders; a session points at its
+// arc via the nullable Session.arcId (SetNull on delete, so deleting an arc
+// leaves its sessions intact and merely un-arced).
+model CampaignArc {
+  id         String   @id @default(uuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name       String
+  position   Int
+  createdAt  DateTime @default(now())
+
+  sessions   Session[]
+
+  @@index([campaignId, position])
 }
 
 enum CampaignRole {
@@ -1461,6 +1485,10 @@ model Session {
   endedAt     DateTime?
   // Optional human-readable name for the session, e.g. "Session 4 — The Sunless Citadel".
   title       String?
+  // Optional arc/part this session belongs to in the journal (#863). SetNull so
+  // deleting an arc leaves the session intact and merely un-arced.
+  arcId       String?
+  arc         CampaignArc?  @relation(fields: [arcId], references: [id], onDelete: SetNull)
   // Campaign recap aggregate computed at session-end (#245). Null while active.
   summary     Json?
 
@@ -1469,6 +1497,7 @@ model Session {
   participants   SessionParticipant[]
 
   @@index([campaignId, status])
+  @@index([arcId])
 }
 
 // One character's membership in a shared session, with their present-interval
