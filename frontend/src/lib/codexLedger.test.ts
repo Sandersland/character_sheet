@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type { CampaignEntity } from "@/types/character";
+import type { CampaignEntity, EntityStats } from "@/types/character";
 import {
   CODEX_SORT_OPTIONS,
   groupByInitial,
   monogram,
+  mostMentioned,
+  needsChronicling,
   notesSnippet,
   typeCounts,
 } from "@/lib/codexLedger";
@@ -18,6 +20,17 @@ function entity(partial: Partial<CampaignEntity> & { id: string; name: string })
     visibility: "REVEALED",
     createdAt: "",
     updatedAt: "",
+    ...partial,
+  };
+}
+
+function stats(partial: Partial<EntityStats>): EntityStats {
+  return {
+    mentionCount: 0,
+    firstMentioned: null,
+    lastMentioned: null,
+    chroniclers: [],
+    hasDescription: false,
     ...partial,
   };
 }
@@ -88,6 +101,59 @@ describe("monogram", () => {
 
   it("falls back for an empty name", () => {
     expect(monogram("   ")).toBe("?");
+  });
+});
+
+describe("needsChronicling", () => {
+  it("keeps only mentioned, descriptionless entities, most-mentioned first", () => {
+    const result = needsChronicling([
+      entity({ id: "1", name: "Described", stats: stats({ mentionCount: 9, hasDescription: true }) }),
+      entity({ id: "2", name: "Quiet", stats: stats({ mentionCount: 0 }) }),
+      entity({ id: "3", name: "Busy", stats: stats({ mentionCount: 5 }) }),
+      entity({ id: "4", name: "Once", stats: stats({ mentionCount: 1 }) }),
+    ]);
+    expect(result.map((e) => e.id)).toEqual(["3", "4"]);
+  });
+
+  it("excludes entities without stats", () => {
+    expect(needsChronicling([entity({ id: "1", name: "No stats" })])).toEqual([]);
+  });
+
+  it("returns empty for an empty list", () => {
+    expect(needsChronicling([])).toEqual([]);
+  });
+});
+
+describe("mostMentioned", () => {
+  it("takes the top 3 by mention count, dropping zero-mention entities", () => {
+    const result = mostMentioned([
+      entity({ id: "1", name: "A", stats: stats({ mentionCount: 2 }) }),
+      entity({ id: "2", name: "B", stats: stats({ mentionCount: 7 }) }),
+      entity({ id: "3", name: "C", stats: stats({ mentionCount: 0 }) }),
+      entity({ id: "4", name: "D", stats: stats({ mentionCount: 4 }) }),
+      entity({ id: "5", name: "E", stats: stats({ mentionCount: 3 }) }),
+    ]);
+    expect(result.map((e) => e.id)).toEqual(["2", "4", "5"]);
+  });
+
+  it("breaks count ties by name", () => {
+    const result = mostMentioned([
+      entity({ id: "1", name: "Zeph", stats: stats({ mentionCount: 2 }) }),
+      entity({ id: "2", name: "Aldric", stats: stats({ mentionCount: 2 }) }),
+    ]);
+    expect(result.map((e) => e.name)).toEqual(["Aldric", "Zeph"]);
+  });
+
+  it("respects a custom n and ignores statless entities", () => {
+    const result = mostMentioned(
+      [
+        entity({ id: "1", name: "A", stats: stats({ mentionCount: 1 }) }),
+        entity({ id: "2", name: "B", stats: stats({ mentionCount: 5 }) }),
+        entity({ id: "3", name: "C" }),
+      ],
+      1,
+    );
+    expect(result.map((e) => e.id)).toEqual(["2"]);
   });
 });
 
