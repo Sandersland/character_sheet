@@ -1,20 +1,27 @@
 import { Link, useParams } from "react-router-dom";
 
 import Spinner from "@/components/ui/Spinner";
+import { useAuth } from "@/features/auth/AuthProvider";
 import CampaignItemCard from "@/features/entities/CampaignItemCard";
-import EntityDetailHeader from "@/features/entities/EntityDetailHeader";
-import EntityDetailsCard from "@/features/entities/EntityDetailsCard";
-import EntityMentions from "@/features/entities/EntityMentions";
+import EntityArticleHeader from "@/features/entities/EntityArticleHeader";
+import EntityChronicle from "@/features/entities/EntityChronicle";
+import EntityConnections from "@/features/entities/EntityConnections";
+import EntityContributeBand from "@/features/entities/EntityContributeBand";
+import EntityEditForm from "@/features/entities/EntityEditForm";
+import EntityInfobox from "@/features/entities/EntityInfobox";
 import { FormerIdentitiesCard, SurvivorBanner } from "@/features/entities/EntityMergeCards";
 import { useEntityBackTo } from "@/features/entities/useEntityBackTo";
 import { useEntityDetail } from "@/features/entities/useEntityDetail";
 import { useEntityMerges } from "@/features/entities/useEntityMerges";
 
+// Wiki-article entity page (#842): masthead + lead, derived-facts infobox,
+// session-grouped chronicle, co-mention connections, and a contribute band.
 export default function EntityDetailPage() {
   const { id: campaignId, entityId } = useParams();
   const backTo = useEntityBackTo(campaignId);
   const detail = useEntityDetail(campaignId, entityId);
-  const { entity, role, item, backlinks, byId } = detail;
+  const { entity, role, item, backlinks, connections, characters, byId } = detail;
+  const { user } = useAuth();
   const { survivorChain, formerIdentityIds, nameFor } = useEntityMerges(campaignId, entityId, byId);
 
   if (entity === undefined) return <Spinner variant="page" />;
@@ -35,9 +42,7 @@ export default function EntityDetailPage() {
 
   return (
     <div className="min-h-screen bg-parchment-100">
-      <EntityDetailHeader entity={entity} role={role} backTo={backTo} />
-
-      <main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-8">
+      <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
         <SurvivorBanner
           entity={entity}
           survivorChain={survivorChain}
@@ -51,30 +56,66 @@ export default function EntityDetailPage() {
           </p>
         )}
 
-        {entity.type === "ITEM" && item && (
-          <CampaignItemCard item={item} isOwner={role === "OWNER"} />
+        {!detail.editing && (
+          <EntityArticleHeader
+            entity={entity}
+            role={role}
+            backTo={backTo}
+            onEdit={detail.startEdit}
+          />
         )}
 
-        <EntityDetailsCard
-          entity={entity}
-          role={role}
-          editing={detail.editing}
-          busy={detail.busy}
-          form={detail.form}
-          onEdit={detail.startEdit}
-          onCancel={detail.cancelEdit}
-          onSave={detail.handleSave}
-          onToggleVisibility={detail.handleToggleVisibility}
-          onDelete={detail.handleDelete}
-        />
+        <div className="flex flex-col gap-6 xl:grid xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start">
+          <EntityInfobox
+            entity={entity}
+            role={role}
+            backlinks={backlinks}
+            characters={characters}
+            viewerId={user?.id}
+            busy={detail.busy}
+            onToggleVisibility={detail.handleToggleVisibility}
+            onDelete={detail.handleDelete}
+          />
+          <article className="flex flex-col gap-6 xl:order-first">
+            {detail.editing ? (
+              <EntityEditForm
+                form={detail.form}
+                busy={detail.busy}
+                onSave={detail.handleSave}
+                onCancel={detail.cancelEdit}
+              />
+            ) : (
+              entity.notes?.trim() && (
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-parchment-800">
+                  {entity.notes}
+                </p>
+              )
+            )}
 
-        <FormerIdentitiesCard
-          formerIdentityIds={formerIdentityIds}
-          nameFor={nameFor}
-          campaignId={campaignId}
-        />
+            {entity.type === "ITEM" && item && (
+              <CampaignItemCard item={item} isOwner={role === "OWNER"} />
+            )}
 
-        <EntityMentions backlinks={backlinks} byId={byId} campaignId={campaignId} />
+            <FormerIdentitiesCard
+              formerIdentityIds={formerIdentityIds}
+              nameFor={nameFor}
+              campaignId={campaignId}
+            />
+
+            <EntityChronicle
+              backlinks={backlinks}
+              entityId={entityId}
+              byId={byId}
+              campaignId={campaignId}
+            />
+
+            <EntityConnections connections={connections} campaignId={campaignId} />
+
+            {!detail.editing && (
+              <EntityContributeBand name={entity.name} onEdit={detail.startEdit} />
+            )}
+          </article>
+        </div>
       </main>
     </div>
   );

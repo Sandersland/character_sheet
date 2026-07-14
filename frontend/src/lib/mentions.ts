@@ -163,7 +163,7 @@ export interface MentionResolved {
 }
 
 // Chip background/text per type — mirrors ENTITY_TYPE_TONE + Badge's TONE_CLASSES.
-const MENTION_CHIP_TONE_CLASS: Record<EntityType, string> = {
+export const MENTION_CHIP_TONE_CLASS: Record<EntityType, string> = {
   NPC: "bg-garnet-50 text-garnet-800",
   LOCATION: "bg-vitality-50 text-vitality-800",
   FACTION: "bg-arcane-50 text-arcane-800",
