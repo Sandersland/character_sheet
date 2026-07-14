@@ -609,7 +609,6 @@ export async function fetchEntityConnections(
   );
 }
 
-// fallow-ignore-next-line unused-export
 export async function fetchEntityActivity(
   campaignId: string,
   opts?: { limit?: number },

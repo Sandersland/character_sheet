@@ -14,6 +14,7 @@ vi.mock("@/api/client", () => ({
   fetchCharacters: vi.fn(),
   addCharacterToCampaign: vi.fn(),
   fetchEntities: vi.fn(),
+  fetchEntityActivity: vi.fn(),
   createEntity: vi.fn(),
   updateEntity: vi.fn(),
   deleteEntity: vi.fn(),
@@ -75,6 +76,7 @@ beforeEach(() => {
   __resetCampaignEntitiesCacheForTests();
   __resetCampaignMergesCacheForTests();
   vi.mocked(client.fetchEntities).mockResolvedValue([]);
+  vi.mocked(client.fetchEntityActivity).mockResolvedValue([]);
   vi.mocked(client.fetchEntityMerges).mockResolvedValue([]);
   vi.mocked(client.fetchCampaignItems).mockResolvedValue([]);
   vi.mocked(client.fetchItems).mockResolvedValue([]);

@@ -1,27 +1,70 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import MentionText from "@/features/journal/MentionText";
+import { __resetEntityPreviewCacheForTests } from "@/features/entities/entityPreviewData";
+import * as client from "@/api/client";
 import type { CampaignEntity } from "@/types/character";
 import { axe } from "@/test/axe";
+
+vi.mock("@/api/client", () => ({
+  fetchEntities: vi.fn(),
+  fetchEntityConnections: vi.fn(),
+}));
 
 const A = "11111111-1111-1111-1111-111111111111";
 const B = "22222222-2222-2222-2222-222222222222";
 
-function map(
-  entries: [string, Pick<CampaignEntity, "name" | "type">][],
-): Map<string, Pick<CampaignEntity, "name" | "type">> {
+type MentionEntity = Pick<CampaignEntity, "name" | "type" | "aliases" | "notes" | "visibility">;
+
+function chief(overrides: Partial<MentionEntity> = {}): MentionEntity {
+  return {
+    name: "Goblin Chief",
+    type: "NPC",
+    aliases: [],
+    notes: "Leads the Cragmaw tribe.",
+    visibility: "REVEALED",
+    ...overrides,
+  };
+}
+
+function map(entries: [string, MentionEntity][] = [[A, chief()]]): Map<string, MentionEntity> {
   return new Map(entries);
 }
 
-function renderText(body: string, entities = map([[A, { name: "Goblin Chief", type: "NPC" }]])) {
+function renderText(body: string, entities = map(), campaignId: string | null = "camp-1") {
   return render(
     <MemoryRouter>
-      <MentionText body={body} entities={entities} campaignId="camp-1" />
+      <MentionText body={body} entities={entities} campaignId={campaignId} />
     </MemoryRouter>,
   );
 }
+
+function stubPointer(fine: boolean) {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: fine,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  }));
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  __resetEntityPreviewCacheForTests();
+  stubPointer(true);
+  vi.mocked(client.fetchEntities).mockResolvedValue([]);
+  vi.mocked(client.fetchEntityConnections).mockResolvedValue([]);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("MentionText (#248)", () => {
   it("renders a known id as a chip linking to the entity", () => {
@@ -52,7 +95,7 @@ describe("MentionText (#248)", () => {
       <MemoryRouter>
         <MentionText
           body={`@[${A}]`}
-          entities={map([[A, { name: "Goblin Warlord", type: "NPC" }]])}
+          entities={map([[A, chief({ name: "Goblin Warlord" })]])}
           campaignId="camp-1"
         />
       </MemoryRouter>,
@@ -64,5 +107,75 @@ describe("MentionText (#248)", () => {
   it("has no axe violations", async () => {
     const { container } = renderText(`Met @[${A}] at the gate`);
     expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+describe("MentionText hover preview (#843)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function hover(el: Element, ms = 300) {
+    fireEvent.pointerOver(el);
+    await act(async () => {
+      vi.advanceTimersByTime(ms);
+    });
+  }
+
+  it("renders without fetching anything (data is hover-lazy)", () => {
+    renderText(`Met @[${A}] today`);
+    expect(vi.mocked(client.fetchEntities)).not.toHaveBeenCalled();
+    expect(vi.mocked(client.fetchEntityConnections)).not.toHaveBeenCalled();
+  });
+
+  it("shows the preview card after the hover intent delay", async () => {
+    renderText(`Met @[${A}] today`);
+    await hover(screen.getByRole("link", { name: /Goblin Chief/ }));
+    const card = screen.getByTestId("entity-preview-card");
+    expect(card).toHaveTextContent("Goblin Chief");
+    expect(card).toHaveTextContent(/Leads the Cragmaw tribe/);
+  });
+
+  it("fetches stats and connections once across re-hovers (shared cache)", async () => {
+    renderText(`Met @[${A}] today`);
+    const chip = screen.getByRole("link", { name: /Goblin Chief/ });
+    await hover(chip);
+    fireEvent.pointerOut(chip);
+    await hover(chip);
+
+    expect(vi.mocked(client.fetchEntities)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(client.fetchEntityConnections)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(client.fetchEntityConnections)).toHaveBeenCalledWith("camp-1", A, {
+      limit: 3,
+    });
+  });
+
+  it("gives a redacted chip no link and no preview", async () => {
+    renderText(`Saw @[${B}]`, map([]));
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    await hover(screen.getByLabelText("Hidden entity"));
+    expect(screen.queryByTestId("entity-preview-card")).not.toBeInTheDocument();
+    expect(vi.mocked(client.fetchEntities)).not.toHaveBeenCalled();
+  });
+
+  it("keeps a no-campaignId chip inert: no link, no preview", async () => {
+    renderText(`Met @[${A}]`, map(), null);
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    await hover(screen.getByText(/Goblin Chief/));
+    expect(screen.queryByTestId("entity-preview-card")).not.toBeInTheDocument();
+    expect(vi.mocked(client.fetchEntities)).not.toHaveBeenCalled();
+  });
+
+  it("does nothing on a coarse pointer while keeping the chip's link for tap nav", async () => {
+    stubPointer(false);
+    renderText(`Met @[${A}] today`);
+    const chip = screen.getByRole("link", { name: /Goblin Chief/ });
+    await hover(chip, 1000);
+    expect(screen.queryByTestId("entity-preview-card")).not.toBeInTheDocument();
+    expect(chip).toHaveAttribute("href", `/campaigns/camp-1/entities/${A}`);
   });
 });
