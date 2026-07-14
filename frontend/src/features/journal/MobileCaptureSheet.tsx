@@ -37,11 +37,9 @@ export default function MobileCaptureSheet({
   composer,
   anchorKey,
 }: MobileCaptureSheetProps) {
-  // Pin the body with a real position:fixed scroll-lock BEFORE useDialogChrome so
-  // the layout viewport can't scroll under the keyboard (the #877 desync source),
-  // and so this hook's scroll-restore cleanup runs AFTER the dialog's focus-restore
-  // (cleanups run in reverse mount order) — otherwise refocusing the opener could
-  // reveal-scroll the page back off-origin as we close.
+  // Body scroll-lock (#877) — before useDialogChrome so its scroll-restore cleanup
+  // runs after the dialog's focus-restore (reverse mount order), else the opener
+  // refocus could reveal-scroll the page back off-origin on close.
   useMobileScrollLock();
   const panelRef = useDialogChrome(onClose);
   const feedRef = useRef<HTMLDivElement>(null);
@@ -57,12 +55,9 @@ export default function MobileCaptureSheet({
   }, [anchorKey, height]);
 
   return createPortal(
-    // Full-screen opaque backdrop in the surface colour, sitting *behind* the
-    // pinned panel as a safety net: any region the visualViewport-pinned panel
-    // doesn't cover (above it when offsetTop > 0, or a transient during the
-    // keyboard animation) shows parchment, never the sheet underneath. This only
-    // holds because useMobileScrollLock stops iOS scrolling the layout viewport
-    // under the keyboard (#877) — otherwise this fixed layer would itself drift.
+    // Opaque safety net behind the pinned panel: any region the panel doesn't
+    // cover shows parchment, never the sheet (reliable once the body-lock pins
+    // the layout viewport — #877).
     <div role="presentation" className="fixed inset-0 z-50 bg-parchment-50">
       <div
         ref={panelRef}
