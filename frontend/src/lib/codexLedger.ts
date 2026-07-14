@@ -5,12 +5,32 @@ import type { CampaignEntity, EntityStats, EntityType } from "@/types/character"
 
 export type CodexSort = "alpha" | "recent" | "mentions";
 
-// Mention-based sorts stay disabled until per-entity stats land (#839).
-export const CODEX_SORT_OPTIONS: { value: CodexSort; label: string; disabled: boolean }[] = [
-  { value: "alpha", label: "A → Z", disabled: false },
-  { value: "recent", label: "Recently mentioned", disabled: true },
-  { value: "mentions", label: "Most mentioned", disabled: true },
+export const CODEX_SORT_OPTIONS: { value: CodexSort; label: string }[] = [
+  { value: "alpha", label: "A → Z" },
+  { value: "recent", label: "Recently mentioned" },
+  { value: "mentions", label: "Most mentioned" },
 ];
+
+function compareByName(a: CampaignEntity, b: CampaignEntity): number {
+  return normalizeForMatch(a.name).localeCompare(normalizeForMatch(b.name));
+}
+
+// "Recently mentioned" comparator (#853): latest lastMentioned first; never-mentioned last.
+export function compareByRecentMention(a: CampaignEntity, b: CampaignEntity): number {
+  const am = a.stats?.lastMentioned ?? null;
+  const bm = b.stats?.lastMentioned ?? null;
+  if (!am || !bm) return Number(!am) - Number(!bm) || compareByName(a, b);
+  return (
+    bm.date.localeCompare(am.date) ||
+    (bm.sessionOrdinal ?? 0) - (am.sessionOrdinal ?? 0) ||
+    compareByName(a, b)
+  );
+}
+
+// "Most mentioned" comparator (#853): count descending, statless entities count as zero.
+export function compareByMentionCount(a: CampaignEntity, b: CampaignEntity): number {
+  return (b.stats?.mentionCount ?? 0) - (a.stats?.mentionCount ?? 0) || compareByName(a, b);
+}
 
 export interface LetterGroup {
   letter: string;
@@ -80,8 +100,6 @@ export function needsChronicling(entities: CampaignEntity[]): StatsEntity[] {
 export function mostMentioned(entities: CampaignEntity[], n = 3): StatsEntity[] {
   return withStats(entities)
     .filter((e) => e.stats.mentionCount > 0)
-    .sort(
-      (a, b) => b.stats.mentionCount - a.stats.mentionCount || a.name.localeCompare(b.name),
-    )
+    .sort(compareByMentionCount)
     .slice(0, n);
 }

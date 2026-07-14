@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { CampaignEntity, EntityStats } from "@/types/character";
+import type { CampaignEntity, EntityMentionRef, EntityStats } from "@/types/character";
 import {
   CODEX_SORT_OPTIONS,
+  compareByMentionCount,
+  compareByRecentMention,
   groupByInitial,
   monogram,
   mostMentioned,
@@ -158,9 +160,75 @@ describe("mostMentioned", () => {
 });
 
 describe("CODEX_SORT_OPTIONS", () => {
-  it("enables only the alphabetical sort until mention stats land", () => {
-    const enabled = CODEX_SORT_OPTIONS.filter((o) => !o.disabled).map((o) => o.value);
-    expect(enabled).toEqual(["alpha"]);
+  it("offers all three sorts", () => {
     expect(CODEX_SORT_OPTIONS.map((o) => o.value)).toEqual(["alpha", "recent", "mentions"]);
+  });
+});
+
+function mention(partial: Partial<EntityMentionRef>): EntityMentionRef {
+  return { sessionId: null, sessionTitle: null, sessionOrdinal: null, date: "", ...partial };
+}
+
+describe("compareByRecentMention", () => {
+  it("orders the latest lastMentioned date first", () => {
+    const list = [
+      entity({ id: "1", name: "Old", stats: stats({ lastMentioned: mention({ date: "2026-07-01" }) }) }),
+      entity({ id: "2", name: "New", stats: stats({ lastMentioned: mention({ date: "2026-07-10" }) }) }),
+    ];
+    expect([...list].sort(compareByRecentMention).map((e) => e.id)).toEqual(["2", "1"]);
+  });
+
+  it("breaks same-date ties by session ordinal, descending", () => {
+    const list = [
+      entity({
+        id: "1",
+        name: "Early",
+        stats: stats({ lastMentioned: mention({ date: "2026-07-10", sessionOrdinal: 2 }) }),
+      }),
+      entity({
+        id: "2",
+        name: "Late",
+        stats: stats({ lastMentioned: mention({ date: "2026-07-10", sessionOrdinal: 5 }) }),
+      }),
+    ];
+    expect([...list].sort(compareByRecentMention).map((e) => e.id)).toEqual(["2", "1"]);
+  });
+
+  it("sorts never-mentioned and statless entities last, alphabetically", () => {
+    const list = [
+      entity({ id: "1", name: "Zeta no stats" }),
+      entity({ id: "2", name: "Alpha unmentioned", stats: stats({}) }),
+      entity({ id: "3", name: "Seen", stats: stats({ lastMentioned: mention({ date: "2026-07-01" }) }) }),
+    ];
+    expect([...list].sort(compareByRecentMention).map((e) => e.id)).toEqual(["3", "2", "1"]);
+  });
+
+  it("falls back to name order on fully tied mentions", () => {
+    const ref = mention({ date: "2026-07-10", sessionOrdinal: 3 });
+    const list = [
+      entity({ id: "1", name: "Zeph", stats: stats({ lastMentioned: ref }) }),
+      entity({ id: "2", name: "Aldric", stats: stats({ lastMentioned: ref }) }),
+    ];
+    expect([...list].sort(compareByRecentMention).map((e) => e.id)).toEqual(["2", "1"]);
+  });
+});
+
+describe("compareByMentionCount", () => {
+  it("orders by count descending, statless entities counting as zero", () => {
+    const list = [
+      entity({ id: "1", name: "None" }),
+      entity({ id: "2", name: "Few", stats: stats({ mentionCount: 2 }) }),
+      entity({ id: "3", name: "Many", stats: stats({ mentionCount: 7 }) }),
+    ];
+    expect([...list].sort(compareByMentionCount).map((e) => e.id)).toEqual(["3", "2", "1"]);
+  });
+
+  it("breaks count ties by normalized name", () => {
+    const list = [
+      entity({ id: "1", name: "Zeph", stats: stats({ mentionCount: 2 }) }),
+      entity({ id: "2", name: "Élise", stats: stats({ mentionCount: 2 }) }),
+      entity({ id: "3", name: "Aldric", stats: stats({ mentionCount: 2 }) }),
+    ];
+    expect([...list].sort(compareByMentionCount).map((e) => e.id)).toEqual(["3", "2", "1"]);
   });
 });

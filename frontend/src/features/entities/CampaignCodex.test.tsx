@@ -223,13 +223,13 @@ describe("CampaignCodex rail filters (#840)", () => {
     expect(screen.queryAllByRole("link")).toHaveLength(0);
   });
 
-  it("offers A→Z sort and disables mention sorts until stats land", () => {
+  it("offers all three sorts enabled, defaulting to A→Z", () => {
     renderCodex();
     const sortSelect = screen.getByLabelText("Sort");
     expect(sortSelect).toHaveValue("alpha");
     expect(screen.getByRole("option", { name: "A → Z" })).toBeEnabled();
-    expect(screen.getByRole("option", { name: "Recently mentioned" })).toBeDisabled();
-    expect(screen.getByRole("option", { name: "Most mentioned" })).toBeDisabled();
+    expect(screen.getByRole("option", { name: "Recently mentioned" })).toBeEnabled();
+    expect(screen.getByRole("option", { name: "Most mentioned" })).toBeEnabled();
   });
 
   it("shows the empty state when the campaign has no entities", () => {
