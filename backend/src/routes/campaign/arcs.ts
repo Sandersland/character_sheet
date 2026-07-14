@@ -42,15 +42,23 @@ function serializeArc(row: CampaignArc) {
 arcsRouter.get("/campaigns/:id/arcs", async (req, res) => {
   await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
 
+  // Order by [position, createdAt] in EVERY read path: two concurrent DM creates
+  // can both read the same arc count and land on the same `position` (the POST
+  // below isn't transactional), so createdAt is the deterministic tiebreak that
+  // keeps tied arcs in a stable order. A hardening UNIQUE(campaignId, position)
+  // constraint would fight the PATCH reorder flow, so it's tracked as a follow-up.
   const arcs = await prisma.campaignArc.findMany({
     where: { campaignId: req.params.id },
-    orderBy: { position: "asc" },
+    orderBy: [{ position: "asc" }, { createdAt: "asc" }],
   });
   res.json(arcs.map(serializeArc));
 });
 
 // ── POST /api/campaigns/:id/arcs ─────────────────────────────────────────────
-// Owner-only create; position appends to the end of the current ordering.
+// Owner-only create; position appends (= current arc count). The count+create
+// isn't atomic, so two concurrent DM creates can tie on `position`; that's made
+// harmless by the [position, createdAt] read ordering above (hardening constraint
+// is a tracked follow-up).
 arcsRouter.post("/campaigns/:id/arcs", async (req, res) => {
   await assertCampaignOwner(prisma, req.user!.id, req.params.id, "edit", OWNER_ONLY);
 

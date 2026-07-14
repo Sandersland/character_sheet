@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
 
-import { assertCampaignMembership, assertCampaignOwner, assertCharacterAccess } from "@/lib/auth/access.js";
+import type { CampaignRole } from "@/generated/prisma/client.js";
+import { assertCampaignMembership, assertCharacterAccess } from "@/lib/auth/access.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
 import {
@@ -148,13 +149,6 @@ sessionsRouter.get("/campaigns/:campaignId/sessions", async (req, res) => {
     include: { participants: { include: { character: { select: { id: true, name: true } } } } },
   });
 
-  // Derive the 1-based chapter number by startedAt ascending, then key it by id
-  // so the newest-first payload can look each session's number up.
-  const numberById = new Map<string, number>();
-  [...sessions]
-    .sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime())
-    .forEach((s, i) => numberById.set(s.id, i + 1));
-
   const noteCountById = new Map<string, number>();
   if (characterId !== undefined && sessions.length > 0) {
     const grouped = await prisma.journalEntry.groupBy({
@@ -167,10 +161,17 @@ sessionsRouter.get("/campaigns/:campaignId/sessions", async (req, res) => {
     }
   }
 
+  // Derive the 1-based chapter number by startedAt ASCENDING. `sessions` is
+  // already ordered DESCENDING, so the ascending rank of the row at descending
+  // index `i` (0 = newest) is `total - i` — a single-pass arithmetic read (no
+  // map lookup, so the value is provably defined). One active session per
+  // campaign means startedAt values are strictly increasing, so the reverse
+  // index is exact with no tie ambiguity.
+  const total = sessions.length;
   res.json(
-    sessions.map((s) => ({
+    sessions.map((s, i) => ({
       ...s,
-      sessionNumber: numberById.get(s.id) ?? 1,
+      sessionNumber: total - i,
       noteCount: noteCountById.get(s.id) ?? 0,
     })),
   );
@@ -196,10 +197,15 @@ const patchSessionSchema = z
 
 type PatchSessionData = z.infer<typeof patchSessionSchema>;
 
-// A 404 body a helper hands back for the route to send, or null to proceed.
+// A status + message a helper hands back for the route to send, or null to proceed.
 type PatchDenial = { status: number; error: string };
 
 // The caller is a participant iff they own a character joined to the session.
+// NOTE: deliberately NOT filtered to `leftAt: null` (present participants only).
+// Chapter titles are edited from the journal page AFTER the session has ended,
+// when every participant's `leftAt` is set — restricting to still-present players
+// would break the primary use case (naming a chapter after the fact). So a former
+// participant of a closed session may still title it; that is intended.
 async function callerOwnsParticipant(userId: string, sessionId: string): Promise<boolean> {
   const participant = await prisma.sessionParticipant.findFirst({
     where: { sessionId, character: { ownerId: userId } },
@@ -226,23 +232,20 @@ async function arcIsInCampaign(campaignId: string, arcId: string): Promise<boole
 }
 
 // Per-field authorization for the session PATCH: arcId is owner-only (and the arc
-// must be in the campaign); title needs the caller to be a participant. Throws
-// 403 via assertCampaignOwner for a non-owner arcId edit; returns a denial body
-// for the recoverable cases, or null when the update may proceed.
+// must be in the campaign); title needs the caller to be a participant. Returns a
+// denial uniformly for every failure — the caller has already asserted membership
+// and passes the resolved `role` in, so this never throws — or null to proceed.
 async function authorizeSessionPatch(
+  role: CampaignRole,
   userId: string,
   campaignId: string,
   sessionId: string,
   data: PatchSessionData,
 ): Promise<PatchDenial | null> {
   if (data.arcId !== undefined) {
-    await assertCampaignOwner(
-      prisma,
-      userId,
-      campaignId,
-      "edit",
-      "Only the campaign owner may assign a session to an arc",
-    );
+    if (role !== "OWNER") {
+      return { status: 403, error: "Only the campaign owner may assign a session to an arc" };
+    }
     if (data.arcId !== null && !(await arcIsInCampaign(campaignId, data.arcId))) {
       return { status: 404, error: "Arc not found" };
     }
@@ -263,7 +266,7 @@ function sessionPatchUpdate(data: PatchSessionData) {
 
 sessionsRouter.patch("/campaigns/:campaignId/sessions/:sessionId", async (req, res) => {
   const { campaignId, sessionId } = req.params;
-  await assertCampaignMembership(prisma, req.user!.id, campaignId, "view");
+  const { role } = await assertCampaignMembership(prisma, req.user!.id, campaignId, "view");
 
   if (!(await sessionBelongsToCampaign(sessionId, campaignId))) {
     res.status(404).json({ error: "Session not found" });
@@ -273,7 +276,7 @@ sessionsRouter.patch("/campaigns/:campaignId/sessions/:sessionId", async (req, r
   const data = parseBodyOr400(patchSessionSchema, req.body, res);
   if (data === undefined) return;
 
-  const denial = await authorizeSessionPatch(req.user!.id, campaignId, sessionId, data);
+  const denial = await authorizeSessionPatch(role, req.user!.id, campaignId, sessionId, data);
   if (denial) {
     res.status(denial.status).json({ error: denial.error });
     return;

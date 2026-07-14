@@ -95,6 +95,21 @@ describe("arc CRUD — owner gating", () => {
     expect(res.body.map((a: { name: string }) => a.name)).toEqual(["Act I", "Act II"]);
   });
 
+  it("breaks a position tie deterministically by createdAt", async () => {
+    const campaignId = await setupCampaign();
+    // Simulate two concurrent creates that both landed on position 0.
+    await prisma.campaignArc.create({
+      data: { campaignId, name: "Older", position: 0, createdAt: new Date("2026-01-01T00:00:00Z") },
+    });
+    await prisma.campaignArc.create({
+      data: { campaignId, name: "Newer", position: 0, createdAt: new Date("2026-01-02T00:00:00Z") },
+    });
+
+    const res = await agent(cookiePlayer).get(`/api/campaigns/${campaignId}/arcs`);
+    expect(res.status).toBe(200);
+    expect(res.body.map((a: { name: string }) => a.name)).toEqual(["Older", "Newer"]);
+  });
+
   it("owner renames and reorders; non-owner PATCH 403s", async () => {
     const campaignId = await setupCampaign();
     const arc = await agent(cookieOwner).post(`/api/campaigns/${campaignId}/arcs`).send({ name: "Act I" });
