@@ -45,6 +45,37 @@ export const ENTITY_TYPE_TONE: Record<
   OTHER: "neutral",
 };
 
+// Inked-name mention styling per entity type (#862). Mentions render as a
+// scribe's inked name — small-caps, semibold, entity-colored text with a
+// dotted underline at ~45% opacity of the ink — not a pill. The `-800` step is
+// deliberate: the reversed dark ramp makes it light-on-dark, so both themes
+// clear WCAG AA (4.5:1) as text. Shared by MentionText and the suggestion list
+// so a type reads the same ink everywhere. Typed Record → new EntityTypes are a
+// compile error (label-helper convention).
+export const ENTITY_TYPE_INK_TEXT_CLASS: Record<EntityType, string> = {
+  NPC: "text-garnet-800",
+  LOCATION: "text-vitality-800",
+  FACTION: "text-arcane-800",
+  ITEM: "text-gold-800",
+  PC: "text-garnet-800",
+  OTHER: "text-parchment-800",
+};
+
+// Dotted-underline border color per type: the same ink at ~45% opacity.
+export const ENTITY_TYPE_INK_BORDER_CLASS: Record<EntityType, string> = {
+  NPC: "border-garnet-800/45",
+  LOCATION: "border-vitality-800/45",
+  FACTION: "border-arcane-800/45",
+  ITEM: "border-gold-800/45",
+  PC: "border-garnet-800/45",
+  OTHER: "border-parchment-800/45",
+};
+
+// Presentation-agnostic ink recipe (no font-family — it inherits: serif in
+// journal prose, sans elsewhere). Compose with the per-type text + border ink.
+export const MENTION_INK_BASE_CLASS =
+  "border-b border-dotted font-semibold [font-variant-caps:small-caps]";
+
 const MENTION_TOKEN =
   /@\[([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]/gi;
 
