@@ -82,6 +82,7 @@ export default function EntityInfobox({
   busy,
   onToggleVisibility,
   onDelete,
+  onEdit,
 }: {
   entity: CampaignEntity;
   role?: CampaignRole;
@@ -91,6 +92,7 @@ export default function EntityInfobox({
   busy: boolean;
   onToggleVisibility: () => void;
   onDelete: () => void;
+  onEdit: () => void;
 }) {
   const sheetPath = ownedSheetPath(entity, characters, viewerId);
 
@@ -105,6 +107,15 @@ export default function EntityInfobox({
         portraitUrl={entity.portraitUrl}
         className="h-24 w-24 text-4xl"
       />
+      {role === "OWNER" && !entity.portraitUrl && (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="mt-2 text-xs font-semibold text-garnet-700 hover:underline"
+        >
+          ＋ Add a portrait
+        </button>
+      )}
       <dl className="mt-3 flex flex-col divide-y divide-parchment-200">
         <FactRow label="Type">{ENTITY_TYPE_LABELS[entity.type]}</FactRow>
         <FactRow label="First mentioned">{firstMentionedLabel(entity)}</FactRow>

@@ -315,6 +315,7 @@ describe("CampaignCodex create flow (#367)", () => {
     await user.selectOptions(screen.getByLabelText("Type"), "NPC");
     await user.type(screen.getByLabelText(/name/i), "  Sildar Hallwinter  ");
     await user.type(screen.getByLabelText(/aliases/i), "Sil, the Knight");
+    await user.type(screen.getByLabelText(/portrait url/i), "https://example.com/sildar.png");
     await user.type(screen.getByLabelText(/notes/i), "Rescued near Phandalin.");
     await user.click(screen.getByRole("button", { name: /create entity/i }));
 
@@ -322,6 +323,7 @@ describe("CampaignCodex create flow (#367)", () => {
       type: "NPC",
       name: "Sildar Hallwinter",
       aliases: ["Sil", "the Knight"],
+      portraitUrl: "https://example.com/sildar.png",
       notes: "Rescued near Phandalin.",
     });
     expect(vi.mocked(primeCampaignEntities)).toHaveBeenCalledWith(
