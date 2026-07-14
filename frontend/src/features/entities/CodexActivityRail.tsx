@@ -102,7 +102,7 @@ function needsSentence(count: number): string {
 
 // Gold surface built directly (not Card): Card's own bg-parchment-50 vs a
 // className override is a stylesheet-order coin flip.
-export function NeedsChroniclingCard({
+function NeedsChroniclingCard({
   campaignId,
   entities,
 }: {
