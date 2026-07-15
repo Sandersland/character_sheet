@@ -9,7 +9,8 @@ frontend/src/
 ├── components/
 │   └── ui/              # domain-agnostic primitives (Card, Badge, MeterBar, Modal, BottomSheet, Tabs, OverflowMenu, DropdownMenu, Popover, Avatar, ErrorBoundary, EmptyState, Spinner)
 ├── features/
-│   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable, ProficienciesCard, AbilityScoresPanel
+│   ├── abilities/       # AbilityScoreBox, AbilityScoreEditor, SkillsTable, ProficienciesCard, AbilityScoresPanel,
+│   │                    #   ProficientSkillsCard (#923: Overview proficient/expertise summary + "All 18" SkillsTable modal)
 │   ├── advancement/     # AdvancementSection, AdvancementPanel (shell) → AsiFlow, FeatFlow,
 │   │                    #   CustomFeatForm; hooks useAsiDraft/useFeatCatalog/useCustomFeatDraft; featView reducer
 │   ├── auth/            # AuthProvider (useAuth), AuthGate, AppHeader, AccountMenu
@@ -29,6 +30,9 @@ frontend/src/
 │   │                    #   CharacterSheetContent (banner + chrome) → CharacterSheetHeader is the
 │   │                    #   persistent garnet banner (identity + BannerVitals + Tabs) and CharacterSheetBody
 │   │                    #   routes the ?tab= panel (panels/{Overview,Combat,Inventory,Magic,Story}Panel).
+│   │                    #   OverviewPanel (#923): AbilityScoresPanel (abilities + saves + skills) on top,
+│   │                    #   then a 3-col grid — ProficientSkillsCard+Proficiencies / Class Features+Advancements /
+│   │                    #   Experience+Spell Slots (SpellSlotSummary, caster-only)+Equipped.
 │   │                    #   StoryPanel groups the journal doorway + IdentityCard + campaign prefs (#927).
 │   │                    #   Tab logic is pure in sheetTabs.ts (getSheetTabs/resolveActiveTab; Magic is
 │   │                    #   caster-only) + the useSheetTabs hook (URL-backed ?tab= state).
@@ -84,7 +88,8 @@ frontend/src/
 │   │                    #   + cluster hooks useItemCatalog/useInventoryTransactions/useSellSelection,
 │   │                    #   InventoryRow (→ InventoryEditForm/EquipToggle/AttuneToggle/ItemSummary/
 │   │                    #   ItemProse), AddItemPanel, SellPanel,
-│   │                    #   StartingEquipmentEditor, EquipmentDoll (→ EquipSlotCell → SlotPickerPanel)
+│   │                    #   StartingEquipmentEditor, EquipmentDoll (→ EquipSlotCell → SlotPickerPanel),
+│   │                    #   EquippedItemsCard (#923: read-only Overview list of equipped items by slot)
 │   ├── journal/         # JournalDoorway (#867: the sheet's only journal surface — a CSS-drawn closed-book
 │   │                    #   card that links to the journal page; no editing on the sheet; summary via
 │   │                    #   journalDoorwaySummary.ts). Field-chronicle page cluster (#864): JournalPage's ChronicleSpine (chapter
@@ -137,7 +142,8 @@ frontend/src/
 │   │                    #   useSpellPicker + SpellPickerRow/SlotLevelSelector/SpellTargetToggle,
 │   │                    #   EndSessionPrompt, actionResolvers.ts, useActiveResolution, useManeuverDie,
 │   │                    #   useSessionButton (sheet-header Start/Join/Resume session state)
-│   ├── spells/          # SpellsSection, SpellRow, AddSpellPanel
+│   ├── spells/          # SpellsSection, SpellRow, AddSpellPanel,
+│   │                    #   SpellSlotSummary (#923: read-only Overview per-level pips; full mgmt on Magic tab)
 │   └── theme/           # ThemeProvider (useTheme) — applies data-theme app-wide
 ├── hooks/               # reusable React hooks used by pages or multiple clusters
 │   │                    #   (useCharacter, useCharacterList, useCharacterDraft, useReferenceData,
@@ -226,6 +232,7 @@ Source of truth: `ls frontend/src/lib`. No React/JSX; all unit-testable in isola
 | `capabilityDraft.ts` | JSX-free capability-draft logic for the `CapabilityEditor` subcomponents (#604): the `NEW_*` kind defaults + `draftForKind` (fresh draft on a kind switch), `keyOptions` (skill/ability key list for a target), and the field-normalization patch builders `applySpell` (clears the DC/attack the picked spell doesn't use), `applyTarget` (resets a stale `targetKey`), `applyDiceToggle`, `applyGrantType` / `applyProfKind` / `applyAdvantageOn` (reset dependent fields on a grant-axis change). Keep this normalization here, never re-derive it in a field component. |
 | `activatedEffect.ts` | Display labels for an `activatedEffect` capability's activation type — `activationLabel`/`ACTIVATION_LABELS` (action/bonus/reaction/commandWord), mirroring the backend `describeActivation`. Feeds `ActivateControl`. |
 | `characterSections.ts` | Sheet-section visibility predicates (`hasProficiencies`/`hasAdvancements`) — the inline card-gate expressions from the sheet panels (OverviewPanel). |
+| `overviewSkills.ts` | `proficientSkills(skills)` — the proficient/expertise-only, label-sorted skill list for the Overview `ProficientSkillsCard` summary (#923). |
 | `formatJournalDate.ts` | Formats ISO journal dates in UTC ("Jun 22, 2026"); `formatRelativeDay` gives "today"/"yesterday"/"N days ago" by UTC calendar-day diff, absolute past 30 days (#841). |
 | `sessionRecap.ts` | Pure recap-shaping for `SessionSummaryModal` — `formatDuration`/`formatTimeRange` (window strings), `sortSlotsSpent` (drop-zero + ascending slot pairs), `withSummary` (participants carrying a computed summary) + the `SummarizedParticipant` type. |
 | `advancement.ts` | `entryDetail` — pretty-prints an AdvancementEntry's ASI/feat effects for AdvancementSection's list view. |
