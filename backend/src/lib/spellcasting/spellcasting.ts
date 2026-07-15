@@ -12,6 +12,7 @@
  * What is derived at read time (in lib/character/character-serialize.ts serializeCharacter):
  *   - slot totals (from srd/srd.ts FULL_CASTER_SLOTS + class + level)
  *   - spellSaveDC / spellAttackBonus / ability (from srd/srd.ts deriveSpellcasting)
+ *   - preparedSpellLimit / preparedSpellCount (from srd/srd.ts derivePreparedSpellLimit)
  */
 
 import { randomUUID } from "node:crypto";
@@ -34,7 +35,7 @@ import type {
   SpellComponents,
   SpellcastingMutableState,
 } from "./spell-state.js";
-import { deriveSpellcasting } from "@/lib/srd/srd.js";
+import { deriveSpellcasting, derivePreparedSpellLimit } from "@/lib/srd/srd.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 // Defined in ability-cost.ts (one-directional dep graph); re-exported so
@@ -186,6 +187,8 @@ interface SpellOpContext {
   // wielder-mode item spell's DC/attack (#528). Null for a non-caster.
   wielderSpellSaveDC: number | null;
   wielderSpellAttackBonus: number | null;
+  // Derived prepared-spell cap (#883). Null for known/pact/third casters.
+  preparedSpellLimit: number | null;
 }
 
 function applyExpendSlotOp(ctx: SpellOpContext, op: ExpendSlotOperation): OpOutcome {
@@ -364,6 +367,15 @@ function applyPrepareSpellOp(
   const preparing = op.type === "prepareSpell";
   // Already in the desired state — no-op (skip write + log).
   if (preparing === entry.prepared) return null;
+  // Prepared-spell cap (#883). Grants (source!=null) and cantrips never count.
+  if (preparing && ctx.preparedSpellLimit != null) {
+    const count = state.spells.filter((s) => s.prepared && s.level > 0 && s.source == null).length;
+    if (count >= ctx.preparedSpellLimit) {
+      throw new InvalidSpellcastingOperationError(
+        `You can prepare at most ${ctx.preparedSpellLimit} spells (spellcasting modifier + level).`,
+      );
+    }
+  }
   entry.prepared = preparing;
   return {
     eventType: op.type,
@@ -755,6 +767,7 @@ function buildSpellOpContext(
   slotTotals: Record<number, number>,
   arcanaTotals: Record<number, number>,
   derived: DerivedSpellcasting,
+  preparedSpellLimit: number | null,
 ): SpellOpContext {
   return {
     ...ids,
@@ -765,6 +778,7 @@ function buildSpellOpContext(
     casterCampaignId: row.campaignId,
     wielderSpellSaveDC: derived?.spellSaveDC ?? null,
     wielderSpellAttackBonus: derived?.spellAttackBonus ?? null,
+    preparedSpellLimit,
   };
 }
 
@@ -816,9 +830,11 @@ export async function applySpellcastingOperations(
       abilityScores: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        take: 1,
+        // All entries (not just the primary) so the multiclass prepared-cap sum works.
         select: {
           name: true,
+          level: true,
+          subclass: true,
           // Subclass-granted spells (#898) injected into the working view below.
           subclassRef: { include: { grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } } } },
         },
@@ -835,6 +851,12 @@ export async function applySpellcastingOperations(
       const className = row.classEntries[0]?.name ?? "";
       const abilityScores = row.abilityScores as Record<string, number>;
       const derived = deriveSpellcasting(className, level, abilityScores, profBonus);
+      // Single-class uses the XP-derived level (per-class column can be stale) so the
+      // enforced cap matches the serialized limit; multiclass uses per-entry levels.
+      const limitEntries = row.classEntries.length === 1
+        ? [{ name: className, level, subclass: row.classEntries[0]?.subclass ?? null }]
+        : row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass }));
+      const preparedSpellLimit = derivePreparedSpellLimit(limitEntries, abilityScores);
 
       const { slotTotals, arcanaTotals } = computeSlotTables(row.spellcasting, derived);
 
@@ -862,6 +884,7 @@ export async function applySpellcastingOperations(
         slotTotals,
         arcanaTotals,
         derived,
+        preparedSpellLimit,
       );
 
       const outcome = await dispatchSpellOp(ctx, op);

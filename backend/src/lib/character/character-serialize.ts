@@ -18,6 +18,7 @@ import {
   deriveFeatProficiencies,
   deriveSpellcasting,
   deriveMulticlassSpellcasting,
+  derivePreparedSpellLimit,
   deriveImprovisedAttack,
   deriveUnarmedDamageDie,
   deriveUnarmedStrike,
@@ -571,13 +572,66 @@ function buildSpellcastingView(
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
 ): object | undefined {
-  // Multiclass (2+ entries): merge caster levels into one slot pool and surface
-  // Warlock Pact Magic separately (per the #123 derivation). Single-class output
-  // is left byte-for-byte identical via the primary-class path below.
+  const view = buildSpellcastingViewBase(row, primaryClass, level, abilityScores, proficiencyBonus);
+  if (view === undefined) return undefined;
+  return { ...view, ...derivePreparedFields(view, preparedLimitEntries(row, primaryClass, level), abilityScores) };
+}
+
+// Class entries feeding the prepared-cap sum: single-class uses the XP-derived
+// level (the per-class column can be stale); multiclass uses per-entry levels.
+function preparedLimitEntries(
+  row: CharacterWithRelations,
+  primaryClass: PrimaryClass,
+  level: number,
+): Array<{ name: string; level: number; subclass: string | null }> {
+  if (row.classEntries.length > 1) {
+    return row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass }));
+  }
+  return [{ name: primaryClass?.name ?? "", level, subclass: primaryClass?.subclass ?? null }];
+}
+
+// Derived prepared-spell cap fields (#883): the limit plus the current count.
+// source==null excludes granted spells; level>0 excludes always-prepared cantrips.
+function derivePreparedFields(
+  view: object,
+  entries: Array<{ name: string; level: number; subclass: string | null }>,
+  abilityScores: Record<string, number>,
+): { preparedSpellLimit: number | null; preparedSpellCount: number } {
+  const raw = (view as { spells?: unknown }).spells;
+  const spells: SpellEntry[] = Array.isArray(raw) ? raw : [];
+  return {
+    preparedSpellLimit: derivePreparedSpellLimit(entries, abilityScores),
+    preparedSpellCount: spells.filter((s) => s.prepared && s.level > 0 && s.source == null).length,
+  };
+}
+
+// The unadorned spellcasting view (slots/spells/ability), before the derived
+// prepared-cap fields are layered on. Returns undefined for non-casters.
+// Multiclass (2+ entries) merges caster levels into one slot pool + separate Pact
+// Magic (#123); single-class output is left byte-for-byte identical below.
+function buildSpellcastingViewBase(
+  row: CharacterWithRelations,
+  primaryClass: PrimaryClass,
+  level: number,
+  abilityScores: Record<string, number>,
+  proficiencyBonus: number,
+): object | undefined {
   if (row.classEntries.length > 1) {
     return buildMulticlassSpellcastingView(row, abilityScores, proficiencyBonus);
   }
+  return buildSingleClassSpellcastingView(row, primaryClass, level, abilityScores, proficiencyBonus);
+}
 
+// Single-class spellcasting view: caster stats + slots, or a slotless
+// granted-only view, or the legacy blob fallback. Uses the XP-derived level
+// (the per-class column can be stale).
+function buildSingleClassSpellcastingView(
+  row: CharacterWithRelations,
+  primaryClass: PrimaryClass,
+  level: number,
+  abilityScores: Record<string, number>,
+  proficiencyBonus: number,
+): object | undefined {
   const derivedSpell = deriveSpellcasting(
     primaryClass?.name ?? "",
     level,
@@ -585,12 +639,8 @@ function buildSpellcastingView(
     proficiencyBonus,
     primaryClass?.subclass ?? undefined,
   );
-
-  // Subclass-granted spells (derived, never persisted). Single-class uses the
-  // XP-derived level since the per-class column can be stale.
   const granted = deriveGrantedSpells(primaryClass?.subclassRef, level);
-  // Item-granted spells (#528) — surfaced for any holder, caster or not.
-  const itemSpells = deriveItemSpellsFor(row);
+  const itemSpells = deriveItemSpellsFor(row); // #528: surfaced for any holder, caster or not.
 
   if (derivedSpell) {
     return buildCasterSpellcastingView(row, derivedSpell, granted, itemSpells);
