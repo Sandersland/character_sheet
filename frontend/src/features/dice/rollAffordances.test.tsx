@@ -7,7 +7,7 @@ import { logRoll } from "@/api/client";
 import { RollProvider } from "@/features/dice/RollContext";
 import SkillsTable from "@/features/abilities/SkillsTable";
 import AbilityScoreBox from "@/features/abilities/AbilityScoreBox";
-import VitalsStrip from "@/features/character-meta/VitalsStrip";
+import BannerVitals from "@/features/character-meta/BannerVitals";
 import type { RollResult, RollSpec } from "@/lib/dice";
 import type { AbilityScores, Character, Skill } from "@/types/character";
 
@@ -104,8 +104,8 @@ describe("roll affordances log their category event", () => {
 
   it("initiative logs an initiative roll", async () => {
     const user = userEvent.setup();
-    const character = { initiativeBonus: 2, armorClass: 13, armorClassBreakdown: [], speed: 30, proficiencyBonus: 2 } as unknown as Character;
-    renderInSession(<VitalsStrip character={character} />);
+    const character = { initiativeBonus: 2, armorClass: 13, armorClassBreakdown: [], speed: 30, proficiencyBonus: 2, hitPoints: { current: 10, max: 10, temp: 0 } } as unknown as Character;
+    renderInSession(<BannerVitals character={character} />);
 
     await user.click(screen.getByTitle(/Roll Initiative/));
 

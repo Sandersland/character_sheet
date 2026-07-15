@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import VitalsStrip from "@/features/character-meta/VitalsStrip";
+import BannerVitals from "@/features/character-meta/BannerVitals";
 import { RollProvider } from "@/features/dice/RollContext";
 import type { Character } from "@/types/character";
 
@@ -66,21 +66,17 @@ const mockCharacter: Character = {
   journal: [],
 };
 
-describe("VitalsStrip", () => {
-  it("renders armor class", () => {
-    renderWithRoll(<VitalsStrip character={mockCharacter} />);
+describe("BannerVitals", () => {
+  it("renders armor class as a disclosure button (no manual input)", () => {
+    const { container } = renderWithRoll(<BannerVitals character={mockCharacter} />);
     expect(screen.getByText("14")).toBeInTheDocument();
-  });
-
-  it("has no manual AC input — the tile is a disclosure button", () => {
-    const { container } = renderWithRoll(<VitalsStrip character={mockCharacter} />);
     expect(container.querySelector("input")).toBeNull();
     expect(screen.getByRole("button", { name: "Armor Class breakdown" })).toBeInTheDocument();
   });
 
   it("clicking the AC tile opens the breakdown with labels, values, and total", async () => {
     const user = userEvent.setup();
-    renderWithRoll(<VitalsStrip character={mockCharacter} />);
+    renderWithRoll(<BannerVitals character={mockCharacter} />);
     await user.click(screen.getByRole("button", { name: "Armor Class breakdown" }));
     const dialog = screen.getByRole("dialog", { name: "Armor Class breakdown" });
     expect(dialog).toHaveTextContent("Leather");
@@ -93,38 +89,32 @@ describe("VitalsStrip", () => {
 
   it("Escape closes the breakdown popover", async () => {
     const user = userEvent.setup();
-    renderWithRoll(<VitalsStrip character={mockCharacter} />);
+    renderWithRoll(<BannerVitals character={mockCharacter} />);
     await user.click(screen.getByRole("button", { name: "Armor Class breakdown" }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("renders initiative as a formatted modifier", () => {
-    renderWithRoll(<VitalsStrip character={mockCharacter} />);
-    // initiativeBonus=3 → formatModifier(3) = "+3"
-    expect(screen.getByText("+3")).toBeInTheDocument();
-  });
-
-  it("renders speed with ft suffix", () => {
-    renderWithRoll(<VitalsStrip character={mockCharacter} />);
+  it("renders speed with ft suffix and proficiency as a formatted modifier", () => {
+    renderWithRoll(<BannerVitals character={mockCharacter} />);
     expect(screen.getByText("35 ft")).toBeInTheDocument();
+    expect(screen.getByText("+2")).toBeInTheDocument(); // proficiencyBonus=2
   });
 
-  it("renders proficiency bonus as a formatted modifier", () => {
-    renderWithRoll(<VitalsStrip character={mockCharacter} />);
-    // proficiencyBonus=2 → "+2"
-    // (initiativeBonus is also +3, but proficiency is +2 — both use formatModifier)
-    expect(screen.getByText("+2")).toBeInTheDocument();
+  it("renders an always-on HP readout (current / max)", () => {
+    renderWithRoll(<BannerVitals character={mockCharacter} />);
+    expect(screen.getByText("Hit Points")).toBeInTheDocument();
+    expect(screen.getByText("28")).toBeInTheDocument();
+    expect(screen.getByText("/36")).toBeInTheDocument();
   });
 
-  it("does not render an HP readout (HitPointTracker owns HP)", () => {
-    renderWithRoll(<VitalsStrip character={mockCharacter} />);
-    expect(screen.queryByText("Hit Points")).not.toBeInTheDocument();
-  });
-
-  it("does not render an HP MeterBar (no duplicate of HitPointTracker)", () => {
-    renderWithRoll(<VitalsStrip character={mockCharacter} />);
-    expect(screen.queryByRole("meter")).not.toBeInTheDocument();
+  it("shows temp HP when present", () => {
+    renderWithRoll(
+      <BannerVitals
+        character={{ ...mockCharacter, hitPoints: { ...mockCharacter.hitPoints, temp: 5 } }}
+      />,
+    );
+    expect(screen.getByText("+5")).toBeInTheDocument();
   });
 });
