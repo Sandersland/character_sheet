@@ -1,6 +1,11 @@
 import { useSearchParams } from "react-router-dom";
 
-import { getSheetTabs, resolveActiveTab, type SheetTab, type SheetTabId } from "./sheetTabs";
+import {
+  getSheetTabs,
+  resolveActiveTab,
+  type SheetTab,
+  type SheetTabId,
+} from "@/features/character-meta/sheetTabs";
 import type { Character } from "@/types/character";
 
 interface SheetTabsState {

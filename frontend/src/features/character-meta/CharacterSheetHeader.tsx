@@ -147,6 +147,7 @@ export default function CharacterSheetHeader({
             tabs={tabs}
             active={activeTab}
             onChange={(id) => onTabChange(id as SheetTabId)}
+            idBase="sheet"
           />
         </div>
       </div>

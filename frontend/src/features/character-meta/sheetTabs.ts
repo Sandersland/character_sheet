@@ -34,5 +34,7 @@ export function getSheetTabs(character: Character): SheetTab[] {
  *  `?tab=magic` on a non-caster, or a stale/typo value). */
 export function resolveActiveTab(param: string | null, tabs: SheetTab[]): SheetTabId {
   const match = tabs.find((t) => t.id === param);
-  return match ? match.id : tabs[0].id;
+  // Fall back to the first available tab; guard the empty-tabs case (no crash if
+  // a caller skips the length check the hook applies).
+  return match ? match.id : (tabs[0]?.id ?? "overview");
 }
