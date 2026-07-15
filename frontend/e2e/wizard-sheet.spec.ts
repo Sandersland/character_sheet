@@ -19,7 +19,7 @@ test("wizard sheet shows core vitals and derived spell slots", async ({ page }) 
   // the Spell Slots panel with its level-1 slot meter on the Magic tab.
   await page.getByRole("tab", { name: "Magic" }).click();
   await expect(page.getByRole("heading", { name: "Spell Slots" })).toBeVisible();
-  await expect(page.getByText("Level 1", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("1st", { exact: true }).first()).toBeVisible();
 
   expect(errors).toEqual([]);
 });

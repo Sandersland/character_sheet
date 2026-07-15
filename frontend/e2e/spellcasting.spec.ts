@@ -6,11 +6,9 @@ import { createCharacter, gotoSheet, learnSpells, uniqueName } from "./helpers/a
 
 const WIZARD_L5_XP = 6500;
 
+// Remaining slots = count of available (expend) pips for that level.
 function slotRemaining(page: Page, level: number): Promise<number> {
-  return page
-    .getByRole("meter", { name: `Level ${level} slots remaining` })
-    .getAttribute("aria-valuenow")
-    .then(Number);
+  return page.getByTitle(`Expend a level ${level} slot`).count();
 }
 
 function spellRow(page: Page, name: string) {
