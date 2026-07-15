@@ -30,7 +30,7 @@ frontend/src/
 │   │                    #   CharacterSheetContent (banner + chrome) → CharacterSheetHeader is the
 │   │                    #   persistent garnet banner (identity + BannerVitals + Tabs) and CharacterSheetBody
 │   │                    #   routes the ?tab= panel (panels/{Overview,Combat,Inventory,Magic,Story}Panel).
-│   │                    #   OverviewPanel (#923): AbilityScoresPanel (abilities + saves + skills) on top,
+│   │                    #   OverviewPanel (#923): AbilityScoresPanel (abilities + saves row) on top,
 │   │                    #   then a 3-col grid — ProficientSkillsCard+Proficiencies / Class Features+Advancements /
 │   │                    #   Experience+Spell Slots (SpellSlotSummary, caster-only)+Equipped.
 │   │                    #   StoryPanel groups the journal doorway + IdentityCard + campaign prefs (#927).
