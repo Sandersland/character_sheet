@@ -12,7 +12,6 @@ export interface SpellListDerivation {
   availableArcanaLevels: number[];
   learnedSpellIds: Set<string>;
   sortedSpells: Spell[];
-  spellLevels: number[];
   dismissibleSpellBuffs: ActiveBuff[];
   slotsArePactMagic: boolean;
 }
@@ -41,7 +40,6 @@ export function deriveSpellList(character: Character): SpellListDerivation {
     availableArcanaLevels: availableArcanaLevels(arcana),
     learnedSpellIds: new Set(spells.flatMap((s) => (s.spellId ? [s.spellId] : []))),
     sortedSpells,
-    spellLevels: [...new Set(sortedSpells.map((s) => s.level))].sort((a, b) => a - b),
     dismissibleSpellBuffs,
     slotsArePactMagic,
   };

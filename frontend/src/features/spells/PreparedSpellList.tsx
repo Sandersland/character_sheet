@@ -1,6 +1,7 @@
 // Quick-cast list inside the spellcasting block: at-will cantrips + prepared
 // leveled spells, each with a Cast affordance that reuses SpellsSection's cast flow.
 import { derivePreparedCastable } from "@/lib/preparedSpells";
+import { slotOrdinal } from "@/lib/spellMeta";
 import type { Character, Spell } from "@/types/character";
 
 interface PreparedSpellListProps {
@@ -9,12 +10,7 @@ interface PreparedSpellListProps {
   onCast: (spell: Spell) => void;
 }
 
-const ORDINALS = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"];
-function ordinal(n: number) {
-  return ORDINALS[n] ?? `${n}th`;
-}
-
-function SpellRow({
+function QuickCastRow({
   spell,
   cantrip,
   busy,
@@ -25,7 +21,7 @@ function SpellRow({
   busy: boolean;
   onCast: (spell: Spell) => void;
 }) {
-  const tag = cantrip ? spell.range : `${ordinal(spell.level)} · ${spell.range}`;
+  const tag = cantrip ? spell.range : `${slotOrdinal(spell.level)} · ${spell.range}`;
   return (
     <div className="flex items-center gap-2.5 border-b border-dotted border-parchment-300 py-1.5 last:border-b-0">
       <span
@@ -67,7 +63,7 @@ function Group({
         {heading}
       </p>
       {spells.map((spell) => (
-        <SpellRow key={spell.id} spell={spell} cantrip={cantrip} busy={busy} onCast={onCast} />
+        <QuickCastRow key={spell.id} spell={spell} cantrip={cantrip} busy={busy} onCast={onCast} />
       ))}
     </div>
   );

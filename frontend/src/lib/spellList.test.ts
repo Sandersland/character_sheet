@@ -117,7 +117,6 @@ describe("deriveSpellList — spellbook grouping", () => {
     } as unknown as Partial<Character>);
     const d = deriveSpellList(character);
     expect(d.sortedSpells.map((s) => s.name)).toEqual(["Acid Splash", "Alarm", "Zephyr"]);
-    expect(d.spellLevels).toEqual([0, 1]);
   });
 
 });

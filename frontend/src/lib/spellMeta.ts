@@ -96,6 +96,13 @@ export function levelLabel(level: number): string {
   return level === 0 ? "Cantrip" : `Level ${level}`;
 }
 
+const SLOT_ORDINALS = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"];
+
+// Ordinal for a spell/slot level ("3rd") — the slot-pip + quick-cast label form.
+export function slotOrdinal(n: number): string {
+  return SLOT_ORDINALS[n] ?? `${n}th`;
+}
+
 /**
  * Returns the effect preview string for a spell at a given slot level
  * (e.g. "8d6 fire damage" / "2d4 healing").

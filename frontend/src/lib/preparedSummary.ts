@@ -12,6 +12,7 @@ export interface PreparedSummary {
 export function derivePreparedSummary(sc: Spellcasting): PreparedSummary | null {
   const limit = sc.preparedSpellLimit ?? null;
   if (limit == null) return null;
-  const count = sc.preparedSpellCount ?? (sc.spells ?? []).filter((s) => s.prepared).length;
+  const count =
+    sc.preparedSpellCount ?? (sc.spells ?? []).filter((s) => s.level > 0 && s.prepared).length;
   return { count, limit };
 }

@@ -26,7 +26,7 @@ export default function SpellcastingStatBar({
   prepared,
 }: SpellcastingStatBarProps) {
   return (
-    <div className={`grid grid-cols-2 gap-2.5 ${prepared ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+    <div className={`grid gap-2.5 ${prepared ? "grid-cols-3" : "grid-cols-2"}`}>
       <StatBox label="Save DC" value={String(spellSaveDC)} />
       <StatBox label="Spell Attack" value={formatModifier(spellAttackBonus)} />
       {prepared && (

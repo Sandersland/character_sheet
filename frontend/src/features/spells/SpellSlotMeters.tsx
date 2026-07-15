@@ -2,6 +2,7 @@
 // available slot (click to expend); a spent pip clicks to restore.
 import type { ReactNode } from "react";
 
+import { slotOrdinal } from "@/lib/spellMeta";
 import type { SpellSlots } from "@/types/character";
 
 interface PactBlock {
@@ -127,11 +128,6 @@ function buildGroups(props: SpellSlotMetersProps): GroupSpec[] {
   return groups;
 }
 
-const ORDINALS = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"];
-function ordinal(n: number) {
-  return ORDINALS[n] ?? `${n}th`;
-}
-
 const PIP_FILL: Record<MeterSpec["tone"], string> = {
   arcane: "bg-arcane-500 border-arcane-700",
   gold: "bg-gold-400 border-gold-700",
@@ -178,7 +174,7 @@ function SlotMeter({ meter, busy }: { meter: MeterSpec; busy: boolean }) {
   return (
     <div className="flex items-center gap-3">
       <span className="w-10 shrink-0 text-[10px] font-bold uppercase tracking-wide text-parchment-500">
-        {ordinal(meter.level)}
+        {slotOrdinal(meter.level)}
       </span>
       <span className="flex flex-wrap gap-1.5">{pips}</span>
       <span className="ml-auto text-[11px] tabular-nums text-parchment-500">
