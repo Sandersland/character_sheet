@@ -77,7 +77,7 @@ describe("buildLevelUpPlan — bespoke choose-N (maneuvers/fightingStyle/discipl
     expect(plan.find((s) => s.kind === "fightingStyle")?.count).toBe(1);
   });
 
-  it("Battle Master 2→3 grants subclass + maneuvers + a tool proficiency", () => {
+  it("Battle Master 2→3 re-plan (subclass pre-chosen) surfaces maneuvers + tool proficiency", () => {
     const plan = buildLevelUpPlan(char("fighter", 2), target("fighter", 3, "battle master"));
     expect(kinds(plan)).toEqual(["hitPoints", "maneuvers", "toolProficiency", "review"]);
     expect(plan.find((s) => s.kind === "maneuvers")?.count).toBe(3);
