@@ -30,6 +30,7 @@ const MONK_CLASS_NAME = "Test Monk (Serialize Suite)";
 const SHADOW_SUBCLASS_NAME = "Way of Shadow";
 let fighterClassId: string;
 let bmSubclassId: string;
+let shadowSubclassId: string;
 let warlockClassId: string;
 let monkClassId: string;
 
@@ -64,10 +65,19 @@ beforeAll(async () => {
     update: { subclassLevel: 3 },
   });
   monkClassId = monk.id;
-  await prisma.subclass.upsert({
+  const shadow = await prisma.subclass.upsert({
     where: { classId_name: { classId: monk.id, name: SHADOW_SUBCLASS_NAME } },
     create: { classId: monk.id, name: SHADOW_SUBCLASS_NAME, description: "Minor Illusion at 3." },
     update: {},
+  });
+  shadowSubclassId = shadow.id;
+  // Way of Shadow grants Minor Illusion at L3 as data (#898).
+  const minorIllusion = await prisma.spell.findUnique({ where: { name: "Minor Illusion" }, select: { id: true } });
+  if (!minorIllusion) throw new Error("Minor Illusion not seeded — run `prisma db seed` before tests");
+  await prisma.subclassGrantedSpell.upsert({
+    where: { subclassId_spellId: { subclassId: shadow.id, spellId: minorIllusion.id } },
+    create: { subclassId: shadow.id, spellId: minorIllusion.id, gateLevel: 3, castingAbility: "wisdom" },
+    update: { gateLevel: 3, castingAbility: "wisdom" },
   });
 });
 afterAll(async () => {
@@ -193,7 +203,7 @@ async function createMulticlassMonkFighter() {
       spellcasting: Prisma.JsonNull,
       classEntries: {
         create: [
-          { id: "ce-d-1", name: "monk", classId: monkClassId, position: 0, level: 3, subclass: SHADOW_SUBCLASS_NAME },
+          { id: "ce-d-1", name: "monk", classId: monkClassId, position: 0, level: 3, subclass: SHADOW_SUBCLASS_NAME, subclassId: shadowSubclassId },
           { id: "ce-d-2", name: FIGHTER_CLASS_NAME, classId: fighterClassId, position: 1, level: 1 },
         ],
       },

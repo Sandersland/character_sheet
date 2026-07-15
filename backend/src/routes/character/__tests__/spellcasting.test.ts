@@ -702,6 +702,27 @@ describe("subclass-granted spells", () => {
       update: {},
     });
     monkClassId = cls.id;
+
+    // Way of Shadow grants Minor Illusion at L3 as data (#898): a catalog Subclass
+    // row under this test class + a SubclassGrantedSpell → the seeded Minor Illusion.
+    // Way of the Open Hand exists as a catalog row but grants nothing.
+    const shadow = await prisma.subclass.upsert({
+      where: { classId_name: { classId: monkClassId, name: "Way of Shadow" } },
+      create: { classId: monkClassId, name: "Way of Shadow", description: "Test subclass" },
+      update: {},
+    });
+    await prisma.subclass.upsert({
+      where: { classId_name: { classId: monkClassId, name: "Way of the Open Hand" } },
+      create: { classId: monkClassId, name: "Way of the Open Hand", description: "Test subclass" },
+      update: {},
+    });
+    const minorIllusion = await prisma.spell.findUnique({ where: { name: "Minor Illusion" }, select: { id: true } });
+    if (!minorIllusion) throw new Error("Minor Illusion not seeded — run `prisma db seed` before tests");
+    await prisma.subclassGrantedSpell.upsert({
+      where: { subclassId_spellId: { subclassId: shadow.id, spellId: minorIllusion.id } },
+      create: { subclassId: shadow.id, spellId: minorIllusion.id, gateLevel: 3, castingAbility: "wisdom" },
+      update: { gateLevel: 3, castingAbility: "wisdom" },
+    });
   });
 
   afterEach(async () => {
@@ -709,6 +730,16 @@ describe("subclass-granted spells", () => {
   });
 
   const createMonk = async (opts: { xp: number; subclass: string | null; spells?: unknown[] }) => {
+    // Link the subclass FK (#898): granted spells resolve off subclassId, mirroring
+    // what setSubclass / creation write in production.
+    const subclassId = opts.subclass
+      ? (
+          await prisma.subclass.findUnique({
+            where: { classId_name: { classId: monkClassId, name: opts.subclass } },
+            select: { id: true },
+          })
+        )?.id
+      : undefined;
     await prisma.character.create({
       data: {
         id: MONK_ID,
@@ -728,7 +759,11 @@ describe("subclass-granted spells", () => {
         currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
         ownerId: OWNER_ID,
         spellcasting: { slotsUsed: {}, spells: opts.spells ?? [] } as Prisma.InputJsonValue,
-        classEntries: { create: [{ name: "monk", classId: monkClassId, position: 0, subclass: opts.subclass ?? undefined }] },
+        classEntries: {
+          create: [
+            { name: "monk", classId: monkClassId, position: 0, subclass: opts.subclass ?? undefined, subclassId },
+          ],
+        },
       },
     });
   };
