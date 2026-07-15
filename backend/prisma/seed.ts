@@ -82,27 +82,33 @@ async function seedSubclasses(prisma: PrismaClient, classIds: Map<string, string
   }
 }
 
-// Subclass-granted spells (#898): resolve each seed row's subclass + catalog
-// spell to ids, then upsert the grant. Runs after subclasses AND spells are
-// seeded. A missing subclass/spell is a hard seed error (mirrors the other
+// Resolve one granted-spell seed row's subclass + catalog spell to ids and upsert
+// it. A missing class/subclass/spell is a hard seed error (mirrors the other
 // catalogs' fail-fast on unknown references).
+async function upsertGrantedSpell(
+  prisma: PrismaClient,
+  classIds: Map<string, string>,
+  g: (typeof SUBCLASS_GRANTED_SPELLS)[number],
+) {
+  const classId = classIds.get(g.className);
+  if (!classId) throw new Error(`Seed error: unknown class "${g.className}" in SUBCLASS_GRANTED_SPELLS`);
+  const subclass = await prisma.subclass.findUnique({
+    where: { classId_name: { classId, name: g.subclassName } },
+    select: { id: true },
+  });
+  if (!subclass) throw new Error(`Seed error: unknown subclass "${g.subclassName}" for ${g.className}`);
+  const spell = await prisma.spell.findUnique({ where: { name: g.spellName }, select: { id: true } });
+  if (!spell) throw new Error(`Seed error: granted spell "${g.spellName}" not in the Spell catalog`);
+  await prisma.subclassGrantedSpell.upsert({
+    where: { subclassId_spellId: { subclassId: subclass.id, spellId: spell.id } },
+    create: { subclassId: subclass.id, spellId: spell.id, gateLevel: g.gateLevel, castingAbility: g.castingAbility },
+    update: { gateLevel: g.gateLevel, castingAbility: g.castingAbility },
+  });
+}
+
+// Subclass-granted spells (#898). Runs after subclasses AND spells are seeded.
 async function seedSubclassGrantedSpells(prisma: PrismaClient, classIds: Map<string, string>) {
-  for (const g of SUBCLASS_GRANTED_SPELLS) {
-    const classId = classIds.get(g.className);
-    if (!classId) throw new Error(`Seed error: unknown class "${g.className}" in SUBCLASS_GRANTED_SPELLS`);
-    const subclass = await prisma.subclass.findUnique({
-      where: { classId_name: { classId, name: g.subclassName } },
-      select: { id: true },
-    });
-    if (!subclass) throw new Error(`Seed error: unknown subclass "${g.subclassName}" for ${g.className}`);
-    const spell = await prisma.spell.findUnique({ where: { name: g.spellName }, select: { id: true } });
-    if (!spell) throw new Error(`Seed error: granted spell "${g.spellName}" not in the Spell catalog`);
-    await prisma.subclassGrantedSpell.upsert({
-      where: { subclassId_spellId: { subclassId: subclass.id, spellId: spell.id } },
-      create: { subclassId: subclass.id, spellId: spell.id, gateLevel: g.gateLevel, castingAbility: g.castingAbility },
-      update: { gateLevel: g.gateLevel, castingAbility: g.castingAbility },
-    });
-  }
+  for (const g of SUBCLASS_GRANTED_SPELLS) await upsertGrantedSpell(prisma, classIds, g);
 }
 
 // Upsert the action catalog by unique key.

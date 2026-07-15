@@ -134,7 +134,7 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
           // Subclass-granted spells (#898): the valid-grant set is re-derived from
           // these loaded catalog rows (reconcileSubclass ran first, so a cleared
           // subclass yields subclassRef = null → an empty valid set).
-          subclassRef: { include: { grantedSpells: { include: { spell: true } } } },
+          subclassRef: { include: { grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } } } },
         },
       },
     },

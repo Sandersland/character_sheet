@@ -717,13 +717,12 @@ describe("subclass-granted spells", () => {
       update: {},
     });
     const minorIllusion = await prisma.spell.findUnique({ where: { name: "Minor Illusion" }, select: { id: true } });
-    if (minorIllusion) {
-      await prisma.subclassGrantedSpell.upsert({
-        where: { subclassId_spellId: { subclassId: shadow.id, spellId: minorIllusion.id } },
-        create: { subclassId: shadow.id, spellId: minorIllusion.id, gateLevel: 3, castingAbility: "wisdom" },
-        update: { gateLevel: 3, castingAbility: "wisdom" },
-      });
-    }
+    if (!minorIllusion) throw new Error("Minor Illusion not seeded — run `prisma db seed` before tests");
+    await prisma.subclassGrantedSpell.upsert({
+      where: { subclassId_spellId: { subclassId: shadow.id, spellId: minorIllusion.id } },
+      create: { subclassId: shadow.id, spellId: minorIllusion.id, gateLevel: 3, castingAbility: "wisdom" },
+      update: { gateLevel: 3, castingAbility: "wisdom" },
+    });
   });
 
   afterEach(async () => {

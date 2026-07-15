@@ -175,11 +175,13 @@ The only permitted backend-call site. Every exported function maps to one endpoi
 
 ### Catalog + per-character row
 
-Two distinct approaches, both in play:
+Three distinct approaches, all in play:
 
 **Selection tables** (race/class/background): a nullable FK to the catalog *and* an own `name` snapshot. The character's displayed race/class/bg can drift from the catalog (homebrew, renamed) — the snapshot is the source of truth, the FK is just provenance. `serializeCharacter` flattens these back to the flat wire shape.
 
 **Full snapshots** (inventory items, spells): at acquire/learn time, all catalog fields are copied into the per-character row (`InventoryItem`, spell `SpellEntry` in the JSON). After that, the catalog is ignored — the snapshot is fully self-contained and freely editable (e.g. "Club" → "Club +1"). No merge-with-catalog logic anywhere. The snapshot also carries the wearable `slot EquipSlot?` (`null` = bag-only) and `rarity ItemRarity?` (display-only, for the Worn view) alongside `requiresAttunement` (#565).
+
+**FK-keyed live reference** (subclass-granted spells, #898): the *mapping* is seeded rows that reference the catalog by FK — `SubclassGrantedSpell(subclassId → Subclass, spellId → Spell, gateLevel, castingAbility)` — but the catalog content is **never snapshotted**. `deriveGrantedSpells(subclassRef, level)` resolves the full spell **live** at serialize time from the loaded `classEntries.subclassRef.grantedSpells.spell` relation (same shape as `deriveItemSpells`). Reach for this over a snapshot when the per-character state is *"which catalog rows apply"* rather than *"an owned, editable copy"*: it stays automatically in sync with the catalog, needs no reconcile-with-catalog logic, and adding content is seed rows not code — the substrate for data-authored / homebrew subclasses (keyed on `subclassId`, so a homebrew subclass grants nothing until it owns a catalog row, #911). The trade-off vs a snapshot is no per-character drift (you can't edit one character's granted spell) and a live join on read.
 
 **Paper-doll `EquipSlot` enum (#565):** `MAIN_HAND`, `OFF_HAND`, `BODY`, `HEAD`, `NECK`, `CLOAK`, `HANDS`, `WRISTS`, `BELT`, `FEET`, `RING`. Lives on `Item.slot`/`CampaignItem.slot` (catalog declaration of where wearable gear goes; `null` = not wearable) and on `InventoryItem.equippedSlot` (the per-row placement — the derive source for the wire `equipped`) + `InventoryItem.slot` (the snapshotted catalog slot). Weapons/body armor derive their eligible slots from detail data, so they leave the catalog `slot` null. RING has capacity 2, every other slot 1; a two-handed weapon occupies MAIN_HAND and locks OFF_HAND. Placement rules + the `equip` op live in `lib/inventory/inventory.ts`.
 

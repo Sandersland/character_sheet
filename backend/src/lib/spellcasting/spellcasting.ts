@@ -820,7 +820,7 @@ export async function applySpellcastingOperations(
         select: {
           name: true,
           // Subclass-granted spells (#898) injected into the working view below.
-          subclassRef: { include: { grantedSpells: { include: { spell: true } } } },
+          subclassRef: { include: { grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } } } },
         },
       },
       inventoryItems: {

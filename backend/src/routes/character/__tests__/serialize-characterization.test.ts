@@ -73,13 +73,12 @@ beforeAll(async () => {
   shadowSubclassId = shadow.id;
   // Way of Shadow grants Minor Illusion at L3 as data (#898).
   const minorIllusion = await prisma.spell.findUnique({ where: { name: "Minor Illusion" }, select: { id: true } });
-  if (minorIllusion) {
-    await prisma.subclassGrantedSpell.upsert({
-      where: { subclassId_spellId: { subclassId: shadow.id, spellId: minorIllusion.id } },
-      create: { subclassId: shadow.id, spellId: minorIllusion.id, gateLevel: 3, castingAbility: "wisdom" },
-      update: { gateLevel: 3, castingAbility: "wisdom" },
-    });
-  }
+  if (!minorIllusion) throw new Error("Minor Illusion not seeded — run `prisma db seed` before tests");
+  await prisma.subclassGrantedSpell.upsert({
+    where: { subclassId_spellId: { subclassId: shadow.id, spellId: minorIllusion.id } },
+    create: { subclassId: shadow.id, spellId: minorIllusion.id, gateLevel: 3, castingAbility: "wisdom" },
+    update: { gateLevel: 3, castingAbility: "wisdom" },
+  });
 });
 afterAll(async () => {
   await prisma.subclass.deleteMany({ where: { classId: fighterClassId, name: BM_SUBCLASS_NAME } });

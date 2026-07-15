@@ -118,13 +118,24 @@ export function deriveGrantedSpells(
     }));
 }
 
-// The ability a subclass's granted spells use for save DC / attack bonus
-// (default Wisdom when the subclass grants nothing).
+const ABILITY_NAMES = new Set<string>([
+  "strength",
+  "dexterity",
+  "constitution",
+  "intelligence",
+  "wisdom",
+  "charisma",
+]);
+
+// The ability a subclass's granted spells use for save DC / attack bonus. The
+// column is a plain `string`, so validate it against the six lowercase ability
+// names — a mis-cased/unknown value falls back to Wisdom rather than silently
+// producing a NaN modifier / wrong save DC.
 export function deriveGrantedCastingAbility(
   source: GrantedSpellSource | null | undefined,
 ): keyof AbilityScores {
-  const ability = source?.grantedSpells[0]?.castingAbility;
-  return (ability as keyof AbilityScores) ?? "wisdom";
+  const raw = source?.grantedSpells[0]?.castingAbility;
+  return (raw && ABILITY_NAMES.has(raw) ? raw : "wisdom") as keyof AbilityScores;
 }
 
 // The minimal inventory-item shape item-spell derivation needs: an item is a

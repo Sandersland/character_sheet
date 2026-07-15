@@ -171,4 +171,17 @@ describe("deriveGrantedCastingAbility", () => {
     expect(deriveGrantedCastingAbility(null)).toBe("wisdom");
     expect(deriveGrantedCastingAbility(undefined)).toBe("wisdom");
   });
+
+  it("rejects an invalid (mis-cased / unknown) casting ability and defaults to wisdom", () => {
+    const bad: GrantedSpellSource = {
+      name: "Homebrew",
+      grantedSpells: [{ gateLevel: 3, castingAbility: "Wisdom", spell: catalogSpell() }], // capital W = invalid key
+    };
+    expect(deriveGrantedCastingAbility(bad)).toBe("wisdom");
+    const garbage: GrantedSpellSource = {
+      name: "Homebrew",
+      grantedSpells: [{ gateLevel: 3, castingAbility: "luck", spell: catalogSpell() }],
+    };
+    expect(deriveGrantedCastingAbility(garbage)).toBe("wisdom");
+  });
 });
