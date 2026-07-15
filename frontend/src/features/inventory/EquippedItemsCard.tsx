@@ -9,7 +9,7 @@ interface EquippedItemsCardProps {
 // Read-only glance at what the character has equipped, by slot. Placement and
 // equip/unequip live on the Inventory tab; this only reflects current standing.
 export default function EquippedItemsCard({ inventory }: EquippedItemsCardProps) {
-  const equipped = inventory.filter((item) => item.equippedSlot);
+  const equipped = (inventory ?? []).filter((item) => item.equippedSlot);
 
   return (
     <Card title="Equipped">
