@@ -163,6 +163,14 @@ describe("subclass choices — derivation + ops", () => {
     expect(res.status).toBe(400);
   });
 
+  it("rejects a malformed (non-UUID) optionId as a clean 400, not a 500", async () => {
+    // GrantedAbility.id is a `text` PK, so findUnique returns null for a garbage
+    // id (no Prisma P2023) and the catalog-membership guard yields a 400. Locks
+    // this against a future switch to a uuid-typed column silently 500ing.
+    const res = await post([{ type: "learnSubclassChoice", choiceKey: "huntersPrey", optionId: "not-a-real-uuid" }]);
+    expect(res.status).toBe(400);
+  });
+
   it("rejects a choice the subclass has not reached yet (Multiattack is L11)", async () => {
     const res = await post([{ type: "learnSubclassChoice", choiceKey: "hunterMultiattack", custom: { name: "X", description: "Y" } }]);
     expect(res.status).toBe(400);
