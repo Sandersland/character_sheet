@@ -1748,6 +1748,12 @@ export async function applyHitPointOperations(
         continue;
       }
 
+      // levelUp shares its extracted seam with the unified endpoint (#895).
+      if (op.type === "levelUp") {
+        await applyLevelUpHpInTx(tx, characterId, op, batchId, sessionId);
+        continue;
+      }
+
       // Phase 1: re-read state and build the per-op context.
       const ctx = await buildHpOpContext(tx, characterId);
 
@@ -1796,6 +1802,36 @@ export async function applyHitPointOperations(
   });
 
   return { concentrationChecks };
+}
+
+/**
+ * Applies one level-up HP gain inside a caller-supplied transaction/batchId,
+ * so the unified level-up endpoint (#885) can compose HP with other domains
+ * under one batchId. Composes the same phases as the loop's levelUp path
+ * (buildHpOpContext → snapshot → applyLevelUpOp → write-back → snapshots →
+ * logHpOpEvent); levelUp has no phase-5 follow-ons, so this is byte-identical.
+ * Emits the reversible `levelUp` event experience-ops.ts reads to auto-reverse.
+ */
+export async function applyLevelUpHpInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: LevelUpOperation,
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  const ctx = await buildHpOpContext(tx, characterId);
+  const beforeHp = { ...ctx.hp };
+  const beforeHd = { ...ctx.hd };
+  const result = await applyLevelUpOp(ctx, op);
+  await tx.character.update({
+    where: { id: characterId },
+    data: {
+      hitPoints: ctx.hp as unknown as Prisma.InputJsonValue,
+      hitDice: ctx.hd as unknown as Prisma.InputJsonValue,
+    },
+  });
+  const { beforeState, afterState } = buildHpOpSnapshots(ctx, op, beforeHp, beforeHd, result.eventData);
+  await logHpOpEvent(tx, characterId, op, result, beforeState, afterState, batchId, sessionId);
 }
 
 /**
