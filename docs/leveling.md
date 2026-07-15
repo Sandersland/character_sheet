@@ -37,6 +37,16 @@ XP going up does **not** automatically raise HP. A character can have XP at leve
 
 ---
 
+## Level-up plan builder
+
+`buildLevelUpPlan(character, targetClassEntry)` in `backend/src/lib/leveling/level-up-plan.ts` is a pure planner returning the ordered `LevelUpStep[]` a single level grants — the ceremony (#886) renders it and the endpoint (#885) validates against it. It never re-encodes thresholds: every step is **derived by diffing an existing rule function at the new per-class level N vs N−1** (with the target subclass held fixed), emitting the step only when the delta is positive.
+
+Emitted order: `hitPoints` (always) → `advancement` (`advancementSlotsForLevel` grew) → `subclass` (N reaches `subclassLevel` and the target subclass is unset) → `maneuvers` / `fightingStyle` / `disciplines` / `toolProficiency` (the bespoke choose-N counts on `deriveResources` grew) → `subclassChoice*` (one per generic `subclassChoices` key whose count grew, #899) → `newSpells` → `review` (always). `subclassLevel` is passed in (a pure fn can't fetch the catalog `Class` row), defaulting to 3 like `reconcileSubclass`. When `target.subclass` is null and a `subclass` step is emitted, subclass-derived steps (maneuvers, toolProficiency, subclassChoice*) are absent — the ceremony must re-invoke `buildLevelUpPlan` with the chosen subclass to get the complete plan.
+
+The `newSpells` step follows RAW: it appears only for casters that **learn** on level-up — the known casters (Sorcerer/Bard/Ranger/Warlock) plus Wizard's spellbook — gated by `learnsNewSpellsOnLevelUp` and counted by `spellsGainedAtLevel(className, level)`, both in `backend/src/lib/srd/spellcasting-tables.ts`. `spellsGainedAtLevel` is the level-over-level delta of the `SPELLS_KNOWN_BY_CLASS` tables (Bard includes the Magical Secrets +2 jumps at 10/14/18; Ranger the half-caster cadence), or a flat 2 for Wizard from level 2. Prepared casters (Cleric/Druid/Paladin) carry no table and get no `newSpells` step — they re-prepare, governed by the prepared-spell cap (#883).
+
+---
+
 ## Level-down auto-reverses HP and dice
 
 When a new XP value drops the derived level below `hitDice.total`, `applyExperienceOperations` calls `revertLevelUps` inside the same transaction:
