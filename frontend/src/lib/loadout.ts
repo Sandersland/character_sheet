@@ -20,14 +20,14 @@ import {
 } from "@/lib/paperDoll";
 
 // Loadout section headings — the grouped-list rename of the doll's slot groups.
-export const LOADOUT_GROUP_LABELS: Record<SlotGroup, string> = {
+const LOADOUT_GROUP_LABELS: Record<SlotGroup, string> = {
   hands: "Weapons",
   armor: "Armor",
   adornment: "Accessories",
 };
 
 // 5e caps attunement at three items; the count is derived, never stored.
-export const ATTUNEMENT_CAP = 3;
+const ATTUNEMENT_CAP = 3;
 
 export interface FilledLoadoutRow {
   kind: "filled";
