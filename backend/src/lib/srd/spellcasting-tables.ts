@@ -428,6 +428,9 @@ export const SPELLS_KNOWN_BY_CLASS: Readonly<Record<string, Readonly<Record<numb
   },
 };
 
+// Bard levels whose Spells Known jump is Magical Secrets (+2, any spell list).
+export const BARD_MAGICAL_SECRETS_LEVELS: ReadonlySet<number> = new Set([10, 14, 18]);
+
 /**
  * Number of new spells learned on reaching `level` (the level-over-level delta
  * of the Spells Known column). Wizard adds a flat 2 per level from level 2 up;

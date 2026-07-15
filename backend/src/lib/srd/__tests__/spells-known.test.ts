@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 
-import { SPELLS_KNOWN_BY_CLASS, spellsGainedAtLevel, learnsNewSpellsOnLevelUp } from "@/lib/srd/spellcasting-tables.js";
+import {
+  BARD_MAGICAL_SECRETS_LEVELS,
+  SPELLS_KNOWN_BY_CLASS,
+  spellsGainedAtLevel,
+  learnsNewSpellsOnLevelUp,
+} from "@/lib/srd/spellcasting-tables.js";
 
 describe("SPELLS_KNOWN_BY_CLASS tables", () => {
   it("covers every level 1-20 for each known caster", () => {
@@ -44,6 +49,7 @@ describe("spellsGainedAtLevel", () => {
     expect(spellsGainedAtLevel("bard", 14)).toBe(2);
     expect(spellsGainedAtLevel("bard", 18)).toBe(2);
     expect(spellsGainedAtLevel("bard", 12)).toBe(0);
+    expect([...BARD_MAGICAL_SECRETS_LEVELS].sort((a, b) => a - b)).toEqual([10, 14, 18]);
   });
 
   it("Ranger learns nothing at level 1, then follows the half-caster cadence", () => {
