@@ -113,7 +113,6 @@ export default function SpellbookList({
             </div>
           </div>
         )}
-        {rest.busy && <span className="text-[10px] text-parchment-600">Saving…</span>}
       </div>
 
       {spells.length === 0 ? (
