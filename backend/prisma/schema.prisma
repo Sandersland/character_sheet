@@ -615,7 +615,9 @@ model SubclassGrantedSpell {
   spellId        String
   spell          Spell    @relation(fields: [spellId], references: [id], onDelete: Cascade)
   // Character level at which the grant becomes active (the subclass grant level).
-  gateLevel      Int      @default(3)
+  // No default: real grants span levels 1–17 (Cleric 1/3/5/7/9, Paladin
+  // 3/5/9/13/17), so every seed/write sets it explicitly (#913).
+  gateLevel      Int
   // Ability the granted spells use for save DC / attack bonus (lowercase, e.g.
   // "wisdom" | "charisma"). Uniform per subclass in 5e; stored per-row for simplicity.
   castingAbility String
