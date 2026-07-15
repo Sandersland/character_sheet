@@ -138,6 +138,15 @@ export function deriveResources(
     Object.assign(result, sub.def.deriveExtras(level, abilityScores, profBonus));
   }
 
+  // Generic subclass "choose N" features (#899): list only those the character
+  // has reached (count > 0). The reconciler/clamp and level-up step read this.
+  if (sub.active && sub.def?.choices) {
+    const subclassChoices = sub.def.choices
+      .map((c) => ({ key: c.key, label: c.label, catalogSource: c.catalogSource, count: c.count(level) }))
+      .filter((c) => c.count > 0);
+    if (subclassChoices.length > 0) result.subclassChoices = subclassChoices;
+  }
+
   return result;
 }
 

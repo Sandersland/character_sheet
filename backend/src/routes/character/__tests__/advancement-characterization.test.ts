@@ -129,6 +129,7 @@ const EMPTY_RESOURCES = {
   maneuversKnown: [],
   disciplinesKnown: [],
   toolProficienciesKnown: [],
+  choicesKnown: {},
   advancements: [],
   fightingStyle: null,
 };

@@ -66,6 +66,19 @@ export interface ToolProfEntry {
 }
 
 /**
+ * One picked option of a generic subclass "choose N" feature (#899) —
+ * e.g. a Ranger's Hunter's Prey selection. Mirrors ManeuverEntry but carries
+ * no mechanics: the option catalog is GrantedAbility rows, the selection is
+ * just this snapshot. Stored under choicesKnown[choiceKey].
+ */
+export interface ChoiceEntry {
+  id: string;         // per-character entry UUID (operation target)
+  optionId?: string;  // catalog GrantedAbility.id provenance — undefined for custom
+  name: string;
+  description: string;
+}
+
+/**
  * A structured mechanical effect defined on a catalog or custom feat.
  * Snapshot into AdvancementEntry.improvements at take-time so removal/derivation
  * never depend on the catalog row being present.
@@ -127,6 +140,13 @@ export interface ResourcesMutableState {
   disciplinesKnown: DisciplineEntry[];
   /** Level-gated tool proficiency choices (currently: Student of War). */
   toolProficienciesKnown: ToolProfEntry[];
+  /**
+   * Generic subclass "choose N" selections (#899), keyed by SubclassChoice.key
+   * (e.g. "huntersPrey"). Each list is capped at the level-derived count and
+   * trimmed by reconcileSubclassChoices on level-down. A new choose-N feature
+   * adds a subclass declaration + seed rows — no new state key here.
+   */
+  choicesKnown: Record<string, ChoiceEntry[]>;
   /** Ability Score Improvements and feats taken, in the order chosen. */
   advancements: AdvancementEntry[];
   /**
@@ -150,6 +170,7 @@ export function normalizeResourcesMutable(json: Prisma.JsonValue): ResourcesMuta
       maneuversKnown: [],
       disciplinesKnown: [],
       toolProficienciesKnown: [],
+      choicesKnown: {},
       advancements: [],
       fightingStyle: null,
     };
@@ -159,11 +180,17 @@ export function normalizeResourcesMutable(json: Prisma.JsonValue): ResourcesMuta
   const rawStyle = obj.fightingStyle;
   const fightingStyle: FightingStyleKey | null =
     typeof rawStyle === "string" && isKnownFightingStyle(rawStyle) ? rawStyle : null;
+  const rawChoices = obj.choicesKnown;
+  const choicesKnown: Record<string, ChoiceEntry[]> =
+    rawChoices && typeof rawChoices === "object" && !Array.isArray(rawChoices)
+      ? (rawChoices as Record<string, ChoiceEntry[]>)
+      : {};
   return {
     used: (obj.used as Record<string, number>) ?? {},
     maneuversKnown: (obj.maneuversKnown as ManeuverEntry[]) ?? [],
     disciplinesKnown: (obj.disciplinesKnown as DisciplineEntry[]) ?? [],
     toolProficienciesKnown: (obj.toolProficienciesKnown as ToolProfEntry[]) ?? [],
+    choicesKnown,
     advancements: (obj.advancements as AdvancementEntry[]) ?? [],
     fightingStyle,
   };
@@ -180,6 +207,7 @@ export function serializeResourcesState(state: ResourcesMutableState): Prisma.In
     maneuversKnown: state.maneuversKnown,
     disciplinesKnown: state.disciplinesKnown,
     toolProficienciesKnown: state.toolProficienciesKnown,
+    choicesKnown: state.choicesKnown,
     advancements: state.advancements,
     fightingStyle: state.fightingStyle,
   } as unknown as Prisma.InputJsonValue;
@@ -198,6 +226,9 @@ export function snapshotResources(state: ResourcesMutableState): ResourcesMutabl
     maneuversKnown: state.maneuversKnown.map((m) => ({ ...m })),
     disciplinesKnown: state.disciplinesKnown.map((d) => ({ ...d })),
     toolProficienciesKnown: state.toolProficienciesKnown.map((t) => ({ ...t })),
+    choicesKnown: Object.fromEntries(
+      Object.entries(state.choicesKnown).map(([key, entries]) => [key, entries.map((e) => ({ ...e }))]),
+    ),
     advancements: state.advancements.map((a) => ({
       ...a,
       abilityDeltas: { ...a.abilityDeltas },
@@ -280,6 +311,26 @@ export interface ForgetToolProficiencyOperation {
   entryId: string;
 }
 
+/**
+ * Pick an option for a generic subclass "choose N" feature (#899) — from the
+ * catalog (optionId) or a custom entry. `choiceKey` selects which declared
+ * choice (e.g. "huntersPrey"); the option must belong to that choice's catalog
+ * source and stay within the level-derived count.
+ */
+export interface LearnSubclassChoiceOperation {
+  type: "learnSubclassChoice";
+  choiceKey: string;
+  optionId?: string; // catalog GrantedAbility.id
+  custom?: { name: string; description: string };
+}
+
+/** Remove a picked subclass-choice option by its per-character entry id. */
+export interface ForgetSubclassChoiceOperation {
+  type: "forgetSubclassChoice";
+  choiceKey: string;
+  entryId: string;
+}
+
 export type ResourceOperation =
   | SpendResourceOperation
   | RestoreResourceOperation
@@ -289,7 +340,9 @@ export type ResourceOperation =
   | ForgetDisciplineOperation
   | SwapDisciplineOperation
   | LearnToolProficiencyOperation
-  | ForgetToolProficiencyOperation;
+  | ForgetToolProficiencyOperation
+  | LearnSubclassChoiceOperation
+  | ForgetSubclassChoiceOperation;
 
 // ── Per-op appliers ─────────────────────────────────────────────────────────
 // Each validates + mutates `state` in place (throwing on any illegal op) and
@@ -648,6 +701,99 @@ function applyForgetToolProficiencyOp(
   };
 }
 
+// ── Generic subclass "choose N" appliers (#899) ───────────────────────────────
+// Validate against the level-derived subclassChoices declaration: the choice
+// must be available at this level/subclass, the option must belong to the
+// choice's catalog source, and the pick must stay within the derived count.
+
+// Resolve a subclass-choice op's target (catalog optionId or custom) to a new
+// ChoiceEntry, enforcing catalog membership + dedup. Shared shape with
+// resolveDiscipline; keeps applyLearnSubclassChoiceOp under the complexity bar.
+async function resolveChoiceOption(
+  tx: Prisma.TransactionClient,
+  op: LearnSubclassChoiceOperation,
+  choice: NonNullable<DerivedClassInfo["subclassChoices"]>[number],
+  known: ChoiceEntry[],
+): Promise<ChoiceEntry> {
+  if (!op.optionId) {
+    const custom = op.custom!;
+    return { id: randomUUID(), name: custom.name, description: custom.description };
+  }
+  if (known.some((e) => e.optionId === op.optionId)) {
+    throw new InvalidResourceOperationError(`Option already chosen (optionId: ${op.optionId})`);
+  }
+  const option = await tx.grantedAbility.findUnique({ where: { id: op.optionId } });
+  if (!option || option.source !== choice.catalogSource) {
+    throw new InvalidResourceOperationError(
+      `Option not found in the ${choice.label} catalog: ${op.optionId}`,
+    );
+  }
+  return { id: randomUUID(), optionId: option.id, name: option.name, description: option.description };
+}
+
+async function applyLearnSubclassChoiceOp(
+  tx: Prisma.TransactionClient,
+  state: ResourcesMutableState,
+  op: LearnSubclassChoiceOperation,
+  derivedInfo: DerivedClassInfo | null,
+): Promise<ResourceOpAudit> {
+  if (Boolean(op.optionId) === Boolean(op.custom)) {
+    throw new InvalidResourceOperationError(
+      "learnSubclassChoice: provide exactly one of optionId or custom",
+    );
+  }
+
+  const choice = derivedInfo?.subclassChoices?.find((c) => c.key === op.choiceKey);
+  if (!choice) {
+    throw new InvalidResourceOperationError(
+      `Subclass choice "${op.choiceKey}" is not available for this character at this level`,
+    );
+  }
+
+  const known = state.choicesKnown[op.choiceKey] ?? [];
+  if (known.length >= choice.count) {
+    throw new InvalidResourceOperationError(
+      `Cannot choose more for ${choice.label}: already chose ${known.length}/${choice.count}`,
+    );
+  }
+
+  const newEntry = await resolveChoiceOption(tx, op, choice, known);
+  state.choicesKnown[op.choiceKey] = [...known, newEntry];
+  return {
+    eventType: "learnSubclassChoice",
+    summary: `Chose ${choice.label}: ${newEntry.name}`,
+    eventData: {
+      choiceKey: op.choiceKey,
+      entryId: newEntry.id,
+      optionName: newEntry.name,
+      optionId: newEntry.optionId ?? null,
+    },
+  };
+}
+
+function applyForgetSubclassChoiceOp(
+  state: ResourcesMutableState,
+  op: ForgetSubclassChoiceOperation,
+): ResourceOpAudit {
+  const known = state.choicesKnown[op.choiceKey] ?? [];
+  const idx = known.findIndex((e) => e.id === op.entryId);
+  if (idx === -1) {
+    throw new InvalidResourceOperationError(
+      `Subclass choice entry not found: ${op.entryId} (choice "${op.choiceKey}")`,
+    );
+  }
+  const forgotten = known[idx];
+  const next = known.filter((_, i) => i !== idx);
+  // Drop the key entirely when emptied so choicesKnown stays free of stale keys.
+  if (next.length === 0) delete state.choicesKnown[op.choiceKey];
+  else state.choicesKnown[op.choiceKey] = next;
+  return {
+    eventType: "forgetSubclassChoice",
+    summary: `Removed ${op.choiceKey} choice: ${forgotten.name}`,
+    eventData: { choiceKey: op.choiceKey, entryId: op.entryId, optionName: forgotten.name },
+  };
+}
+
 // ── applyOp dispatch ──────────────────────────────────────────────────────────
 // Shared per-op context (mirrors spellcasting.ts's SpellOpContext) + a
 // discriminant-keyed handler map, so the transaction handler's applyOp reduces
@@ -677,6 +823,8 @@ const RESOURCE_OP_HANDLERS: {
   swapDiscipline: (ctx, op) => applySwapDisciplineOp(ctx.tx, ctx.state, op, ctx.level),
   learnToolProficiency: (ctx, op) => applyLearnToolProficiencyOp(ctx.state, op, ctx.derivedInfo),
   forgetToolProficiency: (ctx, op) => applyForgetToolProficiencyOp(ctx.state, op),
+  learnSubclassChoice: (ctx, op) => applyLearnSubclassChoiceOp(ctx.tx, ctx.state, op, ctx.derivedInfo),
+  forgetSubclassChoice: (ctx, op) => applyForgetSubclassChoiceOp(ctx.state, op),
 };
 
 function dispatchResourceOp(ctx: ResourceOpContext, op: ResourceOperation): ResourceOpResult {

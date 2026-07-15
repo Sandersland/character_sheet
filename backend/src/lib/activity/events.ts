@@ -75,6 +75,9 @@ export type EventType =
   | "learnToolProficiency"
   | "forgetToolProficiency"
   | "toolProficienciesReconciled"
+  | "learnSubclassChoice"
+  | "forgetSubclassChoice"
+  | "subclassChoicesReconciled"
   // advancement (ASI + feats)
   | "abilityScoreImprovement"
   | "featTaken"

@@ -144,7 +144,33 @@ const BEAST_MASTER_FEATURES: DerivedFeature[] = [
 export const ranger: ClassDefinition = {
   features: RANGER_FEATURES,
   subclasses: {
-    hunter: { grantLevel: 3, features: HUNTER_FEATURES },
+    hunter: {
+      grantLevel: 3,
+      features: HUNTER_FEATURES,
+      // Each Hunter tier is a "choose one" (#899): the option catalog lives as
+      // GrantedAbility rows (source = catalogSource), the pick as choicesKnown[key].
+      choices: [
+        { key: "huntersPrey", label: "Hunter's Prey", catalogSource: "huntersPrey", count: (l) => (l >= 3 ? 1 : 0) },
+        {
+          key: "defensiveTactics",
+          label: "Defensive Tactics",
+          catalogSource: "defensiveTactics",
+          count: (l) => (l >= 7 ? 1 : 0),
+        },
+        {
+          key: "hunterMultiattack",
+          label: "Multiattack",
+          catalogSource: "hunterMultiattack",
+          count: (l) => (l >= 11 ? 1 : 0),
+        },
+        {
+          key: "superiorHuntersDefense",
+          label: "Superior Hunter's Defense",
+          catalogSource: "superiorHuntersDefense",
+          count: (l) => (l >= 15 ? 1 : 0),
+        },
+      ],
+    },
     "beast master": { grantLevel: 3, features: BEAST_MASTER_FEATURES },
   },
 };
