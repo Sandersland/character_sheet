@@ -1,7 +1,6 @@
 import { useState } from "react";
 
 import RollResultToast from "@/features/dice/RollResultToast";
-import RollModeToggle from "@/features/dice/RollModeToggle";
 import { RollProvider } from "@/features/dice/RollContext";
 import CharacterSheetHeader from "@/features/character-meta/CharacterSheetHeader";
 import CharacterSheetBody from "@/features/character-meta/CharacterSheetBody";
@@ -45,7 +44,7 @@ export default function CharacterSheetContent({
       sessionId={session.inActiveSession ? session.activeSessionId : null}
       rollModifiers={character.rollModifiers}
     >
-      <div className="min-h-screen bg-parchment-100 pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-0">
+      <div className="min-h-screen bg-parchment-100 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
         <CharacterSheetHeader
           character={character}
           session={session}
@@ -79,7 +78,6 @@ export default function CharacterSheetContent({
           onUpdate={onUpdate}
           activeTab={activeTab}
         />
-        <RollModeToggle />
         <RollResultToast />
         <SheetBottomNav tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />
       </div>

@@ -5,8 +5,8 @@
  * Mount once alongside `RollResultToast`, inside `RollProvider`.
  *
  * Placement is pure-CSS per breakpoint (#770): a fixed full-width docked bar at
- * `< md`, stacked just above the SheetBottomNav (#928); the original bottom-6
- * left-6 floating pill at `md:`.
+ * `< md` (only mounted on the session page, which has no bottom nav); the
+ * original bottom-6 left-6 floating pill at `md:`.
  */
 
 import type { RollMode } from "@/lib/dice";
@@ -23,7 +23,7 @@ export default function RollModeToggle() {
   return (
     <div
       data-testid="roll-mode-bar"
-      className="pointer-events-auto fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-50 flex justify-center border-t border-parchment-200 bg-parchment-50 px-2 pb-2 pt-2 md:inset-x-auto md:bottom-6 md:left-6 md:justify-start md:border-t-0 md:bg-transparent md:p-0"
+      className="pointer-events-auto fixed inset-x-0 bottom-0 z-50 flex justify-center border-t border-parchment-200 bg-parchment-50 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:inset-x-auto md:bottom-6 md:left-6 md:justify-start md:border-t-0 md:bg-transparent md:p-0"
     >
       <div
         role="group"

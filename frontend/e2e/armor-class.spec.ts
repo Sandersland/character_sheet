@@ -75,7 +75,9 @@ test("armor class: barbarian Unarmored Defense — Con stacks with a shield, bod
   await expect(breakdown(page)).toHaveCount(0);
   await acTile(page).click();
   await expect(breakdown(page)).toBeVisible();
-  await page.getByText("Speed", { exact: true }).click();
+  // "Speed" also labels the mobile mini-header's vital tile (display:none here) —
+  // scope the outside-click to the visible banner copy.
+  await page.getByText("Speed", { exact: true }).and(page.locator(":visible")).click();
   await expect(breakdown(page)).toHaveCount(0);
 
   // ── Shield stacks on top of Unarmored Defense: 14 + 2 = 16 ──────────────────
