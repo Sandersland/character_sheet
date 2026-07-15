@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { login } from "./helpers/auth";
-import { createCharacter, uniqueName } from "./helpers/api";
+import { createCharacter, gotoSheet, uniqueName } from "./helpers/api";
 import { collectConsoleErrors } from "./helpers/console";
 
 // Resistance auto-halve on the damage-taken flow (#456). A raging Barbarian
@@ -31,7 +31,7 @@ test("resistance: raging Barbarian halves matching damage, full for others", asy
   });
   expect(rage.ok(), `rage: ${rage.status()}`).toBeTruthy();
 
-  await page.goto(`/characters/${id}`);
+  await gotoSheet(page, id, "combat");
   await expect(page.getByRole("heading", { name: "Hit Points" })).toBeVisible();
 
   const errors = collectConsoleErrors(page);

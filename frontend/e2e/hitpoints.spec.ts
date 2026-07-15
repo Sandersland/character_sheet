@@ -22,6 +22,8 @@ async function diceAvailable(page: Page): Promise<number> {
 test("HP: damage drops, heal restores, short rest spends a hit die", async ({ page }) => {
   await login(page);
   await page.getByRole("link", { name: /Smoke Fighter/ }).click();
+  // The HP tracker lives on the Combat tab of the sheet's tabbed workspace.
+  await page.getByRole("tab", { name: "Combat" }).click();
   await expect(page.getByRole("heading", { name: "Hit Points" })).toBeVisible();
 
   const errors = collectConsoleErrors(page);

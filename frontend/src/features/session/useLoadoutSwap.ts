@@ -36,7 +36,7 @@ interface CommittedSwap {
  * two-handed weapon needs a free off-hand), then draws the incoming; the inverse
  * re-equips each stowed item into its original slot. `costsAction` is true when
  * anything was stowed (a real swap); filling empty hands is a free draw.
- * Mirrors EquipmentDoll's replace batching.
+ * Mirrors LoadoutList's replace batching.
  */
 function buildSwapOps(
   incoming: InventoryItem,

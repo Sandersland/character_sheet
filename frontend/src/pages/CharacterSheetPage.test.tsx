@@ -46,9 +46,12 @@ vi.mock("@/features/journal/CapturePalette", () => ({
 }));
 vi.mock("@/features/session/SessionsModal", () => ({ default: () => null }));
 vi.mock("@/features/abilities/SkillsTable", () => ({ default: () => null }));
+vi.mock("@/features/abilities/ProficientSkillsCard", () => ({ default: () => null }));
+vi.mock("@/features/spells/SpellSlotSummary", () => ({ default: () => null }));
+vi.mock("@/features/inventory/EquippedItemsCard", () => ({ default: () => null }));
 vi.mock("@/features/spells/SpellsSection", () => ({ default: () => null }));
 vi.mock("@/features/abilities/ProficienciesCard", () => ({ default: () => null }));
-vi.mock("@/features/character-meta/VitalsStrip", () => ({ default: () => null }));
+vi.mock("@/features/character-meta/BannerVitals", () => ({ default: () => null }));
 vi.mock("@/features/conditions/ConditionsStrip", () => ({ default: () => null }));
 
 const mockUseCharacter = vi.mocked(useCharacter);

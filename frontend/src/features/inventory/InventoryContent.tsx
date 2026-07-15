@@ -1,5 +1,5 @@
 import type { Character, InventoryOperation } from "@/types/character";
-import EquipmentDoll from "@/features/inventory/EquipmentDoll";
+import LoadoutList from "@/features/inventory/LoadoutList";
 import InventorySections from "@/features/inventory/InventorySections";
 import { type InventorySection } from "@/lib/inventorySections";
 
@@ -34,7 +34,7 @@ export default function InventoryContent({
   onToggleSelect,
 }: InventoryContentProps) {
   if (view === "worn") {
-    return <EquipmentDoll character={character} pending={pending} onSubmit={onSubmit} />;
+    return <LoadoutList character={character} pending={pending} onSubmit={onSubmit} />;
   }
   return (
     <InventorySections

@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { createCharacter, uniqueName } from "./helpers/api";
+import { createCharacter, gotoSheet, uniqueName } from "./helpers/api";
 
 // #572: a DM authors a Ring as gear placed in the RING slot from the campaign
 // item form, awards it to a member, and the player equips it on the paper doll —
@@ -80,19 +80,19 @@ test("DM authors a slotted ring, awards it, and the player equips + replaces it"
 
   // PL-3: the player opens the sheet, switches to the Worn paper doll, and the
   // awarded ring is equippable in the RING slot.
-  await page.goto(`/characters/${characterId}`);
+  await gotoSheet(page, characterId, "inventory");
   await expect(page.getByRole("heading", { name: "Inventory", exact: true })).toBeVisible();
   await page.getByRole("radio", { name: "Worn" }).click();
 
-  // The two RING cells relabel by id sort order, so assert placement by ring name
-  // (which cell it lands in is incidental).
-  await page.getByRole("button", { name: /Ring 1 slot, empty/ }).click();
+  // The two RING rows relabel by id sort order, so assert placement by ring name
+  // (which row it lands in is incidental).
+  await page.getByRole("button", { name: "Equip Ring 1" }).click();
   await expect(page.getByText("Equip Ring 1")).toBeVisible();
   await page.getByRole("button", { name: /Band of Alpha/ }).click();
   await expect(page.getByRole("button", { name: /Ring [12]: Band of Alpha/ })).toBeVisible();
 
-  // Fill the remaining cell — the RING slot is now at capacity (2/2).
-  await page.getByRole("button", { name: /Ring 2 slot, empty/ }).click();
+  // Fill the remaining row — the RING slot is now at capacity (2/2).
+  await page.getByRole("button", { name: "Equip Ring 2" }).click();
   await expect(page.getByText("Equip Ring 2")).toBeVisible();
   await page.getByRole("button", { name: /Band of Beta/ }).click();
   await expect(page.getByRole("button", { name: /Ring [12]: Band of Beta/ })).toBeVisible();
