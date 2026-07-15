@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { createCharacter, createSessionCharacter, uniqueName } from "./helpers/api";
+import { createCharacter, createSessionCharacter, gotoSheet, uniqueName } from "./helpers/api";
 
 // A fresh, session-ready character keeps the inventory (and thus the in-session
 // attack-form selector) unambiguous: exactly one weapon exists, so its equipped
@@ -18,7 +18,7 @@ test("inventory: add catalog item shows weight/qty; equip/unequip drives the att
   });
 
   const errors = collectConsoleErrors(page);
-  await page.goto(`/characters/${id}`);
+  await gotoSheet(page, id, "inventory");
   await expect(page.getByRole("heading", { name: "Inventory", exact: true })).toBeVisible();
 
   // ── Add a catalog Dagger (weight 1 lb) with quantity 2 ──────────────────────
@@ -93,7 +93,7 @@ test("inventory: sell lets you pick quantity + a single total; remainder stays",
   expect(acquire.ok(), `acquire: ${acquire.status()}`).toBeTruthy();
 
   const errors = collectConsoleErrors(page);
-  await page.goto(`/characters/${id}`);
+  await gotoSheet(page, id, "inventory");
   await expect(page.getByRole("heading", { name: "Inventory", exact: true })).toBeVisible();
 
   // Enter select mode, pick the stack, open the sell review.

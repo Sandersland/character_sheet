@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { createCharacter, learnSpells, uniqueName } from "./helpers/api";
+import { createCharacter, gotoSheet, learnSpells, uniqueName } from "./helpers/api";
 
 const WIZARD_L5_XP = 6500;
 
@@ -27,7 +27,7 @@ test("spellcasting: leveled cast, upcast, and free cantrip drive the slot pips",
   await learnSpells(page.request, id, ["Fire Bolt", "Magic Missile"]);
 
   const errors = collectConsoleErrors(page);
-  await page.goto(`/characters/${id}`);
+  await gotoSheet(page, id, "magic");
   await expect(page.getByRole("heading", { name: "Spell Slots" })).toBeVisible();
 
   const l1Before = await slotRemaining(page, 1);

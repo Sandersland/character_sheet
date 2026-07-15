@@ -1,4 +1,4 @@
-import { expect, type APIRequestContext } from "@playwright/test";
+import { expect, type APIRequestContext, type Page } from "@playwright/test";
 
 // Per-spec fixtures: create throwaway characters and seed their domain state
 // through the same REST endpoints the app uses. Callers pass page.request after
@@ -18,6 +18,18 @@ const ABILITY_SCORES = {
 
 export function uniqueName(prefix: string): string {
   return `${prefix} ${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`;
+}
+
+// Navigate to a character sheet, optionally landing on a specific workspace tab.
+// Since #922 the sheet is a tabbed workspace whose active tab lives in the `?tab=`
+// query param (default: overview); a spec that drives a now-tabbed section
+// (combat HP/conditions, inventory, magic/spells, story) must target its tab.
+export async function gotoSheet(
+  page: Page,
+  id: string,
+  tab?: "overview" | "combat" | "inventory" | "magic" | "story",
+): Promise<void> {
+  await page.goto(`/characters/${id}${tab ? `?tab=${tab}` : ""}`);
 }
 
 type AbilityScores = typeof ABILITY_SCORES;

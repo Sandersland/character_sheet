@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { createCharacter, uniqueName } from "./helpers/api";
+import { createCharacter, gotoSheet, uniqueName } from "./helpers/api";
 
 // Unarmored Defense is derived server-side (deriveArmorClass in srd.ts): the AC
 // tile shows the number, its popover discloses the labeled breakdown. Each spec
@@ -60,7 +60,7 @@ test("armor class: barbarian Unarmored Defense — Con stacks with a shield, bod
   });
 
   const errors = collectConsoleErrors(page);
-  await page.goto(`/characters/${id}`);
+  await gotoSheet(page, id, "inventory");
   await expect(page.getByRole("heading", { name: "Inventory", exact: true })).toBeVisible();
 
   // ── Unarmored: 10 + Dex + Con via Unarmored Defense ─────────────────────────
@@ -109,7 +109,7 @@ test("armor class: monk Unarmored Defense adds Wis, but a shield disqualifies it
   });
 
   const errors = collectConsoleErrors(page);
-  await page.goto(`/characters/${id}`);
+  await gotoSheet(page, id, "inventory");
   await expect(page.getByRole("heading", { name: "Inventory", exact: true })).toBeVisible();
 
   // ── Unarmored: 10 + Dex + Wis via Unarmored Defense ─────────────────────────

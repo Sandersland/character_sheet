@@ -12,7 +12,8 @@ test("Quick capture: margin dock at md+, chat surface on mobile", async ({ page 
   // Collect after login so the pre-auth 401s from login()'s initial goto don't count.
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Smoke Fighter/ }).click();
-  await expect(page.getByRole("heading", { name: "Hit Points" })).toBeVisible();
+  // Gate on the always-on banner (Quick capture is banner-driven, tab-agnostic).
+  await expect(page.getByRole("heading", { name: /Smoke Fighter/, level: 1 })).toBeVisible();
 
   const grabber = page.locator('button[aria-label="Close"]');
   const enterHint = page.getByText(/↵ save · shift\+↵ new line/);

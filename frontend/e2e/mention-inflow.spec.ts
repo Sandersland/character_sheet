@@ -40,7 +40,8 @@ test("Quick capture: @-mention suggestions render in-flow and unclipped on mobil
   const viewport = { width: 390, height: 844 };
   await page.setViewportSize(viewport);
   await page.goto(`/characters/${characterId}`);
-  await expect(page.getByRole("heading", { name: "Hit Points" })).toBeVisible();
+  // Gate on the always-on banner (Quick capture is banner-driven, tab-agnostic).
+  await expect(page.getByRole("heading", { name: /Mention Mobile/, level: 1 })).toBeVisible();
 
   // Open the mobile Quick-capture BottomSheet and type an @-query.
   await page.keyboard.press("Control+j");
