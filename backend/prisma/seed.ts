@@ -12,6 +12,7 @@ import { MANEUVERS } from "./seed/maneuvers.js";
 import { DISCIPLINES } from "./seed/disciplines.js";
 import { SHADOW_ARTS } from "./seed/shadow-arts.js";
 import { CHANNEL_DIVINITIES } from "./seed/channel-divinity.js";
+import { SUBCLASS_CHOICE_OPTIONS } from "./seed/subclass-choices.js";
 import { FEATS } from "./seed/feats.js";
 import { SPELLS } from "./seed/spells.js";
 import { SUBCLASS_GRANTED_SPELLS } from "./seed/subclass-granted-spells.js";
@@ -214,6 +215,26 @@ async function seedShadowArts(prisma: PrismaClient) {
   }
 }
 
+// Seed generic subclass "choose N" options (#899) as GrantedAbility rows keyed
+// by `source` = the choice's catalogSource. Plain descriptive features — no
+// cost/effect columns.
+async function seedSubclassChoiceOptions(prisma: PrismaClient) {
+  for (const option of SUBCLASS_CHOICE_OPTIONS) {
+    const data = {
+      name: option.name,
+      source: option.source,
+      description: option.description,
+      minLevel: option.minLevel,
+      alwaysKnown: false,
+    };
+    await prisma.grantedAbility.upsert({
+      where: { name: option.name },
+      create: data,
+      update: data,
+    });
+  }
+}
+
 // Seed Channel Divinity catalog — upsert by unique name. Each spends 1 CD charge.
 async function seedChannelDivinities(prisma: PrismaClient) {
   for (const cd of CHANNEL_DIVINITIES) {
@@ -315,7 +336,13 @@ async function seedPacks(prisma: PrismaClient, itemIdsByName: Map<string, string
 }
 
 async function main() {
-  assertUniqueGrantedAbilityNames([...MANEUVERS, ...DISCIPLINES, ...SHADOW_ARTS, ...CHANNEL_DIVINITIES]);
+  assertUniqueGrantedAbilityNames([
+    ...MANEUVERS,
+    ...DISCIPLINES,
+    ...SHADOW_ARTS,
+    ...CHANNEL_DIVINITIES,
+    ...SUBCLASS_CHOICE_OPTIONS,
+  ]);
   await seedRaces(prisma);
   const classIds = await seedClasses(prisma);
   await seedSubclasses(prisma, classIds);
@@ -324,6 +351,7 @@ async function main() {
   await seedDisciplines(prisma);
   await seedShadowArts(prisma);
   await seedChannelDivinities(prisma);
+  await seedSubclassChoiceOptions(prisma);
   await seedFeats(prisma);
   await seedBackgrounds(prisma);
   await seedSpells(prisma);

@@ -734,6 +734,16 @@ function buildResourcesPayload(
     derivedRes.disciplineChoiceCount !== undefined
       ? stored.disciplinesKnown.slice(0, derivedRes.disciplineChoiceCount)
       : stored.disciplinesKnown;
+  // Generic subclass "choose N" clamp-on-read (#899): keep only keys the derived
+  // subclassChoices still grant, each capped to its count — defense-in-depth
+  // mirroring reconcileSubclassChoices for characters not yet reconciled.
+  const subclassChoices = derivedRes.subclassChoices ?? [];
+  const choiceCaps = new Map(subclassChoices.map((c) => [c.key, c.count]));
+  const clampedChoicesKnown: Record<string, typeof stored.choicesKnown[string]> = {};
+  for (const [key, entries] of Object.entries(stored.choicesKnown)) {
+    const cap = choiceCaps.get(key) ?? 0;
+    if (cap > 0) clampedChoicesKnown[key] = entries.slice(0, cap);
+  }
   return {
     features: derivedRes.features,
     maneuverChoiceCount: derivedRes.maneuverChoiceCount,
@@ -756,6 +766,11 @@ function buildResourcesPayload(
     maneuversKnown: clampedManeuversKnown,
     disciplinesKnown: clampedDisciplinesKnown,
     toolProficienciesKnown: clampedToolProfsKnown,
+    // Generic subclass "choose N" surface (#899): the derived choices (key/label/
+    // count/catalogSource) tell the level-up Choose-N step which pickers to render;
+    // choicesKnown holds the (clamped) selections.
+    subclassChoices,
+    choicesKnown: clampedChoicesKnown,
     // Fighting Style choice surface for the frontend picker. Choice count is
     // level-gated (Fighter L1 -> 1); fightingStyle is already clamped to null
     // when the character isn't entitled.

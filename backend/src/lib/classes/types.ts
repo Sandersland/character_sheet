@@ -40,6 +40,41 @@ export interface DerivedClassInfo {
   shadowArtsAvailable?: boolean;
   /** Way of Shadow only: whether the L11+ Cloak of Shadows self-invisible toggle is available. */
   cloakOfShadowsAvailable?: boolean;
+  /**
+   * Generic subclass "choose N from a catalog" selections active at this level
+   * (issue #899). Only choices whose derived count > 0 are listed — so a
+   * subclass feature not yet reached (e.g. Hunter's Defensive Tactics before L7)
+   * is absent. Drives the resources reconciler/clamp and the level-up Choose-N
+   * step. See SubclassChoice for the declaration shape.
+   */
+  subclassChoices?: DerivedSubclassChoice[];
+}
+
+/**
+ * A generic level-gated "choose N options" feature declared on a subclass
+ * (issue #899) — e.g. Ranger's Hunter's Prey, Barbarian totems. Its only
+ * persisted state is the selection (ResourcesMutableState.choicesKnown[key]);
+ * the option catalog lives as GrantedAbility rows keyed by `catalogSource`.
+ * Distinct from the bespoke maneuvers/disciplines/tool-prof lists, which carry
+ * extra mechanics (save DCs, cast/swap ops) and stay hand-rolled.
+ */
+export interface SubclassChoice {
+  /** Stable machine key — the choicesKnown map key and the learn/forget op target. */
+  key: string;
+  /** Display label, e.g. "Hunter's Prey". */
+  label: string;
+  /** GrantedAbility.source the option catalog is drawn from, e.g. "huntersPrey". */
+  catalogSource: string;
+  /** Level-derived number of options the character may choose (0 below the grant level). */
+  count: (level: number) => number;
+}
+
+/** A SubclassChoice resolved for a specific character level, surfaced on DerivedClassInfo. */
+export interface DerivedSubclassChoice {
+  key: string;
+  label: string;
+  catalogSource: string;
+  count: number;
 }
 
 export type ResourceFn = (
@@ -61,6 +96,12 @@ export interface SubclassDefinition {
   features: DerivedFeature[];
   resourceFn?: ResourceFn;
   deriveExtras?: ExtrasFn;
+  /**
+   * Generic "choose N from a catalog" features (issue #899). Declared as data —
+   * a new choose-N needs a SubclassChoice entry + seed rows, not a bespoke
+   * reconciler. Collected into DerivedClassInfo.subclassChoices in registry.ts.
+   */
+  choices?: SubclassChoice[];
 }
 
 export interface ClassDefinition {

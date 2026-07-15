@@ -75,12 +75,25 @@ backend/src/lib/leveling/level-reconciliation.ts
 | `reconcileManeuvers` | Runs after `reconcileSubclass` so it sees a cleared subclass. Calls `deriveResources(...)` for the new level; `allowed = maneuverChoiceCount ?? 0`. Trims `maneuversKnown` to the first `allowed` entries (oldest kept, LIFO). Emits `resources/maneuversReconciled`. |
 | `reconcileDisciplines` | Way of the Four Elements. Runs after `reconcileSubclass`; `allowed = disciplineChoiceCount ?? 0` (1/2/3/4 at monk levels 3/6/11/17). Trims `disciplinesKnown` to the first `allowed` entries (oldest kept, LIFO). Emits `resources/disciplinesReconciled`. |
 | `reconcileToolProficiencies` | Trims `toolProficienciesKnown` when the subclass no longer grants a tool choice (level dropped below 3, or subclass cleared). Also runs after `reconcileSubclass` for the same reason. Creation-fixed tool profs (in `Character.toolProficiencies`) are untouched. Uses a `resources`-category event. |
+| `reconcileSubclassChoices` | **Generic (#899).** One reconciler for **every** data-driven subclass "choose N" (see below). Re-derives `subclassChoices` at the new level and caps each `choicesKnown[key]` list to its count — 0 when the subclass no longer grants that choice (tier not reached, or subclass cleared by `reconcileSubclass`, which runs first). Emits a single `resources/subclassChoicesReconciled`. Adding a new choose-N needs a subclass declaration + seed rows, **not** a new reconciler. |
 | `reconcileFightingStyle` | Clears the persisted `fightingStyle` when `fightingStyleChoiceCount` drops to 0 at the new level (e.g. a class change away from Fighter). Uses a `resources`-category event. |
 | `reconcileAdvancements` | LIFO-reverses the tail of `advancements[]` (ASIs/feats) whose required level is now above the derived level — subtracting the stored deltas from `abilityScores`/`hitPoints`/`initiativeBonus`. Order-independent (ASI slots are class-level-gated, not subclass-gated), so it runs last. Uses `advancement`-category events. |
 
 Order matters: later reconcilers observe earlier ones' writes (maneuvers and tool profs must see the already-cleared subclass so that `deriveResources` returns `null → allowed = 0` for a full reset).
 
 `reconcileManeuvers`, `reconcileDisciplines`, and `reconcileToolProficiencies` are thin configs over a shared `reconcileKnownList(ctx, config)` helper that owns the fetch → derive → trim → audit flow (see the checklist below for the config fields).
+
+#### Generic subclass "choose N" — data, not a bespoke reconciler (#899)
+
+A level-gated feature that is just **"choose N options from a catalog"** with no extra mechanics (Ranger's Hunter's Prey, and the shape Barbarian totems / Sorcerer Metamagic-known / Warlock Invocations-known will use) is declared as **data** — no new reconciler, state key, or clamp.
+
+- **Declare** the choice on the subclass in `backend/src/lib/classes/<class>.ts`: `choices: [{ key, label, catalogSource, count: (level) => n }]` (see `SubclassChoice` in `classes/types.ts`). `registry.ts` collects the choices the character has reached (`count > 0`) into `DerivedClassInfo.subclassChoices`.
+- **Options** live in the catalog as `GrantedAbility` rows keyed by `source = catalogSource` (seeded in `prisma/seed/subclass-choices.ts`) — the content-as-seed-data direction (same as #898's granted spells). `GET /api/subclass-choices/:source` lists them for the picker.
+- **Selections** persist in one generic map `Character.resources.choicesKnown[key]` (`ChoiceEntry[]`). A new choose-N adds **no** top-level state key.
+- **Mutation** goes through the existing resources endpoint (`learnSubclassChoice` / `forgetSubclassChoice` ops), validated against `subclassChoices` (count cap, catalog membership, dedup; custom entries allowed).
+- **Reconcile + clamp** are both generic: `reconcileSubclassChoices` (above) on write, and one loop in `buildResourcesPayload` on read.
+
+This is the preferred path for the description-only seeded subclasses (#910). It is distinct from maneuvers/disciplines/tool-profs, which stay hand-rolled because they carry extra mechanics (save DCs, cast/swap ops, `TOOLS` validation).
 
 #### Choice-less level-gated grants are pure-derived, not persisted
 
@@ -97,7 +110,7 @@ It runs unconditionally on every XP op (cheap — one indexed read). This means:
 
 **Undo:** reconciliation events ride the same LIFO `batchId` as the XP event. Because they use standard `category/type` event shapes that already have undo branches in `backend/src/routes/activity.ts`, no new revert code is needed:
 - `class` category → restores `subclassId`/`subclass` from `before` via `data.classEntryId`
-- `resources` category → restores `before.resources` wholesale — the canonical 6-key `snapshotResources()` shape (`used`, `maneuversKnown`, `disciplinesKnown`, `toolProficienciesKnown`, `advancements`, `fightingStyle`); since #818 no key can be silently wiped on revert
+- `resources` category → restores `before.resources` wholesale — the canonical 7-key `snapshotResources()` shape (`used`, `maneuversKnown`, `disciplinesKnown`, `toolProficienciesKnown`, `choicesKnown`, `advancements`, `fightingStyle`); since #818 no key can be silently wiped on revert
 
 ### Layer 2 — Clamp-on-read (non-destructive, defense-in-depth)
 
