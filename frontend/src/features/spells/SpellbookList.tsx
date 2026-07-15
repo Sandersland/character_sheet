@@ -1,15 +1,30 @@
-// The grouped Spellbook list (cantrips + leveled groups of SpellRows).
+// The grimoire spellbook: a Prepared N/M budget meter, a filter strip, and spells
+// inked by level into a two-page desktop spread (single scroll on mobile).
+// caster-spellbook.html §2 & §4.
+import { useState } from "react";
+
 import EmptyState from "@/components/ui/EmptyState";
 import { GiSpellBook } from "@/components/ui/icons";
+import MeterBar from "@/components/ui/MeterBar";
+import ChipGroup from "@/components/ui/ChipGroup";
+import ChipToggle from "@/components/ui/ChipToggle";
+import Select from "@/components/ui/Select";
 import SpellRow from "@/features/spells/SpellRow";
-import type { Spell, SpellSlots } from "@/types/character";
+import { LEVEL_OPTIONS, SPELL_SCHOOLS } from "@/lib/addSpell";
+import { schoolLabel } from "@/lib/spellMeta";
+import {
+  filterSpellbook,
+  type PreparedBudget,
+  type SpellbookFilter,
+} from "@/lib/spellList";
+import type { Spell, SpellSchool, SpellSlots } from "@/types/character";
 
 interface SpellbookListProps {
   spells: Spell[];
   sortedSpells: Spell[];
-  spellLevels: number[];
   slots: SpellSlots[];
   characterLevel: number;
+  budget: PreparedBudget;
   busy: boolean;
   concentratingOnEntryId: string | null;
   onCast: (spell: Spell, slotLevel?: number) => void;
@@ -19,27 +34,29 @@ interface SpellbookListProps {
   onAddSpell: () => void;
 }
 
-interface SpellLevelGroupProps extends Omit<SpellbookListProps, "spells" | "spellLevels" | "onAddSpell"> {
-  level: number;
-}
+type GroupProps = Pick<
+  SpellbookListProps,
+  "slots" | "characterLevel" | "budget" | "busy" | "concentratingOnEntryId" | "onCast" | "onPrepare" | "onForget" | "availableSlotsFor"
+> & { level: number; levelSpells: Spell[] };
 
 function SpellLevelGroup({
-  level, sortedSpells, slots, characterLevel, busy,
+  level, levelSpells, slots, characterLevel, budget, busy,
   concentratingOnEntryId, onCast, onPrepare, onForget, availableSlotsFor,
-}: SpellLevelGroupProps) {
-  const levelSpells = sortedSpells.filter((s) => s.level === level);
+}: GroupProps) {
   const slotInfo = level === 0 ? null : slots.find((s) => s.level === level);
   return (
-    <div>
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <h4 className="text-[11px] font-semibold uppercase tracking-wide text-arcane-700">
+    <div className="break-inside-avoid">
+      <div className="mb-1 flex items-baseline justify-between gap-2 border-b border-parchment-300 pb-1">
+        <h4 className="font-display text-sm font-semibold text-parchment-700">
           {level === 0 ? "Cantrips" : `Level ${level}`}
         </h4>
-        {slotInfo && (
-          <span className="text-[11px] tabular-nums text-arcane-700">
-            {slotInfo.total - slotInfo.used}/{slotInfo.total} slots
-          </span>
-        )}
+        <span className="text-[10px] uppercase tracking-wide text-parchment-500">
+          {level === 0
+            ? "always prepared"
+            : slotInfo
+              ? `${slotInfo.total - slotInfo.used}/${slotInfo.total} slots`
+              : ""}
+        </span>
       </div>
       <ul className="flex flex-col">
         {levelSpells.map((spell) => (
@@ -47,6 +64,7 @@ function SpellLevelGroup({
             key={spell.id}
             spell={spell}
             characterLevel={characterLevel}
+            budget={budget}
             busy={busy}
             onCast={onCast}
             onPrepare={onPrepare}
@@ -60,15 +78,41 @@ function SpellLevelGroup({
   );
 }
 
+const EMPTY_FILTER: SpellbookFilter = { level: null, school: null, prepared: false, ritual: false };
+
 export default function SpellbookList({
-  spells, spellLevels, onAddSpell, ...rest
+  spells, sortedSpells, budget, onAddSpell, ...rest
 }: SpellbookListProps) {
+  const [filter, setFilter] = useState<SpellbookFilter>(EMPTY_FILTER);
+
+  const visible = filterSpellbook(sortedSpells, filter);
+  const levels = [...new Set(visible.map((s) => s.level))].sort((a, b) => a - b);
+
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
-          Spellbook ({spells.length})
-        </h3>
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-parchment-500">Spellbook</p>
+          <h3 className="font-display text-xl font-bold text-arcane-800">
+            {spells.length} spell{spells.length === 1 ? "" : "s"}
+          </h3>
+        </div>
+        {budget.limit != null && (
+          <div className="w-40 text-right">
+            <p className="text-[9px] font-bold uppercase tracking-wide text-parchment-500">Prepared today</p>
+            <p className="font-display text-sm font-bold text-parchment-900 tabular-nums">
+              {budget.count} / {budget.limit}
+            </p>
+            <div className="mt-1">
+              <MeterBar
+                current={budget.count}
+                max={budget.limit}
+                tone="arcane"
+                label={`${budget.count} of ${budget.limit} prepared`}
+              />
+            </div>
+          </div>
+        )}
         {rest.busy && <span className="text-[10px] text-parchment-600">Saving…</span>}
       </div>
 
@@ -80,11 +124,55 @@ export default function SpellbookList({
           action={{ label: "+ Add spell", onClick: onAddSpell }}
         />
       ) : (
-        <div className="flex flex-col gap-4">
-          {spellLevels.map((level) => (
-            <SpellLevelGroup key={level} level={level} {...rest} />
-          ))}
-        </div>
+        <>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <ChipGroup label="Spellbook filters">
+              <ChipToggle pressed={filter.prepared} onChange={(v) => setFilter((f) => ({ ...f, prepared: v }))}>
+                Prepared
+              </ChipToggle>
+              <ChipToggle pressed={filter.ritual} onChange={(v) => setFilter((f) => ({ ...f, ritual: v }))}>
+                Ritual
+              </ChipToggle>
+            </ChipGroup>
+            <Select
+              aria-label="Filter by level"
+              className="w-auto"
+              value={filter.level == null ? "" : String(filter.level)}
+              onChange={(e) => setFilter((f) => ({ ...f, level: e.target.value === "" ? null : Number(e.target.value) }))}
+            >
+              {LEVEL_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </Select>
+            <Select
+              aria-label="Filter by school"
+              className="w-auto"
+              value={filter.school ?? ""}
+              onChange={(e) => setFilter((f) => ({ ...f, school: e.target.value === "" ? null : (e.target.value as SpellSchool) }))}
+            >
+              <option value="">All schools</option>
+              {SPELL_SCHOOLS.map((s) => (
+                <option key={s} value={s}>{schoolLabel(s)}</option>
+              ))}
+            </Select>
+          </div>
+
+          {visible.length === 0 ? (
+            <p className="py-6 text-center text-xs text-parchment-600">No spells match these filters.</p>
+          ) : (
+            <div className="md:grid md:grid-cols-2 md:gap-x-10">
+              {levels.map((level) => (
+                <SpellLevelGroup
+                  key={level}
+                  level={level}
+                  levelSpells={visible.filter((s) => s.level === level)}
+                  budget={budget}
+                  {...rest}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

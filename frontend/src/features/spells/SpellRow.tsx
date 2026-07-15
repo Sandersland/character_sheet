@@ -2,6 +2,7 @@
 // Derivations live in lib/spellRow; presentational blocks in the sibling subcomponents.
 import { useState } from "react";
 
+import type { PreparedBudget } from "@/lib/spellList";
 import { deriveSpellRow, resolveCastAction } from "@/lib/spellRow";
 import { effectPreview, componentsLabel } from "@/lib/spellMeta";
 import SpellRowActions from "@/features/spells/SpellRowActions";
@@ -18,6 +19,8 @@ interface SpellRowProps {
   onCast: (spell: Spell, slotLevel?: number) => void;
   onPrepare: (spell: Spell) => void;
   onForget: (spell: Spell) => void;
+  /** Prepared-spell budget (#883) gating the rune toggle. */
+  budget: PreparedBudget;
   /** Available slot levels for the "cast with slot" picker (leveled spells only). */
   availableSlots: number[];
   /** True when this spell is the character's active concentration spell. */
@@ -31,6 +34,7 @@ export default function SpellRow({
   onCast,
   onPrepare,
   onForget,
+  budget,
   availableSlots,
   isConcentrating = false,
 }: SpellRowProps) {
@@ -73,6 +77,7 @@ export default function SpellRow({
         <SpellRowActions
           spell={spell}
           derived={derived}
+          budget={budget}
           busy={busy}
           onPrepare={onPrepare}
           onForget={onForget}

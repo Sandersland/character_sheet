@@ -7,7 +7,7 @@
 
 import { useRef } from "react";
 
-import { deriveSpellList } from "@/lib/spellList";
+import { deriveSpellList, preparedBudget } from "@/lib/spellList";
 import { availableSlotsForSpell } from "@/lib/spellPicker";
 import type { Character, Spell } from "@/types/character";
 import AddSpellPanel from "@/features/spells/AddSpellPanel";
@@ -26,6 +26,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
   const concentratingOn = spellcasting.concentratingOn ?? null;
 
   const derived = deriveSpellList(character);
+  const budget = preparedBudget(spellcasting);
   const spellbookRef = useRef<HTMLDivElement>(null);
   const {
     busy, error, castResult, addPanelOpen,
@@ -54,9 +55,9 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
       <SpellbookList
         spells={spells}
         sortedSpells={derived.sortedSpells}
-        spellLevels={derived.spellLevels}
         slots={slots}
         characterLevel={character.level}
+        budget={budget}
         busy={busy}
         concentratingOnEntryId={concentratingOn?.entryId ?? null}
         onCast={handleCast}

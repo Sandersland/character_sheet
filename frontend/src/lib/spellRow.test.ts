@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { deriveSpellRow, resolveCastAction, upcastSlotOptions } from "@/lib/spellRow";
+import { deriveSpellRow, resolveCastAction, runeState, upcastSlotOptions } from "@/lib/spellRow";
 import type { Spell } from "@/types/character";
 
 const leveled: Spell = {
@@ -95,6 +95,28 @@ describe("deriveSpellRow", () => {
   it("falls back to neutral tone for an unknown school", () => {
     const d = deriveSpellRow({ ...leveled, school: "mystery" as Spell["school"] }, [3]);
     expect(d.schoolTone).toBe("neutral");
+  });
+});
+
+describe("runeState", () => {
+  it("locks a cantrip (always prepared)", () => {
+    expect(runeState(cantrip)).toBe("locked");
+  });
+
+  it("locks a subclass-granted spell", () => {
+    expect(runeState({ ...leveled, source: "subclass" })).toBe("locked");
+  });
+
+  it("locks an item-granted spell", () => {
+    expect(runeState(itemSpell)).toBe("locked");
+  });
+
+  it("reports a prepared leveled spell", () => {
+    expect(runeState({ ...leveled, prepared: true })).toBe("prepared");
+  });
+
+  it("reports a known-but-unprepared leveled spell", () => {
+    expect(runeState({ ...leveled, prepared: false })).toBe("unprepared");
   });
 });
 
