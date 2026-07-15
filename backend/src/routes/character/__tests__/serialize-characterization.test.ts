@@ -297,6 +297,9 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     ]);
     expect(b.spellcasting.arcana).toEqual([]);
     expect(b.spellcasting.concentratingOn).toBeNull();
+    // Prepared-spell cap (#883): INT mod 3 + level 5 = 8; empty spellbook → 0 prepared.
+    expect(b.spellcasting.preparedSpellLimit).toBe(8);
+    expect(b.spellcasting.preparedSpellCount).toBe(0);
 
     // Single class, no subclass.
     expect(b.classes).toEqual([{ id: "ce-b", name: "wizard", level: 5 }]);
@@ -321,6 +324,9 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     });
     expect(c.spellcasting.spells).toEqual([]);
     expect(c.spellcasting.concentratingOn).toBeNull();
+    // Known/pact caster only (warlock + non-caster fighter) → no prepared cap.
+    expect(c.spellcasting.preparedSpellLimit).toBeNull();
+    expect(c.spellcasting.preparedSpellCount).toBe(0);
     expect(c.classes).toHaveLength(2);
   });
 
@@ -344,6 +350,10 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
       source: "subclass",
     });
     expect(d.spellcasting.concentratingOn).toBeNull();
+    // No prepared caster in the mix → null cap; the source:"subclass" cantrip grant
+    // is excluded from the count (source!=null and level 0 both disqualify it).
+    expect(d.spellcasting.preparedSpellLimit).toBeNull();
+    expect(d.spellcasting.preparedSpellCount).toBe(0);
     expect(d.classes).toHaveLength(2);
   });
 

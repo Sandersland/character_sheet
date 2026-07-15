@@ -222,6 +222,29 @@ function casterLevelContribution(fraction: CasterFraction, level: number): numbe
   return 0; // pact + none never contribute to the merged pool
 }
 
+/**
+ * Prepared-spell cap (PHB): a prepared caster may have `abilityMod + classLevel`
+ * spells prepared (min 1). Summed across prepared-caster classes for multiclass.
+ * Returns null when no class prepares (known/pact/third casters are unaffected).
+ * Pure function — no DB access, safe to call in serializeCharacter.
+ */
+export function derivePreparedSpellLimit(
+  classEntries: ReadonlyArray<{ name: string; level: number; subclass?: string | null }>,
+  abilityScores: Record<string, number>,
+): number | null {
+  let total = 0;
+  let anyPrepared = false;
+  for (const entry of classEntries) {
+    const profile = casterProfile(entry.name, entry.subclass);
+    if (!profile || profile.preparation !== "prepared") continue;
+    if (profile.fraction === "half" && entry.level < 2) continue; // Paladin has no spellcasting below level 2
+    anyPrepared = true;
+    const mod = abilityModifier(abilityScores[profile.ability] ?? 10);
+    total += Math.max(1, mod + casterLevelContribution(profile.fraction, entry.level));
+  }
+  return anyPrepared ? total : null;
+}
+
 /** One caster class's derived per-class spellcasting stats in a multiclass character. */
 export interface MulticlassCasterClass {
   className: string;
