@@ -24,6 +24,7 @@ frontend/src/
 │   │                    #   StartingEquipmentSection, PreviewSection, CreateActions
 │   │                    #   (CharacterCreatePage step frames; orchestrated by hooks/useCharacterCreation)
 │   ├── character-meta/  # CharacterCard, BannerVitals, ActivityModal, DeleteCharacterModal, BackendStatus,
+│   │                    #   IdentityCard (#927: read-only background/alignment on the Story panel),
 │   │                    #   CharacterSheet{Header,Content,Body,Modals}, CharacterLoadError, panels/ (sheet-page sections)
 │   │                    #   Tabbed sheet shell (#921/#922): CharacterSheetPage = load/guard states →
 │   │                    #   CharacterSheetContent (banner + chrome) → CharacterSheetHeader is the
@@ -32,6 +33,7 @@ frontend/src/
 │   │                    #   OverviewPanel (#923): AbilityScoresPanel (abilities + saves + skills) on top,
 │   │                    #   then a 3-col grid — ProficientSkillsCard+Proficiencies / Class Features+Advancements /
 │   │                    #   Experience+Spell Slots (SpellSlotSummary, caster-only)+Equipped.
+│   │                    #   StoryPanel groups the journal doorway + IdentityCard + campaign prefs (#927).
 │   │                    #   Tab logic is pure in sheetTabs.ts (getSheetTabs/resolveActiveTab; Magic is
 │   │                    #   caster-only) + the useSheetTabs hook (URL-backed ?tab= state).
 │   │                    #   BannerVitals' AC tile is read-only: a Popover disclosing the
