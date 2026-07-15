@@ -5,7 +5,11 @@
 import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { advancementSlotsForLevel, fightingStyleChoiceCount } from "@/lib/srd/srd.js";
-import { learnsNewSpellsOnLevelUp, spellsGainedAtLevel } from "@/lib/srd/spellcasting-tables.js";
+import {
+  BARD_MAGICAL_SECRETS_LEVELS,
+  learnsNewSpellsOnLevelUp,
+  spellsGainedAtLevel,
+} from "@/lib/srd/spellcasting-tables.js";
 
 export type LevelUpStepKind =
   | "hitPoints"
@@ -40,66 +44,96 @@ export interface TargetClassEntry {
   subclassLevel?: number;
 }
 
+// The target plus its derived resources at N and N-1 — the context each step reads.
+interface PlanContext {
+  target: TargetClassEntry;
+  now: DerivedClassInfo | null;
+  prev: DerivedClassInfo | null;
+}
+
 // deriveResources at a given per-class level, holding the target subclass fixed.
-function derivedAt(
-  target: TargetClassEntry,
-  abilityScores: Record<string, number>,
-  level: number,
-): DerivedClassInfo | null {
+function derivedAt(target: TargetClassEntry, abilityScores: Record<string, number>, level: number): DerivedClassInfo | null {
   if (level < 1) return null;
   return deriveResources(target.name, target.subclass ?? undefined, level, abilityScores, proficiencyBonusForLevel(level));
+}
+
+function advancementStep({ target }: PlanContext): LevelUpStep | null {
+  const delta = advancementSlotsForLevel(target.name, target.newLevel) - advancementSlotsForLevel(target.name, target.newLevel - 1);
+  return delta > 0 ? { kind: "advancement", count: delta } : null;
+}
+
+// Emitted only when reaching the subclass level with no subclass yet chosen.
+function subclassStep({ target }: PlanContext): LevelUpStep | null {
+  const subclassLevel = target.subclassLevel ?? 3;
+  return target.newLevel === subclassLevel && !target.subclass ? { kind: "subclass" } : null;
+}
+
+function fightingStyleStep({ target }: PlanContext): LevelUpStep | null {
+  const delta = fightingStyleChoiceCount(target.name, target.newLevel) - fightingStyleChoiceCount(target.name, target.newLevel - 1);
+  return delta > 0 ? { kind: "fightingStyle", count: delta } : null;
+}
+
+// Diff one bespoke choose-N count (maneuvers/disciplines/tools) across N vs N-1.
+function choiceCountStep(
+  { now, prev }: PlanContext,
+  kind: LevelUpStepKind,
+  field: "maneuverChoiceCount" | "disciplineChoiceCount" | "toolProfChoiceCount",
+): LevelUpStep | null {
+  const delta = (now?.[field] ?? 0) - (prev?.[field] ?? 0);
+  return delta > 0 ? { kind, count: delta } : null;
+}
+
+// Generic subclass "choose N from a catalog" (#899): one step per key that grew.
+function subclassChoiceSteps({ now, prev }: PlanContext): LevelUpStep[] {
+  const prevCounts = new Map((prev?.subclassChoices ?? []).map((c) => [c.key, c.count]));
+  return (now?.subclassChoices ?? [])
+    .map((choice) => ({ choice, delta: choice.count - (prevCounts.get(choice.key) ?? 0) }))
+    .filter(({ delta }) => delta > 0)
+    .map(({ choice, delta }) => ({
+      kind: "subclassChoice" as const,
+      count: delta,
+      meta: { key: choice.key, label: choice.label, catalogSource: choice.catalogSource },
+    }));
+}
+
+// Known casters + Wizard's spellbook; Bard's Magical Secrets levels are tagged.
+function newSpellsStep({ target }: PlanContext): LevelUpStep | null {
+  if (!learnsNewSpellsOnLevelUp(target.name, target.subclass)) return null;
+  const count = spellsGainedAtLevel(target.name, target.newLevel);
+  if (count <= 0) return null;
+  const magicalSecrets = target.name.toLowerCase() === "bard" && BARD_MAGICAL_SECRETS_LEVELS.has(target.newLevel);
+  return { kind: "newSpells", count, ...(magicalSecrets ? { meta: { magicalSecrets: true } } : {}) };
 }
 
 /**
  * The ordered choice-steps advancing `target.name` to `target.newLevel` grants.
  * Pure — no DB access. Each step is derived by diffing a rule function at the
  * new level vs one below; steps with a zero delta are omitted.
+ *
+ * The plan is computed for the CURRENTLY-KNOWN subclass: when `target.subclass`
+ * is null (reaching the subclass level) only the `subclass` step is emitted —
+ * subclass-derived choices can't be known until the subclass is picked, so the
+ * ceremony re-plans after that step.
  */
 export function buildLevelUpPlan(character: LevelUpPlanCharacter, target: TargetClassEntry): LevelUpStep[] {
-  const steps: LevelUpStep[] = [];
-  const { abilityScores } = character;
-  const n = target.newLevel;
+  const ctx: PlanContext = {
+    target,
+    now: derivedAt(target, character.abilityScores, target.newLevel),
+    prev: derivedAt(target, character.abilityScores, target.newLevel - 1),
+  };
 
-  steps.push({ kind: "hitPoints" });
+  const candidates: (LevelUpStep | null)[] = [
+    { kind: "hitPoints" },
+    advancementStep(ctx),
+    subclassStep(ctx),
+    choiceCountStep(ctx, "maneuvers", "maneuverChoiceCount"),
+    fightingStyleStep(ctx),
+    choiceCountStep(ctx, "disciplines", "disciplineChoiceCount"),
+    choiceCountStep(ctx, "toolProficiency", "toolProfChoiceCount"),
+    ...subclassChoiceSteps(ctx),
+    newSpellsStep(ctx),
+    { kind: "review" },
+  ];
 
-  const advDelta = advancementSlotsForLevel(target.name, n) - advancementSlotsForLevel(target.name, n - 1);
-  if (advDelta > 0) steps.push({ kind: "advancement", count: advDelta });
-
-  const subclassLevel = target.subclassLevel ?? 3;
-  if (n === subclassLevel && !target.subclass) steps.push({ kind: "subclass" });
-
-  const now = derivedAt(target, abilityScores, n);
-  const prev = derivedAt(target, abilityScores, n - 1);
-
-  const maneuverDelta = (now?.maneuverChoiceCount ?? 0) - (prev?.maneuverChoiceCount ?? 0);
-  if (maneuverDelta > 0) steps.push({ kind: "maneuvers", count: maneuverDelta });
-
-  const fsDelta = fightingStyleChoiceCount(target.name, n) - fightingStyleChoiceCount(target.name, n - 1);
-  if (fsDelta > 0) steps.push({ kind: "fightingStyle", count: fsDelta });
-
-  const disciplineDelta = (now?.disciplineChoiceCount ?? 0) - (prev?.disciplineChoiceCount ?? 0);
-  if (disciplineDelta > 0) steps.push({ kind: "disciplines", count: disciplineDelta });
-
-  const toolDelta = (now?.toolProfChoiceCount ?? 0) - (prev?.toolProfChoiceCount ?? 0);
-  if (toolDelta > 0) steps.push({ kind: "toolProficiency", count: toolDelta });
-
-  const prevChoiceCounts = new Map((prev?.subclassChoices ?? []).map((c) => [c.key, c.count]));
-  for (const choice of now?.subclassChoices ?? []) {
-    const delta = choice.count - (prevChoiceCounts.get(choice.key) ?? 0);
-    if (delta > 0) {
-      steps.push({
-        kind: "subclassChoice",
-        count: delta,
-        meta: { key: choice.key, label: choice.label, catalogSource: choice.catalogSource },
-      });
-    }
-  }
-
-  if (learnsNewSpellsOnLevelUp(target.name, target.subclass)) {
-    const newSpells = spellsGainedAtLevel(target.name, n);
-    if (newSpells > 0) steps.push({ kind: "newSpells", count: newSpells });
-  }
-
-  steps.push({ kind: "review" });
-  return steps;
+  return candidates.filter((step): step is LevelUpStep => step !== null);
 }

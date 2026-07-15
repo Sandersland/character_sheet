@@ -143,4 +143,32 @@ describe("buildLevelUpPlan — newSpells", () => {
     const plan = buildLevelUpPlan(char("sorcerer", 11), target("sorcerer", 12));
     expect(kinds(plan)).not.toContain("newSpells");
   });
+
+  it("tags a Bard Magical Secrets level (9→10) but not a normal learn level", () => {
+    const secrets = buildLevelUpPlan(char("bard", 9), target("bard", 10)).find((s) => s.kind === "newSpells");
+    expect(secrets?.count).toBe(2);
+    expect(secrets?.meta?.magicalSecrets).toBe(true);
+
+    const normal = buildLevelUpPlan(char("bard", 2), target("bard", 3)).find((s) => s.kind === "newSpells");
+    expect(normal?.count).toBe(1);
+    expect(normal?.meta?.magicalSecrets).toBeUndefined();
+  });
+
+  it("third-caster subclasses (Eldritch Knight / Arcane Trickster) emit no newSpells step", () => {
+    expect(kinds(buildLevelUpPlan(char("fighter", 7, "eldritch knight"), target("fighter", 8, "eldritch knight")))).not.toContain("newSpells");
+    expect(kinds(buildLevelUpPlan(char("rogue", 7, "arcane trickster"), target("rogue", 8, "arcane trickster")))).not.toContain("newSpells");
+  });
+});
+
+describe("buildLevelUpPlan — subclass-unset re-plan contract", () => {
+  it("Fighter 2→3 with subclass unset emits only the subclass step (no subclass-derived choices)", () => {
+    const plan = buildLevelUpPlan(char("fighter", 2), target("fighter", 3, null));
+    expect(kinds(plan)).toEqual(["hitPoints", "subclass", "review"]);
+  });
+
+  it("Fighter 2→3 with Battle Master set surfaces the subclass-derived choices", () => {
+    const plan = buildLevelUpPlan(char("fighter", 2), target("fighter", 3, "battle master"));
+    expect(kinds(plan)).toContain("maneuvers");
+    expect(kinds(plan)).toContain("toolProficiency");
+  });
 });
