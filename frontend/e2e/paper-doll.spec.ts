@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { createCharacter, uniqueName } from "./helpers/api";
+import { createCharacter, gotoSheet, uniqueName } from "./helpers/api";
 
 // Equip an unequipped bag weapon onto the paper-doll "Worn" view: switch views,
 // click the empty Main hand slot, pick the weapon from the inline picker, and
@@ -34,7 +34,7 @@ test("paper doll: equip a bag item into a slot from the Worn view", async ({ pag
   expect(acquire.ok(), `acquire: ${acquire.status()}`).toBeTruthy();
 
   const errors = collectConsoleErrors(page);
-  await page.goto(`/characters/${id}`);
+  await gotoSheet(page, id, "inventory");
   await expect(page.getByRole("heading", { name: "Inventory", exact: true })).toBeVisible();
 
   // Switch the Inventory card to the paper-doll Worn view.

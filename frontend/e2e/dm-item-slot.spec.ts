@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { createCharacter, uniqueName } from "./helpers/api";
+import { createCharacter, gotoSheet, uniqueName } from "./helpers/api";
 
 // #572: a DM authors a Ring as gear placed in the RING slot from the campaign
 // item form, awards it to a member, and the player equips it on the paper doll —
@@ -80,7 +80,7 @@ test("DM authors a slotted ring, awards it, and the player equips + replaces it"
 
   // PL-3: the player opens the sheet, switches to the Worn paper doll, and the
   // awarded ring is equippable in the RING slot.
-  await page.goto(`/characters/${characterId}`);
+  await gotoSheet(page, characterId, "inventory");
   await expect(page.getByRole("heading", { name: "Inventory", exact: true })).toBeVisible();
   await page.getByRole("radio", { name: "Worn" }).click();
 

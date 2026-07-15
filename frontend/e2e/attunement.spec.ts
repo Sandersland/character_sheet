@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { createCharacter, uniqueName } from "./helpers/api";
+import { createCharacter, gotoSheet, uniqueName } from "./helpers/api";
 
 // A DM authors a magic item with a passiveBonus capability + attunement, awards
 // it to a held character, and the player attunes it from the sheet (#546).
@@ -46,7 +46,7 @@ test("attunement: award a capability item, then attune it from the sheet", async
   expect(award.ok(), `award: ${award.status()}`).toBeTruthy();
 
   const errors = collectConsoleErrors(page);
-  await page.goto(`/characters/${characterId}`);
+  await gotoSheet(page, characterId, "inventory");
   await expect(page.getByRole("heading", { name: "Inventory", exact: true })).toBeVisible();
 
   // The card shows the capability + the requires-attunement state, and the
