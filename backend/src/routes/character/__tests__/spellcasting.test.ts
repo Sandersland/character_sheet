@@ -986,3 +986,127 @@ describe("Warlock Pact Magic + Mystic Arcanum", () => {
     expect(rest.body.spellcasting.spells).toHaveLength(2);
   });
 });
+
+// ── Prepared-spell cap (#883) ────────────────────────────────────────────────
+
+const PREPCAP_OWNER = "owner-prepcap";
+const PREPCAP_WIZARD_ID = "test-prepcap-wizard-8";
+const PREPCAP_SORCERER_ID = "test-prepcap-sorcerer-8";
+
+// N level-1 spells; the first `preparedCount` are prepared, the rest unprepared.
+function leveledSpells(preparedCount: number, total: number) {
+  return Array.from({ length: total }, (_, i) => ({
+    id: `prep-${i + 1}`,
+    name: `Fixture Prepared ${i + 1}`,
+    level: 1,
+    school: "evocation",
+    prepared: i < preparedCount,
+    castingTime: "1 action",
+    range: "60 ft",
+    duration: "Instantaneous",
+    description: "Placeholder.",
+  }));
+}
+
+const PREPCAP_CANTRIP = {
+  id: "prep-cantrip", name: "Fixture Prepared Cantrip", level: 0, school: "evocation",
+  prepared: true, castingTime: "1 action", range: "60 ft", duration: "Instantaneous",
+  description: "Cantrip.",
+};
+
+describe("prepared-spell cap enforcement (#883)", () => {
+  let wizardClassId: string;
+  let sorcererClassId: string;
+  const WIZARD_CATALOG = "PrepCap Wizard";
+  const SORCERER_CATALOG = "PrepCap Sorcerer";
+
+  afterAll(async () => {
+    await prisma.characterClass.deleteMany({ where: { name: { in: [WIZARD_CATALOG, SORCERER_CATALOG] } } });
+  });
+
+  beforeEach(async () => {
+    await ensureTestOwner(PREPCAP_OWNER);
+    COOKIE = await authCookie(PREPCAP_OWNER);
+    const wiz = await prisma.characterClass.upsert({
+      where: { name: WIZARD_CATALOG },
+      create: { name: WIZARD_CATALOG, hitDie: "d6", savingThrows: ["intelligence", "wisdom"], skillChoiceCount: 2, skillChoices: ["arcana"], isSpellcaster: true },
+      update: {},
+    });
+    wizardClassId = wiz.id;
+    const sorc = await prisma.characterClass.upsert({
+      where: { name: SORCERER_CATALOG },
+      create: { name: SORCERER_CATALOG, hitDie: "d6", savingThrows: ["constitution", "charisma"], skillChoiceCount: 2, skillChoices: ["arcana"], isSpellcaster: true },
+      update: {},
+    });
+    sorcererClassId = sorc.id;
+
+    // Wizard 8 / INT 18 → prepared limit 12. Seed 12 prepared + 1 unprepared + a cantrip.
+    await prisma.character.create({
+      data: {
+        id: PREPCAP_WIZARD_ID, name: "PrepCap Wizard", alignment: "Neutral", ownerId: PREPCAP_OWNER,
+        experiencePoints: 34000, initiativeBonus: 0, speed: 30,
+        hitPoints: { current: 40, max: 40, temp: 0 }, hitDice: { total: 8, die: "d6" },
+        abilityScores: { strength: 8, dexterity: 12, constitution: 12, intelligence: 18, wisdom: 10, charisma: 10 },
+        savingThrowProficiencies: ["intelligence", "wisdom"], skills: [], toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+        spellcasting: { slotsUsed: {}, spells: [...leveledSpells(12, 13), PREPCAP_CANTRIP] } as Prisma.InputJsonValue,
+        classEntries: { create: [{ name: "wizard", classId: wizardClassId, level: 8, position: 0 }] },
+      },
+    });
+
+    // Sorcerer 8 / CHA 18 → known caster → no prepared limit. Seed 20 "prepared" leveled + 1 unprepared.
+    await prisma.character.create({
+      data: {
+        id: PREPCAP_SORCERER_ID, name: "PrepCap Sorcerer", alignment: "Neutral", ownerId: PREPCAP_OWNER,
+        experiencePoints: 34000, initiativeBonus: 0, speed: 30,
+        hitPoints: { current: 40, max: 40, temp: 0 }, hitDice: { total: 8, die: "d6" },
+        abilityScores: { strength: 8, dexterity: 12, constitution: 12, intelligence: 10, wisdom: 10, charisma: 18 },
+        savingThrowProficiencies: ["constitution", "charisma"], skills: [], toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+        spellcasting: { slotsUsed: {}, spells: leveledSpells(20, 21) } as Prisma.InputJsonValue,
+        classEntries: { create: [{ name: "sorcerer", classId: sorcererClassId, level: 8, position: 0 }] },
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: { in: [PREPCAP_WIZARD_ID, PREPCAP_SORCERER_ID] } } });
+  });
+
+  const wizUrl = `/api/characters/${PREPCAP_WIZARD_ID}/spellcasting/transactions`;
+
+  it("rejects preparing a 13th spell over the cap of 12", async () => {
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).post(wizUrl)
+      .send({ operations: [{ type: "prepareSpell", entryId: "prep-13" }] });
+    expect(res.status).toBe(400);
+    expect(res.body.error ?? JSON.stringify(res.body)).toMatch(/at most 12/);
+  });
+
+  it("unpreparing frees a slot so a new spell can then be prepared", async () => {
+    const app = createApp();
+    const free = await supertest.agent(app).set("Cookie", COOKIE).post(wizUrl)
+      .send({ operations: [{ type: "unprepareSpell", entryId: "prep-1" }] });
+    expect(free.status).toBe(200);
+    const prep = await supertest.agent(app).set("Cookie", COOKIE).post(wizUrl)
+      .send({ operations: [{ type: "prepareSpell", entryId: "prep-13" }] });
+    expect(prep.status).toBe(200);
+    expect(prep.body.spellcasting.preparedSpellCount).toBe(12);
+  });
+
+  it("cantrips are always prepared, rejected on toggle, and never count toward the cap", async () => {
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).post(wizUrl)
+      .send({ operations: [{ type: "prepareSpell", entryId: "prep-cantrip" }] });
+    expect(res.status).toBe(400);
+    const get = await supertest(createApp()).get(`/api/characters/${PREPCAP_WIZARD_ID}`).set("Cookie", COOKIE);
+    expect(get.body.spellcasting.preparedSpellLimit).toBe(12);
+    expect(get.body.spellcasting.preparedSpellCount).toBe(12);
+  });
+
+  it("known caster (sorcerer) reports a null limit and is not blocked", async () => {
+    const url = `/api/characters/${PREPCAP_SORCERER_ID}/spellcasting/transactions`;
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).post(url)
+      .send({ operations: [{ type: "prepareSpell", entryId: "prep-21" }] });
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.preparedSpellLimit).toBeNull();
+  });
+});

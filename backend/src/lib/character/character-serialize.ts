@@ -18,6 +18,7 @@ import {
   deriveFeatProficiencies,
   deriveSpellcasting,
   deriveMulticlassSpellcasting,
+  derivePreparedSpellLimit,
   deriveImprovisedAttack,
   deriveUnarmedDamageDie,
   deriveUnarmedStrike,
@@ -574,6 +575,32 @@ function buildSpellcastingView(
   // Multiclass (2+ entries): merge caster levels into one slot pool and surface
   // Warlock Pact Magic separately (per the #123 derivation). Single-class output
   // is left byte-for-byte identical via the primary-class path below.
+  const view = buildSpellcastingViewBase(row, primaryClass, level, abilityScores, proficiencyBonus);
+  if (view === undefined) return undefined;
+
+  // Derived prepared-spell cap (#883): sum over prepared-caster classes. Single-class
+  // uses XP-derived level (the per-class column can be stale); multiclass uses per-entry.
+  const spells = (view as { spells?: SpellEntry[] }).spells ?? [];
+  const entriesForLimit = row.classEntries.length > 1
+    ? row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass }))
+    : [{ name: primaryClass?.name ?? "", level, subclass: primaryClass?.subclass ?? null }];
+  return {
+    ...view,
+    preparedSpellLimit: derivePreparedSpellLimit(entriesForLimit, abilityScores),
+    // source==null excludes granted spells; level>0 excludes always-prepared cantrips.
+    preparedSpellCount: spells.filter((s) => s.prepared && s.level > 0 && s.source == null).length,
+  };
+}
+
+// The unadorned spellcasting view (slots/spells/ability), before the derived
+// prepared-cap fields are layered on. Returns undefined for non-casters.
+function buildSpellcastingViewBase(
+  row: CharacterWithRelations,
+  primaryClass: PrimaryClass,
+  level: number,
+  abilityScores: Record<string, number>,
+  proficiencyBonus: number,
+): object | undefined {
   if (row.classEntries.length > 1) {
     return buildMulticlassSpellcastingView(row, abilityScores, proficiencyBonus);
   }
