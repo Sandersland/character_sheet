@@ -141,8 +141,8 @@ export default function CharacterSheetHeader({
           <BannerVitals character={character} />
         </div>
 
-        {/* Workspace tab bar */}
-        <div className="mt-4 pb-4">
+        {/* Workspace tab bar (desktop only; mobile uses the docked SheetBottomNav) */}
+        <div className="mt-4 hidden pb-4 md:block">
           <Tabs
             tabs={tabs}
             active={activeTab}

@@ -5,6 +5,7 @@ import RollModeToggle from "@/features/dice/RollModeToggle";
 import { RollProvider } from "@/features/dice/RollContext";
 import CharacterSheetHeader from "@/features/character-meta/CharacterSheetHeader";
 import CharacterSheetBody from "@/features/character-meta/CharacterSheetBody";
+import SheetBottomNav from "@/features/character-meta/SheetBottomNav";
 import CharacterSheetModals from "@/features/character-meta/CharacterSheetModals";
 import { useSheetTabs } from "@/features/character-meta/useSheetTabs";
 import { useCaptureDock } from "@/hooks/useCaptureDock";
@@ -44,7 +45,7 @@ export default function CharacterSheetContent({
       sessionId={session.inActiveSession ? session.activeSessionId : null}
       rollModifiers={character.rollModifiers}
     >
-      <div className="min-h-screen bg-parchment-100 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
+      <div className="min-h-screen bg-parchment-100 pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-0">
         <CharacterSheetHeader
           character={character}
           session={session}
@@ -80,6 +81,7 @@ export default function CharacterSheetContent({
         />
         <RollModeToggle />
         <RollResultToast />
+        <SheetBottomNav tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />
       </div>
     </RollProvider>
   );
