@@ -1,10 +1,10 @@
 // Top-of-section overview: stat bar, concentration/buff banners, slot meters,
 // and the inline cast-result + error banners. Returns a Fragment so its blocks
 // stay direct children of SpellsSection's gap-5 flex column.
-import { abilityModifier } from "@/lib/abilities";
+import { derivePreparedSummary } from "@/lib/preparedSummary";
 import type { CastResult } from "@/lib/spellCast";
 import type { SpellListDerivation } from "@/lib/spellList";
-import type { AbilityName, Character } from "@/types/character";
+import type { Character } from "@/types/character";
 import CastResultBanner from "@/features/spells/CastResultBanner";
 import SpellStatusBanners from "@/features/spells/SpellStatusBanners";
 import SpellSlotMeters from "@/features/spells/SpellSlotMeters";
@@ -28,15 +28,13 @@ export default function SpellcastingOverview({
   onExpend, onRestore, onDropConcentration, onDismissBuff, onDismissResult,
 }: SpellcastingOverviewProps) {
   const sc = character.spellcasting!;
-  const abilityScore = character.abilityScores[sc.ability as AbilityName] ?? 10;
 
   return (
     <>
       <SpellcastingStatBar
         spellSaveDC={sc.spellSaveDC}
         spellAttackBonus={sc.spellAttackBonus}
-        ability={sc.ability}
-        abilityMod={abilityModifier(abilityScore)}
+        prepared={derivePreparedSummary(sc)}
       />
       <SpellStatusBanners
         concentratingOn={sc.concentratingOn ?? null}
