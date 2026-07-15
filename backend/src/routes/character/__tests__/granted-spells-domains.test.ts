@@ -69,6 +69,10 @@ async function createLifeCleric(xp: number) {
       ownerId: OWNER_ID,
       spellcasting: { slotsUsed: {}, spells: [] } as Prisma.InputJsonValue,
       classEntries: {
+        // ClassEntry.level is left at its default (1): the single-class serialize
+        // path derives level from experiencePoints (the per-class column can be
+        // stale), so XP alone drives the gate. A multiclass test would need to
+        // set per-entry `level` — that path uses e.level, not the XP total.
         create: [{ name: "cleric", classId: clericClassId, position: 0, subclass: "life domain", subclassId: lifeDomainId }],
       },
     },
