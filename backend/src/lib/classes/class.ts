@@ -343,6 +343,18 @@ async function applyAddClass(ctx: ClassOpContext, op: AddClassOperation): Promis
   });
 }
 
+// Applies one setSubclass inside a caller-supplied tx/batchId so the unified
+// level-up endpoint (#885) can compose it with other domains (#895).
+export async function setSubclassInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: SetSubclassOperation,
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  await applySetSubclass({ tx, characterId, batchId, sessionId }, op);
+}
+
 export async function applyClassOperations(
   characterId: string,
   operations: ClassOperation[]
@@ -355,7 +367,7 @@ export async function applyClassOperations(
     for (const op of operations) {
       switch (op.type) {
         case "setSubclass":
-          await applySetSubclass(ctx, op);
+          await setSubclassInTx(ctx.tx, ctx.characterId, op, ctx.batchId, ctx.sessionId);
           break;
         case "setFightingStyle":
           await applySetFightingStyle(ctx, op);
