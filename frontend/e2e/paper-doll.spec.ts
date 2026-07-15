@@ -4,9 +4,9 @@ import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
 import { createCharacter, gotoSheet, uniqueName } from "./helpers/api";
 
-// Equip an unequipped bag weapon onto the paper-doll "Worn" view: switch views,
-// click the empty Main hand slot, pick the weapon from the inline picker, and
-// assert it now sits on the doll.
+// Equip an unequipped bag weapon onto the "Worn" loadout list: switch views,
+// open the empty Main hand row's ＋ Equip picker, pick the weapon, and assert it
+// now fills the Main hand row.
 test("paper doll: equip a bag item into a slot from the Worn view", async ({ page }) => {
   await login(page);
   const id = await createCharacter(page.request, {
@@ -40,15 +40,15 @@ test("paper doll: equip a bag item into a slot from the Worn view", async ({ pag
   // Switch the Inventory card to the paper-doll Worn view.
   await page.getByRole("radio", { name: "Worn" }).click();
 
-  // The Main hand starts empty; open its inline picker and choose the blade.
-  await page.getByRole("button", { name: /Main hand slot, empty/ }).click();
+  // The Main hand starts empty; open its ＋ Equip picker and choose the blade.
+  await page.getByRole("button", { name: "Equip Main hand" }).click();
   await expect(page.getByText("Equip Main hand")).toBeVisible();
   await page.getByRole("button", { name: /Test Blade/ }).click();
 
-  // The blade now occupies the Main hand slot (its Popover trigger).
+  // The blade now fills the Main hand row (its actions Popover trigger).
   await expect(page.getByRole("button", { name: /Main hand: Test Blade/ })).toBeVisible();
-  // …and the empty-slot affordance is gone.
-  await expect(page.getByRole("button", { name: /Main hand slot, empty/ })).toHaveCount(0);
+  // …and the empty-row ＋ Equip affordance is gone.
+  await expect(page.getByRole("button", { name: "Equip Main hand" })).toHaveCount(0);
 
   expect(errors).toEqual([]);
 });
