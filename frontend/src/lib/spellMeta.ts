@@ -10,7 +10,23 @@
 
 import { abilityLabel, abilityModifier } from "@/lib/abilities";
 import { readEffectSpec, resolveEffectSpec } from "@/lib/effects";
-import type { AbilityName, Character, Session, Spell } from "@/types/character";
+import type { AbilityName, Character, Session, Spell, SpellSchool } from "@/types/character";
+
+/** Title-case display label for a spell school (never render the raw key). */
+const SCHOOL_LABELS: Record<SpellSchool, string> = {
+  abjuration: "Abjuration",
+  conjuration: "Conjuration",
+  divination: "Divination",
+  enchantment: "Enchantment",
+  evocation: "Evocation",
+  illusion: "Illusion",
+  necromancy: "Necromancy",
+  transmutation: "Transmutation",
+};
+
+export function schoolLabel(school: SpellSchool): string {
+  return SCHOOL_LABELS[school] ?? school;
+}
 
 /**
  * Human-readable school-tone mapping (mirrors SpellRow.tsx SCHOOL_TONE but
@@ -78,6 +94,13 @@ export function targetLocked(spell: Spell): boolean {
 /** "Cantrip" or "Level N" */
 export function levelLabel(level: number): string {
   return level === 0 ? "Cantrip" : `Level ${level}`;
+}
+
+const SLOT_ORDINALS = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"];
+
+// Ordinal for a spell/slot level ("3rd") — the slot-pip + quick-cast label form.
+export function slotOrdinal(n: number): string {
+  return SLOT_ORDINALS[n] ?? `${n}th`;
 }
 
 /**

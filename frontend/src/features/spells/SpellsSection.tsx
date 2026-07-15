@@ -5,7 +5,9 @@
  * the presentational subcomponents (overview, spellbook list, add-spell panel).
  */
 
-import { deriveSpellList } from "@/lib/spellList";
+import { useRef } from "react";
+
+import { deriveSpellList, preparedBudget } from "@/lib/spellList";
 import { availableSlotsForSpell } from "@/lib/spellPicker";
 import type { Character, Spell } from "@/types/character";
 import AddSpellPanel from "@/features/spells/AddSpellPanel";
@@ -24,6 +26,8 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
   const concentratingOn = spellcasting.concentratingOn ?? null;
 
   const derived = deriveSpellList(character);
+  const budget = preparedBudget(spellcasting);
+  const spellbookRef = useRef<HTMLDivElement>(null);
   const {
     busy, error, castResult, addPanelOpen,
     setCastResult, setAddPanelOpen, send,
@@ -40,17 +44,20 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
         castResult={castResult}
         onExpend={(level) => send([{ type: "expendSlot", level }])}
         onRestore={(level) => send([{ type: "restoreSlot", level }])}
+        onCast={handleCast}
+        onManageSpellbook={() => spellbookRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
         onDropConcentration={() => send([{ type: "dropConcentration" }])}
         onDismissBuff={(entryId) => send([{ type: "dismissBuff", entryId }])}
         onDismissResult={() => setCastResult(null)}
       />
 
+      <div ref={spellbookRef}>
       <SpellbookList
         spells={spells}
         sortedSpells={derived.sortedSpells}
-        spellLevels={derived.spellLevels}
         slots={slots}
         characterLevel={character.level}
+        budget={budget}
         busy={busy}
         concentratingOnEntryId={concentratingOn?.entryId ?? null}
         onCast={handleCast}
@@ -61,6 +68,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
         }
         onAddSpell={() => setAddPanelOpen(true)}
       />
+      </div>
 
       {addPanelOpen ? (
         <AddSpellPanel

@@ -24,9 +24,12 @@ export default function AddSpellPanel({ onLearn, onClose, busy, learnedSpellIds 
   }
 
   return (
-    <div className="mt-3 rounded-card border border-arcane-200 bg-arcane-50 p-4">
+    <div className="mt-3 rounded-card border border-arcane-200 bg-gradient-to-b from-parchment-50 to-arcane-50 p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-arcane-900">Learn a Spell</h3>
+        <div>
+          <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-parchment-500">Scribe a new spell</p>
+          <h3 className="font-display text-lg font-bold text-arcane-800">Learn a spell</h3>
+        </div>
         <button
           type="button"
           onClick={onClose}

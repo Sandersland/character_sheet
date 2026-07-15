@@ -1,37 +1,61 @@
-// Prepare / Cast / Remove controls for a spellbook row.
-import type { SpellRowDerived } from "@/lib/spellRow";
+// Rune prepare-toggle + Cast / Remove controls for a spellbook row.
+import { canPrepare, type PreparedBudget } from "@/lib/spellList";
+import { runeState, type SpellRowDerived } from "@/lib/spellRow";
 import type { Spell } from "@/types/character";
 
 interface SpellRowActionsProps {
   spell: Spell;
   derived: SpellRowDerived;
+  budget: PreparedBudget;
   busy: boolean;
   onPrepare: (spell: Spell) => void;
   onForget: (spell: Spell) => void;
   onCastClick: () => void;
 }
 
+function PrepareRune({ spell, budget, busy, onPrepare }: Pick<SpellRowActionsProps, "spell" | "budget" | "busy" | "onPrepare">) {
+  const state = runeState(spell);
+  if (state === "locked") {
+    return (
+      <span
+        aria-label="Always prepared"
+        title="Always prepared"
+        className="h-5 w-5 shrink-0 rounded-full border border-arcane-600 bg-arcane-500"
+      />
+    );
+  }
+  // Kept clickable at the cap so the tap surfaces the reason (handler pre-blocks).
+  const blocked = state === "unprepared" && !canPrepare(spell, budget);
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      aria-pressed={state === "prepared"}
+      onClick={() => onPrepare(spell)}
+      aria-label={state === "prepared" ? `Unprepare ${spell.name}` : `Prepare ${spell.name}`}
+      title={
+        state === "prepared"
+          ? "Mark as unprepared"
+          : blocked
+            ? `Prepared limit reached (${budget.limit})`
+            : "Mark as prepared"
+      }
+      className={`h-5 w-5 shrink-0 rounded-full border transition-colors disabled:opacity-40 ${
+        state === "prepared"
+          ? "border-garnet-700 bg-garnet-600 ring-2 ring-garnet-50"
+          : `border-parchment-400 bg-parchment-50 hover:border-garnet-500 ${blocked ? "opacity-50" : ""}`
+      }`}
+    />
+  );
+}
+
 export default function SpellRowActions({
-  spell, derived, busy, onPrepare, onForget, onCastClick,
+  spell, derived, budget, busy, onPrepare, onForget, onCastClick,
 }: SpellRowActionsProps) {
-  const { isCantrip, item, itemExhausted, isGranted } = derived;
+  const { item, itemExhausted, isCantrip, isGranted } = derived;
   return (
     <div className="flex shrink-0 items-center gap-2">
-      {!isCantrip && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onPrepare(spell)}
-          className={`rounded px-2 py-0.5 text-xs font-semibold transition-colors disabled:opacity-40 ${
-            spell.prepared
-              ? "bg-arcane-100 text-arcane-800 hover:bg-arcane-200"
-              : "bg-parchment-100 text-parchment-600 hover:bg-parchment-200"
-          }`}
-          title={spell.prepared ? "Mark as unprepared" : "Mark as prepared"}
-        >
-          {spell.prepared ? "prepared" : "unprepared"}
-        </button>
-      )}
+      <PrepareRune spell={spell} budget={budget} busy={busy} onPrepare={onPrepare} />
 
       <button
         type="button"

@@ -1117,6 +1117,9 @@ export interface Character {
       casterFraction: "full" | "half" | "third" | "pact" | "none";
     }[];
     spells: Spell[];
+    /** Derived prepared-spell cap (#883): the limit and current prepared count. */
+    preparedSpellLimit?: number | null;
+    preparedSpellCount?: number;
     /**
      * The spell the character is currently concentrating on (5e: only one at a
      * time), or null. `entryId` matches a `Spell.id` in `spells`.

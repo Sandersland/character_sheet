@@ -29,6 +29,15 @@ export function deriveSpellRow(spell: Spell, availableSlots: number[]): SpellRow
   return { isCantrip, item, atWill, chargeCost, itemExhausted, isGranted, schoolTone, noBudget };
 }
 
+// Prepare-rune state: cantrips/granted spells are always-prepared (locked), the
+// rest toggle between prepared and known-unprepared.
+export type RuneState = "locked" | "prepared" | "unprepared";
+
+export function runeState(spell: Spell): RuneState {
+  if (spell.level === 0 || spell.source === "subclass" || spell.source === "item") return "locked";
+  return spell.prepared ? "prepared" : "unprepared";
+}
+
 export type CastAction =
   | { kind: "cast" }
   | { kind: "castAt"; slotLevel: number }

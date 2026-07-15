@@ -2,7 +2,7 @@
 import Badge from "@/components/ui/Badge";
 import SpellItemBadges from "@/features/spells/SpellItemBadges";
 import type { SpellRowDerived } from "@/lib/spellRow";
-import { levelLabel } from "@/lib/spellMeta";
+import { levelLabel, schoolLabel } from "@/lib/spellMeta";
 import type { Spell } from "@/types/character";
 
 interface SpellRowBadgesProps {
@@ -16,7 +16,7 @@ export default function SpellRowBadges({ spell, derived, isConcentrating }: Spel
   return (
     <div className="flex items-center gap-1">
       <Badge tone="neutral">{levelLabel(spell.level)}</Badge>
-      <Badge tone={schoolTone}>{spell.school}</Badge>
+      <Badge tone={schoolTone}>{schoolLabel(spell.school)}</Badge>
       {spell.concentration &&
         (isConcentrating ? (
           <Badge tone="arcane" className="bg-arcane-700 text-parchment-50">
