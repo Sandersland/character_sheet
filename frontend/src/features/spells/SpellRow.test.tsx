@@ -40,11 +40,14 @@ const mockUpcastSpell: Spell = {
   upcastDicePerLevel: 1,
 };
 
+const UNBOUNDED = { count: 0, limit: null, atLimit: false };
+
 function defaultProps(spell: Spell, overrides = {}) {
   return {
     spell,
     characterLevel: 5,
     busy: false,
+    budget: UNBOUNDED,
     onCast: vi.fn(),
     onPrepare: vi.fn(),
     onForget: vi.fn(),
@@ -62,7 +65,7 @@ describe("SpellRow", () => {
   it("renders level and school badges", () => {
     render(<ul><SpellRow {...defaultProps(mockSpell)} /></ul>);
     expect(screen.getByText("Level 3")).toBeInTheDocument();
-    expect(screen.getByText("evocation")).toBeInTheDocument();
+    expect(screen.getByText("Evocation")).toBeInTheDocument();
   });
 
   it("shows 'Cantrip' badge for cantrips", () => {
@@ -70,14 +73,15 @@ describe("SpellRow", () => {
     expect(screen.getByText("Cantrip")).toBeInTheDocument();
   });
 
-  it("shows prepare button for leveled spells", () => {
+  it("shows a prepare rune toggle for leveled spells", () => {
     render(<ul><SpellRow {...defaultProps(mockSpell)} /></ul>);
-    expect(screen.getByRole("button", { name: /prepared|unprepared/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Prepare Fireball/i })).toBeInTheDocument();
   });
 
-  it("hides prepare button for cantrips", () => {
+  it("shows a non-interactive always-prepared rune for cantrips", () => {
     render(<ul><SpellRow {...defaultProps(mockCantrip)} /></ul>);
-    expect(screen.queryByRole("button", { name: /prepared|unprepared/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Prepare|Unprepare/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Always prepared")).toBeInTheDocument();
   });
 
   it("calls onCast when Cast is clicked (single available slot)", async () => {
@@ -97,11 +101,11 @@ describe("SpellRow", () => {
     expect(onCast).toHaveBeenCalledWith(mockCantrip);
   });
 
-  it("calls onPrepare with the spell when prepare is toggled", async () => {
+  it("calls onPrepare with the spell when the rune is toggled", async () => {
     const user = userEvent.setup();
     const onPrepare = vi.fn();
     render(<ul><SpellRow {...defaultProps(mockSpell, { onPrepare })} /></ul>);
-    await user.click(screen.getByRole("button", { name: /prepared|unprepared/i }));
+    await user.click(screen.getByRole("button", { name: /Prepare Fireball/i }));
     expect(onPrepare).toHaveBeenCalledWith(mockSpell);
   });
 
@@ -113,10 +117,10 @@ describe("SpellRow", () => {
     expect(onForget).toHaveBeenCalledWith(mockSpell);
   });
 
-  it("disables Cast and prepare buttons when busy", () => {
+  it("disables Cast and the prepare rune when busy", () => {
     render(<ul><SpellRow {...defaultProps(mockSpell, { busy: true })} /></ul>);
     expect(screen.getByRole("button", { name: "Cast" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /prepared|unprepared/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Prepare Fireball/i })).toBeDisabled();
   });
 
   describe("concentration badge", () => {

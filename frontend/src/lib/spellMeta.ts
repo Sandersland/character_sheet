@@ -10,7 +10,23 @@
 
 import { abilityLabel, abilityModifier } from "@/lib/abilities";
 import { readEffectSpec, resolveEffectSpec } from "@/lib/effects";
-import type { AbilityName, Character, Session, Spell } from "@/types/character";
+import type { AbilityName, Character, Session, Spell, SpellSchool } from "@/types/character";
+
+/** Title-case display label for a spell school (never render the raw key). */
+const SCHOOL_LABELS: Record<SpellSchool, string> = {
+  abjuration: "Abjuration",
+  conjuration: "Conjuration",
+  divination: "Divination",
+  enchantment: "Enchantment",
+  evocation: "Evocation",
+  illusion: "Illusion",
+  necromancy: "Necromancy",
+  transmutation: "Transmutation",
+};
+
+export function schoolLabel(school: SpellSchool): string {
+  return SCHOOL_LABELS[school] ?? school;
+}
 
 /**
  * Human-readable school-tone mapping (mirrors SpellRow.tsx SCHOOL_TONE but

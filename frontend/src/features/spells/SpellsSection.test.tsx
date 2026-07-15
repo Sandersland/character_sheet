@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, renderHook, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import SpellsSection from "@/features/spells/SpellsSection";
+import { useSpellcasting } from "@/features/spells/useSpellcasting";
 import * as client from "@/api/client";
 import type { Character, Spell } from "@/types/character";
 
@@ -108,6 +109,98 @@ describe("SpellsSection concentration", () => {
       />,
     );
     expect(screen.getByText("concentrating")).toBeInTheDocument();
+  });
+});
+
+// A prepared caster with a known-but-unprepared leveled spell + a configurable cap.
+function makeWizard(
+  over: { prepared?: boolean; preparedSpellCount?: number; preparedSpellLimit?: number | null } = {},
+): Character {
+  const spell: Spell = { ...BLESS, id: "entry-shield", name: "Shield", prepared: over.prepared ?? false };
+  return {
+    id: "wiz-1",
+    level: 5,
+    abilityScores: {
+      strength: 10, dexterity: 10, constitution: 10,
+      intelligence: 16, wisdom: 10, charisma: 10,
+    },
+    classes: [{ name: "Wizard" }],
+    spellcasting: {
+      ability: "intelligence",
+      spellSaveDC: 13,
+      spellAttackBonus: 5,
+      slots: [{ level: 1, total: 4, used: 0 }],
+      arcana: [],
+      spells: [spell],
+      concentratingOn: null,
+      preparedSpellCount: over.preparedSpellCount ?? 1,
+      preparedSpellLimit: over.preparedSpellLimit ?? 8,
+    },
+  } as unknown as Character;
+}
+
+describe("SpellsSection preparation (grimoire runes)", () => {
+  it("dispatches prepareSpell when an under-limit open rune is tapped", async () => {
+    const user = userEvent.setup();
+    const mockApply = vi.mocked(client.applySpellcastingTransactions);
+    mockApply.mockResolvedValue(makeWizard({ prepared: true }));
+
+    render(<SpellsSection character={makeWizard()} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: /Prepare Shield/i }));
+
+    expect(mockApply).toHaveBeenCalledWith("wiz-1", [{ type: "prepareSpell", entryId: "entry-shield" }]);
+  });
+
+  it("dispatches unprepareSpell when a filled rune is tapped", async () => {
+    const user = userEvent.setup();
+    const mockApply = vi.mocked(client.applySpellcastingTransactions);
+    mockApply.mockResolvedValue(makeWizard());
+
+    render(<SpellsSection character={makeWizard({ prepared: true, preparedSpellCount: 2 })} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: /Unprepare Shield/i }));
+
+    expect(mockApply).toHaveBeenCalledWith("wiz-1", [{ type: "unprepareSpell", entryId: "entry-shield" }]);
+  });
+
+  it("blocks preparing past the cap without calling the client and shows the reason", async () => {
+    const user = userEvent.setup();
+    const mockApply = vi.mocked(client.applySpellcastingTransactions);
+
+    render(
+      <SpellsSection
+        character={makeWizard({ prepared: false, preparedSpellCount: 8, preparedSpellLimit: 8 })}
+        onUpdate={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /Prepare Shield/i }));
+
+    expect(mockApply).not.toHaveBeenCalled();
+    expect(screen.getByText(/prepare at most 8/i)).toBeInTheDocument();
+  });
+
+  it("surfaces the server rejection text when the prepare op is refused", async () => {
+    const user = userEvent.setup();
+    const mockApply = vi.mocked(client.applySpellcastingTransactions);
+    mockApply.mockRejectedValue(new Error("You can prepare at most 8 spells."));
+
+    render(<SpellsSection character={makeWizard()} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: /Prepare Shield/i }));
+
+    expect(await screen.findByText("You can prepare at most 8 spells.")).toBeInTheDocument();
+  });
+
+  it("handleSwap batches unprepare-one + prepare-another in a single client call", async () => {
+    const mockApply = vi.mocked(client.applySpellcastingTransactions);
+    mockApply.mockResolvedValue(makeWizard());
+    const { result } = renderHook(() => useSpellcasting(makeWizard(), vi.fn()));
+
+    result.current.handleSwap("entry-drop", "entry-add");
+
+    expect(mockApply).toHaveBeenCalledTimes(1);
+    expect(mockApply).toHaveBeenCalledWith("wiz-1", [
+      { type: "unprepareSpell", entryId: "entry-drop" },
+      { type: "prepareSpell", entryId: "entry-add" },
+    ]);
   });
 });
 

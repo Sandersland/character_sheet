@@ -30,9 +30,9 @@ test("levelup: awarding XP across a threshold raises level, proficiency, and slo
   // Before: level 4, +2 proficiency (Proficiency is a persistent banner chip).
   await expect(page.getByText("Level 4").first()).toBeVisible();
   await expect(proficiencyValue(page)).toHaveText("+2");
-  // No 3rd-level slots yet — checked on the Magic tab, where the slot meters live.
+  // No 3rd-level slots yet — checked on the Magic tab, where the slot pips live.
   await page.getByRole("tab", { name: "Magic" }).click();
-  await expect(page.getByRole("meter", { name: "Level 3 slots remaining" })).toHaveCount(0);
+  await expect(page.getByTitle("Expend a level 3 slot")).toHaveCount(0);
 
   // Back to Overview to award enough XP to cross into level 5.
   await page.getByRole("tab", { name: "Overview" }).click();
@@ -42,9 +42,9 @@ test("levelup: awarding XP across a threshold raises level, proficiency, and slo
   // After: level 5, +3 proficiency.
   await expect(page.getByText("Level 5").first()).toBeVisible();
   await expect(proficiencyValue(page)).toHaveText("+3");
-  // 3rd-level slots now derived — visible on the Magic tab.
+  // 3rd-level slots now derived — their expend pips appear on the Magic tab.
   await page.getByRole("tab", { name: "Magic" }).click();
-  await expect(page.getByRole("meter", { name: "Level 3 slots remaining" })).toBeVisible();
+  await expect(page.getByTitle("Expend a level 3 slot").first()).toBeVisible();
 
   expect(errors).toEqual([]);
 });

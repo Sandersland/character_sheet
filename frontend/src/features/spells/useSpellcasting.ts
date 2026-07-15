@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { applySpellcastingTransactions } from "@/api/client";
 import { planCast, type CastResult } from "@/lib/spellCast";
+import { canPrepare, preparedBudget } from "@/lib/spellList";
 import type {
   Character,
   LearnSpellOperation,
@@ -37,7 +38,25 @@ export function useSpellcasting(character: Character, onUpdate: (c: Character) =
   }
 
   function handlePrepare(spell: Spell) {
-    send([{ type: spell.prepared ? "unprepareSpell" : "prepareSpell", entryId: spell.id }]);
+    if (spell.prepared) {
+      send([{ type: "unprepareSpell", entryId: spell.id }]);
+      return;
+    }
+    // Optimistic pre-block at the derived cap (#883); the server enforces it too.
+    const budget = preparedBudget(character.spellcasting!);
+    if (!canPrepare(spell, budget)) {
+      setError(`You can prepare at most ${budget.limit} spells.`);
+      return;
+    }
+    send([{ type: "prepareSpell", entryId: spell.id }]);
+  }
+
+  // Swap = unprepare one + prepare another in a single atomic batch.
+  function handleSwap(dropId: string, addId: string) {
+    send([
+      { type: "unprepareSpell", entryId: dropId },
+      { type: "prepareSpell", entryId: addId },
+    ]);
   }
 
   function handleForget(spell: Spell) {
@@ -53,6 +72,6 @@ export function useSpellcasting(character: Character, onUpdate: (c: Character) =
   return {
     busy, error, castResult, addPanelOpen,
     setCastResult, setAddPanelOpen, send,
-    handleCast, handlePrepare, handleForget, handleLearn,
+    handleCast, handlePrepare, handleForget, handleLearn, handleSwap,
   };
 }
