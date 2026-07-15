@@ -6,7 +6,9 @@ import { ensureTestOwner } from "@/test-support/owner.js";
 import {
   InvalidHitPointOperationError,
   applyDamageInTx,
+  applyLevelUpHpInTx,
   applyTempHpInTx,
+  normalizeHitDice,
   normalizeHitPoints,
 } from "@/lib/combat/hitpoints.js";
 
@@ -100,6 +102,69 @@ describe("applyDamageInTx / applyTempHpInTx shared in-tx HP mutation (#816)", ()
       const id = await fixture();
       const result = await prisma.$transaction((tx) => applyDamageInTx(tx, id, 5, BATCH, null));
       expect(result).toBeNull();
+    });
+  });
+
+  describe("applyLevelUpHpInTx (#895 seam)", () => {
+    const LEVELUP_BATCH = "batch-levelup-in-tx";
+
+    async function levelUpFixture(experiencePoints: number) {
+      const character = await prisma.character.create({
+        data: {
+          ...BASE_CHAR,
+          experiencePoints,
+          hitPoints: { current: 30, max: 30, temp: 0 },
+          hitDice: { total: 1, die: "d8" },
+          ownerId: OWNER_ID,
+          spellcasting: Prisma.JsonNull,
+          classEntries: { create: { name: "Fighter", level: 1, position: 0 } },
+        },
+        include: { classEntries: true },
+      });
+      created.push(character.id);
+      return character;
+    }
+
+    it("bumps HP + hit dice + class entry and emits one reversible levelUp event under the caller's batchId", async () => {
+      const character = await levelUpFixture(300); // derives level 2 → one pending level-up
+      const entryId = character.classEntries[0].id;
+
+      await prisma.$transaction((tx) =>
+        applyLevelUpHpInTx(tx, character.id, { type: "levelUp", method: "average" }, LEVELUP_BATCH, null),
+      );
+
+      const row = await prisma.character.findUniqueOrThrow({
+        where: { id: character.id },
+        include: { classEntries: true },
+      });
+      expect(normalizeHitPoints(row.hitPoints)).toMatchObject({ current: 35, max: 35 }); // d8 average = 5
+      expect(normalizeHitDice(row.hitDice).total).toBe(2);
+      expect(row.classEntries[0].level).toBe(2);
+
+      const events = await prisma.characterEvent.findMany({
+        where: { characterId: character.id, batchId: LEVELUP_BATCH },
+      });
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({ category: "hitPoints", type: "levelUp" });
+      expect(events[0].data).toMatchObject({
+        method: "average",
+        roll: null,
+        conMod: 0,
+        faces: 8,
+        hpGain: 5,
+        primaryEntryId: entryId,
+        prevEntryLevel: 1,
+        newEntryLevel: 2,
+      });
+    });
+
+    it("throws when there is no pending level-up (hd.total >= derived level)", async () => {
+      const character = await levelUpFixture(0); // derives level 1, hd.total already 1
+      await expect(
+        prisma.$transaction((tx) =>
+          applyLevelUpHpInTx(tx, character.id, { type: "levelUp", method: "average" }, LEVELUP_BATCH, null),
+        ),
+      ).rejects.toThrowError(InvalidHitPointOperationError);
     });
   });
 
