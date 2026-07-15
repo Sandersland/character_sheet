@@ -401,3 +401,50 @@ export function deriveSpellcasting(
 
   return null;
 }
+
+// ── Spells Known progression (level-up learning) ──────────────────────────────
+// Cumulative "Spells Known" counts by class level for the classes that LEARN a
+// fixed set on level-up (PHB Spells Known columns). Bard includes the Magical
+// Secrets +2 jumps at 10/14/18; Ranger follows the half-caster cadence (none
+// until L2). Wizard is intentionally absent — it adds a flat 2 to its spellbook
+// each level (level >= 2), handled in spellsGainedAtLevel. Prepared casters
+// (Cleric/Druid/Paladin) never learn on level-up and carry no table.
+export const SPELLS_KNOWN_BY_CLASS: Readonly<Record<string, Readonly<Record<number, number>>>> = {
+  sorcerer: {
+     1: 2,  2: 3,  3: 4,  4: 5,  5: 6,  6: 7,  7: 8,  8: 9,  9: 10, 10: 11,
+    11: 12, 12: 12, 13: 13, 14: 13, 15: 14, 16: 14, 17: 15, 18: 15, 19: 15, 20: 15,
+  },
+  bard: {
+     1: 4,  2: 5,  3: 6,  4: 7,  5: 8,  6: 9,  7: 10, 8: 11, 9: 12, 10: 14,
+    11: 15, 12: 15, 13: 16, 14: 18, 15: 19, 16: 19, 17: 20, 18: 22, 19: 22, 20: 22,
+  },
+  ranger: {
+     1: 0,  2: 2,  3: 3,  4: 3,  5: 4,  6: 4,  7: 5,  8: 5,  9: 6,  10: 6,
+    11: 7,  12: 7,  13: 8,  14: 8,  15: 9,  16: 9,  17: 10, 18: 10, 19: 11, 20: 11,
+  },
+  warlock: {
+     1: 2,  2: 3,  3: 4,  4: 5,  5: 6,  6: 7,  7: 8,  8: 9,  9: 10, 10: 10,
+    11: 11, 12: 11, 13: 12, 14: 12, 15: 13, 16: 13, 17: 14, 18: 14, 19: 15, 20: 15,
+  },
+};
+
+/**
+ * Number of new spells learned on reaching `level` (the level-over-level delta
+ * of the Spells Known column). Wizard adds a flat 2 per level from level 2 up;
+ * prepared casters and non-casters return 0 (they don't learn on level-up).
+ */
+export function spellsGainedAtLevel(className: string, level: number): number {
+  const key = className.toLowerCase();
+  if (key === "wizard") return level >= 2 ? 2 : 0;
+  const table = SPELLS_KNOWN_BY_CLASS[key];
+  if (!table) return 0;
+  const known = (lvl: number) => (lvl < 1 ? 0 : table[Math.min(20, lvl)] ?? 0);
+  return Math.max(0, known(level) - known(level - 1));
+}
+
+/** Whether a class learns new spells on level-up (known casters + Wizard's spellbook), per RAW. */
+export function learnsNewSpellsOnLevelUp(className: string, subclass?: string | null): boolean {
+  const profile = casterProfile(className, subclass);
+  if (!profile) return false;
+  return profile.preparation === "known" || className.toLowerCase() === "wizard";
+}
