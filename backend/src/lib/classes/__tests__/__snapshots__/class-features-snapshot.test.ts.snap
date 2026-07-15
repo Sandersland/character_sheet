@@ -9473,6 +9473,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -9496,6 +9502,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Whenever you use a spell of 1st level or higher to restore hit points to a creature, the creature regains additional HP equal to 2 + the spell's level.",
           "level": 1,
           "name": "Disciple of Life",
+          "source": "subclass",
+        },
+        {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
           "source": "subclass",
         },
         {
@@ -9545,6 +9557,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -9591,6 +9609,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -9634,6 +9658,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Whenever you use a spell of 1st level or higher to restore hit points to a creature, the creature regains additional HP equal to 2 + the spell's level.",
           "level": 1,
           "name": "Disciple of Life",
+          "source": "subclass",
+        },
+        {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
           "source": "subclass",
         },
         {
@@ -9686,6 +9716,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Whenever you use a spell of 1st level or higher to restore hit points to a creature, the creature regains additional HP equal to 2 + the spell's level.",
           "level": 1,
           "name": "Disciple of Life",
+          "source": "subclass",
+        },
+        {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
           "source": "subclass",
         },
         {
@@ -9747,6 +9783,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -9802,6 +9844,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Whenever you use a spell of 1st level or higher to restore hit points to a creature, the creature regains additional HP equal to 2 + the spell's level.",
           "level": 1,
           "name": "Disciple of Life",
+          "source": "subclass",
+        },
+        {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
           "source": "subclass",
         },
         {
@@ -9869,6 +9917,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -9930,6 +9984,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Whenever you use a spell of 1st level or higher to restore hit points to a creature, the creature regains additional HP equal to 2 + the spell's level.",
           "level": 1,
           "name": "Disciple of Life",
+          "source": "subclass",
+        },
+        {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
           "source": "subclass",
         },
         {
@@ -10003,6 +10063,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -10070,6 +10136,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Whenever you use a spell of 1st level or higher to restore hit points to a creature, the creature regains additional HP equal to 2 + the spell's level.",
           "level": 1,
           "name": "Disciple of Life",
+          "source": "subclass",
+        },
+        {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
           "source": "subclass",
         },
         {
@@ -10143,6 +10215,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -10210,6 +10288,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Whenever you use a spell of 1st level or higher to restore hit points to a creature, the creature regains additional HP equal to 2 + the spell's level.",
           "level": 1,
           "name": "Disciple of Life",
+          "source": "subclass",
+        },
+        {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
           "source": "subclass",
         },
         {
@@ -10283,6 +10367,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -10353,6 +10443,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -10420,6 +10516,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Whenever you use a spell of 1st level or higher to restore hit points to a creature, the creature regains additional HP equal to 2 + the spell's level.",
           "level": 1,
           "name": "Disciple of Life",
+          "source": "subclass",
+        },
+        {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
           "source": "subclass",
         },
         {
@@ -10499,6 +10601,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -10575,6 +10683,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -10648,6 +10762,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "Whenever you use a spell of 1st level or higher to restore hit points to a creature, the creature regains additional HP equal to 2 + the spell's level.",
           "level": 1,
           "name": "Disciple of Life",
+          "source": "subclass",
+        },
+        {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+          "level": 1,
+          "name": "Domain Spells",
           "source": "subclass",
         },
         {
@@ -10732,6 +10852,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -10749,6 +10875,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "As an action, touch a willing creature to give it advantage on Dexterity (Stealth) checks. Lasts 1 hour or until you use this feature again.",
           "level": 1,
           "name": "Blessing of the Trickster",
+          "source": "subclass",
+        },
+        {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
           "source": "subclass",
         },
         {
@@ -10792,6 +10924,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -10832,6 +10970,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -10869,6 +11013,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "As an action, touch a willing creature to give it advantage on Dexterity (Stealth) checks. Lasts 1 hour or until you use this feature again.",
           "level": 1,
           "name": "Blessing of the Trickster",
+          "source": "subclass",
+        },
+        {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
           "source": "subclass",
         },
         {
@@ -10915,6 +11065,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "As an action, touch a willing creature to give it advantage on Dexterity (Stealth) checks. Lasts 1 hour or until you use this feature again.",
           "level": 1,
           "name": "Blessing of the Trickster",
+          "source": "subclass",
+        },
+        {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
           "source": "subclass",
         },
         {
@@ -10970,6 +11126,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -11019,6 +11181,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "As an action, touch a willing creature to give it advantage on Dexterity (Stealth) checks. Lasts 1 hour or until you use this feature again.",
           "level": 1,
           "name": "Blessing of the Trickster",
+          "source": "subclass",
+        },
+        {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
           "source": "subclass",
         },
         {
@@ -11080,6 +11248,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -11135,6 +11309,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "As an action, touch a willing creature to give it advantage on Dexterity (Stealth) checks. Lasts 1 hour or until you use this feature again.",
           "level": 1,
           "name": "Blessing of the Trickster",
+          "source": "subclass",
+        },
+        {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
           "source": "subclass",
         },
         {
@@ -11202,6 +11382,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -11263,6 +11449,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "As an action, touch a willing creature to give it advantage on Dexterity (Stealth) checks. Lasts 1 hour or until you use this feature again.",
           "level": 1,
           "name": "Blessing of the Trickster",
+          "source": "subclass",
+        },
+        {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
           "source": "subclass",
         },
         {
@@ -11330,6 +11522,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -11391,6 +11589,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "As an action, touch a willing creature to give it advantage on Dexterity (Stealth) checks. Lasts 1 hour or until you use this feature again.",
           "level": 1,
           "name": "Blessing of the Trickster",
+          "source": "subclass",
+        },
+        {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
           "source": "subclass",
         },
         {
@@ -11458,6 +11662,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -11522,6 +11732,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -11583,6 +11799,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "As an action, touch a willing creature to give it advantage on Dexterity (Stealth) checks. Lasts 1 hour or until you use this feature again.",
           "level": 1,
           "name": "Blessing of the Trickster",
+          "source": "subclass",
+        },
+        {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
           "source": "subclass",
         },
         {
@@ -11656,6 +11878,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -11726,6 +11954,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
+          "source": "subclass",
+        },
+        {
           "description": "You cast spells using Wisdom. Full-caster progression. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum 1).",
           "level": 1,
           "name": "Spellcasting",
@@ -11793,6 +12027,12 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "description": "As an action, touch a willing creature to give it advantage on Dexterity (Stealth) checks. Lasts 1 hour or until you use this feature again.",
           "level": 1,
           "name": "Blessing of the Trickster",
+          "source": "subclass",
+        },
+        {
+          "description": "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+          "level": 1,
+          "name": "Domain Spells",
           "source": "subclass",
         },
         {

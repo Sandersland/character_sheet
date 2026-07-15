@@ -41,6 +41,13 @@ const CLERIC_FEATURES: DerivedFeature[] = [
 
 const LIFE_DOMAIN_FEATURES: DerivedFeature[] = [
   {
+    name: "Domain Spells",
+    level: 1,
+    source: "subclass",
+    description:
+      "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+  },
+  {
     name: "Bonus Proficiency",
     level: 1,
     source: "subclass",
@@ -84,6 +91,13 @@ const LIFE_DOMAIN_FEATURES: DerivedFeature[] = [
 ];
 
 const TRICKERY_DOMAIN_FEATURES: DerivedFeature[] = [
+  {
+    name: "Domain Spells",
+    level: 1,
+    source: "subclass",
+    description:
+      "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+  },
   {
     name: "Blessing of the Trickster",
     level: 1,
