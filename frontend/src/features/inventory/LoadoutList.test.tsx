@@ -178,3 +178,72 @@ describe("LoadoutList equip / unequip / swap", () => {
     ]);
   });
 });
+
+const attunableRing = (o: Partial<InventoryItem> = {}) =>
+  ring({ requiresAttunement: true, rarity: "RARE", equippedSlot: "RING", ...o });
+
+describe("LoadoutList attunement", () => {
+  it("shows the Attuned N/3 header reflecting the real count", () => {
+    const { unmount } = render(
+      <LoadoutList
+        character={makeCharacter([
+          attunableRing({ id: "a", name: "Ring A", attuned: true }),
+          attunableRing({ id: "b", name: "Ring B", attuned: true }),
+        ])}
+        pending={false}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Attuned 2/3")).toBeInTheDocument();
+    unmount();
+
+    renderList([
+      attunableRing({ id: "a", name: "Ring A", attuned: true }),
+      attunableRing({ id: "b", name: "Ring B", attuned: true }),
+      item({ id: "c", name: "Cloak", slot: "CLOAK", equippedSlot: "CLOAK", requiresAttunement: true, attuned: true }),
+    ]);
+    expect(screen.getByText("Attuned 3/3")).toBeInTheDocument();
+  });
+
+  it("renders an Attune control only for items requiring attunement", () => {
+    renderList([
+      attunableRing({ id: "a", name: "Ring A" }),
+      weapon(false, { id: "sword", name: "Longsword", equippedSlot: "MAIN_HAND" }),
+    ]);
+    expect(screen.getAllByRole("button", { name: "Attune" })).toHaveLength(1);
+  });
+
+  it("disables Attune at the 3-item cap and enables it below", () => {
+    const belowCap = [attunableRing({ id: "a", name: "Ring A" })];
+    const { unmount } = render(
+      <LoadoutList character={makeCharacter(belowCap)} pending={false} onSubmit={vi.fn()} />,
+    );
+    expect(screen.getByRole("button", { name: "Attune" })).toBeEnabled();
+    unmount();
+
+    const atCap = [
+      attunableRing({ id: "a", name: "Ring A" }),
+      item({ id: "c1", name: "Cloak", slot: "CLOAK", equippedSlot: "CLOAK", requiresAttunement: true, attuned: true }),
+      item({ id: "b1", name: "Belt", slot: "BELT", equippedSlot: "BELT", requiresAttunement: true, attuned: true }),
+      item({ id: "h1", name: "Helm", slot: "HEAD", equippedSlot: "HEAD", requiresAttunement: true, attuned: true }),
+    ];
+    renderList(atCap);
+    expect(screen.getByRole("button", { name: "Attune" })).toBeDisabled();
+  });
+
+  it("fires an attune op when toggling an unattuned item", async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderList([attunableRing({ id: "a", name: "Ring A" })]);
+    await user.click(screen.getByRole("button", { name: "Attune" }));
+    expect(onSubmit).toHaveBeenCalledWith([{ type: "attune", inventoryItemId: "a" }]);
+  });
+
+  it("shows an Attuned tag and fires unattune on an attuned item", async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderList([attunableRing({ id: "a", name: "Ring A", attuned: true })]);
+    const toggle = screen.getByRole("button", { name: "Attuned" });
+    expect(toggle).toBeInTheDocument();
+    await user.click(toggle);
+    expect(onSubmit).toHaveBeenCalledWith([{ type: "unattune", inventoryItemId: "a" }]);
+  });
+});

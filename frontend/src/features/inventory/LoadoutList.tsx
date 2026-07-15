@@ -5,8 +5,9 @@ import { EQUIP_SLOT_ICONS, Lock, MoreHorizontal, TriangleAlert } from "@/compone
 import Badge from "@/components/ui/Badge";
 import Popover from "@/components/ui/Popover";
 import SlotPickerPanel from "@/features/inventory/SlotPickerPanel";
+import AttuneToggle from "@/features/inventory/AttuneToggle";
 import { bagItemsForSlot } from "@/lib/paperDoll";
-import { buildLoadoutGroups, type FilledLoadoutRow } from "@/lib/loadout";
+import { attunementSummary, buildLoadoutGroups, type FilledLoadoutRow } from "@/lib/loadout";
 import { rarityLabel, rarityTone } from "@/lib/rarity";
 
 interface LoadoutListProps {
@@ -83,6 +84,7 @@ function FilledRowActions({ row, candidates, pending, onUnequip, onReplace }: Fi
 export default function LoadoutList({ character, pending, onSubmit }: LoadoutListProps) {
   const inventory = character.inventory;
   const groups = buildLoadoutGroups(character);
+  const attunement = attunementSummary(inventory);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -109,6 +111,13 @@ export default function LoadoutList({ character, pending, onSubmit }: LoadoutLis
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-end">
+        <span
+          className={`text-xs font-semibold ${attunement.atCap ? "text-arcane-700" : "text-parchment-500"}`}
+        >
+          Attuned {attunement.count}/{attunement.cap}
+        </span>
+      </div>
       {groups.map((group) => (
         <section key={group.key} className="flex flex-col gap-1.5">
           <h4 className="text-xs font-semibold uppercase tracking-wide text-parchment-500">
@@ -189,6 +198,14 @@ export default function LoadoutList({ character, pending, onSubmit }: LoadoutLis
                   {grip && <Badge tone="neutral">{grip.short}</Badge>}
                   {item.rarity && item.rarity !== "COMMON" && (
                     <Badge tone={rarityTone(item.rarity)}>{rarityLabel(item.rarity)}</Badge>
+                  )}
+                  {item.requiresAttunement && (
+                    <AttuneToggle
+                      item={item}
+                      pending={pending}
+                      atCap={attunement.atCap}
+                      onSubmit={onSubmit}
+                    />
                   )}
                   <FilledRowActions
                     row={row}
