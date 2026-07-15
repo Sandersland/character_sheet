@@ -1,10 +1,12 @@
-// Top-of-section overview: stat bar, concentration/buff banners, slot meters,
-// and the inline cast-result + error banners. Returns a Fragment so its blocks
-// stay direct children of SpellsSection's gap-5 flex column.
+// The spellcasting block on the record: an arcane-keyed ruled-ledger card with
+// boxed stat readouts, slot pips, a prepared quick-cast list, the inline
+// cast-result/error banners, and a Manage-spellbook opener (caster-spellbook.html §1).
+import { abilityLabel } from "@/lib/abilities";
 import { derivePreparedSummary } from "@/lib/preparedSummary";
 import type { CastResult } from "@/lib/spellCast";
 import type { SpellListDerivation } from "@/lib/spellList";
 import type { Character, Spell } from "@/types/character";
+import Card from "@/components/ui/Card";
 import CastResultBanner from "@/features/spells/CastResultBanner";
 import PreparedSpellList from "@/features/spells/PreparedSpellList";
 import SpellStatusBanners from "@/features/spells/SpellStatusBanners";
@@ -34,7 +36,21 @@ export default function SpellcastingOverview({
   const sc = character.spellcasting!;
 
   return (
-    <>
+    <Card className="p-6">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-2 rounded border border-parchment-300"
+      />
+      <div className="relative flex flex-col gap-4">
+      <div className="flex items-center gap-2.5 text-[11px] font-bold uppercase tracking-wider text-arcane-800">
+        <span>Spellcasting</span>
+        {sc.ability && (
+          <span className="font-semibold normal-case tracking-normal text-parchment-500">
+            {abilityLabel(sc.ability)}
+          </span>
+        )}
+        <span aria-hidden="true" className="h-px flex-1 bg-gradient-to-r from-arcane-200 to-transparent" />
+      </div>
       <SpellcastingStatBar
         spellSaveDC={sc.spellSaveDC}
         spellAttackBonus={sc.spellAttackBonus}
@@ -70,6 +86,7 @@ export default function SpellcastingOverview({
       >
         Manage spellbook →
       </button>
-    </>
+      </div>
+    </Card>
   );
 }
