@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 
 import BackendStatus from "@/features/character-meta/BackendStatus";
 import BannerVitals from "@/features/character-meta/BannerVitals";
+import MobileSheetHeader from "@/features/character-meta/MobileSheetHeader";
 import CampaignIndicator from "@/features/campaign/CampaignIndicator";
 import Tabs from "@/components/ui/Tabs";
 import { classSummary } from "@/lib/multiclass";
@@ -39,7 +40,17 @@ export default function CharacterSheetHeader({
   onOpenDelete,
 }: CharacterSheetHeaderProps) {
   return (
-    <header className="bg-gradient-to-br from-garnet-800 via-garnet-700 to-garnet-900 text-parchment-50">
+    <>
+      {/* Mobile: compact sticky mini-header. Desktop: the garnet banner below. */}
+      <MobileSheetHeader
+        character={character}
+        session={session}
+        onOpenCapture={onOpenCapture}
+        onOpenSessions={onOpenSessions}
+        onOpenActivity={onOpenActivity}
+        onOpenDelete={onOpenDelete}
+      />
+      <header className="hidden bg-gradient-to-br from-garnet-800 via-garnet-700 to-garnet-900 text-parchment-50 md:block">
       <div className="mx-auto max-w-6xl px-6 pt-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-4">
@@ -151,6 +162,7 @@ export default function CharacterSheetHeader({
           />
         </div>
       </div>
-    </header>
+      </header>
+    </>
   );
 }

@@ -52,6 +52,8 @@ vi.mock("@/features/inventory/EquippedItemsCard", () => ({ default: () => null }
 vi.mock("@/features/spells/SpellsSection", () => ({ default: () => null }));
 vi.mock("@/features/abilities/ProficienciesCard", () => ({ default: () => null }));
 vi.mock("@/features/character-meta/BannerVitals", () => ({ default: () => null }));
+// Stub the mobile mini-header so the session-button matrix targets one (desktop) instance.
+vi.mock("@/features/character-meta/MobileSheetHeader", () => ({ default: () => null }));
 vi.mock("@/features/conditions/ConditionsStrip", () => ({ default: () => null }));
 
 const mockUseCharacter = vi.mocked(useCharacter);

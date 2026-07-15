@@ -65,10 +65,10 @@ describe("RollModeToggle", () => {
   it("docks as a fixed bottom bar on mobile and floats bottom-left at md+", () => {
     const { container } = setup();
     const bar = container.firstElementChild as HTMLElement;
-    // Mobile: full-width fixed bar stacked just above the SheetBottomNav (#928).
+    // Mobile: full-width fixed bar docked at the bottom (session page has no nav).
     expect(bar.className).toContain("fixed");
     expect(bar.className).toContain("inset-x-0");
-    expect(bar.className).toContain("bottom-[calc(4rem+env(safe-area-inset-bottom))]");
+    expect(bar.className).toContain("bottom-0");
     expect(bar.className).toContain("border-t");
     // md+: floating bottom-6 left-6 pill (surface stripped back to the control).
     expect(bar.className).toContain("md:bottom-6");
