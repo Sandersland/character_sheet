@@ -992,6 +992,8 @@ describe("Warlock Pact Magic + Mystic Arcanum", () => {
 const PREPCAP_OWNER = "owner-prepcap";
 const PREPCAP_WIZARD_ID = "test-prepcap-wizard-8";
 const PREPCAP_SORCERER_ID = "test-prepcap-sorcerer-8";
+const PREPCAP_STALE_ID = "test-prepcap-stale-level";
+const PREPCAP_MULTI_ID = "test-prepcap-multi";
 
 // N level-1 spells; the first `preparedCount` are prepared, the rest unprepared.
 function leveledSpells(preparedCount: number, total: number) {
@@ -1017,11 +1019,13 @@ const PREPCAP_CANTRIP = {
 describe("prepared-spell cap enforcement (#883)", () => {
   let wizardClassId: string;
   let sorcererClassId: string;
+  let clericClassId: string;
   const WIZARD_CATALOG = "PrepCap Wizard";
   const SORCERER_CATALOG = "PrepCap Sorcerer";
+  const CLERIC_CATALOG = "PrepCap Cleric";
 
   afterAll(async () => {
-    await prisma.characterClass.deleteMany({ where: { name: { in: [WIZARD_CATALOG, SORCERER_CATALOG] } } });
+    await prisma.characterClass.deleteMany({ where: { name: { in: [WIZARD_CATALOG, SORCERER_CATALOG, CLERIC_CATALOG] } } });
   });
 
   beforeEach(async () => {
@@ -1039,6 +1043,12 @@ describe("prepared-spell cap enforcement (#883)", () => {
       update: {},
     });
     sorcererClassId = sorc.id;
+    const cler = await prisma.characterClass.upsert({
+      where: { name: CLERIC_CATALOG },
+      create: { name: CLERIC_CATALOG, hitDie: "d8", savingThrows: ["wisdom", "charisma"], skillChoiceCount: 2, skillChoices: ["religion"], isSpellcaster: true },
+      update: {},
+    });
+    clericClassId = cler.id;
 
     // Wizard 8 / INT 18 → prepared limit 12. Seed 12 prepared + 1 unprepared + a cantrip.
     await prisma.character.create({
@@ -1067,10 +1077,46 @@ describe("prepared-spell cap enforcement (#883)", () => {
         classEntries: { create: [{ name: "sorcerer", classId: sorcererClassId, level: 8, position: 0 }] },
       },
     });
+
+    // Single-class Wizard with a STALE classEntry.level=1 but XP for level 8 (INT 18).
+    // Enforcement must use the XP-derived level (limit 12), not the stale column (limit 6).
+    await prisma.character.create({
+      data: {
+        id: PREPCAP_STALE_ID, name: "PrepCap Stale", alignment: "Neutral", ownerId: PREPCAP_OWNER,
+        experiencePoints: 34000, initiativeBonus: 0, speed: 30,
+        hitPoints: { current: 40, max: 40, temp: 0 }, hitDice: { total: 8, die: "d6" },
+        abilityScores: { strength: 8, dexterity: 12, constitution: 12, intelligence: 18, wisdom: 10, charisma: 10 },
+        savingThrowProficiencies: ["intelligence", "wisdom"], skills: [], toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+        spellcasting: { slotsUsed: {}, spells: leveledSpells(8, 9) } as Prisma.InputJsonValue,
+        classEntries: { create: [{ name: "wizard", classId: wizardClassId, level: 1, position: 0 }] },
+      },
+    });
+
+    // Multiclass Wizard 3 (INT 16 → 6) + Cleric 2 (WIS 12 → 3) → combined prepared cap 9.
+    await prisma.character.create({
+      data: {
+        id: PREPCAP_MULTI_ID, name: "PrepCap Multi", alignment: "Neutral", ownerId: PREPCAP_OWNER,
+        experiencePoints: 6500, initiativeBonus: 0, speed: 30,
+        hitPoints: { current: 30, max: 30, temp: 0 }, hitDice: { total: 5, die: "d6" },
+        abilityScores: { strength: 8, dexterity: 12, constitution: 12, intelligence: 16, wisdom: 12, charisma: 10 },
+        savingThrowProficiencies: ["intelligence", "wisdom"], skills: [], toolProficiencies: [],
+        currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
+        spellcasting: { slotsUsed: {}, spells: leveledSpells(9, 10) } as Prisma.InputJsonValue,
+        classEntries: {
+          create: [
+            { name: "wizard", classId: wizardClassId, level: 3, position: 0 },
+            { name: "cleric", classId: clericClassId, level: 2, position: 1 },
+          ],
+        },
+      },
+    });
   });
 
   afterEach(async () => {
-    await prisma.character.deleteMany({ where: { id: { in: [PREPCAP_WIZARD_ID, PREPCAP_SORCERER_ID] } } });
+    await prisma.character.deleteMany({
+      where: { id: { in: [PREPCAP_WIZARD_ID, PREPCAP_SORCERER_ID, PREPCAP_STALE_ID, PREPCAP_MULTI_ID] } },
+    });
   });
 
   const wizUrl = `/api/characters/${PREPCAP_WIZARD_ID}/spellcasting/transactions`;
@@ -1108,5 +1154,26 @@ describe("prepared-spell cap enforcement (#883)", () => {
       .send({ operations: [{ type: "prepareSpell", entryId: "prep-21" }] });
     expect(res.status).toBe(200);
     expect(res.body.spellcasting.preparedSpellLimit).toBeNull();
+  });
+
+  it("single-class enforcement uses the XP-derived level, not a stale classEntry.level", async () => {
+    // Stale column would cap at 6 (already exceeded); the XP-derived cap is 12, so
+    // a 9th prepared spell must be accepted and the limit reported as 12.
+    const url = `/api/characters/${PREPCAP_STALE_ID}/spellcasting/transactions`;
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).post(url)
+      .send({ operations: [{ type: "prepareSpell", entryId: "prep-9" }] });
+    expect(res.status).toBe(200);
+    expect(res.body.spellcasting.preparedSpellLimit).toBe(12);
+    expect(res.body.spellcasting.preparedSpellCount).toBe(9);
+  });
+
+  it("multiclass prepared caster is rejected at the combined cap", async () => {
+    const url = `/api/characters/${PREPCAP_MULTI_ID}/spellcasting/transactions`;
+    const res = await supertest.agent(createApp()).set("Cookie", COOKIE).post(url)
+      .send({ operations: [{ type: "prepareSpell", entryId: "prep-10" }] });
+    expect(res.status).toBe(400);
+    expect(res.body.error ?? JSON.stringify(res.body)).toMatch(/at most 9/);
+    const get = await supertest(createApp()).get(`/api/characters/${PREPCAP_MULTI_ID}`).set("Cookie", COOKIE);
+    expect(get.body.spellcasting.preparedSpellLimit).toBe(9);
   });
 });

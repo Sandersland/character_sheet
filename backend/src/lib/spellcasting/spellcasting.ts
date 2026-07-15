@@ -851,10 +851,12 @@ export async function applySpellcastingOperations(
       const className = row.classEntries[0]?.name ?? "";
       const abilityScores = row.abilityScores as Record<string, number>;
       const derived = deriveSpellcasting(className, level, abilityScores, profBonus);
-      const preparedSpellLimit = derivePreparedSpellLimit(
-        row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass })),
-        abilityScores,
-      );
+      // Single-class uses the XP-derived level (per-class column can be stale) so the
+      // enforced cap matches the serialized limit; multiclass uses per-entry levels.
+      const limitEntries = row.classEntries.length === 1
+        ? [{ name: className, level, subclass: row.classEntries[0]?.subclass ?? null }]
+        : row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass }));
+      const preparedSpellLimit = derivePreparedSpellLimit(limitEntries, abilityScores);
 
       const { slotTotals, arcanaTotals } = computeSlotTables(row.spellcasting, derived);
 
