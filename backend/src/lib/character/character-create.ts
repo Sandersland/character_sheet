@@ -94,6 +94,24 @@ async function resolveFixedItems(
   return { inventoryCreates };
 }
 
+// Resolve a plain subclass name: link this class's catalog id when the name matches
+// AND the class grants a subclass at creation (level 1), so FK-keyed derivations
+// (granted spells #898) resolve; otherwise keep it a legacy/homebrew string with no
+// id (served once homebrew subclasses own catalog rows, #911).
+async function resolveSubclassName(
+  characterClass: ResolvedClass,
+  name: string,
+): Promise<{ subclassId: string | null; subclassName: string }> {
+  if (characterClass.subclassLevel <= 1) {
+    const match = await prisma.subclass.findUnique({
+      where: { classId_name: { classId: characterClass.id, name } },
+      select: { id: true, name: true },
+    });
+    if (match) return { subclassId: match.id, subclassName: match.name };
+  }
+  return { subclassId: null, subclassName: name };
+}
+
 // Validate a subclass choice: it must belong to the chosen class and only
 // classes that grant subclasses at level 1 can have one at creation. A legacy
 // plain-string subclass (no id) is kept as-is for homebrew / pre-catalog data.
@@ -125,18 +143,7 @@ async function resolveSubclass(
     return { ok: true, subclassId: subclass.id, subclassName: subclass.name };
   }
   if (primaryClassChoice.subclass) {
-    // A plain-string subclass name: if it matches this class's catalog row (and the
-    // class grants a subclass at creation), link the id so FK-keyed derivations —
-    // e.g. granted spells (#898) — resolve. Otherwise keep it as a legacy/homebrew
-    // string with no id (served once homebrew subclasses own catalog rows, #911).
-    if (characterClass.subclassLevel <= 1) {
-      const match = await prisma.subclass.findUnique({
-        where: { classId_name: { classId: characterClass.id, name: primaryClassChoice.subclass } },
-        select: { id: true, name: true },
-      });
-      if (match) return { ok: true, subclassId: match.id, subclassName: match.name };
-    }
-    return { ok: true, subclassId: null, subclassName: primaryClassChoice.subclass };
+    return { ok: true, ...(await resolveSubclassName(characterClass, primaryClassChoice.subclass)) };
   }
   return { ok: true, subclassId: null, subclassName: null };
 }
