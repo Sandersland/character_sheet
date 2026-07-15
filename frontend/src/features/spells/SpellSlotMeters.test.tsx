@@ -22,7 +22,23 @@ describe("SpellSlotMeters", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("labels merged warlock slots as Pact Magic and fires expend/restore ops", async () => {
+  it("renders one pip per slot, filled + spent", () => {
+    render(
+      <SpellSlotMeters
+        slots={[{ level: 1, total: 4, used: 1 }]}
+        pact={null}
+        arcana={[]}
+        slotsArePactMagic={false}
+        busy={false}
+        onExpend={vi.fn()}
+        onRestore={vi.fn()}
+      />,
+    );
+    expect(screen.getAllByTestId("slot-pip")).toHaveLength(4);
+    expect(screen.getByText("3 / 4 left")).toBeInTheDocument();
+  });
+
+  it("labels merged warlock slots as Pact Magic and fires expend/restore ops from the pips", async () => {
     const user = userEvent.setup();
     const onExpend = vi.fn();
     const onRestore = vi.fn();
@@ -43,11 +59,10 @@ describe("SpellSlotMeters", () => {
     expect(onExpend).toHaveBeenCalledWith(1);
     expect(onRestore).toHaveBeenCalledWith(1);
   });
-
 });
 
-describe("SpellSlotMeters — arcanum & disabled states", () => {
-  it("renders a Mystic Arcanum charge with a restore control but no expend control", () => {
+describe("SpellSlotMeters — arcanum & boundary states", () => {
+  it("renders a spent Mystic Arcanum charge with a restore pip but no expend pip", () => {
     render(
       <SpellSlotMeters
         slots={[]}
@@ -61,10 +76,10 @@ describe("SpellSlotMeters — arcanum & disabled states", () => {
     );
     expect(screen.getByRole("heading", { name: /Mystic Arcanum/i })).toBeInTheDocument();
     expect(screen.getByTitle("Restore the level 6 Mystic Arcanum")).toBeEnabled();
-    expect(screen.queryByText("− use")).not.toBeInTheDocument();
+    expect(screen.queryByTitle(/^Expend/)).not.toBeInTheDocument();
   });
 
-  it("disables expend at 0 remaining and restore at full", () => {
+  it("offers expend pips at full and no restore pip when nothing is spent", () => {
     render(
       <SpellSlotMeters
         slots={[{ level: 2, total: 3, used: 0 }]}
@@ -76,9 +91,24 @@ describe("SpellSlotMeters — arcanum & disabled states", () => {
         onRestore={vi.fn()}
       />,
     );
-    // Full: restore disabled, expend enabled.
-    expect(screen.getByTitle("Restore a level 2 slot")).toBeDisabled();
-    expect(screen.getByTitle("Expend a level 2 slot")).toBeEnabled();
+    expect(screen.getAllByTitle("Expend a level 2 slot")).toHaveLength(3);
+    expect(screen.queryByTitle("Restore a level 2 slot")).not.toBeInTheDocument();
+  });
+
+  it("disables every pip while busy", () => {
+    render(
+      <SpellSlotMeters
+        slots={[{ level: 1, total: 2, used: 1 }]}
+        pact={null}
+        arcana={[]}
+        slotsArePactMagic={false}
+        busy
+        onExpend={vi.fn()}
+        onRestore={vi.fn()}
+      />,
+    );
+    expect(screen.getByTitle("Expend a level 1 slot")).toBeDisabled();
+    expect(screen.getByTitle("Restore a level 1 slot")).toBeDisabled();
   });
 
   it("renders a dedicated Pact Magic block for a multiclass warlock", () => {

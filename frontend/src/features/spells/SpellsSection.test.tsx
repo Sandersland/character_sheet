@@ -91,6 +91,15 @@ describe("SpellsSection concentration", () => {
     expect(mockApply).toHaveBeenCalledWith("char-1", [{ type: "dropConcentration" }]);
   });
 
+  it("scrolls to the spellbook when Manage spellbook is clicked", async () => {
+    const user = userEvent.setup();
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    render(<SpellsSection character={makeCharacter(null)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: /manage spellbook/i }));
+    expect(scrollIntoView).toHaveBeenCalled();
+  });
+
   it("marks the active concentration spell's badge as 'concentrating'", () => {
     render(
       <SpellsSection

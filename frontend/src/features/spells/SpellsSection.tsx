@@ -5,6 +5,8 @@
  * the presentational subcomponents (overview, spellbook list, add-spell panel).
  */
 
+import { useRef } from "react";
+
 import { deriveSpellList } from "@/lib/spellList";
 import { availableSlotsForSpell } from "@/lib/spellPicker";
 import type { Character, Spell } from "@/types/character";
@@ -24,6 +26,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
   const concentratingOn = spellcasting.concentratingOn ?? null;
 
   const derived = deriveSpellList(character);
+  const spellbookRef = useRef<HTMLDivElement>(null);
   const {
     busy, error, castResult, addPanelOpen,
     setCastResult, setAddPanelOpen, send,
@@ -40,11 +43,14 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
         castResult={castResult}
         onExpend={(level) => send([{ type: "expendSlot", level }])}
         onRestore={(level) => send([{ type: "restoreSlot", level }])}
+        onCast={handleCast}
+        onManageSpellbook={() => spellbookRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
         onDropConcentration={() => send([{ type: "dropConcentration" }])}
         onDismissBuff={(entryId) => send([{ type: "dismissBuff", entryId }])}
         onDismissResult={() => setCastResult(null)}
       />
 
+      <div ref={spellbookRef}>
       <SpellbookList
         spells={spells}
         sortedSpells={derived.sortedSpells}
@@ -61,6 +67,7 @@ export default function SpellsSection({ character, onUpdate }: SpellsSectionProp
         }
         onAddSpell={() => setAddPanelOpen(true)}
       />
+      </div>
 
       {addPanelOpen ? (
         <AddSpellPanel

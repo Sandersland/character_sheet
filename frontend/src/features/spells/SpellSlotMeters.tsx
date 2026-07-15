@@ -1,7 +1,7 @@
-// Spell-slot / Pact Magic / Mystic Arcanum meter blocks.
+// Spell-slot / Pact Magic / Mystic Arcanum pip blocks. A filled pip is an
+// available slot (click to expend); a spent pip clicks to restore.
 import type { ReactNode } from "react";
 
-import MeterBar from "@/components/ui/MeterBar";
 import type { SpellSlots } from "@/types/character";
 
 interface PactBlock {
@@ -25,7 +25,6 @@ interface MeterSpec {
   remaining: number;
   total: number;
   tone: "arcane" | "gold";
-  label: string;
   onExpend?: () => void;
   onRestore: () => void;
   expendTitle?: string;
@@ -64,7 +63,6 @@ function slotsGroup(
       remaining: slot.total - slot.used,
       total: slot.total,
       tone: "arcane",
-      label: `Level ${slot.level} slots remaining`,
       onExpend: () => onExpend(slot.level),
       onRestore: () => onRestore(slot.level),
       expendTitle: `Expend a level ${slot.level} slot`,
@@ -89,7 +87,6 @@ function pactGroup(pact: PactBlock, { onExpend, onRestore }: Handlers): GroupSpe
       remaining: pact.count - pact.used,
       total: pact.count,
       tone: "arcane",
-      label: `Pact Magic level ${pact.slotLevel} slots remaining`,
       onExpend: () => onExpend(pact.slotLevel),
       onRestore: () => onRestore(pact.slotLevel),
       expendTitle: `Expend a Pact Magic (level ${pact.slotLevel}) slot`,
@@ -115,7 +112,6 @@ function arcanaGroup(arcana: SpellSlots[], { onRestore }: Handlers): GroupSpec {
       remaining: charge.total - charge.used,
       total: charge.total,
       tone: "gold",
-      label: `Level ${charge.level} Mystic Arcanum`,
       onRestore: () => onRestore(charge.level),
       restoreTitle: `Restore the level ${charge.level} Mystic Arcanum`,
     })),
@@ -131,36 +127,63 @@ function buildGroups(props: SpellSlotMetersProps): GroupSpec[] {
   return groups;
 }
 
+const ORDINALS = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th"];
+function ordinal(n: number) {
+  return ORDINALS[n] ?? `${n}th`;
+}
+
+const PIP_FILL: Record<MeterSpec["tone"], string> = {
+  arcane: "bg-arcane-500 border-arcane-700",
+  gold: "bg-gold-400 border-gold-700",
+};
+const PIP_BASE = "h-3.5 w-3.5 rounded-full border transition-colors disabled:opacity-40";
+const PIP_SPENT = "bg-parchment-100 border-parchment-300";
+
 function SlotMeter({ meter, busy }: { meter: MeterSpec; busy: boolean }) {
-  return (
-    <div>
-      <div className="mb-1 flex items-baseline justify-between text-xs text-parchment-600">
-        <span className="font-medium">Level {meter.level}</span>
-        <span className="tabular-nums">{meter.remaining}/{meter.total}</span>
-      </div>
-      <MeterBar current={meter.remaining} max={meter.total} tone={meter.tone} label={meter.label} />
-      <div className="mt-1.5 flex gap-1">
-        {meter.onExpend && (
-          <button
-            type="button"
-            disabled={busy || meter.remaining === 0}
-            onClick={meter.onExpend}
-            className="flex-1 rounded bg-arcane-100 py-0.5 text-[11px] font-semibold text-arcane-700 hover:bg-arcane-200 disabled:opacity-30"
-            title={meter.expendTitle}
-          >
-            − use
-          </button>
-        )}
+  const pips = Array.from({ length: meter.total }, (_, i) => {
+    if (i >= meter.remaining) {
+      return (
         <button
+          key={i}
           type="button"
-          disabled={busy || meter.remaining === meter.total}
+          data-testid="slot-pip"
+          disabled={busy}
           onClick={meter.onRestore}
-          className="flex-1 rounded bg-arcane-100 py-0.5 text-[11px] font-semibold text-arcane-700 hover:bg-arcane-200 disabled:opacity-30"
           title={meter.restoreTitle}
-        >
-          + restore
-        </button>
-      </div>
+          aria-label={meter.restoreTitle}
+          className={`${PIP_BASE} ${PIP_SPENT} hover:border-parchment-400`}
+        />
+      );
+    }
+    if (meter.onExpend) {
+      return (
+        <button
+          key={i}
+          type="button"
+          data-testid="slot-pip"
+          disabled={busy}
+          onClick={meter.onExpend}
+          title={meter.expendTitle}
+          aria-label={meter.expendTitle}
+          className={`${PIP_BASE} ${PIP_FILL[meter.tone]}`}
+        />
+      );
+    }
+    // Available Mystic Arcanum charge — no manual expend affordance.
+    return (
+      <span key={i} data-testid="slot-pip" aria-hidden="true" className={`${PIP_BASE} ${PIP_FILL[meter.tone]}`} />
+    );
+  });
+
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-10 shrink-0 text-[10px] font-bold uppercase tracking-wide text-parchment-500">
+        {ordinal(meter.level)}
+      </span>
+      <span className="flex flex-wrap gap-1.5">{pips}</span>
+      <span className="ml-auto text-[11px] tabular-nums text-parchment-500">
+        {meter.remaining} / {meter.total} left
+      </span>
     </div>
   );
 }
@@ -173,7 +196,7 @@ export default function SpellSlotMeters(props: SpellSlotMetersProps) {
           <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
             {group.heading}
           </h3>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="flex flex-col gap-2">
             {group.meters.map((meter) => (
               <SlotMeter key={meter.level} meter={meter} busy={props.busy} />
             ))}
