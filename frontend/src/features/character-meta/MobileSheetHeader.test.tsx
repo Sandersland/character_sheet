@@ -77,6 +77,22 @@ describe("MobileSheetHeader", () => {
     expect(screen.getByText("Lvl 4")).toBeInTheDocument();
   });
 
+  it("for a multiclass character, the pill shows the level (subclass rides in the class line)", () => {
+    renderHeader(
+      makeCharacter({
+        level: 8,
+        subclass: "Champion",
+        classes: [
+          { id: "cls-1", name: "Fighter", level: 5 },
+          { id: "cls-2", name: "Rogue", level: 3 },
+        ],
+      }),
+    );
+    expect(screen.getByText("Human · Fighter 5 / Rogue 3")).toBeInTheDocument();
+    expect(screen.getByText("Lvl 8")).toBeInTheDocument();
+    expect(screen.queryByText("Champion")).not.toBeInTheDocument();
+  });
+
   it("renders the four vital tiles (AC, Init, Speed, Prof)", () => {
     renderHeader();
     expect(screen.getByText("AC")).toBeInTheDocument();

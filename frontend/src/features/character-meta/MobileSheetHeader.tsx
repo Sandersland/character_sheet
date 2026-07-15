@@ -43,9 +43,13 @@ export default function MobileSheetHeader({
 
   // "Race · Class Level" — classSummary carries per-class levels for multiclass;
   // single-class shows its own level (subclass moves to the trailing pill).
-  const classLine = isMulticlass(character.classes)
+  const multiclass = isMulticlass(character.classes);
+  const classLine = multiclass
     ? classSummary(character.classes, { name: character.class })
     : `${character.class} ${character.level}`;
+  // Pill carries new info: subclass for single-class; for multiclass the
+  // subclasses already ride in classLine, so show the level instead.
+  const pill = !multiclass && character.subclass ? character.subclass : `Lvl ${character.level}`;
 
   return (
     <header className="sticky top-0 z-30 border-b border-parchment-200 bg-parchment-50 px-3 py-2.5 shadow-sm md:hidden">
@@ -63,7 +67,7 @@ export default function MobileSheetHeader({
           </p>
         </div>
         <span className="flex-none rounded-full bg-garnet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-garnet-700">
-          {character.subclass ?? `Lvl ${character.level}`}
+          {pill}
         </span>
         {/* Session button: campaign-required; sessions are shared per campaign. */}
         {session.hasCampaign ? (
@@ -106,7 +110,7 @@ export default function MobileSheetHeader({
         </span>
         <span className="flex-none font-display text-sm font-semibold text-garnet-800">
           {current}
-          <span className="text-parchment-500">/{max}</span>
+          <span className="text-parchment-600">/{max}</span>
           {temp > 0 && <span className="text-arcane-700"> +{temp}</span>}
         </span>
         <div className="flex-1">

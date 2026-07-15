@@ -23,10 +23,11 @@ interface CharacterSheetHeaderProps {
 }
 
 /**
- * The persistent sheet banner: identity + always-on vitals + the workspace tab
- * bar, all on the garnet field. It stays put while the tab panels swap below it,
- * so vitals and abilities are never more than a glance away (the "1d / Codex"
- * direction — see epic #921).
+ * The persistent sheet header, rendered per breakpoint: the compact
+ * MobileSheetHeader (`md:hidden`) and the desktop garnet banner (`hidden
+ * md:block`) — identity + always-on vitals + the workspace tab bar. Desktop
+ * stays put while the tab panels swap below it (the "1d / Codex" direction, epic
+ * #921); mobile navigation is the SheetBottomNav.
  */
 export default function CharacterSheetHeader({
   character,
