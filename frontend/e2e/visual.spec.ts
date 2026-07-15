@@ -149,7 +149,9 @@ test("visual: spells section", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Spell Slots" })).toBeVisible();
   await ready(page);
 
-  await expect(sectionByTitle(page, "Spells")).toHaveScreenshot("spells-section.png", {
+  // The Magic tab hosts the self-styled spellcasting block + grimoire (#926
+  // dropped the outer Spells card), so snapshot the whole tab panel.
+  await expect(page.locator("#sheet-panel-magic")).toHaveScreenshot("spells-section.png", {
     maxDiffPixelRatio: 0.01,
   });
 });
