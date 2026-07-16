@@ -44,7 +44,9 @@ export default function CharacterSheetContent({
       sessionId={session.inActiveSession ? session.activeSessionId : null}
       rollModifiers={character.rollModifiers}
     >
-      <div className="min-h-screen bg-parchment-100 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
+      {/* Fixed bottom gutter clears the capped-height SheetBottomNav; no raw env()
+          here so iOS Safari's dynamic toolbar can't balloon it. */}
+      <div className="min-h-screen bg-parchment-100 pb-24 md:pb-0">
         <CharacterSheetHeader
           character={character}
           session={session}
