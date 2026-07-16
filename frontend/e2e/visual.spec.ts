@@ -149,8 +149,9 @@ test("visual: spells section", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Spell Slots" })).toBeVisible();
   await ready(page);
 
-  // The Magic tab hosts the self-styled spellcasting block + grimoire (#926
-  // dropped the outer Spells card), so snapshot the whole tab panel.
+  // The Magic tab's default view is the self-styled spellcasting record block
+  // (quick-cast + slot pips); the grimoire is a separate view behind "Manage
+  // spellbook →". Snapshot the record — the tab panel's default state.
   await expect(page.locator("#sheet-panel-magic")).toHaveScreenshot("spells-section.png", {
     maxDiffPixelRatio: 0.01,
   });

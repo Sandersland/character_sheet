@@ -2,7 +2,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { findCharacterByName, gotoSheet, restoreResourcePool } from "./helpers/api";
+import { findCharacterByName, gotoSheet, openSpellbook, restoreResourcePool } from "./helpers/api";
 
 // The Shadow Monk persona (seeded in global-setup) is Monk L6 with the Way of
 // Shadow subclass — Shadow Arts unlock at L3, and Minor Illusion is granted.
@@ -60,6 +60,9 @@ test("shadow arts: a granted Minor Illusion shows a subclass badge, no Remove, a
   // The spellbook (with the granted Minor Illusion) lives on the Magic tab.
   await gotoSheet(page, id, "magic");
   await expect(page.getByRole("heading", { name: /Shadow Monk/, level: 1 })).toBeVisible();
+
+  // The spellbook rows live in the grimoire, opened via "Manage spellbook →".
+  await openSpellbook(page);
 
   // The granted Minor Illusion appears in the spellbook with a subclass badge.
   // Scope to the spellbook row (has a Cast button) — the Shadow Arts class-feature
