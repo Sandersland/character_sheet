@@ -1,34 +1,31 @@
 /**
- * Fixed-position toast that displays the most recent roll from `RollContext`.
- * Auto-dismisses after 3.5 seconds; a new roll resets the timer and replaces
- * the display immediately. Highlights natural 20 (crit) and natural 1 (fumble)
- * for single-d20 rolls (checks, saves, attacks, initiative).
+ * Quick-mode result chip (#945): a compact, auto-dismissing readout of the
+ * most recent roll from `RollContext`. Shown only when the Dice-rolls
+ * preference is `quick` (animated mode surfaces the result in DiceRollModal
+ * instead). Auto-dismisses after 3s; a new roll resets the timer and replaces
+ * the display immediately.
  *
- * Portaled to document.body so its stacking is deterministic. Suppressed
- * everywhere while any dialog is open (#801): mobile sheets and desktop
- * modals both draw a full-screen backdrop-blur scrim that would occlude the
- * corner toast, and in-dialog rolls already show their result on the sheet.
+ * Portaled to document.body and pinned top-center with a safe-area inset so it
+ * never covers the sheet's bottom nav or key content on mobile. Suppressed
+ * while any dialog is open (#801): mobile sheets and desktop modals draw a
+ * full-screen scrim, and in-dialog rolls already show their result on the sheet.
  * Mount once inside `RollProvider`, at the `CharacterSheetPage` level.
  */
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { usesAdvantage } from "@/lib/dice";
 import { useAnyDialogOpen } from "@/hooks/useDialogChrome";
+import RollBreakdown from "@/features/dice/RollBreakdown";
 import { useRoll, type RollEntry } from "@/features/dice/RollContext";
 
-const DISMISS_MS = 3500;
-
-function modifierSuffix(modifier: number): string {
-  return modifier > 0 ? ` + ${modifier}` : modifier < 0 ? ` − ${Math.abs(modifier)}` : "";
-}
+const DISMISS_MS = 3000;
 
 export default function RollResultToast() {
   const { lastRoll } = useRoll();
   const anyDialogOpen = useAnyDialogOpen();
   const [visible, setVisible] = useState(false);
-  // Hold a snapshot so the toast can fade out without losing its content.
+  // Hold a snapshot so the chip can fade out without losing its content.
   const [displayed, setDisplayed] = useState<RollEntry | null>(null);
 
   useEffect(() => {
@@ -41,82 +38,21 @@ export default function RollResultToast() {
 
   if (!displayed || anyDialogOpen) return null;
 
-  const { label, result } = displayed;
-  const { total, dice, spec, modifier } = result;
-
-  // Crit/fumble only applies to a single d20 roll (checks, saves, attacks, initiative).
-  const isD20Single = spec.faces === 20 && spec.count === 1;
-  const advantage = usesAdvantage(spec);
-  // The taken die under advantage/disadvantage is the kept (non-dropped) one.
-  const takenDie = dice.find((d) => !d.dropped) ?? dice[0];
-  const naturalRoll = isD20Single ? (takenDie?.value ?? 0) : 0;
-  const isCrit = naturalRoll === 20;
-  const isFumble = naturalRoll === 1;
-
   return createPortal(
     <div
+      data-testid="roll-result-toast"
       role="status"
       aria-live="polite"
       aria-atomic="true"
       className={`
-        pointer-events-none fixed bottom-6 right-6 z-50 w-52
+        pointer-events-none fixed left-1/2 z-50 w-max max-w-[16rem] -translate-x-1/2
+        top-[calc(env(safe-area-inset-top,0px)+0.75rem)]
         transition-all duration-300 ease-out
-        ${visible ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"}
+        ${visible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}
       `}
     >
-      <div
-        className={`
-          flex flex-col gap-1 rounded-card p-4 shadow-lg
-          ${
-            isCrit
-              ? "border-2 border-gold-400 bg-gold-50"
-              : isFumble
-                ? "border border-parchment-300 bg-parchment-100"
-                : "border border-parchment-200 bg-parchment-50"
-          }
-        `}
-      >
-        {isCrit && (
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-gold-800">
-            Natural 20 — Critical!
-          </p>
-        )}
-        {isFumble && (
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-parchment-600">
-            Natural 1 — Fumble
-          </p>
-        )}
-        {advantage && (
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-garnet-700">
-            {spec.mode === "advantage" ? "Advantage" : "Disadvantage"}
-          </p>
-        )}
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
-          {label}
-        </p>
-        <p
-          className={`font-display text-3xl font-semibold leading-none ${
-            isCrit
-              ? "text-gold-800"
-              : isFumble
-                ? "text-parchment-600"
-                : "text-garnet-800"
-          }`}
-        >
-          {total}
-        </p>
-        <p className="text-[11px] tabular-nums text-parchment-600">
-          {spec.count}d{spec.faces} (
-          {dice.map((die, index) => (
-            <span key={index}>
-              {index > 0 && ", "}
-              <span className={die.dropped ? "text-parchment-400 line-through" : ""}>
-                {die.value}
-              </span>
-            </span>
-          ))}
-          ){modifierSuffix(modifier)}
-        </p>
+      <div className="rounded-card border border-parchment-200 bg-parchment-50/95 px-3 py-2 text-left shadow-lg backdrop-blur-sm">
+        <RollBreakdown label={displayed.label} result={displayed.result} />
       </div>
     </div>,
     document.body,

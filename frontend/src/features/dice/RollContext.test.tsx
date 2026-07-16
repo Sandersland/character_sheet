@@ -1,9 +1,10 @@
 import { useEffect } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 
 import { logRoll } from "@/api/client";
 import { RollProvider, useRoll, type RollLog } from "@/features/dice/RollContext";
+import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
 import RollResultToast from "@/features/dice/RollResultToast";
 import type { RollResult, RollSpec } from "@/lib/dice";
 
@@ -50,30 +51,31 @@ function AnimatedRollOnMount({ spec, label, log }: { spec: RollSpec; label: stri
 describe("RollProvider — rollAnimated + logging", () => {
   beforeEach(() => {
     mockLogRoll.mockClear();
+    localStorage.clear();
   });
 
-  it("plays the 3D dice, toasts the result, and logs the roll inside a session", async () => {
+  it("animated: plays the 3D dice, shows the result in the modal (no persistent toast), and logs", async () => {
     render(
-      <RollProvider characterId="char-1" sessionId="sess-1">
-        <AnimatedRollOnMount
-          spec={{ count: 1, faces: 20, modifier: 5 }}
-          label="Perception check"
-          log={{ kind: "check", source: "Perception check", ability: "wisdom", skill: "perception" }}
-        />
-        <RollResultToast />
-      </RollProvider>,
+      <DiceRollStyleProvider>
+        <RollProvider characterId="char-1" sessionId="sess-1">
+          <AnimatedRollOnMount
+            spec={{ count: 1, faces: 20, modifier: 5 }}
+            label="Perception check"
+            log={{ kind: "check", source: "Perception check", ability: "wisdom", skill: "perception" }}
+          />
+          <RollResultToast />
+        </RollProvider>
+      </DiceRollStyleProvider>,
     );
 
     // 3D roller mounted in an overlay dialog (lazy-loaded behind Suspense).
     expect(await screen.findByTestId("dice-roller")).toBeInTheDocument();
-
-    // The corner toast stays suppressed behind the open 3D modal (#801).
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
-    expect(screen.queryByText("22")).not.toBeInTheDocument();
 
-    // After dismissing the modal, the toast shows the total (17 + 5).
-    fireEvent.click(await screen.findByText("Done"));
-    await waitFor(() => expect(screen.getAllByText("22").length).toBeGreaterThan(0));
+    // The modal itself shows the total (17 + 5) — the persistent chip stays away.
+    const modalResult = await screen.findByTestId("roll-modal-result");
+    expect(modalResult).toHaveTextContent("22");
+    expect(screen.queryByTestId("roll-result-toast")).not.toBeInTheDocument();
 
     const [cid, sid, payload] = mockLogRoll.mock.calls[0];
     expect(cid).toBe("char-1");
@@ -86,6 +88,29 @@ describe("RollProvider — rollAnimated + logging", () => {
       total: 22,
       faces: [NATURAL],
     });
+  });
+
+  it("quick: skips the 3D dice and shows the compact chip with the result", async () => {
+    localStorage.setItem("cs:pref:diceRoll", "quick");
+    render(
+      <DiceRollStyleProvider>
+        <RollProvider characterId="char-1" sessionId="sess-1">
+          <AnimatedRollOnMount
+            spec={{ count: 1, faces: 20, modifier: 5 }}
+            label="Perception check"
+            log={{ kind: "check", source: "Perception check", ability: "wisdom", skill: "perception" }}
+          />
+          <RollResultToast />
+        </RollProvider>
+      </DiceRollStyleProvider>,
+    );
+
+    // No 3D overlay; the compact chip carries the result and it still logs.
+    const chip = await screen.findByTestId("roll-result-toast");
+    expect(chip).toHaveTextContent("Perception check");
+    expect(screen.queryByTestId("dice-roller")).not.toBeInTheDocument();
+    await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
+    expect(mockLogRoll.mock.calls[0][2]).toMatchObject({ kind: "check", skill: "perception" });
   });
 
   it("does not log when no session is active (still animates)", async () => {
