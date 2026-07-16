@@ -6,6 +6,7 @@ import AppHeader from "@/features/auth/AppHeader";
 import AuthGate from "@/features/auth/AuthGate";
 import { AuthProvider } from "@/features/auth/AuthProvider";
 import { ThemeProvider } from "@/features/theme/ThemeProvider";
+import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
 import CampaignDetailPage from "@/features/campaign/CampaignDetailPage";
 import CampaignsPage from "@/features/campaign/CampaignsPage";
 import JoinCampaignRoute from "@/features/campaign/JoinCampaignRoute";
@@ -28,6 +29,8 @@ export default function App() {
       <ErrorBoundary>
         {/* Theme wraps everything so data-theme is applied app-wide. */}
         <ThemeProvider>
+          {/* Dice-roll presentation preference (Animated vs Quick, #945). */}
+          <DiceRollStyleProvider>
           {/* Auth wraps the route tree: AuthGate shows the login screen for an
               anonymous user (incl. after a 401), the app otherwise. */}
           <AuthProvider>
@@ -66,6 +69,7 @@ export default function App() {
               </Suspense>
             </AuthGate>
           </AuthProvider>
+          </DiceRollStyleProvider>
         </ThemeProvider>
       </ErrorBoundary>
     </BrowserRouter>
