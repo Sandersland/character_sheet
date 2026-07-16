@@ -53,6 +53,12 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+// The grimoire (prepare runes, spellbook rows) is a separate view opened from the
+// record block's "Manage spellbook →"; open it before asserting on its contents.
+async function openGrimoire(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: /manage spellbook/i }));
+}
+
 describe("SpellsSection concentration", () => {
   it("does not show the concentration banner when not concentrating", () => {
     render(<SpellsSection character={makeCharacter(null)} onUpdate={vi.fn()} />);
@@ -92,22 +98,27 @@ describe("SpellsSection concentration", () => {
     expect(mockApply).toHaveBeenCalledWith("char-1", [{ type: "dropConcentration" }]);
   });
 
-  it("scrolls to the spellbook when Manage spellbook is clicked", async () => {
+  it("opens the grimoire view (not stacked) when Manage spellbook is clicked", async () => {
     const user = userEvent.setup();
-    const scrollIntoView = vi.fn();
-    Element.prototype.scrollIntoView = scrollIntoView;
     render(<SpellsSection character={makeCharacter(null)} onUpdate={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: /manage spellbook/i }));
-    expect(scrollIntoView).toHaveBeenCalled();
+    // Record block is showing, grimoire is not.
+    expect(screen.queryByRole("button", { name: /^done$/i })).not.toBeInTheDocument();
+    await openGrimoire(user);
+    // Grimoire is now the active view (its Done control appears); the record's
+    // "Manage spellbook" opener is gone — the two are never on screen together.
+    expect(screen.getByRole("button", { name: /^done$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /manage spellbook/i })).not.toBeInTheDocument();
   });
 
-  it("marks the active concentration spell's badge as 'concentrating'", () => {
+  it("marks the active concentration spell's badge as 'concentrating'", async () => {
+    const user = userEvent.setup();
     render(
       <SpellsSection
         character={makeCharacter({ entryId: "entry-bless", spellName: "Bless" })}
         onUpdate={vi.fn()}
       />,
     );
+    await openGrimoire(user);
     expect(screen.getByText("concentrating")).toBeInTheDocument();
   });
 });
@@ -146,6 +157,7 @@ describe("SpellsSection preparation (grimoire runes)", () => {
     mockApply.mockResolvedValue(makeWizard({ prepared: true }));
 
     render(<SpellsSection character={makeWizard()} onUpdate={vi.fn()} />);
+    await openGrimoire(user);
     await user.click(screen.getByRole("button", { name: /Prepare Shield/i }));
 
     expect(mockApply).toHaveBeenCalledWith("wiz-1", [{ type: "prepareSpell", entryId: "entry-shield" }]);
@@ -157,6 +169,7 @@ describe("SpellsSection preparation (grimoire runes)", () => {
     mockApply.mockResolvedValue(makeWizard());
 
     render(<SpellsSection character={makeWizard({ prepared: true, preparedSpellCount: 2 })} onUpdate={vi.fn()} />);
+    await openGrimoire(user);
     await user.click(screen.getByRole("button", { name: /Unprepare Shield/i }));
 
     expect(mockApply).toHaveBeenCalledWith("wiz-1", [{ type: "unprepareSpell", entryId: "entry-shield" }]);
@@ -172,6 +185,7 @@ describe("SpellsSection preparation (grimoire runes)", () => {
         onUpdate={vi.fn()}
       />,
     );
+    await openGrimoire(user);
     await user.click(screen.getByRole("button", { name: /Prepare Shield/i }));
 
     expect(mockApply).not.toHaveBeenCalled();
@@ -184,6 +198,7 @@ describe("SpellsSection preparation (grimoire runes)", () => {
     mockApply.mockRejectedValue(new Error("You can prepare at most 8 spells."));
 
     render(<SpellsSection character={makeWizard()} onUpdate={vi.fn()} />);
+    await openGrimoire(user);
     await user.click(screen.getByRole("button", { name: /Prepare Shield/i }));
 
     expect(await screen.findByText("You can prepare at most 8 spells.")).toBeInTheDocument();
