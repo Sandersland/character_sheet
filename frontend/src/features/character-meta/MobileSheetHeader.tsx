@@ -6,12 +6,10 @@ import Popover from "@/components/ui/Popover";
 import RollButton from "@/features/dice/RollButton";
 import { formatModifier } from "@/lib/abilities";
 import { classSummary, isMulticlass } from "@/lib/multiclass";
-import type { useSessionButton } from "@/features/session/useSessionButton";
 import type { Character } from "@/types/character";
 
 interface MobileSheetHeaderProps {
   character: Character;
-  session: ReturnType<typeof useSessionButton>;
   onOpenCapture: () => void;
   onOpenSessions: () => void;
   onOpenActivity: () => void;
@@ -33,7 +31,6 @@ const TILE_LABEL = "mt-1 text-[9px] font-semibold uppercase tracking-wide text-p
  */
 export default function MobileSheetHeader({
   character,
-  session,
   onOpenCapture,
   onOpenSessions,
   onOpenActivity,
@@ -69,17 +66,10 @@ export default function MobileSheetHeader({
         <span className="flex-none rounded-full bg-garnet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-garnet-700">
           {pill}
         </span>
-        {/* Session button: campaign-required; sessions are shared per campaign. */}
-        {session.hasCampaign ? (
-          <button
-            type="button"
-            disabled={session.sessionPending || !session.sessionReady}
-            onClick={session.handleSessionButton}
-            className="flex-none rounded-control bg-garnet-700 px-2.5 py-1 text-[11px] font-semibold text-parchment-50 transition-colors hover:bg-garnet-800 disabled:opacity-50"
-          >
-            {session.sessionLabel}
-          </button>
-        ) : (
+        {/* Start/join/resume moved to the SessionDoorway bar above the nav (#942).
+            Campaign-less characters have no doorway, so keep the Join-campaign
+            invite here. */}
+        {!character.campaignId && (
           <Link
             to="/campaigns"
             title="Join a campaign to play a shared session"
@@ -98,10 +88,6 @@ export default function MobileSheetHeader({
           ]}
         />
       </div>
-
-      {session.sessionError && (
-        <p className="mt-1 text-[11px] font-semibold text-garnet-700">{session.sessionError}</p>
-      )}
 
       {/* HP: read-only readout + meter (editing lives on the Combat tab). */}
       <div className="mt-2 flex items-center gap-2">
