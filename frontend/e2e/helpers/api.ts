@@ -32,6 +32,19 @@ export async function gotoSheet(
   await page.goto(`/characters/${id}${tab ? `?tab=${tab}` : ""}`);
 }
 
+// The Magic tab is two mutually-exclusive views: the record block (quick-cast +
+// slot pips) and the grimoire (full spellbook rows: prepare/cast/forget). The
+// spellbook rows live only in the grimoire — open it via "Manage spellbook →"
+// before interacting with a spell row, and close it via "Done" to read the
+// record's slot pips again.
+export async function openSpellbook(page: Page): Promise<void> {
+  await page.getByRole("button", { name: /manage spellbook/i }).click();
+}
+
+export async function closeSpellbook(page: Page): Promise<void> {
+  await page.getByRole("button", { name: /^done$/i }).click();
+}
+
 type AbilityScores = typeof ABILITY_SCORES;
 
 interface CreateCharacterOpts {

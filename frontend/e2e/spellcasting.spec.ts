@@ -2,7 +2,14 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { createCharacter, gotoSheet, learnSpells, uniqueName } from "./helpers/api";
+import {
+  closeSpellbook,
+  createCharacter,
+  gotoSheet,
+  learnSpells,
+  openSpellbook,
+  uniqueName,
+} from "./helpers/api";
 
 const WIZARD_L5_XP = 6500;
 
@@ -31,21 +38,29 @@ test("spellcasting: leveled cast, upcast, and free cantrip drive the slot pips",
   const l1Before = await slotRemaining(page, 1);
   const l2Before = await slotRemaining(page, 2);
 
+  // Spell rows (with their upcast slot picker) live in the grimoire; the
+  // interactive slot pips live on the record. Open the grimoire to cast the
+  // three spells, then return to the record to verify the pips.
+  await openSpellbook(page);
+
   // ── Cast Magic Missile with a level-1 slot ──────────────────────────────────
   await spellRow(page, "Magic Missile").getByRole("button", { name: "Cast" }).click();
   await page.getByTitle(/Magic Missile with a level 1 slot/).click();
-  await expect.poll(() => slotRemaining(page, 1)).toBe(l1Before - 1);
 
   // ── Upcast Magic Missile with a level-2 slot ────────────────────────────────
   await spellRow(page, "Magic Missile").getByRole("button", { name: "Cast" }).click();
   await page.getByTitle(/Magic Missile with a level 2 slot/).click();
-  await expect.poll(() => slotRemaining(page, 2)).toBe(l2Before - 1);
 
   // ── Cantrip consumes no slot ────────────────────────────────────────────────
   await spellRow(page, "Fire Bolt").getByRole("button", { name: "Cast" }).click();
   await expect(page.getByText(/Fire Bolt/).first()).toBeVisible();
-  expect(await slotRemaining(page, 1)).toBe(l1Before - 1);
-  expect(await slotRemaining(page, 2)).toBe(l2Before - 1);
+
+  await closeSpellbook(page);
+
+  // Back on the record: one level-1 slot spent (base cast) + one level-2 slot
+  // spent (upcast); the cantrip drove no pips.
+  await expect.poll(() => slotRemaining(page, 1)).toBe(l1Before - 1);
+  await expect.poll(() => slotRemaining(page, 2)).toBe(l2Before - 1);
 
   expect(errors).toEqual([]);
 });
