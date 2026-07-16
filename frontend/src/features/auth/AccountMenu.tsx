@@ -1,10 +1,12 @@
-import { Check, Monitor, Moon, Sun, type LucideIcon } from "lucide-react";
+import { Check, Dices, Monitor, Moon, Sun, Zap, type LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import Avatar from "@/components/ui/Avatar";
 import DropdownMenu from "@/components/ui/DropdownMenu";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { useTheme } from "@/features/theme/ThemeProvider";
+import { useDiceRollStyle } from "@/features/dice/DiceRollStyleProvider";
+import type { DiceRollStyle } from "@/hooks/useDiceRollStyle";
 import type { ThemePreference } from "@/hooks/useThemePreference";
 
 const THEME_OPTIONS: { value: ThemePreference; label: string; icon: LucideIcon }[] = [
@@ -13,10 +15,16 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; icon: LucideIcon }
   { value: "system", label: "System", icon: Monitor },
 ];
 
-// Avatar-triggered account dropdown: identity, appearance picker, and logout.
+const DICE_OPTIONS: { value: DiceRollStyle; label: string; icon: LucideIcon }[] = [
+  { value: "animated", label: "Animated", icon: Dices },
+  { value: "quick", label: "Quick", icon: Zap },
+];
+
+// Avatar-triggered account dropdown: identity, appearance + dice pickers, and logout.
 export default function AccountMenu() {
   const { user, logout } = useAuth();
   const { preference, setPreference } = useTheme();
+  const { style: diceStyle, setStyle: setDiceStyle } = useDiceRollStyle();
 
   return (
     <DropdownMenu
@@ -61,6 +69,30 @@ export default function AccountMenu() {
                   role="menuitemradio"
                   aria-checked={active}
                   onClick={() => setPreference(value)}
+                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-parchment-100 focus-visible:bg-parchment-100 focus-visible:outline-none ${
+                    active ? "text-parchment-900" : "text-parchment-600"
+                  }`}
+                >
+                  <Icon className="size-4" aria-hidden="true" />
+                  <span className="flex-1">{label}</span>
+                  {active && <Check className="size-4" aria-hidden="true" />}
+                </button>
+              );
+            })}
+          </div>
+          <div className="border-b border-parchment-200 py-1" role="group" aria-label="Dice rolls">
+            <p className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-parchment-500">
+              Dice rolls
+            </p>
+            {DICE_OPTIONS.map(({ value, label, icon: Icon }) => {
+              const active = diceStyle === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={active}
+                  onClick={() => setDiceStyle(value)}
                   className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-parchment-100 focus-visible:bg-parchment-100 focus-visible:outline-none ${
                     active ? "text-parchment-900" : "text-parchment-600"
                   }`}

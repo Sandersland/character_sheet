@@ -14,12 +14,15 @@ vi.mock("@/features/auth/AuthProvider", () => ({
 
 import AccountMenu from "@/features/auth/AccountMenu";
 import { ThemeProvider } from "@/features/theme/ThemeProvider";
+import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
 
 function renderMenu() {
   return render(
     <MemoryRouter>
       <ThemeProvider>
-        <AccountMenu />
+        <DiceRollStyleProvider>
+          <AccountMenu />
+        </DiceRollStyleProvider>
       </ThemeProvider>
     </MemoryRouter>,
   );
@@ -112,6 +115,25 @@ describe("AccountMenu", () => {
     await user.keyboard("{ArrowDown}");
     await user.keyboard("{Enter}");
     expect(localStorage.getItem("cs:pref:theme")).toBe("dark");
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+  });
+
+  it("renders Animated/Quick dice options, defaults to Animated, and switches", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await user.click(screen.getByRole("button", { name: "Account" }));
+
+    const animated = screen.getByRole("menuitemradio", { name: "Animated" });
+    const quick = screen.getByRole("menuitemradio", { name: "Quick" });
+    expect(animated).toHaveAttribute("aria-checked", "true");
+    expect(quick).toHaveAttribute("aria-checked", "false");
+
+    await user.click(quick);
+    expect(localStorage.getItem("cs:pref:diceRoll")).toBe("quick");
+    expect(screen.getByRole("menuitemradio", { name: "Quick" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
     expect(screen.getByRole("menu")).toBeInTheDocument();
   });
 
