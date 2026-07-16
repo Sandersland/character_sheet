@@ -45,13 +45,13 @@ export default function RollResultToast() {
       aria-live="polite"
       aria-atomic="true"
       className={`
-        pointer-events-none fixed left-1/2 z-50 w-max max-w-[16rem] -translate-x-1/2
-        top-[calc(env(safe-area-inset-top,0px)+0.75rem)]
+        pointer-events-none fixed left-1/2 z-50 w-max max-w-[16rem] -translate-x-1/2 sm:max-w-xs
+        top-[calc(env(safe-area-inset-top,0px)+0.75rem)] sm:top-6
         transition-all duration-300 ease-out
         ${visible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0"}
       `}
     >
-      <div className="rounded-card border border-parchment-200 bg-parchment-50/95 px-3 py-2 text-left shadow-lg backdrop-blur-sm">
+      <div className="rounded-card border border-parchment-200 bg-parchment-50/95 px-3 py-2 text-left shadow-lg backdrop-blur-sm sm:px-5 sm:py-3.5 sm:shadow-xl">
         <RollBreakdown label={displayed.label} result={displayed.result} />
       </div>
     </div>,

@@ -78,12 +78,12 @@ export default function RollBreakdown({ label, result, emphasis = false }: RollB
           {banner.text}
         </p>
       ))}
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600 sm:text-xs">
         {label}
       </p>
       <p
         className={`font-display font-semibold leading-none tabular-nums ${
-          emphasis ? "text-4xl" : "text-3xl"
+          emphasis ? "text-4xl" : "text-3xl sm:text-4xl"
         } ${totalClassName}`}
       >
         {total}
