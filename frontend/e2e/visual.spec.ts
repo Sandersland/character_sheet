@@ -169,7 +169,7 @@ test("visual: session / turn view", async ({ page }) => {
 
   await setTheme(page, "light");
   await page.goto(`/characters/${id}`);
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
+  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
   await expect(page).toHaveURL(/\/session$/);
   await expect(page.getByRole("button", { name: /Start combat/i })).toBeVisible();
   await ready(page);

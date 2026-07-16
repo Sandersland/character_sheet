@@ -19,7 +19,7 @@ test("session rest button: short rest spends a hit die, long rest is available",
   });
 
   await page.goto(`/characters/${id}`);
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
+  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
   await expect(page).toHaveURL(/\/session$/);
 
   // No Rest & HP tab in the reference strip anymore.

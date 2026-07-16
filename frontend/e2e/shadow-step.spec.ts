@@ -12,7 +12,7 @@ test("session: a Way of Shadow monk uses Shadow Step as a bonus action", async (
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Shadow Monk/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
+  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
   await expect(page).toHaveURL(/\/session$/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();

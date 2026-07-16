@@ -10,7 +10,7 @@ test("session HP sheet: tap the bar, apply damage, see it in the log", async ({ 
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
+  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
   await expect(page).toHaveURL(/\/session$/);
 
   const bar = page.getByRole("button", { name: /manage hit points/i });

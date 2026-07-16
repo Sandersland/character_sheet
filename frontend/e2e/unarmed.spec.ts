@@ -11,7 +11,7 @@ test("unarmed: Monk L6 shows the Ki-Empowered Strikes magical badge", async ({ p
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Monk L6/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
+  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
   await expect(page).toHaveURL(/\/session$/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
