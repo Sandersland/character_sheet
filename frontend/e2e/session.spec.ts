@@ -118,7 +118,7 @@ test("session: roll toast is suppressed while the attack sheet is open (mobile)"
   await page.getByRole("button", { name: "Attack", exact: true }).click();
 
   const sheet = page.getByRole("dialog");
-  const toast = page.locator('[role="status"].right-6');
+  const toast = page.locator('[data-testid="roll-result-toast"]');
 
   await sheet.getByRole("button", { name: "Roll to hit" }).click();
 

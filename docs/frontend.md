@@ -54,7 +54,8 @@ frontend/src/
 │   │                    #   chips/exhaustion/AddConditionPanel + applyConditionTransactions), AddConditionPanel,
 │   │                    #   CompactConditionsBar (mobile session strip; tap → "Conditions" BottomSheet → ConditionsSheetBody, #769)
 │   ├── dice/            # DiceRoller, PhysicsDiceRoller, DiceScene, DieMesh, DiceRollSequence,
-│   │                    #   DiceRollModal, RollButton, RollContext, RollResultToast, RollModeToggle,
+│   │                    #   DiceRollModal, RollButton, RollContext, RollResultToast, RollBreakdown,
+│   │                    #   RollModeToggle, DiceRollStyleProvider (useDiceRollStyle),
 │   │                    #   diceRollerTypes.ts, useDieFaceData.ts
 │   ├── entities/        # CampaignCodex (Codex tab: full-width browse shell orchestrating rail + ledger #840),
 │   │                    #   CodexRail (search/type-filter/sort/create toggle), CodexLedger (A→Z letter-divided
@@ -415,9 +416,11 @@ OAuth-only (no passwords). Pieces:
   `GET /api/auth/providers` (each a plain anchor to its `startUrl`), so enabling
   a provider server-side needs no frontend change.
 
-`App.tsx` order: `BrowserRouter → ErrorBoundary → ThemeProvider → AuthProvider →
-AuthGate → (AppHeader + Routes)` — ErrorBoundary stays outermost over the app
-content; ThemeProvider wraps auth so `data-theme` applies app-wide.
+`App.tsx` order: `BrowserRouter → ErrorBoundary → ThemeProvider →
+DiceRollStyleProvider → AuthProvider → AuthGate → (AppHeader + Routes)` —
+ErrorBoundary stays outermost over the app content; ThemeProvider wraps auth so
+`data-theme` applies app-wide; `DiceRollStyleProvider` (#945) sits alongside it
+so the dice-roll preference is app-wide too.
 
 ## Theme / dark mode — `features/theme/`
 
@@ -463,11 +466,13 @@ usesAdvantage(spec): boolean            // the advantage/disadvantage guard (bel
 
 The manual toggle is `features/dice/RollModeToggle.tsx` — a sticky Normal/ADV/DIS control (mounted alongside `RollResultToast` only in `SessionContent`; it was removed from the sheet page, where auto adv/dis from conditions #486 still applies) that sets `mode` in `RollContext`; `roll()` merges that mode into every eligible spec (a caller-pinned `spec.mode` wins). Placement is pure-CSS per breakpoint (#770, same split-by-`md:` pattern as #746): at `< md` it renders a fixed full-width **docked bar** at `inset-x-0 bottom-0` (parchment surface, top border, safe-area bottom padding) — the session page has no bottom nav, so it sits flush at the bottom; at `md:` the surface strips back to the original `bottom-6 left-6` floating pill. `SessionContent` (no bottom nav) adds a bottom gutter so the last content row clears the bar — `pb-[calc(4rem+env(safe-area-inset-bottom))]` with `md:pb-6`; the sheet's `CharacterSheetContent` needs only nav clearance (`pb-[calc(5rem+env(safe-area-inset-bottom))]`, `md:pb-0`). The `role=group` / `aria-label="Roll mode"` / `aria-pressed` control renders once (no per-breakpoint double-render); z-index is unchanged, so an open `BottomSheet` sits over the bar. `RollResultToast` shows both dice (dropped one struck through), an Advantage/Disadvantage label, and keeps natural-20/1 highlighting on the **taken** die; `DiceRoller` renders both d20s.
 
-**Toast visibility (#801).** `RollResultToast` is `createPortal`'d to `document.body` so its stacking is deterministic, and it returns `null` while **any** dialog is open — `hooks/useDialogChrome.ts` keeps a module-scoped open-dialog count (every `Modal`/`BottomSheet` increments on mount / decrements on unmount) exposed via `useAnyDialogOpen()`. Suppression is **everywhere, not gated to `< md`**: mobile sheets and the desktop centered modal both draw a full-screen backdrop-blur scrim that would occlude the corner toast, and a roll fired from inside a dialog already shows its result on the sheet (the attack card). No z-index change — suppression, not escalation. Rolls fired while a dialog is open still log to the session log via the existing `useRollLogger`/`logSessionRoll` path.
+**Dice-rolls preference (#945).** A per-browser Animated-vs-Quick choice — `DiceRollStyleProvider` (mounted at `App.tsx` root beside `ThemeProvider`; `useDiceRollStyle()` → `{ style, setStyle }`) over the localStorage hook `hooks/useDiceRollStyle.ts` (key `cs:pref:diceRoll`, `"animated" | "quick"`, default `animated`), shaped exactly like the theme pref. Toggled in `AccountMenu`'s "Dice rolls" group (next to Appearance). The two modes are **mutually exclusive** and only branch `rollAnimated` (below): `animated` plays the 3D `DiceRollModal`, which shows the total + breakdown at settle (`RollBreakdown`) and auto-dismisses after a short linger — **no persistent toast**; `quick` skips the 3D and resolves instantly to the compact `RollResultToast` chip. Both surfaces render the same `RollBreakdown` (source · `NdF(faces) ±mod` · adv/dis · nat-20/1), so they carry identical info. `useDiceRollStyle()` degrades to the `animated` default outside a provider so `RollProvider` test harnesses need no wrapper.
+
+**Result-chip visibility (#801/#945).** `RollResultToast` is `createPortal`'d to `document.body` and pinned **top-center** with a `env(safe-area-inset-top)` offset so it never covers the sheet's bottom nav or key content on mobile (was a bottom-right card). It returns `null` while **any** dialog is open — `hooks/useDialogChrome.ts` keeps a module-scoped open-dialog count (every `Modal`/`BottomSheet` increments on mount / decrements on unmount) exposed via `useAnyDialogOpen()`. Suppression is **everywhere, not gated to `< md`**: mobile sheets and the desktop centered modal both draw a full-screen backdrop-blur scrim, and a roll fired from inside a dialog already shows its result on the sheet (the attack card). Rolls fired while a dialog is open still log to the session log via the existing `useRollLogger`/`logSessionRoll` path.
 
 **Roll affordances → `RollContext`.** `RollProvider` (mounted once per page in `CharacterSheetPage`/`SessionPage`) exposes two roll paths that share the sticky `mode`:
-- `roll(spec, label)` — instant fast-roll (no 3D). Used by the in-combat attack/damage/spell pickers, which run their own `logRoll` calls.
-- `rollAnimated(spec, label, log?, onSettled?)` — plays the 3D `DiceRollModal` overlay, publishes to `RollResultToast`, and (when `log` is set) emits the roll's category event. This is what `RollButton` uses, so the sheet's **skill checks** (`SkillsTable`), **ability checks + saving throws** (`AbilityScoreBox`), and **initiative** (`BannerVitals`) all animate and log via the `log={{ kind, source, ability?, skill?, dc? }}` prop (#460). `onSettled(result)` fires with the settled `RollResult` so a caller can apply the exact **shown** roll server-side — `UseConsumableButton` (#121) uses it to forward a consumable's rolled effect-die values via the `use` op's `rolls`, so the animated roll equals the applied heal.
+- `roll(spec, label)` — instant fast-roll (no 3D); always publishes to the `RollResultToast` chip. Used by the in-combat attack/damage/spell pickers, which run their own `logRoll` calls.
+- `rollAnimated(spec, label, log?, onSettled?)` — honors the Dice-rolls preference: `animated` opens the 3D `DiceRollModal` (its own result surface — no toast), `quick` resolves instantly to the `RollResultToast` chip. Both log the roll (when `log` is set) and fire `onSettled`. This is what `RollButton` uses, so the sheet's **skill checks** (`SkillsTable`), **ability checks + saving throws** (`AbilityScoreBox`), and **initiative** (`BannerVitals`) go through it via the `log={{ kind, source, ability?, skill?, dc? }}` prop (#460). `onSettled(result)` fires with the settled `RollResult` so a caller can apply the exact **shown** roll server-side — `UseConsumableButton` (#121) uses it to forward a consumable's rolled effect-die values via the `use` op's `rolls`, so the roll equals the applied heal.
 
 `logSessionRoll` is the shared **best-effort** logging path (a no-op unless `RollProvider` was given both `characterId` and an active `sessionId` — rolls only log inside a session, like attack/damage). `ConcentrationSaveModal` calls it directly so a manual concentration CON save reaches the Session Log as a `saveRoll` too. `RollProvider`'s `onRollLogged` bumps the session-log refresh key.
 
