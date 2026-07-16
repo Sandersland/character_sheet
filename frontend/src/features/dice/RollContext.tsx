@@ -107,18 +107,42 @@ interface RollProviderProps {
   rollModifiers?: RollModifier[];
 }
 
+/** A roll awaiting its 3D tumble (null when no overlay is open). */
+interface PendingRoll {
+  id: number;
+  spec: RollSpec;
+  label: string;
+  log?: RollLog;
+  onSettled?: (result: RollResult) => void;
+}
+
+/**
+ * The best-effort session-logging concern, split out of `RollProvider`: mirrors
+ * the live session identity into a ref and returns a stable `logSessionRoll`
+ * that no-ops unless both a character and an active session exist.
+ */
+function useSessionRollLog({
+  characterId,
+  sessionId,
+  onRollLogged,
+}: Pick<RollProviderProps, "characterId" | "sessionId" | "onRollLogged">) {
+  const sessionRef = useRef({ characterId, sessionId, onRollLogged });
+  sessionRef.current = { characterId, sessionId, onRollLogged };
+
+  return useCallback((input: RollLogInput) => {
+    const { characterId: cid, sessionId: sid, onRollLogged: onLogged } = sessionRef.current;
+    if (!cid || !sid) return;
+    logRoll(cid, sid, input)
+      .then(() => onLogged?.())
+      .catch((e) => console.error("roll log failed", e));
+  }, []);
+}
+
 /** Mount once at page level to enable `useRoll` in all children. */
 export function RollProvider({ children, characterId, sessionId, onRollLogged, rollModifiers = [] }: RollProviderProps) {
   const [lastRoll, setLastRoll] = useState<RollEntry | null>(null);
   const [mode, setMode] = useState<RollMode>("normal");
-  // The active animated roll awaiting its 3D tumble (null when no overlay is open).
-  const [pending, setPending] = useState<{
-    id: number;
-    spec: RollSpec;
-    label: string;
-    log?: RollLog;
-    onSettled?: (result: RollResult) => void;
-  } | null>(null);
+  const [pending, setPending] = useState<PendingRoll | null>(null);
   const idRef = useRef(0);
   // Read live values inside stable callbacks without re-creating them per change.
   const modeRef = useRef(mode);
@@ -127,22 +151,13 @@ export function RollProvider({ children, characterId, sessionId, onRollLogged, r
   const { style } = useDiceRollStyle();
   const styleRef = useRef(style);
   styleRef.current = style;
-  const sessionRef = useRef({ characterId, sessionId, onRollLogged });
-  sessionRef.current = { characterId, sessionId, onRollLogged };
   // Mirror `pending` in a ref so handleResult's side effects stay OUT of the
   // setPending updater — updaters must be pure, and StrictMode double-invokes
   // them, which would otherwise double-fire logSessionRoll (#473 review).
   const pendingRef = useRef(pending);
   pendingRef.current = pending;
 
-  // Best-effort session log — no-op unless both a character and active session exist.
-  const logSessionRoll = useCallback((input: RollLogInput) => {
-    const { characterId: cid, sessionId: sid, onRollLogged: onLogged } = sessionRef.current;
-    if (!cid || !sid) return;
-    logRoll(cid, sid, input)
-      .then(() => onLogged?.())
-      .catch((e) => console.error("roll log failed", e));
-  }, []);
+  const logSessionRoll = useSessionRollLog({ characterId, sessionId, onRollLogged });
 
   // Callers may pin a spec's own mode; otherwise the sticky toggle applies.
   const roll = useCallback((spec: RollSpec, label: string): RollResult => {
@@ -186,7 +201,9 @@ export function RollProvider({ children, characterId, sessionId, onRollLogged, r
   );
 
   // Fired when the 3D overlay's die settles: log it, then hand it back. The
-  // modal itself shows the result, so animated mode never publishes the toast.
+  // modal itself is the result surface in animated mode, so we intentionally do
+  // NOT setLastRoll here — only RollResultToast reads lastRoll, and firing it
+  // would double up the readout with the modal.
   const handleResult = useCallback((result: RollResult) => {
     const current = pendingRef.current;
     if (!current) return;
