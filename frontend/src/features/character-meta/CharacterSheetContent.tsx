@@ -44,9 +44,11 @@ export default function CharacterSheetContent({
       sessionId={session.inActiveSession ? session.activeSessionId : null}
       rollModifiers={character.rollModifiers}
     >
-      {/* Fixed bottom gutter clears the capped-height SheetBottomNav; no raw env()
-          here so iOS Safari's dynamic toolbar can't balloon it. */}
-      <div className="min-h-screen bg-parchment-100 pb-24 md:pb-0">
+      {/* Mobile: a 100dvh app-shell — fixed header + in-flow bottom nav with the
+          panels scrolling in the middle, so iOS Safari's dynamic toolbar can't
+          shift a body-scrolled fixed nav (no gap; nav always flush). Desktop
+          reverts to normal min-h-screen body scroll (nav is md:hidden). */}
+      <div className="flex h-[100dvh] flex-col overflow-hidden bg-parchment-100 md:block md:h-auto md:min-h-screen md:overflow-visible">
         <CharacterSheetHeader
           character={character}
           session={session}
@@ -74,12 +76,16 @@ export default function CharacterSheetContent({
           onCloseCapture={closeCapture}
         />
 
-        <CharacterSheetBody
-          character={character}
-          reference={reference}
-          onUpdate={onUpdate}
-          activeTab={activeTab}
-        />
+        {/* min-h-0 lets the scroll region shrink below its content so it actually
+            scrolls (the flexbox overflow gotcha). Desktop: normal flow. */}
+        <div className="min-h-0 flex-1 overflow-y-auto md:flex-none md:overflow-visible">
+          <CharacterSheetBody
+            character={character}
+            reference={reference}
+            onUpdate={onUpdate}
+            activeTab={activeTab}
+          />
+        </div>
         <RollResultToast />
         <SheetBottomNav tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />
       </div>
