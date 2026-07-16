@@ -52,7 +52,7 @@ export default function MobileSheetHeader({
   const pill = !multiclass && character.subclass ? character.subclass : `Lvl ${character.level}`;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-parchment-200 bg-parchment-50 px-3 py-2.5 shadow-sm md:hidden">
+    <header className="z-30 shrink-0 border-b border-parchment-200 bg-parchment-50 px-3 py-2.5 shadow-sm md:hidden">
       {/* Row 1: identity + collapsed actions */}
       <div className="flex items-center gap-2.5">
         <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-control bg-gradient-to-br from-garnet-700 to-garnet-900 font-display text-lg font-semibold text-parchment-50 shadow-raised">

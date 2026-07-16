@@ -25,19 +25,17 @@ const TAB_ICONS: Record<SheetTabId, IconType> = {
 };
 
 /**
- * Mobile-only (`md:hidden`) fixed bottom nav that swaps the top tab bar on phones.
+ * Mobile-only (`md:hidden`) bottom nav that swaps the top tab bar on phones.
  * Renders the character's tabs (Magic hidden for non-casters) as equal-width
- * icon+label targets. Sits above the docked RollModeToggle — see the stacked
- * bottom offsets in RollModeToggle + CharacterSheetContent's mobile gutter.
+ * icon+label targets. It's an in-flow child of CharacterSheetContent's 100dvh
+ * app-shell (not `position: fixed`), so iOS Safari's dynamic toolbar can't shift
+ * it; the safe-area padding only lifts labels clear of the home indicator.
  */
 export default function SheetBottomNav({ tabs, activeTab, onTabChange }: SheetBottomNavProps) {
   return (
     <nav
       aria-label="Sheet sections"
-      // Cap the safe-area inset so iOS Safari's dynamic bottom toolbar can't
-      // balloon the bar; buttons carry their own height so icons never squish.
-      style={{ paddingBottom: "min(env(safe-area-inset-bottom), 2.125rem)" }}
-      className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-garnet-800 bg-gradient-to-b from-garnet-700 to-garnet-900 text-parchment-50 md:hidden"
+      className="flex flex-none items-stretch border-t border-garnet-800 bg-gradient-to-b from-garnet-700 to-garnet-900 pb-[env(safe-area-inset-bottom)] text-parchment-50 md:hidden"
     >
       {tabs.map((tab) => {
         const Icon = TAB_ICONS[tab.id];
