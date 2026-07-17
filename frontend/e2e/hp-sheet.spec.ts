@@ -38,7 +38,10 @@ test("session HP sheet: tap the bar, apply damage, see it in the log", async ({ 
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // (The session-log assertion returns with the Combat-tab Turn/Log sub-nav in
-  // #962; the log tab isn't on the Combat tab yet after the #963 doorway jump.)
+  // The damage event lands on the session log — reachable via the Combat-tab
+  // Turn/Log sub-nav (#962).
+  await page.getByRole("tab", { name: /Log/ }).click();
+  await expect(page.getByText("damage", { exact: true }).first()).toBeVisible();
+
   expect(errors).toEqual([]);
 });
