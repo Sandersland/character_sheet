@@ -101,10 +101,11 @@ interface SessionLogProps {
   characterId: string;
   sessionId: string;
   /**
-   * Changing this value re-fetches the event list. Pass the character object
-   * (or a version counter) so casts and HP changes trigger a live refresh.
+   * Optional: changing this value re-fetches the event list, for a caller that
+   * keeps the log mounted across live mutations. Omit it when the log is mounted
+   * on demand (e.g. Combat's Turn/Log sub-nav, #962) — each mount refetches.
    */
-  refreshKey: unknown;
+  refreshKey?: unknown;
 }
 
 export default function SessionLog({ characterId, sessionId, refreshKey }: SessionLogProps) {
