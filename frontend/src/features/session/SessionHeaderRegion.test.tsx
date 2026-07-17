@@ -78,10 +78,16 @@ describe("SessionHeaderRegion", () => {
     expect(handlers.onCapture).toHaveBeenCalledOnce();
   });
 
-  it("also disables Leave / End while an end is in flight (endPending path)", () => {
+  it("also disables Leave / End (both breakpoints) while an end is in flight (endPending path)", async () => {
+    const user = userEvent.setup();
     renderRegion({ endPending: true });
+    // Desktop inline buttons.
     expect(screen.getByRole("button", { name: "Leave Session" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "End Session" })).toBeDisabled();
+    // Mobile overflow items (aria-disabled).
+    await user.click(screen.getByRole("button", { name: "Session actions" }));
+    expect(screen.getByRole("menuitem", { name: "Leave Session" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("menuitem", { name: "End Session" })).toHaveAttribute("aria-disabled", "true");
   });
 
   it("surfaces a leave error at both breakpoints when present", () => {
