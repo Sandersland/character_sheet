@@ -117,4 +117,22 @@ describe("BannerVitals", () => {
     );
     expect(screen.getByText("+5")).toBeInTheDocument();
   });
+
+  // #982: the live-Combat panel no longer carries a CompactHpBar, so the header
+  // HP readout must be the entry point to the HP sheet.
+  it("with onUpdate, the HP chip is a 'Manage hit points' button that opens the HP sheet", async () => {
+    const user = userEvent.setup();
+    renderWithRoll(<BannerVitals character={mockCharacter} onUpdate={() => {}} />);
+    const hpButton = screen.getByRole("button", { name: /manage hit points/i });
+    expect(hpButton).toBeInTheDocument();
+    await user.click(hpButton);
+    expect(
+      screen.getByRole("heading", { name: /hit points/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("without onUpdate, the HP readout stays read-only (no manage-HP button)", () => {
+    renderWithRoll(<BannerVitals character={mockCharacter} />);
+    expect(screen.queryByRole("button", { name: /manage hit points/i })).not.toBeInTheDocument();
+  });
 });

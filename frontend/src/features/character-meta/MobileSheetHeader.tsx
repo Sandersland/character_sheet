@@ -3,13 +3,17 @@ import { Link } from "react-router-dom";
 import MeterBar from "@/components/ui/MeterBar";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import Popover from "@/components/ui/Popover";
+import ArmorClassBreakdown from "@/features/character-meta/ArmorClassBreakdown";
 import RollButton from "@/features/dice/RollButton";
+import ManageHpButton from "@/features/hitpoints/ManageHpButton";
 import { formatModifier } from "@/lib/abilities";
 import { classSummary, isMulticlass } from "@/lib/multiclass";
 import type { Character } from "@/types/character";
 
 interface MobileSheetHeaderProps {
   character: Character;
+  /** Opens the shared HP sheet from the HP readout; omit for a read-only row. */
+  onUpdate?: (character: Character) => void;
   /** Live-session controls folded into the "Sheet actions" menu while joined
    *  (#979) — there's no separate in-panel controls strip anymore. */
   sessionActions?: { busy: boolean; onLeave: () => void; onEnd: () => void } | null;
@@ -34,6 +38,7 @@ const TILE_LABEL = "mt-1 text-[9px] font-semibold uppercase tracking-wide text-p
  */
 export default function MobileSheetHeader({
   character,
+  onUpdate,
   sessionActions = null,
   onOpenCapture,
   onOpenSessions,
@@ -41,6 +46,21 @@ export default function MobileSheetHeader({
   onOpenDelete,
 }: MobileSheetHeaderProps) {
   const { current, max, temp } = character.hitPoints;
+
+  // HP readout (value + meter) — the shared inner content whether the row is a
+  // tappable HP-sheet trigger (#982) or a read-only readout.
+  const hpReadout = (
+    <>
+      <span className="flex-none font-display text-sm font-semibold text-garnet-800">
+        {current}
+        <span className="text-parchment-600">/{max}</span>
+        {temp > 0 && <span className="text-arcane-700"> +{temp}</span>}
+      </span>
+      <div className="flex-1">
+        <MeterBar current={current} max={max} tone="vitality" label={`Hit points ${current} of ${max}`} />
+      </div>
+    </>
+  );
 
   // One menu, not two (#979): while joined, Leave/End Session join Note/Sessions/
   // Activity here (above Delete) instead of a separate in-panel controls strip.
@@ -100,19 +120,23 @@ export default function MobileSheetHeader({
         <OverflowMenu label="Sheet actions" items={menuItems} />
       </div>
 
-      {/* HP: read-only readout + meter (editing lives on the Combat tab). */}
+      {/* HP: the tappable HP surface (#982) — opens the shared "Hit Points" sheet.
+          Read-only readout when no onUpdate (test/preview callers). */}
       <div className="mt-2 flex items-center gap-2">
         <span className="text-[10px] font-semibold uppercase tracking-wide text-parchment-600">
           HP
         </span>
-        <span className="flex-none font-display text-sm font-semibold text-garnet-800">
-          {current}
-          <span className="text-parchment-600">/{max}</span>
-          {temp > 0 && <span className="text-arcane-700"> +{temp}</span>}
-        </span>
-        <div className="flex-1">
-          <MeterBar current={current} max={max} tone="vitality" label={`Hit points ${current} of ${max}`} />
-        </div>
+        {onUpdate ? (
+          <ManageHpButton
+            character={character}
+            onUpdate={onUpdate}
+            className="flex flex-1 items-center gap-2 rounded-control px-1 py-0.5 text-left transition-colors hover:bg-parchment-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
+          >
+            {hpReadout}
+          </ManageHpButton>
+        ) : (
+          <div className="flex flex-1 items-center gap-2">{hpReadout}</div>
+        )}
       </div>
 
       {/* Vitals: AC · Init · Speed · Prof, one equal-width row. */}
@@ -128,21 +152,7 @@ export default function MobileSheetHeader({
             </>
           }
         >
-          <dl className="px-3 py-2 text-sm">
-            {character.armorClassBreakdown.map((part, i) => (
-              <div key={`${part.label}-${i}`} className="flex items-center justify-between gap-4 py-0.5">
-                <dt className="text-parchment-700">{part.label}</dt>
-                <dd className="font-semibold tabular-nums text-parchment-900">
-                  {/* deriveArmorClassParts always emits the base (armor/unarmored) part first. */}
-                  {i === 0 ? part.value : formatModifier(part.value)}
-                </dd>
-              </div>
-            ))}
-            <div className="mt-1 flex items-center justify-between gap-4 border-t border-parchment-200 pt-1">
-              <dt className="font-semibold text-parchment-800">Total</dt>
-              <dd className="font-semibold tabular-nums text-parchment-900">{character.armorClass}</dd>
-            </div>
-          </dl>
+          <ArmorClassBreakdown character={character} />
         </Popover>
 
         <RollButton

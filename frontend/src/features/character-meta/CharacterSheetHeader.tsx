@@ -11,6 +11,9 @@ import type { Character } from "@/types/character";
 
 interface CharacterSheetHeaderProps {
   character: Character;
+  /** Applies HP edits from the header's tappable HP readout (#982) — routed to
+   *  `handleCharacterUpdate` so damage/heal also bumps the session log. */
+  onUpdate: (c: Character) => void;
   tabs: SheetTab[];
   activeTab: SheetTabId;
   onTabChange: (id: SheetTabId) => void;
@@ -33,6 +36,26 @@ interface CharacterSheetHeaderProps {
   onOpenDelete: () => void;
 }
 
+/** Annotate the Combat tab with a gold "session live" pip (#961/#964); every
+ *  other tab passes through. Extracted so the header component stays under the
+ *  cognitive-complexity ceiling. */
+function withCombatLivePip(tabs: SheetTab[], isLive: boolean): SheetTab[] {
+  if (!isLive) return tabs;
+  return tabs.map((tab) =>
+    tab.id === "combat"
+      ? {
+          ...tab,
+          badge: (
+            <>
+              <span className="block h-1.5 w-1.5 rounded-full bg-gold-400" aria-hidden />
+              <span className="sr-only"> (session live)</span>
+            </>
+          ),
+        }
+      : tab,
+  );
+}
+
 /**
  * The persistent sheet header, rendered per breakpoint: the compact
  * MobileSheetHeader (`md:hidden`) and the desktop garnet banner (`hidden
@@ -42,6 +65,7 @@ interface CharacterSheetHeaderProps {
  */
 export default function CharacterSheetHeader({
   character,
+  onUpdate,
   tabs,
   activeTab,
   onTabChange,
@@ -56,28 +80,14 @@ export default function CharacterSheetHeader({
   onOpenActivity,
   onOpenDelete,
 }: CharacterSheetHeaderProps) {
-  // Desktop tab bar mirrors the mobile nav pip: a gold dot on Combat while live
-  // (#961/#964). Annotate the Combat tab's badge; leave every other tab as-is.
-  const bannerTabs: SheetTab[] = isLive
-    ? tabs.map((tab) =>
-        tab.id === "combat"
-          ? {
-              ...tab,
-              badge: (
-                <>
-                  <span className="block h-1.5 w-1.5 rounded-full bg-gold-400" aria-hidden />
-                  <span className="sr-only"> (session live)</span>
-                </>
-              ),
-            }
-          : tab,
-      )
-    : tabs;
+  // Desktop tab bar mirrors the mobile nav pip: a gold dot on Combat while live.
+  const bannerTabs = withCombatLivePip(tabs, isLive);
   return (
     <>
       {/* Mobile: compact sticky mini-header. Desktop: the garnet banner below. */}
       <MobileSheetHeader
         character={character}
+        onUpdate={onUpdate}
         sessionActions={
           isLiveJoined && onLeaveSession && onEndSession
             ? { busy: sessionActionBusy, onLeave: onLeaveSession, onEnd: onEndSession }
@@ -155,7 +165,7 @@ export default function CharacterSheetHeader({
 
         {/* Always-on vitals */}
         <div className="mt-4">
-          <BannerVitals character={character} />
+          <BannerVitals character={character} onUpdate={onUpdate} />
         </div>
 
         {/* Workspace tab bar (desktop only; mobile uses the docked SheetBottomNav) */}
