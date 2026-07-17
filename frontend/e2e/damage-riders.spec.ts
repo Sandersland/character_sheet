@@ -82,7 +82,9 @@ test("damage riders: attuned Flame Tongue adds a typed +2d6 fire term to its att
 
   // The attack picker is a modal bottom sheet (#729) — dismiss it before
   await page.keyboard.press("Escape");
-  // (Session-log assertion returns with the Combat-tab Turn/Log sub-nav in #962;
-  // no log tab on the Combat tab yet after the #963 doorway jump.)
+  // The rider damage lands on the session log — via the Combat Turn/Log sub-nav (#962).
+  await page.getByRole("tab", { name: /Log/ }).click();
+  await expect(page.getByText(/fire/i).first()).toBeVisible();
+
   expect(errors).toEqual([]);
 });

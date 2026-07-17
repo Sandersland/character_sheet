@@ -3,6 +3,16 @@ import { expect, test } from "@playwright/test";
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
 
+// #962: the legacy /session route redirects to the sheet's Combat tab (bookmarks).
+test("session: /characters/:id/session redirects to the Combat tab", async ({ page }) => {
+  await login(page);
+  await page.getByRole("link", { name: /Session Fighter/ }).click();
+  await expect(page).toHaveURL(/\/characters\/[^/?]+$/);
+  const base = page.url();
+  await page.goto(`${base}/session`);
+  await expect(page).toHaveURL(/[?&]tab=combat/);
+});
+
 // Uses the Session Fighter roster persona (seeded with its own campaign so a
 // live session can be started/resumed here). The session button resolves to
 // Start/Resume/Join depending on leftover state — any of them lands on /session.
