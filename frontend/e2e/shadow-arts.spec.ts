@@ -43,10 +43,9 @@ test("shadow arts: a Way of Shadow monk casts Shadow Arts, taking concentration 
     .filter({ has: page.getByRole("button", { name: "Cast" }) })
     .first();
   await pwtRow.getByRole("button", { name: "Cast" }).click();
-  // Stealth isn't a monk proficiency, so its buffed row lives in the full skills
-  // table behind the Overview "All N →" expander (curated skills redesign #923).
-  await page.getByRole("button", { name: /All \d+ →/ }).click();
-  const stealthRow = page.getByRole("row").filter({ hasText: "Stealth" });
+  // Pass without Trace's +10 shows inline on the Stealth row — all 18 skills are
+  // inline roll rows on the Overview now (#957), no "All N" modal.
+  const stealthRow = page.locator("li").filter({ hasText: "Stealth" }).first();
   await expect(stealthRow.getByText(/\+10/)).toBeVisible();
 
   expect(errors).toEqual([]);

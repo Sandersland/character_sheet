@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 import OverviewPanel from "@/features/character-meta/panels/OverviewPanel";
+import { RollProvider } from "@/features/dice/RollContext";
 import type { Character } from "@/types/character";
 import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
 
@@ -31,7 +32,11 @@ function makeCharacter(overrides: Partial<Character>): Character {
 
 function renderPanel(character: Character) {
   const props: SheetPanelProps = { character, reference: null, onUpdate: vi.fn() };
-  return render(<OverviewPanel {...props} />);
+  return render(
+    <RollProvider>
+      <OverviewPanel {...props} />
+    </RollProvider>,
+  );
 }
 
 describe("OverviewPanel", () => {
@@ -46,14 +51,14 @@ describe("OverviewPanel", () => {
         },
       } as Partial<Character>)
     );
-    expect(screen.getByText("Proficient Skills")).toBeInTheDocument();
+    expect(screen.getByText("Skills")).toBeInTheDocument();
     expect(screen.getByText("Spell Slots")).toBeInTheDocument();
     expect(screen.getByText("Equipped")).toBeInTheDocument();
   });
 
   it("omits the Spell Slots card for a non-caster", () => {
     renderPanel(makeCharacter({ spellcasting: undefined }));
-    expect(screen.getByText("Proficient Skills")).toBeInTheDocument();
+    expect(screen.getByText("Skills")).toBeInTheDocument();
     expect(screen.queryByText("Spell Slots")).not.toBeInTheDocument();
   });
 });
