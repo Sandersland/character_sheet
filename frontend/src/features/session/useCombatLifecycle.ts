@@ -24,7 +24,10 @@ export function useCombatLifecycle({
   live,
 }: {
   character: Character;
-  session: Session;
+  // Nullable so the hook can be lifted to the workspace above the join guard
+  // (#979): the Leave/End affordances only surface while live+joined, so the
+  // handlers below never fire with a null session.
+  session: Session | null;
   onUpdate: (c: Character) => void;
   live: Pick<LiveSessionValue, "refresh" | "setEndedSession" | "bumpLog">;
 }) {
@@ -45,6 +48,7 @@ export function useCombatLifecycle({
 
   const handleLeave = () =>
     leave.run(async () => {
+      if (!session) return;
       await leaveAndClearTurnState(session, character.id);
       await live.refresh(); // No navigate() — we're already in the workspace.
     }, "Failed to leave the session. Please try again.");
@@ -55,6 +59,8 @@ export function useCombatLifecycle({
     endPromptOpen: endFlow.endPromptOpen,
     leavePending: leave.pending,
     leaveError: leave.error,
+    /** A leave or end is in flight — disables the header's Leave/End affordances. */
+    sessionActionBusy: end.pending || leave.pending,
     openEndPrompt: endFlow.openEndPrompt,
     closeEndPrompt: endFlow.closeEndPrompt,
     handleCharacterUpdate,

@@ -23,25 +23,22 @@ import Card from "@/components/ui/Card";
 import AbilityScoresPanel from "@/features/abilities/AbilityScoresPanel";
 import AllSkillsCard from "@/features/abilities/AllSkillsCard";
 import LiveTurnBody from "@/features/session/LiveTurnBody";
-import SessionHeaderRegion from "@/features/session/SessionHeaderRegion";
 import SessionLog from "@/features/session/SessionLog";
 import { nextTabForKey, type LiveView } from "@/features/session/combatLiveTabs";
 import { useIsBelowMd } from "@/hooks/useIsBelowMd";
-import EndSessionPrompt from "@/features/session/EndSessionPrompt";
 import { useLiveSession } from "@/features/session/LiveSessionProvider";
 import { useTurnStateContext } from "@/features/session/TurnStateProvider";
-import { useCombatLifecycle } from "@/features/session/useCombatLifecycle";
 import type { Character, Session } from "@/types/character";
 
 interface CombatLivePanelProps {
   character: Character;
   /** The live joined session (participants included) — parent-guaranteed non-null. */
   session: Session;
+  /** Character update handler — already bumps the session-log counter (the lifted
+   *  `useCombatLifecycle.handleCharacterUpdate`, #979). */
   onUpdate: (c: Character) => void;
-  /** The Combat tab is the visible tab — gates overlay/prompt render. */
+  /** The Combat tab is the visible tab — gates overlay render. */
   active: boolean;
-  /** Open the workspace quick-capture dock (the header's Note action). */
-  onCapture: () => void;
 }
 
 export default function CombatLivePanel({
@@ -49,11 +46,11 @@ export default function CombatLivePanel({
   session,
   onUpdate,
   active,
-  onCapture,
 }: CombatLivePanelProps) {
   const turnState = useTurnStateContext();
   const live = useLiveSession();
-  const life = useCombatLifecycle({ character, session, onUpdate, live });
+  // Note: the End/Leave lifecycle + its prompt now live in the workspace + sheet
+  // header (#979), not here — this panel is just the turn surface + rails.
   // #962: a small Turn/Log sub-nav — the session Log is the only secondary
   // surface that stays under Combat (Inventory/Class/Spells moved to the sheet's
   // own tabs; Loot is dropped from the UI). Mobile only — desktop (#964) shows
@@ -72,15 +69,6 @@ export default function CombatLivePanel({
 
   return (
     <div className="bg-parchment-100">
-      <SessionHeaderRegion
-        leavePending={life.leavePending}
-        endPending={life.endPending}
-        leaveError={life.leaveError}
-        onCapture={onCapture}
-        onLeave={life.handleLeave}
-        onEndClick={life.openEndPrompt}
-      />
-
       {/* A section, not a <main> — this renders inside CharacterSheetBody's
           <main> landmark (the sheet's Combat tab), so a nested main is invalid.
           Mobile: a single column with a Turn/Log sub-nav. Desktop (#964): a
@@ -119,7 +107,7 @@ export default function CombatLivePanel({
               character={character}
               session={session}
               turnState={turnState}
-              onUpdate={life.handleCharacterUpdate}
+              onUpdate={onUpdate}
               onLogChanged={live.bumpLog}
               overlaysActive={active && turnVisible}
             />
@@ -159,18 +147,6 @@ export default function CombatLivePanel({
           </Card>
         </aside>
       </div>
-
-      {/* The End-Session prompt — gated on the tab being visible so a hidden
-          panel never trap-focuses a dialog over Overview. The recap overlay
-          lives at the workspace level (it must outlive this panel unmounting). */}
-      {active && life.endPromptOpen && (
-        <EndSessionPrompt
-          busy={life.endPending}
-          error={life.endError}
-          onConfirm={life.handleConfirmEnd}
-          onCancel={life.closeEndPrompt}
-        />
-      )}
     </div>
   );
 }

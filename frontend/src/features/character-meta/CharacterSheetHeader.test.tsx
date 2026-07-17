@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
@@ -81,5 +81,36 @@ describe("CharacterSheetHeader live state (#964)", () => {
     expect(screen.queryByText(/^Round/)).not.toBeInTheDocument();
     const combatTab = screen.getByRole("tab", { name: /Combat/ });
     expect(within(combatTab).queryByText(/session live/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("CharacterSheetHeader desktop session controls (#979)", () => {
+  it("shows Leave / End Session in the banner while joined and fires their handlers", () => {
+    const onLeaveSession = vi.fn();
+    const onEndSession = vi.fn();
+    renderHeader({ isLive: true, isLiveJoined: true, onLeaveSession, onEndSession });
+
+    // The desktop banner buttons (role=button); the mobile menu items are
+    // role=menuitem and only exist after opening the ⋮, so no ambiguity here.
+    fireEvent.click(screen.getByRole("button", { name: "End Session" }));
+    expect(onEndSession).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Leave Session" }));
+    expect(onLeaveSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables the banner session controls while an action is in flight", () => {
+    const onEndSession = vi.fn();
+    renderHeader({ isLive: true, isLiveJoined: true, sessionActionBusy: true, onLeaveSession: vi.fn(), onEndSession });
+
+    const end = screen.getByRole("button", { name: "End Session" });
+    expect(end).toBeDisabled();
+    fireEvent.click(end);
+    expect(onEndSession).not.toHaveBeenCalled();
+  });
+
+  it("shows no session controls when not joined", () => {
+    renderHeader({ isLive: true, isLiveJoined: false });
+    expect(screen.queryByRole("button", { name: "Leave Session" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "End Session" })).not.toBeInTheDocument();
   });
 });

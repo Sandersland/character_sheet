@@ -4,9 +4,9 @@
  * Leave/owner logic lives once, not cloned across the two hosts.
  */
 
-import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
+import { useCallback, useRef, useState, type MutableRefObject } from "react";
 
-import { applyExperienceOperations, endSession, fetchCampaign, leaveSession } from "@/api/client";
+import { applyExperienceOperations, endSession, leaveSession } from "@/api/client";
 import { clearTurnState } from "@/features/session/turnStatePersistence";
 import { errorMessage } from "@/lib/errorMessage";
 import type { Session } from "@/types/character";
@@ -31,25 +31,6 @@ export function usePendingAction() {
     }
   }, []);
   return { pending, error, setError, run };
-}
-
-/** True once the viewer is confirmed the campaign OWNER (gates the Loot tab). */
-export function useIsSessionOwner(campaignId: string): boolean {
-  const [isOwner, setIsOwner] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    fetchCampaign(campaignId)
-      .then((c) => {
-        if (!cancelled) setIsOwner(c.role === "OWNER");
-      })
-      .catch(() => {
-        /* non-owners simply never see the Loot tab */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [campaignId]);
-  return isOwner;
 }
 
 /**
@@ -87,7 +68,10 @@ export async function leaveAndClearTurnState(session: Session, characterId: stri
  */
 export function useEndSessionFlow(
   characterId: string,
-  session: Session,
+  // Nullable so the flow can be lifted above the join guard (#979) — the prompt
+  // is only openable while a session is live+joined, so confirmEnd never runs
+  // with a null session, but the hook itself must call unconditionally.
+  session: Session | null,
   end: ReturnType<typeof usePendingAction>,
 ) {
   const [endPromptOpen, setEndPromptOpen] = useState(false);
@@ -106,6 +90,7 @@ export function useEndSessionFlow(
     },
     confirmEnd: (xpAmount: number, onEnded: (ended: Session) => void | Promise<void>) =>
       end.run(async () => {
+        if (!session) return;
         const ended = await awardXpThenEndSession(characterId, session, xpAmount, awardedRef);
         setEndPromptOpen(false);
         await onEnded(ended);

@@ -10,6 +10,9 @@ import type { Character } from "@/types/character";
 
 interface MobileSheetHeaderProps {
   character: Character;
+  /** Live-session controls folded into the "Sheet actions" menu while joined
+   *  (#979) — there's no separate in-panel controls strip anymore. */
+  sessionActions?: { busy: boolean; onLeave: () => void; onEnd: () => void } | null;
   onOpenCapture: () => void;
   onOpenSessions: () => void;
   onOpenActivity: () => void;
@@ -31,12 +34,28 @@ const TILE_LABEL = "mt-1 text-[9px] font-semibold uppercase tracking-wide text-p
  */
 export default function MobileSheetHeader({
   character,
+  sessionActions = null,
   onOpenCapture,
   onOpenSessions,
   onOpenActivity,
   onOpenDelete,
 }: MobileSheetHeaderProps) {
   const { current, max, temp } = character.hitPoints;
+
+  // One menu, not two (#979): while joined, Leave/End Session join Note/Sessions/
+  // Activity here (above Delete) instead of a separate in-panel controls strip.
+  const menuItems = [
+    { label: "＋ Note", onSelect: onOpenCapture },
+    { label: "Sessions", onSelect: onOpenSessions },
+    { label: "Activity", onSelect: onOpenActivity },
+    ...(sessionActions
+      ? [
+          { label: "Leave Session", onSelect: sessionActions.onLeave, disabled: sessionActions.busy, separatorBefore: true },
+          { label: "End Session", onSelect: sessionActions.onEnd, disabled: sessionActions.busy },
+        ]
+      : []),
+    { label: "Delete", onSelect: onOpenDelete, danger: true, separatorBefore: true },
+  ];
 
   // "Race · Class Level" — classSummary carries per-class levels for multiclass;
   // single-class shows its own level (subclass moves to the trailing pill).
@@ -78,15 +97,7 @@ export default function MobileSheetHeader({
             Join campaign
           </Link>
         )}
-        <OverflowMenu
-          label="Sheet actions"
-          items={[
-            { label: "＋ Note", onSelect: onOpenCapture },
-            { label: "Sessions", onSelect: onOpenSessions },
-            { label: "Activity", onSelect: onOpenActivity },
-            { label: "Delete", onSelect: onOpenDelete, danger: true, separatorBefore: true },
-          ]}
-        />
+        <OverflowMenu label="Sheet actions" items={menuItems} />
       </div>
 
       {/* HP: read-only readout + meter (editing lives on the Combat tab). */}
