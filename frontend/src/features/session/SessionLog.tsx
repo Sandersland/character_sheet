@@ -2,9 +2,9 @@
  * SessionLog — read-only event timeline for a single play session.
  *
  * Fetches all CharacterEvents whose sessionId matches the current session and
- * renders them newest-first. Refreshes automatically when `refreshKey` changes
- * (SessionPage passes the character object as the key, so every cast/damage/heal
- * that calls onUpdate triggers a refresh).
+ * renders them newest-first. Re-fetches on every mount; a caller that keeps the
+ * log mounted across live mutations can pass the optional `refreshKey` prop (the
+ * character object or a version counter) to trigger additional re-fetches.
  *
  * Intentionally read-only — no undo here. Use ActivityModal on the character
  * sheet for the full undo-capable history.
