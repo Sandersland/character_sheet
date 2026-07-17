@@ -1,9 +1,9 @@
 /**
  * Shared roll-result readout (#945): source label, total, and the
  * dice/modifier breakdown, with crit / fumble / advantage flags. Rendered by
- * both the Quick-mode compact chip (RollResultToast) and the Animated-mode
- * settle overlay (DiceRollModal) so both surfaces carry identical information
- * and can never drift.
+ * the shared result seal (RollResultSeal), which both the Quick path and the
+ * Animated-mode 3D tray (DiceRollModal) settle onto, so the readout carries
+ * identical information regardless of preference and can never drift.
  */
 
 import { usesAdvantage, type RollResult } from "@/lib/dice";

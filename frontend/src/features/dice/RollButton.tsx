@@ -1,7 +1,7 @@
 /**
  * A transparent roll affordance: wraps any existing display (a modifier
  * number, a stat label, etc.) and makes it clickable. On click, plays the 3D
- * `DiceRollModal` via `rollAnimated` — the result appears in `RollResultToast`
+ * `DiceRollModal` via `rollAnimated` — the result appears in `RollResultSeal`
  * and, when `log` is set and a session is active, emits the roll's category
  * event. Must be used inside `RollProvider`.
  *
