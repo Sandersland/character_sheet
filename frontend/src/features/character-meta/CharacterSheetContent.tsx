@@ -16,6 +16,8 @@ import { useLiveRound } from "@/features/session/useLiveRound";
 import SessionDoorway from "@/features/session/SessionDoorway";
 import LiveSessionStrip from "@/features/session/LiveSessionStrip";
 import CombatLivePanel from "@/features/session/CombatLivePanel";
+import { useCombatLifecycle } from "@/features/session/useCombatLifecycle";
+import EndSessionPrompt from "@/features/session/EndSessionPrompt";
 import SessionSummaryModal from "@/features/session/SessionSummaryModal";
 import type { SheetTabId } from "@/features/character-meta/sheetTabs";
 import type { Character, ReferenceData } from "@/types/character";
@@ -82,6 +84,11 @@ function CharacterSheetWorkspace({
     onGoToCombat: () => onTabChange("combat"),
   };
 
+  // The End/Leave-session lifecycle lifts here (#979) so the persistent sheet
+  // header — a sibling of the panel region — can drive it (there is no separate
+  // in-panel controls strip anymore). Handlers no-op until a session is joined.
+  const life = useCombatLifecycle({ character, session: live.session, onUpdate, live });
+
   // #960: when a session is live AND this character is in it, the Combat tab
   // renders the live turn tracker instead of the static combat panel. Mounted
   // once here (persists across tab switches, so an in-progress picker + economy
@@ -91,9 +98,8 @@ function CharacterSheetWorkspace({
       <CombatLivePanel
         character={character}
         session={live.session}
-        onUpdate={onUpdate}
+        onUpdate={life.handleCharacterUpdate}
         active={activeTab === "combat"}
-        onCapture={openCapture}
       />
     ) : null;
 
@@ -116,6 +122,10 @@ function CharacterSheetWorkspace({
           onTabChange={onTabChange}
           isLive={isLive}
           liveRound={liveRound}
+          isLiveJoined={isLiveJoined}
+          sessionActionBusy={life.sessionActionBusy}
+          onLeaveSession={life.handleLeave}
+          onEndSession={life.openEndPrompt}
           onOpenCapture={openCapture}
           onOpenSessions={modals.openSessions}
           onOpenActivity={modals.openActivity}
@@ -159,16 +169,7 @@ function CharacterSheetWorkspace({
             sessionLoading={live.status === "loading"}
           />
         </div>
-        {/* End-of-session recap — at the workspace level so it outlives the live
-            panel unmounting when the session goes static after End (#960). */}
-        {live.endedSession && (
-          <SessionSummaryModal
-            characterId={character.id}
-            session={live.endedSession}
-            onClose={() => live.setEndedSession(null)}
-            onCharacterUpdate={onUpdate}
-          />
-        )}
+        <WorkspaceSessionModals characterId={character.id} live={live} life={life} onUpdate={onUpdate} />
         <RollResultSeal />
         {/* Mobile: the session cue (live-strip / doorway), between the panels
             and the bottom nav; absent on the Combat tab (#961). */}
@@ -181,6 +182,62 @@ function CharacterSheetWorkspace({
         />
       </div>
     </RollProvider>
+  );
+}
+
+/**
+ * The two workspace-level session overlays (#960/#979), extracted to keep the
+ * workspace under the complexity ceiling: the end-of-session recap (outlives the
+ * live panel unmounting once the session goes static) and the End-Session confirm
+ * prompt (a Modal, triggerable from the sheet header on any tab, not just Combat).
+ */
+function WorkspaceSessionModals({
+  characterId,
+  live,
+  life,
+  onUpdate,
+}: {
+  characterId: string;
+  live: ReturnType<typeof useLiveSession>;
+  life: ReturnType<typeof useCombatLifecycle>;
+  onUpdate: (c: Character) => void;
+}) {
+  return (
+    <>
+      {live.endedSession && (
+        <SessionSummaryModal
+          characterId={characterId}
+          session={live.endedSession}
+          onClose={() => live.setEndedSession(null)}
+          onCharacterUpdate={onUpdate}
+        />
+      )}
+      {life.endPromptOpen && (
+        <EndSessionPrompt
+          busy={life.endPending}
+          error={life.endError}
+          onConfirm={life.handleConfirmEnd}
+          onCancel={life.closeEndPrompt}
+        />
+      )}
+      {/* Leave has no modal, so a failed "Leave Session" (from the header) shows
+          here as a dismissible toast — otherwise the failure would be silent. */}
+      {life.leaveError && (
+        <div
+          role="alert"
+          className="fixed inset-x-0 bottom-4 z-50 mx-auto flex max-w-sm items-center gap-3 rounded-card border border-garnet-300 bg-parchment-50 px-4 py-2.5 text-sm text-garnet-800 shadow-card"
+        >
+          <span className="min-w-0 flex-1">{life.leaveError}</span>
+          <button
+            type="button"
+            onClick={life.dismissLeaveError}
+            className="shrink-0 text-xs font-semibold text-garnet-700 hover:text-garnet-900"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 

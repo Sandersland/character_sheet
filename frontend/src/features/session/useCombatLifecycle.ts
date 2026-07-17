@@ -1,12 +1,10 @@
 /**
- * The live-Combat panel's async lifecycle (#960): owner check + End-Session
- * (guarded XP award) + Leave. Unlike the old `useSessionLifecycle` (the
- * `/session` page's, which `navigate()`s back to the sheet), this one is
- * workspace-native — End/Leave call `LiveSessionProvider.refresh()` so the
- * Combat tab reverts to the static panel underneath with no navigation, and the
- * recap survives the panel unmounting because `endedSession` lives in the
- * provider, not here (#960 decision 5 / addendum D). Shares the End/Leave/owner
- * primitives with `useSessionLifecycle` via `sessionLifecycleHelpers`.
+ * The live-session End/Leave lifecycle (#960), lifted to `CharacterSheetWorkspace`
+ * so the sheet header can drive it (#979). Workspace-native — End/Leave call
+ * `LiveSessionProvider.refresh()` so the Combat tab reverts to the static panel
+ * underneath with no navigation, and the recap survives the panel unmounting
+ * because `endedSession` lives in the provider, not here (#960 decision 5 /
+ * addendum D). Built from the shared `sessionLifecycleHelpers` primitives.
  */
 
 import {
@@ -24,7 +22,10 @@ export function useCombatLifecycle({
   live,
 }: {
   character: Character;
-  session: Session;
+  // Nullable so the hook can be lifted to the workspace above the join guard
+  // (#979): the Leave/End affordances only surface while live+joined, so the
+  // handlers below never fire with a null session.
+  session: Session | null;
   onUpdate: (c: Character) => void;
   live: Pick<LiveSessionValue, "refresh" | "setEndedSession" | "bumpLog">;
 }) {
@@ -45,6 +46,7 @@ export function useCombatLifecycle({
 
   const handleLeave = () =>
     leave.run(async () => {
+      if (!session) return;
       await leaveAndClearTurnState(session, character.id);
       await live.refresh(); // No navigate() — we're already in the workspace.
     }, "Failed to leave the session. Please try again.");
@@ -53,8 +55,12 @@ export function useCombatLifecycle({
     endPending: end.pending,
     endError: end.error,
     endPromptOpen: endFlow.endPromptOpen,
-    leavePending: leave.pending,
+    /** A failed Leave surfaces here (End errors show in the prompt); the workspace
+     *  renders it as a dismissible toast, since Leave has no modal of its own. */
     leaveError: leave.error,
+    dismissLeaveError: () => leave.setError(null),
+    /** A leave or end is in flight — disables the header's Leave/End affordances. */
+    sessionActionBusy: end.pending || leave.pending,
     openEndPrompt: endFlow.openEndPrompt,
     closeEndPrompt: endFlow.closeEndPrompt,
     handleCharacterUpdate,

@@ -97,6 +97,65 @@ describe("MobileSheetHeader", () => {
     expect(screen.getByRole("link", { name: /join campaign/i })).toHaveAttribute("href", "/campaigns");
   });
 
+  // #979: the live-session controls fold into this one menu (no separate strip).
+  it("adds Leave / End Session to the menu while joined, and fires their handlers", () => {
+    const onLeave = vi.fn();
+    const onEnd = vi.fn();
+    render(
+      <MemoryRouter>
+        <RollProvider>
+          <MobileSheetHeader
+            character={makeCharacter()}
+            sessionActions={{ busy: false, onLeave, onEnd }}
+            onOpenCapture={vi.fn()}
+            onOpenSessions={vi.fn()}
+            onOpenActivity={vi.fn()}
+            onOpenDelete={vi.fn()}
+          />
+        </RollProvider>
+      </MemoryRouter>,
+    );
+
+    // Selecting an item closes the menu, so re-open it between the two clicks.
+    fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "End Session" }));
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Leave Session" }));
+    expect(onLeave).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables Leave / End Session while a session action is in flight", () => {
+    const onEnd = vi.fn();
+    render(
+      <MemoryRouter>
+        <RollProvider>
+          <MobileSheetHeader
+            character={makeCharacter()}
+            sessionActions={{ busy: true, onLeave: vi.fn(), onEnd }}
+            onOpenCapture={vi.fn()}
+            onOpenSessions={vi.fn()}
+            onOpenActivity={vi.fn()}
+            onOpenDelete={vi.fn()}
+          />
+        </RollProvider>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));
+    const end = screen.getByRole("menuitem", { name: "End Session" });
+    expect(end).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(end);
+    expect(onEnd).not.toHaveBeenCalled();
+  });
+
+  it("shows no Leave / End Session items when not in a live session", () => {
+    renderHeader();
+    fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));
+    expect(screen.queryByRole("menuitem", { name: "Leave Session" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "End Session" })).not.toBeInTheDocument();
+  });
+
   it("exposes Note / Sessions / Activity / Delete in the overflow menu", () => {
     const onOpenCapture = vi.fn();
     const onOpenDelete = vi.fn();
