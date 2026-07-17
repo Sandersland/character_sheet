@@ -15,10 +15,13 @@ interface Props {
   activeKeys: ConditionKey[];
   busy: boolean;
   onApply: (op: ApplyConditionOperation) => void;
+  /** Start expanded — used when a host opens the picker directly in an overlay
+   *  (the live-Combat utility strip's "+ Add", #982). Defaults to collapsed. */
+  defaultOpen?: boolean;
 }
 
-export default function AddConditionPanel({ activeKeys, busy, onApply }: Props) {
-  const [open, setOpen] = useState(false);
+export default function AddConditionPanel({ activeKeys, busy, onApply, defaultOpen = false }: Props) {
+  const [open, setOpen] = useState(defaultOpen);
   const [search, setSearch] = useState("");
   const [source, setSource] = useState("");
 

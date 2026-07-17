@@ -24,9 +24,12 @@ import AddConditionPanel from "@/features/conditions/AddConditionPanel";
 interface Props {
   character: Character;
   onUpdate: (updated: Character) => void;
+  /** Open the add-condition picker expanded — set when a host launches this body
+   *  straight into "add" mode (the live-Combat "+ Add" trigger, #982). */
+  defaultAddOpen?: boolean;
 }
 
-export default function ConditionsSheetBody({ character, onUpdate }: Props) {
+export default function ConditionsSheetBody({ character, onUpdate, defaultAddOpen }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -135,7 +138,12 @@ export default function ConditionsSheetBody({ character, onUpdate }: Props) {
 
       {/* Inline add-condition panel */}
       <div className="mt-3">
-        <AddConditionPanel activeKeys={activeKeys} busy={busy} onApply={handleApply} />
+        <AddConditionPanel
+          activeKeys={activeKeys}
+          busy={busy}
+          onApply={handleApply}
+          defaultOpen={defaultAddOpen}
+        />
       </div>
 
       {error && <p className="mt-2 text-xs text-garnet-700">{error}</p>}
