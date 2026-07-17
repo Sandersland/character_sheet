@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import { joinSession, startCampaignSession } from "@/api/client";
 import { useLiveSession } from "@/features/session/LiveSessionProvider";
@@ -68,10 +67,14 @@ const HIDDEN_SUMMARY: SessionDoorwaySummary = {
  * `LiveSessionProvider` (#959) — it no longer fetches, so there is exactly ONE
  * doorway read per sheet. It distills the shared doorway into the bar's summary
  * and dispatches the start/join/resume action, re-resolving the shared state on
- * success so a just-started session lights up the workspace.
+ * success so a just-started session lights up the workspace. On success it jumps
+ * **in-workspace** to the Combat tab (#963) via `onEnterCombat` — no more
+ * `navigate('/characters/:id/session')`; the live tracker lives under Combat now.
  */
-export function useSessionDoorway(id: string | undefined): UseSessionDoorway {
-  const navigate = useNavigate();
+export function useSessionDoorway(
+  id: string | undefined,
+  onEnterCombat: () => void = () => {},
+): UseSessionDoorway {
   const { status, doorway, session, sessionId, refresh } = useLiveSession();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,8 +95,10 @@ export function useSessionDoorway(id: string | undefined): UseSessionDoorway {
     setError(null);
     try {
       await dispatchDoorwayAction(summary.action, campaignId, activeSessionId, id);
+      // Re-resolve BEFORE switching so Combat renders the live tracker, not the
+      // static panel off stale not-joined state (#963 addendum).
       await refresh();
-      navigate(`/characters/${id}/session`);
+      onEnterCombat();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start or join the session.");
     } finally {

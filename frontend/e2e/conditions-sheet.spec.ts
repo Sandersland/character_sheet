@@ -18,8 +18,8 @@ test("session conditions strip (mobile): tap, apply a condition, see it reflect 
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await expect(page).toHaveURL(/[?&]tab=combat/);
 
   const strip = page.getByRole("button", { name: /manage conditions/i });
   await expect(strip).toBeVisible();
@@ -40,9 +40,7 @@ test("session conditions strip (mobile): tap, apply a condition, see it reflect 
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // The apply lands on the activity log via applyConditionTransactions.
-  await page.getByRole("tab", { name: /Log/ }).click();
-  await expect(page.getByText(/Applied condition: Poisoned/i).first()).toBeVisible();
-
+  // (Session-log assertion returns with the Combat-tab Turn/Log sub-nav in #962;
+  // no log tab on the Combat tab yet after the #963 doorway jump.)
   expect(errors).toEqual([]);
 });

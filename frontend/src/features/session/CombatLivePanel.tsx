@@ -68,7 +68,9 @@ export default function CombatLivePanel({
         onEndClick={life.openEndPrompt}
       />
 
-      <main className="mx-auto flex max-w-4xl flex-col gap-4 px-6 pt-6">
+      {/* A section, not a <main> — this renders inside CharacterSheetBody's
+          <main> landmark (the sheet's Combat tab), so a nested main is invalid. */}
+      <div className="mx-auto flex max-w-4xl flex-col gap-4 px-6 pt-6">
         <LiveTurnBody
           character={character}
           session={session}
@@ -77,7 +79,7 @@ export default function CombatLivePanel({
           onLogChanged={live.bumpLog}
           overlaysActive={active}
         />
-      </main>
+      </div>
 
       {/* The End-Session prompt — gated on the tab being visible so a hidden
           panel never trap-focuses a dialog over Overview. The recap overlay

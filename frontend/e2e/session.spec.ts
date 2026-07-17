@@ -6,13 +6,17 @@ import { collectConsoleErrors } from "./helpers/console";
 // Uses the Session Fighter roster persona (seeded with its own campaign so a
 // live session can be started/resumed here). The session button resolves to
 // Start/Resume/Join depending on leftover state — any of them lands on /session.
-test("session: start combat, take an action, and see it in the log", async ({ page }) => {
+// #963: the doorway lands on the Combat tab in-workspace (?tab=combat), where
+// the live turn tracker runs. (The Session Log lives on /session's reference
+// tabs; its move to a Turn/Log sub-nav under Combat is #962, so the log
+// assertion returns then.)
+test("session: start combat and take an action from the Combat tab", async ({ page }) => {
   await login(page);
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
   await page.getByRole("button", { name: "Start my turn" }).click();
@@ -22,11 +26,6 @@ test("session: start combat, take an action, and see it in the log", async ({ pa
   await page.getByRole("button", { name: /Use Action/ }).click();
   await page.getByRole("button", { name: "Dodge" }).click();
   await expect(page.getByRole("button", { name: "Use Action" })).toHaveCount(0);
-
-  // The combat event is written to the session log.
-  await page.getByRole("tab", { name: /Log/ }).click();
-  await expect(page.getByText(/No events yet/)).toHaveCount(0);
-  await expect(page.getByText("combat", { exact: true }).first()).toBeVisible();
 
   expect(errors).toEqual([]);
 });
@@ -38,8 +37,8 @@ test("session: opening Use-an-item then closing leaves the action available", as
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
   await page.getByRole("button", { name: "Start my turn" }).click();
@@ -68,8 +67,8 @@ test("session: the global roll-mode footer is retired (mobile)", async ({ page }
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await expect(page).toHaveURL(/[?&]tab=combat/);
 
   // No docked footer and no global "Roll mode" group anywhere.
   await expect(page.getByTestId("roll-mode-bar")).toHaveCount(0);
@@ -96,8 +95,8 @@ test("session: the result seal shows over the open attack sheet (mobile)", async
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
   await page.getByRole("button", { name: "Start my turn" }).click();
@@ -128,8 +127,8 @@ test("session: Change weapons in the Action sheet opens the per-hand picker on m
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
   await page.getByRole("button", { name: "Start my turn" }).click();

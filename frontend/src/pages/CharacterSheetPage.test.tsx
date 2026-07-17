@@ -192,7 +192,8 @@ describe("CharacterSheetPage session doorway (#942)", () => {
     const button = await findDoorwayButton(/join session/i);
     button.click();
     await waitFor(() => expect(mockJoin).toHaveBeenCalledWith("camp1", "s1", "c1"));
-    expect(navigateMock).toHaveBeenCalledWith("/characters/c1/session");
+    // #963: jumps to the Combat tab in-workspace, never navigates to /session.
+    expect(navigateMock).not.toHaveBeenCalledWith("/characters/c1/session");
   });
 
   it("starts a session when 'Start session' is clicked", async () => {
@@ -208,7 +209,8 @@ describe("CharacterSheetPage session doorway (#942)", () => {
     const button = await findDoorwayButton(/start session/i);
     button.click();
     await waitFor(() => expect(mockStart).toHaveBeenCalledWith("camp1", "c1"));
-    expect(navigateMock).toHaveBeenCalledWith("/characters/c1/session");
+    // #963: lands on the Combat tab in-workspace, never navigates to /session.
+    expect(navigateMock).not.toHaveBeenCalledWith("/characters/c1/session");
   });
 
   it("surfaces an error and does not navigate when starting a session fails", async () => {
