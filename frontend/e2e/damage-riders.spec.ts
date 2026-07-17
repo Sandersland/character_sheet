@@ -80,11 +80,13 @@ test("damage riders: attuned Flame Tongue adds a typed +2d6 fire term to its att
   await expect(rider).toBeVisible();
   await rider.click();
 
-  // The attack picker is a modal bottom sheet (#729) — dismiss it before
+  // The attack picker is a modal bottom sheet (#729) — dismiss it before reading.
   await page.keyboard.press("Escape");
-  // The rider damage lands on the session log — via the Combat Turn/Log sub-nav (#962).
-  await page.getByRole("tab", { name: /Log/ }).click();
-  await expect(page.getByText(/fire/i).first()).toBeVisible();
+  // The rider damage lands on the session log — the always-visible right rail on
+  // desktop (#964; the Turn/Log sub-nav is mobile-only).
+  await expect(
+    page.getByRole("complementary", { name: /Session log/i }).getByText(/fire/i).first(),
+  ).toBeVisible();
 
   expect(errors).toEqual([]);
 });

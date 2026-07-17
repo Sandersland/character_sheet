@@ -38,10 +38,11 @@ test("session HP sheet: tap the bar, apply damage, see it in the log", async ({ 
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // The damage event lands on the session log — reachable via the Combat-tab
-  // Turn/Log sub-nav (#962).
-  await page.getByRole("tab", { name: /Log/ }).click();
-  await expect(page.getByText("damage", { exact: true }).first()).toBeVisible();
+  // The damage event lands on the session log — the always-visible right rail on
+  // desktop (#964; the Turn/Log sub-nav is mobile-only).
+  await expect(
+    page.getByRole("complementary", { name: /Session log/i }).getByText("damage", { exact: true }).first(),
+  ).toBeVisible();
 
   expect(errors).toEqual([]);
 });

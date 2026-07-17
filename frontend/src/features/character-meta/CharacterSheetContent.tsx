@@ -114,6 +114,8 @@ function CharacterSheetWorkspace({
           tabs={tabs}
           activeTab={activeTab}
           onTabChange={onTabChange}
+          isLive={isLive}
+          liveRound={liveRound}
           onOpenCapture={openCapture}
           onOpenSessions={modals.openSessions}
           onOpenActivity={modals.openActivity}

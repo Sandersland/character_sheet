@@ -14,6 +14,12 @@ interface CharacterSheetHeaderProps {
   tabs: SheetTab[];
   activeTab: SheetTabId;
   onTabChange: (id: SheetTabId) => void;
+  /** A session is live (joined or joinable) — drives the banner live badge + the
+   *  Combat tab pip on the desktop tab bar (#964, mirrors the mobile nav pip). */
+  isLive?: boolean;
+  /** The active combat round to show in the banner badge (null = live but not in
+   *  combat, or not joined). */
+  liveRound?: number | null;
   onOpenCapture: () => void;
   onOpenSessions: () => void;
   onOpenActivity: () => void;
@@ -32,11 +38,30 @@ export default function CharacterSheetHeader({
   tabs,
   activeTab,
   onTabChange,
+  isLive = false,
+  liveRound = null,
   onOpenCapture,
   onOpenSessions,
   onOpenActivity,
   onOpenDelete,
 }: CharacterSheetHeaderProps) {
+  // Desktop tab bar mirrors the mobile nav pip: a gold dot on Combat while live
+  // (#961/#964). Annotate the Combat tab's badge; leave every other tab as-is.
+  const bannerTabs: SheetTab[] = isLive
+    ? tabs.map((tab) =>
+        tab.id === "combat"
+          ? {
+              ...tab,
+              badge: (
+                <>
+                  <span className="block h-1.5 w-1.5 rounded-full bg-gold-400" aria-hidden />
+                  <span className="sr-only"> (session live)</span>
+                </>
+              ),
+            }
+          : tab,
+      )
+    : tabs;
   return (
     <>
       {/* Mobile: compact sticky mini-header. Desktop: the garnet banner below. */}
@@ -84,6 +109,16 @@ export default function CharacterSheetHeader({
                 </span>
                 <CampaignIndicator character={character} />
               </p>
+              {/* Always-on live-state badge (#964): the desktop banner never
+                  navigates, so it carries the "is a session live / what round"
+                  signal the mobile strip provides below the fold. */}
+              {isLive && (
+                <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-garnet-900/50 px-2.5 py-0.5 text-xs font-semibold text-parchment-50 ring-1 ring-parchment-50/30">
+                  <span aria-hidden>⚔</span>
+                  {liveRound != null ? `Round ${liveRound}` : "Live"}
+                  <span className="sr-only"> session in progress</span>
+                </span>
+              )}
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -142,7 +177,7 @@ export default function CharacterSheetHeader({
         {/* Workspace tab bar (desktop only; mobile uses the docked SheetBottomNav) */}
         <div className="mt-4 hidden pb-4 md:block">
           <Tabs
-            tabs={tabs}
+            tabs={bannerTabs}
             active={activeTab}
             onChange={(id) => onTabChange(id as SheetTabId)}
             idBase="sheet"

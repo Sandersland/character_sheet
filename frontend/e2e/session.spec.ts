@@ -40,6 +40,35 @@ test("session: start combat and take an action from the Combat tab", async ({ pa
   expect(errors).toEqual([]);
 });
 
+// #964: on desktop (md+, the default e2e viewport) live Combat is a three-column
+// view — roll rails · turn tracker · session log. A skill rolled from the LEFT
+// rail must land in the RIGHT-rail session log without any tab switch, and the
+// banner + Combat tab must carry the live signal.
+test("session: desktop three-column live Combat — left-rail roll lands in the right-rail log", async ({ page }) => {
+  await login(page);
+
+  const errors = collectConsoleErrors(page);
+  await page.getByRole("link", { name: /Session Fighter/ }).click();
+  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await expect(page).toHaveURL(/[?&]tab=combat/);
+
+  // Both rails are present alongside the center tracker (desktop only).
+  const rollRail = page.getByRole("complementary", { name: /Ability checks, saves, and skills/i });
+  const logRail = page.getByRole("complementary", { name: /Session log/i });
+  await expect(rollRail).toBeVisible();
+  await expect(logRail).toBeVisible();
+
+  // The persistent banner shows the live state; the Combat tab carries the pip.
+  await expect(page.getByRole("tab", { name: /Combat \(session live\)/i })).toBeVisible();
+
+  // Roll a skill from the left rail → it logs to the right-rail session log, no
+  // tab switch (there is no mobile Turn/Log sub-nav at this breakpoint).
+  await rollRail.getByRole("button", { name: /Arcana/ }).click();
+  await expect(logRail.getByText(/Arcana check:/)).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
+
 // #765: opening the item picker and closing it without using anything must not
 // spend the Action — the slot commits only on use.
 test("session: opening Use-an-item then closing leaves the action available", async ({ page }) => {

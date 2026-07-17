@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import type { Character, ReferenceData } from "@/types/character";
 
 export type SheetTabId = "overview" | "combat" | "inventory" | "magic" | "story";
@@ -5,6 +7,9 @@ export type SheetTabId = "overview" | "combat" | "inventory" | "magic" | "story"
 export interface SheetTab {
   id: SheetTabId;
   label: string;
+  /** Optional pill/dot rendered by the `Tabs` bar (e.g. the live-session pip on
+   *  Combat, #964). Set per-render by the header, not baked into the tab list. */
+  badge?: ReactNode;
 }
 
 /** Props every tab panel receives — the character, loaded reference data, and the

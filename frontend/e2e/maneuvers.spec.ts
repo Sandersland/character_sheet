@@ -35,7 +35,10 @@ test("maneuvers: spending an effect maneuver decrements a superiority die", asyn
 
   await evasive.click();
   await expect.poll(() => superiorityLeft(page)).toBe(before - 1);
-  await expect(page.getByText(/Evasive Footwork —/)).toBeVisible();
+  // Scope to the applied-effect strip ("… — add +N to your AC"), not the desktop
+  // right-rail log's "Used Evasive Footwork — d8:X" entries (#964 made it always
+  // visible, so the bare name now matches many log rows).
+  await expect(page.getByText(/Evasive Footwork — add/)).toBeVisible();
 
   expect(errors).toEqual([]);
 });

@@ -93,6 +93,21 @@ describe("SessionLog roll breakdown", () => {
     expect(mockFetchSession).toHaveBeenCalledWith("char-1", "sess-1");
   });
 
+  // #964: both live-Combat call sites stay mounted and pass the shared
+  // logRefresh counter, so bumping refreshKey must re-fetch (a stale mounted log
+  // was the review regression this guards).
+  it("re-fetches when refreshKey changes", async () => {
+    mockFetchSession.mockResolvedValue({ events: [] } as never);
+
+    const { rerender } = render(
+      <SessionLog characterId="char-1" sessionId="sess-1" refreshKey={0} />,
+    );
+    await waitFor(() => expect(mockFetchSession).toHaveBeenCalledTimes(1));
+
+    rerender(<SessionLog characterId="char-1" sessionId="sess-1" refreshKey={1} />);
+    await waitFor(() => expect(mockFetchSession).toHaveBeenCalledTimes(2));
+  });
+
   it("falls back to the stored summary for old events without faces", async () => {
     renderWith([
       makeEvent({
