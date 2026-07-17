@@ -24,6 +24,13 @@ import { isNaturalOne, isNaturalTwenty } from "@/lib/dice";
 import RollBreakdown from "@/features/dice/RollBreakdown";
 import { useRoll, type RollEntry } from "@/features/dice/RollContext";
 
+// The seal's scrim intercepts pointer events (that's how tap-anywhere dismiss
+// works), so it MUST clear itself — otherwise it would trap every tap after a
+// roll until dismissed, blocking rapid in-combat rolling (roll-to-hit → roll
+// damage) and any automated flow. Auto-dismiss after a short linger; a new roll
+// resets it, a tap clears it immediately.
+const DISMISS_MS = 2200;
+
 type Outcome = "critical" | "fumble" | "normal";
 
 function outcomeOf(entry: RollEntry): Outcome {
@@ -52,7 +59,10 @@ export default function RollResultSeal() {
   const [entry, setEntry] = useState<RollEntry | null>(null);
 
   useEffect(() => {
-    if (lastRoll) setEntry(lastRoll);
+    if (!lastRoll) return;
+    setEntry(lastRoll);
+    const timer = setTimeout(() => setEntry(null), DISMISS_MS);
+    return () => clearTimeout(timer);
   }, [lastRoll?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!entry) return null;

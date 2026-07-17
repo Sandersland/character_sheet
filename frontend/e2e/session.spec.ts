@@ -99,9 +99,11 @@ test("session: roll-mode toggle docks as a bottom bar on mobile", async ({ page 
   expect(errors).toEqual([]);
 });
 
-// #801: rolling to hit inside the attack sheet must not surface the corner roll
-// toast behind the scrim; it reappears once the sheet closes.
-test("session: roll toast is suppressed while the attack sheet is open (mobile)", async ({
+// #956: rolling to hit inside the attack sheet surfaces the result SEAL on top
+// of the sheet — it is NEVER suppressed behind the scrim (inverting the old
+// #801 behavior: the seal owns a z tier above dialogs so an in-sheet roll is
+// always visible).
+test("session: the result seal shows over the open attack sheet (mobile)", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -118,17 +120,14 @@ test("session: roll toast is suppressed while the attack sheet is open (mobile)"
   await page.getByRole("button", { name: "Attack", exact: true }).click();
 
   const sheet = page.getByRole("dialog");
-  const toast = page.locator('[data-testid="roll-result-toast"]');
+  const seal = page.locator('[data-testid="roll-result-seal"]');
 
   await sheet.getByRole("button", { name: "Roll to hit" }).click();
 
-  // Result shows on the attack card; the corner toast stays hidden behind the scrim.
+  // The result seal appears on top of the open sheet — not suppressed (#956);
+  // the attack card still shows its own inline result too.
+  await expect(seal).toBeVisible();
   await expect(sheet.getByText("=").first()).toBeVisible();
-  await expect(toast).toHaveCount(0);
-
-  // Closing the sheet brings the toast back for the just-rolled result.
-  await sheet.getByRole("button", { name: "Close" }).click();
-  await expect(toast).toBeVisible();
 
   expect(errors).toEqual([]);
 });

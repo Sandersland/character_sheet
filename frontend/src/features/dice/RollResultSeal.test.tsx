@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { useEffect, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -124,5 +124,30 @@ describe("RollResultSeal (never suppressed / tap-anywhere dismiss)", () => {
 
     fireEvent.pointerDown(screen.getByTestId("roll-result-seal"));
     expect(screen.queryByText("Initiative")).not.toBeInTheDocument();
+  });
+
+  it("auto-dismisses after the linger so it never traps interaction", () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <RollProvider>
+          <SealHarness />
+        </RollProvider>,
+      );
+
+      act(() => {
+        fireEvent.click(screen.getByText("fire-roll"));
+      });
+      expect(screen.getByTestId("roll-result-seal")).toBeInTheDocument();
+
+      // The scrim intercepts pointer events, so it must clear itself — a roll
+      // must not block the next tap/roll indefinitely.
+      act(() => {
+        vi.advanceTimersByTime(2200);
+      });
+      expect(screen.queryByTestId("roll-result-seal")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
