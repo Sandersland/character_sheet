@@ -66,4 +66,22 @@ describe("RollButton roll mode (#958)", () => {
     expect(rollAnimated).toHaveBeenCalledTimes(2);
     expect(rollAnimated.mock.calls[1][0]).toMatchObject({ mode: "normal" });
   });
+
+  it("cancels the long-press when the pointer is cancelled (mobile scroll)", () => {
+    vi.useFakeTimers();
+    renderButton();
+    const btn = mainButton();
+
+    fireEvent.pointerDown(btn);
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    // A scroll steals the pointer before the hold threshold — no menu opens.
+    fireEvent.pointerCancel(btn);
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(screen.queryByTestId("roll-mode-menu")).not.toBeInTheDocument();
+    expect(rollAnimated).not.toHaveBeenCalled();
+  });
 });

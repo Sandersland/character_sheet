@@ -17,7 +17,17 @@ import { useLongPress } from "@/hooks/useLongPress";
 import { useRoll, type RollLog } from "@/features/dice/RollContext";
 import RollModeMenu from "@/features/dice/RollModeMenu";
 
-interface RollButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick"> {
+// The tap/hold gesture owns the pointer + click + context-menu handlers, so a
+// caller can't pass them through (they'd silently clobber the long-press wiring).
+type OwnedHandlers =
+  | "onClick"
+  | "onPointerDown"
+  | "onPointerUp"
+  | "onPointerLeave"
+  | "onPointerCancel"
+  | "onContextMenu";
+
+interface RollButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, OwnedHandlers> {
   spec: RollSpec;
   label: string;
   /** Roll-category metadata; when set the roll logs to the Session Log. */
@@ -73,13 +83,15 @@ export default function RollButton({
   return (
     <>
       <button
+        // Caller props first, then the gesture wiring + guard so they always
+        // win (the Omit type already forbids these keys, this is defense in depth).
+        {...props}
         ref={btnRef}
         type="button"
         title={`Roll ${label}: ${formatRollSpec(previewSpec)}${chip ? ` — ${chip}` : ""} · hold for advantage/disadvantage`}
+        className={`cursor-pointer rounded transition-colors hover:bg-garnet-50 hover:text-garnet-700 ${className}`}
         {...press}
         onContextMenu={(e) => e.preventDefault()}
-        className={`cursor-pointer rounded transition-colors hover:bg-garnet-50 hover:text-garnet-700 ${className}`}
-        {...props}
       >
         {children}
         {chip && (

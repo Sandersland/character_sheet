@@ -32,6 +32,9 @@ export function useLongPress(onTap: () => void, onLongPress: () => void) {
     },
     onPointerUp: clearTimer,
     onPointerLeave: clearTimer,
+    // A scroll/gesture that steals the pointer cancels it — don't fire the
+    // long-press (mobile: a drag over the row must not open the mode menu).
+    onPointerCancel: clearTimer,
     onClick: () => {
       if (armed.current) {
         armed.current = false;
