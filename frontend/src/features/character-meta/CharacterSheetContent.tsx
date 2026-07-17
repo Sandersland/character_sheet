@@ -220,6 +220,23 @@ function WorkspaceSessionModals({
           onCancel={life.closeEndPrompt}
         />
       )}
+      {/* Leave has no modal, so a failed "Leave Session" (from the header) shows
+          here as a dismissible toast — otherwise the failure would be silent. */}
+      {life.leaveError && (
+        <div
+          role="alert"
+          className="fixed inset-x-0 bottom-4 z-50 mx-auto flex max-w-sm items-center gap-3 rounded-card border border-garnet-300 bg-parchment-50 px-4 py-2.5 text-sm text-garnet-800 shadow-card"
+        >
+          <span className="min-w-0 flex-1">{life.leaveError}</span>
+          <button
+            type="button"
+            onClick={life.dismissLeaveError}
+            className="shrink-0 text-xs font-semibold text-garnet-700 hover:text-garnet-900"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
     </>
   );
 }

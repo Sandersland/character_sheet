@@ -1,7 +1,8 @@
 /**
- * Shared session-lifecycle primitives (#960) used by both the `/session` page's
- * `useSessionLifecycle` and the workspace `useCombatLifecycle` — so the End/
- * Leave/owner logic lives once, not cloned across the two hosts.
+ * Session-lifecycle primitives (#960) behind the workspace `useCombatLifecycle`:
+ * the pending/error wrapper, the leave call, and the End-Session confirm flow
+ * (guarded XP award → end). Once shared with the `/session` page's lifecycle;
+ * that host was retired in #962, leaving `useCombatLifecycle` the sole consumer.
  */
 
 import { useCallback, useRef, useState, type MutableRefObject } from "react";

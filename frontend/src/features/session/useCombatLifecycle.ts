@@ -57,8 +57,10 @@ export function useCombatLifecycle({
     endPending: end.pending,
     endError: end.error,
     endPromptOpen: endFlow.endPromptOpen,
-    leavePending: leave.pending,
+    /** A failed Leave surfaces here (End errors show in the prompt); the workspace
+     *  renders it as a dismissible toast, since Leave has no modal of its own. */
     leaveError: leave.error,
+    dismissLeaveError: () => leave.setError(null),
     /** A leave or end is in flight — disables the header's Leave/End affordances. */
     sessionActionBusy: end.pending || leave.pending,
     openEndPrompt: endFlow.openEndPrompt,
