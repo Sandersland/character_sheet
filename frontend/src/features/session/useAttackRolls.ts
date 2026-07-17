@@ -49,6 +49,7 @@ export function useAttackRolls({
   addTallyDamageRider,
   currentRow,
   source = "action",
+  manualMode = "normal",
 }: {
   roll: ReturnType<typeof useRoll>["roll"];
   logRollSafe: ReturnType<typeof useRollLogger>;
@@ -60,10 +61,12 @@ export function useAttackRolls({
   currentRow: AttackTallyRow | null;
   /** Which economy slot these rolls record into — `action` (default) or `bonusAction` for the off-hand (#813). */
   source?: TallyRowSource;
+  /** The attack sheet's own ADV/DIS choice (#958) — merged with state grants. */
+  manualMode?: RollMode;
 }) {
   // State-driven advantage/disadvantage on attack rolls (#486, e.g. Poisoned)
-  // merged with the manual toggle; resolved once per attack in handleAttack.
-  const { mode: manualMode, rollModifiers } = useRoll();
+  // merged with the sheet's own ADV/DIS control (#958); resolved once per attack.
+  const { rollModifiers } = useRoll();
   // Attacks aren't ability-scoped, so the resolved mode is the same for every row.
   const resolvedAttack = resolveRollMode(rollModifiers, { kind: "attack" }, manualMode);
   const attackChip = rollModeChip(resolvedAttack);

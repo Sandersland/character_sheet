@@ -597,9 +597,33 @@ model Subclass {
   name        String
   description String
 
-  selections CharacterClassEntry[]
+  selections    CharacterClassEntry[]
+  grantedSpells SubclassGrantedSpell[]
 
   @@unique([classId, name])
+}
+
+// A spell a subclass grants for free (always-prepared), keyed to the shared Spell
+// catalog by FK — the subclass's spell content lives once, in the catalog, and is
+// referenced here rather than snapshotted (#898). Resolved live at read time in
+// deriveGrantedSpells; never persisted onto the character. Homebrew subclasses
+// (once they own Subclass rows, #911) grant spells by adding rows here — no code.
+model SubclassGrantedSpell {
+  id             String   @id @default(uuid())
+  subclassId     String
+  subclass       Subclass @relation(fields: [subclassId], references: [id], onDelete: Cascade)
+  spellId        String
+  spell          Spell    @relation(fields: [spellId], references: [id], onDelete: Cascade)
+  // Character level at which the grant becomes active (the subclass grant level).
+  // No default: real grants span levels 1–17 (Cleric 1/3/5/7/9, Paladin
+  // 3/5/9/13/17), so every seed/write sets it explicitly (#913).
+  gateLevel      Int
+  // Ability the granted spells use for save DC / attack bonus (lowercase, e.g.
+  // "wisdom" | "charisma"). Uniform per subclass in 5e; stored per-row for simplicity.
+  castingAbility String
+
+  @@unique([subclassId, spellId])
+  @@index([subclassId])
 }
 
 model Background {
@@ -982,6 +1006,9 @@ model Spell {
   upcastDicePerLevel Int?
   // Cantrip damage scales with character level (5/11/17 thresholds) per 5e rules.
   cantripScaling     Boolean  @default(false)
+
+  // Subclasses that grant this spell for free (#898).
+  grantedBy          SubclassGrantedSpell[]
 }
 
 // Baseline equipment catalog, same role as Race/CharacterClass above: seeded
@@ -1389,6 +1416,9 @@ enum CharacterEventType {
   learnToolProficiency
   forgetToolProficiency
   toolProficienciesReconciled
+  learnSubclassChoice
+  forgetSubclassChoice
+  subclassChoicesReconciled
   // advancement (ASI + feats)
   abilityScoreImprovement
   featTaken

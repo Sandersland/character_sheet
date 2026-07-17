@@ -4,7 +4,7 @@
  * interactive innards (and the applyConditionTransactions / busy / error logic)
  * live in ConditionsSheetBody, shared with the mobile CompactConditionsBar sheet.
  *
- * On the character sheet it's mounted near VitalsStrip; on the session page it's
+ * On the character sheet it's mounted on the Combat tab; on the session page it's
  * the desktop (md+) form, with CompactConditionsBar taking mobile.
  */
 

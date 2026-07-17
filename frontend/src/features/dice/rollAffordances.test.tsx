@@ -5,9 +5,9 @@ import userEvent from "@testing-library/user-event";
 
 import { logRoll } from "@/api/client";
 import { RollProvider } from "@/features/dice/RollContext";
-import SkillsTable from "@/features/abilities/SkillsTable";
+import AllSkillsCard from "@/features/abilities/AllSkillsCard";
 import AbilityScoreBox from "@/features/abilities/AbilityScoreBox";
-import VitalsStrip from "@/features/character-meta/VitalsStrip";
+import BannerVitals from "@/features/character-meta/BannerVitals";
 import type { RollResult, RollSpec } from "@/lib/dice";
 import type { AbilityScores, Character, Skill } from "@/types/character";
 
@@ -65,7 +65,7 @@ describe("roll affordances log their category event", () => {
       { name: "perception", ability: "wisdom", proficient: true },
     ];
     renderInSession(
-      <SkillsTable skills={skills} abilityScores={scores} proficiencyBonus={2} />,
+      <AllSkillsCard skills={skills} abilityScores={scores} proficiencyBonus={2} />,
     );
 
     // WIS 16 → +3, proficient +2 = +5.
@@ -104,8 +104,8 @@ describe("roll affordances log their category event", () => {
 
   it("initiative logs an initiative roll", async () => {
     const user = userEvent.setup();
-    const character = { initiativeBonus: 2, armorClass: 13, armorClassBreakdown: [], speed: 30, proficiencyBonus: 2 } as unknown as Character;
-    renderInSession(<VitalsStrip character={character} />);
+    const character = { initiativeBonus: 2, armorClass: 13, armorClassBreakdown: [], speed: 30, proficiencyBonus: 2, hitPoints: { current: 10, max: 10, temp: 0 } } as unknown as Character;
+    renderInSession(<BannerVitals character={character} />);
 
     await user.click(screen.getByTitle(/Roll Initiative/));
 

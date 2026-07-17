@@ -129,7 +129,13 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
       spellcasting: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        select: { name: true, subclass: true, level: true },
+        select: {
+          level: true,
+          // Subclass-granted spells (#898): the valid-grant set is re-derived from
+          // these loaded catalog rows (reconcileSubclass ran first, so a cleared
+          // subclass yields subclassRef = null → an empty valid set).
+          subclassRef: { include: { grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } } } },
+        },
       },
     },
   });
@@ -144,9 +150,7 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
   const singleClass = row.classEntries.length <= 1;
   const validIds = new Set(
     row.classEntries
-      .flatMap((e) =>
-        deriveGrantedSpells(e.name, e.subclass ?? undefined, singleClass ? newDerivedLevel : e.level),
-      )
+      .flatMap((e) => deriveGrantedSpells(e.subclassRef, singleClass ? newDerivedLevel : e.level))
       .map((s) => s.id),
   );
 
@@ -238,15 +242,22 @@ interface KnownListConfig {
    * before the trim and once after. MUST return a freshly-constructed object
    * (not `state` itself): the same function runs twice on the same mutable
    * object, so returning a live reference would yield identical before/after
-   * payloads. Since #818 all reconcilers emit the unified 6-key snapshot via
+   * payloads. Since #818 all reconcilers emit the unified 7-key snapshot via
    * snapshotResources() — the persisted payload is load-bearing for wholesale
    * undo, so it must stay the full canonical shape (never a partial subset).
    */
   snapshot: (state: ResourcesMutableState) => Record<string, unknown>;
 }
 
-async function reconcileKnownList(ctx: ReconcileContext, config: KnownListConfig): Promise<void> {
-  const { tx, characterId, newDerivedLevel, batchId } = ctx;
+// Shared preamble for the resources-based reconcilers (reconcileKnownList and
+// reconcileSubclassChoices): fetch the row, normalize the mutable state, and
+// derive class info at the new level. Returns null when the row is gone
+// (caller returns early). deriveResources is pure/in-memory, so deriving even
+// when the caller will bail on an empty list is negligible.
+async function loadResourcesReconcileState(
+  ctx: ReconcileContext,
+): Promise<{ state: ResourcesMutableState; derived: DerivedClassInfo | null } | null> {
+  const { tx, characterId, newDerivedLevel } = ctx;
 
   const row = await tx.character.findUnique({
     where: { id: characterId },
@@ -260,14 +271,9 @@ async function reconcileKnownList(ctx: ReconcileContext, config: KnownListConfig
       },
     },
   });
-  if (!row) return;
+  if (!row) return null;
 
   const state = normalizeResourcesMutable(row.resources);
-  // Widened view of the three list slots so the union-keyed write typechecks;
-  // only ever writes back the same (sliced) list it read.
-  const lists: Record<KnownListKey, KnownEntry[]> = state;
-  if (lists[config.listKey].length === 0) return; // nothing to trim
-
   const abilityScores = row.abilityScores as Record<string, number>;
   const profBonus = proficiencyBonusForLevel(newDerivedLevel);
   const primaryEntry = row.classEntries[0];
@@ -278,6 +284,20 @@ async function reconcileKnownList(ctx: ReconcileContext, config: KnownListConfig
     abilityScores,
     profBonus,
   );
+  return { state, derived };
+}
+
+async function reconcileKnownList(ctx: ReconcileContext, config: KnownListConfig): Promise<void> {
+  const { tx, characterId, batchId } = ctx;
+
+  const loaded = await loadResourcesReconcileState(ctx);
+  if (!loaded) return;
+  const { state, derived } = loaded;
+
+  // Widened view of the three list slots so the union-keyed write typechecks;
+  // only ever writes back the same (sliced) list it read.
+  const lists: Record<KnownListKey, KnownEntry[]> = state;
+  if (lists[config.listKey].length === 0) return; // nothing to trim
 
   // allowed = 0 when subclass is cleared (derived is null) or below grant level.
   const allowed = config.allowed(derived);
@@ -359,6 +379,71 @@ async function reconcileToolProficiencies(ctx: ReconcileContext): Promise<void> 
         ? `${removedCount} tool proficiency choice${removedCount > 1 ? "s" : ""} removed — subclass no longer available`
         : `${removedCount} tool proficiency choice${removedCount > 1 ? "s" : ""} removed — level cap reduced to ${allowed}`,
     snapshot: (state) => ({ resources: snapshotResources(state) }),
+  });
+}
+
+// ── reconcileSubclassChoices ──────────────────────────────────────────────────
+// Generic level-down trim for every subclass "choose N" feature (#899). One
+// reconciler serves all declared choices: for each key in choicesKnown it caps
+// the list to the level-derived count (0 when the subclass no longer grants that
+// choice — leveled below its tier, or subclass cleared by reconcileSubclass,
+// which runs first). Keeps the oldest picks (LIFO drop), matching the read-clamp.
+//
+// Uses a `resources`-category event so the existing undo branch restores
+// before.resources wholesale — no new undo code.
+
+// Trim each choicesKnown list to its cap (keys absent from `caps` → 0, dropped).
+// Mutates `choicesKnown` in place (LIFO: keep the oldest picks); returns the
+// number of entries removed.
+function trimChoicesToCaps(
+  choicesKnown: ResourcesMutableState["choicesKnown"],
+  caps: Map<string, number>,
+): number {
+  let removed = 0;
+  for (const [key, entries] of Object.entries(choicesKnown)) {
+    const cap = caps.get(key) ?? 0;
+    if (entries.length <= cap) continue;
+    removed += entries.length - cap;
+    if (cap === 0) delete choicesKnown[key];
+    else choicesKnown[key] = entries.slice(0, cap);
+  }
+  return removed;
+}
+
+async function reconcileSubclassChoices(ctx: ReconcileContext): Promise<void> {
+  const { tx, characterId, batchId } = ctx;
+
+  const loaded = await loadResourcesReconcileState(ctx);
+  if (!loaded) return;
+  const { state, derived } = loaded;
+  if (Object.keys(state.choicesKnown).length === 0) return; // nothing chosen
+
+  // key → derived count; keys absent here get cap 0 (subclass/tier no longer grants them).
+  const caps = new Map((derived?.subclassChoices ?? []).map((c) => [c.key, c.count]));
+
+  // Snapshot BEFORE mutating — normalizeResourcesMutable passes the choicesKnown
+  // object through by reference, so the trim below would otherwise corrupt it.
+  const before = { resources: snapshotResources(state) };
+
+  const removedCount = trimChoicesToCaps(state.choicesKnown, caps);
+  if (removedCount === 0) return; // all within caps
+
+  await tx.character.update({
+    where: { id: characterId },
+    data: { resources: serializeResourcesState(state) },
+  });
+
+  const after = { resources: snapshotResources(state) };
+
+  await logEvent(tx, {
+    characterId,
+    category: "resources",
+    type: "subclassChoicesReconciled",
+    summary: `${removedCount} subclass choice${removedCount > 1 ? "s" : ""} removed — no longer available at this level`,
+    before,
+    after,
+    data: { removedCount },
+    batchId,
   });
 }
 
@@ -639,6 +724,7 @@ const LEVEL_GATED_RECONCILERS: Reconciler[] = [
   reconcileManeuvers,
   reconcileDisciplines,
   reconcileToolProficiencies,
+  reconcileSubclassChoices,
   reconcileFightingStyle,
   reconcileAdvancements,
 ];

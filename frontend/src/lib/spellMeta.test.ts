@@ -1,7 +1,14 @@
 import { describe, it, expect } from "vitest";
 
-import { isAttackCantrip, partyHealAllies } from "@/lib/spellMeta";
+import { isAttackCantrip, partyHealAllies, schoolLabel } from "@/lib/spellMeta";
 import type { Session, Spell } from "@/types/character";
+
+describe("schoolLabel", () => {
+  it("title-cases a school key", () => {
+    expect(schoolLabel("transmutation")).toBe("Transmutation");
+    expect(schoolLabel("evocation")).toBe("Evocation");
+  });
+});
 
 describe("isAttackCantrip (#734)", () => {
   const spell = (o: Partial<Spell>): Spell => ({ id: "s", name: "S", level: 0, ...o }) as Spell;

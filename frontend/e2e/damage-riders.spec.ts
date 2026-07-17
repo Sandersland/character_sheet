@@ -61,8 +61,8 @@ test("damage riders: attuned Flame Tongue adds a typed +2d6 fire term to its att
 
   const errors = collectConsoleErrors(page);
   await page.goto(`/characters/${characterId}`);
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
   await page.getByRole("button", { name: "Start my turn" }).click();
@@ -80,11 +80,13 @@ test("damage riders: attuned Flame Tongue adds a typed +2d6 fire term to its att
   await expect(rider).toBeVisible();
   await rider.click();
 
-  // The attack picker is a modal bottom sheet (#729) — dismiss it before
-  // reaching the Log tab behind the scrim.
+  // The attack picker is a modal bottom sheet (#729) — dismiss it before reading.
   await page.keyboard.press("Escape");
-  await page.getByRole("tab", { name: /Log/ }).click();
-  await expect(page.getByText(/fire/i).first()).toBeVisible();
+  // The rider damage lands on the session log — the always-visible right rail on
+  // desktop (#964; the Turn/Log sub-nav is mobile-only).
+  await expect(
+    page.getByRole("complementary", { name: /Session log/i }).getByText(/fire/i).first(),
+  ).toBeVisible();
 
   expect(errors).toEqual([]);
 });

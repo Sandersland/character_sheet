@@ -88,6 +88,22 @@ const forgetToolProficiencyOpSchema = z.object({
   entryId: z.string().min(1),
 });
 
+// Exactly-one-of optionId/custom is enforced in the applier (400 on violation),
+// so the schema stays a plain ZodObject — no `.refine` (keeps it out of the
+// discriminated union's ZodEffects path).
+const learnSubclassChoiceOpSchema = z.object({
+  type: z.literal("learnSubclassChoice"),
+  choiceKey: z.string().min(1),
+  optionId: z.string().optional(),
+  custom: z.object({ name: z.string().min(1), description: z.string().min(1) }).optional(),
+});
+
+const forgetSubclassChoiceOpSchema = z.object({
+  type: z.literal("forgetSubclassChoice"),
+  choiceKey: z.string().min(1),
+  entryId: z.string().min(1),
+});
+
 const operationSchema = z.discriminatedUnion("type", [
   spendResourceOpSchema,
   restoreResourceOpSchema,
@@ -98,6 +114,8 @@ const operationSchema = z.discriminatedUnion("type", [
   swapDisciplineOpSchema,
   learnToolProficiencyOpSchema,
   forgetToolProficiencyOpSchema,
+  learnSubclassChoiceOpSchema,
+  forgetSubclassChoiceOpSchema,
 ]);
 
 const transactionsRequestSchema = z.object({
@@ -117,6 +135,8 @@ const transactionsRequestSchema = z.object({
 //   swapDiscipline        — retrain one discipline for another (1 per monk level)
 //   learnToolProficiency  — choose an artisan's tool (Student of War, level 3+)
 //   forgetToolProficiency — undo a tool proficiency choice by entry id
+//   learnSubclassChoice   — pick an option for a generic subclass choose-N (#899)
+//   forgetSubclassChoice  — undo a subclass-choice pick by entry id
 //
 // Returns the full updated character on success.
 

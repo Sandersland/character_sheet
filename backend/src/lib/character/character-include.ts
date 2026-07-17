@@ -11,7 +11,13 @@ export const characterInclude = {
   backgroundSelection: true,
   classEntries: {
     orderBy: { position: "asc" },
-    include: { class: { select: { subclassLevel: true } } },
+    include: {
+      class: { select: { subclassLevel: true } },
+      // Subclass-granted spells (#898), resolved live at serialize time from the
+      // catalog rows this join loads (never snapshotted). Null when no subclass or
+      // a homebrew subclass without a catalog row (#911).
+      subclassRef: { include: { grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } } } },
+    },
   },
   inventoryItems: {
     orderBy: { position: "asc" },

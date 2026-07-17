@@ -1,4 +1,4 @@
-type MeterTone = "garnet" | "arcane" | "gold";
+type MeterTone = "garnet" | "arcane" | "gold" | "vitality";
 
 interface MeterBarProps {
   current: number;
@@ -11,6 +11,7 @@ const TONE_FILL: Record<MeterTone, string> = {
   garnet: "bg-garnet-600",
   arcane: "bg-arcane-500",
   gold: "bg-gold-500",
+  vitality: "bg-vitality-500",
 };
 
 /**

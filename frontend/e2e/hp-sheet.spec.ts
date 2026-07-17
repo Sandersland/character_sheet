@@ -10,8 +10,8 @@ test("session HP sheet: tap the bar, apply damage, see it in the log", async ({ 
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await expect(page).toHaveURL(/[?&]tab=combat/);
 
   const bar = page.getByRole("button", { name: /manage hit points/i });
   await expect(bar).toBeVisible();
@@ -38,9 +38,11 @@ test("session HP sheet: tap the bar, apply damage, see it in the log", async ({ 
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // The damage event lands on the activity log like Rest-tab damage.
-  await page.getByRole("tab", { name: /Log/ }).click();
-  await expect(page.getByText("damage", { exact: true }).first()).toBeVisible();
+  // The damage event lands on the session log — the always-visible right rail on
+  // desktop (#964; the Turn/Log sub-nav is mobile-only).
+  await expect(
+    page.getByRole("complementary", { name: /Session log/i }).getByText("damage", { exact: true }).first(),
+  ).toBeVisible();
 
   expect(errors).toEqual([]);
 });

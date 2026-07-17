@@ -12,8 +12,10 @@ import { MANEUVERS } from "./seed/maneuvers.js";
 import { DISCIPLINES } from "./seed/disciplines.js";
 import { SHADOW_ARTS } from "./seed/shadow-arts.js";
 import { CHANNEL_DIVINITIES } from "./seed/channel-divinity.js";
+import { SUBCLASS_CHOICE_OPTIONS } from "./seed/subclass-choices.js";
 import { FEATS } from "./seed/feats.js";
 import { SPELLS } from "./seed/spells.js";
+import { SUBCLASS_GRANTED_SPELLS } from "./seed/subclass-granted-spells.js";
 import { PACKS } from "./seed/packs.js";
 import { assertUniqueGrantedAbilityNames } from "./seed/guards.js";
 
@@ -79,6 +81,35 @@ async function seedSubclasses(prisma: PrismaClient, classIds: Map<string, string
       update: { description: sub.description },
     });
   }
+}
+
+// Resolve one granted-spell seed row's subclass + catalog spell to ids and upsert
+// it. A missing class/subclass/spell is a hard seed error (mirrors the other
+// catalogs' fail-fast on unknown references).
+async function upsertGrantedSpell(
+  prisma: PrismaClient,
+  classIds: Map<string, string>,
+  g: (typeof SUBCLASS_GRANTED_SPELLS)[number],
+) {
+  const classId = classIds.get(g.className);
+  if (!classId) throw new Error(`Seed error: unknown class "${g.className}" in SUBCLASS_GRANTED_SPELLS`);
+  const subclass = await prisma.subclass.findUnique({
+    where: { classId_name: { classId, name: g.subclassName } },
+    select: { id: true },
+  });
+  if (!subclass) throw new Error(`Seed error: unknown subclass "${g.subclassName}" for ${g.className}`);
+  const spell = await prisma.spell.findUnique({ where: { name: g.spellName }, select: { id: true } });
+  if (!spell) throw new Error(`Seed error: granted spell "${g.spellName}" not in the Spell catalog`);
+  await prisma.subclassGrantedSpell.upsert({
+    where: { subclassId_spellId: { subclassId: subclass.id, spellId: spell.id } },
+    create: { subclassId: subclass.id, spellId: spell.id, gateLevel: g.gateLevel, castingAbility: g.castingAbility },
+    update: { gateLevel: g.gateLevel, castingAbility: g.castingAbility },
+  });
+}
+
+// Subclass-granted spells (#898). Runs after subclasses AND spells are seeded.
+async function seedSubclassGrantedSpells(prisma: PrismaClient, classIds: Map<string, string>) {
+  for (const g of SUBCLASS_GRANTED_SPELLS) await upsertGrantedSpell(prisma, classIds, g);
 }
 
 // Upsert the action catalog by unique key.
@@ -178,6 +209,26 @@ async function seedShadowArts(prisma: PrismaClient) {
     };
     await prisma.grantedAbility.upsert({
       where: { name: art.name },
+      create: data,
+      update: data,
+    });
+  }
+}
+
+// Seed generic subclass "choose N" options (#899) as GrantedAbility rows keyed
+// by `source` = the choice's catalogSource. Plain descriptive features — no
+// cost/effect columns.
+async function seedSubclassChoiceOptions(prisma: PrismaClient) {
+  for (const option of SUBCLASS_CHOICE_OPTIONS) {
+    const data = {
+      name: option.name,
+      source: option.source,
+      description: option.description,
+      minLevel: option.minLevel,
+      alwaysKnown: false,
+    };
+    await prisma.grantedAbility.upsert({
+      where: { name: option.name },
       create: data,
       update: data,
     });
@@ -285,7 +336,13 @@ async function seedPacks(prisma: PrismaClient, itemIdsByName: Map<string, string
 }
 
 async function main() {
-  assertUniqueGrantedAbilityNames([...MANEUVERS, ...DISCIPLINES, ...SHADOW_ARTS, ...CHANNEL_DIVINITIES]);
+  assertUniqueGrantedAbilityNames([
+    ...MANEUVERS,
+    ...DISCIPLINES,
+    ...SHADOW_ARTS,
+    ...CHANNEL_DIVINITIES,
+    ...SUBCLASS_CHOICE_OPTIONS,
+  ]);
   await seedRaces(prisma);
   const classIds = await seedClasses(prisma);
   await seedSubclasses(prisma, classIds);
@@ -294,9 +351,11 @@ async function main() {
   await seedDisciplines(prisma);
   await seedShadowArts(prisma);
   await seedChannelDivinities(prisma);
+  await seedSubclassChoiceOptions(prisma);
   await seedFeats(prisma);
   await seedBackgrounds(prisma);
   await seedSpells(prisma);
+  await seedSubclassGrantedSpells(prisma, classIds);
   const itemIdsByName = await seedItems(prisma);
   await seedPacks(prisma, itemIdsByName);
 }

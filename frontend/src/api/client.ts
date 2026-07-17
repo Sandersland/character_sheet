@@ -42,6 +42,7 @@ import type {
   ReferenceData,
   ResourceOperation,
   Session,
+  SessionDoorwayState,
   SpellcastingOperation,
 } from "@/types/character";
 import type { AuthProviderInfo, AuthUser } from "@/types/auth";
@@ -854,6 +855,18 @@ export async function fetchActiveSession(characterId: string): Promise<Session |
     `/characters/${characterId}/sessions/active`,
     undefined,
     "Failed to fetch active session",
+  );
+}
+
+/**
+ * Get the sheet's session-doorway state (#942) — the one state-aware fact set the
+ * SessionDoorway bar renders. Solo characters get `campaignId: null` (bar absent).
+ */
+export async function fetchSessionDoorway(characterId: string): Promise<SessionDoorwayState> {
+  return request<SessionDoorwayState>(
+    `/characters/${characterId}/sessions/doorway`,
+    undefined,
+    "Failed to fetch session doorway",
   );
 }
 

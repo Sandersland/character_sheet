@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { createCharacter, uniqueName } from "./helpers/api";
+import { createCharacter, gotoSheet, uniqueName } from "./helpers/api";
 
 // Unarmored Defense is derived server-side (deriveArmorClass in srd.ts): the AC
 // tile shows the number, its popover discloses the labeled breakdown. Each spec
@@ -60,7 +60,7 @@ test("armor class: barbarian Unarmored Defense — Con stacks with a shield, bod
   });
 
   const errors = collectConsoleErrors(page);
-  await page.goto(`/characters/${id}`);
+  await gotoSheet(page, id, "inventory");
   await expect(page.getByRole("heading", { name: "Inventory", exact: true })).toBeVisible();
 
   // ── Unarmored: 10 + Dex + Con via Unarmored Defense ─────────────────────────
@@ -75,7 +75,9 @@ test("armor class: barbarian Unarmored Defense — Con stacks with a shield, bod
   await expect(breakdown(page)).toHaveCount(0);
   await acTile(page).click();
   await expect(breakdown(page)).toBeVisible();
-  await page.getByText("Speed", { exact: true }).click();
+  // "Speed" also labels the mobile mini-header's vital tile (display:none here) —
+  // scope the outside-click to the visible banner copy.
+  await page.getByText("Speed", { exact: true }).and(page.locator(":visible")).click();
   await expect(breakdown(page)).toHaveCount(0);
 
   // ── Shield stacks on top of Unarmored Defense: 14 + 2 = 16 ──────────────────
@@ -109,7 +111,7 @@ test("armor class: monk Unarmored Defense adds Wis, but a shield disqualifies it
   });
 
   const errors = collectConsoleErrors(page);
-  await page.goto(`/characters/${id}`);
+  await gotoSheet(page, id, "inventory");
   await expect(page.getByRole("heading", { name: "Inventory", exact: true })).toBeVisible();
 
   // ── Unarmored: 10 + Dex + Wis via Unarmored Defense ─────────────────────────

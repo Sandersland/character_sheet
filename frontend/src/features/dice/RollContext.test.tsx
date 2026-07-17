@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 
 import { logRoll } from "@/api/client";
 import { RollProvider, useRoll, type RollLog } from "@/features/dice/RollContext";
-import RollResultToast from "@/features/dice/RollResultToast";
+import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
+import RollResultSeal from "@/features/dice/RollResultSeal";
 import type { RollResult, RollSpec } from "@/lib/dice";
 
 vi.mock("@/api/client", () => ({
@@ -50,30 +51,29 @@ function AnimatedRollOnMount({ spec, label, log }: { spec: RollSpec; label: stri
 describe("RollProvider — rollAnimated + logging", () => {
   beforeEach(() => {
     mockLogRoll.mockClear();
+    localStorage.clear();
   });
 
-  it("plays the 3D dice, toasts the result, and logs the roll inside a session", async () => {
+  it("animated: plays the 3D dice, then settles into the shared result seal, and logs", async () => {
     render(
-      <RollProvider characterId="char-1" sessionId="sess-1">
-        <AnimatedRollOnMount
-          spec={{ count: 1, faces: 20, modifier: 5 }}
-          label="Perception check"
-          log={{ kind: "check", source: "Perception check", ability: "wisdom", skill: "perception" }}
-        />
-        <RollResultToast />
-      </RollProvider>,
+      <DiceRollStyleProvider>
+        <RollProvider characterId="char-1" sessionId="sess-1">
+          <AnimatedRollOnMount
+            spec={{ count: 1, faces: 20, modifier: 5 }}
+            label="Perception check"
+            log={{ kind: "check", source: "Perception check", ability: "wisdom", skill: "perception" }}
+          />
+          <RollResultSeal />
+        </RollProvider>
+      </DiceRollStyleProvider>,
     );
 
-    // 3D roller mounted in an overlay dialog (lazy-loaded behind Suspense).
-    expect(await screen.findByTestId("dice-roller")).toBeInTheDocument();
-
-    // The corner toast stays suppressed behind the open 3D modal (#801).
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
-    expect(screen.queryByText("22")).not.toBeInTheDocument();
 
-    // After dismissing the modal, the toast shows the total (17 + 5).
-    fireEvent.click(await screen.findByText("Done"));
-    await waitFor(() => expect(screen.getAllByText("22").length).toBeGreaterThan(0));
+    // At settle the overlay hands off to the seal (17 + 5) and unmounts itself.
+    const seal = await screen.findByTestId("roll-result-seal");
+    expect(seal).toHaveTextContent("22");
+    expect(screen.queryByTestId("dice-roller")).not.toBeInTheDocument();
 
     const [cid, sid, payload] = mockLogRoll.mock.calls[0];
     expect(cid).toBe("char-1");
@@ -88,7 +88,30 @@ describe("RollProvider — rollAnimated + logging", () => {
     });
   });
 
-  it("does not log when no session is active (still animates)", async () => {
+  it("quick: skips the 3D dice and lands the result on the seal directly", async () => {
+    localStorage.setItem("cs:pref:diceRoll", "quick");
+    render(
+      <DiceRollStyleProvider>
+        <RollProvider characterId="char-1" sessionId="sess-1">
+          <AnimatedRollOnMount
+            spec={{ count: 1, faces: 20, modifier: 5 }}
+            label="Perception check"
+            log={{ kind: "check", source: "Perception check", ability: "wisdom", skill: "perception" }}
+          />
+          <RollResultSeal />
+        </RollProvider>
+      </DiceRollStyleProvider>,
+    );
+
+    // No 3D overlay; the seal carries the result and it still logs.
+    const chip = await screen.findByTestId("roll-result-seal");
+    expect(chip).toHaveTextContent("Perception check");
+    expect(screen.queryByTestId("dice-roller")).not.toBeInTheDocument();
+    await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
+    expect(mockLogRoll.mock.calls[0][2]).toMatchObject({ kind: "check", skill: "perception" });
+  });
+
+  it("does not log when no session is active (still settles into the seal)", async () => {
     render(
       <RollProvider characterId="char-1" sessionId={null}>
         <AnimatedRollOnMount
@@ -96,12 +119,12 @@ describe("RollProvider — rollAnimated + logging", () => {
           label="Strength save"
           log={{ kind: "save", source: "Strength save", ability: "strength" }}
         />
+        <RollResultSeal />
       </RollProvider>,
     );
 
-    expect(await screen.findByTestId("dice-roller")).toBeInTheDocument();
-    // Give any async logging a chance to (not) fire.
-    await Promise.resolve();
+    // The animated path resolves onto the seal even with nothing to log.
+    expect(await screen.findByTestId("roll-result-seal")).toBeInTheDocument();
     expect(mockLogRoll).not.toHaveBeenCalled();
   });
 
@@ -109,31 +132,23 @@ describe("RollProvider — rollAnimated + logging", () => {
     render(
       <RollProvider characterId="char-1" sessionId="sess-1">
         <AnimatedRollOnMount spec={{ count: 1, faces: 20 }} label="Bare roll" />
+        <RollResultSeal />
       </RollProvider>,
     );
 
-    expect(await screen.findByTestId("dice-roller")).toBeInTheDocument();
-    await Promise.resolve();
+    expect(await screen.findByTestId("roll-result-seal")).toBeInTheDocument();
     expect(mockLogRoll).not.toHaveBeenCalled();
   });
 
-  it("carries the sticky roll mode onto the logged event", async () => {
+  it("carries a per-roll spec.mode onto the logged event", async () => {
     function AdvantageRoll() {
-      const { rollAnimated, setMode } = useRoll();
+      const { rollAnimated } = useRoll();
       useEffect(() => {
-        setMode("advantage");
-      }, [setMode]);
-      useEffect(() => {
-        // Fire after the mode is applied.
-        const t = setTimeout(
-          () =>
-            rollAnimated({ count: 1, faces: 20, modifier: 1 }, "Initiative", {
-              kind: "initiative",
-              source: "Initiative",
-            }),
-          0,
-        );
-        return () => clearTimeout(t);
+        // Roll mode is per-roll now (#958): the surface pins it onto the spec.
+        rollAnimated({ count: 1, faces: 20, modifier: 1, mode: "advantage" }, "Initiative", {
+          kind: "initiative",
+          source: "Initiative",
+        });
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, []);
       return null;

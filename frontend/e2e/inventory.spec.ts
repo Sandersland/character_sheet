@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { createCharacter, createSessionCharacter, uniqueName } from "./helpers/api";
+import { createCharacter, createSessionCharacter, gotoSheet, uniqueName } from "./helpers/api";
 
 // A fresh, session-ready character keeps the inventory (and thus the in-session
 // attack-form selector) unambiguous: exactly one weapon exists, so its equipped
@@ -18,7 +18,7 @@ test("inventory: add catalog item shows weight/qty; equip/unequip drives the att
   });
 
   const errors = collectConsoleErrors(page);
-  await page.goto(`/characters/${id}`);
+  await gotoSheet(page, id, "inventory");
   await expect(page.getByRole("heading", { name: "Inventory", exact: true })).toBeVisible();
 
   // ── Add a catalog Dagger (weight 1 lb) with quantity 2 ──────────────────────
@@ -38,8 +38,8 @@ test("inventory: add catalog item shows weight/qty; equip/unequip drives the att
   await expect(page.getByRole("button", { name: "Equipped" })).toBeVisible();
 
   // ── Into the live session, where the attack row reflects equipped weapons ────
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
   await page.getByRole("button", { name: "Start my turn" }).click();
@@ -52,17 +52,10 @@ test("inventory: add catalog item shows weight/qty; equip/unequip drives the att
   await expect(page.getByRole("radio", { name: "Dagger" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Roll to hit/ })).toBeVisible();
 
-  // The attack picker is a modal bottom sheet (#729): close it, unequip from the
-  // Inventory tab behind it, then reopen — with no weapon equipped the picker now
-  // shows the turn-screen empty-state hint and the selector drops the Dagger
-  // segment (defaulting to Unarmed). (Closing refunds the Attack action.)
+  // (The mid-session unequip half relied on the /session Inventory reference tab
+  // to strip the weapon while the picker is open; that reference tab is gone from
+  // the Combat tab after #963, and the sheet-Inventory-tab flow returns in #962.)
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Equipped", pressed: true }).click();
-  await page.getByRole("button", { name: /Use Action/ }).click();
-  await page.getByRole("button", { name: "Attack", exact: true }).click();
-  await expect(page.getByText(/No weapon equipped/i)).toBeVisible();
-  await expect(page.getByRole("radio", { name: "Dagger" })).toHaveCount(0);
-
   expect(errors).toEqual([]);
 });
 
@@ -93,7 +86,7 @@ test("inventory: sell lets you pick quantity + a single total; remainder stays",
   expect(acquire.ok(), `acquire: ${acquire.status()}`).toBeTruthy();
 
   const errors = collectConsoleErrors(page);
-  await page.goto(`/characters/${id}`);
+  await gotoSheet(page, id, "inventory");
   await expect(page.getByRole("heading", { name: "Inventory", exact: true })).toBeVisible();
 
   // Enter select mode, pick the stack, open the sell review.

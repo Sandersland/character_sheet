@@ -1,49 +1,37 @@
-// Save DC / Attack / Ability readout at the top of SpellsSection.
-import { abilityAbbr, formatModifier } from "@/lib/abilities";
-import type { AbilityName } from "@/types/character";
+// Boxed arcane stat readouts at the top of the spellcasting block:
+// Save DC · Spell Attack · Prepared X / Y (hidden when there is no prepare mechanic).
+import { formatModifier } from "@/lib/abilities";
+import type { PreparedSummary } from "@/lib/preparedSummary";
 
 interface SpellcastingStatBarProps {
   spellSaveDC: number;
   spellAttackBonus: number;
-  ability: AbilityName | undefined;
-  abilityMod: number;
+  prepared: PreparedSummary | null;
+}
+
+function StatBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-arcane-200 bg-gradient-to-b from-parchment-50 to-arcane-50 px-1 py-2 text-center">
+      <p className="text-[9px] font-bold uppercase tracking-wide text-parchment-600">{label}</p>
+      <p className="font-display text-2xl font-bold leading-tight text-arcane-800 tabular-nums">
+        {value}
+      </p>
+    </div>
+  );
 }
 
 export default function SpellcastingStatBar({
   spellSaveDC,
   spellAttackBonus,
-  ability,
-  abilityMod,
+  prepared,
 }: SpellcastingStatBarProps) {
   return (
-    <div className="flex flex-wrap items-center gap-4 rounded-control bg-arcane-50 px-4 py-3">
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-arcane-700">
-          Spell Save DC
-        </p>
-        <p className="font-display text-xl font-semibold text-arcane-900">{spellSaveDC}</p>
-      </div>
-      <div className="h-8 w-px bg-arcane-200" aria-hidden="true" />
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-arcane-700">
-          Spell Attack
-        </p>
-        <p className="font-display text-xl font-semibold text-arcane-900">
-          {formatModifier(spellAttackBonus)}
-        </p>
-      </div>
-      <div className="h-8 w-px bg-arcane-200" aria-hidden="true" />
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-arcane-700">
-          Ability
-        </p>
-        <p className="font-display text-xl font-semibold text-arcane-900">
-          {ability ? abilityAbbr(ability) : "—"}
-          <span className="ml-1 text-sm font-normal text-arcane-700">
-            ({formatModifier(abilityMod)})
-          </span>
-        </p>
-      </div>
+    <div className={`grid gap-2.5 ${prepared ? "grid-cols-3" : "grid-cols-2"}`}>
+      <StatBox label="Save DC" value={String(spellSaveDC)} />
+      <StatBox label="Spell Attack" value={formatModifier(spellAttackBonus)} />
+      {prepared && (
+        <StatBox label="Prepared" value={`${prepared.count} / ${prepared.limit ?? "—"}`} />
+      )}
     </div>
   );
 }

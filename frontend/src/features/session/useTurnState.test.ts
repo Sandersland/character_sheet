@@ -420,6 +420,17 @@ describe("attack tally", () => {
     expect(result.current.attackTally[0].damage).toBeUndefined();
   });
 
+  it("a tally refinement (setTallyDamage) pushes no new undo snapshot (#967)", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    const historyLen = result.current.history.length;
+    const id = result.current.attackTally[0].id;
+    // The refinement writes directly — undoing the parent recordAttack drops the
+    // whole row, so the damage write is never independently undoable.
+    act(() => { result.current.setTallyDamage(id, 9); });
+    expect(result.current.history).toHaveLength(historyLen);
+  });
+
   it("setTallyAttackTotal overrides a row's to-hit total by id, preserving nat flags + verdict", () => {
     const { result } = inAttack();
     act(() => { result.current.recordAttack(recorded({ total: 14, keptFace: 12 })); });
@@ -1202,5 +1213,33 @@ describe("turn-hook activity window (#457)", () => {
     expect(result.current.tookDamageThisTurn).toBe(true);
     act(() => { result.current.startTurn(); });    // my next turn begins
     expect(result.current.tookDamageThisTurn).toBe(true); // ← survives (was the bug)
+  });
+});
+
+describe("nullable sessionId (workspace provider, #959)", () => {
+  it("returns null when there is no live joined session", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), null));
+    expect(result.current).toBeNull();
+  });
+
+  it("re-hydrates on null → id (session goes live) and tears down on id → null", () => {
+    // Seed a persisted in-combat snapshot for the session about to go live.
+    localStorage.setItem("cs:turn:s-live", JSON.stringify({ inCombat: true, round: 2 }));
+    const { result, rerender } = renderHook(
+      ({ sid }: { sid: string | null }) => useTurnState(makeCharacter(), sid),
+      { initialProps: { sid: null as string | null } },
+    );
+    expect(result.current).toBeNull();
+
+    // Session goes live: the re-hydration effect loads the snapshot (the lazy
+    // initializer only ran on mount, when sessionId was null).
+    rerender({ sid: "s-live" });
+    expect(result.current).not.toBeNull();
+    expect(result.current?.inCombat).toBe(true);
+    expect(result.current?.round).toBe(2);
+
+    // Session ends: back to null.
+    rerender({ sid: null });
+    expect(result.current).toBeNull();
   });
 });

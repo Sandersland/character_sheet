@@ -34,7 +34,9 @@ test("creation: guided flow lands on the sheet with the chosen class", async ({ 
 
   await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+$/);
   await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
-  await expect(page.getByText("Fighter").first()).toBeVisible();
+  // The mobile mini-header also carries the class line but is display:none at the
+  // desktop test viewport — scope to the visible (banner) copy.
+  await expect(page.getByText("Fighter").and(page.locator(":visible")).first()).toBeVisible();
 
   expect(errors).toEqual([]);
 });

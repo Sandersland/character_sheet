@@ -12,6 +12,8 @@ test("campaign prefs: opt in and out of party-target healing", async ({ page }) 
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
+  // Campaign preferences live on the sheet's Story tab.
+  await page.getByRole("tab", { name: "Story" }).click();
 
   const toggle = page.getByRole("checkbox", { name: /allow party members to heal my sheet/i });
   await expect(toggle).toBeVisible();

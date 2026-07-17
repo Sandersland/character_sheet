@@ -1,7 +1,13 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { login } from "./helpers/auth";
-import { createCharacter, createSessionCharacter, learnSpells, uniqueName } from "./helpers/api";
+import {
+  createCharacter,
+  createSessionCharacter,
+  gotoSheet,
+  learnSpells,
+  uniqueName,
+} from "./helpers/api";
 
 // Visual regression baselines for the key screens. Baselines live in
 // e2e/__screenshots__/ (checked in) and are regenerated with
@@ -57,7 +63,7 @@ test("visual: character sheet — light theme", async ({ page }) => {
   });
 
   await setTheme(page, "light");
-  await page.goto(`/characters/${id}`);
+  await gotoSheet(page, id, "combat");
   await expect(page.getByRole("heading", { name: "Hit Points" })).toBeVisible();
   await ready(page);
 
@@ -79,7 +85,7 @@ test("visual: character sheet — dark theme", async ({ page }) => {
   });
 
   await setTheme(page, "dark");
-  await page.goto(`/characters/${id}`);
+  await gotoSheet(page, id, "combat");
   await expect(page.getByRole("heading", { name: "Hit Points" })).toBeVisible();
   await ready(page);
 
@@ -101,7 +107,7 @@ test("visual: inventory section and ledger modal", async ({ page }) => {
   });
 
   await setTheme(page, "light");
-  await page.goto(`/characters/${id}`);
+  await gotoSheet(page, id, "inventory");
   await expect(page.getByRole("heading", { name: "Inventory", exact: true })).toBeVisible();
 
   // Acquire one catalog Dagger so both the inventory row and its ledger event are
@@ -139,11 +145,14 @@ test("visual: spells section", async ({ page }) => {
   await learnSpells(page.request, id, ["Fire Bolt", "Magic Missile"]);
 
   await setTheme(page, "light");
-  await page.goto(`/characters/${id}`);
+  await gotoSheet(page, id, "magic");
   await expect(page.getByRole("heading", { name: "Spell Slots" })).toBeVisible();
   await ready(page);
 
-  await expect(sectionByTitle(page, "Spells")).toHaveScreenshot("spells-section.png", {
+  // The Magic tab's default view is the self-styled spellcasting record block
+  // (quick-cast + slot pips); the grimoire is a separate view behind "Manage
+  // spellbook →". Snapshot the record — the tab panel's default state.
+  await expect(page.locator("#sheet-panel-magic")).toHaveScreenshot("spells-section.png", {
     maxDiffPixelRatio: 0.01,
   });
 });
@@ -160,8 +169,8 @@ test("visual: session / turn view", async ({ page }) => {
 
   await setTheme(page, "light");
   await page.goto(`/characters/${id}`);
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await expect(page).toHaveURL(/[?&]tab=combat/);
   await expect(page.getByRole("button", { name: /Start combat/i })).toBeVisible();
   await ready(page);
 
