@@ -20,6 +20,7 @@ vi.mock("react-router-dom", async () => {
 
 vi.mock("@/api/client", () => ({
   fetchSessionDoorway: vi.fn(),
+  fetchActiveSession: vi.fn().mockResolvedValue(null),
   joinSession: vi.fn(),
   startCampaignSession: vi.fn(),
 }));
@@ -32,6 +33,12 @@ vi.mock("@/features/abilities/AbilityScoreBox", () => ({ default: () => null }))
 vi.mock("@/features/dice/RollResultSeal", () => ({ default: () => null }));
 vi.mock("@/features/dice/RollModeToggle", () => ({ default: () => null }));
 vi.mock("@/features/dice/RollContext", () => ({ RollProvider: ({ children }: { children: React.ReactNode }) => children }));
+// The turn-state provider is orthogonal to the doorway states under test; stub it
+// so its useTurnState call doesn't need a full combat-ready character fixture.
+vi.mock("@/features/session/TurnStateProvider", () => ({
+  TurnStateProvider: ({ children }: { children: React.ReactNode }) => children,
+  useTurnStateContext: () => null,
+}));
 vi.mock("@/features/character-meta/ActivityModal", () => ({ default: () => null }));
 vi.mock("@/features/advancement/AdvancementSection", () => ({ default: () => null }));
 vi.mock("@/features/character-meta/BackendStatus", () => ({ default: () => null }));

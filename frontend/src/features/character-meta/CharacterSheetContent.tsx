@@ -9,6 +9,8 @@ import CharacterSheetModals from "@/features/character-meta/CharacterSheetModals
 import { useSheetTabs } from "@/features/character-meta/useSheetTabs";
 import { useSwipeTabs } from "@/features/character-meta/useSwipeTabs";
 import { useCaptureDock } from "@/hooks/useCaptureDock";
+import { LiveSessionProvider, useLiveSession } from "@/features/session/LiveSessionProvider";
+import { TurnStateProvider } from "@/features/session/TurnStateProvider";
 import { useSessionDoorway } from "@/features/session/useSessionDoorway";
 import SessionDoorway from "@/features/session/SessionDoorway";
 import type { Character, ReferenceData } from "@/types/character";
@@ -21,12 +23,27 @@ interface CharacterSheetContentProps {
 }
 
 /**
- * The loaded-sheet view: banner + tab panels + the roll/modal chrome. Split out
- * from CharacterSheetPage so the page holds only the load/error/guard states and
- * this owns the per-character interaction state (tabs, modals, capture dock,
- * session doorway).
+ * The loaded-sheet view. Wraps the workspace in the shared session providers
+ * (#959) — `LiveSessionProvider` (is a session live + am I in it) above
+ * `TurnStateProvider` (the single turn-state instance) — so the Combat tab, the
+ * live strip, the nav pip, and the doorway all read one server-derived source.
  */
-export default function CharacterSheetContent({
+export default function CharacterSheetContent(props: CharacterSheetContentProps) {
+  return (
+    <LiveSessionProvider characterId={props.character.id}>
+      <TurnStateProvider character={props.character}>
+        <CharacterSheetWorkspace {...props} />
+      </TurnStateProvider>
+    </LiveSessionProvider>
+  );
+}
+
+/**
+ * The sheet body: banner + tab panels + the roll/modal chrome. Split from
+ * CharacterSheetPage so the page holds only load/error/guard states and this
+ * owns the per-character interaction state (tabs, modals, capture dock, doorway).
+ */
+function CharacterSheetWorkspace({
   id,
   character,
   reference,
@@ -38,6 +55,9 @@ export default function CharacterSheetContent({
   const [sessionsOpen, setSessionsOpen] = useState(false);
   // Cmd/Ctrl+J toggles the quick-capture dock from anywhere on the sheet.
   const { captureOpen, openCapture, closeCapture } = useCaptureDock();
+  // Session-log invalidation is shared with RollProvider so a logged roll and
+  // the log view use one counter (#959).
+  const { bumpLog } = useLiveSession();
   const session = useSessionDoorway(id);
   // Mobile: horizontal swipe on the panel region walks the tabs (clamped).
   const swipe = useSwipeTabs(tabs, activeTab, onTabChange);
@@ -46,6 +66,7 @@ export default function CharacterSheetContent({
     <RollProvider
       characterId={character.id}
       sessionId={session.inActiveSession ? session.activeSessionId : null}
+      onRollLogged={bumpLog}
       rollModifiers={character.rollModifiers}
     >
       {/* Mobile: a 100dvh app-shell — fixed header + in-flow bottom nav with the

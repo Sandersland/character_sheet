@@ -1,16 +1,14 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { fetchSessionDoorway, joinSession, startCampaignSession } from "@/api/client";
+import { joinSession, startCampaignSession } from "@/api/client";
+import { useLiveSession } from "@/features/session/LiveSessionProvider";
 import {
   summarizeSessionDoorway,
   type DoorwayAction,
   type SessionDoorwaySummary,
 } from "@/features/session/sessionDoorwaySummary";
 import type { Session, SessionDoorwayState } from "@/types/character";
-
-// undefined = still loading; null = the read failed (bar renders nothing).
-type DoorwayResult = SessionDoorwayState | null | undefined;
 
 // The network side of a doorway tap. "resume" needs no call — the character is
 // already joined; join/start hit their existing endpoints before we navigate.
@@ -66,29 +64,26 @@ const HIDDEN_SUMMARY: SessionDoorwaySummary = {
 };
 
 /**
- * Owns the sheet's session-doorway state (#942): resolves the doorway on mount
- * (same resolve-on-mount cadence as the old fetchActiveSession — no polling),
- * distills it to the render summary, and dispatches the start/join/resume action.
- * Replaces useSessionButton — the SessionDoorway bar is a dumb renderer of this.
+ * The sheet's session-doorway render state (#942), now a thin adapter over
+ * `LiveSessionProvider` (#959) — it no longer fetches, so there is exactly ONE
+ * doorway read per sheet. It distills the shared doorway into the bar's summary
+ * and dispatches the start/join/resume action, re-resolving the shared state on
+ * success so a just-started session lights up the workspace.
  */
 export function useSessionDoorway(id: string | undefined): UseSessionDoorway {
   const navigate = useNavigate();
-  const [doorway, setDoorway] = useState<DoorwayResult>(undefined);
+  const { status, doorway, session, sessionId, refresh } = useLiveSession();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!id) return;
-    fetchSessionDoorway(id).then(setDoorway).catch(() => setDoorway(null));
-  }, [id]);
+  const ready = status !== "loading";
+  const summary = doorway ? summarizeSessionDoorway(doorway) : HIDDEN_SUMMARY;
 
-  const ready = doorway !== undefined && doorway !== null;
-  const summary = ready ? summarizeSessionDoorway(doorway) : HIDDEN_SUMMARY;
-
-  const liveSession = doorway?.session ?? null;
-  const inActiveSession = liveSession?.joined ?? false;
-  const activeSessionId = liveSession?.id;
-  const activeSession = doorway ? toCaptureSession(doorway) : null;
+  const inActiveSession = status === "liveJoined";
+  const activeSessionId = sessionId ?? undefined;
+  // Prefer the full session (participants) when joined; else synthesize the
+  // capture-dock slice from the doorway.
+  const activeSession = session ?? (doorway ? toCaptureSession(doorway) : null);
 
   const onAction = async () => {
     const campaignId = doorway?.campaignId;
@@ -97,6 +92,7 @@ export function useSessionDoorway(id: string | undefined): UseSessionDoorway {
     setError(null);
     try {
       await dispatchDoorwayAction(summary.action, campaignId, activeSessionId, id);
+      await refresh();
       navigate(`/characters/${id}/session`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start or join the session.");

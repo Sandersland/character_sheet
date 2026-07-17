@@ -538,14 +538,30 @@ function endTurnState(s: TurnState): TurnState {
 // The cognitive score here counts the hook's ~24 delegating useCallback closures,
 // one per TurnStateActions member — all real branching lives in the module-level
 // pure transition functions above (each individually under the ceilings).
+export function useTurnState(character: Character, sessionId: string): TurnStateView;
+export function useTurnState(character: Character, sessionId: string | null): TurnStateView | null;
+// A null sessionId means "no live joined session" (#959): the hook still runs
+// every hook unconditionally but returns null, so the single TurnStateProvider
+// instance can hold a null value off-combat without violating rules-of-hooks.
 // fallow-ignore-next-line complexity
-export function useTurnState(character: Character, sessionId: string): TurnStateView {
+export function useTurnState(character: Character, sessionId: string | null): TurnStateView | null {
   const [state, setState] = useState<TurnState>(() => {
     // Lazily hydrate; merge over defaults so a stale-schema snapshot missing a
     // newer field (e.g. history, pre-#730) backfills its current default (#750).
-    const loaded = loadTurnState(sessionId);
+    const loaded = sessionId ? loadTurnState(sessionId) : null;
     return loaded ? hydrateTurnState(loaded) : initialState();
   });
+
+  // Re-hydrate when the session identity changes — a session may go live (null →
+  // id) or end (id → null) while the sheet stays mounted, and the lazy
+  // initializer above only runs on first mount.
+  const prevSessionIdRef = useRef(sessionId);
+  useEffect(() => {
+    if (prevSessionIdRef.current === sessionId) return;
+    prevSessionIdRef.current = sessionId;
+    const loaded = sessionId ? loadTurnState(sessionId) : null;
+    setState(loaded ? hydrateTurnState(loaded) : initialState());
+  }, [sessionId]);
 
   // Derived (not persisted): TWF eligibility follows the LIVE loadout, so a
   // mid-turn weapon swap updates the off-hand affordance immediately (#733).
@@ -555,9 +571,10 @@ export function useTurnState(character: Character, sessionId: string): TurnState
   const attacksPerAction = character.attacksPerAction;
   const currentHp = character.hitPoints?.current ?? 0;
 
-  // Persist state to localStorage whenever it changes.
+  // Persist state to localStorage whenever it changes — a no-op while there is
+  // no live session (null sessionId).
   useEffect(() => {
-    saveTurnState(sessionId, state);
+    if (sessionId) saveTurnState(sessionId, state);
   }, [sessionId, state]);
 
   // Watch current HP: any drop marks damage taken (feeds the durable-buff
@@ -747,6 +764,9 @@ export function useTurnState(character: Character, sessionId: string): TurnState
   const undo = useCallback(() => {
     setState(undoState);
   }, []);
+
+  // No live joined session → no turn tracker. Every hook above still ran.
+  if (sessionId === null) return null;
 
   return {
     ...state,
