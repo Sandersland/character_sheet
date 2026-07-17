@@ -8,10 +8,10 @@
  *   attack/damage/spell pickers which run their own logging.
  * - `rollAnimated(spec, label, log?)` — the sheet's skill/ability/save/
  *   initiative affordances. Honors the Dice-rolls preference (#945): `animated`
- *   plays the 3D `DiceRollModal` (which shows its own result at settle — no
- *   persistent toast), `quick` resolves instantly to the compact
- *   `RollResultToast` chip. Both log the roll (when `log` is set and a session
- *   is active) via `logRoll` and hand the settled result to `onSettled`.
+ *   plays the 3D `DiceRollModal` which, at settle, hands off to the shared
+ *   `RollResultSeal`; `quick` publishes the same seal instantly. Both log the
+ *   roll (when `log` is set and a session is active) via `logRoll` and hand the
+ *   settled result to `onSettled`.
  *
  * `logSessionRoll` is the shared best-effort logging path — a no-op outside an
  * active session — used by `rollAnimated` and directly by the concentration-save
@@ -200,16 +200,19 @@ export function RollProvider({ children, characterId, sessionId, onRollLogged, r
     [logResult],
   );
 
-  // Fired when the 3D overlay's die settles: log it, then hand it back. The
-  // modal itself is the result surface in animated mode, so we intentionally do
-  // NOT setLastRoll here — only RollResultToast reads lastRoll, and firing it
-  // would double up the readout with the modal.
+  // Fired when the 3D overlay's die settles: log it, hand it back, then hand
+  // off to the shared result seal. The animated tumble is the animation; the
+  // seal is the payoff — publishing `lastRoll` here and unmounting the overlay
+  // makes the 3D tray "settle into" the same seal the quick path lands on
+  // (#956), one visual language instead of a modal-vs-toast split.
   const handleResult = useCallback((result: RollResult) => {
     const current = pendingRef.current;
     if (!current) return;
     logResult(current.spec, current.log, result);
     // Hand the settled roll back so the caller can apply the exact shown values.
     current.onSettled?.(result);
+    setLastRoll({ id: current.id, label: current.label, result });
+    setPending(null);
   }, [logResult]);
 
   return (

@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import RollResultToast from "@/features/dice/RollResultToast";
+import RollResultSeal from "@/features/dice/RollResultSeal";
 import { RollProvider } from "@/features/dice/RollContext";
 import CharacterSheetHeader from "@/features/character-meta/CharacterSheetHeader";
 import CharacterSheetBody from "@/features/character-meta/CharacterSheetBody";
@@ -105,7 +105,7 @@ export default function CharacterSheetContent({
             activeTab={activeTab}
           />
         </div>
-        <RollResultToast />
+        <RollResultSeal />
         {/* Mobile: the session doorway bar, between the panels and the bottom nav. */}
         <SessionDoorway
           placement="mobile"

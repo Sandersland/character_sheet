@@ -29,7 +29,7 @@ vi.mock("@/hooks/useReferenceData", () => ({ useReferenceData: () => ({ referenc
 vi.mock("@/hooks/useCaptureHotkey", () => ({ useCaptureHotkey: () => {} }));
 
 vi.mock("@/features/abilities/AbilityScoreBox", () => ({ default: () => null }));
-vi.mock("@/features/dice/RollResultToast", () => ({ default: () => null }));
+vi.mock("@/features/dice/RollResultSeal", () => ({ default: () => null }));
 vi.mock("@/features/dice/RollModeToggle", () => ({ default: () => null }));
 vi.mock("@/features/dice/RollContext", () => ({ RollProvider: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock("@/features/character-meta/ActivityModal", () => ({ default: () => null }));

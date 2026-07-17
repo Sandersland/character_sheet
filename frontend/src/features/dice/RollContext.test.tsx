@@ -5,7 +5,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { logRoll } from "@/api/client";
 import { RollProvider, useRoll, type RollLog } from "@/features/dice/RollContext";
 import { DiceRollStyleProvider } from "@/features/dice/DiceRollStyleProvider";
-import RollResultToast from "@/features/dice/RollResultToast";
+import RollResultSeal from "@/features/dice/RollResultSeal";
 import type { RollResult, RollSpec } from "@/lib/dice";
 
 vi.mock("@/api/client", () => ({
@@ -54,7 +54,7 @@ describe("RollProvider — rollAnimated + logging", () => {
     localStorage.clear();
   });
 
-  it("animated: plays the 3D dice, shows the result in the modal (no persistent toast), and logs", async () => {
+  it("animated: plays the 3D dice, then settles into the shared result seal, and logs", async () => {
     render(
       <DiceRollStyleProvider>
         <RollProvider characterId="char-1" sessionId="sess-1">
@@ -63,19 +63,17 @@ describe("RollProvider — rollAnimated + logging", () => {
             label="Perception check"
             log={{ kind: "check", source: "Perception check", ability: "wisdom", skill: "perception" }}
           />
-          <RollResultToast />
+          <RollResultSeal />
         </RollProvider>
       </DiceRollStyleProvider>,
     );
 
-    // 3D roller mounted in an overlay dialog (lazy-loaded behind Suspense).
-    expect(await screen.findByTestId("dice-roller")).toBeInTheDocument();
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
 
-    // The modal itself shows the total (17 + 5) — the persistent chip stays away.
-    const modalResult = await screen.findByTestId("roll-modal-result");
-    expect(modalResult).toHaveTextContent("22");
-    expect(screen.queryByTestId("roll-result-toast")).not.toBeInTheDocument();
+    // At settle the overlay hands off to the seal (17 + 5) and unmounts itself.
+    const seal = await screen.findByTestId("roll-result-seal");
+    expect(seal).toHaveTextContent("22");
+    expect(screen.queryByTestId("dice-roller")).not.toBeInTheDocument();
 
     const [cid, sid, payload] = mockLogRoll.mock.calls[0];
     expect(cid).toBe("char-1");
@@ -90,7 +88,7 @@ describe("RollProvider — rollAnimated + logging", () => {
     });
   });
 
-  it("quick: skips the 3D dice and shows the compact chip with the result", async () => {
+  it("quick: skips the 3D dice and lands the result on the seal directly", async () => {
     localStorage.setItem("cs:pref:diceRoll", "quick");
     render(
       <DiceRollStyleProvider>
@@ -100,20 +98,20 @@ describe("RollProvider — rollAnimated + logging", () => {
             label="Perception check"
             log={{ kind: "check", source: "Perception check", ability: "wisdom", skill: "perception" }}
           />
-          <RollResultToast />
+          <RollResultSeal />
         </RollProvider>
       </DiceRollStyleProvider>,
     );
 
-    // No 3D overlay; the compact chip carries the result and it still logs.
-    const chip = await screen.findByTestId("roll-result-toast");
+    // No 3D overlay; the seal carries the result and it still logs.
+    const chip = await screen.findByTestId("roll-result-seal");
     expect(chip).toHaveTextContent("Perception check");
     expect(screen.queryByTestId("dice-roller")).not.toBeInTheDocument();
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
     expect(mockLogRoll.mock.calls[0][2]).toMatchObject({ kind: "check", skill: "perception" });
   });
 
-  it("does not log when no session is active (still animates)", async () => {
+  it("does not log when no session is active (still settles into the seal)", async () => {
     render(
       <RollProvider characterId="char-1" sessionId={null}>
         <AnimatedRollOnMount
@@ -121,12 +119,12 @@ describe("RollProvider — rollAnimated + logging", () => {
           label="Strength save"
           log={{ kind: "save", source: "Strength save", ability: "strength" }}
         />
+        <RollResultSeal />
       </RollProvider>,
     );
 
-    expect(await screen.findByTestId("dice-roller")).toBeInTheDocument();
-    // Give any async logging a chance to (not) fire.
-    await Promise.resolve();
+    // The animated path resolves onto the seal even with nothing to log.
+    expect(await screen.findByTestId("roll-result-seal")).toBeInTheDocument();
     expect(mockLogRoll).not.toHaveBeenCalled();
   });
 
@@ -134,11 +132,11 @@ describe("RollProvider — rollAnimated + logging", () => {
     render(
       <RollProvider characterId="char-1" sessionId="sess-1">
         <AnimatedRollOnMount spec={{ count: 1, faces: 20 }} label="Bare roll" />
+        <RollResultSeal />
       </RollProvider>,
     );
 
-    expect(await screen.findByTestId("dice-roller")).toBeInTheDocument();
-    await Promise.resolve();
+    expect(await screen.findByTestId("roll-result-seal")).toBeInTheDocument();
     expect(mockLogRoll).not.toHaveBeenCalled();
   });
 

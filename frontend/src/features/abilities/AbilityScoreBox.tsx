@@ -19,7 +19,7 @@ interface AbilityScoreBoxProps {
  * table, so it gets the visual weight, not the label.
  *
  * The modifier and "Save" link are clickable roll affordances that emit
- * to `RollResultToast` via `RollContext`.
+ * to `RollResultSeal` via `RollContext`.
  */
 export default function AbilityScoreBox({
   ability,

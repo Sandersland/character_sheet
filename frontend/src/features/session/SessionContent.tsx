@@ -11,7 +11,7 @@
 import type { useNavigate } from "react-router-dom";
 
 import { RollProvider } from "@/features/dice/RollContext";
-import RollResultToast from "@/features/dice/RollResultToast";
+import RollResultSeal from "@/features/dice/RollResultSeal";
 import RollModeToggle from "@/features/dice/RollModeToggle";
 import CompactHpBar from "@/features/hitpoints/CompactHpBar";
 import RestButton from "@/features/hitpoints/RestButton";
@@ -124,7 +124,7 @@ export default function SessionContent({ character, session, reference, setChara
         />
       </div>
       <RollModeToggle />
-      <RollResultToast />
+      <RollResultSeal />
     </RollProvider>
   );
 }

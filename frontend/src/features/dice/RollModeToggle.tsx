@@ -2,7 +2,7 @@
  * Manual advantage/disadvantage toggle. Sets the sticky `mode` in `RollContext`
  * that every eligible d20 roll affordance (RollButton, stat rolls, saves,
  * attacks, initiative) picks up. Clicking the active mode returns to normal.
- * Mount once alongside `RollResultToast`, inside `RollProvider`.
+ * Mount once alongside `RollResultSeal`, inside `RollProvider`.
  *
  * Placement is pure-CSS per breakpoint (#770): a fixed full-width docked bar at
  * `< md` (only mounted on the session page, which has no bottom nav); the
