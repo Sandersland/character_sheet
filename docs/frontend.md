@@ -30,8 +30,15 @@ frontend/src/
 │   │                    #   CharacterSheetContent (banner + chrome) → CharacterSheetHeader renders BOTH the
 │   │                    #   desktop-only garnet banner (hidden md:block; identity + BannerVitals + Tabs) and the
 │   │                    #   MobileSheetHeader (md:hidden compact sticky mini-header: avatar + name/subtitle + subclass/Lvl
-│   │                    #   pill, read-only HP MeterBar, one AC·Init·Speed·Prof tile row, session pill + OverflowMenu
-│   │                    #   for Note/Sessions/Activity/Delete). CharacterSheetBody
+│   │                    #   pill, tappable HP MeterBar → HP sheet, one AC·Init·Speed·Prof tile row + OverflowMenu).
+│   │                    #   Live-play header refit (#985): the banner's right cluster is sheet chrome only
+│   │                    #   (Sessions/Activity quiet links + a ⋯ OverflowMenu holding Delete — never beside
+│   │                    #   End session); while isLive a slim full-bleed garnet DesktopLiveStrip under the hero
+│   │                    #   owns session identity (pip · "Live session · name" · one Round/Live pill) and, when
+│   │                    #   joined, the ＋ Note / Leave / End controls. On mobile, while live+joined AND the
+│   │                    #   Combat tab is active MobileSheetHeader collapses to a one-line FightBar (avatar · name ·
+│   │                    #   HP+mini-meter via ManageHpButton · Round/Live pill · ⋯); tapping it expands the full
+│   │                    #   ExpandedSheetHeader (with a collapse handle). CharacterSheetBody
 │   │                    #   routes the ?tab= panel (panels/{Overview,Combat,Inventory,Magic,Story}Panel).
 │   │                    #   OverviewPanel (#923): AbilityScoresPanel (abilities + saves row) on top,
 │   │                    #   then a 3-col grid — AllSkillsCard+Proficiencies / Class Features+Advancements /

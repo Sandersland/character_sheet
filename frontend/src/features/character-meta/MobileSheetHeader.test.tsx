@@ -182,3 +182,76 @@ describe("MobileSheetHeader", () => {
     expect(onOpenCapture).toHaveBeenCalledTimes(1);
   });
 });
+
+// #985: while a session is live+joined AND the Combat tab is active, the header
+// collapses to a one-line fight bar to reclaim the glass for the turn tracker.
+describe("MobileSheetHeader fight bar (#985)", () => {
+  function renderBar(props: Partial<Parameters<typeof MobileSheetHeader>[0]> = {}) {
+    return render(
+      <MemoryRouter>
+        <RollProvider>
+          <MobileSheetHeader
+            character={makeCharacter()}
+            onUpdate={vi.fn()}
+            sessionActions={{ busy: false, onLeave: vi.fn(), onEnd: vi.fn() }}
+            combatActive
+            liveRound={3}
+            onOpenCapture={vi.fn()}
+            onOpenSessions={vi.fn()}
+            onOpenActivity={vi.fn()}
+            onOpenDelete={vi.fn()}
+            {...props}
+          />
+        </RollProvider>
+      </MemoryRouter>,
+    );
+  }
+
+  it("collapses to the fight bar (name, HP tap-through, round pill) in live Combat", () => {
+    renderBar();
+    // Name still present; the vitals tiles are collapsed away.
+    expect(screen.getByText("Aldric")).toBeInTheDocument();
+    expect(screen.queryByText("AC")).not.toBeInTheDocument();
+    expect(screen.queryByText("Speed")).not.toBeInTheDocument();
+    // HP taps through to the shared HP sheet (ManageHpButton).
+    expect(screen.getByRole("button", { name: /manage hit points/i })).toBeInTheDocument();
+    // Single round indicator.
+    expect(screen.getByText("Round 3")).toBeInTheDocument();
+  });
+
+  it("shows 'Live' on the pill when there is no active round", () => {
+    renderBar({ liveRound: null });
+    expect(screen.getByText("Live")).toBeInTheDocument();
+    expect(screen.queryByText(/^Round/)).not.toBeInTheDocument();
+  });
+
+  it("expands to the full header on tapping the bar, then re-collapses", () => {
+    renderBar();
+    expect(screen.queryByText("AC")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /expand character header/i }));
+    // Full vitals now visible.
+    expect(screen.getByText("AC")).toBeInTheDocument();
+    expect(screen.getByText("Speed")).toBeInTheDocument();
+
+    // The collapse handle returns to the fight bar.
+    fireEvent.click(screen.getByRole("button", { name: /collapse to fight bar/i }));
+    expect(screen.queryByText("AC")).not.toBeInTheDocument();
+  });
+
+  it("stays the full header off the Combat tab even while joined", () => {
+    renderBar({ combatActive: false });
+    expect(screen.getByText("AC")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /expand character header/i })).not.toBeInTheDocument();
+  });
+
+  it("exposes Note / Leave / End inside the fight-bar overflow", () => {
+    const onLeave = vi.fn();
+    renderBar({ sessionActions: { busy: false, onLeave, onEnd: vi.fn() } });
+    fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));
+    expect(screen.getByRole("menuitem", { name: /note/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "End Session" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Leave Session" }));
+    expect(onLeave).toHaveBeenCalledTimes(1);
+  });
+});

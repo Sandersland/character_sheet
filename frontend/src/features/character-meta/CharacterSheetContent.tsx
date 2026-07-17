@@ -45,6 +45,12 @@ export default function CharacterSheetContent(props: CharacterSheetContentProps)
   );
 }
 
+/** The live session's title for the header strip/fight bar — hoisted to module
+ *  scope so the workspace's JSX stays a plain call (no added branch complexity). */
+function sessionTitle(session: ReturnType<typeof useSessionDoorway>): string | null {
+  return session.activeSession?.title ?? null;
+}
+
 /**
  * The sheet body: banner + tab panels + the roll/modal chrome. Split from
  * CharacterSheetPage so the page holds only load/error/guard states and this
@@ -123,6 +129,7 @@ function CharacterSheetWorkspace({
           onTabChange={onTabChange}
           isLive={isLive}
           liveRound={liveRound}
+          sessionName={sessionTitle(session)}
           isLiveJoined={isLiveJoined}
           sessionActionBusy={life.sessionActionBusy}
           onLeaveSession={life.handleLeave}
