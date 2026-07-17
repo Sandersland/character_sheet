@@ -31,7 +31,6 @@ vi.mock("@/hooks/useCaptureHotkey", () => ({ useCaptureHotkey: () => {} }));
 
 vi.mock("@/features/abilities/AbilityScoreBox", () => ({ default: () => null }));
 vi.mock("@/features/dice/RollResultSeal", () => ({ default: () => null }));
-vi.mock("@/features/dice/RollModeToggle", () => ({ default: () => null }));
 vi.mock("@/features/dice/RollContext", () => ({ RollProvider: ({ children }: { children: React.ReactNode }) => children }));
 // The turn-state provider is orthogonal to the doorway states under test; stub it
 // so its useTurnState call doesn't need a full combat-ready character fixture.

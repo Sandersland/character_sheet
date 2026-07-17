@@ -95,14 +95,14 @@ describe("AllSkillsCard", () => {
     // Badge: "+4 Enhance Ability" on the Stealth row (source label, never a raw key).
     expect(screen.getByText(/\+4 Enhance Ability/)).toBeInTheDocument();
     // Bonus folds the buff in: Dex +3 + proficiency +2 + temp +4 = +9.
-    expect(screen.getByTitle("Roll Stealth check: 1d20 + 9")).toBeInTheDocument();
+    expect(screen.getByTitle(/^Roll Stealth check: 1d20 \+ 9\b/)).toBeInTheDocument();
   });
 
   it("rolls a skill check with the correct bonus (ability mod + proficiency)", () => {
     renderCard(allEighteen({ stealth: { proficient: true } }));
     // Stealth = Dex mod (+3) + proficiency (+2) = +5.
-    expect(screen.getByTitle("Roll Stealth check: 1d20 + 5")).toBeInTheDocument();
+    expect(screen.getByTitle(/^Roll Stealth check: 1d20 \+ 5\b/)).toBeInTheDocument();
     // Non-proficient Acrobatics = Dex mod (+3) only.
-    expect(screen.getByTitle("Roll Acrobatics check: 1d20 + 3")).toBeInTheDocument();
+    expect(screen.getByTitle(/^Roll Acrobatics check: 1d20 \+ 3\b/)).toBeInTheDocument();
   });
 });

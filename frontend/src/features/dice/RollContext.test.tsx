@@ -140,23 +140,15 @@ describe("RollProvider — rollAnimated + logging", () => {
     expect(mockLogRoll).not.toHaveBeenCalled();
   });
 
-  it("carries the sticky roll mode onto the logged event", async () => {
+  it("carries a per-roll spec.mode onto the logged event", async () => {
     function AdvantageRoll() {
-      const { rollAnimated, setMode } = useRoll();
+      const { rollAnimated } = useRoll();
       useEffect(() => {
-        setMode("advantage");
-      }, [setMode]);
-      useEffect(() => {
-        // Fire after the mode is applied.
-        const t = setTimeout(
-          () =>
-            rollAnimated({ count: 1, faces: 20, modifier: 1 }, "Initiative", {
-              kind: "initiative",
-              source: "Initiative",
-            }),
-          0,
-        );
-        return () => clearTimeout(t);
+        // Roll mode is per-roll now (#958): the surface pins it onto the spec.
+        rollAnimated({ count: 1, faces: 20, modifier: 1, mode: "advantage" }, "Initiative", {
+          kind: "initiative",
+          source: "Initiative",
+        });
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, []);
       return null;
