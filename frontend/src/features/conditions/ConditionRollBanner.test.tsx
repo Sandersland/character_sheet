@@ -40,4 +40,18 @@ describe("ConditionRollBanner (#984)", () => {
       screen.getByText("Advantage on Strength checks and Strength saving throws"),
     ).toBeInTheDocument();
   });
+
+  it("renders a single banner joining both clauses for a mixed-tone source", () => {
+    // One source granting both advantage and disadvantage collapses to ONE
+    // banner (name appears once) with both clauses joined by "; ".
+    const mixed: RollModifier[] = [
+      { mode: "advantage", kind: "check", source: "Enlarge/Reduce" },
+      { mode: "disadvantage", kind: "save", source: "Enlarge/Reduce" },
+    ];
+    render(<ConditionRollBanner modifiers={mixed} />);
+    expect(screen.getAllByText("Enlarge/Reduce")).toHaveLength(1);
+    expect(
+      screen.getByText("Advantage on ability checks; Disadvantage on saving throws"),
+    ).toBeInTheDocument();
+  });
 });

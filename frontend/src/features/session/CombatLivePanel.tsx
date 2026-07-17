@@ -83,6 +83,9 @@ export default function CombatLivePanel({
             skills as Overview (#957), rendered inside the workspace RollProvider
             so a roll stamps the seal (#956) and logs to the session for free. */}
         <aside className="hidden md:flex md:flex-col md:gap-4" aria-label="Ability checks, saves, and skills">
+          {/* The condition banner (#984) rides the roll rails: this desktop-only
+              rail here, and the Overview panel on mobile (the mobile Combat Turn
+              view has no rails, so no banner is expected there). */}
           <ConditionRollBanner modifiers={character.rollModifiers} />
           <AbilityScoresPanel character={character} gridClassName="grid-cols-3" />
           <AllSkillsCard

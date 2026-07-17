@@ -27,7 +27,7 @@ export default function ConditionRollBanner({ modifiers, className = "" }: Condi
   if (summaries.length === 0) return null;
 
   return (
-    <div className={`flex flex-col gap-2 ${className}`} aria-label="Active roll modifiers">
+    <div className={`flex flex-col gap-2 ${className}`} role="region" aria-label="Active roll modifiers">
       {summaries.map((summary) => (
         <div
           key={summary.source}
