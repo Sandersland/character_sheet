@@ -1,12 +1,10 @@
 /**
- * The live-Combat panel's async lifecycle (#960): owner check + End-Session
- * (guarded XP award) + Leave. Unlike the old `useSessionLifecycle` (the
- * `/session` page's, which `navigate()`s back to the sheet), this one is
- * workspace-native — End/Leave call `LiveSessionProvider.refresh()` so the
- * Combat tab reverts to the static panel underneath with no navigation, and the
- * recap survives the panel unmounting because `endedSession` lives in the
- * provider, not here (#960 decision 5 / addendum D). Shares the End/Leave/owner
- * primitives with `useSessionLifecycle` via `sessionLifecycleHelpers`.
+ * The live-session End/Leave lifecycle (#960), lifted to `CharacterSheetWorkspace`
+ * so the sheet header can drive it (#979). Workspace-native — End/Leave call
+ * `LiveSessionProvider.refresh()` so the Combat tab reverts to the static panel
+ * underneath with no navigation, and the recap survives the panel unmounting
+ * because `endedSession` lives in the provider, not here (#960 decision 5 /
+ * addendum D). Built from the shared `sessionLifecycleHelpers` primitives.
  */
 
 import {

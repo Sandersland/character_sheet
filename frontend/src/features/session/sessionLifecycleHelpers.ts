@@ -62,10 +62,10 @@ export async function leaveAndClearTurnState(session: Session, characterId: stri
 }
 
 /**
- * The End-Session prompt + confirm flow, shared by both lifecycle hooks. Owns
- * the prompt open-state and the XP-award-then-end call (guarded); the host
- * supplies `onEnded` — the only difference between the two (the `/session` page
- * stashes the recap locally; the workspace stashes it in the provider + refreshes).
+ * The End-Session prompt + confirm flow. Owns the prompt open-state and the
+ * XP-award-then-end call (guarded); the caller supplies `onEnded` (the workspace
+ * stashes the recap in the provider + refreshes). Once shared with the retired
+ * `/session` host's lifecycle; `useCombatLifecycle` is the sole consumer now.
  */
 export function useEndSessionFlow(
   characterId: string,

@@ -8,13 +8,14 @@
  * Consumes the #959 workspace providers: turn state via `useTurnStateContext()`
  * (never its own `useTurnState` — a second instance would diverge), live session
  * via `useLiveSession()`, and the workspace `RollProvider` (already threaded
- * with the live `sessionId`). It owns only UI state (the open picker) + the
- * End/Leave lifecycle; the turn economy lives in the provider, so it survives a
+ * with the live `sessionId`). It owns only UI state (the open picker + the
+ * Turn/Log sub-nav) — the End/Leave lifecycle + its prompt live in the workspace
+ * + sheet header (#979). The turn economy lives in the provider, so it survives a
  * swipe away (this panel stays mounted, hidden) and even a remount.
  *
  * `active` = the Combat tab is the visible tab. Overlay pickers (BottomSheet,
  * portaled to document.body) render ONLY while active, so a hidden panel's open
- * sheet never floats over Overview; the End prompt is likewise active-gated.
+ * sheet never floats over Overview.
  */
 
 import { useState, type KeyboardEvent } from "react";
