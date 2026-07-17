@@ -58,9 +58,11 @@ test("session: opening Use-an-item then closing leaves the action available", as
   expect(errors).toEqual([]);
 });
 
-// #770: on a mobile viewport the roll-mode toggle docks as a fixed full-width
-// bottom bar instead of floating over the action controls.
-test("session: roll-mode toggle docks as a bottom bar on mobile", async ({ page }) => {
+// #958: the global docked NORMAL/ADV/DIS footer is retired — roll mode rides
+// the roll surface now (long-press menu on skills/saves; a visible control on
+// the attack sheet). This asserts the footer is gone and the turn flow still
+// works without it.
+test("session: the global roll-mode footer is retired (mobile)", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page);
 
@@ -69,28 +71,11 @@ test("session: roll-mode toggle docks as a bottom bar on mobile", async ({ page 
   await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
   await expect(page).toHaveURL(/\/session$/);
 
-  const toggle = page.getByRole("group", { name: "Roll mode" });
-  await expect(toggle).toBeVisible();
-  await expect(toggle.getByRole("button", { name: /^advantage$/i })).toBeVisible();
+  // No docked footer and no global "Roll mode" group anywhere.
+  await expect(page.getByTestId("roll-mode-bar")).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Roll mode" })).toHaveCount(0);
 
-  // The outer wrapper is the full-width docked bar; the role=group is the
-  // centered inner control, so measure the bar itself for the geometry.
-  const bar = page.getByTestId("roll-mode-bar");
-  const box = await bar.boundingBox();
-  expect(box).not.toBeNull();
-  if (box) {
-    expect(box.x).toBeLessThan(40);
-    expect(box.width).toBeGreaterThan(300);
-    expect(box.y + box.height).toBeGreaterThan(844 - 120);
-  }
-
-  // Toggling advantage still flips the shared roll mode (aria-pressed).
-  const adv = toggle.getByRole("button", { name: /^advantage$/i });
-  await adv.click();
-  await expect(adv).toHaveAttribute("aria-pressed", "true");
-
-  // A d20 affordance below the bar remains tappable — Playwright's click gate
-  // fails if the bar overlaps it.
+  // The turn flow is unaffected by the footer's removal.
   await page.getByRole("button", { name: /Start combat/i }).click();
   await page.getByRole("button", { name: "Start my turn" }).click();
   await page.getByRole("button", { name: /Use Action/ }).click();

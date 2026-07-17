@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useEffect } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import InlineAttackPicker from "@/features/session/InlineAttackPicker";
@@ -113,6 +113,22 @@ describe("InlineAttackPicker — attack form selector (#786)", () => {
     expect(screen.getByRole("radio", { name: "Dagger" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Unarmed Strike" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Improvised Weapon" })).toBeInTheDocument();
+  });
+
+  it("shows the sheet's own ADV/DIS control and defaults to Normal (#958)", async () => {
+    const user = userEvent.setup();
+    renderPicker(
+      makeCharacter({
+        inventory: [equippedWeapon("Longsword", "inv-1")] as unknown as Character["inventory"],
+      }),
+    );
+    const mode = screen.getByRole("group", { name: "Attack roll mode" });
+    expect(mode).toBeInTheDocument();
+    expect(within(mode).getByRole("button", { name: "Normal" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(within(mode).getByRole("button", { name: "Advantage" }));
+    expect(within(mode).getByRole("button", { name: "Advantage" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(mode).getByRole("button", { name: "Normal" })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("shows exactly one attack card (one Roll to hit) and one damage card", () => {
