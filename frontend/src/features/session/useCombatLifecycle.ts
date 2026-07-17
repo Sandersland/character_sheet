@@ -12,7 +12,6 @@
 import {
   leaveAndClearTurnState,
   useEndSessionFlow,
-  useIsSessionOwner,
   usePendingAction,
 } from "@/features/session/sessionLifecycleHelpers";
 import type { LiveSessionValue } from "@/features/session/LiveSessionProvider";
@@ -32,7 +31,6 @@ export function useCombatLifecycle({
   const end = usePendingAction();
   const leave = usePendingAction();
   const endFlow = useEndSessionFlow(character.id, session, end);
-  const isOwner = useIsSessionOwner(session.campaignId);
 
   function handleCharacterUpdate(updated: Character) {
     onUpdate(updated);
@@ -57,7 +55,6 @@ export function useCombatLifecycle({
     endPromptOpen: endFlow.endPromptOpen,
     leavePending: leave.pending,
     leaveError: leave.error,
-    isOwner,
     openEndPrompt: endFlow.openEndPrompt,
     closeEndPrompt: endFlow.closeEndPrompt,
     handleCharacterUpdate,
