@@ -3,21 +3,26 @@
  * tracker on the live Combat tab (#982). It collapses what used to be a
  * full-height "No active conditions" card into a single line:
  *
- *   Conditions · <active chips | "none"> · + Add    ·    Exhaustion N    ·    Rest
+ *   Conditions · <active chips | "none"> · + Add    ·    Exhaustion −N+    ·    Rest
  *
  * It stays one line tall when nothing is active and only grows to show chips when
- * conditions are applied. Add/remove/exhaustion all run through the shared
- * ConditionsSheetBody (so the transaction calls stay single-sourced) inside a
+ * conditions are applied. Conditions add/remove run through the shared
+ * ConditionsSheetBody (so those transaction calls stay single-sourced) inside a
  * BottomSheet overlay — the picker never renders inline in the tracker's flow, so
- * opening it can't push the hero down. Rest reuses the session RestButton.
+ * opening it can't push the hero down. Exhaustion is stepped inline via ±
+ * controls (the same `setExhaustion` op the conditions sheet uses), so there's no
+ * second sheet-opening button colliding with the "manage conditions" name (#989).
+ * Rest reuses the session RestButton.
  */
 
 import { useState } from "react";
+import { Minus, Plus } from "lucide-react";
 
+import { applyConditionTransactions } from "@/api/client";
 import BottomSheet from "@/components/ui/BottomSheet";
 import ConditionsSheetBody from "@/features/conditions/ConditionsSheetBody";
 import RestButton from "@/features/hitpoints/RestButton";
-import { conditionLabel } from "@/lib/conditions";
+import { conditionLabel, EXHAUSTION_MAX } from "@/lib/conditions";
 import type { Character } from "@/types/character";
 
 interface Props {
@@ -25,10 +30,14 @@ interface Props {
   onUpdate: (character: Character) => void;
 }
 
+const STEP =
+  "flex h-6 w-6 items-center justify-center rounded-control border border-parchment-300 bg-parchment-50 text-parchment-700 transition-colors hover:bg-parchment-100 disabled:cursor-not-allowed disabled:opacity-40";
+
 export default function CombatUtilityStrip({ character, onUpdate }: Props) {
   // null = closed; "manage" opens the sheet as-is; "add" opens it with the
   // condition picker already expanded (the "+ Add" affordance).
   const [sheet, setSheet] = useState<null | "manage" | "add">(null);
+  const [exhaustionBusy, setExhaustionBusy] = useState(false);
   const { active, exhaustion } = character.conditions;
 
   // Dynamic accessible name so the active conditions are announced, not hidden
@@ -37,6 +46,22 @@ export default function CombatUtilityStrip({ character, onUpdate }: Props) {
     active.length > 0
       ? `Manage conditions: ${active.map((c) => conditionLabel(c.key)).join(", ")}`
       : "Manage conditions";
+
+  // Inline exhaustion step — the same setExhaustion transaction op the conditions
+  // sheet fires, so exhaustion stays single-sourced through the client.
+  async function stepExhaustion(next: number) {
+    const clamped = Math.min(EXHAUSTION_MAX, Math.max(0, next));
+    if (clamped === exhaustion) return;
+    setExhaustionBusy(true);
+    try {
+      const updated = await applyConditionTransactions(character.id, [
+        { type: "setExhaustion", level: clamped },
+      ]);
+      onUpdate(updated);
+    } finally {
+      setExhaustionBusy(false);
+    }
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-card border border-parchment-200 bg-parchment-50 px-3 py-2 shadow-card">
@@ -76,21 +101,37 @@ export default function CombatUtilityStrip({ character, onUpdate }: Props) {
         + Add
       </button>
 
-      {/* Exhaustion readout — opens the combined conditions+exhaustion sheet, so
-          the label names both surfaces (#989 review). */}
-      <button
-        type="button"
-        aria-label="Manage conditions and exhaustion"
-        onClick={() => setSheet("manage")}
-        className="flex shrink-0 items-center gap-1.5 rounded-control px-1.5 py-0.5 transition-colors hover:bg-parchment-100"
-      >
+      {/* Exhaustion — inline ± steppers (no sheet, so no "manage conditions"
+          name collision). Fires the same setExhaustion op as the sheet (#989). */}
+      <div className="flex shrink-0 items-center gap-1.5">
         <span className="font-sans text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
           Exhaustion
         </span>
-        <span className="font-display text-sm font-semibold tabular-nums text-parchment-900">
+        <button
+          type="button"
+          aria-label="Decrease exhaustion"
+          disabled={exhaustionBusy || exhaustion <= 0}
+          onClick={() => stepExhaustion(exhaustion - 1)}
+          className={STEP}
+        >
+          <Minus aria-hidden="true" className="h-3.5 w-3.5" />
+        </button>
+        <span
+          aria-live="polite"
+          className="min-w-[1rem] text-center font-display text-sm font-semibold tabular-nums text-parchment-900"
+        >
           {exhaustion}
         </span>
-      </button>
+        <button
+          type="button"
+          aria-label="Increase exhaustion"
+          disabled={exhaustionBusy || exhaustion >= EXHAUSTION_MAX}
+          onClick={() => stepExhaustion(exhaustion + 1)}
+          className={STEP}
+        >
+          <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+        </button>
+      </div>
 
       {/* Rest — reuses the session rest control + its short/long-rest handlers. */}
       <div className="ml-auto shrink-0">

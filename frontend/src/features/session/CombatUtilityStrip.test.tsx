@@ -120,7 +120,7 @@ describe("CombatUtilityStrip (#982)", () => {
     expect(mockApply).toHaveBeenCalledWith("char-1", [{ type: "removeCondition", key: "stunned" }]);
   });
 
-  it("changes exhaustion through the transaction endpoint", async () => {
+  it("steps exhaustion up via the inline stepper (setExhaustion op)", async () => {
     const user = userEvent.setup();
     const mockApply = vi.mocked(client.applyConditionTransactions);
     mockApply.mockResolvedValue(makeCharacter({ active: [], exhaustion: 3 }));
@@ -129,8 +129,48 @@ describe("CombatUtilityStrip (#982)", () => {
       <CombatUtilityStrip character={makeCharacter({ active: [], exhaustion: 2 })} onUpdate={vi.fn()} />,
     );
 
-    await user.click(screen.getByRole("button", { name: /manage conditions and exhaustion/i }));
-    await user.click(screen.getByRole("button", { name: /increase exhaustion/i }));
+    // Inline stepper — no sheet, no "manage conditions" name collision.
+    await user.click(screen.getByRole("button", { name: "Increase exhaustion" }));
     expect(mockApply).toHaveBeenCalledWith("char-1", [{ type: "setExhaustion", level: 3 }]);
+  });
+
+  it("steps exhaustion down via the inline stepper", async () => {
+    const user = userEvent.setup();
+    const mockApply = vi.mocked(client.applyConditionTransactions);
+    mockApply.mockResolvedValue(makeCharacter({ active: [], exhaustion: 1 }));
+
+    render(
+      <CombatUtilityStrip character={makeCharacter({ active: [], exhaustion: 2 })} onUpdate={vi.fn()} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Decrease exhaustion" }));
+    expect(mockApply).toHaveBeenCalledWith("char-1", [{ type: "setExhaustion", level: 1 }]);
+  });
+
+  it("disables the down-stepper at 0 and the up-stepper at the max", () => {
+    const { rerender } = render(
+      <CombatUtilityStrip character={makeCharacter({ active: [], exhaustion: 0 })} onUpdate={vi.fn()} />,
+    );
+    expect(screen.getByRole("button", { name: "Decrease exhaustion" })).toBeDisabled();
+
+    rerender(
+      <CombatUtilityStrip character={makeCharacter({ active: [], exhaustion: 6 })} onUpdate={vi.fn()} />,
+    );
+    expect(screen.getByRole("button", { name: "Increase exhaustion" })).toBeDisabled();
+  });
+
+  it("keeps 'manage conditions' as the ONLY control matching that name (no exhaustion collision)", () => {
+    render(
+      <CombatUtilityStrip
+        character={makeCharacter({
+          active: [{ key: "poisoned", appliedAt: "2026-01-01T00:00:00.000Z" }],
+          exhaustion: 2,
+        })}
+        onUpdate={vi.fn()}
+      />,
+    );
+    // getAllByRole with a name regex would throw in strict e2e if 2 matched;
+    // here we assert exactly one control carries a "manage conditions" name.
+    expect(screen.getAllByRole("button", { name: /manage conditions/i })).toHaveLength(1);
   });
 });
