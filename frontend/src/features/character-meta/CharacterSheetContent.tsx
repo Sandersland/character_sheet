@@ -63,7 +63,8 @@ function CharacterSheetWorkspace({
   const live = useLiveSession();
   const turnState = useTurnStateContext();
   const liveRound = useLiveRound();
-  const session = useSessionDoorway(id);
+  // Start/Join from the doorway jumps to the Combat tab in-workspace (#963).
+  const session = useSessionDoorway(id, () => onTabChange("combat"));
   // Mobile: horizontal swipe on the panel region walks the tabs (clamped).
   const swipe = useSwipeTabs(tabs, activeTab, onTabChange);
 

@@ -10,8 +10,8 @@ test("session HP sheet: tap the bar, apply damage, see it in the log", async ({ 
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
-  await expect(page).toHaveURL(/\/session$/);
+  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await expect(page).toHaveURL(/[?&]tab=combat/);
 
   const bar = page.getByRole("button", { name: /manage hit points/i });
   await expect(bar).toBeVisible();
@@ -38,9 +38,7 @@ test("session HP sheet: tap the bar, apply damage, see it in the log", async ({ 
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // The damage event lands on the activity log like Rest-tab damage.
-  await page.getByRole("tab", { name: /Log/ }).click();
-  await expect(page.getByText("damage", { exact: true }).first()).toBeVisible();
-
+  // (The session-log assertion returns with the Combat-tab Turn/Log sub-nav in
+  // #962; the log tab isn't on the Combat tab yet after the #963 doorway jump.)
   expect(errors).toEqual([]);
 });
