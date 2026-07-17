@@ -54,7 +54,7 @@ export default function CombatLivePanel({
   // #962: a small Turn/Log sub-nav — the session Log is the only secondary
   // surface that stays under Combat (Inventory/Class/Spells moved to the sheet's
   // own tabs; Loot is dropped from the UI).
-  const [view, setView] = useState<"turn" | "log">("turn");
+  const [view, setView] = useState<LiveView>("turn");
 
   // The panel is mounted only while live+joined, so turnState is non-null in
   // practice; guard the render (never the hooks above) for safety.
