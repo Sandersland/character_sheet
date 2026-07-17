@@ -80,10 +80,11 @@ export default function CombatLivePanel({
           <main> landmark (the sheet's Combat tab), so a nested main is invalid. */}
       <div className="mx-auto flex max-w-4xl flex-col gap-4 px-6 pt-6">
         <TurnLogSubNav view={view} onChange={setView} />
-        {/* Both views stay mounted so the turn economy + open picker survive a
-            Turn↔Log flip; hide the inactive one (LiveTurnBody's overlays are also
-            gated off when Log is showing). */}
-        <div hidden={view !== "turn"}>
+        {/* Only the Turn view stays mounted (hidden when inactive) so the turn
+            economy + an open picker survive a Turn↔Log flip; its overlays are
+            gated off when Log is showing. The Log view renders on demand —
+            SessionLog re-fetches on mount, so it's always fresh. */}
+        <div hidden={view !== "turn"} role="tabpanel" id="combat-panel-turn" aria-labelledby="combat-tab-turn">
           <LiveTurnBody
             character={character}
             session={session}
@@ -94,9 +95,11 @@ export default function CombatLivePanel({
           />
         </div>
         {view === "log" && (
-          <Card title="Session Log" className="p-4">
-            <SessionLog characterId={character.id} sessionId={session.id} refreshKey={live.logRefresh} />
-          </Card>
+          <div role="tabpanel" id="combat-panel-log" aria-labelledby="combat-tab-log">
+            <Card title="Session Log" className="p-4">
+              <SessionLog characterId={character.id} sessionId={session.id} />
+            </Card>
+          </div>
         )}
       </div>
 
@@ -123,7 +126,9 @@ function TurnLogSubNav({ view, onChange }: { view: "turn" | "log"; onChange: (v:
     <button
       type="button"
       role="tab"
+      id={`combat-tab-${id}`}
       aria-selected={view === id}
+      aria-controls={`combat-panel-${id}`}
       onClick={() => onChange(id)}
       className={`rounded-control px-4 py-1.5 text-sm font-semibold transition-colors ${
         view === id ? "bg-garnet-700 text-parchment-50" : "text-parchment-600 hover:bg-parchment-100"
