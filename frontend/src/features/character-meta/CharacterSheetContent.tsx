@@ -24,7 +24,7 @@ interface CharacterSheetContentProps {
  * The loaded-sheet view: banner + tab panels + the roll/modal chrome. Split out
  * from CharacterSheetPage so the page holds only the load/error/guard states and
  * this owns the per-character interaction state (tabs, modals, capture dock,
- * session button).
+ * session doorway).
  */
 export default function CharacterSheetContent({
   id,
@@ -96,6 +96,7 @@ export default function CharacterSheetContent({
           className="min-h-0 flex-1 overflow-y-auto md:flex-none md:overflow-visible"
           onTouchStart={swipe.onTouchStart}
           onTouchEnd={swipe.onTouchEnd}
+          onTouchCancel={swipe.onTouchCancel}
         >
           <CharacterSheetBody
             character={character}

@@ -75,5 +75,12 @@ export function useSwipeTabs(
     onTabChange(tabs[nextIndex].id);
   };
 
-  return { onTouchStart, onTouchEnd };
+  // An OS-cancelled gesture (incoming call, notification pull-down) fires
+  // onTouchCancel instead of onTouchEnd; clear the start so the NEXT gesture's
+  // end can't compute a delta from this stale one.
+  const onTouchCancel = () => {
+    startRef.current = null;
+  };
+
+  return { onTouchStart, onTouchEnd, onTouchCancel };
 }

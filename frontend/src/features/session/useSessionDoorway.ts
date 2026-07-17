@@ -14,13 +14,18 @@ type DoorwayResult = SessionDoorwayState | null | undefined;
 
 // The network side of a doorway tap. "resume" needs no call — the character is
 // already joined; join/start hit their existing endpoints before we navigate.
-async function dispatchDoorwayAction(
+// Exported for direct unit testing of the join/start dispatch + guard.
+export async function dispatchDoorwayAction(
   action: DoorwayAction,
   campaignId: string,
   sessionId: string | undefined,
   characterId: string,
 ): Promise<void> {
-  if (action === "join" && sessionId) {
+  if (action === "join") {
+    // A liveNotJoined/earlyJoin doorway always carries a session, so this is a
+    // can't-happen guard — but fail loud rather than skip the join and still
+    // navigate to an empty session page (the signature admits undefined).
+    if (!sessionId) throw new Error("Cannot join a session without a session id");
     await joinSession(campaignId, sessionId, characterId);
   } else if (action === "start") {
     await startCampaignSession(campaignId, characterId);

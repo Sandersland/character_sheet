@@ -73,6 +73,16 @@ describe("useSwipeTabs", () => {
     expect(onTabChange).not.toHaveBeenCalled();
   });
 
+  it("ignores an end after the gesture was cancelled (stale start cleared)", () => {
+    const onTabChange = vi.fn();
+    const { result } = renderHook(() => useSwipeTabs(TABS, "overview", onTabChange));
+    result.current.onTouchStart(touchStart(200, 100));
+    result.current.onTouchCancel();
+    // A subsequent end with a big leftward delta must not fire off the stale start.
+    result.current.onTouchEnd(touchEnd(80, 100));
+    expect(onTabChange).not.toHaveBeenCalled();
+  });
+
   it("ignores multi-touch gestures", () => {
     const onTabChange = vi.fn();
     const { result } = renderHook(() => useSwipeTabs(TABS, "overview", onTabChange));
