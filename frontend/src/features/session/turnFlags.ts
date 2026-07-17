@@ -1,8 +1,6 @@
 // Feature flags for turn-UI surfaces that depend on systems not yet built (#737).
-// Both default OFF so the UI degrades to today's reality:
-//   - showInitiative: there is no server-side initiative / turn-order model yet
-//     (epic #728, Decision #1). The rail is decorative scaffolding until that
-//     system lands; flip this on to preview it.
+// Defaults OFF so the UI degrades to today's reality:
 //   - showMovement: speed / difficult-terrain tracking is a future feature.
-export const showInitiative = false;
+// (An initiative rail flag once lived here too; it was dropped because the app
+//  doesn't model enemies, so there's no turn-order to render.)
 export const showMovement = false;

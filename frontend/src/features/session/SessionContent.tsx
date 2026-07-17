@@ -12,17 +12,12 @@ import type { useNavigate } from "react-router-dom";
 
 import { RollProvider } from "@/features/dice/RollContext";
 import RollResultSeal from "@/features/dice/RollResultSeal";
-import CompactHpBar from "@/features/hitpoints/CompactHpBar";
-import RestButton from "@/features/hitpoints/RestButton";
-import CompactConditionsBar from "@/features/conditions/CompactConditionsBar";
-import ConditionsStrip from "@/features/conditions/ConditionsStrip";
-import TurnHub from "@/features/session/TurnHub";
+import LiveTurnBody from "@/features/session/LiveTurnBody";
 import SessionHeaderRegion from "@/features/session/SessionHeaderRegion";
 import SessionReferenceTabs from "@/features/session/SessionReferenceTabs";
 import SessionOverlays from "@/features/session/SessionOverlays";
 import { useTurnState } from "@/features/session/useTurnState";
 import { useSessionLifecycle } from "@/features/session/useSessionLifecycle";
-import { partyHealAllies } from "@/lib/spellMeta";
 import { useCaptureHotkey } from "@/hooks/useCaptureHotkey";
 import type { Character, Session, ReferenceData } from "@/types/character";
 
@@ -63,32 +58,14 @@ export default function SessionContent({ character, session, reference, setChara
         />
 
         <main className="mx-auto flex max-w-4xl flex-col gap-4 px-6 pt-6 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-6">
-          {/* Compact HP strip + rest button — always visible; tap opens the HP
-              sheet (#768) / rest sheet (#814). */}
-          <div className="flex items-stretch gap-2">
-            <div className="min-w-0 flex-1">
-              <CompactHpBar character={character} onUpdate={life.handleCharacterUpdate} />
-            </div>
-            <RestButton character={character} onUpdate={life.handleCharacterUpdate} />
-          </div>
-
-          {/* Active conditions + exhaustion. Compact strip on mobile (tap to
-              open the sheet), full card at md+ (#769). */}
-          <div className="md:hidden">
-            <CompactConditionsBar character={character} onUpdate={life.handleCharacterUpdate} />
-          </div>
-          <div className="hidden md:block">
-            <ConditionsStrip character={character} onUpdate={life.handleCharacterUpdate} />
-          </div>
-
-          {/* Turn hub — primary surface; inline attack/item pickers live here. */}
-          <TurnHub
+          {/* HP strip + rest + conditions + the turn hub (shared with the sheet's
+              live Combat tab via LiveTurnBody, #960). */}
+          <LiveTurnBody
             character={character}
-            sessionId={session.id}
+            session={session}
             turnState={turnState}
             onUpdate={life.handleCharacterUpdate}
             onLogChanged={life.bumpLog}
-            allies={partyHealAllies(session, character.id)}
           />
 
           {/* Reference tabs — secondary content; hidden on mobile during the active turn. */}

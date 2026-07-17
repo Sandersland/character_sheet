@@ -20,13 +20,12 @@ import BonusActionSlot from "@/features/session/BonusActionSlot";
 import ReactionSlot from "@/features/session/ReactionSlot";
 import EffectManeuverStrip from "@/features/session/EffectManeuverStrip";
 import LoadoutRefundStrip from "@/features/session/LoadoutRefundStrip";
-import InitiativeRail from "@/features/session/InitiativeRail";
 import TurnConcentrationBanner from "@/features/session/TurnConcentrationBanner";
 import TurnDeathSaves from "@/features/session/TurnDeathSaves";
 import TurnSummaryBanner from "@/features/session/TurnSummaryBanner";
 import { useTallyResolve } from "@/features/session/useTallyResolve";
 import TurnResolutionSheets from "@/features/session/TurnResolutionSheets";
-import { showInitiative, showMovement } from "@/features/session/turnFlags";
+import { showMovement } from "@/features/session/turnFlags";
 import type { AllyOption } from "@/lib/spellMeta";
 import type { TurnStateView } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
@@ -40,6 +39,14 @@ interface TurnHubProps {
   onLogChanged: () => void;
   /** Opted-in party members a healing cast can target on their sheet (#462). */
   allies: AllyOption[];
+  /**
+   * Whether the hub's overlay pickers (BottomSheet, portaled to document.body)
+   * may render (#960). Defaults true. In the sheet workspace the live-Combat
+   * panel stays mounted while you swipe to another tab; passing `false` unmounts
+   * an open picker so it can't float over Overview, while the picker STATE
+   * (activeResolution) survives so it reopens on return.
+   */
+  overlaysActive?: boolean;
 }
 
 // Idle-phase presentation: the Start-Combat gate (not in combat) or the
@@ -50,14 +57,12 @@ function TurnHubIdle({
   character,
   onUpdate,
   onLogChanged,
-  youInitial,
   turnState,
   turn,
 }: {
   character: Character;
   onUpdate: (c: Character) => void;
   onLogChanged: () => void;
-  youInitial: string;
   turnState: TurnStateView;
   turn: ReturnType<typeof useTurnActions>;
 }) {
@@ -109,10 +114,6 @@ function TurnHubIdle({
             End combat
           </button>
         </div>
-
-        {showInitiative && (
-          <InitiativeRail youInitial={youInitial} active={false} />
-        )}
 
         <TurnDeathSaves character={character} onUpdate={onUpdate} />
 
@@ -261,7 +262,7 @@ function TurnMessages({
   );
 }
 
-export default function TurnHub({ character, sessionId, turnState, onUpdate, onLogChanged, allies }: TurnHubProps) {
+export default function TurnHub({ character, sessionId, turnState, onUpdate, onLogChanged, allies, overlaysActive = true }: TurnHubProps) {
   const {
     inCombat,
     round,
@@ -309,9 +310,6 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     onLogChanged,
   });
 
-  // Decorative initiative rail's "you" marker (#737).
-  const youInitial = character.name?.[0]?.toUpperCase() ?? "?";
-
   // ── Idle state ─────────────────────────────────────────────────────────────
   if (phase === "idle") {
     return (
@@ -319,7 +317,6 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
         character={character}
         onUpdate={onUpdate}
         onLogChanged={onLogChanged}
-        youInitial={youInitial}
         turnState={turnState}
         turn={turn}
       />
@@ -338,12 +335,6 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
         onUndo={handleUndo}
         onEndTurn={handleEndTurn}
       />
-
-      {showInitiative && (
-        <div className="mb-4">
-          <InitiativeRail youInitial={youInitial} active />
-        </div>
-      )}
 
       <div className="flex flex-col gap-3">
         {/* Death saves surface on your own turn too — the primary moment a
@@ -423,20 +414,26 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
         />
 
         {/* ── Resolution sheets ─────────────────────────────────────────────── */}
-        <TurnResolutionSheets
-          character={character}
-          sessionId={sessionId}
-          turnState={turnState}
-          activeResolution={activeResolution}
-          closeResolution={closeResolution}
-          setShowActionMenu={setShowActionMenu}
-          setShowBonusMenu={setShowBonusMenu}
-          onUpdate={onUpdate}
-          onLogChanged={onLogChanged}
-          allies={allies}
-          send={send}
-          loadoutSwap={loadoutSwap}
-        />
+        {/* Overlay pickers render only when the panel is the active tab (#960):
+            a portaled BottomSheet would otherwise float over another tab while
+            this panel is mounted-but-hidden. `activeResolution` survives, so the
+            sheet reopens on return. */}
+        {overlaysActive && (
+          <TurnResolutionSheets
+            character={character}
+            sessionId={sessionId}
+            turnState={turnState}
+            activeResolution={activeResolution}
+            closeResolution={closeResolution}
+            setShowActionMenu={setShowActionMenu}
+            setShowBonusMenu={setShowBonusMenu}
+            onUpdate={onUpdate}
+            onLogChanged={onLogChanged}
+            allies={allies}
+            send={send}
+            loadoutSwap={loadoutSwap}
+          />
+        )}
 
         {/* ── Effect maneuvers (no slot consumed) — e.g. Evasive Footwork ─────── */}
         <EffectManeuverStrip
