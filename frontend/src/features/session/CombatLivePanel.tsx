@@ -65,7 +65,6 @@ export default function CombatLivePanel({
   // practice; guard the render (never the hooks above) for safety.
   if (!turnState) return null;
 
-  const isActiveTurn = turnState.phase === "active";
   // The turn tracker is visible (so its overlay pickers may render) whenever the
   // Combat tab is active AND the turn surface is showing: on mobile that means
   // the Turn sub-nav view; on desktop the tracker is always the center column.
@@ -74,10 +73,6 @@ export default function CombatLivePanel({
   return (
     <div className="bg-parchment-100">
       <SessionHeaderRegion
-        character={character}
-        session={session}
-        isActiveTurn={isActiveTurn}
-        round={turnState.round}
         leavePending={life.leavePending}
         endPending={life.endPending}
         leaveError={life.leaveError}

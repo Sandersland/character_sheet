@@ -1,22 +1,21 @@
 /**
- * SessionHeaderRegion — the SessionPage header, with the #746 mobile turn shell.
+ * SessionHeaderRegion — the live-Combat panel's session-controls strip.
  *
- * During the player's active turn on a mobile viewport (`< md`) it renders the
- * slim CompactTurnHeader; otherwise (and always at `md`+) the full SessionTopBar.
- * Pure CSS `md:` toggles gated on `isActiveTurn` — no JS breakpoint hook.
+ * The tracker lives INSIDE the sheet workspace (#960), whose own header already
+ * owns character identity + the live round: `MobileSheetHeader` (sticky, mobile)
+ * and the desktop garnet banner (`CharacterSheetHeader`, with the #964 round
+ * badge). So this strip carries ONLY the session-specific controls — Note /
+ * Leave / End — with no duplicated identity and no "back to sheet" link (there's
+ * no separate `/session` page to return from anymore, #962/#976).
+ *
+ * Desktop shows the inline button cluster; mobile collapses to a slim overflow
+ * menu (space is precious mid-turn). Pure CSS `md:` toggle — no breakpoint hook.
  */
 
-import CompactTurnHeader from "@/features/session/CompactTurnHeader";
-import SessionTopBar from "@/features/session/SessionTopBar";
-import type { Character, Session } from "@/types/character";
+import OverflowMenu from "@/components/ui/OverflowMenu";
+import SessionHeaderControls from "@/features/session/SessionHeaderControls";
 
 interface SessionHeaderRegionProps {
-  character: Character;
-  session: Session;
-  /** turnState.phase === "active" — the player's active turn. */
-  isActiveTurn: boolean;
-  /** turnState.round — surfaced in the compact header's Round chip. */
-  round: number;
   leavePending: boolean;
   endPending: boolean;
   leaveError: string | null;
@@ -26,10 +25,6 @@ interface SessionHeaderRegionProps {
 }
 
 export default function SessionHeaderRegion({
-  character,
-  session,
-  isActiveTurn,
-  round,
   leavePending,
   endPending,
   leaveError,
@@ -37,15 +32,13 @@ export default function SessionHeaderRegion({
   onLeave,
   onEndClick,
 }: SessionHeaderRegionProps) {
+  const controlsBusy = endPending || leavePending;
   return (
-    <>
-      {/* Full top bar — hidden on mobile only during the active turn. */}
-      <div className={isActiveTurn ? "hidden md:block" : undefined}>
-        <SessionTopBar
-          character={character}
-          session={session}
-          leavePending={leavePending}
-          endPending={endPending}
+    <div className="border-b border-parchment-200 bg-parchment-50">
+      {/* Desktop: inline Note / Leave / End, right-aligned. */}
+      <div className="mx-auto hidden max-w-6xl justify-end px-6 py-3 md:flex">
+        <SessionHeaderControls
+          controlsBusy={controlsBusy}
           leaveError={leaveError}
           onCapture={onCapture}
           onLeave={onLeave}
@@ -53,21 +46,26 @@ export default function SessionHeaderRegion({
         />
       </div>
 
-      {/* Compact turn header — mobile only, active turn only. */}
-      {isActiveTurn && (
-        <div className="md:hidden">
-          <CompactTurnHeader
-            character={character}
-            round={round}
-            leavePending={leavePending}
-            endPending={endPending}
-            leaveError={leaveError}
-            onCapture={onCapture}
-            onLeave={onLeave}
-            onEndClick={onEndClick}
-          />
-        </div>
-      )}
-    </>
+      {/* Mobile: a slim right-aligned overflow menu — identity is in the sticky
+          MobileSheetHeader above, the round in the turn tracker below. */}
+      <div className="flex items-center justify-end gap-2 px-4 py-2 md:hidden">
+        {leaveError && <p className="min-w-0 flex-1 text-xs text-garnet-700">{leaveError}</p>}
+        <OverflowMenu
+          label="Session actions"
+          className="shrink-0"
+          items={[
+            { label: "＋ Note", onSelect: onCapture },
+            { label: "Leave Session", onSelect: onLeave, disabled: controlsBusy },
+            {
+              label: "End Session",
+              onSelect: onEndClick,
+              danger: true,
+              separatorBefore: true,
+              disabled: controlsBusy,
+            },
+          ]}
+        />
+      </div>
+    </div>
   );
 }

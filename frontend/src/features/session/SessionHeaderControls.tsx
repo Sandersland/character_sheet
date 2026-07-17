@@ -1,9 +1,8 @@
 /**
- * SessionHeaderControls — the SessionTopBar's right-hand cluster: BackendStatus
- * plus the Note / Leave / End Session buttons and the leave-error line.
+ * SessionHeaderControls — the live-Combat strip's desktop button cluster: the
+ * Note / Leave / End Session buttons and the leave-error line. Backend
+ * proof-of-life lives in the sheet banner, so it's not duplicated here (#976).
  */
-
-import BackendStatus from "@/features/character-meta/BackendStatus";
 
 interface SessionHeaderControlsProps {
   controlsBusy: boolean;
@@ -22,7 +21,6 @@ export default function SessionHeaderControls({
 }: SessionHeaderControlsProps) {
   return (
     <div className="flex flex-col items-end gap-2">
-      <BackendStatus />
       <div className="flex items-center gap-2">
         {/* Visible quick-capture affordance (#274) — opens the same palette as Cmd/Ctrl+J. */}
         <button
