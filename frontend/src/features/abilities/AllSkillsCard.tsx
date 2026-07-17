@@ -15,16 +15,10 @@ interface AllSkillsCardProps {
   proficiencyBonus: number;
 }
 
-/**
- * All 18 skills, inline and always open on the Overview, grouped by governing
- * ability (D1: flat, no accordion). Every skill — proficient or not — is a
- * one-tap `RollButton` (kind `check`), so the roll fires with no dialog open
- * and its result reaches the result surface un-suppressed (#957). Replaces the
- * proficient-only card + full-screen "All Skills" modal.
- *
- * Proficiency is a non-color-only signal: a filled dot (gold expertise / garnet
- * proficient / faint neutral) plus an "Expertise" tag and row emphasis.
- */
+// All 18 skills inline on the Overview, grouped by ability (D1: flat, no
+// accordion); every skill is a one-tap RollButton so the roll fires with no
+// dialog open and its result is un-suppressed (#957). Replaces the
+// proficient-only card + "All Skills" modal.
 export default function AllSkillsCard({ skills, abilityScores, proficiencyBonus }: AllSkillsCardProps) {
   const groups = ABILITY_ORDER.map((ability) => ({
     ability,
