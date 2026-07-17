@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
 
 import SessionHeaderRegion from "@/features/session/SessionHeaderRegion";
 
@@ -16,15 +15,13 @@ function renderRegion(props: Partial<React.ComponentProps<typeof SessionHeaderRe
     onEndClick: vi.fn(),
   };
   render(
-    <MemoryRouter>
-      <SessionHeaderRegion
-        leavePending={false}
-        endPending={false}
-        leaveError={null}
-        {...handlers}
-        {...props}
-      />
-    </MemoryRouter>,
+    <SessionHeaderRegion
+      leavePending={false}
+      endPending={false}
+      leaveError={null}
+      {...handlers}
+      {...props}
+    />,
   );
   return handlers;
 }
@@ -81,8 +78,16 @@ describe("SessionHeaderRegion", () => {
     expect(handlers.onCapture).toHaveBeenCalledOnce();
   });
 
-  it("surfaces a leave error when present", () => {
+  it("also disables Leave / End while an end is in flight (endPending path)", () => {
+    renderRegion({ endPending: true });
+    expect(screen.getByRole("button", { name: "Leave Session" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "End Session" })).toBeDisabled();
+  });
+
+  it("surfaces a leave error at both breakpoints when present", () => {
     renderRegion({ leaveError: "Could not leave" });
-    expect(screen.getAllByText("Could not leave").length).toBeGreaterThan(0);
+    // JSDOM renders both the desktop (SessionHeaderControls) and mobile error
+    // <p> simultaneously — the error intentionally surfaces at both breakpoints.
+    expect(screen.getAllByText("Could not leave")).toHaveLength(2);
   });
 });
