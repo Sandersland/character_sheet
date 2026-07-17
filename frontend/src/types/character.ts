@@ -2081,3 +2081,40 @@ export interface ChronicleSession {
   noteCount: number;
   participants?: SessionParticipant[];
 }
+
+/**
+ * The sheet's session-doorway read model (#942):
+ * `GET /api/characters/:id/sessions/doorway`. One state-aware fact set the
+ * SessionDoorway bar renders. This union is the FROZEN contract — scheduling
+ * (#951) extends server behavior only (emits the `scheduled*`/`earlyJoin` kinds
+ * + `scheduled` sessions, flips `canStart` owner-only). The client already
+ * handles all five kinds; the server never returns the scheduled ones yet.
+ */
+export type SessionDoorwayKind =
+  | "none"
+  | "liveJoined"
+  | "liveNotJoined"
+  | "scheduledUpcoming"
+  | "earlyJoin";
+
+export interface SessionDoorwaySessionState {
+  id: string;
+  status: "active" | "scheduled"; // "scheduled" impossible until #951
+  startedAt: string | null; // ISO 8601
+  scheduledAt: string | null; // ISO 8601; null until #951
+  title: string | null;
+  /** This character is a present participant (joined, not left). */
+  joined: boolean;
+  /** DERIVED from the latest combatRoundAdvanced event — never persisted. */
+  round: number | null;
+}
+
+export interface SessionDoorwayState {
+  /** null → solo character → the doorway renders nothing. */
+  campaignId: string | null;
+  role: "OWNER" | "PLAYER";
+  /** THIS ISSUE: true for every campaign member. #951 flips it owner-only. */
+  canStart: boolean;
+  kind: SessionDoorwayKind;
+  session: SessionDoorwaySessionState | null;
+}

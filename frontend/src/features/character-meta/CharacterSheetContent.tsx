@@ -7,8 +7,10 @@ import CharacterSheetBody from "@/features/character-meta/CharacterSheetBody";
 import SheetBottomNav from "@/features/character-meta/SheetBottomNav";
 import CharacterSheetModals from "@/features/character-meta/CharacterSheetModals";
 import { useSheetTabs } from "@/features/character-meta/useSheetTabs";
+import { useSwipeTabs } from "@/features/character-meta/useSwipeTabs";
 import { useCaptureDock } from "@/hooks/useCaptureDock";
-import { useSessionButton } from "@/features/session/useSessionButton";
+import { useSessionDoorway } from "@/features/session/useSessionDoorway";
+import SessionDoorway from "@/features/session/SessionDoorway";
 import type { Character, ReferenceData } from "@/types/character";
 
 interface CharacterSheetContentProps {
@@ -22,7 +24,7 @@ interface CharacterSheetContentProps {
  * The loaded-sheet view: banner + tab panels + the roll/modal chrome. Split out
  * from CharacterSheetPage so the page holds only the load/error/guard states and
  * this owns the per-character interaction state (tabs, modals, capture dock,
- * session button).
+ * session doorway).
  */
 export default function CharacterSheetContent({
   id,
@@ -36,7 +38,9 @@ export default function CharacterSheetContent({
   const [sessionsOpen, setSessionsOpen] = useState(false);
   // Cmd/Ctrl+J toggles the quick-capture dock from anywhere on the sheet.
   const { captureOpen, openCapture, closeCapture } = useCaptureDock();
-  const session = useSessionButton(id, character);
+  const session = useSessionDoorway(id);
+  // Mobile: horizontal swipe on the panel region walks the tabs (clamped).
+  const swipe = useSwipeTabs(tabs, activeTab, onTabChange);
 
   return (
     <RollProvider
@@ -51,7 +55,6 @@ export default function CharacterSheetContent({
       <div className="flex h-[100dvh] flex-col overflow-hidden bg-parchment-100 md:block md:h-auto md:min-h-screen md:overflow-visible">
         <CharacterSheetHeader
           character={character}
-          session={session}
           tabs={tabs}
           activeTab={activeTab}
           onTabChange={onTabChange}
@@ -59,6 +62,16 @@ export default function CharacterSheetContent({
           onOpenSessions={() => setSessionsOpen(true)}
           onOpenActivity={() => setActivityOpen(true)}
           onOpenDelete={() => setConfirmDeleteOpen(true)}
+        />
+
+        {/* Desktop: the session doorway strip, pinned under the garnet banner. */}
+        <SessionDoorway
+          placement="desktop"
+          summary={session.summary}
+          sessionTitle={session.activeSession?.title}
+          pending={session.pending}
+          error={session.error}
+          onAction={session.onAction}
         />
 
         <CharacterSheetModals
@@ -77,8 +90,14 @@ export default function CharacterSheetContent({
         />
 
         {/* min-h-0 lets the scroll region shrink below its content so it actually
-            scrolls (the flexbox overflow gotcha). Desktop: normal flow. */}
-        <div className="min-h-0 flex-1 overflow-y-auto md:flex-none md:overflow-visible">
+            scrolls (the flexbox overflow gotcha). Desktop: normal flow. Mobile:
+            horizontal swipe here walks the panel tabs. */}
+        <div
+          className="min-h-0 flex-1 overflow-y-auto md:flex-none md:overflow-visible"
+          onTouchStart={swipe.onTouchStart}
+          onTouchEnd={swipe.onTouchEnd}
+          onTouchCancel={swipe.onTouchCancel}
+        >
           <CharacterSheetBody
             character={character}
             reference={reference}
@@ -87,6 +106,15 @@ export default function CharacterSheetContent({
           />
         </div>
         <RollResultToast />
+        {/* Mobile: the session doorway bar, between the panels and the bottom nav. */}
+        <SessionDoorway
+          placement="mobile"
+          summary={session.summary}
+          sessionTitle={session.activeSession?.title}
+          pending={session.pending}
+          error={session.error}
+          onAction={session.onAction}
+        />
         <SheetBottomNav tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />
       </div>
     </RollProvider>

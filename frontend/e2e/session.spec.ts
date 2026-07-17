@@ -11,7 +11,7 @@ test("session: start combat, take an action, and see it in the log", async ({ pa
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
+  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
   await expect(page).toHaveURL(/\/session$/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
@@ -38,7 +38,7 @@ test("session: opening Use-an-item then closing leaves the action available", as
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
+  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
   await expect(page).toHaveURL(/\/session$/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
@@ -66,7 +66,7 @@ test("session: roll-mode toggle docks as a bottom bar on mobile", async ({ page 
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
+  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
   await expect(page).toHaveURL(/\/session$/);
 
   const toggle = page.getByRole("group", { name: "Roll mode" });
@@ -109,7 +109,7 @@ test("session: roll toast is suppressed while the attack sheet is open (mobile)"
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
+  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
   await expect(page).toHaveURL(/\/session$/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
@@ -144,7 +144,7 @@ test("session: Change weapons in the Action sheet opens the per-hand picker on m
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
+  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
   await expect(page).toHaveURL(/\/session$/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();

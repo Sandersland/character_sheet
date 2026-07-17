@@ -7,12 +7,10 @@ import CampaignIndicator from "@/features/campaign/CampaignIndicator";
 import Tabs from "@/components/ui/Tabs";
 import { classSummary } from "@/lib/multiclass";
 import type { SheetTab, SheetTabId } from "@/features/character-meta/sheetTabs";
-import type { useSessionButton } from "@/features/session/useSessionButton";
 import type { Character } from "@/types/character";
 
 interface CharacterSheetHeaderProps {
   character: Character;
-  session: ReturnType<typeof useSessionButton>;
   tabs: SheetTab[];
   activeTab: SheetTabId;
   onTabChange: (id: SheetTabId) => void;
@@ -31,7 +29,6 @@ interface CharacterSheetHeaderProps {
  */
 export default function CharacterSheetHeader({
   character,
-  session,
   tabs,
   activeTab,
   onTabChange,
@@ -45,7 +42,6 @@ export default function CharacterSheetHeader({
       {/* Mobile: compact sticky mini-header. Desktop: the garnet banner below. */}
       <MobileSheetHeader
         character={character}
-        session={session}
         onOpenCapture={onOpenCapture}
         onOpenSessions={onOpenSessions}
         onOpenActivity={onOpenActivity}
@@ -93,17 +89,10 @@ export default function CharacterSheetHeader({
           <div className="flex flex-col items-end gap-2">
             <BackendStatus />
             <div className="flex flex-wrap items-center justify-end gap-3">
-              {/* Session button: campaign-required; sessions are shared per campaign. */}
-              {session.hasCampaign ? (
-                <button
-                  type="button"
-                  disabled={session.sessionPending || !session.sessionReady}
-                  onClick={session.handleSessionButton}
-                  className="rounded-control bg-parchment-50 px-3 py-1.5 text-xs font-semibold text-garnet-800 transition-colors hover:bg-parchment-100 disabled:opacity-50"
-                >
-                  {session.sessionLabel}
-                </button>
-              ) : (
+              {/* Starting/joining/resuming a session now lives in the SessionDoorway
+                  strip under this banner (#942). Campaign-less characters have no
+                  doorway, so the "Join a campaign" invite stays here. */}
+              {!character.campaignId && (
                 <Link
                   to="/campaigns"
                   title="Join a campaign to play a shared session"
@@ -142,9 +131,6 @@ export default function CharacterSheetHeader({
                 Delete
               </button>
             </div>
-            {session.sessionError && (
-              <p className="text-xs font-semibold text-garnet-100">{session.sessionError}</p>
-            )}
           </div>
         </div>
 

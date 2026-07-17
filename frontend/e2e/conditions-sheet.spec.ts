@@ -18,7 +18,7 @@ test("session conditions strip (mobile): tap, apply a condition, see it reflect 
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
+  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
   await expect(page).toHaveURL(/\/session$/);
 
   const strip = page.getByRole("button", { name: /manage conditions/i });

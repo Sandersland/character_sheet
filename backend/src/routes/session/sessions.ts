@@ -16,6 +16,7 @@ import {
   logRollEvent,
   SessionError,
 } from "@/lib/session/sessions.js";
+import { getSessionDoorway } from "@/lib/session/doorway.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
 import { parseRollInput, requireCharacterId, withSessionErrors } from "./session-route-helpers.js";
@@ -344,6 +345,18 @@ sessionsRouter.get("/characters/:id/sessions/active", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
   const session = await getActiveSession(req.params.id);
   res.json(session ?? null);
+});
+
+// ── GET /api/characters/:id/sessions/doorway ──────────────────────────────────
+// The sheet's session-doorway read model (#942): one state-aware fact set the
+// SessionDoorway bar renders (live/join/start now; scheduled kinds after #951).
+// Settles a stale session on read (getSessionDoorway → getActiveSession →
+// autoCloseIfStale). Character-scoped read; solo characters get campaignId: null.
+// NOTE: must precede the `:sessionId` route so "doorway" isn't captured as an id.
+
+sessionsRouter.get("/characters/:id/sessions/doorway", async (req, res) => {
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
+  res.json(await getSessionDoorway(req.params.id, req.user!.id));
 });
 
 // ── GET /api/characters/:id/sessions/:sessionId ───────────────────────────────

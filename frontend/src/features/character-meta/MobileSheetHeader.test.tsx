@@ -4,25 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 
 import MobileSheetHeader from "@/features/character-meta/MobileSheetHeader";
 import { RollProvider } from "@/features/dice/RollContext";
-import type { useSessionButton } from "@/features/session/useSessionButton";
 import type { Character } from "@/types/character";
-
-type SessionButton = ReturnType<typeof useSessionButton>;
-
-function makeSession(overrides: Partial<SessionButton> = {}): SessionButton {
-  return {
-    hasCampaign: true,
-    sessionLabel: "Start Session",
-    sessionPending: false,
-    sessionReady: true,
-    inActiveSession: false,
-    activeSession: null,
-    activeSessionId: undefined,
-    sessionError: null,
-    handleSessionButton: vi.fn(),
-    ...overrides,
-  } as SessionButton;
-}
 
 function makeCharacter(overrides: Partial<Character> = {}): Character {
   return {
@@ -32,6 +14,7 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
     class: "Fighter",
     subclass: "Champion",
     level: 7,
+    campaignId: "camp1",
     armorClass: 18,
     armorClassBreakdown: [
       { label: "Chain Mail", value: 16 },
@@ -45,13 +28,12 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
   } as Character;
 }
 
-function renderHeader(character = makeCharacter(), session = makeSession()) {
+function renderHeader(character = makeCharacter()) {
   return render(
     <MemoryRouter>
       <RollProvider>
         <MobileSheetHeader
           character={character}
-          session={session}
           onOpenCapture={vi.fn()}
           onOpenSessions={vi.fn()}
           onOpenActivity={vi.fn()}
@@ -104,13 +86,14 @@ describe("MobileSheetHeader", () => {
     expect(screen.getByText("30")).toBeInTheDocument();
   });
 
-  it("renders the session button from the session prop", () => {
+  it("no longer renders a session button in the header (moved to the doorway bar)", () => {
     renderHeader();
-    expect(screen.getByRole("button", { name: "Start Session" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /session/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /join campaign/i })).not.toBeInTheDocument();
   });
 
   it("offers 'Join campaign' when the character is in no campaign", () => {
-    renderHeader(makeCharacter(), makeSession({ hasCampaign: false }));
+    renderHeader(makeCharacter({ campaignId: undefined }));
     expect(screen.getByRole("link", { name: /join campaign/i })).toHaveAttribute("href", "/campaigns");
   });
 
@@ -122,7 +105,6 @@ describe("MobileSheetHeader", () => {
         <RollProvider>
           <MobileSheetHeader
             character={makeCharacter()}
-            session={makeSession()}
             onOpenCapture={onOpenCapture}
             onOpenSessions={vi.fn()}
             onOpenActivity={vi.fn()}

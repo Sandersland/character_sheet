@@ -20,7 +20,7 @@ async function openAttackSheet(page: import("@playwright/test").Page) {
   await page.goto(`/characters/${id}`);
   await expect(page.getByRole("heading", { name: /Battle Master/, level: 1 })).toBeVisible();
 
-  await page.getByRole("button", { name: /(Start|Resume|Join) Session/ }).click();
+  await page.getByRole("button", { name: /(Start|Resume|Join) session/i }).click();
   await expect(page).toHaveURL(/\/session$/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
