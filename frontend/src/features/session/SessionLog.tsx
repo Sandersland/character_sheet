@@ -101,9 +101,10 @@ interface SessionLogProps {
   characterId: string;
   sessionId: string;
   /**
-   * Optional: changing this value re-fetches the event list, for a caller that
-   * keeps the log mounted across live mutations. Omit it when the log is mounted
-   * on demand (e.g. Combat's Turn/Log sub-nav, #962) — each mount refetches.
+   * Changing this value re-fetches the event list. Both live-Combat call sites
+   * (the desktop right rail and the mobile Turn/Log panel, #964) stay mounted, so
+   * they pass the shared `logRefresh` counter to pick up new events. Optional —
+   * a caller that fully unmounts/remounts per view refetches on mount anyway.
    */
   refreshKey?: unknown;
 }

@@ -129,8 +129,11 @@ export default function CombatLivePanel({
               overlaysActive={active && turnVisible}
             />
           </div>
-          {/* Mobile-only Log panel (the desktop log is the right rail). Rendered
-              on demand — SessionLog re-fetches on mount, so it's always fresh. */}
+          {/* Mobile-only Log panel (the desktop log is the right rail). It stays
+              mounted (hidden via a class), so — like the desktop rail — it reads
+              the shared `logRefresh` counter to re-fetch when a roll or turn
+              action logs an event (#959); without that it would show only the
+              events present when the panel first mounted. */}
           <div
             className={`${view === "log" ? "" : "hidden"} md:hidden`}
             role="tabpanel"
@@ -139,7 +142,11 @@ export default function CombatLivePanel({
             tabIndex={0}
           >
             <Card title="Session Log" className="p-4">
-              <SessionLog characterId={character.id} sessionId={session.id} />
+              <SessionLog
+                characterId={character.id}
+                sessionId={session.id}
+                refreshKey={live.logRefresh}
+              />
             </Card>
           </div>
         </div>
