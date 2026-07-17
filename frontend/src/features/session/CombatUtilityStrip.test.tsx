@@ -52,6 +52,34 @@ describe("CombatUtilityStrip (#982)", () => {
     expect(screen.queryByText("poisoned")).not.toBeInTheDocument();
   });
 
+  // a11y (#989 review): the manage-conditions button's accessible name must name
+  // the active conditions (via conditionLabel), never leave them hidden.
+  it("the manage-conditions accessible name lists active condition labels", () => {
+    render(
+      <CombatUtilityStrip
+        character={makeCharacter({
+          active: [
+            { key: "poisoned", appliedAt: "2026-01-01T00:00:00.000Z" },
+            { key: "stunned", appliedAt: "2026-01-01T00:00:00.000Z" },
+          ],
+          exhaustion: 0,
+        })}
+        onUpdate={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: /manage conditions: poisoned, stunned/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("the manage-conditions accessible name is unadorned when nothing is active", () => {
+    render(
+      <CombatUtilityStrip character={makeCharacter({ active: [], exhaustion: 0 })} onUpdate={vi.fn()} />,
+    );
+    // Exactly "Manage conditions" (no trailing ": ..." list).
+    expect(screen.getByRole("button", { name: "Manage conditions" })).toBeInTheDocument();
+  });
+
   it("opens the add-condition picker as an overlay and applies a condition", async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
@@ -86,7 +114,8 @@ describe("CombatUtilityStrip (#982)", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /manage conditions/i }));
+    // Active-condition summary button — its name now carries the condition list.
+    await user.click(screen.getByRole("button", { name: /manage conditions: stunned/i }));
     await user.click(screen.getByRole("button", { name: /remove stunned/i }));
     expect(mockApply).toHaveBeenCalledWith("char-1", [{ type: "removeCondition", key: "stunned" }]);
   });
@@ -100,7 +129,7 @@ describe("CombatUtilityStrip (#982)", () => {
       <CombatUtilityStrip character={makeCharacter({ active: [], exhaustion: 2 })} onUpdate={vi.fn()} />,
     );
 
-    await user.click(screen.getByRole("button", { name: /manage exhaustion/i }));
+    await user.click(screen.getByRole("button", { name: /manage conditions and exhaustion/i }));
     await user.click(screen.getByRole("button", { name: /increase exhaustion/i }));
     expect(mockApply).toHaveBeenCalledWith("char-1", [{ type: "setExhaustion", level: 3 }]);
   });

@@ -31,13 +31,20 @@ export default function CombatUtilityStrip({ character, onUpdate }: Props) {
   const [sheet, setSheet] = useState<null | "manage" | "add">(null);
   const { active, exhaustion } = character.conditions;
 
+  // Dynamic accessible name so the active conditions are announced, not hidden
+  // behind a static "Manage conditions" (#989 review). Labels only — never keys.
+  const conditionsLabel =
+    active.length > 0
+      ? `Manage conditions: ${active.map((c) => conditionLabel(c.key)).join(", ")}`
+      : "Manage conditions";
+
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-card border border-parchment-200 bg-parchment-50 px-3 py-2 shadow-card">
       {/* Conditions summary — opens the full add/remove/exhaustion sheet. Uses
           spans (not a <ul>) so it stays valid phrasing content inside a button. */}
       <button
         type="button"
-        aria-label="Manage conditions"
+        aria-label={conditionsLabel}
         onClick={() => setSheet("manage")}
         className="group flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-control px-1 py-0.5 text-left transition-colors hover:bg-parchment-100"
       >
@@ -69,10 +76,11 @@ export default function CombatUtilityStrip({ character, onUpdate }: Props) {
         + Add
       </button>
 
-      {/* Exhaustion readout — tap to change it in the same sheet. */}
+      {/* Exhaustion readout — opens the combined conditions+exhaustion sheet, so
+          the label names both surfaces (#989 review). */}
       <button
         type="button"
-        aria-label="Manage exhaustion"
+        aria-label="Manage conditions and exhaustion"
         onClick={() => setSheet("manage")}
         className="flex shrink-0 items-center gap-1.5 rounded-control px-1.5 py-0.5 transition-colors hover:bg-parchment-100"
       >
@@ -91,7 +99,10 @@ export default function CombatUtilityStrip({ character, onUpdate }: Props) {
 
       {sheet && (
         <BottomSheet title="Conditions" onClose={() => setSheet(null)}>
+          {/* key={sheet} remounts on a mode switch so `defaultAddOpen` (read only
+              at mount by AddConditionPanel) always reflects the current mode. */}
           <ConditionsSheetBody
+            key={sheet}
             character={character}
             onUpdate={onUpdate}
             defaultAddOpen={sheet === "add"}

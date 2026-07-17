@@ -25,11 +25,18 @@ interface Props {
 export default function ManageHpButton({ character, onUpdate, className, children }: Props) {
   const [open, setOpen] = useState(false);
 
+  // Dynamic accessible name so a screen-reader user hears the HP numbers, not
+  // just "Manage hit points" (#989 review). The visual readout is aria-hidden'd
+  // by the label, so the temp value must ride along here too.
+  const { current, max, temp } = character.hitPoints;
+  const label =
+    `Manage hit points: ${current} of ${max}` + (temp > 0 ? ` (+${temp} temp)` : "");
+
   return (
     <>
       <button
         type="button"
-        aria-label="Manage hit points"
+        aria-label={label}
         onClick={() => setOpen(true)}
         className={className}
       >

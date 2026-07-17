@@ -2,8 +2,10 @@
  * ConditionsSheetBody — the interactive innards of the conditions surface:
  * active-condition chips with a remove control, the exhaustion stepper, and the
  * inline AddConditionPanel. Owns busy + error state and fires the API calls, so
- * the applyConditionTransactions logic stays single-sourced between the desktop
- * card (ConditionsStrip) and the mobile sheet (CompactConditionsBar, #769).
+ * the applyConditionTransactions logic stays single-sourced across all three
+ * hosts: the desktop card (ConditionsStrip), the mobile sheet
+ * (CompactConditionsBar, #769), and the live-Combat utility strip
+ * (CombatUtilityStrip, #982).
  */
 
 import { Minus, Plus, X } from "lucide-react";
