@@ -38,49 +38,51 @@ function renderStrengthBox(rollModifiers: RollModifier[]) {
   );
 }
 
-describe("state-driven roll mode + source chip (#486)", () => {
+// #984: the per-row "why" TEXT chip is gone — the reason lives once in the
+// ConditionRollBanner above the rails. An affected roll affordance shows only a
+// subtle, non-text amber dot, and the roll STILL auto-applies the resolved mode.
+describe("state-driven roll mode + affected-row indicator (#486/#984)", () => {
   beforeEach(() => mockLogRoll.mockClear());
 
-  it("shows an advantage chip and rolls with advantage on a Strength check while raging", async () => {
+  it("marks affected affordances with a dot (no text) and still rolls with advantage while raging", async () => {
     const user = userEvent.setup();
     renderStrengthBox(rage);
-    // Rage grants advantage on both Strength checks and saves, so both affordances chip.
-    expect(screen.getAllByText("advantage — Rage")).toHaveLength(2);
+    // Rage grants advantage on both Strength checks and saves → both affordances
+    // get the dot; neither renders the old "advantage — Rage" stamp.
+    expect(screen.getAllByTestId("roll-mode-indicator")).toHaveLength(2);
+    expect(screen.queryByText(/advantage — Rage/i)).toBeNull();
+    expect(screen.queryByTestId("roll-mode-chip")).toBeNull();
 
     await user.click(screen.getByTitle(/Roll Strength check/));
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
     expect(mockLogRoll.mock.calls[0][2]).toMatchObject({ kind: "check", rollMode: "advantage" });
   });
 
-  it("shows no chip and rolls normally once no state applies (Rage ended)", async () => {
+  it("shows no indicator and rolls normally once no state applies (Rage ended)", async () => {
     const user = userEvent.setup();
     renderStrengthBox([]);
-    expect(screen.queryByTestId("roll-mode-chip")).toBeNull();
+    expect(screen.queryByTestId("roll-mode-indicator")).toBeNull();
 
     await user.click(screen.getByTitle(/Roll Strength check/));
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
     expect(mockLogRoll.mock.calls[0][2].rollMode).toBe("normal");
   });
 
-  it("cancels advantage + disadvantage from different sources to normal (RAW)", async () => {
+  it("still cancels advantage + disadvantage from different sources to normal (RAW)", async () => {
     const user = userEvent.setup();
     renderStrengthBox([...rage, ...poisonedCheck]);
-    // Chip surfaces both sources; the resolved mode is normal.
-    const chip = screen.getAllByTestId("roll-mode-chip")[0];
-    expect(chip.textContent).toContain("normal");
-    expect(chip.textContent).toContain("Rage");
-    expect(chip.textContent).toContain("Poisoned");
+    // Both sources apply to a Strength check, so it stays marked, but resolves normal.
+    expect(screen.getAllByTestId("roll-mode-indicator").length).toBeGreaterThan(0);
 
     await user.click(screen.getByTitle(/Roll Strength check/));
     await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
     expect(mockLogRoll.mock.calls[0][2].rollMode).toBe("normal");
   });
 
-  it("keeps an ability-scoped grant off a non-matching ability (no chip on a Strength save vs a check-only grant)", () => {
+  it("keeps an ability/category-scoped grant off a non-matching affordance", () => {
     renderStrengthBox(poisonedCheck);
-    // Poisoned disadvantage is check-only; the Save affordance must not show a chip.
-    // The check affordance does (disadvantage — Poisoned).
-    expect(screen.getByText("disadvantage — Poisoned")).toBeInTheDocument();
-    expect(screen.getAllByTestId("roll-mode-chip")).toHaveLength(1);
+    // Poisoned disadvantage is check-only: the Strength CHECK affordance is
+    // marked; the Strength SAVE affordance is not.
+    expect(screen.getAllByTestId("roll-mode-indicator")).toHaveLength(1);
   });
 });

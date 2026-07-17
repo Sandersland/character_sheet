@@ -35,13 +35,6 @@ interface RollButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
   children: ReactNode;
 }
 
-// The "why" chip's colour echoes the resolved state-driven mode.
-function chipColorClass(mode: RollMode): string {
-  if (mode === "advantage") return "text-gold-600";
-  if (mode === "disadvantage") return "text-garnet-600";
-  return "text-parchment-500";
-}
-
 export default function RollButton({
   spec,
   label,
@@ -72,12 +65,19 @@ export default function RollButton({
     () => setMenuOpen(true),
   );
 
-  // The "why" chip reflects the state-driven mode for a plain (Normal) roll.
+  // State-driven advantage/disadvantage still resolves per roll (#486) and still
+  // drives the roll's mode (see rollWith). What changed in #984: the "why" is no
+  // longer stamped under every row — it lives ONCE in the ConditionRollBanner
+  // above the rails. Here an affected affordance gets only a subtle amber dot,
+  // and the full reason (`chip`) stays available on the button's title tooltip.
   const chipResolved = log
     ? resolveRollMode(rollModifiers, { kind: log.kind, ability: log.ability }, "normal")
     : null;
+  // `chip` is non-empty exactly when a state modifier applied (rollModeChip
+  // returns "" for no sources), so it doubles as the "row is affected" flag.
   const chip = chipResolved ? rollModeChip(chipResolved) : "";
   const chipMode = chipResolved?.mode ?? "normal";
+  const affected = chip !== "";
   const previewSpec = spec.mode !== undefined ? spec : { ...spec, mode: chipMode };
 
   return (
@@ -89,18 +89,17 @@ export default function RollButton({
         ref={btnRef}
         type="button"
         title={`Roll ${label}: ${formatRollSpec(previewSpec)}${chip ? ` — ${chip}` : ""} · hold for advantage/disadvantage`}
-        className={`cursor-pointer rounded transition-colors hover:bg-garnet-50 hover:text-garnet-700 ${className}`}
+        className={`relative cursor-pointer rounded transition-colors hover:bg-garnet-50 hover:text-garnet-700 ${className}`}
         {...press}
         onContextMenu={(e) => e.preventDefault()}
       >
         {children}
-        {chip && (
+        {affected && (
           <span
-            data-testid="roll-mode-chip"
-            className={`mt-0.5 block text-[9px] font-semibold uppercase leading-none tracking-wide ${chipColorClass(chipMode)}`}
-          >
-            {chip}
-          </span>
+            data-testid="roll-mode-indicator"
+            aria-hidden="true"
+            className="pointer-events-none absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-gold-500"
+          />
         )}
       </button>
       {menuOpen && (
