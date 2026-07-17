@@ -420,6 +420,17 @@ describe("attack tally", () => {
     expect(result.current.attackTally[0].damage).toBeUndefined();
   });
 
+  it("a tally refinement (setTallyDamage) pushes no new undo snapshot (#967)", () => {
+    const { result } = inAttack();
+    act(() => { result.current.recordAttack(recorded()); });
+    const historyLen = result.current.history.length;
+    const id = result.current.attackTally[0].id;
+    // The refinement writes directly — undoing the parent recordAttack drops the
+    // whole row, so the damage write is never independently undoable.
+    act(() => { result.current.setTallyDamage(id, 9); });
+    expect(result.current.history).toHaveLength(historyLen);
+  });
+
   it("setTallyAttackTotal overrides a row's to-hit total by id, preserving nat flags + verdict", () => {
     const { result } = inAttack();
     act(() => { result.current.recordAttack(recorded({ total: 14, keptFace: 12 })); });
