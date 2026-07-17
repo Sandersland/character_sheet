@@ -23,6 +23,7 @@ import { useState, type KeyboardEvent } from "react";
 import Card from "@/components/ui/Card";
 import AbilityScoresPanel from "@/features/abilities/AbilityScoresPanel";
 import AllSkillsCard from "@/features/abilities/AllSkillsCard";
+import ConditionRollBanner from "@/features/conditions/ConditionRollBanner";
 import LiveTurnBody from "@/features/session/LiveTurnBody";
 import SessionLog from "@/features/session/SessionLog";
 import { nextTabForKey, type LiveView } from "@/features/session/combatLiveTabs";
@@ -82,6 +83,7 @@ export default function CombatLivePanel({
             skills as Overview (#957), rendered inside the workspace RollProvider
             so a roll stamps the seal (#956) and logs to the session for free. */}
         <aside className="hidden md:flex md:flex-col md:gap-4" aria-label="Ability checks, saves, and skills">
+          <ConditionRollBanner modifiers={character.rollModifiers} />
           <AbilityScoresPanel character={character} gridClassName="grid-cols-3" />
           <AllSkillsCard
             skills={character.skills}
