@@ -28,6 +28,10 @@ export default function DiceRollModal({ spec, label, onResult, onClose }: DiceRo
           label={label}
           onResult={onResult}
           autoRollOnMount
+          // Suppress the in-canvas total: the seal is the summary. Without this
+          // the canvas total would flash for the single frame between settle and
+          // this overlay unmounting in favour of the seal.
+          showTotal={false}
           className="w-full"
         />
       </div>

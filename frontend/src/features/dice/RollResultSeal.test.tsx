@@ -48,6 +48,14 @@ describe("RollResultSeal outcome variants", () => {
     expect(screen.getByText(/Natural 20 — Critical!/i)).toBeInTheDocument();
   });
 
+  it("does not mark a dropped natural 20 (disadvantage) as critical", () => {
+    // disadvantage keeps the lower die (5); the dropped 20 must NOT crit.
+    rollWith([20, 5], { count: 1, faces: 20, mode: "disadvantage" });
+
+    expect(screen.getByTestId("roll-result-seal")).toHaveAttribute("data-outcome", "normal");
+    expect(screen.queryByText(/Critical/i)).not.toBeInTheDocument();
+  });
+
   it("marks a natural 1 on the taken die as a fumble outcome", () => {
     rollWith([1], { count: 1, faces: 20 });
 
