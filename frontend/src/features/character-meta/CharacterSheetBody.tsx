@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import OverviewPanel from "@/features/character-meta/panels/OverviewPanel";
 import CombatPanel from "@/features/character-meta/panels/CombatPanel";
 import InventoryPanel from "@/features/character-meta/panels/InventoryPanel";
@@ -11,6 +13,15 @@ interface CharacterSheetBodyProps {
   reference: ReferenceData | null;
   onUpdate: (c: Character) => void;
   activeTab: SheetTabId;
+  /**
+   * The live-Combat turn tracker (#960), when a session is live + joined. It
+   * SUPERSEDES the static Combat panel and stays mounted across tab switches
+   * (hidden off-Combat) so an in-progress picker + economy survive a swipe.
+   */
+  livePanel?: ReactNode;
+  /** True while the live-session status is still resolving — suppress the static
+   *  Combat panel for that beat so it doesn't flash before the live panel. */
+  sessionLoading?: boolean;
 }
 
 /**
@@ -22,6 +33,8 @@ export default function CharacterSheetBody({
   reference,
   onUpdate,
   activeTab,
+  livePanel,
+  sessionLoading = false,
 }: CharacterSheetBodyProps) {
   const panelProps = { character, reference, onUpdate };
   return (
@@ -35,10 +48,16 @@ export default function CharacterSheetBody({
         aria-labelledby={`sheet-tab-${activeTab}`}
       >
         {activeTab === "overview" && <OverviewPanel {...panelProps} />}
-        {activeTab === "combat" && <CombatPanel {...panelProps} />}
+        {/* Combat: the live tracker supersedes the static panel; while the
+            live-session status is still loading, render neither (no flash). */}
+        {activeTab === "combat" && !livePanel && !sessionLoading && <CombatPanel {...panelProps} />}
         {activeTab === "inventory" && <InventoryPanel {...panelProps} />}
         {activeTab === "magic" && <MagicPanel {...panelProps} />}
         {activeTab === "story" && <StoryPanel {...panelProps} />}
+        {/* Mounted-but-hidden off Combat so an in-progress picker + economy
+            survive a swipe round-trip (the turn state itself lives in the
+            provider; this preserves the open-picker UI state). */}
+        {livePanel && <div hidden={activeTab !== "combat"}>{livePanel}</div>}
       </div>
     </main>
   );
