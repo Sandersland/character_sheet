@@ -17,12 +17,13 @@
  * sheet never floats over Overview; the End prompt is likewise active-gated.
  */
 
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 
 import Card from "@/components/ui/Card";
 import LiveTurnBody from "@/features/session/LiveTurnBody";
 import SessionHeaderRegion from "@/features/session/SessionHeaderRegion";
 import SessionLog from "@/features/session/SessionLog";
+import { nextTabForKey, type LiveView } from "@/features/session/combatLiveTabs";
 import EndSessionPrompt from "@/features/session/EndSessionPrompt";
 import { useLiveSession } from "@/features/session/LiveSessionProvider";
 import { useTurnStateContext } from "@/features/session/TurnStateProvider";
@@ -53,7 +54,7 @@ export default function CombatLivePanel({
   // #962: a small Turn/Log sub-nav — the session Log is the only secondary
   // surface that stays under Combat (Inventory/Class/Spells moved to the sheet's
   // own tabs; Loot is dropped from the UI).
-  const [view, setView] = useState<"turn" | "log">("turn");
+  const [view, setView] = useState<LiveView>("turn");
 
   // The panel is mounted only while live+joined, so turnState is non-null in
   // practice; guard the render (never the hooks above) for safety.
@@ -80,10 +81,11 @@ export default function CombatLivePanel({
           <main> landmark (the sheet's Combat tab), so a nested main is invalid. */}
       <div className="mx-auto flex max-w-4xl flex-col gap-4 px-6 pt-6">
         <TurnLogSubNav view={view} onChange={setView} />
-        {/* Both views stay mounted so the turn economy + open picker survive a
-            Turn↔Log flip; hide the inactive one (LiveTurnBody's overlays are also
-            gated off when Log is showing). */}
-        <div hidden={view !== "turn"}>
+        {/* Only the Turn view stays mounted (hidden when inactive) so the turn
+            economy + an open picker survive a Turn↔Log flip; its overlays are
+            gated off when Log is showing. The Log view renders on demand —
+            SessionLog re-fetches on mount, so it's always fresh. */}
+        <div hidden={view !== "turn"} role="tabpanel" id="combat-panel-turn" aria-labelledby="combat-tab-turn" tabIndex={0}>
           <LiveTurnBody
             character={character}
             session={session}
@@ -94,9 +96,11 @@ export default function CombatLivePanel({
           />
         </div>
         {view === "log" && (
-          <Card title="Session Log" className="p-4">
-            <SessionLog characterId={character.id} sessionId={session.id} refreshKey={live.logRefresh} />
-          </Card>
+          <div role="tabpanel" id="combat-panel-log" aria-labelledby="combat-tab-log" tabIndex={0}>
+            <Card title="Session Log" className="p-4">
+              <SessionLog characterId={character.id} sessionId={session.id} />
+            </Card>
+          </div>
         )}
       </div>
 
@@ -118,13 +122,24 @@ export default function CombatLivePanel({
 /** The mobile Turn/Log sub-nav (#962). A tablist so the running session Log is
  *  reachable under Combat (Inventory/Class/Spells moved to the sheet's own tabs;
  *  Loot dropped). #964 renders the log as a persistent desktop column instead. */
-function TurnLogSubNav({ view, onChange }: { view: "turn" | "log"; onChange: (v: "turn" | "log") => void }) {
-  const tab = (id: "turn" | "log", label: string) => (
+function TurnLogSubNav({ view, onChange }: { view: LiveView; onChange: (v: LiveView) => void }) {
+  const handleKeyDown = (e: KeyboardEvent, id: LiveView) => {
+    const next = nextTabForKey(e.key, id);
+    if (!next) return;
+    e.preventDefault();
+    onChange(next);
+    document.getElementById(`combat-tab-${next}`)?.focus();
+  };
+  const tab = (id: LiveView, label: string) => (
     <button
       type="button"
       role="tab"
+      id={`combat-tab-${id}`}
       aria-selected={view === id}
+      aria-controls={`combat-panel-${id}`}
+      tabIndex={view === id ? 0 : -1}
       onClick={() => onChange(id)}
+      onKeyDown={(e) => handleKeyDown(e, id)}
       className={`rounded-control px-4 py-1.5 text-sm font-semibold transition-colors ${
         view === id ? "bg-garnet-700 text-parchment-50" : "text-parchment-600 hover:bg-parchment-100"
       }`}
