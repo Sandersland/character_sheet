@@ -18,6 +18,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -65,8 +66,13 @@ export function LiveSessionProvider({ characterId, children }: Props) {
   const [loaded, setLoaded] = useState(false);
   const [logRefresh, setLogRefresh] = useState(0);
   const [endedSession, setEndedSession] = useState<Session | null>(null);
+  // Monotonic request nonce: rapid refreshes (e.g. successive visibilitychange
+  // events) race, and a slow stale response must never overwrite a newer one —
+  // that would resurrect a zombie tracker. Only the latest in-flight call writes.
+  const refreshSeqRef = useRef(0);
 
   const refresh = useCallback(async () => {
+    const seq = ++refreshSeqRef.current;
     try {
       const d = await fetchSessionDoorway(characterId);
       // The doorway lacks participants — the live panel needs the full Session
@@ -75,13 +81,15 @@ export function LiveSessionProvider({ characterId, children }: Props) {
         d.session?.status === "active" && d.session.joined
           ? await fetchActiveSession(characterId)
           : null;
+      if (seq !== refreshSeqRef.current) return; // a newer refresh has started
       setDoorway(d);
       setSession(full);
     } catch {
+      if (seq !== refreshSeqRef.current) return;
       setDoorway(null);
       setSession(null);
     } finally {
-      setLoaded(true);
+      if (seq === refreshSeqRef.current) setLoaded(true);
     }
   }, [characterId]);
 

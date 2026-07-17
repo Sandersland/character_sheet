@@ -102,4 +102,43 @@ describe("LiveSessionProvider refresh", () => {
     });
     expect(screen.getByTestId("status")).toHaveTextContent("none");
   });
+
+  it("drops a stale refresh response so it cannot overwrite a newer one", async () => {
+    // Mount refresh (call A) hangs; a later refresh (call B) resolves to 'none'
+    // FIRST, then A resolves to a live session — A must be dropped as stale.
+    let resolveStale!: (v: SessionDoorwayState) => void;
+    const stale = new Promise<SessionDoorwayState>((r) => {
+      resolveStale = r;
+    });
+    mockDoorway.mockReturnValueOnce(stale);
+    mockDoorway.mockResolvedValueOnce(doorway({ kind: "none", session: null }));
+    mockActive.mockResolvedValue(fullSession);
+
+    let refreshFn: () => Promise<void> = async () => {};
+    function Capture() {
+      const { status, refresh } = useLiveSession();
+      refreshFn = refresh;
+      return <span data-testid="status">{status}</span>;
+    }
+    render(
+      <LiveSessionProvider characterId="c1">
+        <Capture />
+      </LiveSessionProvider>,
+    );
+    // Mount refresh is in flight (hung); status is still loading.
+    expect(screen.getByTestId("status")).toHaveTextContent("loading");
+
+    // A newer refresh resolves to 'none' and wins.
+    await act(async () => {
+      await refreshFn();
+    });
+    expect(screen.getByTestId("status")).toHaveTextContent("none");
+
+    // Now the stale mount refresh finally resolves to a LIVE session — dropped.
+    await act(async () => {
+      resolveStale(doorway({ kind: "liveJoined", session: liveSession(true) }));
+      await stale;
+    });
+    expect(screen.getByTestId("status")).toHaveTextContent("none");
+  });
 });
