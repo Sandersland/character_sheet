@@ -44,6 +44,7 @@ function renderHeader(props: Partial<Parameters<typeof CharacterSheetHeader>[0]>
       <RollProvider>
         <CharacterSheetHeader
           character={makeCharacter()}
+          onUpdate={vi.fn()}
           tabs={TABS}
           activeTab="combat"
           onTabChange={vi.fn()}

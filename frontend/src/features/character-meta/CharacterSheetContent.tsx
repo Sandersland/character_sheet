@@ -117,6 +117,7 @@ function CharacterSheetWorkspace({
       <div className="flex h-[100dvh] flex-col overflow-hidden bg-parchment-100 md:block md:h-auto md:min-h-screen md:overflow-visible">
         <CharacterSheetHeader
           character={character}
+          onUpdate={life.handleCharacterUpdate}
           tabs={tabs}
           activeTab={activeTab}
           onTabChange={onTabChange}
