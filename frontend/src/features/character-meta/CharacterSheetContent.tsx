@@ -12,9 +12,12 @@ import { useCaptureDock } from "@/hooks/useCaptureDock";
 import { LiveSessionProvider, useLiveSession } from "@/features/session/LiveSessionProvider";
 import { TurnStateProvider, useTurnStateContext } from "@/features/session/TurnStateProvider";
 import { useSessionDoorway } from "@/features/session/useSessionDoorway";
+import { useLiveRound } from "@/features/session/useLiveRound";
 import SessionDoorway from "@/features/session/SessionDoorway";
+import LiveSessionStrip from "@/features/session/LiveSessionStrip";
 import CombatLivePanel from "@/features/session/CombatLivePanel";
 import SessionSummaryModal from "@/features/session/SessionSummaryModal";
+import type { SheetTabId } from "@/features/character-meta/sheetTabs";
 import type { Character, ReferenceData } from "@/types/character";
 
 interface CharacterSheetContentProps {
@@ -52,18 +55,31 @@ function CharacterSheetWorkspace({
   onUpdate,
 }: CharacterSheetContentProps) {
   const { tabs, activeTab, onTabChange } = useSheetTabs(character);
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const [activityOpen, setActivityOpen] = useState(false);
-  const [sessionsOpen, setSessionsOpen] = useState(false);
+  const modals = useSheetModals();
   // Cmd/Ctrl+J toggles the quick-capture dock from anywhere on the sheet.
   const { captureOpen, openCapture, closeCapture } = useCaptureDock();
   // Session-log invalidation is shared with RollProvider so a logged roll and
   // the log view use one counter (#959).
   const live = useLiveSession();
   const turnState = useTurnStateContext();
+  const liveRound = useLiveRound();
   const session = useSessionDoorway(id);
   // Mobile: horizontal swipe on the panel region walks the tabs (clamped).
   const swipe = useSwipeTabs(tabs, activeTab, onTabChange);
+
+  // #961: while a session is live + joined, off-Combat tabs show a "Go to fight"
+  // strip (an in-workspace jump to Combat) instead of the doorway; the Combat
+  // nav item carries a live pip. On the Combat tab, no strip (D4) — the panel is
+  // the context. Non-joined/starting states keep the existing doorway.
+  const isLiveJoined = live.status === "liveJoined";
+  const isLive = isLiveJoined || live.status === "liveNotJoined";
+  const cueProps = {
+    activeTab,
+    isLiveJoined,
+    session,
+    liveRound,
+    onGoToCombat: () => onTabChange("combat"),
+  };
 
   // #960: when a session is live AND this character is in it, the Combat tab
   // renders the live turn tracker instead of the static combat panel. Mounted
@@ -98,33 +114,27 @@ function CharacterSheetWorkspace({
           activeTab={activeTab}
           onTabChange={onTabChange}
           onOpenCapture={openCapture}
-          onOpenSessions={() => setSessionsOpen(true)}
-          onOpenActivity={() => setActivityOpen(true)}
-          onOpenDelete={() => setConfirmDeleteOpen(true)}
+          onOpenSessions={modals.openSessions}
+          onOpenActivity={modals.openActivity}
+          onOpenDelete={modals.openDelete}
         />
 
-        {/* Desktop: the session doorway strip, pinned under the garnet banner. */}
-        <SessionDoorway
-          placement="desktop"
-          summary={session.summary}
-          sessionTitle={session.activeSession?.title}
-          pending={session.pending}
-          error={session.error}
-          onAction={session.onAction}
-        />
+        {/* Desktop: the session cue (live-strip when joined, else doorway),
+            pinned under the garnet banner; absent on the Combat tab (#961). */}
+        <SessionCue placement="desktop" {...cueProps} />
 
         <CharacterSheetModals
           character={character}
           onUpdate={onUpdate}
           captureSessionId={session.activeSessionId}
           captureSession={session.inActiveSession ? session.activeSession : null}
-          deleteOpen={confirmDeleteOpen}
-          activityOpen={activityOpen}
-          sessionsOpen={sessionsOpen}
+          deleteOpen={modals.deleteOpen}
+          activityOpen={modals.activityOpen}
+          sessionsOpen={modals.sessionsOpen}
           captureOpen={captureOpen}
-          onCloseDelete={() => setConfirmDeleteOpen(false)}
-          onCloseActivity={() => setActivityOpen(false)}
-          onCloseSessions={() => setSessionsOpen(false)}
+          onCloseDelete={modals.closeDelete}
+          onCloseActivity={modals.closeActivity}
+          onCloseSessions={modals.closeSessions}
           onCloseCapture={closeCapture}
         />
 
@@ -157,17 +167,78 @@ function CharacterSheetWorkspace({
           />
         )}
         <RollResultSeal />
-        {/* Mobile: the session doorway bar, between the panels and the bottom nav. */}
-        <SessionDoorway
-          placement="mobile"
-          summary={session.summary}
-          sessionTitle={session.activeSession?.title}
-          pending={session.pending}
-          error={session.error}
-          onAction={session.onAction}
+        {/* Mobile: the session cue (live-strip / doorway), between the panels
+            and the bottom nav; absent on the Combat tab (#961). */}
+        <SessionCue placement="mobile" {...cueProps} />
+        <SheetBottomNav
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={onTabChange}
+          livePipTab={isLive ? "combat" : null}
         />
-        <SheetBottomNav tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />
       </div>
     </RollProvider>
   );
+}
+
+/**
+ * The off-Combat session cue (#961): the live-joined "Go to fight" strip (an
+ * in-workspace jump to Combat) when live+joined, else the existing doorway
+ * (start / join / scheduled). Renders nothing on the Combat tab (D4).
+ */
+function SessionCue({
+  placement,
+  activeTab,
+  isLiveJoined,
+  session,
+  liveRound,
+  onGoToCombat,
+}: {
+  placement: "desktop" | "mobile";
+  activeTab: SheetTabId;
+  isLiveJoined: boolean;
+  session: ReturnType<typeof useSessionDoorway>;
+  liveRound: number | null;
+  onGoToCombat: () => void;
+}) {
+  if (activeTab === "combat") return null;
+  if (isLiveJoined) {
+    return (
+      <LiveSessionStrip
+        placement={placement}
+        title={session.activeSession?.title ?? null}
+        round={liveRound}
+        onGoToCombat={onGoToCombat}
+      />
+    );
+  }
+  return (
+    <SessionDoorway
+      placement={placement}
+      summary={session.summary}
+      sessionTitle={session.activeSession?.title}
+      pending={session.pending}
+      error={session.error}
+      onAction={session.onAction}
+    />
+  );
+}
+
+/** The sheet's modal open-state + toggles (delete / activity / sessions),
+ *  factored out so the workspace body stays free of inline handler closures. */
+function useSheetModals() {
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
+  return {
+    deleteOpen,
+    activityOpen,
+    sessionsOpen,
+    openDelete: () => setDeleteOpen(true),
+    closeDelete: () => setDeleteOpen(false),
+    openActivity: () => setActivityOpen(true),
+    closeActivity: () => setActivityOpen(false),
+    openSessions: () => setSessionsOpen(true),
+    closeSessions: () => setSessionsOpen(false),
+  };
 }
