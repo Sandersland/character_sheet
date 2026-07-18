@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -144,5 +144,67 @@ describe("AbilityScoreStep — ASI branch", () => {
     await user.click(screen.getByRole("button", { name: /decrease constitution/i }));
 
     expect(applied(setDraft).advancement).toBeUndefined();
+  });
+});
+
+async function toFeatBranch() {
+  const user = userEvent.setup();
+  const utils = renderStep();
+  await user.click(screen.getByRole("button", { name: /take a feat/i }));
+  await screen.findByPlaceholderText(/filter feats/i);
+  return { user, ...utils };
+}
+
+describe("AbilityScoreStep — feat branch", () => {
+  it("does not fetch the feat catalog while on the ability-score branch", () => {
+    renderStep();
+    expect(feats).not.toHaveBeenCalled();
+  });
+
+  it("lists catalog feats after switching to the feat branch", async () => {
+    await toFeatBranch();
+    expect(feats).toHaveBeenCalled();
+    expect(screen.getByText("Alert")).toBeInTheDocument();
+    expect(screen.getByText("Resilient")).toBeInTheDocument();
+  });
+
+  it("stages a full-feat op", async () => {
+    const { user, setDraft } = await toFeatBranch();
+    const alertRow = screen.getByText("Alert").closest("li")!;
+    await user.click(within(alertRow).getByRole("button", { name: /select/i }));
+    await user.click(screen.getByRole("button", { name: /take feat/i }));
+
+    expect(applied(setDraft).advancement).toEqual({ type: "takeFeat", featId: "alert" });
+  });
+
+  it("requires and defaults a half-feat's ability choice (labels via abilityLabel)", async () => {
+    const { user, setDraft } = await toFeatBranch();
+    const resilientRow = screen.getByText("Resilient").closest("li")!;
+    await user.click(within(resilientRow).getByRole("button", { name: /select/i }));
+
+    // Half-feat: Take feat gates on a choice.
+    expect(screen.getByRole("button", { name: /take feat/i })).toBeDisabled();
+    expect(screen.getByRole("option", { name: /Constitution \(currently 16\)/ })).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByRole("combobox"), "constitution");
+    await user.click(screen.getByRole("button", { name: /take feat/i }));
+
+    expect(applied(setDraft).advancement).toEqual({
+      type: "takeFeat",
+      featId: "resilient",
+      abilityChoice: "constitution",
+    });
+  });
+
+  it("stages a custom-feat op", async () => {
+    const { user, setDraft } = await toFeatBranch();
+    await user.click(screen.getByRole("button", { name: /add custom feat/i }));
+    await user.type(screen.getByPlaceholderText(/feat name/i), "Lucky Strike");
+    await user.click(screen.getByRole("button", { name: /add custom feat/i }));
+
+    expect(applied(setDraft).advancement).toMatchObject({
+      type: "takeFeat",
+      custom: { name: "Lucky Strike" },
+    });
   });
 });
