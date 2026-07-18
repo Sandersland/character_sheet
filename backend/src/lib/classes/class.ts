@@ -366,7 +366,7 @@ export async function applyClassOperations(
       const ctx: ClassOpContext = { tx, characterId: id, batchId, sessionId };
       switch (op.type) {
         case "setSubclass":
-          await setSubclassInTx(tx, id, op, batchId, sessionId);
+          await applySetSubclass(ctx, op);
           break;
         case "setFightingStyle":
           await applySetFightingStyle(ctx, op);
