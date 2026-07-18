@@ -1,11 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import supertest from "supertest";
 
-import { createApp } from "@/app.js";
-
 // The SPA sends `credentials: "include"` so the session cookie flows
 // cross-origin (dev: 5173 → 4000). That requires CORS to allow credentials AND
 // echo a concrete origin (never `*`). Probed via the public health route.
+
+// createApp reads CORS_ORIGIN via the frozen config snapshot, so each test
+// stubs env then re-imports app fresh (vi.resetModules) to observe it.
+async function appWithCorsOrigin(value: string) {
+  vi.stubEnv("CORS_ORIGIN", value);
+  vi.resetModules();
+  const { createApp } = await import("@/app.js");
+  return createApp();
+}
 
 describe("CORS credentials", () => {
   afterEach(() => {
@@ -13,8 +20,7 @@ describe("CORS credentials", () => {
   });
 
   it("reflects the request origin + allows credentials when CORS_ORIGIN is unset", async () => {
-    vi.stubEnv("CORS_ORIGIN", "");
-    const res = await supertest(createApp())
+    const res = await supertest(await appWithCorsOrigin(""))
       .get("/api/health")
       .set("Origin", "http://localhost:5173");
 
@@ -23,8 +29,7 @@ describe("CORS credentials", () => {
   });
 
   it("allows credentials for an allowlisted origin when CORS_ORIGIN is set", async () => {
-    vi.stubEnv("CORS_ORIGIN", "https://app.example.com");
-    const res = await supertest(createApp())
+    const res = await supertest(await appWithCorsOrigin("https://app.example.com"))
       .get("/api/health")
       .set("Origin", "https://app.example.com");
 
@@ -33,8 +38,7 @@ describe("CORS credentials", () => {
   });
 
   it("does not echo an origin outside the allowlist", async () => {
-    vi.stubEnv("CORS_ORIGIN", "https://app.example.com");
-    const res = await supertest(createApp())
+    const res = await supertest(await appWithCorsOrigin("https://app.example.com"))
       .get("/api/health")
       .set("Origin", "https://evil.example.com");
 
