@@ -88,3 +88,61 @@ describe("AbilityScoreStep — scaffold + branch toggle", () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 });
+
+describe("AbilityScoreStep — ASI branch", () => {
+  it("stages a +2 takeAsi op and shows 0 remaining after two points", async () => {
+    const user = userEvent.setup();
+    const { setDraft } = renderStep();
+
+    await user.click(screen.getByRole("button", { name: /increase constitution/i }));
+    await user.click(screen.getByRole("button", { name: /increase constitution/i }));
+
+    expect(screen.getByText(/0 remaining/i)).toBeInTheDocument();
+    expect(applied(setDraft).advancement).toEqual({
+      type: "takeAsi",
+      increases: [{ ability: "constitution", amount: 2 }],
+    });
+  });
+
+  it("caps a single ability at 20, disabling its further increase (start 19)", async () => {
+    const user = userEvent.setup();
+    renderStep();
+
+    const bump = screen.getByRole("button", { name: /increase strength/i });
+    await user.click(bump);
+
+    expect(screen.getByText(/→ 20/)).toBeInTheDocument();
+    expect(bump).toBeDisabled();
+    expect(screen.getByText(/1 remaining/i)).toBeInTheDocument();
+  });
+
+  it("stages a 1/1 split summing to two", async () => {
+    const user = userEvent.setup();
+    const { setDraft } = renderStep();
+
+    await user.click(screen.getByRole("button", { name: /increase constitution/i }));
+    await user.click(screen.getByRole("button", { name: /increase wisdom/i }));
+
+    const op = applied(setDraft).advancement;
+    expect(op).toMatchObject({ type: "takeAsi" });
+    const increases = (op as { increases: unknown[] }).increases;
+    expect(increases).toHaveLength(2);
+    expect(increases).toEqual(
+      expect.arrayContaining([
+        { ability: "constitution", amount: 1 },
+        { ability: "wisdom", amount: 1 },
+      ]),
+    );
+  });
+
+  it("clears the staged op when points drop below two", async () => {
+    const user = userEvent.setup();
+    const { setDraft } = renderStep();
+
+    await user.click(screen.getByRole("button", { name: /increase constitution/i }));
+    await user.click(screen.getByRole("button", { name: /increase constitution/i }));
+    await user.click(screen.getByRole("button", { name: /decrease constitution/i }));
+
+    expect(applied(setDraft).advancement).toBeUndefined();
+  });
+});
