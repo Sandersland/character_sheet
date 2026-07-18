@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { fetchActivity, fetchSessions, revertBatch } from "@/api/client";
 import {
@@ -362,27 +362,29 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
   // sends exactly { includeFields: true }. An optional signal lets a superseded
   // filter-change load be aborted so a slow stale response can't overwrite a
   // fresher one.
-  function load(signal?: AbortSignal) {
-    setEvents(null);
-    setError(null);
-    fetchActivity(
-      characterId,
-      buildActivityQuery({ categoryFilter, typeFilter, sessionFilter, entityId }),
-      signal,
-    )
-      .then(setEvents)
-      .catch((err) => {
-        if (isAbortError(err, signal)) return; // superseded load — the newer one wins
-        setError("Couldn't load the activity log — try again.");
-      });
-  }
+  const load = useCallback(
+    (signal?: AbortSignal) => {
+      setEvents(null);
+      setError(null);
+      fetchActivity(
+        characterId,
+        buildActivityQuery({ categoryFilter, typeFilter, sessionFilter, entityId }),
+        signal,
+      )
+        .then(setEvents)
+        .catch((err) => {
+          if (isAbortError(err, signal)) return; // superseded load — the newer one wins
+          setError("Couldn't load the activity log — try again.");
+        });
+    },
+    [characterId, categoryFilter, typeFilter, sessionFilter, entityId],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
     load(controller.signal);
     return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reloads on any filter/character change; load() reads current closures, intentionally excluded
-  }, [characterId, categoryFilter, typeFilter, sessionFilter, entityId]);
+  }, [load]);
 
   // Populate the session picker once per character.
   useEffect(() => {
