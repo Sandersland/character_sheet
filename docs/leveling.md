@@ -14,7 +14,7 @@ Read this when touching XP or level-up/level-down, or adding any feature whose a
 
 ## Level-gated reconciliation — the pattern
 
-Level-gated state is persisted state whose legal maximum is determined by level. Two complementary layers, both required:
+Level-gated state is persisted state whose legal maximum is determined by level. Two complementary layers, both required — and both must compute the legal limit via one shared rule function (`lib/srd/` / `lib/leveling/` / `lib/classes/class-features.ts`), never two inline copies of the rule:
 
 **Layer 1 — reconcile-on-write** (destructive, audited, undoable): `reconcileLevelGatedState(ctx)` runs the `LEVEL_GATED_RECONCILERS` array (`lib/leveling/level-reconciliation.ts`) inside the XP transaction after every XP op. That array is authoritative for what's registered; **order matters** — later reconcilers observe earlier ones' writes (e.g. maneuvers must see the already-cleared subclass so the derived cap goes to 0). Reconciliation events ride the same `batchId` as the XP event and reuse existing undo branches (`class` restores from `before`; `resources` restores the full `before.resources` snapshot).
 

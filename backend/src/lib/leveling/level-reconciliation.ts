@@ -23,7 +23,9 @@
  *    write it as a thin `reconcileKnownList` config instead of hand-rolling.
  * 2. Add it to `LEVEL_GATED_RECONCILERS` (order matters — later reconcilers
  *    see results of earlier ones; maneuvers must run after subclass).
- * 3. Add a matching clamp-on-read in serializeCharacter.
+ * 3. Add a matching clamp-on-read in serializeCharacter. Both sides must
+ *    compute the legal limit via one shared rule function — never two inline
+ *    copies (e.g. effective-levels.ts, resources.ts clampChoicesToCaps).
  * 4. Add new EventType values as needed (schema.prisma + events.ts + migrate).
  *
  * Feats and Ability Score Improvements ship via `reconcileAdvancements`.
@@ -31,8 +33,10 @@
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { proficiencyBonusForLevel } from "./experience.js";
+import { effectiveEntryLevel, subclassActiveAt, subclassGateLevel } from "./effective-levels.js";
 import { logEvent, type EventType } from "@/lib/activity/events.js";
 import {
+  clampChoicesToCaps,
   normalizeResourcesMutable,
   serializeResourcesState,
   snapshotResources,
@@ -84,14 +88,12 @@ async function reconcileSubclass(ctx: ReconcileContext): Promise<void> {
     },
   });
 
-  const singleClass = entries.length <= 1;
-
   for (const entry of entries) {
     if (entry.subclass === null && entry.subclassId === null) continue;
 
-    const subclassLevel = entry.class?.subclassLevel ?? 3;
-    const effectiveLevel = singleClass ? newDerivedLevel : entry.level;
-    if (effectiveLevel >= subclassLevel) continue;
+    const effectiveLevel = effectiveEntryLevel(entry.level, entries.length, newDerivedLevel);
+    if (subclassActiveAt(effectiveLevel, entry.class?.subclassLevel)) continue;
+    const subclassLevel = subclassGateLevel(entry.class?.subclassLevel);
 
     // Level has fallen below the grant level — clear this entry's subclass.
     await tx.characterClassEntry.update({
@@ -144,13 +146,10 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
   const state = normalizeSpellcastingMutable(row.spellcasting);
   if (!state.spells.some((s) => s.source === "subclass")) return; // normal case
 
-  // Grants across every class entry, symmetric with collectGrantedSpells. Single-
-  // class uses the XP-derived level (the per-class column can be stale); a
-  // multiclass entry uses its own per-class level.
-  const singleClass = row.classEntries.length <= 1;
+  // Grants across every class entry, symmetric with the serialize read side.
   const validIds = new Set(
     row.classEntries
-      .flatMap((e) => deriveGrantedSpells(e.subclassRef, singleClass ? newDerivedLevel : e.level))
+      .flatMap((e) => deriveGrantedSpells(e.subclassRef, effectiveEntryLevel(e.level, row.classEntries.length, newDerivedLevel)))
       .map((s) => s.id),
   );
 
@@ -392,22 +391,18 @@ async function reconcileToolProficiencies(ctx: ReconcileContext): Promise<void> 
 // Uses a `resources`-category event so the existing undo branch restores
 // before.resources wholesale — no new undo code.
 
-// Trim each choicesKnown list to its cap (keys absent from `caps` → 0, dropped).
-// Mutates `choicesKnown` in place (LIFO: keep the oldest picks); returns the
-// number of entries removed.
+// Mutating wrapper over clampChoicesToCaps (resources.ts): applies the shared
+// cap policy in place (delete-on-zero-cap), returns the entries removed.
 function trimChoicesToCaps(
   choicesKnown: ResourcesMutableState["choicesKnown"],
   caps: Map<string, number>,
 ): number {
-  let removed = 0;
-  for (const [key, entries] of Object.entries(choicesKnown)) {
-    const cap = caps.get(key) ?? 0;
-    if (entries.length <= cap) continue;
-    removed += entries.length - cap;
-    if (cap === 0) delete choicesKnown[key];
-    else choicesKnown[key] = entries.slice(0, cap);
+  const { clamped, removedCount } = clampChoicesToCaps(choicesKnown, caps);
+  for (const key of Object.keys(choicesKnown)) {
+    if (key in clamped) choicesKnown[key] = clamped[key];
+    else delete choicesKnown[key];
   }
-  return removed;
+  return removedCount;
 }
 
 async function reconcileSubclassChoices(ctx: ReconcileContext): Promise<void> {

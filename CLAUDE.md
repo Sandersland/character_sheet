@@ -15,7 +15,7 @@ See `docs/development.md` for per-workspace commands, running outside Docker, an
 
 **Derive, don't persist.** `level`/`proficiencyBonus` are computed from `experiencePoints`; spell slot totals/save DC/attack bonus, `armorClass`, `speed` bonuses, and `attacksPerAction` are all derived at read time in `serializeCharacter` via the `lib/srd/` rule functions. `race`/`class`/`background` are read from the selection relations. None of these are columns; don't add them back. (Exempt: `Character.ownerId` — ownership is identity state, not a function of any other column.)
 
-**Level-gated state reconciles through one registry.** Any persisted state whose legal maximum depends on character level must add a reconciler to `LEVEL_GATED_RECONCILERS` in `backend/src/lib/leveling/level-reconciliation.ts` **and** a matching clamp-on-read in `serializeCharacter`. Never hand-roll level-down logic at a new call site. See `docs/leveling.md`.
+**Level-gated state reconciles through one registry.** Any persisted state whose legal maximum depends on character level must add a reconciler to `LEVEL_GATED_RECONCILERS` in `backend/src/lib/leveling/level-reconciliation.ts` **and** a matching clamp-on-read in `serializeCharacter`, both computing the legal limit via one shared rule function (`lib/srd/` / `lib/leveling/` / `lib/classes/class-features.ts`) — never two inline copies of the rule. Never hand-roll level-down logic at a new call site. See `docs/leveling.md`.
 
 **5e rules data lives only in backend `lib/`** (`lib/srd/`, `lib/leveling/experience.ts`, `lib/inventory/starting-equipment.ts`). Never duplicate rules on the frontend or inline them in a route. (Catalog *content* — items, spells, packs — lives in DB seed tables, not TS modules.)
 

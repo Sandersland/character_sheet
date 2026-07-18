@@ -13,6 +13,7 @@ import {
   type AbilityScores,
 } from "@/lib/spellcasting/granted-spells.js";
 import { SHADOW_ART_CONCENTRATION_PREFIX } from "@/lib/classes/shadow-arts.js";
+import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
 import type { PrimaryClass } from "./classes.js";
 
@@ -24,9 +25,10 @@ function mergeGrantedSpells(stored: SpellEntry[], granted: SpellEntry[]): SpellE
   return [...stored, ...granted.filter((g) => !storedNames.has(g.name.toLowerCase()))];
 }
 
-// Subclass-granted spells across every class entry (each gated by its own level).
-function collectGrantedSpells(entries: CharacterWithRelations["classEntries"]): SpellEntry[] {
-  return entries.flatMap((e) => deriveGrantedSpells(e.subclassRef, e.level));
+// Subclass-granted spells across every class entry, each gated by its effective
+// level (multiclass here → per-entry; single-sourced via effectiveEntryLevel).
+function collectGrantedSpells(entries: CharacterWithRelations["classEntries"], derivedLevel: number): SpellEntry[] {
+  return entries.flatMap((e) => deriveGrantedSpells(e.subclassRef, effectiveEntryLevel(e.level, entries.length, derivedLevel)));
 }
 
 // Item-granted spells (#528) for a holder's active items. Appended after learned
@@ -46,8 +48,8 @@ function deriveItemSpellsFor(row: CharacterWithRelations): SpellEntry[] {
 
 // Casting ability for the slotless multiclass view — from the first entry that
 // actually grants a spell (defaults to Wisdom when none do).
-function collectGrantedCastingAbility(entries: CharacterWithRelations["classEntries"]): keyof AbilityScores {
-  const granting = entries.find((e) => deriveGrantedSpells(e.subclassRef, e.level).length > 0);
+function collectGrantedCastingAbility(entries: CharacterWithRelations["classEntries"], derivedLevel: number): keyof AbilityScores {
+  const granting = entries.find((e) => deriveGrantedSpells(e.subclassRef, effectiveEntryLevel(e.level, entries.length, derivedLevel)).length > 0);
   return deriveGrantedCastingAbility(granting?.subclassRef);
 }
 
@@ -174,10 +176,14 @@ function preparedLimitEntries(
   primaryClass: PrimaryClass,
   level: number,
 ): Array<{ name: string; level: number; subclass: string | null }> {
-  if (row.classEntries.length > 1) {
-    return row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass }));
+  if (row.classEntries.length === 0) {
+    return [{ name: primaryClass?.name ?? "", level, subclass: primaryClass?.subclass ?? null }];
   }
-  return [{ name: primaryClass?.name ?? "", level, subclass: primaryClass?.subclass ?? null }];
+  return row.classEntries.map((e) => ({
+    name: e.name,
+    level: effectiveEntryLevel(e.level, row.classEntries.length, level),
+    subclass: e.subclass,
+  }));
 }
 
 // Derived prepared-spell cap fields (#883): the limit plus the current count.
@@ -207,7 +213,7 @@ function buildSpellcastingViewBase(
   proficiencyBonus: number,
 ): object | undefined {
   if (row.classEntries.length > 1) {
-    return buildMulticlassSpellcastingView(row, abilityScores, proficiencyBonus);
+    return buildMulticlassSpellcastingView(row, level, abilityScores, proficiencyBonus);
   }
   return buildSingleClassSpellcastingView(row, primaryClass, level, abilityScores, proficiencyBonus);
 }
@@ -245,6 +251,7 @@ function buildSingleClassSpellcastingView(
 // from every class entry (not just the primary) so a caster in any slot renders.
 function buildMulticlassSpellcastingView(
   row: CharacterWithRelations,
+  level: number,
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
 ): object | undefined {
@@ -255,7 +262,7 @@ function buildMulticlassSpellcastingView(
   );
 
   // Subclass-granted spells across every class entry (each gated by its own level).
-  const granted = collectGrantedSpells(row.classEntries);
+  const granted = collectGrantedSpells(row.classEntries, level);
   const itemSpells = deriveItemSpellsFor(row);
   const stored = normalizeSpellcastingMutable(row.spellcasting);
 
@@ -263,7 +270,7 @@ function buildMulticlassSpellcastingView(
   // surface a slotless view (ability derived per rule; mirrors the single-class branch).
   if (multi.classes.length === 0) {
     if (granted.length === 0 && itemSpells.length === 0) return undefined;
-    const castingAbility = collectGrantedCastingAbility(row.classEntries);
+    const castingAbility = collectGrantedCastingAbility(row.classEntries, level);
     const abilMod = abilityModifier(abilityScores[castingAbility] ?? 10);
     const grantedSpells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];
     return {

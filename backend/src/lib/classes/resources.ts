@@ -159,6 +159,26 @@ export interface ResourcesMutableState {
   fightingStyle: FightingStyleKey | null;
 }
 
+// ── Subclass "choose N" cap policy ──────────────────────────────────────────────
+// Single-sourced level-gating for choicesKnown, shared by reconcile-on-write
+// (trimChoicesToCaps) and clamp-on-read (buildResourcesPayload). Caps each key's
+// list to its derived count (LIFO: keep the oldest picks); keys absent from
+// `caps` (subclass/tier no longer grants them) get cap 0 and are dropped from
+// `clamped`. `removedCount` is the total entries over cap.
+export function clampChoicesToCaps(
+  choicesKnown: Record<string, ChoiceEntry[]>,
+  caps: Map<string, number>,
+): { clamped: Record<string, ChoiceEntry[]>; removedCount: number } {
+  const clamped: Record<string, ChoiceEntry[]> = {};
+  let removedCount = 0;
+  for (const [key, entries] of Object.entries(choicesKnown)) {
+    const cap = caps.get(key) ?? 0;
+    if (entries.length > cap) removedCount += entries.length - cap;
+    if (cap > 0) clamped[key] = entries.slice(0, cap);
+  }
+  return { clamped, removedCount };
+}
+
 // ── Normalizer ────────────────────────────────────────────────────────────────
 // Tolerant of null (character has never used any resources) and future schema
 // additions. Mirror of normalizeSpellcastingMutable.
