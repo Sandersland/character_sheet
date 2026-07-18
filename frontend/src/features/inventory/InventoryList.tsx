@@ -113,7 +113,6 @@ export default function InventoryList({ character, onUpdate }: InventoryListProp
         metersProps={metersProps}
         hasItems={hasItems}
         configuringSell={sell.configuringSell}
-        addOpen={addOpen}
         addPanel={addPanel}
         error={error}
         body={body}

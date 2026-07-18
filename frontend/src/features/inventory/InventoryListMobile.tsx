@@ -2,17 +2,8 @@ import type { ReactNode } from "react";
 
 import Card from "@/components/ui/Card";
 import AddItemFab from "@/features/inventory/AddItemFab";
-import InventoryMobileHeader from "@/features/inventory/InventoryMobileHeader";
+import InventoryMobileHeader, { type MetersProps } from "@/features/inventory/InventoryMobileHeader";
 import type { FilterKey } from "@/lib/inventorySections";
-
-interface MetersProps {
-  totalWeight: number;
-  capacity: number;
-  overCapacity: boolean;
-  hasAttunable: boolean;
-  attunedCount: number;
-  atCap: boolean;
-}
 
 interface InventoryListMobileProps {
   search: string;
@@ -24,7 +15,6 @@ interface InventoryListMobileProps {
   metersProps: MetersProps;
   hasItems: boolean;
   configuringSell: boolean;
-  addOpen: boolean;
   addPanel: ReactNode;
   error: string | null;
   body: ReactNode;
@@ -45,7 +35,6 @@ export default function InventoryListMobile({
   metersProps,
   hasItems,
   configuringSell,
-  addOpen,
   addPanel,
   error,
   body,
@@ -68,7 +57,7 @@ export default function InventoryListMobile({
           configuringSell={configuringSell}
         />
 
-        {addOpen && <div className="px-4 pt-3">{addPanel}</div>}
+        {addPanel && <div className="px-4 pt-3">{addPanel}</div>}
         {error && <p className="px-4 pt-3 text-xs font-semibold text-garnet-700">{error}</p>}
 
         {body}

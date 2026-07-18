@@ -12,7 +12,8 @@ interface ItemDetailFooterProps {
 }
 
 // The Sell / Edit / Drop footer of the item detail sheet (#1029); Drop is a
-// two-step confirm that submits a remove op and closes the sheet.
+// two-step confirm. submitOperations never rejects (errors surface in the list
+// behind the sheet), so confirm always closes the sheet — same as edit/sell.
 export default function ItemDetailFooter({
   item,
   pending,

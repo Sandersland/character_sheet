@@ -2,7 +2,7 @@ import InventoryMeters from "@/features/inventory/InventoryMeters";
 import InventoryMobileToolbar from "@/features/inventory/InventoryMobileToolbar";
 import type { FilterKey } from "@/lib/inventorySections";
 
-interface MetersProps {
+export interface MetersProps {
   totalWeight: number;
   capacity: number;
   overCapacity: boolean;
