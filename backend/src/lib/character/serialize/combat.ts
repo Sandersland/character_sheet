@@ -55,8 +55,7 @@ export function selectEquippedBodyArmor(
 // Unarmored Defense/Mage Armor best-of) → Defense fighting style → feat AC →
 // per-source "ac" buffs → the acFloor (Barkskin) reconciling part last.
 // The branchiness is inherent to the 5e AC layering (each optional source is a
-// conditional addend), not accidental complexity — it was previously inlined in
-// serializeCharacter's body; extracting it here is a net structural win.
+// conditional addend), not accidental complexity.
 // fallow-ignore-next-line complexity
 export function buildArmorClassView(
   row: CharacterWithRelations,
