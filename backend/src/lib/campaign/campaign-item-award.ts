@@ -14,7 +14,7 @@ import { getActiveSessionId } from "@/lib/session/sessions.js";
 // event is written on the TARGET character so the grant is LIFO-undoable via
 // the shared inventory revert (category "inventory", shape-driven).
 
-export class CampaignItemAwardError extends Error {
+class CampaignItemAwardError extends Error {
   status: number;
   constructor(status: number, message: string) {
     super(message);
