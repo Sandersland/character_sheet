@@ -64,6 +64,10 @@ export function TurnSlotCard({
         >
           <Icon className="h-5 w-5" />
         </span>
+        {/* Text column owns all the flex slack (`min-w-0 flex-1`); the icon tile
+            and Use button are both `shrink-0`, so the slot TITLE never gets
+            crowded into an ellipsis (#986) — the title has no `truncate`, so a
+            long name wraps rather than clips. Only the subtitle/preview ellipsizes. */}
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 text-sm font-semibold text-parchment-800">
             {title}
@@ -80,7 +84,7 @@ export function TurnSlotCard({
             type="button"
             onClick={onUse}
             aria-label={useLabel}
-            className={`shrink-0 rounded-control border px-4 py-2 text-xs font-semibold shadow-sm transition-colors ${t.useBtn}`}
+            className={`inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-control border px-4 py-2 text-xs font-semibold shadow-sm transition-colors ${t.useBtn}`}
           >
             Use
           </button>
