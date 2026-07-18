@@ -51,8 +51,9 @@ interface LevelUpContext {
   planCharacter: LevelUpPlanCharacter;
   targetEntry: TargetClassEntry;
   chosenSubclassName: string | null;
-  // subclass/fightingStyle seams write the position-0 entry only, so those steps
-  // are only legal when the target IS the primary entry.
+  // applyResourceOpInTx derives choice caps from the position-0 entry only, so
+  // resource-backed steps are only legal when the target IS the primary entry
+  // (the subclass/fightingStyle seams are entry-aware since #1065).
   targetIsPrimary: boolean;
 }
 
@@ -186,6 +187,14 @@ const LEVEL_UP_OP_APPLIERS: Record<
     applySpellcastingOpInTx(tx, id, op as SpellcastingOperation, batchId, sessionId, userId),
 };
 
+// applyResourceOpInTx derives choice caps from the primary entry only, and the
+// resource-pool read-clamp mirrors that — a non-primary pick would be written
+// uncapped and then hidden on read, so reject these steps up front until that
+// seam is entry-aware.
+const RESOURCE_BACKED: ReadonlySet<LevelUpStepKind> = new Set([
+  "maneuvers", "disciplines", "toolProficiency", "subclassChoice",
+]);
+
 /**
  * Validate `submission` against the character's derived level-up plan and apply
  * every resulting choice (hit points, advancement, subclass, subclass-derived
@@ -203,9 +212,10 @@ export async function applyLevelUpTransaction(
 
   const steps = validateLevelUpSubmission(planCharacter, targetEntry, chosenSubclassName, submission);
 
-  // setSubclass / setFightingStyle write the primary (position-0) entry only.
-  if (!targetIsPrimary && steps.some((s) => s.kind === "subclass" || s.kind === "fightingStyle")) {
-    throw new InvalidLevelUpError("Subclass and fighting-style choices are not supported for a non-primary class yet");
+  if (!targetIsPrimary && steps.some((s) => RESOURCE_BACKED.has(s.kind))) {
+    throw new InvalidLevelUpError(
+      "Subclass features that grant maneuvers, disciplines, or other picks are not supported for a non-primary class yet",
+    );
   }
 
   const ops = buildLevelUpOps(steps, submission);

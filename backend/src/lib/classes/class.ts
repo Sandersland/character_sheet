@@ -12,12 +12,13 @@
 
 import { Prisma } from "@/generated/prisma/client.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
+import { effectiveEntryLevel } from "@/lib/leveling/effective-levels.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { levelUpHpGain, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import {
   abilityModifier,
-  fightingStyleChoiceCount,
+  characterFightingStyleChoiceCount,
   hitDieFace,
   isKnownFightingStyle,
   multiclassPrerequisitesMet,
@@ -66,8 +67,11 @@ interface ClassOpContext {
   sessionId: string | null;
 }
 
-// setSubclass: choose the primary class's subclass once the character reaches its
-// subclass-granting level; drifts subclassId + name onto the primary class entry.
+// setSubclass: choose a subclass once the owning class entry reaches its
+// subclass-granting level; drifts subclassId + name onto that entry. The target
+// entry is resolved BY the subclass's class (#1065) — each class appears at most
+// once among a character's entries (applyAddClass enforces uniqueness), so the
+// subclass id alone is unambiguous.
 async function applySetSubclass(ctx: ClassOpContext, op: SetSubclassOperation): Promise<void> {
   const { tx, characterId, batchId, sessionId } = ctx;
 
@@ -78,17 +82,14 @@ async function applySetSubclass(ctx: ClassOpContext, op: SetSubclassOperation): 
       experiencePoints: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        take: 1,
-        select: { id: true, name: true, subclass: true, subclassId: true, classId: true },
+        select: { id: true, name: true, subclass: true, subclassId: true, classId: true, level: true },
       },
     },
   });
   if (!character) {
     throw new InvalidClassOperationError(`Character not found: ${characterId}`);
   }
-
-  const primaryEntry = character.classEntries[0];
-  if (!primaryEntry) {
+  if (character.classEntries.length === 0) {
     throw new InvalidClassOperationError("Character has no class entry");
   }
 
@@ -101,30 +102,35 @@ async function applySetSubclass(ctx: ClassOpContext, op: SetSubclassOperation): 
     throw new InvalidClassOperationError(`Subclass not found: ${op.subclassId}`);
   }
 
-  // Validate subclass belongs to the character's primary class.
-  if (subclass.classId !== primaryEntry.classId) {
+  // Validate the character has levels in the subclass's class.
+  const entry = character.classEntries.find((e) => e.classId === subclass.classId);
+  if (!entry) {
     throw new InvalidClassOperationError(
-      `Subclass "${subclass.name}" belongs to ${subclass.class.name}, not the character's class`
+      `Subclass "${subclass.name}" belongs to ${subclass.class.name}, not one of the character's classes`
     );
   }
 
-  // Validate character level meets the subclass-granting level.
-  const level = levelForExperience(character.experiencePoints);
+  // Validate the entry's class level meets the subclass-granting level.
+  const level = effectiveEntryLevel(
+    entry.level,
+    character.classEntries.length,
+    levelForExperience(character.experiencePoints),
+  );
   const required = subclass.class.subclassLevel;
   if (level < required) {
     throw new InvalidClassOperationError(
-      `Character is level ${level} but ${subclass.class.name} grants a subclass at level ${required}`
+      `Character is ${subclass.class.name} level ${level} but the subclass is not granted until level ${required}`
     );
   }
 
   const beforeData = {
-    subclassId: primaryEntry.subclassId ?? null,
-    subclass: primaryEntry.subclass ?? null,
+    subclassId: entry.subclassId ?? null,
+    subclass: entry.subclass ?? null,
   };
 
   // Write subclassId + drifting name to the class entry.
   await tx.characterClassEntry.update({
-    where: { id: primaryEntry.id },
+    where: { id: entry.id },
     data: {
       subclassId: subclass.id,
       subclass: subclass.name,
@@ -143,14 +149,16 @@ async function applySetSubclass(ctx: ClassOpContext, op: SetSubclassOperation): 
     summary: `Chose subclass: ${subclass.name} (${subclass.class.name})`,
     before: { ...beforeData },
     after: { ...afterData },
-    data: { classEntryId: primaryEntry.id, subclassId: subclass.id, subclassName: subclass.name },
+    data: { classEntryId: entry.id, subclassId: subclass.id, subclassName: subclass.name },
     batchId,
     sessionId,
   });
 }
 
-// setFightingStyle: record the Fighter L1 Fighting Style choice in resources
-// state (resources-category event so activity.ts reverts it wholesale).
+// setFightingStyle: record the Fighting Style choice (Fighter L1 feature) in
+// resources state (resources-category event so activity.ts reverts it wholesale).
+// Entitlement is judged across EVERY class entry at its own class level (#1065:
+// a wizard/Fighter multiclass qualifies via the Fighter entry).
 async function applySetFightingStyle(ctx: ClassOpContext, op: SetFightingStyleOperation): Promise<void> {
   const { tx, characterId, batchId, sessionId } = ctx;
 
@@ -162,8 +170,7 @@ async function applySetFightingStyle(ctx: ClassOpContext, op: SetFightingStyleOp
       resources: true,
       classEntries: {
         orderBy: { position: "asc" as const },
-        take: 1,
-        select: { name: true },
+        select: { name: true, level: true },
       },
     },
   });
@@ -176,12 +183,12 @@ async function applySetFightingStyle(ctx: ClassOpContext, op: SetFightingStyleOp
     throw new InvalidClassOperationError(`Unknown fighting style: ${op.key}`);
   }
 
-  // Validate the character is entitled to a fighting style at this level.
-  const className = character.classEntries[0]?.name ?? "";
+  // Validate some class entry entitles the character to a fighting style.
   const level = levelForExperience(character.experiencePoints);
-  if (fightingStyleChoiceCount(className, level) === 0) {
+  if (characterFightingStyleChoiceCount(character.classEntries, level) === 0) {
+    const classNames = character.classEntries.map((e) => e.name).join("/");
     throw new InvalidClassOperationError(
-      `Character (${className || "no class"}, level ${level}) cannot choose a Fighting Style`,
+      `Character (${classNames || "no class"}, level ${level}) cannot choose a Fighting Style`,
     );
   }
 
