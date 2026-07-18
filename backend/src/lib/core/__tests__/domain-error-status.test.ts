@@ -10,6 +10,7 @@ import { InvalidHitPointOperationError } from "@/lib/combat/hp-core.js";
 import { InvalidResourceOperationError } from "@/lib/classes/resources.js";
 import {
   AttunementLimitError,
+  InsufficientCurrencyError,
   InvalidInventoryOperationError,
 } from "@/lib/inventory/inventory-currency.js";
 import { InvalidSpellcastingOperationError } from "@/lib/spellcasting/ability-cost.js";
@@ -21,6 +22,7 @@ describe("domain errors carry an explicit HTTP status", () => {
     expect(new InvalidHitPointOperationError("x").status).toBe(400);
     expect(new InvalidResourceOperationError("x").status).toBe(400);
     expect(new InvalidInventoryOperationError("x").status).toBe(400);
+    expect(new InsufficientCurrencyError("x").status).toBe(400);
     expect(new InvalidSpellcastingOperationError("x").status).toBe(400);
     expect(new UnknownActionError("x").status).toBe(400);
   });
