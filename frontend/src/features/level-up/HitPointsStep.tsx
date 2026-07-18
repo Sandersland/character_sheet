@@ -1,12 +1,17 @@
 // The Hit Points ceremony step (#887): the player takes the fixed average or
 // rolls the advancing class's hit die; a live preview shows the new max HP.
 
+import { lazy, Suspense, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import { useReferenceData } from "@/hooks/useReferenceData";
 import { abilityAbbr, abilityLabel, abilityModifier, formatModifier } from "@/lib/abilities";
+import type { RollResult } from "@/lib/dice";
 import { advancingHitDie, averageHitPointGain, dieFaces, hitPointGainRange } from "@/lib/hitDice";
+
+// Lazy so the 3D dice stack loads only when the player actually rolls their hit die.
+const DiceRoller = lazy(() => import("@/features/dice/DiceRoller"));
 
 const CHOICE_BASE =
   "relative rounded-card border border-parchment-300 bg-parchment-50 px-4 py-5 text-center transition-colors hover:bg-parchment-100";
@@ -37,8 +42,19 @@ export default function HitPointsStep() {
   const fixedBase = averageHitPointGain(faces, 0);
   const { min, max } = hitPointGainRange(faces, conMod);
 
+  // The rolled hit die, held locally so toggling average↔roll reuses the same
+  // roll (#887): the die only re-mounts — and re-rolls — while this is null.
+  const [roll, setRoll] = useState<number | null>(null);
+
+  function handleRoll(result: RollResult) {
+    const value = result.dice[0]?.value ?? 1;
+    setRoll(value);
+    setDraft((d) => ({ ...d, hp: { method: "roll", roll: value } }));
+  }
+
   const method = draft.hp?.method;
-  const gain = method === "average" ? averageGain : null;
+  const gain =
+    method === "average" ? averageGain : method === "roll" && roll != null ? roll + conMod : null;
   const currentMax = character.hitPoints.max;
 
   return (
@@ -67,20 +83,33 @@ export default function HitPointsStep() {
 
         <button
           type="button"
-          onClick={() => setDraft((d) => ({ ...d, hp: { method: "roll" } }))}
+          onClick={() => setDraft((d) => ({ ...d, hp: roll != null ? { method: "roll", roll } : { method: "roll" } }))}
           aria-pressed={method === "roll"}
           className={`${CHOICE_BASE} ${method === "roll" ? CHOICE_SEL : ""}`}
         >
           <span className={`${PICK} ${method === "roll" ? "border-garnet-700 bg-garnet-600" : "border-parchment-300"}`} />
           <div className={CH}>Roll 1{die}</div>
           <div className={`${CBIG} ${method === "roll" ? "text-garnet-700" : "text-parchment-900"}`}>
-            {min}–{max}
+            {roll != null ? `+${roll + conMod}` : `${min}–${max}`}
           </div>
           <div className={CNOTE}>
             1{die} {conText} = a gamble
           </div>
         </button>
       </div>
+
+      {method === "roll" && roll == null && (
+        <Suspense fallback={null}>
+          <DiceRoller
+            spec={{ count: 1, faces }}
+            label={`Hit die — 1${die}`}
+            onResult={handleRoll}
+            autoRollOnMount
+            showTotal={false}
+            className="mt-4"
+          />
+        </Suspense>
+      )}
 
       {gain != null && (
         <p className="mt-4 text-center text-sm text-parchment-600">
