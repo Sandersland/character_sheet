@@ -47,6 +47,11 @@ export default function CharacterSwitcherSheet({ currentId, onClose }: Character
     <BottomSheet title="Characters" subtitle="Switch sheet" onClose={onClose}>
       <div className="-mx-4">
         {characters === null && !error && <Spinner className="py-8" />}
+        {error && (
+          <p className="px-4 py-6 text-center text-sm text-parchment-500">
+            Couldn&apos;t load characters. Check your connection.
+          </p>
+        )}
 
         {characters?.map((c) => {
           const current = c.id === currentId;

@@ -54,7 +54,7 @@ function renderHeader(props: Partial<Parameters<typeof MobileSheetHeader>[0]> = 
 describe("MobileSheetHeader", () => {
   it("renders the name and 'Race · Class Level' subtitle", () => {
     renderHeader();
-    expect(screen.getByRole("heading", { name: "Aldric" })).toBeInTheDocument();
+    expect(screen.getByText("Aldric")).toBeInTheDocument();
     expect(screen.getByText("Human · Fighter 7")).toBeInTheDocument();
   });
 

@@ -71,7 +71,7 @@ describe("CharacterSwitcherSheet (#1027)", () => {
     expect(screen.queryByText("Sheet for other")).not.toBeInTheDocument();
   });
 
-  it("'All characters' goes to the list; 'New character' goes to creation", async () => {
+  it("'All characters' goes to the list", async () => {
     vi.mocked(client.fetchCharacters).mockResolvedValue([summary()]);
     renderSheet();
 

@@ -256,9 +256,9 @@ function ExpandedSheetHeader({
           </span>
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-1">
-              <h1 className="truncate font-display text-lg font-semibold leading-tight text-garnet-800">
+              <span className="truncate font-display text-lg font-semibold leading-tight text-garnet-800">
                 {character.name}
-              </h1>
+              </span>
               <ChevronDown className="h-3.5 w-3.5 flex-none text-parchment-400" aria-hidden />
             </span>
             <span className="block truncate text-xs text-parchment-600">
