@@ -37,7 +37,7 @@ export interface RunCharacterTransactionOptions<S extends Prisma.CharacterSelect
   applyOp: (ctx: CharacterTxContext<Prisma.CharacterGetPayload<{ select: S }>, Op>) => Promise<void>;
   /** When provided (incl. null), tag events with this id instead of getActiveSessionId. */
   sessionId?: string | null;
-  /** Runs inside the same $transaction after the op loop (e.g. retroactive summary recompute). */
+  /** Runs inside the same $transaction after the op loop, incl. when operations is empty (e.g. retroactive summary recompute). */
   afterOps?: (ctx: {
     tx: Prisma.TransactionClient;
     characterId: string;

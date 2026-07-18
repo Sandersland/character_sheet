@@ -154,6 +154,25 @@ describe("runCharacterTransaction", () => {
     expect(calls).toBe(0);
   });
 
+  it("still runs afterOps when the operations array is empty", async () => {
+    let afterCalls = 0;
+    await runCharacterTransaction<{ experiencePoints: true }, { add: number }>(
+      characterId,
+      [],
+      {
+        select: { experiencePoints: true },
+        notFound: (id) => new NotFoundError(id),
+        applyOp: async () => {
+          throw new Error("applyOp should not run for an empty batch");
+        },
+        afterOps: async () => {
+          afterCalls += 1;
+        },
+      },
+    );
+    expect(afterCalls).toBe(1);
+  });
+
   it("runs afterOps once after the op loop with the batch's stable ids", async () => {
     const order: string[] = [];
     const batchIds = new Set<string>();
@@ -204,6 +223,37 @@ describe("runCharacterTransaction", () => {
 
     expect(opSessions).toEqual(["explicit-session-123"]);
     expect(afterSession).toBe("explicit-session-123");
+  });
+
+  it("passes an explicit null sessionId verbatim, bypassing the active-session lookup", async () => {
+    // A real active session so getActiveSessionId would return non-null — the
+    // discriminator that proves null is passed verbatim, not looked up.
+    const campaign = await prisma.campaign.create({
+      data: { name: "Tx Null-Session Campaign", ownerId: OWNER_ID, inviteCode: `tx-null-${characterId}` },
+    });
+    await prisma.character.update({ where: { id: characterId }, data: { campaignId: campaign.id } });
+    const session = await prisma.session.create({
+      data: { campaignId: campaign.id, status: "active", startedAt: new Date() },
+    });
+    await prisma.sessionParticipant.create({ data: { sessionId: session.id, characterId } });
+
+    const opSessions: (string | null)[] = [];
+    await runCharacterTransaction<{ experiencePoints: true }, { add: number }>(
+      characterId,
+      [{ add: 1 }],
+      {
+        select: { experiencePoints: true },
+        notFound: (id) => new NotFoundError(id),
+        sessionId: null,
+        applyOp: async ({ sessionId }) => {
+          opSessions.push(sessionId);
+        },
+      },
+    );
+
+    await prisma.character.update({ where: { id: characterId }, data: { campaignId: null } });
+    await prisma.campaign.deleteMany({ where: { id: campaign.id } });
+    expect(opSessions).toEqual([null]);
   });
 
   it("rolls back the op writes when afterOps throws (afterOps runs in the same tx)", async () => {
