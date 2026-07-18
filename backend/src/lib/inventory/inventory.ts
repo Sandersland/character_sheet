@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import { Prisma, type EquipSlot, type ItemRarity } from "@/generated/prisma/client.js";
 import {
   activatedMaxUses,
@@ -27,8 +25,7 @@ import {
 import { rollDie } from "@/lib/core/dice.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { applyHealInTx } from "@/lib/combat/hitpoints.js";
-import { prisma } from "@/lib/core/prisma.js";
-import { getActiveSessionId } from "@/lib/session/sessions.js";
+import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 
 // 5e: a character can attune to at most 3 magic items (DMG p. 138). Derived
 // (counted from live rows), never persisted.
@@ -1868,55 +1865,58 @@ export async function applyInventoryOperations(
   characterId: string,
   operations: InventoryOperation[]
 ): Promise<UseResult[]> {
-  const batchId = randomUUID();
-  const sessionId = await getActiveSessionId(characterId);
+  // Appliers re-read what they need internally, so the scaffold row is just an
+  // existence check — one extra point-read for item-only ops, buying mid-batch
+  // deletion safety.
   const useResults: UseResult[] = [];
-  // Flat, exhaustive, type-narrowed op dispatch: high cyclomatic (one branch per
-  // op type) but trivially readable (cognitive 3). A dispatch map would trade the
-  // per-case type narrowing for casts and read worse, so this is adjudicated as an
-  // idiomatic switch rather than refactored (#690 opportunistic burn-down).
-  // fallow-ignore-next-line complexity
-  await prisma.$transaction(async (tx) => {
-    for (const op of operations) {
+  await runCharacterTransaction(characterId, operations, {
+    select: { id: true },
+    notFound: (id) => new InvalidInventoryOperationError(`Character not found: ${id}`),
+    // Flat, exhaustive, type-narrowed op dispatch: high cyclomatic (one branch per
+    // op type) but trivially readable (cognitive 1). A dispatch map would trade the
+    // per-case type narrowing for casts and read worse, so this is adjudicated as an
+    // idiomatic switch rather than refactored (#690 opportunistic burn-down).
+    // fallow-ignore-next-line complexity
+    applyOp: async ({ tx, op, characterId: id, batchId, sessionId }) => {
       switch (op.type) {
         case "acquire":
-          await applyAcquire(tx, characterId, op, batchId, sessionId);
+          await applyAcquire(tx, id, op, batchId, sessionId);
           break;
         case "adjustQuantity":
-          await applyAdjustQuantity(tx, characterId, op, batchId, sessionId);
+          await applyAdjustQuantity(tx, id, op, batchId, sessionId);
           break;
         case "use":
-          useResults.push(await applyUse(tx, characterId, op, batchId, sessionId));
+          useResults.push(await applyUse(tx, id, op, batchId, sessionId));
           break;
         case "update":
-          await applyUpdate(tx, characterId, op);
+          await applyUpdate(tx, id, op);
           break;
         case "remove":
-          await applyRemove(tx, characterId, op, batchId, sessionId);
+          await applyRemove(tx, id, op, batchId, sessionId);
           break;
         case "sell":
-          await applySell(tx, characterId, op, batchId, sessionId);
+          await applySell(tx, id, op, batchId, sessionId);
           break;
         case "equip":
-          await applyEquip(tx, characterId, op, batchId, sessionId);
+          await applyEquip(tx, id, op, batchId, sessionId);
           break;
         case "setEquipped":
-          await applySetEquipped(tx, characterId, op, batchId, sessionId);
+          await applySetEquipped(tx, id, op, batchId, sessionId);
           break;
         case "attune":
-          await applyAttune(tx, characterId, op, batchId, sessionId);
+          await applyAttune(tx, id, op, batchId, sessionId);
           break;
         case "unattune":
-          await applyUnattune(tx, characterId, op, batchId, sessionId);
+          await applyUnattune(tx, id, op, batchId, sessionId);
           break;
         case "activate":
-          await applyActivate(tx, characterId, op, batchId, sessionId);
+          await applyActivate(tx, id, op, batchId, sessionId);
           break;
         case "deactivate":
-          await applyDeactivate(tx, characterId, op, batchId, sessionId);
+          await applyDeactivate(tx, id, op, batchId, sessionId);
           break;
       }
-    }
+    },
   });
   return useResults;
 }
