@@ -70,7 +70,7 @@ function MobileSlotRow({
   const tappable = Boolean(onUse) && !used;
   const rowInner = (
     <>
-      <span aria-hidden className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-control ${t.tile}`}>
+      <span aria-hidden="true" className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-control ${t.tile}`}>
         <Icon className="h-5 w-5" />
       </span>
       <span className="min-w-0 flex-1">
@@ -87,7 +87,7 @@ function MobileSlotRow({
       {tappable && (
         <>
           <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-vitality-700">Ready</span>
-          <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-parchment-400" />
+          <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-parchment-400" />
         </>
       )}
     </>
@@ -128,7 +128,7 @@ function DesktopSlotCard({
     <div className={`rounded-card border bg-parchment-50 p-3 ${t.border} ${used ? "opacity-60" : ""}`}>
       <div className="flex items-center gap-3">
         <span
-          aria-hidden
+          aria-hidden="true"
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-control ${t.tile}`}
         >
           <Icon className="h-5 w-5" />

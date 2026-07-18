@@ -117,15 +117,16 @@ export default function CombatLivePanel({
             onOpenLog={isBelowMd ? () => setShowLog(true) : undefined}
           />
           {/* Mobile log peek (#1028) — pinned one-liner above the bottom nav; taps
-              open the full log sheet. Reads the shared logRefresh counter. */}
-          <div className="md:hidden">
+              open the full log sheet. Mount-gated on isBelowMd (not md:hidden) so
+              it doesn't fetch the session on desktop, where the right rail does. */}
+          {isBelowMd && (
             <LogPeek
               characterId={character.id}
               sessionId={session.id}
               refreshKey={live.logRefresh}
               onOpen={() => setShowLog(true)}
             />
-          </div>
+          )}
         </div>
 
         {/* Right rail (desktop only) — the session log, always visible during the
