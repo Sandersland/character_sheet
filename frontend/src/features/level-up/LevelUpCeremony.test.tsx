@@ -50,7 +50,7 @@ describe("LevelUpCeremony", () => {
     const items = screen.getAllByRole("listitem");
     expect(items.map((li) => li.getAttribute("aria-label"))).toEqual([
       "Step 1: Hit Points",
-      "Step 2: Ability Score",
+      "Step 2: Ability Score / Feat",
       "Step 3: Review",
     ]);
     expect(screen.getByText(/fighter · Champion/i)).toBeInTheDocument();
@@ -120,14 +120,17 @@ describe("LevelUpCeremony", () => {
     expect(screen.queryByText("SHEET")).not.toBeInTheDocument();
   });
 
-  it("renders the #1065 blocked notice (no stepper) for a non-primary subclass plan", async () => {
+  it("renders the #1065 blocked notice (no stepper) for a non-primary resource-backed plan", async () => {
     planMock.mockResolvedValue(
-      plan([{ kind: "hitPoints" }, { kind: "subclass" }, { kind: "review" }], { isPrimary: false, subclass: null }),
+      plan([{ kind: "hitPoints" }, { kind: "maneuvers", count: 2 }, { kind: "review" }], {
+        isPrimary: false,
+        subclass: "Battle Master",
+      }),
     );
     renderCeremony();
     const user = userEvent.setup();
 
-    expect(await screen.findByText(/can't be resolved in the ceremony yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/can't be resolved for a non-primary class yet/i)).toBeInTheDocument();
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /back to sheet/i }));
     expect(screen.getByText("SHEET")).toBeInTheDocument();

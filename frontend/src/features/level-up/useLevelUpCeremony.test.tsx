@@ -110,9 +110,12 @@ describe("useLevelUpCeremony", () => {
     expect(result.current.stepIndex).toBe(1);
   });
 
-  it("flags a non-primary plan containing subclass/fightingStyle steps as blocked (#1065)", async () => {
+  it("flags a non-primary plan containing resource-backed steps as blocked (#1065)", async () => {
     planMock.mockResolvedValue(
-      plan([{ kind: "hitPoints" }, { kind: "subclass" }, { kind: "review" }], { isPrimary: false, subclass: null }),
+      plan([{ kind: "hitPoints" }, { kind: "maneuvers", count: 2 }, { kind: "review" }], {
+        isPrimary: false,
+        subclass: "Battle Master",
+      }),
     );
     const { result } = renderHook(() => useLevelUpCeremony(character), { wrapper: makeWrapper() });
 
@@ -120,8 +123,10 @@ describe("useLevelUpCeremony", () => {
     expect(result.current.blocked).toBe(true);
   });
 
-  it("does not block a non-primary plan without those steps", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "review" }], { isPrimary: false }));
+  it("does not block a non-primary subclass/fightingStyle plan (entry-aware since #1065)", async () => {
+    planMock.mockResolvedValue(
+      plan([{ kind: "hitPoints" }, { kind: "subclass" }, { kind: "review" }], { isPrimary: false, subclass: null }),
+    );
     const { result } = renderHook(() => useLevelUpCeremony(character), { wrapper: makeWrapper() });
 
     await waitFor(() => expect(result.current.plan).not.toBeNull());

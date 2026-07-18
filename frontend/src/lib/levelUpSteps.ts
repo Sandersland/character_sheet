@@ -20,7 +20,7 @@ export function stepKey(step: LevelUpStep): string {
 
 const STEP_LABELS: Record<LevelUpStepKind, string> = {
   hitPoints: "Hit Points",
-  advancement: "Ability Score",
+  advancement: "Ability Score / Feat",
   subclass: "Subclass",
   maneuvers: "Maneuvers",
   fightingStyle: "Fighting Style",
@@ -53,16 +53,20 @@ export function railState(steps: LevelUpStep[], currentKey: string): LevelUpStep
   return steps.map((_, i) => (i < current ? "done" : i === current ? "active" : "pending"));
 }
 
-/**
- * #1065: subclass/fightingStyle can't commit for a non-primary target yet, so a
- * plan pairing them blocks the ceremony (the shell shows a notice instead).
- */
+// Mirror of the backend RESOURCE_BACKED set gating applyLevelUpTransaction:
+// these picks derive their caps from the primary entry, so a non-primary plan
+// containing them can't commit yet (#1065). This mirror must never be NARROWER
+// than the backend guard, or users hit a raw 400 instead of the notice.
+const RESOURCE_BACKED_KINDS: ReadonlySet<LevelUpStepKind> = new Set([
+  "maneuvers",
+  "disciplines",
+  "toolProficiency",
+  "subclassChoice",
+]);
+
+/** Whether the shell must show the #1065 notice instead of the stepper. */
 export function ceremonyBlocked(plan: LevelUpPlanResponse | null): boolean {
-  return (
-    plan != null &&
-    !plan.target.isPrimary &&
-    plan.steps.some((s) => s.kind === "subclass" || s.kind === "fightingStyle")
-  );
+  return plan != null && !plan.target.isPrimary && plan.steps.some((s) => RESOURCE_BACKED_KINDS.has(s.kind));
 }
 
 // Draft entries that can satisfy a list step, by kind. subclassChoice narrows

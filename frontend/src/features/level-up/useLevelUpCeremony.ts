@@ -70,6 +70,7 @@ function useLevelUpSubmit(characterId: string, classEntryId: string | null, draf
     setSubmitting(true);
     setSubmitError(null);
     try {
+      // kind:"new" (multiclass-into) targets are deferred to the entry wiring (#892).
       await submitLevelUp(characterId, { target: { kind: "existing", classEntryId }, ...draft });
       onDone();
     } catch (e: unknown) {

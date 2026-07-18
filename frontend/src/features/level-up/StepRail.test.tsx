@@ -17,7 +17,7 @@ describe("StepRail", () => {
     const items = screen.getAllByRole("listitem");
     expect(items.map((li) => li.getAttribute("aria-label"))).toEqual([
       "Step 1: Hit Points",
-      "Step 2: Ability Score",
+      "Step 2: Ability Score / Feat",
       "Step 3: Review",
     ]);
   });
@@ -26,7 +26,7 @@ describe("StepRail", () => {
     render(<StepRail steps={PLAN} currentKey="advancement" />);
     const active = screen.getAllByRole("listitem").filter((li) => li.getAttribute("aria-current") === "step");
     expect(active).toHaveLength(1);
-    expect(active[0]).toHaveAttribute("aria-label", "Step 2: Ability Score");
+    expect(active[0]).toHaveAttribute("aria-label", "Step 2: Ability Score / Feat");
   });
 
   it("shows a check glyph on done steps and the number elsewhere", () => {

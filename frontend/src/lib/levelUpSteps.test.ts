@@ -35,7 +35,7 @@ describe("stepKey", () => {
 describe("stepLabel", () => {
   it("maps kinds to display names, never the raw key", () => {
     expect(stepLabel({ kind: "hitPoints" })).toBe("Hit Points");
-    expect(stepLabel({ kind: "advancement" })).toBe("Ability Score");
+    expect(stepLabel({ kind: "advancement" })).toBe("Ability Score / Feat");
     expect(stepLabel({ kind: "fightingStyle" })).toBe("Fighting Style");
     expect(stepLabel({ kind: "toolProficiency" })).toBe("Tool Proficiency");
     expect(stepLabel({ kind: "newSpells" })).toBe("New Spells");
@@ -75,14 +75,19 @@ describe("ceremonyBlocked", () => {
     return { target: { className: "fighter", subclass: null, newLevel: 3, isPrimary }, steps };
   }
 
-  it("blocks a non-primary plan containing a subclass or fightingStyle step (#1065)", () => {
-    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "subclass" }, { kind: "review" }], false))).toBe(true);
-    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "fightingStyle", count: 1 }], false))).toBe(true);
+  it("blocks a non-primary plan containing a resource-backed step (#1065)", () => {
+    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "maneuvers", count: 2 }, { kind: "review" }], false))).toBe(true);
+    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "disciplines", count: 1 }], false))).toBe(true);
+    expect(ceremonyBlocked(plan([{ kind: "toolProficiency", count: 1 }], false))).toBe(true);
+    expect(
+      ceremonyBlocked(plan([{ kind: "subclassChoice", count: 1, meta: { key: "huntersPrey", label: "Hunter's Prey" } }], false)),
+    ).toBe(true);
   });
 
-  it("does not block primary plans, non-primary plans without those steps, or a missing plan", () => {
-    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "subclass" }, { kind: "review" }], true))).toBe(false);
-    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "review" }], false))).toBe(false);
+  it("does not block subclass/fightingStyle steps (entry-aware since #1065), primary plans, or a missing plan", () => {
+    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "subclass" }, { kind: "review" }], false))).toBe(false);
+    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "fightingStyle", count: 1 }], false))).toBe(false);
+    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "maneuvers", count: 2 }, { kind: "review" }], true))).toBe(false);
     expect(ceremonyBlocked(null)).toBe(false);
   });
 });

@@ -715,6 +715,44 @@ describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () 
     const primary = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID, position: 0 } });
     expect(primary.subclass).toBe("School of Evocation");
   });
+
+  // Pins the RESOURCE_BACKED guard for an ALREADY-subclassed non-primary entry:
+  // Battle Master Fighter 6→7 grants only maneuvers (no subclass step), so this
+  // is the path a subclass-step-only guard would miss (#886 review).
+  it("400: a non-primary Battle Master 6→7 (maneuvers-only plan) is rejected by the resource-backed guard", async () => {
+    const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const CHAR_ID = "lvtx-mc-bm-maneuvers";
+    await prisma.character.create({
+      data: {
+        ...WIZARD_FIXTURE,
+        id: CHAR_ID,
+        name: "LevelUpTx MC BM Maneuvers",
+        experiencePoints: 64000, // level 10 threshold; entries sum 9 → 1 pending
+        hitPoints: { current: 60, max: 60, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 9, die: "d6", spent: 0 },
+        classEntries: {
+          create: [
+            { name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 3 },
+            { name: "fighter", subclass: "Battle Master", classId: fighter.id, position: 1, level: 6 },
+          ],
+        },
+      },
+    });
+    const secondary = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID, position: 1 } });
+    const maneuvers = await prisma.grantedAbility.findMany({ where: { source: "maneuver" }, take: 2, select: { id: true } });
+    expect(maneuvers).toHaveLength(2);
+
+    // Complete, count-valid submission — the rejection must come from the
+    // non-primary guard, not a validation mismatch.
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: secondary.id },
+      hp: { method: "average" },
+      maneuvers: maneuvers.map((m) => ({ type: "learnManeuver", maneuverId: m.id })),
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/not supported for a non-primary class/i);
+  });
 });
 
 // Hunter's Prey (Ranger → Hunter, L3) is the seeded generic subclass choice that
