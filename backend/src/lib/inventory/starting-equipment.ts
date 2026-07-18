@@ -1,12 +1,10 @@
 // Starting equipment — per-class packages (2014 Basic Rules).
 //
-// TODO(revisit): this lives here as an intermediate step while pack-contents
-// have been migrated to the DB (Pack / PackContent tables, seeded in
-// prisma/seed.ts). A future phase may migrate this nested choice-group /
-// open-pick structure to the DB as well, once the schema design is worth
-// the effort. For now the frontend gets this via GET /api/reference
-// (reference.ts attaches each class row's entry) and pack expansion is
-// handled server-side at character creation using the DB-backed packs.
+// This nested choice-group / open-pick structure stays in TS as an intermediate
+// step: pack contents already migrated to the DB (Pack / PackContent tables) but
+// the choice-group schema isn't worth designing yet. The frontend receives it
+// via GET /api/reference (each class row's entry); pack expansion runs
+// server-side at character creation from the DB-backed packs.
 
 export type WeaponClassName = "simple" | "martial";
 export type WeaponRangeName = "melee" | "ranged";

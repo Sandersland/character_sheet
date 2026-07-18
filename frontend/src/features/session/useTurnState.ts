@@ -53,8 +53,6 @@ function nextRowId(): string {
   return `tally-${Date.now().toString(36)}-${rowIdSeq}`;
 }
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 export type TurnPhase = "idle" | "active";
 
 /** State of the Extra-Attack counter while the Attack action is in progress. */
@@ -252,8 +250,6 @@ export type TurnStateView = TurnState &
     twfAvailable: boolean;
   };
 
-// ── Hook ─────────────────────────────────────────────────────────────────────
-
 function initialState(): TurnState {
   return {
     inCombat: false,
@@ -307,9 +303,8 @@ function backfillRows(rows: AttackTallyRow[] | undefined): AttackTallyRow[] {
   return (rows ?? []).map((r) => ({ ...r, id: r.id ?? nextRowId(), source: r.source ?? "action" }));
 }
 
-// ── Pure state transitions ────────────────────────────────────────────────────
-// Module-scope, one per economy mutation. A `return s` no-op means `mutate`
-// pushes nothing onto the undo stack (guards stay history-free).
+// Pure state transitions: module-scope, one per economy mutation. A `return s`
+// no-op means `mutate` pushes nothing onto the undo stack (guards stay history-free).
 
 const consumeActionState = (s: TurnState): TurnState =>
   s.actionsRemaining <= 0 ? s : { ...s, actionsRemaining: s.actionsRemaining - 1, attack: null };
@@ -535,8 +530,7 @@ function endTurnState(s: TurnState): TurnState {
   };
 }
 
-// ── Remaining transitions extracted for the reducer (#967) ───────────────────
-
+// Remaining transitions extracted for the reducer (#967).
 function startCombatState(): TurnState {
   return {
     inCombat: true,
@@ -594,8 +588,7 @@ function commitBonusActionSpellState(s: TurnState, spellLevel: number): TurnStat
   };
 }
 
-// ── Reducer: actions-as-data over the pure transitions above (#967) ───────────
-//
+// Reducer: actions-as-data over the pure transitions above (#967).
 // Collapses the former ~24 delegating useCallbacks into one stable dispatch.
 // Every real transition still lives in a module-level pure fn; the reducer only
 // routes an action to its handler and — for the CONSUMING actions — pushes the

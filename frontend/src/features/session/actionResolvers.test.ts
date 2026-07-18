@@ -3,7 +3,7 @@
  * corresponding key in the backend ACTION_EFFECT_FN dispatch table.
  *
  * If this test fails after adding a new action, add the matching entry in
- * backend/src/lib/actions.ts ACTION_EFFECT_FN (and vice versa).
+ * the backend ACTION_EFFECT_FN table (and vice versa).
  */
 
 import { describe, it, expect } from "vitest";

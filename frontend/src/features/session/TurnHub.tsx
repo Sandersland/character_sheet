@@ -410,7 +410,6 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
     onLogChanged,
   });
 
-  // ── Idle state ─────────────────────────────────────────────────────────────
   if (phase === "idle") {
     return (
       <TurnHubIdle
@@ -422,8 +421,6 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
       />
     );
   }
-
-  // ── Active state ────────────────────────────────────────────────────────────
 
   // Shared surfaces — identical on both breakpoints; only the slot rows and the
   // wrapper/header differ (TurnSlotCard self-adapts to a full-bleed mobile row).

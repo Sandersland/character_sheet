@@ -1,6 +1,6 @@
 /**
- * Paper-doll placement rules (#566) — the frontend mirror of backend's
- * lib/inventory/inventory.ts allowedSlotsForItem + slot taxonomy. Pure logic (no JSX):
+ * Paper-doll placement rules (#566) — the frontend mirror of the backend's
+ * allowedSlotsForItem + slot taxonomy. Pure logic (no JSX):
  * which slots an item may occupy, how the twelve rendered cells group into the
  * desktop rails / mobile tiles, and which bag items fit a given slot. The server
  * is the source of truth for placement validation; this only drives the UI.
@@ -78,7 +78,7 @@ export function allowedSlotsForItem(item: InventoryItem): EquipSlot[] {
 }
 
 // Any item the paper doll can place — i.e. it has at least one legal slot.
-// (Named to avoid colliding with lib/inventory/items.ts isEquippable, which is the
+// (Named to avoid colliding with isEquippable, which is the
 // category-level rule; this one is slot-aware and takes the full item.)
 export function hasEquipSlots(item: InventoryItem): boolean {
   return allowedSlotsForItem(item).length > 0;

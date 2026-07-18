@@ -20,9 +20,7 @@ import { formatRollBreakdown } from "@/lib/dice";
 import { categoryTone } from "@/lib/events";
 import type { CharacterEvent } from "@/types/character";
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-// Category → badge tone resolves through the shared lookup in lib/events so new
+// Category → badge tone resolves through the shared categoryTone lookup so new
 // event categories stay covered. The session log keeps its own terser TYPE_LABEL
 // map below (e.g. "combat" vs the activity log's "Combat started").
 //
@@ -135,8 +133,6 @@ function rollBreakdownSummary(event: CharacterEvent): string | null {
   const damagePart = data.damageType ? ` ${data.damageType}` : "";
   return `${data.source}: ${data.total}${damagePart} (${breakdown})`;
 }
-
-// ── Component ─────────────────────────────────────────────────────────────────
 
 interface SessionLogProps {
   characterId: string;

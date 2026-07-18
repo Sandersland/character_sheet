@@ -1,9 +1,9 @@
 /**
  * Shared, React-free cannon-es physics for the real-physics dice roller
- * (`components/PhysicsDiceRoller.tsx`). Builds the world/tray/bodies, throws
+ * (PhysicsDiceRoller). Builds the world/tray/bodies, throws
  * dice with randomized velocity, steps the simulation, and reads the
  * settled face value off each die — physics *is* the source of randomness
- * here, unlike `lib/dice.ts`'s `rollDie`. Kept separate from the React
+ * here, unlike `rollDie`. Kept separate from the React
  * component so the same throw/step/read logic can run either across many
  * animation frames (the normal tumble) or synchronously in a tight loop
  * (the reduced-motion/skip path) without duplicating it.
@@ -71,7 +71,7 @@ const TRAY_WALL_HEIGHT = 4;
 const TRAY_WALL_THICKNESS = 0.5;
 // How far a die's start x can jitter off its lane center before being
 // thrown — small, for the same neighbor-clipping reason DiceRoller's
-// scripted skitter stays z-only (see lib/dieFaces.ts's DIE_GAP comment).
+// scripted skitter stays z-only (see the DIE_GAP comment).
 const START_X_JITTER = 0.4;
 // Room beyond a die's outermost resting lane for its own half-width, the
 // start jitter above, and some margin to actually scatter/bounce around in

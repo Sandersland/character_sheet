@@ -104,7 +104,6 @@ export default function SpellPickerRow({ spell, view, row, onPatch, onCast, onAt
       <div className="flex flex-wrap items-start justify-between gap-2">
         <SpellRowHeader spell={spell} view={view} />
 
-        {/* ── Right: cost badge + slot picker + target toggle + cast buttons ── */}
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <Badge tone={view.isCantrip ? "neutral" : "gold"}>{castCostBadge(spell)}</Badge>
           {!view.isCantrip && (

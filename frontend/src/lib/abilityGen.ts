@@ -4,11 +4,11 @@ import { rollSpec } from "./dice";
  * Pure ability-score generation helpers for the character-creation form.
  * All four 5e generation methods funnel into the same end state: six raw
  * scores the player assigns to abilities, validated client-side before
- * POSTing — the backend (src/lib/srd.ts) only ever sees the final
- * `abilityScores` object, not which method produced it.
+ * POSTing — the backend only ever sees the final `abilityScores` object,
+ * not which method produced it.
  *
- * Rolling itself delegates to the generic engine in `lib/dice.ts` (also
- * used by the `<DiceRoller>` component), so there's a single place that
+ * Rolling itself delegates to the generic engine `rollSpec` (also
+ * used by the DiceRoller component), so there's a single place that
  * reads `Math.random`.
  */
 

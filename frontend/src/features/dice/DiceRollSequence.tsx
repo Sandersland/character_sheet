@@ -85,7 +85,7 @@ export default function DiceRollSequence({
       lastTriggerRef.current = previousTrigger;
       if (pauseTimerRef.current !== undefined) clearTimeout(pauseTimerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- resets sequence state only when triggerKey changes; setters are stable
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- StrictMode-safe sequence reset keyed on triggerKey; stepIndex is read only to guard the reset, so adding it would re-run this (and its rewinding cleanup) every step and stall the sequence at step 0; useEffectEvent (the sanctioned extraction) isn't in React 18.3.1 (#1056)
   }, [triggerKey]);
 
   // Advancing the sequence is a side effect of a step settling (notify the
