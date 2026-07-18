@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { fetchActivity, fetchSessions, revertBatch } from "@/api/client";
 import {
@@ -338,9 +338,48 @@ function ActivityStatus({
   );
 }
 
-export default function ActivityModal({ characterId, onClose, onUpdate, entityId }: ActivityModalProps) {
+interface ActivityFilterState {
+  characterId: string;
+  categoryFilter: string;
+  typeFilter: string | null;
+  sessionFilter: string;
+  entityId?: string;
+}
+
+// Owns the activity-timeline load (mount + filter/character change) and exposes `reload` for the undo handler; the abort teardown drops a superseded load so a stale response can't overwrite a fresher one, and the extraction keeps the modal under the complexity gate with no exhaustive-deps suppression (#1056).
+function useActivityEvents(filters: ActivityFilterState) {
+  const { characterId, categoryFilter, typeFilter, sessionFilter, entityId } = filters;
   const [events, setEvents] = useState<CharacterEvent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(
+    (signal?: AbortSignal) => {
+      setEvents(null);
+      setError(null);
+      fetchActivity(
+        characterId,
+        buildActivityQuery({ categoryFilter, typeFilter, sessionFilter, entityId }),
+        signal,
+      )
+        .then(setEvents)
+        .catch((err) => {
+          if (isAbortError(err, signal)) return; // superseded load — the newer one wins
+          setError("Couldn't load the activity log — try again.");
+        });
+    },
+    [characterId, categoryFilter, typeFilter, sessionFilter, entityId],
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    reload(controller.signal);
+    return () => controller.abort();
+  }, [reload]);
+
+  return { events, error, reload };
+}
+
+export default function ActivityModal({ characterId, onClose, onUpdate, entityId }: ActivityModalProps) {
   const [expandedFields, setExpandedFields] = useState<Set<string>>(new Set());
   // Bulk-sale summary collapse (issue #104). Keyed by batch.key, kept INDEPENDENT
   // of expandedFields (keyed by event.id) so the summary line and the per-row
@@ -348,7 +387,6 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
   const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set());
   const [undoing, setUndoing] = useState(false);
   const [undoError, setUndoError] = useState<string | null>(null);
-  const showSpinner = useDelayedFlag(events === null && !error);
 
   // Filter state. "all" category disables the category predicate; an empty
   // typeFilter/sessionFilter disables those. Type chips are inventory-only.
@@ -357,32 +395,14 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
   const [sessionFilter, setSessionFilter] = useState<string>("");
   const [sessions, setSessions] = useState<Session[]>([]);
 
-  // Load events (with field-level diffs) on mount, when a filter changes, and
-  // after an undo. Only defined filters are forwarded so an unfiltered load
-  // sends exactly { includeFields: true }. An optional signal lets a superseded
-  // filter-change load be aborted so a slow stale response can't overwrite a
-  // fresher one.
-  function load(signal?: AbortSignal) {
-    setEvents(null);
-    setError(null);
-    fetchActivity(
-      characterId,
-      buildActivityQuery({ categoryFilter, typeFilter, sessionFilter, entityId }),
-      signal,
-    )
-      .then(setEvents)
-      .catch((err) => {
-        if (isAbortError(err, signal)) return; // superseded load — the newer one wins
-        setError("Couldn't load the activity log — try again.");
-      });
-  }
-
-  useEffect(() => {
-    const controller = new AbortController();
-    load(controller.signal);
-    return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reloads on any filter/character change; load() reads current closures, intentionally excluded
-  }, [characterId, categoryFilter, typeFilter, sessionFilter, entityId]);
+  const { events, error, reload } = useActivityEvents({
+    characterId,
+    categoryFilter,
+    typeFilter,
+    sessionFilter,
+    entityId,
+  });
+  const showSpinner = useDelayedFlag(events === null && !error);
 
   // Populate the session picker once per character.
   useEffect(() => {
@@ -416,7 +436,7 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
     try {
       const updated = await revertBatch(characterId, batchId);
       onUpdate(updated);
-      load(); // Refresh the timeline so reverted events are dimmed.
+      reload(); // Refresh the timeline so reverted events are dimmed.
     } catch (err) {
       setUndoError(err instanceof Error ? err.message : "Undo failed — try again.");
     } finally {

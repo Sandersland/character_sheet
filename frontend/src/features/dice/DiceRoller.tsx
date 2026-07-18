@@ -179,7 +179,7 @@ function ScriptedDie({
     } else {
       phaseRef.current = "spin";
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- rollId is the trigger; rolling/reducedMotion/targetQuaternion read fresh on each fire
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- scripted-tumble seed keyed on the rollId trigger; rolling/reducedMotion/targetQuaternion are read fresh on each fire, so completing the deps would restart the animation mid-roll; useEffectEvent (the sanctioned extraction) isn't in React 18.3.1 (#1056)
   }, [rollId]);
 
   useFrame((_, delta) => {

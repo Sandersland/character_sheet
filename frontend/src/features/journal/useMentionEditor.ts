@@ -306,15 +306,17 @@ function useMentionHandlers(
   // Cancel the deferred blur-close on unmount so it never fires post-teardown.
   useEffect(() => () => void (blurTimer.current && clearTimeout(blurTimer.current)), []);
 
+  // Destructure the stable setters so callbacks depend on them, not the whole `s` model (which changes every render) — preserves callback identity without a suppression.
+  const { setTrigger, setActiveIndex } = s;
+
   const syncTrigger = useCallback(() => {
     const el = innerRef.current;
     if (!el) return;
     const before = serializeMentionDomBeforeCaret(el);
     const parsed = parseTrigger(before);
-    s.setTrigger(parsed ? { ...parsed, caretOffset: before.length } : null);
-    s.setActiveIndex(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- captures only stable refs + setters; adding `s` would recreate this each render
-  }, []);
+    setTrigger(parsed ? { ...parsed, caretOffset: before.length } : null);
+    setActiveIndex(0);
+  }, [innerRef, setTrigger, setActiveIndex]);
 
   const handleInput = useCallback(() => {
     const el = innerRef.current;
@@ -377,9 +379,8 @@ function useMentionHandlers(
 
   const handleBlur = useCallback(() => {
     if (blurTimer.current) clearTimeout(blurTimer.current);
-    blurTimer.current = setTimeout(() => s.setTrigger(null), 120);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- captures only stable refs + setters; adding `s` would recreate this each render
-  }, []);
+    blurTimer.current = setTimeout(() => setTrigger(null), 120);
+  }, [setTrigger]);
 
   return {
     insertToken,
@@ -399,11 +400,11 @@ export function useMentionEditor({ value, onChange, campaignId, onKeyDown }: Use
   const lastNamesKey = useRef<string | null>(null);
   const handlers = useMentionHandlers(innerRef, s, onChange, campaignId, onKeyDown);
 
+  // `s.resolve` is redundant with `s.namesKey` (both track `byId`) but listing it keeps exhaustive-deps clean without a suppression; syncEditorDom's namesKey guard no-ops the extra fire.
   useEffect(() => {
     const el = innerRef.current;
     if (el) syncEditorDom(el, value, s.namesKey, lastNamesKey, s.resolve);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- refs are stable; s.resolve changes iff s.namesKey does (both track byId), so namesKey covers it
-  }, [value, s.namesKey]);
+  }, [value, s.namesKey, s.resolve]);
 
   return {
     innerRef,
