@@ -32,9 +32,10 @@ const campaignInclude = {
   },
 };
 
-// ── POST /api/campaigns ──────────────────────────────────────────────────────
-// Create a campaign + the creator's OWNER membership in one transaction.
-
+/**
+ * POST /api/campaigns
+ * Create a campaign + the creator's OWNER membership in one transaction.
+ */
 campaignsRouter.post("/campaigns", async (req, res) => {
   const parseResult = createCampaignSchema.safeParse(req.body);
   if (!parseResult.success) {
@@ -58,9 +59,10 @@ campaignsRouter.post("/campaigns", async (req, res) => {
   res.status(201).json(campaign);
 });
 
-// ── GET /api/campaigns ───────────────────────────────────────────────────────
-// Every campaign the caller is a member of, with their own role surfaced.
-
+/**
+ * GET /api/campaigns
+ * Every campaign the caller is a member of, with their own role surfaced.
+ */
 campaignsRouter.get("/campaigns", async (req, res) => {
   const userId = req.user!.id;
   const campaigns = await prisma.campaign.findMany({
@@ -78,9 +80,10 @@ campaignsRouter.get("/campaigns", async (req, res) => {
   );
 });
 
-// ── GET /api/campaigns/:id ───────────────────────────────────────────────────
-// Members + each member's characters (id + name).
-
+/**
+ * GET /api/campaigns/:id
+ * Members + each member's characters (id + name).
+ */
 campaignsRouter.get("/campaigns/:id", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
 
@@ -99,9 +102,10 @@ campaignsRouter.get("/campaigns/:id", async (req, res) => {
   res.json({ ...campaign, role });
 });
 
-// ── POST /api/campaigns/join ─────────────────────────────────────────────────
-// Resolve a campaign by invite code and join as PLAYER (idempotent on @@unique).
-
+/**
+ * POST /api/campaigns/join
+ * Resolve a campaign by invite code and join as PLAYER (idempotent on @@unique).
+ */
 campaignsRouter.post("/campaigns/join", async (req, res) => {
   const parseResult = joinCampaignSchema.safeParse(req.body);
   if (!parseResult.success) {
@@ -134,10 +138,11 @@ campaignsRouter.post("/campaigns/join", async (req, res) => {
   res.json(joined);
 });
 
-// ── POST /api/campaigns/:id/characters ───────────────────────────────────────
-// Attach one of the caller's characters to the campaign. Returns the full
-// serialized character so the frontend can swap state in one assignment.
-
+/**
+ * POST /api/campaigns/:id/characters
+ * Attach one of the caller's characters to the campaign. Returns the full
+ * serialized character so the frontend can swap state in one assignment.
+ */
 campaignsRouter.post("/campaigns/:id/characters", async (req, res) => {
   const parseResult = attachCharacterSchema.safeParse(req.body);
   if (!parseResult.success) {

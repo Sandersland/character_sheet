@@ -1,4 +1,3 @@
-// ---- Operation types ----
 // These op shapes intentionally mirror frontend/src/types/character.ts (the two
 // workspaces share no types); the clone is inherited, not new.
 

@@ -37,10 +37,10 @@ export function buildResourcesView(
     proficiencyBonus,
   );
 
-  // ── Fighting Style clamp-on-read ──────────────────────────────────────────
-  // The chosen style key is persisted in resources.fightingStyle. Clamp it to
-  // null when the character is no longer entitled (e.g. class change / level
-  // drop) — defense-in-depth mirroring reconcileFightingStyle on the write side.
+  // Fighting Style clamp-on-read: the chosen style key is persisted in
+  // resources.fightingStyle. Clamp it to null when the character is no longer
+  // entitled (e.g. class change / level drop) — defense-in-depth mirroring
+  // reconcileFightingStyle on the write side.
   const fightingStyleChoices = fightingStyleChoiceCount(primaryClass?.name ?? "", level);
   const storedFightingStyle = normalizeResourcesMutable(row.resources).fightingStyle;
   const fightingStyle: FightingStyleKey | null =

@@ -34,8 +34,6 @@ import type { ActiveBuff } from "@/lib/combat/active-effects.js";
 import type { AbilityCost } from "@/lib/spellcasting/ability-cost.js";
 import type { EffectSpec } from "@/lib/combat/effects.js";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "special";
 
 /** Rage's melee-damage bonus by barbarian level (+2 / +3 / +4). */
@@ -76,35 +74,32 @@ interface ResourcePool {
   remaining: number;
 }
 
-// ── DERIVED_ACTIONS ────────────────────────────────────────────────────────────
 // Mirrors prisma/seed.ts ACTIONS array. Keep in sync when adding new actions.
-
 const DERIVED_ACTIONS: DerivedActionRecord[] = [
-  // ── Universal actions ──────────────────────────────────────────────────────
-  // These are intentionally NOT included in `availableActions` on the character
-  // because TurnHub already renders them from the client-side UNIVERSAL_ACTIONS
-  // list. Including them here would duplicate them.
-  // Only class-specific (non-universal) actions go in availableActions.
+  // Universal actions are intentionally NOT included in `availableActions` on the
+  // character because TurnHub already renders them from the client-side
+  // UNIVERSAL_ACTIONS list — including them here would duplicate them. Only
+  // class-specific (non-universal) actions go in availableActions.
 
-  // ── Barbarian ─────────────────────────────────────────────────────────────
+  // Barbarian
   { key: "rage", name: "Rage", cost: "bonusAction", grantClass: "barbarian", grantLevel: 1, resourceKey: "rage", resourceAmount: 1 },
   { key: "endRage", name: "End Rage", cost: "bonusAction", grantClass: "barbarian", grantLevel: 1 },
   { key: "recklessAttack", name: "Reckless Attack", cost: "free", grantClass: "barbarian", grantLevel: 2 },
 
-  // ── Bard ──────────────────────────────────────────────────────────────────
+  // Bard
   { key: "bardicInspiration", name: "Bardic Inspiration", cost: "bonusAction", grantClass: "bard", grantLevel: 1, resourceKey: "bardicInspiration", resourceAmount: 1 },
 
-  // ── Cleric ────────────────────────────────────────────────────────────────
+  // Cleric
   { key: "channelDivinityCleric", name: "Channel Divinity", cost: "action", grantClass: "cleric", grantLevel: 2, resourceKey: "channelDivinity", resourceAmount: 1 },
 
-  // ── Druid ─────────────────────────────────────────────────────────────────
+  // Druid
   { key: "wildShape", name: "Wild Shape", cost: "action", grantClass: "druid", grantLevel: 2, resourceKey: "wildShape", resourceAmount: 1 },
 
-  // ── Fighter ───────────────────────────────────────────────────────────────
+  // Fighter
   { key: "secondWind", name: "Second Wind", cost: "bonusAction", grantClass: "fighter", grantLevel: 1, resourceKey: "secondWind", resourceAmount: 1 },
   { key: "actionSurge", name: "Action Surge", cost: "special", grantClass: "fighter", grantLevel: 2, resourceKey: "actionSurge", resourceAmount: 1 },
 
-  // ── Monk ──────────────────────────────────────────────────────────────────
+  // Monk
   { key: "flurryOfBlows", name: "Flurry of Blows", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "ki", resourceAmount: 2 },
   { key: "patientDefense", name: "Patient Defense", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "ki", resourceAmount: 1 },
   { key: "stepOfTheWind", name: "Step of the Wind", cost: "bonusAction", grantClass: "monk", grantLevel: 2, resourceKey: "ki", resourceAmount: 1 },
@@ -113,19 +108,17 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   { key: "shadowStep", name: "Shadow Step", cost: "bonusAction", grantClass: "monk", grantSubclass: "Shadow", grantLevel: 6, reminder: "Teleport up to 60 ft between areas of dim light or darkness; advantage on your first melee attack before the end of this turn." },
   { key: "opportunist", name: "Opportunist", cost: "reaction", grantClass: "monk", grantSubclass: "Shadow", grantLevel: 17, reminder: "When a creature within 5 ft of you is hit by another creature's attack, make a melee attack against it as your reaction." },
 
-  // ── Paladin ───────────────────────────────────────────────────────────────
+  // Paladin
   { key: "divineSense", name: "Divine Sense", cost: "action", grantClass: "paladin", grantLevel: 1, resourceKey: "divineSense", resourceAmount: 1 },
   { key: "layOnHands", name: "Lay on Hands", cost: "action", grantClass: "paladin", grantLevel: 1, resourceKey: "layOnHands", resourceAmount: 5 },
   { key: "channelDivinityPaladin", name: "Channel Divinity", cost: "action", grantClass: "paladin", grantLevel: 3, resourceKey: "channelDivinity", resourceAmount: 1 },
 
-  // ── Rogue ─────────────────────────────────────────────────────────────────
+  // Rogue
   { key: "cunningAction", name: "Cunning Action", cost: "bonusAction", grantClass: "rogue", grantLevel: 2 },
 
-  // ── Sorcerer ─────────────────────────────────────────────────────────────
+  // Sorcerer
   { key: "metamagic", name: "Metamagic", cost: "free", grantClass: "sorcerer", grantLevel: 3, resourceKey: "sorceryPoints", resourceAmount: 1 },
 ];
-
-// ── deriveActions ─────────────────────────────────────────────────────────────
 
 /**
  * Filter DERIVED_ACTIONS for a character's class/subclass/level and annotate
@@ -190,7 +183,6 @@ export function deriveActions(
     });
 }
 
-// ── ACTION_EFFECT_FN ──────────────────────────────────────────────────────────
 // Keyed by action `key`. Each function receives an execution context and returns
 // an array of existing op objects that the Phase-C orchestrator dispatches to
 // the appropriate domain handlers within a single Prisma transaction.
@@ -220,7 +212,7 @@ type ActionOp = SpendResourceOp | AdjustQuantityOp | HealOp | ApplyBuffOp | Clea
 type EffectFn = (ctx: ActionContext) => ActionOp[];
 
 export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
-  // ── Generic no-op actions (ephemeral only — no server effect needed) ───────
+  // Generic no-op actions (ephemeral only — no server effect needed)
   attack: () => [],
   castSpell: () => [],
   dodge: () => [],
@@ -234,7 +226,7 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   opportunityAttack: () => [],
   castSpellReaction: () => [],
 
-  // ── Use Object (drink a healing potion, etc.) ─────────────────────────────
+  // Use Object (drink a healing potion, etc.)
   useObject: (ctx) => {
     const ops: ActionOp[] = [];
     if (ctx.inventoryItemId) {
@@ -246,7 +238,7 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
     return ops;
   },
 
-  // ── Barbarian ─────────────────────────────────────────────────────────────
+  // Barbarian
   // Rage applies a durable while-active meleeDamage buff (auto-ends via the
   // session turn-hook / long rest / 0 HP) and spends a rage use.
   rage: (ctx) => [
@@ -271,27 +263,27 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   endRage: () => [{ type: "clearBuff", key: "rage", reason: "Rage ended" }],
   recklessAttack: () => [], // ephemeral — advantage/disadvantage is tracked by the table
 
-  // ── Bard ──────────────────────────────────────────────────────────────────
+  // Bard
   bardicInspiration: () => [{ type: "spendResource", key: "bardicInspiration" }],
 
-  // ── Cleric ────────────────────────────────────────────────────────────────
+  // Cleric
   channelDivinityCleric: () => [{ type: "spendResource", key: "channelDivinity" }],
 
-  // ── Druid ─────────────────────────────────────────────────────────────────
+  // Druid
   wildShape: () => [{ type: "spendResource", key: "wildShape" }],
 
-  // ── Fighter ───────────────────────────────────────────────────────────────
+  // Fighter
   // secondWind is a cast-core action — see ACTION_CAST_FN below.
   // actionSurge stays a pure counter: the extra-action grant is client-side.
   actionSurge: () => [{ type: "spendResource", key: "actionSurge" }],
 
-  // ── Monk ──────────────────────────────────────────────────────────────────
+  // Monk
   flurryOfBlows: () => [{ type: "spendResource", key: "ki", amount: 2 }],
   patientDefense: () => [{ type: "spendResource", key: "ki" }],
   stepOfTheWind: () => [{ type: "spendResource", key: "ki" }],
   stunningStrike: () => [{ type: "spendResource", key: "ki" }],
 
-  // ── Paladin ───────────────────────────────────────────────────────────────
+  // Paladin
   divineSense: () => [{ type: "spendResource", key: "divineSense" }],
   layOnHands: (ctx) => {
     const amount = ctx.roll ?? 0;
@@ -303,17 +295,16 @@ export const ACTION_EFFECT_FN: Record<string, EffectFn> = {
   },
   channelDivinityPaladin: () => [{ type: "spendResource", key: "channelDivinity" }],
 
-  // ── Rogue ─────────────────────────────────────────────────────────────────
+  // Rogue
   cunningAction: () => [], // bonus action consumed ephemerally; no server effect
 
-  // ── Sorcerer ─────────────────────────────────────────────────────────────
+  // Sorcerer
   metamagic: (ctx) => {
     const amount = ctx.roll ?? 1;
     return [{ type: "spendResource", key: "sorceryPoints", amount }];
   },
 };
 
-// ── ACTION_CAST_FN ────────────────────────────────────────────────────────────
 // Cast-core actions: the orchestrator routes these through castAbilityInTx (pay
 // pool cost → self-apply heal), not the op-list dispatch. The 5e rule lives here
 // (pool key + base spend + the self-heal effect); the die value is the client roll.

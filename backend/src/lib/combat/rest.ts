@@ -134,7 +134,6 @@ async function rechargeItemChargePoolsOnRest(
   return { recharged, before, after };
 }
 
-// ---- Rest phase helpers ----
 // applyShortRestOp / applyLongRestOp share the same anatomy: HP/hit-dice math,
 // then a series of independent restore phases (class resource pools, spell
 // slots, item resets), then eventData + summary assembly, then one

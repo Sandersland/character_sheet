@@ -28,7 +28,6 @@ import {
   type ConcentrationCheckResult,
 } from "./concentration.js";
 
-// ---- Per-op phase helpers ----
 // The applyHitPointOperations loop runs each op through five ordered phases:
 // context build → dispatch → snapshot assembly → main-event emit → follow-on
 // events. Each phase is a named helper below so the loop reads linearly; the
@@ -269,8 +268,6 @@ async function applyHpOpFollowOns(
 
   return null;
 }
-
-// ---- Transaction handler ----
 
 /**
  * Applies a batch of HP operations atomically in one Prisma transaction.

@@ -78,7 +78,7 @@ type ActivityEventRow = CharacterEvent & {
 
 type RevertResult = { ok: true } | { ok: false; status: 404 | 409; error: string };
 
-// ── Revert context + handler registry ─────────────────────────────────────────
+// Revert context + handler registry.
 // Mirrors the LEVEL_GATED_RECONCILERS pattern in level-reconciliation.ts: each
 // category's before-snapshot restore lives in a named handler, and reverseEvent
 // dispatches through REVERT_HANDLERS instead of an if/else chain.

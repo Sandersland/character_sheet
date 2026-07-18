@@ -2,7 +2,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 
 export class InvalidHitPointOperationError extends Error {}
 
-// ---- Canonical JSON shapes (stored in hitPoints / hitDice columns) ----
+// Canonical JSON shapes (stored in hitPoints / hitDice columns).
 
 export interface HitPoints {
   current: number;
@@ -17,7 +17,6 @@ export interface HitDice {
   spent: number;
 }
 
-// ---- Normalizers ----
 // These are applied in serializeCharacter (lib/character/character-serialize.ts) so every
 // GET response carries the new fields even for rows that predate the
 // `deathSaves` / `spent` additions — no data migration needed.
@@ -45,7 +44,7 @@ export function normalizeHitDice(json: Prisma.JsonValue): HitDice {
   };
 }
 
-// ---- Pure helpers (no DB, fully unit-testable) ----
+// Pure helpers (no DB, fully unit-testable).
 
 /**
  * Fixed average HP gain per level-up for a given hit die face count.

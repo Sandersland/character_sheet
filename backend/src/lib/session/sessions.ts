@@ -36,8 +36,6 @@ type SessionWithParticipants = Prisma.SessionGetPayload<{
   include: typeof sessionWithParticipants;
 }>;
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 /**
  * Returns the id of the campaign's currently-active session for a character, or
  * null if the character is in no campaign / no session is active. Signature is
@@ -201,8 +199,6 @@ async function assertActiveParticipant(
   }
 }
 
-// ── Lifecycle ─────────────────────────────────────────────────────────────────
-
 /**
  * Starts a new shared session for a campaign with `characterId` as the first
  * participant. Rejects if a session is already active for the campaign.
@@ -328,8 +324,6 @@ export async function endSession(sessionId: string) {
   });
   return { ...updated, journalEntries };
 }
-
-// ── Combat event logging ───────────────────────────────────────────────────────
 
 type CombatEventType = "combatStarted" | "combatEnded" | "combatRoundAdvanced";
 
