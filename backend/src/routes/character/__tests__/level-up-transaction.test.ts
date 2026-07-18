@@ -245,11 +245,8 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
   });
 });
 
-// ════════════════════════════════════════════════════════════════════════════
-// Atomicity: a mid-apply seam failure rolls back the ENTIRE ceremony (issue #885
-// core AC). HP applies first in-tx, so a later spell failure must undo it too.
-// ════════════════════════════════════════════════════════════════════════════
-
+// HP applies first in-tx, so a failure in the last (spell) op proves the whole
+// ceremony rolls back — the core #885 acceptance criterion.
 describe("POST …/level-up/transactions — atomicity (mid-apply failure rolls back everything)", () => {
   const CHAR_ID = "lvtx-atomicity-wizard";
 
@@ -309,11 +306,8 @@ describe("POST …/level-up/transactions — atomicity (mid-apply failure rolls 
   });
 });
 
-// ════════════════════════════════════════════════════════════════════════════
-// Single undo: the whole ceremony is grouped under one batchId, so ONE
-// revertBatch reverses everything (issue #885 core AC).
-// ════════════════════════════════════════════════════════════════════════════
-
+// The ceremony shares one batchId, so a single revertBatch must reverse every
+// domain it touched — the other core #885 acceptance criterion.
 describe("POST …/level-up/transactions — whole-ceremony single undo (revertBatch)", () => {
   const CHAR_ID = "lvtx-undo-battlemaster";
 
@@ -375,11 +369,6 @@ describe("POST …/level-up/transactions — whole-ceremony single undo (revertB
     expect(persisted.subclass ?? null).toBeNull();
   });
 });
-
-// ════════════════════════════════════════════════════════════════════════════
-// Rejection matrix: one `it` per case, asserting status AND a discriminating
-// message fragment. Fixtures are built on demand by small factories.
-// ════════════════════════════════════════════════════════════════════════════
 
 describe("POST …/level-up/transactions — rejection matrix", () => {
   const fighterClass = () => prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
@@ -582,12 +571,8 @@ describe("POST …/level-up/transactions — rejection matrix", () => {
   });
 });
 
-// ════════════════════════════════════════════════════════════════════════════
-// Subclass-choice validator messages (review minors): an unknown choiceKey is
-// excess, and a KNOWN generic subclass choice (Ranger → Hunter, Hunter's Prey at
-// L3) enforces its count.
-// ════════════════════════════════════════════════════════════════════════════
-
+// Hunter's Prey (Ranger → Hunter, L3) is the seeded generic subclass choice that
+// makes the known-key count check reachable without fixture gymnastics.
 describe("POST …/level-up/transactions — subclassChoice validator messages", () => {
   it("rejects a subclassChoices entry with a bogus choiceKey on a ceremony with no such step", async () => {
     const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
