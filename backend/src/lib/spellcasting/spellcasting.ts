@@ -39,7 +39,7 @@ import { deriveSpellcasting, derivePreparedSpellLimit } from "@/lib/srd/srd.js";
 
 // ── Error class ───────────────────────────────────────────────────────────────
 // Defined in ability-cost.ts (one-directional dep graph); re-exported so
-// existing importers (routes/spellcasting.ts) keep resolving it here unchanged.
+// existing importers (spellcastingRouter) keep resolving it here unchanged.
 export { InvalidSpellcastingOperationError };
 
 // Persisted spell state shape + normalizer live in the leaf module spell-state.ts

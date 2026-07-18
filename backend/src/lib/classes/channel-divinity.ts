@@ -1,6 +1,6 @@
 /**
  * Channel Divinity cast handler (Cleric + Paladin, #419) — the CD counterpart to
- * lib/shadow-arts.ts. Each CD option is a GrantedAbility row with source
+ * applyShadowArtsOperations. Each CD option is a GrantedAbility row with source
  * "channelDivinity"; using one spends 1 Channel Divinity charge via the shared
  * payAbilityCostInTx pool path and routes through castAbilityInTx.
  *

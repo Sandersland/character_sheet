@@ -83,7 +83,7 @@ const DERIVED_ACTIONS: DerivedActionRecord[] = [
   // ── Universal actions ──────────────────────────────────────────────────────
   // These are intentionally NOT included in `availableActions` on the character
   // because TurnHub already renders them from the client-side UNIVERSAL_ACTIONS
-  // list (lib/turnRules.ts). Including them here would duplicate them.
+  // list. Including them here would duplicate them.
   // Only class-specific (non-universal) actions go in availableActions.
 
   // ── Barbarian ─────────────────────────────────────────────────────────────

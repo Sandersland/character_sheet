@@ -1,8 +1,8 @@
 /**
  * Activity-log revert (LIFO undo) integration tests.
  *
- * Covers the POST /api/characters/:id/events/:batchId/revert endpoint in
- * routes/activity.ts — the unified audit log's "undo last action" path. This
+ * Covers the POST /api/characters/:id/events/:batchId/revert endpoint —
+ * the unified audit log's "undo last action" path. This
  * is core safety infrastructure and was previously untested.
  *
  * Mirrors spellcasting.test.ts: real Postgres in beforeEach, supertest against

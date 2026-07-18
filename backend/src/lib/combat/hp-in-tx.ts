@@ -15,7 +15,7 @@ import { applyConcentrationCheckInTx, type ConcentrationCheckResult } from "./co
 /**
  * Applies a single heal op inside a caller-supplied Prisma transaction.
  *
- * Exported so the actions orchestrator (routes/actions.ts) can compose a
+ * Exported so the actions orchestrator (actionsRouter) can compose a
  * "consume potion + heal" pair into one atomic $transaction without opening a
  * nested transaction. Keep the heal logic in sync with the `case "heal"` in
  * dispatchHpOp (hp-transaction.ts).

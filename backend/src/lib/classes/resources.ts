@@ -1,12 +1,12 @@
 /**
- * Resource + maneuver transaction handler — the analog to lib/spellcasting.ts
+ * Resource + maneuver transaction handler — the analog to applySpellcastingOperations
  * for trackable class/subclass resources (superiority dice, ki, rage) and
  * known-maneuver lists.
  *
  * What is persisted: `used` counts per resource key and the `maneuversKnown`
- * snapshot array. What is derived at read time (in lib/character/character-serialize.ts
- * serializeCharacter): pool totals, die size, recharge timing, maneuver
- * choice count — all via deriveResources() in src/lib/class-features.ts.
+ * snapshot array. What is derived at read time (in serializeCharacter): pool
+ * totals, die size, recharge timing, maneuver choice count — all via
+ * deriveResources().
  */
 
 import { randomUUID } from "node:crypto";
@@ -932,7 +932,7 @@ export async function applyResourceOperations(
 /**
  * Applies a single spendResource op inside a caller-supplied Prisma transaction.
  *
- * Exported so the actions orchestrator (routes/actions.ts) can include a
+ * Exported so the actions orchestrator (actionsRouter) can include a
  * resource spend alongside an inventory adjust or HP heal in one atomic
  * $transaction. Shares applySpendResourceOp with applyResourceOperations.
  */

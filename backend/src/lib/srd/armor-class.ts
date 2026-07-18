@@ -1,6 +1,7 @@
-// Local union (not ArmorCategoryName from inventory.ts) to avoid a srd↔inventory import cycle.
-// Shields are handled via hasShield, never passed as body armor, so they're excluded here.
-export type BodyArmorCategory = "light" | "medium" | "heavy";
+import type { ArmorCategoryName } from "@/lib/inventory/item-detail-inputs.js";
+
+// Body armor excludes shields (handled via hasShield, never passed as body armor).
+export type BodyArmorCategory = Exclude<ArmorCategoryName, "shield">;
 
 // One labeled addend of the derived AC; the wire shape for armorClassBreakdown.
 // reminder carries condition text for an addend not auto-applied (value 0, #383).

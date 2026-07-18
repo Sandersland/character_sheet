@@ -41,6 +41,8 @@ See `docs/development.md` for per-workspace commands, running outside Docker, an
 
 **Keep build artifacts out of the repo.** Screenshots and generated images go to `/tmp` or the session scratchpad — a `PreToolUse` hook (`.claude/hooks/block-project-artifacts.mjs`) enforces this. Fix the destination path; don't work around it.
 
+**Comments state what the code can't.** Write comments only for the *why*: invariants, 5e-rule decisions, gotchas, and deliberate-coupling latches ("if you change this, also update X") — never to restate the code or label sections (a file that needs section banners needs splitting; endpoint contracts go in JSDoc on the handler). Refer to other code by exported **symbol name, never file path** (paths rot on reorg; symbols are greppable). Issue refs (`#NN`) for provenance are encouraged. Every suppression (`fallow-ignore-next-line`, `eslint-disable-next-line`) must be rule-specific and end with `-- <reason>`. When you edit code, update or delete its comment in the same edit — and never drop an existing why-comment in a refactor.
+
 **Docs are pointers, not mirrors.** The code is the source of truth; docs exist only for what can't be derived from it (invariants, footguns, procedures). If a change makes a doc statement false, fix or delete that statement — never append descriptions of new code to a doc, and never add per-component/per-function inventories.
 
 ## Doc map

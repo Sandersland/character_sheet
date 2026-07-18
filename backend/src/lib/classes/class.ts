@@ -209,7 +209,7 @@ async function applySetFightingStyle(ctx: ClassOpContext, op: SetFightingStyleOp
   await logEvent(tx, {
     characterId,
     // `resources` category so the existing resources revert branch in
-    // routes/activity.ts restores before.resources (incl. fightingStyle)
+    // activityRouter's undo restores before.resources (incl. fightingStyle)
     // with zero new undo code.
     category: "resources",
     type: "fightingStyleChosen",

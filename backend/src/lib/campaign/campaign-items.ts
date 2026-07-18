@@ -27,7 +27,7 @@ const CATEGORIES = ["weapon", "armor", "consumable", "gear"] as const;
 const WORN_SLOTS = ["HEAD", "NECK", "CLOAK", "HANDS", "WRISTS", "BELT", "FEET", "RING"] as const;
 const ARMOR_CATEGORIES = ["light", "medium", "heavy", "shield"] as const;
 const WEAPON_CLASSES = ["simple", "martial"] as const;
-// fallow-ignore-next-line code-duplication
+// fallow-ignore-next-line code-duplication -- validation literal list mirrors the catalog enum values by design
 const WEAPON_RANGES = ["melee", "ranged"] as const;
 
 const currencySchema = z

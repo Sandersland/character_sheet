@@ -178,7 +178,7 @@ export type InventoryItemWithDetails = Prisma.InventoryItemGetPayload<{ include:
 
 // The Item catalog include used when fetching a catalog Item's detail rows
 // for snapshot — same shape as inventoryItemDetailInclude above but typed
-// against Item (not InventoryItem). Exported so routes/characters.ts can
+// against Item (not InventoryItem). Exported so charactersRouter can
 // build starting-equipment inventory rows at character creation time.
 export const catalogItemDetailInclude = {
   weaponDetail: true,

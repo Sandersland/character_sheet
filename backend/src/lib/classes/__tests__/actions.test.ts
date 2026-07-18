@@ -1,5 +1,5 @@
 /**
- * Unit tests for lib/actions.ts:
+ * Unit tests for deriveActions / ACTION_EFFECT_FN:
  *   - deriveActions: class/subclass/level gates, resource gating, case-insensitivity
  *   - ACTION_EFFECT_FN: per-key op arrays for every handler in the dispatch table
  *

@@ -1,5 +1,5 @@
 /**
- * Conditions transaction handler — the analog to lib/resources.ts for tracking
+ * Conditions transaction handler — the analog to applyResourceOperations for tracking
  * a character's active status conditions (prone, poisoned, stunned, …) plus a
  * single 0–6 exhaustion level.
  *
