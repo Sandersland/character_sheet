@@ -6,6 +6,12 @@ import MobileSheetHeader from "@/features/character-meta/MobileSheetHeader";
 import { RollProvider } from "@/features/dice/RollContext";
 import type { Character } from "@/types/character";
 
+// The switcher sheet fetches the character list on open; keep it inert here.
+vi.mock("@/api/client", async (importActual) => ({
+  ...(await importActual<typeof import("@/api/client")>()),
+  fetchCharacters: vi.fn().mockResolvedValue([]),
+}));
+
 function makeCharacter(overrides: Partial<Character> = {}): Character {
   return {
     id: "c1",
@@ -177,25 +183,14 @@ describe("MobileSheetHeader live pill (#1026)", () => {
 });
 
 // #1026: collapse-on-scroll — a `scrolled` sheet collapses the header to a single
-// bar (name + HP + pill); tapping it re-expands the full two-row header.
+// bar (name + HP + pill); the identity remains the switcher trigger (#1027).
 describe("MobileSheetHeader collapse-on-scroll (#1026)", () => {
   it("collapses to a single bar once scrolled, hiding the AC badge and subtitle", () => {
     renderHeader({ scrolled: true });
     expect(screen.getByText("Aldric")).toBeInTheDocument();
     expect(screen.queryByText("Human · Fighter 7")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /armor class/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /expand character header/i })).toBeInTheDocument();
-  });
-
-  it("expands to the full header on tapping the collapsed bar, then re-collapses", () => {
-    renderHeader({ scrolled: true });
-    fireEvent.click(screen.getByRole("button", { name: /expand character header/i }));
-    // Full header now visible (AC badge + subtitle back).
-    expect(screen.getByText("Human · Fighter 7")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /armor class/i })).toBeInTheDocument();
-    // Collapse handle returns to the single bar.
-    fireEvent.click(screen.getByRole("button", { name: /collapse header/i }));
-    expect(screen.queryByText("Human · Fighter 7")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /switch character/i })).toBeInTheDocument();
   });
 
   it("carries the live pill on the collapsed bar and taps through to Combat", () => {
@@ -213,6 +208,27 @@ describe("MobileSheetHeader collapse-on-scroll (#1026)", () => {
   it("stays the full header when not scrolled", () => {
     renderHeader({ scrolled: false });
     expect(screen.getByText("Human · Fighter 7")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /expand character header/i })).not.toBeInTheDocument();
+  });
+});
+
+// #1027: the identity block is the mobile route back out — tapping it opens the
+// character switcher sheet in both the expanded and collapsed header states.
+describe("MobileSheetHeader character switcher (#1027)", () => {
+  it("opens the switcher sheet when the identity is tapped (expanded)", () => {
+    renderHeader();
+    fireEvent.click(screen.getByRole("button", { name: /switch character/i }));
+    expect(screen.getByRole("dialog", { name: /characters/i })).toBeInTheDocument();
+  });
+
+  it("opens the switcher sheet from the collapsed bar identity", () => {
+    renderHeader({ scrolled: true });
+    fireEvent.click(screen.getByRole("button", { name: /switch character/i }));
+    expect(screen.getByRole("dialog", { name: /characters/i })).toBeInTheDocument();
+  });
+
+  it("adds an 'All characters' item to the overflow menu", () => {
+    renderHeader();
+    fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));
+    expect(screen.getByRole("menuitem", { name: /all characters/i })).toBeInTheDocument();
   });
 });
