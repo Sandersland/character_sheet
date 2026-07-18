@@ -3,20 +3,24 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
-import { fetchLevelUpPlan, submitLevelUp } from "@/api/client";
+import { fetchLevelUpPlan, fetchReference, submitLevelUp } from "@/api/client";
 import LevelUpCeremony from "@/features/level-up/LevelUpCeremony";
 import { axe } from "@/test/axe";
-import type { Character, LevelUpPlanResponse, LevelUpStep } from "@/types/character";
+import type { Character, LevelUpPlanResponse, LevelUpStep, ReferenceData } from "@/types/character";
 
-vi.mock("@/api/client", () => ({ fetchLevelUpPlan: vi.fn(), submitLevelUp: vi.fn() }));
+vi.mock("@/api/client", () => ({ fetchLevelUpPlan: vi.fn(), fetchReference: vi.fn(), submitLevelUp: vi.fn() }));
 
 const planMock = vi.mocked(fetchLevelUpPlan);
+const referenceMock = vi.mocked(fetchReference);
 const submitMock = vi.mocked(submitLevelUp);
 
 const character = {
   id: "c1",
   pendingLevelUps: 1,
   classes: [{ id: "entry-1", name: "fighter", level: 7, subclass: "Champion" }],
+  abilityScores: { strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 },
+  hitPoints: { current: 52, max: 52, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+  hitDice: { total: 7, die: "d10", spent: 0 },
 } as unknown as Character;
 
 function plan(steps: LevelUpStep[], target?: Partial<LevelUpPlanResponse["target"]>): LevelUpPlanResponse {
@@ -39,6 +43,13 @@ function renderCeremony() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  referenceMock.mockResolvedValue({
+    races: [],
+    classes: [],
+    backgrounds: [],
+    alignments: [],
+    artisanTools: [],
+  } as unknown as ReferenceData);
 });
 
 describe("LevelUpCeremony", () => {
@@ -64,8 +75,10 @@ describe("LevelUpCeremony", () => {
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByText("Step 1 of 3")).toBeInTheDocument());
-    // Seeded hp draft satisfies step 1 — Continue is enabled.
+    // Continue is disabled until the HP step records a choice.
     const cont = screen.getByRole("button", { name: /continue/i });
+    expect(cont).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: /take average/i }));
     expect(cont).toBeEnabled();
     await user.click(cont);
 
@@ -96,6 +109,7 @@ describe("LevelUpCeremony", () => {
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByText("Step 1 of 2")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /take average/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
     await user.click(screen.getByRole("button", { name: /confirm level up/i }));
 
@@ -113,6 +127,7 @@ describe("LevelUpCeremony", () => {
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByText("Step 1 of 2")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /take average/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
     await user.click(screen.getByRole("button", { name: /confirm level up/i }));
 

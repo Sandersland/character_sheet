@@ -3,6 +3,7 @@
 // the Cancel/Back/Continue footer that flips to Confirm on the last step.
 
 import Spinner from "@/components/ui/Spinner";
+import HitPointsStep from "@/features/level-up/HitPointsStep";
 import LevelUpStepPlaceholder from "@/features/level-up/LevelUpStepPlaceholder";
 import StepRail from "@/features/level-up/StepRail";
 import { useLevelUpCeremony, type LevelUpCeremony as Ceremony } from "@/features/level-up/useLevelUpCeremony";
@@ -28,7 +29,9 @@ const PRIMARY_BTN =
 
 // Step-body slot: #887–#891 register their real bodies per kind here; anything
 // unregistered renders the placeholder.
-const STEP_BODIES: Partial<Record<LevelUpStepKind, React.ComponentType<{ step: LevelUpStep }>>> = {};
+const STEP_BODIES: Partial<Record<LevelUpStepKind, React.ComponentType<{ step: LevelUpStep }>>> = {
+  hitPoints: HitPointsStep,
+};
 
 function StepBody({ step }: { step: LevelUpStep }) {
   const Body = STEP_BODIES[step.kind] ?? LevelUpStepPlaceholder;
