@@ -812,83 +812,121 @@ export async function applySpellcastingOperations(
   operations: SpellcastingOperation[],
   casterUserId: string,
 ): Promise<void> {
+  // The scaffold's per-op row is only the existence check: applySpellcastingOpInTx
+  // re-reads its own state via SPELLCASTING_SELECT so it composes under a caller tx.
   await runCharacterTransaction(characterId, operations, {
+    select: { id: true },
+    notFound: (id) => new InvalidSpellcastingOperationError(`Character not found: ${id}`),
+    applyOp: ({ tx, op, characterId: id, batchId, sessionId }) =>
+      applySpellcastingOpInTx(tx, id, op, batchId, sessionId, casterUserId),
+  });
+}
+
+// Columns/relations a spellcasting op re-reads. Hoisted so the seam and the
+// wrapper's existence check share one select.
+const SPELLCASTING_SELECT = {
+  name: true,
+  campaignId: true,
+  spellcasting: true,
+  experiencePoints: true,
+  abilityScores: true,
+  classEntries: {
+    orderBy: { position: "asc" as const },
+    // All entries (not just the primary) so the multiclass prepared-cap sum works.
     select: {
       name: true,
-      campaignId: true,
-      spellcasting: true,
-      experiencePoints: true,
-      abilityScores: true,
-      classEntries: {
-        orderBy: { position: "asc" as const },
-        // All entries (not just the primary) so the multiclass prepared-cap sum works.
-        select: {
-          name: true,
-          level: true,
-          subclass: true,
-          // Subclass-granted spells (#898) injected into the working view below.
-          subclassRef: { include: { grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } } } },
-        },
-      },
-      inventoryItems: {
-        select: { id: true, name: true, equippedSlot: true, attuned: true, capabilities: true },
-      },
+      level: true,
+      subclass: true,
+      // Subclass-granted spells (#898) injected into the working view below.
+      subclassRef: { include: { grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } } } },
     },
-    notFound: (id) => new InvalidSpellcastingOperationError(`Character not found: ${id}`),
-    applyOp: async ({ tx, row, op, batchId, sessionId }) => {
-      // Derived stats needed for slot-bounds checks.
-      const level = levelForExperience(row.experiencePoints);
-      const profBonus = proficiencyBonusForLevel(level);
-      const className = row.classEntries[0]?.name ?? "";
-      const abilityScores = row.abilityScores as Record<string, number>;
-      const derived = deriveSpellcasting(className, level, abilityScores, profBonus);
-      // Single-class uses the XP-derived level (per-class column can be stale) so the
-      // enforced cap matches the serialized limit; multiclass uses per-entry levels.
-      const limitEntries = row.classEntries.length === 1
-        ? [{ name: className, level, subclass: row.classEntries[0]?.subclass ?? null }]
-        : row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass }));
-      const preparedSpellLimit = derivePreparedSpellLimit(limitEntries, abilityScores);
+  },
+  inventoryItems: {
+    select: { id: true, name: true, equippedSlot: true, attuned: true, capabilities: true },
+  },
+} satisfies Prisma.CharacterSelect;
 
-      const { slotTotals, arcanaTotals } = computeSlotTables(row.spellcasting, derived);
+type SpellcastingRow = Prisma.CharacterGetPayload<{ select: typeof SPELLCASTING_SELECT }>;
 
-      const state = normalizeSpellcastingMutable(row.spellcasting);
-      const beforeState = cloneSpellState(state);
+// Read fresh state and assemble the per-op context + before-snapshot. Split out
+// of applySpellcastingOpInTx to keep that seam under the unit-size gate.
+function buildSpellcastingOp(
+  ids: { tx: Prisma.TransactionClient; characterId: string; batchId: string; sessionId: string | null; casterUserId: string },
+  row: SpellcastingRow,
+): { ctx: SpellOpContext; state: SpellcastingMutableState; beforeState: SpellStateSnapshot } {
+  // Derived stats needed for slot-bounds checks.
+  const level = levelForExperience(row.experiencePoints);
+  const profBonus = proficiencyBonusForLevel(level);
+  const className = row.classEntries[0]?.name ?? "";
+  const abilityScores = row.abilityScores as Record<string, number>;
+  const derived = deriveSpellcasting(className, level, abilityScores, profBonus);
+  // Single-class uses the XP-derived level (per-class column can be stale) so the
+  // enforced cap matches the serialized limit; multiclass uses per-entry levels.
+  const limitEntries = row.classEntries.length === 1
+    ? [{ name: className, level, subclass: row.classEntries[0]?.subclass ?? null }]
+    : row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass }));
+  const preparedSpellLimit = derivePreparedSpellLimit(limitEntries, abilityScores);
 
-      injectDerivedSpells(
-        state,
-        row.classEntries[0]?.subclassRef,
-        level,
-        row.inventoryItems.map((i) => ({
-          id: i.id,
-          name: i.name,
-          // #565: `equipped` is derived from equippedSlot (no persisted boolean).
-          equipped: i.equippedSlot != null,
-          attuned: i.attuned,
-          capabilities: i.capabilities,
-        })),
-      );
+  const { slotTotals, arcanaTotals } = computeSlotTables(row.spellcasting, derived);
 
-      const ctx = buildSpellOpContext(
-        { tx, characterId, batchId, sessionId, casterUserId },
-        row,
-        state,
-        slotTotals,
-        arcanaTotals,
-        derived,
-        preparedSpellLimit,
-      );
+  const state = normalizeSpellcastingMutable(row.spellcasting);
+  const beforeState = cloneSpellState(state);
 
-      const outcome = await dispatchSpellOp(ctx, op);
-      if (outcome === null) return;
+  injectDerivedSpells(
+    state,
+    row.classEntries[0]?.subclassRef,
+    level,
+    row.inventoryItems.map((i) => ({
+      id: i.id,
+      name: i.name,
+      // #565: `equipped` is derived from equippedSlot (no persisted boolean).
+      equipped: i.equippedSlot != null,
+      attuned: i.attuned,
+      capabilities: i.capabilities,
+    })),
+  );
 
-      await persistSpellState(tx, characterId, state);
-      await logSpellcastingEvent(
-        tx,
-        { characterId, batchId, sessionId },
-        outcome,
-        beforeState,
-        cloneSpellState(state),
-      );
-    },
+  const ctx = buildSpellOpContext(ids, row, state, slotTotals, arcanaTotals, derived, preparedSpellLimit);
+  return { ctx, state, beforeState };
+}
+
+/**
+ * Applies one spellcasting op inside a caller-supplied transaction/batchId, so the
+ * unified level-up endpoint (#885) can compose spellcasting with other domains
+ * under one batchId. Reads fresh state via `tx` on every call (a batch sees each
+ * prior op's result), dispatches, and — unless the op is a no-op (null outcome) —
+ * persists + logs its own event (the single copy of the logic).
+ */
+export async function applySpellcastingOpInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: SpellcastingOperation,
+  batchId: string,
+  sessionId: string | null,
+  casterUserId: string,
+): Promise<void> {
+  const row = await tx.character.findUnique({
+    where: { id: characterId },
+    select: SPELLCASTING_SELECT,
   });
+  if (!row) {
+    throw new InvalidSpellcastingOperationError(`Character not found: ${characterId}`);
+  }
+
+  const { ctx, state, beforeState } = buildSpellcastingOp(
+    { tx, characterId, batchId, sessionId, casterUserId },
+    row,
+  );
+
+  const outcome = await dispatchSpellOp(ctx, op);
+  if (outcome === null) return;
+
+  await persistSpellState(tx, characterId, state);
+  await logSpellcastingEvent(
+    tx,
+    { characterId, batchId, sessionId },
+    outcome,
+    beforeState,
+    cloneSpellState(state),
+  );
 }
