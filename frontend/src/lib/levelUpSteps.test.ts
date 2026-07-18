@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { draftSatisfies, railState, stepKey, stepLabel, type LevelUpDraft } from "@/lib/levelUpSteps";
-import type { LevelUpStep } from "@/types/character";
+import {
+  ceremonyBlocked,
+  draftSatisfies,
+  railState,
+  stepKey,
+  stepLabel,
+  stepPosition,
+  type LevelUpDraft,
+} from "@/lib/levelUpSteps";
+import type { LevelUpPlanResponse, LevelUpStep } from "@/types/character";
 
 const PLAN: LevelUpStep[] = [
   { kind: "hitPoints" },
@@ -50,6 +58,32 @@ describe("railState", () => {
 
   it("falls back to the first step when the key is unknown (e.g. after a re-plan)", () => {
     expect(railState(PLAN, "gone")).toEqual(["active", "pending", "pending"]);
+  });
+});
+
+describe("stepPosition", () => {
+  it("finds the index of the named step, falling back to 0 for an unknown key", () => {
+    expect(stepPosition(PLAN, "advancement")).toBe(1);
+    expect(stepPosition(PLAN, "review")).toBe(2);
+    expect(stepPosition(PLAN, "gone")).toBe(0);
+    expect(stepPosition([], "hitPoints")).toBe(0);
+  });
+});
+
+describe("ceremonyBlocked", () => {
+  function plan(steps: LevelUpStep[], isPrimary: boolean): LevelUpPlanResponse {
+    return { target: { className: "fighter", subclass: null, newLevel: 3, isPrimary }, steps };
+  }
+
+  it("blocks a non-primary plan containing a subclass or fightingStyle step (#1065)", () => {
+    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "subclass" }, { kind: "review" }], false))).toBe(true);
+    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "fightingStyle", count: 1 }], false))).toBe(true);
+  });
+
+  it("does not block primary plans, non-primary plans without those steps, or a missing plan", () => {
+    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "subclass" }, { kind: "review" }], true))).toBe(false);
+    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "review" }], false))).toBe(false);
+    expect(ceremonyBlocked(null)).toBe(false);
   });
 });
 

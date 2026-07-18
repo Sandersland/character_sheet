@@ -1,7 +1,7 @@
 // Pure step model for the level-up ceremony rail (#886) — precedent: stepRail.
 // No JSX; rendered by StepRail / LevelUpCeremony.
 
-import type { LevelUpStep, LevelUpStepKind, LevelUpSubmission } from "@/types/character";
+import type { LevelUpPlanResponse, LevelUpStep, LevelUpStepKind, LevelUpSubmission } from "@/types/character";
 
 export type LevelUpStepState = "done" | "active" | "pending";
 
@@ -39,30 +39,46 @@ export function stepLabel(step: LevelUpStep): string {
 }
 
 /**
- * Per-step rail state, index-aligned with `steps`. An unknown currentKey (the
- * current step vanished in a re-plan) falls back to the first step active.
+ * The step index `currentKey` names, falling back to the first step when the
+ * key is unknown (the current step vanished in a re-plan).
  */
-export function railState(steps: LevelUpStep[], currentKey: string): LevelUpStepState[] {
+export function stepPosition(steps: LevelUpStep[], currentKey: string): number {
   const found = steps.findIndex((step) => stepKey(step) === currentKey);
-  const current = found === -1 ? 0 : found;
+  return found === -1 ? 0 : found;
+}
+
+/** Per-step rail state, index-aligned with `steps`. */
+export function railState(steps: LevelUpStep[], currentKey: string): LevelUpStepState[] {
+  const current = stepPosition(steps, currentKey);
   return steps.map((_, i) => (i < current ? "done" : i === current ? "active" : "pending"));
 }
 
+/**
+ * #1065: subclass/fightingStyle can't commit for a non-primary target yet, so a
+ * plan pairing them blocks the ceremony (the shell shows a notice instead).
+ */
+export function ceremonyBlocked(plan: LevelUpPlanResponse | null): boolean {
+  return (
+    plan != null &&
+    !plan.target.isPrimary &&
+    plan.steps.some((s) => s.kind === "subclass" || s.kind === "fightingStyle")
+  );
+}
+
+// Draft entries that can satisfy a list step, by kind. subclassChoice narrows
+// to its step's meta.key — several choose-N steps share the one draft array.
+const LIST_ENTRIES: Partial<
+  Record<LevelUpStepKind, (step: LevelUpStep, draft: LevelUpDraft) => readonly unknown[] | undefined>
+> = {
+  maneuvers: (_step, draft) => draft.maneuvers,
+  disciplines: (_step, draft) => draft.disciplines,
+  toolProficiency: (_step, draft) => draft.toolProficiencies,
+  subclassChoice: (step, draft) => draft.subclassChoices?.filter((c) => c.choiceKey === step.meta?.key),
+  newSpells: (_step, draft) => draft.spellsLearned,
+};
+
 function listCount(step: LevelUpStep, draft: LevelUpDraft): number {
-  switch (step.kind) {
-    case "maneuvers":
-      return draft.maneuvers?.length ?? 0;
-    case "disciplines":
-      return draft.disciplines?.length ?? 0;
-    case "toolProficiency":
-      return draft.toolProficiencies?.length ?? 0;
-    case "subclassChoice":
-      return (draft.subclassChoices ?? []).filter((c) => c.choiceKey === step.meta?.key).length;
-    case "newSpells":
-      return draft.spellsLearned?.length ?? 0;
-    default:
-      return 0;
-  }
+  return LIST_ENTRIES[step.kind]?.(step, draft)?.length ?? 0;
 }
 
 /**
