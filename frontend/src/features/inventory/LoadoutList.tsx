@@ -110,8 +110,8 @@ export default function LoadoutList({ character, pending, onSubmit }: LoadoutLis
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-end">
+    <div className="flex flex-col gap-4 max-md:gap-3 max-md:pt-2.5">
+      <div className="flex items-center justify-end max-md:px-4">
         <span
           className={`text-xs font-semibold ${attunement.atCap ? "text-arcane-700" : "text-parchment-500"}`}
         >
@@ -119,8 +119,8 @@ export default function LoadoutList({ character, pending, onSubmit }: LoadoutLis
         </span>
       </div>
       {groups.map((group) => (
-        <section key={group.key} className="flex flex-col gap-1.5">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-parchment-500">
+        <section key={group.key} className="flex flex-col gap-1.5 max-md:gap-0">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-parchment-500 max-md:border-y max-md:border-parchment-200 max-md:bg-parchment-100 max-md:px-4 max-md:py-1.5">
             {group.label}
           </h4>
           <ul className="flex flex-col gap-1.5">
@@ -130,7 +130,7 @@ export default function LoadoutList({ character, pending, onSubmit }: LoadoutLis
                 return (
                   <li
                     key={row.key}
-                    className="flex items-center gap-2 rounded-card border border-dashed border-parchment-200 bg-parchment-50/50 px-3 py-2"
+                    className="flex items-center gap-2 rounded-card border border-dashed border-parchment-200 bg-parchment-50/50 px-3 py-2 max-md:rounded-none max-md:border-0 max-md:border-b max-md:border-solid max-md:px-4"
                   >
                     <Lock aria-hidden="true" className="size-4 shrink-0 text-parchment-400" />
                     <span className="flex-1 text-xs font-medium text-parchment-500">{row.label}</span>
@@ -144,7 +144,7 @@ export default function LoadoutList({ character, pending, onSubmit }: LoadoutLis
                 return (
                   <li
                     key={row.key}
-                    className="flex items-center gap-2 rounded-card border border-dashed border-parchment-200 bg-parchment-50/50 px-3 py-2"
+                    className="flex items-center gap-2 rounded-card border border-dashed border-parchment-200 bg-parchment-50/50 px-3 py-2 max-md:rounded-none max-md:border-0 max-md:border-b max-md:border-solid max-md:px-4"
                   >
                     <Icon aria-hidden="true" className="size-5 shrink-0 text-parchment-300" />
                     <span className="flex-1 text-xs font-medium text-parchment-500">{row.label}</span>
@@ -180,7 +180,7 @@ export default function LoadoutList({ character, pending, onSubmit }: LoadoutLis
               return (
                 <li
                   key={row.key}
-                  className="flex items-center gap-2 rounded-card border border-parchment-200 bg-parchment-50 px-3 py-2"
+                  className="flex items-center gap-2 rounded-card border border-parchment-200 bg-parchment-50 px-3 py-2 max-md:rounded-none max-md:border-0 max-md:border-b max-md:px-4"
                 >
                   <Icon aria-hidden="true" className="size-5 shrink-0 text-garnet-700" />
                   <div className="flex min-w-0 flex-1 flex-col">
