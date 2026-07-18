@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import { Prisma } from "@/generated/prisma/client.js";
 import {
   activeResistedDamageTypes,
@@ -12,8 +10,7 @@ import { itemImmuneDamageTypes, itemResistedDamageTypes, type GrantItem } from "
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { resetActivatedUsesForRestInTx } from "@/lib/inventory/item-recharge.js";
-import { prisma } from "@/lib/core/prisma.js";
-import { getActiveSessionId } from "@/lib/session/sessions.js";
+import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import {
   abilityModifier,
   advancementSlotsForLevel,
@@ -1721,23 +1718,23 @@ export async function applyHitPointOperations(
   characterId: string,
   operations: HitPointOperation[]
 ): Promise<{ concentrationChecks: ConcentrationCheckResult[] }> {
-  // One batchId groups all ops in this request on the activity timeline,
-  // same as inventory uses (lib/inventory/inventory.ts → applyInventoryOperations).
-  const batchId = randomUUID();
-  const sessionId = await getActiveSessionId(characterId);
-
-  // Collect any concentration checks triggered by damage ops so the route can
-  // surface the auto-rolled CON save(s) to the player.
+  // Collect concentration checks triggered by damage ops so the route can
+  // surface the auto-rolled CON save(s); pushed to from applyOp below.
   const concentrationChecks: ConcentrationCheckResult[] = [];
 
-  await prisma.$transaction(async (tx) => {
-    for (const op of operations) {
+  // The scaffold's per-op row is only the existence check: each op applier
+  // re-reads its own state via buildHpOpContext (or the levelUp/concentration
+  // seams) so the in-tx composition helpers stay composable under a caller tx.
+  await runCharacterTransaction(characterId, operations, {
+    select: { id: true },
+    notFound: (id) => new InvalidHitPointOperationError(`Character not found: ${id}`),
+    applyOp: async ({ tx, op, characterId: id, batchId, sessionId }) => {
       // A manual concentration save (issue #76) touches no HP — resolve it on
       // its own and skip the HP read/write-back below.
       if (op.type === "concentrationSave") {
         const check = await applyConcentrationSaveInTx(
           tx,
-          characterId,
+          id,
           op.entryId,
           op.roll,
           op.damage,
@@ -1745,17 +1742,17 @@ export async function applyHitPointOperations(
           sessionId,
         );
         if (check) concentrationChecks.push(check);
-        continue;
+        return;
       }
 
       // levelUp shares its extracted seam with the unified endpoint (#895).
       if (op.type === "levelUp") {
-        await applyLevelUpHpInTx(tx, characterId, op, batchId, sessionId);
-        continue;
+        await applyLevelUpHpInTx(tx, id, op, batchId, sessionId);
+        return;
       }
 
       // Phase 1: re-read state and build the per-op context.
-      const ctx = await buildHpOpContext(tx, characterId);
+      const ctx = await buildHpOpContext(tx, id);
 
       // Snapshot the sub-state before this op so the event can show both
       // before/after and the per-field diffs (ctx.beforeClassLevel covers the
@@ -1771,7 +1768,7 @@ export async function applyHitPointOperations(
 
       // Common write-back: every op persists hitPoints + hitDice.
       await tx.character.update({
-        where: { id: characterId },
+        where: { id },
         data: {
           hitPoints: ctx.hp as unknown as Prisma.InputJsonValue,
           hitDice: ctx.hd as unknown as Prisma.InputJsonValue,
@@ -1784,13 +1781,13 @@ export async function applyHitPointOperations(
 
       // Phase 4: emit the main hitPoints event — always FIRST in the batch,
       // before any follow-on events.
-      await logHpOpEvent(tx, characterId, op, result, beforeState, afterState, batchId, sessionId);
+      await logHpOpEvent(tx, id, op, result, beforeState, afterState, batchId, sessionId);
 
       // Phase 5: follow-on events (rest buff-clears + activated-use resets,
       // while-active clears, damage-triggered concentration check).
       const check = await applyHpOpFollowOns(
         tx,
-        characterId,
+        id,
         op,
         ctx.hp,
         damageForConcentration,
@@ -1798,7 +1795,7 @@ export async function applyHitPointOperations(
         sessionId,
       );
       if (check) concentrationChecks.push(check);
-    }
+    },
   });
 
   return { concentrationChecks };

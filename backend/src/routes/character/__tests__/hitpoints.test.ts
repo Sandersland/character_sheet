@@ -351,6 +351,22 @@ describe("POST /api/characters/:id/hp", () => {
     expect(res.body.hitPoints).toHaveProperty("deathSaves");
     expect(res.body.hitDice).toHaveProperty("spent");
   });
+
+  // ── batch visibility ──────────────────────────────────────────────────────
+
+  it("multi-op batch: op 2 sees op 1's persisted HP", async () => {
+    // start: temp 5, current 20, max 22. damage 8 → temp 0, current 17;
+    // heal 4 operates on 17 → 21 (a stale re-read of current 20 would cap at 22).
+    const res = await post(FIXTURE.id, {
+      operations: [
+        { type: "damage", amount: 8 },
+        { type: "heal", amount: 4 },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.hitPoints.temp).toBe(0);
+    expect(res.body.hitPoints.current).toBe(21);
+  });
 });
 
 // ── rest undo preserves resource sub-fields (issue #319) ────────────────────

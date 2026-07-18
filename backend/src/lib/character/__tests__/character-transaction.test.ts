@@ -153,4 +153,133 @@ describe("runCharacterTransaction", () => {
     );
     expect(calls).toBe(0);
   });
+
+  it("still runs afterOps when the operations array is empty", async () => {
+    let afterCalls = 0;
+    await runCharacterTransaction<{ experiencePoints: true }, { add: number }>(
+      characterId,
+      [],
+      {
+        select: { experiencePoints: true },
+        notFound: (id) => new NotFoundError(id),
+        applyOp: async () => {
+          throw new Error("applyOp should not run for an empty batch");
+        },
+        afterOps: async () => {
+          afterCalls += 1;
+        },
+      },
+    );
+    expect(afterCalls).toBe(1);
+  });
+
+  it("runs afterOps once after the op loop with the batch's stable ids", async () => {
+    const order: string[] = [];
+    const batchIds = new Set<string>();
+    let afterSessionId: string | null | undefined;
+
+    await runCharacterTransaction<{ experiencePoints: true }, { add: number }>(
+      characterId,
+      [{ add: 1 }, { add: 2 }],
+      {
+        select: { experiencePoints: true },
+        notFound: (id) => new NotFoundError(id),
+        applyOp: async ({ batchId }) => {
+          order.push("op");
+          batchIds.add(batchId);
+        },
+        afterOps: async ({ batchId, sessionId }) => {
+          order.push("after");
+          batchIds.add(batchId);
+          afterSessionId = sessionId;
+        },
+      },
+    );
+
+    expect(order).toEqual(["op", "op", "after"]);
+    expect(batchIds.size).toBe(1);
+    expect(afterSessionId).toBeNull();
+  });
+
+  it("uses an explicit sessionId verbatim instead of the active-session lookup", async () => {
+    const opSessions: (string | null)[] = [];
+    let afterSession: string | null | undefined;
+
+    await runCharacterTransaction<{ experiencePoints: true }, { add: number }>(
+      characterId,
+      [{ add: 1 }],
+      {
+        select: { experiencePoints: true },
+        notFound: (id) => new NotFoundError(id),
+        sessionId: "explicit-session-123",
+        applyOp: async ({ sessionId }) => {
+          opSessions.push(sessionId);
+        },
+        afterOps: async ({ sessionId }) => {
+          afterSession = sessionId;
+        },
+      },
+    );
+
+    expect(opSessions).toEqual(["explicit-session-123"]);
+    expect(afterSession).toBe("explicit-session-123");
+  });
+
+  it("passes an explicit null sessionId verbatim, bypassing the active-session lookup", async () => {
+    // A real active session so getActiveSessionId would return non-null — the
+    // discriminator that proves null is passed verbatim, not looked up.
+    const campaign = await prisma.campaign.create({
+      data: { name: "Tx Null-Session Campaign", ownerId: OWNER_ID, inviteCode: `tx-null-${characterId}` },
+    });
+    await prisma.character.update({ where: { id: characterId }, data: { campaignId: campaign.id } });
+    const session = await prisma.session.create({
+      data: { campaignId: campaign.id, status: "active", startedAt: new Date() },
+    });
+    await prisma.sessionParticipant.create({ data: { sessionId: session.id, characterId } });
+
+    const opSessions: (string | null)[] = [];
+    try {
+      await runCharacterTransaction<{ experiencePoints: true }, { add: number }>(
+        characterId,
+        [{ add: 1 }],
+        {
+          select: { experiencePoints: true },
+          notFound: (id) => new NotFoundError(id),
+          sessionId: null,
+          applyOp: async ({ sessionId }) => {
+            opSessions.push(sessionId);
+          },
+        },
+      );
+      expect(opSessions).toEqual([null]);
+    } finally {
+      await prisma.character.update({ where: { id: characterId }, data: { campaignId: null } });
+      await prisma.campaign.deleteMany({ where: { id: campaign.id } });
+    }
+  });
+
+  it("rolls back the op writes when afterOps throws (afterOps runs in the same tx)", async () => {
+    await expect(
+      runCharacterTransaction<{ experiencePoints: true }, { add: number }>(
+        characterId,
+        [{ add: 50 }],
+        {
+          select: { experiencePoints: true },
+          notFound: (id) => new NotFoundError(id),
+          applyOp: async ({ tx, op }) => {
+            await tx.character.update({
+              where: { id: characterId },
+              data: { experiencePoints: { increment: op.add } },
+            });
+          },
+          afterOps: async () => {
+            throw new Error("after-boom");
+          },
+        },
+      ),
+    ).rejects.toThrow("after-boom");
+
+    const final = await prisma.character.findUniqueOrThrow({ where: { id: characterId } });
+    expect(final.experiencePoints).toBe(0);
+  });
 });
