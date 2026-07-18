@@ -11,8 +11,6 @@
 
 import type { ActionCost, FightingStyleKey } from "@/types/character";
 
-// ── Two-Weapon Fighting eligibility ──────────────────────────────────────────
-
 /**
  * Returns true when the character's equipped loadout allows a TWF bonus-action
  * off-hand attack: at least two weapons equipped, both of which are light
@@ -43,8 +41,6 @@ export function canTwoWeaponFight(
   // Baseline: both held weapons must have the light property.
   return equippedWeapons.slice(0, 2).every((i) => i.weapon?.light === true);
 }
-
-// ── Universal action list ─────────────────────────────────────────────────────
 
 export interface TurnActionOption {
   key: string;

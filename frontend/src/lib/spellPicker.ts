@@ -120,8 +120,6 @@ export function sortSpells(spells: Spell[]): Spell[] {
   return [...spells].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
 }
 
-// ── Level-section grouping (rich cast sheet) ─────────────────────────────────
-
 /** One spell-level section of the cast sheet. Input must already be sorted
  *  (sortSpells) so sections and rows come out in display order. */
 export interface SpellLevelGroup {

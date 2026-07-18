@@ -185,8 +185,6 @@ describe("sortSpells", () => {
   });
 });
 
-// ── Level-section grouping (rich cast sheet) ─────────────────────────────────
-
 describe("groupSpellsByLevel", () => {
   it("groups a sorted list into contiguous level sections", () => {
     const out = groupSpellsByLevel([

@@ -1,8 +1,8 @@
 /**
  * Frontend action-resolver registry.
  *
- * Mirrors the backend ACTION_EFFECT_FN dispatch table (backend/src/lib/actions.ts)
- * key-for-key. Each entry describes:
+ * Mirrors the backend ACTION_EFFECT_FN dispatch table key-for-key. Each entry
+ * describes:
  *   - Which inline tool to render when the player picks this action (kind).
  *   - Which economy slot it consumes (slot).
  *   - Whether the action fires applyActionTransactions server-side (serverEffect).
@@ -12,13 +12,11 @@
  *     (Second Wind). healInput: true for Lay on Hands (numeric pool draw, no die).
  *
  * Adding a new action = one row here + the matching ACTION_EFFECT_FN entry.
- * ⚑ Keep in sync with backend/src/lib/actions.ts ACTION_EFFECT_FN.
+ * ⚑ Keep in sync with the backend ACTION_EFFECT_FN table.
  */
 
 import type { Character } from "@/types/character";
 import type { RollSpec } from "@/lib/dice";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
 
 /**
  * What inline tool the TurnHub renders when this action is selected.
@@ -64,10 +62,7 @@ export interface ActionResolver {
   serverEffect: boolean;
 }
 
-// ── Registry ──────────────────────────────────────────────────────────────────
-
 export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
-  // ── Universal no-op actions (ephemeral slot only) ──────────────────────────
   attack:            { key: "attack",            kind: "attack-picker",  slot: "action",      serverEffect: false },
   castSpell:         { key: "castSpell",         kind: "spell-picker",   slot: "action",      serverEffect: false },
   castSpellBonus:    { key: "castSpellBonus",    kind: "spell-picker",   slot: "bonusAction", serverEffect: false },
@@ -90,21 +85,16 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   // Two-Weapon Fighting off-hand bonus attack (#732) — economy-only, like `attack`.
   twf:               { key: "twf",               kind: "twf-picker",     slot: "bonusAction", serverEffect: false },
 
-  // ── Barbarian ──────────────────────────────────────────────────────────────
   rage:              { key: "rage",              kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "rage" },
   endRage:           { key: "endRage",           kind: "simple-confirm", slot: "bonusAction", serverEffect: true  },
   recklessAttack:    { key: "recklessAttack",    kind: "simple-confirm", slot: "free",        serverEffect: false },
 
-  // ── Bard ───────────────────────────────────────────────────────────────────
   bardicInspiration: { key: "bardicInspiration", kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "bardicInspiration" },
 
-  // ── Cleric ─────────────────────────────────────────────────────────────────
   channelDivinityCleric: { key: "channelDivinityCleric", kind: "simple-confirm", slot: "action", serverEffect: true, resourceKey: "channelDivinity" },
 
-  // ── Druid ──────────────────────────────────────────────────────────────────
   wildShape:         { key: "wildShape",         kind: "simple-confirm", slot: "action",      serverEffect: true,  resourceKey: "wildShape" },
 
-  // ── Fighter ────────────────────────────────────────────────────────────────
   secondWind: {
     key: "secondWind",
     kind: "heal-roll",
@@ -115,7 +105,6 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   },
   actionSurge:       { key: "actionSurge",       kind: "simple-confirm", slot: "special",     serverEffect: true,  resourceKey: "actionSurge" },
 
-  // ── Monk ───────────────────────────────────────────────────────────────────
   flurryOfBlows:     { key: "flurryOfBlows",     kind: "attack-picker",  slot: "bonusAction", serverEffect: true,  resourceKey: "ki", resourceAmount: 2 },
   patientDefense:    { key: "patientDefense",    kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "ki" },
   stepOfTheWind:     { key: "stepOfTheWind",     kind: "simple-confirm", slot: "bonusAction", serverEffect: true,  resourceKey: "ki" },
@@ -124,19 +113,14 @@ export const ACTION_RESOLVERS: Record<string, ActionResolver> = {
   shadowStep:        { key: "shadowStep",        kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
   opportunist:       { key: "opportunist",       kind: "simple-confirm", slot: "reaction",    serverEffect: false },
 
-  // ── Paladin ────────────────────────────────────────────────────────────────
   divineSense:       { key: "divineSense",       kind: "simple-confirm", slot: "action",      serverEffect: true,  resourceKey: "divineSense" },
   layOnHands:        { key: "layOnHands",        kind: "heal-input",     slot: "action",      serverEffect: true,  resourceKey: "layOnHands" },
   channelDivinityPaladin: { key: "channelDivinityPaladin", kind: "simple-confirm", slot: "action", serverEffect: true, resourceKey: "channelDivinity" },
 
-  // ── Rogue ──────────────────────────────────────────────────────────────────
   cunningAction:     { key: "cunningAction",     kind: "simple-confirm", slot: "bonusAction", serverEffect: false },
 
-  // ── Sorcerer ───────────────────────────────────────────────────────────────
   metamagic:         { key: "metamagic",         kind: "simple-confirm", slot: "free",        serverEffect: true,  resourceKey: "sorceryPoints" },
 };
-
-// ── Lookup ─────────────────────────────────────────────────────────────────────
 
 /** Returns the resolver for the given action key, or undefined if unrecognized. */
 export function resolverFor(key: string): ActionResolver | undefined {
