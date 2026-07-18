@@ -238,23 +238,24 @@ describe("runCharacterTransaction", () => {
     await prisma.sessionParticipant.create({ data: { sessionId: session.id, characterId } });
 
     const opSessions: (string | null)[] = [];
-    await runCharacterTransaction<{ experiencePoints: true }, { add: number }>(
-      characterId,
-      [{ add: 1 }],
-      {
-        select: { experiencePoints: true },
-        notFound: (id) => new NotFoundError(id),
-        sessionId: null,
-        applyOp: async ({ sessionId }) => {
-          opSessions.push(sessionId);
+    try {
+      await runCharacterTransaction<{ experiencePoints: true }, { add: number }>(
+        characterId,
+        [{ add: 1 }],
+        {
+          select: { experiencePoints: true },
+          notFound: (id) => new NotFoundError(id),
+          sessionId: null,
+          applyOp: async ({ sessionId }) => {
+            opSessions.push(sessionId);
+          },
         },
-      },
-    );
-
-    expect(opSessions).toEqual([null]);
-
-    await prisma.character.update({ where: { id: characterId }, data: { campaignId: null } });
-    await prisma.campaign.deleteMany({ where: { id: campaign.id } });
+      );
+      expect(opSessions).toEqual([null]);
+    } finally {
+      await prisma.character.update({ where: { id: characterId }, data: { campaignId: null } });
+      await prisma.campaign.deleteMany({ where: { id: campaign.id } });
+    }
   });
 
   it("rolls back the op writes when afterOps throws (afterOps runs in the same tx)", async () => {
