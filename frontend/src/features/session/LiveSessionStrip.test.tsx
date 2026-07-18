@@ -8,9 +8,7 @@ import type { SheetTab } from "@/features/character-meta/sheetTabs";
 describe("LiveSessionStrip (#961)", () => {
   it("shows the title + round and jumps to combat on tap", () => {
     const onGoToCombat = vi.fn();
-    render(
-      <LiveSessionStrip title="Night One" round={3} placement="mobile" onGoToCombat={onGoToCombat} />,
-    );
+    render(<LiveSessionStrip title="Night One" round={3} onGoToCombat={onGoToCombat} />);
     expect(screen.getByText(/Night One/)).toBeInTheDocument();
     expect(screen.getByText(/Round 3/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /go to fight/i }));
@@ -18,7 +16,7 @@ describe("LiveSessionStrip (#961)", () => {
   });
 
   it("falls back to a generic label and omits the round when not in combat", () => {
-    render(<LiveSessionStrip title={null} round={null} placement="mobile" onGoToCombat={vi.fn()} />);
+    render(<LiveSessionStrip title={null} round={null} onGoToCombat={vi.fn()} />);
     expect(screen.getByText(/Session live/)).toBeInTheDocument();
     expect(screen.queryByText(/Round/)).not.toBeInTheDocument();
   });

@@ -33,10 +33,28 @@ interface CharacterSheetHeaderProps {
   sessionActionBusy?: boolean;
   onLeaveSession?: () => void;
   onEndSession?: () => void;
+  /** Mobile only (#1026): the panel scroller has scrolled past the top, so the
+   *  compact header collapses to a single bar. */
+  scrolled?: boolean;
+  /** Mobile only (#1026): jump to the Combat tab — the live pill's tap target. */
+  onGoToCombat?: () => void;
   onOpenCapture: () => void;
   onOpenSessions: () => void;
   onOpenActivity: () => void;
   onOpenDelete: () => void;
+}
+
+/** The mobile header's folded-in Leave/End controls (#979), present only while
+ *  this character is in a live session. Extracted so the header render stays
+ *  under the cognitive ceiling. */
+function buildSessionActions(
+  isLiveJoined: boolean,
+  busy: boolean,
+  onLeave?: () => void,
+  onEnd?: () => void,
+): { busy: boolean; onLeave: () => void; onEnd: () => void } | null {
+  if (!isLiveJoined || !onLeave || !onEnd) return null;
+  return { busy, onLeave, onEnd };
 }
 
 /** Annotate the Combat tab with a gold "session live" pip (#961/#964); every
@@ -79,32 +97,77 @@ export default function CharacterSheetHeader({
   sessionActionBusy = false,
   onLeaveSession,
   onEndSession,
+  scrolled = false,
+  onGoToCombat,
   onOpenCapture,
   onOpenSessions,
   onOpenActivity,
   onOpenDelete,
 }: CharacterSheetHeaderProps) {
-  // Desktop tab bar mirrors the mobile nav pip: a gold dot on Combat while live.
-  const bannerTabs = withCombatLivePip(tabs, isLive);
   return (
     <>
       {/* Mobile: compact sticky mini-header. Desktop: the garnet banner below. */}
       <MobileSheetHeader
         character={character}
         onUpdate={onUpdate}
-        sessionActions={
-          isLiveJoined && onLeaveSession && onEndSession
-            ? { busy: sessionActionBusy, onLeave: onLeaveSession, onEnd: onEndSession }
-            : null
-        }
-        combatActive={activeTab === "combat"}
+        sessionActions={buildSessionActions(isLiveJoined, sessionActionBusy, onLeaveSession, onEndSession)}
         liveRound={liveRound}
-        sessionName={sessionName}
+        scrolled={scrolled}
+        onGoToCombat={onGoToCombat}
         onOpenCapture={onOpenCapture}
         onOpenSessions={onOpenSessions}
         onOpenActivity={onOpenActivity}
         onOpenDelete={onOpenDelete}
       />
+      <DesktopBanner
+        character={character}
+        onUpdate={onUpdate}
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        isLive={isLive}
+        liveRound={liveRound}
+        sessionName={sessionName}
+        isLiveJoined={isLiveJoined}
+        sessionActionBusy={sessionActionBusy}
+        onLeaveSession={onLeaveSession}
+        onEndSession={onEndSession}
+        onOpenCapture={onOpenCapture}
+        onOpenSessions={onOpenSessions}
+        onOpenActivity={onOpenActivity}
+        onOpenDelete={onOpenDelete}
+      />
+    </>
+  );
+}
+
+/**
+ * The desktop garnet banner (`hidden md:block`): level crest + identity + the
+ * always-on vitals + workspace tab bar, with the slim live strip while a session
+ * is live. Extracted from CharacterSheetHeader so each render function stays
+ * shallow; the mobile counterpart is MobileSheetHeader.
+ */
+function DesktopBanner({
+  character,
+  onUpdate,
+  tabs,
+  activeTab,
+  onTabChange,
+  isLive = false,
+  liveRound = null,
+  sessionName = null,
+  isLiveJoined = false,
+  sessionActionBusy = false,
+  onLeaveSession,
+  onEndSession,
+  onOpenCapture,
+  onOpenSessions,
+  onOpenActivity,
+  onOpenDelete,
+}: Omit<CharacterSheetHeaderProps, "scrolled" | "onGoToCombat">) {
+  // Desktop tab bar mirrors the mobile nav pip: a gold dot on Combat while live.
+  const bannerTabs = withCombatLivePip(tabs, isLive);
+  return (
       <header className="hidden bg-gradient-to-br from-garnet-800 via-garnet-700 to-garnet-900 text-parchment-50 md:block">
       <div className="mx-auto max-w-6xl px-6 pt-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -189,7 +252,6 @@ export default function CharacterSheetHeader({
         </div>
       </div>
       </header>
-    </>
   );
 }
 

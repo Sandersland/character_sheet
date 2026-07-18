@@ -154,10 +154,11 @@ describe("CharacterSheetHeader banner chrome (#985)", () => {
     expect(screen.getAllByRole("button", { name: /Note/ })).toHaveLength(1);
   });
 
-  it("renders the live strip with the session name and a single round indicator", () => {
+  it("renders the live strip with the session name and one round indicator per breakpoint", () => {
     renderHeader({ activeTab: "overview", isLive: true, liveRound: 2, sessionName: "Goblin Ambush", isLiveJoined: true, onLeaveSession: vi.fn(), onEndSession: vi.fn() });
     expect(screen.getByText(/Goblin Ambush/)).toBeInTheDocument();
-    // One round indicator only (no floating badge duplicating it).
-    expect(screen.getAllByText("Round 2")).toHaveLength(1);
+    // Exactly two round indicators — the desktop banner strip and the mobile
+    // header pill (#1026); only one is visible at a time by breakpoint.
+    expect(screen.getAllByText("Round 2")).toHaveLength(2);
   });
 });
