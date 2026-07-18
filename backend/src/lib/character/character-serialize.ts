@@ -1,31 +1,15 @@
 import { experienceProgress, levelForExperience } from "@/lib/leveling/experience.js";
-import {
-  serializeArmorDetail,
-  serializeConsumableDetail,
-  serializeWeaponDetail,
-} from "@/lib/inventory/itemDetail.js";
 import { normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import {
   abilityModifier,
   advancementSlotsForLevel,
-  deriveArmorClass,
-  deriveArmorClassParts,
   deriveAttacksPerAction,
-  deriveFastMovement,
   deriveFeatBonuses,
   deriveFeatProficiencies,
   deriveSpellcasting,
   deriveMulticlassSpellcasting,
   derivePreparedSpellLimit,
-  deriveImprovisedAttack,
-  deriveUnarmedDamageDie,
-  deriveUnarmedStrike,
-  deriveUnarmoredMovement,
-  deriveWeaponAttackBonus,
-  deriveWeaponDamage,
-  deriveFightingStyleBonuses,
   fightingStyleChoiceCount,
-  type BodyArmorCategory,
   type FightingStyleKey,
 } from "@/lib/srd/srd.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
@@ -33,17 +17,6 @@ import { deriveActions, type AvailableAction } from "@/lib/classes/actions.js";
 import { normalizeResourcesMutable, type AdvancementEntry } from "@/lib/classes/resources.js";
 import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
 import { normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
-import {
-  activatedMaxUses,
-  chargePoolOf,
-  describeActivatedReminder,
-  describeChargeRecharge,
-  deriveItemGrants,
-  readCapability,
-  serializeCapability,
-  type ActivatedEffectCapability,
-} from "@/lib/inventory/capabilities.js";
-import { itemBuffKey } from "@/lib/inventory/inventory.js";
 import { reverseAdvancementEffects } from "@/lib/leveling/advancement.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spellcasting.js";
 import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
@@ -55,7 +28,7 @@ import {
 } from "@/lib/spellcasting/granted-spells.js";
 import { SHADOW_ART_CONCENTRATION_PREFIX } from "@/lib/classes/shadow-arts.js";
 import type { CharacterWithRelations } from "./character-include.js";
-import { buildRollModifiers, buildTargetModifiers, type TargetModifierMap } from "./serialize/effects.js";
+import { buildRollModifiers, buildTargetModifiers } from "./serialize/effects.js";
 import {
   buildMergedArmorProficiencies,
   buildMergedWeaponProficiencies,
@@ -64,6 +37,13 @@ import {
   buildToolProficienciesView,
   mergeItemWeaponProficiencies,
 } from "./serialize/proficiencies.js";
+import { buildInventoryContext, buildItemGrantsView, serializeInventoryItem } from "./serialize/inventory.js";
+import {
+  buildArmorClassView,
+  buildSpeedView,
+  buildUnarmedAttacksView,
+  selectEquippedBodyArmor,
+} from "./serialize/combat.js";
 
 export { buildRollModifiers };
 
@@ -113,181 +93,6 @@ export function serializeCharacterSummary(row: {
 // `consumable` sub-objects via the shared lib/itemDetail.js serializers
 // (also used by routes/items.ts for the catalog) rather than flattening
 // back out — `id`/the owning FK aren't meaningful to the client.
-
-interface InventoryItemContext {
-  /** The character's effective ability scores (post-advancement-clamp). */
-  effectiveScores: Record<string, number>;
-  /** The character's proficiency bonus (derived from level). */
-  proficiencyBonus: number;
-  /** The character's merged weapon proficiency grants (class + race + feat). */
-  weaponGrants: ReadonlyArray<{ name: string }>;
-  /**
-   * True when any equipped item occupies the off-hand: either an equipped
-   * shield or ≥ 2 equipped weapons. Used by `deriveWeaponDamage` to resolve
-   * the correct die for versatile weapons (2H die when off-hand is free).
-   */
-  offHandBusy: boolean;
-  /**
-   * The character's chosen Fighting Style (already clamped to null when the
-   * character isn't entitled). Threaded into deriveWeaponAttackBonus so Archery
-   * adds +2 to ranged weapon attacks.
-   */
-  fightingStyle: FightingStyleKey | null;
-  /** Sum of active "meleeDamage" buffs (#455); added to melee weapon damage. */
-  meleeDamageBonus: number;
-  /** Sum of active "attackRoll" buffs (#419, e.g. Sacred Weapon); added to weapon attack bonus. */
-  attackRollBonus: number;
-  /** Buff keys currently active — an activatedEffect item is "active" when its key is present (#543). */
-  activeItemBuffKeys: Set<string>;
-}
-
-// Catalog/description identity fields — the item-facts an inventory row
-// snapshots regardless of category (weapon/armor/consumable/gear all have
-// these; the category-specific detail block nests in separately below).
-function buildInventoryItemIdentity(row: CharacterWithRelations["inventoryItems"][number]) {
-  return {
-    id: row.id,
-    itemId: row.itemId ?? undefined,
-    name: row.name,
-    category: row.category,
-    quantity: row.quantity,
-    weight: row.weight ?? undefined,
-    cost: row.cost ?? undefined,
-    description: row.description ?? undefined,
-  };
-}
-
-// Paper-doll placement (#565) + attunement (#545) state. `equipped` is
-// DERIVED from placement — equippedSlot is the source of truth.
-function buildInventoryItemPlacement(row: CharacterWithRelations["inventoryItems"][number]) {
-  return {
-    equipped: row.equippedSlot != null,
-    equippedSlot: row.equippedSlot ?? undefined,
-    slot: row.slot ?? undefined,
-    rarity: row.rarity ?? undefined,
-    attuned: row.attuned,
-    requiresAttunement: row.requiresAttunement,
-    attunementPrereqKind: row.attunementPrereqKind ?? undefined,
-    attunementPrereqValue: row.attunementPrereqValue ?? undefined,
-    notes: row.notes ?? undefined,
-  };
-}
-
-// The weapon sub-object (detail snapshot + derived attackBonus/damage), or
-// undefined for a non-weapon row.
-function buildInventoryWeaponView(
-  row: CharacterWithRelations["inventoryItems"][number],
-  context: InventoryItemContext,
-):
-  | (ReturnType<typeof serializeWeaponDetail> & {
-      attackBonus: number;
-      damage: ReturnType<typeof deriveWeaponDamage>;
-    })
-  | undefined {
-  if (!row.weaponDetail) return undefined;
-  return {
-    ...serializeWeaponDetail(row.weaponDetail),
-    attackBonus: deriveWeaponAttackBonus(
-      {
-        name: row.name,
-        finesse: row.weaponDetail.finesse,
-        weaponClass: row.weaponDetail.weaponClass,
-        weaponRange: row.weaponDetail.weaponRange,
-      },
-      context.effectiveScores,
-      context.proficiencyBonus,
-      context.weaponGrants,
-      context.fightingStyle,
-      context.attackRollBonus,
-    ),
-    damage: deriveWeaponDamage(
-      {
-        name: row.name,
-        finesse: row.weaponDetail.finesse,
-        weaponRange: row.weaponDetail.weaponRange,
-        damageDiceCount: row.weaponDetail.damageDiceCount,
-        damageDiceFaces: row.weaponDetail.damageDiceFaces,
-        damageType: row.weaponDetail.damageType,
-        versatileDiceCount: row.weaponDetail.versatileDiceCount,
-        versatileDiceFaces: row.weaponDetail.versatileDiceFaces,
-        twoHanded: row.weaponDetail.twoHanded,
-      },
-      context.offHandBusy,
-      context.effectiveScores,
-      context.meleeDamageBonus,
-    ),
-  };
-}
-
-function serializeInventoryItem(
-  row: CharacterWithRelations["inventoryItems"][number],
-  context: InventoryItemContext,
-) {
-  return {
-    ...buildInventoryItemIdentity(row),
-    ...buildInventoryItemPlacement(row),
-    weapon: buildInventoryWeaponView(row, context),
-    armor: row.armorDetail ? serializeArmorDetail(row.armorDetail) : undefined,
-    consumable: row.consumableDetail ? serializeConsumableDetail(row.consumableDetail) : undefined,
-    capabilities: row.capabilities.length > 0 ? row.capabilities.map(serializeCapability) : undefined,
-    activated: serializeActivatedEffect(row, context),
-    charges: serializeChargePool(row),
-  };
-}
-
-// Derives the item's shared charge-pool state (#555): max, remaining (derived,
-// never stored), and the human recharge text for the pill's tooltip. Absent when
-// the item has no well-formed charges capability.
-function serializeChargePool(row: CharacterWithRelations["inventoryItems"][number]) {
-  const pool = chargePoolOf(row.capabilities);
-  if (!pool) return undefined;
-  return {
-    max: pool.cap.maxCharges,
-    remaining: Math.max(0, pool.cap.maxCharges - (pool.row.used ?? 0)),
-    recharge: describeChargeRecharge(pool.cap),
-  };
-}
-
-// Derives the activate/deactivate control state for an item's activatedEffect
-// capability (#543): remaining uses, active flag, and the reminder text. Absent
-// when the item has no activatedEffect capability.
-function serializeActivatedEffect(
-  row: CharacterWithRelations["inventoryItems"][number],
-  context: InventoryItemContext,
-) {
-  const cap = row.capabilities
-    .map(readCapability)
-    // Type-predicate (not a cast): an opaque row with kind "activatedEffect" but no
-    // `activation` (readCapability's fallthrough) must NOT match — else the reminder
-    // string would drop the DM's label. Require the field to be present.
-    .find((c): c is ActivatedEffectCapability => c.kind === "activatedEffect" && "activation" in c);
-  if (!cap) return undefined;
-  // A charges-costed effect (#555) is bounded by the item's shared pool: "uses"
-  // = how many activations the remaining charges afford (floor division), so
-  // ActivateControl's readout and out-of-uses gating work unchanged.
-  if (cap.resourceKind === "charges") {
-    const pool = chargePoolOf(row.capabilities);
-    const cost = Math.max(1, cap.chargeCost);
-    const remaining = pool ? Math.max(0, pool.cap.maxCharges - (pool.row.used ?? 0)) : 0;
-    return {
-      activation: cap.activation,
-      reminder: describeActivatedReminder(cap),
-      maxUses: pool ? Math.floor(pool.cap.maxCharges / cost) : 0,
-      remainingUses: Math.floor(remaining / cost),
-      active: context.activeItemBuffKeys.has(itemBuffKey(row.id)),
-      available: row.equippedSlot != null || row.attuned,
-    };
-  }
-  const maxUses = activatedMaxUses(cap);
-  return {
-    activation: cap.activation,
-    reminder: describeActivatedReminder(cap),
-    maxUses,
-    remainingUses: maxUses === null ? null : Math.max(0, maxUses - row.activatedUsesSpent),
-    active: context.activeItemBuffKeys.has(itemBuffKey(row.id)),
-    available: row.equippedSlot != null || row.attuned,
-  };
-}
 
 type PrimaryClass = CharacterWithRelations["classEntries"][number] | undefined;
 
@@ -754,231 +559,6 @@ function applyFeatLayer(
   // proficiencies by the caller using OR — existing proficiency is never removed.
   const featProficiencies = deriveFeatProficiencies(clampedAdvancements);
   return { featBonuses, effectiveMaxHp, featProficiencies };
-}
-
-// Off-hand state is computed once for the whole inventory so versatile weapons
-// know whether to use their two-handed die. Off-hand is "busy" when any equipped
-// item is a shield OR when 2+ weapons are equipped (two-weapon fighting) — the
-// lightweight approach that avoids a full main-hand/off-hand slot model.
-function buildInventoryContext(
-  row: CharacterWithRelations,
-  effectiveScores: Record<string, number>,
-  proficiencyBonus: number,
-  weaponGrants: ReturnType<typeof buildMergedWeaponProficiencies>,
-  fightingStyle: FightingStyleKey | null,
-  buffTargets: TargetModifierMap,
-): InventoryItemContext {
-  const equippedItems = row.inventoryItems.filter((i) => i.equippedSlot != null);
-  const equippedShieldPresent = equippedItems.some(
-    (i) => i.armorDetail?.armorCategory === "shield",
-  );
-  const equippedWeaponCount = equippedItems.filter((i) => i.category === "weapon").length;
-  const offHandBusy = equippedShieldPresent || equippedWeaponCount >= 2;
-
-  // Sum "meleeDamage" contributions (Rage buff + item passiveBonus) — added to
-  // melee weapon damage in deriveWeaponDamage, the same read path skills use (#455/#545).
-  const meleeDamageBonus = (buffTargets.meleeDamage ?? []).reduce((sum, b) => sum + b.modifier, 0);
-  // Sum "attackRoll" contributions (Sacred Weapon buff + item passiveBonus) — added
-  // to weapon attack bonus (#419/#545).
-  const attackRollBonus = (buffTargets.attackRoll ?? []).reduce((sum, b) => sum + b.modifier, 0);
-
-  // Active-item buff keys — an activatedEffect item is "active" when its item:<id> buff is present.
-  const activeItemBuffKeys = new Set(normalizeActiveEffectsMutable(row.activeEffects).buffs.map((b) => b.key));
-
-  return { effectiveScores, proficiencyBonus, weaponGrants, offHandBusy, fightingStyle, meleeDamageBonus, attackRollBonus, activeItemBuffKeys };
-}
-
-// Item-granted traits (#529): resistances/immunities/conditionImmunities/
-// advantages/proficiencies from active (equipped or attuned-when-required)
-// items. Derived on read — nothing here is persisted. resistances also feed
-// the #456 halve flow at damage-apply time (lib/combat/hitpoints.ts). The skill/save
-// name Sets are pre-split for the proficiency merges below.
-function buildItemGrantsView(row: CharacterWithRelations): {
-  itemGrants: ReturnType<typeof deriveItemGrants>;
-  itemSkillProfs: Set<string>;
-  itemSaveProfs: Set<string>;
-} {
-  const itemGrants = deriveItemGrants(
-    row.inventoryItems.map((i) => ({
-      name: i.name,
-      equipped: i.equippedSlot != null,
-      attuned: i.attuned,
-      requiresAttunement: i.requiresAttunement,
-      capabilities: i.capabilities,
-    })),
-  );
-  const itemSkillProfs = new Set(
-    itemGrants.proficiencies.filter((p) => p.profType === "skill").map((p) => p.value),
-  );
-  const itemSaveProfs = new Set(
-    itemGrants.proficiencies.filter((p) => p.profType === "save").map((p) => p.value),
-  );
-  return { itemGrants, itemSkillProfs, itemSaveProfs };
-}
-
-// The best equipped body armor snapshot (or null when unarmored) in the shape
-// deriveArmorClassParts consumes.
-type BestBodyArmor = Parameters<typeof deriveArmorClassParts>[0];
-
-// AC is derived, not persisted: best equipped body armor + Dex (per category)
-// + shield. The BODY slot holds one body armor (#565), so "best" is defensive.
-// bestArmor/hasShield also feed speed (Unarmored/Fast Movement) and the Monk
-// unarmed strike, so they're selected once here and threaded to those builders.
-function selectEquippedBodyArmor(
-  row: CharacterWithRelations,
-  effectiveScores: Record<string, number>,
-): { bestArmor: BestBodyArmor; hasShield: boolean } {
-  const equippedArmorDetails = row.inventoryItems
-    .filter((i) => i.equippedSlot != null && i.armorDetail)
-    .map((i) => ({ name: i.name, ...i.armorDetail! }));
-  const hasShield = equippedArmorDetails.some((a) => a.armorCategory === "shield");
-  const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
-  const bestArmor = equippedArmorDetails
-    .filter((a): a is (typeof equippedArmorDetails)[number] & { armorCategory: BodyArmorCategory } => a.armorCategory !== "shield")
-    .reduce<BestBodyArmor>((best, a) => {
-      const candidate = {
-        name: a.name,
-        armorCategory: a.armorCategory,
-        baseArmorClass: a.baseArmorClass,
-        dexModifierMax: a.dexModifierMax,
-      };
-      if (best === null) return candidate;
-      return deriveArmorClass(candidate, false, dexMod) > deriveArmorClass(best, false, dexMod)
-        ? candidate
-        : best;
-    }, null);
-  return { bestArmor, hasShield };
-}
-
-// AC assembly: labeled addends whose exact sum is armorClass (single source of
-// the base formula in srd/srd.ts). Layered in order: base parts (armor/Dex/shield/
-// Unarmored Defense/Mage Armor best-of) → Defense fighting style → feat AC →
-// per-source "ac" buffs → the acFloor (Barkskin) reconciling part last.
-// The branchiness is inherent to the 5e AC layering (each optional source is a
-// conditional addend), not accidental complexity — it was previously inlined in
-// serializeCharacter's body; extracting it here is a net structural win.
-// fallow-ignore-next-line complexity
-function buildArmorClassView(
-  row: CharacterWithRelations,
-  effectiveScores: Record<string, number>,
-  bestArmor: BestBodyArmor,
-  hasShield: boolean,
-  fightingStyle: FightingStyleKey | null,
-  featBonuses: ReturnType<typeof deriveFeatBonuses>,
-  buffTargets: TargetModifierMap,
-): { armorClass: number; armorClassBreakdown: ReturnType<typeof deriveArmorClassParts> } {
-  const dexMod = abilityModifier(effectiveScores.dexterity ?? 10);
-  // Feeds Unarmored Defense (Barbarian/Monk) when no body armor is equipped.
-  const unarmoredDefense = {
-    classNames: row.classEntries.map((e) => e.name),
-    conMod: abilityModifier(effectiveScores.constitution ?? 10),
-    wisMod: abilityModifier(effectiveScores.wisdom ?? 10),
-  };
-  // Mage Armor (#363): a spell buff sets the unarmored base to 13 + Dex — the
-  // highest-valued `acUnarmoredBase` buff becomes a best-of candidate in the
-  // unarmored formula (ignored while wearing body armor; the equip hook true-ends it).
-  const mageArmor = (buffTargets.acUnarmoredBase ?? []).reduce<{ label: string; value: number } | undefined>(
-    (best, c) => (best && best.value >= c.modifier ? best : { label: c.source, value: c.modifier }),
-    undefined,
-  );
-  // Labeled AC addends; armorClass below is their exact sum (single source in srd/srd.ts).
-  const acParts = deriveArmorClassParts(bestArmor, hasShield, dexMod, unarmoredDefense, mageArmor);
-  // Defense fighting style only applies while wearing body armor (5e).
-  const styleAc = bestArmor !== null ? deriveFightingStyleBonuses(fightingStyle).armorClass : 0;
-  if (styleAc !== 0) acParts.push({ label: "Defense fighting style", value: styleAc });
-  if (featBonuses.armorClass !== 0) acParts.push({ label: "Feats", value: featBonuses.armorClass });
-  // Active-item AC bonuses (#383) + flat AC spell buffs (Shield of Faith +2, #363):
-  // each labeled per source. v1 applies only unconditional bonuses; a conditional
-  // one surfaces as reminder text (value 0) rather than being silently added.
-  for (const c of buffTargets.ac ?? []) {
-    if (c.condition) acParts.push({ label: c.source, value: 0, reminder: c.condition });
-    else acParts.push({ label: c.source, value: c.modifier });
-  }
-  // Barkskin (#363): AC can't drop below the floor while active — applied last,
-  // stacking over armor/Dex/buffs. Kept in the breakdown as a reconciling part so
-  // the labeled parts still sum to armorClass (a 0-value reminder when AC already
-  // meets the floor). Highest floor wins if several are active.
-  const acFloor = (buffTargets.acFloor ?? []).reduce<{ source: string; value: number } | undefined>(
-    (best, c) => (best && best.value >= c.modifier ? best : { source: c.source, value: c.modifier }),
-    undefined,
-  );
-  if (acFloor) {
-    const subtotal = acParts.reduce((total, p) => total + p.value, 0);
-    if (subtotal < acFloor.value) {
-      acParts.push({ label: `${acFloor.source} (floor ${acFloor.value})`, value: acFloor.value - subtotal });
-    } else {
-      acParts.push({ label: acFloor.source, value: 0, reminder: `floor ${acFloor.value}` });
-    }
-  }
-  return {
-    armorClass: acParts.reduce((total, p) => total + p.value, 0),
-    armorClassBreakdown: acParts,
-  };
-}
-
-// Per-class level lookup (0 when the class isn't in the mix) — multiclass-safe
-// inputs for the class-level-scaled speed/unarmed terms.
-function classEntryLevel(row: CharacterWithRelations, className: string): number {
-  return row.classEntries.find((e) => e.name.toLowerCase() === className)?.level ?? 0;
-}
-
-// Speed is the persisted racial base plus additive terms only (never merged
-// into each other): feat speed bonuses, Monk Unarmored Movement (monk class
-// level, unarmored & unshielded), Barbarian Fast Movement (barbarian class
-// level 5+, not in heavy armor), and any active "speed"-targeted buff
-// (e.g. Boots of Speed, #543).
-function buildSpeedView(
-  row: CharacterWithRelations,
-  bestArmor: BestBodyArmor,
-  hasShield: boolean,
-  featBonuses: ReturnType<typeof deriveFeatBonuses>,
-  buffTargets: TargetModifierMap,
-): number {
-  const unarmoredMovementBonus = deriveUnarmoredMovement({
-    monkLevel: classEntryLevel(row, "monk"),
-    isUnarmored: bestArmor === null,
-    hasShield,
-  });
-  const fastMovementBonus = deriveFastMovement({
-    barbarianLevel: classEntryLevel(row, "barbarian"),
-    wearingHeavyArmor: bestArmor?.armorCategory === "heavy",
-  });
-  return (
-    row.speed +
-    featBonuses.speed +
-    unarmoredMovementBonus +
-    fastMovementBonus +
-    (buffTargets["speed"] ?? []).reduce((sum, b) => sum + b.modifier, 0)
-  );
-}
-
-// Unarmed strike + improvised weapon rows. Derived from the same clamped
-// advancements slice so Tavern Brawler's upgrades are automatically excluded
-// when the character is over-cap. A Monk (unarmored & unshielded) swaps in
-// max(Dex, Str) + the level-scaled Martial Arts die, off the monk class-entry
-// level for multiclass correctness.
-function buildUnarmedAttacksView(
-  row: CharacterWithRelations,
-  effectiveScores: Record<string, number>,
-  proficiencyBonus: number,
-  clampedAdvancements: AdvancementEntry[],
-  weaponGrants: ReadonlyArray<{ name: string }>,
-  bestArmor: BestBodyArmor,
-  hasShield: boolean,
-): { unarmedStrike: ReturnType<typeof deriveUnarmedStrike>; improvisedWeapon: ReturnType<typeof deriveImprovisedAttack> } {
-  const unarmedDie = deriveUnarmedDamageDie(clampedAdvancements);
-  const unarmedStrike = deriveUnarmedStrike(effectiveScores, proficiencyBonus, unarmedDie, {
-    level: classEntryLevel(row, "monk"),
-    isUnarmored: bestArmor === null,
-    hasShield,
-  });
-  const improvisedProficient = weaponGrants.some((g) => g.name === "Improvised Weapons");
-  const improvisedWeapon = deriveImprovisedAttack(
-    effectiveScores,
-    proficiencyBonus,
-    improvisedProficient,
-  );
-  return { unarmedStrike, improvisedWeapon };
 }
 
 // Class-specific available actions for the turn tracker — derived from
