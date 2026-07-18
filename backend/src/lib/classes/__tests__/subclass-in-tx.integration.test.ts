@@ -129,4 +129,48 @@ describe("setSubclassInTx (#895 seam)", () => {
       ),
     ).rejects.toThrowError(InvalidClassOperationError);
   });
+
+  // #1065: the target entry is resolved by the subclass's class, not position 0.
+  async function multiclassAt(fighterLevel: number) {
+    const character = await prisma.character.create({
+      data: {
+        ...BASE_CHAR,
+        experiencePoints: 6500, // derived total 5; multiclass uses per-entry levels
+        ownerId: OWNER_ID,
+        spellcasting: Prisma.JsonNull,
+        classEntries: {
+          create: [
+            { name: "wizard", classId: wizardId, position: 0, level: 3 },
+            { name: "fighter", classId: fighterId, position: 1, level: fighterLevel },
+          ],
+        },
+      },
+      include: { classEntries: { orderBy: { position: "asc" } } },
+    });
+    createdChars.push(character.id);
+    return character;
+  }
+
+  it("writes the subclass onto a NON-primary entry of the subclass's class", async () => {
+    const character = await multiclassAt(3);
+    const [primary, secondary] = character.classEntries;
+
+    await prisma.$transaction((tx) =>
+      setSubclassInTx(tx, character.id, { type: "setSubclass", subclassId: battleMasterId }, BATCH, null),
+    );
+
+    const after = await prisma.characterClassEntry.findUniqueOrThrow({ where: { id: secondary.id } });
+    expect(after.subclassId).toBe(battleMasterId);
+    const untouchedPrimary = await prisma.characterClassEntry.findUniqueOrThrow({ where: { id: primary.id } });
+    expect(untouchedPrimary.subclassId).toBeNull();
+  });
+
+  it("throws when the NON-primary entry's class level is below the grant level", async () => {
+    const character = await multiclassAt(2); // fighter 2 < subclassLevel 3 (derived total 5 must NOT mask this)
+    await expect(
+      prisma.$transaction((tx) =>
+        setSubclassInTx(tx, character.id, { type: "setSubclass", subclassId: battleMasterId }, BATCH, null),
+      ),
+    ).rejects.toThrowError(InvalidClassOperationError);
+  });
 });

@@ -589,6 +589,134 @@ describe("POST …/level-up/transactions — rejection matrix", () => {
   });
 });
 
+// Non-primary ceremonies (#1065): multiclass-into-Fighter is the canonical case —
+// its plan is [hitPoints, fightingStyle, review], so without generalized class
+// appliers no valid submission exists at all.
+describe("POST …/level-up/transactions — multiclass ceremonies (#1065)", () => {
+  const WIZARD_FIXTURE = {
+    ...BASE,
+    ownerId: OWNER_ID,
+    // STR 14 satisfies the Fighter multiclass prerequisite (STR 13 or DEX 13).
+    abilityScores: { strength: 14, dexterity: 12, constitution: 12, intelligence: 16, wisdom: 10, charisma: 10 },
+    spellcasting: { slotsUsed: {}, arcanumUsed: {}, spells: [], concentratingOn: null },
+  };
+
+  it("multiclass INTO Fighter applies hp + fighting style under one batchId, and the style survives serialization", async () => {
+    const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const CHAR_ID = "lvtx-mc-into-fighter";
+    await prisma.character.create({
+      data: {
+        ...WIZARD_FIXTURE,
+        id: CHAR_ID,
+        name: "LevelUpTx MC Into Fighter",
+        experiencePoints: 2700, // level 4 threshold; hitDice.total 3 → 1 pending
+        hitPoints: { current: 18, max: 18, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 3, die: "d6", spent: 0 },
+        classEntries: {
+          create: [{ name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 3 }],
+        },
+      },
+    });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "new", classId: fighter.id },
+      hp: { method: "average" },
+      fightingStyle: "defense",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.hitDice.total).toBe(4);
+    // The new level-1 Fighter entry exists and the chosen style is VISIBLE on the
+    // wire — the read-side clamp must not null it just because the primary class
+    // (wizard) grants no style.
+    expect(res.body.classes).toHaveLength(2);
+    // The created entry snapshots the catalog's display name ("Fighter").
+    expect(res.body.classes[1]).toMatchObject({ name: "Fighter", level: 1 });
+    expect(res.body.resources.fightingStyle).toBe("defense");
+
+    const batchIds = await distinctBatchIds(CHAR_ID);
+    expect(batchIds).toHaveLength(1);
+
+    // Persisted, not just serialized.
+    const after = await prisma.character.findUniqueOrThrow({ where: { id: CHAR_ID } });
+    expect((after.resources as { fightingStyle?: string }).fightingStyle).toBe("defense");
+  });
+
+  it("single revert undoes the whole multiclass ceremony: entry gone, style cleared", async () => {
+    const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const CHAR_ID = "lvtx-mc-undo";
+    await prisma.character.create({
+      data: {
+        ...WIZARD_FIXTURE,
+        id: CHAR_ID,
+        name: "LevelUpTx MC Undo",
+        experiencePoints: 2700,
+        hitPoints: { current: 18, max: 18, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 3, die: "d6", spent: 0 },
+        classEntries: {
+          create: [{ name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 3 }],
+        },
+      },
+    });
+
+    const ceremony = await post(CHAR_ID, {
+      target: { kind: "new", classId: fighter.id },
+      hp: { method: "average" },
+      fightingStyle: "defense",
+    });
+    expect(ceremony.status).toBe(200);
+
+    const res = await revert(CHAR_ID, await latestBatchId(CHAR_ID));
+    expect(res.status).toBe(200);
+    expect(res.body.classes).toHaveLength(1);
+    expect(res.body.hitDice.total).toBe(3);
+    expect(res.body.resources.fightingStyle ?? null).toBeNull();
+    expect(res.body.pendingLevelUps).toBe(1);
+  });
+
+  it("an EXISTING non-primary Fighter 2→3 can choose a subclass with no resource choices (Champion)", async () => {
+    const wizard = await prisma.characterClass.findFirstOrThrow({ where: { name: "Wizard" } });
+    const fighter = await prisma.characterClass.findFirstOrThrow({ where: { name: "Fighter" } });
+    const champion = await prisma.subclass.findFirstOrThrow({ where: { name: "Champion", classId: fighter.id } });
+    const CHAR_ID = "lvtx-mc-champion";
+    await prisma.character.create({
+      data: {
+        ...WIZARD_FIXTURE,
+        id: CHAR_ID,
+        name: "LevelUpTx MC Champion",
+        experiencePoints: 14000, // level 6 threshold; entries sum 5 → 1 pending
+        hitPoints: { current: 34, max: 34, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+        hitDice: { total: 5, die: "d6", spent: 0 },
+        classEntries: {
+          create: [
+            { name: "wizard", subclass: "School of Evocation", classId: wizard.id, position: 0, level: 3 },
+            { name: "fighter", subclass: null, classId: fighter.id, position: 1, level: 2 },
+          ],
+        },
+      },
+    });
+    const secondary = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID, position: 1 } });
+
+    const res = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: secondary.id },
+      hp: { method: "average" },
+      subclassId: champion.id,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.hitDice.total).toBe(6);
+    expect(res.body.classes[1].subclass).toBe("Champion");
+
+    // The subclass landed on the SECONDARY entry, not the primary.
+    const persisted = await prisma.characterClassEntry.findUniqueOrThrow({ where: { id: secondary.id } });
+    expect(persisted.subclass).toBe("Champion");
+    const primary = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID, position: 0 } });
+    expect(primary.subclass).toBe("School of Evocation");
+  });
+});
+
 // Hunter's Prey (Ranger → Hunter, L3) is the seeded generic subclass choice that
 // makes the known-key count check reachable without fixture gymnastics.
 describe("POST …/level-up/transactions — subclassChoice validator messages", () => {
