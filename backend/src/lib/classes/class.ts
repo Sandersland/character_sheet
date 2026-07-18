@@ -30,11 +30,7 @@ import {
   snapshotResources,
 } from "./resources.js";
 
-// ── Error class ───────────────────────────────────────────────────────────────
-
 export class InvalidClassOperationError extends Error {}
-
-// ── Operation types ───────────────────────────────────────────────────────────
 
 /** Set the character's subclass by catalog id. */
 export interface SetSubclassOperation {
@@ -61,9 +57,7 @@ export type ClassOperation =
   | SetFightingStyleOperation
   | AddClassOperation;
 
-// ── Transaction handler ───────────────────────────────────────────────────────
-
-// Per-op context: the transaction client plus the batch/session ids stable
+// Transaction handler. Per-op context: the transaction client plus the batch/session ids stable
 // across the whole batch. Each helper re-reads the character with its own select.
 interface ClassOpContext {
   tx: Prisma.TransactionClient;
@@ -209,7 +203,7 @@ async function applySetFightingStyle(ctx: ClassOpContext, op: SetFightingStyleOp
   await logEvent(tx, {
     characterId,
     // `resources` category so the existing resources revert branch in
-    // routes/activity.ts restores before.resources (incl. fightingStyle)
+    // activityRouter's undo restores before.resources (incl. fightingStyle)
     // with zero new undo code.
     category: "resources",
     type: "fightingStyleChosen",

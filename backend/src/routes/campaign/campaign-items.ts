@@ -35,8 +35,10 @@ import { prisma } from "@/lib/core/prisma.js";
 
 export const campaignItemsRouter = Router();
 
-// ── GET /api/campaigns/:id/items ─────────────────────────────────────────────
-// Owner-only full list (Manage tab) — includes dmNotes. Players get 403.
+/**
+ * GET /api/campaigns/:id/items
+ * Owner-only full list (Manage tab) — includes dmNotes. Players get 403.
+ */
 campaignItemsRouter.get("/campaigns/:id/items", async (req, res) => {
   await assertCampaignOwner(
     prisma,
@@ -55,9 +57,11 @@ campaignItemsRouter.get("/campaigns/:id/items", async (req, res) => {
   res.json(items.map((row) => serializeCampaignItem(row, true, holders.get(row.id) ?? [])));
 });
 
-// ── GET /api/campaigns/:id/items/by-entity/:entityId ─────────────────────────
-// Member-readable single item for the Codex card, keyed by the fronting entity.
-// Non-owners only see it when that entity is REVEALED, and never see dmNotes.
+/**
+ * GET /api/campaigns/:id/items/by-entity/:entityId
+ * Member-readable single item for the Codex card, keyed by the fronting entity.
+ * Non-owners only see it when that entity is REVEALED, and never see dmNotes.
+ */
 campaignItemsRouter.get("/campaigns/:id/items/by-entity/:entityId", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
   const isOwner = role === "OWNER";
@@ -83,8 +87,10 @@ campaignItemsRouter.get("/campaigns/:id/items/by-entity/:entityId", async (req, 
   res.json(serializeCampaignItem(link.campaignItem, isOwner, holders.get(link.campaignItem.id) ?? []));
 });
 
-// ── POST /api/campaigns/:id/items ────────────────────────────────────────────
-// Owner-only create. Auto-registers a HIDDEN ITEM entity + link in one txn.
+/**
+ * POST /api/campaigns/:id/items
+ * Owner-only create. Auto-registers a HIDDEN ITEM entity + link in one txn.
+ */
 campaignItemsRouter.post("/campaigns/:id/items", async (req, res) => {
   await assertCampaignOwner(
     prisma,
@@ -123,8 +129,10 @@ campaignItemsRouter.post("/campaigns/:id/items", async (req, res) => {
   res.status(201).json(serializeCampaignItem(created, true));
 });
 
-// ── PATCH /api/campaigns/:id/items/:itemId ───────────────────────────────────
-// Owner-only update. A rename is mirrored onto the fronting entity in the txn.
+/**
+ * PATCH /api/campaigns/:id/items/:itemId
+ * Owner-only update. A rename is mirrored onto the fronting entity in the txn.
+ */
 campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
   await assertCampaignOwner(
     prisma,
@@ -196,11 +204,13 @@ campaignItemsRouter.patch("/campaigns/:id/items/:itemId", async (req, res) => {
   res.json(serializeCampaignItem(updated, true));
 });
 
-// ── DELETE /api/campaigns/:id/items/:itemId ──────────────────────────────────
-// Owner-only. CLEANUP RULE (mirrors the CampaignCharacterLink precedent): the
-// fronting ITEM entity has no life without its item, so deleting the item also
-// deletes its linked entity in the same transaction (which cascades the link +
-// any journal refs). The item delete cascades its detail rows.
+/**
+ * DELETE /api/campaigns/:id/items/:itemId
+ * Owner-only. CLEANUP RULE (mirrors the CampaignCharacterLink precedent): the
+ * fronting ITEM entity has no life without its item, so deleting the item also
+ * deletes its linked entity in the same transaction (which cascades the link +
+ * any journal refs). The item delete cascades its detail rows.
+ */
 campaignItemsRouter.delete("/campaigns/:id/items/:itemId", async (req, res) => {
   await assertCampaignOwner(
     prisma,
@@ -229,10 +239,12 @@ campaignItemsRouter.delete("/campaigns/:id/items/:itemId", async (req, res) => {
   res.status(204).end();
 });
 
-// ── POST /api/campaigns/:id/items/:campaignItemId/award ───────────────────────
-// Owner-only intent-bearing transaction (#381): snapshots the item into a member
-// character's inventory, reveals the fronting entity, and writes an undoable
-// audit event on the TARGET character. Unique-item conflicts 409 with the holder.
+/**
+ * POST /api/campaigns/:id/items/:campaignItemId/award
+ * Owner-only intent-bearing transaction (#381): snapshots the item into a member
+ * character's inventory, reveals the fronting entity, and writes an undoable
+ * audit event on the TARGET character. Unique-item conflicts 409 with the holder.
+ */
 campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/award", async (req, res) => {
   await assertCampaignOwner(
     prisma,
@@ -265,10 +277,12 @@ campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/award", async (re
   res.status(200).json({ holders: holders.get(req.params.campaignItemId) ?? [] });
 });
 
-// ── POST /api/campaigns/:id/items/:campaignItemId/revoke ──────────────────────
-// Owner-only counterpart: removes the provenance-matched inventory row (undoable
-// audit event on the target character). A player-modified snapshot is still
-// revocable — the match is by campaignItemId, not by field equality.
+/**
+ * POST /api/campaigns/:id/items/:campaignItemId/revoke
+ * Owner-only counterpart: removes the provenance-matched inventory row (undoable
+ * audit event on the target character). A player-modified snapshot is still
+ * revocable — the match is by campaignItemId, not by field equality.
+ */
 campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/revoke", async (req, res) => {
   await assertCampaignOwner(
     prisma,

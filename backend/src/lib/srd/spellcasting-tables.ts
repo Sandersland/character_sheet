@@ -1,6 +1,5 @@
 import { abilityModifier } from "@/lib/srd/math.js";
 
-// ── Spellcasting ability by class ────────────────────────────────────────────
 // Maps a class name (lowercase) to the ability that governs its spellcasting.
 // Used to derive spellSaveDC and spellAttackBonus at read time.
 // Warlock uses Pact Magic (single-level slots, short-rest recharge) and Paladin/
@@ -162,7 +161,6 @@ const THIRD_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number
   20: { 1: 4, 2: 3, 3: 3, 4: 1 },
 };
 
-// ── Caster fractions (multiclass) ─────────────────────────────────────────────
 // How much each class contributes to the combined multiclass caster level:
 // full = +level, half = +floor(level/2), third = +floor(level/3), pact = tracked
 // separately (never merged), none = non-caster. Third casters are keyed by
@@ -425,7 +423,6 @@ export function deriveSpellcasting(
   return null;
 }
 
-// ── Spells Known progression (level-up learning) ──────────────────────────────
 // Cumulative "Spells Known" counts by class level for the classes that LEARN a
 // fixed set on level-up (PHB Spells Known columns). Bard includes the Magical
 // Secrets +2 jumps at 10/14/18; Ranger follows the half-caster cadence (none

@@ -381,7 +381,7 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
     const controller = new AbortController();
     load(controller.signal);
     return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reloads on any filter/character change; load() reads current closures, intentionally excluded
   }, [characterId, categoryFilter, typeFilter, sessionFilter, entityId]);
 
   // Populate the session picker once per character.

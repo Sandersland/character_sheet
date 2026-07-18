@@ -35,19 +35,13 @@ import {
 import { advancementSlotsForLevel, abilityModifier } from "@/lib/srd/srd.js";
 import { normalizeHitPoints, normalizeHitDice, type HitPoints, type HitDice } from "@/lib/combat/hitpoints.js";
 
-// ── Error class ───────────────────────────────────────────────────────────────
-
 export class InvalidAdvancementOperationError extends Error {}
-
-// ── Valid ability names ───────────────────────────────────────────────────────
 
 const ABILITY_NAMES = new Set([
   "strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma",
 ]);
 
 const ABILITY_CAP = 20;
-
-// ── Pure helpers ──────────────────────────────────────────────────────────────
 
 /**
  * Computes the effect of applying `abilityDeltas` to `scores`.
@@ -112,8 +106,6 @@ export function reverseAdvancementEffects(
   return { scores: newScores, hitPoints: newHp, initiativeBonus: newInit };
 }
 
-// ── Operation types ───────────────────────────────────────────────────────────
-
 export interface TakeAsiOperation {
   type: "takeAsi";
   /** One or two increases summing to exactly 2, each capped at 1 or 2. */
@@ -151,8 +143,6 @@ export type AdvancementOperation =
   | TakeAsiOperation
   | TakeFeatOperation
   | RemoveAdvancementOperation;
-
-// ── Per-op context, outcome, and shared helpers ───────────────────────────────
 
 /** Normalized per-op inputs handed to each advancement op handler. */
 interface AdvancementOpContext {
@@ -244,8 +234,6 @@ function resolveHalfFeatBump(args: {
   abilityDeltas[abilityChoice] = abilityIncrease;
   return abilityDeltas;
 }
-
-// ── Op handlers ───────────────────────────────────────────────────────────────
 
 /** Validates a takeAsi op's increases (count, sum, ability names, per-ability cap). */
 function validateAsiIncreases(op: TakeAsiOperation, scores: Record<string, number>): void {
@@ -472,8 +460,6 @@ function dispatchAdvancementOp(
     }
   }
 }
-
-// ── Transaction handler ───────────────────────────────────────────────────────
 
 /**
  * Applies a batch of advancement operations atomically in one Prisma transaction.

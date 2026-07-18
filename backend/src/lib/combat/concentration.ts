@@ -12,7 +12,7 @@ import { rollDie } from "@/lib/core/dice.js";
 import { normalizeResourcesMutable } from "@/lib/classes/resources.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 
-// ---- Concentration-on-damage (issue #41) ----
+// Concentration-on-damage (issue #41).
 
 /**
  * Outcome of a concentration check triggered by a damage instance. Returned

@@ -56,7 +56,7 @@ export function selectEquippedBodyArmor(
 // per-source "ac" buffs → the acFloor (Barkskin) reconciling part last.
 // The branchiness is inherent to the 5e AC layering (each optional source is a
 // conditional addend), not accidental complexity.
-// fallow-ignore-next-line complexity
+// fallow-ignore-next-line complexity -- inherent 5e AC layering (one conditional addend per source), not accidental complexity
 export function buildArmorClassView(
   row: CharacterWithRelations,
   effectiveScores: Record<string, number>,

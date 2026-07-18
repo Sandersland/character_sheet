@@ -1,12 +1,12 @@
 /**
- * Resource + maneuver transaction handler — the analog to lib/spellcasting.ts
+ * Resource + maneuver transaction handler — the analog to applySpellcastingOperations
  * for trackable class/subclass resources (superiority dice, ki, rage) and
  * known-maneuver lists.
  *
  * What is persisted: `used` counts per resource key and the `maneuversKnown`
- * snapshot array. What is derived at read time (in lib/character/character-serialize.ts
- * serializeCharacter): pool totals, die size, recharge timing, maneuver
- * choice count — all via deriveResources() in src/lib/class-features.ts.
+ * snapshot array. What is derived at read time (in serializeCharacter): pool
+ * totals, die size, recharge timing, maneuver choice count — all via
+ * deriveResources().
  */
 
 import { randomUUID } from "node:crypto";
@@ -22,12 +22,9 @@ import {
   type FightingStyleKey,
 } from "@/lib/srd/srd.js";
 
-// ── Error class ───────────────────────────────────────────────────────────────
-
 export class InvalidResourceOperationError extends Error {}
 
-// ── Canonical mutable state shape ─────────────────────────────────────────────
-// Stored in Character.resources JSON column.
+// Canonical mutable state shape. Stored in Character.resources JSON column.
 // `used`: resource key (string) → number of units currently spent.
 // `maneuversKnown`: snapshot array of learned maneuvers; each entry has a
 //   locally-generated `id` (the operation target), optional `maneuverId`
@@ -159,8 +156,7 @@ export interface ResourcesMutableState {
   fightingStyle: FightingStyleKey | null;
 }
 
-// ── Subclass "choose N" cap policy ──────────────────────────────────────────────
-// Single-sourced level-gating for choicesKnown, shared by reconcile-on-write
+// Subclass "choose N" cap policy: single-sourced level-gating for choicesKnown, shared by reconcile-on-write
 // (trimChoicesToCaps) and clamp-on-read (buildResourcesPayload). Caps each key's
 // list to its derived count (LIFO: keep the oldest picks); keys absent from
 // `caps` (subclass/tier no longer grants them) get cap 0 and are dropped from
@@ -179,8 +175,7 @@ export function clampChoicesToCaps(
   return { clamped, removedCount };
 }
 
-// ── Normalizer ────────────────────────────────────────────────────────────────
-// Tolerant of null (character has never used any resources) and future schema
+// Normalizer: tolerant of null (character has never used any resources) and future schema
 // additions. Mirror of normalizeSpellcastingMutable.
 
 export function normalizeResourcesMutable(json: Prisma.JsonValue): ResourcesMutableState {
@@ -260,8 +255,6 @@ export function snapshotResources(state: ResourcesMutableState): ResourcesMutabl
     fightingStyle: state.fightingStyle,
   };
 }
-
-// ── Operation types ───────────────────────────────────────────────────────────
 
 /** Spend one or more units of a trackable resource (e.g. a superiority die). */
 export interface SpendResourceOperation {
@@ -364,8 +357,7 @@ export type ResourceOperation =
   | LearnSubclassChoiceOperation
   | ForgetSubclassChoiceOperation;
 
-// ── Per-op appliers ─────────────────────────────────────────────────────────
-// Each validates + mutates `state` in place (throwing on any illegal op) and
+// Per-op appliers: each validates + mutates `state` in place (throwing on any illegal op) and
 // returns the audit payload the dispatcher writes to the event log. Kept
 // module-private so the public API (applyResourceOperations) stays byte-stable.
 
@@ -721,8 +713,7 @@ function applyForgetToolProficiencyOp(
   };
 }
 
-// ── Generic subclass "choose N" appliers (#899) ───────────────────────────────
-// Validate against the level-derived subclassChoices declaration: the choice
+// Generic subclass "choose N" appliers (#899): validate against the level-derived subclassChoices declaration: the choice
 // must be available at this level/subclass, the option must belong to the
 // choice's catalog source, and the pick must stay within the derived count.
 
@@ -814,8 +805,7 @@ function applyForgetSubclassChoiceOp(
   };
 }
 
-// ── applyOp dispatch ──────────────────────────────────────────────────────────
-// Shared per-op context (mirrors spellcasting.ts's SpellOpContext) + a
+// applyOp dispatch: shared per-op context (mirrors spellcasting.ts's SpellOpContext) + a
 // discriminant-keyed handler map, so the transaction handler's applyOp reduces
 // to "build context, dispatch, persist" instead of a growing switch.
 
@@ -862,8 +852,6 @@ function snapshotResourcesState(state: ResourcesMutableState): {
 } {
   return { resources: snapshotResources(state) };
 }
-
-// ── Transaction handler ───────────────────────────────────────────────────────
 
 /**
  * Applies a batch of resource operations atomically in one Prisma transaction.
@@ -932,7 +920,7 @@ export async function applyResourceOperations(
 /**
  * Applies a single spendResource op inside a caller-supplied Prisma transaction.
  *
- * Exported so the actions orchestrator (routes/actions.ts) can include a
+ * Exported so the actions orchestrator (actionsRouter) can include a
  * resource spend alongside an inventory adjust or HP heal in one atomic
  * $transaction. Shares applySpendResourceOp with applyResourceOperations.
  */

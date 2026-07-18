@@ -20,11 +20,7 @@ import { normalizeResourcesMutable } from "./resources.js";
 import { normalizeSpellcastingMutable, snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
 import { KI_CAST_CHARACTER_SELECT, emitKiCastEvents, type KiCastCharacterRow } from "./ki-cast.js";
 
-// ── Error class ───────────────────────────────────────────────────────────────
-
 export class InvalidDisciplineOperationError extends Error {}
-
-// ── Operation types ───────────────────────────────────────────────────────────
 
 /**
  * Cast a known elemental discipline. `disciplineId` is the catalog Discipline.id;
@@ -39,8 +35,6 @@ export interface CastDisciplineOperation {
 }
 
 export type DisciplineOperation = CastDisciplineOperation;
-
-// ── 5e rules ──────────────────────────────────────────────────────────────────
 
 /** Max ki spendable on a single discipline by monk level (PHB Elemental Disciplines table). */
 export function maxKiPerDiscipline(monkLevel: number): number {
@@ -85,8 +79,6 @@ export function disciplineEffectSpec(row: DisciplineEffectRow): EffectSpec {
     concentrates: (name) => CONCENTRATION_DISCIPLINES.has(name),
   });
 }
-
-// ── Cast resolution (gate + catalog + cost validation) ─────────────────────────
 
 /**
  * Validate the ki spent on a discipline: a pool-cost discipline must be within
@@ -150,8 +142,6 @@ async function resolveDisciplineCast(
   const effect = disciplineEffectSpec(catalog);
   return { catalog, cost, effect, saveDc };
 }
-
-// ── Transaction handler ───────────────────────────────────────────────────────
 
 /**
  * Applies a batch of discipline operations atomically. Mirrors

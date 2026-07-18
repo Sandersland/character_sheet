@@ -1,6 +1,6 @@
 /**
  * Shadow Arts cast handler (Way of Shadow, #441) — the ki-cast counterpart to
- * lib/disciplines.ts. Each of the 4 L3 Shadow Arts spells is a GrantedAbility
+ * applyDisciplineOperations. Each of the 4 L3 Shadow Arts spells is a GrantedAbility
  * row with source "shadowArts"; casting one spends a flat 2 ki via the shared
  * payAbilityCostInTx pool path and routes through castAbilityInTx (concentration
  * + buff application from the shared engine/#438).
@@ -19,11 +19,7 @@ import { catalogEffectSpec, type EffectSpec } from "@/lib/combat/effects.js";
 import { normalizeSpellcastingMutable, snapshotSpellcasting } from "@/lib/spellcasting/spell-state.js";
 import { KI_CAST_CHARACTER_SELECT, emitKiCastEvents } from "./ki-cast.js";
 
-// ── Error class ───────────────────────────────────────────────────────────────
-
 export class InvalidShadowArtOperationError extends Error {}
-
-// ── Operation types ───────────────────────────────────────────────────────────
 
 /** Cast a Shadow Arts spell. `shadowArtId` is the catalog GrantedAbility.id. */
 export interface CastShadowArtOperation {
@@ -32,8 +28,6 @@ export interface CastShadowArtOperation {
 }
 
 export type ShadowArtOperation = CastShadowArtOperation;
-
-// ── 5e rules ──────────────────────────────────────────────────────────────────
 
 // Prefix stamped on a Shadow Art's concentration entryId so its id space never overlaps a spellbook Spell.id.
 export const SHADOW_ART_CONCENTRATION_PREFIX = "shadow-art:";
@@ -66,8 +60,6 @@ export function shadowArtEffectSpec(row: ShadowArtEffectRow): EffectSpec {
     concentrates: (name) => CONCENTRATION_SHADOW_ARTS.has(name),
   });
 }
-
-// ── Transaction handler ───────────────────────────────────────────────────────
 
 /**
  * Applies a batch of Shadow Arts operations atomically. Mirrors

@@ -31,7 +31,7 @@ vi.mock("@/features/dice/DiceRoller", () => ({
         total: 11 + modifier,
         spec: { count: 1, faces: 20, modifier },
       });
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- mock fires onResult once on mount; empty deps intentional
     }, []);
     return <div data-testid="dice-roller" />;
   },

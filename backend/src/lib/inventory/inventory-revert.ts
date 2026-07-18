@@ -9,10 +9,10 @@ import {
 } from "./inventory-currency.js";
 import type { DeletedInventoryItemSnapshot } from "./inventory-snapshot.js";
 
-// ── Undo / revert ────────────────────────────────────────────────────────────
+// Undo / revert.
 //
 // Reverses one already-applied inventory CharacterEvent inside the caller's
-// revert transaction (routes/activity.ts). Shape-driven, NOT type-driven:
+// revert transaction (activityRouter). Shape-driven, NOT type-driven:
 // event `type` names (acquired/consumed/sold/…) are shared across ops, so the
 // row action is decided by the snapshot shape instead:
 //

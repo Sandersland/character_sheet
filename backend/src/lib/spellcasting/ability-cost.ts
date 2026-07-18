@@ -15,11 +15,7 @@
 import { Prisma } from "@/generated/prisma/client.js";
 import { applySpendResourceInTx, type SpendResourceOperation } from "@/lib/classes/resources.js";
 
-// ── Error class ───────────────────────────────────────────────────────────────
-
 export class InvalidSpellcastingOperationError extends Error {}
-
-// ── Cost declaration ────────────────────────────────────────────────────────
 
 export type AbilityCost =
   | { kind: "slot"; minLevel: number }

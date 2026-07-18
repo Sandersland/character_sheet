@@ -85,7 +85,7 @@ export default function DiceRollSequence({
       lastTriggerRef.current = previousTrigger;
       if (pauseTimerRef.current !== undefined) clearTimeout(pauseTimerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resets sequence state only when triggerKey changes; setters are stable
   }, [triggerKey]);
 
   // Advancing the sequence is a side effect of a step settling (notify the

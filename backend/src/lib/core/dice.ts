@@ -1,7 +1,7 @@
 /**
  * Server-side dice engine.
  *
- * Most rolls in this app are rolled on the client (lib/dice.ts there) and the
+ * Most rolls in this app are rolled on the client and the
  * raw value is POSTed to a transaction endpoint, which validates the range and
  * applies the rules math. A few rolls, however, must be made by the server with
  * no client input — e.g. the automatic Constitution saving throw to maintain

@@ -69,13 +69,13 @@ export function serializeCharacterSummary(row: {
 // by our own seed/PATCH/POST path, not external input, so they aren't
 // re-validated against the frontend Character type's nested shapes here.
 // (journal is no longer a Json column — it's the relational JournalEntry
-// table, mutated only via routes/journal.ts and mapped to the wire shape below.)
+// table, mutated only via journalRouter and mapped to the wire shape below.)
 // inventory is the exception: it's relational (InventoryItem rows, see
 // schema.prisma), mapped into the same JSON shape the frontend already
 // expects below. weaponDetail/armorDetail/consumableDetail (at most one
 // present, matching `category`) nest as nullable `weapon`/`armor`/
-// `consumable` sub-objects via the shared lib/itemDetail.js serializers
-// (also used by routes/items.ts for the catalog) rather than flattening
+// `consumable` sub-objects via the shared serializeWeaponDetail/serializeArmorDetail/
+// serializeConsumableDetail (also used by itemsRouter for the catalog) rather than flattening
 // back out — `id`/the owning FK aren't meaningful to the client.
 
 // Journal entries — relational JournalEntry rows (no longer a Json column),
@@ -106,7 +106,7 @@ function buildCampaignPreferencesView(row: CharacterWithRelations) {
 }
 
 export function serializeCharacter(row: CharacterWithRelations) {
-  // ── Derivation order (later steps read earlier outputs; do not reorder) ──
+  // Derivation order below: later steps read earlier outputs; do not reorder.
   // 1. XP → level + proficiency bonus (derive-don't-persist; docs/leveling.md).
   const progress = experienceProgress(row.experiencePoints);
   const primaryClass = row.classEntries[0];
@@ -283,12 +283,11 @@ export function serializeCharacter(row: CharacterWithRelations) {
     },
 
     // Class-specific available actions for the turn tracker (universal ones
-    // render client-side from lib/turnRules.ts).
+    // render client-side from UNIVERSAL_ACTIONS).
     availableActions: buildAvailableActionsView(primaryClass, progress.level, resources),
 
-    // ── Combat attack rows ─────────────────────────────────────────────────
-    // Derived at read time; the frontend renders these directly in AttacksPanel
-    // rather than recomputing attack math on the client.
+    // Combat attack rows — derived at read time; the frontend renders these
+    // directly in AttacksPanel rather than recomputing attack math on the client.
     unarmedStrike,
     improvisedWeapon,
     // Weapon attacks per Attack action (Extra Attack), max across multiclass.

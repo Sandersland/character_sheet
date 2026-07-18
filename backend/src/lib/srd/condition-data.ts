@@ -2,8 +2,8 @@
 // source of truth for condition rules data — the frontend resolves display text
 // through a label map derived from these keys, never by rendering raw keys.
 // Exhaustion is intentionally NOT in this list: it is a single 0–6 level handled
-// as a special case (see EXHAUSTION_MAX below; per-level effect text lives in the
-// frontend's lib/conditions.ts), not a boolean presence in the active-conditions
+// as a special case (see EXHAUSTION_MAX below; per-level effect text lives on the
+// frontend), not a boolean presence in the active-conditions
 // list.
 
 export type ConditionKey =
@@ -147,7 +147,7 @@ export function isKnownCondition(key: string): key is ConditionKey {
  * and saving throws (cumulative with level 1's effect). Levels 2/4/5/6 (speed
  * halved, hp max halved, speed 0, death) don't affect d20 rolls, so they have
  * no representation here — their text lives in the frontend's
- * lib/conditions.ts exhaustionEffect().
+ * exhaustionEffect().
  */
 export function exhaustionRollEffects(level: number): RollEffect[] {
   if (level < 1) return [];

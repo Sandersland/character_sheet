@@ -28,7 +28,6 @@ import {
   type ConcentrationCheckResult,
 } from "./concentration.js";
 
-// ---- Per-op phase helpers ----
 // The applyHitPointOperations loop runs each op through five ordered phases:
 // context build → dispatch → snapshot assembly → main-event emit → follow-on
 // events. Each phase is a named helper below so the loop reads linearly; the
@@ -216,7 +215,7 @@ async function logHpOpEvent(
  * damage-triggered concentration check. Returns the concentration check (if
  * one ran) so the route can surface the auto-rolled CON save to the player.
  */
-// fallow-ignore-next-line complexity
+// fallow-ignore-next-line complexity -- fixed-order follow-on phases; splitting would obscure the ordering contract
 async function applyHpOpFollowOns(
   tx: Prisma.TransactionClient,
   characterId: string,
@@ -269,8 +268,6 @@ async function applyHpOpFollowOns(
 
   return null;
 }
-
-// ---- Transaction handler ----
 
 /**
  * Applies a batch of HP operations atomically in one Prisma transaction.
@@ -332,7 +329,7 @@ export async function applyHitPointOperations(
       const damageForConcentration = result.damageForConcentration ?? null;
 
       // Common write-back: every op persists hitPoints + hitDice.
-      // fallow-ignore-next-line code-duplication
+      // fallow-ignore-next-line code-duplication -- shared hitPoints+hitDice write-back, intentionally identical across ops
       await tx.character.update({
         where: { id },
         data: {
@@ -386,7 +383,7 @@ export async function applyLevelUpHpInTx(
   const beforeHp = { ...ctx.hp };
   const beforeHd = { ...ctx.hd };
   const result = await applyLevelUpOp(ctx, op);
-  // fallow-ignore-next-line code-duplication
+  // fallow-ignore-next-line code-duplication -- same intentional hitPoints+hitDice write-back as the main op path
   await tx.character.update({
     where: { id: characterId },
     data: {

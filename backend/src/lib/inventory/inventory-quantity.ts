@@ -20,9 +20,9 @@ import {
 import { snapshotInventoryItemForUndo } from "./inventory-snapshot.js";
 
 /**
- * Exported so the actions orchestrator (routes/actions.ts) can include
+ * Exported so the actions orchestrator (actionsRouter) can include
  * an adjustQuantity op inside a shared $transaction without re-opening one.
- * Two callers: the applyOp switch in inventory.ts and routes/character/actions.ts.
+ * Two callers: the applyOp switch in applyInventoryOperations and actionsRouter.
  */
 export async function applyAdjustQuantity(
   tx: Prisma.TransactionClient,
@@ -60,7 +60,7 @@ export async function applyAdjustQuantity(
     sessionId,
   });
 
-  // fallow-ignore-next-line code-duplication
+  // fallow-ignore-next-line code-duplication -- zero-quantity delete-and-clear-buff vs update branch intentionally shared across quantity mutations
   if (nextQuantity === 0) {
     // Adjusting to zero deletes the row — clear any seeded buff so it can't leak.
     await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `used up ${item.name}`);
@@ -91,7 +91,7 @@ export async function applyUpdate(tx: Prisma.TransactionClient, characterId: str
       weight: op.weight,
       cost: op.cost !== undefined ? toJsonInput(op.cost) : undefined,
       description: op.description,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma nested-update input type gap forces the cast on weaponDetail
       weaponDetail: op.weapon ? { update: op.weapon as any } : undefined,
       armorDetail: op.armor ? { update: op.armor } : undefined,
       consumableDetail: op.consumable ? { update: op.consumable } : undefined,
@@ -166,7 +166,7 @@ export async function applySell(tx: Prisma.TransactionClient, characterId: strin
     sessionId,
   });
 
-  // fallow-ignore-next-line code-duplication
+  // fallow-ignore-next-line code-duplication -- full-sell delete-and-clear-buff vs update branch shares the adjust-quantity pattern by design
   if (quantitySold === item.quantity) {
     // Full-stack sell deletes the row — clear any seeded buff so it can't leak.
     await clearBuffByKeyInTx(tx, characterId, itemBuffKey(item.id), batchId, sessionId, `sold ${item.name}`);

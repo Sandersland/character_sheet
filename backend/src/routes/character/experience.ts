@@ -6,8 +6,7 @@ import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const experienceRouter = Router({ mergeParams: true });
 
-// ── Per-op Zod schemas ── (discriminated on `type`) ─────────────────────────
-
+// Per-op Zod schemas, discriminated on `type`.
 const awardOpSchema = z.object({
   type: z.literal("award"),
   // Signed — positive = gain, negative = correction/deduction.
@@ -29,8 +28,6 @@ const experienceRequestSchema = z.object({
   // recomputed server-side. Must belong to the character (400 otherwise).
   sessionId: z.string().uuid().optional(),
 });
-
-// ── Route ────────────────────────────────────────────────────────────────────
 
 // POST /api/characters/:id/experience
 // Intent-bearing XP mutations: award (signed delta) and set (absolute).

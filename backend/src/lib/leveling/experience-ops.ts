@@ -13,8 +13,6 @@ import { recomputeSummaries } from "@/lib/session/sessions.js";
 
 export class InvalidExperienceOperationError extends Error {}
 
-// ── Operation types ────────────────────────────────────────────────────────
-
 /** Award or deduct XP by a signed delta ("Earned 450 XP from encounter"). */
 export interface XpAwardOperation {
   type: "award";
@@ -28,8 +26,6 @@ export interface XpSetOperation {
 }
 
 export type ExperienceOperation = XpAwardOperation | XpSetOperation;
-
-// ── Auto-reverse helpers ────────────────────────────────────────────────────
 
 /**
  * Rolls back HP/hit-dice/class-entry-level when XP drops the derived level
@@ -149,8 +145,6 @@ async function revertLevelUps(
   });
 }
 
-// ── Op helpers ──────────────────────────────────────────────────────────────
-
 /**
  * Resolves the target XP total + event type for one op. Award applies a signed
  * delta clamped at 0; set takes an exact non-negative value (rejects negatives).
@@ -231,8 +225,6 @@ async function applyExperienceOp(ctx: XpTxContext): Promise<void> {
   // already in an invalid state on their next XP op.
   await reconcileLevelGatedState({ tx, characterId, newDerivedLevel, batchId });
 }
-
-// ── Main handler ────────────────────────────────────────────────────────────
 
 /**
  * Applies a batch of XP operations atomically. Each op writes a

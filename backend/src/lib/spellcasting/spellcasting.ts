@@ -37,9 +37,8 @@ import type {
 } from "./spell-state.js";
 import { deriveSpellcasting, derivePreparedSpellLimit } from "@/lib/srd/srd.js";
 
-// ── Error class ───────────────────────────────────────────────────────────────
 // Defined in ability-cost.ts (one-directional dep graph); re-exported so
-// existing importers (routes/spellcasting.ts) keep resolving it here unchanged.
+// existing importers (spellcastingRouter) keep resolving it here unchanged.
 export { InvalidSpellcastingOperationError };
 
 // Persisted spell state shape + normalizer live in the leaf module spell-state.ts
@@ -47,7 +46,6 @@ export { InvalidSpellcastingOperationError };
 // here so this module's public surface stays stable.
 export { normalizeSpellcastingMutable };
 
-// ── Custom spell input shape ──────────────────────────────────────────────────
 export interface CustomSpellInput {
   name: string;
   level: number;
@@ -70,8 +68,6 @@ export interface CustomSpellInput {
   upcastDicePerLevel?: number;
   cantripScaling?: boolean;
 }
-
-// ── Operation types ───────────────────────────────────────────────────────────
 
 /**
  * Cast a spell. For leveled spells, `slotLevel` must be >= spell.level and a
@@ -167,7 +163,6 @@ export type SpellcastingOperation =
   | DropConcentrationOperation
   | DismissBuffOperation;
 
-// ── Per-op helper context + outcome ───────────────────────────────────────────
 // Each helper mutates ctx.state in place and returns an OpOutcome, or null for a
 // no-op (which skips both the state write-back and the logEvent in the dispatcher).
 
@@ -652,8 +647,6 @@ async function applyDismissBuffOp(ctx: SpellOpContext, op: DismissBuffOperation)
   return null;
 }
 
-// ── applyOp helpers ───────────────────────────────────────────────────────────
-
 type DerivedSpellcasting = ReturnType<typeof deriveSpellcasting>;
 
 // Build the slot/arcana level→total maps from derived spellcasting, falling back
@@ -803,8 +796,6 @@ async function logSpellcastingEvent(
     sessionId: ids.sessionId,
   });
 }
-
-// ── Transaction handler ───────────────────────────────────────────────────────
 
 /**
  * Applies a batch of spellcasting operations atomically in one Prisma

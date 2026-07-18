@@ -1,3 +1,4 @@
+import comments from "@eslint-community/eslint-plugin-eslint-comments";
 import js from "@eslint/js";
 import jsxA11y from "eslint-plugin-jsx-a11y";
 import reactHooks from "eslint-plugin-react-hooks";
@@ -6,8 +7,20 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   { ignores: ["dist/**", "playwright-report/**", "test-results/**"] },
+  // Stale eslint-disable directives fail lint the moment they stop being needed (#1045).
+  { linterOptions: { reportUnusedDisableDirectives: "error" } },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    // Suppression hygiene (#1045): every disable must name its rule
+    // (no-unlimited-disable) and carry a `-- reason` (require-description),
+    // machine-enforcing the CLAUDE.md suppression policy.
+    plugins: { "@eslint-community/eslint-comments": comments },
+    rules: {
+      "@eslint-community/eslint-comments/no-unlimited-disable": "error",
+      "@eslint-community/eslint-comments/require-description": "error",
+    },
+  },
   {
     files: ["**/*.{ts,tsx}"],
     plugins: {

@@ -106,7 +106,7 @@ export function snapshotItemDetail(item: CatalogItemWithDetails) {
   return snapshotDetailCreate(item);
 }
 
-// ── Undo snapshot ────────────────────────────────────────────────────────────
+// Undo snapshot.
 //
 // When an op DELETES an InventoryItem row (full sell, remove, adjust-to-zero)
 // the relational row + its detail rows are gone, so `before`/`after` alone
@@ -165,7 +165,7 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
     attunementPrereqValue: item.attunementPrereqValue,
     notes: item.notes,
     position: item.position,
-    // fallow-ignore-next-line code-duplication
+    // fallow-ignore-next-line code-duplication -- snapshot mirrors the persisted capability shape field-for-field on purpose
     capabilities: item.capabilities.map((c) => ({
       kind: c.kind,
       description: c.description,
@@ -216,7 +216,7 @@ export function snapshotInventoryItemForUndo(item: InventoryItemWithDetails): De
 
 // Builds the nested-create payload for an InventoryItem from a catalog Item
 // that has already been fetched with catalogItemDetailInclude. Used by
-// routes/characters.ts to create starting-equipment rows atomically inside
+// charactersRouter to create starting-equipment rows atomically inside
 // prisma.character.create, without going through applyInventoryOperations
 // (which would write ledger rows — starting gear is a character's genesis
 // state, not an economic event; same reasoning as prisma/seed.ts).

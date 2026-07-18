@@ -259,7 +259,7 @@ export default function PhysicsDiceRoller({
     }
 
     return undefined;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on rollKey/autoRollOnMount; roll() reads current refs, deliberately excluded
   }, [rollKey, autoRollOnMount]);
 
   // Lets a parent (e.g. DiceRollSequence) interrupt an in-flight tumble on
@@ -279,7 +279,7 @@ export default function PhysicsDiceRoller({
     // depending on a function recreated every render would fire this on
     // every render, fighting the lifecycle effect above for ownership of
     // activeRef the same way depending on `rolling`/`result` would.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on [skip] alone; resolveInstantly reads current refs (see note above)
   }, [skip]);
 
   const settled = rolling ? null : result;

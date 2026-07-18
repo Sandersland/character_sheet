@@ -1,8 +1,6 @@
 import type { FightingStyleKey } from "@/lib/srd/fighting-styles.js";
 import { abilityModifier } from "@/lib/srd/math.js";
 
-// ── Armor & weapon proficiency grants ────────────────────────────────────────
-
 /** Armor categories that a character can be proficient with. */
 export type ArmorProficiencyCategory = "light" | "medium" | "heavy" | "shield";
 
@@ -51,8 +49,6 @@ export const RACE_PROFICIENCY_GRANTS: Record<string, ProficiencyGrant> = {
   // was expanded to named subraces (Hill/Mountain/High/Wood/Drow).
   Dwarf:      { armor: [], weapons: ["Battleaxes", "Handaxes", "Light Hammers", "Warhammers"] },
 };
-
-// ── Weapon proficiency matching ──────────────────────────────────────────────
 
 /**
  * Returns true if the character is proficient with the given weapon based on

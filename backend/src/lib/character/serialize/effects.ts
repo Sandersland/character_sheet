@@ -54,8 +54,8 @@ export function buildTargetModifiers(
 
 // State-driven roll modifiers (#486): advantage/disadvantage grants from active
 // conditions (5e rules data in srd) merged with active-effect buffs (e.g. Rage).
-// Derived on read — the frontend resolves the effective mode per roll via
-// lib/rollMode.ts (adv + disadv from different sources cancel to normal, RAW).
+// Derived on read — the frontend resolves the effective mode per roll
+// (adv + disadv from different sources cancel to normal, RAW).
 export function buildRollModifiers(
   conditions: ConditionsMutableState,
   activeEffects: ActiveEffectsMutableState,

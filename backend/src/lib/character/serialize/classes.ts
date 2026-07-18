@@ -37,10 +37,10 @@ export function buildResourcesView(
     proficiencyBonus,
   );
 
-  // ── Fighting Style clamp-on-read ──────────────────────────────────────────
-  // The chosen style key is persisted in resources.fightingStyle. Clamp it to
-  // null when the character is no longer entitled (e.g. class change / level
-  // drop) — defense-in-depth mirroring reconcileFightingStyle on the write side.
+  // Fighting Style clamp-on-read: the chosen style key is persisted in
+  // resources.fightingStyle. Clamp it to null when the character is no longer
+  // entitled (e.g. class change / level drop) — defense-in-depth mirroring
+  // reconcileFightingStyle on the write side.
   const fightingStyleChoices = fightingStyleChoiceCount(primaryClass?.name ?? "", level);
   const storedFightingStyle = normalizeResourcesMutable(row.resources).fightingStyle;
   const fightingStyle: FightingStyleKey | null =
@@ -186,7 +186,7 @@ export function applyFeatLayer(
 
 // Class-specific available actions for the turn tracker — derived from
 // class/subclass/level + current resource pools. Universal actions are
-// rendered client-side from UNIVERSAL_ACTIONS in lib/turnRules.ts;
+// rendered client-side from UNIVERSAL_ACTIONS;
 // only class-specific ones live here to avoid double-rendering.
 export function buildAvailableActionsView(
   primaryClass: PrimaryClass,
