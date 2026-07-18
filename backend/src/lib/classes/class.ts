@@ -119,7 +119,7 @@ async function applySetSubclass(ctx: ClassOpContext, op: SetSubclassOperation): 
   const required = subclass.class.subclassLevel;
   if (level < required) {
     throw new InvalidClassOperationError(
-      `Character is ${subclass.class.name} level ${level} but ${subclass.class.name} grants a subclass at level ${required}`
+      `Character is ${subclass.class.name} level ${level} but the subclass is not granted until level ${required}`
     );
   }
 

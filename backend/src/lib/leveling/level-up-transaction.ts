@@ -187,6 +187,14 @@ const LEVEL_UP_OP_APPLIERS: Record<
     applySpellcastingOpInTx(tx, id, op as SpellcastingOperation, batchId, sessionId, userId),
 };
 
+// applyResourceOpInTx derives choice caps from the primary entry only, and the
+// resource-pool read-clamp mirrors that — a non-primary pick would be written
+// uncapped and then hidden on read, so reject these steps up front until that
+// seam is entry-aware.
+const RESOURCE_BACKED: ReadonlySet<LevelUpStepKind> = new Set([
+  "maneuvers", "disciplines", "toolProficiency", "subclassChoice",
+]);
+
 /**
  * Validate `submission` against the character's derived level-up plan and apply
  * every resulting choice (hit points, advancement, subclass, subclass-derived
@@ -204,12 +212,6 @@ export async function applyLevelUpTransaction(
 
   const steps = validateLevelUpSubmission(planCharacter, targetEntry, chosenSubclassName, submission);
 
-  // The resources seam derives choice caps (and the read-clamp derives its view)
-  // from the primary entry only — a non-primary pick would be written uncapped
-  // and then hidden on read, so reject it up front until that seam is entry-aware.
-  const RESOURCE_BACKED: ReadonlySet<LevelUpStepKind> = new Set([
-    "maneuvers", "disciplines", "toolProficiency", "subclassChoice",
-  ]);
   if (!targetIsPrimary && steps.some((s) => RESOURCE_BACKED.has(s.kind))) {
     throw new InvalidLevelUpError(
       "Subclass features that grant maneuvers, disciplines, or other picks are not supported for a non-primary class yet",
