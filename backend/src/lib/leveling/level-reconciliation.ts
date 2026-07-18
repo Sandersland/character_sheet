@@ -397,12 +397,10 @@ function trimChoicesToCaps(
   choicesKnown: ResourcesMutableState["choicesKnown"],
   caps: Map<string, number>,
 ): number {
-  const { removedCount } = clampChoicesToCaps(choicesKnown, caps);
-  for (const [key, entries] of Object.entries(choicesKnown)) {
-    const cap = caps.get(key) ?? 0;
-    if (entries.length <= cap) continue;
-    if (cap === 0) delete choicesKnown[key];
-    else choicesKnown[key] = entries.slice(0, cap);
+  const { clamped, removedCount } = clampChoicesToCaps(choicesKnown, caps);
+  for (const key of Object.keys(choicesKnown)) {
+    if (key in clamped) choicesKnown[key] = clamped[key];
+    else delete choicesKnown[key];
   }
   return removedCount;
 }
