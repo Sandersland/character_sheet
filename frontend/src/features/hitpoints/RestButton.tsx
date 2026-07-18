@@ -14,8 +14,9 @@ interface RestButtonProps {
 
 /**
  * Always-visible BG3-style session rest control (#814): a compact campfire button
- * beside CompactHpBar that opens a "Rest" sheet with the short/long rest controls
- * and hit-dice readout — the session home for rests now the Rest & HP tab is gone.
+ * beside the sheet-header HP chip (ManageHpButton), folded into CombatUtilityStrip,
+ * that opens a "Rest" sheet with the short/long rest controls and hit-dice readout
+ * — the session home for rests now the Rest & HP tab is gone.
  */
 export default function RestButton({ character, onUpdate }: RestButtonProps) {
   const [sheetOpen, setSheetOpen] = useState(false);

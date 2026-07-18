@@ -25,3 +25,7 @@ backend/package-lock.json
 frontend/package-lock.json
 .fallow/
 lefthook-local.yml
+
+# Harness runtime state (ephemeral)
+.claude/scheduled_tasks.lock
+.claude/*.lock
