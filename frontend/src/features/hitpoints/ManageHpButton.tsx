@@ -18,9 +18,9 @@ interface Props {
  * "Manage hit points" that opens the shared "Hit Points" `BottomSheet`
  * (`HpSheetBody` — the single damage/heal/temp editing surface). Reused by the
  * sheet header vitals (desktop banner + mobile mini-header) so the header HP
- * readout IS the entry point to the HP sheet, now the live-Combat panel no longer
- * carries its own `CompactHpBar`. The sheet stays open after an apply (mirrors
- * `CompactHpBar`), so a player can chain damage/heal without re-opening it.
+ * readout IS the entry point to the HP sheet (the live-Combat panel carries no
+ * separate HP control). The sheet stays open after an apply, so a player can
+ * chain damage/heal without re-opening it.
  */
 export default function ManageHpButton({ character, onUpdate, className, children }: Props) {
   const [open, setOpen] = useState(false);

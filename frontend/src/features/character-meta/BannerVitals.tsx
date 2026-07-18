@@ -12,8 +12,8 @@ import type { Character } from "@/types/character";
  * for the garnet banner (translucent-white chips, light text). AC keeps its
  * labeled breakdown popover and Initiative stays rollable. HP is the tappable
  * HP surface (#982): with `onUpdate` the chip opens the shared "Hit Points"
- * sheet — the live-Combat panel no longer carries its own `CompactHpBar`, so the
- * header meter is the entry point. Without `onUpdate` it degrades to a read-only
+ * sheet — the header meter is the sole entry point (the live-Combat panel has no
+ * separate HP control). Without `onUpdate` it degrades to a read-only
  * readout (test/preview callers).
  */
 const CHIP =
