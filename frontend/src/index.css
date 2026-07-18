@@ -201,6 +201,15 @@
   }
 }
 
+/* Hidden scrollbar for the mobile filter-chip strip (#1029): it scrolls
+   horizontally with an edge fade, so the native bar is visual noise. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Faint card-surface grain (#228); overlay layer, never tints interaction. */
 .surface-grain::after {
   content: "";
