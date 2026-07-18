@@ -51,8 +51,9 @@ interface LevelUpContext {
   planCharacter: LevelUpPlanCharacter;
   targetEntry: TargetClassEntry;
   chosenSubclassName: string | null;
-  // subclass/fightingStyle seams write the position-0 entry only, so those steps
-  // are only legal when the target IS the primary entry.
+  // applyResourceOpInTx derives choice caps from the position-0 entry only, so
+  // resource-backed steps are only legal when the target IS the primary entry
+  // (the subclass/fightingStyle seams are entry-aware since #1065).
   targetIsPrimary: boolean;
 }
 
@@ -203,9 +204,16 @@ export async function applyLevelUpTransaction(
 
   const steps = validateLevelUpSubmission(planCharacter, targetEntry, chosenSubclassName, submission);
 
-  // setSubclass / setFightingStyle write the primary (position-0) entry only.
-  if (!targetIsPrimary && steps.some((s) => s.kind === "subclass" || s.kind === "fightingStyle")) {
-    throw new InvalidLevelUpError("Subclass and fighting-style choices are not supported for a non-primary class yet");
+  // The resources seam derives choice caps (and the read-clamp derives its view)
+  // from the primary entry only — a non-primary pick would be written uncapped
+  // and then hidden on read, so reject it up front until that seam is entry-aware.
+  const RESOURCE_BACKED: ReadonlySet<LevelUpStepKind> = new Set([
+    "maneuvers", "disciplines", "toolProficiency", "subclassChoice",
+  ]);
+  if (!targetIsPrimary && steps.some((s) => RESOURCE_BACKED.has(s.kind))) {
+    throw new InvalidLevelUpError(
+      "Subclass features that grant maneuvers, disciplines, or other picks are not supported for a non-primary class yet",
+    );
   }
 
   const ops = buildLevelUpOps(steps, submission);
