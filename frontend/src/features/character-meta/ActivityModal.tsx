@@ -338,31 +338,27 @@ function ActivityStatus({
   );
 }
 
-export default function ActivityModal({ characterId, onClose, onUpdate, entityId }: ActivityModalProps) {
+interface ActivityFilterState {
+  characterId: string;
+  categoryFilter: string;
+  typeFilter: string | null;
+  sessionFilter: string;
+  entityId?: string;
+}
+
+// Owns the activity timeline load: fetches (with field-level diffs) on mount and
+// whenever a filter/character changes, and exposes `reload` for the undo handler.
+// Only defined filters are forwarded so an unfiltered load sends exactly
+// { includeFields: true }. The AbortController teardown lets a superseded
+// filter-change load be aborted so a slow stale response can't overwrite a
+// fresher one. Extracted from ActivityModal so the modal component stays under
+// the cognitive-complexity gate while keeping exhaustive-deps honest (#1056).
+function useActivityEvents(filters: ActivityFilterState) {
+  const { characterId, categoryFilter, typeFilter, sessionFilter, entityId } = filters;
   const [events, setEvents] = useState<CharacterEvent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [expandedFields, setExpandedFields] = useState<Set<string>>(new Set());
-  // Bulk-sale summary collapse (issue #104). Keyed by batch.key, kept INDEPENDENT
-  // of expandedFields (keyed by event.id) so the summary line and the per-row
-  // field-diff toggles can't collide.
-  const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set());
-  const [undoing, setUndoing] = useState(false);
-  const [undoError, setUndoError] = useState<string | null>(null);
-  const showSpinner = useDelayedFlag(events === null && !error);
 
-  // Filter state. "all" category disables the category predicate; an empty
-  // typeFilter/sessionFilter disables those. Type chips are inventory-only.
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [typeFilter, setTypeFilter] = useState<string | null>(null);
-  const [sessionFilter, setSessionFilter] = useState<string>("");
-  const [sessions, setSessions] = useState<Session[]>([]);
-
-  // Load events (with field-level diffs) on mount, when a filter changes, and
-  // after an undo. Only defined filters are forwarded so an unfiltered load
-  // sends exactly { includeFields: true }. An optional signal lets a superseded
-  // filter-change load be aborted so a slow stale response can't overwrite a
-  // fresher one.
-  const load = useCallback(
+  const reload = useCallback(
     (signal?: AbortSignal) => {
       setEvents(null);
       setError(null);
@@ -382,9 +378,37 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
 
   useEffect(() => {
     const controller = new AbortController();
-    load(controller.signal);
+    reload(controller.signal);
     return () => controller.abort();
-  }, [load]);
+  }, [reload]);
+
+  return { events, error, reload };
+}
+
+export default function ActivityModal({ characterId, onClose, onUpdate, entityId }: ActivityModalProps) {
+  const [expandedFields, setExpandedFields] = useState<Set<string>>(new Set());
+  // Bulk-sale summary collapse (issue #104). Keyed by batch.key, kept INDEPENDENT
+  // of expandedFields (keyed by event.id) so the summary line and the per-row
+  // field-diff toggles can't collide.
+  const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set());
+  const [undoing, setUndoing] = useState(false);
+  const [undoError, setUndoError] = useState<string | null>(null);
+
+  // Filter state. "all" category disables the category predicate; an empty
+  // typeFilter/sessionFilter disables those. Type chips are inventory-only.
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [sessionFilter, setSessionFilter] = useState<string>("");
+  const [sessions, setSessions] = useState<Session[]>([]);
+
+  const { events, error, reload } = useActivityEvents({
+    characterId,
+    categoryFilter,
+    typeFilter,
+    sessionFilter,
+    entityId,
+  });
+  const showSpinner = useDelayedFlag(events === null && !error);
 
   // Populate the session picker once per character.
   useEffect(() => {
@@ -418,7 +442,7 @@ export default function ActivityModal({ characterId, onClose, onUpdate, entityId
     try {
       const updated = await revertBatch(characterId, batchId);
       onUpdate(updated);
-      load(); // Refresh the timeline so reverted events are dimmed.
+      reload(); // Refresh the timeline so reverted events are dimmed.
     } catch (err) {
       setUndoError(err instanceof Error ? err.message : "Undo failed — try again.");
     } finally {
