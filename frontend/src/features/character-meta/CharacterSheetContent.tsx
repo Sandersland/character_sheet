@@ -80,10 +80,12 @@ function CharacterSheetWorkspace({
   const collapse = useScrollCollapse();
   const goToCombat = () => onTabChange("combat");
 
-  // #961: while a session is live + joined, off-Combat tabs show a "Go to fight"
-  // strip (an in-workspace jump to Combat) instead of the doorway; the Combat
-  // nav item carries a live pip. On the Combat tab, no strip (D4) — the panel is
-  // the context. Non-joined/starting states keep the existing doorway.
+  // #961/#1026: while a session is live + joined, off-Combat tabs show a "Go to
+  // fight" strip (an in-workspace jump to Combat) instead of the doorway — but
+  // only on DESKTOP. On mobile the header live pill carries live state, so
+  // SessionCue returns null there (no strip). The Combat nav item carries a live
+  // pip. On the Combat tab, no strip (D4) — the panel is the context.
+  // Non-joined/starting states keep the existing doorway.
   const isLiveJoined = live.status === "liveJoined";
   const isLive = isLiveJoined || live.status === "liveNotJoined";
   const cueProps = {
@@ -273,7 +275,9 @@ function renderLivePanel(
 /**
  * The off-Combat session cue (#961): the live-joined "Go to fight" strip (an
  * in-workspace jump to Combat) when live+joined, else the existing doorway
- * (start / join / scheduled). Renders nothing on the Combat tab (D4).
+ * (start / join / scheduled). Renders nothing on the Combat tab (D4), and
+ * nothing when live+joined on mobile — the header pill carries live state there
+ * (#1026), so only desktop shows the strip.
  */
 function SessionCue({
   placement,

@@ -68,7 +68,10 @@ function withCombatLivePip(tabs: SheetTab[], isLive: boolean): SheetTab[] {
           ...tab,
           badge: (
             <>
-              <span className="block h-1.5 w-1.5 rounded-full bg-gold-400" aria-hidden />
+              <span
+                className="block h-1.5 w-1.5 rounded-full bg-gold-400"
+                aria-hidden
+              />
               <span className="sr-only"> (session live)</span>
             </>
           ),
@@ -110,7 +113,12 @@ export default function CharacterSheetHeader({
       <MobileSheetHeader
         character={character}
         onUpdate={onUpdate}
-        sessionActions={buildSessionActions(isLiveJoined, sessionActionBusy, onLeaveSession, onEndSession)}
+        sessionActions={buildSessionActions(
+          isLiveJoined,
+          sessionActionBusy,
+          onLeaveSession,
+          onEndSession,
+        )}
         liveRound={liveRound}
         scrolled={scrolled}
         onGoToCombat={onGoToCombat}
@@ -168,7 +176,7 @@ function DesktopBanner({
   // Desktop tab bar mirrors the mobile nav pip: a gold dot on Combat while live.
   const bannerTabs = withCombatLivePip(tabs, isLive);
   return (
-      <header className="hidden bg-gradient-to-br from-garnet-800 via-garnet-700 to-garnet-900 text-parchment-50 md:block">
+    <header className="hidden bg-gradient-to-br from-garnet-800 via-garnet-700 to-garnet-900 text-parchment-50 md:block">
       <div className="mx-auto max-w-6xl px-6 pt-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-4">
@@ -251,7 +259,7 @@ function DesktopBanner({
           />
         </div>
       </div>
-      </header>
+    </header>
   );
 }
 
@@ -287,7 +295,11 @@ function BannerActions({
     <div className="flex flex-wrap items-center justify-end gap-3">
       {/* Campaign-less characters have no doorway, so keep the invite here (#942). */}
       {uncampaigned && (
-        <Link to="/campaigns" title="Join a campaign to play a shared session" className={BANNER_CHIP}>
+        <Link
+          to="/campaigns"
+          title="Join a campaign to play a shared session"
+          className={BANNER_CHIP}
+        >
           Join a campaign
         </Link>
       )}
@@ -342,10 +354,18 @@ function DesktopLiveStrip({
 }) {
   return (
     <div className="-mx-6 mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-parchment-50/15 bg-garnet-900/60 px-6 py-2">
-      <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full bg-vitality-100 ring-4 ring-vitality-500/30" />
+      <span
+        aria-hidden
+        className="h-2.5 w-2.5 shrink-0 rounded-full bg-vitality-100 ring-4 ring-vitality-500/30"
+      />
       <span className="min-w-0 truncate text-sm font-bold text-parchment-50">
         Live session
-        {sessionName && <span className="font-semibold text-garnet-100"> · {sessionName}</span>}
+        {sessionName && (
+          <span className="font-semibold text-garnet-100">
+            {" "}
+            · {sessionName}
+          </span>
+        )}
       </span>
       <span className="shrink-0 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-bold text-parchment-50">
         {liveRound != null ? `Round ${liveRound}` : "Live"}
@@ -356,12 +376,22 @@ function DesktopLiveStrip({
             ＋ Note
           </button>
           {onLeaveSession && (
-            <button type="button" disabled={sessionActionBusy} onClick={onLeaveSession} className={STRIP_BTN}>
+            <button
+              type="button"
+              disabled={sessionActionBusy}
+              onClick={onLeaveSession}
+              className={STRIP_BTN}
+            >
               Leave Session
             </button>
           )}
           {onEndSession && (
-            <button type="button" disabled={sessionActionBusy} onClick={onEndSession} className={STRIP_BTN_SOLID}>
+            <button
+              type="button"
+              disabled={sessionActionBusy}
+              onClick={onEndSession}
+              className={STRIP_BTN_SOLID}
+            >
               End Session
             </button>
           )}
