@@ -204,6 +204,55 @@ describe("POST /api/characters/:id/class/transactions — addClass (#125)", () =
     expect(res.status).toBe(400);
   });
 
+  // ── multi-op batch: per-op visibility of prior ops' writes ────────────────────
+
+  it("a two-addClass batch sees the first op's writes (positions, hit dice, HP compound)", async () => {
+    // Two pending level-ups (derived level 5, only 3 applied), and fighter at
+    // level 3 so the final entry-level sum (3+1+1) fits the derived cap.
+    await prisma.character.update({
+      where: { id: FIXTURE_ID },
+      data: { hitDice: { total: 3, die: "d10", spent: 0 } },
+    });
+    await prisma.characterClassEntry.updateMany({
+      where: { characterId: FIXTURE_ID },
+      data: { level: 3 },
+    });
+    // Barbarian: canonical name (srd prereq Str 13 — fixture Str 15 meets it).
+    const b = await prisma.characterClass.upsert({
+      where: { name: "Barbarian" },
+      create: {
+        name: "Barbarian",
+        hitDie: "d12",
+        savingThrows: ["strength", "constitution"],
+        skillChoiceCount: 2,
+        skillChoices: ["athletics"],
+        isSpellcaster: false,
+      },
+      update: {},
+    });
+
+    const res = await tx({
+      operations: [
+        { type: "addClass", classId: wizardId },
+        { type: "addClass", classId: b.id },
+      ],
+    });
+    expect(res.status).toBe(200);
+    // Op 2 must observe op 1's persisted hitDice/hitPoints/classEntries:
+    // HP 30 + (d6 avg 4 + con 2) + (d12 avg 7 + con 2) = 45, dice 3 + 1 + 1 = 5.
+    expect(res.body.hitPoints.max).toBe(45);
+    expect(res.body.hitDice.total).toBe(5);
+    expect(res.body.classes).toHaveLength(3);
+
+    // Positions compound (a stale second op would also compute position 1).
+    const entries = await prisma.characterClassEntry.findMany({
+      where: { characterId: FIXTURE_ID },
+      orderBy: { position: "asc" },
+    });
+    expect(entries.map((e) => e.position)).toEqual([0, 1, 2]);
+    expect(entries.map((e) => e.name)).toEqual(["fighter", WIZARD, "Barbarian"]);
+  });
+
   // ── audit event + undo ────────────────────────────────────────────────────────
 
   it("logs a class/classAdded event and undo deletes the entry + restores HP", async () => {

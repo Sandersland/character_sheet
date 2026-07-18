@@ -10,13 +10,10 @@
  * before most classes grant their subclass).
  */
 
-import { randomUUID } from "node:crypto";
-
 import { Prisma } from "@/generated/prisma/client.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "@/lib/activity/events.js";
-import { prisma } from "@/lib/core/prisma.js";
-import { getActiveSessionId } from "@/lib/session/sessions.js";
+import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { levelUpHpGain, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import {
   abilityModifier,
@@ -359,15 +356,17 @@ export async function applyClassOperations(
   characterId: string,
   operations: ClassOperation[]
 ): Promise<void> {
-  const batchId = randomUUID();
-  const sessionId = await getActiveSessionId(characterId);
-
-  await prisma.$transaction(async (tx) => {
-    const ctx: ClassOpContext = { tx, characterId, batchId, sessionId };
-    for (const op of operations) {
+  // The scaffold's per-op row is only the existence check: each applier
+  // re-reads with its own domain select (see ClassOpContext) so it can also be
+  // composed under a caller-supplied tx (setSubclassInTx).
+  await runCharacterTransaction(characterId, operations, {
+    select: { id: true },
+    notFound: (id) => new InvalidClassOperationError(`Character not found: ${id}`),
+    applyOp: async ({ tx, op, characterId: id, batchId, sessionId }) => {
+      const ctx: ClassOpContext = { tx, characterId: id, batchId, sessionId };
       switch (op.type) {
         case "setSubclass":
-          await setSubclassInTx(ctx.tx, ctx.characterId, op, ctx.batchId, ctx.sessionId);
+          await applySetSubclass(ctx, op);
           break;
         case "setFightingStyle":
           await applySetFightingStyle(ctx, op);
@@ -376,6 +375,6 @@ export async function applyClassOperations(
           await applyAddClass(ctx, op);
           break;
       }
-    }
+    },
   });
 }
