@@ -461,8 +461,8 @@ function dispatchAdvancementOp(
   }
 }
 
-// Columns/relations an advancement op re-reads. Hoisted to a module const so the
-// seam (applyAdvancementOpInTx) and the wrapper's existence check share one select.
+// Columns/relations applyAdvancementOpInTx re-reads per op; the batch wrapper's
+// scaffold row is an existence-only { id: true } check.
 const ADVANCEMENT_SELECT = {
   resources: true,
   abilityScores: true,

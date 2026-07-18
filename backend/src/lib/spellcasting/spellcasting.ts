@@ -822,8 +822,8 @@ export async function applySpellcastingOperations(
   });
 }
 
-// Columns/relations a spellcasting op re-reads. Hoisted so the seam and the
-// wrapper's existence check share one select.
+// Columns/relations applySpellcastingOpInTx re-reads per op; the batch wrapper's
+// scaffold row is an existence-only { id: true } check.
 const SPELLCASTING_SELECT = {
   name: true,
   campaignId: true,

@@ -856,8 +856,8 @@ function snapshotResourcesState(state: ResourcesMutableState): {
   return { resources: snapshotResources(state) };
 }
 
-// Columns/relations a resource op re-reads. Hoisted so both the seam
-// (applyResourceOpInTx) and the wrapper's existence check share one select.
+// Columns/relations applyResourceOpInTx re-reads per op; the batch wrapper's
+// scaffold row is an existence-only { id: true } check.
 const RESOURCES_SELECT = {
   resources: true,
   experiencePoints: true,
