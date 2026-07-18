@@ -3,7 +3,7 @@
 // disadvantage grants — see backend buildRollModifiers) into ONE plain-English
 // line per source, e.g. "Poisoned → Disadvantage on attack rolls and ability
 // checks". This is the single home for the "why" the sheet used to stamp under
-// every ability box and all 18 skill rows; `lib/rollMode.ts` still resolves the
+// every ability box and all 18 skill rows; `resolveRollMode` still resolves the
 // mode per roll (unchanged). No JSX here — the banner component consumes this.
 
 import { abilityLabel } from "@/lib/abilities";

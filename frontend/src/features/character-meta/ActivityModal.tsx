@@ -27,7 +27,7 @@ interface ActivityModalProps {
 }
 
 // Category filter options: an "All" sentinel followed by every event category,
-// in a stable order. Labels resolve through lib/events so keys never leak. These
+// in a stable order. Labels resolve through the events helpers so keys never leak. These
 // feed a compact <select> (not a tab strip) so all 11 categories fit the modal.
 const CATEGORY_FILTER_IDS = Object.keys(CATEGORY_LABELS) as CharacterEventCategory[];
 

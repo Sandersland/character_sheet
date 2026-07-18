@@ -1,6 +1,6 @@
 /**
  * Characterization for the frontend readEffectSpec/resolveEffectSpec twins
- * (#685). This file mirrors backend/src/lib/combat/__tests__/effects.test.ts
+ * (#685). This file mirrors the backend effects characterization suite
  * case-for-case (same fixture values) so the two hand-mirrored readers stay
  * diffably parallel, and adds the variants the backend suite pins elsewhere
  * or that were unpinned on this side entirely (buff, ki scaling, full-field

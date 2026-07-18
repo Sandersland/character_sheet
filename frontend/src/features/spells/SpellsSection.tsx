@@ -1,7 +1,7 @@
 /**
  * SpellsSection — interactive orchestrator for spellcasting on the character sheet.
- * State + op batching live in useSpellcasting; pure list derivation in lib/spellList;
- * pure cast planning in lib/spellCast. This shell wires derived data + handlers into
+ * State + op batching live in useSpellcasting; pure list derivation in spellList;
+ * pure cast planning in spellCast. This shell wires derived data + handlers into
  * the presentational subcomponents (overview, spellbook list, add-spell panel).
  *
  * Two mutually-exclusive views (caster-spellbook.html §1 vs §2/§4): the record block

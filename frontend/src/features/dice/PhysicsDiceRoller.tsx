@@ -122,7 +122,7 @@ function PhysicsRig({ dice, resolver, activeRef, onSettled, geometry, groups, ro
 
 /**
  * Real-physics dice roller: thrown with randomized velocity/spin into an
- * invisible tray (gravity, collisions, bouncing — see `lib/physicsDice.ts`),
+ * invisible tray (gravity, collisions, bouncing — see `createDiceWorld`/`throwDie`),
  * and the result is *read off whichever face lands up* rather than decided
  * in advance — physics is the source of randomness here, unlike the
  * scripted `DiceRoller`. Shares the same look (`DieMesh`/`DiceScene`) and

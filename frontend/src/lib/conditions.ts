@@ -2,7 +2,7 @@ import type { ConditionKey } from "@/types/character";
 
 /**
  * Display labels + short descriptions for the 14 standard 5e conditions and
- * exhaustion. This mirrors the backend rules data in src/lib/srd.ts — the
+ * exhaustion. This mirrors the backend SRD rules data — the
  * backend remains the single source of truth for rules; this is presentation
  * metadata only (labels/descriptions for the chip strip + picker). Never render
  * a raw condition key in the UI; resolve through conditionLabel().
