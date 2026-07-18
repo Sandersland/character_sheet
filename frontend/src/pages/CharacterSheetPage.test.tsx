@@ -7,7 +7,6 @@ import { fetchSessionDoorway, joinSession, startCampaignSession } from "@/api/cl
 import { useCharacter } from "@/hooks/useCharacter";
 import type { Character, SessionDoorwayState, SessionDoorwaySessionState } from "@/types/character";
 
-// ── Mocks ──────────────────────────────────────────────────────────────────────
 // Stub the data hooks + client; stub heavy sheet child components so the test
 // targets only the session doorway's state matrix (#942, formerly the header
 // session button #245).
@@ -60,6 +59,7 @@ vi.mock("@/features/abilities/ProficienciesCard", () => ({ default: () => null }
 vi.mock("@/features/character-meta/BannerVitals", () => ({ default: () => null }));
 // Stub the mobile mini-header (the desktop banner keeps the campaign-less link).
 vi.mock("@/features/character-meta/MobileSheetHeader", () => ({ default: () => null }));
+vi.mock("@/features/character-meta/MobileOverviewVitals", () => ({ default: () => null }));
 vi.mock("@/features/conditions/ConditionsStrip", () => ({ default: () => null }));
 
 const mockUseCharacter = vi.mocked(useCharacter);
@@ -82,6 +82,7 @@ function makeCharacter(overrides: Partial<Character>): Character {
     toolProficiencies: [],
     advancements: [],
     advancementSlots: { total: 0, used: 0 },
+    rollModifiers: [],
     ...overrides,
   } as Character;
 }

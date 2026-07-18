@@ -44,6 +44,16 @@ pre-commit:
         # (fallow-audit-base-cache-*). Those leak — they accumulate and exhaust
         # the git worktree slot limit, which broke the autodev/antidote pipeline.
         "$FALLOW" audit --base "$BASE" --quiet --gate-marker pre-commit --no-cache
+    # fallow twin of eslint's require-description gate (#1045): every
+    # `fallow-ignore-next-line` must carry a `-- <reason>`. fallow has no built-in
+    # reason requirement, so this trivial grep supplies one. Also a CI step.
+    fallow-reasons:
+      run: sh scripts/check-fallow-reasons.sh
+    # Banner twin of fallow-reasons (#1057): no lint rule detects section
+    # dividers, so this grep gate enforces the CLAUDE.md banner ban in
+    # frontend/src. Also a CI step.
+    comment-banners:
+      run: sh scripts/check-comment-banners.sh
     lint-backend:
       root: "backend/"
       glob: "**/*.{ts,tsx}"

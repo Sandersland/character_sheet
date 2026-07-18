@@ -1,2 +1,3 @@
 - [Design system](design_system.md) — fantasy-tactile parchment direction, color/font/component tokens, mock data layer conventions
 - [Attack sheet mockup](attack_sheet_mockup.md) — #811 APPROVED final spec in Claude Design ("Attack Sheet - Final Spec.dc.html" is authoritative; earlier files are history)
+- [Live-play + rolling mockup](liveplay_rolling_mockup.md) — #942 Combat-dissolve + roll-seal redesign, 5 canvases; D1–D4 decided+applied, no initiative tracking, faithful turn surface

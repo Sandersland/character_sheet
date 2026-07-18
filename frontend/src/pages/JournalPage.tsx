@@ -155,7 +155,7 @@ function BackLink({ character }: { character: Character }) {
   );
 }
 
-// ── Desktop: fixed spine + manuscript, side by side ────────────────────────────
+// Desktop: fixed spine + manuscript, side by side.
 function JournalDesktopView(props: JournalViewProps) {
   const { character, onUpdate, spine, effectiveId, filter, onFilterChange, onSelect, error, manuscript } = props;
   // useCaptureDock (not a bare useState) so ⌘J/Ctrl+J toggles the dock here too,
@@ -199,7 +199,7 @@ function JournalDesktopView(props: JournalViewProps) {
   );
 }
 
-// ── Mobile: a chapters list that pushes to the manuscript page ─────────────────
+// Mobile: a chapters list that pushes to the manuscript page.
 function JournalMobileView(props: JournalViewProps) {
   const { character, onUpdate, spine, effectiveId, filter, onFilterChange, onSelect, error, manuscript } = props;
   const [pageOpen, setPageOpen] = useState(false);

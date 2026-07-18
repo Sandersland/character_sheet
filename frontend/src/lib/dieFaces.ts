@@ -1,7 +1,7 @@
 /**
  * Shared, React-free three.js geometry/face-data for dice. Both the scripted
- * animator (`components/DiceRoller.tsx`) and the physics roller
- * (`components/PhysicsDiceRoller.tsx`) render the same die shapes and need
+ * animator (DiceRoller) and the physics roller
+ * (PhysicsDiceRoller) render the same die shapes and need
  * the same per-face normals/centroids — the scripted roller to know which
  * orientation to unwind onto, the physics roller to both build a matching
  * collision body and to read which face landed up. Keeping this pure and

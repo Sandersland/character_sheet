@@ -1,6 +1,8 @@
 import { formatModifier } from "@/lib/abilities";
 import Popover from "@/components/ui/Popover";
+import ArmorClassBreakdown from "@/features/character-meta/ArmorClassBreakdown";
 import RollButton from "@/features/dice/RollButton";
+import ManageHpButton from "@/features/hitpoints/ManageHpButton";
 import type { Character } from "@/types/character";
 
 /**
@@ -8,9 +10,11 @@ import type { Character } from "@/types/character";
  *
  * These are the only combat numbers that stay visible across every tab. Styled
  * for the garnet banner (translucent-white chips, light text). AC keeps its
- * labeled breakdown popover and Initiative stays rollable, exactly as they were
- * in the old parchment vitals strip; HP is a read-only readout here (the Combat
- * tab's HitPointTracker remains the single editing surface).
+ * labeled breakdown popover and Initiative stays rollable. HP is the tappable
+ * HP surface (#982): with `onUpdate` the chip opens the shared "Hit Points"
+ * sheet — the header meter is the sole entry point (the live-Combat panel has no
+ * separate HP control). Without `onUpdate` it degrades to a read-only
+ * readout (test/preview callers).
  */
 const CHIP =
   "flex min-w-[68px] flex-col items-center justify-center rounded-control border border-white/25 bg-white/10 px-4 py-2";
@@ -26,8 +30,26 @@ function StatChip({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function BannerVitals({ character }: { character: Character }) {
+export default function BannerVitals({
+  character,
+  onUpdate,
+}: {
+  character: Character;
+  /** Opens the shared HP sheet from the HP chip; omit for a read-only readout. */
+  onUpdate?: (character: Character) => void;
+}) {
   const { current, max, temp } = character.hitPoints;
+
+  const hpReadout = (
+    <>
+      <span className={VALUE}>
+        {current}
+        <span className="text-sm font-medium text-garnet-100">/{max}</span>
+        {temp > 0 && <span className="text-sm font-medium text-arcane-200"> +{temp}</span>}
+      </span>
+      <span className={LABEL}>Hit Points</span>
+    </>
+  );
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -42,21 +64,7 @@ export default function BannerVitals({ character }: { character: Character }) {
           </>
         }
       >
-        <dl className="px-3 py-2 text-sm">
-          {character.armorClassBreakdown.map((part, i) => (
-            <div key={`${part.label}-${i}`} className="flex items-center justify-between gap-4 py-0.5">
-              <dt className="text-parchment-700">{part.label}</dt>
-              <dd className="font-semibold tabular-nums text-parchment-900">
-                {/* deriveArmorClassParts always emits the base (armor/unarmored) part first. */}
-                {i === 0 ? part.value : formatModifier(part.value)}
-              </dd>
-            </div>
-          ))}
-          <div className="mt-1 flex items-center justify-between gap-4 border-t border-parchment-200 pt-1">
-            <dt className="font-semibold text-parchment-800">Total</dt>
-            <dd className="font-semibold tabular-nums text-parchment-900">{character.armorClass}</dd>
-          </div>
-        </dl>
+        <ArmorClassBreakdown character={character} />
       </Popover>
 
       {/* Initiative — rollable. */}
@@ -74,15 +82,21 @@ export default function BannerVitals({ character }: { character: Character }) {
 
       <StatChip label="Proficiency" value={formatModifier(character.proficiencyBonus)} />
 
-      {/* HP — read-only readout; the Combat tab's tracker owns HP edits. */}
-      <div className={CHIP} title="Manage HP on the Combat tab">
-        <span className={VALUE}>
-          {current}
-          <span className="text-sm font-medium text-garnet-100">/{max}</span>
-          {temp > 0 && <span className="text-sm font-medium text-arcane-200"> +{temp}</span>}
-        </span>
-        <span className={LABEL}>Hit Points</span>
-      </div>
+      {/* HP — the tappable HP surface (#982): opens the shared "Hit Points" sheet.
+          Read-only readout when no onUpdate (test/preview callers). */}
+      {onUpdate ? (
+        <ManageHpButton
+          character={character}
+          onUpdate={onUpdate}
+          className={`${CHIP} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50`}
+        >
+          {hpReadout}
+        </ManageHpButton>
+      ) : (
+        <div className={CHIP} title="Manage HP on the Combat tab">
+          {hpReadout}
+        </div>
+      )}
     </div>
   );
 }

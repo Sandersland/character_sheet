@@ -1,5 +1,5 @@
 /**
- * Unit tests for lib/turnRules.ts — pure functions, no React.
+ * Unit tests for turnRules — pure functions, no React.
  * Mirrors actionResolvers.test.ts style: explicit vitest imports, no globals.
  */
 
@@ -13,8 +13,6 @@ import {
 
 // deriveAttacksPerAction moved to the backend (srd.ts); Extra Attack counts now
 // arrive on the serialized character as `attacksPerAction`.
-
-// ── canTwoWeaponFight ─────────────────────────────────────────────────────────
 
 /** Minimal item shape canTwoWeaponFight actually reads. */
 function makeWeapon(light: boolean, equipped = true) {
@@ -54,7 +52,7 @@ describe("canTwoWeaponFight", () => {
     expect(canTwoWeaponFight([noDetail, noDetail])).toBe(false);
   });
 
-  // ── Two-Weapon Fighting style relaxes the light restriction (#732) ──────────
+  // Two-Weapon Fighting style relaxes the light restriction (#732).
   it("non-light pair → false without the Two-Weapon Fighting style", () => {
     expect(canTwoWeaponFight([makeWeapon(false), makeWeapon(false)])).toBe(false);
     // An unrelated style does not relax it either.
@@ -81,8 +79,6 @@ describe("canTwoWeaponFight", () => {
     expect(canTwoWeaponFight([makeWeapon(true), makeWeapon(true)], "twoWeaponFighting")).toBe(true);
   });
 });
-
-// ── UNIVERSAL_ACTIONS + universalActionsForCost ───────────────────────────────
 
 describe("UNIVERSAL_ACTIONS", () => {
   it("has exactly 15 entries (lock the list)", () => {

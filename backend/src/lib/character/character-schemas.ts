@@ -73,7 +73,7 @@ export type CreateCharacterBody = z.infer<typeof createCharacterSchema>;
 // see POST /api/characters/:id/inventory/transactions instead.
 //
 // experiencePoints is also absent here — XP changes must go through
-// POST /api/characters/:id/experience (routes/experience.ts) so they are
+// POST /api/characters/:id/experience so they are
 // logged to the activity timeline and auto-reverse HP on level-down.
 //
 // currency IS still patchable here (a bare DM-handed-over amount isn't
@@ -119,7 +119,7 @@ export const updateCharacterSchema = z
     // inventory being absent from PATCH).
     //
     // journal is also absent: it's now the relational JournalEntry table,
-    // mutated via the plain-REST routes/journal.ts CRUD endpoints, not PATCH.
+    // mutated via the plain-REST /characters/:id/journal CRUD endpoints, not PATCH.
   })
   .partial()
   .strict();

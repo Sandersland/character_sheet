@@ -20,8 +20,6 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import type { RollEffect, RollModeKind } from "@/lib/srd/roll-effects.js";
 
-// ── Canonical mutable state shape ─────────────────────────────────────────────
-
 // How long a buff rides the character. "concentration" clears when its granting
 // concentration ends (the #438 default). "while-active" persists until explicitly
 // toggled off; "until-rest" clears on the matching rest. The latter two survive
@@ -58,7 +56,6 @@ export interface ActiveEffectsMutableState {
   buffs: ActiveBuff[];
 }
 
-// ── Normalizer ────────────────────────────────────────────────────────────────
 // Tolerant of null (character has never had a buff) and of malformed entries
 // (dropped). Mirror of normalizeConditionsMutable.
 
@@ -165,8 +162,6 @@ export function serializeActiveEffectsState(state: ActiveEffectsMutableState): P
   } as unknown as Prisma.InputJsonValue;
 }
 
-// ── Pure summarizers ──────────────────────────────────────────────────────────
-
 /** Group active buffs by their target key. */
 export function buffsByTarget(state: ActiveEffectsMutableState): Record<string, ActiveBuff[]> {
   const out: Record<string, ActiveBuff[]> = {};
@@ -194,7 +189,6 @@ function snapshot(state: ActiveEffectsMutableState): { activeEffects: ActiveEffe
   return { activeEffects: { buffs: state.buffs.map((b) => ({ ...b })) } };
 }
 
-// ── Transaction helpers ─────────────────────────────────────────────────────
 // Self-contained read → mutate → write → log against the activeEffects column,
 // sharing the caller's batchId so batch revert (category "effects" branch)
 // restores activeEffects together with the spellcasting/concentration change.

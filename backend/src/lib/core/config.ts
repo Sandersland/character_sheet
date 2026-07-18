@@ -46,8 +46,8 @@ const schema = z.object({
   APP_BASE_URL: z.string().url().default("http://localhost:4000"),
   SESSION_COOKIE_SECURE: z.boolean(),
   ALLOW_DEV_LOGIN: z.boolean(),
-  // Pass-through values other modules read; kept here so the full auth-relevant
-  // surface is documented in one place.
+  // app.ts reads CORS_ORIGIN/SERVE_STATIC_DIR from config; PORT is surfaced here
+  // too, keeping the full auth-relevant env surface in one place.
   CORS_ORIGIN: z.string().optional(),
   SERVE_STATIC_DIR: z.string().optional(),
   PORT: z.string().optional(),

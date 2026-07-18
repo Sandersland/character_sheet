@@ -18,7 +18,7 @@ export const referenceRouter = Router();
 // toolChoices, not this list).
 referenceRouter.get("/reference", async (_req, res) => {
   // Sequential rather than Promise.all — see the matching comment in
-  // routes/characters.ts's POST handler.
+  // charactersRouter's POST handler.
   const races = await prisma.race.findMany({ orderBy: { name: "asc" } });
   const rawClasses = await prisma.characterClass.findMany({
     orderBy: { name: "asc" },

@@ -29,6 +29,23 @@ if (typeof globalThis.PointerEvent === "undefined") {
   globalThis.PointerEvent = PointerEventPolyfill as unknown as typeof PointerEvent;
 }
 
+// jsdom lacks IntersectionObserver; stub a no-op so the header's scroll-collapse
+// observer (useScrollCollapse) can construct without throwing.
+if (typeof globalThis.IntersectionObserver === "undefined") {
+  class IntersectionObserverStub {
+    root = null;
+    rootMargin = "";
+    thresholds: number[] = [];
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  }
+  globalThis.IntersectionObserver = IntersectionObserverStub as unknown as typeof IntersectionObserver;
+}
+
 // Default no-op matchMedia stub (jsdom lacks it); tests can override per-case.
 if (!window.matchMedia) {
   window.matchMedia = (query: string) =>

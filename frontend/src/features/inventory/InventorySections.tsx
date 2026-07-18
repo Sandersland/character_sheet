@@ -1,6 +1,11 @@
+import { useState } from "react";
+
 import type { InventoryOperation } from "@/types/character";
 import { ITEM_CATEGORY_ICONS } from "@/components/ui/icons";
+import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import InventoryRow from "@/features/inventory/InventoryRow";
+import InventoryRowCompact from "@/features/inventory/InventoryRowCompact";
+import ItemDetailSheet from "@/features/inventory/ItemDetailSheet";
 import { formatWeight, type InventorySection } from "@/lib/inventorySections";
 import { itemCategoryLabel } from "@/lib/items";
 
@@ -17,7 +22,9 @@ interface InventorySectionsProps {
   onToggleSelect: (id: string) => void;
 }
 
-// The scrollable, category-sectioned list of inventory rows.
+// The category-sectioned list of inventory rows. Desktop keeps padded rows in an
+// inner scroller; mobile (#1029) renders dense full-bleed rows that open a detail
+// sheet, sticky section headers, and no nested scroller (the page scrolls).
 export default function InventorySections({
   sections,
   editingId,
@@ -30,9 +37,51 @@ export default function InventorySections({
   onSubmit,
   onToggleSelect,
 }: InventorySectionsProps) {
+  const isMobile = useIsBelowMd();
+  const [openId, setOpenId] = useState<string | null>(null);
+
   if (sections.length === 0) {
     return <p className="py-8 text-center text-sm text-parchment-600">No items match your search.</p>;
   }
+
+  if (isMobile) {
+    const openItem = sections.flatMap((section) => section.items).find((item) => item.id === openId) ?? null;
+    return (
+      <div>
+        {sections.map((section) => {
+          const CategoryIcon = ITEM_CATEGORY_ICONS[section.category];
+          return (
+            <section key={section.category}>
+              <h4 className="sticky top-0 z-10 flex items-center justify-between gap-2 border-y border-parchment-200 bg-parchment-100 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wide text-parchment-600">
+                <span className="flex items-center gap-1.5">
+                  <CategoryIcon aria-hidden="true" className="text-sm" />
+                  {itemCategoryLabel(section.category)}
+                </span>
+                <span className="tabular-nums font-semibold text-parchment-500">
+                  {section.items.length} · {formatWeight(section.weight)} lb
+                </span>
+              </h4>
+              <ul className="flex flex-col">
+                {section.items.map((item) => (
+                  <InventoryRowCompact key={item.id} item={item} onOpen={() => setOpenId(item.id)} />
+                ))}
+              </ul>
+            </section>
+          );
+        })}
+        {openItem && (
+          <ItemDetailSheet
+            item={openItem}
+            pending={pending}
+            atCap={atCap}
+            onSubmit={onSubmit}
+            onClose={() => setOpenId(null)}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="max-h-96 overflow-y-auto">
       {sections.map((section) => {

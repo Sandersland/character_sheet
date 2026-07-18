@@ -1,7 +1,7 @@
 /**
  * Generic dice-rolling engine. This is the one place `Math.random` is read
- * for rolling dice — `lib/abilityGen.ts`'s 4d6-drop-lowest generator and the
- * `<DiceRoller>` component (components/DiceRoller.tsx) both delegate here,
+ * for rolling dice — abilityGen's 4d6-drop-lowest generator and the
+ * DiceRoller component both delegate here,
  * so every roll in the app (ability scores today; hit dice, attacks, and
  * saving throws later) shares the same engine and exposes the same
  * per-die detail instead of just a final sum.

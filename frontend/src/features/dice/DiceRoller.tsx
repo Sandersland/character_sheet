@@ -47,7 +47,7 @@ const DROP_HEIGHT_MAX = 2.0;
 // actually reads as the die having been thrown/rolled rather than just
 // bobbing in place. Deliberately z-only, not also sideways along x: dice sit
 // side by side along x at DIE_GAP apart with only ~0.35 of clearance over
-// their circumscribed-sphere diameter at rest (see lib/dieFaces.ts's DIE_GAP
+// their circumscribed-sphere diameter at rest (see the DIE_GAP
 // comment), so any x-direction travel risks two neighbors visibly clipping
 // through each other mid-roll. z has no such neighbor to clip into.
 const SKITTER_DISTANCE_MIN = 0.9;
@@ -179,8 +179,7 @@ function ScriptedDie({
     } else {
       phaseRef.current = "spin";
     }
-    // rollId is the trigger; rolling/reducedMotion/targetQuaternion are read fresh each time it fires.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- scripted-tumble seed keyed on the rollId trigger; rolling/reducedMotion/targetQuaternion are read fresh on each fire, so completing the deps would restart the animation mid-roll; useEffectEvent (the sanctioned extraction) isn't in React 18.3.1 (#1056)
   }, [rollId]);
 
   useFrame((_, delta) => {
@@ -247,7 +246,7 @@ function describeRoll(spec: DiceRollerProps["spec"], rolling: boolean, settled: 
 
 /**
  * Animated, reusable 3D dice roller — real three.js polyhedra (via React
- * Three Fiber) that tumble and settle on a real roll from `lib/dice.ts`,
+ * Three Fiber) that tumble and settle on a real roll from `rollSpec`,
  * dimming any dice `spec.dropLowest` excludes from the total (e.g. the
  * dropped die in 4d6-drop-lowest). Parents stay in control of *when* a roll
  * happens via `rollKey` — character creation rolls ability scores via the
@@ -256,7 +255,7 @@ function describeRoll(spec: DiceRollerProps["spec"], rolling: boolean, settled: 
  * previously-computed hit-die roll) and is meant to be dropped in unchanged
  * wherever that's the case.
  *
- * The engine (`lib/dice.ts`) always decides the result; the 3D dice tumble
+ * The engine (`rollSpec`) always decides the result; the 3D dice tumble
  * freely and then orient to land on that result, so rolls stay deterministic
  * and testable even though the animation looks physical. Honors
  * `prefers-reduced-motion` by settling immediately, and exposes the result

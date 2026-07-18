@@ -1,5 +1,5 @@
 /**
- * Conditions transaction handler — the analog to lib/resources.ts for tracking
+ * Conditions transaction handler — the analog to applyResourceOperations for tracking
  * a character's active status conditions (prone, poisoned, stunned, …) plus a
  * single 0–6 exhaustion level.
  *
@@ -23,11 +23,7 @@ import {
   type ConditionKey,
 } from "@/lib/srd/srd.js";
 
-// ── Error class ───────────────────────────────────────────────────────────────
-
 export class InvalidConditionOperationError extends Error {}
-
-// ── Canonical mutable state shape ─────────────────────────────────────────────
 
 /** One applied standard 5e condition. Boolean presence — deduped by `key`. */
 export interface ConditionEntry {
@@ -44,7 +40,6 @@ export interface ConditionsMutableState {
   exhaustion: number;
 }
 
-// ── Normalizer ────────────────────────────────────────────────────────────────
 // Tolerant of null (character has never had a condition) and of stale/unknown
 // keys (dropped). Mirror of normalizeResourcesMutable. Exhaustion clamped 0–6.
 
@@ -95,8 +90,6 @@ function serializeConditionsState(state: ConditionsMutableState): Prisma.InputJs
   } as unknown as Prisma.InputJsonValue;
 }
 
-// ── Operation types ───────────────────────────────────────────────────────────
-
 /** Apply (add) a standard 5e status condition. No-op-error if already present. */
 export interface ApplyConditionOperation {
   type: "applyCondition";
@@ -121,8 +114,6 @@ export type ConditionOperation =
   | RemoveConditionOperation
   | SetExhaustionOperation;
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function deepCopy(state: ConditionsMutableState): { conditions: ConditionsMutableState } {
   return {
     conditions: {
@@ -135,8 +126,6 @@ function deepCopy(state: ConditionsMutableState): { conditions: ConditionsMutabl
 function conditionLabel(key: ConditionKey): string {
   return CONDITIONS.find((c) => c.key === key)?.label ?? key;
 }
-
-// ── In-transaction helper ─────────────────────────────────────────────────────
 
 /**
  * Apply a condition inside a caller-supplied transaction, sharing its batchId so
@@ -180,8 +169,6 @@ export async function applyConditionInTx(
     sessionId,
   });
 }
-
-// ── Transaction handler ───────────────────────────────────────────────────────
 
 /**
  * Applies a batch of condition operations atomically in one Prisma transaction.

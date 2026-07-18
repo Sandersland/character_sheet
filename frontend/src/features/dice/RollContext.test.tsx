@@ -31,7 +31,7 @@ vi.mock("@/features/dice/DiceRoller", () => ({
         total: NATURAL + modifier,
         spec: { count: 1, faces: 20, modifier, mode: spec?.mode },
       });
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- mock fires onResult once on mount; empty deps intentional
     }, []);
     return <div data-testid="dice-roller" />;
   },
@@ -43,7 +43,7 @@ function AnimatedRollOnMount({ spec, label, log }: { spec: RollSpec; label: stri
   const { rollAnimated } = useRoll();
   useEffect(() => {
     rollAnimated(spec, label, log);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- harness rolls once on mount; empty deps intentional
   }, []);
   return null;
 }
@@ -149,7 +149,7 @@ describe("RollProvider — rollAnimated + logging", () => {
           kind: "initiative",
           source: "Initiative",
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- harness rolls once on mount; empty deps intentional
       }, []);
       return null;
     }

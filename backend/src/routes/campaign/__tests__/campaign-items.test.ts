@@ -693,4 +693,114 @@ describe("campaign items (#380)", () => {
       expect(detail).not.toBeNull();
     });
   });
+
+  // Pin the grant/castSpell column-mapper defaults ahead of the lib extraction.
+  describe("column-mapper pins (#1002)", () => {
+    it("persists two grant capabilities with null/false column defaults and serializes both", async () => {
+      const res = await supertest(app)
+        .post(`/api/campaigns/${campaignId}/items`)
+        .set("Cookie", cookieOwner)
+        .send({
+          name: "Sentinel Cloak (1002)",
+          category: "gear",
+          capabilities: [
+            { kind: "grant", grantType: "resistance", grantValueKind: "damageType", grantValue: "fire" },
+            { kind: "grant", grantType: "advantage", grantOn: "initiative", cantBeSurprised: true },
+          ],
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.capabilities).toHaveLength(2);
+      // Falsy grant fields are OMITTED from the wire, never null.
+      expect(res.body.capabilities[0]).toEqual({
+        kind: "grant",
+        grantType: "resistance",
+        grantValueKind: "damageType",
+        grantValue: "fire",
+      });
+      expect(res.body.capabilities[1]).toEqual({
+        kind: "grant",
+        grantType: "advantage",
+        grantOn: "initiative",
+        cantBeSurprised: true,
+      });
+
+      const persisted = await prisma.campaignItemCapability.findMany({
+        where: { campaignItemId: res.body.id },
+        orderBy: { grantType: "asc" },
+      });
+      expect(persisted).toHaveLength(2);
+      const advantage = persisted.find((c) => c.grantType === "advantage")!;
+      const resistance = persisted.find((c) => c.grantType === "resistance")!;
+      expect(resistance).toMatchObject({
+        kind: "grant",
+        grantType: "resistance",
+        grantOn: null,
+        grantValueKind: "damageType",
+        grantValue: "fire",
+        cantBeSurprised: false,
+        description: null,
+      });
+      expect(advantage).toMatchObject({
+        kind: "grant",
+        grantType: "advantage",
+        grantOn: "initiative",
+        grantValueKind: null,
+        grantValue: null,
+        cantBeSurprised: true,
+        description: null,
+      });
+    });
+
+    it("defaults omitted castSpell uses/concentration/chargeCost columns and round-trips", async () => {
+      const res = await supertest(app)
+        .post(`/api/campaigns/${campaignId}/items`)
+        .set("Cookie", cookieOwner)
+        .send({
+          name: "Staff of Webs (1002)",
+          category: "gear",
+          capabilities: [
+            {
+              kind: "castSpell",
+              spellId: "spell-web",
+              spellName: "Web",
+              spellLevel: 2,
+              castLevel: 2,
+              resource: "perRestLong",
+              dcMode: "fixed",
+              dcValue: 13,
+              attackMode: "fixed",
+            },
+          ],
+        });
+      expect(res.status).toBe(201);
+      expect(res.body.capabilities).toHaveLength(1);
+      // uses/concentration surface their defaults; chargeCost stays off the wire on a non-charges resource.
+      expect(res.body.capabilities[0]).toEqual({
+        kind: "castSpell",
+        spellId: "spell-web",
+        spellName: "Web",
+        spellLevel: 2,
+        castLevel: 2,
+        resource: "perRestLong",
+        uses: 1,
+        concentration: false,
+        dcMode: "fixed",
+        dcValue: 13,
+        attackMode: "fixed",
+      });
+
+      const persisted = await prisma.campaignItemCapability.findMany({ where: { campaignItemId: res.body.id } });
+      expect(persisted).toHaveLength(1);
+      expect(persisted[0]).toMatchObject({
+        kind: "castSpell",
+        castResource: "perRestLong",
+        castUses: 1,
+        castConcentration: false,
+        chargeCost: null,
+        dcValue: 13,
+        attackValue: null,
+        description: null,
+      });
+    });
+  });
 });

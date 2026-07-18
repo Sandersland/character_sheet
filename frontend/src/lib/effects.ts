@@ -1,4 +1,4 @@
-// Mirror of backend lib/combat/effects.ts — keep in sync. Canonical 5e effect model
+// Mirror of the backend combat-effects module — keep in sync. Canonical 5e effect model
 // (dice + save + scaling) extracted from Spell so it can describe any activated
 // ability. The one intentional divergence: resolveEffectSpec returns the real
 // RollSpec from @/lib/dice (the backend has no RollSpec type).

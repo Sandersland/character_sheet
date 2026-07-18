@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 
-import SessionLog from "@/features/session/SessionLog";
+import SessionLog, { TYPE_LABEL } from "@/features/session/SessionLog";
 import { fetchSession } from "@/api/client";
-import type { CharacterEvent } from "@/types/character";
+import type { CharacterEvent, CharacterEventType } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   fetchSession: vi.fn(),
@@ -121,5 +121,126 @@ describe("SessionLog roll breakdown", () => {
     await waitFor(() =>
       expect(screen.queryByText(/\(1d20 \(/)).not.toBeInTheDocument(),
     );
+  });
+});
+
+// Every event type in the frontend union, kept exhaustive by the compile-time
+// guard below — omit one and typecheck fails, forcing this list (and the
+// coverage assertion) current. (#983)
+const ALL_EVENT_TYPES = [
+  "acquired", "consumed", "sold", "bought", "removed",
+  "awarded", "revoked",
+  "damage", "heal", "setTemp", "shortRest", "longRest",
+  "levelUp", "levelDown", "deathSave", "stabilize",
+  "xpAward", "xpSet",
+  "currencyAdjust",
+  "castSpell", "expendSlot", "restoreSlot",
+  "learnSpell", "forgetSpell", "prepareSpell", "unprepareSpell",
+  "concentrationDropped",
+  "subclassChosen", "subclassRemoved",
+  "fightingStyleChosen", "fightingStyleRemoved",
+  "spendResource", "restoreResource",
+  "learnManeuver", "forgetManeuver", "maneuversReconciled",
+  "learnToolProficiency", "forgetToolProficiency", "toolProficienciesReconciled",
+  "abilityScoreImprovement", "featTaken",
+  "advancementRemoved", "advancementsReconciled",
+  "equipped", "unequipped",
+  "sessionStarted", "sessionEnded",
+  "combatStarted", "combatEnded", "combatRoundAdvanced",
+  "conditionApplied", "conditionRemoved", "exhaustionSet",
+  "attackRoll", "damageRoll",
+  "checkRoll", "saveRoll", "initiativeRoll",
+  "revert",
+] as const satisfies readonly CharacterEventType[];
+
+// Fails typecheck if ALL_EVENT_TYPES omits any CharacterEventType member.
+type _Complete =
+  Exclude<CharacterEventType, (typeof ALL_EVENT_TYPES)[number]> extends never ? true : never;
+
+describe("SessionLog TYPE_LABEL coverage", () => {
+  it("has an explicit label for every event type (no silent humanizer reliance)", () => {
+    const complete: _Complete = true;
+    expect(complete).toBe(true);
+    for (const type of ALL_EVENT_TYPES) {
+      expect(TYPE_LABEL[type], `TYPE_LABEL is missing an explicit entry for "${type}"`).toBeDefined();
+    }
+  });
+});
+
+describe("SessionLog event labels", () => {
+  it("labels initiativeRoll and conditionApplied without leaking the raw key", async () => {
+    renderWith([
+      makeEvent({ id: "i", category: "roll", type: "initiativeRoll", summary: "Initiative: 14" }),
+      makeEvent({ id: "c", category: "conditions", type: "conditionApplied", summary: "Poisoned" }),
+    ]);
+
+    expect(await screen.findByText("initiative")).toBeInTheDocument();
+    expect(screen.getByText("condition")).toBeInTheDocument();
+    expect(screen.queryByText("initiativeRoll")).not.toBeInTheDocument();
+    expect(screen.queryByText("conditionApplied")).not.toBeInTheDocument();
+  });
+
+  it("humanizes an unmapped event type instead of leaking the camelCase key", async () => {
+    renderWith([
+      makeEvent({ id: "x", category: "class", type: "someFutureType" as CharacterEventType, summary: "A future thing" }),
+    ]);
+
+    expect(await screen.findByText("some future type")).toBeInTheDocument();
+    expect(screen.queryByText("someFutureType")).not.toBeInTheDocument();
+  });
+});
+
+describe("SessionLog roll-run collapsing", () => {
+  it("collapses 12 consecutive initiative rolls to one row plus an expandable disclosure", async () => {
+    const rolls = Array.from({ length: 12 }, (_, i) =>
+      makeEvent({
+        id: `init-${i}`,
+        category: "roll",
+        type: "initiativeRoll",
+        summary: `Initiative: ${20 - i}`,
+      }),
+    );
+    renderWith(rolls);
+
+    // Only the newest initiative row is visible; the rest hide behind a disclosure.
+    expect(await screen.findByText("Initiative: 20")).toBeInTheDocument();
+    expect(screen.queryByText("Initiative: 19")).not.toBeInTheDocument();
+    expect(screen.queryByText("Initiative: 9")).not.toBeInTheDocument();
+
+    const disclosure = screen.getByText(/11 earlier initiative rolls/);
+    fireEvent.click(disclosure);
+
+    // Expanding reveals every hidden row.
+    expect(await screen.findByText("Initiative: 19")).toBeInTheDocument();
+    expect(screen.getByText("Initiative: 9")).toBeInTheDocument();
+  });
+
+  it("breaks the run on an interleaved non-roll event and leaves other types untouched", async () => {
+    renderWith([
+      makeEvent({ id: "i1", category: "roll", type: "initiativeRoll", summary: "Initiative: 18" }),
+      makeEvent({ id: "i2", category: "roll", type: "initiativeRoll", summary: "Initiative: 15" }),
+      makeEvent({ id: "d1", category: "hitPoints", type: "damage", summary: "Took 5 damage" }),
+      makeEvent({ id: "i3", category: "roll", type: "initiativeRoll", summary: "Initiative: 12" }),
+      makeEvent({ id: "i4", category: "roll", type: "initiativeRoll", summary: "Initiative: 10" }),
+    ]);
+
+    // Two separate 2-long runs, each collapsed independently around the damage row.
+    expect(await screen.findByText("Initiative: 18")).toBeInTheDocument();
+    expect(screen.getByText("Took 5 damage")).toBeInTheDocument();
+    expect(screen.getByText("Initiative: 12")).toBeInTheDocument();
+    expect(screen.queryByText("Initiative: 15")).not.toBeInTheDocument();
+    expect(screen.queryByText("Initiative: 10")).not.toBeInTheDocument();
+    expect(screen.getAllByText(/1 earlier initiative rolls/)).toHaveLength(2);
+  });
+
+  it("does not collapse consecutive non-roll events", async () => {
+    renderWith([
+      makeEvent({ id: "d1", category: "hitPoints", type: "damage", summary: "Took 5 damage" }),
+      makeEvent({ id: "d2", category: "hitPoints", type: "damage", summary: "Took 3 damage" }),
+    ]);
+
+    expect(await screen.findByText("Took 5 damage")).toBeInTheDocument();
+    expect(screen.getByText("Took 3 damage")).toBeInTheDocument();
+    expect(screen.queryByText(/earlier/)).not.toBeInTheDocument();
   });
 });

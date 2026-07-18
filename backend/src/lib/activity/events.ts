@@ -1,7 +1,5 @@
 import { Prisma } from "@/generated/prisma/client.js";
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
 export type EventCategory =
   | "inventory"
   | "hitPoints"
@@ -139,8 +137,6 @@ export interface LogEventParams {
   sessionId?: string | null;
 }
 
-// ── diffToFields ─────────────────────────────────────────────────────────────
-
 type DiffField = {
   path: string;
   oldValue: Prisma.InputJsonValue | null;
@@ -196,8 +192,6 @@ export function diffToFields(
 
   return result;
 }
-
-// ── logEvent ─────────────────────────────────────────────────────────────────
 
 /**
  * Writes one `CharacterEvent` row and its derived `CharacterEventField` rows

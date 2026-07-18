@@ -1,5 +1,5 @@
 // Pure planning logic for the weapon-row maneuver prompt — extracted from
-// features/session/ManeuverPrompt.tsx (#689). No JSX.
+// ManeuverPrompt (#689). No JSX.
 //
 // Only maneuvers whose placement is "attackRoll" or "damageRoll" belong in a
 // weapon row (they augment THIS weapon's rolls). "attackOption" (Commander's

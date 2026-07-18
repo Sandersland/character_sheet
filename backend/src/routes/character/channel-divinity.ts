@@ -55,12 +55,6 @@ channelDivinityRouter.get<{ id: string }>("/", async (req, res) => {
   res.json(options);
 });
 
-// ── POST /api/characters/:id/channel-divinity/transactions ────────────────────
-//
-// Intent-bearing batch mutation — mirrors the shadow-arts endpoint. The one op:
-//   castChannelDivinity — spend 1 CD charge; apply the option's real side effect
-//   (Sacred Weapon attack buff, Cloak of Shadows invisibility) or reminder/DC.
-
 const castChannelDivinityOpSchema = z.object({
   type: z.literal("castChannelDivinity"),
   abilityId: z.string().min(1),
@@ -72,6 +66,12 @@ const transactionsRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),
 });
 
+/**
+ * POST /api/characters/:id/channel-divinity/transactions
+ * Intent-bearing batch mutation — mirrors the shadow-arts endpoint. The one op:
+ *   castChannelDivinity — spend 1 CD charge; apply the option's real side effect
+ *   (Sacred Weapon attack buff, Cloak of Shadows invisibility) or reminder/DC.
+ */
 makeTransactionsEndpoint({
   router: channelDivinityRouter,
   schema: transactionsRequestSchema,

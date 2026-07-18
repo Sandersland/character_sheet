@@ -99,7 +99,7 @@ export function parseMentionBody(body: string): MentionSegment[] {
 }
 
 // Fold a name/alias/query to a comparison key. MUST stay in parity with the
-// backend normalizeForMatch (lib/activity/journal-refs.ts) so search matches identically.
+// backend normalizeForMatch so search matches identically.
 export function normalizeForMatch(s: string): string {
   return s
     .normalize("NFD")
@@ -186,8 +186,7 @@ export function parseTrigger(textBeforeCaret: string): MentionTrigger | null {
   return { active: true, query: raw, triggerStart: at };
 }
 
-// --- contenteditable DOM ⇄ @[<uuid>] string (the edit-time chip editor, #269) ---
-
+/** contenteditable DOM ⇄ @[<uuid>] string — the edit-time chip editor (#269). */
 export interface MentionResolved {
   name: string;
   type: EntityType;

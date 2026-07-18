@@ -1,10 +1,31 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import InventoryList from "@/features/inventory/InventoryList";
 import { applyInventoryTransactions, updateCharacter } from "@/api/client";
 import type { Character, Currency, InventoryItem } from "@/types/character";
+
+// useIsBelowMd reads matchMedia; the setup stub reports matches:false (mobile).
+// The multi-select sell bar + the header Add/Sell actions are desktop-only after
+// #1029, so those suites force the desktop layout; the rest run mobile.
+function setMatchMedia(matcher: (query: string) => boolean) {
+  window.matchMedia = (query: string) =>
+    ({
+      matches: matcher(query),
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList;
+}
+const forceDesktop = () => setMatchMedia((q) => q.includes("min-width"));
+const forceMobile = () => setMatchMedia(() => false);
+
+afterEach(() => forceMobile());
 
 // Consumable rows render a Use button that reads useRoll(); this suite doesn't
 // exercise rolling, so stub the roll context instead of wrapping every render.
@@ -131,8 +152,12 @@ describe("InventoryList sectioning", () => {
       makeItem({ id: "g1", name: "Torch", category: "gear", weight: 1, quantity: 2 }),
     ];
     render(<InventoryList character={makeCharacter(15, inventory)} onUpdate={vi.fn()} />);
-    expect(screen.getByText(/Weapons · 1 · 3 lb/)).toBeInTheDocument();
-    expect(screen.getByText(/Gear · 1 · 2 lb/)).toBeInTheDocument();
+    // Mobile headers carry the caps label + a right-aligned count · weight payoff.
+    const weapons = screen.getByRole("heading", { level: 4, name: /Weapons/ });
+    expect(weapons).toHaveTextContent(/Weapons/);
+    expect(weapons).toHaveTextContent(/1 · 3 lb/);
+    const gear = screen.getByRole("heading", { level: 4, name: /Gear/ });
+    expect(gear).toHaveTextContent(/1 · 2 lb/);
   });
 
   it("orders sections Weapons → Armor → Gear → Consumables", () => {
@@ -181,11 +206,22 @@ describe("InventoryList sectioning", () => {
 });
 
 describe("InventoryList empty state", () => {
-  it("shows an empty-pack message + add CTA and no sections or meter", () => {
+  it("desktop: shows an empty-pack message + add CTA and no sections or meter", () => {
+    forceDesktop();
     render(<InventoryList character={makeCharacter(10, [])} onUpdate={vi.fn()} />);
     expect(screen.getByText(/your pack is empty/i)).toBeInTheDocument();
     // Two "+ Add item" affordances when empty: the header button + the empty-state CTA.
     expect(screen.getAllByRole("button", { name: "+ Add item" })).toHaveLength(2);
+    expect(screen.queryByRole("meter")).toBeNull();
+    expect(screen.queryByRole("heading", { level: 4 })).toBeNull();
+  });
+
+  it("mobile: shows only the empty-state CTA (no header add, no FAB) and no meter", () => {
+    render(<InventoryList character={makeCharacter(10, [])} onUpdate={vi.fn()} />);
+    expect(screen.getByText(/your pack is empty/i)).toBeInTheDocument();
+    // Header actions and the FAB drop out when empty — only the CTA remains.
+    expect(screen.getAllByRole("button", { name: "+ Add item" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Add item" })).toBeNull();
     expect(screen.queryByRole("meter")).toBeNull();
     expect(screen.queryByRole("heading", { level: 4 })).toBeNull();
   });
@@ -284,7 +320,10 @@ describe("InventoryList purse", () => {
   });
 });
 
+// Bulk multi-select sell lives in the desktop header; on mobile a single item is
+// sold from its detail sheet (see the mobile suite below).
 describe("InventoryList multi-select sell", () => {
+  beforeEach(() => forceDesktop());
   const inventory = [
     makeItem({ id: "w1", name: "Longsword", category: "weapon", cost: { cp: 0, sp: 0, gp: 10, pp: 0 } }),
     makeItem({ id: "a1", name: "Shield", category: "armor", cost: { cp: 0, sp: 0, gp: 5, pp: 0 } }),
@@ -448,5 +487,63 @@ describe("InventoryList multi-select sell", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.getByRole("button", { name: "Sell items" })).toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Select Longsword" })).toBeNull();
+  });
+});
+
+describe("InventoryList mobile (#1029)", () => {
+  const inventory = [
+    makeItem({ id: "w1", name: "Longsword", category: "weapon", equipped: false, cost: { cp: 0, sp: 0, gp: 10, pp: 0 } }),
+  ];
+
+  it("renders the slim encumbrance strip with the Load label", () => {
+    render(<InventoryList character={makeCharacter(10, inventory)} onUpdate={vi.fn()} />);
+    expect(screen.getByText("Load")).toBeInTheDocument();
+    expect(screen.getByText(/65\.0 \/ 150 lb/)).toBeInTheDocument();
+  });
+
+  it("drops the header Sell/Add actions in favor of a FAB", () => {
+    render(<InventoryList character={makeCharacter(10, inventory)} onUpdate={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "Sell items" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "+ Add item" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Add item" })).toBeInTheDocument();
+  });
+
+  it("the FAB opens the add-item panel", async () => {
+    const user = userEvent.setup();
+    render(<InventoryList character={makeCharacter(10, inventory)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+    expect(screen.getByLabelText("Item")).toBeInTheDocument();
+  });
+
+  it("tapping a row opens its detail sheet with Equip, Sell, and Drop", async () => {
+    const user = userEvent.setup();
+    render(<InventoryList character={makeCharacter(10, inventory)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Longsword details" }));
+    const sheet = screen.getByRole("dialog", { name: "Longsword" });
+    expect(within(sheet).getByRole("button", { name: "Equip" })).toBeInTheDocument();
+    expect(within(sheet).getByRole("button", { name: "Sell" })).toBeInTheDocument();
+    expect(within(sheet).getByRole("button", { name: "Drop" })).toBeInTheDocument();
+  });
+
+  it("Drop from the sheet is a two-step confirm that submits a remove op", async () => {
+    const user = userEvent.setup();
+    render(<InventoryList character={makeCharacter(10, inventory)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Longsword details" }));
+    await user.click(screen.getByRole("button", { name: "Drop" }));
+    expect(applyInventoryTransactions).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    expect(applyInventoryTransactions).toHaveBeenCalledWith("char-1", [
+      { type: "remove", inventoryItemId: "w1" },
+    ]);
+  });
+
+  it("Equip from the sheet submits a setEquipped op", async () => {
+    const user = userEvent.setup();
+    render(<InventoryList character={makeCharacter(10, inventory)} onUpdate={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Longsword details" }));
+    await user.click(screen.getByRole("button", { name: "Equip" }));
+    expect(applyInventoryTransactions).toHaveBeenCalledWith("char-1", [
+      { type: "setEquipped", inventoryItemId: "w1", equipped: true },
+    ]);
   });
 });

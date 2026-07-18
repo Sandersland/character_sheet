@@ -35,12 +35,6 @@ disciplinesRouter.get("/", async (_req, res) => {
   );
 });
 
-// ── POST /api/characters/:id/disciplines/transactions ─────────────────────────
-//
-// Intent-bearing batch mutation for elemental disciplines — mirrors the
-// spellcasting/resources transaction endpoints. The one op today:
-//   castDiscipline — spend ki, roll the discipline's EffectSpec, log the cast.
-
 const castDisciplineOpSchema = z.object({
   type: z.literal("castDiscipline"),
   disciplineId: z.string().min(1),
@@ -54,6 +48,12 @@ const transactionsRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),
 });
 
+/**
+ * POST /api/characters/:id/disciplines/transactions
+ * Intent-bearing batch mutation for elemental disciplines — mirrors the
+ * spellcasting/resources transaction endpoints. The one op today:
+ *   castDiscipline — spend ki, roll the discipline's EffectSpec, log the cast.
+ */
 makeTransactionsEndpoint({
   router: disciplinesRouter,
   schema: transactionsRequestSchema,

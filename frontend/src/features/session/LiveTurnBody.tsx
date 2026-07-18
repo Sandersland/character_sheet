@@ -1,15 +1,22 @@
 /**
- * The shared live-turn body (#960): the compact HP + rest strip, the conditions
- * surface, and the turn hub — the composition common to the `/session` page
- * (`SessionContent`) and the sheet's live Combat tab (`CombatLivePanel`).
+ * The shared live-turn body (#960, re-weighted #982): the turn hub leads as the
+ * hero, followed by a single one-line vitals strip (conditions · exhaustion ·
+ * rest). This is the composition common to the `/session` page (`SessionContent`)
+ * and the sheet's live Combat tab (`CombatLivePanel`).
+ *
+ * Order matters (#982): the turn tracker is the reason the tab exists, so it
+ * renders FIRST — no HP bar or full-height conditions card pushes it below the
+ * fold on mobile. HP now lives in the sheet header (with its meter), so there's
+ * no HP bar here; Rest folds into CombatUtilityStrip. The strip's
+ * add-condition picker opens as a BottomSheet overlay, so it never displaces the
+ * tracker. Turn-engine behaviour is untouched — this is composition only, keeping
+ * the #955 fidelity guarantee.
+ *
  * Renders inner fragments (not a `<main>`) so each host supplies its own
  * landmark + any extras (the `/session` page appends its reference tabs).
  */
 
-import CompactHpBar from "@/features/hitpoints/CompactHpBar";
-import RestButton from "@/features/hitpoints/RestButton";
-import CompactConditionsBar from "@/features/conditions/CompactConditionsBar";
-import ConditionsStrip from "@/features/conditions/ConditionsStrip";
+import CombatUtilityStrip from "@/features/session/CombatUtilityStrip";
 import TurnHub from "@/features/session/TurnHub";
 import { partyHealAllies } from "@/lib/spellMeta";
 import type { TurnStateView } from "@/features/session/useTurnState";
@@ -25,6 +32,8 @@ interface LiveTurnBodyProps {
   onLogChanged: () => void;
   /** Gate the turn hub's overlay pickers (#960 mounted-but-hidden). */
   overlaysActive?: boolean;
+  /** Opens the session log (mobile turn-bar icon, #1028). */
+  onOpenLog?: () => void;
 }
 
 export default function LiveTurnBody({
@@ -34,26 +43,12 @@ export default function LiveTurnBody({
   onUpdate,
   onLogChanged,
   overlaysActive,
+  onOpenLog,
 }: LiveTurnBodyProps) {
   return (
     <>
-      {/* Compact HP strip + rest button — always visible mid-turn (#768/#814). */}
-      <div className="flex items-stretch gap-2">
-        <div className="min-w-0 flex-1">
-          <CompactHpBar character={character} onUpdate={onUpdate} />
-        </div>
-        <RestButton character={character} onUpdate={onUpdate} />
-      </div>
-
-      {/* Active conditions + exhaustion (compact on mobile, card at md+, #769). */}
-      <div className="md:hidden">
-        <CompactConditionsBar character={character} onUpdate={onUpdate} />
-      </div>
-      <div className="hidden md:block">
-        <ConditionsStrip character={character} onUpdate={onUpdate} />
-      </div>
-
-      {/* Turn hub — the primary surface; inline attack/item pickers live here. */}
+      {/* Turn hub — the primary surface, rendered FIRST (#982). Inline
+          attack/item pickers live here. */}
       <TurnHub
         character={character}
         sessionId={session.id}
@@ -62,7 +57,12 @@ export default function LiveTurnBody({
         onLogChanged={onLogChanged}
         allies={partyHealAllies(session, character.id)}
         overlaysActive={overlaysActive}
+        onOpenLog={onOpenLog}
       />
+
+      {/* Quiet one-line vitals strip below the hero: conditions + exhaustion +
+          rest. HP lives in the sheet header now, so it's not repeated here. */}
+      <CombatUtilityStrip character={character} onUpdate={onUpdate} />
     </>
   );
 }

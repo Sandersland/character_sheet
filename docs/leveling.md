@@ -1,184 +1,45 @@
-# Leveling: XP, Level-Up, Level-Down, and Level-Gated State
+# Leveling: XP, Level-Up/Down, and Level-Gated State
 
-Read this when you are:
-- touching XP or the level-up/level-down flow
-- adding any feature whose **availability or count depends on character level** (subclass, maneuvers known, tool proficiencies, fighting style, feats, Ability Score Improvements)
-- trying to understand why `level` is not a column
-
----
+Read this when touching XP or level-up/level-down, or adding any feature whose availability or count depends on character level (subclass, maneuvers known, feats/ASIs, choose-N picks).
 
 ## XP → level is derived, never persisted
 
-`experiencePoints` is the only stored authority for a character's level. `level` and `proficiencyBonus` are **never columns** — they are computed at read time:
+`experiencePoints` is the only stored authority. `levelForExperience` / `proficiencyBonusForLevel` / `experienceProgress` (`lib/leveling/experience.ts`, pure) are spread onto the wire shape by `serializeCharacter`. Never re-add these as columns.
 
-```
-backend/src/lib/leveling/experience.ts
-  levelForExperience(xp)         → number 1–20 (pure, no DB)
-  proficiencyBonusForLevel(lvl)  → number
-  experienceProgress(xp)         → { level, proficiencyBonus, currentLevelThreshold,
-                                      nextLevelThreshold, xpToNextLevel }
-```
+**Level-up (HP gain) is a separate explicit action:** XP can outrun applied levels. `hitDice.total` counts applied HP level-ups (mirrored by `classEntries[0].level`); `pendingLevelUps = derivedLevel − hitDice.total` is derived and drives the Level-up UI. The action is a `levelUp` op on `POST /characters/:id/hp`.
 
-`serializeCharacter` (`backend/src/lib/character-serialize.ts`) calls `experienceProgress(row.experiencePoints)` and spreads the result onto the wire shape. These values must never be added back as columns — add or modify the curve in `experience.ts` and every read automatically reflects it.
+**Level-up plan:** `buildLevelUpPlan(character, targetClassEntry)` (`lib/leveling/level-up-plan.ts`) returns the ordered choice-steps one level grants. It never re-encodes thresholds — every step is derived by diffing an existing rule function at level N vs N−1. When a `subclass` step is emitted and the target subclass is still null, subclass-derived steps are absent; the ceremony re-invokes the planner with the chosen subclass.
 
----
-
-## Level-up (HP gain) is a separate, explicit action
-
-XP going up does **not** automatically raise HP. A character can have XP at level 7 while only having applied HP for 5 levels. The fields that track this are:
-
-| Field | What it represents |
-|---|---|
-| `experiencePoints` | XP-derived level authority |
-| `hitDice.total` | How many HP level-ups have actually been applied |
-| `classEntries[0].level` | Mirrors `hitDice.total` (repaired by `revertLevelUps`) |
-
-`pendingLevelUps = derivedLevel − hitDice.total` is computed in `serializeCharacter` and drives the "Level up" button in the UI. The level-up action hits `POST /characters/:id/hp` with a `levelUp` op.
-
----
-
-## Level-up plan builder
-
-`buildLevelUpPlan(character, targetClassEntry)` in `backend/src/lib/leveling/level-up-plan.ts` is a pure planner returning the ordered `LevelUpStep[]` a single level grants — the ceremony (#886) renders it and the endpoint (#885) validates against it. It never re-encodes thresholds: every step is **derived by diffing an existing rule function at the new per-class level N vs N−1** (with the target subclass held fixed), emitting the step only when the delta is positive.
-
-Emitted order: `hitPoints` (always) → `advancement` (`advancementSlotsForLevel` grew) → `subclass` (N reaches `subclassLevel` and the target subclass is unset) → `maneuvers` / `fightingStyle` / `disciplines` / `toolProficiency` (the bespoke choose-N counts on `deriveResources` grew) → `subclassChoice*` (one per generic `subclassChoices` key whose count grew, #899) → `newSpells` → `review` (always). `subclassLevel` is passed in (a pure fn can't fetch the catalog `Class` row), defaulting to 3 like `reconcileSubclass`. When `target.subclass` is null and a `subclass` step is emitted, subclass-derived steps (maneuvers, toolProficiency, subclassChoice*) are absent — the ceremony must re-invoke `buildLevelUpPlan` with the chosen subclass to get the complete plan.
-
-The `newSpells` step follows RAW: it appears only for casters that **learn** on level-up — the known casters (Sorcerer/Bard/Ranger/Warlock) plus Wizard's spellbook — gated by `learnsNewSpellsOnLevelUp` and counted by `spellsGainedAtLevel(className, level)`, both in `backend/src/lib/srd/spellcasting-tables.ts`. `spellsGainedAtLevel` is the level-over-level delta of the `SPELLS_KNOWN_BY_CLASS` tables (Bard includes the Magical Secrets +2 jumps at 10/14/18; Ranger the half-caster cadence), or a flat 2 for Wizard from level 2. Prepared casters (Cleric/Druid/Paladin) carry no table and get no `newSpells` step — they re-prepare, governed by the prepared-spell cap (#883).
-
----
-
-## Level-down auto-reverses HP and dice
-
-When a new XP value drops the derived level below `hitDice.total`, `applyExperienceOperations` calls `revertLevelUps` inside the same transaction:
-
-```
-backend/src/lib/leveling/experience-ops.ts
-  revertLevelUps(tx, characterId, currentHdTotal, targetLevel, batchId)
-```
-
-It reads the most recent `levelUp` CharacterEvents newest-first to recover exact per-level HP gains (fixed-average fallback for levels without an event record), subtracts them from `hitPoints.max` / `hitPoints.current`, decrements `hitDice.total`, and repairs `classEntries[0].level` to match. Emits one `hitPoints/levelDown` event carrying `data.primaryEntryId` so the undo handler can restore the class-entry level.
-
----
+**Level-down auto-reverses:** when XP drops the derived level below `hitDice.total`, `applyExperienceOperations` calls `revertLevelUps` in the same transaction (recovers per-level HP gains from `levelUp` events, decrements `hitDice.total`, repairs the class entry level), then runs reconciliation.
 
 ## Level-gated reconciliation — the pattern
 
-Level-gated state is **persisted state whose legal maximum is determined by the character's level**. Examples (each has a registered reconciler): subclass choice (locked until `class.subclassLevel`), maneuvers known, tool proficiencies, fighting style, and Ability Score Improvements / feats (granted at fixed class levels, handled by `reconcileAdvancements`).
+Level-gated state is persisted state whose legal maximum is determined by level. Two complementary layers, both required — and both must compute the legal limit via one shared rule function (`lib/srd/` / `lib/leveling/` / `lib/classes/class-features.ts`), never two inline copies of the rule:
 
-When level drops, this state must be reconciled. The system uses two complementary layers.
+**Layer 1 — reconcile-on-write** (destructive, audited, undoable): `reconcileLevelGatedState(ctx)` runs the `LEVEL_GATED_RECONCILERS` array (`lib/leveling/level-reconciliation.ts`) inside the XP transaction after every XP op. That array is authoritative for what's registered; **order matters** — later reconcilers observe earlier ones' writes (e.g. maneuvers must see the already-cleared subclass so the derived cap goes to 0). Reconciliation events ride the same `batchId` as the XP event and reuse existing undo branches (`class` restores from `before`; `resources` restores the full `before.resources` snapshot).
 
-### Layer 1 — Reconcile-on-write (destructive, audited, undoable)
+**Layer 2 — clamp-on-read** (non-destructive, defense-in-depth): `serializeCharacter` caps displayed values to the derived limit (`slice(0, choiceCount)` / `Math.min(total, used)`), so a character already in an invalid state renders correctly before their next XP op.
 
-Runs inside the XP transaction immediately after `revertLevelUps`. The entry point is:
+### Generic subclass "choose N" — data, not code
 
-```
-backend/src/lib/leveling/level-reconciliation.ts
-  reconcileLevelGatedState(ctx: ReconcileContext)
-```
+A feature that is just "choose N options from a catalog" with no extra mechanics is declared as **data** — no new reconciler, state key, or clamp:
 
-`ReconcileContext` carries `{ tx, characterId, newDerivedLevel, batchId }`. Internally it runs the `LEVEL_GATED_RECONCILERS` array **in order**:
+- Declare `choices: [{ key, label, catalogSource, count: (level) => n }]` on the subclass in `lib/classes/<class>.ts`.
+- Options are seeded `GrantedAbility` rows keyed by `source = catalogSource` (`prisma/seed/subclass-choices.ts`); `GET /api/subclass-choices/:source` lists them.
+- Selections persist in the generic `resources.choicesKnown[key]` map, mutated via the existing resources endpoint (`learn`/`forgetSubclassChoice`).
+- `reconcileSubclassChoices` and one read-clamp loop cover every such choice generically.
 
-| Reconciler | What it does |
-|---|---|
-| `reconcileClassEntryLevels` | Runs **first**. Trims multiclass `CharacterClassEntry` levels (and removes entries that fall to level 0, highest `position` first) so the summed class levels never exceed `newDerivedLevel`. Snapshots the pre-reconcile entries so undo can restore/recreate them; emits `class/classLevelsReconciled`. No-op for single-class characters. |
-| `reconcileSubclass` | Per-entry (#125): clears `subclassId`/`subclass` on **any** `CharacterClassEntry` whose effective level is below that class's `subclassLevel`. Effective level is the XP-derived total for a single-class character (the per-class column is self-healed lazily by the HP level-up) and the per-class `entry.level` for a multiclass character. Emits one `class/subclassRemoved` per cleared entry. Mirrored by a clamp-on-read in `serializeCharacter`'s `classes` block. |
-| `reconcileGrantedSpells` | Runs **after `reconcileSubclass`** (so it sees the already-cleared subclass); defense-in-depth for **derived** subclass-granted spells (e.g. a Way of Shadow monk's Minor Illusion at L3). These are pure-derived at read time and **never persisted** in the happy path, so this only fires if a `source:"subclass"` entry ever leaks into the stored `spellcasting.spells[]`. It re-derives valid grants across **every** class entry (symmetric with `collectGrantedSpells`) and strips any leaked grant no longer valid at the new level; if the stripped grant was the concentrated spell, `concentratingOn` is nulled too (Shadow Arts / still-kept spells untouched). Reuses the `spellcasting`-category undo branch (restores `before.spellcasting`) — no new EventType. Early-returns when no `source:"subclass"` entry is present (the normal case). |
-| `reconcileManeuvers` | Runs after `reconcileSubclass` so it sees a cleared subclass. Calls `deriveResources(...)` for the new level; `allowed = maneuverChoiceCount ?? 0`. Trims `maneuversKnown` to the first `allowed` entries (oldest kept, LIFO). Emits `resources/maneuversReconciled`. |
-| `reconcileDisciplines` | Way of the Four Elements. Runs after `reconcileSubclass`; `allowed = disciplineChoiceCount ?? 0` (1/2/3/4 at monk levels 3/6/11/17). Trims `disciplinesKnown` to the first `allowed` entries (oldest kept, LIFO). Emits `resources/disciplinesReconciled`. |
-| `reconcileToolProficiencies` | Trims `toolProficienciesKnown` when the subclass no longer grants a tool choice (level dropped below 3, or subclass cleared). Also runs after `reconcileSubclass` for the same reason. Creation-fixed tool profs (in `Character.toolProficiencies`) are untouched. Uses a `resources`-category event. |
-| `reconcileSubclassChoices` | **Generic (#899).** One reconciler for **every** data-driven subclass "choose N" (see below). Re-derives `subclassChoices` at the new level and caps each `choicesKnown[key]` list to its count — 0 when the subclass no longer grants that choice (tier not reached, or subclass cleared by `reconcileSubclass`, which runs first). Emits a single `resources/subclassChoicesReconciled`. Adding a new choose-N needs a subclass declaration + seed rows, **not** a new reconciler. |
-| `reconcileFightingStyle` | Clears the persisted `fightingStyle` when `fightingStyleChoiceCount` drops to 0 at the new level (e.g. a class change away from Fighter). Uses a `resources`-category event. |
-| `reconcileAdvancements` | LIFO-reverses the tail of `advancements[]` (ASIs/feats) whose required level is now above the derived level — subtracting the stored deltas from `abilityScores`/`hitPoints`/`initiativeBonus`. Order-independent (ASI slots are class-level-gated, not subclass-gated), so it runs last. Uses `advancement`-category events. |
+Hand-rolled reconcilers remain only for features with extra mechanics (maneuvers/disciplines/tool profs — save DCs, cast/swap ops, validation).
 
-Order matters: later reconcilers observe earlier ones' writes (maneuvers and tool profs must see the already-cleared subclass so that `deriveResources` returns `null → allowed = 0` for a full reset).
+### Choice-less grants are pure-derived
 
-`reconcileManeuvers`, `reconcileDisciplines`, and `reconcileToolProficiencies` are thin configs over a shared `reconcileKnownList(ctx, config)` helper that owns the fetch → derive → trim → audit flow (see the checklist below for the config fields).
-
-#### Generic subclass "choose N" — data, not a bespoke reconciler (#899)
-
-A level-gated feature that is just **"choose N options from a catalog"** with no extra mechanics (Ranger's Hunter's Prey, and the shape Barbarian totems / Sorcerer Metamagic-known / Warlock Invocations-known will use) is declared as **data** — no new reconciler, state key, or clamp.
-
-- **Declare** the choice on the subclass in `backend/src/lib/classes/<class>.ts`: `choices: [{ key, label, catalogSource, count: (level) => n }]` (see `SubclassChoice` in `classes/types.ts`). `registry.ts` collects the choices the character has reached (`count > 0`) into `DerivedClassInfo.subclassChoices`.
-- **Options** live in the catalog as `GrantedAbility` rows keyed by `source = catalogSource` (seeded in `prisma/seed/subclass-choices.ts`) — the content-as-seed-data direction (same as #898's granted spells). `GET /api/subclass-choices/:source` lists them for the picker.
-- **Selections** persist in one generic map `Character.resources.choicesKnown[key]` (`ChoiceEntry[]`). A new choose-N adds **no** top-level state key.
-- **Mutation** goes through the existing resources endpoint (`learnSubclassChoice` / `forgetSubclassChoice` ops), validated against `subclassChoices` (count cap, catalog membership, dedup; custom entries allowed).
-- **Reconcile + clamp** are both generic: `reconcileSubclassChoices` (above) on write, and one loop in `buildResourcesPayload` on read.
-
-This is the preferred path for the description-only seeded subclasses (#910). It is distinct from maneuvers/disciplines/tool-profs, which stay hand-rolled because they carry extra mechanics (save DCs, cast/swap ops, `TOOLS` validation).
-
-#### Choice-less level-gated grants are pure-derived, not persisted
-
-A level-gated grant with **zero player choice** (e.g. a Way of Shadow monk always gets Minor Illusion at L3) is a pure function of `(subclass, level)`. It is therefore **derived at serialize time** by `deriveGrantedSpells` in `backend/src/lib/spellcasting/granted-spells.ts` and merged into the spellcasting view — it is **never written** into `spellcasting.spells[]`. The op runner injects it transiently so the Cast button resolves its id, then strips it before persisting. This keeps the reconciler/clamp non-negotiable satisfied without reintroducing drift: `reconcileGrantedSpells` is a **guard** against a leaked persisted grant, not the primary enforcement. The derived id scheme `granted:<subclass>:<spell>` is the seam a future side-table would key on if a *stateful* granted spell ever appears. Snapshotting granted content (freezing the SRD text at grant time) is a Phase-D versioning concern introduced uniformly with spells/items — not by persisting grants ad-hoc.
-
-Each reconciler is an async function with the same signature:
-```typescript
-type Reconciler = (ctx: ReconcileContext) => Promise<void>;
-```
-
-It runs unconditionally on every XP op (cheap — one indexed read). This means:
-- Characters who gained a subclass via XP alone (never clicked "Level Up") still get reconciled.
-- Characters already in an invalid state are self-healed the moment their next XP op runs.
-
-**Undo:** reconciliation events ride the same LIFO `batchId` as the XP event. Because they use standard `category/type` event shapes that already have undo branches in `backend/src/routes/activity.ts`, no new revert code is needed:
-- `class` category → restores `subclassId`/`subclass` from `before` via `data.classEntryId`
-- `resources` category → restores `before.resources` wholesale — the canonical 7-key `snapshotResources()` shape (`used`, `maneuversKnown`, `disciplinesKnown`, `toolProficienciesKnown`, `choicesKnown`, `advancements`, `fightingStyle`); since #818 no key can be silently wiped on revert
-
-### Layer 2 — Clamp-on-read (non-destructive, defense-in-depth)
-
-`serializeCharacter` caps displayed values to the derived limit so characters already in an invalid state render correctly before their next XP op:
-
-```typescript
-// backend/src/routes/characters.ts — inside the `resources` block
-maneuversKnown:
-  derivedRes.maneuverChoiceCount !== undefined
-    ? stored.maneuversKnown.slice(0, derivedRes.maneuverChoiceCount)
-    : stored.maneuversKnown,
-```
-
-This mirrors the adjacent `Math.min(pool.total, stored.used[pool.key] ?? 0)` clamps for resource pools and `Math.min(total, stored.slotsUsed[…])` for spell slots.
-
----
+A level-gated grant with zero player choice (e.g. Way of Shadow's Minor Illusion at L3) is a pure function of `(subclass, level)` — derived at serialize time (`deriveGrantedSpells`) and **never persisted**. `reconcileGrantedSpells` is only a guard against leaked persisted grants, not the primary enforcement.
 
 ## Checklist: adding a new level-gated feature
 
-When you ship a feature whose count or availability depends on level (feats, ASI, Ki points unlocked at a certain level, etc.):
-
-### 1. Rules data → `srd.ts`
-Add the level table and derivation function to `backend/src/lib/srd.ts`. Example: a `featsGrantedAt(className, level)` helper returning how many feats the character is allowed. Never inline rules in a route or duplicate them on the frontend (see CLAUDE.md non-negotiables).
-
-### 2. Write a `Reconciler` and register it
-In `backend/src/lib/leveling/level-reconciliation.ts`:
-- If the feature is a **"known" list in `Character.resources`** capped by a level-derived choice count (like maneuvers/disciplines/tool profs), write it as a thin `reconcileKnownList(ctx, config)` config — the helper owns the fetch → derive → early-return → trim → update → `logEvent` flow. The config supplies: `listKey`, `allowed(derived)` (the choice-count extractor), `eventType`, `summary(removedCount, allowed)`, and `snapshot(state)` (the before/after event payload — called on the live state before and after the trim).
-- Otherwise write `async function reconcile<Feature>(ctx: ReconcileContext): Promise<void>` by hand:
-  - Re-read only the persisted fields you need (one indexed read).
-  - Call the relevant derivation from `srd.ts` to get the new cap.
-  - Early-return if current count ≤ cap (no action).
-  - Trim/clear excess, `tx.character.update(...)`.
-  - `logEvent(tx, { category, type, before, after, data, batchId })` — pick a category that has an existing undo branch in `activity.ts` if possible.
-- Add the new reconciler to `LEVEL_GATED_RECONCILERS` in dependency order.
-
-### 3. Clamp-on-read in `serializeCharacter`
-In `backend/src/routes/characters.ts`, add a `Math.min`/`slice` clamp in the serialization block for the new field, analogous to `maneuversKnown.slice(0, maneuverChoiceCount)`.
-
-### 4. New `EventType` (if needed)
-- Add the value to `CharacterEventType` enum in `backend/prisma/schema.prisma`.
-- Add it to the `EventType` union in `backend/src/lib/activity/events.ts`.
-- Migrate + regenerate:
-  ```bash
-  cd backend
-  DATABASE_URL=postgresql://character_sheet:character_sheet@localhost:5432/character_sheet \
-    npx prisma migrate dev --name add_<name>_event_type
-  DATABASE_URL=postgresql://character_sheet:character_sheet@localhost:5432/character_sheet \
-    npx prisma generate
-  ```
-  Both steps are required — the generated client can be stale even after migration.
-
-### 5. Undo branch (if needed)
-If you had to introduce a new event category not already handled in `routes/activity.ts`, add a branch to the LIFO revert handler there. Reuse an existing branch where possible — the `resources` category already restores the full `before.resources` JSON, so any reconciler that writes into `Character.resources` gets undo for free.
-
-### 6. Tests
-Mirror the maneuver test block in `backend/src/routes/__tests__/experience.test.ts`:
-1. Partial trim: level drops to a cap > 0 → excess removed, oldest kept.
-2. Full clear: level drops below grant level → all entries removed.
-3. Event emitted: `resources/maneuversReconciled` (or your equivalent) appears in the activity log.
-4. Undo: reverting the XP-reset batch restores the full before-state.
-5. Read-clamp: a character with persisted excess at the wrong level serves the capped count on `GET` without any XP op.
+1. **Rules data** → the appropriate `lib/srd/` file (or `lib/classes/<class>.ts`). Never inline in a route or duplicate on the frontend.
+2. **Reconciler** → for a "known" list capped by a choice count, write a thin `reconcileKnownList(ctx, config)` config; otherwise a hand-written `Reconciler` (one indexed re-read → derive cap → early-return if within → trim → `logEvent` with a category that has an existing undo branch). Register it in `LEVEL_GATED_RECONCILERS` in dependency order.
+3. **Clamp-on-read** in `serializeCharacter`, analogous to the existing `slice`/`Math.min` clamps.
+4. **New `EventType`** (if needed): add to the `CharacterEventType` Prisma enum + the `EventType` union in `lib/activity/events.ts`; `prisma migrate dev` **and** `prisma generate` (both required).
+5. **Undo branch** (only if you introduced a new event category): add it to the revert handler in `lib/activity/activity.ts`. Reconcilers writing into `Character.resources` get undo for free via the `resources` branch.
+6. **Tests** — mirror the maneuver block in `routes/__tests__/experience.test.ts`: partial trim (oldest kept), full clear, event emitted, undo restores, and read-clamp serves the capped count without an XP op.

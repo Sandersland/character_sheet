@@ -117,4 +117,41 @@ describe("BannerVitals", () => {
     );
     expect(screen.getByText("+5")).toBeInTheDocument();
   });
+
+  // #982: the live-Combat panel no longer carries a CompactHpBar, so the header
+  // HP readout must be the entry point to the HP sheet.
+  it("with onUpdate, the HP chip is a 'Manage hit points' button that opens the HP sheet", async () => {
+    const user = userEvent.setup();
+    renderWithRoll(<BannerVitals character={mockCharacter} onUpdate={() => {}} />);
+    const hpButton = screen.getByRole("button", { name: /manage hit points/i });
+    expect(hpButton).toBeInTheDocument();
+    await user.click(hpButton);
+    expect(
+      screen.getByRole("heading", { name: /hit points/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("without onUpdate, the HP readout stays read-only (no manage-HP button)", () => {
+    renderWithRoll(<BannerVitals character={mockCharacter} />);
+    expect(screen.queryByRole("button", { name: /manage hit points/i })).not.toBeInTheDocument();
+  });
+
+  // a11y (#989 review): the manage-HP button's accessible name must carry the HP
+  // numbers, so a screen-reader user hears them (not just "Manage hit points").
+  it("the manage-HP button's accessible name includes the current/max HP", () => {
+    renderWithRoll(<BannerVitals character={mockCharacter} onUpdate={() => {}} />);
+    expect(screen.getByRole("button", { name: /manage hit points: 28 of 36/i })).toBeInTheDocument();
+  });
+
+  it("the manage-HP accessible name announces temp HP when present", () => {
+    renderWithRoll(
+      <BannerVitals
+        character={{ ...mockCharacter, hitPoints: { ...mockCharacter.hitPoints, temp: 5 } }}
+        onUpdate={() => {}}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: /manage hit points: 28 of 36 \(\+5 temp\)/i }),
+    ).toBeInTheDocument();
+  });
 });

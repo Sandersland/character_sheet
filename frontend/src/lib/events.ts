@@ -3,7 +3,7 @@ import type { CharacterEventCategory } from "@/types/character";
 /**
  * Display helpers for the unified activity log (audit events).
  *
- * Mirrors `lib/abilities.ts`: keep the storage keys (camelCase event types,
+ * Mirrors the `ABILITY_LABELS` pattern: keep the storage keys (camelCase event types,
  * lowercase category names) out of the UI and resolve everything through these
  * lookups. The maps are intentionally `Partial<Record<…>>` and tolerant — an
  * unknown key degrades to the raw key rather than crashing or being ad-hoc

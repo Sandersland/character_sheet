@@ -1,17 +1,17 @@
-import { randomUUID } from "node:crypto";
-
 import { Prisma } from "@/generated/prisma/client.js";
 import { levelForExperience } from "./experience.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { reconcileLevelGatedState } from "./level-reconciliation.js";
+import {
+  CharacterTxContext,
+  runCharacterTransaction,
+} from "@/lib/character/character-transaction.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { fixedAverageForDie, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import { abilityModifier, hitDieFace } from "@/lib/srd/srd.js";
-import { getActiveSessionId, recomputeSummaries } from "@/lib/session/sessions.js";
+import { recomputeSummaries } from "@/lib/session/sessions.js";
 
 export class InvalidExperienceOperationError extends Error {}
-
-// ── Operation types ────────────────────────────────────────────────────────
 
 /** Award or deduct XP by a signed delta ("Earned 450 XP from encounter"). */
 export interface XpAwardOperation {
@@ -26,8 +26,6 @@ export interface XpSetOperation {
 }
 
 export type ExperienceOperation = XpAwardOperation | XpSetOperation;
-
-// ── Auto-reverse helpers ────────────────────────────────────────────────────
 
 /**
  * Rolls back HP/hit-dice/class-entry-level when XP drops the derived level
@@ -147,8 +145,6 @@ async function revertLevelUps(
   });
 }
 
-// ── Op helpers ──────────────────────────────────────────────────────────────
-
 /**
  * Resolves the target XP total + event type for one op. Award applies a signed
  * delta clamped at 0; set takes an exact non-negative value (rejects negatives).
@@ -181,26 +177,19 @@ export function xpEventSummary(
     : `Deducted ${Math.abs(delta).toLocaleString()} XP (${prevXp.toLocaleString()} → ${newXp.toLocaleString()})`;
 }
 
+type XpTxContext = CharacterTxContext<
+  Prisma.CharacterGetPayload<{ select: { experiencePoints: true; hitDice: true } }>,
+  ExperienceOperation
+>;
+
 /**
  * Applies one XP op inside the batch transaction: persist the new total, log the
  * undoable event, auto-reverse HP/hit-dice if the derived level dropped below the
  * applied level, then reconcile all level-gated state. State is re-read per op so
  * a multi-op batch sees each prior result.
  */
-async function applyExperienceOp(
-  tx: Prisma.TransactionClient,
-  op: ExperienceOperation,
-  ctx: { characterId: string; batchId: string; sessionId: string | null },
-): Promise<void> {
-  const { characterId, batchId, sessionId } = ctx;
-  const row = await tx.character.findUnique({
-    where: { id: characterId },
-    select: { experiencePoints: true, hitDice: true },
-  });
-  if (!row) {
-    throw new InvalidExperienceOperationError(`Character not found: ${characterId}`);
-  }
-
+async function applyExperienceOp(ctx: XpTxContext): Promise<void> {
+  const { tx, row, op, characterId, batchId, sessionId } = ctx;
   const prevXp = row.experiencePoints;
   const hd = normalizeHitDice(row.hitDice);
   const { newXp, eventType } = resolveXpChange(op, prevXp);
@@ -237,8 +226,6 @@ async function applyExperienceOp(
   await reconcileLevelGatedState({ tx, characterId, newDerivedLevel, batchId });
 }
 
-// ── Main handler ────────────────────────────────────────────────────────────
-
 /**
  * Applies a batch of XP operations atomically. Each op writes a
  * `CharacterEvent` (category: "experience"). If the resulting XP drops the
@@ -258,11 +245,8 @@ export async function applyExperienceOperations(
   operations: ExperienceOperation[],
   explicitSessionId?: string,
 ): Promise<void> {
-  const batchId = randomUUID();
-
-  // When an explicit session is targeted, validate ownership and use it for
-  // event tagging; otherwise fall back to the auto-detected active session.
-  let sessionId: string | null;
+  // Domain guard: an explicit session must belong to the character. Runs before
+  // the transaction so a non-participant throws with no mutation.
   if (explicitSessionId) {
     const participant = await prisma.sessionParticipant.findUnique({
       where: { sessionId_characterId: { sessionId: explicitSessionId, characterId } },
@@ -273,31 +257,31 @@ export async function applyExperienceOperations(
         `Character ${characterId} is not a participant of session ${explicitSessionId}`,
       );
     }
-    sessionId = explicitSessionId;
-  } else {
-    sessionId = await getActiveSessionId(characterId);
   }
 
-  await prisma.$transaction(async (tx) => {
-    for (const op of operations) {
-      await applyExperienceOp(tx, op, { characterId, batchId, sessionId });
-    }
-
-    // Retroactive path: when XP was tagged to a SPECIFIC (already-ended) session
-    // via an explicit override, recompute + re-persist that session's stored
-    // summary so its `xpGained` reflects the new award. Mirrors endSession's
-    // compute-and-persist (sessions.ts). Skipped for the active-session/default
-    // path — the active session's summary is computed once at endSession.
-    if (explicitSessionId) {
-      const session = await tx.session.findUnique({
-        where: { id: explicitSessionId },
-        include: {
-          participants: { include: { character: { select: { id: true, name: true } } } },
-        },
-      });
-      if (session) {
-        await recomputeSummaries(tx, session);
-      }
-    }
-  });
+  await runCharacterTransaction<{ experiencePoints: true; hitDice: true }, ExperienceOperation>(
+    characterId,
+    operations,
+    {
+      select: { experiencePoints: true, hitDice: true },
+      notFound: (id) => new InvalidExperienceOperationError(`Character not found: ${id}`),
+      // undefined → scaffold falls back to the active session; string → tag verbatim.
+      sessionId: explicitSessionId,
+      applyOp: applyExperienceOp,
+      // Retroactive path: recompute + re-persist the targeted (ended) session's
+      // stored summary so its xpGained reflects the award. Mirrors endSession's
+      // compute-and-persist (sessions.ts); skipped for the active-session path.
+      afterOps: explicitSessionId
+        ? async ({ tx }) => {
+            const session = await tx.session.findUnique({
+              where: { id: explicitSessionId },
+              include: {
+                participants: { include: { character: { select: { id: true, name: true } } } },
+              },
+            });
+            if (session) await recomputeSummaries(tx, session);
+          }
+        : undefined,
+    },
+  );
 }

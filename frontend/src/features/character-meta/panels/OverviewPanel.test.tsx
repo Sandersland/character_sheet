@@ -26,6 +26,7 @@ function makeCharacter(overrides: Partial<Character>): Character {
     inventory: [],
     advancements: [],
     advancementSlots: { total: 0, used: 0 },
+    rollModifiers: [],
     ...overrides,
   } as Character;
 }

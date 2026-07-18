@@ -14,8 +14,6 @@ import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const resourcesRouter = Router({ mergeParams: true });
 
-// ── Zod schemas ───────────────────────────────────────────────────────────────
-
 const spendResourceOpSchema = z.object({
   type: z.literal("spendResource"),
   key: z.string().min(1),
@@ -29,7 +27,7 @@ const restoreResourceOpSchema = z.object({
   amount: z.number().int().positive().optional(),
 });
 
-const learnManeuverOpSchema = z
+export const learnManeuverOpSchema = z
   .object({
     type: z.literal("learnManeuver"),
     maneuverId: z.string().optional(),
@@ -52,7 +50,7 @@ const customDisciplineSchema = z.object({
   minLevel: z.number().int().positive().optional(),
 });
 
-const learnDisciplineOpSchema = z
+export const learnDisciplineOpSchema = z
   .object({
     type: z.literal("learnDiscipline"),
     disciplineId: z.string().optional(),
@@ -78,7 +76,7 @@ const swapDisciplineOpSchema = z
     message: "Provide exactly one of disciplineId or custom",
   });
 
-const learnToolProficiencyOpSchema = z.object({
+export const learnToolProficiencyOpSchema = z.object({
   type: z.literal("learnToolProficiency"),
   name: z.string().min(1),
 });
@@ -91,7 +89,7 @@ const forgetToolProficiencyOpSchema = z.object({
 // Exactly-one-of optionId/custom is enforced in the applier (400 on violation),
 // so the schema stays a plain ZodObject — no `.refine` (keeps it out of the
 // discriminated union's ZodEffects path).
-const learnSubclassChoiceOpSchema = z.object({
+export const learnSubclassChoiceOpSchema = z.object({
   type: z.literal("learnSubclassChoice"),
   choiceKey: z.string().min(1),
   optionId: z.string().optional(),
@@ -122,24 +120,24 @@ const transactionsRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),
 });
 
-// ── POST /api/characters/:id/resources/transactions ───────────────────────────
-//
-// Intent-bearing batch mutation for class/subclass resource state — mirrors
-// POST /api/characters/:id/spellcasting/transactions. Operations:
-//   spendResource         — spend one or more units of a pool (e.g. superiority die)
-//   restoreResource       — restore spent units (undo mis-click or Relentless trigger)
-//   learnManeuver         — add a maneuver from catalog or custom payload
-//   forgetManeuver        — remove a known maneuver by entry id
-//   learnDiscipline       — add an elemental discipline (Four Elements monk)
-//   forgetDiscipline      — remove a known discipline by entry id
-//   swapDiscipline        — retrain one discipline for another (1 per monk level)
-//   learnToolProficiency  — choose an artisan's tool (Student of War, level 3+)
-//   forgetToolProficiency — undo a tool proficiency choice by entry id
-//   learnSubclassChoice   — pick an option for a generic subclass choose-N (#899)
-//   forgetSubclassChoice  — undo a subclass-choice pick by entry id
-//
-// Returns the full updated character on success.
-
+/**
+ * POST /api/characters/:id/resources/transactions
+ * Intent-bearing batch mutation for class/subclass resource state — mirrors
+ * POST /api/characters/:id/spellcasting/transactions. Operations:
+ *   spendResource         — spend one or more units of a pool (e.g. superiority die)
+ *   restoreResource       — restore spent units (undo mis-click or Relentless trigger)
+ *   learnManeuver         — add a maneuver from catalog or custom payload
+ *   forgetManeuver        — remove a known maneuver by entry id
+ *   learnDiscipline       — add an elemental discipline (Four Elements monk)
+ *   forgetDiscipline      — remove a known discipline by entry id
+ *   swapDiscipline        — retrain one discipline for another (1 per monk level)
+ *   learnToolProficiency  — choose an artisan's tool (Student of War, level 3+)
+ *   forgetToolProficiency — undo a tool proficiency choice by entry id
+ *   learnSubclassChoice   — pick an option for a generic subclass choose-N (#899)
+ *   forgetSubclassChoice  — undo a subclass-choice pick by entry id
+ *
+ * Returns the full updated character on success.
+ */
 makeTransactionsEndpoint({
   router: resourcesRouter,
   schema: transactionsRequestSchema,

@@ -7,8 +7,6 @@
  * existing `CharacterEvent` rows. No new per-event bookkeeping is introduced.
  */
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
 /** One acquired-item line: catalog/custom name + net quantity gained. */
 export interface SummaryItem {
   name: string;
@@ -85,8 +83,6 @@ export interface CampaignRecap {
   totalPresentMs: number;
 }
 
-// ── Input shape ──────────────────────────────────────────────────────────────
-
 /**
  * The minimal subset of a `CharacterEvent` the aggregation reads. Matches the
  * Prisma row (before/after/data are JSON) but is declared independently so the
@@ -104,8 +100,6 @@ interface SummaryWindow {
   startedAt: Date;
   endedAt: Date;
 }
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -167,8 +161,6 @@ function isArcanumCast(event: SummaryEventInput, level: number): boolean {
   const arcanumAfter = spellcastingCount(event.after, "arcanumUsed", level);
   return arcanumAfter > arcanumBefore;
 }
-
-// ── Aggregation ──────────────────────────────────────────────────────────────
 
 /** Mutable running totals folded across a session's events. */
 interface SummaryAccumulator {

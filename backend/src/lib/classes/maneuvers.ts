@@ -1,6 +1,6 @@
 /**
  * Battle Master maneuver cast handler — the maneuver counterpart to
- * lib/disciplines.ts. A maneuver is a superiority-die-fuelled activated ability
+ * applyDisciplineOperations. A maneuver is a superiority-die-fuelled activated ability
  * catalogued in GrantedAbility (source "maneuver"); casting one spends one die
  * via the shared payAbilityCostInTx pool path, rolls it server-side, and (for
  * Rally) applies self temp HP through the core's self-apply path.

@@ -9,6 +9,7 @@ import type { CorsOptions } from "cors";
 import express from "express";
 
 import { requireAuth } from "@/lib/auth/middleware.js";
+import { config } from "@/lib/core/config.js";
 import { errorHandler } from "@/lib/core/error-handler.js";
 import { httpLogger } from "@/lib/core/logger.js";
 import { creationRateLimiter, globalRateLimiter, securityHeaders } from "@/lib/core/security.js";
@@ -31,6 +32,7 @@ import { hitPointsRouter } from "@/routes/character/hitpoints.js";
 import { inventoryRouter } from "@/routes/character/inventory.js";
 import { itemsRouter } from "@/routes/catalog/items.js";
 import { journalRouter } from "@/routes/session/journal.js";
+import { levelUpRouter } from "@/routes/character/level-up.js";
 import { disciplinesRouter } from "@/routes/character/disciplines.js";
 import { shadowArtsRouter } from "@/routes/character/shadow-arts.js";
 import { maneuversRouter } from "@/routes/character/maneuvers.js";
@@ -53,7 +55,7 @@ import { spellcastingRouter } from "@/routes/character/spellcasting.js";
 // deploys (where CORS isn't exercised anyway). Harden a split-origin prod by
 // setting `CORS_ORIGIN` to the explicit allowlist.
 function corsOptions(): CorsOptions {
-  const configured = process.env.CORS_ORIGIN?.trim();
+  const configured = config.CORS_ORIGIN;
   if (!configured) return { origin: true, credentials: true };
   const allowlist = configured
     .split(",")
@@ -66,11 +68,11 @@ export function createApp() {
   const app = express();
 
   // Single-origin mode is decided up front so the CSP can be tuned for the SPA.
-  const staticDir = process.env.SERVE_STATIC_DIR?.trim();
+  const staticDir = config.SERVE_STATIC_DIR;
 
   // Security headers first, then CORS, body parsing, request logging, and a
   // coarse global rate limit — all before any router runs.
-  app.use(securityHeaders(staticDir || undefined));
+  app.use(securityHeaders(staticDir));
   app.use(cors(corsOptions()));
   app.use(express.json());
   app.use(httpLogger);
@@ -105,6 +107,7 @@ export function createApp() {
   app.use("/api/characters/:id/class", classRouter);
   app.use("/api/characters/:id/channel-divinity", channelDivinityRouter);
   app.use("/api/characters/:id/advancement", advancementRouter);
+  app.use("/api/characters/:id/level-up", levelUpRouter);
   app.use("/api/characters/:id/actions", actionsRouter);
   // activity owns two sub-paths (/activity, /events/:batchId/revert), so it
   // mounts on the character root rather than a single leaf.

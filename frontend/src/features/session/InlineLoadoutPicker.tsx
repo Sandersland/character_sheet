@@ -2,7 +2,7 @@
  * InlineLoadoutPicker — the per-hand weapon-swap picker (#789) hosted inside the
  * Action sheet's "Change weapons" resolution (#815). A Main-hand and Off-hand
  * card, each expanding an inline disclosure of deduped bag candidates + a free
- * Stow. Per-option gating (lib/loadoutPicker): swapping a HELD hand costs the
+ * Stow. Per-option gating (loadoutPicker): swapping a HELD hand costs the
  * Action (blocked at 0), drawing into a FREE hand is free. A committed swap keeps
  * the sheet open and surfaces a Refund (also mirrored under the turn slots).
  */

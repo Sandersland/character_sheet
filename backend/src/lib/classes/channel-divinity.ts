@@ -1,6 +1,6 @@
 /**
  * Channel Divinity cast handler (Cleric + Paladin, #419) — the CD counterpart to
- * lib/shadow-arts.ts. Each CD option is a GrantedAbility row with source
+ * applyShadowArtsOperations. Each CD option is a GrantedAbility row with source
  * "channelDivinity"; using one spends 1 Channel Divinity charge via the shared
  * payAbilityCostInTx pool path and routes through castAbilityInTx.
  *
@@ -23,11 +23,7 @@ import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/exp
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import { abilityModifier } from "@/lib/srd/srd.js";
 
-// ── Error class ───────────────────────────────────────────────────────────────
-
 export class InvalidChannelDivinityOperationError extends Error {}
-
-// ── Operation types ───────────────────────────────────────────────────────────
 
 /** Use a Channel Divinity option. `abilityId` is the catalog GrantedAbility.id. */
 export interface CastChannelDivinityOperation {
@@ -36,8 +32,6 @@ export interface CastChannelDivinityOperation {
 }
 
 export type ChannelDivinityOperation = CastChannelDivinityOperation;
-
-// ── 5e rules: option gate + kind ──────────────────────────────────────────────
 
 // How a CD option expresses through the declarative core:
 //   announce  — spend CD, surface the save DC; the condition is reminder text.
@@ -104,8 +98,7 @@ function preserveLifeHpPool(clericLevel: number): number {
   return clericLevel * 5;
 }
 
-// ── Descriptor (shared by GET + cast summary) ─────────────────────────────────
-
+// Descriptor (shared by GET + cast summary).
 export interface ChannelDivinityDescriptor {
   id: string;
   name: string;
@@ -182,8 +175,6 @@ function channelDivinityEffectSpec(kind: ChannelDivinityKind): EffectSpec {
     concentration: false,
   };
 }
-
-// ── Transaction handler ───────────────────────────────────────────────────────
 
 /**
  * Applies a batch of Channel Divinity operations atomically. Mirrors

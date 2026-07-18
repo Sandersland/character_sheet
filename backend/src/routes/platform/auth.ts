@@ -61,9 +61,10 @@ function requestOrigin(req: Request): string {
   return `${proto}://${host}`;
 }
 
-// ── GET /api/auth/providers ──────────────────────────────────────────────────
-// List the sign-in providers this deployment has configured.
-
+/**
+ * GET /api/auth/providers
+ * List the sign-in providers this deployment has configured.
+ */
 authRouter.get("/auth/providers", (req, res) => {
   const origin = requestOrigin(req);
   const providers = enabledProviders().map((provider) => ({
@@ -74,19 +75,20 @@ authRouter.get("/auth/providers", (req, res) => {
   res.json({ providers });
 });
 
-// ── POST /api/auth/dev-login ─────────────────────────────────────────────────
-// Non-prod session primitive: mints a session for a fixed dev user WITHOUT a
-// real provider, so headless/worktree UI verification (and local scripts) can
-// authenticate without driving the OAuth dance. Guarded by config.ALLOW_DEV_LOGIN
-// (defaults off, hard-forced off in production), and returns the same 404 shape
-// as an unknown provider so it's invisible in normal/prod deploys.
-
 const DEV_USER = {
   id: "dev-user-local",
   email: "dev@local.test",
   name: "Dev User",
 } as const;
 
+/**
+ * POST /api/auth/dev-login
+ * Non-prod session primitive: mints a session for a fixed dev user WITHOUT a
+ * real provider, so headless/worktree UI verification (and local scripts) can
+ * authenticate without driving the OAuth dance. Guarded by config.ALLOW_DEV_LOGIN
+ * (defaults off, hard-forced off in production), and returns the same 404 shape
+ * as an unknown provider so it's invisible in normal/prod deploys.
+ */
 authRouter.post("/auth/dev-login", async (_req, res) => {
   if (!config.ALLOW_DEV_LOGIN) {
     res.status(404).json({ error: "Unknown or disabled provider" });
@@ -104,10 +106,11 @@ authRouter.post("/auth/dev-login", async (_req, res) => {
   res.json({ token, user });
 });
 
-// ── GET /api/auth/:provider/start ────────────────────────────────────────────
-// Begin the OAuth dance: stash state+PKCE in a short-lived cookie, 302 to the
-// provider's authorize endpoint.
-
+/**
+ * GET /api/auth/:provider/start
+ * Begin the OAuth dance: stash state+PKCE in a short-lived cookie, 302 to the
+ * provider's authorize endpoint.
+ */
 authRouter.get("/auth/:provider/start", (req, res) => {
   const provider = getProvider(req.params.provider);
   if (!provider) {
@@ -129,10 +132,11 @@ authRouter.get("/auth/:provider/start", (req, res) => {
   res.redirect(302, buildAuthorizeUrl(provider, { state, challenge }));
 });
 
-// ── GET /api/auth/:provider/callback ─────────────────────────────────────────
-// Provider redirects back here with ?code&state (or ?error). Verify, exchange,
-// resolve the user, and mint a session.
-
+/**
+ * GET /api/auth/:provider/callback
+ * Provider redirects back here with ?code&state (or ?error). Verify, exchange,
+ * resolve the user, and mint a session.
+ */
 authRouter.get("/auth/:provider/callback", async (req, res) => {
   // Read and immediately clear the transaction cookie — it's single-use.
   const tx = decodeTx(getCookie(req, OAUTH_TX_COOKIE));
@@ -195,16 +199,14 @@ authRouter.get("/auth/:provider/callback", async (req, res) => {
   res.redirect(302, requestOrigin(req));
 });
 
-// ── POST /api/auth/logout ────────────────────────────────────────────────────
-
+/** POST /api/auth/logout */
 authRouter.post("/auth/logout", async (req, res) => {
   await destroySession(getCookie(req, SESSION_COOKIE) ?? "");
   clearCookie(res, SESSION_COOKIE);
   res.json({ ok: true });
 });
 
-// ── GET /api/auth/me ─────────────────────────────────────────────────────────
-
+/** GET /api/auth/me */
 authRouter.get("/auth/me", async (req, res) => {
   const user = await lookupSession(getCookie(req, SESSION_COOKIE) ?? "");
   if (!user) {

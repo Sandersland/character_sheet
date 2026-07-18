@@ -10,13 +10,10 @@
  * before most classes grant their subclass).
  */
 
-import { randomUUID } from "node:crypto";
-
 import { Prisma } from "@/generated/prisma/client.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "@/lib/activity/events.js";
-import { prisma } from "@/lib/core/prisma.js";
-import { getActiveSessionId } from "@/lib/session/sessions.js";
+import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
 import { levelUpHpGain, normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import {
   abilityModifier,
@@ -33,11 +30,7 @@ import {
   snapshotResources,
 } from "./resources.js";
 
-// ── Error class ───────────────────────────────────────────────────────────────
-
 export class InvalidClassOperationError extends Error {}
-
-// ── Operation types ───────────────────────────────────────────────────────────
 
 /** Set the character's subclass by catalog id. */
 export interface SetSubclassOperation {
@@ -64,9 +57,7 @@ export type ClassOperation =
   | SetFightingStyleOperation
   | AddClassOperation;
 
-// ── Transaction handler ───────────────────────────────────────────────────────
-
-// Per-op context: the transaction client plus the batch/session ids stable
+// Transaction handler. Per-op context: the transaction client plus the batch/session ids stable
 // across the whole batch. Each helper re-reads the character with its own select.
 interface ClassOpContext {
   tx: Prisma.TransactionClient;
@@ -212,7 +203,7 @@ async function applySetFightingStyle(ctx: ClassOpContext, op: SetFightingStyleOp
   await logEvent(tx, {
     characterId,
     // `resources` category so the existing resources revert branch in
-    // routes/activity.ts restores before.resources (incl. fightingStyle)
+    // activityRouter's undo restores before.resources (incl. fightingStyle)
     // with zero new undo code.
     category: "resources",
     type: "fightingStyleChosen",
@@ -355,27 +346,41 @@ export async function setSubclassInTx(
   await applySetSubclass({ tx, characterId, batchId, sessionId }, op);
 }
 
+// Applies one setFightingStyle inside a caller-supplied tx/batchId so the unified
+// level-up endpoint (#885) can compose it with other domains (#895).
+export async function setFightingStyleInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: SetFightingStyleOperation,
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  await applySetFightingStyle({ tx, characterId, batchId, sessionId }, op);
+}
+
 export async function applyClassOperations(
   characterId: string,
   operations: ClassOperation[]
 ): Promise<void> {
-  const batchId = randomUUID();
-  const sessionId = await getActiveSessionId(characterId);
-
-  await prisma.$transaction(async (tx) => {
-    const ctx: ClassOpContext = { tx, characterId, batchId, sessionId };
-    for (const op of operations) {
+  // The scaffold's per-op row is only the existence check: each applier
+  // re-reads with its own domain select (see ClassOpContext) so it can also be
+  // composed under a caller-supplied tx (setSubclassInTx).
+  await runCharacterTransaction(characterId, operations, {
+    select: { id: true },
+    notFound: (id) => new InvalidClassOperationError(`Character not found: ${id}`),
+    applyOp: async ({ tx, op, characterId: id, batchId, sessionId }) => {
+      const ctx: ClassOpContext = { tx, characterId: id, batchId, sessionId };
       switch (op.type) {
         case "setSubclass":
-          await setSubclassInTx(ctx.tx, ctx.characterId, op, ctx.batchId, ctx.sessionId);
+          await applySetSubclass(ctx, op);
           break;
         case "setFightingStyle":
-          await applySetFightingStyle(ctx, op);
+          await setFightingStyleInTx(tx, id, op, batchId, sessionId);
           break;
         case "addClass":
           await applyAddClass(ctx, op);
           break;
       }
-    }
+    },
   });
 }

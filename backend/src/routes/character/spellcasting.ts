@@ -9,8 +9,6 @@ import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const spellcastingRouter = Router({ mergeParams: true });
 
-// ── Zod schemas ───────────────────────────────────────────────────────────────
-
 const customSpellSchema = z.object({
   name: z.string().min(1),
   level: z.number().int().min(0).max(9),
@@ -82,7 +80,7 @@ const restoreSlotOpSchema = z.object({
   level: z.number().int().min(1).max(9),
 });
 
-const learnSpellOpSchema = z
+export const learnSpellOpSchema = z
   .object({
     type: z.literal("learnSpell"),
     spellId: z.string().optional(),
@@ -135,21 +133,21 @@ const transactionsRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),
 });
 
-// ── POST /api/characters/:id/spellcasting/transactions ────────────────────────
-//
-// Intent-bearing batch mutation for spell state — mirrors
-// POST /api/characters/:id/inventory/transactions. Operations:
-//   castSpell  — cast a known spell, expend its slot (if leveled), log the roll
-//   expendSlot — bare slot expenditure (no spell association)
-//   restoreSlot — restore one expended slot (undo mis-click)
-//   learnSpell — add a spell from catalog (spellId) or custom payload
-//   forgetSpell — remove a spell from the spellbook by entryId
-//   prepareSpell / unprepareSpell — toggle preparation on a non-cantrip
-//
-// Returns the full updated character on success (same shape as all other
-// endpoints — re-fetched with characterInclude so derived spellcasting fields
-// reflect the new state).
-
+/**
+ * POST /api/characters/:id/spellcasting/transactions
+ * Intent-bearing batch mutation for spell state — mirrors
+ * POST /api/characters/:id/inventory/transactions. Operations:
+ *   castSpell  — cast a known spell, expend its slot (if leveled), log the roll
+ *   expendSlot — bare slot expenditure (no spell association)
+ *   restoreSlot — restore one expended slot (undo mis-click)
+ *   learnSpell — add a spell from catalog (spellId) or custom payload
+ *   forgetSpell — remove a spell from the spellbook by entryId
+ *   prepareSpell / unprepareSpell — toggle preparation on a non-cantrip
+ *
+ * Returns the full updated character on success (same shape as all other
+ * endpoints — re-fetched with characterInclude so derived spellcasting fields
+ * reflect the new state).
+ */
 makeTransactionsEndpoint({
   router: spellcastingRouter,
   schema: transactionsRequestSchema,

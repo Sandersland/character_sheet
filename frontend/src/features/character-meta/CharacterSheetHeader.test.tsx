@@ -44,6 +44,7 @@ function renderHeader(props: Partial<Parameters<typeof CharacterSheetHeader>[0]>
       <RollProvider>
         <CharacterSheetHeader
           character={makeCharacter()}
+          onUpdate={vi.fn()}
           tabs={TABS}
           activeTab="combat"
           onTabChange={vi.fn()}
@@ -112,5 +113,52 @@ describe("CharacterSheetHeader desktop session controls (#979)", () => {
     renderHeader({ isLive: true, isLiveJoined: false });
     expect(screen.queryByRole("button", { name: "Leave Session" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "End Session" })).not.toBeInTheDocument();
+  });
+});
+
+describe("CharacterSheetHeader banner chrome (#985)", () => {
+  it("puts Delete behind the ⋯ overflow, never as a bare banner button", () => {
+    renderHeader({ activeTab: "overview" });
+    // No bare Delete button — it lives in the menu.
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+
+    // The desktop banner's kebab is "Sheet actions" (mobile header is md:hidden
+    // but also renders one in jsdom; scope to the first opened menu's item).
+    fireEvent.click(screen.getAllByRole("button", { name: /sheet actions/i })[0]);
+    expect(screen.getByRole("menuitem", { name: "Delete" })).toBeInTheDocument();
+  });
+
+  it("fires onOpenDelete from the overflow menu", () => {
+    const onOpenDelete = vi.fn();
+    renderHeader({ activeTab: "overview", onOpenDelete });
+    fireEvent.click(screen.getAllByRole("button", { name: /sheet actions/i })[0]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+    expect(onOpenDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the banner ＋ Note chip when not joined and moves it to the strip when joined", () => {
+    // Not joined: the banner carries the ＋ Note quick-capture chip.
+    const { unmount } = renderHeader({ activeTab: "overview", isLive: false });
+    expect(screen.getByRole("button", { name: /Note/ })).toBeInTheDocument();
+    unmount();
+
+    // Joined: the strip owns Note alongside Leave/End, so the banner drops its chip.
+    renderHeader({
+      activeTab: "overview",
+      isLive: true,
+      isLiveJoined: true,
+      onLeaveSession: vi.fn(),
+      onEndSession: vi.fn(),
+    });
+    // Exactly one ＋ Note (the strip's), not a duplicate in the banner cluster.
+    expect(screen.getAllByRole("button", { name: /Note/ })).toHaveLength(1);
+  });
+
+  it("renders the live strip with the session name and one round indicator per breakpoint", () => {
+    renderHeader({ activeTab: "overview", isLive: true, liveRound: 2, sessionName: "Goblin Ambush", isLiveJoined: true, onLeaveSession: vi.fn(), onEndSession: vi.fn() });
+    expect(screen.getByText(/Goblin Ambush/)).toBeInTheDocument();
+    // Exactly two round indicators — the desktop banner strip and the mobile
+    // header pill (#1026); only one is visible at a time by breakpoint.
+    expect(screen.getAllByText("Round 2")).toHaveLength(2);
   });
 });

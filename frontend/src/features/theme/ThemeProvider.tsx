@@ -1,4 +1,4 @@
-/* eslint-disable react-refresh/only-export-components */
+/* eslint-disable react-refresh/only-export-components -- provider module co-exports its use* hook beside the component; same-file hook+provider is intentional, HMR-only caveat */
 /**
  * App-wide theme context. Persists the player's light/dark/system preference
  * (via useThemePreference) and reflects the resolved theme onto

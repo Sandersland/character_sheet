@@ -46,14 +46,12 @@ export default function ManeuverPrompt({
   onRollsUpdated,
   onUpdate,
 }: ManeuverPromptProps) {
-  // ── All hooks at the top — no hooks after early returns ───────────────────
-
+  // All hooks at the top — no hooks after the early returns below.
   const { pool, dieLabel, busy, spend } = useManeuverDie(character, onUpdate);
   const [spentFor, setSpentFor] = useState<string | null>(null);
   const [selectedDamageManeuver, setSelectedDamageManeuver] = useState("");
 
-  // ── Derive maneuver lists (pure planning in lib/maneuverPrompt.ts) ─────────
-
+  // Derive maneuver lists (pure planning in planManeuverPrompt).
   const maneuversKnown = character.resources?.maneuversKnown ?? [];
 
   // Guard: only render when the character is a Battle Master with dice left.
@@ -70,8 +68,6 @@ export default function ManeuverPrompt({
 
   // Resolved current damage maneuver selection — fall back to first if state is stale.
   const activeDamageManeuver = resolveDamageSelection(plan.damageRollManeuvers, selectedDamageManeuver);
-
-  // ── Spend handlers ────────────────────────────────────────────────────────
 
   async function handlePrecision(m: ManeuverEntry) {
     if (busy || !lastAttackRoll) return;
