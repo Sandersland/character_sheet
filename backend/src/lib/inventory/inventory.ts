@@ -1865,8 +1865,9 @@ export async function applyInventoryOperations(
   characterId: string,
   operations: InventoryOperation[]
 ): Promise<UseResult[]> {
-  // Appliers re-read the row (and their own detail selects) internally, so the
-  // scaffold's per-op row is only the existence check.
+  // Appliers re-read what they need internally, so the scaffold row is just an
+  // existence check — one extra point-read for item-only ops, buying mid-batch
+  // deletion safety.
   const useResults: UseResult[] = [];
   await runCharacterTransaction(characterId, operations, {
     select: { id: true },
