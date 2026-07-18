@@ -6,8 +6,11 @@
 import { Router } from "express";
 import { z } from "zod";
 
-import { applyLevelUpTransaction } from "@/lib/leveling/level-up-transaction.js";
-import { InvalidLevelUpError } from "@/lib/leveling/level-up-submission.js";
+import { assertCharacterAccess } from "@/lib/auth/access.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { applyLevelUpTransaction, resolveLevelUpContext } from "@/lib/leveling/level-up-transaction.js";
+import { InvalidLevelUpError, resolveLevelUpPlan } from "@/lib/leveling/level-up-submission.js";
+import type { LevelUpTarget } from "@/lib/combat/hp-operations.js";
 import { InvalidHitPointOperationError } from "@/lib/combat/hitpoints.js";
 import { InvalidAdvancementOperationError } from "@/lib/leveling/advancement.js";
 import { InvalidClassOperationError } from "@/lib/classes/class.js";
@@ -26,6 +29,71 @@ import { learnSpellOpSchema } from "@/routes/character/spellcasting.js";
 import { fightingStyleKeySchema } from "@/routes/character/class.js";
 
 export const levelUpRouter = Router({ mergeParams: true });
+
+const planQuerySchema = z
+  .object({
+    classEntryId: z.string().min(1).optional(),
+    classId: z.string().min(1).optional(),
+    subclassId: z.string().min(1).optional(),
+  })
+  .refine((q) => !(q.classEntryId && q.classId), {
+    message: "classEntryId and classId are mutually exclusive",
+  });
+
+// Neither classEntryId nor classId given → plan the primary (position-0) entry.
+async function resolvePlanTarget(
+  characterId: string,
+  query: z.infer<typeof planQuerySchema>,
+): Promise<LevelUpTarget> {
+  if (query.classEntryId) return { kind: "existing", classEntryId: query.classEntryId };
+  if (query.classId) return { kind: "new", classId: query.classId };
+  const primary = await prisma.characterClassEntry.findFirst({
+    where: { characterId },
+    orderBy: { position: "asc" },
+    select: { id: true },
+  });
+  if (!primary) throw new InvalidLevelUpError("Character has no class entries");
+  return { kind: "existing", classEntryId: primary.id };
+}
+
+/**
+ * GET /api/characters/:id/level-up/plan
+ * The derived ceremony plan (#886): the resolved target — className, effective
+ * subclass, newLevel, isPrimary — plus the ordered LevelUpStep list the POST
+ * below will validate a submission against. Query: classEntryId XOR classId
+ * (default: the primary entry); optional subclassId triggers the re-plan for a
+ * not-yet-committed subclass pick. Read-only — nothing is mutated.
+ */
+levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "view");
+
+  const parsed = planQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid query", details: parsed.error.flatten() });
+    return;
+  }
+
+  try {
+    const target = await resolvePlanTarget(req.params.id, parsed.data);
+    const context = await resolveLevelUpContext(req.params.id, target, parsed.data.subclassId);
+    const steps = resolveLevelUpPlan(context.planCharacter, context.targetEntry, context.chosenSubclassName);
+    res.json({
+      target: {
+        className: context.targetEntry.name,
+        subclass: context.chosenSubclassName ?? context.targetEntry.subclass ?? null,
+        newLevel: context.targetEntry.newLevel,
+        isPrimary: context.targetIsPrimary,
+      },
+      steps,
+    });
+  } catch (error) {
+    if (error instanceof InvalidLevelUpError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    throw error;
+  }
+});
 
 // z.infer of this schema must satisfy LevelUpSubmission — each field reuses the
 // exact op schema its domain already validates, so the parsed body is the domain
