@@ -115,8 +115,6 @@ async function postTransactions<TOp>(
   );
 }
 
-// ── Auth ────────────────────────────────────────────────────────────────────
-
 // The enabled sign-in providers — drives the login screen's buttons (data-driven
 // so adding a provider server-side needs no frontend change). Public endpoint.
 export async function fetchAuthProviders(): Promise<AuthProviderInfo[]> {
@@ -269,8 +267,8 @@ export async function applyChannelDivinityTransactions(
 }
 
 // One inline edit is a batch of one operation; a bulk action (e.g. selling
-// several stacks at once) is a batch of several — see backend's
-// lib/inventory/inventory.ts for the atomicity/ledger semantics.
+// several stacks at once) is a batch of several — see backend
+// applyInventoryOperations for the atomicity/ledger semantics.
 export async function applyInventoryTransactions(
   characterId: string,
   operations: InventoryOperation[]
@@ -301,8 +299,7 @@ export async function deleteCharacter(id: string): Promise<void> {
   await send(`/characters/${id}`, { method: "DELETE" }, `Failed to delete character ${id}`);
 }
 
-// ── Journal CRUD ─────────────────────────────────────────────────────────────
-// Plain REST (no transaction/op batching) — journal entries carry no mechanical
+// Journal CRUD. Plain REST (no transaction/op batching) — journal entries carry no mechanical
 // effect, so they aren't routed through the audit log. Each call returns the
 // full updated Character so the caller can swap its state in one assignment.
 
@@ -472,8 +469,6 @@ export async function revertBatch(
   );
 }
 
-// ── Actions ───────────────────────────────────────────────────────────────────
-
 // Applies a batch of action operations atomically via the Phase-C orchestrator:
 // each action's effect function (spend resource, consume item, heal, etc.) runs
 // in a single Prisma transaction with a shared batchId, so "drink potion" is
@@ -492,9 +487,8 @@ export async function applyActionTransactions(
   );
 }
 
-// ── Campaigns (#246) ──────────────────────────────────────────────────────────
-// Plain REST: list/create/join/attach. The attach call returns the full updated
-// Character (same shape as every character-mutating endpoint).
+// Campaigns (#246). Plain REST: list/create/join/attach. The attach call returns
+// the full updated Character (same shape as every character-mutating endpoint).
 
 export async function fetchCampaigns(): Promise<Campaign[]> {
   return request<Campaign[]>("/campaigns", undefined, "Failed to fetch campaigns");
@@ -523,11 +517,10 @@ export async function addCharacterToCampaign(
   );
 }
 
-// ── Campaign entities & @-tagging (#248) ───────────────────────────────────────
-// Plain REST. Search/list is campaign-scoped; create/edit are any-member; delete
-// is OWNER-only (server-enforced). Backlinks come pre-filtered server-side to the
-// caller's own notes plus other members' CAMPAIGN-shared ones (#838), so no
-// client-side visibility logic is needed.
+// Campaign entities & @-tagging (#248). Plain REST. Search/list is campaign-scoped;
+// create/edit are any-member; delete is OWNER-only (server-enforced). Backlinks come
+// pre-filtered server-side to the caller's own notes plus other members' CAMPAIGN-
+// shared ones (#838), so no client-side visibility logic is needed.
 
 export async function fetchEntities(
   campaignId: string,
@@ -626,9 +619,9 @@ export async function fetchEntityActivity(
   );
 }
 
-// ── Entity identity merges (#387) ─────────────────────────────────────────────
-// Owner-only writes (prepare/execute/unmerge). The list is scrubbed server-side:
-// a non-owner only ever receives EXECUTED merges between revealed identities.
+// Entity identity merges (#387). Owner-only writes (prepare/execute/unmerge). The
+// list is scrubbed server-side: a non-owner only ever receives EXECUTED merges
+// between revealed identities.
 
 export async function fetchEntityMerges(campaignId: string): Promise<CampaignEntityMerge[]> {
   return request<CampaignEntityMerge[]>(
@@ -668,10 +661,10 @@ export async function unmergeEntityMerge(campaignId: string, mergeId: string): P
   );
 }
 
-// ── Campaign items (#380) ───────────────────────────────────────────────────────
-// Owner-only CRUD (list/create/update/delete). fetchCampaignItemByEntity is the
-// member-readable Codex read, keyed by the fronting entity — non-owners get it
-// only when that entity is revealed, and never see dmNotes (scrubbed server-side).
+// Campaign items (#380). Owner-only CRUD (list/create/update/delete).
+// fetchCampaignItemByEntity is the member-readable Codex read, keyed by the fronting
+// entity — non-owners get it only when that entity is revealed, and never see
+// dmNotes (scrubbed server-side).
 
 export async function fetchCampaignItems(campaignId: string): Promise<CampaignItem[]> {
   return request<CampaignItem[]>(`/campaigns/${campaignId}/items`, undefined, "Failed to fetch campaign items");
@@ -742,8 +735,6 @@ export async function revokeCampaignItem(
   );
 }
 
-// ── Sessions ──────────────────────────────────────────────────────────────────
-
 /** Start a shared campaign session with the given character as first participant. */
 export async function startCampaignSession(
   campaignId: string,
@@ -805,11 +796,11 @@ export async function fetchSessions(characterId: string): Promise<Session[]> {
   return request<Session[]>(`/characters/${characterId}/sessions`, undefined, "Failed to fetch sessions");
 }
 
-// ── Journal chronicle (#863/#864) ─────────────────────────────────────────────
-// The read model behind the field-chronicle page: the campaign's arcs ("parts")
-// and its sessions ("chapters") with derived sessionNumber + this character's
-// per-session noteCount. A member sees every session of their campaign; passing a
-// characterId that isn't the caller's own 403s server-side.
+// Journal chronicle (#863/#864). The read model behind the field-chronicle page:
+// the campaign's arcs ("parts") and its sessions ("chapters") with derived
+// sessionNumber + this character's per-session noteCount. A member sees every
+// session of their campaign; passing a characterId that isn't the caller's own
+// 403s server-side.
 
 /** The campaign's arcs / "parts", ordered by position asc (story order). */
 export async function fetchCampaignArcs(campaignId: string): Promise<CampaignArc[]> {
