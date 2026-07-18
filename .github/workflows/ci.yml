@@ -106,6 +106,14 @@ jobs:
       - name: fallow-ignore reasons required
         run: sh scripts/check-fallow-reasons.sh
 
+      # Repo-wide zero-dead-code gate: the audit step above is new-only on the
+      # PR diff, so an export orphaned by deleting its last importer ELSEWHERE
+      # never trips it (the export's own lines didn't change). The tree was
+      # cleaned to zero when this gate landed; this holds it there. Needs the
+      # generated Prisma client (step above) to resolve `@/generated` imports.
+      - name: fallow dead-code (repo-wide zero)
+        run: npx --no-install fallow dead-code --no-cache
+
       # The repo-wide ratchet, expressed PER-WORKSPACE so each workspace's CRAP
       # treatment can differ (#718, tightened from the old repo-wide
       # `--min-severity critical` step). Together the frontend step here and the
@@ -133,7 +141,20 @@ jobs:
       #   --coverage    feeds fallow the vitest Istanbul coverage the test job
       #     produced, so CRAP is exact (untested complexity → real high CRAP)
       #     instead of the export-reference estimate that inflated under
-      #     --production. This re-enables the pinned `maxCrap: 30` bar (#717).
+      #     --production (#717).
+      #   --max-cyclomatic 16 / --max-crap 25  ratchet BELOW the .fallowrc.jsonc
+      #     bars (20/30), locked to the backend's actual ceiling at tightening
+      #     time (max cyclomatic 15, max real-coverage CRAP 21.2). CLI-only
+      #     because the config bars are shared with the frontend, which can't
+      #     absorb them (55 functions over). Cognitive stays at the config's 15:
+      #     three functions sit exactly at it (zero headroom). CRAP 25 (not 20)
+      #     because an UNCOVERED function floors at CC²+CC — 20 would ban every
+      #     untested cyc-4 helper (seed.ts, customLogLevel sit at exactly 20.0);
+      #     25 still bans untested cyc≥5. Next notch to 20 needs branch tests
+      #     for resolveSubclass (21.2) and validateToolChoices (20.1) in
+      #     character-create.ts. A new backend function in the 16–20 cyclomatic
+      #     band passes the local pre-commit audit (config bars) and fails only
+      #     here — required check, so it still can't merge.
       # The coverage artifact was generated in this same runner (identical
       # $GITHUB_WORKSPACE absolute paths across jobs), so no --coverage-root remap
       # is needed. Plain mode (no --min-severity) is stricter than the frontend
@@ -145,7 +166,7 @@ jobs:
           path: backend/coverage
 
       - name: "fallow health (backend production: real CRAP via vitest coverage)"
-        run: npx --no-install fallow health -w backend --production --coverage backend/coverage/coverage-final.json --no-cache
+        run: npx --no-install fallow health -w backend --production --coverage backend/coverage/coverage-final.json --max-cyclomatic 16 --max-crap 25 --no-cache
 
   build:
     # Production type-check + bundle. vitest transpiles via esbuild and does NOT

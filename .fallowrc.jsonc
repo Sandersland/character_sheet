@@ -27,6 +27,9 @@
   },
   // Complexity ceilings pinned to fallow 3.2.0's defaults (#691): the gate's
   // bar is OURS to move, not an upstream default a version bump can shift.
+  // These are the SHARED bars (audit/pre-commit + frontend health). The CI
+  // backend health step ratchets tighter via CLI flags (--max-cyclomatic 16
+  // --max-crap 25) — the frontend can't absorb those, so they don't live here.
   "health": {
     "maxCyclomatic": 20,
     "maxCognitive": 15,
