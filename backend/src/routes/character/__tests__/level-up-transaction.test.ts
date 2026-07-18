@@ -243,6 +243,31 @@ describe("POST /api/characters/:id/level-up/transactions — Wizard 3→4 (hp + 
     expect(categories).toContain("advancement");
     expect(categories).toContain("spellcasting");
   });
+
+  // The issue's undo AC names "HP, ability delta, hit die, spells" — the caster
+  // ceremony covers the two domains the Battle Master undo test can't.
+  it("single revert restores hp, ability delta, hit die, and unlearns the spells", async () => {
+    const entry = await prisma.characterClassEntry.findFirstOrThrow({ where: { characterId: CHAR_ID } });
+    const spells = await prisma.spell.findMany({ where: { classes: { has: "wizard" } }, take: 2, select: { id: true } });
+
+    const ceremony = await post(CHAR_ID, {
+      target: { kind: "existing", classEntryId: entry.id },
+      hp: { method: "average" },
+      advancement: { type: "takeAsi", increases: [{ ability: "intelligence", amount: 2 }] },
+      spellsLearned: spells.map((s) => ({ type: "learnSpell", spellId: s.id })),
+    });
+    expect(ceremony.status).toBe(200);
+    expect(ceremony.body.abilityScores.intelligence).toBe(18);
+
+    const res = await revert(CHAR_ID, await latestBatchId(CHAR_ID));
+    expect(res.status).toBe(200);
+    expect(res.body.hitPoints.max).toBe(18);
+    expect(res.body.hitPoints.current).toBe(18);
+    expect(res.body.hitDice.total).toBe(3);
+    expect(res.body.abilityScores.intelligence).toBe(16);
+    expect(res.body.spellcasting.spells).toHaveLength(0);
+    expect(res.body.pendingLevelUps).toBe(1);
+  });
 });
 
 // HP applies first in-tx, so a failure in the last (spell) op proves the whole
@@ -275,8 +300,6 @@ describe("POST …/level-up/transactions — atomicity (mid-apply failure rolls 
     const [realSpell] = await prisma.spell.findMany({ where: { classes: { has: "wizard" } }, take: 1, select: { id: true, name: true } });
     expect(realSpell).toBeDefined();
 
-    const eventsBefore = await eventCount(CHAR_ID);
-
     const res = await post(CHAR_ID, {
       target: { kind: "existing", classEntryId: entry.id },
       hp: { method: "average" },
@@ -301,7 +324,6 @@ describe("POST …/level-up/transactions — atomicity (mid-apply failure rolls 
     expect(after.abilityScores).toMatchObject({ intelligence: 16 });
     const book = (after.spellcasting as { spells: Array<{ id: string }> }).spells;
     expect(book).toHaveLength(0); // the valid first spell must NOT be present
-    expect(await eventCount(CHAR_ID)).toBe(eventsBefore);
     expect(await eventCount(CHAR_ID)).toBe(0);
   });
 });
@@ -403,7 +425,6 @@ describe("POST …/level-up/transactions — rejection matrix", () => {
     return entry.id;
   }
 
-  // ── zod 400 (schema shape) ──────────────────────────────────────────────
 
   it("zod 400: missing hp entirely → Invalid request body", async () => {
     const entryId = await makeFighter({ id: "lvtx-rej-nohp", name: "LevelUpTx Rej NoHp", xp: 34000, hitDiceTotal: 7, entryLevel: 7, subclass: "Champion" });
@@ -426,7 +447,6 @@ describe("POST …/level-up/transactions — rejection matrix", () => {
     expect(res.body.error).toMatch(/invalid request body/i);
   });
 
-  // ── validator 400s (documented contract) ────────────────────────────────
 
   it("validator 400: excess spellsLearned for a Fighter → does not grant new spells", async () => {
     const entryId = await makeFighter({ id: "lvtx-rej-excessspell", name: "LevelUpTx Rej ExcessSpell", xp: 34000, hitDiceTotal: 7, entryLevel: 7, subclass: "Champion" });
@@ -488,7 +508,6 @@ describe("POST …/level-up/transactions — rejection matrix", () => {
     expect(res.body.error).toMatch(/subclass not found/i);
   });
 
-  // ── in-tx guard 400: valid shape but no pending level-up ──────────────────
 
   it("in-tx 400: valid-shaped submission but no pending level-up → the hp seam throws", async () => {
     // XP 2700 derives level 4; hitDice.total already 4 → newLevel 5 validates
@@ -503,7 +522,6 @@ describe("POST …/level-up/transactions — rejection matrix", () => {
     expect(res.body.error).toMatch(/no pending level-up/i);
   });
 
-  // ── non-primary multiclass 400 ────────────────────────────────────────────
 
   it("400: a subclass choice on a NON-primary multiclass entry is not supported", async () => {
     const CHAR_ID = "lvtx-rej-multiclass";
@@ -547,7 +565,7 @@ describe("POST …/level-up/transactions — rejection matrix", () => {
     expect(res.body.error).toMatch(/non-primary class/i);
   });
 
-  // ── access guards (404 / 403), matching authorization.test.ts convention ──
+  // Status-only asserts, matching the authorization.test.ts access-guard convention.
 
   it("404: nonexistent characterId", async () => {
     const res = await post("lvtx-does-not-exist", {
