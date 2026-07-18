@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { assertCharacterAccess } from "@/lib/auth/access.js";
-import { applyHitPointOperations, InvalidHitPointOperationError } from "@/lib/combat/hitpoints.js";
+import { applyHitPointOperations } from "@/lib/combat/hitpoints.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
@@ -104,21 +104,12 @@ hitPointsRouter.post<{ id: string }>("/", async (req, res) => {
     return;
   }
 
-  let concentrationChecks: Awaited<
-    ReturnType<typeof applyHitPointOperations>
-  >["concentrationChecks"] = [];
-  try {
-    ({ concentrationChecks } = await applyHitPointOperations(
-      req.params.id,
-      parseResult.data.operations,
-    ));
-  } catch (error) {
-    if (error instanceof InvalidHitPointOperationError) {
-      res.status(400).json({ error: error.message });
-      return;
-    }
-    throw error;
-  }
+  // InvalidHitPointOperationError carries status 400, so an invalid op flows to
+  // the central `errorHandler` — no route-local try/catch needed.
+  const { concentrationChecks } = await applyHitPointOperations(
+    req.params.id,
+    parseResult.data.operations,
+  );
 
   const updated = await prisma.character.findUnique({
     where: { id: req.params.id },

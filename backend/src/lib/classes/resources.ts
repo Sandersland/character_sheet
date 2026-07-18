@@ -22,7 +22,10 @@ import {
   type FightingStyleKey,
 } from "@/lib/srd/srd.js";
 
-export class InvalidResourceOperationError extends Error {}
+// status → the 400 the central `errorHandler` maps (client op-validation error).
+export class InvalidResourceOperationError extends Error {
+  status = 400;
+}
 
 // Canonical mutable state shape. Stored in Character.resources JSON column.
 // `used`: resource key (string) → number of units currently spent.

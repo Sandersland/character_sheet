@@ -23,7 +23,7 @@ import { z } from "zod";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { ACTION_EFFECT_FN, ACTION_CAST_FN, rageMeleeDamageBonus } from "@/lib/classes/actions.js";
+import { ACTION_EFFECT_FN, ACTION_CAST_FN, rageMeleeDamageBonus, UnknownActionError } from "@/lib/classes/actions.js";
 import { castAbilityInTx } from "@/lib/spellcasting/ability-cast.js";
 import type { PayCostContext } from "@/lib/spellcasting/ability-cost.js";
 import type { SpendResourceOperation } from "@/lib/classes/resources.js";
@@ -157,7 +157,7 @@ async function applyActionEffectInTx(
 function assertKnownActionKeys(operations: ExecuteActionOp[]): void {
   for (const op of operations) {
     if (!ACTION_CAST_FN[op.actionKey] && !ACTION_EFFECT_FN[op.actionKey]) {
-      throw new Error(`Unknown action key: ${op.actionKey}`);
+      throw new UnknownActionError(`Unknown action key: ${op.actionKey}`);
     }
   }
 }
@@ -176,22 +176,6 @@ async function computeRageDamageBonus(operations: ExecuteActionOp[], characterId
   return rageMeleeDamageBonus(barbarianLevel);
 }
 
-/**
- * Classify a transaction error as a client 400 (a known domain-validation
- * message) vs a genuine 500. Pattern-matches the domain error strings.
- */
-function isActionBadRequest(msg: string): boolean {
-  return (
-    msg.includes("not found on this character") ||
-    msg.includes("Cannot reduce") ||
-    msg.includes("below zero") ||
-    msg.includes("only ") ||
-    msg.includes("not available") ||
-    msg.includes("amount must be positive") ||
-    msg.includes("Unknown action key")
-  );
-}
-
 actionsRouter.post<{ id: string }>(
   "/transactions",
   async (req, res) => {
@@ -208,39 +192,38 @@ actionsRouter.post<{ id: string }>(
 
     const { operations } = parsed.data;
 
-    try {
-      // Fail fast on unknown keys BEFORE any DB work (400, not 500).
-      assertKnownActionKeys(operations);
+    // Fail fast on unknown keys BEFORE any DB work. Every domain error the ops
+    // throw (UnknownActionError, Invalid{HitPoint,Resource,Inventory,Spellcasting}-
+    // OperationError) carries an explicit `status`, so an op-validation failure
+    // flows to the central `errorHandler` as its 400 and an unexpected throw as a
+    // clean 500 — no message-string sniffing, no hand-rolled 500 here.
+    assertKnownActionKeys(operations);
 
-      const rageDamageBonus = await computeRageDamageBonus(operations, characterId);
-      const batchId = randomUUID();
-      const sessionId = await getActiveSessionId(characterId);
+    const rageDamageBonus = await computeRageDamageBonus(operations, characterId);
+    const batchId = randomUUID();
+    const sessionId = await getActiveSessionId(characterId);
 
-      // Cross-domain atomic transaction — every op (cast-core, spendResource,
-      // adjustQuantity, heal) shares the same batchId so they appear as one
-      // batch on the activity timeline and a single revertBatch undoes them all.
-      await prisma.$transaction(async (tx) => {
-        for (const op of operations) {
-          await applyActionOpInTx(tx, characterId, op, batchId, sessionId, rageDamageBonus);
-        }
-      });
-
-      // Return the full updated character, same as every other transaction endpoint.
-      const row = await prisma.character.findUnique({
-        where: { id: characterId },
-        include: characterInclude,
-      });
-      if (!row) {
-        res.status(404).json({ error: "Character not found after transaction" });
-        return;
+    // Cross-domain atomic transaction — every op (cast-core, spendResource,
+    // adjustQuantity, heal) shares the same batchId so they appear as one
+    // batch on the activity timeline and a single revertBatch undoes them all.
+    await prisma.$transaction(async (tx) => {
+      for (const op of operations) {
+        await applyActionOpInTx(tx, characterId, op, batchId, sessionId, rageDamageBonus);
       }
+    });
 
-      // batchId is additive alongside the serialized character so the client
-      // can revert this exact batch on turn undo (#758).
-      res.json({ ...serializeCharacter(row), batchId });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Action transaction failed";
-      res.status(isActionBadRequest(msg) ? 400 : 500).json({ error: msg });
+    // Return the full updated character, same as every other transaction endpoint.
+    const row = await prisma.character.findUnique({
+      where: { id: characterId },
+      include: characterInclude,
+    });
+    if (!row) {
+      res.status(404).json({ error: "Character not found after transaction" });
+      return;
     }
+
+    // batchId is additive alongside the serialized character so the client
+    // can revert this exact batch on turn undo (#758).
+    res.json({ ...serializeCharacter(row), batchId });
   }
 );

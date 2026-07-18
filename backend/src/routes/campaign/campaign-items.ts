@@ -4,7 +4,6 @@ import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import {
   awardCampaignItem,
-  CampaignItemAwardError,
   campaignItemHolders,
   revokeCampaignItem,
 } from "@/lib/campaign/campaign-item-award.js";
@@ -257,21 +256,15 @@ campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/award", async (re
   const data = parseBodyOr400(awardSchema, req.body, res);
   if (data === undefined) return;
 
-  try {
-    await awardCampaignItem({
-      campaignId: req.params.id,
-      campaignItemId: req.params.campaignItemId,
-      characterId: data.characterId,
-      quantity: data.quantity ?? 1,
-      sessionId: data.sessionId,
-    });
-  } catch (err) {
-    if (err instanceof CampaignItemAwardError) {
-      res.status(err.status).json({ error: err.message });
-      return;
-    }
-    throw err;
-  }
+  // CampaignItemAwardError carries its own status (400/404/409), so it flows to
+  // the central `errorHandler` — no route-local mapping needed.
+  await awardCampaignItem({
+    campaignId: req.params.id,
+    campaignItemId: req.params.campaignItemId,
+    characterId: data.characterId,
+    quantity: data.quantity ?? 1,
+    sessionId: data.sessionId,
+  });
 
   const holders = await campaignItemHolders([req.params.campaignItemId]);
   res.status(200).json({ holders: holders.get(req.params.campaignItemId) ?? [] });
@@ -295,19 +288,13 @@ campaignItemsRouter.post("/campaigns/:id/items/:campaignItemId/revoke", async (r
   const data = parseBodyOr400(revokeSchema, req.body, res);
   if (data === undefined) return;
 
-  try {
-    await revokeCampaignItem({
-      campaignId: req.params.id,
-      campaignItemId: req.params.campaignItemId,
-      characterId: data.characterId,
-    });
-  } catch (err) {
-    if (err instanceof CampaignItemAwardError) {
-      res.status(err.status).json({ error: err.message });
-      return;
-    }
-    throw err;
-  }
+  // CampaignItemAwardError carries its own status, so it flows to the central
+  // `errorHandler` — no route-local mapping needed.
+  await revokeCampaignItem({
+    campaignId: req.params.id,
+    campaignItemId: req.params.campaignItemId,
+    characterId: data.characterId,
+  });
 
   const holders = await campaignItemHolders([req.params.campaignItemId]);
   res.status(200).json({ holders: holders.get(req.params.campaignItemId) ?? [] });

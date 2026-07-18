@@ -1,19 +1,14 @@
 /**
  * Unit tests for the shared session-route helpers (#592): characterId body
- * validation, SessionError/CombatError status mapping, and the catch wrapper.
- * Pure — no DB; a hand-rolled req/res double captures status + body.
+ * validation and roll-body parsing. Pure — no DB; a hand-rolled req/res double
+ * captures status + body. SessionError/CombatError now carry their own `status`
+ * (the central `errorHandler` maps it), covered by domain-error-status.test.ts.
  */
 
 import type { Request, Response } from "express";
 import { describe, expect, it } from "vitest";
 
-import { CombatError, SessionError } from "@/lib/session/sessions.js";
-import {
-  parseRollInput,
-  requireCharacterId,
-  sessionErrorStatus,
-  withSessionErrors,
-} from "@/routes/session/session-route-helpers.js";
+import { parseRollInput, requireCharacterId } from "@/routes/session/session-route-helpers.js";
 
 function mockRes() {
   const res = {
@@ -70,16 +65,6 @@ describe("requireCharacterId", () => {
     const id = requireCharacterId(reqWith({ characterId: 42 }), res as unknown as Response);
     expect(id).toBeNull();
     expect(res.statusCode).toBe(400);
-  });
-});
-
-describe("sessionErrorStatus", () => {
-  it("maps a not-found message to 404", () => {
-    expect(sessionErrorStatus("Session not found: abc")).toBe(404);
-  });
-
-  it("maps any other message to 409", () => {
-    expect(sessionErrorStatus("Character is not part of this campaign")).toBe(409);
   });
 });
 
@@ -158,63 +143,5 @@ describe("parseRollInput", () => {
     const res = mockRes();
     expect(parseRollInput(reqWith({ ...valid, rollMode: "sideways" }), res as unknown as Response)).toBeNull();
     expect(res.body).toEqual({ error: "rollMode must be one of normal, advantage, disadvantage" });
-  });
-});
-
-describe("withSessionErrors", () => {
-  it("passes through when the handler resolves", async () => {
-    const res = mockRes();
-    let ran = false;
-    await withSessionErrors(async (_req, r) => {
-      ran = true;
-      (r as unknown as ReturnType<typeof mockRes>).status(201).json({ ok: true });
-    })(reqWith({}), res as unknown as Response);
-    expect(ran).toBe(true);
-    expect(res.statusCode).toBe(201);
-    expect(res.body).toEqual({ ok: true });
-  });
-
-  it("maps a not-found SessionError to 404 { error }", async () => {
-    const res = mockRes();
-    await withSessionErrors(async () => {
-      throw new SessionError("Session not found: xyz");
-    })(reqWith({}), res as unknown as Response);
-    expect(res.statusCode).toBe(404);
-    expect(res.body).toEqual({ error: "Session not found: xyz" });
-  });
-
-  it("maps a non-not-found SessionError to 409 { error }", async () => {
-    const res = mockRes();
-    await withSessionErrors(async () => {
-      throw new SessionError("A session is already active");
-    })(reqWith({}), res as unknown as Response);
-    expect(res.statusCode).toBe(409);
-    expect(res.body).toEqual({ error: "A session is already active" });
-  });
-
-  it("maps CombatError the same way (404 for not found)", async () => {
-    const res = mockRes();
-    await withSessionErrors(async () => {
-      throw new CombatError("Session not found: xyz");
-    })(reqWith({}), res as unknown as Response);
-    expect(res.statusCode).toBe(404);
-  });
-
-  it("maps a non-not-found CombatError to 409", async () => {
-    const res = mockRes();
-    await withSessionErrors(async () => {
-      throw new CombatError("Not an active participant");
-    })(reqWith({}), res as unknown as Response);
-    expect(res.statusCode).toBe(409);
-  });
-
-  it("re-throws any non-session error to the terminal handler", async () => {
-    const res = mockRes();
-    await expect(
-      withSessionErrors(async () => {
-        throw new Error("boom");
-      })(reqWith({}), res as unknown as Response),
-    ).rejects.toThrow("boom");
-    expect(res.statusCode).toBeUndefined();
   });
 });
