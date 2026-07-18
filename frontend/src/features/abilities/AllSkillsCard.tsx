@@ -13,13 +13,18 @@ interface AllSkillsCardProps {
   skills: Skill[];
   abilityScores: AbilityScores;
   proficiencyBonus: number;
+  /**
+   * Render the card flat + border-defined (#986) for the desktop live-Combat
+   * reference rail, so it recedes behind the turn tracker. Defaults off.
+   */
+  muted?: boolean;
 }
 
 // All 18 skills inline on the Overview, grouped by ability (D1: flat, no
 // accordion); every skill is a one-tap RollButton so the roll fires with no
 // dialog open and its result is un-suppressed (#957). Replaces the
 // proficient-only card + "All Skills" modal.
-export default function AllSkillsCard({ skills, abilityScores, proficiencyBonus }: AllSkillsCardProps) {
+export default function AllSkillsCard({ skills, abilityScores, proficiencyBonus, muted = false }: AllSkillsCardProps) {
   const groups = ABILITY_ORDER.map((ability) => ({
     ability,
     skills: skills
@@ -28,7 +33,7 @@ export default function AllSkillsCard({ skills, abilityScores, proficiencyBonus 
   })).filter((group) => group.skills.length > 0);
 
   return (
-    <Card title="Skills">
+    <Card title="Skills" className={muted ? "bg-parchment-100 shadow-none" : ""}>
       <div className="flex flex-col divide-y divide-parchment-200">
         {groups.map((group) => (
           <section key={group.ability} className="py-1.5 first:pt-0.5 last:pb-0.5">

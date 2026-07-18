@@ -91,7 +91,9 @@ describe("CombatUtilityStrip (#982)", () => {
     );
 
     // "+ Add" opens the picker already expanded (no extra inline expand click).
-    await user.click(screen.getByRole("button", { name: "+ Add" }));
+    // Accessible name is the standalone "Add condition" (#986 review), not the
+    // context-dependent visible "+ Add".
+    await user.click(screen.getByRole("button", { name: "Add condition" }));
     const proneRow = screen.getByText("Prone").closest("li")!;
     await user.click(within(proneRow).getByRole("button", { name: "Apply" }));
 

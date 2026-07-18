@@ -77,8 +77,15 @@ export default function CombatLivePanel({
           three-column live view — roll rails · turn tracker · session log — so a
           player rolls a save, watches the fight, and reads the log at once, no
           tab switch. The turn tracker (LiveTurnBody) is mounted ONCE and
-          reflowed by the grid; no forked turn engine. */}
-      <div className="mx-auto flex max-w-4xl flex-col gap-4 px-6 pt-6 md:grid md:max-w-6xl md:grid-cols-[17rem_minmax(0,1fr)_20rem] md:items-start md:gap-6">
+          reflowed by the grid; no forked turn engine.
+
+          Mobile top spacing (#986): the host `<main>` already pads `py-8` (32px)
+          and the compact fight bar sits directly above, so the panel's own top
+          padding was stacking into a ~56px dead band under the bar. `-mt-8`
+          cancels main's top pad and `pt-4` restores a tight, comfortable gap so
+          the turn tracker sits close under the fight bar; desktop keeps its
+          normal `md:pt-6` (the garnet banner, not a thin bar, sits above). */}
+      <div className="mx-auto -mt-8 flex max-w-4xl flex-col gap-4 px-6 pt-4 md:mt-0 md:grid md:max-w-6xl md:grid-cols-[17rem_minmax(0,1fr)_20rem] md:items-start md:gap-6 md:pt-6">
         {/* Left rail (desktop only) — the same ability/save boxes + inline all-18
             skills as Overview (#957), rendered inside the workspace RollProvider
             so a roll stamps the seal (#956) and logs to the session for free. */}
@@ -87,11 +94,15 @@ export default function CombatLivePanel({
               rail here, and the Overview panel on mobile (the mobile Combat Turn
               view has no rails, so no banner is expected there). */}
           <ConditionRollBanner modifiers={character.rollModifiers} />
-          <AbilityScoresPanel character={character} gridClassName="grid-cols-3" />
+          {/* `muted` (#986): the rail is a reference surface next to the turn
+              tracker, so its ability boxes + skills card render flat and calmer
+              — the tracker stays the hero. All 18 skills + all saves still show. */}
+          <AbilityScoresPanel character={character} gridClassName="grid-cols-3" muted />
           <AllSkillsCard
             skills={character.skills}
             abilityScores={character.abilityScores}
             proficiencyBonus={character.proficiencyBonus}
+            muted
           />
         </aside>
 

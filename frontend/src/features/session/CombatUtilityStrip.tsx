@@ -95,6 +95,7 @@ export default function CombatUtilityStrip({ character, onUpdate }: Props) {
       {/* Direct "+ Add" — opens the picker expanded inside the overlay. */}
       <button
         type="button"
+        aria-label="Add condition"
         onClick={() => setSheet("add")}
         className="shrink-0 rounded-control px-1.5 py-0.5 text-xs font-semibold text-garnet-700 transition-colors hover:bg-garnet-50 hover:text-garnet-800"
       >

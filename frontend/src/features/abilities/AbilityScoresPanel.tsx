@@ -10,6 +10,11 @@ interface AbilityScoresPanelProps {
    * #964) passes `grid-cols-3` so the boxes stay legible in ~18rem.
    */
   gridClassName?: string;
+  /**
+   * Render the boxes in the calmer reference-rail style (#986) — flat, softer
+   * save chips — so the desktop live-Combat left rail recedes behind the tracker.
+   */
+  muted?: boolean;
 }
 
 // The abilities + saves row across the top of the Overview tab. Skills are NOT
@@ -17,6 +22,7 @@ interface AbilityScoresPanelProps {
 export default function AbilityScoresPanel({
   character,
   gridClassName = "grid-cols-3 sm:grid-cols-6",
+  muted = false,
 }: AbilityScoresPanelProps) {
   // orderedAbilityEntries gives canonical 5e order (STR-DEX-CON-INT-WIS-CHA), not arbitrary key order.
   const abilityEntries = orderedAbilityEntries(character.abilityScores);
@@ -31,6 +37,7 @@ export default function AbilityScoresPanel({
           score={score}
           saveProficient={character.savingThrowProficiencies.includes(key)}
           proficiencyBonus={character.proficiencyBonus}
+          muted={muted}
         />
       ))}
     </div>
