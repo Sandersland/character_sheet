@@ -6,8 +6,8 @@
  *
  * Order matters (#982): the turn tracker is the reason the tab exists, so it
  * renders FIRST — no HP bar or full-height conditions card pushes it below the
- * fold on mobile. HP now lives in the sheet header (with its meter), so the old
- * CompactHpBar is gone from here; Rest folds into CombatUtilityStrip. The strip's
+ * fold on mobile. HP now lives in the sheet header (with its meter), so there's
+ * no HP bar here; Rest folds into CombatUtilityStrip. The strip's
  * add-condition picker opens as a BottomSheet overlay, so it never displaces the
  * tracker. Turn-engine behaviour is untouched — this is composition only, keeping
  * the #955 fidelity guarantee.
