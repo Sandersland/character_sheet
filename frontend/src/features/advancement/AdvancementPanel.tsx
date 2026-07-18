@@ -29,15 +29,12 @@ export default function AdvancementPanel({
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"asi" | "feat">("asi");
 
-  // ── ASI state ──────────────────────────────────────────────────────────────
   const asi = useAsiDraft();
 
-  // ── Feat state ─────────────────────────────────────────────────────────────
   const feats = useFeatCatalog(open && tab === "feat");
   const [view, dispatchView] = useReducer(featViewReducer, FEAT_VIEW_INITIAL);
   const { selectedFeat, abilityChoice, customMode } = view;
 
-  // ── Custom feat form state ─────────────────────────────────────────────────
   const custom = useCustomFeatDraft();
 
   // Reset feat panel when switching mode.
@@ -47,7 +44,6 @@ export default function AdvancementPanel({
     if (next === "feat") feats.ensureFetched();
   }
 
-  // ── ASI helpers ────────────────────────────────────────────────────────────
   function handleAsiSubmit() {
     if (asi.totalPoints !== 2) return;
     onSubmit(asi.buildOperation());
@@ -55,7 +51,6 @@ export default function AdvancementPanel({
     setOpen(false);
   }
 
-  // ── Feat helpers ───────────────────────────────────────────────────────────
   function handleFeatSubmit() {
     if (customMode) {
       const op = custom.buildOperation();
@@ -130,12 +125,10 @@ export default function AdvancementPanel({
         ))}
       </div>
 
-      {/* ── ASI tab ── */}
       {tab === "asi" && (
         <AsiFlow currentScores={currentScores} busy={busy} asi={asi} onApply={handleAsiSubmit} />
       )}
 
-      {/* ── Feat tab ── */}
       {tab === "feat" && (
         <FeatFlow
           currentScores={currentScores}

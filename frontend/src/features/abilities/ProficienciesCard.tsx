@@ -34,8 +34,7 @@ interface Props {
   onUpdate: (updated: Character) => void;
 }
 
-// ── Tool grouping helpers (identical to the ones that were in ToolProficienciesCard) ──
-
+// Tool grouping helpers — identical to the ones that were in ToolProficienciesCard.
 const CATEGORY_LABELS: Record<ToolProficiency["category"], string> = {
   artisan:           "Artisan's Tools",
   gamingSet:         "Gaming Sets",
@@ -71,8 +70,6 @@ function sortedArmor(profs: ArmorProficiency[]): ArmorProficiency[] {
       ARMOR_CATEGORY_ORDER.indexOf(b.category)
   );
 }
-
-// ── Shared chip component ──
 
 interface ProficiencyRowProps {
   label: string;
@@ -143,8 +140,6 @@ function ProficiencyRow({
   );
 }
 
-// ── Section wrapper ──
-
 function ProficiencySection({
   title,
   children,
@@ -167,8 +162,6 @@ function ProficiencySection({
     </div>
   );
 }
-
-// ── Main card ──
 
 export default function ProficienciesCard({
   character,
