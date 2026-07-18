@@ -31,17 +31,9 @@ interface InventoryItemContext {
   proficiencyBonus: number;
   /** The character's merged weapon proficiency grants (class + race + feat). */
   weaponGrants: ReadonlyArray<{ name: string }>;
-  /**
-   * True when any equipped item occupies the off-hand: either an equipped
-   * shield or ≥ 2 equipped weapons. Used by `deriveWeaponDamage` to resolve
-   * the correct die for versatile weapons (2H die when off-hand is free).
-   */
+  /** Shield equipped or ≥2 weapons equipped — picks the versatile-weapon die (2H when off-hand free). */
   offHandBusy: boolean;
-  /**
-   * The character's chosen Fighting Style (already clamped to null when the
-   * character isn't entitled). Threaded into deriveWeaponAttackBonus so Archery
-   * adds +2 to ranged weapon attacks.
-   */
+  /** Chosen Fighting Style, pre-clamped to null when unentitled; Archery adds +2 ranged attack. */
   fightingStyle: FightingStyleKey | null;
   /** Sum of active "meleeDamage" buffs (#455); added to melee weapon damage. */
   meleeDamageBonus: number;

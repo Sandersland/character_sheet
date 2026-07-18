@@ -155,8 +155,8 @@ export async function prepareMerge(
   return { ok: true, merge: serializeMerge(merge) };
 }
 
-// Flips PREPARED→EXECUTED and auto-reveals a HIDDEN survivor in the same txn
-// (#379). Idempotent: keeps the first executedAt.
+// Flips PREPARED→EXECUTED and auto-reveals the survivor in the same txn
+// (#379). Idempotent on re-execute: keeps the first executedAt.
 export async function executeMerge(
   db: PrismaClient,
   campaignId: string,

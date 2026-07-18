@@ -12,14 +12,8 @@ import type { ToolProfEntry } from "@/lib/classes/resources.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
 import type { TargetModifierMap } from "./effects.js";
 
-/**
- * Merges creation-fixed tool profs (Character.toolProficiencies column) with
- * level-gated subclass choices (toolProficienciesKnown from resources JSON)
- * into the single wire-format array the API emits.
- *
- * Dedup rule: creation-fixed entries win — they survive level-down and
- * the client should never show a duplicate proficiency row.
- */
+// Creation-fixed tool profs + level-gated subclass choices → one wire array;
+// creation-fixed wins on dedup (survives level-down, no duplicate rows).
 function buildMergedToolProficiencies(
   stored: Prisma.JsonValue,
   subclassKnown: ToolProfEntry[],
@@ -45,16 +39,9 @@ function buildMergedToolProficiencies(
   return merged;
 }
 
-/**
- * Merges armor proficiency grants from class(es), race, and feats into a
- * deduplicated list tagged with the highest-priority source (class > race > feat).
- *
- * Multiclass: iterates all classEntries and takes the full union of their grants.
- * This is a deliberate simplification of 5e's restricted multiclass-proficiency
- * rules (which restrict certain armor/weapon grants on secondary class pickup);
- * correct for the current single-class setup and conservatively permissive for
- * any future multiclass character.
- */
+// Armor grants from class(es)/race/feats, deduped, highest-priority source wins
+// (class > race > feat). Multiclass takes the full union — a deliberate,
+// conservatively permissive simplification of 5e's multiclass restrictions.
 export function buildMergedArmorProficiencies(
   classEntries: { name: string }[],
   raceName: string | undefined,
@@ -80,13 +67,8 @@ export function buildMergedArmorProficiencies(
   return out;
 }
 
-/**
- * Merges weapon proficiency grants from class(es), race, and feats into a
- * deduplicated list tagged with the highest-priority source (class > race > feat).
- * Entries may be category-level ("Simple Weapons") or specific names ("Longswords").
- *
- * See buildMergedArmorProficiencies for the multiclass simplification note.
- */
+// Weapon grants (category-level or specific names) from class(es)/race/feats,
+// deduped, highest-priority wins; see buildMergedArmorProficiencies on multiclass.
 export function buildMergedWeaponProficiencies(
   classEntries: { name: string }[],
   raceName: string | undefined,
