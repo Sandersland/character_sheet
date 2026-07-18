@@ -848,8 +848,8 @@ function dispatchResourceOp(ctx: ResourceOpContext, op: ResourceOperation): Reso
   return handler(ctx, op);
 }
 
-// Shared before/after event snapshot shape — used by both the batch handler
-// and applySpendResourceInTx.
+// Shared before/after event snapshot shape for the per-op event log
+// (applyResourceOpInTx).
 function snapshotResourcesState(state: ResourcesMutableState): {
   resources: ReturnType<typeof snapshotResources>;
 } {
