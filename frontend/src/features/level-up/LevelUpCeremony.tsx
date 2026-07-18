@@ -6,6 +6,7 @@ import Spinner from "@/components/ui/Spinner";
 import LevelUpStepPlaceholder from "@/features/level-up/LevelUpStepPlaceholder";
 import StepRail from "@/features/level-up/StepRail";
 import { useLevelUpCeremony, type LevelUpCeremony as Ceremony } from "@/features/level-up/useLevelUpCeremony";
+import { LevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import type { Character, LevelUpStep, LevelUpStepKind } from "@/types/character";
 
@@ -127,7 +128,9 @@ export default function LevelUpCeremony({ character }: { character: Character })
             <StepRail steps={c.steps} currentKey={c.currentKey} />
           </div>
           <div className="mt-5 border-t border-parchment-200 pt-4">
-            <StepBody step={c.currentStep} />
+            <LevelUpStepContext.Provider value={{ character, draft: c.draft, setDraft: c.setDraft, plan: c.plan }}>
+              <StepBody step={c.currentStep} />
+            </LevelUpStepContext.Provider>
           </div>
           {c.submitError && (
             <p role="alert" className="mt-2 text-center text-sm font-semibold text-garnet-700">
