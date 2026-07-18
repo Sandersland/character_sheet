@@ -56,6 +56,8 @@ Every mutable domain follows the same shape:
 
 `lib/inventory/inventory.ts` is the reference implementation for the lib layer. Do not add new mutable domains via `PATCH /characters/:id`. The campaign-side counterpart is DM award/revoke (`lib/campaign/campaign-item-award.ts`), which writes undoable events on the **target** character.
 
+The level-up ceremony endpoint (`/level-up/transactions`) is the **composition variant**: it validates a structured submission against `buildLevelUpPlan`, then drives ONE `runCharacterTransaction` whose applyOp dispatches to the per-domain `*InTx` seams (`applyLevelUpHpInTx`, `applyAdvancementOpInTx`, `setSubclassInTx`, `setFightingStyleInTx`, `applyResourceOpInTx`, `applySpellcastingOpInTx`) — never the outer `apply*Operations` wrappers, which each mint their own transaction + `batchId`. The shared `batchId` is what makes the whole ceremony one atomic unit and one `revertBatch` undo.
+
 ## Docker Compose
 
 Four services: `db` (Postgres 17, 5432), `pgadmin` (5050, behind the `tools` profile), `backend` (Express, 4000), `frontend` (Vite, 5173). Backend/frontend each have their own Dockerfile with source bind-mounted for hot reload and an anonymous volume shadowing `node_modules`. Prisma client generates into `src/generated/prisma` (gitignored) — run `npx prisma generate` after a fresh clone or schema change.
