@@ -14,8 +14,6 @@ import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const conditionsRouter = Router({ mergeParams: true });
 
-// ── Zod schemas ───────────────────────────────────────────────────────────────
-
 const conditionKeySchema = z.enum(
   CONDITIONS.map((c) => c.key) as [ConditionKey, ...ConditionKey[]],
 );
@@ -46,16 +44,16 @@ const transactionsRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),
 });
 
-// ── POST /api/characters/:id/conditions/transactions ───────────────────────────
-//
-// Intent-bearing batch mutation for status-condition state — mirrors
-// POST /api/characters/:id/resources/transactions. Operations:
-//   applyCondition   — add a standard 5e condition (prone, poisoned, …)
-//   removeCondition  — remove an active condition by key
-//   setExhaustion    — set exhaustion to an absolute level (0–6)
-//
-// Returns the full updated character on success.
-
+/**
+ * POST /api/characters/:id/conditions/transactions
+ * Intent-bearing batch mutation for status-condition state — mirrors
+ * POST /api/characters/:id/resources/transactions. Operations:
+ *   applyCondition   — add a standard 5e condition (prone, poisoned, …)
+ *   removeCondition  — remove an active condition by key
+ *   setExhaustion    — set exhaustion to an absolute level (0–6)
+ *
+ * Returns the full updated character on success.
+ */
 makeTransactionsEndpoint({
   router: conditionsRouter,
   schema: transactionsRequestSchema,

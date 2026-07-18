@@ -106,7 +106,7 @@ export function snapshotItemDetail(item: CatalogItemWithDetails) {
   return snapshotDetailCreate(item);
 }
 
-// ── Undo snapshot ────────────────────────────────────────────────────────────
+// Undo snapshot.
 //
 // When an op DELETES an InventoryItem row (full sell, remove, adjust-to-zero)
 // the relational row + its detail rows are gone, so `before`/`after` alone

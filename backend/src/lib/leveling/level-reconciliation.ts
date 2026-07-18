@@ -52,8 +52,6 @@ import { normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import { deriveGrantedSpells } from "@/lib/spellcasting/granted-spells.js";
 
-// ── Reconcile context ─────────────────────────────────────────────────────────
-
 export interface ReconcileContext {
   tx: Prisma.TransactionClient;
   characterId: string;
@@ -64,7 +62,6 @@ export interface ReconcileContext {
 
 type Reconciler = (ctx: ReconcileContext) => Promise<void>;
 
-// ── reconcileSubclass ─────────────────────────────────────────────────────────
 // Clears a subclass choice on ANY class entry whose effective level has dropped
 // below that class's subclassLevel. Per-entry (issue #125): a multiclass
 // character picks a subclass per class at that class's own grant level, so each
@@ -114,7 +111,6 @@ async function reconcileSubclass(ctx: ReconcileContext): Promise<void> {
   }
 }
 
-// ── reconcileGrantedSpells ────────────────────────────────────────────────────
 // Defense-in-depth: subclass-granted spells are pure-derived at read time and
 // never persisted in the happy path, so this only fires if a source:"subclass"
 // entry ever leaks into the stored spells[]. It strips any leaked grant no longer
@@ -211,7 +207,6 @@ async function reconcileGrantedSpells(ctx: ReconcileContext): Promise<void> {
   });
 }
 
-// ── reconcileKnownList ────────────────────────────────────────────────────────
 // Shared flow for trimming a level-gated "known" list in Character.resources
 // (maneuvers, elemental disciplines, tool proficiency choices) when the level-
 // derived choice count has decreased. Each runs AFTER reconcileSubclass so an
@@ -328,7 +323,6 @@ async function reconcileKnownList(ctx: ReconcileContext, config: KnownListConfig
   });
 }
 
-// ── reconcileManeuvers ────────────────────────────────────────────────────────
 // Trims the persisted maneuversKnown array when the level-derived choice count
 // has decreased. See reconcileKnownList for the shared trim/audit flow.
 
@@ -345,7 +339,6 @@ async function reconcileManeuvers(ctx: ReconcileContext): Promise<void> {
   });
 }
 
-// ── reconcileDisciplines ──────────────────────────────────────────────────────
 // Trims persisted disciplinesKnown (Way of the Four Elements) when the level-
 // derived choice count decreases. See reconcileKnownList for the shared flow.
 
@@ -362,7 +355,6 @@ async function reconcileDisciplines(ctx: ReconcileContext): Promise<void> {
   });
 }
 
-// ── reconcileToolProficiencies ────────────────────────────────────────────────
 // Trims toolProficienciesKnown when the subclass no longer grants a tool choice
 // (character leveled down below 3, or subclass was cleared). Only creation-fixed
 // tool profs (stored in Character.toolProficiencies) are untouched — they are
@@ -381,7 +373,6 @@ async function reconcileToolProficiencies(ctx: ReconcileContext): Promise<void> 
   });
 }
 
-// ── reconcileSubclassChoices ──────────────────────────────────────────────────
 // Generic level-down trim for every subclass "choose N" feature (#899). One
 // reconciler serves all declared choices: for each key in choicesKnown it caps
 // the list to the level-derived count (0 when the subclass no longer grants that
@@ -442,7 +433,6 @@ async function reconcileSubclassChoices(ctx: ReconcileContext): Promise<void> {
   });
 }
 
-// ── reconcileFightingStyle ────────────────────────────────────────────────────
 // Clears the persisted fighting style when the character is no longer entitled
 // to one at the new level (e.g. a class change away from Fighter via the data —
 // fightingStyleChoiceCount drops to 0). Fighter keeps its choice at every level
@@ -500,7 +490,6 @@ async function reconcileFightingStyle(ctx: ReconcileContext): Promise<void> {
   });
 }
 
-// ── reconcileAdvancements ─────────────────────────────────────────────────────
 // Reverses the tail of advancements[] when the XP-derived level has fallen
 // below the level required for those slots (i.e. character leveled down past
 // an ASI level). Uses LIFO: the most-recently-taken advancements are removed
@@ -608,7 +597,6 @@ async function reconcileAdvancements(ctx: ReconcileContext): Promise<void> {
   });
 }
 
-// ── reconcileClassEntryLevels ─────────────────────────────────────────────────
 // Multiclass level-down (issue #124): trims per-class CharacterClassEntry.level
 // so the sum matches the XP-derived total level. Single-class characters are
 // handled by revertLevelUps (experience-ops.ts) for backward compatibility and
@@ -705,8 +693,6 @@ async function reconcileClassEntryLevels(ctx: ReconcileContext): Promise<void> {
     batchId,
   });
 }
-
-// ── Registry + orchestrator ───────────────────────────────────────────────────
 
 /**
  * Ordered list of reconcilers. Each runs sequentially in the XP transaction

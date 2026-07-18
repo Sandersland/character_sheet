@@ -11,7 +11,7 @@ import {
   itemBuffKey,
 } from "./inventory-types.js";
 
-// ── Paper-doll placement (#565) ──────────────────────────────────────────────
+// Paper-doll placement (#565).
 //
 // equippedSlot is the single source of truth for "is this equipped" — the wire
 // `equipped` field derives from (equippedSlot != null). RING holds 2 items;

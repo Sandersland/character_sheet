@@ -32,12 +32,6 @@ shadowArtsRouter.get("/", async (_req, res) => {
   );
 });
 
-// ── POST /api/characters/:id/shadow-arts/transactions ─────────────────────────
-//
-// Intent-bearing batch mutation for Shadow Arts — mirrors the disciplines
-// endpoint. The one op today:
-//   castShadowArt — spend a flat 2 ki, apply concentration/buff, log the cast.
-
 const castShadowArtOpSchema = z.object({
   type: z.literal("castShadowArt"),
   shadowArtId: z.string().min(1),
@@ -49,6 +43,12 @@ const transactionsRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),
 });
 
+/**
+ * POST /api/characters/:id/shadow-arts/transactions
+ * Intent-bearing batch mutation for Shadow Arts — mirrors the disciplines
+ * endpoint. The one op today:
+ *   castShadowArt — spend a flat 2 ki, apply concentration/buff, log the cast.
+ */
 makeTransactionsEndpoint({
   router: shadowArtsRouter,
   schema: transactionsRequestSchema,

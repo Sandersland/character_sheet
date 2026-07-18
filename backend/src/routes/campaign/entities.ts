@@ -55,13 +55,6 @@ const updateEntitySchema = z
   .partial()
   .strict();
 
-// ── GET /api/campaigns/:id/entities?q=&type=&include=stats ───────────────────
-// List/search the campaign's entities. The campaign-scoped volume is small, so
-// we fetch (optionally narrowed by a valid type) and match in memory on name,
-// aliases, and notes (#839), labeling each hit's field. An invalid type is
-// ignored. ?include=stats attaches derived mention stats (computed at read; a
-// fixed number of queries regardless of result size).
-
 function parseLimit(raw: unknown, fallback: number): number {
   const n = Number(raw);
   return Number.isInteger(n) && n > 0 ? Math.min(n, 50) : fallback;
@@ -74,6 +67,14 @@ function parseEntityType(raw: unknown): (typeof ENTITY_TYPES)[number] | undefine
     : undefined;
 }
 
+/**
+ * GET /api/campaigns/:id/entities?q=&type=&include=stats
+ * List/search the campaign's entities. The campaign-scoped volume is small, so
+ * we fetch (optionally narrowed by a valid type) and match in memory on name,
+ * aliases, and notes (#839), labeling each hit's field. An invalid type is
+ * ignored. ?include=stats attaches derived mention stats (computed at read; a
+ * fixed number of queries regardless of result size).
+ */
 entitiesRouter.get("/campaigns/:id/entities", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
   const isOwner = role === "OWNER";
@@ -114,10 +115,11 @@ entitiesRouter.get("/campaigns/:id/entities", async (req, res) => {
   res.json(await withEntityStats(prisma, req.params.id, req.user!.id, isOwner, matched));
 });
 
-// ── GET /api/campaigns/:id/entities/activity ─────────────────────────────────
-// Campaign-wide Codex activity (#839). Registered before the generic :entityId
-// routes so the /activity segment can't be shadowed.
-
+/**
+ * GET /api/campaigns/:id/entities/activity
+ * Campaign-wide Codex activity (#839). Registered before the generic :entityId
+ * routes so the /activity segment can't be shadowed.
+ */
 entitiesRouter.get("/campaigns/:id/entities/activity", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
   const limit = parseLimit(req.query.limit, 20);
@@ -126,9 +128,10 @@ entitiesRouter.get("/campaigns/:id/entities/activity", async (req, res) => {
   );
 });
 
-// ── POST /api/campaigns/:id/entities ─────────────────────────────────────────
-// Create an entity. Any member may create.
-
+/**
+ * POST /api/campaigns/:id/entities
+ * Create an entity. Any member may create.
+ */
 entitiesRouter.post("/campaigns/:id/entities", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
 
@@ -155,12 +158,6 @@ entitiesRouter.post("/campaigns/:id/entities", async (req, res) => {
   res.status(201).json(entity);
 });
 
-// ── Entity identity merges (#387) ────────────────────────────────────────────
-// Owner-only "revealed to be" links. PREPARED is the DM's secret prep — scrubbed
-// from every non-owner payload; EXECUTED is the public reveal (auto-reveals a
-// HIDDEN survivor). Chains resolve transitively via lib/entity-merges. Registered
-// before the generic :entityId routes so the /merges segment can't be shadowed.
-
 const prepareMergeSchema = z
   .object({
     mergedEntityId: z.string().uuid(),
@@ -169,7 +166,15 @@ const prepareMergeSchema = z
   })
   .strict();
 
-// GET list — owner sees all; non-owner scrubbing lives in listVisibleMerges.
+/**
+ * Entity identity merges (#387): owner-only "revealed to be" links. PREPARED is
+ * the DM's secret prep — scrubbed from every non-owner payload; EXECUTED is the
+ * public reveal (auto-reveals a HIDDEN survivor). Chains resolve transitively via
+ * lib/entity-merges. Registered before the generic :entityId routes so the
+ * /merges segment can't be shadowed.
+ *
+ * GET list — owner sees all; non-owner scrubbing lives in listVisibleMerges.
+ */
 entitiesRouter.get("/campaigns/:id/entities/merges", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
   res.json(await listVisibleMerges(prisma, req.params.id, role === "OWNER"));
@@ -232,9 +237,10 @@ entitiesRouter.delete("/campaigns/:id/entities/merges/:mergeId", async (req, res
   res.status(204).end();
 });
 
-// ── PATCH /api/campaigns/:id/entities/:entityId ──────────────────────────────
-// Edit an entity. Any member; 404 if the entity isn't in this campaign.
-
+/**
+ * PATCH /api/campaigns/:id/entities/:entityId
+ * Edit an entity. Any member; 404 if the entity isn't in this campaign.
+ */
 entitiesRouter.patch("/campaigns/:id/entities/:entityId", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "edit");
 
@@ -269,9 +275,10 @@ entitiesRouter.patch("/campaigns/:id/entities/:entityId", async (req, res) => {
   res.json(entity);
 });
 
-// ── DELETE /api/campaigns/:id/entities/:entityId ─────────────────────────────
-// Delete an entity (cascades its refs). OWNER only.
-
+/**
+ * DELETE /api/campaigns/:id/entities/:entityId
+ * Delete an entity (cascades its refs). OWNER only.
+ */
 entitiesRouter.delete("/campaigns/:id/entities/:entityId", async (req, res) => {
   await assertCampaignOwner(
     prisma,
@@ -294,11 +301,12 @@ entitiesRouter.delete("/campaigns/:id/entities/:entityId", async (req, res) => {
   res.status(204).end();
 });
 
-// ── GET /api/campaigns/:id/entities/:entityId/backlinks ──────────────────────
-// Notes that @-tag this entity, newest-first. This is THE sharing surface
-// (#838): the caller's own entries plus other members' CAMPAIGN-visible ones.
-// A PRIVATE note is visible only to its author — no owner/DM bypass.
-
+/**
+ * GET /api/campaigns/:id/entities/:entityId/backlinks
+ * Notes that @-tag this entity, newest-first. This is THE sharing surface
+ * (#838): the caller's own entries plus other members' CAMPAIGN-visible ones.
+ * A PRIVATE note is visible only to its author — no owner/DM bypass.
+ */
 entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
 
@@ -319,10 +327,11 @@ entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, re
   );
 });
 
-// ── GET /api/campaigns/:id/entities/:entityId/connections ────────────────────
-// Co-mention graph (#839): entities sharing a visible entry with this one,
-// merge-resolved to survivors, counted by distinct entries, sorted desc.
-
+/**
+ * GET /api/campaigns/:id/entities/:entityId/connections
+ * Co-mention graph (#839): entities sharing a visible entry with this one,
+ * merge-resolved to survivors, counted by distinct entries, sorted desc.
+ */
 entitiesRouter.get("/campaigns/:id/entities/:entityId/connections", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
   const isOwner = role === "OWNER";

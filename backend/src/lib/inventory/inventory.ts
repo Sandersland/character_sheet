@@ -8,7 +8,7 @@ import { applyEquip, applySetEquipped } from "./inventory-placement.js";
 import { applyAttune, applyUnattune } from "./inventory-attunement.js";
 import { applyActivate, applyDeactivate } from "./inventory-activation.js";
 
-// ── Domain façade ────────────────────────────────────────────────────────────
+// Domain façade.
 //
 // inventory.ts is the transaction-pattern reference implementation (CLAUDE.md):
 // the transaction entry lives here and re-exports the public surface split

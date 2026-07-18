@@ -106,7 +106,7 @@ function buildCampaignPreferencesView(row: CharacterWithRelations) {
 }
 
 export function serializeCharacter(row: CharacterWithRelations) {
-  // ── Derivation order (later steps read earlier outputs; do not reorder) ──
+  // Derivation order below: later steps read earlier outputs; do not reorder.
   // 1. XP → level + proficiency bonus (derive-don't-persist; docs/leveling.md).
   const progress = experienceProgress(row.experiencePoints);
   const primaryClass = row.classEntries[0];
@@ -286,9 +286,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
     // render client-side from UNIVERSAL_ACTIONS).
     availableActions: buildAvailableActionsView(primaryClass, progress.level, resources),
 
-    // ── Combat attack rows ─────────────────────────────────────────────────
-    // Derived at read time; the frontend renders these directly in AttacksPanel
-    // rather than recomputing attack math on the client.
+    // Combat attack rows — derived at read time; the frontend renders these
+    // directly in AttacksPanel rather than recomputing attack math on the client.
     unarmedStrike,
     improvisedWeapon,
     // Weapon attacks per Attack action (Extra Attack), max across multiclass.

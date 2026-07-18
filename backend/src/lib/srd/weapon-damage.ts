@@ -82,8 +82,6 @@ export function deriveWeaponDamage(
   };
 }
 
-// ── Unarmed strike + improvised weapon derivation ─────────────────────────────
-
 /**
  * Returns the unarmed-strike damage die face count for the given advancements.
  * Default is 1 (1 + STR mod, minimum 1 per 5e PHB). Tavern Brawler raises it to

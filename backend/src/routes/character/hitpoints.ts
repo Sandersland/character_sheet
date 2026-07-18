@@ -9,8 +9,7 @@ import { serializeCharacter } from "@/lib/character/character-serialize.js";
 
 export const hitPointsRouter = Router({ mergeParams: true });
 
-// ---- Per-op Zod schemas ---- (discriminated on `type`) --------------------
-
+// Per-op Zod schemas, discriminated on `type`.
 const damageOpSchema = z.object({
   type: z.literal("damage"),
   amount: z.number().int().positive(),
@@ -93,8 +92,6 @@ const operationSchema = z.discriminatedUnion("type", [
 const hpRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),
 });
-
-// ---- Route ----------------------------------------------------------------
 
 hitPointsRouter.post<{ id: string }>("/", async (req, res) => {
   await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");

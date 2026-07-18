@@ -126,7 +126,6 @@ export function applyStabilizeOp(ctx: HpOpContext): HpOpResult {
   return { summary: "Stabilized", eventData: {} };
 }
 
-// ---- Level-up helpers ----
 // applyLevelUpOp dispatches on the op's target: a NEW class (multiclass), an
 // EXISTING class entry, or the no-target position-0 self-heal. All three share
 // the roll validation + HP/hit-dice bump and the same eventData shape, which

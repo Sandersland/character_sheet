@@ -2,7 +2,6 @@
 
 import { Prisma } from "@/generated/prisma/client.js";
 
-// ── Canonical mutable state shape ─────────────────────────────────────────────
 // Stored in Character.spellcasting JSON column.
 // `slotsUsed`: slot level (as string key, JSON requirement) → used count.
 // `spells`: the character's known/prepared spell list (snapshotted from catalog
@@ -102,7 +101,6 @@ export interface SpellcastingMutableState {
   concentratingOn: ConcentrationState | null;
 }
 
-// ── Normalizer ────────────────────────────────────────────────────────────────
 // Handles both the new compact format AND the legacy blob shape seeded before
 // this migration (which had `ability`, `spellSaveDC`, `spellAttackBonus`,
 // `slots: [{level, total, used}]`, `spells`). The legacy fields are ignored

@@ -13,8 +13,6 @@ import { makeTransactionsEndpoint } from "@/lib/http/transactions-endpoint.js";
 
 export const advancementRouter = Router({ mergeParams: true });
 
-// ── Zod schemas ───────────────────────────────────────────────────────────────
-
 const increaseSchema = z.object({
   ability: z.string().min(1),
   amount: z.union([z.literal(1), z.literal(2)]),
@@ -81,16 +79,16 @@ const transactionsRequestSchema = z.object({
   operations: z.array(operationSchema).min(1),
 });
 
-// ── POST /api/characters/:id/advancement/transactions ─────────────────────────
-//
-// Intent-bearing batch mutation for Ability Score Improvements and Feats.
-// Operations:
-//   takeAsi             — raise one ability by +2, or two abilities by +1 each
-//   takeFeat            — spend a slot on a catalog or custom feat
-//   removeAdvancement   — reverse a previously taken ASI or feat by entry id
-//
-// Returns the full updated character on success.
-
+/**
+ * POST /api/characters/:id/advancement/transactions
+ * Intent-bearing batch mutation for Ability Score Improvements and Feats.
+ * Operations:
+ *   takeAsi             — raise one ability by +2, or two abilities by +1 each
+ *   takeFeat            — spend a slot on a catalog or custom feat
+ *   removeAdvancement   — reverse a previously taken ASI or feat by entry id
+ *
+ * Returns the full updated character on success.
+ */
 makeTransactionsEndpoint({
   router: advancementRouter,
   schema: transactionsRequestSchema,

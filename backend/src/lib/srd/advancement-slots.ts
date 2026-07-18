@@ -1,4 +1,3 @@
-// ── Ability Score Improvement / Feat slot table ───────────────────────────────
 // Per 5e PHB: most classes get ASI slots at levels 4, 8, 12, 16, 19.
 // Fighter gets two extras (levels 6 and 14); Rogue gets one extra (level 10).
 // Returns the *total* number of slots the character has earned at `level`.
@@ -19,7 +18,6 @@ export function advancementSlotsForLevel(className: string, level: number): numb
   return [...BASE_ASI_LEVELS, ...extra].filter((l) => level >= l).length;
 }
 
-// ── Multiclass ability-score prerequisites (PHB p. 163) ───────────────────────
 // Adding a level in a NEW class via multiclassing requires a minimum ability
 // score (13). Each class maps to a list of OPTIONS: the prerequisite is met when
 // ANY one option is fully satisfied — abilities within an option are AND-ed,

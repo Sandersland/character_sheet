@@ -37,8 +37,10 @@ function serializeArc(row: CampaignArc) {
   };
 }
 
-// ── GET /api/campaigns/:id/arcs ──────────────────────────────────────────────
-// Member-readable ordered list (the journal spine). Any campaign member sees it.
+/**
+ * GET /api/campaigns/:id/arcs
+ * Member-readable ordered list (the journal spine). Any campaign member sees it.
+ */
 arcsRouter.get("/campaigns/:id/arcs", async (req, res) => {
   await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
 
@@ -54,11 +56,13 @@ arcsRouter.get("/campaigns/:id/arcs", async (req, res) => {
   res.json(arcs.map(serializeArc));
 });
 
-// ── POST /api/campaigns/:id/arcs ─────────────────────────────────────────────
-// Owner-only create; position appends (= current arc count). The count+create
-// isn't atomic, so two concurrent DM creates can tie on `position`; that's made
-// harmless by the [position, createdAt] read ordering above (hardening constraint
-// is a tracked follow-up).
+/**
+ * POST /api/campaigns/:id/arcs
+ * Owner-only create; position appends (= current arc count). The count+create
+ * isn't atomic, so two concurrent DM creates can tie on `position`; that's made
+ * harmless by the [position, createdAt] read ordering above (hardening constraint
+ * is a tracked follow-up).
+ */
 arcsRouter.post("/campaigns/:id/arcs", async (req, res) => {
   await assertCampaignOwner(prisma, req.user!.id, req.params.id, "edit", OWNER_ONLY);
 
@@ -72,9 +76,11 @@ arcsRouter.post("/campaigns/:id/arcs", async (req, res) => {
   res.status(201).json(serializeArc(arc));
 });
 
-// ── PATCH /api/campaigns/:id/arcs/:arcId ─────────────────────────────────────
-// Owner-only rename and/or reorder. Full sequence normalization is the caller's
-// job (#864); this persists whatever name/position the owner sends.
+/**
+ * PATCH /api/campaigns/:id/arcs/:arcId
+ * Owner-only rename and/or reorder. Full sequence normalization is the caller's
+ * job (#864); this persists whatever name/position the owner sends.
+ */
 arcsRouter.patch("/campaigns/:id/arcs/:arcId", async (req, res) => {
   await assertCampaignOwner(prisma, req.user!.id, req.params.id, "edit", OWNER_ONLY);
 
@@ -97,9 +103,11 @@ arcsRouter.patch("/campaigns/:id/arcs/:arcId", async (req, res) => {
   res.json(serializeArc(arc));
 });
 
-// ── DELETE /api/campaigns/:id/arcs/:arcId ────────────────────────────────────
-// Owner-only. Sessions fall back to un-arced via the SetNull relation — deleting
-// an arc never deletes a session or its journal entries.
+/**
+ * DELETE /api/campaigns/:id/arcs/:arcId
+ * Owner-only. Sessions fall back to un-arced via the SetNull relation — deleting
+ * an arc never deletes a session or its journal entries.
+ */
 arcsRouter.delete("/campaigns/:id/arcs/:arcId", async (req, res) => {
   await assertCampaignOwner(prisma, req.user!.id, req.params.id, "edit", OWNER_ONLY);
 

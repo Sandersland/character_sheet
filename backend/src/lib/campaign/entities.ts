@@ -53,8 +53,6 @@ export async function findViewableEntity(
   return isOwner || entity.visibility !== "HIDDEN" ? entity : null;
 }
 
-// ── Entity identity merges (#387) ────────────────────────────────────────────
-
 type MergeRow = {
   id: string;
   campaignId: string;
@@ -314,8 +312,6 @@ export async function withEntityStats<E extends ListedEntity>(
   return matched.map((e) => ({ ...e, stats: statsPayload(stats.get(e.id), e.notes, ctx) }));
 }
 
-// ── Campaign-wide Codex activity (#839) ──────────────────────────────────────
-
 type ActivitySortable = { sortKey: [number, number, number] };
 
 function activitySortKey(date: Date, loggedAt?: Date, createdAt?: Date): [number, number, number] {
@@ -405,8 +401,6 @@ export async function buildEntityActivityFeed(
     .map(({ item }) => item);
 }
 
-// ── Backlinks (#838) ─────────────────────────────────────────────────────────
-
 // Notes @-tagging the entity, newest-first: the caller's own entries plus other
 // members' CAMPAIGN-visible ones. A PRIVATE note is author-only — no DM bypass.
 export async function buildEntityBacklinks(
@@ -472,8 +466,6 @@ export async function buildEntityBacklinks(
     identity: { id: ref.entity.id, name: ref.entity.name },
   }));
 }
-
-// ── Connections (#839) ───────────────────────────────────────────────────────
 
 // Co-mention graph: entities sharing a visible entry with the target,
 // merge-resolved to survivors, counted by distinct entries, sorted desc.

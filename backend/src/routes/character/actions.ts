@@ -39,8 +39,6 @@ import { serializeCharacter } from "@/lib/character/character-serialize.js";
 
 export const actionsRouter = Router({ mergeParams: true });
 
-// ── POST /api/characters/:id/actions/transactions ─────────────────────────────
-
 const executeActionSchema = z.object({
   type: z.literal("executeAction"),
   actionKey: z.string().min(1),
