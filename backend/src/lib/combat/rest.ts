@@ -348,8 +348,8 @@ function resetLongRestSpellcasting(row: HpOpContext["row"]): {
 
 /**
  * Recharge limited-use consumables (#121): charged items (maxUses set) reset
- * to full. Lives here rather than in lib/inventory/inventory.ts to avoid an
- * import cycle (inventory already imports this module).
+ * to full. Lives in the combat domain (with the rest phases that trigger it)
+ * rather than lib/inventory, avoiding an inventory↔combat import cycle.
  */
 async function rechargeConsumables(
   tx: Prisma.TransactionClient,

@@ -20,3 +20,6 @@ export type { HitPoints, HitDice } from "./hp-core.js";
 export { applyHitPointOperations, applyLevelUpHpInTx } from "./hp-transaction.js";
 
 export { applyHealInTx, applyDamageInTx, applyTempHpInTx } from "./hp-in-tx.js";
+// Part of the public surface; current external callers infer this return type.
+// fallow-ignore-next-line unused-type
+export type { ConcentrationCheckResult } from "./concentration.js";

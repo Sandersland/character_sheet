@@ -17,8 +17,8 @@ import { applyConcentrationCheckInTx, type ConcentrationCheckResult } from "./co
  *
  * Exported so the actions orchestrator (routes/actions.ts) can compose a
  * "consume potion + heal" pair into one atomic $transaction without opening a
- * nested transaction. Keep the heal logic in sync with the `case "heal"` branch
- * inside applyHitPointOperations in hp-transaction.ts.
+ * nested transaction. Keep the heal logic in sync with the `case "heal"` in
+ * dispatchHpOp (hp-transaction.ts).
  */
 export async function applyHealInTx(
   tx: Prisma.TransactionClient,
@@ -128,7 +128,7 @@ async function mutateHitPointsInTx(
 
 /**
  * Apply damage to a character's HP inside an existing transaction, mirroring
- * the `case "damage"` branch of applyHitPointOperations.
+ * the `case "damage"` in dispatchHpOp (hp-transaction.ts).
  *
  * Exported so the spellcasting orchestrator (lib/spellcasting/spellcasting.ts) can compose a
  * "cast self-targeted damage spell + take damage" pair into one atomic
@@ -162,7 +162,7 @@ export async function applyDamageInTx(
   });
 
   // Resolve concentration on this damage instance (issue #41), mirroring the
-  // `case "damage"` branch of applyHitPointOperations.
+  // `case "damage"` in dispatchHpOp (hp-transaction.ts).
   return applyConcentrationCheckInTx(tx, characterId, amount, hp.current, batchId, sessionId);
 }
 
