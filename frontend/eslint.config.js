@@ -12,13 +12,19 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    // Suppression hygiene (#1045): every disable must name its rule
-    // (no-unlimited-disable) and carry a `-- reason` (require-description),
-    // machine-enforcing the CLAUDE.md suppression policy.
+    // Comment hygiene, machine-enforcing the CLAUDE.md comment policy.
+    // Suppression directives (#1045): every disable must name its rule
+    // (no-unlimited-disable) and carry a `-- reason` (require-description).
+    // Warning markers (#1057): the no-warning-comments terms below are banned
+    // anywhere in a comment — track the work in an issue, not a marker that rots.
     plugins: { "@eslint-community/eslint-comments": comments },
     rules: {
       "@eslint-community/eslint-comments/no-unlimited-disable": "error",
       "@eslint-community/eslint-comments/require-description": "error",
+      "no-warning-comments": [
+        "error",
+        { terms: ["todo", "fixme", "xxx"], location: "anywhere" },
+      ],
     },
   },
   {

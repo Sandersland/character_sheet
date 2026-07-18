@@ -106,6 +106,12 @@ jobs:
       - name: fallow-ignore reasons required
         run: sh scripts/check-fallow-reasons.sh
 
+      # Banner twin of the reasons gate (#1057): no lint rule detects section
+      # dividers, so this grep enforces the CLAUDE.md banner ban in frontend/src.
+      # Server-side twin of the lefthook `comment-banners` job. Every event.
+      - name: section banners forbidden
+        run: sh scripts/check-comment-banners.sh
+
       # The repo-wide ratchet, expressed PER-WORKSPACE so each workspace's CRAP
       # treatment can differ (#718, tightened from the old repo-wide
       # `--min-severity critical` step). Together the frontend step here and the
