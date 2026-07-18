@@ -71,7 +71,7 @@ export function createApp() {
 
   // Security headers first, then CORS, body parsing, request logging, and a
   // coarse global rate limit — all before any router runs.
-  app.use(securityHeaders(staticDir || undefined));
+  app.use(securityHeaders(staticDir));
   app.use(cors(corsOptions()));
   app.use(express.json());
   app.use(httpLogger);
