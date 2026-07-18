@@ -1,5 +1,5 @@
 /**
- * Unit tests for features/session/useTurnState.ts.
+ * Unit tests for useTurnState.
  *
  * Establishes the first renderHook test in the repo. jsdom provides a real
  * localStorage; we clear it in beforeEach to isolate each test.

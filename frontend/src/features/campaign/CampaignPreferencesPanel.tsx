@@ -40,7 +40,7 @@ function ToggleRow({ label, hint, checked, disabled, onChange }: ToggleRowProps)
 
 // Campaign-scoped play preferences (#537). Rendered only when the character is
 // attached to a campaign (the caller gates on character.campaignId). Reads the
-// serialized prefs and writes each flag through the api/client helper.
+// serialized prefs and writes each flag through the API client helper.
 export default function CampaignPreferencesPanel({
   character,
   onUpdate,

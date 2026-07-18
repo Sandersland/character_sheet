@@ -1,5 +1,5 @@
 // SpellRow — per-spell view in the spellbook list: badges, actions, slot picker, expand.
-// Derivations live in lib/spellRow; presentational blocks in the sibling subcomponents.
+// Derivations live in spellRow; presentational blocks in the sibling subcomponents.
 import { useState } from "react";
 
 import type { PreparedBudget } from "@/lib/spellList";

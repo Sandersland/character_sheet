@@ -20,7 +20,7 @@ import { formatRollBreakdown } from "@/lib/dice";
 import { categoryTone } from "@/lib/events";
 import type { CharacterEvent } from "@/types/character";
 
-// Category → badge tone resolves through the shared lookup in lib/events so new
+// Category → badge tone resolves through the shared categoryTone lookup so new
 // event categories stay covered. The session log keeps its own terser TYPE_LABEL
 // map below (e.g. "combat" vs the activity log's "Combat started").
 //

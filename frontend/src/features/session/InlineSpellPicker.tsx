@@ -13,7 +13,7 @@
  * `focusSpellId` opens the picker on a single spell (bonus-spell card
  * pre-selection) with a "Show all spells" escape hatch.
  *
- * This is a thin shell: selection/slot predicates live in `lib/spellPicker`,
+ * This is a thin shell: selection/slot predicates live in `spellPicker`,
  * state + orchestration in `useSpellPicker`, and per-row rendering in
  * `SpellPickerRow` (with `SlotLevelSelector` + `SpellTargetToggle`). All roll
  * results surface in the global RollResultSeal; "Done" closes the panel.

@@ -1,5 +1,5 @@
-// Pure Way-of-the-Four-Elements discipline rules — mirror of the ki cap in
-// backend/src/lib/disciplines.ts and the ki-scaled effect roll. No JSX.
+// Pure Way-of-the-Four-Elements discipline rules — mirror of the backend ki cap
+// and the ki-scaled effect roll. No JSX.
 
 import { resolveEffectSpec } from "@/lib/effects";
 import type { RollSpec } from "@/lib/dice";

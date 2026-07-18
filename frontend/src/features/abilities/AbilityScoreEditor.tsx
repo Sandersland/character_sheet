@@ -52,7 +52,7 @@ interface AbilityScoreEditorProps {
 /**
  * Ability-score generation + assignment for character creation. Supports
  * all four 5e methods the player might show up with: rolled dice (4d6
- * drop-lowest, generated client-side via lib/abilityGen), the standard
+ * drop-lowest, generated client-side via abilityGen), the standard
  * array, point buy, and plain manual entry for stats already rolled
  * offline at the table.
  */

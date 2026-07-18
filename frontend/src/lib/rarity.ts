@@ -3,7 +3,7 @@ import type { ItemRarity } from "@/types/character";
 
 /**
  * Display labels + standard gp values for the six 5e magic-item rarity tiers.
- * Mirrors the backend rules data in src/lib/srd.ts (ITEM_RARITIES) — the backend
+ * Mirrors the backend rules data ITEM_RARITIES — the backend
  * stays the single source of truth; this is presentation metadata only (labels +
  * the derived value hint). Never render a raw rarity key; resolve via rarityLabel().
  */

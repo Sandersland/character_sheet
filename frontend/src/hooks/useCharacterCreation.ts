@@ -46,7 +46,7 @@ export interface CharacterCreation {
 }
 
 // Orchestrates the character-creation form: draft state, reference-driven
-// derivations (in lib/characterCreation), validation gating, and submit.
+// derivations (in characterCreation), validation gating, and submit.
 export function useCharacterCreation(): CharacterCreation {
   const navigate = useNavigate();
   const { draft, update, clear } = useCharacterDraft();

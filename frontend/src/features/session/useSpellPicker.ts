@@ -1,7 +1,7 @@
 /**
  * useSpellPicker — state + orchestration for InlineSpellPicker.
  *
- * Owns per-spell row state and composes the pure lib/spellPicker predicates
+ * Owns per-spell row state and composes the pure spellPicker predicates
  * with useRoll() and the async spellcasting client call. Keeps the component
  * (and its sub-components) presentational.
  */

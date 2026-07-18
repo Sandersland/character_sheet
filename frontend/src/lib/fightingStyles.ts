@@ -2,7 +2,7 @@ import type { FightingStyleKey } from "@/types/character";
 
 /**
  * Display labels + descriptions for the 6 core Fighting Styles. Mirrors the
- * backend rules data in src/lib/srd.ts (FIGHTING_STYLES) — the backend remains
+ * backend rules data FIGHTING_STYLES — the backend remains
  * the single source of truth for rules and derived effects; this is presentation
  * metadata only (labels/descriptions for the picker). Never render a raw style
  * key in the UI; resolve through fightingStyleLabel().

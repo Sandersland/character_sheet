@@ -1,6 +1,6 @@
 // Spellcasting orchestration state + op handlers for SpellsSection. Feature-local
 // (not a shared hook): batches ops through applySpellcastingTransactions and owns
-// busy/error/castResult/panel state. Pure cast planning lives in lib/spellCast.
+// busy/error/castResult/panel state. Pure cast planning lives in spellCast.
 import { useState } from "react";
 
 import { applySpellcastingTransactions } from "@/api/client";
