@@ -1,7 +1,7 @@
 // The Hit Points ceremony step (#887): the player takes the fixed average or
 // rolls the advancing class's hit die; a live preview shows the new max HP.
 
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { useLevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
@@ -25,8 +25,9 @@ export default function HitPointsStep() {
   const { character, draft, setDraft } = useLevelUpStepContext();
   const { reference } = useReferenceData();
   const referenceClasses = reference?.classes ?? [];
-  const [searchParams] = useSearchParams();
-  const classEntryId = searchParams.get("entry") ?? character.classes?.[0]?.id;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const entries = character.classes ?? [];
+  const classEntryId = searchParams.get("entry") ?? entries[0]?.id;
 
   const conMod = abilityModifier(character.abilityScores.constitution);
   const conLabel = formatModifier(conMod);
@@ -45,6 +46,9 @@ export default function HitPointsStep() {
   // The rolled hit die, held locally so toggling average↔roll reuses the same
   // roll (#887): the die only re-mounts — and re-rolls — while this is null.
   const [roll, setRoll] = useState<number | null>(null);
+  // Drop a held roll when the advancing class (hence the die) changes, so a d10
+  // roll never carries onto a d6 class — the re-mounted die auto-rolls the new one.
+  useEffect(() => setRoll(null), [faces]);
 
   function handleRoll(result: RollResult) {
     const value = result.dice[0]?.value ?? 1;
@@ -59,6 +63,25 @@ export default function HitPointsStep() {
 
   return (
     <div>
+      {entries.length > 1 && (
+        <fieldset className="mb-5 flex flex-col gap-2">
+          <legend className="text-[11px] font-bold uppercase tracking-wide text-parchment-500">
+            Which class advances?
+          </legend>
+          {entries.map((entry) => (
+            <label key={entry.id} className="flex items-center gap-2 text-sm text-parchment-800">
+              <input
+                type="radio"
+                name="levelup-advancing-class"
+                checked={classEntryId === entry.id}
+                onChange={() => setSearchParams({ entry: entry.id }, { replace: true })}
+              />
+              {entry.name} {entry.level} → {entry.level + 1}
+            </label>
+          ))}
+        </fieldset>
+      )}
+
       <h2 className="text-center font-display text-xl font-semibold text-parchment-900">
         Roll for hit points, or take the average?
       </h2>

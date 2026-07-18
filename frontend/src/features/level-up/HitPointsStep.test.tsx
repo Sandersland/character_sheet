@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useSearchParams } from "react-router-dom";
 
 import { fetchReference } from "@/api/client";
 import HitPointsStep from "@/features/level-up/HitPointsStep";
@@ -47,6 +47,26 @@ const baseCharacter = {
   hitDice: { total: 7, die: "d10", spent: 0 },
 } as unknown as Character;
 
+const multiCharacter = {
+  ...baseCharacter,
+  classes: [
+    { id: "entry-1", name: "fighter", level: 7, subclass: "Champion" },
+    { id: "entry-2", name: "wizard", level: 3, subclass: null },
+  ],
+} as unknown as Character;
+
+// Two classes with different hit dice so a class switch visibly changes the die.
+const MULTICLASS_REFERENCE = {
+  races: [],
+  backgrounds: [],
+  alignments: [],
+  artisanTools: [],
+  classes: [
+    { id: "cls-fighter", name: "fighter", hitDie: "d10" },
+    { id: "cls-wizard", name: "wizard", hitDie: "d6" },
+  ],
+} as unknown as ReferenceData;
+
 const basePlan = {
   target: { className: "fighter", subclass: "Champion", newLevel: 8, isPrimary: true },
   steps: [{ kind: "hitPoints" }],
@@ -70,17 +90,29 @@ function renderStep(over?: { draft?: LevelUpDraft; character?: Character; url?: 
   return { setDraft };
 }
 
+function LocationSearch() {
+  const [sp] = useSearchParams();
+  return <div data-testid="search">{sp.toString()}</div>;
+}
+
 // Stateful host so card clicks and dice results flow through a real setDraft.
-function StatefulStep({ onDraft }: { onDraft?: (d: LevelUpDraft) => void }) {
+function StatefulStep({
+  onDraft,
+  character = baseCharacter,
+}: {
+  onDraft?: (d: LevelUpDraft) => void;
+  character?: Character;
+}) {
   const [draft, setDraft] = useState<LevelUpDraft>({});
   useEffect(() => {
     onDraft?.(draft);
   }, [draft, onDraft]);
-  const value: LevelUpStepContextValue = { character: baseCharacter, draft, setDraft, plan: basePlan };
+  const value: LevelUpStepContextValue = { character, draft, setDraft, plan: basePlan };
   return (
     <MemoryRouter initialEntries={["/characters/c1/level-up"]}>
       <LevelUpStepContext.Provider value={value}>
         <HitPointsStep />
+        <LocationSearch />
       </LevelUpStepContext.Provider>
     </MemoryRouter>
   );
@@ -135,5 +167,36 @@ describe("HitPointsStep", () => {
     // Still 59 (the held 7), not 55 (a fresh mount's 3) — the die never re-rolled.
     expect(await screen.findByText(/52\s*→\s*59/)).toBeInTheDocument();
     expect(rollMountCount).toBe(1);
+  });
+
+  it("shows no advancing-class selector for a single-class character", async () => {
+    renderStep();
+
+    expect(screen.queryByText(/which class advances/i)).not.toBeInTheDocument();
+  });
+
+  it("renders the advancing-class selector for a multiclass character", async () => {
+    renderStep({ character: multiCharacter });
+
+    expect(await screen.findByText(/which class advances/i)).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /fighter 7 → 8/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /wizard 3 → 4/i })).toBeInTheDocument();
+  });
+
+  it("switching the advancing class updates ?entry=, the die, and the preview", async () => {
+    fetchReferenceMock.mockResolvedValue(MULTICLASS_REFERENCE);
+    render(<StatefulStep character={multiCharacter} />);
+    const user = userEvent.setup();
+
+    // Default is the primary (fighter, d10).
+    expect(await screen.findByRole("button", { name: /roll 1d10/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: /wizard 3 → 4/i }));
+    expect(screen.getByTestId("search")).toHaveTextContent("entry=entry-2");
+
+    // The die follows the wizard's d6; average now previews 52 → 56 (+4).
+    expect(await screen.findByRole("button", { name: /roll 1d6/i })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /take average/i }));
+    expect(await screen.findByText(/52\s*→\s*56/)).toBeInTheDocument();
   });
 });
