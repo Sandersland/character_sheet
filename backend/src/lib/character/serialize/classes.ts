@@ -9,7 +9,8 @@ import {
 } from "@/lib/srd/srd.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { deriveActions, type AvailableAction } from "@/lib/classes/actions.js";
-import { normalizeResourcesMutable, type AdvancementEntry } from "@/lib/classes/resources.js";
+import { clampChoicesToCaps, normalizeResourcesMutable, type AdvancementEntry } from "@/lib/classes/resources.js";
+import { effectiveEntryLevel, subclassActiveAt } from "@/lib/leveling/effective-levels.js";
 import { normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import { reverseAdvancementEffects } from "@/lib/leveling/advancement.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
@@ -84,11 +85,7 @@ function buildResourcesPayload(
   // mirroring reconcileSubclassChoices for characters not yet reconciled.
   const subclassChoices = derivedRes.subclassChoices ?? [];
   const choiceCaps = new Map(subclassChoices.map((c) => [c.key, c.count]));
-  const clampedChoicesKnown: Record<string, typeof stored.choicesKnown[string]> = {};
-  for (const [key, entries] of Object.entries(stored.choicesKnown)) {
-    const cap = choiceCaps.get(key) ?? 0;
-    if (cap > 0) clampedChoicesKnown[key] = entries.slice(0, cap);
-  }
+  const { clamped: clampedChoicesKnown } = clampChoicesToCaps(stored.choicesKnown, choiceCaps);
   return {
     features: derivedRes.features,
     maneuverChoiceCount: derivedRes.maneuverChoiceCount,
@@ -223,18 +220,14 @@ export function buildClassesView(row: CharacterWithRelations, totalLevel: number
     subclassId?: string;
     classId?: string;
   }[] = [];
-  const singleClass = row.classEntries.length <= 1;
   for (const entry of row.classEntries) {
     if (remaining <= 0) break;
     const level = Math.min(entry.level, remaining);
     remaining -= level;
     // Per-entry subclass clamp-on-read (issue #125): hide a subclass whose
-    // grant level exceeds this entry's effective level (per-class for a
-    // multiclass character, XP-derived total for a single class). Mirrors
-    // reconcileSubclass on the write side.
-    const subclassLevel = entry.class?.subclassLevel ?? 3;
-    const effectiveLevel = singleClass ? totalLevel : level;
-    const subclassVisible = effectiveLevel >= subclassLevel;
+    // grant level exceeds this entry's effective level. Mirrors reconcileSubclass.
+    const effectiveLevel = effectiveEntryLevel(level, row.classEntries.length, totalLevel);
+    const subclassVisible = subclassActiveAt(effectiveLevel, entry.class?.subclassLevel);
     out.push({
       id: entry.id,
       name: entry.name,
