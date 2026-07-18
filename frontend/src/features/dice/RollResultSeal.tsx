@@ -58,12 +58,15 @@ export default function RollResultSeal() {
   const { lastRoll } = useRoll();
   const [entry, setEntry] = useState<RollEntry | null>(null);
 
+  // Keying on the whole `lastRoll` is equivalent to keying on its id: setLastRoll
+  // always publishes a fresh object carrying a unique ++idRef id, so lastRoll's
+  // identity changes iff its id does — no redundant re-fire on an identical id.
   useEffect(() => {
     if (!lastRoll) return;
     setEntry(lastRoll);
     const timer = setTimeout(() => setEntry(null), DISMISS_MS);
     return () => clearTimeout(timer);
-  }, [lastRoll?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed on lastRoll?.id; setEntry is stable, whole lastRoll would re-fire on an identical id
+  }, [lastRoll]);
 
   if (!entry) return null;
 
