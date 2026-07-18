@@ -1,6 +1,6 @@
 /**
  * Shadow Arts cast handler (Way of Shadow, #441) — the ki-cast counterpart to
- * lib/disciplines.ts. Each of the 4 L3 Shadow Arts spells is a GrantedAbility
+ * applyDisciplineOperations. Each of the 4 L3 Shadow Arts spells is a GrantedAbility
  * row with source "shadowArts"; casting one spends a flat 2 ki via the shared
  * payAbilityCostInTx pool path and routes through castAbilityInTx (concentration
  * + buff application from the shared engine/#438).

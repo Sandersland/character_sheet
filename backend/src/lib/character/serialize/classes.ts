@@ -186,7 +186,7 @@ export function applyFeatLayer(
 
 // Class-specific available actions for the turn tracker — derived from
 // class/subclass/level + current resource pools. Universal actions are
-// rendered client-side from UNIVERSAL_ACTIONS in lib/turnRules.ts;
+// rendered client-side from UNIVERSAL_ACTIONS;
 // only class-specific ones live here to avoid double-rendering.
 export function buildAvailableActionsView(
   primaryClass: PrimaryClass,

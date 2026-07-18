@@ -74,7 +74,7 @@ describe("characters routes", () => {
     });
     COOKIE = await authCookie(TEST_USER.id);
     // Sequential rather than Promise.all — see the matching comment in
-    // routes/characters.ts's POST handler.
+    // charactersRouter's POST handler.
     const race = await prisma.race.upsert({
       where: { name: TEST_RACE.name },
       create: TEST_RACE,

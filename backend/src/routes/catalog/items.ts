@@ -18,8 +18,9 @@ const itemInclude = {
 
 type ItemWithDetails = Prisma.ItemGetPayload<{ include: typeof itemInclude }>;
 
-// Same nested weapon/armor/consumable shape serializeInventoryItem in
-// routes/characters.ts builds for an InventoryItem — see lib/inventory/itemDetail.ts.
+// Same nested weapon/armor/consumable shape serializeInventoryItem builds for
+// an InventoryItem — see the shared serializeWeaponDetail/serializeArmorDetail/
+// serializeConsumableDetail.
 function serializeItem(row: ItemWithDetails) {
   return {
     id: row.id,

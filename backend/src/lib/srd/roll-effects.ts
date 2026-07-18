@@ -1,7 +1,7 @@
 // Roll-mode taxonomy shared by conditions (srd) and active-effect buffs (combat):
 // a state can grant advantage/disadvantage on a class of d20 roll, optionally
 // narrowed to one ability. Merged into the derived rollModifiers list on read
-// (serializeCharacter) and resolved per roll on the frontend (lib/rollMode.ts).
+// (serializeCharacter) and resolved per roll on the frontend.
 
 export type RollAdvantage = "advantage" | "disadvantage";
 

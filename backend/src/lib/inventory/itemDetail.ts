@@ -1,8 +1,8 @@
 // Shared serialization for the optional weapon/armor/consumable detail rows
 // that hang off both the Item catalog and per-character InventoryItem rows
 // (see schema.prisma's comment on Item/InventoryItem for why they're
-// separate detail tables rather than columns). `routes/characters.ts`
-// (inventory rows) and `routes/items.ts` (the catalog) both need the same
+// separate detail tables rather than columns). `charactersRouter`
+// (inventory rows) and `itemsRouter` (the catalog) both need the same
 // nested `weapon`/`armor`/`consumable` shape on the wire, so it lives here
 // once rather than twice.
 //

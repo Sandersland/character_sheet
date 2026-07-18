@@ -21,10 +21,10 @@ import { applyActivate, applyDeactivate } from "./inventory-activation.js";
 // are the public-API contract, not dead code.
 
 // Detail-input shapes are single-sourced in item-detail-inputs.ts (shared with the catalog seed).
-// fallow-ignore-next-line unused-type
+// fallow-ignore-next-line unused-type -- public-API barrel re-export, consumed as a type import elsewhere (see header)
 export type { ItemCategoryName, ArmorCategoryName, WeaponDetailInput, ArmorDetailInput, ConsumableDetailInput } from "./item-detail-inputs.js";
 
-// fallow-ignore-next-line unused-type
+// fallow-ignore-next-line unused-type -- public-API barrel re-export, consumed as a type import elsewhere (see header)
 export type { Currency } from "./inventory-currency.js";
 export {
   InsufficientCurrencyError,
@@ -34,13 +34,13 @@ export {
   currencyCredit,
 } from "./inventory-currency.js";
 
-// fallow-ignore-next-line unused-type
+// fallow-ignore-next-line unused-type -- public-API barrel re-export, consumed as a type import elsewhere (see header)
 export type { CustomItemInput, AcquireOperation, AdjustQuantityOperation, UpdateOperation, RemoveOperation, SellOperation, EquipOperation, SetEquippedOperation, AttuneOperation, UnattuneOperation, ActivateOperation, DeactivateOperation, UseOperation, InventoryOperation, UseResult, InventoryItemWithDetails, CatalogItemWithDetails } from "./inventory-types.js";
 export { itemBuffKey, inventoryItemDetailInclude, catalogItemDetailInclude } from "./inventory-types.js";
 
 export { isHealingConsumable } from "./inventory-consumable.js";
 
-// fallow-ignore-next-line unused-type
+// fallow-ignore-next-line unused-type -- public-API barrel re-export, consumed as a type import elsewhere (see header)
 export type { DeletedInventoryItemSnapshot, AutoEquipCandidate } from "./inventory-snapshot.js";
 export {
   snapshotInventoryItemForUndo,
@@ -71,7 +71,7 @@ export async function applyInventoryOperations(
     // op type) but trivially readable (cognitive 1). A dispatch map would trade the
     // per-case type narrowing for casts and read worse, so this is adjudicated as an
     // idiomatic switch rather than refactored (#690 opportunistic burn-down).
-    // fallow-ignore-next-line complexity
+    // fallow-ignore-next-line complexity -- idiomatic type-narrowed op switch (cognitive 1); a dispatch map would read worse (#690)
     applyOp: async ({ tx, op, characterId: id, batchId, sessionId }) => {
       switch (op.type) {
         case "acquire":

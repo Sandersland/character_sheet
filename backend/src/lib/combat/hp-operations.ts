@@ -3,7 +3,7 @@
 // workspaces share no types); the clone is inherited, not new.
 
 /** HP damage: temp absorbs first, then current. Floors at 0. */
-// fallow-ignore-next-line code-duplication
+// fallow-ignore-next-line code-duplication -- op shape intentionally mirrors the frontend Character op types (cross-workspace clone, inherited not new)
 export interface DamageOperation {
   type: "damage";
   amount: number; // raw damage; must be > 0
