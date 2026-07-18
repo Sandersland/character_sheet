@@ -68,6 +68,11 @@ export function canPrepare(spell: Spell, budget: PreparedBudget): boolean {
   return !budget.atLimit;
 }
 
+// At-cap swap targets (#938): runeState "prepared" already excludes cantrips/granted.
+export function swapCandidates(spells: Spell[]): Spell[] {
+  return spells.filter((s) => runeState(s) === "prepared");
+}
+
 // Grimoire filter strip: level / school / prepared-only / ritual-only.
 export interface SpellbookFilter {
   level: number | null;
