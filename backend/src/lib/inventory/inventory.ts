@@ -382,8 +382,8 @@ function normalizeWeaponClassification(input: WeaponDetailInput) {
   return {
     rangeNormal: input.rangeNormal ?? null,
     rangeLong: input.rangeLong ?? null,
-    weaponClass: (input.weaponClass ?? null) as "simple" | "martial" | null,
-    weaponRange: (input.weaponRange ?? null) as "melee" | "ranged" | null,
+    weaponClass: input.weaponClass ?? null,
+    weaponRange: input.weaponRange ?? null,
   };
 }
 
