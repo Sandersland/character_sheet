@@ -1,8 +1,8 @@
 /**
  * Shape of character data returned by `GET /api/characters` and
  * `GET /api/characters/:id`. `level`/`proficiencyBonus`/threshold fields
- * are derived server-side from `experiencePoints` (see backend's
- * src/lib/leveling/experience.ts) and never set directly by the client.
+ * are derived server-side from `experiencePoints` (via `levelForExperience`)
+ * and never set directly by the client.
  */
 
 import type { EffectSpec } from "@/lib/effects";
@@ -70,9 +70,8 @@ export type WeaponRange = "melee" | "ranged";
 /**
  * Weapon-specific mechanics, present (as `weapon`) only on a row whose
  * category is "weapon". Dice are decomposed (count/faces/modifier) to match
- * `lib/dice.ts`'s `RollSpec` shape rather than a "1d6" string, so a future
- * damage-roll feature reads these directly — see backend's schema.prisma
- * comment on ItemWeaponDetail.
+ * the `RollSpec` shape rather than a "1d6" string, so a future damage-roll
+ * feature reads these directly — mirrors the `ItemWeaponDetail` model.
  */
 export interface WeaponDetail {
   damageDiceCount: number;
@@ -102,8 +101,8 @@ export interface WeaponDetail {
    */
   attackBonus?: number;
   /**
-   * Derived damage roll spec — grip-resolved at read time by `deriveWeaponDamage`
-   * in `srd.ts`. Encodes the correct die for versatile weapons based on what else
+   * Derived damage roll spec — grip-resolved at read time by `deriveWeaponDamage`.
+   * Encodes the correct die for versatile weapons based on what else
    * is equipped (1d10 when off-hand is free; 1d8 when a shield or second weapon
    * is equipped). Present on `InventoryItem.weapon`; absent on catalog `Item.weapon`.
    */
@@ -156,8 +155,8 @@ export interface ConsumableDetail {
  * Baseline equipment catalog served by `GET /api/items` — the "pick a
  * club, don't hand-author one" path for the inventory editor (Phase B).
  * `InventoryItem` below snapshots these fields (including `weapon`/`armor`/
- * `consumable`) rather than referencing this type live; see backend's
- * schema.prisma comment on Item/InventoryItem.
+ * `consumable`) rather than referencing this type live — mirrors the `Item`
+ * and `InventoryItem` models.
  */
 export interface Item {
   id: string;
@@ -171,9 +170,11 @@ export interface Item {
   consumable?: ConsumableDetail;
 }
 
-// ── Item capabilities & attunement (#546) ─────────────────────────────────────
-// Mirrors backend lib/inventory/capabilities.ts. Only passiveBonus is authorable/rendered
-// this slice; the reserved kinds round-trip as opaque.
+/**
+ * Item capabilities & attunement (#546). Mirrors the backend `CapabilityKind`.
+ * Only passiveBonus is authorable/rendered this slice; the reserved kinds
+ * round-trip as opaque.
+ */
 export type CapabilityKind = "passiveBonus" | "castSpell" | "charges" | "grant" | "activatedEffect";
 
 export type CapabilityTarget =
@@ -193,7 +194,7 @@ export type CapabilityOp = "add" | "setTo";
 
 export type AttunementPrereqKind = "class" | "spellcaster" | "species" | "alignment";
 
-// grant kind (#529). Mirrors backend lib/inventory/capabilities.ts.
+/** grant kind (#529). Mirrors the backend `GrantType`. */
 export type GrantType = "resistance" | "immunity" | "conditionImmunity" | "advantage" | "proficiency";
 export type AdvantageOn = "save" | "check" | "initiative" | "attack";
 export type GrantValueKind = "damageType" | "condition" | "skill" | "ability" | "save" | "weapon" | "tool" | "language";
@@ -321,7 +322,7 @@ export interface ItemProficiencyGrant {
  * to diverge from the catalog (e.g. renaming "Club" to "Club +1" and
  * bumping its own `weapon.damageModifier` after a magic bonus).
  */
-/** Paper-doll placement slot (#565) — mirrors backend's EquipSlot enum. */
+/** Paper-doll placement slot (#565) — mirrors the backend `EquipSlot` enum. */
 export type EquipSlot =
   | "MAIN_HAND"
   | "OFF_HAND"
@@ -385,9 +386,9 @@ export type ActivationType = "action" | "bonus" | "reaction" | "commandWord";
 // Looser than WeaponDetail/ArmorDetail above (which describe what the API
 // always returns, every flag included) — these describe what a client only
 // has to *send*: just the fields the matching *Detail table's columns are
-// NOT NULL for, matching backend's lib/inventory/inventory.ts WeaponDetailInput/
-// ArmorDetailInput exactly. Everything else defaults server-side and is
-// refinable later via an `update` operation.
+// NOT NULL for, matching the backend `WeaponDetailInput`/`ArmorDetailInput`
+// exactly. Everything else defaults server-side and is refinable later via an
+// `update` operation.
 export interface WeaponDetailInput {
   damageDiceCount: number;
   damageDiceFaces: number;
@@ -419,10 +420,9 @@ export interface ArmorDetailInput {
 
 /**
  * Body for a custom (homebrew) `acquire` operation — same shape as `Item`
- * minus `id`, plus the category's required minimal detail block (backend's
- * routes/inventory.ts rejects e.g. a "weapon" with no `weapon` block, since
- * those columns are NOT NULL). Matches backend's lib/inventory/inventory.ts
- * CustomItemInput.
+ * minus `id`, plus the category's required minimal detail block (the acquire
+ * route rejects e.g. a "weapon" with no `weapon` block, since those columns
+ * are NOT NULL). Matches the backend `CustomItemInput`.
  */
 export type CustomItemInput =
   | {
@@ -453,7 +453,7 @@ export type CustomItemInput =
 
 /**
  * One operation in a `POST /api/characters/:id/inventory/transactions`
- * batch — see backend's lib/inventory/inventory.ts for the full semantics (which ops
+ * batch — see `applyInventoryOperations` for the full semantics (which ops
  * get logged to the ledger, atomicity, etc). A request batches 1+ of these.
  */
 export type InventoryOperation =
@@ -498,8 +498,7 @@ export type InventoryOperation =
   | { type: "deactivate"; inventoryItemId: string };
 
 
-// ── Unified activity timeline ─────────────────────────────────────────────────
-
+/** The unified activity timeline — every domain covered by the audit-log event stream. */
 export type CharacterEventCategory =
   | "inventory"
   | "hitPoints"
@@ -728,8 +727,7 @@ export interface JournalEntry {
   sessionId?: string;
 }
 
-// ── Class feature types ───────────────────────────────────────────────────────
-
+/** Class/subclass feature + resource-pool types. */
 export type RechargeOn = "shortRest" | "longRest" | "short-or-long" | "none";
 
 export interface ResourcePool {
@@ -847,7 +845,7 @@ export interface FeatImprovement {
 
 /**
  * One taken Ability Score Improvement or feat on a character.
- * Mirrors backend/src/lib/resources.ts AdvancementEntry.
+ * Mirrors the backend `AdvancementEntry`.
  */
 export interface AdvancementEntry {
   id: string;
@@ -928,8 +926,8 @@ export interface ToolProfEntry {
 }
 
 /**
- * The 6 core Fighting Style keys (mirror of srd.ts FightingStyleKey). Persisted
- * choice is just this key; the mechanical effect is derived on the backend.
+ * The 6 core Fighting Style keys (mirror of the backend `FightingStyleKey`).
+ * Persisted choice is just this key; the mechanical effect is derived on the backend.
  */
 export type FightingStyleKey =
   | "archery"
@@ -977,8 +975,6 @@ export interface ClassEntry {
   classId?: string;
 }
 
-// ── Action catalog types (Phase B) ───────────────────────────────────────────
-
 /**
  * Action-economy cost — which slot an action consumes on the character's turn.
  * Mirrors the `ActionCost` enum on the backend Action model.
@@ -987,7 +983,7 @@ export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "speci
 
 /**
  * A lean "available action" entry attached to the serialized character.
- * Derived at read time by `deriveActions` in `backend/src/lib/actions.ts`.
+ * Derived at read time by `deriveActions`.
  * Display copy (name/description) is joined from the `Action` catalog.
  * `enabled` cross-references remaining resource-pool counts so the frontend
  * can grey out abilities the character can't afford.
@@ -1005,8 +1001,7 @@ export interface AvailableAction {
   reminder?: string;
 }
 
-// ── Subclass option (from GET /api/reference) ─────────────────────────────────
-
+/** Subclass option (from GET /api/reference). */
 export interface SubclassOption {
   id: string;
   name: string;
@@ -1141,7 +1136,7 @@ export interface Character {
   activeEffects: ActiveEffectsState;
   /**
    * State-driven advantage/disadvantage grants (#486), derived from active
-   * conditions + buffs. Resolved per roll via lib/rollMode.ts. Always present.
+   * conditions + buffs. Resolved per roll via `resolveRollMode`. Always present.
    */
   rollModifiers: RollModifier[];
 
@@ -1187,8 +1182,7 @@ export interface Character {
   campaignPreferences?: CampaignPreferences;
 }
 
-// ── Shared campaigns (#246) ───────────────────────────────────────────────────
-
+/** Shared campaigns (#246). */
 export type CampaignRole = "OWNER" | "PLAYER";
 
 export interface CampaignMember {
@@ -1215,7 +1209,7 @@ export interface Campaign {
  * Campaign arc / "part" (#863): a named grouping the journal page files sessions
  * ("chapters") under so a long campaign stays navigable. Ordered by `position`
  * (story order → roman numeral I, II, III on the spine). Mirrors the backend
- * `serializeArc` shape from `routes/campaign/arcs.ts`.
+ * `serializeArc` shape.
  */
 export interface CampaignArc {
   id: string;
@@ -1225,8 +1219,7 @@ export interface CampaignArc {
   createdAt: string;
 }
 
-// ── Campaign entity registry & @-tagging (#248) ───────────────────────────────
-
+/** Campaign entity registry & @-tagging (#248). */
 export type EntityType = "NPC" | "LOCATION" | "FACTION" | "ITEM" | "PC" | "OTHER";
 
 // DM reveal state (#379): non-owner members only ever see REVEALED entities.
@@ -1382,8 +1375,7 @@ export interface EntityBacklink {
   identity: { id: string; name: string };
 }
 
-// ── Entity identity merges (#387) ─────────────────────────────────────────────
-
+/** Entity identity merges (#387). */
 export type MergeStatus = "PREPARED" | "EXECUTED";
 
 /**
@@ -1422,8 +1414,7 @@ export interface CharacterSummary {
  * Baseline catalog entries served by `GET /api/reference`, used to populate
  * the character-creation form. These are *suggestions* the backend can
  * derive mechanics from — a created character's race/class/background name
- * can still drift from (or omit) a catalog match; see backend's
- * schema.prisma for the reasoning.
+ * can still drift from (or omit) a catalog match (the catalog+snapshot pattern).
  */
 export interface RaceOption {
   id: string;
@@ -1432,10 +1423,11 @@ export interface RaceOption {
   toolProficiencies: string[];
 }
 
-// ── Starting equipment types (mirrors backend/src/lib/srd.ts) ──────────────
-// The frontend receives these from GET /api/reference (attached to each
-// ClassOption) and never needs to hardcode them itself.
-
+/**
+ * Starting equipment types — mirror of the backend `ClassStartingEquipment` /
+ * `STARTING_EQUIPMENT`. The frontend receives these from GET /api/reference
+ * (attached to each ClassOption) and never needs to hardcode them itself.
+ */
 export interface WeaponPoolFilter {
   weaponClass?: WeaponClass;
   range?: WeaponRange;
@@ -1474,8 +1466,7 @@ export interface ClassStartingEquipment {
   gold: StartingGold;
 }
 
-// ── Reference types ─────────────────────────────────────────────────────────
-
+/** Reference types (GET /api/reference) that populate the character-creation form. */
 export interface ClassOption {
   id: string;
   name: string;
@@ -1532,8 +1523,8 @@ export interface ReferenceData {
 }
 
 /** Body for `POST /api/characters`. The backend derives AC/HP/saves/skills
- * from `race`/`classes[0]`/`abilityScores` — see backend's
- * src/lib/srd.ts — rather than the client computing and sending them. */
+ * from `race`/`classes[0]`/`abilityScores` via `deriveCreatedCharacter` —
+ * rather than the client computing and sending them. */
 // One selection per equipment choice group when mode:"package".
 export interface PackageSelection {
   optionIndex: number;
@@ -1559,11 +1550,13 @@ export interface CreateCharacterInput {
   startingEquipment?: StartingEquipmentInput;
 }
 
-// ── Spellcasting operation types (mirrors backend/src/lib/spellcasting.ts) ───
-// Sent as `{ operations: SpellcastingOperation[] }` to
-// POST /api/characters/:id/spellcasting/transactions.
-
-/** Custom spell input for learnSpell without a catalog entry. */
+/**
+ * Spellcasting operation types — mirror of `applySpellcastingOperations`. Sent
+ * as `{ operations: SpellcastingOperation[] }` to
+ * POST /api/characters/:id/spellcasting/transactions.
+ *
+ * CustomSpellInput: custom spell input for learnSpell without a catalog entry.
+ */
 export interface CustomSpellInput {
   name: string;
   level: number;
@@ -1640,9 +1633,10 @@ export type SpellcastingOperation =
   | DropConcentrationOperation
   | DismissBuffOperation;
 
-// ── Class operation types (mirrors backend/src/lib/class.ts) ─────────────────
-// Sent as `{ operations: ClassOperation[] }` to POST /api/characters/:id/class/transactions.
-
+/**
+ * Class operation types — mirror of `applyClassOperations`. Sent as
+ * `{ operations: ClassOperation[] }` to POST /api/characters/:id/class/transactions.
+ */
 export interface SetSubclassOperation { type: "setSubclass"; subclassId: string }
 export interface SetFightingStyleOperation { type: "setFightingStyle"; key: FightingStyleKey }
 /** Multiclass into a new class by catalog id — creates a level-1 entry (prereqs enforced server-side). */
@@ -1654,9 +1648,10 @@ export interface AddClassOperation {
 }
 export type ClassOperation = SetSubclassOperation | SetFightingStyleOperation | AddClassOperation;
 
-// ── Resource operation types (mirrors backend/src/lib/resources.ts) ──────────
-// Sent as `{ operations: ResourceOperation[] }` to POST /api/characters/:id/resources/transactions.
-
+/**
+ * Resource operation types — mirror of `applyResourceOperations`. Sent as
+ * `{ operations: ResourceOperation[] }` to POST /api/characters/:id/resources/transactions.
+ */
 export interface SpendResourceOperation { type: "spendResource"; key: string; amount?: number; roll?: number }
 export interface RestoreResourceOperation { type: "restoreResource"; key: string; amount?: number }
 export interface LearnManeuverOperation { type: "learnManeuver"; maneuverId?: string; custom?: { name: string; description: string } }
@@ -1682,11 +1677,12 @@ export type ResourceOperation =
   | LearnToolProficiencyOperation
   | ForgetToolProficiencyOperation;
 
-// ── Discipline operation types (mirrors backend/src/lib/disciplines.ts) ──────
-// Sent as `{ operations: DisciplineOperation[] }` to
-// POST /api/characters/:id/disciplines/transactions.
-
-/** Cast a known elemental discipline: spend ki, send the client-computed roll total (0 for utility). */
+/**
+ * Discipline operation types — mirror of `applyDisciplineOperations`. Sent as
+ * `{ operations: DisciplineOperation[] }` to POST /api/characters/:id/disciplines/transactions.
+ *
+ * Cast a known elemental discipline: spend ki, send the client-computed roll total (0 for utility).
+ */
 export interface CastDisciplineOperation {
   type: "castDiscipline";
   disciplineId: string;
@@ -1695,33 +1691,38 @@ export interface CastDisciplineOperation {
 }
 export type DisciplineOperation = CastDisciplineOperation;
 
-// ── Shadow Arts operation types (mirrors backend/src/lib/shadow-arts.ts) ──────
-// Sent as `{ operations: ShadowArtOperation[] }` to
-// POST /api/characters/:id/shadow-arts/transactions.
-
-/** Cast a Shadow Art (Way of Shadow): spend a flat 2 ki, apply concentration/buff. */
+/**
+ * Shadow Arts operation types — mirror of `applyShadowArtsOperations`. Sent as
+ * `{ operations: ShadowArtOperation[] }` to POST /api/characters/:id/shadow-arts/transactions.
+ *
+ * Cast a Shadow Art (Way of Shadow): spend a flat 2 ki, apply concentration/buff.
+ */
 export interface CastShadowArtOperation {
   type: "castShadowArt";
   shadowArtId: string;
 }
 export type ShadowArtOperation = CastShadowArtOperation;
 
-// ── Channel Divinity operation types (mirrors backend/src/lib/channel-divinity.ts) ──
-// Sent as `{ operations: ChannelDivinityOperation[] }` to
-// POST /api/characters/:id/channel-divinity/transactions.
-
-/** Use a Channel Divinity option (Cleric/Paladin): spend 1 CD charge. */
+/**
+ * Channel Divinity operation types — mirror of `applyChannelDivinityOperations`.
+ * Sent as `{ operations: ChannelDivinityOperation[] }` to
+ * POST /api/characters/:id/channel-divinity/transactions.
+ *
+ * Use a Channel Divinity option (Cleric/Paladin): spend 1 CD charge.
+ */
 export interface CastChannelDivinityOperation {
   type: "castChannelDivinity";
   abilityId: string;
 }
 export type ChannelDivinityOperation = CastChannelDivinityOperation;
 
-// ── Conditions state + operation types (mirrors backend/src/lib/combat/conditions.ts)
-// Sent as `{ operations: ConditionOperation[] }` to
-// POST /api/characters/:id/conditions/transactions.
-
-/** The 14 standard 5e status condition keys (mirror of srd.ts ConditionKey). */
+/**
+ * Conditions state + operation types — mirror of `ConditionOperation` /
+ * `applyConditionsOperations`. Sent as `{ operations: ConditionOperation[] }` to
+ * POST /api/characters/:id/conditions/transactions.
+ *
+ * ConditionKey: the 14 standard 5e status condition keys (mirror of the backend `ConditionKey`).
+ */
 export type ConditionKey =
   | "blinded"
   | "charmed"
@@ -1751,10 +1752,12 @@ export interface ConditionsState {
   exhaustion: number;
 }
 
-// ── Active effects (buffs) — mirrors backend/src/lib/combat/active-effects.ts ─────────
-
-// Duration axis (#455). Absent on the wire means "concentration" (byte-parity
-// with #438). while-active / until-rest are durable self-buffs (e.g. Rage).
+/**
+ * Active effects (buffs) — mirror of `ActiveBuff`.
+ *
+ * Duration axis (#455). Absent on the wire means "concentration" (byte-parity
+ * with #438). while-active / until-rest are durable self-buffs (e.g. Rage).
+ */
 export type BuffDuration = "concentration" | "while-active" | "until-rest";
 
 export interface ActiveBuff {
@@ -1779,8 +1782,10 @@ export interface ActiveEffectsState {
   buffs: ActiveBuff[];
 }
 
-// ── State-driven roll modifiers (#486) — mirror of backend/src/lib/srd/roll-effects.ts ─
-// The four d20 roll categories a state can bind advantage/disadvantage to.
+/**
+ * State-driven roll modifiers (#486) — mirror of `RollEffect` / `RollModifier`.
+ * The four d20 roll categories a state can bind advantage/disadvantage to.
+ */
 export type RollModeKind = "attack" | "check" | "save" | "initiative";
 
 /** One advantage/disadvantage grant; `ability` (lowercase key) narrows it to a single ability. */
@@ -1803,10 +1808,10 @@ export type ConditionOperation =
   | RemoveConditionOperation
   | SetExhaustionOperation;
 
-// ── Advancement operation types (mirrors backend/src/lib/leveling/advancement.ts) ─────
-// Sent as `{ operations: AdvancementOperation[] }` to
-// POST /api/characters/:id/advancement/transactions.
-
+/**
+ * Advancement operation types — mirror of `applyAdvancementOperations`. Sent as
+ * `{ operations: AdvancementOperation[] }` to POST /api/characters/:id/advancement/transactions.
+ */
 export interface TakeAsiOperation {
   type: "takeAsi";
   increases: { ability: string; amount: 1 | 2 }[];
@@ -1835,17 +1840,21 @@ export type AdvancementOperation =
   | TakeFeatOperation
   | RemoveAdvancementOperation;
 
-// ── XP operation types (mirrors backend/src/lib/leveling/experience-ops.ts) ──────────
-// Sent as `{ operations: ExperienceOperation[] }` to POST /api/characters/:id/experience.
-
-/** Award or deduct XP by a signed delta. */
+/**
+ * XP operation types — mirror of `applyExperienceOperations`. Sent as
+ * `{ operations: ExperienceOperation[] }` to POST /api/characters/:id/experience.
+ *
+ * Award or deduct XP by a signed delta.
+ */
 export interface XpAwardOperation { type: "award"; amount: number }
 /** Set total XP to an exact value. */
 export interface XpSetOperation { type: "set"; value: number }
 export type ExperienceOperation = XpAwardOperation | XpSetOperation;
 
-// ── HP operation types (mirrors backend/src/lib/combat/hitpoints.ts) ───────────────
-// Sent as `{ operations: HitPointOperation[] }` to POST /api/characters/:id/hp.
+/**
+ * HP operation types — mirror of `applyHitPointOperations`. Sent as
+ * `{ operations: HitPointOperation[] }` to POST /api/characters/:id/hp.
+ */
 
 /**
  * `autoRollConcentration: false` (issue #76) defers a triggered concentration
@@ -1859,7 +1868,7 @@ export type ExperienceOperation = XpAwardOperation | XpSetOperation;
 export interface DamageOperation { type: "damage"; amount: number; damageType?: string; applyResistance?: boolean; autoRollConcentration?: boolean }
 export interface HealOperation { type: "heal"; amount: number }
 export interface SetTempOperation { type: "setTemp"; amount: number }
-/** `rolls`: one raw die value per hit die spent (rolled by the client via dice.ts). */
+/** `rolls`: one raw die value per hit die spent (rolled by the client via `rollDie`). */
 export interface ShortRestOperation { type: "shortRest"; rolls: number[] }
 export interface LongRestOperation { type: "longRest" }
 /**
@@ -1870,14 +1879,14 @@ export interface LongRestOperation { type: "longRest" }
 export type LevelUpTarget =
   | { kind: "existing"; classEntryId: string }
   | { kind: "new"; classId: string };
-/** For "roll": client rolls via dice.ts, sends the raw die face as `roll`. */
+/** For "roll": client rolls via `rollDie`, sends the raw die face as `roll`. */
 export interface LevelUpOperation {
   type: "levelUp";
   method: "average" | "roll";
   roll?: number;
   target?: LevelUpTarget;
 }
-/** Client rolls d20 via dice.ts, sends the raw value. Only valid at 0 HP. */
+/** Client rolls d20 via `rollDie`, sends the raw value. Only valid at 0 HP. */
 export interface DeathSaveOperation { type: "deathSave"; roll: number }
 export interface StabilizeOperation { type: "stabilize" }
 /**
@@ -1921,9 +1930,11 @@ export interface ConcentrationCheck {
   damage: number;
 }
 
-// ── Action operation types (mirrors backend/src/lib/actions.ts) ─────────────
-// Sent as `{ operations: ActionOperation[] }` to
-// POST /api/characters/:id/actions/transactions.
+/**
+ * Action operation types — the executeAction op is resolved via `ACTION_EFFECT_FN`.
+ * Sent as `{ operations: ActionOperation[] }` to
+ * POST /api/characters/:id/actions/transactions.
+ */
 
 /**
  * Execute a named action from the Action catalog. The server looks up
@@ -1948,8 +1959,7 @@ export interface ExecuteActionOperation {
 
 export type ActionOperation = ExecuteActionOperation;
 
-// ── Session ───────────────────────────────────────────────────────────────────
-
+/** Session types — live-play lifecycle + end-of-session summary shapes. */
 export type SessionStatus = "active" | "ended";
 
 /** One acquired-item line in a session summary. */
