@@ -32,6 +32,7 @@ import { hitPointsRouter } from "@/routes/character/hitpoints.js";
 import { inventoryRouter } from "@/routes/character/inventory.js";
 import { itemsRouter } from "@/routes/catalog/items.js";
 import { journalRouter } from "@/routes/session/journal.js";
+import { levelUpRouter } from "@/routes/character/level-up.js";
 import { disciplinesRouter } from "@/routes/character/disciplines.js";
 import { shadowArtsRouter } from "@/routes/character/shadow-arts.js";
 import { maneuversRouter } from "@/routes/character/maneuvers.js";
@@ -106,6 +107,7 @@ export function createApp() {
   app.use("/api/characters/:id/class", classRouter);
   app.use("/api/characters/:id/channel-divinity", channelDivinityRouter);
   app.use("/api/characters/:id/advancement", advancementRouter);
+  app.use("/api/characters/:id/level-up", levelUpRouter);
   app.use("/api/characters/:id/actions", actionsRouter);
   // activity owns two sub-paths (/activity, /events/:batchId/revert), so it
   // mounts on the character root rather than a single leaf.

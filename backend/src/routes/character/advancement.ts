@@ -18,7 +18,7 @@ const increaseSchema = z.object({
   amount: z.union([z.literal(1), z.literal(2)]),
 });
 
-const takeAsiOpSchema = z.object({
+export const takeAsiOpSchema = z.object({
   type: z.literal("takeAsi"),
   increases: z.array(increaseSchema).min(1).max(2),
 });
@@ -43,7 +43,7 @@ const featImprovementSchema = z
     { message: "FeatImprovement: 'key' is required for proficiency targets (skill, savingThrow, armor, weapon)" },
   );
 
-const takeFeatOpSchema = z
+export const takeFeatOpSchema = z
   .object({
     type: z.literal("takeFeat"),
     featId: z.string().optional(),
