@@ -319,7 +319,8 @@ export function capabilityCreate(cap: z.infer<typeof capabilityInputSchema>) {
       return chargesColumns(cap);
     case "grant":
       return grantColumns(cap);
-    default:
+    case "passiveBonus":
+    case "activatedEffect":
       return passiveColumns(cap);
   }
 }
