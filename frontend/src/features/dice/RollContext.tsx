@@ -1,4 +1,4 @@
-/* eslint-disable react-refresh/only-export-components */
+/* eslint-disable react-refresh/only-export-components -- provider module co-exports its use* hook beside the component; same-file hook+provider is intentional, HMR-only caveat */
 /**
  * Sheet-scoped roll context: a single `RollProvider` at the `CharacterSheetPage`
  * / `SessionPage` level gives every child component access to `useRoll()`.

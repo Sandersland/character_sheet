@@ -1,4 +1,4 @@
-/* eslint-disable react-refresh/only-export-components */
+/* eslint-disable react-refresh/only-export-components -- provider module co-exports its use* hook beside the component; same-file hook+provider is intentional, HMR-only caveat */
 /**
  * Workspace-level live-session identity (#959): the sheet needs to know whether
  * a session is live and whether this character is in it, so the Combat tab, the

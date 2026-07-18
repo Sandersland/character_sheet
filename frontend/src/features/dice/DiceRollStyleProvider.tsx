@@ -1,4 +1,4 @@
-/* eslint-disable react-refresh/only-export-components */
+/* eslint-disable react-refresh/only-export-components -- provider module co-exports its use* hook beside the component; same-file hook+provider is intentional, HMR-only caveat */
 /**
  * App-wide dice-roll presentation context (#945). Persists the player's
  * Animated (3D) vs Quick (compact chip) preference via useDiceRollStyle,

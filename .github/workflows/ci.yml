@@ -99,6 +99,13 @@ jobs:
           !(github.event.pull_request.head.ref == 'staging' && github.event.pull_request.base.ref == 'main')
         run: npx --no-install fallow audit --base "origin/${{ github.event.pull_request.base.ref }}" --gate new-only --no-cache
 
+      # fallow twin of eslint's require-description gate (#1045): every
+      # `fallow-ignore-next-line` must carry a `-- <reason>`. Server-side twin of
+      # the lefthook `fallow-reasons` job, so a `--no-verify` push is re-checked.
+      # Runs on every event (whole tree), not just PRs.
+      - name: fallow-ignore reasons required
+        run: sh scripts/check-fallow-reasons.sh
+
       # The repo-wide ratchet, expressed PER-WORKSPACE so each workspace's CRAP
       # treatment can differ (#718, tightened from the old repo-wide
       # `--min-severity critical` step). Together the frontend step here and the

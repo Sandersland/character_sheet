@@ -179,8 +179,7 @@ function ScriptedDie({
     } else {
       phaseRef.current = "spin";
     }
-    // rollId is the trigger; rolling/reducedMotion/targetQuaternion are read fresh each time it fires.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rollId is the trigger; rolling/reducedMotion/targetQuaternion read fresh on each fire
   }, [rollId]);
 
   useFrame((_, delta) => {

@@ -527,7 +527,7 @@ describe("InlineAttackPicker — manual crit via verdict (#766/#811)", () => {
       liveTurnState.startCombat();
       liveTurnState.startTurn();
       liveTurnState.enterAttackMode();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- harness drives into attack mode once on mount; empty deps intentional
     }, []);
     return (
       <RollProvider>
@@ -774,7 +774,7 @@ describe("InlineAttackPicker — Precision Attack under the attack card (#809)",
       turnState.startCombat();
       turnState.startTurn();
       turnState.enterAttackMode();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- harness drives into attack mode once on mount; empty deps intentional
     }, []);
     return (
       <RollProvider>
