@@ -1,5 +1,5 @@
-// Campaign-entity domain logic (#1001): stats aggregation, merge lifecycle,
-// and journal-ref attribution. HTTP-free; routes pass `db` and map results.
+// Campaign-entity domain logic: stats, merge lifecycle, backlinks,
+// connections, activity feed, and attribution. HTTP-free; routes pass `db`.
 
 import type { PrismaClient } from "@/generated/prisma/client.js";
 import { collectMergedInIdentities, wouldCreateCycle } from "@/lib/activity/entity-merges.js";
@@ -501,7 +501,7 @@ export async function buildEntityConnections(
   );
   const targetIds = new Set([
     targetId,
-    ...resolveVisibleMergeUnion(edges, [targetId], revealedIds, isOwner).get(targetId)!,
+    ...(resolveVisibleMergeUnion(edges, [targetId], revealedIds, isOwner).get(targetId) ?? []),
   ]);
 
   const targetRefs = await db.journalEntryRef.findMany({
