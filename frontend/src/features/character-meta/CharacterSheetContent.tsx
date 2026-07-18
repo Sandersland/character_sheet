@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import RollResultSeal from "@/features/dice/RollResultSeal";
 import { RollProvider } from "@/features/dice/RollContext";
@@ -8,6 +8,7 @@ import SheetBottomNav from "@/features/character-meta/SheetBottomNav";
 import CharacterSheetModals from "@/features/character-meta/CharacterSheetModals";
 import { useSheetTabs } from "@/features/character-meta/useSheetTabs";
 import { useSwipeTabs } from "@/features/character-meta/useSwipeTabs";
+import { useScrollCollapse } from "@/features/character-meta/useScrollCollapse";
 import { useCaptureDock } from "@/hooks/useCaptureDock";
 import { LiveSessionProvider, useLiveSession } from "@/features/session/LiveSessionProvider";
 import { TurnStateProvider, useTurnStateContext } from "@/features/session/TurnStateProvider";
@@ -20,7 +21,7 @@ import { useCombatLifecycle } from "@/features/session/useCombatLifecycle";
 import EndSessionPrompt from "@/features/session/EndSessionPrompt";
 import SessionSummaryModal from "@/features/session/SessionSummaryModal";
 import type { SheetTabId } from "@/features/character-meta/sheetTabs";
-import type { Character, ReferenceData } from "@/types/character";
+import type { Character, ReferenceData, Session } from "@/types/character";
 
 interface CharacterSheetContentProps {
   id: string | undefined;
@@ -75,11 +76,16 @@ function CharacterSheetWorkspace({
   const session = useSessionDoorway(id, () => onTabChange("combat"));
   // Mobile: horizontal swipe on the panel region walks the tabs (clamped).
   const swipe = useSwipeTabs(tabs, activeTab, onTabChange);
+  // Mobile: collapse the compact header to a single bar once the panels scroll.
+  const collapse = useScrollCollapse();
+  const goToCombat = () => onTabChange("combat");
 
-  // #961: while a session is live + joined, off-Combat tabs show a "Go to fight"
-  // strip (an in-workspace jump to Combat) instead of the doorway; the Combat
-  // nav item carries a live pip. On the Combat tab, no strip (D4) — the panel is
-  // the context. Non-joined/starting states keep the existing doorway.
+  // #961/#1026: while a session is live + joined, off-Combat tabs show a "Go to
+  // fight" strip (an in-workspace jump to Combat) instead of the doorway — but
+  // only on DESKTOP. On mobile the header live pill carries live state, so
+  // SessionCue returns null there (no strip). The Combat nav item carries a live
+  // pip. On the Combat tab, no strip (D4) — the panel is the context.
+  // Non-joined/starting states keep the existing doorway.
   const isLiveJoined = live.status === "liveJoined";
   const isLive = isLiveJoined || live.status === "liveNotJoined";
   const cueProps = {
@@ -87,27 +93,20 @@ function CharacterSheetWorkspace({
     isLiveJoined,
     session,
     liveRound,
-    onGoToCombat: () => onTabChange("combat"),
+    onGoToCombat: goToCombat,
   };
 
   // The End/Leave-session lifecycle lifts here (#979) so the persistent sheet
   // header — a sibling of the panel region — can drive it (there is no separate
   // in-panel controls strip anymore). Handlers no-op until a session is joined.
   const life = useCombatLifecycle({ character, session: live.session, onUpdate, live });
-
-  // #960: when a session is live AND this character is in it, the Combat tab
-  // renders the live turn tracker instead of the static combat panel. Mounted
-  // once here (persists across tab switches, so an in-progress picker + economy
-  // survive a swipe round-trip); visible only while Combat is the active tab.
-  const livePanel =
-    turnState && live.session ? (
-      <CombatLivePanel
-        character={character}
-        session={live.session}
-        onUpdate={life.handleCharacterUpdate}
-        active={activeTab === "combat"}
-      />
-    ) : null;
+  const livePanel = renderLivePanel(
+    character,
+    live.session,
+    Boolean(turnState),
+    activeTab === "combat",
+    life.handleCharacterUpdate,
+  );
 
   return (
     <RollProvider
@@ -134,6 +133,8 @@ function CharacterSheetWorkspace({
           sessionActionBusy={life.sessionActionBusy}
           onLeaveSession={life.handleLeave}
           onEndSession={life.openEndPrompt}
+          scrolled={collapse.collapsed}
+          onGoToCombat={goToCombat}
           onOpenCapture={openCapture}
           onOpenSessions={modals.openSessions}
           onOpenActivity={modals.openActivity}
@@ -163,11 +164,16 @@ function CharacterSheetWorkspace({
             scrolls (the flexbox overflow gotcha). Desktop: normal flow. Mobile:
             horizontal swipe here walks the panel tabs. */}
         <div
+          ref={collapse.scrollRef}
           className="min-h-0 flex-1 overflow-y-auto md:flex-none md:overflow-visible"
           onTouchStart={swipe.onTouchStart}
           onTouchEnd={swipe.onTouchEnd}
           onTouchCancel={swipe.onTouchCancel}
         >
+          {/* Collapse-on-scroll sentinel: once it leaves the scroller the mobile
+              header collapses (#1026). Mobile-only — desktop doesn't collapse and
+              must not gain the 1px this adds to the flow. */}
+          <div ref={collapse.sentinelRef} aria-hidden className="h-px w-full md:hidden" />
           <CharacterSheetBody
             character={character}
             reference={reference}
@@ -250,9 +256,28 @@ function WorkspaceSessionModals({
 }
 
 /**
+ * The live turn tracker (#960), mounted once (persists across tab switches, so an
+ * in-progress picker + economy survive a swipe round-trip). Returns null — not an
+ * element — when there's no live session so CharacterSheetBody falls back to the
+ * static Combat panel. Extracted so the workspace render stays under the ceiling.
+ */
+function renderLivePanel(
+  character: Character,
+  session: Session | null,
+  hasTurnState: boolean,
+  combatActive: boolean,
+  onUpdate: (c: Character) => void,
+): ReactNode {
+  if (!hasTurnState || !session) return null;
+  return <CombatLivePanel character={character} session={session} onUpdate={onUpdate} active={combatActive} />;
+}
+
+/**
  * The off-Combat session cue (#961): the live-joined "Go to fight" strip (an
  * in-workspace jump to Combat) when live+joined, else the existing doorway
- * (start / join / scheduled). Renders nothing on the Combat tab (D4).
+ * (start / join / scheduled). Renders nothing on the Combat tab (D4), and
+ * nothing when live+joined on mobile — the header pill carries live state there
+ * (#1026), so only desktop shows the strip.
  */
 function SessionCue({
   placement,
@@ -271,9 +296,11 @@ function SessionCue({
 }) {
   if (activeTab === "combat") return null;
   if (isLiveJoined) {
+    // Mobile carries live state via the header pill now (#1026); only desktop
+    // keeps the full-width live strip.
+    if (placement === "mobile") return null;
     return (
       <LiveSessionStrip
-        placement={placement}
         title={session.activeSession?.title ?? null}
         round={liveRound}
         onGoToCombat={onGoToCombat}

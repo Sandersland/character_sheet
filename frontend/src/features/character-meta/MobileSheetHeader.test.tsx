@@ -28,16 +28,17 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
   } as Character;
 }
 
-function renderHeader(character = makeCharacter()) {
+function renderHeader(props: Partial<Parameters<typeof MobileSheetHeader>[0]> = {}) {
   return render(
     <MemoryRouter>
       <RollProvider>
         <MobileSheetHeader
-          character={character}
+          character={props.character ?? makeCharacter()}
           onOpenCapture={vi.fn()}
           onOpenSessions={vi.fn()}
           onOpenActivity={vi.fn()}
           onOpenDelete={vi.fn()}
+          {...props}
         />
       </RollProvider>
     </MemoryRouter>,
@@ -55,13 +56,13 @@ describe("MobileSheetHeader", () => {
     renderHeader();
     expect(screen.getByText("Champion")).toBeInTheDocument();
 
-    renderHeader(makeCharacter({ subclass: undefined, level: 4 }));
+    renderHeader({ character: makeCharacter({ subclass: undefined, level: 4 }) });
     expect(screen.getByText("Lvl 4")).toBeInTheDocument();
   });
 
   it("for a multiclass character, the pill shows the level (subclass rides in the class line)", () => {
-    renderHeader(
-      makeCharacter({
+    renderHeader({
+      character: makeCharacter({
         level: 8,
         subclass: "Champion",
         classes: [
@@ -69,21 +70,23 @@ describe("MobileSheetHeader", () => {
           { id: "cls-2", name: "Rogue", level: 3 },
         ],
       }),
-    );
+    });
     expect(screen.getByText("Human · Fighter 5 / Rogue 3")).toBeInTheDocument();
     expect(screen.getByText("Lvl 8")).toBeInTheDocument();
     expect(screen.queryByText("Champion")).not.toBeInTheDocument();
   });
 
-  it("renders the four vital tiles (AC, Init, Speed, Prof)", () => {
+  it("shows HP numbers and the AC badge, but not the Init/Speed/Prof tiles", () => {
     renderHeader();
-    expect(screen.getByText("AC")).toBeInTheDocument();
-    expect(screen.getByText("Init")).toBeInTheDocument();
-    expect(screen.getByText("Speed")).toBeInTheDocument();
-    expect(screen.getByText("Prof")).toBeInTheDocument();
-    // Values render alongside their labels.
+    // HP readout (current / max).
+    expect(screen.getByText("44")).toBeInTheDocument();
+    // AC badge value via its breakdown trigger.
+    expect(screen.getByRole("button", { name: /armor class/i })).toBeInTheDocument();
     expect(screen.getByText("18")).toBeInTheDocument();
-    expect(screen.getByText("30")).toBeInTheDocument();
+    // The old vitals tiles are gone (Init/Speed/Prof now live on Overview).
+    expect(screen.queryByText("Init")).not.toBeInTheDocument();
+    expect(screen.queryByText("Speed")).not.toBeInTheDocument();
+    expect(screen.queryByText("Prof")).not.toBeInTheDocument();
   });
 
   it("no longer renders a session button in the header (moved to the doorway bar)", () => {
@@ -93,28 +96,14 @@ describe("MobileSheetHeader", () => {
   });
 
   it("offers 'Join campaign' when the character is in no campaign", () => {
-    renderHeader(makeCharacter({ campaignId: undefined }));
+    renderHeader({ character: makeCharacter({ campaignId: undefined }) });
     expect(screen.getByRole("link", { name: /join campaign/i })).toHaveAttribute("href", "/campaigns");
   });
 
-  // #979: the live-session controls fold into this one menu (no separate strip).
   it("adds Leave / End Session to the menu while joined, and fires their handlers", () => {
     const onLeave = vi.fn();
     const onEnd = vi.fn();
-    render(
-      <MemoryRouter>
-        <RollProvider>
-          <MobileSheetHeader
-            character={makeCharacter()}
-            sessionActions={{ busy: false, onLeave, onEnd }}
-            onOpenCapture={vi.fn()}
-            onOpenSessions={vi.fn()}
-            onOpenActivity={vi.fn()}
-            onOpenDelete={vi.fn()}
-          />
-        </RollProvider>
-      </MemoryRouter>,
-    );
+    renderHeader({ sessionActions: { busy: false, onLeave, onEnd } });
 
     // Selecting an item closes the menu, so re-open it between the two clicks.
     fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));
@@ -127,20 +116,7 @@ describe("MobileSheetHeader", () => {
 
   it("disables Leave / End Session while a session action is in flight", () => {
     const onEnd = vi.fn();
-    render(
-      <MemoryRouter>
-        <RollProvider>
-          <MobileSheetHeader
-            character={makeCharacter()}
-            sessionActions={{ busy: true, onLeave: vi.fn(), onEnd }}
-            onOpenCapture={vi.fn()}
-            onOpenSessions={vi.fn()}
-            onOpenActivity={vi.fn()}
-            onOpenDelete={vi.fn()}
-          />
-        </RollProvider>
-      </MemoryRouter>,
-    );
+    renderHeader({ sessionActions: { busy: true, onLeave: vi.fn(), onEnd } });
 
     fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));
     const end = screen.getByRole("menuitem", { name: "End Session" });
@@ -158,20 +134,7 @@ describe("MobileSheetHeader", () => {
 
   it("exposes Note / Sessions / Activity / Delete in the overflow menu", () => {
     const onOpenCapture = vi.fn();
-    const onOpenDelete = vi.fn();
-    render(
-      <MemoryRouter>
-        <RollProvider>
-          <MobileSheetHeader
-            character={makeCharacter()}
-            onOpenCapture={onOpenCapture}
-            onOpenSessions={vi.fn()}
-            onOpenActivity={vi.fn()}
-            onOpenDelete={onOpenDelete}
-          />
-        </RollProvider>
-      </MemoryRouter>,
-    );
+    renderHeader({ onOpenCapture });
 
     fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));
     expect(screen.getByRole("menuitem", { name: /note/i })).toBeInTheDocument();
@@ -183,75 +146,73 @@ describe("MobileSheetHeader", () => {
   });
 });
 
-// #985: while a session is live+joined AND the Combat tab is active, the header
-// collapses to a one-line fight bar to reclaim the glass for the turn tracker.
-describe("MobileSheetHeader fight bar (#985)", () => {
-  function renderBar(props: Partial<Parameters<typeof MobileSheetHeader>[0]> = {}) {
-    return render(
-      <MemoryRouter>
-        <RollProvider>
-          <MobileSheetHeader
-            character={makeCharacter()}
-            onUpdate={vi.fn()}
-            sessionActions={{ busy: false, onLeave: vi.fn(), onEnd: vi.fn() }}
-            combatActive
-            liveRound={3}
-            onOpenCapture={vi.fn()}
-            onOpenSessions={vi.fn()}
-            onOpenActivity={vi.fn()}
-            onOpenDelete={vi.fn()}
-            {...props}
-          />
-        </RollProvider>
-      </MemoryRouter>,
-    );
-  }
-
-  it("collapses to the fight bar (name, HP tap-through, round pill) in live Combat", () => {
-    renderBar();
-    // Name still present; the vitals tiles are collapsed away.
-    expect(screen.getByText("Aldric")).toBeInTheDocument();
-    expect(screen.queryByText("AC")).not.toBeInTheDocument();
-    expect(screen.queryByText("Speed")).not.toBeInTheDocument();
-    // HP taps through to the shared HP sheet (ManageHpButton).
-    expect(screen.getByRole("button", { name: /manage hit points/i })).toBeInTheDocument();
-    // Single round indicator.
-    expect(screen.getByText("Round 3")).toBeInTheDocument();
+// #1026: the live pill replaces the "Session live" banner — shown whenever a
+// session is live+joined, carrying round/live state and tapping through to Combat.
+describe("MobileSheetHeader live pill (#1026)", () => {
+  it("shows a Round pill while live and taps through to Combat", () => {
+    const onGoToCombat = vi.fn();
+    renderHeader({
+      sessionActions: { busy: false, onLeave: vi.fn(), onEnd: vi.fn() },
+      liveRound: 3,
+      onGoToCombat,
+    });
+    fireEvent.click(screen.getByRole("button", { name: /round 3/i }));
+    expect(onGoToCombat).toHaveBeenCalledTimes(1);
   });
 
   it("shows 'Live' on the pill when there is no active round", () => {
-    renderBar({ liveRound: null });
-    expect(screen.getByText("Live")).toBeInTheDocument();
-    expect(screen.queryByText(/^Round/)).not.toBeInTheDocument();
+    renderHeader({
+      sessionActions: { busy: false, onLeave: vi.fn(), onEnd: vi.fn() },
+      liveRound: null,
+      onGoToCombat: vi.fn(),
+    });
+    expect(screen.getByRole("button", { name: /^live — go to fight$/i })).toBeInTheDocument();
   });
 
-  it("expands to the full header on tapping the bar, then re-collapses", () => {
-    renderBar();
-    expect(screen.queryByText("AC")).not.toBeInTheDocument();
+  it("shows no live pill when not in a session", () => {
+    renderHeader();
+    expect(screen.queryByRole("button", { name: /go to fight/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /round/i })).not.toBeInTheDocument();
+  });
+});
 
+// #1026: collapse-on-scroll — a `scrolled` sheet collapses the header to a single
+// bar (name + HP + pill); tapping it re-expands the full two-row header.
+describe("MobileSheetHeader collapse-on-scroll (#1026)", () => {
+  it("collapses to a single bar once scrolled, hiding the AC badge and subtitle", () => {
+    renderHeader({ scrolled: true });
+    expect(screen.getByText("Aldric")).toBeInTheDocument();
+    expect(screen.queryByText("Human · Fighter 7")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /armor class/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /expand character header/i })).toBeInTheDocument();
+  });
+
+  it("expands to the full header on tapping the collapsed bar, then re-collapses", () => {
+    renderHeader({ scrolled: true });
     fireEvent.click(screen.getByRole("button", { name: /expand character header/i }));
-    // Full vitals now visible.
-    expect(screen.getByText("AC")).toBeInTheDocument();
-    expect(screen.getByText("Speed")).toBeInTheDocument();
-
-    // The collapse handle returns to the fight bar.
-    fireEvent.click(screen.getByRole("button", { name: /collapse to fight bar/i }));
-    expect(screen.queryByText("AC")).not.toBeInTheDocument();
+    // Full header now visible (AC badge + subtitle back).
+    expect(screen.getByText("Human · Fighter 7")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /armor class/i })).toBeInTheDocument();
+    // Collapse handle returns to the single bar.
+    fireEvent.click(screen.getByRole("button", { name: /collapse header/i }));
+    expect(screen.queryByText("Human · Fighter 7")).not.toBeInTheDocument();
   });
 
-  it("stays the full header off the Combat tab even while joined", () => {
-    renderBar({ combatActive: false });
-    expect(screen.getByText("AC")).toBeInTheDocument();
+  it("carries the live pill on the collapsed bar and taps through to Combat", () => {
+    const onGoToCombat = vi.fn();
+    renderHeader({
+      scrolled: true,
+      sessionActions: { busy: false, onLeave: vi.fn(), onEnd: vi.fn() },
+      liveRound: 2,
+      onGoToCombat,
+    });
+    fireEvent.click(screen.getByRole("button", { name: /round 2/i }));
+    expect(onGoToCombat).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays the full header when not scrolled", () => {
+    renderHeader({ scrolled: false });
+    expect(screen.getByText("Human · Fighter 7")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /expand character header/i })).not.toBeInTheDocument();
-  });
-
-  it("exposes Note / Leave / End inside the fight-bar overflow", () => {
-    const onLeave = vi.fn();
-    renderBar({ sessionActions: { busy: false, onLeave, onEnd: vi.fn() } });
-    fireEvent.click(screen.getByRole("button", { name: /sheet actions/i }));
-    expect(screen.getByRole("menuitem", { name: /note/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: "End Session" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("menuitem", { name: "Leave Session" }));
-    expect(onLeave).toHaveBeenCalledTimes(1);
   });
 });
