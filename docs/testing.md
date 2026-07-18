@@ -1,260 +1,60 @@
 # Testing
 
-> **Tests don't type-check.** Vitest transpiles with esbuild, which strips types
-> without checking them, so a type-only error passes `npm test` and `npm run lint`
-> but breaks the production `tsc` build (and the Railway deploy). The CI `build`
-> job (`.github/workflows/ci.yml`) is the type gate — run `npm run build` locally
-> before pushing if you've changed type-significant code or test signatures.
+Read this when running or writing tests.
+
+> **Tests don't type-check.** Vitest transpiles with esbuild, so type-only errors pass `npm test` but break the `tsc` build. Run `npm run typecheck` (or `npm run build`) before pushing type-significant changes.
 
 ## Running tests
 
 ```bash
-# All tests (both workspaces):
-docker compose up db -d
-npm run test
-
-# Backend only (needs Postgres running):
-docker compose up db -d
-npm run test -w backend
-
-# Single backend test file:
-cd backend && npx vitest run src/routes/__tests__/spellcasting.test.ts
-
-# Backend with coverage (Istanbul → backend/coverage/coverage-final.json).
-# This feeds the fallow CRAP gate (docs/development.md); CI's test job runs it.
-docker compose up db -d
-npm run test:coverage -w backend
-
-# Frontend (no DB needed):
-cd frontend && npx vitest run
+docker compose up db -d          # backend tests need Postgres
+npm run test                     # both workspaces
+npm run test -w backend          # backend only
+cd backend && npx vitest run src/routes/__tests__/spellcasting.test.ts   # one file
+npm run test:coverage -w backend # Istanbul coverage → feeds the fallow CRAP gate
+cd frontend && npx vitest run    # frontend (no DB)
 ```
 
-> **Coverage & the fallow gate**: `npm run test:coverage -w backend` writes an Istanbul
-> `coverage-final.json` that fallow reads for exact per-function CRAP (untested complexity
-> → real high CRAP). Config lives in `backend/vitest.config.ts` under `test.coverage`
-> (`provider: "istanbul"`, `all: true` so untested files still report their real 0%). If
-> you add a complex backend function, cover it or the `fallow health … --coverage` step
-> fails on `maxCrap > 30`. `coverage/` is gitignored.
+Local setup: `backend/.env` must contain `DATABASE_URL` (`cp .env.example backend/.env` on a fresh clone); `backend/vitest.config.ts` reads it automatically via `loadEnv`.
 
-> **Local setup**: `backend/.env` must exist and contain `DATABASE_URL`. Copy it from
-> `.env.example` on a fresh clone: `cp .env.example backend/.env`. The vitest config
-> (`backend/vitest.config.ts`) reads this file automatically via Vite's `loadEnv`, so
-> no manual env-var export is needed. In CI, set `DATABASE_URL` as a real environment
-> variable and it will take precedence over the file.
+## Backend route tests (`backend/src/routes/__tests__/`)
 
-## Backend test structure
+`supertest` against `createApp()`, real Postgres via Prisma — no mocks.
 
-All backend route tests live in `backend/src/routes/__tests__/` and use:
-- **`supertest`** against `createApp()` (imported from `app.ts`, which builds the Express app without binding a port)
-- **Real Postgres** — tests hit the actual DB via Prisma; no mocks
+**Fixture rules (parallel files, one shared DB):**
 
-### Standard fixture pattern
+- Upsert catalog fixtures in `beforeEach`; delete only what the test created (`afterEach`/`afterAll`).
+- **Never `deleteMany` a seeded catalog row** — use uniquely-named fixture rows (e.g. `"Spellcasting Route Test Wizard"`, with the class-entry *snapshot* `name` set to `"wizard"` so rule lookups still match). If you nuke a seeded row: `cd backend && npx prisma db seed`.
+- **Unique, file-prefixed fixture IDs + a per-file owner** (`ensureTestOwner("owner-<domain>")`, `backend/src/test-support/owner.ts`) so parallel suites never collide.
+- **Never assert on an unscoped/global list** — tables hold the union of every running suite's fixtures. Find your own row (`findInList`, `test-support/list.js`) and assert on it; an eslint `no-restricted-syntax` rule backstops this for `GET /api/characters`.
+- Don't add a `fileParallelism` override — the speed matters. Connection teardown is handled by `backend/vitest.setup.ts` (`$disconnect()` + `pool.end()`).
 
-```typescript
-beforeEach(async () => {
-  // 1. Upsert any catalog rows the test needs (race, class, items, spells…)
-  const cls = await prisma.characterClass.upsert({ where: { name: "Fixture Class" }, create: {...}, update: {} });
-  // 2. Create the character fixture
-  await prisma.character.create({ data: { ...FIXTURE_BASE, classEntries: { create: [...] } } });
-});
+**Every transaction endpoint gets:** a 404 test (unknown character), a 400 test (malformed op), one test per domain error, and a multi-op **atomicity** test (a failing second op rolls back the first).
 
-afterEach(async () => {
-  // Delete only what this test created — don't touch seeded rows
-  await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
-});
-
-afterAll(async () => {
-  // Clean up catalog fixtures — use uniquely-named rows, not seeded class names
-  await prisma.characterClass.deleteMany({ where: { name: "Fixture Class" } });
-});
-```
-
-### Fixture isolation gotcha (cautionary tale)
-
-**Do not** `deleteMany` a seeded catalog row in `afterAll`. The seed creates shared rows (e.g., the "Wizard" `CharacterClass`); deleting them corrupts the DB for other test suites running in the same vitest process.
-
-**The fix**: use a **uniquely-named** fixture row that won't conflict with the seed (e.g. `"Spellcasting Route Test Wizard"` instead of `"Wizard"`). The `CharacterClassEntry` *snapshot* `name` field is what business logic reads (e.g. `deriveSpellcasting` lowercases it), so you can safely set the entry name to `"wizard"` while the catalog row has a unique test-only name:
-
-```typescript
-// Catalog row: unique name so afterAll delete is safe
-await prisma.characterClass.upsert({ where: { name: "My Test Wizard Class" }, create: { name: "My Test Wizard Class", ... } });
-
-// Class entry: snapshot name = "wizard" so deriveSpellcasting("wizard") matches
-classEntries: { create: [{ name: "wizard", classId: cls.id, position: 0 }] }
-```
-
-If you accidentally delete a seeded row, restore it:
-```bash
-cd backend && npx prisma db seed
-```
-
-### Parallel test isolation (one shared DB)
-
-Vitest runs test **files in parallel** (no `fileParallelism` override — and don't add one; the speed matters), but every file hits **one shared Postgres**. Each suite deletes only its own rows in `afterEach`, so at any instant the tables hold the **union of every currently-running suite's live fixtures** — a set that churns as siblings create and tear down. Two rules keep that safe:
-
-1. **Unique, file-prefixed fixture IDs + a per-file owner.** Prefix fixture ids with the file's domain (`test-activity-1`, `test-sessions-1`, …) and own them with `ensureTestOwner("owner-<domain>")` (`backend/src/test-support/owner.ts`). Distinct ids per file mean two suites never write the same row.
-
-2. **Never assert on an unscoped/global collection — scope to your own fixture.** A bare list endpoint (`GET /api/characters`) returns *everyone's* fixtures, so its length and membership change mid-test. Don't compare two whole-list snapshots, and don't assert exact length/membership of an unscoped list. Instead find your own row and assert on it:
-
-```typescript
-import { findInList } from "../../test-support/list.js";
-
-// eslint-disable-next-line no-restricted-syntax -- lists all, asserts only on own fixture
-const res = await supertest(createApp()).get("/api/characters");
-const mine = findInList(res.body, FIXTURE.id);   // not res.body.length / toEqual(wholeList)
-expect(mine).toBeDefined();                      // clear "fixture not found" message
-expect(mine).toMatchObject({ name: "Test Fixture", level: 3 });
-```
-
-The healthy reference is the `GET /api/characters returns summaries…` test in `characters.test.ts`. The anti-pattern — comparing an unfiltered and a filtered `GET /api/characters` snapshot for equality — flaked PR #134 in CI and is the subject of #135. A `no-restricted-syntax` eslint rule (`backend/eslint.config.js`, scoped to `__tests__`) flags reads of the unscoped `/api/characters` list as a backstop, so a new suite must consciously scope (or disable with a reason). (Scoped sub-resources like a single character's `res.body.inventory` are fine — they belong to your fixture.)
-
-> **Connection teardown.** `backend/vitest.setup.ts` ends each file's Prisma pool in `afterAll` (`prisma.$disconnect()` + `pool.end()`). Without it, pooled sockets linger after a file finishes and have surfaced as an intermittent "socket hang up" under parallel load. `prisma.$disconnect()` alone does **not** end the externally-supplied `pg.Pool` — hence the explicit `pool.end()` (the pool is exported from `lib/prisma.ts` for exactly this).
-
-### 400 vs 404 pattern
-
-Every transaction endpoint should have:
-- One test for 404 (unknown character id)
-- One test for 400 on malformed body (invalid `type` in operations array)
-- One test each for every domain error case (slot exhausted, duplicate learn, etc.)
-
-### Atomic batch test
-
-Always add a multi-op atomicity test: a second op that fails should roll back the first:
-```typescript
-it("batch is atomic", async () => {
-  await supertest(app).post(url).send({
-    operations: [
-      { type: "validOp" },       // would succeed alone
-      { type: "validOp", id: "does-not-exist" }, // fails → rolls back first
-    ]
-  });
-  expect(res.status).toBe(400);
-  // assert character state is unchanged
-});
-```
+Pure domain logic gets lib-level unit tests in `backend/src/lib/__tests__/`.
 
 ## Frontend tests
 
-No DB needed. Run with `cd frontend && npx vitest run`.
+Colocated next to their source (no `__tests__/` dir): `*.test.ts` for pure logic/fetch-mocks, `*.test.tsx` for component render tests (RTL + user-event). Conventions:
 
-### Setup
-
-`vite.config.ts` carries the `test` block (`environment: "jsdom"`, `setupFiles: ["./src/test/setup.ts"]`, `globals: false`). Vitest inherits the `@/` alias from the same config. `src/test/setup.ts` registers jest-dom matchers, the jest-axe `toHaveNoViolations` matcher, and runs RTL `cleanup()` after each test. Test deps: `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, `@testing-library/dom`, `jest-axe`.
-
-### Two flavors — both colocated next to their source file (no `__tests__/` subdirectory)
-
-**Pure logic / fetch-mock → `*.test.ts`**
-
-```ts
-// src/lib/dice.test.ts — no DOM, no React
-import { describe, it, expect } from "vitest";
-import { rollSpec } from "@/lib/dice";
-```
-
-Examples: `src/api/client.test.ts` (mocks `fetch`, tests all client functions), `src/lib/dice.test.ts`, `src/lib/abilityGen.test.ts`.
-
-**Component render tests → `*.test.tsx`** (next to the component)
-
-```tsx
-// src/features/inventory/InventoryRow.test.tsx
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import InventoryRow from "@/features/inventory/InventoryRow";
-```
-
-Examples: `src/components/ui/Modal.test.tsx` (portal, focus trap, Esc/backdrop/Close, body overflow, focus restore), `src/features/spells/SpellRow.test.tsx` (callback assertions + typed fixture).
-
-### Conventions
-
-**`globals: false`** — always import explicitly from `"vitest"`:
-```ts
-import { describe, it, expect, vi, beforeEach } from "vitest";
-```
-
-**Query by accessible role/name** where possible — it tests what the user actually sees:
-```ts
-screen.getByRole("button", { name: "Cast" })
-screen.getByRole("meter")
-screen.getByRole("dialog")
-```
-
-**Two gotchas from the existing suite:**
-- An `<img alt="">` has ARIA role `presentation`, not `img` — query it with `container.querySelector("img")` instead of `getByRole("img")`.
-- A button's accessible name comes from its text content, not its `title` attribute — use the text (e.g. `"Cast"`, not `"Cast Fireball"`).
-
-**Runtime accessibility checks** — import `axe` from `@/test/axe` and assert no violations on rendered output. The matcher is registered globally in `setup.ts`; the helper re-exports `axe` and carries the vitest type augmentation. Add this to component tests for any surface with form controls, interactive widgets, or non-trivial structure:
-```tsx
-import { axe } from "@/test/axe";
-
-it("has no axe accessibility violations", async () => {
-  const { container } = render(<Card title="Skills">Content</Card>);
-  expect(await axe(container)).toHaveNoViolations();
-});
-```
-This complements the static `eslint-plugin-jsx-a11y` lint (in `frontend/eslint.config.js`, recommended ruleset): lint catches markup-level mistakes (unassociated labels, non-semantic interactive elements, bad ARIA) at dev time; axe catches computed/runtime issues. `src/components/ui/Card.test.tsx` is the reference example.
-
-**Router-dependent components** — wrap in `MemoryRouter`:
-```tsx
-render(<MemoryRouter><CharacterCard character={base} /></MemoryRouter>);
-```
-
-**Domain component fixtures** — build a fully-typed fixture object at the top of the test file, then spread-override per test:
-```ts
-const base: InventoryItem = { id: "item-1", name: "Club", category: "weapon", quantity: 1, equipped: false };
-renderRow({ item: { ...base, equipped: true } });
-```
-
-**Interaction** — use `userEvent.setup()` for clicks, typing, and keyboard events that involve real browser-like sequencing; use `fireEvent` only for low-level event injection (e.g. `fireEvent.keyDown(document, { key: "Escape" })` in Modal tests).
+- `globals: false` — always import from `"vitest"` explicitly.
+- Query by accessible role/name. Gotchas: `<img alt="">` has role `presentation` (use `container.querySelector`); a button's accessible name is its text, not its `title`.
+- Add an axe check (`import { axe } from "@/test/axe"` → `toHaveNoViolations`) for surfaces with form controls or interactive widgets; `Card.test.tsx` is the reference.
+- Router-dependent components wrap in `MemoryRouter`. Build one fully-typed fixture per file and spread-override per test.
+- Stub `@/features/dice/DiceRoller` (Three.js won't render in jsdom); the lazy import resolves a tick later, so assert with `findByTestId`.
 
 ## Browser / UI verification (behind auth)
 
-Unit tests mock the network, but driving the real UI in a browser hits `requireAuth` — a fresh stack shows the `LoginPage` and OAuth can't complete headless. To get a signed-in session with something to look at:
-
-1. Bring the stack up and wait for `/api/health`.
-2. `npm run seed:verify` — mints a session via `POST /api/auth/dev-login` and builds a representative "Verify Dummy" character through the real endpoints (idempotent). Needs `ALLOW_DEV_LOGIN=true` (dev compose default). See development.md.
-3. In Playwright, sign in with an in-page `fetch('/api/auth/dev-login', { method: 'POST' })` then reload (`cs_session` is HttpOnly, so it can't be set from `document.cookie`).
-
-The **`verify-frontend` skill** automates all of this (seed → sign in → run RTL tests + browser verification in parallel).
+Real-browser verification hits `requireAuth` and OAuth can't complete headless. Path: bring the stack up → `npm run seed:verify` (dev-login session + a representative "Verify Dummy" character; needs `ALLOW_DEV_LOGIN=true`, the dev-compose default) → in Playwright, sign in with an in-page `fetch('/api/auth/dev-login', { method: 'POST' })` then reload (the cookie is HttpOnly). The `verify-frontend` skill automates all of this.
 
 ## End-to-end (Playwright)
 
-Full-flow browser tests live in `frontend/e2e/` (`*.spec.ts`; vitest excludes this dir). Run them through the profile-gated compose service, which works against the main stack and any worktree slot identically:
+Specs live in `frontend/e2e/`; run via `npm run e2e` (→ `docker compose --profile e2e run --rm e2e`, a pinned Playwright image on host networking that derives its base URL from `FRONTEND_PORT`, so it works against the main stack or any worktree slot).
 
-```bash
-npm run e2e            # → docker compose --profile e2e run --rm e2e
-```
+- `global-setup.ts` signs in via dev-login and idempotently recreates the shared personas (Smoke Fighter, Wizard L5, Battle Master, Session Fighter) — safe after a backend vitest pass wipes the dev user.
+- Per-spec state is created **inside each spec** via `e2e/helpers/api.ts`, never in globalSetup — every spec is independently runnable and personas stay unmutated.
+- Session-driving personas get their own campaigns (one active session per campaign); `workers: 1` runs serially.
+- The stack sets `RATE_LIMIT_DISABLED=true` (compose + CI) so repeated runs never trip the limiter.
+- Selectors are role/name-based; specs assert zero console errors (`e2e/helpers/console.ts`).
 
-The `e2e` service uses a pinned `mcr.microsoft.com/playwright` image on host networking and derives its base URL from `FRONTEND_PORT`, so no ports are hardcoded (override with `E2E_BASE_URL`). `e2e/global-setup.ts` signs in via `dev-login` and idempotently (re)creates the shared roster — matched by name, recreated every run so a prior backend vitest pass (whose `auth.test.ts` wipes `dev-user-local`) is fine:
-
-- **Smoke Fighter** (Fighter L1) — baseline sheet + HP/rest flows.
-- **Wizard L5** (6500 XP) — derived spell slots (XP set through the transactions endpoint so level/slots derive server-side).
-- **Battle Master** (Fighter L5 + subclass + Evasive Footwork maneuver, on a dedicated campaign) — in-session superiority-die spend.
-- **Session Fighter** (Fighter L1 on a dedicated campaign) — start/resume a live session in-spec.
-
-The stack runs the backend with `RATE_LIMIT_DISABLED=true` — the compose default (`docker-compose.yml`) and the CI e2e job both set it — so back-to-back e2e runs on a warm backend never trip the request limiter. Without it, the accumulated `dev-login` traffic drifts toward `RATE_LIMIT_MAX` (600) and the alphabetical-tail specs (shadow-arts, spellcasting, unarmed, visual, wizard-sheet) fail with 429-induced login timeouts; the flag makes local e2e deterministic across repeated runs.
-
-Personas that need a live session each get their own campaign (a campaign allows only one active session), and the config runs `workers: 1` serially so session-driving specs never contend. Per-spec state (throwaway characters, learned spells, awarded XP, resource restores) is created **inside each spec** through `e2e/helpers/api.ts` against the same REST endpoints the app uses — never in globalSetup — so every spec is independently runnable and the shared personas stay unmutated. Selectors are role/name-based (no `data-testid`); specs assert zero console errors via `e2e/helpers/console.ts`. Domain specs cover HP, inventory, spellcasting, maneuvers, session, guided creation, and level-up.
-
-### Visual regression (`toHaveScreenshot`)
-
-`e2e/visual.spec.ts` captures pixel baselines for the key screens: character sheet (light + dark themes), inventory section + ledger (Activity) modal, spells section, session/turn view, and the creation-flow steps. Baselines are checked-in **source fixtures** under `frontend/e2e/__screenshots__/` (`{name}-{platform}.png`, one flat dir via `snapshotPathTemplate`) — committed source, not build artifacts, exactly like the `.svg` assets in the tree. Because these PNGs live in the repo, the `block-project-artifacts` hook allowlists the `/e2e/__screenshots__/` path (in `ALLOWED_SUBSTRINGS`, alongside `.svg`'s exemption) so writing/committing a baseline there isn't blocked while every other in-tree image write still is.
-
-Determinism is the whole game, so the config (`expect.toHaveScreenshot`) disables animations, hides the caret, pins a fixed viewport, and scales by CSS pixels; each spec blocks the Google Fonts network load so text falls back to the pinned e2e image's bundled fonts (identical at capture and comparison time) and awaits `document.fonts.ready`. Per-run-unique pixels (character names) are masked on full-page shots; scoped section/modal shots exclude the name entirely. Per-screen diff budgets are tuned via `maxDiffPixelRatio` at each call.
-
-Regenerate baselines **only when a visual change is intentional**, from inside the e2e container so the renders match CI's fonts:
-
-```bash
-docker compose --profile e2e run --rm e2e npm run e2e:update-snapshots
-```
-
-Review the regenerated PNGs before committing them. Running unrelated visual changes through `--update-snapshots` silently launders a regression into the baseline, so the diff is the gate.
-
-## Lib-level unit tests
-
-Pure domain logic goes in `backend/src/lib/__tests__/`:
-- `experience.test.ts` — XP table, level derivation
-- `hitpoints.test.ts` — HP math, death saves, rest
-- `inventory.test.ts` — currency math, operation handler
-
-Add new `lib/__tests__/<domain>.test.ts` for any non-trivial pure logic in a new domain handler.
+**Visual regression** (`e2e/visual.spec.ts`): pixel baselines are checked-in source fixtures under `frontend/e2e/__screenshots__/` (allowlisted in the artifact-blocking hook). Determinism: animations disabled, fixed viewport, fonts pinned to the e2e image (Google Fonts blocked), per-run-unique pixels masked. Regenerate **only for intentional visual changes**, from inside the container (`docker compose --profile e2e run --rm e2e npm run e2e:update-snapshots`) and review the PNGs — blanket `--update-snapshots` launders regressions into the baseline.

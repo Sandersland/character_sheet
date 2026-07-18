@@ -1,87 +1,38 @@
 # Deployment
 
-How this app is packaged for hosting, and the runbook for the **dev/staging**
-environment (Railway behind Cloudflare Access). In-app auth + per-owner character
-ownership now exist (#101/#102): every `/api` route requires a session and a user
-only sees/edits their own characters, so a public prod environment is no longer
-blocked on the auth gap — see "When prod comes" for what remains.
+Read this when packaging the app for hosting, deploying the dev environment (Railway behind Cloudflare Access), or running backups/restores.
 
 ## Packaging model
 
-Components are env-driven so any of them can be deployed anywhere:
-
 | Image | File | Use |
 |---|---|---|
-| Combined single-origin | `Dockerfile` (repo root) | API serves the built SPA on one origin. Used by Railway dev and `docker-compose.prod.yml`. |
-| Backend (API-only) | `backend/Dockerfile.prod` | Split deploys where the frontend is hosted separately. |
-| Frontend (nginx static) | `frontend/Dockerfile.prod` | Split deploys; serves `dist/` with SPA fallback. |
+| Combined single-origin | `Dockerfile` (root) | API serves the built SPA on one origin. Railway dev + `docker-compose.prod.yml`. |
+| Backend (API-only) | `backend/Dockerfile.prod` | Split deploys. |
+| Frontend (nginx static) | `frontend/Dockerfile.prod` | Split deploys; SPA fallback. |
+
+Single-origin is deliberate: one hostname → one Cloudflare Access policy, same-origin fetch, no CORS/cookie problems.
 
 ### Environment variables
 
-| Var | Used by | Notes |
-|---|---|---|
-| `DATABASE_URL` | backend | Postgres connection string. Required. |
-| `PORT` | backend | Listen port (default 4000). Railway injects its own. |
-| `SERVE_STATIC_DIR` | backend | When set, the API serves the SPA from this dir (single-origin). Combined image sets `/app/public`. Unset → API-only. |
-| `CORS_ORIGIN` | backend | Comma-separated allowlist. Empty → reflect the request origin (fine for single-origin/local). Set for split mode. CORS always sends `Access-Control-Allow-Credentials: true` (the SPA sends the session cookie), so the origin is always a concrete value, never `*` — set the allowlist explicitly to harden a split-origin prod. |
-| `LOG_LEVEL` | backend | Pino log level (`fatal`…`trace`, or `silent`). Default `info`; tests run `silent`. JSON output in prod, pretty in dev. |
-| `RATE_LIMIT_WINDOW_MS` | backend | Rate-limit window in ms. Default `900000` (15 min). |
-| `RATE_LIMIT_MAX` | backend | Max requests per window per IP, global. Default `600`. |
-| `RATE_LIMIT_CREATE_MAX` | backend | Tighter cap for `POST /api/characters` per window. Default `30`. |
-| `RATE_LIMIT_DISABLED` | backend | `true` disables rate limiting entirely (also auto-off under test). |
-| `APP_BASE_URL` | backend | Browser-facing app origin. Builds the OAuth `redirect_uri` **and** the post-login redirect, so it must be the origin the user's browser uses — the SPA's. Dev Compose default `http://localhost:5173` (the SPA, which proxies `/api`); single-origin prod = the one deployed origin. |
-| `GOOGLE_CLIENT_ID` | backend | Google OAuth client id. Optional — Google sign-in is enabled only when **both** id and secret are set; absent → the app boots with no providers. Injected into the backend container via Compose (the app does **not** read `backend/.env`). |
-| `GOOGLE_CLIENT_SECRET` | backend | Google OAuth client secret. See above; both must be set together. |
-| `SESSION_COOKIE_SECURE` | backend | Whether session/oauth cookies get the `Secure` flag. Tri-state: defaults to on in production, off elsewhere; set `true`/`false` to override (e.g. force off behind a local proxy). |
-| `ALLOW_DEV_LOGIN` | backend | Enables `POST /api/auth/dev-login` (passwordless session for headless/worktree UI verification — see `seed:verify`). **Never set in production**: hard-forced off when `NODE_ENV=production` regardless of value. Dev Compose defaults it to `true`. |
-| `VITE_API_URL` | frontend **build/dev** | Where the SPA sends API calls. Dev Compose default `/api` (same-origin via the Vite proxy); `/api` for single-origin prod; the API's absolute URL for split. |
-| `VITE_PROXY_TARGET` | frontend **dev** | Where the Vite dev proxy forwards `/api`. Compose default `http://backend:4000`; bare `npm run dev` falls back to `http://localhost:4000`. |
+| Var | Notes |
+|---|---|
+| `DATABASE_URL` | Required. |
+| `PORT` | Backend listen port (default 4000; Railway injects its own). |
+| `SERVE_STATIC_DIR` | Set → API serves the SPA from this dir (single-origin; combined image sets `/app/public`). Unset → API-only. |
+| `CORS_ORIGIN` | Comma-separated allowlist; empty reflects the request origin. Credentials are always sent, so the origin is never `*` — set explicitly for split-origin prod. |
+| `APP_BASE_URL` | Browser-facing origin; builds the OAuth `redirect_uri` + post-login redirect. Dev default `http://localhost:5173` (the SPA proxies `/api`). |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Provider enabled only when both set; absent → app boots with no providers. |
+| `SESSION_COOKIE_SECURE` | Tri-state: default on in production, off elsewhere. |
+| `ALLOW_DEV_LOGIN` | Enables `POST /api/auth/dev-login`. Hard-forced off when `NODE_ENV=production`. Dev compose defaults it on. |
+| `LOG_LEVEL`, `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX`, `RATE_LIMIT_CREATE_MAX`, `RATE_LIMIT_DISABLED` | Logging + rate-limit knobs; limiter auto-off under test. |
+| `VITE_API_URL` | Frontend build/dev: `/api` for single-origin, absolute API URL for split. |
+| `VITE_PROXY_TARGET` | Vite dev proxy target (compose: `http://backend:4000`). |
 
-**OAuth setup (dev):** dev runs single-origin from the browser's view — the SPA on
-`:5173` proxies `/api/*` to the backend (`vite.config.ts` `server.proxy`), so the
-session cookie is same-origin and login redirects back to the app. Steps:
-1. Google Cloud Console → create an OAuth **Web application** client; configure the
-   consent screen (add yourself as a test user while unpublished).
-2. Authorized redirect URI: `http://localhost:5173/api/auth/google/callback`
-   (= `${APP_BASE_URL}/api/auth/google/callback`).
-3. Put `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in a root `.env` (gitignored);
-   `docker compose up -d --force-recreate backend frontend`.
+**OAuth setup (dev):** Google Cloud Console → Web application client, redirect URI `http://localhost:5173/api/auth/google/callback` (= `${APP_BASE_URL}/api/auth/google/callback`); put the id/secret in a gitignored root `.env` and recreate the containers.
 
-A provider appears in `GET /api/auth/providers` and is usable only when its
-id+secret pair is set.
+### CSP notes (single-origin mode)
 
-The single-origin design is deliberate: one hostname means one Cloudflare Access
-policy, same-origin `fetch` (no CORS), and no cross-origin Access-cookie problems.
-
-### Security headers & rate limiting
-
-The backend applies `helmet` (HSTS, `nosniff`, `X-Frame-Options`, CSP, …) and
-`express-rate-limit` (the `RATE_LIMIT_*` knobs above). In single-origin mode
-(`SERVE_STATIC_DIR` set) the Content-Security-Policy is tuned to allow the
-Vite-built assets (self-hosted scripts, `'unsafe-inline'` styles, `data:`
-fonts/images). Inline scripts are handled by two complementary mechanisms:
-
-- **First-party inline scripts** (the pre-paint theme snippet in `index.html`
-  that prevents a dark-mode FOUC) are allowlisted by **hash, computed at boot
-  from the served `index.html`** (`inlineScriptHashes` in
-  `backend/src/lib/core/security.ts`) — the allowance can never drift from the
-  deployed markup, and editing the snippet needs no CSP change. Debugging note,
-  hard-won: an inline-script CSP violation with a **stable** hash across
-  requests is almost certainly a first-party static script; Cloudflare's
-  injected snippets embed per-request tokens, so their hashes churn. This exact
-  misread cost an afternoon of chasing Cloudflare.
-- **Cloudflare's edge injections** get a **fresh per-request `script-src`
-  nonce**: Cloudflare's documented CSP integration parses the response's CSP
-  header and stamps the nonce onto scripts it injects (verified live on the
-  auto-injected Web Analytics beacon).
-
-Additional Cloudflare allowances observed on the live zone: the Web Analytics
-beacon (script host + connect) and Speed Brain's inline
-`<script type="speculationrules">` (the `'inline-speculation-rules'` keyword —
-declarative prefetch JSON only, not an inline-JS loosening). If a
-future asset is blocked, adjust the directives in
-`backend/src/lib/core/security.ts`. Rate limiting is auto-disabled under test and can
-be turned off in any environment with `RATE_LIMIT_DISABLED=true`.
+`backend/src/lib/core/security.ts` owns helmet/CSP. First-party inline scripts (the pre-paint theme snippet) are allowlisted by **hash computed at boot from the served `index.html`** — so editing the snippet needs no CSP change. Cloudflare edge injections get a per-request nonce (their hashes churn per request; a **stable** hash on a CSP violation means a first-party script — this misread once cost an afternoon). If a future asset is blocked, adjust directives in that file.
 
 ## Local production smoke test
 
@@ -90,197 +41,35 @@ cp .env.production.example .env.production   # edit POSTGRES_PASSWORD etc.
 APP_PORT=4100 docker compose -f docker-compose.prod.yml --env-file .env.production up --build
 ```
 
-Verify: `http://localhost:4100/` loads the SPA, `…/api/health` returns
-`{"status":"ok"}`, a deep link like `/characters/new` returns the SPA (200), and
-data round-trips (`/api/characters`, `/api/reference`). Migrations apply and the
-seed (idempotent — upserts only) runs on boot.
+Verify: `/` loads the SPA, `/api/health` returns ok, a deep link returns the SPA, data round-trips.
 
-## Deploy dev to Railway
+## Railway dev + Cloudflare Access
 
-1. **Create project** → add an environment named `dev`.
-2. **Add Postgres** (Railway plugin). It exposes `DATABASE_URL`.
-3. **Add a service** from the GitHub repo. Build using the **root `Dockerfile`**
-   (single-origin). Service variables:
-   - `DATABASE_URL` → reference the Postgres plugin variable.
-   - `SERVE_STATIC_DIR=/app/public` (already set by the image; set explicitly if overriding).
-   - `PORT` is provided by Railway; the server honors it.
-   - `CORS_ORIGIN` not needed in single-origin mode.
-4. **Healthcheck:** path `GET /api/health`.
-5. **Boot behavior:** the start command runs `prisma migrate deploy` then
-   `prisma db seed` then `node dist/index.js`. Both are safe to run every deploy.
-6. **Custom domain:** add `dev.<yourdomain>` to the service. **Remove/disable the
-   generated `*.up.railway.app` domain** so the only public entrypoint is the
-   Cloudflare-proxied hostname (otherwise the Railway URL bypasses Access).
+Railway: project with a `dev` environment → Postgres plugin (`DATABASE_URL`) → service from the repo using the root `Dockerfile`; healthcheck `GET /api/health`; boot runs `migrate deploy` + `db seed` + `node dist/index.js`. Add the custom domain and **disable the generated `*.up.railway.app` domain** (it would bypass Access).
 
-## Put dev behind Cloudflare Access
-
-The domain is owned but not yet on Cloudflare, so first move DNS:
-
-1. **Add the site** in Cloudflare → it gives you two nameservers.
-2. **At the registrar**, replace the nameservers with Cloudflare's. Wait for
-   activation (Cloudflare emails you; usually minutes–hours).
-3. **DNS record:** add `dev.<yourdomain>` as a **CNAME** to the Railway service
-   target, **Proxied (orange cloud)**.
-4. **Zero Trust → Access → Applications → Add → Self-hosted:**
-   - Application domain: `dev.<yourdomain>`.
-   - Policy: **Allow** with an `Emails` rule for your address (and/or add a
-     **Google** login method). Enable **One-time PIN** as a fallback login method.
-   - Free Zero Trust plan covers up to 50 users — no cost for this.
-5. **Verify:** in an incognito window, `https://dev.<yourdomain>` redirects to the
-   Cloudflare login; after Google/OTP it loads the app. Confirm the
-   `*.up.railway.app` URL no longer resolves to the app.
-
-### Optional hardening (later)
-
-For a fully private origin (no public URL at all), run a **Cloudflare Tunnel**
-(`cloudflared`) as a sidecar and point Access at the tunnel instead of a proxied
-public hostname. Not required for v1.
+Cloudflare: move DNS to Cloudflare, CNAME `dev.<domain>` → the Railway target (proxied), then Zero Trust → Access → self-hosted app on that hostname with an email Allow policy (+ One-time PIN fallback). Verify incognito hits the Access login and the Railway URL no longer serves the app.
 
 ## Backups & restore
 
-The whole point of this app is **persistent, long-running campaigns** — months of
-character history in the audit log (`CharacterEvent`), inventory, sessions, journal
-entries. That history lives entirely in one Postgres volume (`postgres_data`). A
-dropped volume or a bad migration loses the campaign. Treat backups as mandatory ops
-for any environment that holds real data.
-
-> **Real values used below** (from `docker-compose.yml` / `docker-compose.prod.yml`):
-> the DB **service** is `db`, image `postgres:17-alpine`, default **user** and
-> **database** are both `character_sheet`, internal **port** `5432`. Dev publishes
-> `5432` on the host; the prod compose does **not** publish a host port (the DB is
-> reachable only inside the Compose network), so always go through
-> `docker compose … exec db …`. If you overrode `POSTGRES_USER`/`POSTGRES_DB` in
-> `.env.production`, substitute those names in every command.
-
-### Manual backup (dockerized Postgres)
-
-Use the **custom format** (`-Fc`): it's compressed and restores with `pg_restore`'s
-selective/parallel options. Pipe straight to a host file with `-T` (no TTY) so the
-redirect lands on your machine, not in the container.
+Months of campaign history live in one Postgres volume; a bad migration or dropped volume loses it. The DB service is `db`, user/database both `character_sheet`. Prod compose publishes no host port — always go through `docker compose … exec db`.
 
 ```bash
-# Dev stack (docker-compose.yml) — DB is service `db`, user/db = character_sheet
+# Backup (custom format — compressed, selective restore):
 docker compose exec -T db pg_dump -U character_sheet -Fc character_sheet \
   > "backup-$(date +%Y%m%d-%H%M%S).dump"
+# (prod: add -f docker-compose.prod.yml --env-file .env.production)
 
-# Prod stack (docker-compose.prod.yml) — same service name, no host port published
-docker compose -f docker-compose.prod.yml --env-file .env.production \
-  exec -T db pg_dump -U character_sheet -Fc character_sheet \
-  > "prod-backup-$(date +%Y%m%d-%H%M%S).dump"
-```
-
-A single database holds everything this app writes, so `pg_dump character_sheet` is a
-complete backup. (`pg_dumpall` would also capture cluster-wide roles/globals — not
-needed here, since the app uses one role created by the Postgres image. If you ever
-add roles, capture them with `pg_dumpall --globals-only`.)
-
-A plain-SQL alternative (human-readable, restores with `psql`) if you prefer it:
-
-```bash
-docker compose exec -T db pg_dump -U character_sheet character_sheet \
-  | gzip > "backup-$(date +%Y%m%d-%H%M%S).sql.gz"
-```
-
-### Manual restore
-
-Restoring the custom-format dump. `--clean --if-exists` drops existing objects first
-so the restore is idempotent into a non-empty database:
-
-```bash
-# Dev stack
+# Restore (idempotent into a non-empty DB):
 docker compose exec -T db pg_restore -U character_sheet -d character_sheet \
   --clean --if-exists < backup-YYYYMMDD-HHMMSS.dump
-
-# Prod stack
-docker compose -f docker-compose.prod.yml --env-file .env.production \
-  exec -T db pg_restore -U character_sheet -d character_sheet \
-  --clean --if-exists < prod-backup-YYYYMMDD-HHMMSS.dump
 ```
 
-For the worst case (corrupt/empty volume), bring the DB up fresh and restore into it:
+One database holds everything, so `pg_dump character_sheet` is a complete backup. After a restore, restart the backend and verify `/api/health` + `/api/characters` + an audit log. (The restore path was verified end-to-end 2026-06-26 — re-run the dry run into a throwaway DB after major schema changes.)
 
-```bash
-docker compose up db -d
-# wait for healthy, then:
-docker compose exec -T db pg_restore -U character_sheet -d character_sheet < backup.dump
-```
+For hosted (Railway) dev, `pg_dump "$DATABASE_URL" -Fc` works directly; automate with a cron service uploading to **off-box** object storage (a backup living in the same Railway project dies with it). Retention ~7 daily + 4 weekly via the storage provider's lifecycle rules. If automation is deferred: manual dump before every migration/deploy and at least weekly during active play.
 
-Restoring the plain-SQL `.sql.gz` variant instead:
-
-```bash
-gunzip -c backup-YYYYMMDD-HHMMSS.sql.gz \
-  | docker compose exec -T db psql -U character_sheet -d character_sheet
-```
-
-After any restore, restart the app/backend so Prisma reconnects, and verify data
-round-trips: `…/api/health` is `{"status":"ok"}`, `/api/characters` lists the
-expected characters, and a character's audit log still shows its history.
-
-> **✅ Restore path verified (2026-06-26, dev stack).** The full round-trip was run
-> end-to-end with the exact commands above: `pg_dump -Fc` → `createdb restore_test` →
-> `pg_restore -d restore_test`. All 27 tables matched the source **row-for-row**, a
-> 6-table relational join (character → race / class / inventory) was identical, and an
-> FK-integrity check found **0 orphaned rows**; the throwaway DB was dropped and the
-> live database left untouched. Caveat: the dev dataset's audit-log tables
-> (`CharacterEvent`, `Session`, `JournalEntry`) were empty, so populated-history
-> fidelity is inferred from the mechanism (every populated table + all FKs restored
-> exactly), not separately exercised. Re-run this dry run after major schema changes —
-> the recipe is the dump/restore commands above into a throwaway DB.
-
-### Automated backups for hosted (Railway) dev
-
-The dev host is Railway behind Cloudflare Access (see above). Railway's Postgres
-plugin exposes a `DATABASE_URL` (and `PG*` vars), so `pg_dump` can run against it
-directly — no `docker compose` indirection:
-
-```bash
-pg_dump "$DATABASE_URL" -Fc -f "cs-$(date +%Y%m%d).dump"
-```
-
-Recommended automated path, in order of preference:
-
-1. **Railway cron service.** Add a second service (a tiny image with `postgres-client`
-   + `awscli`/`rclone`) on a **cron schedule** (e.g. daily `0 4 * * *`). It runs the
-   `pg_dump "$DATABASE_URL" -Fc` above and uploads the dump to **off-box object
-   storage** (S3, Cloudflare R2, Backblaze B2). Off-box is the point — a backup that
-   lives in the same Railway project dies with it.
-2. **Managed snapshots.** If the Postgres plugin/plan offers automated daily snapshots,
-   enable them as a baseline — but still keep an independent off-box `pg_dump`, since
-   provider snapshots are tied to the same account/provider.
-
-**Retention:** keep ~7 daily + 4 weekly + a few monthly dumps. Enforce it with the
-storage provider's lifecycle/expiry rules (e.g. S3/R2 lifecycle policy) rather than a
-hand-rolled cleanup script, and confirm new dumps are actually landing.
-
-**If full automation is deferred:** run the manual `pg_dump` above on a fixed cadence —
-**before every migration/deploy** (see below) and at least **weekly** during active
-play — and copy the dump off the host. Document the last-known-good backup date
-somewhere the DM will see it.
-
-### Prisma migrations: a bad migration needs a restore, not a rollback
-
-Prisma migrations are **forward-only**. The deploy path
-(`prisma migrate deploy`, run on every container/Railway boot — see `development.md`)
-only ever rolls migrations *forward*; there is no `migrate down`/rollback. A migration
-that drops or corrupts data **cannot be undone by Prisma** — the recovery path is a
-**database restore** from the most recent good dump.
-
-Therefore:
-
-- **Always take a fresh `pg_dump` immediately before applying a new migration** to any
-  environment with real data. That dump is your only rollback.
-- Develop migrations against a throwaway DB (`prisma migrate dev` locally, or a
-  worktree's isolated stack — see `development.md`), never first against prod data.
-- If a deployed migration goes wrong: restore the pre-migration dump (above), fix the
-  migration in code, and only then redeploy. Don't try to hand-patch a half-applied
-  migration in place.
+**Prisma migrations are forward-only** — there is no rollback. A migration that drops or corrupts data is recovered by **restoring the pre-migration dump**, fixing the migration in code, and redeploying. Always take a fresh dump immediately before applying a migration to any environment with real data; develop migrations against a throwaway DB first.
 
 ## When prod comes
 
-In-app authentication + per-owner ownership are shipped (#101/#102), so prod is no
-longer blocked on them. Prod reuses the same combined image in a second Railway
-environment — public (no Cloudflare Access, since the app gates itself) or with its
-own Access policy as desired. Remaining prod prerequisites: register a prod Google
-OAuth client + redirect URI, and set `APP_BASE_URL`/`GOOGLE_CLIENT_*`/`SESSION_COOKIE_SECURE=true`
-for the prod origin. (The single-origin CSP allowances for Google avatars, the 3D
-dice worker, and the Cloudflare beacon are in place — see `backend/src/lib/security.ts`.)
+Auth + ownership are shipped, so prod reuses the combined image in a second Railway environment (public, or behind its own Access policy). Remaining: a prod Google OAuth client + redirect URI, and `APP_BASE_URL`/`GOOGLE_CLIENT_*`/`SESSION_COOKIE_SECURE=true` for the prod origin.

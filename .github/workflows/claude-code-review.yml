@@ -34,21 +34,21 @@ jobs:
         with:
           fetch-depth: 1
 
-      # Sonnet review for every PR. A SHARED mandate — documentation-impact +
-      # comment-drift checks, an anti-false-positive guard, and a formal
-      # REQUEST_CHANGES verdict — applies uniformly to ALL base branches (#157),
-      # so doc/comment drift is caught at the feature->staging PR where it's
-      # introduced rather than deferred to (and surprise-failing) the
-      # staging->main promotion. --allowed-tools keep the reviewer's read/search
-      # tools AND permit `gh pr review`, so the reviewer can submit its verdict —
-      # which the "Enforce verdict" step below turns into a pass/fail check.
+      # Sonnet review for every PR. A SHARED mandate — a comment-drift check, an
+      # anti-false-positive guard, and a formal REQUEST_CHANGES verdict — applies
+      # uniformly to ALL base branches (#157). Docs are pointers, not mirrors
+      # (see CLAUDE.md): the reviewer flags a doc only when the diff makes an
+      # existing doc statement FALSE, never for missing additions.
+      # --allowed-tools keep the reviewer's read/search tools AND permit
+      # `gh pr review`, so the reviewer can submit its verdict — which the
+      # "Enforce verdict" step below turns into a pass/fail check.
       # NOTE: preserve the single-outer / double-inner quoting around
       # --append-system-prompt; the inner double quotes keep the prompt a single
       # arg. `$SHARED` is interpolated via the standard '"'"$VAR"'"' splice.
       - name: Configure review
         id: cfg
         run: |
-          SHARED='After reviewing code, assess DOCUMENTATION IMPACT: map the PR changed paths through the doc-ownership map in CLAUDE.md (backend/src/routes or app.ts -> architecture.md router map; backend/src/lib -> architecture.md lib table / leveling.md; schema.prisma JSON columns/models/event types -> architecture.md; backend/src/lib/events.ts EventCategory -> architecture.md audit log; frontend/src/{features,pages,components/ui,lib} -> frontend.md; new mutable transaction domain -> CLAUDE.md + architecture.md; Dockerfile/compose/env -> deployment.md; package.json/Prisma -> development.md). For any doc-significant change lacking a matching doc update in this PR, post a comment naming the specific doc + section to update. COMMENT DRIFT: inspect the diff for code comments, docstrings, or schema.prisma model comments that the change contradicts or strands (code under a comment changed but the comment claim is now stale, or new behavior a nearby comment misdescribes); flag each inline. ANTI-FALSE-POSITIVE: Review the three-dot base...head diff only. Before claiming any file/doc/symbol is missing or absent, read it at the PR HEAD with the Read tool and confirm; never infer absence from a merge diff. VERDICT: submit a formal PR review of REQUEST_CHANGES (run: gh pr review ${{ github.event.pull_request.number }} --request-changes --body <summary>) when EITHER documentation/comments need updating OR there are findings beyond minor nits; otherwise approve or comment as usual. Keep the inline --comment findings; the verdict just summarizes.'
+          SHARED='COMMENT DRIFT: inspect the diff for code comments, docstrings, or schema.prisma model comments that the change contradicts or strands (code under a comment changed but the comment claim is now stale, or new behavior a nearby comment misdescribes); flag each inline. Docs under docs/ and CLAUDE.md are pointers, not mirrors: flag them ONLY if this diff makes an existing statement in them false — never request additions describing new code. ANTI-FALSE-POSITIVE: Review the three-dot base...head diff only. Before claiming any file/doc/symbol is missing or absent, read it at the PR HEAD with the Read tool and confirm; never infer absence from a merge diff. VERDICT: submit a formal PR review of REQUEST_CHANGES (run: gh pr review ${{ github.event.pull_request.number }} --request-changes --body <summary>) when there are findings beyond minor nits; otherwise approve or comment as usual. Keep the inline --comment findings; the verdict just summarizes.'
           echo 'claude_args=--model claude-sonnet-4-6 --allowed-tools "Bash(gh:*)" "Read" "Grep" "Glob" --append-system-prompt "'"$SHARED"'"' >> "$GITHUB_OUTPUT"
 
       # Record a UTC marker before the review runs. "Enforce verdict" only counts

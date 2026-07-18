@@ -90,7 +90,7 @@ Launch one background subagent per issue (`run_in_background: true`), so they bu
 > - Backend calls: only through `frontend/src/api/client.ts` — never `fetch` directly from a component.
 > - Frontend placement: domain-agnostic primitives in `components/ui/`, domain components in `features/<domain>/`, pure logic (no JSX) in `lib/`.
 > - Backend (if touched): derive-don't-persist; 5e rules data only in `lib/`; mutate state only through `…/transactions` endpoints; level-gated state through `LEVEL_GATED_RECONCILERS` + a clamp-on-read.
-> - Docs: if your change touches a surface in the CLAUDE.md doc-map, update the mapped doc in the same PR.
+> - Docs: pointers, not mirrors — if your change makes an existing statement in `docs/`/CLAUDE.md false, fix or delete that statement in the same PR; never append descriptions of new code.
 > - Artifacts: screenshots/captures go to `/tmp` only — never the project tree.
 > ```
 >
