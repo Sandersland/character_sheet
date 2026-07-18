@@ -181,7 +181,6 @@ export default function StartingEquipmentEditor({
         </button>
       </div>
 
-      {/* ── Package mode ─────────────────────────────────────────────────── */}
       {isPackage && value.mode === "package" && (
         <div className="flex flex-col gap-5">
           {startingEquipment.groups.map((group, groupIdx) => {
@@ -274,7 +273,6 @@ export default function StartingEquipmentEditor({
         </div>
       )}
 
-      {/* ── Gold mode ──────────────────────────────────────────────────────── */}
       {isGold && value.mode === "gold" && (
         <div className="flex flex-col gap-3">
           <p className="text-sm text-parchment-700">

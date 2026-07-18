@@ -61,7 +61,6 @@ export default function LevelUpModal({
   return (
     <Modal title="Level Up" onClose={onClose}>
       <div className="flex flex-col gap-4">
-        {/* ── Which class advances ── */}
         <fieldset className="flex flex-col gap-2">
           <legend className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
             Which class advances?

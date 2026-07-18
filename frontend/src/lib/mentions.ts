@@ -186,8 +186,7 @@ export function parseTrigger(textBeforeCaret: string): MentionTrigger | null {
   return { active: true, query: raw, triggerStart: at };
 }
 
-// --- contenteditable DOM ⇄ @[<uuid>] string (the edit-time chip editor, #269) ---
-
+/** contenteditable DOM ⇄ @[<uuid>] string — the edit-time chip editor (#269). */
 export interface MentionResolved {
   name: string;
   type: EntityType;
