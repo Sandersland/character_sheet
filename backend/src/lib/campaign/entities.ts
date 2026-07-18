@@ -2,6 +2,7 @@
 // and journal-ref attribution. HTTP-free; routes pass `db` and map results.
 
 import type { PrismaClient } from "@/generated/prisma/client.js";
+import { wouldCreateCycle } from "@/lib/activity/entity-merges.js";
 import {
   aggregateEntityStats,
   resolveVisibleMergeUnion,
@@ -49,6 +50,152 @@ export async function findViewableEntity(
   });
   if (!entity || entity.campaignId !== campaignId) return null;
   return isOwner || entity.visibility !== "HIDDEN" ? entity : null;
+}
+
+// ── Entity identity merges (#387) ────────────────────────────────────────────
+
+type MergeRow = {
+  id: string;
+  campaignId: string;
+  mergedEntityId: string;
+  survivorEntityId: string;
+  status: "PREPARED" | "EXECUTED";
+  note: string | null;
+  preparedAt: Date;
+  executedAt: Date | null;
+};
+
+function serializeMerge(m: MergeRow) {
+  return {
+    id: m.id,
+    campaignId: m.campaignId,
+    mergedEntityId: m.mergedEntityId,
+    survivorEntityId: m.survivorEntityId,
+    status: m.status,
+    note: m.note,
+    preparedAt: m.preparedAt,
+    executedAt: m.executedAt,
+  };
+}
+
+type SerializedMerge = ReturnType<typeof serializeMerge>;
+
+export type MergeResult =
+  | { ok: true; merge: SerializedMerge }
+  | { ok: false; status: 400 | 404; error: string };
+
+export type DeleteMergeResult = { ok: true } | { ok: false; status: 404; error: string };
+
+// Owner sees all; a non-owner sees only EXECUTED merges whose both identities
+// are REVEALED (a PREPARED merge or a hidden identity never leaks).
+export async function listVisibleMerges(
+  db: PrismaClient,
+  campaignId: string,
+  isOwner: boolean,
+): Promise<SerializedMerge[]> {
+  const merges = await db.campaignEntityMerge.findMany({
+    where: { campaignId },
+    include: {
+      mergedEntity: { select: { visibility: true } },
+      survivorEntity: { select: { visibility: true } },
+    },
+    orderBy: { preparedAt: "asc" },
+  });
+
+  const visible = isOwner
+    ? merges
+    : merges.filter(
+        (m) =>
+          m.status === "EXECUTED" &&
+          m.mergedEntity.visibility === "REVEALED" &&
+          m.survivorEntity.visibility === "REVEALED",
+      );
+
+  return visible.map(serializeMerge);
+}
+
+// Validates same-campaign, no self-merge, the merged entity isn't already
+// merged, and no cycle. Creates a PREPARED record.
+export async function prepareMerge(
+  db: PrismaClient,
+  campaignId: string,
+  input: { mergedEntityId: string; survivorEntityId: string; note?: string },
+): Promise<MergeResult> {
+  const { mergedEntityId, survivorEntityId, note } = input;
+
+  if (mergedEntityId === survivorEntityId) {
+    return { ok: false, status: 400, error: "An entity cannot merge into itself" };
+  }
+
+  const both = await db.campaignEntity.findMany({
+    where: { id: { in: [mergedEntityId, survivorEntityId] }, campaignId },
+    select: { id: true },
+  });
+  if (both.length !== 2) {
+    return { ok: false, status: 400, error: "Both entities must belong to this campaign" };
+  }
+
+  const already = await db.campaignEntityMerge.findUnique({ where: { mergedEntityId } });
+  if (already) {
+    return { ok: false, status: 400, error: "That entity is already merged into another identity" };
+  }
+
+  const edges = await db.campaignEntityMerge.findMany({
+    where: { campaignId },
+    select: { mergedEntityId: true, survivorEntityId: true, status: true },
+  });
+  if (wouldCreateCycle(edges, mergedEntityId, survivorEntityId)) {
+    return { ok: false, status: 400, error: "That merge would create an identity cycle" };
+  }
+
+  const merge = await db.campaignEntityMerge.create({
+    data: { campaignId, mergedEntityId, survivorEntityId, note: note ?? null },
+  });
+  return { ok: true, merge: serializeMerge(merge) };
+}
+
+// Flips PREPARED→EXECUTED and auto-reveals a HIDDEN survivor in the same txn
+// (#379). Idempotent: keeps the first executedAt.
+export async function executeMerge(
+  db: PrismaClient,
+  campaignId: string,
+  mergeId: string,
+): Promise<MergeResult> {
+  const merge = await db.campaignEntityMerge.findUnique({ where: { id: mergeId } });
+  if (!merge || merge.campaignId !== campaignId) {
+    return { ok: false, status: 404, error: "Merge not found" };
+  }
+
+  const updated = await db.$transaction(async (tx) => {
+    await tx.campaignEntity.update({
+      where: { id: merge.survivorEntityId },
+      data: { visibility: "REVEALED" },
+    });
+    return tx.campaignEntityMerge.update({
+      where: { id: merge.id },
+      data: { status: "EXECUTED", executedAt: merge.executedAt ?? new Date() },
+    });
+  });
+  return { ok: true, merge: serializeMerge(updated) };
+}
+
+// Removes the record; the entities regain full independence and refs stay
+// pointing at whichever id was actually tagged.
+export async function deleteMerge(
+  db: PrismaClient,
+  campaignId: string,
+  mergeId: string,
+): Promise<DeleteMergeResult> {
+  const merge = await db.campaignEntityMerge.findUnique({
+    where: { id: mergeId },
+    select: { id: true, campaignId: true },
+  });
+  if (!merge || merge.campaignId !== campaignId) {
+    return { ok: false, status: 404, error: "Merge not found" };
+  }
+
+  await db.campaignEntityMerge.delete({ where: { id: merge.id } });
+  return { ok: true };
 }
 
 type ListedEntity = { id: string; notes: string | null };

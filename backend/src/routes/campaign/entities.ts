@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
-import { collectMergedInIdentities, wouldCreateCycle } from "@/lib/activity/entity-merges.js";
+import { collectMergedInIdentities } from "@/lib/activity/entity-merges.js";
 import {
   matchEntityQuery,
   resolveVisibleMergeUnion,
@@ -10,8 +10,12 @@ import {
   visibleEntryWhere,
 } from "@/lib/activity/entity-stats.js";
 import {
+  deleteMerge,
+  executeMerge,
   findViewableEntity,
+  listVisibleMerges,
   loadSessionContext,
+  prepareMerge,
   withEntityStats,
 } from "@/lib/campaign/entities.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
@@ -251,59 +255,13 @@ const prepareMergeSchema = z
   })
   .strict();
 
-type MergeRow = {
-  id: string;
-  campaignId: string;
-  mergedEntityId: string;
-  survivorEntityId: string;
-  status: "PREPARED" | "EXECUTED";
-  note: string | null;
-  preparedAt: Date;
-  executedAt: Date | null;
-};
-
-function serializeMerge(m: MergeRow) {
-  return {
-    id: m.id,
-    campaignId: m.campaignId,
-    mergedEntityId: m.mergedEntityId,
-    survivorEntityId: m.survivorEntityId,
-    status: m.status,
-    note: m.note,
-    preparedAt: m.preparedAt,
-    executedAt: m.executedAt,
-  };
-}
-
-// GET list — owner sees all; a non-owner sees only EXECUTED merges whose both
-// identities are REVEALED (a PREPARED merge or a hidden identity never leaks).
+// GET list — owner sees all; non-owner scrubbing lives in listVisibleMerges.
 entitiesRouter.get("/campaigns/:id/entities/merges", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
-
-  const merges = await prisma.campaignEntityMerge.findMany({
-    where: { campaignId: req.params.id },
-    include: {
-      mergedEntity: { select: { visibility: true } },
-      survivorEntity: { select: { visibility: true } },
-    },
-    orderBy: { preparedAt: "asc" },
-  });
-
-  const visible =
-    role === "OWNER"
-      ? merges
-      : merges.filter(
-          (m) =>
-            m.status === "EXECUTED" &&
-            m.mergedEntity.visibility === "REVEALED" &&
-            m.survivorEntity.visibility === "REVEALED",
-        );
-
-  res.json(visible.map(serializeMerge));
+  res.json(await listVisibleMerges(prisma, req.params.id, role === "OWNER"));
 });
 
-// POST prepare — OWNER only. Validates same-campaign, no self-merge, the merged
-// entity isn't already merged, and no cycle. Creates a PREPARED record.
+// POST prepare — OWNER only.
 entitiesRouter.post("/campaigns/:id/entities/merges", async (req, res) => {
   await assertCampaignOwner(
     prisma,
@@ -315,45 +273,16 @@ entitiesRouter.post("/campaigns/:id/entities/merges", async (req, res) => {
 
   const parsed = parseBodyOr400(prepareMergeSchema, req.body, res);
   if (parsed === undefined) return;
-  const { mergedEntityId, survivorEntityId, note } = parsed;
 
-  if (mergedEntityId === survivorEntityId) {
-    res.status(400).json({ error: "An entity cannot merge into itself" });
+  const result = await prepareMerge(prisma, req.params.id, parsed);
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
     return;
   }
-
-  const both = await prisma.campaignEntity.findMany({
-    where: { id: { in: [mergedEntityId, survivorEntityId] }, campaignId: req.params.id },
-    select: { id: true },
-  });
-  if (both.length !== 2) {
-    res.status(400).json({ error: "Both entities must belong to this campaign" });
-    return;
-  }
-
-  const already = await prisma.campaignEntityMerge.findUnique({ where: { mergedEntityId } });
-  if (already) {
-    res.status(400).json({ error: "That entity is already merged into another identity" });
-    return;
-  }
-
-  const edges = await prisma.campaignEntityMerge.findMany({
-    where: { campaignId: req.params.id },
-    select: { mergedEntityId: true, survivorEntityId: true, status: true },
-  });
-  if (wouldCreateCycle(edges, mergedEntityId, survivorEntityId)) {
-    res.status(400).json({ error: "That merge would create an identity cycle" });
-    return;
-  }
-
-  const merge = await prisma.campaignEntityMerge.create({
-    data: { campaignId: req.params.id, mergedEntityId, survivorEntityId, note: note ?? null },
-  });
-  res.status(201).json(serializeMerge(merge));
+  res.status(201).json(result.merge);
 });
 
-// POST execute — OWNER only. Flips PREPARED→EXECUTED and auto-reveals a HIDDEN
-// survivor in the same txn (#379). Idempotent: keeps the first executedAt.
+// POST execute — OWNER only.
 entitiesRouter.post("/campaigns/:id/entities/merges/:mergeId/execute", async (req, res) => {
   await assertCampaignOwner(
     prisma,
@@ -363,27 +292,15 @@ entitiesRouter.post("/campaigns/:id/entities/merges/:mergeId/execute", async (re
     "Only the campaign owner may execute a merge",
   );
 
-  const merge = await prisma.campaignEntityMerge.findUnique({ where: { id: req.params.mergeId } });
-  if (!merge || merge.campaignId !== req.params.id) {
-    res.status(404).json({ error: "Merge not found" });
+  const result = await executeMerge(prisma, req.params.id, req.params.mergeId);
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
     return;
   }
-
-  const updated = await prisma.$transaction(async (tx) => {
-    await tx.campaignEntity.update({
-      where: { id: merge.survivorEntityId },
-      data: { visibility: "REVEALED" },
-    });
-    return tx.campaignEntityMerge.update({
-      where: { id: merge.id },
-      data: { status: "EXECUTED", executedAt: merge.executedAt ?? new Date() },
-    });
-  });
-  res.json(serializeMerge(updated));
+  res.json(result.merge);
 });
 
-// DELETE unmerge — OWNER only. Removes the record; the entities regain full
-// independence and refs stay pointing at whichever id was actually tagged.
+// DELETE unmerge — OWNER only.
 entitiesRouter.delete("/campaigns/:id/entities/merges/:mergeId", async (req, res) => {
   await assertCampaignOwner(
     prisma,
@@ -393,16 +310,11 @@ entitiesRouter.delete("/campaigns/:id/entities/merges/:mergeId", async (req, res
     "Only the campaign owner may unmerge entities",
   );
 
-  const merge = await prisma.campaignEntityMerge.findUnique({
-    where: { id: req.params.mergeId },
-    select: { id: true, campaignId: true },
-  });
-  if (!merge || merge.campaignId !== req.params.id) {
-    res.status(404).json({ error: "Merge not found" });
+  const result = await deleteMerge(prisma, req.params.id, req.params.mergeId);
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
     return;
   }
-
-  await prisma.campaignEntityMerge.delete({ where: { id: merge.id } });
   res.status(204).end();
 });
 
