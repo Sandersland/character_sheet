@@ -59,7 +59,7 @@ export default function AsiAbilityGrid({ asi, currentScores }: { asi: AsiDraft; 
       </div>
 
       <p className="mx-auto mt-3.5 max-w-xl text-center text-[12.5px] italic text-parchment-500">
-        ⚔ Prefer a feat? Switch the toggle to browse Great Weapon Master, Sentinel, Resilient…
+        Prefer a feat? Switch the toggle to browse Great Weapon Master, Sentinel, Resilient…
       </p>
     </>
   );
