@@ -2,17 +2,18 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
-import { collectMergedInIdentities, wouldCreateCycle } from "@/lib/activity/entity-merges.js";
+import { matchEntityQuery } from "@/lib/activity/entity-stats.js";
 import {
-  aggregateEntityStats,
-  buildSessionOrdinalMap,
-  matchEntityQuery,
-  resolveVisibleMergeUnion,
-  tallyCoMentions,
-  visibleEntryWhere,
-  type EntityStatsAggregate,
-  type StatRef,
-} from "@/lib/activity/entity-stats.js";
+  buildEntityActivityFeed,
+  buildEntityBacklinks,
+  buildEntityConnections,
+  deleteMerge,
+  executeMerge,
+  findViewableEntity,
+  listVisibleMerges,
+  prepareMerge,
+  withEntityStats,
+} from "@/lib/campaign/entities.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
 
@@ -61,31 +62,6 @@ const updateEntitySchema = z
 // ignored. ?include=stats attaches derived mention stats (computed at read; a
 // fixed number of queries regardless of result size).
 
-// Session context resolver for mention refs: title + startedAt-ordinal (#839).
-async function loadSessionContext(campaignId: string) {
-  const sessions = await prisma.session.findMany({
-    where: { campaignId },
-    orderBy: { startedAt: "asc" },
-    select: { id: true, title: true },
-  });
-  return {
-    ordinals: buildSessionOrdinalMap(sessions),
-    titles: new Map(sessions.map((s) => [s.id, s.title])),
-  };
-}
-
-type SessionContext = Awaited<ReturnType<typeof loadSessionContext>>;
-
-function mentionRef(ref: StatRef | null, ctx: SessionContext) {
-  if (!ref) return null;
-  return {
-    sessionId: ref.sessionId,
-    sessionTitle: (ref.sessionId ? ctx.titles.get(ref.sessionId) : null) ?? null,
-    sessionOrdinal: (ref.sessionId ? ctx.ordinals.get(ref.sessionId) : null) ?? null,
-    date: ref.date,
-  };
-}
-
 function parseLimit(raw: unknown, fallback: number): number {
   const n = Number(raw);
   return Number.isInteger(n) && n > 0 ? Math.min(n, 50) : fallback;
@@ -96,129 +72,6 @@ function parseEntityType(raw: unknown): (typeof ENTITY_TYPES)[number] | undefine
   return (ENTITY_TYPES as readonly string[]).includes(raw as string)
     ? (raw as (typeof ENTITY_TYPES)[number])
     : undefined;
-}
-
-// Hidden entities are invisible to non-owners: null → 404 rather than leak existence.
-async function findViewableEntity(entityId: string, campaignId: string, isOwner: boolean) {
-  const entity = await prisma.campaignEntity.findUnique({
-    where: { id: entityId },
-    select: { id: true, campaignId: true, visibility: true },
-  });
-  if (!entity || entity.campaignId !== campaignId) return null;
-  return isOwner || entity.visibility !== "HIDDEN" ? entity : null;
-}
-
-type ListedEntity = { id: string; notes: string | null };
-
-const EMPTY_AGGREGATE: EntityStatsAggregate = {
-  mentionCount: 0,
-  firstMentioned: null,
-  lastMentioned: null,
-  chroniclers: [],
-};
-
-function statsPayload(
-  agg: EntityStatsAggregate | undefined,
-  notes: string | null,
-  ctx: SessionContext,
-) {
-  const a = agg ?? EMPTY_AGGREGATE;
-  return {
-    mentionCount: a.mentionCount,
-    firstMentioned: mentionRef(a.firstMentioned, ctx),
-    lastMentioned: mentionRef(a.lastMentioned, ctx),
-    chroniclers: a.chroniclers,
-    hasDescription: (notes ?? "").trim().length > 0,
-  };
-}
-
-// Refs tagging a merged-in identity attribute to every listed survivor above it.
-function buildAttributionIndex(union: Map<string, string[]>): Map<string, string[]> {
-  const attributeTo = new Map<string, string[]>();
-  for (const [listedId, mergedIn] of union) {
-    for (const id of [listedId, ...mergedIn]) {
-      getOrPush(attributeTo, id, listedId);
-    }
-  }
-  return attributeTo;
-}
-
-function getOrPush(map: Map<string, string[]>, key: string, value: string): void {
-  const existing = map.get(key);
-  if (existing) {
-    existing.push(value);
-    return;
-  }
-  map.set(key, [value]);
-}
-
-async function fetchVisibleStatRefs(
-  campaignId: string,
-  userId: string,
-  attributeTo: Map<string, string[]>,
-): Promise<StatRef[]> {
-  if (attributeTo.size === 0) return [];
-  const refRows = await prisma.journalEntryRef.findMany({
-    where: {
-      entityId: { in: [...attributeTo.keys()] },
-      entry: visibleEntryWhere(userId, campaignId),
-    },
-    select: {
-      entityId: true,
-      entryId: true,
-      entry: {
-        select: {
-          sessionId: true,
-          date: true,
-          loggedAt: true,
-          createdAt: true,
-          character: { select: { name: true } },
-        },
-      },
-    },
-  });
-  return refRows.flatMap((row) =>
-    (attributeTo.get(row.entityId) ?? []).map((survivor) => ({
-      entityId: survivor,
-      entryId: row.entryId,
-      characterName: row.entry.character.name,
-      sessionId: row.entry.sessionId,
-      date: row.entry.date,
-      loggedAt: row.entry.loggedAt,
-      createdAt: row.entry.createdAt,
-    })),
-  );
-}
-
-// Stats block for the list route (#839): fixed query count regardless of N.
-async function withEntityStats<E extends ListedEntity>(
-  campaignId: string,
-  userId: string,
-  isOwner: boolean,
-  matched: E[],
-) {
-  const [edges, allEntities, ctx] = await Promise.all([
-    prisma.campaignEntityMerge.findMany({
-      where: { campaignId },
-      select: { mergedEntityId: true, survivorEntityId: true, status: true },
-    }),
-    // A type-filtered list may miss merged identities of other types; the scrub
-    // needs every entity's visibility.
-    prisma.campaignEntity.findMany({
-      where: { campaignId },
-      select: { id: true, visibility: true },
-    }),
-    loadSessionContext(campaignId),
-  ]);
-  const revealedIds = new Set(
-    allEntities.filter((e) => e.visibility === "REVEALED").map((e) => e.id),
-  );
-  const listedIds = matched.map((e) => e.id);
-  const union = resolveVisibleMergeUnion(edges, listedIds, revealedIds, isOwner);
-  const attributeTo = buildAttributionIndex(union);
-  const statRefs = await fetchVisibleStatRefs(campaignId, userId, attributeTo);
-  const stats = aggregateEntityStats(statRefs);
-  return matched.map((e) => ({ ...e, stats: statsPayload(stats.get(e.id), e.notes, ctx) }));
 }
 
 entitiesRouter.get("/campaigns/:id/entities", async (req, res) => {
@@ -258,100 +111,18 @@ entitiesRouter.get("/campaigns/:id/entities", async (req, res) => {
     return;
   }
 
-  res.json(await withEntityStats(req.params.id, req.user!.id, isOwner, matched));
+  res.json(await withEntityStats(prisma, req.params.id, req.user!.id, isOwner, matched));
 });
 
 // ── GET /api/campaigns/:id/entities/activity ─────────────────────────────────
-// Campaign-wide Codex activity (#839): the newest visible mention refs merged
-// with entity-created events, newest-first. Registered before the generic
-// :entityId routes so the /activity segment can't be shadowed.
-
-type ActivitySortable = { sortKey: [number, number, number] };
-
-function activitySortKey(date: Date, loggedAt?: Date, createdAt?: Date): [number, number, number] {
-  return [date.getTime(), (loggedAt ?? date).getTime(), (createdAt ?? date).getTime()];
-}
-
-function compareActivityDesc(a: ActivitySortable, b: ActivitySortable): number {
-  return (
-    b.sortKey[0] - a.sortKey[0] || b.sortKey[1] - a.sortKey[1] || b.sortKey[2] - a.sortKey[2]
-  );
-}
+// Campaign-wide Codex activity (#839). Registered before the generic :entityId
+// routes so the /activity segment can't be shadowed.
 
 entitiesRouter.get("/campaigns/:id/entities/activity", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
-  const isOwner = role === "OWNER";
-
   const limit = parseLimit(req.query.limit, 20);
-
-  // Two bounded streams (each pre-sorted + capped at N) merged in memory.
-  const [refs, createdEntities, ctx] = await Promise.all([
-    prisma.journalEntryRef.findMany({
-      where: {
-        entity: {
-          campaignId: req.params.id,
-          ...(isOwner ? {} : { visibility: "REVEALED" }),
-        },
-        entry: visibleEntryWhere(req.user!.id, req.params.id),
-      },
-      select: {
-        entity: { select: { id: true, name: true, type: true } },
-        entry: {
-          select: {
-            sessionId: true,
-            date: true,
-            loggedAt: true,
-            createdAt: true,
-            character: { select: { name: true } },
-          },
-        },
-      },
-      orderBy: [
-        { entry: { date: "desc" } },
-        { entry: { loggedAt: "desc" } },
-        { entry: { createdAt: "desc" } },
-      ],
-      take: limit,
-    }),
-    prisma.campaignEntity.findMany({
-      where: {
-        campaignId: req.params.id,
-        ...(isOwner ? {} : { visibility: "REVEALED" }),
-      },
-      select: { id: true, name: true, type: true, createdAt: true },
-      orderBy: { createdAt: "desc" },
-      take: limit,
-    }),
-    loadSessionContext(req.params.id),
-  ]);
-
-  const items = [
-    ...refs.map((ref) => ({
-      sortKey: activitySortKey(ref.entry.date, ref.entry.loggedAt, ref.entry.createdAt),
-      item: {
-        kind: "mention" as const,
-        characterName: ref.entry.character.name,
-        entity: ref.entity,
-        sessionOrdinal:
-          (ref.entry.sessionId ? ctx.ordinals.get(ref.entry.sessionId) : null) ?? null,
-        date: ref.entry.date,
-      },
-    })),
-    ...createdEntities.map((e) => ({
-      sortKey: activitySortKey(e.createdAt),
-      item: {
-        kind: "created" as const,
-        entity: { id: e.id, name: e.name, type: e.type },
-        date: e.createdAt,
-      },
-    })),
-  ];
-
   res.json(
-    items
-      .sort(compareActivityDesc)
-      .slice(0, limit)
-      .map(({ item }) => item),
+    await buildEntityActivityFeed(prisma, req.params.id, req.user!.id, role === "OWNER", limit),
   );
 });
 
@@ -398,59 +169,13 @@ const prepareMergeSchema = z
   })
   .strict();
 
-type MergeRow = {
-  id: string;
-  campaignId: string;
-  mergedEntityId: string;
-  survivorEntityId: string;
-  status: "PREPARED" | "EXECUTED";
-  note: string | null;
-  preparedAt: Date;
-  executedAt: Date | null;
-};
-
-function serializeMerge(m: MergeRow) {
-  return {
-    id: m.id,
-    campaignId: m.campaignId,
-    mergedEntityId: m.mergedEntityId,
-    survivorEntityId: m.survivorEntityId,
-    status: m.status,
-    note: m.note,
-    preparedAt: m.preparedAt,
-    executedAt: m.executedAt,
-  };
-}
-
-// GET list — owner sees all; a non-owner sees only EXECUTED merges whose both
-// identities are REVEALED (a PREPARED merge or a hidden identity never leaks).
+// GET list — owner sees all; non-owner scrubbing lives in listVisibleMerges.
 entitiesRouter.get("/campaigns/:id/entities/merges", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
-
-  const merges = await prisma.campaignEntityMerge.findMany({
-    where: { campaignId: req.params.id },
-    include: {
-      mergedEntity: { select: { visibility: true } },
-      survivorEntity: { select: { visibility: true } },
-    },
-    orderBy: { preparedAt: "asc" },
-  });
-
-  const visible =
-    role === "OWNER"
-      ? merges
-      : merges.filter(
-          (m) =>
-            m.status === "EXECUTED" &&
-            m.mergedEntity.visibility === "REVEALED" &&
-            m.survivorEntity.visibility === "REVEALED",
-        );
-
-  res.json(visible.map(serializeMerge));
+  res.json(await listVisibleMerges(prisma, req.params.id, role === "OWNER"));
 });
 
-// POST prepare — OWNER only. Validates same-campaign, no self-merge, the merged
-// entity isn't already merged, and no cycle. Creates a PREPARED record.
+// POST prepare — OWNER only.
 entitiesRouter.post("/campaigns/:id/entities/merges", async (req, res) => {
   await assertCampaignOwner(
     prisma,
@@ -462,45 +187,16 @@ entitiesRouter.post("/campaigns/:id/entities/merges", async (req, res) => {
 
   const parsed = parseBodyOr400(prepareMergeSchema, req.body, res);
   if (parsed === undefined) return;
-  const { mergedEntityId, survivorEntityId, note } = parsed;
 
-  if (mergedEntityId === survivorEntityId) {
-    res.status(400).json({ error: "An entity cannot merge into itself" });
+  const result = await prepareMerge(prisma, req.params.id, parsed);
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
     return;
   }
-
-  const both = await prisma.campaignEntity.findMany({
-    where: { id: { in: [mergedEntityId, survivorEntityId] }, campaignId: req.params.id },
-    select: { id: true },
-  });
-  if (both.length !== 2) {
-    res.status(400).json({ error: "Both entities must belong to this campaign" });
-    return;
-  }
-
-  const already = await prisma.campaignEntityMerge.findUnique({ where: { mergedEntityId } });
-  if (already) {
-    res.status(400).json({ error: "That entity is already merged into another identity" });
-    return;
-  }
-
-  const edges = await prisma.campaignEntityMerge.findMany({
-    where: { campaignId: req.params.id },
-    select: { mergedEntityId: true, survivorEntityId: true, status: true },
-  });
-  if (wouldCreateCycle(edges, mergedEntityId, survivorEntityId)) {
-    res.status(400).json({ error: "That merge would create an identity cycle" });
-    return;
-  }
-
-  const merge = await prisma.campaignEntityMerge.create({
-    data: { campaignId: req.params.id, mergedEntityId, survivorEntityId, note: note ?? null },
-  });
-  res.status(201).json(serializeMerge(merge));
+  res.status(201).json(result.merge);
 });
 
-// POST execute — OWNER only. Flips PREPARED→EXECUTED and auto-reveals a HIDDEN
-// survivor in the same txn (#379). Idempotent: keeps the first executedAt.
+// POST execute — OWNER only.
 entitiesRouter.post("/campaigns/:id/entities/merges/:mergeId/execute", async (req, res) => {
   await assertCampaignOwner(
     prisma,
@@ -510,27 +206,15 @@ entitiesRouter.post("/campaigns/:id/entities/merges/:mergeId/execute", async (re
     "Only the campaign owner may execute a merge",
   );
 
-  const merge = await prisma.campaignEntityMerge.findUnique({ where: { id: req.params.mergeId } });
-  if (!merge || merge.campaignId !== req.params.id) {
-    res.status(404).json({ error: "Merge not found" });
+  const result = await executeMerge(prisma, req.params.id, req.params.mergeId);
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
     return;
   }
-
-  const updated = await prisma.$transaction(async (tx) => {
-    await tx.campaignEntity.update({
-      where: { id: merge.survivorEntityId },
-      data: { visibility: "REVEALED" },
-    });
-    return tx.campaignEntityMerge.update({
-      where: { id: merge.id },
-      data: { status: "EXECUTED", executedAt: merge.executedAt ?? new Date() },
-    });
-  });
-  res.json(serializeMerge(updated));
+  res.json(result.merge);
 });
 
-// DELETE unmerge — OWNER only. Removes the record; the entities regain full
-// independence and refs stay pointing at whichever id was actually tagged.
+// DELETE unmerge — OWNER only.
 entitiesRouter.delete("/campaigns/:id/entities/merges/:mergeId", async (req, res) => {
   await assertCampaignOwner(
     prisma,
@@ -540,16 +224,11 @@ entitiesRouter.delete("/campaigns/:id/entities/merges/:mergeId", async (req, res
     "Only the campaign owner may unmerge entities",
   );
 
-  const merge = await prisma.campaignEntityMerge.findUnique({
-    where: { id: req.params.mergeId },
-    select: { id: true, campaignId: true },
-  });
-  if (!merge || merge.campaignId !== req.params.id) {
-    res.status(404).json({ error: "Merge not found" });
+  const result = await deleteMerge(prisma, req.params.id, req.params.mergeId);
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
     return;
   }
-
-  await prisma.campaignEntityMerge.delete({ where: { id: merge.id } });
   res.status(204).end();
 });
 
@@ -623,68 +302,20 @@ entitiesRouter.delete("/campaigns/:id/entities/:entityId", async (req, res) => {
 entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
 
-  const entity = await findViewableEntity(req.params.entityId, req.params.id, role === "OWNER");
+  const entity = await findViewableEntity(prisma, req.params.entityId, req.params.id, role === "OWNER");
   if (!entity) {
     res.status(404).json({ error: "Entity not found" });
     return;
   }
 
-  // Identity-merge union (#387): a survivor's backlinks include the refs of every
-  // identity that EXECUTED-merged transitively into it, each labeled by which
-  // identity was tagged. A non-owner never sees a HIDDEN identity's refs/name.
-  const edges = await prisma.campaignEntityMerge.findMany({
-    where: { campaignId: req.params.id },
-    select: { mergedEntityId: true, survivorEntityId: true, status: true },
-  });
-  let mergedIn = collectMergedInIdentities(edges, req.params.entityId, { executedOnly: true });
-  if (role !== "OWNER" && mergedIn.length > 0) {
-    const revealed = await prisma.campaignEntity.findMany({
-      where: { id: { in: mergedIn }, visibility: "REVEALED" },
-      select: { id: true },
-    });
-    const revealedSet = new Set(revealed.map((e) => e.id));
-    mergedIn = mergedIn.filter((id) => revealedSet.has(id));
-  }
-  const entityIds = [req.params.entityId, ...mergedIn];
-
-  const [refs, ctx] = await Promise.all([
-    prisma.journalEntryRef.findMany({
-      where: {
-        entityId: { in: entityIds },
-        // Own entries, or CAMPAIGN-shared ones from characters still in this
-        // campaign (refs survive a character leaving; the share must not).
-        entry: visibleEntryWhere(req.user!.id, req.params.id),
-      },
-      include: {
-        entity: { select: { id: true, name: true } },
-        entry: { include: { character: { select: { name: true } } } },
-      },
-      orderBy: [
-        { entry: { date: "desc" } },
-        { entry: { loggedAt: "desc" } },
-        { entry: { createdAt: "desc" } },
-      ],
-    }),
-    loadSessionContext(req.params.id),
-  ]);
-
   res.json(
-    refs.map((ref) => ({
-      entry: {
-        id: ref.entry.id,
-        characterId: ref.entry.characterId,
-        sessionId: ref.entry.sessionId,
-        sessionTitle: (ref.entry.sessionId ? ctx.titles.get(ref.entry.sessionId) : null) ?? null,
-        sessionOrdinal:
-          (ref.entry.sessionId ? ctx.ordinals.get(ref.entry.sessionId) : null) ?? null,
-        kind: ref.entry.kind,
-        date: ref.entry.date,
-        loggedAt: ref.entry.loggedAt,
-        body: ref.entry.body,
-      },
-      characterName: ref.entry.character.name,
-      identity: { id: ref.entity.id, name: ref.entity.name },
-    })),
+    await buildEntityBacklinks(
+      prisma,
+      req.params.id,
+      req.user!.id,
+      role === "OWNER",
+      req.params.entityId,
+    ),
   );
 });
 
@@ -696,7 +327,7 @@ entitiesRouter.get("/campaigns/:id/entities/:entityId/connections", async (req, 
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
   const isOwner = role === "OWNER";
 
-  const target = await findViewableEntity(req.params.entityId, req.params.id, isOwner);
+  const target = await findViewableEntity(prisma, req.params.entityId, req.params.id, isOwner);
   if (!target) {
     res.status(404).json({ error: "Entity not found" });
     return;
@@ -704,48 +335,7 @@ entitiesRouter.get("/campaigns/:id/entities/:entityId/connections", async (req, 
 
   const limit = parseLimit(req.query.limit, 10);
 
-  const [edges, allEntities] = await Promise.all([
-    prisma.campaignEntityMerge.findMany({
-      where: { campaignId: req.params.id },
-      select: { mergedEntityId: true, survivorEntityId: true, status: true },
-    }),
-    prisma.campaignEntity.findMany({
-      where: { campaignId: req.params.id },
-      select: { id: true, name: true, type: true, visibility: true },
-    }),
-  ]);
-  const entityById = new Map(allEntities.map((e) => [e.id, e]));
-  const revealedIds = new Set(
-    allEntities.filter((e) => e.visibility === "REVEALED").map((e) => e.id),
-  );
-  const targetIds = new Set([
-    target.id,
-    ...resolveVisibleMergeUnion(edges, [target.id], revealedIds, isOwner).get(target.id)!,
-  ]);
-
-  const targetRefs = await prisma.journalEntryRef.findMany({
-    where: {
-      entityId: { in: [...targetIds] },
-      entry: visibleEntryWhere(req.user!.id, req.params.id),
-    },
-    select: { entryId: true },
-  });
-  const entryIds = [...new Set(targetRefs.map((r) => r.entryId))];
-
-  const coRefs =
-    entryIds.length === 0
-      ? []
-      : await prisma.journalEntryRef.findMany({
-          where: { entryId: { in: entryIds } },
-          select: { entryId: true, entityId: true },
-        });
-
   res.json(
-    tallyCoMentions(coRefs, { edges, entityById, targetIds, isOwner })
-      .slice(0, limit)
-      .map(({ entity, count }) => ({
-        entity: { id: entity.id, name: entity.name, type: entity.type },
-        count,
-      })),
+    await buildEntityConnections(prisma, req.params.id, req.user!.id, isOwner, target.id, limit),
   );
 });
