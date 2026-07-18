@@ -251,9 +251,10 @@ describe("runCharacterTransaction", () => {
       },
     );
 
+    expect(opSessions).toEqual([null]);
+
     await prisma.character.update({ where: { id: characterId }, data: { campaignId: null } });
     await prisma.campaign.deleteMany({ where: { id: campaign.id } });
-    expect(opSessions).toEqual([null]);
   });
 
   it("rolls back the op writes when afterOps throws (afterOps runs in the same tx)", async () => {
