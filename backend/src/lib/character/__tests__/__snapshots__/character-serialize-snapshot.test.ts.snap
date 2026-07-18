@@ -13,7 +13,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
   "activeEffects": {
     "buffs": [
       {
-        "duration": "concentration",
+        "duration": "until-rest",
         "id": "buff-charm",
         "key": "item:inv-charm",
         "modifier": 10,

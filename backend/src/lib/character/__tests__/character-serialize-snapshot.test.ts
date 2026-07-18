@@ -76,7 +76,7 @@ async function createMulticlassCaster() {
       },
       activeEffects: {
         buffs: [
-          { id: "buff-charm", key: "item:inv-charm", target: "speed", modifier: 10, source: "Charm of the Snapshot", duration: "untilRest", restType: "long" },
+          { id: "buff-charm", key: "item:inv-charm", target: "speed", modifier: 10, source: "Charm of the Snapshot", duration: "until-rest", restType: "long" },
           { id: "buff-chant", key: "spell:sp-chant", target: "athletics", modifier: 2, source: "Heroic Chant", duration: "concentration", rollEffects: [{ mode: "advantage", kind: "save", ability: "strength" }] },
         ],
       },
