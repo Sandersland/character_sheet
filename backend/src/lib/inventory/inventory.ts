@@ -15,17 +15,13 @@ import { applyActivate, applyDeactivate } from "./inventory-activation.js";
 // across the sibling concern modules, so no import site outside lib/inventory/
 // changes.
 
-// Public type surface re-exported for import sites outside lib/inventory/. Each
-// is consumed externally as a type import; fallow can't trace an `export type
-// … from` chain to those consumers, so the whole-line unused-type suppressions
-// are the public-API contract, not dead code.
+// AdjustQuantityOperation is the only concern-module type still consumed outside
+// lib/inventory/ (routes/character/actions.ts casts a synthetic op to it). The
+// rest of the split's public surface is the value exports below; the other op /
+// detail-input / snapshot interfaces stay concern-module-local — the inventory
+// route types its ops via z.infer, not the exported interfaces (#1039).
+export type { AdjustQuantityOperation } from "./inventory-types.js";
 
-// Detail-input shapes are single-sourced in item-detail-inputs.ts (shared with the catalog seed).
-// fallow-ignore-next-line unused-type -- public-API barrel re-export, consumed as a type import elsewhere (see header)
-export type { ItemCategoryName, ArmorCategoryName, WeaponDetailInput, ArmorDetailInput, ConsumableDetailInput } from "./item-detail-inputs.js";
-
-// fallow-ignore-next-line unused-type -- public-API barrel re-export, consumed as a type import elsewhere (see header)
-export type { Currency } from "./inventory-currency.js";
 export {
   InsufficientCurrencyError,
   InvalidInventoryOperationError,
@@ -34,14 +30,10 @@ export {
   currencyCredit,
 } from "./inventory-currency.js";
 
-// fallow-ignore-next-line unused-type -- public-API barrel re-export, consumed as a type import elsewhere (see header)
-export type { CustomItemInput, AcquireOperation, AdjustQuantityOperation, UpdateOperation, RemoveOperation, SellOperation, EquipOperation, SetEquippedOperation, AttuneOperation, UnattuneOperation, ActivateOperation, DeactivateOperation, UseOperation, InventoryOperation, UseResult, InventoryItemWithDetails, CatalogItemWithDetails } from "./inventory-types.js";
 export { itemBuffKey, inventoryItemDetailInclude, catalogItemDetailInclude } from "./inventory-types.js";
 
 export { isHealingConsumable } from "./inventory-consumable.js";
 
-// fallow-ignore-next-line unused-type -- public-API barrel re-export, consumed as a type import elsewhere (see header)
-export type { DeletedInventoryItemSnapshot, AutoEquipCandidate } from "./inventory-snapshot.js";
 export {
   snapshotInventoryItemForUndo,
   buildInventoryCreateFromCatalog,

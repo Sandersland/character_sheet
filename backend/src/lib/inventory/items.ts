@@ -1,4 +1,4 @@
-import type { ItemCategoryName } from "./inventory.js";
+import type { ItemCategoryName } from "./item-detail-inputs.js";
 
 // 5e equippability rule: only weapons and armor can be worn/wielded
 // (the "equipped" flag). Consumables and gear are carried, never equipped.
