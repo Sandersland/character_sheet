@@ -5,6 +5,7 @@ import {
   deriveSpellList,
   filterSpellbook,
   preparedBudget,
+  swapCandidates,
 } from "@/lib/spellList";
 import { availableSlotsForSpell } from "@/lib/spellPicker";
 import type { Character, Spell } from "@/types/character";
@@ -200,6 +201,33 @@ describe("canPrepare", () => {
   });
   it("allows preparing when under the cap", () => {
     expect(canPrepare(spell({ id: "x", name: "X", level: 1 }), { count: 3, limit: 12, atLimit: false })).toBe(true);
+  });
+});
+
+describe("swapCandidates", () => {
+  it("includes only prepared leveled spells", () => {
+    const spells = [
+      spell({ id: "bless", name: "Bless", level: 1, prepared: true }),
+      spell({ id: "shield", name: "Shield", level: 1, prepared: false }),
+      spell({ id: "web", name: "Web", level: 2, prepared: true }),
+    ];
+    expect(swapCandidates(spells).map((s) => s.id)).toEqual(["bless", "web"]);
+  });
+
+  it("excludes cantrips and granted spells even when marked prepared", () => {
+    const spells = [
+      spell({ id: "fb", name: "Fire Bolt", level: 0, prepared: true }),
+      spell({ id: "sub", name: "Thunderwave", level: 1, prepared: true, source: "subclass" }),
+      spell({ id: "item", name: "Fly", level: 3, prepared: true, source: "item" }),
+    ];
+    expect(swapCandidates(spells)).toEqual([]);
+  });
+
+  it("is empty when nothing is droppable", () => {
+    expect(swapCandidates([])).toEqual([]);
+    expect(
+      swapCandidates([spell({ id: "shield", name: "Shield", level: 1, prepared: false })]),
+    ).toEqual([]);
   });
 });
 

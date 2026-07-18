@@ -124,10 +124,17 @@ describe("SpellsSection concentration", () => {
 });
 
 // A prepared caster with a known-but-unprepared leveled spell + a configurable cap.
+// withBless adds a prepared Bless — a droppable swap candidate for the at-cap bar (#938).
 function makeWizard(
-  over: { prepared?: boolean; preparedSpellCount?: number; preparedSpellLimit?: number | null } = {},
+  over: {
+    prepared?: boolean;
+    preparedSpellCount?: number;
+    preparedSpellLimit?: number | null;
+    withBless?: boolean;
+  } = {},
 ): Character {
-  const spell: Spell = { ...BLESS, id: "entry-shield", name: "Shield", prepared: over.prepared ?? false };
+  const shield: Spell = { ...BLESS, id: "entry-shield", name: "Shield", prepared: over.prepared ?? false };
+  const spells = over.withBless ? [BLESS, shield] : [shield];
   return {
     id: "wiz-1",
     level: 5,
@@ -142,7 +149,7 @@ function makeWizard(
       spellAttackBonus: 5,
       slots: [{ level: 1, total: 4, used: 0 }],
       arcana: [],
-      spells: [spell],
+      spells,
       concentratingOn: null,
       preparedSpellCount: over.preparedSpellCount ?? 1,
       preparedSpellLimit: over.preparedSpellLimit ?? 8,
@@ -175,7 +182,8 @@ describe("SpellsSection preparation (grimoire runes)", () => {
     expect(mockApply).toHaveBeenCalledWith("wiz-1", [{ type: "unprepareSpell", entryId: "entry-shield" }]);
   });
 
-  it("blocks preparing past the cap without calling the client and shows the reason", async () => {
+  // No prepared spell in the book → nothing to swap out, so the plain error remains (#938).
+  it("blocks an at-cap prepare with zero swap candidates: no client call, shows the reason", async () => {
     const user = userEvent.setup();
     const mockApply = vi.mocked(client.applySpellcastingTransactions);
 
@@ -216,6 +224,71 @@ describe("SpellsSection preparation (grimoire runes)", () => {
       { type: "unprepareSpell", entryId: "entry-drop" },
       { type: "prepareSpell", entryId: "entry-add" },
     ]);
+  });
+});
+
+describe("SpellsSection at-cap swap bar (#938)", () => {
+  const atCap = () =>
+    makeWizard({ preparedSpellCount: 8, preparedSpellLimit: 8, withBless: true });
+
+  it("opens the swap bar instead of erroring when a droppable candidate exists", async () => {
+    const user = userEvent.setup();
+    const mockApply = vi.mocked(client.applySpellcastingTransactions);
+
+    render(<SpellsSection character={atCap()} onUpdate={vi.fn()} />);
+    await openGrimoire(user);
+    await user.click(screen.getByRole("button", { name: /Prepare Shield/i }));
+
+    expect(mockApply).not.toHaveBeenCalled();
+    const bar = screen.getByRole("status");
+    expect(bar).toHaveTextContent(/Prepared limit reached \(8\)/i);
+    expect(bar).toHaveTextContent("Shield");
+    expect(screen.queryByText(/prepare at most/i)).not.toBeInTheDocument();
+  });
+
+  it("dispatches unprepare+prepare as one batch when a chip is picked, then closes", async () => {
+    const user = userEvent.setup();
+    const mockApply = vi.mocked(client.applySpellcastingTransactions);
+    mockApply.mockResolvedValue(makeWizard({ prepared: true, withBless: false }));
+
+    render(<SpellsSection character={atCap()} onUpdate={vi.fn()} />);
+    await openGrimoire(user);
+    await user.click(screen.getByRole("button", { name: /Prepare Shield/i }));
+    await user.click(screen.getByRole("button", { name: /Swap out Bless to prepare Shield/i }));
+
+    expect(mockApply).toHaveBeenCalledTimes(1);
+    expect(mockApply).toHaveBeenCalledWith("wiz-1", [
+      { type: "unprepareSpell", entryId: "entry-bless" },
+      { type: "prepareSpell", entryId: "entry-shield" },
+    ]);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("closes on cancel without calling the client", async () => {
+    const user = userEvent.setup();
+    const mockApply = vi.mocked(client.applySpellcastingTransactions);
+
+    render(<SpellsSection character={atCap()} onUpdate={vi.fn()} />);
+    await openGrimoire(user);
+    await user.click(screen.getByRole("button", { name: /Prepare Shield/i }));
+    await user.click(screen.getByRole("button", { name: /^cancel$/i }));
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(mockApply).not.toHaveBeenCalled();
+  });
+
+  it("closes on Escape without calling the client", async () => {
+    const user = userEvent.setup();
+    const mockApply = vi.mocked(client.applySpellcastingTransactions);
+
+    render(<SpellsSection character={atCap()} onUpdate={vi.fn()} />);
+    await openGrimoire(user);
+    await user.click(screen.getByRole("button", { name: /Prepare Shield/i }));
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(mockApply).not.toHaveBeenCalled();
   });
 });
 
