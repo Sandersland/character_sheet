@@ -1,11 +1,12 @@
-import { ChevronDown, ChevronUp, Shield } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { ChevronDown, Shield } from "lucide-react";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 import MeterBar from "@/components/ui/MeterBar";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import Popover from "@/components/ui/Popover";
 import ArmorClassBreakdown from "@/features/character-meta/ArmorClassBreakdown";
+import CharacterSwitcherSheet from "@/features/character-meta/CharacterSwitcherSheet";
 import ManageHpButton from "@/features/hitpoints/ManageHpButton";
 import { classSummary, isMulticlass } from "@/lib/multiclass";
 import type { Character } from "@/types/character";
@@ -24,7 +25,7 @@ interface MobileSheetHeaderProps {
   /** Jump to the Combat tab — the live pill's tap target (#1026). */
   onGoToCombat?: () => void;
   /** The sheet's scroll region has scrolled past the top; collapses the header to
-   *  a single bar until tapped to expand (#1026). */
+   *  a single bar (#1026). */
   scrolled?: boolean;
   onOpenCapture: () => void;
   onOpenSessions: () => void;
@@ -81,15 +82,18 @@ function HpNumbers({ current, max, temp }: { current: number; max: number; temp:
 }
 
 // One menu, not two (#979): while joined, Leave/End Session join Note/Sessions/
-// Activity (above Delete) instead of a separate in-panel controls strip.
+// Activity/All characters (above Delete). "All characters" (#1027) is the ⋮
+// discoverability fallback for the identity-tap switcher.
 function buildMenuItems(
   handlers: Pick<MobileSheetHeaderProps, "onOpenCapture" | "onOpenSessions" | "onOpenActivity" | "onOpenDelete">,
+  onAllCharacters: () => void,
   sessionActions: MobileSheetHeaderProps["sessionActions"],
 ): SheetMenuItem[] {
   return [
     { label: "＋ Note", onSelect: handlers.onOpenCapture },
     { label: "Sessions", onSelect: handlers.onOpenSessions },
     { label: "Activity", onSelect: handlers.onOpenActivity },
+    { label: "All characters", onSelect: onAllCharacters, separatorBefore: true },
     ...(sessionActions
       ? [
           { label: "Leave Session", onSelect: sessionActions.onLeave, disabled: sessionActions.busy, separatorBefore: true },
@@ -103,9 +107,9 @@ function buildMenuItems(
 /**
  * Mobile-only (`md:hidden`) sticky mini-header — the phone counterpart to the
  * desktop garnet banner. A compact two-row strip: identity + live pill on row 1,
- * HP meter + AC badge on row 2 (#1026). Init/Speed/Prof moved off the header to
- * Overview. Scrolling the sheet collapses it to a single {@link CollapsedBar};
- * tapping that bar re-expands the full header.
+ * HP meter + AC badge on row 2 (#1026). Scrolling the sheet collapses it to a
+ * single {@link CollapsedBar}. In both states the identity block is a button
+ * opening the {@link CharacterSwitcherSheet} — the mobile route back out (#1027).
  */
 export default function MobileSheetHeader({
   character,
@@ -119,50 +123,47 @@ export default function MobileSheetHeader({
   onOpenActivity,
   onOpenDelete,
 }: MobileSheetHeaderProps) {
-  // Tap-to-expand overrides the scroll collapse; scrolling back to the top (or
-  // away again) resets it so the header re-syncs to the scroll position.
-  const [expanded, setExpanded] = useState(false);
-  useEffect(() => setExpanded(false), [scrolled]);
+  const navigate = useNavigate();
+  const [switcherOpen, setSwitcherOpen] = useState(false);
 
-  const menuItems = buildMenuItems({ onOpenCapture, onOpenSessions, onOpenActivity, onOpenDelete }, sessionActions);
+  const menuItems = buildMenuItems(
+    { onOpenCapture, onOpenSessions, onOpenActivity, onOpenDelete },
+    () => navigate("/"),
+    sessionActions,
+  );
   const live = sessionActions !== null;
   const pill = live ? <LivePill round={liveRound} onGoToCombat={onGoToCombat} /> : null;
-
-  if (scrolled && !expanded) {
-    return (
-      <CollapsedBar character={character} onUpdate={onUpdate} pill={pill} menuItems={menuItems} onExpand={() => setExpanded(true)} />
-    );
-  }
+  const openSwitcher = () => setSwitcherOpen(true);
 
   return (
-    <ExpandedSheetHeader
-      character={character}
-      onUpdate={onUpdate}
-      pill={pill}
-      menuItems={menuItems}
-      collapsible={scrolled}
-      onCollapse={() => setExpanded(false)}
-    />
+    <>
+      {scrolled ? (
+        <CollapsedBar character={character} onUpdate={onUpdate} pill={pill} menuItems={menuItems} onOpenSwitcher={openSwitcher} />
+      ) : (
+        <ExpandedSheetHeader character={character} onUpdate={onUpdate} pill={pill} menuItems={menuItems} onOpenSwitcher={openSwitcher} />
+      )}
+      {switcherOpen && <CharacterSwitcherSheet currentId={character.id} onClose={() => setSwitcherOpen(false)} />}
+    </>
   );
 }
 
 /**
  * The collapsed one-line bar (#1026): avatar · name · HP + mini meter · live pill
  * · ⋯. The scroll-collapsed default — calm paper chrome so the panel below stays
- * the subject. Tapping the identity region re-expands the full header.
+ * the subject. Tapping the identity region opens the character switcher (#1027).
  */
 function CollapsedBar({
   character,
   onUpdate,
   pill,
   menuItems,
-  onExpand,
+  onOpenSwitcher,
 }: {
   character: Character;
   onUpdate?: (character: Character) => void;
   pill: React.ReactNode;
   menuItems: SheetMenuItem[];
-  onExpand: () => void;
+  onOpenSwitcher: () => void;
 }) {
   const { current, max, temp } = character.hitPoints;
   const hp = (
@@ -175,11 +176,11 @@ function CollapsedBar({
   );
   return (
     <header className="z-30 flex shrink-0 items-center gap-2 border-b border-parchment-200 bg-parchment-50 px-4 py-2 shadow-sm md:hidden">
-      {/* Identity — the tap-to-expand target (avatar + name). */}
+      {/* Identity — opens the switcher (avatar + name + caret). */}
       <button
         type="button"
-        onClick={onExpand}
-        aria-label="Expand character header"
+        onClick={onOpenSwitcher}
+        aria-label="Switch character"
         className="flex min-w-0 flex-1 items-center gap-2 rounded-control text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
       >
         <span className="flex h-7 w-7 flex-none items-center justify-center rounded-control bg-gradient-to-br from-garnet-700 to-garnet-900 font-display text-sm font-semibold text-parchment-50 shadow-raised">
@@ -188,6 +189,7 @@ function CollapsedBar({
         <span className="truncate font-display text-[15px] font-semibold leading-tight text-garnet-800">
           {character.name}
         </span>
+        <ChevronDown className="h-3.5 w-3.5 flex-none text-parchment-400" aria-hidden />
       </button>
 
       {/* HP — its own tap target (#982): opens the shared "Hit Points" sheet. */}
@@ -211,23 +213,21 @@ function CollapsedBar({
 
 /**
  * The full (expanded) two-row header (#1026). Row 1: avatar + identity + caret +
- * live pill + ⋯. Row 2: HP numbers + full-width meter + AC badge. While scrolled
- * (`collapsible`) it leads with a handle to collapse back to the single bar.
+ * live pill + ⋯. Row 2: HP numbers + full-width meter + AC badge. The identity
+ * (avatar + name + subtitle) is a button opening the character switcher (#1027).
  */
 function ExpandedSheetHeader({
   character,
   onUpdate,
   pill,
   menuItems,
-  collapsible,
-  onCollapse,
+  onOpenSwitcher,
 }: {
   character: Character;
   onUpdate?: (character: Character) => void;
   pill: React.ReactNode;
   menuItems: SheetMenuItem[];
-  collapsible: boolean;
-  onCollapse: () => void;
+  onOpenSwitcher: () => void;
 }) {
   const { current, max, temp } = character.hitPoints;
 
@@ -243,34 +243,29 @@ function ExpandedSheetHeader({
 
   return (
     <header className="z-30 shrink-0 border-b border-parchment-200 bg-parchment-50 px-4 py-2.5 shadow-sm md:hidden">
-      {/* Collapse handle back to the single bar (only while scrolled). */}
-      {collapsible && (
+      {/* Row 1: identity (switcher trigger) + live pill + actions */}
+      <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={onCollapse}
-          aria-label="Collapse header"
-          className="mb-1.5 flex w-full items-center justify-center rounded-control py-0.5 text-parchment-500 transition-colors hover:bg-parchment-100 hover:text-parchment-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
+          onClick={onOpenSwitcher}
+          aria-label="Switch character"
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-control text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600"
         >
-          <ChevronUp className="h-4 w-4" aria-hidden />
+          <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-control bg-gradient-to-br from-garnet-700 to-garnet-900 font-display text-lg font-semibold text-parchment-50 shadow-raised">
+            {character.name.charAt(0)}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-1">
+              <span className="truncate font-display text-lg font-semibold leading-tight text-garnet-800">
+                {character.name}
+              </span>
+              <ChevronDown className="h-3.5 w-3.5 flex-none text-parchment-400" aria-hidden />
+            </span>
+            <span className="block truncate text-xs text-parchment-600">
+              {character.race} · {classLine}
+            </span>
+          </span>
         </button>
-      )}
-
-      {/* Row 1: identity + live pill + actions */}
-      <div className="flex items-center gap-2">
-        <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-control bg-gradient-to-br from-garnet-700 to-garnet-900 font-display text-lg font-semibold text-parchment-50 shadow-raised">
-          {character.name.charAt(0)}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1">
-            <h1 className="truncate font-display text-lg font-semibold leading-tight text-garnet-800">
-              {character.name}
-            </h1>
-            <ChevronDown className="h-3.5 w-3.5 flex-none text-parchment-400" aria-hidden />
-          </div>
-          <p className="truncate text-xs text-parchment-600">
-            {character.race} · {classLine}
-          </p>
-        </div>
         <span className="flex-none rounded-full bg-garnet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-garnet-700">
           {levelPill}
         </span>

@@ -18,7 +18,9 @@ async function openAttackSheet(page: import("@playwright/test").Page) {
 
   const errors = collectConsoleErrors(page);
   await page.goto(`/characters/${id}`);
-  await expect(page.getByRole("heading", { name: /Battle Master/, level: 1 })).toBeVisible();
+  // Mobile header has no h1 (#1027 — the identity is a "Switch character" button);
+  // that button appearing confirms the sheet rendered.
+  await expect(page.getByRole("button", { name: "Switch character" })).toBeVisible();
 
   await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
   await expect(page).toHaveURL(/[?&]tab=combat/);
