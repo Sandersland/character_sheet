@@ -153,4 +153,81 @@ describe("runCharacterTransaction", () => {
     );
     expect(calls).toBe(0);
   });
+
+  it("runs afterOps once after the op loop with the batch's stable ids", async () => {
+    const order: string[] = [];
+    const batchIds = new Set<string>();
+    let afterSessionId: string | null | undefined;
+
+    await runCharacterTransaction<{ experiencePoints: true }, { add: number }>(
+      characterId,
+      [{ add: 1 }, { add: 2 }],
+      {
+        select: { experiencePoints: true },
+        notFound: (id) => new NotFoundError(id),
+        applyOp: async ({ batchId }) => {
+          order.push("op");
+          batchIds.add(batchId);
+        },
+        afterOps: async ({ batchId, sessionId }) => {
+          order.push("after");
+          batchIds.add(batchId);
+          afterSessionId = sessionId;
+        },
+      },
+    );
+
+    expect(order).toEqual(["op", "op", "after"]);
+    expect(batchIds.size).toBe(1);
+    expect(afterSessionId).toBeNull();
+  });
+
+  it("uses an explicit sessionId verbatim instead of the active-session lookup", async () => {
+    const opSessions: (string | null)[] = [];
+    let afterSession: string | null | undefined;
+
+    await runCharacterTransaction<{ experiencePoints: true }, { add: number }>(
+      characterId,
+      [{ add: 1 }],
+      {
+        select: { experiencePoints: true },
+        notFound: (id) => new NotFoundError(id),
+        sessionId: "explicit-session-123",
+        applyOp: async ({ sessionId }) => {
+          opSessions.push(sessionId);
+        },
+        afterOps: async ({ sessionId }) => {
+          afterSession = sessionId;
+        },
+      },
+    );
+
+    expect(opSessions).toEqual(["explicit-session-123"]);
+    expect(afterSession).toBe("explicit-session-123");
+  });
+
+  it("rolls back the op writes when afterOps throws (afterOps runs in the same tx)", async () => {
+    await expect(
+      runCharacterTransaction<{ experiencePoints: true }, { add: number }>(
+        characterId,
+        [{ add: 50 }],
+        {
+          select: { experiencePoints: true },
+          notFound: (id) => new NotFoundError(id),
+          applyOp: async ({ tx, op }) => {
+            await tx.character.update({
+              where: { id: characterId },
+              data: { experiencePoints: { increment: op.add } },
+            });
+          },
+          afterOps: async () => {
+            throw new Error("after-boom");
+          },
+        },
+      ),
+    ).rejects.toThrow("after-boom");
+
+    const final = await prisma.character.findUniqueOrThrow({ where: { id: characterId } });
+    expect(final.experiencePoints).toBe(0);
+  });
 });

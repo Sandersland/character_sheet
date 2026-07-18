@@ -35,6 +35,15 @@ export interface RunCharacterTransactionOptions<S extends Prisma.CharacterSelect
   notFound: (characterId: string) => Error;
   /** Validate + mutate for one op; a throw rolls back the whole batch. */
   applyOp: (ctx: CharacterTxContext<Prisma.CharacterGetPayload<{ select: S }>, Op>) => Promise<void>;
+  /** When provided (incl. null), tag events with this id instead of getActiveSessionId. */
+  sessionId?: string | null;
+  /** Runs inside the same $transaction after the op loop (e.g. retroactive summary recompute). */
+  afterOps?: (ctx: {
+    tx: Prisma.TransactionClient;
+    characterId: string;
+    batchId: string;
+    sessionId: string | null;
+  }) => Promise<void>;
 }
 
 /**
@@ -48,7 +57,8 @@ export async function runCharacterTransaction<S extends Prisma.CharacterSelect, 
   opts: RunCharacterTransactionOptions<S, Op>,
 ): Promise<void> {
   const batchId = randomUUID();
-  const sessionId = await getActiveSessionId(characterId);
+  const sessionId =
+    opts.sessionId !== undefined ? opts.sessionId : await getActiveSessionId(characterId);
 
   await prisma.$transaction(async (tx) => {
     for (const op of operations) {
@@ -60,5 +70,6 @@ export async function runCharacterTransaction<S extends Prisma.CharacterSelect, 
       if (!row) throw opts.notFound(characterId);
       await opts.applyOp({ tx, row, op, characterId, batchId, sessionId });
     }
+    if (opts.afterOps) await opts.afterOps({ tx, characterId, batchId, sessionId });
   });
 }
