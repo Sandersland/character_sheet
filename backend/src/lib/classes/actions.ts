@@ -36,6 +36,12 @@ import type { EffectSpec } from "@/lib/combat/effects.js";
 
 export type ActionCost = "action" | "bonusAction" | "reaction" | "free" | "special";
 
+// An op referencing an actionKey in neither dispatch table. status → the 400 the
+// central `errorHandler` maps, so the actions route needs no try/catch.
+export class UnknownActionError extends Error {
+  status = 400;
+}
+
 /** Rage's melee-damage bonus by barbarian level (+2 / +3 / +4). */
 export function rageMeleeDamageBonus(barbarianLevel: number): number {
   return barbarianLevel >= 16 ? 4 : barbarianLevel >= 9 ? 3 : 2;

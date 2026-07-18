@@ -19,7 +19,7 @@ import {
 import { getSessionDoorway } from "@/lib/session/doorway.js";
 import { characterInclude } from "@/lib/character/character-include.js";
 import { serializeCharacter } from "@/lib/character/character-serialize.js";
-import { parseRollInput, requireCharacterId, withSessionErrors } from "./session-route-helpers.js";
+import { parseRollInput, requireCharacterId } from "./session-route-helpers.js";
 
 export const sessionsRouter = Router();
 
@@ -46,7 +46,7 @@ async function assertSessionInCampaign(sessionId: string, campaignId: string): P
     select: { campaignId: true },
   });
   if (!session || session.campaignId !== campaignId) {
-    throw new SessionError(`Session not found: ${sessionId}`);
+    throw new SessionError(`Session not found: ${sessionId}`, 404);
   }
 }
 
@@ -57,7 +57,7 @@ async function assertSessionInCampaign(sessionId: string, campaignId: string): P
  */
 sessionsRouter.post(
   "/campaigns/:campaignId/sessions",
-  withSessionErrors(async (req, res) => {
+  async (req, res) => {
     await assertCampaignMembership(prisma, req.user!.id, req.params.campaignId, "view");
     const characterId = requireCharacterId(req, res);
     if (characterId === null) return;
@@ -71,7 +71,7 @@ sessionsRouter.post(
       include: characterInclude,
     });
     res.status(201).json({ session, character: serializeCharacter(updated) });
-  }),
+  },
 );
 
 /**
@@ -80,7 +80,7 @@ sessionsRouter.post(
  */
 sessionsRouter.post(
   "/campaigns/:campaignId/sessions/:sessionId/join",
-  withSessionErrors(async (req, res) => {
+  async (req, res) => {
     await assertCampaignMembership(prisma, req.user!.id, req.params.campaignId, "view");
     const characterId = requireCharacterId(req, res);
     if (characterId === null) return;
@@ -95,7 +95,7 @@ sessionsRouter.post(
     });
     const participant = await joinSession(req.params.sessionId, characterId);
     res.status(existing ? 200 : 201).json({ participant });
-  }),
+  },
 );
 
 /**
@@ -104,7 +104,7 @@ sessionsRouter.post(
  */
 sessionsRouter.post(
   "/campaigns/:campaignId/sessions/:sessionId/leave",
-  withSessionErrors(async (req, res) => {
+  async (req, res) => {
     await assertCampaignMembership(prisma, req.user!.id, req.params.campaignId, "view");
     const characterId = requireCharacterId(req, res);
     if (characterId === null) return;
@@ -113,7 +113,7 @@ sessionsRouter.post(
     await assertSessionInCampaign(req.params.sessionId, req.params.campaignId);
     const participant = await leaveSession(req.params.sessionId, characterId);
     res.json({ participant });
-  }),
+  },
 );
 
 /**
@@ -123,13 +123,13 @@ sessionsRouter.post(
  */
 sessionsRouter.post(
   "/campaigns/:campaignId/sessions/:sessionId/end",
-  withSessionErrors(async (req, res) => {
+  async (req, res) => {
     await assertCampaignMembership(prisma, req.user!.id, req.params.campaignId, "view");
 
     await assertSessionInCampaign(req.params.sessionId, req.params.campaignId);
     const session = await endSession(req.params.sessionId);
     res.json({ session });
-  }),
+  },
 );
 
 /**
@@ -409,25 +409,25 @@ sessionsRouter.get("/characters/:id/sessions/:sessionId", async (req, res) => {
  */
 sessionsRouter.post(
   "/characters/:id/sessions/:sessionId/combat/start",
-  withSessionErrors(async (req, res) => {
+  async (req, res) => {
     await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
     await logCombatEvent(req.params.id, req.params.sessionId, "combatStarted");
     res.status(201).json({ ok: true });
-  }),
+  },
 );
 
 sessionsRouter.post(
   "/characters/:id/sessions/:sessionId/combat/end",
-  withSessionErrors(async (req, res) => {
+  async (req, res) => {
     await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
     await logCombatEvent(req.params.id, req.params.sessionId, "combatEnded");
     res.status(201).json({ ok: true });
-  }),
+  },
 );
 
 sessionsRouter.post(
   "/characters/:id/sessions/:sessionId/combat/round",
-  withSessionErrors(async (req, res) => {
+  async (req, res) => {
     await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
     const { round } = req.body as { round?: number };
     if (typeof round !== "number" || round < 1) {
@@ -436,19 +436,19 @@ sessionsRouter.post(
     }
     await logCombatEvent(req.params.id, req.params.sessionId, "combatRoundAdvanced", { round });
     res.status(201).json({ ok: true });
-  }),
+  },
 );
 
 /** POST /api/characters/:id/sessions/:sessionId/roll — logs a roll event (character-scoped). */
 sessionsRouter.post(
   "/characters/:id/sessions/:sessionId/roll",
-  withSessionErrors(async (req, res) => {
+  async (req, res) => {
     await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
     const roll = parseRollInput(req, res);
     if (roll === null) return;
     await logRollEvent(req.params.id, req.params.sessionId, roll);
     res.status(201).json({ ok: true });
-  }),
+  },
 );
 
 // Shared event serialization for session detail reads.

@@ -1,6 +1,9 @@
 import { Prisma } from "@/generated/prisma/client.js";
 
-export class InvalidHitPointOperationError extends Error {}
+// status → the 400 the central `errorHandler` maps (client op-validation error).
+export class InvalidHitPointOperationError extends Error {
+  status = 400;
+}
 
 // Canonical JSON shapes (stored in hitPoints / hitDice columns).
 

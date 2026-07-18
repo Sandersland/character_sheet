@@ -12,10 +12,15 @@ export interface Currency {
   [key: string]: number;
 }
 
-export class InsufficientCurrencyError extends Error {}
-export class InvalidInventoryOperationError extends Error {}
-// Attunement cap breach — carries an explicit 409 (conflict) so the transactions
-// endpoint surfaces it distinctly from a plain 400 validation error.
+// status → the 400 the central `errorHandler` maps (client op-validation error).
+export class InsufficientCurrencyError extends Error {
+  status = 400;
+}
+export class InvalidInventoryOperationError extends Error {
+  status = 400;
+}
+// Attunement cap breach — overrides to an explicit 409 (conflict) so the central
+// `errorHandler` surfaces it distinctly from a plain 400 validation error.
 export class AttunementLimitError extends InvalidInventoryOperationError {
   status = 409;
 }
