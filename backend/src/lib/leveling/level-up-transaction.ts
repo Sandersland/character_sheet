@@ -23,7 +23,7 @@ import {
   applyLevelUpHpInTx,
   normalizeHitDice,
 } from "@/lib/combat/hitpoints.js";
-import type { LevelUpOperation } from "@/lib/combat/hp-operations.js";
+import type { LevelUpOperation, LevelUpTarget } from "@/lib/combat/hp-operations.js";
 import {
   validateLevelUpSubmission,
   InvalidLevelUpError,
@@ -47,7 +47,7 @@ type LevelUpTxOp =
   | { domain: "spellcasting"; op: SpellcastingOperation };
 
 // Everything resolveLevelUpContext hands to validation + op-building.
-interface LevelUpContext {
+export interface LevelUpContext {
   planCharacter: LevelUpPlanCharacter;
   targetEntry: TargetClassEntry;
   chosenSubclassName: string | null;
@@ -78,11 +78,16 @@ async function subclassLevelFor(classId: string | null, className: string): Prom
   return row?.subclassLevel ?? 3;
 }
 
-// Reads the character + resolves submission.target into the validator inputs. The
+// Reads the character + resolves a level-up target into the validator inputs
+// (shared by applyLevelUpTransaction and the GET plan route, #886). The
 // per-entry `level` column can lag hitDice.total for a single-class character, so
 // a single-class existing target derives newLevel from hitDice.total (precedent:
 // the prepared-cap re-read in applySpellcastingOpInTx).
-async function resolveLevelUpContext(characterId: string, submission: LevelUpSubmission): Promise<LevelUpContext> {
+export async function resolveLevelUpContext(
+  characterId: string,
+  target: LevelUpTarget,
+  subclassId?: string,
+): Promise<LevelUpContext> {
   const character = await prisma.character.findUnique({
     where: { id: characterId },
     select: {
@@ -100,7 +105,6 @@ async function resolveLevelUpContext(characterId: string, submission: LevelUpSub
   let classId: string | null;
   let targetIsPrimary: boolean;
 
-  const target = submission.target;
   if (target.kind === "existing") {
     const entry = character.classEntries.find((e) => e.id === target.classEntryId);
     if (!entry) throw new InvalidLevelUpError(`Class entry not found: ${target.classEntryId}`);
@@ -125,11 +129,11 @@ async function resolveLevelUpContext(characterId: string, submission: LevelUpSub
   const subclassLevel = await subclassLevelFor(classId, targetClassName);
 
   let chosenSubclassName: string | null = null;
-  if (submission.subclassId) {
+  if (subclassId) {
     // applySetSubclass re-validates subclass-belongs-to-class in-tx; here we only
     // resolve id → name for the pure validator (one copy of the membership rule).
-    const sub = await prisma.subclass.findUnique({ where: { id: submission.subclassId }, select: { name: true } });
-    if (!sub) throw new InvalidLevelUpError(`Subclass not found: ${submission.subclassId}`);
+    const sub = await prisma.subclass.findUnique({ where: { id: subclassId }, select: { name: true } });
+    if (!sub) throw new InvalidLevelUpError(`Subclass not found: ${subclassId}`);
     chosenSubclassName = sub.name;
   }
 
@@ -208,7 +212,7 @@ export async function applyLevelUpTransaction(
   userId: string,
 ): Promise<void> {
   const { planCharacter, targetEntry, chosenSubclassName, targetIsPrimary } =
-    await resolveLevelUpContext(characterId, submission);
+    await resolveLevelUpContext(characterId, submission.target, submission.subclassId);
 
   const steps = validateLevelUpSubmission(planCharacter, targetEntry, chosenSubclassName, submission);
 

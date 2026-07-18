@@ -81,33 +81,43 @@ function insertSubclassStep(plan: LevelUpStep[]): LevelUpStep[] {
 }
 
 /**
- * Resolve the effective plan, honoring the re-plan contract (see buildLevelUpPlan
- * docstring): when the base plan surfaces a subclass step the plan must be rebuilt
- * for the chosen subclass (its subclass-derived choices can't exist until then),
- * then the subclass step re-inserted. Throws when the subclass presence in the
- * submission disagrees with what the level grants.
+ * Resolve the plan, honoring the re-plan contract (see buildLevelUpPlan
+ * docstring): when the base plan surfaces a subclass step AND a subclass is
+ * chosen, the plan is rebuilt for that subclass (its subclass-derived choices
+ * can't exist until then) and the subclass step re-inserted. With no chosen
+ * subclass the base plan is returned as-is — the ceremony (#886) serves it so
+ * the player can make the subclass pick, then re-requests the plan.
  */
+export function resolveLevelUpPlan(
+  character: LevelUpPlanCharacter,
+  target: TargetClassEntry,
+  chosenSubclassName: string | null,
+): LevelUpStep[] {
+  const basePlan = buildLevelUpPlan(character, target);
+  if (!chosenSubclassName || !basePlan.some((step) => step.kind === "subclass")) {
+    return basePlan;
+  }
+  const replan = buildLevelUpPlan(character, { ...target, subclass: chosenSubclassName });
+  return insertSubclassStep(replan);
+}
+
+// Submission-coupled wrapper: the plan must agree with the subclass presence in
+// the submission before counts are checked.
 function resolveEffectivePlan(
   character: LevelUpPlanCharacter,
   target: TargetClassEntry,
   chosenSubclassName: string | null,
   submission: LevelUpSubmission,
 ): LevelUpStep[] {
-  const basePlan = buildLevelUpPlan(character, target);
-  const needsSubclass = basePlan.some((step) => step.kind === "subclass");
-
-  if (needsSubclass) {
-    if (!chosenSubclassName) {
-      throw new InvalidLevelUpError("this level-up requires choosing a subclass");
-    }
-    const replan = buildLevelUpPlan(character, { ...target, subclass: chosenSubclassName });
-    return insertSubclassStep(replan);
+  const plan = resolveLevelUpPlan(character, target, chosenSubclassName);
+  const needsSubclass = plan.some((step) => step.kind === "subclass");
+  if (needsSubclass && !chosenSubclassName) {
+    throw new InvalidLevelUpError("this level-up requires choosing a subclass");
   }
-
-  if (submission.subclassId) {
+  if (!needsSubclass && submission.subclassId) {
     throw new InvalidLevelUpError("this level-up does not include a subclass choice");
   }
-  return basePlan;
+  return plan;
 }
 
 // Per-step count check: every plan step (except review) must be matched by the

@@ -37,6 +37,9 @@ import type {
   JournalEntryKind,
   InventoryOperation,
   Item,
+  LevelUpPlanResponse,
+  LevelUpSubmission,
+  LevelUpTarget,
   ManeuverOperation,
   ManeuverCastResult,
   ReferenceData,
@@ -101,7 +104,9 @@ const jsonBody = (body: unknown, method = "POST"): RequestInit => ({
 // full updated Character. Every uniform domain funnels through here — the only
 // per-domain differences are the URL segment and the error label. (applyHitPoint-
 // Operations and applyExperienceOperations deliberately don't use this: HP unwraps
-// { character, concentrationChecks } and XP threads an optional sessionId.)
+// { character, concentrationChecks } and XP threads an optional sessionId.
+// submitLevelUp doesn't either: its body is the structured LevelUpSubmission
+// itself, not an { operations } batch.)
 async function postTransactions<TOp>(
   characterId: string,
   domain: string,
@@ -453,6 +458,38 @@ export async function applyAdvancementTransactions(
   operations: AdvancementOperation[]
 ): Promise<Character> {
   return postTransactions(characterId, "advancement", operations, "Failed to apply advancement operations");
+}
+
+// The derived level-up ceremony plan (#886): resolved target + ordered steps.
+// `subclassId` triggers the server-side re-plan for a not-yet-committed subclass
+// pick. Read-only — nothing is mutated.
+export async function fetchLevelUpPlan(
+  characterId: string,
+  target: LevelUpTarget,
+  subclassId?: string,
+): Promise<LevelUpPlanResponse> {
+  const params = new URLSearchParams();
+  if (target.kind === "existing") params.set("classEntryId", target.classEntryId);
+  else params.set("classId", target.classId);
+  if (subclassId) params.set("subclassId", subclassId);
+  return request<LevelUpPlanResponse>(
+    `/characters/${characterId}/level-up/plan?${params.toString()}`,
+    undefined,
+    "Failed to fetch level-up plan",
+  );
+}
+
+// Commits one whole level-up ceremony atomically. The submission is the body
+// verbatim (see the postTransactions note above); returns the leveled Character.
+export async function submitLevelUp(
+  characterId: string,
+  submission: LevelUpSubmission,
+): Promise<Character> {
+  return request<Character>(
+    `/characters/${characterId}/level-up/transactions`,
+    jsonBody(submission),
+    "Failed to apply level-up",
+  );
 }
 
 // Reverts the most-recent non-reverted batch (LIFO undo). Returns the updated

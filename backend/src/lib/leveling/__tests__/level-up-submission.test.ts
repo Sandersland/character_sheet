@@ -6,6 +6,7 @@ import {
   type TargetClassEntry,
 } from "@/lib/leveling/level-up-plan.js";
 import {
+  resolveLevelUpPlan,
   validateLevelUpSubmission,
   InvalidLevelUpError,
   type LevelUpSubmission,
@@ -33,6 +34,25 @@ function maneuver(id: string): NonNullable<LevelUpSubmission["maneuvers"]>[numbe
 function kinds(steps: ReturnType<typeof validateLevelUpSubmission>): string[] {
   return steps.map((s) => s.kind);
 }
+
+describe("resolveLevelUpPlan — submission-free plan resolution (#886)", () => {
+  it("Fighter 7→8 resolves the base plan", () => {
+    const steps = resolveLevelUpPlan(char("fighter", 7, "champion"), target("fighter", 8, "champion"), null);
+    expect(steps.map((s) => s.kind)).toEqual(["hitPoints", "advancement", "review"]);
+  });
+
+  it("Fighter 2→3 with no subclass chosen surfaces only the subclass step", () => {
+    const steps = resolveLevelUpPlan(char("fighter", 2), target("fighter", 3, null), null);
+    expect(steps.map((s) => s.kind)).toEqual(["hitPoints", "subclass", "review"]);
+  });
+
+  it("Fighter 2→3 with Battle Master chosen re-plans and splices the subclass step", () => {
+    const steps = resolveLevelUpPlan(char("fighter", 2), target("fighter", 3, null), "battle master");
+    expect(steps.map((s) => s.kind)).toEqual(["hitPoints", "subclass", "maneuvers", "toolProficiency", "review"]);
+    const replan = buildLevelUpPlan(char("fighter", 2), target("fighter", 3, "battle master"));
+    expect(steps.filter((s) => s.kind !== "subclass")).toEqual(replan);
+  });
+});
 
 describe("validateLevelUpSubmission — happy paths", () => {
   it("Fighter 7→8 with hp + advancement returns the ordered steps", () => {

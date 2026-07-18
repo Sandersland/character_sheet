@@ -15,9 +15,11 @@ import AboutPage from "@/pages/AboutPage";
 import CharacterListPage from "@/pages/CharacterListPage";
 import CharacterSheetPage from "@/pages/CharacterSheetPage";
 
-// Route-lazy the heavy non-initial surfaces: character creation and the journal.
+// Route-lazy the heavy non-initial surfaces: character creation, the journal,
+// and the level-up ceremony.
 const CharacterCreatePage = lazy(() => import("@/pages/CharacterCreatePage"));
 const JournalPage = lazy(() => import("@/pages/JournalPage"));
+const LevelUpPage = lazy(() => import("@/pages/LevelUpPage"));
 
 // #962: the live session now lives on the sheet's Combat tab (#960), so the old
 // `/characters/:id/session` route redirects there. Kept for bookmarks / e2e; a
@@ -52,6 +54,8 @@ export default function App() {
                     <Route path="/characters/:id" element={<CharacterSheetPage />} />
                     {/* Field-chronicle journal page (#864) */}
                     <Route path="/characters/:id/journal" element={<JournalPage />} />
+                    {/* Level-up ceremony (#886) */}
+                    <Route path="/characters/:id/level-up" element={<LevelUpPage />} />
                     {/* Live-play now lives on the sheet's Combat tab (#960/#962);
                         the old session route redirects there. */}
                     <Route path="/characters/:id/session" element={<LegacySessionRedirect />} />

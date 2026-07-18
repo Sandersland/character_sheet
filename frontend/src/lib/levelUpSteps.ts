@@ -1,0 +1,108 @@
+// Pure step model for the level-up ceremony rail (#886) — precedent: stepRail.
+// No JSX; rendered by StepRail / LevelUpCeremony.
+
+import type { LevelUpPlanResponse, LevelUpStep, LevelUpStepKind, LevelUpSubmission } from "@/types/character";
+
+export type LevelUpStepState = "done" | "active" | "pending";
+
+/** The in-progress submission minus its target (owned by useLevelUpCeremony). */
+export type LevelUpDraft = Omit<LevelUpSubmission, "target">;
+
+/**
+ * Stable identity for a step across re-plans: kind, plus meta.key for the
+ * repeatable subclassChoice kind. Tracking position by key (not index) keeps
+ * the player on their step when a subclass pick inserts new steps.
+ */
+export function stepKey(step: LevelUpStep): string {
+  const key = step.meta?.key;
+  return typeof key === "string" ? `${step.kind}:${key}` : step.kind;
+}
+
+const STEP_LABELS: Record<LevelUpStepKind, string> = {
+  hitPoints: "Hit Points",
+  advancement: "Ability Score / Feat",
+  subclass: "Subclass",
+  maneuvers: "Maneuvers",
+  fightingStyle: "Fighting Style",
+  disciplines: "Disciplines",
+  toolProficiency: "Tool Proficiency",
+  subclassChoice: "Subclass Choice",
+  newSpells: "New Spells",
+  review: "Review",
+};
+
+/** Display name for a step — subclassChoice steps carry theirs in meta.label. */
+export function stepLabel(step: LevelUpStep): string {
+  const label = step.meta?.label;
+  if (step.kind === "subclassChoice" && typeof label === "string") return label;
+  return STEP_LABELS[step.kind];
+}
+
+/**
+ * The step index `currentKey` names, falling back to the first step when the
+ * key is unknown (the current step vanished in a re-plan).
+ */
+export function stepPosition(steps: LevelUpStep[], currentKey: string): number {
+  const found = steps.findIndex((step) => stepKey(step) === currentKey);
+  return found === -1 ? 0 : found;
+}
+
+/** Per-step rail state, index-aligned with `steps`. */
+export function railState(steps: LevelUpStep[], currentKey: string): LevelUpStepState[] {
+  const current = stepPosition(steps, currentKey);
+  return steps.map((_, i) => (i < current ? "done" : i === current ? "active" : "pending"));
+}
+
+// Mirror of the backend RESOURCE_BACKED set gating applyLevelUpTransaction:
+// these picks derive their caps from the primary entry, so a non-primary plan
+// containing them can't commit yet (#1065). This mirror must never be NARROWER
+// than the backend guard, or users hit a raw 400 instead of the notice.
+const RESOURCE_BACKED_KINDS: ReadonlySet<LevelUpStepKind> = new Set([
+  "maneuvers",
+  "disciplines",
+  "toolProficiency",
+  "subclassChoice",
+]);
+
+/** Whether the shell must show the #1065 notice instead of the stepper. */
+export function ceremonyBlocked(plan: LevelUpPlanResponse | null): boolean {
+  return plan != null && !plan.target.isPrimary && plan.steps.some((s) => RESOURCE_BACKED_KINDS.has(s.kind));
+}
+
+// Draft entries that can satisfy a list step, by kind. subclassChoice narrows
+// to its step's meta.key — several choose-N steps share the one draft array.
+const LIST_ENTRIES: Partial<
+  Record<LevelUpStepKind, (step: LevelUpStep, draft: LevelUpDraft) => readonly unknown[] | undefined>
+> = {
+  maneuvers: (_step, draft) => draft.maneuvers,
+  disciplines: (_step, draft) => draft.disciplines,
+  toolProficiency: (_step, draft) => draft.toolProficiencies,
+  subclassChoice: (step, draft) => draft.subclassChoices?.filter((c) => c.choiceKey === step.meta?.key),
+  newSpells: (_step, draft) => draft.spellsLearned,
+};
+
+function listCount(step: LevelUpStep, draft: LevelUpDraft): number {
+  return LIST_ENTRIES[step.kind]?.(step, draft)?.length ?? 0;
+}
+
+/**
+ * Whether the draft carries enough to advance past `step` — the Continue gate.
+ * Mirrors the server's per-step count check loosely (≥ count, not exact-match:
+ * the server stays the authority on exactness at submit).
+ */
+export function draftSatisfies(step: LevelUpStep, draft: LevelUpDraft): boolean {
+  switch (step.kind) {
+    case "hitPoints":
+      return draft.hp != null && (draft.hp.method !== "roll" || draft.hp.roll != null);
+    case "advancement":
+      return draft.advancement != null;
+    case "subclass":
+      return draft.subclassId != null;
+    case "fightingStyle":
+      return draft.fightingStyle != null;
+    case "review":
+      return true;
+    default:
+      return listCount(step, draft) >= (step.count ?? 1);
+  }
+}

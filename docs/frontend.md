@@ -39,6 +39,7 @@ WCAG AA rules that have shipped broken before (full rationale in `design_system.
 - **Icons resolve through `components/ui/icons.ts`** — lucide for chrome, game-icons for D&D flavor, per-icon subpath imports, monochrome `currentColor` (no `fill`/hex), `aria-hidden` when decorative. No colorful emoji in the UI.
 - **Never render a raw skill/ability/enum key** — resolve display text through the label helpers (`lib/abilities.ts`, `lib/mentions.ts`, `lib/items.ts`, …). See the CLAUDE.md non-negotiable.
 - **Orchestrator/row split** for large interactive sections: one orchestrator owns state + API batching + `onUpdate`; rows are presentational with callbacks. Reference: `features/inventory/InventoryList` / `InventoryRow`.
+- **Full-screen wizard/stepper:** a multi-step guided flow is its own route rendering a full-screen ceremony, not a modal. Reference: `features/level-up/` (`useLevelUpCeremony` state machine + `StepRail`).
 
 ## API calls
 
