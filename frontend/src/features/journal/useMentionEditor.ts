@@ -306,8 +306,7 @@ function useMentionHandlers(
   // Cancel the deferred blur-close on unmount so it never fires post-teardown.
   useEffect(() => () => void (blurTimer.current && clearTimeout(blurTimer.current)), []);
 
-  // Destructure the stable setters so callbacks depend on them, not the whole
-  // `s` model (which changes every render) — keeps identity without a suppression.
+  // Destructure the stable setters so callbacks depend on them, not the whole `s` model (which changes every render) — preserves callback identity without a suppression.
   const { setTrigger, setActiveIndex } = s;
 
   const syncTrigger = useCallback(() => {
@@ -401,9 +400,7 @@ export function useMentionEditor({ value, onChange, campaignId, onKeyDown }: Use
   const lastNamesKey = useRef<string | null>(null);
   const handlers = useMentionHandlers(innerRef, s, onChange, campaignId, onKeyDown);
 
-  // `s.resolve` is redundant with `s.namesKey` (both track `byId`), but listing
-  // it keeps exhaustive-deps clean without a suppression; the namesKey guard in
-  // syncEditorDom no-ops the extra fire when only the byId Map identity changed.
+  // `s.resolve` is redundant with `s.namesKey` (both track `byId`) but listing it keeps exhaustive-deps clean without a suppression; syncEditorDom's namesKey guard no-ops the extra fire.
   useEffect(() => {
     const el = innerRef.current;
     if (el) syncEditorDom(el, value, s.namesKey, lastNamesKey, s.resolve);

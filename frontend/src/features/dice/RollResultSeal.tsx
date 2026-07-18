@@ -58,8 +58,7 @@ export default function RollResultSeal() {
   const { lastRoll } = useRoll();
   const [entry, setEntry] = useState<RollEntry | null>(null);
 
-  // setLastRoll always publishes a fresh object with a unique ++idRef id, so
-  // keying on `lastRoll` is equivalent to its id — no re-fire on an identical id.
+  // setLastRoll always publishes a fresh object with a unique ++idRef id, so keying on `lastRoll` is equivalent to its id — no re-fire on an identical id.
   useEffect(() => {
     if (!lastRoll) return;
     setEntry(lastRoll);

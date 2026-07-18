@@ -346,11 +346,7 @@ interface ActivityFilterState {
   entityId?: string;
 }
 
-// Owns the activity-timeline load (with field-level diffs) on mount and on any
-// filter/character change, exposing `reload` for the undo handler. The abort
-// teardown drops a superseded filter-change load so a stale response can't
-// overwrite a fresher one. Extracted from ActivityModal so the modal stays under
-// the cognitive-complexity gate while keeping exhaustive-deps suppression-free (#1056).
+// Owns the activity-timeline load (mount + filter/character change) and exposes `reload` for the undo handler; the abort teardown drops a superseded load so a stale response can't overwrite a fresher one, and the extraction keeps the modal under the complexity gate with no exhaustive-deps suppression (#1056).
 function useActivityEvents(filters: ActivityFilterState) {
   const { characterId, categoryFilter, typeFilter, sessionFilter, entityId } = filters;
   const [events, setEvents] = useState<CharacterEvent[] | null>(null);
