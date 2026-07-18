@@ -29,11 +29,6 @@ export interface AvailableAction {
 }
 
 /**
- * Action operation types — the executeAction op is resolved via `ACTION_EFFECT_FN`.
- * Sent as `{ operations: ActionOperation[] }` to
- * POST /api/characters/:id/actions/transactions.
- */
-/**
  * Execute a named action from the Action catalog. The server looks up
  * ACTION_EFFECT_FN[key], emits the appropriate domain ops (spendResource,
  * adjustQuantity, heal, etc.) within a single atomic transaction, and returns
@@ -54,4 +49,9 @@ export interface ExecuteActionOperation {
   roll?: number;
 }
 
+/**
+ * Action operation types — the executeAction op is resolved via `ACTION_EFFECT_FN`.
+ * Sent as `{ operations: ActionOperation[] }` to
+ * POST /api/characters/:id/actions/transactions.
+ */
 export type ActionOperation = ExecuteActionOperation;
