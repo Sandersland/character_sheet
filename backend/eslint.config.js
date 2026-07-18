@@ -4,10 +4,10 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    // Never lint generated output: dist/ (compiled) and src/generated/prisma
-    // (gitignored Prisma client). The latter ships its own blanket
-    // `/* eslint-disable */`, which the #1045 directive-hygiene rules would
-    // otherwise flag — generated code isn't ours to annotate.
+    // Never lint generated output: dist/ (compiled) and anything under
+    // src/generated/ (today the gitignored Prisma client, which ships its own
+    // blanket `/* eslint-disable */` that the #1045 directive-hygiene rules
+    // would otherwise flag — generated code isn't ours to annotate).
     ignores: ["dist/**", "src/generated/**"],
   },
   // Stale eslint-disable directives fail lint the moment they stop being needed (#1045).
