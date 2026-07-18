@@ -16,11 +16,8 @@ import {
   type HitDice,
 } from "./hp-core.js";
 
-// ---- Per-op appliers ----
-// Module-private helpers extracted from the applyHitPointOperations switch.
-// Each mutates ctx.hp/ctx.hd in place, does any side-table writes it owns,
-// throws InvalidHitPointOperationError on validation failure, and returns the
-// summary/eventData for the dispatcher to log. Helpers never call logEvent.
+// Per-op context: the mutable hp/hd state + row the appliers (hp-ops.ts) read
+// and write, built once per op by buildHpOpContext.
 
 export interface HpOpContext {
   tx: Prisma.TransactionClient;
