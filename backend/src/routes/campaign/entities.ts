@@ -4,15 +4,16 @@ import { z } from "zod";
 import { assertCampaignMembership, assertCampaignOwner } from "@/lib/auth/access.js";
 import { collectMergedInIdentities, wouldCreateCycle } from "@/lib/activity/entity-merges.js";
 import {
-  aggregateEntityStats,
-  buildSessionOrdinalMap,
   matchEntityQuery,
   resolveVisibleMergeUnion,
   tallyCoMentions,
   visibleEntryWhere,
-  type EntityStatsAggregate,
-  type StatRef,
 } from "@/lib/activity/entity-stats.js";
+import {
+  findViewableEntity,
+  loadSessionContext,
+  withEntityStats,
+} from "@/lib/campaign/entities.js";
 import { parseBodyOr400 } from "@/lib/http/parse-body.js";
 import { prisma } from "@/lib/core/prisma.js";
 
@@ -61,31 +62,6 @@ const updateEntitySchema = z
 // ignored. ?include=stats attaches derived mention stats (computed at read; a
 // fixed number of queries regardless of result size).
 
-// Session context resolver for mention refs: title + startedAt-ordinal (#839).
-async function loadSessionContext(campaignId: string) {
-  const sessions = await prisma.session.findMany({
-    where: { campaignId },
-    orderBy: { startedAt: "asc" },
-    select: { id: true, title: true },
-  });
-  return {
-    ordinals: buildSessionOrdinalMap(sessions),
-    titles: new Map(sessions.map((s) => [s.id, s.title])),
-  };
-}
-
-type SessionContext = Awaited<ReturnType<typeof loadSessionContext>>;
-
-function mentionRef(ref: StatRef | null, ctx: SessionContext) {
-  if (!ref) return null;
-  return {
-    sessionId: ref.sessionId,
-    sessionTitle: (ref.sessionId ? ctx.titles.get(ref.sessionId) : null) ?? null,
-    sessionOrdinal: (ref.sessionId ? ctx.ordinals.get(ref.sessionId) : null) ?? null,
-    date: ref.date,
-  };
-}
-
 function parseLimit(raw: unknown, fallback: number): number {
   const n = Number(raw);
   return Number.isInteger(n) && n > 0 ? Math.min(n, 50) : fallback;
@@ -96,129 +72,6 @@ function parseEntityType(raw: unknown): (typeof ENTITY_TYPES)[number] | undefine
   return (ENTITY_TYPES as readonly string[]).includes(raw as string)
     ? (raw as (typeof ENTITY_TYPES)[number])
     : undefined;
-}
-
-// Hidden entities are invisible to non-owners: null → 404 rather than leak existence.
-async function findViewableEntity(entityId: string, campaignId: string, isOwner: boolean) {
-  const entity = await prisma.campaignEntity.findUnique({
-    where: { id: entityId },
-    select: { id: true, campaignId: true, visibility: true },
-  });
-  if (!entity || entity.campaignId !== campaignId) return null;
-  return isOwner || entity.visibility !== "HIDDEN" ? entity : null;
-}
-
-type ListedEntity = { id: string; notes: string | null };
-
-const EMPTY_AGGREGATE: EntityStatsAggregate = {
-  mentionCount: 0,
-  firstMentioned: null,
-  lastMentioned: null,
-  chroniclers: [],
-};
-
-function statsPayload(
-  agg: EntityStatsAggregate | undefined,
-  notes: string | null,
-  ctx: SessionContext,
-) {
-  const a = agg ?? EMPTY_AGGREGATE;
-  return {
-    mentionCount: a.mentionCount,
-    firstMentioned: mentionRef(a.firstMentioned, ctx),
-    lastMentioned: mentionRef(a.lastMentioned, ctx),
-    chroniclers: a.chroniclers,
-    hasDescription: (notes ?? "").trim().length > 0,
-  };
-}
-
-// Refs tagging a merged-in identity attribute to every listed survivor above it.
-function buildAttributionIndex(union: Map<string, string[]>): Map<string, string[]> {
-  const attributeTo = new Map<string, string[]>();
-  for (const [listedId, mergedIn] of union) {
-    for (const id of [listedId, ...mergedIn]) {
-      getOrPush(attributeTo, id, listedId);
-    }
-  }
-  return attributeTo;
-}
-
-function getOrPush(map: Map<string, string[]>, key: string, value: string): void {
-  const existing = map.get(key);
-  if (existing) {
-    existing.push(value);
-    return;
-  }
-  map.set(key, [value]);
-}
-
-async function fetchVisibleStatRefs(
-  campaignId: string,
-  userId: string,
-  attributeTo: Map<string, string[]>,
-): Promise<StatRef[]> {
-  if (attributeTo.size === 0) return [];
-  const refRows = await prisma.journalEntryRef.findMany({
-    where: {
-      entityId: { in: [...attributeTo.keys()] },
-      entry: visibleEntryWhere(userId, campaignId),
-    },
-    select: {
-      entityId: true,
-      entryId: true,
-      entry: {
-        select: {
-          sessionId: true,
-          date: true,
-          loggedAt: true,
-          createdAt: true,
-          character: { select: { name: true } },
-        },
-      },
-    },
-  });
-  return refRows.flatMap((row) =>
-    (attributeTo.get(row.entityId) ?? []).map((survivor) => ({
-      entityId: survivor,
-      entryId: row.entryId,
-      characterName: row.entry.character.name,
-      sessionId: row.entry.sessionId,
-      date: row.entry.date,
-      loggedAt: row.entry.loggedAt,
-      createdAt: row.entry.createdAt,
-    })),
-  );
-}
-
-// Stats block for the list route (#839): fixed query count regardless of N.
-async function withEntityStats<E extends ListedEntity>(
-  campaignId: string,
-  userId: string,
-  isOwner: boolean,
-  matched: E[],
-) {
-  const [edges, allEntities, ctx] = await Promise.all([
-    prisma.campaignEntityMerge.findMany({
-      where: { campaignId },
-      select: { mergedEntityId: true, survivorEntityId: true, status: true },
-    }),
-    // A type-filtered list may miss merged identities of other types; the scrub
-    // needs every entity's visibility.
-    prisma.campaignEntity.findMany({
-      where: { campaignId },
-      select: { id: true, visibility: true },
-    }),
-    loadSessionContext(campaignId),
-  ]);
-  const revealedIds = new Set(
-    allEntities.filter((e) => e.visibility === "REVEALED").map((e) => e.id),
-  );
-  const listedIds = matched.map((e) => e.id);
-  const union = resolveVisibleMergeUnion(edges, listedIds, revealedIds, isOwner);
-  const attributeTo = buildAttributionIndex(union);
-  const statRefs = await fetchVisibleStatRefs(campaignId, userId, attributeTo);
-  const stats = aggregateEntityStats(statRefs);
-  return matched.map((e) => ({ ...e, stats: statsPayload(stats.get(e.id), e.notes, ctx) }));
 }
 
 entitiesRouter.get("/campaigns/:id/entities", async (req, res) => {
@@ -258,7 +111,7 @@ entitiesRouter.get("/campaigns/:id/entities", async (req, res) => {
     return;
   }
 
-  res.json(await withEntityStats(req.params.id, req.user!.id, isOwner, matched));
+  res.json(await withEntityStats(prisma, req.params.id, req.user!.id, isOwner, matched));
 });
 
 // ── GET /api/campaigns/:id/entities/activity ─────────────────────────────────
@@ -322,7 +175,7 @@ entitiesRouter.get("/campaigns/:id/entities/activity", async (req, res) => {
       orderBy: { createdAt: "desc" },
       take: limit,
     }),
-    loadSessionContext(req.params.id),
+    loadSessionContext(prisma, req.params.id),
   ]);
 
   const items = [
@@ -623,7 +476,7 @@ entitiesRouter.delete("/campaigns/:id/entities/:entityId", async (req, res) => {
 entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, res) => {
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
 
-  const entity = await findViewableEntity(req.params.entityId, req.params.id, role === "OWNER");
+  const entity = await findViewableEntity(prisma, req.params.entityId, req.params.id, role === "OWNER");
   if (!entity) {
     res.status(404).json({ error: "Entity not found" });
     return;
@@ -665,7 +518,7 @@ entitiesRouter.get("/campaigns/:id/entities/:entityId/backlinks", async (req, re
         { entry: { createdAt: "desc" } },
       ],
     }),
-    loadSessionContext(req.params.id),
+    loadSessionContext(prisma, req.params.id),
   ]);
 
   res.json(
@@ -696,7 +549,7 @@ entitiesRouter.get("/campaigns/:id/entities/:entityId/connections", async (req, 
   const { role } = await assertCampaignMembership(prisma, req.user!.id, req.params.id, "view");
   const isOwner = role === "OWNER";
 
-  const target = await findViewableEntity(req.params.entityId, req.params.id, isOwner);
+  const target = await findViewableEntity(prisma, req.params.entityId, req.params.id, isOwner);
   if (!target) {
     res.status(404).json({ error: "Entity not found" });
     return;
