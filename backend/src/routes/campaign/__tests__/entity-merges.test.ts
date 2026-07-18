@@ -280,6 +280,129 @@ describe("entity identity merges (#387)", () => {
     expect((merges.body as { id: string }[]).some((m) => m.id === mergeId)).toBe(false);
   });
 
+  it("re-executing an EXECUTED merge keeps the first executedAt", async () => {
+    const jenkins = await makeEntity(campaignId, "Jenkins I");
+    const vecna = await makeEntity(campaignId, "Vecna I");
+    const prep = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges`)
+      .set("Cookie", cookieOwner)
+      .send({ mergedEntityId: jenkins, survivorEntityId: vecna });
+    const mergeId = prep.body.id as string;
+
+    const first = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges/${mergeId}/execute`)
+      .set("Cookie", cookieOwner);
+    expect(first.status).toBe(200);
+    const firstExecutedAt = first.body.executedAt as string;
+    expect(firstExecutedAt).toBeTruthy();
+
+    const second = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges/${mergeId}/execute`)
+      .set("Cookie", cookieOwner);
+    expect(second.status).toBe(200);
+    expect(second.body.status).toBe("EXECUTED");
+    expect(second.body.executedAt).toBe(firstExecutedAt);
+  });
+
+  it("404s execute and unmerge for unknown or cross-campaign merge ids", async () => {
+    const unknownId = "00000000-0000-4000-8000-000000000000";
+    const execUnknown = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges/${unknownId}/execute`)
+      .set("Cookie", cookieOwner);
+    expect(execUnknown.status).toBe(404);
+
+    const delUnknown = await supertest(app)
+      .delete(`/api/campaigns/${campaignId}/entities/merges/${unknownId}`)
+      .set("Cookie", cookieOwner);
+    expect(delUnknown.status).toBe(404);
+
+    // A real merge, but belonging to the other campaign.
+    const foreignMerged = await makeEntity(otherCampaignId, "Foreign Merged X");
+    const foreignSurvivor = await makeEntity(otherCampaignId, "Foreign Survivor X");
+    const foreignPrep = await supertest(app)
+      .post(`/api/campaigns/${otherCampaignId}/entities/merges`)
+      .set("Cookie", cookieOwner)
+      .send({ mergedEntityId: foreignMerged, survivorEntityId: foreignSurvivor });
+    const foreignMergeId = foreignPrep.body.id as string;
+
+    const execForeign = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges/${foreignMergeId}/execute`)
+      .set("Cookie", cookieOwner);
+    expect(execForeign.status).toBe(404);
+
+    const delForeign = await supertest(app)
+      .delete(`/api/campaigns/${campaignId}/entities/merges/${foreignMergeId}`)
+      .set("Cookie", cookieOwner);
+    expect(delForeign.status).toBe(404);
+  });
+
+  it("scrubs an EXECUTED merge whose merged identity is still HIDDEN from player payloads", async () => {
+    const ghost = await makeEntity(campaignId, "Ghost H", "HIDDEN");
+    const survivor = await makeEntity(campaignId, "Survivor H");
+    const prep = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges`)
+      .set("Cookie", cookieOwner)
+      .send({ mergedEntityId: ghost, survivorEntityId: survivor });
+    const mergeId = prep.body.id as string;
+    const exec = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges/${mergeId}/execute`)
+      .set("Cookie", cookieOwner);
+    expect(exec.status).toBe(200);
+
+    const ownerMerges = await supertest(app)
+      .get(`/api/campaigns/${campaignId}/entities/merges`)
+      .set("Cookie", cookieOwner);
+    expect((ownerMerges.body as { id: string }[]).some((m) => m.id === mergeId)).toBe(true);
+
+    // Executed, but the merged side is still HIDDEN — a player must not see it.
+    const playerMerges = await supertest(app)
+      .get(`/api/campaigns/${campaignId}/entities/merges`)
+      .set("Cookie", cookiePlayer);
+    expect((playerMerges.body as { id: string }[]).some((m) => m.id === mergeId)).toBe(false);
+  });
+
+  it("excludes a HIDDEN merged identity's refs from a player's backlinks", async () => {
+    const ghost = await makeEntity(campaignId, "Ghost R", "HIDDEN");
+    const survivor = await makeEntity(campaignId, "Survivor R");
+    const prep = await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges`)
+      .set("Cookie", cookieOwner)
+      .send({ mergedEntityId: ghost, survivorEntityId: survivor });
+    await supertest(app)
+      .post(`/api/campaigns/${campaignId}/entities/merges/${prep.body.id}/execute`)
+      .set("Cookie", cookieOwner);
+
+    // CAMPAIGN entries so entry visibility can't be the excluder.
+    const seed = async (entityId: string, body: string) => {
+      const entry = await prisma.journalEntry.create({
+        data: {
+          characterId: CHAR_OWNER,
+          kind: "NOTE",
+          date: new Date("2026-06-23T00:00:00.000Z"),
+          body,
+          visibility: "CAMPAIGN",
+          authorUserId: OWNER,
+        },
+      });
+      await prisma.journalEntryRef.create({ data: { entryId: entry.id, entityId } });
+    };
+    await seed(ghost, "whispers of Ghost R");
+    await seed(survivor, "met Survivor R");
+
+    const ownerRes = await supertest(app)
+      .get(`/api/campaigns/${campaignId}/entities/${survivor}/backlinks`)
+      .set("Cookie", cookieOwner);
+    const ownerIds = (ownerRes.body as { identity: { id: string } }[]).map((b) => b.identity.id);
+    expect(new Set(ownerIds)).toEqual(new Set([ghost, survivor]));
+
+    const playerRes = await supertest(app)
+      .get(`/api/campaigns/${campaignId}/entities/${survivor}/backlinks`)
+      .set("Cookie", cookiePlayer);
+    expect(playerRes.status).toBe(200);
+    const playerIds = (playerRes.body as { identity: { id: string } }[]).map((b) => b.identity.id);
+    expect(playerIds).toEqual([survivor]);
+  });
+
   it("cascade-deletes the merge when either entity is deleted", async () => {
     const jenkins = await makeEntity(campaignId, "Jenkins C");
     const vecna = await makeEntity(campaignId, "Vecna C");
