@@ -38,6 +38,14 @@ describe("CombatUtilityStrip (#982)", () => {
     expect(screen.queryByText(/no active conditions/i)).not.toBeInTheDocument();
   });
 
+  it("shows the hit-dice count inline on the mobile Rest row (#1028)", () => {
+    render(
+      <CombatUtilityStrip character={makeCharacter({ active: [], exhaustion: 0 })} onUpdate={vi.fn()} />,
+    );
+    // hitDice total 5, none spent → 5/5d10 available, shown on the Rest row itself.
+    expect(screen.getByText(/Hit dice 5\/5d10/)).toBeInTheDocument();
+  });
+
   it("renders active-condition chips as labels (never raw keys)", () => {
     render(
       <CombatUtilityStrip

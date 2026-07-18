@@ -13,7 +13,8 @@
  */
 
 import Card from "@/components/ui/Card";
-import { Zap } from "@/components/ui/icons";
+import { ChevronRight, ScrollText, Zap } from "@/components/ui/icons";
+import { useIsBelowMd } from "@/hooks/useIsBelowMd";
 import { useTurnActions } from "@/features/session/useTurnActions";
 import ActionSlot from "@/features/session/ActionSlot";
 import BonusActionSlot from "@/features/session/BonusActionSlot";
@@ -25,7 +26,7 @@ import TurnDeathSaves from "@/features/session/TurnDeathSaves";
 import TurnSummaryBanner from "@/features/session/TurnSummaryBanner";
 import { useTallyResolve } from "@/features/session/useTallyResolve";
 import TurnResolutionSheets from "@/features/session/TurnResolutionSheets";
-import { showMovement } from "@/features/session/turnFlags";
+import { showInitiative, showMovement } from "@/features/session/turnFlags";
 import type { AllyOption } from "@/lib/spellMeta";
 import type { TurnStateView } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
@@ -47,6 +48,9 @@ interface TurnHubProps {
    * (activeResolution) survives so it reopens on return.
    */
   overlaysActive?: boolean;
+  /** Opens the session log (mobile only, #1028). The turn bar shows a log icon
+   *  only when a host wires this; the `/session`-less sheet Combat tab does. */
+  onOpenLog?: () => void;
 }
 
 // Idle-phase presentation: the Start-Combat gate (not in combat) or the
@@ -199,7 +203,79 @@ function TurnHubHeader({
   );
 }
 
+// Mobile turn bar (#1028): replaces the "Your turn" card header + the Turn/Log
+// segmented control. Serif title + Round · Move {speed} ft, a pinned End turn at
+// a fixed spot, a log icon (when a host wires onOpenLog), and Undo once history
+// exists. Full-bleed; the desktop card keeps TurnHubHeader.
+function MobileTurnBar({
+  round,
+  speed,
+  busy,
+  canUndo,
+  onUndo,
+  onEndTurn,
+  onOpenLog,
+}: {
+  round: number;
+  speed: number | undefined;
+  busy: boolean;
+  canUndo: boolean;
+  onUndo: () => void;
+  onEndTurn: () => void;
+  onOpenLog?: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2.5 border-b border-parchment-200 bg-parchment-50 px-4 py-2.5">
+      <div className="min-w-0 flex-1">
+        <p className="font-display text-lg font-semibold leading-tight text-garnet-700">Your turn</p>
+        <p className="mt-0.5 text-xs font-medium tabular-nums text-parchment-600">
+          Round {round}
+          {typeof speed === "number" && <> · Move {speed} ft</>}
+        </p>
+      </div>
+      {canUndo && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onUndo}
+          className="shrink-0 rounded-control px-2 py-1.5 text-xs font-semibold text-arcane-700 transition-colors hover:bg-arcane-50 disabled:opacity-50"
+        >
+          <span aria-hidden="true">↩ </span>Undo
+        </button>
+      )}
+      {onOpenLog && (
+        <button
+          type="button"
+          onClick={onOpenLog}
+          aria-label="Open session log"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-parchment-500 transition-colors hover:bg-parchment-100"
+        >
+          <ScrollText aria-hidden="true" className="h-5 w-5" />
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={onEndTurn}
+        className="shrink-0 rounded-control border border-garnet-300 bg-garnet-700 px-3.5 py-2 text-xs font-semibold text-parchment-50 shadow-sm transition-colors hover:bg-garnet-800"
+      >
+        End turn
+      </button>
+    </div>
+  );
+}
+
+// Initiative strip (#1023 Phase B–D): the turn-order scroller. Behind the
+// showInitiative flag — the app doesn't model enemies/turn-order yet, so it
+// renders nothing for users today. Markup kept minimal until the data exists.
+function InitiativeStrip() {
+  if (!showInitiative) return null;
+  return (
+    <div className="flex items-center gap-2 overflow-x-auto border-b border-parchment-200 px-4 py-2" aria-label="Initiative order" />
+  );
+}
+
 // Action Surge (Fighter) — self-gating: renders nothing when unavailable.
+// Desktop keeps the compact gold pill; mobile (#1028) is a full-bleed gold row.
 function ActionSurgeButton({
   available,
   pool,
@@ -211,7 +287,24 @@ function ActionSurgeButton({
   busy: boolean;
   onSurge: () => void;
 }) {
+  const isMobile = useIsBelowMd();
   if (!available) return null;
+  const usesLeft = pool && pool.remaining > 1 ? `${pool.remaining} uses left` : "1 use left";
+  if (isMobile) {
+    return (
+      <button
+        type="button"
+        disabled={busy}
+        onClick={onSurge}
+        className="pressable divider-hairline flex min-h-[52px] w-full items-center gap-3 bg-gold-50 px-4 py-2.5 text-left disabled:opacity-50"
+      >
+        <Zap aria-hidden="true" className="h-5 w-5 shrink-0 text-gold-800" />
+        <span className="flex-1 text-base font-semibold text-gold-800">Action Surge</span>
+        <span className="shrink-0 text-xs font-semibold tabular-nums text-gold-800/75">{usesLeft}</span>
+        <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-gold-800/60" />
+      </button>
+    );
+  }
   return (
     <button
       type="button"
@@ -262,7 +355,8 @@ function TurnMessages({
   );
 }
 
-export default function TurnHub({ character, sessionId, turnState, onUpdate, onLogChanged, allies, overlaysActive = true }: TurnHubProps) {
+export default function TurnHub({ character, sessionId, turnState, onUpdate, onLogChanged, allies, overlaysActive = true, onOpenLog }: TurnHubProps) {
+  const isBelowMd = useIsBelowMd();
   const {
     inCombat,
     round,
@@ -325,6 +419,149 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
 
   // ── Active state ────────────────────────────────────────────────────────────
 
+  // Shared surfaces — identical on both breakpoints; only the slot rows and the
+  // wrapper/header differ (TurnSlotCard self-adapts to a full-bleed mobile row).
+  const deathSaves = <TurnDeathSaves character={character} onUpdate={onUpdate} />;
+  const concentration = (
+    <TurnConcentrationBanner character={character} onUpdate={onUpdate} onLogChanged={onLogChanged} />
+  );
+  const actionSlot = (
+    <ActionSlot
+      actionsRemaining={actionsRemaining}
+      attack={attack}
+      showActionMenu={showActionMenu}
+      setShowActionMenu={setShowActionMenu}
+      classActions={classActions}
+      sheetModel={actionSheetModel}
+      busy={busy}
+      handleAttackAction={handleAttackAction}
+      handleResumeAttack={handleResumeAttack}
+      handleActionClick={handleActionClick}
+    />
+  );
+  const bonusSlot = (
+    <BonusActionSlot
+      bonusActionUsed={bonusActionUsed}
+      bonusAttack={bonusAttack}
+      showBonusMenu={showBonusMenu}
+      setShowBonusMenu={setShowBonusMenu}
+      twfAvailable={twfAvailable}
+      classBonusActions={classBonusActions}
+      sheetModel={bonusSheetModel}
+      busy={busy}
+      handleTwfAction={handleTwfAction}
+      handleActionClick={handleActionClick}
+      handleBonusSpellCast={handleBonusSpellCast}
+      consumeBonusAction={consumeBonusAction}
+    />
+  );
+  const reactionSlot = (
+    <ReactionSlot
+      reactionUsed={reactionUsed}
+      showReactionMenu={showReactionMenu}
+      setShowReactionMenu={setShowReactionMenu}
+      classReactions={classReactions}
+      sheetModel={reactionSheetModel}
+      reactionManeuvers={reactionManeuvers}
+      superiorityRemaining={superiorityRemaining}
+      dieLabel={dieLabel}
+      dieBusy={dieBusy}
+      busy={busy}
+      reactionMessage={reactionMessage}
+      error={error}
+      handleActionClick={handleActionClick}
+      handleReactionManeuver={handleReactionManeuver}
+      consumeReaction={consumeReaction}
+    />
+  );
+  const actionSurge = (
+    <ActionSurgeButton
+      available={actionSurgeAvailable}
+      pool={actionSurgePool}
+      busy={busy}
+      onSurge={handleActionSurge}
+    />
+  );
+  // Overlay pickers render only when the panel is the active tab (#960): a
+  // portaled BottomSheet would otherwise float over another tab while this panel
+  // is mounted-but-hidden. `activeResolution` survives, so the sheet reopens.
+  const resolutionSheets = overlaysActive && (
+    <TurnResolutionSheets
+      character={character}
+      sessionId={sessionId}
+      turnState={turnState}
+      activeResolution={activeResolution}
+      closeResolution={closeResolution}
+      setShowActionMenu={setShowActionMenu}
+      setShowBonusMenu={setShowBonusMenu}
+      onUpdate={onUpdate}
+      onLogChanged={onLogChanged}
+      allies={allies}
+      send={send}
+      loadoutSwap={loadoutSwap}
+    />
+  );
+  // Split around Action Surge so the desktop order stays byte-identical (surge sat
+  // between the Turn-summary banner and the resolution sheets).
+  const trailingBeforeSurge = (
+    <>
+      {/* Weapon-change Refund — persists until refunded or turn end (#815). */}
+      <LoadoutRefundStrip loadout={loadoutSwap} />
+      {/* "Turn summary" banner — attack tally once the sheet is closed; unresolved
+          lines resolve inline, resolved lines offer a quiet Change (#811). */}
+      {!activeResolution && (
+        <TurnSummaryBanner rows={attackTally} onDismiss={clearAttackTally} resolve={tallyResolve} />
+      )}
+    </>
+  );
+  const trailingAfterSurge = (
+    <>
+      {resolutionSheets}
+      {/* Effect maneuvers (no slot consumed) — e.g. Evasive Footwork. */}
+      <EffectManeuverStrip
+        effectManeuvers={effectManeuvers}
+        superiorityRemaining={superiorityRemaining}
+        dieLabel={dieLabel}
+        dieBusy={dieBusy}
+        handleEffectManeuver={handleEffectManeuver}
+      />
+      <TurnMessages error={error} effectMessage={effectMessage} durableReminders={durableReminders} />
+    </>
+  );
+
+  // Mobile (#1028): full-bleed turn bar + edge-to-edge slot rows, no card gutter.
+  if (isBelowMd) {
+    return (
+      <div className="overflow-hidden bg-parchment-50">
+        <MobileTurnBar
+          round={round}
+          speed={character.speed}
+          busy={busy}
+          canUndo={history.length > 0}
+          onUndo={handleUndo}
+          onEndTurn={handleEndTurn}
+          onOpenLog={onOpenLog}
+        />
+        <InitiativeStrip />
+        {/* Death saves / concentration surface above the slots when active; the
+            wrapper hides itself when both render nothing (empty:hidden). */}
+        <div className="flex flex-col gap-3 px-4 py-3 empty:hidden">
+          {deathSaves}
+          {concentration}
+        </div>
+        {actionSlot}
+        {bonusSlot}
+        {reactionSlot}
+        {actionSurge}
+        <div className="flex flex-col gap-3 px-4 py-3 empty:hidden">
+          {trailingBeforeSurge}
+          {trailingAfterSurge}
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop: the original bordered card + header, pixel-identical.
   return (
     <Card className="p-4">
       <TurnHubHeader
@@ -337,114 +574,14 @@ export default function TurnHub({ character, sessionId, turnState, onUpdate, onL
       />
 
       <div className="flex flex-col gap-3">
-        {/* Death saves surface on your own turn too — the primary moment a
-            downed player rolls a save (#736/#744). */}
-        <TurnDeathSaves character={character} onUpdate={onUpdate} />
-
-        <TurnConcentrationBanner
-          character={character}
-          onUpdate={onUpdate}
-          onLogChanged={onLogChanged}
-        />
-
-        {/* ── Action ──────────────────────────────────────────────────────── */}
-        <ActionSlot
-          actionsRemaining={actionsRemaining}
-          attack={attack}
-          showActionMenu={showActionMenu}
-          setShowActionMenu={setShowActionMenu}
-          classActions={classActions}
-          sheetModel={actionSheetModel}
-          busy={busy}
-          handleAttackAction={handleAttackAction}
-          handleResumeAttack={handleResumeAttack}
-          handleActionClick={handleActionClick}
-        />
-
-        {/* ── Bonus Action ─────────────────────────────────────────────────── */}
-        <BonusActionSlot
-          bonusActionUsed={bonusActionUsed}
-          bonusAttack={bonusAttack}
-          showBonusMenu={showBonusMenu}
-          setShowBonusMenu={setShowBonusMenu}
-          twfAvailable={twfAvailable}
-          classBonusActions={classBonusActions}
-          sheetModel={bonusSheetModel}
-          busy={busy}
-          handleTwfAction={handleTwfAction}
-          handleActionClick={handleActionClick}
-          handleBonusSpellCast={handleBonusSpellCast}
-          consumeBonusAction={consumeBonusAction}
-        />
-
-        {/* ── Reaction ─────────────────────────────────────────────────────── */}
-        <ReactionSlot
-          reactionUsed={reactionUsed}
-          showReactionMenu={showReactionMenu}
-          setShowReactionMenu={setShowReactionMenu}
-          classReactions={classReactions}
-          sheetModel={reactionSheetModel}
-          reactionManeuvers={reactionManeuvers}
-          superiorityRemaining={superiorityRemaining}
-          dieLabel={dieLabel}
-          dieBusy={dieBusy}
-          busy={busy}
-          reactionMessage={reactionMessage}
-          error={error}
-          handleActionClick={handleActionClick}
-          handleReactionManeuver={handleReactionManeuver}
-          consumeReaction={consumeReaction}
-        />
-
-        {/* ── Weapon-change Refund — persists until refunded or turn end (#815) ── */}
-        <LoadoutRefundStrip loadout={loadoutSwap} />
-
-        {/* ── "Turn summary" banner — attack tally once the sheet is closed;
-            unresolved lines resolve inline, resolved lines offer quiet Change (#811) ── */}
-        {!activeResolution && (
-          <TurnSummaryBanner rows={attackTally} onDismiss={clearAttackTally} resolve={tallyResolve} />
-        )}
-
-        {/* ── Action Surge (Fighter) ─────────────────────────────────────── */}
-        <ActionSurgeButton
-          available={actionSurgeAvailable}
-          pool={actionSurgePool}
-          busy={busy}
-          onSurge={handleActionSurge}
-        />
-
-        {/* ── Resolution sheets ─────────────────────────────────────────────── */}
-        {/* Overlay pickers render only when the panel is the active tab (#960):
-            a portaled BottomSheet would otherwise float over another tab while
-            this panel is mounted-but-hidden. `activeResolution` survives, so the
-            sheet reopens on return. */}
-        {overlaysActive && (
-          <TurnResolutionSheets
-            character={character}
-            sessionId={sessionId}
-            turnState={turnState}
-            activeResolution={activeResolution}
-            closeResolution={closeResolution}
-            setShowActionMenu={setShowActionMenu}
-            setShowBonusMenu={setShowBonusMenu}
-            onUpdate={onUpdate}
-            onLogChanged={onLogChanged}
-            allies={allies}
-            send={send}
-            loadoutSwap={loadoutSwap}
-          />
-        )}
-
-        {/* ── Effect maneuvers (no slot consumed) — e.g. Evasive Footwork ─────── */}
-        <EffectManeuverStrip
-          effectManeuvers={effectManeuvers}
-          superiorityRemaining={superiorityRemaining}
-          dieLabel={dieLabel}
-          dieBusy={dieBusy}
-          handleEffectManeuver={handleEffectManeuver}
-        />
-
-        <TurnMessages error={error} effectMessage={effectMessage} durableReminders={durableReminders} />
+        {deathSaves}
+        {concentration}
+        {actionSlot}
+        {bonusSlot}
+        {reactionSlot}
+        {trailingBeforeSurge}
+        {actionSurge}
+        {trailingAfterSurge}
       </div>
     </Card>
   );

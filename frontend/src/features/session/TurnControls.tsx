@@ -2,6 +2,9 @@
 
 import type { IconType } from "react-icons";
 
+import { ChevronRight } from "@/components/ui/icons";
+import { useIsBelowMd } from "@/hooks/useIsBelowMd";
+
 type SlotTone = "garnet" | "arcane" | "neutral";
 
 const SLOT_TONES: Record<SlotTone, { border: string; tile: string; useBtn: string }> = {
@@ -22,13 +25,36 @@ const SLOT_TONES: Record<SlotTone, { border: string; tile: string; useBtn: strin
   },
 };
 
+interface TurnSlotCardProps {
+  icon: IconType;
+  title: string;
+  preview: string;
+  tone: SlotTone;
+  used: boolean;
+  usedLabel?: string;
+  /** Optional count chip beside the title (e.g. "×2" when two actions remain). */
+  badge?: string;
+  /** When provided, renders the Use affordance; omit for a static row (no action left). */
+  onUse?: () => void;
+  /** Accessible name for the Use affordance — "Use Action/Bonus/Reaction" for tests + a11y. */
+  useLabel: string;
+  children?: React.ReactNode;
+}
+
 /**
- * A turn-economy slot rendered as a large tap target (#729): an icon tile, the
- * slot name + a preview of what's inside, and a solid "Use" button that opens
- * the slot's bottom-sheet picker. `used` dims the whole row and hides the
- * button. Any counters/results render as `children` beneath the row.
+ * A turn-economy slot rendered as a large tap target (#729). Desktop: a bordered
+ * card with a solid "Use" button (unchanged). Mobile (#1028): a full-bleed ~64pt
+ * row — icon tile, slot name + untruncated preview, a "Ready"/used state and a
+ * chevron — where the whole row is the tap target opening the picker sheet.
+ * Any counters/results render as `children` beneath the row.
  */
-export function TurnSlotCard({
+export function TurnSlotCard(props: TurnSlotCardProps) {
+  return useIsBelowMd() ? <MobileSlotRow {...props} /> : <DesktopSlotCard {...props} />;
+}
+
+// Mobile full-bleed row (#1028): whole row taps into the picker; children (attack
+// counters, reaction result) render below it, not nested inside the button.
+function MobileSlotRow({
   icon: Icon,
   title,
   preview,
@@ -39,21 +65,64 @@ export function TurnSlotCard({
   onUse,
   useLabel,
   children,
-}: {
-  icon: IconType;
-  title: string;
-  preview: string;
-  tone: SlotTone;
-  used: boolean;
-  usedLabel?: string;
-  /** Optional count chip beside the title (e.g. "×2" when two actions remain). */
-  badge?: string;
-  /** When provided, renders the Use button; omit to render a static row (no action left). */
-  onUse?: () => void;
-  /** Accessible name for the Use button — kept as "Use Action/Bonus/Reaction" for tests + a11y. */
-  useLabel: string;
-  children?: React.ReactNode;
-}) {
+}: TurnSlotCardProps) {
+  const t = SLOT_TONES[tone];
+  const tappable = Boolean(onUse) && !used;
+  const rowInner = (
+    <>
+      <span aria-hidden className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-control ${t.tile}`}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5 text-base font-semibold text-parchment-900">
+          {title}
+          {badge && (
+            <span className="rounded-full bg-garnet-100 px-1.5 text-[10px] font-bold text-garnet-700">{badge}</span>
+          )}
+        </span>
+        <span className="mt-0.5 block text-[13px] leading-snug text-parchment-600">
+          {used ? usedLabel : preview}
+        </span>
+      </span>
+      {tappable && (
+        <>
+          <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-vitality-700">Ready</span>
+          <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-parchment-400" />
+        </>
+      )}
+    </>
+  );
+  return (
+    <div className={`divider-hairline ${used ? "opacity-60" : ""}`}>
+      {tappable ? (
+        <button
+          type="button"
+          onClick={onUse}
+          aria-label={useLabel}
+          className="pressable flex min-h-[64px] w-full items-center gap-3 px-4 py-2.5 text-left"
+        >
+          {rowInner}
+        </button>
+      ) : (
+        <div className="flex min-h-[56px] w-full items-center gap-3 px-4 py-2.5">{rowInner}</div>
+      )}
+      {children && <div className="px-4 pb-2">{children}</div>}
+    </div>
+  );
+}
+
+function DesktopSlotCard({
+  icon: Icon,
+  title,
+  preview,
+  tone,
+  used,
+  usedLabel = "used",
+  badge,
+  onUse,
+  useLabel,
+  children,
+}: TurnSlotCardProps) {
   const t = SLOT_TONES[tone];
   return (
     <div className={`rounded-card border bg-parchment-50 p-3 ${t.border} ${used ? "opacity-60" : ""}`}>

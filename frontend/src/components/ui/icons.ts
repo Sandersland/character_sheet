@@ -91,4 +91,5 @@ export {
   Trash2,
   TriangleAlert,
   Link2,
+  ScrollText,
 } from "lucide-react";

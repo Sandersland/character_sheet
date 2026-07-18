@@ -32,6 +32,8 @@ interface LiveTurnBodyProps {
   onLogChanged: () => void;
   /** Gate the turn hub's overlay pickers (#960 mounted-but-hidden). */
   overlaysActive?: boolean;
+  /** Opens the session log (mobile turn-bar icon, #1028). */
+  onOpenLog?: () => void;
 }
 
 export default function LiveTurnBody({
@@ -41,6 +43,7 @@ export default function LiveTurnBody({
   onUpdate,
   onLogChanged,
   overlaysActive,
+  onOpenLog,
 }: LiveTurnBodyProps) {
   return (
     <>
@@ -54,6 +57,7 @@ export default function LiveTurnBody({
         onLogChanged={onLogChanged}
         allies={partyHealAllies(session, character.id)}
         overlaysActive={overlaysActive}
+        onOpenLog={onOpenLog}
       />
 
       {/* Quiet one-line vitals strip below the hero: conditions + exhaustion +
