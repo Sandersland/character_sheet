@@ -313,8 +313,7 @@ function useMentionHandlers(
     const parsed = parseTrigger(before);
     s.setTrigger(parsed ? { ...parsed, caretOffset: before.length } : null);
     s.setActiveIndex(0);
-    // Captures only stable refs + state setters; adding `s` would recreate this every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- captures only stable refs + setters; adding `s` would recreate this each render
   }, []);
 
   const handleInput = useCallback(() => {
@@ -379,8 +378,7 @@ function useMentionHandlers(
   const handleBlur = useCallback(() => {
     if (blurTimer.current) clearTimeout(blurTimer.current);
     blurTimer.current = setTimeout(() => s.setTrigger(null), 120);
-    // Captures only stable refs + state setters; adding `s` would recreate this every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- captures only stable refs + setters; adding `s` would recreate this each render
   }, []);
 
   return {
@@ -404,9 +402,7 @@ export function useMentionEditor({ value, onChange, campaignId, onKeyDown }: Use
   useEffect(() => {
     const el = innerRef.current;
     if (el) syncEditorDom(el, value, s.namesKey, lastNamesKey, s.resolve);
-    // innerRef/lastNamesKey are stable refs; s.resolve changes exactly when s.namesKey
-    // changes (both track byId), so namesKey in the dep array already covers it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refs are stable; s.resolve changes iff s.namesKey does (both track byId), so namesKey covers it
   }, [value, s.namesKey]);
 
   return {

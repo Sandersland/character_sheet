@@ -1,11 +1,28 @@
+import comments from "@eslint-community/eslint-plugin-eslint-comments";
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
+  {
+    // Never lint generated output: dist/ (compiled) and src/generated/prisma
+    // (gitignored Prisma client). The latter ships its own blanket
+    // `/* eslint-disable */`, which the #1045 directive-hygiene rules would
+    // otherwise flag — generated code isn't ours to annotate.
+    ignores: ["dist/**", "src/generated/**"],
+  },
+  // Stale eslint-disable directives fail lint the moment they stop being needed (#1045).
+  { linterOptions: { reportUnusedDisableDirectives: "error" } },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    ignores: ["dist/**"],
+    // Suppression hygiene (#1045): every disable must name its rule
+    // (no-unlimited-disable) and carry a `-- reason` (require-description),
+    // machine-enforcing the CLAUDE.md suppression policy.
+    plugins: { "@eslint-community/eslint-comments": comments },
+    rules: {
+      "@eslint-community/eslint-comments/no-unlimited-disable": "error",
+      "@eslint-community/eslint-comments/require-description": "error",
+    },
   },
   {
     // Regression guard for the shared-DB test-isolation flake (issue #135):

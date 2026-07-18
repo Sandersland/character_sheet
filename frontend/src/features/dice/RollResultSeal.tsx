@@ -63,7 +63,7 @@ export default function RollResultSeal() {
     setEntry(lastRoll);
     const timer = setTimeout(() => setEntry(null), DISMISS_MS);
     return () => clearTimeout(timer);
-  }, [lastRoll?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lastRoll?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed on lastRoll?.id; setEntry is stable, whole lastRoll would re-fire on an identical id
 
   if (!entry) return null;
 
