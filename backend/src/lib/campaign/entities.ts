@@ -2,10 +2,11 @@
 // and journal-ref attribution. HTTP-free; routes pass `db` and map results.
 
 import type { PrismaClient } from "@/generated/prisma/client.js";
-import { wouldCreateCycle } from "@/lib/activity/entity-merges.js";
+import { collectMergedInIdentities, wouldCreateCycle } from "@/lib/activity/entity-merges.js";
 import {
   aggregateEntityStats,
   resolveVisibleMergeUnion,
+  tallyCoMentions,
   visibleEntryWhere,
   buildSessionOrdinalMap,
   type EntityStatsAggregate,
@@ -13,7 +14,7 @@ import {
 } from "@/lib/activity/entity-stats.js";
 
 // Session context resolver for mention refs: title + startedAt-ordinal (#839).
-export async function loadSessionContext(db: PrismaClient, campaignId: string) {
+async function loadSessionContext(db: PrismaClient, campaignId: string) {
   const sessions = await db.session.findMany({
     where: { campaignId },
     orderBy: { startedAt: "asc" },
@@ -311,4 +312,219 @@ export async function withEntityStats<E extends ListedEntity>(
   const statRefs = await fetchVisibleStatRefs(db, campaignId, userId, attributeTo);
   const stats = aggregateEntityStats(statRefs);
   return matched.map((e) => ({ ...e, stats: statsPayload(stats.get(e.id), e.notes, ctx) }));
+}
+
+// ── Campaign-wide Codex activity (#839) ──────────────────────────────────────
+
+type ActivitySortable = { sortKey: [number, number, number] };
+
+function activitySortKey(date: Date, loggedAt?: Date, createdAt?: Date): [number, number, number] {
+  return [date.getTime(), (loggedAt ?? date).getTime(), (createdAt ?? date).getTime()];
+}
+
+function compareActivityDesc(a: ActivitySortable, b: ActivitySortable): number {
+  return (
+    b.sortKey[0] - a.sortKey[0] || b.sortKey[1] - a.sortKey[1] || b.sortKey[2] - a.sortKey[2]
+  );
+}
+
+// Newest visible mention refs merged with entity-created events, newest-first.
+export async function buildEntityActivityFeed(
+  db: PrismaClient,
+  campaignId: string,
+  userId: string,
+  isOwner: boolean,
+  limit: number,
+) {
+  // Two bounded streams (each pre-sorted + capped at N) merged in memory.
+  const [refs, createdEntities, ctx] = await Promise.all([
+    db.journalEntryRef.findMany({
+      where: {
+        entity: {
+          campaignId,
+          ...(isOwner ? {} : { visibility: "REVEALED" }),
+        },
+        entry: visibleEntryWhere(userId, campaignId),
+      },
+      select: {
+        entity: { select: { id: true, name: true, type: true } },
+        entry: {
+          select: {
+            sessionId: true,
+            date: true,
+            loggedAt: true,
+            createdAt: true,
+            character: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: [
+        { entry: { date: "desc" } },
+        { entry: { loggedAt: "desc" } },
+        { entry: { createdAt: "desc" } },
+      ],
+      take: limit,
+    }),
+    db.campaignEntity.findMany({
+      where: {
+        campaignId,
+        ...(isOwner ? {} : { visibility: "REVEALED" }),
+      },
+      select: { id: true, name: true, type: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    }),
+    loadSessionContext(db, campaignId),
+  ]);
+
+  const items = [
+    ...refs.map((ref) => ({
+      sortKey: activitySortKey(ref.entry.date, ref.entry.loggedAt, ref.entry.createdAt),
+      item: {
+        kind: "mention" as const,
+        characterName: ref.entry.character.name,
+        entity: ref.entity,
+        sessionOrdinal:
+          (ref.entry.sessionId ? ctx.ordinals.get(ref.entry.sessionId) : null) ?? null,
+        date: ref.entry.date,
+      },
+    })),
+    ...createdEntities.map((e) => ({
+      sortKey: activitySortKey(e.createdAt),
+      item: {
+        kind: "created" as const,
+        entity: { id: e.id, name: e.name, type: e.type },
+        date: e.createdAt,
+      },
+    })),
+  ];
+
+  return items
+    .sort(compareActivityDesc)
+    .slice(0, limit)
+    .map(({ item }) => item);
+}
+
+// ── Backlinks (#838) ─────────────────────────────────────────────────────────
+
+// Notes @-tagging the entity, newest-first: the caller's own entries plus other
+// members' CAMPAIGN-visible ones. A PRIVATE note is author-only — no DM bypass.
+export async function buildEntityBacklinks(
+  db: PrismaClient,
+  campaignId: string,
+  userId: string,
+  isOwner: boolean,
+  entityId: string,
+) {
+  // Identity-merge union (#387): a survivor's backlinks include the refs of every
+  // identity that EXECUTED-merged transitively into it, each labeled by which
+  // identity was tagged. A non-owner never sees a HIDDEN identity's refs/name.
+  const edges = await db.campaignEntityMerge.findMany({
+    where: { campaignId },
+    select: { mergedEntityId: true, survivorEntityId: true, status: true },
+  });
+  let mergedIn = collectMergedInIdentities(edges, entityId, { executedOnly: true });
+  if (!isOwner && mergedIn.length > 0) {
+    const revealed = await db.campaignEntity.findMany({
+      where: { id: { in: mergedIn }, visibility: "REVEALED" },
+      select: { id: true },
+    });
+    const revealedSet = new Set(revealed.map((e) => e.id));
+    mergedIn = mergedIn.filter((id) => revealedSet.has(id));
+  }
+  const entityIds = [entityId, ...mergedIn];
+
+  const [refs, ctx] = await Promise.all([
+    db.journalEntryRef.findMany({
+      where: {
+        entityId: { in: entityIds },
+        // Own entries, or CAMPAIGN-shared ones from characters still in this
+        // campaign (refs survive a character leaving; the share must not).
+        entry: visibleEntryWhere(userId, campaignId),
+      },
+      include: {
+        entity: { select: { id: true, name: true } },
+        entry: { include: { character: { select: { name: true } } } },
+      },
+      orderBy: [
+        { entry: { date: "desc" } },
+        { entry: { loggedAt: "desc" } },
+        { entry: { createdAt: "desc" } },
+      ],
+    }),
+    loadSessionContext(db, campaignId),
+  ]);
+
+  return refs.map((ref) => ({
+    entry: {
+      id: ref.entry.id,
+      characterId: ref.entry.characterId,
+      sessionId: ref.entry.sessionId,
+      sessionTitle: (ref.entry.sessionId ? ctx.titles.get(ref.entry.sessionId) : null) ?? null,
+      sessionOrdinal:
+        (ref.entry.sessionId ? ctx.ordinals.get(ref.entry.sessionId) : null) ?? null,
+      kind: ref.entry.kind,
+      date: ref.entry.date,
+      loggedAt: ref.entry.loggedAt,
+      body: ref.entry.body,
+    },
+    characterName: ref.entry.character.name,
+    identity: { id: ref.entity.id, name: ref.entity.name },
+  }));
+}
+
+// ── Connections (#839) ───────────────────────────────────────────────────────
+
+// Co-mention graph: entities sharing a visible entry with the target,
+// merge-resolved to survivors, counted by distinct entries, sorted desc.
+export async function buildEntityConnections(
+  db: PrismaClient,
+  campaignId: string,
+  userId: string,
+  isOwner: boolean,
+  targetId: string,
+  limit: number,
+) {
+  const [edges, allEntities] = await Promise.all([
+    db.campaignEntityMerge.findMany({
+      where: { campaignId },
+      select: { mergedEntityId: true, survivorEntityId: true, status: true },
+    }),
+    db.campaignEntity.findMany({
+      where: { campaignId },
+      select: { id: true, name: true, type: true, visibility: true },
+    }),
+  ]);
+  const entityById = new Map(allEntities.map((e) => [e.id, e]));
+  const revealedIds = new Set(
+    allEntities.filter((e) => e.visibility === "REVEALED").map((e) => e.id),
+  );
+  const targetIds = new Set([
+    targetId,
+    ...resolveVisibleMergeUnion(edges, [targetId], revealedIds, isOwner).get(targetId)!,
+  ]);
+
+  const targetRefs = await db.journalEntryRef.findMany({
+    where: {
+      entityId: { in: [...targetIds] },
+      entry: visibleEntryWhere(userId, campaignId),
+    },
+    select: { entryId: true },
+  });
+  const entryIds = [...new Set(targetRefs.map((r) => r.entryId))];
+
+  const coRefs =
+    entryIds.length === 0
+      ? []
+      : await db.journalEntryRef.findMany({
+          where: { entryId: { in: entryIds } },
+          select: { entryId: true, entityId: true },
+        });
+
+  return tallyCoMentions(coRefs, { edges, entityById, targetIds, isOwner })
+    .slice(0, limit)
+    .map(({ entity, count }) => ({
+      entity: { id: entity.id, name: entity.name, type: entity.type },
+      count,
+    }));
 }
