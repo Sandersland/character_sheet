@@ -22,7 +22,7 @@ import { snapshotInventoryItemForUndo } from "./inventory-snapshot.js";
 /**
  * Exported so the actions orchestrator (routes/actions.ts) can include
  * an adjustQuantity op inside a shared $transaction without re-opening one.
- * Keep in sync with the inline version — one code path, two callers.
+ * Two callers: the applyOp switch in inventory.ts and routes/character/actions.ts.
  */
 export async function applyAdjustQuantity(
   tx: Prisma.TransactionClient,
