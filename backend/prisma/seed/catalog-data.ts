@@ -9,6 +9,15 @@
 // NOTE: 5e *rules math* still lives in src/lib (srd.ts, experience.ts,
 // starting-equipment.ts). This file is catalog seed rows only.
 
+// Detail-input shapes are single-sourced in src/lib/inventory (shared with the
+// runtime lib). Relative, not @/, since the seed's tsx context doesn't alias.
+import type {
+  ItemCategoryName,
+  WeaponDetailInput,
+  ArmorDetailInput,
+  ConsumableDetailInput,
+} from "../../src/lib/inventory/item-detail-inputs.js";
+
 export const RACES = [
   // Dwarf subraces
   { name: "Hill Dwarf",     speed: 25 },
@@ -223,55 +232,6 @@ export const BACKGROUNDS = [
 
 function coins(gp: number, sp = 0, cp = 0) {
   return { cp, sp, gp, pp: 0 };
-}
-
-// Matches the Prisma schema's ItemCategory/ArmorCategory enums.
-export type ItemCategoryName = "weapon" | "armor" | "consumable" | "gear";
-export type ArmorCategoryName = "light" | "medium" | "heavy" | "shield";
-
-// Mirrors ItemWeaponDetail/ItemArmorDetail/ItemConsumableDetail's own
-// fields (minus id/itemId) — these objects are used directly as an Item's
-// nested detail create, so there's exactly one place each
-// weapon/armor/consumable's stats are typed in. Dice are
-// count/faces/modifier (matching frontend/src/lib/dice.ts's
-// RollSpec), not a "1d6" string — see schema.prisma's comment on
-// ItemWeaponDetail for why.
-export interface WeaponDetailInput {
-  damageDiceCount: number;
-  damageDiceFaces: number;
-  damageModifier?: number;
-  damageType: string;
-  versatileDiceCount?: number;
-  versatileDiceFaces?: number;
-  finesse?: boolean;
-  light?: boolean;
-  heavy?: boolean;
-  twoHanded?: boolean;
-  reach?: boolean;
-  thrown?: boolean;
-  ammunition?: boolean;
-  rangeNormal?: number;
-  rangeLong?: number;
-  weaponClass?: "simple" | "martial";
-  weaponRange?: "melee" | "ranged";
-}
-
-export interface ArmorDetailInput {
-  armorCategory: ArmorCategoryName;
-  baseArmorClass: number;
-  dexModifierApplies?: boolean;
-  dexModifierMax?: number;
-  stealthDisadvantage?: boolean;
-  strengthRequirement?: number;
-}
-
-export interface ConsumableDetailInput {
-  effectDiceCount?: number;
-  effectDiceFaces?: number;
-  effectModifier?: number;
-  effectDescription?: string;
-  maxUses?: number;
-  usesRemaining?: number;
 }
 
 export interface CatalogItem {
