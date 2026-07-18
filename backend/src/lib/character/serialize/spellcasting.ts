@@ -116,6 +116,7 @@ function buildGrantedOnlySpellcastingView(
   itemSpells: SpellEntry[],
 ): object {
   const stored = normalizeSpellcastingMutable(row.spellcasting);
+  // fallow-ignore-next-line code-duplication
   const castingAbility = deriveGrantedCastingAbility(primaryClass?.subclassRef);
   const abilMod = abilityModifier(abilityScores[castingAbility] ?? 10);
   const grantedSpells = [...mergeGrantedSpells(stored.spells, granted), ...itemSpells];

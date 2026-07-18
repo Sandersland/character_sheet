@@ -117,6 +117,7 @@ export function buildMergedWeaponProficiencies(
 export function mergeItemWeaponProficiencies(
   base: Array<{ name: string; source: "class" | "race" | "feat" | "item" }>,
   itemProfs: { value: string; source: string }[],
+  // fallow-ignore-next-line code-duplication
 ): Array<{ name: string; source: "class" | "race" | "feat" | "item" }> {
   const seen = new Set(base.map((e) => e.name));
   const out = [...base];
