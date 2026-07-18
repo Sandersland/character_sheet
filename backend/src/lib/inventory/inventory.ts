@@ -22,6 +22,13 @@ import {
   snapshotDetailCreate,
   weaponDetailFields,
 } from "./detail-snapshot.js";
+import type {
+  ItemCategoryName,
+  ArmorCategoryName,
+  WeaponDetailInput,
+  ArmorDetailInput,
+  ConsumableDetailInput,
+} from "./item-detail-inputs.js";
 import { rollDie } from "@/lib/core/dice.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { applyHealInTx } from "@/lib/combat/hitpoints.js";
@@ -92,49 +99,15 @@ function toJsonInput(value: Currency | null | undefined): Prisma.InputJsonValue 
   return value ?? Prisma.JsonNull;
 }
 
-export type ItemCategoryName = "weapon" | "armor" | "consumable" | "gear";
-export type ArmorCategoryName = "light" | "medium" | "heavy" | "shield";
-
-// Mirrors ItemWeaponDetail/ItemArmorDetail/ItemConsumableDetail's own
-// fields (minus id/FK) — see prisma/seed.ts's CatalogItem-adjacent
-// interfaces, which this deliberately matches.
-export interface WeaponDetailInput {
-  damageDiceCount: number;
-  damageDiceFaces: number;
-  damageModifier?: number;
-  damageType: string;
-  versatileDiceCount?: number;
-  versatileDiceFaces?: number;
-  finesse?: boolean;
-  light?: boolean;
-  heavy?: boolean;
-  twoHanded?: boolean;
-  reach?: boolean;
-  thrown?: boolean;
-  ammunition?: boolean;
-  rangeNormal?: number;
-  rangeLong?: number;
-  weaponClass?: string;
-  weaponRange?: string;
-}
-
-export interface ArmorDetailInput {
-  armorCategory: ArmorCategoryName;
-  baseArmorClass: number;
-  dexModifierApplies?: boolean;
-  dexModifierMax?: number;
-  stealthDisadvantage?: boolean;
-  strengthRequirement?: number;
-}
-
-export interface ConsumableDetailInput {
-  effectDiceCount?: number;
-  effectDiceFaces?: number;
-  effectModifier?: number;
-  effectDescription?: string;
-  maxUses?: number;
-  usesRemaining?: number;
-}
+// Detail-input shapes are single-sourced in item-detail-inputs.ts (shared with
+// the catalog seed); re-exported here so existing importers keep resolving.
+export type {
+  ItemCategoryName,
+  ArmorCategoryName,
+  WeaponDetailInput,
+  ArmorDetailInput,
+  ConsumableDetailInput,
+};
 
 // A consumable auto-applies its effect only when it heals (#121). Non-heal
 // effects are rolled + recorded but never applied server-side.
@@ -409,8 +382,8 @@ function normalizeWeaponClassification(input: WeaponDetailInput) {
   return {
     rangeNormal: input.rangeNormal ?? null,
     rangeLong: input.rangeLong ?? null,
-    weaponClass: (input.weaponClass ?? null) as "simple" | "martial" | null,
-    weaponRange: (input.weaponRange ?? null) as "melee" | "ranged" | null,
+    weaponClass: input.weaponClass ?? null,
+    weaponRange: input.weaponRange ?? null,
   };
 }
 
