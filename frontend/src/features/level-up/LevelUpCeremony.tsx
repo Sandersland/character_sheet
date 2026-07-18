@@ -9,8 +9,9 @@ import { useLevelUpCeremony, type LevelUpCeremony as Ceremony } from "@/features
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
 import type { Character, LevelUpStep, LevelUpStepKind } from "@/types/character";
 
-// Design note: the stage hard-codes its radial gradient on parchment tokens, so
-// it stays a dark "ceremony" backdrop in BOTH themes (it does not theme-flip).
+// Design note: the stage gradient rides the parchment tokens, so it THEME-FLIPS
+// with them — dark stage + light paper in light theme, inverted in dark. The
+// mockup hard-coded a dark stage; flagged for design review on the #886 PR.
 const STAGE =
   "min-h-screen bg-[radial-gradient(ellipse_70%_55%_at_50%_12%,var(--color-parchment-800),var(--color-parchment-900)_68%)] px-4 py-8 sm:px-6 sm:py-12";
 
