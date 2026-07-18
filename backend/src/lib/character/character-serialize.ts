@@ -1,4 +1,3 @@
-import { Prisma } from "@/generated/prisma/client.js";
 import { experienceProgress, levelForExperience } from "@/lib/leveling/experience.js";
 import {
   serializeArmorDetail,
@@ -9,7 +8,6 @@ import { normalizeHitDice, normalizeHitPoints } from "@/lib/combat/hitpoints.js"
 import {
   abilityModifier,
   advancementSlotsForLevel,
-  CLASS_PROFICIENCY_GRANTS,
   deriveArmorClass,
   deriveArmorClassParts,
   deriveAttacksPerAction,
@@ -27,36 +25,23 @@ import {
   deriveWeaponDamage,
   deriveFightingStyleBonuses,
   fightingStyleChoiceCount,
-  RACE_PROFICIENCY_GRANTS,
-  TOOLS,
-  type ArmorProficiencyCategory,
   type BodyArmorCategory,
   type FightingStyleKey,
-  type ToolProficiencyEntry,
 } from "@/lib/srd/srd.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { deriveActions, type AvailableAction } from "@/lib/classes/actions.js";
-import { normalizeResourcesMutable, type AdvancementEntry, type ToolProfEntry } from "@/lib/classes/resources.js";
-import { normalizeConditionsMutable, type ConditionsMutableState } from "@/lib/combat/conditions.js";
-import {
-  buffsByTarget,
-  normalizeActiveEffectsMutable,
-  type ActiveBuff,
-  type ActiveEffectsMutableState,
-} from "@/lib/combat/active-effects.js";
-import { CONDITIONS, type RollModifier } from "@/lib/srd/srd.js";
-import { exhaustionRollEffects } from "@/lib/srd/condition-data.js";
+import { normalizeResourcesMutable, type AdvancementEntry } from "@/lib/classes/resources.js";
+import { normalizeConditionsMutable } from "@/lib/combat/conditions.js";
+import { normalizeActiveEffectsMutable } from "@/lib/combat/active-effects.js";
 import {
   activatedMaxUses,
   chargePoolOf,
   describeActivatedReminder,
   describeChargeRecharge,
   deriveItemGrants,
-  deriveItemPassiveBonuses,
   readCapability,
   serializeCapability,
   type ActivatedEffectCapability,
-  type ItemPassiveContribution,
 } from "@/lib/inventory/capabilities.js";
 import { itemBuffKey } from "@/lib/inventory/inventory.js";
 import { reverseAdvancementEffects } from "@/lib/leveling/advancement.js";
@@ -70,6 +55,17 @@ import {
 } from "@/lib/spellcasting/granted-spells.js";
 import { SHADOW_ART_CONCENTRATION_PREFIX } from "@/lib/classes/shadow-arts.js";
 import type { CharacterWithRelations } from "./character-include.js";
+import { buildRollModifiers, buildTargetModifiers, type TargetModifierMap } from "./serialize/effects.js";
+import {
+  buildMergedArmorProficiencies,
+  buildMergedWeaponProficiencies,
+  buildSavingThrowProficiencies,
+  buildSkillsView,
+  buildToolProficienciesView,
+  mergeItemWeaponProficiencies,
+} from "./serialize/proficiencies.js";
+
+export { buildRollModifiers };
 
 export function serializeCharacterSummary(row: {
   id: string;
@@ -291,138 +287,6 @@ function serializeActivatedEffect(
     active: context.activeItemBuffKeys.has(itemBuffKey(row.id)),
     available: row.equippedSlot != null || row.attuned,
   };
-}
-
-/**
- * Merges creation-fixed tool profs (Character.toolProficiencies column) with
- * level-gated subclass choices (toolProficienciesKnown from resources JSON)
- * into the single wire-format array the API emits.
- *
- * Dedup rule: creation-fixed entries win — they survive level-down and
- * the client should never show a duplicate proficiency row.
- */
-function buildMergedToolProficiencies(
-  stored: Prisma.JsonValue,
-  subclassKnown: ToolProfEntry[],
-): Array<{ name: string; category: string; source: string }> {
-  const creationFixed = (Array.isArray(stored) ? stored : []) as unknown as ToolProficiencyEntry[];
-  const fixedNames = new Set(creationFixed.map((e) => e.name));
-
-  const merged = [
-    ...creationFixed.map((e) => ({
-      name: e.name,
-      category: TOOLS.find((t) => t.name === e.name)?.category ?? "other",
-      source: e.source,
-    })),
-    // Only add subclass entries that don't duplicate a creation-fixed grant.
-    ...subclassKnown
-      .filter((e) => !fixedNames.has(e.name))
-      .map((e) => ({
-        name: e.name,
-        category: TOOLS.find((t) => t.name === e.name)?.category ?? "other",
-        source: "subclass" as const,
-      })),
-  ];
-  return merged;
-}
-
-/**
- * Merges armor proficiency grants from class(es), race, and feats into a
- * deduplicated list tagged with the highest-priority source (class > race > feat).
- *
- * Multiclass: iterates all classEntries and takes the full union of their grants.
- * This is a deliberate simplification of 5e's restricted multiclass-proficiency
- * rules (which restrict certain armor/weapon grants on secondary class pickup);
- * correct for the current single-class setup and conservatively permissive for
- * any future multiclass character.
- */
-function buildMergedArmorProficiencies(
-  classEntries: { name: string }[],
-  raceName: string | undefined,
-  featArmor: Set<string>,
-): Array<{ category: ArmorProficiencyCategory; source: "class" | "race" | "feat" }> {
-  const seen = new Set<string>();
-  const out: Array<{ category: ArmorProficiencyCategory; source: "class" | "race" | "feat" }> = [];
-
-  const push = (cat: string, source: "class" | "race" | "feat") => {
-    if (seen.has(cat)) return;
-    seen.add(cat);
-    out.push({ category: cat as ArmorProficiencyCategory, source });
-  };
-
-  for (const entry of classEntries) {
-    for (const cat of CLASS_PROFICIENCY_GRANTS[entry.name]?.armor ?? []) push(cat, "class");
-  }
-  if (raceName) {
-    for (const cat of RACE_PROFICIENCY_GRANTS[raceName]?.armor ?? []) push(cat, "race");
-  }
-  for (const cat of featArmor) push(cat, "feat");
-
-  return out;
-}
-
-/**
- * Merges weapon proficiency grants from class(es), race, and feats into a
- * deduplicated list tagged with the highest-priority source (class > race > feat).
- * Entries may be category-level ("Simple Weapons") or specific names ("Longswords").
- *
- * See buildMergedArmorProficiencies for the multiclass simplification note.
- */
-function buildMergedWeaponProficiencies(
-  classEntries: { name: string }[],
-  raceName: string | undefined,
-  featWeapons: Set<string>,
-): Array<{ name: string; source: "class" | "race" | "feat" }> {
-  const seen = new Set<string>();
-  const out: Array<{ name: string; source: "class" | "race" | "feat" }> = [];
-
-  const push = (name: string, source: "class" | "race" | "feat") => {
-    if (seen.has(name)) return;
-    seen.add(name);
-    out.push({ name, source });
-  };
-
-  for (const entry of classEntries) {
-    for (const w of CLASS_PROFICIENCY_GRANTS[entry.name]?.weapons ?? []) push(w, "class");
-  }
-  if (raceName) {
-    for (const w of RACE_PROFICIENCY_GRANTS[raceName]?.weapons ?? []) push(w, "race");
-  }
-  for (const w of featWeapons) push(w, "feat");
-
-  return out;
-}
-
-// Append item-granted weapon proficiencies (#529) after class/race/feat grants,
-// tagged source "item". Deduped by name — an existing grant wins (never demoted).
-function mergeItemWeaponProficiencies(
-  base: Array<{ name: string; source: "class" | "race" | "feat" | "item" }>,
-  itemProfs: { value: string; source: string }[],
-): Array<{ name: string; source: "class" | "race" | "feat" | "item" }> {
-  const seen = new Set(base.map((e) => e.name));
-  const out = [...base];
-  for (const p of itemProfs) {
-    if (seen.has(p.value)) continue;
-    seen.add(p.value);
-    out.push({ name: p.value, source: "item" });
-  }
-  return out;
-}
-
-// Append item-granted tool proficiencies (#529) after the merged creation/subclass
-// tools, tagged source "item". Deduped by name — an existing entry wins.
-function mergeItemToolProficiencies(
-  base: Array<{ name: string; category: string; source: string }>,
-  itemProfs: { value: string; source: string }[],
-): Array<{ name: string; category: string; source: string }> {
-  const seen = new Set(base.map((e) => e.name));
-  const out = [...base];
-  for (const p of itemProfs) {
-    if (seen.has(p.value)) continue;
-    seen.add(p.value);
-    out.push({ name: p.value, category: TOOLS.find((t) => t.name === p.value)?.category ?? "other", source: "item" });
-  }
-  return out;
 }
 
 type PrimaryClass = CharacterWithRelations["classEntries"][number] | undefined;
@@ -924,71 +788,6 @@ function buildInventoryContext(
   return { effectiveScores, proficiencyBonus, weaponGrants, offHandBusy, fightingStyle, meleeDamageBonus, attackRollBonus, activeItemBuffKeys };
 }
 
-// The per-target modifier channel both skills and weapon math read: active cast
-// buffs (buffsByTarget) merged with active-item scalar passiveBonus contributions
-// (#545). Keyed the same way (skill name / meleeDamage / attackRoll) so item
-// bonuses and buffs sum together.
-type TargetModifierMap = Record<string, Array<{ modifier: number; source: string; condition?: string }>>;
-
-function mergeTargetModifiers(
-  buffTargets: Record<string, ActiveBuff[]>,
-  contributions: ItemPassiveContribution[],
-): TargetModifierMap {
-  const out: TargetModifierMap = {};
-  for (const [key, buffs] of Object.entries(buffTargets)) {
-    out[key] = buffs.map((b) => ({ modifier: b.modifier, source: b.source }));
-  }
-  for (const c of contributions) {
-    (out[c.target] ??= []).push({
-      modifier: c.modifier,
-      source: c.source,
-      ...(c.condition ? { condition: c.condition } : {}),
-    });
-  }
-  return out;
-}
-
-// The per-target modifier channel for one character: active cast buffs merged
-// with active-item scalar passiveBonus contributions (#545), keyed by target
-// (skill name / meleeDamage / attackRoll / ac / speed / …).
-function buildTargetModifiers(
-  row: CharacterWithRelations,
-  activeEffects: ReturnType<typeof normalizeActiveEffectsMutable>,
-): TargetModifierMap {
-  const itemPassiveBonuses = deriveItemPassiveBonuses(
-    row.inventoryItems.map((i) => ({
-      name: i.name,
-      equipped: i.equippedSlot != null,
-      attuned: i.attuned,
-      capabilities: i.capabilities,
-    })),
-  );
-  return mergeTargetModifiers(buffsByTarget(activeEffects), itemPassiveBonuses);
-}
-
-// State-driven roll modifiers (#486): advantage/disadvantage grants from active
-// conditions (5e rules data in srd) merged with active-effect buffs (e.g. Rage).
-// Derived on read — the frontend resolves the effective mode per roll via
-// lib/rollMode.ts (adv + disadv from different sources cancel to normal, RAW).
-export function buildRollModifiers(
-  conditions: ConditionsMutableState,
-  activeEffects: ActiveEffectsMutableState,
-): RollModifier[] {
-  const out: RollModifier[] = [];
-  for (const entry of conditions.active) {
-    const def = CONDITIONS.find((c) => c.key === entry.key);
-    if (!def) continue;
-    for (const effect of def.rollEffects ?? []) out.push({ ...effect, source: def.label });
-  }
-  for (const effect of exhaustionRollEffects(conditions.exhaustion)) {
-    out.push({ ...effect, source: "Exhaustion" });
-  }
-  for (const buff of activeEffects.buffs) {
-    for (const effect of buff.rollEffects ?? []) out.push({ ...effect, source: buff.source });
-  }
-  return out;
-}
-
 // Item-granted traits (#529): resistances/immunities/conditionImmunities/
 // advantages/proficiencies from active (equipped or attuned-when-required)
 // items. Derived on read — nothing here is persisted. resistances also feed
@@ -1180,64 +979,6 @@ function buildUnarmedAttacksView(
     improvisedProficient,
   );
   return { unarmedStrike, improvisedWeapon };
-}
-
-// Merge feat- and item-granted saving throw proficiencies (OR with the
-// class-fixed stored set; deduped via Set round-trip). Returns the stored
-// array untouched when there's nothing to merge.
-function buildSavingThrowProficiencies(
-  stored: string[],
-  featSaves: Set<string>,
-  itemSaveProfs: Set<string>,
-): string[] {
-  return featSaves.size > 0 || itemSaveProfs.size > 0
-    ? [...new Set([...stored, ...featSaves, ...itemSaveProfs])]
-    : stored;
-}
-
-// Merge feat/item-granted skill proficiencies (proficient stays true if already
-// true; grants only add) and overlay any active buff as an optional
-// tempModifier + labeled breakdown (#438). Additive term, derived on read.
-function buildSkillsView(
-  row: CharacterWithRelations,
-  featProficiencies: ReturnType<typeof deriveFeatProficiencies>,
-  itemSkillProfs: Set<string>,
-  buffTargets: TargetModifierMap,
-) {
-  return (row.skills as { name: string; ability: string; proficient: boolean }[]).map((s) => {
-    const buffs = buffTargets[s.name] ?? [];
-    const tempModifier = buffs.reduce((sum, b) => sum + b.modifier, 0);
-    return {
-      ...s,
-      proficient: s.proficient || featProficiencies.skills.has(s.name) || itemSkillProfs.has(s.name),
-      ...(tempModifier !== 0
-        ? {
-            tempModifier,
-            tempModifierSources: buffs.map((b) => ({ label: b.source, value: b.modifier })),
-          }
-        : {}),
-    };
-  });
-}
-
-// Merged tool proficiency list — creation-fixed entries (stored in
-// Character.toolProficiencies) + level-gated subclass choices (from
-// resources.toolProficienciesKnown, already clamped by buildResourcesView)
-// + item grants. Deduped by name: creation-fixed wins over subclass.
-function buildToolProficienciesView(
-  row: CharacterWithRelations,
-  resources: object | undefined,
-  itemGrants: ReturnType<typeof deriveItemGrants>,
-) {
-  return mergeItemToolProficiencies(
-    buildMergedToolProficiencies(
-      row.toolProficiencies,
-      resources && "toolProficienciesKnown" in resources
-        ? (resources as { toolProficienciesKnown: ToolProfEntry[] }).toolProficienciesKnown
-        : [],
-    ),
-    itemGrants.proficiencies.filter((p) => p.profType === "tool"),
-  );
 }
 
 // Class-specific available actions for the turn tracker — derived from
