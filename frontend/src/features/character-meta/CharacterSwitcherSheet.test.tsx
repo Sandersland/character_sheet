@@ -32,6 +32,12 @@ beforeEach(() => {
 });
 
 describe("CharacterSwitcherSheet (#1027)", () => {
+  it("shows an error message when the character list fails to load", async () => {
+    vi.mocked(client.fetchCharacters).mockRejectedValue(new Error("network"));
+    renderSheet();
+    expect(await screen.findByText(/couldn't load characters/i)).toBeInTheDocument();
+  });
+
   it("lists owned characters with a class/level line, current one checked", async () => {
     vi.mocked(client.fetchCharacters).mockResolvedValue([
       summary(),
