@@ -80,7 +80,7 @@ const restoreSlotOpSchema = z.object({
   level: z.number().int().min(1).max(9),
 });
 
-const learnSpellOpSchema = z
+export const learnSpellOpSchema = z
   .object({
     type: z.literal("learnSpell"),
     spellId: z.string().optional(),

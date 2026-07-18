@@ -346,6 +346,18 @@ export async function setSubclassInTx(
   await applySetSubclass({ tx, characterId, batchId, sessionId }, op);
 }
 
+// Applies one setFightingStyle inside a caller-supplied tx/batchId so the unified
+// level-up endpoint (#885) can compose it with other domains (#895).
+export async function setFightingStyleInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: SetFightingStyleOperation,
+  batchId: string,
+  sessionId: string | null,
+): Promise<void> {
+  await applySetFightingStyle({ tx, characterId, batchId, sessionId }, op);
+}
+
 export async function applyClassOperations(
   characterId: string,
   operations: ClassOperation[]
@@ -363,7 +375,7 @@ export async function applyClassOperations(
           await applySetSubclass(ctx, op);
           break;
         case "setFightingStyle":
-          await applySetFightingStyle(ctx, op);
+          await setFightingStyleInTx(tx, id, op, batchId, sessionId);
           break;
         case "addClass":
           await applyAddClass(ctx, op);

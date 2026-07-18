@@ -14,16 +14,20 @@ const setSubclassOpSchema = z.object({
   subclassId: z.string().min(1),
 });
 
+// The bare fighting-style key enum, exported so the unified level-up submission
+// (#885) reuses it verbatim for its `fightingStyle` field.
+export const fightingStyleKeySchema = z.enum([
+  "archery",
+  "defense",
+  "dueling",
+  "greatWeaponFighting",
+  "protection",
+  "twoWeaponFighting",
+]);
+
 const setFightingStyleOpSchema = z.object({
   type: z.literal("setFightingStyle"),
-  key: z.enum([
-    "archery",
-    "defense",
-    "dueling",
-    "greatWeaponFighting",
-    "protection",
-    "twoWeaponFighting",
-  ]),
+  key: fightingStyleKeySchema,
 });
 
 const addClassOpSchema = z.object({

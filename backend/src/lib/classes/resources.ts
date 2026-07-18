@@ -848,104 +848,45 @@ function dispatchResourceOp(ctx: ResourceOpContext, op: ResourceOperation): Reso
   return handler(ctx, op);
 }
 
-// Shared before/after event snapshot shape — used by both the batch handler
-// and applySpendResourceInTx.
+// Shared before/after event snapshot shape for the per-op event log
+// (applyResourceOpInTx).
 function snapshotResourcesState(state: ResourcesMutableState): {
   resources: ReturnType<typeof snapshotResources>;
 } {
   return { resources: snapshotResources(state) };
 }
 
-/**
- * Applies a batch of resource operations atomically in one Prisma transaction.
- * Mirrors applySpellcastingOperations exactly:
- *   - one batchId groups all ops in this request on the activity timeline
- *   - any throw rolls back the entire batch (state unchanged)
- *   - CharacterEvent logged per op with full before/after resource snapshot
- *     for revert symmetry with the HP/XP undo handler
- *   - state is re-read per op so a batch of multiple spends sees each prior result
- */
-export async function applyResourceOperations(
-  characterId: string,
-  operations: ResourceOperation[]
-): Promise<void> {
-  await runCharacterTransaction(characterId, operations, {
-    select: {
-      resources: true,
-      experiencePoints: true,
-      abilityScores: true,
-      classEntries: {
-        orderBy: { position: "asc" as const },
-        take: 1,
-        select: { name: true, subclass: true },
-      },
-    },
-    notFound: (id) => new InvalidResourceOperationError(`Character not found: ${id}`),
-    applyOp: async ({ tx, row, op, batchId, sessionId }) => {
-      const level = levelForExperience(row.experiencePoints);
-      const profBonus = proficiencyBonusForLevel(level);
-      const primaryEntry = row.classEntries[0];
-      const className = primaryEntry?.name ?? "";
-      const subclass = primaryEntry?.subclass ?? undefined;
-      const abilityScores = row.abilityScores as Record<string, number>;
-      const derivedInfo = deriveResources(className, subclass, level, abilityScores, profBonus);
-
-      const state = normalizeResourcesMutable(row.resources);
-      const beforeState = snapshotResourcesState(state);
-
-      const audit = await dispatchResourceOp({ tx, state, derivedInfo, level }, op);
-
-      // Write the updated state back — always via serializeResourcesState so
-      // all keys round-trip (prevents clobbering toolProficienciesKnown when
-      // updating maneuversKnown and vice-versa).
-      await tx.character.update({
-        where: { id: characterId },
-        data: { resources: serializeResourcesState(state) },
-      });
-
-      const afterState = snapshotResourcesState(state);
-
-      await logEvent(tx, {
-        characterId,
-        category: "resources",
-        type: audit.eventType as Parameters<typeof logEvent>[1]["type"],
-        summary: audit.summary,
-        before: beforeState,
-        after: afterState,
-        data: audit.eventData,
-        batchId,
-        sessionId,
-      });
-    },
-  });
-}
+// Columns/relations applyResourceOpInTx re-reads per op; the batch wrapper's
+// scaffold row is an existence-only { id: true } check.
+const RESOURCES_SELECT = {
+  resources: true,
+  experiencePoints: true,
+  abilityScores: true,
+  classEntries: {
+    orderBy: { position: "asc" as const },
+    take: 1,
+    select: { name: true, subclass: true },
+  },
+} satisfies Prisma.CharacterSelect;
 
 /**
- * Applies a single spendResource op inside a caller-supplied Prisma transaction.
- *
- * Exported so the actions orchestrator (actionsRouter) can include a
- * resource spend alongside an inventory adjust or HP heal in one atomic
- * $transaction. Shares applySpendResourceOp with applyResourceOperations.
+ * Applies one resource op inside a caller-supplied transaction/batchId, so the
+ * unified level-up endpoint (#885) and the actions orchestrator can compose a
+ * resource change with other domains under one batchId. Reads fresh state via
+ * `tx` on every call (a batch of spends sees each prior result), dispatches via
+ * dispatchResourceOp → writes back → logs its own event (the single copy of the
+ * logic; applySpendResourceInTx is a thin, spend-typed delegate over this).
  */
-export async function applySpendResourceInTx(
+export async function applyResourceOpInTx(
   tx: Prisma.TransactionClient,
   characterId: string,
-  op: SpendResourceOperation,
+  op: ResourceOperation,
   batchId: string,
   sessionId: string | null,
 ): Promise<ResourceOpAudit> {
   const row = await tx.character.findUnique({
     where: { id: characterId },
-    select: {
-      resources: true,
-      experiencePoints: true,
-      abilityScores: true,
-      classEntries: {
-        orderBy: { position: "asc" as const },
-        take: 1,
-        select: { name: true, subclass: true },
-      },
-    },
+    select: RESOURCES_SELECT,
   });
   if (!row) throw new InvalidResourceOperationError(`Character not found: ${characterId}`);
 
@@ -960,8 +901,11 @@ export async function applySpendResourceInTx(
   const state = normalizeResourcesMutable(row.resources);
   const beforeState = snapshotResourcesState(state);
 
-  const audit = applySpendResourceOp(state, op, derivedInfo);
+  const audit = await dispatchResourceOp({ tx, state, derivedInfo, level }, op);
 
+  // Write the updated state back — always via serializeResourcesState so
+  // all keys round-trip (prevents clobbering toolProficienciesKnown when
+  // updating maneuversKnown and vice-versa).
   await tx.character.update({
     where: { id: characterId },
     data: { resources: serializeResourcesState(state) },
@@ -972,7 +916,7 @@ export async function applySpendResourceInTx(
   await logEvent(tx, {
     characterId,
     category: "resources",
-    type: "spendResource",
+    type: audit.eventType as Parameters<typeof logEvent>[1]["type"],
     summary: audit.summary,
     before: beforeState,
     after: afterState,
@@ -982,4 +926,46 @@ export async function applySpendResourceInTx(
   });
 
   return audit;
+}
+
+/**
+ * Applies a batch of resource operations atomically in one Prisma transaction.
+ * Mirrors applySpellcastingOperations exactly:
+ *   - one batchId groups all ops in this request on the activity timeline
+ *   - any throw rolls back the entire batch (state unchanged)
+ *   - CharacterEvent logged per op with full before/after resource snapshot
+ *     for revert symmetry with the HP/XP undo handler
+ *   - state is re-read per op so a batch of multiple spends sees each prior result
+ *
+ * The scaffold's per-op row is only the existence check: applyResourceOpInTx
+ * re-reads its own state via RESOURCES_SELECT so it composes under a caller tx.
+ */
+export async function applyResourceOperations(
+  characterId: string,
+  operations: ResourceOperation[]
+): Promise<void> {
+  await runCharacterTransaction(characterId, operations, {
+    select: { id: true },
+    notFound: (id) => new InvalidResourceOperationError(`Character not found: ${id}`),
+    applyOp: async ({ tx, op, characterId: id, batchId, sessionId }) => {
+      await applyResourceOpInTx(tx, id, op, batchId, sessionId);
+    },
+  });
+}
+
+/**
+ * Applies a single spendResource op inside a caller-supplied Prisma transaction.
+ *
+ * Exported so the actions orchestrator (actionsRouter) can include a
+ * resource spend alongside an inventory adjust or HP heal in one atomic
+ * $transaction. Thin spend-typed delegate over applyResourceOpInTx.
+ */
+export async function applySpendResourceInTx(
+  tx: Prisma.TransactionClient,
+  characterId: string,
+  op: SpendResourceOperation,
+  batchId: string,
+  sessionId: string | null,
+): Promise<ResourceOpAudit> {
+  return applyResourceOpInTx(tx, characterId, op, batchId, sessionId);
 }

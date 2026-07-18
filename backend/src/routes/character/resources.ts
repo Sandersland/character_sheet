@@ -27,7 +27,7 @@ const restoreResourceOpSchema = z.object({
   amount: z.number().int().positive().optional(),
 });
 
-const learnManeuverOpSchema = z
+export const learnManeuverOpSchema = z
   .object({
     type: z.literal("learnManeuver"),
     maneuverId: z.string().optional(),
@@ -50,7 +50,7 @@ const customDisciplineSchema = z.object({
   minLevel: z.number().int().positive().optional(),
 });
 
-const learnDisciplineOpSchema = z
+export const learnDisciplineOpSchema = z
   .object({
     type: z.literal("learnDiscipline"),
     disciplineId: z.string().optional(),
@@ -76,7 +76,7 @@ const swapDisciplineOpSchema = z
     message: "Provide exactly one of disciplineId or custom",
   });
 
-const learnToolProficiencyOpSchema = z.object({
+export const learnToolProficiencyOpSchema = z.object({
   type: z.literal("learnToolProficiency"),
   name: z.string().min(1),
 });
@@ -89,7 +89,7 @@ const forgetToolProficiencyOpSchema = z.object({
 // Exactly-one-of optionId/custom is enforced in the applier (400 on violation),
 // so the schema stays a plain ZodObject — no `.refine` (keeps it out of the
 // discriminated union's ZodEffects path).
-const learnSubclassChoiceOpSchema = z.object({
+export const learnSubclassChoiceOpSchema = z.object({
   type: z.literal("learnSubclassChoice"),
   choiceKey: z.string().min(1),
   optionId: z.string().optional(),
