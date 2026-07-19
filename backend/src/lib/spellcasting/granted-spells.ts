@@ -118,6 +118,22 @@ export function deriveGrantedSpells(
     }));
 }
 
+// The grants a level-up newly turns on (#1139): derived-ids present at nextLevel
+// but not at prevLevel. A null prev source is a fresh subclass pick — every ≤-level
+// grant is incoming; a null next source grants nothing.
+export function grantedSpellsGained(
+  prevSource: GrantedSpellSource | null | undefined,
+  prevLevel: number,
+  nextSource: GrantedSpellSource | null | undefined,
+  nextLevel: number,
+): SpellEntry[] {
+  if (!nextSource) return [];
+  const next = deriveGrantedSpells(nextSource, nextLevel);
+  if (!prevSource) return next;
+  const had = new Set(deriveGrantedSpells(prevSource, prevLevel).map((s) => s.id));
+  return next.filter((s) => !had.has(s.id));
+}
+
 const ABILITY_NAMES = new Set<string>([
   "strength",
   "dexterity",

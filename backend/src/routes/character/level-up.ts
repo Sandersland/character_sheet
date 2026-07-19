@@ -9,6 +9,7 @@ import { z } from "zod";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { applyLevelUpTransaction, resolveLevelUpContext } from "@/lib/leveling/level-up-transaction.js";
+import { grantedSpellsGained } from "@/lib/spellcasting/granted-spells.js";
 import { InvalidLevelUpError, resolveLevelUpPlan } from "@/lib/leveling/level-up-submission.js";
 import type { LevelUpTarget } from "@/lib/combat/hp-operations.js";
 import { InvalidHitPointOperationError } from "@/lib/combat/hitpoints.js";
@@ -77,6 +78,12 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
     const target = await resolvePlanTarget(req.params.id, parsed.data);
     const context = await resolveLevelUpContext(req.params.id, target, parsed.data.subclassId);
     const steps = resolveLevelUpPlan(context.planCharacter, context.targetEntry, context.chosenSubclassName);
+    const gained = grantedSpellsGained(
+      context.persistedGrantedSource,
+      context.targetEntry.newLevel - 1,
+      context.effectiveGrantedSource,
+      context.targetEntry.newLevel,
+    );
     res.json({
       target: {
         className: context.targetEntry.name,
@@ -85,6 +92,7 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
         isPrimary: context.targetIsPrimary,
       },
       steps,
+      grantedSpells: gained.map((s) => ({ name: s.name, level: s.level })),
     });
   } catch (error) {
     if (error instanceof InvalidLevelUpError) {

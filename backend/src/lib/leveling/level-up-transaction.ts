@@ -19,6 +19,7 @@ import {
 import type { FightingStyleKey } from "@/lib/srd/fighting-styles.js";
 import { applyResourceOpInTx, type ResourceOperation } from "@/lib/classes/resources.js";
 import { applySpellcastingOpInTx, type SpellcastingOperation } from "@/lib/spellcasting/spellcasting.js";
+import type { GrantedSpellSource } from "@/lib/spellcasting/granted-spells.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import {
   applyLevelUpHpInTx,
@@ -56,6 +57,11 @@ export interface LevelUpContext {
   // resource-backed steps are only legal when the target IS the primary entry
   // (the subclass/fightingStyle seams are entry-aware since #1065).
   targetIsPrimary: boolean;
+  // #1139: the grant sources the plan route diffs to list incoming granted spells.
+  // persisted = the target's committed subclass; effective = the not-yet-committed
+  // ?subclassId= pick when re-planning, else persisted.
+  persistedGrantedSource: GrantedSpellSource | null;
+  effectiveGrantedSource: GrantedSpellSource | null;
 }
 
 const TARGET_ENTRY_SELECT = {
@@ -65,6 +71,7 @@ const TARGET_ENTRY_SELECT = {
   level: true,
   position: true,
   classId: true,
+  subclassRef: { include: { grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } } } },
 } satisfies Prisma.CharacterClassEntrySelect;
 
 // Fetch the target class's catalog subclassLevel; default 3 (mirrors reconcileSubclass
@@ -103,6 +110,7 @@ export async function resolveLevelUpContext(
   const isMulticlass = character.classEntries.length > 1;
   let targetClassName: string;
   let persistedSubclass: string | null;
+  let persistedGrantedSource: GrantedSpellSource | null = null;
   let newLevel: number;
   let classId: string | null;
   let targetIsPrimary: boolean;
@@ -112,6 +120,7 @@ export async function resolveLevelUpContext(
     if (!entry) throw new InvalidLevelUpError(`Class entry not found: ${target.classEntryId}`);
     targetClassName = entry.name;
     persistedSubclass = entry.subclass;
+    persistedGrantedSource = entry.subclassRef;
     newLevel = isMulticlass ? entry.level + 1 : normalizeHitDice(character.hitDice).total + 1;
     classId = entry.classId;
     targetIsPrimary = entry.position === 0;
@@ -131,12 +140,18 @@ export async function resolveLevelUpContext(
   const subclassLevel = await subclassLevelFor(classId, targetClassName);
 
   let chosenSubclassName: string | null = null;
+  let effectiveGrantedSource: GrantedSpellSource | null = persistedGrantedSource;
   if (subclassId) {
     // applySetSubclass re-validates subclass-belongs-to-class in-tx; here we only
-    // resolve id → name for the pure validator (one copy of the membership rule).
-    const sub = await prisma.subclass.findUnique({ where: { id: subclassId }, select: { name: true } });
+    // resolve id → name for the pure validator (one copy of the membership rule)
+    // and load the pick's grants so the plan route can diff its incoming spells.
+    const sub = await prisma.subclass.findUnique({
+      where: { id: subclassId },
+      select: { name: true, grantedSpells: { orderBy: { gateLevel: "asc" }, include: { spell: true } } },
+    });
     if (!sub) throw new InvalidLevelUpError(`Subclass not found: ${subclassId}`);
     chosenSubclassName = sub.name;
+    effectiveGrantedSource = sub;
   }
 
   return {
@@ -149,6 +164,8 @@ export async function resolveLevelUpContext(
     targetEntry: { name: targetClassName, subclass: persistedSubclass, newLevel, subclassLevel },
     chosenSubclassName,
     targetIsPrimary,
+    persistedGrantedSource,
+    effectiveGrantedSource,
   };
 }
 
