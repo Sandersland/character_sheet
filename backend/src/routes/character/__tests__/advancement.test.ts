@@ -502,6 +502,35 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
     });
   });
 
+  // ── Snapshot isolation from catalog edits ─────────────────────────────────
+
+  describe("deleted catalog feat", () => {
+    it("still serializes the stored featName and improvements after the catalog row is deleted", async () => {
+      // Take Mobile (+10 speed) then delete its catalog row (mirrors a reseed drop).
+      await postAdvancement(FIXTURE_ID, {
+        operations: [{ type: "takeFeat", featId: mobileFeatId }],
+      });
+      await prisma.feat.delete({ where: { id: mobileFeatId } });
+
+      const res = await getCharacter(FIXTURE_ID);
+      expect(res.status).toBe(200);
+      // Snapshot survives: name preserved and the +10 speed improvement still applies.
+      const entry = res.body.advancements.find((e: { featName?: string }) => e.featName?.includes("Mobile"));
+      expect(entry).toBeDefined();
+      expect(res.body.speed).toBe(40);
+
+      // Re-create the row so afterAll cleanup and other tests see a stable catalog.
+      const recreated = await prisma.feat.create({
+        data: {
+          name: "Mobile (Advancement Suite)",
+          description: "Your speed increases by 10 feet.",
+          improvements: [{ target: "speed", amount: 10 }] as unknown as Prisma.InputJsonValue,
+        },
+      });
+      mobileFeatId = recreated.id;
+    });
+  });
+
   // ── GET /api/feats exposes improvements ───────────────────────────────────
 
   describe("GET /api/feats", () => {
@@ -511,6 +540,15 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
       const alert = res.body.find((f: { name: string }) => f.name === "Alert (Advancement Suite)");
       expect(alert).toBeDefined();
       expect(alert.improvements).toEqual([{ target: "initiative", amount: 5 }]);
+    });
+
+    it("exposes category, levelPrerequisite, and repeatable", async () => {
+      const res = await supertest.agent(app).set("Cookie", COOKIE).get("/api/feats");
+      const boon = res.body.find((f: { name: string }) => f.name === "Boon Test Feat (Advancement Suite)");
+      expect(boon).toMatchObject({ category: "epic_boon", levelPrerequisite: 19, repeatable: false });
+      const origin = res.body.find((f: { name: string }) => f.name === "Origin Test Feat (Advancement Suite)");
+      expect(origin.category).toBe("origin");
+      expect(origin.levelPrerequisite).toBeUndefined();
     });
   });
 });

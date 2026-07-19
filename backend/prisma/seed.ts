@@ -261,7 +261,9 @@ async function seedChannelDivinities(prisma: PrismaClient) {
   }
 }
 
-// Seed feat catalog — upsert by unique name.
+// Seed feat catalog — upsert by unique name, then drop stale (2014) rows. Taken
+// feats snapshot their improvements into the character, so a deleted catalog row
+// leaves existing advancements intact (no FK).
 async function seedFeats(prisma: PrismaClient) {
   for (const feat of FEATS) {
     await prisma.feat.upsert({
@@ -269,6 +271,9 @@ async function seedFeats(prisma: PrismaClient) {
       create: feat,
       update: {
         description: feat.description,
+        category: feat.category,
+        levelPrerequisite: orNull(feat.levelPrerequisite),
+        repeatable: orElse(feat.repeatable, false),
         prerequisite: orNull(feat.prerequisite),
         abilityOptions: orElse(feat.abilityOptions, []),
         abilityIncrease: orElse(feat.abilityIncrease, 0),
@@ -276,6 +281,7 @@ async function seedFeats(prisma: PrismaClient) {
       },
     });
   }
+  await prisma.feat.deleteMany({ where: { name: { notIn: FEATS.map((f) => f.name) } } });
 }
 
 async function seedBackgrounds(prisma: PrismaClient) {
