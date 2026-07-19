@@ -31,6 +31,7 @@ export default function BackgroundBonusesSection({ bonuses, onChange }: Backgrou
   const plusOne = abilities.find((a) => assignment[a] === 1 && a !== plusTwo);
 
   function chooseMode(next: SpreadMode) {
+    if (next === mode) return; // re-clicking the active mode must not wipe selections
     setMode(next);
     if (next === "oneOneOne") {
       onChange(Object.fromEntries(abilities.map((a) => [a, 1])));

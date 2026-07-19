@@ -167,4 +167,19 @@ describe("CharacterCreatePage (#253)", () => {
     expect(screen.getByRole("button", { name: "+2 / +1" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "+1 / +1 / +1" })).toHaveAttribute("aria-pressed", "false");
   });
+
+  it("keeps the +2/+1 selections when the already-active mode button is clicked (#1130)", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByLabelText(/name/i);
+
+    await user.selectOptions(screen.getByLabelText("Background"), "Criminal");
+    await user.selectOptions(screen.getByLabelText(/\+2 to/), "dexterity");
+    await user.selectOptions(screen.getByLabelText(/\+1 to/), "intelligence");
+
+    // Re-clicking the already-active "+2 / +1" mode must be a no-op, not a wipe.
+    await user.click(screen.getByRole("button", { name: "+2 / +1" }));
+    expect((screen.getByLabelText(/\+2 to/) as HTMLSelectElement).value).toBe("dexterity");
+    expect((screen.getByLabelText(/\+1 to/) as HTMLSelectElement).value).toBe("intelligence");
+  });
 });
