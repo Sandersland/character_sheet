@@ -24,7 +24,10 @@ referenceRouter.get("/reference", async (_req, res) => {
     orderBy: { name: "asc" },
     include: { subclasses: { orderBy: { name: "asc" } } },
   });
-  const backgrounds = await prisma.background.findMany({ orderBy: { name: "asc" } });
+  const backgrounds = await prisma.background.findMany({
+    orderBy: { name: "asc" },
+    include: { originFeat: { select: { id: true, name: true, description: true, category: true } } },
+  });
 
   const classes = rawClasses.map((c) => ({
     id: c.id,
@@ -64,6 +67,9 @@ referenceRouter.get("/reference", async (_req, res) => {
     name: b.name,
     skillProficiencies: b.skillProficiencies,
     toolProficiencies: b.toolProficiencies,
+    // PHB'24 ability spread + Origin feat; empty/null for spec-less legacy rows (#1130).
+    abilityChoices: b.abilityChoices,
+    originFeat: b.originFeat,
   }));
 
   // Artisan tools for the sheet's Proficiencies-card dropdown (the only category consumed).

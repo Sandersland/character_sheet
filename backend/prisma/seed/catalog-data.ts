@@ -217,17 +217,39 @@ export const CLASSES = [
   },
 ];
 
-export const BACKGROUNDS = [
-  { name: "Sage",      skillProficiencies: ["arcana", "history"] },
-  { name: "Soldier",   skillProficiencies: ["athletics", "intimidation"] },
+// 2024 backgrounds (SRD 5.2 for the 4 SRD rows; PHB'24 for Charlatan/Noble).
+// abilityChoices = the three abilities the +2/+1 (or 1/1/1) spread draws from;
+// originFeatName is resolved to originFeatId in seed.ts. Folk Hero has no 2024
+// version — kept spec-less (2014 legacy, no ability spread / Origin feat, #1130).
+export interface BackgroundSeed {
+  name: string;
+  skillProficiencies: string[];
+  toolProficiencies?: string[];
+  abilityChoices?: string[];
+  originFeatName?: string;
+}
+
+export const BACKGROUNDS: BackgroundSeed[] = [
+  { name: "Sage",      skillProficiencies: ["arcana", "history"],
+    abilityChoices: ["constitution", "intelligence", "wisdom"],
+    originFeatName: "Magic Initiate", toolProficiencies: ["Calligrapher's Supplies"] },
+  { name: "Soldier",   skillProficiencies: ["athletics", "intimidation"],
+    abilityChoices: ["strength", "dexterity", "constitution"],
+    originFeatName: "Savage Attacker", toolProficiencies: ["Dice Set"] },
   { name: "Charlatan", skillProficiencies: ["deception", "sleightOfHand"],
-    toolProficiencies: ["Disguise Kit", "Forgery Kit"] },
-  { name: "Acolyte",   skillProficiencies: ["insight", "religion"] },
-  // Criminal: Thieves' Tools (fixed) + one gaming set (Dice Set by default).
-  { name: "Criminal",  skillProficiencies: ["deception", "stealth"],
-    toolProficiencies: ["Thieves' Tools", "Dice Set"] },
+    abilityChoices: ["dexterity", "constitution", "charisma"],
+    originFeatName: "Skilled", toolProficiencies: ["Forgery Kit"] },
+  { name: "Acolyte",   skillProficiencies: ["insight", "religion"],
+    abilityChoices: ["intelligence", "wisdom", "charisma"],
+    originFeatName: "Magic Initiate", toolProficiencies: ["Calligrapher's Supplies"] },
+  // Criminal (2024): skills changed to sleightOfHand/stealth; Thieves' Tools only.
+  { name: "Criminal",  skillProficiencies: ["sleightOfHand", "stealth"],
+    abilityChoices: ["dexterity", "constitution", "intelligence"],
+    originFeatName: "Alert", toolProficiencies: ["Thieves' Tools"] },
   { name: "Folk Hero", skillProficiencies: ["animalHandling", "survival"] },
-  { name: "Noble",     skillProficiencies: ["history", "persuasion"] },
+  { name: "Noble",     skillProficiencies: ["history", "persuasion"],
+    abilityChoices: ["strength", "intelligence", "charisma"],
+    originFeatName: "Skilled", toolProficiencies: ["Dice Set"] },
 ];
 
 function coins(gp: number, sp = 0, cp = 0) {

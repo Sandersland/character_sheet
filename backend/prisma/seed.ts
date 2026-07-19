@@ -291,13 +291,27 @@ async function seedFeats(prisma: PrismaClient) {
   await prisma.feat.deleteMany({ where: { name: { notIn: FEATS.map((f) => f.name) } } });
 }
 
+// Resolves a background's originFeatName to a Feat id (feats seed first, so the
+// row exists); throws on an unknown name. Two backgrounds (Acolyte/Sage) share
+// the repeatable Magic Initiate row; the class flavor is a creation-time
+// snapshot, not a column.
+async function resolveOriginFeatId(prisma: PrismaClient, bg: (typeof BACKGROUNDS)[number]): Promise<string | null> {
+  if (!bg.originFeatName) return null;
+  const feat = await prisma.feat.findUnique({ where: { name: bg.originFeatName }, select: { id: true } });
+  if (!feat) throw new Error(`seedBackgrounds: unknown origin feat "${bg.originFeatName}" for background "${bg.name}"`);
+  return feat.id;
+}
+
 async function seedBackgrounds(prisma: PrismaClient) {
   for (const background of BACKGROUNDS) {
-    await prisma.background.upsert({
-      where: { name: background.name },
-      create: background,
-      update: background,
-    });
+    const data = {
+      name: background.name,
+      skillProficiencies: background.skillProficiencies,
+      toolProficiencies: background.toolProficiencies ?? [],
+      abilityChoices: background.abilityChoices ?? [],
+      originFeatId: await resolveOriginFeatId(prisma, background),
+    };
+    await prisma.background.upsert({ where: { name: background.name }, create: data, update: data });
   }
 }
 
