@@ -785,6 +785,35 @@ export async function startCampaignSession(
   );
 }
 
+// Solo sessions (#1082) live on the character, not a campaign — a campaign-less
+// character starts/ends its own private session through these character-scoped
+// routes (#1081). Same response shapes as the campaign start/end so the shared
+// doorway + lifecycle plumbing branches only on which call to make.
+
+/** Start a solo (campaign-less) session for a character. */
+export async function startSoloSession(
+  characterId: string,
+  title?: string,
+): Promise<{ session: Session; character: Character }> {
+  return request<{ session: Session; character: Character }>(
+    `/characters/${characterId}/sessions`,
+    jsonBody({ title }),
+    "Failed to start session",
+  );
+}
+
+/** End a solo session by id. */
+export async function endSoloSession(
+  characterId: string,
+  sessionId: string,
+): Promise<{ session: Session }> {
+  return request<{ session: Session }>(
+    `/characters/${characterId}/sessions/${sessionId}/end`,
+    { method: "POST" },
+    "Failed to end session",
+  );
+}
+
 /** Add (or re-add) a character to an active campaign session. */
 export async function joinSession(
   campaignId: string,
