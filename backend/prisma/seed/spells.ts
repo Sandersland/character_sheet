@@ -42,6 +42,18 @@ export interface CatalogSpell {
   buffModifier?: number;
 }
 
+// SRD 5.2 (2024) renamed the proper-noun spells (#1132). Each entry renames the
+// catalog row in place at seed time (applySpellRenames, before the upsert loop),
+// preserving its id so SubclassGrantedSpell FKs / InventoryCapability.spellId
+// provenance survive. `to` MUST be a live SPELLS name; `from` MUST NOT be (the
+// seed-data shape test enforces both).
+export interface SpellRename {
+  from: string;
+  to: string;
+}
+
+export const SPELL_RENAMES: SpellRename[] = [];
+
 export const SPELLS: CatalogSpell[] = [
   // ── Cantrips ──────────────────────────────────────────────────────────────
   {

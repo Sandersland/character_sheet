@@ -29,7 +29,7 @@ import { DISCIPLINES } from "../disciplines.js";
 import { SHADOW_ARTS } from "../shadow-arts.js";
 import { CHANNEL_DIVINITIES } from "../channel-divinity.js";
 import { FEATS } from "../feats.js";
-import { SPELLS } from "../spells.js";
+import { SPELLS, SPELL_RENAMES } from "../spells.js";
 import { PACKS } from "../packs.js";
 import { SUBCLASS_GRANTED_SPELLS } from "../subclass-granted-spells.js";
 import { FEAT_IMPROVEMENT_TARGETS } from "@/lib/srd/feats.js";
@@ -157,6 +157,60 @@ describe("SPELLS — creation picker coverage (#1131)", () => {
     for (const cls of ["bard", "cleric", "druid", "sorcerer", "wizard", "warlock", "paladin", "ranger"]) {
       expect(onList(cls, 1), `${cls} L1 spells`).toBeGreaterThan(preparedSpellCountAt(cls, 1) ?? 0);
     }
+  });
+});
+
+// SRD 5.2 spell resweep (#1132): shape invariants the value-by-value catalog
+// edits must never break. The class list is the authority — a spell offering
+// itself outside its SRD list is the leak bug the resweep fixes.
+describe("SPELLS — structured-field invariants (#1132)", () => {
+  const CLASS_NAMES = new Set([
+    "barbarian", "bard", "cleric", "druid", "fighter", "monk",
+    "paladin", "ranger", "rogue", "sorcerer", "warlock", "wizard",
+  ]);
+
+  it("every spell's classes[] is non-empty and lowercase ⊆ the 12 classes", () => {
+    const bad = SPELLS.filter(
+      (s) => s.classes.length === 0 || s.classes.some((c) => c !== c.toLowerCase() || !CLASS_NAMES.has(c)),
+    ).map((s) => s.name);
+    expect(bad, "spells with an empty or unknown class list").toEqual([]);
+  });
+
+  it("cantripScaling only on cantrips (level 0)", () => {
+    const bad = SPELLS.filter((s) => s.cantripScaling && s.level !== 0).map((s) => s.name);
+    expect(bad, "leveled spell flagged cantripScaling").toEqual([]);
+  });
+
+  it("saveEffect implies a save-based attack", () => {
+    const bad = SPELLS.filter((s) => s.saveEffect && s.attackType !== "save").map((s) => s.name);
+    expect(bad, "saveEffect without attackType 'save'").toEqual([]);
+  });
+
+  it("buff fields appear iff effectKind is 'buff'", () => {
+    const bad = SPELLS.filter((s) => {
+      const hasBuffFields = s.buffTarget != null || s.buffModifier != null;
+      return hasBuffFields !== (s.effectKind === "buff");
+    }).map((s) => s.name);
+    expect(bad, "buff fields not matching effectKind 'buff'").toEqual([]);
+  });
+
+  it("upcastDicePerLevel only on leveled spells (level ≥ 1)", () => {
+    const bad = SPELLS.filter((s) => s.upcastDicePerLevel != null && s.level < 1).map((s) => s.name);
+    expect(bad, "cantrip with upcastDicePerLevel").toEqual([]);
+  });
+
+  it("every SUBCLASS_GRANTED_SPELLS.spellName exists in SPELLS", () => {
+    const names = new Set(SPELLS.map((s) => s.name));
+    const dangling = SUBCLASS_GRANTED_SPELLS.filter((g) => !names.has(g.spellName)).map((g) => g.spellName);
+    expect([...new Set(dangling)], "granted spell not in the catalog").toEqual([]);
+  });
+
+  it("SPELL_RENAMES: no source name still in SPELLS, every target name in SPELLS", () => {
+    const names = new Set(SPELLS.map((s) => s.name));
+    const strandedSources = SPELL_RENAMES.filter((r) => names.has(r.from)).map((r) => r.from);
+    const missingTargets = SPELL_RENAMES.filter((r) => !names.has(r.to)).map((r) => r.to);
+    expect(strandedSources, "rename source still present in SPELLS").toEqual([]);
+    expect(missingTargets, "rename target missing from SPELLS").toEqual([]);
   });
 });
 
