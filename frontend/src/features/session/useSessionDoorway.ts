@@ -53,10 +53,11 @@ export interface UseSessionDoorway {
 
 // The capture dock reads only status/startedAt/title; synthesize a minimal
 // Session from the doorway's live-session state so the ⌘J dock header still works
-// without a second fetch.
+// without a second fetch. campaignId flows through as-is — null for a solo
+// session (#1082), which the dock handles like any other active session.
 function toCaptureSession(state: SessionDoorwayState): Session | null {
   const s = state.session;
-  if (!s || state.campaignId === null || s.status !== "active" || s.startedAt === null) return null;
+  if (!s || s.status !== "active" || s.startedAt === null) return null;
   return { id: s.id, campaignId: state.campaignId, status: "active", startedAt: s.startedAt, title: s.title ?? undefined };
 }
 
