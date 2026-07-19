@@ -141,27 +141,28 @@ describe("AC-granting spells (#363)", () => {
     expect((await serialize()).armorClass).toBe(12);
   });
 
-  it("Barkskin floors AC at 16 while unarmored, as a reconciling breakdown part", async () => {
+  it("Barkskin floors AC at 17 while unarmored, as a reconciling breakdown part", async () => {
     await learnAndCast("Barkskin");
     const view = await serialize();
-    expect(view.armorClass).toBe(16); // unarmored 12 floored up to 16
-    expect(view.armorClassBreakdown).toContainEqual({ label: "Barkskin (floor 16)", value: 4 });
+    expect(view.armorClass).toBe(17); // unarmored 12 floored up to 17 (SRD 5.2)
+    expect(view.armorClassBreakdown).toContainEqual({ label: "Barkskin (floor 17)", value: 5 });
     // Single-source-of-sum invariant: labeled parts sum to armorClass.
-    expect(view.armorClassBreakdown.reduce((t, p) => t + p.value, 0)).toBe(16);
+    expect(view.armorClassBreakdown.reduce((t, p) => t + p.value, 0)).toBe(17);
 
-    await applySpellcastingOperations(characterId, [{ type: "dropConcentration" }], OWNER_ID);
+    // 2024 Barkskin is non-concentration → ends on a long rest, not dropConcentration.
+    await applyHitPointOperations(characterId, [{ type: "longRest" }]);
     expect((await serialize()).armorClass).toBe(12);
   });
 
   it("Barkskin adds a 0-value reminder when AC already meets the floor", async () => {
-    // Half plate 15 + Dex 2 (cap 2) = 17, already ≥ 16.
+    // Half plate 15 + Dex 2 (cap 2) = 17, already ≥ 17.
     const armor = await makeBodyArmor({ name: "Half Plate", armorCategory: "medium", baseArmorClass: 15, dexModifierMax: 2 });
     await applyInventoryOperations(characterId, [{ type: "equip", inventoryItemId: armor.id, slot: "BODY" }]);
     await learnAndCast("Barkskin");
 
     const view = await serialize();
     expect(view.armorClass).toBe(17); // floor doesn't raise AC
-    expect(view.armorClassBreakdown).toContainEqual({ label: "Barkskin", value: 0, reminder: "floor 16" });
+    expect(view.armorClassBreakdown).toContainEqual({ label: "Barkskin", value: 0, reminder: "floor 17" });
     expect(view.armorClassBreakdown.reduce((t, p) => t + p.value, 0)).toBe(17);
   });
 });

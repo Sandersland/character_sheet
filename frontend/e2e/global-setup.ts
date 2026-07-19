@@ -85,9 +85,11 @@ const ROSTER: Persona[] = [
     background: "Sage",
     className: "Warlock",
     // Warlock level-1 loadout: 2 cantrips (incl. Eldritch Blast) + 2 spells.
+    // Hideous Laughter (SRD 5.2 name) is warlock-legal; Dissonant Whispers is
+    // now bard-only (#1132), so it can no longer be a Warlock pick.
     spells: {
       cantripNames: ["Eldritch Blast", "Chill Touch"],
-      spellNames: ["Charm Person", "Dissonant Whispers"],
+      spellNames: ["Charm Person", "Hideous Laughter"],
     },
   },
   {

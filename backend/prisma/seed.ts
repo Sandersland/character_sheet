@@ -14,7 +14,8 @@ import { SHADOW_ARTS } from "./seed/shadow-arts.js";
 import { CHANNEL_DIVINITIES } from "./seed/channel-divinity.js";
 import { SUBCLASS_CHOICE_OPTIONS } from "./seed/subclass-choices.js";
 import { FEATS } from "./seed/feats.js";
-import { SPELLS } from "./seed/spells.js";
+import { SPELLS, SPELL_RENAMES, type CatalogSpell } from "./seed/spells.js";
+import { applySpellRenames } from "./seed/rename-spells.js";
 import { SUBCLASS_GRANTED_SPELLS } from "./seed/subclass-granted-spells.js";
 import { PACKS } from "./seed/packs.js";
 import { assertUniqueGrantedAbilityNames } from "./seed/guards.js";
@@ -315,15 +316,47 @@ async function seedBackgrounds(prisma: PrismaClient) {
   }
 }
 
-// Seed spell catalog — upsert by unique name, same idempotent pattern as items.
+// Every optional Spell column at its reset value (booleans → false, nullable
+// scalars → null). `components` (a Json column) is omitted — Prisma rejects a raw
+// null there, and no spell ever drops it.
+const SPELL_COLUMN_DEFAULTS = {
+  concentration: false, ritual: false, cantripScaling: false,
+  effectKind: null, effectDiceCount: null, effectDiceFaces: null,
+  effectModifier: null, damageType: null, attackType: null,
+  saveAbility: null, saveEffect: null, upcastDicePerLevel: null,
+  buffTarget: null, buffModifier: null,
+} as const;
+
+// Layer the spell over the reset defaults so a toggled-OFF/removed optional
+// actually resets on re-seed (#1132): a bare partial update leaves an absent
+// optional column at its prior value (this stranded Barkskin at
+// concentration=true when SRD 5.2 dropped its concentration). Spread order —
+// defaults first — means any field the spell declares still wins.
+function spellSeedData(spell: CatalogSpell) {
+  return { ...SPELL_COLUMN_DEFAULTS, ...spell };
+}
+
+// Seed spell catalog — apply in-place renames FIRST (so the upsert matches the
+// renamed row, not a stranded twin), upsert by unique name, then drop stale rows
+// (2024-removed spells like Toll the Dead). Learned SpellEntry snapshots are
+// unaffected by a catalog drop (no FK); a one-time resync script refreshes them.
 async function seedSpells(prisma: PrismaClient) {
+  await applySpellRenames(prisma, SPELL_RENAMES);
+  const seededNames = SPELLS.map((s) => s.name);
   for (const spell of SPELLS) {
+    const data = spellSeedData(spell);
     await prisma.spell.upsert({
       where: { name: spell.name },
-      create: spell,
-      update: spell,
+      create: data,
+      update: data,
     });
   }
+  const stale = await prisma.spell.findMany({
+    where: { name: { notIn: seededNames } },
+    select: { name: true },
+  });
+  if (stale.length) console.log(`seedSpells: dropping stale catalog rows: ${stale.map((s) => s.name).join(", ")}`);
+  await prisma.spell.deleteMany({ where: { name: { notIn: seededNames } } });
 }
 
 // Returns itemName → id so packs can resolve their contents.
