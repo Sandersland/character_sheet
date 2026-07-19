@@ -116,6 +116,14 @@ const dismissBuffOpSchema = z.object({
   entryId: z.string().min(1),
 });
 
+// Sorcerer Font of Magic (#903): SP↔slot conversion. toSlot is capped at 5th
+// level (the cost table); toSorceryPoints accepts any slot level.
+const convertSorceryPointsOpSchema = z.object({
+  type: z.literal("convertSorceryPoints"),
+  direction: z.enum(["toSlot", "toSorceryPoints"]),
+  slotLevel: z.number().int().min(1).max(9),
+});
+
 const operationSchema = z.discriminatedUnion("type", [
   castSpellOpSchema,
   castItemSpellOpSchema,
@@ -127,6 +135,7 @@ const operationSchema = z.discriminatedUnion("type", [
   unprepareSpellOpSchema,
   dropConcentrationOpSchema,
   dismissBuffOpSchema,
+  convertSorceryPointsOpSchema,
 ]);
 
 const transactionsRequestSchema = z.object({

@@ -44533,7 +44533,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44567,7 +44567,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44607,7 +44607,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44647,7 +44647,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44687,7 +44687,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44727,7 +44727,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44767,7 +44767,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44807,7 +44807,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44847,7 +44847,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44887,7 +44887,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44927,7 +44927,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -44967,7 +44967,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45007,7 +45007,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45047,7 +45047,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45087,7 +45087,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45127,7 +45127,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45167,7 +45167,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45207,7 +45207,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45247,7 +45247,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45342,7 +45342,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45388,7 +45388,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45440,7 +45440,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45492,7 +45492,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45544,7 +45544,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45602,7 +45602,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45660,7 +45660,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45718,7 +45718,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45776,7 +45776,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45834,7 +45834,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45892,7 +45892,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -45950,7 +45950,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46008,7 +46008,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46072,7 +46072,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46136,7 +46136,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46200,7 +46200,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46264,7 +46264,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46334,7 +46334,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46404,7 +46404,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "class",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46525,7 +46525,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46578,7 +46578,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46637,7 +46637,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46696,7 +46696,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46755,7 +46755,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46820,7 +46820,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46885,7 +46885,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -46950,7 +46950,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47015,7 +47015,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47080,7 +47080,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47145,7 +47145,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47210,7 +47210,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47275,7 +47275,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47346,7 +47346,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47417,7 +47417,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47488,7 +47488,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47559,7 +47559,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47636,7 +47636,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",
@@ -47713,7 +47713,7 @@ exports[`deriveResources snapshot — pins output for every class/subclass acros
           "source": "subclass",
         },
         {
-          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+          "description": "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
           "level": 2,
           "name": "Font of Magic",
           "source": "class",

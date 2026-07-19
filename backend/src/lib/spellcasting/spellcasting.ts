@@ -23,6 +23,8 @@ import { castAbilityInTx, type CastTarget, type OpOutcome } from "./ability-cast
 import { clearBuffByKeyInTx, clearBuffsForSourceInTx } from "@/lib/combat/active-effects.js";
 import { InvalidSpellcastingOperationError, type AbilityCost, type PayCostContext } from "./ability-cost.js";
 import { runCharacterTransaction } from "@/lib/character/character-transaction.js";
+import { applyResourceOpInTx } from "@/lib/classes/resources.js";
+import { sorceryPointCostForSlot, FONT_OF_MAGIC_MAX_SLOT_LEVEL } from "@/lib/classes/sorcerer.js";
 import { readEffectSpec } from "@/lib/combat/effects.js";
 import { proficiencyBonusForLevel, levelForExperience } from "@/lib/leveling/experience.js";
 import { logEvent } from "@/lib/activity/events.js";
@@ -151,6 +153,17 @@ export interface DismissBuffOperation {
   entryId: string;
 }
 
+/**
+ * Sorcerer Font of Magic (#903): convert sorcery points into a spell slot at the
+ * 5e cost table, or expend a spell slot to gain SP equal to its level. Mutates
+ * the SP pool (resources) and the slot state (spellcasting) atomically.
+ */
+export interface ConvertSorceryPointsOperation {
+  type: "convertSorceryPoints";
+  direction: "toSlot" | "toSorceryPoints";
+  slotLevel: number;
+}
+
 export type SpellcastingOperation =
   | CastSpellOperation
   | CastItemSpellOperation
@@ -161,7 +174,8 @@ export type SpellcastingOperation =
   | PrepareSpellOperation
   | UnprepareSpellOperation
   | DropConcentrationOperation
-  | DismissBuffOperation;
+  | DismissBuffOperation
+  | ConvertSorceryPointsOperation;
 
 // Each helper mutates ctx.state in place and returns an OpOutcome, or null for a
 // no-op (which skips both the state write-back and the logEvent in the dispatcher).
@@ -647,6 +661,54 @@ async function applyDismissBuffOp(ctx: SpellOpContext, op: DismissBuffOperation)
   return null;
 }
 
+// Font of Magic (#903). Composes with the resources handler for the SP pool
+// (validates the pool exists + bounds, logs its own resources event under this
+// batch) and mutates the slot state here (logged as the spellcasting event) —
+// both revert on one LIFO undo of the batch.
+async function applyConvertSorceryPointsOp(
+  ctx: SpellOpContext,
+  op: ConvertSorceryPointsOperation,
+): Promise<OpOutcome> {
+  const { state, slotTotals, tx, characterId, batchId, sessionId } = ctx;
+  const level = op.slotLevel;
+  const key = String(level);
+
+  if (op.direction === "toSlot") {
+    const cost = sorceryPointCostForSlot(level);
+    if (cost == null) {
+      throw new InvalidSpellcastingOperationError(
+        `Font of Magic can only create spell slots of level 1-${FONT_OF_MAGIC_MAX_SLOT_LEVEL}`,
+      );
+    }
+    if ((slotTotals[level] ?? 0) === 0) {
+      throw new InvalidSpellcastingOperationError(`You have no level-${level} spell slots`);
+    }
+    // Spend the SP first — validates the pool exists and enough points remain.
+    await applyResourceOpInTx(tx, characterId, { type: "spendResource", key: "sorceryPoints", amount: cost }, batchId, sessionId);
+    // Creating a slot = one more available; `used` may go negative (extra slot).
+    state.slotsUsed[key] = (state.slotsUsed[key] ?? 0) - 1;
+    return {
+      eventType: "convertSorceryPoints",
+      summary: `Converted ${cost} sorcery points into a level-${level} spell slot`,
+      eventData: { direction: "toSlot", slotLevel: level, sorceryPointCost: cost },
+    };
+  }
+
+  const used = state.slotsUsed[key] ?? 0;
+  if ((slotTotals[level] ?? 0) - used <= 0) {
+    throw new InvalidSpellcastingOperationError(`No level-${level} spell slots remaining to convert`);
+  }
+  state.slotsUsed[key] = used + 1;
+  // Gain SP = slot level; restoreResource throws if this would exceed the max,
+  // rejecting the whole conversion (slot stays unspent) — it does not clamp.
+  await applyResourceOpInTx(tx, characterId, { type: "restoreResource", key: "sorceryPoints", amount: level }, batchId, sessionId);
+  return {
+    eventType: "convertSorceryPoints",
+    summary: `Converted a level-${level} spell slot into ${level} sorcery points`,
+    eventData: { direction: "toSorceryPoints", slotLevel: level, sorceryPointsGained: level },
+  };
+}
+
 type DerivedSpellcasting = ReturnType<typeof deriveSpellcasting>;
 
 // Build the slot/arcana level→total maps from derived spellcasting, falling back
@@ -737,6 +799,7 @@ const SPELL_OP_HANDLERS: {
   unprepareSpell: applyPrepareSpellOp,
   dropConcentration: applyDropConcentrationOp,
   dismissBuff: applyDismissBuffOp,
+  convertSorceryPoints: applyConvertSorceryPointsOp,
 };
 
 function dispatchSpellOp(ctx: SpellOpContext, op: SpellcastingOperation): SpellOpResult {
