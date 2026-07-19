@@ -7,6 +7,7 @@ import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
 import { advancementSlotsForLevel, fightingStyleChoiceCount } from "@/lib/srd/srd.js";
 import {
   bardMagicalSecretsAt,
+  levelUpCantripPicks,
   levelUpSpellPicks,
   maxSpellLevelForClass,
   swapCadenceFor,
@@ -104,18 +105,27 @@ function subclassChoiceSteps({ now, prev }: PlanContext): LevelUpStep[] {
 // 2024: onLevelUp-cadence casters (Bard/Sorcerer/Warlock + EK/AT) offer the
 // prepared-count delta plus one optional swap (#1101), so a swap-only step
 // (count 0, canSwap) is emitted even on a no-new-spells level; the Wizard scribes
-// a flat 2 with no swap. Re-prepare classes (Cleric/Druid/Paladin/Ranger) get no
-// step — they re-prepare on a rest. Bard picks from level 10 are Magical Secrets.
+// a flat 2 with no swap. #1131: every caster also picks new cantrips on a
+// cantrips-known growth level (so Cleric/Druid get a cantrips-only step at 4/10),
+// and a fresh level-1 entry offers its full initial spell+cantrip picks with no
+// swap (a new entry may not swap other classes' spells). Bard picks from level 10
+// are Magical Secrets.
 function newSpellsStep({ target }: PlanContext): LevelUpStep | null {
   const count = levelUpSpellPicks(target.name, target.newLevel, target.subclass);
-  const canSwap = swapCadenceFor(target.name, target.subclass) === "onLevelUp";
-  if (count <= 0 && !canSwap) return null;
+  const cantrips = levelUpCantripPicks(target.name, target.newLevel, target.subclass);
+  const canSwap = swapCadenceFor(target.name, target.subclass) === "onLevelUp" && target.newLevel >= 2;
+  if (count <= 0 && cantrips <= 0 && !canSwap) return null;
   const magicalSecrets = bardMagicalSecretsAt(target.name, target.newLevel);
   const maxSpellLevel = maxSpellLevelForClass(target.name, target.newLevel, target.subclass);
   return {
     kind: "newSpells",
     count,
-    meta: { maxSpellLevel, ...(magicalSecrets ? { magicalSecrets: true } : {}), ...(canSwap ? { canSwap: true } : {}) },
+    meta: {
+      maxSpellLevel,
+      ...(magicalSecrets ? { magicalSecrets: true } : {}),
+      ...(canSwap ? { canSwap: true } : {}),
+      ...(cantrips > 0 ? { cantrips } : {}),
+    },
   };
 }
 
