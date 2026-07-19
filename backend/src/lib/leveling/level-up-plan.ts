@@ -8,6 +8,7 @@ import { advancementSlotsForLevel, fightingStyleChoiceCount } from "@/lib/srd/sr
 import {
   BARD_MAGICAL_SECRETS_LEVELS,
   learnsNewSpellsOnLevelUp,
+  maxSpellLevelForClass,
   spellsGainedAtLevel,
 } from "@/lib/srd/spellcasting-tables.js";
 
@@ -102,7 +103,8 @@ function newSpellsStep({ target }: PlanContext): LevelUpStep | null {
   const count = spellsGainedAtLevel(target.name, target.newLevel);
   if (count <= 0) return null;
   const magicalSecrets = target.name.toLowerCase() === "bard" && BARD_MAGICAL_SECRETS_LEVELS.has(target.newLevel);
-  return { kind: "newSpells", count, ...(magicalSecrets ? { meta: { magicalSecrets: true } } : {}) };
+  const maxSpellLevel = maxSpellLevelForClass(target.name, target.newLevel, target.subclass);
+  return { kind: "newSpells", count, meta: { maxSpellLevel, ...(magicalSecrets ? { magicalSecrets: true } : {}) } };
 }
 
 /**

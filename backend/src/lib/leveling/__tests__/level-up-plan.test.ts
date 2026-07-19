@@ -127,6 +127,15 @@ describe("buildLevelUpPlan — newSpells", () => {
     expect(plan.find((s) => s.kind === "newSpells")?.count).toBe(2);
   });
 
+  it("carries the derived spell-level ceiling in meta.maxSpellLevel", () => {
+    expect(buildLevelUpPlan(char("wizard", 2), target("wizard", 3)).find((s) => s.kind === "newSpells")?.meta?.maxSpellLevel).toBe(2);
+    expect(buildLevelUpPlan(char("wizard", 8), target("wizard", 9)).find((s) => s.kind === "newSpells")?.meta?.maxSpellLevel).toBe(5);
+    // Sorcerer learn level: ceiling present, no Magical Secrets flag.
+    const sorc = buildLevelUpPlan(char("sorcerer", 4), target("sorcerer", 5)).find((s) => s.kind === "newSpells");
+    expect(sorc?.meta?.maxSpellLevel).toBe(3);
+    expect(sorc?.meta?.magicalSecrets).toBeUndefined();
+  });
+
   it("Ranger 1→2 gains its first spells known", () => {
     const plan = buildLevelUpPlan(char("ranger", 1), target("ranger", 2));
     expect(kinds(plan)).toEqual(["hitPoints", "newSpells", "review"]);
@@ -148,10 +157,12 @@ describe("buildLevelUpPlan — newSpells", () => {
     const secrets = buildLevelUpPlan(char("bard", 9), target("bard", 10)).find((s) => s.kind === "newSpells");
     expect(secrets?.count).toBe(2);
     expect(secrets?.meta?.magicalSecrets).toBe(true);
+    expect(secrets?.meta?.maxSpellLevel).toBe(5);
 
     const normal = buildLevelUpPlan(char("bard", 2), target("bard", 3)).find((s) => s.kind === "newSpells");
     expect(normal?.count).toBe(1);
     expect(normal?.meta?.magicalSecrets).toBeUndefined();
+    expect(normal?.meta?.maxSpellLevel).toBe(2);
   });
 
   it("third-caster subclasses (Eldritch Knight / Arcane Trickster) emit no newSpells step", () => {
