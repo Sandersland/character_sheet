@@ -59,6 +59,15 @@ interface ResolvedStyleFeat {
   improvements: FeatImprovement[];
 }
 
+// Fast-fail instead of silently skipping every character when the feat seed
+// hasn't run yet (fresh env / out-of-order deploy) — run `prisma db seed` first.
+export async function assertFightingStyleFeatsSeeded(prisma: PrismaClient): Promise<void> {
+  const count = await prisma.feat.count({ where: { category: "fighting_style" } });
+  if (count === 0) {
+    throw new Error("No fighting_style feats in the catalog — run the seed before this migration script.");
+  }
+}
+
 async function resolveStyleFeat(prisma: PrismaClient, styleKey: string): Promise<ResolvedStyleFeat | null> {
   const catalogName = CATALOG_STYLE_NAMES[styleKey];
   if (catalogName) {
@@ -87,6 +96,7 @@ export interface MigrationResult {
  * returns which characters changed.
  */
 export async function migrateFightingStylesToFeats(prisma: PrismaClient = defaultPrisma): Promise<MigrationResult> {
+  await assertFightingStyleFeatsSeeded(prisma);
   const characters = await prisma.character.findMany({
     select: {
       id: true,

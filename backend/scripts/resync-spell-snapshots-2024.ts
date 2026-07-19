@@ -4,8 +4,9 @@
 // in spellcasting.spells — not live references — so a catalog edit alone does not
 // reach them. This refreshes every entry that still resolves to a catalog Spell
 // (by spellId) to the current catalog text/dice, preserving the per-character
-// entry id, spellId, and prepared flag. It also un-strands the double-listing
-// mergeGrantedSpells could produce after a rename (stale name vs new grant name).
+// entry id, spellId, and prepared flag. Refreshed names also let the read-time
+// name-dedup in mergeGrantedSpells match again after a rename; entries map
+// 1-to-1 here — this script never removes or merges rows itself.
 //
 // Custom entries (no spellId) and dangling spellIds (catalog row gone, e.g. Toll
 // the Dead) are left untouched — those snapshots keep working forever as-is.

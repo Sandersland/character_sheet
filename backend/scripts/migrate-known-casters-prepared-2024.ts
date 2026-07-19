@@ -11,6 +11,9 @@
 // Each changed character gets one undoable "prepareSpell" event (full spellcasting
 // before/after snapshots, restored by the spellcasting revert branch in activity.ts).
 //
+// Run with the application OFFLINE/idle: the up-front fetch is written back
+// verbatim per character, so a cast landing mid-run would be overwritten.
+//
 // Imports only lib/ rule functions + prisma (no route/serialize code), per the
 // migration-script rule in CLAUDE.md.
 import { randomUUID } from "node:crypto";
