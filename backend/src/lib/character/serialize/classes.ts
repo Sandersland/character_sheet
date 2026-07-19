@@ -9,7 +9,7 @@ import {
 } from "@/lib/srd/srd.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { deriveActions, type AvailableAction } from "@/lib/classes/actions.js";
-import { clampChoicesToCaps, normalizeResourcesMutable, type AdvancementEntry } from "@/lib/classes/resources.js";
+import { clampChoicesToCaps, normalizeResourcesMutable, splitAdvancementsBySlotCap, type AdvancementEntry } from "@/lib/classes/resources.js";
 import { effectiveEntryLevel, subclassActiveAt } from "@/lib/leveling/effective-levels.js";
 import { normalizeHitPoints } from "@/lib/combat/hitpoints.js";
 import { reverseAdvancementEffects } from "@/lib/leveling/advancement.js";
@@ -137,18 +137,22 @@ export function applyAdvancementClamp(
   effectiveInitBonus: number;
   clampedAdvancements: AdvancementEntry[];
   advSlotTotal: number;
+  usedSlots: number;
 } {
   const storedForAdv = normalizeResourcesMutable(row.resources);
   const advSlotTotal = advancementSlotsForLevel(primaryClass?.name ?? "", level);
   let effectiveScores = row.abilityScores as Record<string, number>;
   let effectiveInitBonus = row.initiativeBonus;
   let effectiveHitPoints = hitPoints;
-  const clampedAdvancements = storedForAdv.advancements.slice(0, advSlotTotal);
+  // Origin feats are kept regardless of the slot cap (#1130) via the shared split.
+  const { kept: clampedAdvancements, excess, usedSlots } = splitAdvancementsBySlotCap(
+    storedForAdv.advancements,
+    advSlotTotal,
+  );
 
-  if (clampedAdvancements.length < storedForAdv.advancements.length) {
+  if (excess.length > 0) {
     // Some advancements are beyond the cap — reverse the excess ones to compute
     // effective display values (without writing; reconcile-on-write handles that).
-    const excess = storedForAdv.advancements.slice(advSlotTotal);
     const reversed = reverseAdvancementEffects(
       effectiveScores,
       effectiveHitPoints,
@@ -160,12 +164,13 @@ export function applyAdvancementClamp(
     effectiveInitBonus = reversed.initiativeBonus;
   }
 
-  return { effectiveScores, hitPoints: effectiveHitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal };
+  return { effectiveScores, hitPoints: effectiveHitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal, usedSlots };
 }
 
 // Feat improvement modifier layer: sum structured feat improvements over the
-// in-cap advancements. Because clampedAdvancements already excludes over-cap
-// feats, level-down behavior is automatic — no separate reversal code needed.
+// kept advancements (origin feats + slot-bounded entries). Because
+// clampedAdvancements already excludes over-cap feats, level-down behavior is
+// automatic — no separate reversal code needed.
 // perLevel bonuses (e.g. Tough) scale with hitDiceTotal (applied level).
 export function applyFeatLayer(
   clampedAdvancements: AdvancementEntry[],

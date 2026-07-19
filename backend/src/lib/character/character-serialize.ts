@@ -142,8 +142,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
   );
 
   // 3. Advancement clamp → effective scores/HP/initiative, then the feat layer
-  //    summed over the surviving in-cap advancements.
-  const { effectiveScores, hitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal } =
+  //    summed over the kept advancements (origin feats + slot-bounded entries).
+  const { effectiveScores, hitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal, usedSlots } =
     applyAdvancementClamp(row, primaryClass, progress.level, normalizedHitPoints);
   const { featBonuses, effectiveMaxHp, featProficiencies } = applyFeatLayer(
     clampedAdvancements,
@@ -289,7 +289,8 @@ export function serializeCharacter(row: CharacterWithRelations) {
     advancements: clampedAdvancements,
     advancementSlots: {
       total: advSlotTotal,
-      used: clampedAdvancements.length,
+      // Origin feats don't consume a slot (#1130) — count only slot-bearing entries.
+      used: usedSlots,
     },
 
     // Class-specific available actions for the turn tracker (universal ones

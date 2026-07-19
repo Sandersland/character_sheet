@@ -33,6 +33,8 @@ export interface AdvancementEntry {
   id: string;
   level: number;
   kind: "asi" | "feat";
+  /** PHB'24 Origin feat from a background (#1130): slot-exempt, not removable. */
+  origin?: true;
   /** Score bumps applied: e.g. { strength: 2 } or { dexterity: 1, constitution: 1 } */
   abilityDeltas: Record<string, number>;
   /** HP delta added to max/current at time of choice. */

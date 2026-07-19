@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
 import {
@@ -7,6 +9,13 @@ import {
   selectAutoEquip,
 } from "@/lib/inventory/inventory.js";
 import { ALIGNMENTS, deriveCreatedCharacter, isKnownTool } from "@/lib/srd/srd.js";
+import { ABILITY_CAP } from "@/lib/leveling/advancement.js";
+import {
+  normalizeResourcesMutable,
+  serializeResourcesState,
+  type AdvancementEntry,
+  type FeatImprovement,
+} from "@/lib/classes/resources.js";
 import { STARTING_EQUIPMENT } from "@/lib/inventory/starting-equipment.js";
 import type { CreateCharacterBody } from "./character-schemas.js";
 
@@ -24,7 +33,22 @@ type PhaseResult<T> = Fail | Ok<T>;
 type PrimaryClassChoice = CreateCharacterBody["classes"][number];
 type ResolvedRace = NonNullable<Awaited<ReturnType<typeof prisma.race.findUnique>>>;
 type ResolvedClass = NonNullable<Awaited<ReturnType<typeof prisma.characterClass.findUnique>>>;
-type ResolvedBackground = Awaited<ReturnType<typeof prisma.background.findUnique>>;
+type ResolvedBackground = Prisma.BackgroundGetPayload<{ include: { originFeat: true } }> | null;
+
+// Background grants resolved from the request: the ability spread already folded
+// into effective scores (baked before deriveCreatedCharacter, #1130 D2) and the
+// Origin feat as a slot-exempt AdvancementEntry (null when the background has none).
+type BackgroundGrants = {
+  effectiveScores: Record<string, number>;
+  originEntry: AdvancementEntry | null;
+};
+
+// Magic Initiate is one repeatable catalog row shared by two backgrounds; the
+// class it grants spells from is a creation-time snapshot, not a column (#1130).
+const MAGIC_INITIATE_CLASS_BY_BACKGROUND: Record<string, string> = {
+  Acolyte: "Cleric",
+  Sage: "Wizard",
+};
 type CreationToolProf = { name: string; source: "background" | "class" | "race" };
 type PackageEquipment = Extract<
   NonNullable<CreateCharacterBody["startingEquipment"]>,
@@ -256,7 +280,10 @@ async function resolveSelections(
   const characterClass = await prisma.characterClass.findUnique({
     where: { name: primaryClassChoice.name },
   });
-  const background = await prisma.background.findUnique({ where: { name: input.background } });
+  const background = await prisma.background.findUnique({
+    where: { name: input.background },
+    include: { originFeat: true },
+  });
 
   // Mechanical derivation needs a catalog anchor for race + class. The
   // background only grants skill-proficiency choices (no mechanical
@@ -286,6 +313,96 @@ async function resolveSelections(
     subclassName: subclass.subclassName,
     skillProficiencies: proficiencies.skillProficiencies,
     creationToolProfs: proficiencies.creationToolProfs,
+  };
+}
+
+// A legal PHB'24 spread is +2/+1 (two abilities) or +1/+1/+1 (three) — always
+// summing to 3.
+function backgroundSpreadShapeValid(amounts: number[]): boolean {
+  const sorted = [...amounts].sort((a, b) => a - b);
+  const isTwoOne = sorted.length === 2 && sorted[0] === 1 && sorted[1] === 2;
+  const isOneOneOne = sorted.length === 3 && sorted.every((a) => a === 1);
+  return isTwoOne || isOneOneOne;
+}
+
+// Validates the spread: every bump is one of the background's three abilities,
+// the shape is legal, and no resulting score tops the 20 cap (SRD 5.2).
+function validateBackgroundSpread(
+  spread: Record<string, number>,
+  choices: string[],
+  base: Record<string, number>,
+): Fail | null {
+  const entries = Object.entries(spread);
+  const invalid = entries.filter(([ability]) => !choices.includes(ability)).map(([a]) => a);
+  if (invalid.length > 0) {
+    return { ok: false, status: 400, error: `backgroundAbilities: ${invalid.join(", ")} not in this background's choices (${choices.join(", ")})` };
+  }
+  if (!backgroundSpreadShapeValid(entries.map(([, amount]) => amount))) {
+    return { ok: false, status: 400, error: "backgroundAbilities must be +2/+1 (two abilities) or +1/+1/+1 (three abilities)" };
+  }
+  const over = entries.find(([ability, amount]) => (base[ability] ?? 10) + amount > ABILITY_CAP);
+  if (over) {
+    return { ok: false, status: 400, error: `backgroundAbilities: ${over[0]} would exceed ${ABILITY_CAP}` };
+  }
+  return null;
+}
+
+function applyBackgroundSpread(
+  base: Record<string, number>,
+  spread: Record<string, number> | undefined,
+): Record<string, number> {
+  const scores = { ...base };
+  for (const [ability, amount] of Object.entries(spread ?? {})) {
+    scores[ability] = (scores[ability] ?? 10) + amount;
+  }
+  return scores;
+}
+
+// Snapshots the background's Origin feat into a slot-exempt AdvancementEntry
+// (#1130). Magic Initiate's granted class is folded into the description snapshot.
+function buildOriginEntry(background: ResolvedBackground): AdvancementEntry | null {
+  const feat = background?.originFeat;
+  if (!feat) return null;
+  const flavor = feat.name === "Magic Initiate" ? MAGIC_INITIATE_CLASS_BY_BACKGROUND[background.name] : undefined;
+  const featDescription = flavor ? `${feat.description}\n\nBackground grant: ${flavor} spell list.` : feat.description;
+  return {
+    id: randomUUID(),
+    level: 1,
+    kind: "feat",
+    origin: true,
+    abilityDeltas: {},
+    hpDelta: 0,
+    initDelta: 0,
+    featId: feat.id,
+    featName: feat.name,
+    featDescription,
+    improvements: (feat.improvements as unknown as FeatImprovement[]) ?? [],
+  };
+}
+
+// Phase 1.5 — background grants (#1130): validate + fold the ability spread into
+// effective scores (baked BEFORE deriveCreatedCharacter so HP/init are correct)
+// and snapshot the Origin feat. A spec-less/custom background rejects any spread
+// but still grants its (absent) feat; omitting the spread applies no bump.
+function resolveBackgroundGrants(
+  input: CreateCharacterBody,
+  background: ResolvedBackground,
+): PhaseResult<BackgroundGrants> {
+  const spread = input.backgroundAbilities;
+  const choices = background?.abilityChoices ?? [];
+
+  if (spread) {
+    if (choices.length === 0) {
+      return { ok: false, status: 400, error: "backgroundAbilities not allowed: this background has no ability spread" };
+    }
+    const shapeError = validateBackgroundSpread(spread, choices, input.abilityScores);
+    if (shapeError) return shapeError;
+  }
+
+  return {
+    ok: true,
+    effectiveScores: applyBackgroundSpread(input.abilityScores, spread),
+    originEntry: buildOriginEntry(background),
   };
 }
 
@@ -488,19 +605,31 @@ async function persistCreatedCharacter(
   input: CreateCharacterBody,
   ownerId: string,
   selections: ResolvedSelections,
-  equipment: MaterializedEquipment
+  equipment: MaterializedEquipment,
+  grants: BackgroundGrants
 ): Promise<{ id: string }> {
   const { race, characterClass, background, primaryClassChoice } = selections;
   const { inventoryItemCreates, startingCurrency } = equipment;
+  const { effectiveScores, originEntry } = grants;
 
+  // Background ability spread is baked into effectiveScores BEFORE derivation so
+  // level-1 HP/initiative reflect it for free — no reversible delta record (#1130).
   const derived = deriveCreatedCharacter(
     {
-      abilityScores: input.abilityScores,
+      abilityScores: effectiveScores,
       skillProficiencies: selections.skillProficiencies,
       toolProficiencies: selections.creationToolProfs,
     },
     { race, characterClass }
   );
+
+  // Origin feat rides the resources.advancements array as a slot-exempt entry.
+  let resources: Prisma.InputJsonValue | undefined;
+  if (originEntry) {
+    const state = normalizeResourcesMutable(null);
+    state.advancements = [originEntry];
+    resources = serializeResourcesState(state);
+  }
 
   const created = await prisma.character.create({
     data: {
@@ -509,8 +638,9 @@ async function persistCreatedCharacter(
       alignment: input.alignment,
       portraitUrl: input.portraitUrl ?? null,
       experiencePoints: input.experiencePoints ?? 0,
-      abilityScores: input.abilityScores,
+      abilityScores: effectiveScores,
       ...derived,
+      ...(resources ? { resources } : {}),
       // toolProficiencies is ToolProficiencyEntry[] from srd/srd.ts; Prisma
       // expects InputJsonValue for Json columns — safe to cast here.
       toolProficiencies: derived.toolProficiencies as unknown as Prisma.InputJsonValue,
@@ -555,9 +685,12 @@ export async function createCharacter(
   const selections = await resolveSelections(input);
   if (!selections.ok) return selections;
 
+  const grants = resolveBackgroundGrants(input, selections.background);
+  if (!grants.ok) return grants;
+
   const equipment = await materializeStartingEquipment(input, selections.primaryClassChoice.name);
   if (!equipment.ok) return equipment;
 
-  const { id } = await persistCreatedCharacter(input, ownerId, selections, equipment);
+  const { id } = await persistCreatedCharacter(input, ownerId, selections, equipment, grants);
   return { ok: true, id };
 }

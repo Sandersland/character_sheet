@@ -47,11 +47,18 @@ describe("GET /api/reference", () => {
     expect(Array.isArray(fighter.toolChoices)).toBe(true);
     expect(typeof fighter.toolChoiceCount).toBe("number");
 
-    // Backgrounds expose granted tool profs.
+    // Backgrounds expose granted tool profs + the 2024 ability spread + Origin feat (#1130).
     const criminal = response.body.backgrounds.find((b: { name: string }) => b.name === "Criminal");
     expect(criminal).toBeDefined();
-    expect(criminal.toolProficiencies).toEqual(
-      expect.arrayContaining(["Thieves' Tools"])
-    );
+    expect(criminal.toolProficiencies).toEqual(["Thieves' Tools"]);
+    expect(criminal.abilityChoices).toEqual(["dexterity", "constitution", "intelligence"]);
+    expect(criminal.skillProficiencies).toEqual(["sleightOfHand", "stealth"]);
+    expect(criminal.originFeat).toMatchObject({ name: "Alert", category: "origin" });
+
+    // Folk Hero has no 2024 spec — spec-less legacy row kept (#1130).
+    const folkHero = response.body.backgrounds.find((b: { name: string }) => b.name === "Folk Hero");
+    expect(folkHero).toBeDefined();
+    expect(folkHero.abilityChoices).toEqual([]);
+    expect(folkHero.originFeat).toBeNull();
   });
 });

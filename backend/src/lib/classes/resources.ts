@@ -115,6 +115,9 @@ export interface AdvancementEntry {
   id: string;                            // per-character entry UUID (operation target)
   level: number;                         // character level when taken (informational)
   kind: "asi" | "feat";
+  /** PHB'24 Origin feat granted by a background (#1130): exempt from the ASI
+   *  slot cap and never reversed on level-down; can't be removed via the route. */
+  origin?: true;
   /** The raw score increases applied: e.g. { strength: 2 } or { dexterity: 1, constitution: 1 } */
   abilityDeltas: Record<string, number>;
   /** HP added to hitPoints.max/current (CON-mod change × hitDice.total). */
@@ -179,6 +182,32 @@ export function clampChoicesToCaps(
     if (cap > 0) clamped[key] = entries.slice(0, cap);
   }
   return { clamped, removedCount };
+}
+
+// Single source of the ASI-slot cap policy (#1130), shared by every clamp-on-read
+// and reconcile-on-write site. Origin feats (background grants) are always kept
+// and never consume a slot; non-origin ASIs/feats keep the earliest `slotTotal`
+// (LIFO — the tail beyond the cap becomes `excess`). `kept` preserves the
+// original order (origin entries stay interleaved); `usedSlots` counts only the
+// slot-consuming entries kept.
+export function splitAdvancementsBySlotCap(
+  advancements: AdvancementEntry[],
+  slotTotal: number,
+): { kept: AdvancementEntry[]; excess: AdvancementEntry[]; usedSlots: number } {
+  const kept: AdvancementEntry[] = [];
+  const excess: AdvancementEntry[] = [];
+  let usedSlots = 0;
+  for (const entry of advancements) {
+    if (entry.origin) {
+      kept.push(entry);
+    } else if (usedSlots < slotTotal) {
+      kept.push(entry);
+      usedSlots++;
+    } else {
+      excess.push(entry);
+    }
+  }
+  return { kept, excess, usedSlots };
 }
 
 // Normalizer: tolerant of null (character has never used any resources) and future schema
