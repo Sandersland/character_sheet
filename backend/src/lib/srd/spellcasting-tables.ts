@@ -268,8 +268,7 @@ export function derivePreparedSpellLimit(
 }
 
 // SRD 5.2 cantrips known, as [minLevel, count] breakpoints (highest applicable
-// wins). Paladin/Ranger prepare no cantrips. Data only for now — the level-up
-// cantrip step is wired in #1131.
+// wins). Paladin/Ranger prepare no cantrips. Drives levelUpCantripPicks (#1131).
 const CANTRIP_BREAKPOINTS: Readonly<Record<string, ReadonlyArray<readonly [number, number]>>> = {
   bard: [[1, 2], [4, 3], [10, 4]],
   cleric: [[1, 3], [4, 4], [10, 5]],
@@ -500,10 +499,24 @@ export function deriveSpellcasting(
  * other class re-prepares on a rest and offers no level-up pick (returns 0).
  */
 export function levelUpSpellPicks(className: string, level: number, subclass?: string | null): number {
-  if (className.toLowerCase() === "wizard") return level >= 2 ? 2 : 0;
+  // #1131: a fresh level-1 entry (creation or multiclass-add) picks its full
+  // prepared count — including re-prepare classes, which offer no picks after.
+  if (level <= 1) return preparedSpellCountAt(className, 1, subclass) ?? 0;
+  if (className.toLowerCase() === "wizard") return 2;
   if (swapCadenceFor(className, subclass) !== "onLevelUp") return 0;
   const now = preparedSpellCountAt(className, level, subclass) ?? 0;
-  const prev = level <= 1 ? 0 : preparedSpellCountAt(className, level - 1, subclass) ?? 0;
+  const prev = preparedSpellCountAt(className, level - 1, subclass) ?? 0;
+  return Math.max(0, now - prev);
+}
+
+/**
+ * Number of new cantrips a class offers on reaching `level` (SRD 5.2) — the
+ * cantrips-known delta from N-1 to N (full count at level 1). 0 for Paladin/Ranger
+ * and non-casters. #1131 wires this into the level-up newSpells step and creation.
+ */
+export function levelUpCantripPicks(className: string, level: number, subclass?: string | null): number {
+  const now = cantripsKnownAtLevel(className, level, subclass);
+  const prev = level <= 1 ? 0 : cantripsKnownAtLevel(className, level - 1, subclass);
   return Math.max(0, now - prev);
 }
 
