@@ -13,7 +13,7 @@ import supertest from "supertest";
 import { createApp } from "@/app.js";
 import { Prisma } from "@/generated/prisma/client.js";
 import { prisma } from "@/lib/core/prisma.js";
-import { SessionError, startSoloSession } from "@/lib/session/sessions.js";
+import { SessionError, startCampaignSession, startSoloSession } from "@/lib/session/sessions.js";
 import { ensureTestOwner } from "@/test-support/owner.js";
 import { authCookie } from "@/test-support/auth.js";
 
@@ -155,6 +155,51 @@ describe("POST /api/characters/:id/sessions — solo start", () => {
   it("403s another user's character", async () => {
     const res = await outsider().post(`/api/characters/${CHAR_SOLO}/sessions`).send({});
     expect(res.status).toBe(403);
+  });
+});
+
+describe("POST /api/characters/:id/sessions/:sessionId/end — solo end", () => {
+  it("200s { session } ended with summaries + recap and a sessionEnded event", async () => {
+    const started = await startSoloSession(CHAR_SOLO, "Lone Road");
+    const res = await agent().post(`/api/characters/${CHAR_SOLO}/sessions/${started.id}/end`).send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.session.status).toBe("ended");
+    expect(res.body.session.summary).not.toBeNull();
+    const participant = res.body.session.participants.find(
+      (p: { characterId: string }) => p.characterId === CHAR_SOLO,
+    );
+    expect(participant.summary).not.toBeNull();
+
+    const event = await prisma.characterEvent.findFirst({
+      where: { characterId: CHAR_SOLO, type: "sessionEnded", sessionId: started.id },
+    });
+    expect(event).not.toBeNull();
+  });
+
+  it("404s when the sessionId is a campaign session the character participates in", async () => {
+    const campaignId = await attachToCampaign(CHAR_CAMPAIGN);
+    const campaignSession = await startCampaignSession(campaignId, CHAR_CAMPAIGN);
+    const res = await agent()
+      .post(`/api/characters/${CHAR_CAMPAIGN}/sessions/${campaignSession.id}/end`)
+      .send({});
+    expect(res.status).toBe(404);
+  });
+
+  it("404s when the character is not a participant of the solo session", async () => {
+    const started = await startSoloSession(CHAR_SOLO);
+    const res = await agent()
+      .post(`/api/characters/${CHAR_CAMPAIGN}/sessions/${started.id}/end`)
+      .send({});
+    expect(res.status).toBe(404);
+  });
+
+  it("409s a second end of the same solo session", async () => {
+    const started = await startSoloSession(CHAR_SOLO);
+    await agent().post(`/api/characters/${CHAR_SOLO}/sessions/${started.id}/end`).send({});
+    const res = await agent().post(`/api/characters/${CHAR_SOLO}/sessions/${started.id}/end`).send({});
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/already ended/i);
   });
 });
 

@@ -51,6 +51,19 @@ async function assertSessionInCampaign(sessionId: string, campaignId: string): P
   }
 }
 
+// Verifies a solo (campaignId-null) session that the character participates in;
+// throws 404 otherwise (#1081). A campaign session — even one the character is in
+// — is invisible to the solo routes, so it 404s here.
+async function assertSoloSessionForCharacter(sessionId: string, characterId: string): Promise<void> {
+  const session = await prisma.session.findUnique({
+    where: { id: sessionId },
+    select: { campaignId: true, participants: { where: { characterId }, select: { id: true } } },
+  });
+  if (!session || session.campaignId !== null || session.participants.length === 0) {
+    throw new SessionError(`Session not found: ${sessionId}`, 404);
+  }
+}
+
 /**
  * POST /api/campaigns/:campaignId/sessions
  * Start a shared session with the given character as first participant. 409 if a
@@ -364,6 +377,19 @@ sessionsRouter.post("/characters/:id/sessions", async (req, res) => {
     include: characterInclude,
   });
   res.status(201).json({ session, character: serializeCharacter(updated) });
+});
+
+/**
+ * POST /api/characters/:id/sessions/:sessionId/end
+ * End the character's solo session (#1081). End-only semantics — no solo
+ * join/leave. 404 unless it's a campaignId-null session the character is in; 409
+ * if already ended (endSession). Returns { session }.
+ */
+sessionsRouter.post("/characters/:id/sessions/:sessionId/end", async (req, res) => {
+  await assertCharacterAccess(prisma, req.user!.id, req.params.id, "edit");
+  await assertSoloSessionForCharacter(req.params.sessionId, req.params.id);
+  const session = await endSession(req.params.sessionId);
+  res.json({ session });
 });
 
 /**
