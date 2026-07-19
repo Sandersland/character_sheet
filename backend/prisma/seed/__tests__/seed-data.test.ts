@@ -17,6 +17,7 @@ import { CHANNEL_DIVINITIES } from "../channel-divinity.js";
 import { FEATS } from "../feats.js";
 import { SPELLS } from "../spells.js";
 import { PACKS } from "../packs.js";
+import { SUBCLASS_GRANTED_SPELLS } from "../subclass-granted-spells.js";
 
 // The values that repeat when a list has a duplicate on `key`.
 const duplicates = <T>(values: T[]): T[] =>
@@ -97,5 +98,15 @@ describe("referential integrity", () => {
       .map((c) => c.itemName)
       .filter((name) => !itemNames.has(name));
     expect([...new Set(dangling)], "pack references an item missing from ITEMS").toEqual([]);
+  });
+
+  // 2024 rules: a subclass grants nothing before its choice level (#1128), so no
+  // granted-spell row may fire below the class's subclassLevel.
+  it("every SUBCLASS_GRANTED_SPELLS gateLevel is at least its class's subclassLevel", () => {
+    const subclassLevelByClass = new Map(CLASSES.map((c) => [c.name, c.subclassLevel]));
+    const early = SUBCLASS_GRANTED_SPELLS.filter(
+      (row) => row.gateLevel < (subclassLevelByClass.get(row.className) ?? 0),
+    ).map((row) => `${row.className}/${row.subclassName}/${row.spellName}@${row.gateLevel}`);
+    expect(early, "granted spell gated below its subclass grant level").toEqual([]);
   });
 });

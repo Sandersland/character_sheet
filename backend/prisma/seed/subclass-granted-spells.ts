@@ -8,7 +8,8 @@
 // The official Paladin oath / Cleric domain / Warlock patron lists are seeded
 // here (#913), referencing the L4–L5 catalog expansion (#912). Paladin oath
 // spells gate at levels 3/5/9/13/17 (CHA), Cleric domain + Warlock expanded
-// lists at 1/3/5/7/9 (Cleric WIS, Warlock CHA).
+// lists at 3/3/5/7/9 (Cleric WIS, Warlock CHA) — the 2024 subclass grant is 3
+// (#1128), so the former level-1 rows now fire at 3 pending the content resweep (#1133).
 
 export interface SubclassGrantedSpellSeed {
   /** Must match a CLASSES entry name. */
@@ -76,9 +77,9 @@ export const SUBCLASS_GRANTED_SPELLS: SubclassGrantedSpellSeed[] = [
   { className: "Paladin", subclassName: "Oath of Vengeance", spellName: "Hold Monster", gateLevel: 17, castingAbility: "charisma" },
   { className: "Paladin", subclassName: "Oath of Vengeance", spellName: "Scrying", gateLevel: 17, castingAbility: "charisma" },
 
-  // Life Domain (Cleric) — WIS, gated 1/3/5/7/9.
-  { className: "Cleric", subclassName: "Life Domain", spellName: "Bless", gateLevel: 1, castingAbility: "wisdom" },
-  { className: "Cleric", subclassName: "Life Domain", spellName: "Cure Wounds", gateLevel: 1, castingAbility: "wisdom" },
+  // Life Domain (Cleric) — WIS, gated 3/3/5/7/9 (#1128).
+  { className: "Cleric", subclassName: "Life Domain", spellName: "Bless", gateLevel: 3, castingAbility: "wisdom" },
+  { className: "Cleric", subclassName: "Life Domain", spellName: "Cure Wounds", gateLevel: 3, castingAbility: "wisdom" },
   { className: "Cleric", subclassName: "Life Domain", spellName: "Lesser Restoration", gateLevel: 3, castingAbility: "wisdom" },
   { className: "Cleric", subclassName: "Life Domain", spellName: "Spiritual Weapon", gateLevel: 3, castingAbility: "wisdom" },
   { className: "Cleric", subclassName: "Life Domain", spellName: "Beacon of Hope", gateLevel: 5, castingAbility: "wisdom" },
@@ -88,9 +89,9 @@ export const SUBCLASS_GRANTED_SPELLS: SubclassGrantedSpellSeed[] = [
   { className: "Cleric", subclassName: "Life Domain", spellName: "Mass Cure Wounds", gateLevel: 9, castingAbility: "wisdom" },
   { className: "Cleric", subclassName: "Life Domain", spellName: "Raise Dead", gateLevel: 9, castingAbility: "wisdom" },
 
-  // Trickery Domain (Cleric) — WIS, gated 1/3/5/7/9.
-  { className: "Cleric", subclassName: "Trickery Domain", spellName: "Charm Person", gateLevel: 1, castingAbility: "wisdom" },
-  { className: "Cleric", subclassName: "Trickery Domain", spellName: "Disguise Self", gateLevel: 1, castingAbility: "wisdom" },
+  // Trickery Domain (Cleric) — WIS, gated 3/3/5/7/9 (#1128).
+  { className: "Cleric", subclassName: "Trickery Domain", spellName: "Charm Person", gateLevel: 3, castingAbility: "wisdom" },
+  { className: "Cleric", subclassName: "Trickery Domain", spellName: "Disguise Self", gateLevel: 3, castingAbility: "wisdom" },
   { className: "Cleric", subclassName: "Trickery Domain", spellName: "Mirror Image", gateLevel: 3, castingAbility: "wisdom" },
   { className: "Cleric", subclassName: "Trickery Domain", spellName: "Pass without Trace", gateLevel: 3, castingAbility: "wisdom" },
   { className: "Cleric", subclassName: "Trickery Domain", spellName: "Blink", gateLevel: 5, castingAbility: "wisdom" },
@@ -100,9 +101,9 @@ export const SUBCLASS_GRANTED_SPELLS: SubclassGrantedSpellSeed[] = [
   { className: "Cleric", subclassName: "Trickery Domain", spellName: "Dominate Person", gateLevel: 9, castingAbility: "wisdom" },
   { className: "Cleric", subclassName: "Trickery Domain", spellName: "Modify Memory", gateLevel: 9, castingAbility: "wisdom" },
 
-  // The Fiend (Warlock) — CHA, gated 1/3/5/7/9.
-  { className: "Warlock", subclassName: "The Fiend", spellName: "Burning Hands", gateLevel: 1, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Fiend", spellName: "Command", gateLevel: 1, castingAbility: "charisma" },
+  // The Fiend (Warlock) — CHA, gated 3/3/5/7/9 (#1128).
+  { className: "Warlock", subclassName: "The Fiend", spellName: "Burning Hands", gateLevel: 3, castingAbility: "charisma" },
+  { className: "Warlock", subclassName: "The Fiend", spellName: "Command", gateLevel: 3, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Fiend", spellName: "Blindness/Deafness", gateLevel: 3, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Fiend", spellName: "Scorching Ray", gateLevel: 3, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Fiend", spellName: "Fireball", gateLevel: 5, castingAbility: "charisma" },
@@ -112,9 +113,9 @@ export const SUBCLASS_GRANTED_SPELLS: SubclassGrantedSpellSeed[] = [
   { className: "Warlock", subclassName: "The Fiend", spellName: "Flame Strike", gateLevel: 9, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Fiend", spellName: "Hallow", gateLevel: 9, castingAbility: "charisma" },
 
-  // The Archfey (Warlock) — CHA, gated 1/3/5/7/9.
-  { className: "Warlock", subclassName: "The Archfey", spellName: "Faerie Fire", gateLevel: 1, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Archfey", spellName: "Sleep", gateLevel: 1, castingAbility: "charisma" },
+  // The Archfey (Warlock) — CHA, gated 3/3/5/7/9 (#1128).
+  { className: "Warlock", subclassName: "The Archfey", spellName: "Faerie Fire", gateLevel: 3, castingAbility: "charisma" },
+  { className: "Warlock", subclassName: "The Archfey", spellName: "Sleep", gateLevel: 3, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Archfey", spellName: "Calm Emotions", gateLevel: 3, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Archfey", spellName: "Phantasmal Force", gateLevel: 3, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Archfey", spellName: "Blink", gateLevel: 5, castingAbility: "charisma" },
@@ -124,9 +125,9 @@ export const SUBCLASS_GRANTED_SPELLS: SubclassGrantedSpellSeed[] = [
   { className: "Warlock", subclassName: "The Archfey", spellName: "Dominate Person", gateLevel: 9, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Archfey", spellName: "Seeming", gateLevel: 9, castingAbility: "charisma" },
 
-  // The Great Old One (Warlock) — CHA, gated 1/3/5/7/9.
-  { className: "Warlock", subclassName: "The Great Old One", spellName: "Dissonant Whispers", gateLevel: 1, castingAbility: "charisma" },
-  { className: "Warlock", subclassName: "The Great Old One", spellName: "Tasha's Hideous Laughter", gateLevel: 1, castingAbility: "charisma" },
+  // The Great Old One (Warlock) — CHA, gated 3/3/5/7/9 (#1128).
+  { className: "Warlock", subclassName: "The Great Old One", spellName: "Dissonant Whispers", gateLevel: 3, castingAbility: "charisma" },
+  { className: "Warlock", subclassName: "The Great Old One", spellName: "Tasha's Hideous Laughter", gateLevel: 3, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Great Old One", spellName: "Detect Thoughts", gateLevel: 3, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Great Old One", spellName: "Phantasmal Force", gateLevel: 3, castingAbility: "charisma" },
   { className: "Warlock", subclassName: "The Great Old One", spellName: "Clairvoyance", gateLevel: 5, castingAbility: "charisma" },
