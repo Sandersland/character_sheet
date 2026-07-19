@@ -7,7 +7,7 @@ import {
   deriveFeatBonuses,
   hitDieFace,
 } from "@/lib/srd/srd.js";
-import { normalizeResourcesMutable } from "@/lib/classes/resources.js";
+import { normalizeResourcesMutable, splitAdvancementsBySlotCap } from "@/lib/classes/resources.js";
 import {
   InvalidHitPointOperationError,
   normalizeHitPoints,
@@ -30,6 +30,7 @@ export interface HpOpContext {
     spellcasting: Prisma.JsonValue;
     resources: Prisma.JsonValue;
     activeEffects: Prisma.JsonValue;
+    conditions: Prisma.JsonValue;
     classEntries: ClassEntryRow[];
     // Union of three shapes over the same rows: castSpell rest-reset (#528: capability
     // id + used), grant derivation (#529: GrantItem name/requiresAttunement), and the
@@ -84,6 +85,7 @@ export async function buildHpOpContext(
       spellcasting: true,
       resources: true,
       activeEffects: true,
+      conditions: true,
       // Selected fields feed two seams: id + capabilities (with used) for the
       // castSpell rest reset (#528), and name/requiresAttunement + capabilities
       // for item-granted resistances (#529, feeding the #456 halve flow below).
@@ -132,7 +134,9 @@ export async function buildHpOpContext(
     primaryEntry?.name ?? "",
     levelForExperience(row.experiencePoints),
   );
-  const featBonus = deriveFeatBonuses(advStateForFeat.advancements.slice(0, featSlotCap), hd.total);
+  // Origin feats are kept regardless of the slot cap (#1130).
+  const { kept: inCapAdvancements } = splitAdvancementsBySlotCap(advStateForFeat.advancements, featSlotCap);
+  const featBonus = deriveFeatBonuses(inCapAdvancements, hd.total);
   // effMax is used for all clamp/ceiling operations instead of hp.max.
   // hp.max is the stored (feat-free) base and is what gets persisted.
   const effMax = hp.max + featBonus.maxHp;

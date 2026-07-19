@@ -44,7 +44,7 @@ const reference: ReferenceData = {
   races: [{ id: "race-1", name: "Elf", speed: 30, toolProficiencies: [] }],
   classes: [makeClass()],
   backgrounds: [
-    { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [] },
+    { id: "bg-1", name: "Sage", skillProficiencies: ["perception"], toolProficiencies: [], abilityChoices: [], originFeat: null },
   ],
   alignments: ["Neutral Good"],
   artisanTools: [],
@@ -80,6 +80,7 @@ function seedDraft(overrides: Partial<CharacterDraft>) {
       wisdom: 10,
       charisma: 10,
     },
+    backgroundAbilities: {},
     skillProficiencies: [],
     toolChoices: [],
     cantripIds: [],

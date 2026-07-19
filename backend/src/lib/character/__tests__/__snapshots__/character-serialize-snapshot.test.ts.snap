@@ -437,8 +437,27 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
       "source": "Poisoned",
     },
     {
+      "kind": "attack",
+      "mode": "flat",
+      "modifier": -4,
+      "source": "Exhaustion",
+    },
+    {
       "kind": "check",
-      "mode": "disadvantage",
+      "mode": "flat",
+      "modifier": -4,
+      "source": "Exhaustion",
+    },
+    {
+      "kind": "save",
+      "mode": "flat",
+      "modifier": -4,
+      "source": "Exhaustion",
+    },
+    {
+      "kind": "initiative",
+      "mode": "flat",
+      "modifier": -4,
       "source": "Exhaustion",
     },
     {
@@ -481,7 +500,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     },
   ],
   "sneakAttack": null,
-  "speed": 40,
+  "speed": 30,
   "spellcasting": {
     "ability": "intelligence",
     "arcana": [],

@@ -65,8 +65,10 @@ describe("exhaustion helpers", () => {
     expect(exhaustionLabel(-5)).toBe("Exhaustion 0");
   });
 
-  it("returns cumulative effect text per level", () => {
+  it("computes the flat 2024 effect text per level (#1136)", () => {
     expect(exhaustionEffect(0)).toBe("No exhaustion.");
+    expect(exhaustionEffect(1)).toBe("−2 on d20 Tests; Speed −5 ft.");
+    expect(exhaustionEffect(3)).toBe("−6 on d20 Tests; Speed −15 ft.");
     expect(exhaustionEffect(6)).toBe("Death.");
     expect(exhaustionEffect(99)).toBe("Death.");
   });

@@ -206,6 +206,42 @@ describe("POST /api/characters/:id/hp", () => {
     expect(res.body.hitDice.spent).toBe(0);
   });
 
+  it("longRest: removes exactly 1 exhaustion level (#1136)", async () => {
+    await prisma.character.update({
+      where: { id: FIXTURE.id },
+      data: { conditions: { active: [], exhaustion: 3 } },
+    });
+    const res = await post(FIXTURE.id, { operations: [{ type: "longRest" }] });
+    expect(res.status).toBe(200);
+    expect(res.body.conditions.exhaustion).toBe(2);
+  });
+
+  it("longRest: leaves exhaustion 0 untouched (no decrement below 0) (#1136)", async () => {
+    const res = await post(FIXTURE.id, { operations: [{ type: "longRest" }] });
+    expect(res.status).toBe(200);
+    expect(res.body.conditions.exhaustion).toBe(0);
+    // No exhaustion part in the long-rest summary.
+    const activity = await supertest(app).get(`/api/characters/${FIXTURE.id}/activity`).set("Cookie", COOKIE);
+    const ev = (activity.body as Array<{ type: string; summary: string }>).find((e) => e.type === "longRest")!;
+    expect(ev.summary).not.toMatch(/[Ee]xhaustion/);
+  });
+
+  it("longRest → undo restores the exhaustion level cleared by the rest (#1136)", async () => {
+    await prisma.character.update({
+      where: { id: FIXTURE.id },
+      data: { conditions: { active: [], exhaustion: 3 } },
+    });
+    await post(FIXTURE.id, { operations: [{ type: "longRest" }] });
+    const activity = await supertest(app).get(`/api/characters/${FIXTURE.id}/activity`).set("Cookie", COOKIE);
+    const ev = (activity.body as Array<{ type: string; reverted: boolean; batchId?: string; summary: string }>)
+      .find((e) => e.type === "longRest" && !e.reverted)!;
+    expect(ev.summary).toMatch(/Exhaustion −1 \(now 2\)/);
+
+    const undo = await supertest(app).post(`/api/characters/${FIXTURE.id}/events/${ev.batchId}/revert`).set("Cookie", COOKIE);
+    expect(undo.status).toBe(200);
+    expect(undo.body.conditions.exhaustion).toBe(3);
+  });
+
   // ── levelUp ──────────────────────────────────────────────────────────────
 
   it("levelUp (average): increments total, bumps max+current by fixed average+conMod", async () => {

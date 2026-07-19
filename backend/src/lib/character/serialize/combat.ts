@@ -12,6 +12,7 @@ import {
   type BodyArmorCategory,
   type FightingStyleKey,
 } from "@/lib/srd/srd.js";
+import { exhaustionSpeedPenalty } from "@/lib/srd/condition-data.js";
 import type { AdvancementEntry } from "@/lib/classes/resources.js";
 import type { CharacterWithRelations } from "@/lib/character/character-include.js";
 import type { TargetModifierMap } from "./effects.js";
@@ -125,13 +126,15 @@ function classEntryLevel(row: CharacterWithRelations, className: string): number
 // into each other): feat speed bonuses, Monk Unarmored Movement (monk class
 // level, unarmored & unshielded), Barbarian Fast Movement (barbarian class
 // level 5+, not in heavy armor), and any active "speed"-targeted buff
-// (e.g. Boots of Speed, #543).
+// (e.g. Boots of Speed, #543), then reduced by exhaustion (−5 ft×level, floored
+// at 0 — SRD 5.2).
 export function buildSpeedView(
   row: CharacterWithRelations,
   bestArmor: BestBodyArmor,
   hasShield: boolean,
   featBonuses: ReturnType<typeof deriveFeatBonuses>,
   buffTargets: TargetModifierMap,
+  exhaustionLevel: number,
 ): number {
   const unarmoredMovementBonus = deriveUnarmoredMovement({
     monkLevel: classEntryLevel(row, "monk"),
@@ -142,13 +145,13 @@ export function buildSpeedView(
     barbarianLevel: classEntryLevel(row, "barbarian"),
     wearingHeavyArmor: bestArmor?.armorCategory === "heavy",
   });
-  return (
+  const sum =
     row.speed +
     featBonuses.speed +
     unarmoredMovementBonus +
     fastMovementBonus +
-    (buffTargets["speed"] ?? []).reduce((sum, b) => sum + b.modifier, 0)
-  );
+    (buffTargets["speed"] ?? []).reduce((sum, b) => sum + b.modifier, 0);
+  return Math.max(0, sum - exhaustionSpeedPenalty(exhaustionLevel));
 }
 
 // Unarmed strike + improvised weapon rows. Derived from the same clamped

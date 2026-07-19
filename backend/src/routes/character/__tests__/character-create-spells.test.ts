@@ -55,6 +55,29 @@ describe("POST /api/characters — creation spell/cantrip picks (#1131)", () => 
     expect(res.body.spellcasting.preparedSpellCount).toBe(2);
   });
 
+  // #1131 × #1130: the two creation features must compose in one create body — a
+  // caster with BOTH a background ability spread AND spell picks gets both applied.
+  it("applies a background ability spread AND spell picks in one create body", async () => {
+    const picks = await warlockPicks();
+    const res = await create({
+      ...BASE, // Sage draws its +2/+1 spread from Con/Int/Wis and grants Magic Initiate.
+      name: "CreateSpells Composed",
+      classes: [{ name: "Warlock" }],
+      backgroundAbilities: { intelligence: 2, constitution: 1 },
+      spells: picks,
+    });
+
+    expect(res.status).toBe(201);
+    // Background spread baked into the effective scores (base int 10→12, con 14→15).
+    expect(res.body.abilityScores.intelligence).toBe(12);
+    expect(res.body.abilityScores.constitution).toBe(15);
+    // Origin feat rides the advancements array, separate from the spell blob.
+    expect(res.body.advancements).toHaveLength(1);
+    expect(res.body.advancements[0]).toMatchObject({ origin: true, kind: "feat" });
+    // Spell picks land in the book unperturbed by the background grant.
+    expect(res.body.spellcasting.spells).toHaveLength(4);
+  });
+
   it("rejects wrong counts with the expected numbers", async () => {
     const picks = await warlockPicks();
     const res = await create({

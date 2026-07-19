@@ -75,7 +75,23 @@ const referenceFixture: ReferenceData = {
     },
   ],
   backgrounds: [
-    { id: "bg-sage", name: "Sage", skillProficiencies: ["history"], toolProficiencies: [] },
+    { id: "bg-sage", name: "Sage", skillProficiencies: ["history"], toolProficiencies: [], abilityChoices: [], originFeat: null },
+    {
+      id: "bg-crim",
+      name: "Criminal",
+      skillProficiencies: ["stealth"],
+      toolProficiencies: ["Thieves' Tools"],
+      abilityChoices: ["dexterity", "constitution", "intelligence"],
+      originFeat: { id: "feat-alert", name: "Alert", description: "You gain a bonus to Initiative.", category: "origin" },
+    },
+    {
+      id: "bg-soldier",
+      name: "Soldier",
+      skillProficiencies: ["athletics"],
+      toolProficiencies: ["Dice Set"],
+      abilityChoices: ["strength", "dexterity", "constitution"],
+      originFeat: { id: "feat-savage", name: "Savage Attacker", description: "Reroll weapon damage.", category: "origin" },
+    },
   ],
   alignments: ["Lawful Good"],
   artisanTools: [{ name: "Smith's Tools", category: "artisan" }],
@@ -164,5 +180,52 @@ describe("CharacterCreatePage (#253)", () => {
     renderPage();
     await user.selectOptions(await screen.findByLabelText(/class/i), "Fighter");
     expect(screen.queryByRole("heading", { name: "Spells" })).not.toBeInTheDocument();
+  });
+
+  it("surfaces the ability spread + origin feat for a specced background and hides it on reset (#1130)", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByLabelText(/name/i);
+
+    await user.selectOptions(screen.getByLabelText("Background"), "Criminal");
+    expect(screen.getByRole("button", { name: "+2 / +1" })).toBeInTheDocument();
+    expect(screen.getByText(/Origin feat: Alert/i)).toBeInTheDocument();
+
+    // Switching to a spec-less background removes the section (draft reset).
+    await user.selectOptions(screen.getByLabelText("Background"), "Sage");
+    expect(screen.queryByRole("button", { name: "+2 / +1" })).not.toBeInTheDocument();
+  });
+
+  it("resets the spread mode when switching between two specced backgrounds (#1130)", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByLabelText(/name/i);
+
+    // Pick Criminal, switch to the +1/+1/+1 mode (which looks complete).
+    await user.selectOptions(screen.getByLabelText("Background"), "Criminal");
+    await user.click(screen.getByRole("button", { name: "+1 / +1 / +1" }));
+    expect(screen.getByRole("button", { name: "+1 / +1 / +1" })).toHaveAttribute("aria-pressed", "true");
+
+    // Switching to another specced background must remount the picker back to the
+    // default +2/+1 mode — not leave the stale "+1/+1/+1" selection showing.
+    await user.selectOptions(screen.getByLabelText("Background"), "Soldier");
+    expect(screen.getByText("Origin feat: Savage Attacker")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "+2 / +1" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "+1 / +1 / +1" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("keeps the +2/+1 selections when the already-active mode button is clicked (#1130)", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByLabelText(/name/i);
+
+    await user.selectOptions(screen.getByLabelText("Background"), "Criminal");
+    await user.selectOptions(screen.getByLabelText(/\+2 to/), "dexterity");
+    await user.selectOptions(screen.getByLabelText(/\+1 to/), "intelligence");
+
+    // Re-clicking the already-active "+2 / +1" mode must be a no-op, not a wipe.
+    await user.click(screen.getByRole("button", { name: "+2 / +1" }));
+    expect((screen.getByLabelText(/\+2 to/) as HTMLSelectElement).value).toBe("dexterity");
+    expect((screen.getByLabelText(/\+1 to/) as HTMLSelectElement).value).toBe("intelligence");
   });
 });

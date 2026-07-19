@@ -631,6 +631,11 @@ model Background {
   name               String   @unique
   skillProficiencies String[]
   toolProficiencies  String[] @default([])
+  // PHB'24: each background grants +3 ability points across these three abilities
+  // (2+1 or 1+1+1) plus one Origin feat. Empty/null for spec-less 2014 legacy rows.
+  abilityChoices     String[] @default([])
+  originFeatId       String?
+  originFeat         Feat?    @relation(fields: [originFeatId], references: [id], onDelete: SetNull)
 
   selections CharacterBackground[]
 }
@@ -967,6 +972,9 @@ model Feat {
   abilityOptions    String[]     @default([]) // abilities the player may raise by abilityIncrease
   abilityIncrease   Int          @default(0)  // usually 1 for half-feats
   improvements      Json         @default("[]") // FeatImprovement[]: { target, amount, perLevel? }
+
+  // Backgrounds that grant this feat as their Origin feat (PHB'24).
+  originForBackgrounds Background[]
 }
 
 // Baseline spell catalog — same catalog-table role as Item above. Seeded from
