@@ -7,6 +7,7 @@ import AbilityScoreStep from "@/features/level-up/AbilityScoreStep";
 import ChoiceStep from "@/features/level-up/ChoiceStep";
 import HitPointsStep from "@/features/level-up/HitPointsStep";
 import LevelUpStepPlaceholder from "@/features/level-up/LevelUpStepPlaceholder";
+import NewSpellsStep from "@/features/level-up/NewSpellsStep";
 import ReviewStep from "@/features/level-up/ReviewStep";
 import StepRail from "@/features/level-up/StepRail";
 import SubclassStep from "@/features/level-up/SubclassStep";
@@ -41,6 +42,7 @@ const STEP_BODIES: Partial<Record<LevelUpStepKind, React.ComponentType<{ step: L
   toolProficiency: ChoiceStep,
   disciplines: ChoiceStep,
   subclass: SubclassStep,
+  newSpells: NewSpellsStep,
   review: ReviewStep,
 };
 
