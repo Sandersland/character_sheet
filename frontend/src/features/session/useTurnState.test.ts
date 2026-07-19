@@ -1225,3 +1225,38 @@ describe("nullable sessionId (workspace provider, #959)", () => {
     expect(result.current).toBeNull();
   });
 });
+
+describe("Sneak Attack once-per-turn guard (#902)", () => {
+  it("markSneakAttackUsed sets the flag; idempotent within a turn", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+    expect(result.current.sneakAttackUsedThisTurn).toBe(false);
+
+    act(() => { result.current.markSneakAttackUsed(); });
+    expect(result.current.sneakAttackUsedThisTurn).toBe(true);
+    act(() => { result.current.markSneakAttackUsed(); });
+    expect(result.current.sneakAttackUsedThisTurn).toBe(true);
+  });
+
+  it("resets on endTurn, the next startTurn, and endCombat (create/cleanup symmetry)", () => {
+    const { result } = renderHook(() => useTurnState(makeCharacter(), SESSION_ID));
+    act(() => { result.current.startCombat(); });
+    act(() => { result.current.startTurn(); });
+
+    act(() => { result.current.markSneakAttackUsed(); });
+    act(() => { result.current.endTurn(); });
+    expect(result.current.sneakAttackUsedThisTurn).toBe(false);
+
+    // A fresh turn, set again, then cleared by the next startTurn.
+    act(() => { result.current.startTurn(); });
+    act(() => { result.current.markSneakAttackUsed(); });
+    act(() => { result.current.startTurn(); });
+    expect(result.current.sneakAttackUsedThisTurn).toBe(false);
+
+    // endCombat wipes it too.
+    act(() => { result.current.markSneakAttackUsed(); });
+    act(() => { result.current.endCombat(); });
+    expect(result.current.sneakAttackUsedThisTurn).toBe(false);
+  });
+});
