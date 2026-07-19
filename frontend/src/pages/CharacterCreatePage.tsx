@@ -79,6 +79,9 @@ export default function CharacterCreatePage() {
 
             {backgroundBonuses.applicable ? (
               <BackgroundBonusesSection
+                // Remount on background switch so the local spread-mode state can't
+                // outlive the cleared assignment and mislead the user (#1130).
+                key={draft.background}
                 bonuses={backgroundBonuses}
                 onChange={(assignment) => update({ backgroundAbilities: assignment })}
               />

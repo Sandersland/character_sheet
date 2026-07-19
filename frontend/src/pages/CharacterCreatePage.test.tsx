@@ -58,6 +58,14 @@ const referenceFixture: ReferenceData = {
       abilityChoices: ["dexterity", "constitution", "intelligence"],
       originFeat: { id: "feat-alert", name: "Alert", description: "You gain a bonus to Initiative.", category: "origin" },
     },
+    {
+      id: "bg-soldier",
+      name: "Soldier",
+      skillProficiencies: ["athletics"],
+      toolProficiencies: ["Dice Set"],
+      abilityChoices: ["strength", "dexterity", "constitution"],
+      originFeat: { id: "feat-savage", name: "Savage Attacker", description: "Reroll weapon damage.", category: "origin" },
+    },
   ],
   alignments: ["Lawful Good"],
   artisanTools: [{ name: "Smith's Tools", category: "artisan" }],
@@ -140,5 +148,23 @@ describe("CharacterCreatePage (#253)", () => {
     // Switching to a spec-less background removes the section (draft reset).
     await user.selectOptions(screen.getByLabelText("Background"), "Sage");
     expect(screen.queryByRole("button", { name: "+2 / +1" })).not.toBeInTheDocument();
+  });
+
+  it("resets the spread mode when switching between two specced backgrounds (#1130)", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByLabelText(/name/i);
+
+    // Pick Criminal, switch to the +1/+1/+1 mode (which looks complete).
+    await user.selectOptions(screen.getByLabelText("Background"), "Criminal");
+    await user.click(screen.getByRole("button", { name: "+1 / +1 / +1" }));
+    expect(screen.getByRole("button", { name: "+1 / +1 / +1" })).toHaveAttribute("aria-pressed", "true");
+
+    // Switching to another specced background must remount the picker back to the
+    // default +2/+1 mode — not leave the stale "+1/+1/+1" selection showing.
+    await user.selectOptions(screen.getByLabelText("Background"), "Soldier");
+    expect(screen.getByText("Origin feat: Savage Attacker")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "+2 / +1" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "+1 / +1 / +1" })).toHaveAttribute("aria-pressed", "false");
   });
 });

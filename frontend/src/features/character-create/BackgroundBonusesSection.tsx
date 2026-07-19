@@ -78,7 +78,7 @@ export default function BackgroundBonusesSection({ bonuses, onChange }: Backgrou
               <select className={SELECT_CLASS} value={plusTwo ?? ""} onChange={(e) => setPlusTwo(e.target.value as AbilityName)}>
                 <option value="">Select ability…</option>
                 {abilities.map((a) => (
-                  <option key={a} value={a}>
+                  <option key={a} value={a} disabled={a === plusOne}>
                     {abilityLabel(a)}
                   </option>
                 ))}

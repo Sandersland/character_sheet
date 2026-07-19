@@ -532,6 +532,15 @@ describe("characters routes", () => {
         expect(res.body.initiativeBonus).toBe(4);
       });
 
+      it("applies a +1/+1/+1 spread across all three abilities", async () => {
+        const res = await post({ ...criminalBody, backgroundAbilities: { dexterity: 1, constitution: 1, intelligence: 1 } });
+        expect(res.status).toBe(201);
+        createdCharacterIds.push(res.body.id);
+        expect(res.body.abilityScores.dexterity).toBe(14);
+        expect(res.body.abilityScores.constitution).toBe(15);
+        expect(res.body.abilityScores.intelligence).toBe(13);
+      });
+
       it("a CON-touching spread raises level-1 max HP", async () => {
         const res = await post({ ...criminalBody, backgroundAbilities: { constitution: 2, dexterity: 1 } });
         expect(res.status).toBe(201);
@@ -558,7 +567,9 @@ describe("characters routes", () => {
       it.each([
         ["a single +3", { dexterity: 3 }],
         ["+2/+2 (sum 4)", { dexterity: 2, constitution: 2 }],
-        ["four +1s", { dexterity: 1, constitution: 1, intelligence: 1, strength: 1 }],
+        // All three are in Criminal's choices but sum to 4 → exercises the shape
+        // check itself (not the choices-membership short-circuit).
+        ["in-choices sum 4 (1/1/2)", { dexterity: 1, constitution: 1, intelligence: 2 }],
       ])("rejects an illegal shape (%s) with 400", async (_label, backgroundAbilities) => {
         const res = await post({ ...criminalBody, backgroundAbilities });
         expect(res.status).toBe(400);
