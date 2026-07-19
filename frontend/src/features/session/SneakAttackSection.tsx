@@ -10,30 +10,30 @@ import type { TurnState, TurnStateActions } from "@/features/session/useTurnStat
 import type { AttackTallyRow } from "@/lib/attackTallySummary";
 import type { Character } from "@/types/character";
 
-interface SneakAttackSectionProps {
-  character: Character;
-  turnState: TurnState & TurnStateActions;
-  /** The current hit row the roll folds into; null before a hit lands. */
-  currentRow: AttackTallyRow | null;
-  onUpdate: (c: Character) => void;
+// Why the roll button is disabled, in priority order — surfaced as its tooltip.
+function rollBlockedReason(
+  currentRow: AttackTallyRow | null,
+  used: boolean,
+  eligible: boolean,
+): string | undefined {
+  if (currentRow === null) return "Roll a hit first";
+  if (used) return "Already used this turn";
+  if (!eligible) return "Confirm eligibility first";
+  return undefined;
 }
 
-export default function SneakAttackSection({
-  character,
-  turnState,
-  currentRow,
-  onUpdate,
-}: SneakAttackSectionProps) {
-  const { sneakAttack } = character;
-  const [eligible, setEligible] = useState(false);
+// Roll state + the server round-trip: the server rolls the Nd6 and enforces
+// once-per-turn; the result folds into the bound hit row's damage riders.
+function useSneakAttackRoll(
+  character: Character,
+  turnState: TurnState & TurnStateActions,
+  currentRow: AttackTallyRow | null,
+  eligible: boolean,
+  onUpdate: (c: Character) => void,
+) {
   const [busy, setBusy] = useState(false);
   const [rolled, setRolled] = useState<number | null>(null);
-
-  // Only rogues have Sneak Attack; nothing to fold into until a hit lands.
-  if (!sneakAttack) return null;
-
   const used = turnState.sneakAttackUsedThisTurn;
-  const label = `${sneakAttack.dice}d${sneakAttack.faces}`;
   const canRoll = eligible && !used && !busy && currentRow !== null;
 
   async function handleRoll() {
@@ -54,6 +54,38 @@ export default function SneakAttackSection({
       setBusy(false);
     }
   }
+
+  return { used, canRoll, rolled, handleRoll };
+}
+
+interface SneakAttackSectionProps {
+  character: Character;
+  turnState: TurnState & TurnStateActions;
+  /** The current hit row the roll folds into; null before a hit lands. */
+  currentRow: AttackTallyRow | null;
+  onUpdate: (c: Character) => void;
+}
+
+export default function SneakAttackSection({
+  character,
+  turnState,
+  currentRow,
+  onUpdate,
+}: SneakAttackSectionProps) {
+  const { sneakAttack } = character;
+  const [eligible, setEligible] = useState(false);
+  const { used, canRoll, rolled, handleRoll } = useSneakAttackRoll(
+    character,
+    turnState,
+    currentRow,
+    eligible,
+    onUpdate,
+  );
+
+  // Only rogues have Sneak Attack; nothing to fold into until a hit lands.
+  if (!sneakAttack) return null;
+
+  const label = `${sneakAttack.dice}d${sneakAttack.faces}`;
 
   return (
     <div className="flex flex-col gap-1.5 rounded-control border border-gold-200 bg-gold-50 p-2">
@@ -80,15 +112,7 @@ export default function SneakAttackSection({
           type="button"
           disabled={!canRoll}
           onClick={handleRoll}
-          title={
-            currentRow === null
-              ? "Roll a hit first"
-              : used
-                ? "Already used this turn"
-                : !eligible
-                  ? "Confirm eligibility first"
-                  : undefined
-          }
+          title={rollBlockedReason(currentRow, used, eligible)}
           className="rounded-control border border-gold-300 bg-gold-100 px-2.5 py-1 text-xs font-semibold text-gold-800 transition-colors hover:bg-gold-200 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Roll Sneak Attack ({label})
