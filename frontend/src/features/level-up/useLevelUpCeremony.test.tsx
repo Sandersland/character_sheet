@@ -21,6 +21,7 @@ function plan(steps: LevelUpStep[], target?: Partial<LevelUpPlanResponse["target
   return {
     target: { className: "fighter", subclass: "Champion", newLevel: 8, isPrimary: true, ...target },
     steps,
+    grantedSpells: [],
   };
 }
 
@@ -147,6 +148,28 @@ describe("useLevelUpCeremony", () => {
     expect(submitMock).toHaveBeenCalledTimes(1);
     expect(submitMock).toHaveBeenCalledWith("c1", {
       target: { kind: "existing", classEntryId: "entry-1" },
+      hp: { method: "average" },
+    });
+  });
+
+  it("honors ?classId= for a multiclass add — plans and submits {kind:'new'} (#1131)", async () => {
+    planMock.mockResolvedValue(
+      plan([{ kind: "hitPoints" }, { kind: "review" }], { isPrimary: false, newLevel: 1, className: "warlock" }),
+    );
+    submitMock.mockResolvedValue({ id: "c1" } as Character);
+    const { result } = renderHook(() => useLevelUpCeremony(character), {
+      wrapper: makeWrapper("/characters/c1/level-up?classId=class-warlock"),
+    });
+
+    await waitFor(() =>
+      expect(planMock).toHaveBeenCalledWith("c1", { kind: "new", classId: "class-warlock" }, undefined),
+    );
+
+    act(() => result.current.setDraft((d) => ({ ...d, hp: { method: "average" } })));
+    await act(() => result.current.confirm());
+
+    expect(submitMock).toHaveBeenCalledWith("c1", {
+      target: { kind: "new", classId: "class-warlock" },
       hp: { method: "average" },
     });
   });

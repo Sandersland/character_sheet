@@ -28,11 +28,13 @@ import {
   snapshotResources,
   normalizeResourcesMutable,
   serializeResourcesState,
+  splitAdvancementsBySlotCap,
   type AdvancementEntry,
   type FeatImprovement,
   type ResourcesMutableState,
 } from "@/lib/classes/resources.js";
-import { advancementSlotsForLevel, abilityModifier } from "@/lib/srd/srd.js";
+import { advancementSlotsForLevel, abilityModifier, characterFightingStyleFeatSlots } from "@/lib/srd/srd.js";
+import { featOfferedForAsiSlot, type FeatCategory } from "@/lib/srd/feats.js";
 import { normalizeHitPoints, normalizeHitDice, type HitPoints, type HitDice } from "@/lib/combat/hitpoints.js";
 
 export class InvalidAdvancementOperationError extends Error {}
@@ -41,7 +43,9 @@ const ABILITY_NAMES = new Set([
   "strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma",
 ]);
 
-const ABILITY_CAP = 20;
+export const ABILITY_CAP = 20;
+// PHB'24: Epic Boon feats raise an ability score to a maximum of 30, not 20.
+const ABILITY_CAP_EPIC_BOON = 30;
 
 /**
  * Computes the effect of applying `abilityDeltas` to `scores`.
@@ -106,6 +110,7 @@ export function reverseAdvancementEffects(
   return { scores: newScores, hitPoints: newHp, initiativeBonus: newInit };
 }
 
+// fallow-ignore-next-line code-duplication -- advancement operation types intentionally mirror the frontend wire types (types/character/leveling.ts); cross-workspace clone, shared-types consolidation is #820
 export interface TakeAsiOperation {
   type: "takeAsi";
   /** One or two increases summing to exactly 2, each capped at 1 or 2. */
@@ -131,6 +136,12 @@ export interface TakeFeatOperation {
   };
   /** Required when taking a half-feat (catalog or custom) with abilityOptions. */
   abilityChoice?: string;
+  /**
+   * Fighting Style feat channel (#1137): when "fightingStyle", the feat consumes
+   * a fightingStyle slot (its own cap), requires category fighting_style or a
+   * custom feat, and dedups against styles already taken. Absent ⇒ ASI slot.
+   */
+  slot?: "fightingStyle";
 }
 
 export interface RemoveAdvancementOperation {
@@ -155,6 +166,8 @@ interface AdvancementOpContext {
   state: ResourcesMutableState;
   level: number;
   totalSlots: number;
+  /** Fighting Style feat cap across all class entries (#1137). */
+  fightingStyleSlotTotal: number;
 }
 
 /**
@@ -186,15 +199,29 @@ function snapshotAdvancementState(
     abilityScores: { ...scores },
     hitPoints: { ...hp, deathSaves: { ...hp.deathSaves } },
     initiativeBonus: initBonus,
-    // Full resources snapshot (incl. fightingStyle) so revert can't wipe it (#818).
+    // Full resources snapshot (incl. all advancements) so revert can't wipe it (#818).
     resources: snapshotResources(state),
   };
 }
 
-function assertSlotAvailable(state: ResourcesMutableState, totalSlots: number): void {
-  if (state.advancements.length >= totalSlots) {
+// Gates the correct partition: an ASI/general feat against totalSlots, a Fighting
+// Style feat (#1137) against its own fightingStyleSlotTotal. Origin feats occupy
+// neither cap (#1130).
+function assertSlotAvailable(ctx: AdvancementOpContext, isFightingStyleSlot: boolean): void {
+  const { usedSlots, usedFightingStyleSlots } = splitAdvancementsBySlotCap(
+    ctx.state.advancements,
+    ctx.totalSlots,
+    ctx.fightingStyleSlotTotal,
+  );
+  if (isFightingStyleSlot) {
+    if (usedFightingStyleSlots >= ctx.fightingStyleSlotTotal) {
+      throw new InvalidAdvancementOperationError(
+        `No Fighting Style feat slots available (${usedFightingStyleSlots}/${ctx.fightingStyleSlotTotal} used)`,
+      );
+    }
+  } else if (usedSlots >= ctx.totalSlots) {
     throw new InvalidAdvancementOperationError(
-      `No advancement slots available (${state.advancements.length}/${totalSlots} used)`,
+      `No advancement slots available (${usedSlots}/${ctx.totalSlots} used)`,
     );
   }
 }
@@ -212,8 +239,11 @@ function resolveHalfFeatBump(args: {
   abilityChoice: string | undefined;
   scores: Record<string, number>;
   missingChoiceMessage: string;
+  /** Score ceiling — 20 for General/custom half-feats, 30 for Epic Boons (PHB'24). */
+  cap?: number;
 }): Record<string, number> {
   const { featName, abilityOptions, abilityIncrease, abilityChoice, scores, missingChoiceMessage } = args;
+  const cap = args.cap ?? ABILITY_CAP;
   const abilityDeltas: Record<string, number> = {};
   if (abilityOptions.length === 0) return abilityDeltas;
 
@@ -226,9 +256,9 @@ function resolveHalfFeatBump(args: {
     );
   }
   const current = scores[abilityChoice] ?? 10;
-  if (current + abilityIncrease > ABILITY_CAP) {
+  if (current + abilityIncrease > cap) {
     throw new InvalidAdvancementOperationError(
-      `takeFeat: ${abilityChoice} would exceed ${ABILITY_CAP} with +${abilityIncrease}`,
+      `takeFeat: ${abilityChoice} would exceed ${cap} with +${abilityIncrease}`,
     );
   }
   abilityDeltas[abilityChoice] = abilityIncrease;
@@ -269,9 +299,9 @@ function validateAsiIncreases(op: TakeAsiOperation, scores: Record<string, numbe
 }
 
 function applyTakeAsi(ctx: AdvancementOpContext, op: TakeAsiOperation): AdvancementOpOutcome {
-  const { scores, hp, hitDice, initBonus, state, level, totalSlots } = ctx;
+  const { scores, hp, hitDice, initBonus, state, level } = ctx;
 
-  assertSlotAvailable(state, totalSlots);
+  assertSlotAvailable(ctx, false);
   validateAsiIncreases(op, scores);
 
   const abilityDeltas: Record<string, number> = {};
@@ -317,11 +347,29 @@ async function resolveCatalogFeat(
   tx: Prisma.TransactionClient,
   op: TakeFeatOperation,
   scores: Record<string, number>,
+  level: number,
+  isFightingStyleSlot: boolean,
 ): Promise<ResolvedFeat> {
   const catalogFeat = await tx.feat.findUnique({ where: { id: op.featId } });
   if (!catalogFeat) {
     throw new InvalidAdvancementOperationError(
       `Feat not found in catalog: ${op.featId}`,
+    );
+  }
+  const category = catalogFeat.category as FeatCategory;
+  if (isFightingStyleSlot) {
+    // The fightingStyle slot (#1137) takes only fighting_style feats — never a
+    // General/Origin/Epic Boon feat routed through it.
+    if (category !== "fighting_style") {
+      throw new InvalidAdvancementOperationError(
+        `takeFeat: "${catalogFeat.name}" (${category}) is not a Fighting Style feat`,
+      );
+    }
+  } else if (!featOfferedForAsiSlot({ category, levelPrerequisite: catalogFeat.levelPrerequisite }, level)) {
+    // PHB'24: only General/Epic Boon feats the character's level satisfies may be
+    // taken via an ASI slot — Origin (backgrounds) and Fighting Style (class) can't.
+    throw new InvalidAdvancementOperationError(
+      `takeFeat: "${catalogFeat.name}" (${category}) is not available at level ${level}`,
     );
   }
   return {
@@ -337,6 +385,7 @@ async function resolveCatalogFeat(
       abilityIncrease: catalogFeat.abilityIncrease,
       abilityChoice: op.abilityChoice,
       scores,
+      cap: category === "epic_boon" ? ABILITY_CAP_EPIC_BOON : ABILITY_CAP,
       missingChoiceMessage: `takeFeat: "${catalogFeat.name}" is a half-feat — provide abilityChoice from: ${catalogFeat.abilityOptions.join(", ")}`,
     }),
   };
@@ -366,9 +415,10 @@ function resolveCustomFeat(op: TakeFeatOperation, scores: Record<string, number>
 }
 
 async function applyTakeFeat(ctx: AdvancementOpContext, op: TakeFeatOperation): Promise<AdvancementOpOutcome> {
-  const { tx, scores, hp, hitDice, initBonus, state, level, totalSlots } = ctx;
+  const { tx, scores, hp, hitDice, initBonus, state, level } = ctx;
+  const isFightingStyleSlot = op.slot === "fightingStyle";
 
-  assertSlotAvailable(state, totalSlots);
+  assertSlotAvailable(ctx, isFightingStyleSlot);
 
   // Exactly one of featId or custom.
   if (Boolean(op.featId) === Boolean(op.custom)) {
@@ -378,7 +428,20 @@ async function applyTakeFeat(ctx: AdvancementOpContext, op: TakeFeatOperation): 
   }
 
   const { featName, featDescription, featId: resolvedFeatId, improvements: featImprovements, abilityDeltas } =
-    op.featId ? await resolveCatalogFeat(tx, op, scores) : resolveCustomFeat(op, scores);
+    op.featId ? await resolveCatalogFeat(tx, op, scores, level, isFightingStyleSlot) : resolveCustomFeat(op, scores);
+
+  // A character can't hold the same Fighting Style twice (#1137) — dedup by
+  // catalog id, else by snapshot name (custom / migrated styles carry no featId).
+  if (isFightingStyleSlot) {
+    const duplicate = state.advancements.some(
+      (a) =>
+        a.slot === "fightingStyle" &&
+        ((resolvedFeatId != null && a.featId === resolvedFeatId) || a.featName === featName),
+    );
+    if (duplicate) {
+      throw new InvalidAdvancementOperationError(`takeFeat: Fighting Style "${featName}" already taken`);
+    }
+  }
 
   const { newScores, hpDelta, initDelta } = computeAdvancementEffect(scores, hitDice.total, abilityDeltas);
 
@@ -386,6 +449,7 @@ async function applyTakeFeat(ctx: AdvancementOpContext, op: TakeFeatOperation): 
     id: randomUUID(),
     level,
     kind: "feat",
+    ...(isFightingStyleSlot ? { slot: "fightingStyle" as const } : {}),
     abilityDeltas,
     hpDelta,
     initDelta,
@@ -427,6 +491,14 @@ function applyRemoveAdvancement(ctx: AdvancementOpContext, op: RemoveAdvancement
   }
 
   const removed = state.advancements[idx];
+
+  // Origin feats are background grants, not player-taken advancements (#1130) —
+  // they're removed by changing the background at creation, never via this route.
+  if (removed.origin) {
+    throw new InvalidAdvancementOperationError(
+      `Cannot remove an Origin feat (${removed.featName ?? "background grant"})`,
+    );
+  }
 
   // Reverse the single entry's effects on scores, HP, and initiative.
   const reversed = reverseAdvancementEffects(scores, hp, initBonus, [removed]);
@@ -472,8 +544,9 @@ const ADVANCEMENT_SELECT = {
   experiencePoints: true,
   classEntries: {
     orderBy: { position: "asc" as const },
-    take: 1,
-    select: { name: true },
+    // All entries (name + level) — the fs-slot cap sums entitlement across every
+    // class entry (#1137); the ASI cap still reads only the primary (position 0).
+    select: { name: true, level: true },
   },
 } satisfies Prisma.CharacterSelect;
 
@@ -512,6 +585,7 @@ export async function applyAdvancementOpInTx(
     state: normalizeResourcesMutable(character.resources),
     level,
     totalSlots: advancementSlotsForLevel(className, level),
+    fightingStyleSlotTotal: characterFightingStyleFeatSlots(character.classEntries, level),
   };
 
   const before = snapshotAdvancementState(ctx.scores, ctx.hp, ctx.initBonus, ctx.state);

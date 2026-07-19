@@ -140,9 +140,9 @@ export const sorcerer: ClassDefinition = {
     ];
   },
   subclasses: {
-    "draconic bloodline": { grantLevel: 1, features: DRACONIC_BLOODLINE_FEATURES },
+    "draconic bloodline": { grantLevel: 3, features: DRACONIC_BLOODLINE_FEATURES },
     "wild magic": {
-      grantLevel: 1,
+      grantLevel: 3,
       features: WILD_MAGIC_FEATURES,
       resourceFn: () => [
         {

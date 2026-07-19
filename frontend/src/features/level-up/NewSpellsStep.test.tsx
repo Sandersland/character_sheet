@@ -56,12 +56,14 @@ function Harness({ step, character }: { step: LevelUpStep; character: Character 
   const plan: LevelUpPlanResponse = {
     target: { className: "wizard", subclass: null, newLevel: 3, isPrimary: true },
     steps: [step],
+    grantedSpells: [],
   };
   return (
     <LevelUpStepContext.Provider value={{ character, draft, setDraft, plan }}>
       <NewSpellsStep step={step} />
       <output data-testid="picks">{JSON.stringify(draft.spellsLearned ?? [])}</output>
       <output data-testid="forgets">{JSON.stringify(draft.spellsForgotten ?? [])}</output>
+      <output data-testid="cantrips">{JSON.stringify(draft.cantripsLearned ?? [])}</output>
     </LevelUpStepContext.Provider>
   );
 }
@@ -113,7 +115,48 @@ describe("NewSpellsStep", () => {
   it("under Magical Secrets, off-class spells are offered", async () => {
     render(<Harness step={newSpellsStep(2, { maxSpellLevel: 2, magicalSecrets: true })} character={caster()} />);
     expect(await screen.findByText("CureWounds")).toBeInTheDocument();
-    expect(screen.getByText(/any class/i)).toBeInTheDocument();
+    expect(screen.getByText(/Bard, Cleric, Druid, or Wizard/i)).toBeInTheDocument();
+  });
+
+  it("states the learn count and, when swaps are allowed, that the swap is separate (#1139)", async () => {
+    render(<Harness step={newSpellsStep(1, { maxSpellLevel: 2, canSwap: true })} character={casterWithBook(BOOK)} />);
+    expect(await screen.findByText(/You learn 1 new spell\./i)).toBeInTheDocument();
+    expect(screen.getByText(/You may also swap one spell for another\./i)).toBeInTheDocument();
+  });
+
+  it("omits the swap sentence when the step cannot swap (#1139)", async () => {
+    render(<Harness step={newSpellsStep(2)} character={caster()} />);
+    expect(await screen.findByText(/You learn 2 new spells\./i)).toBeInTheDocument();
+    expect(screen.queryByText(/You may also swap one spell for another/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("NewSpellsStep — cantrip picks (#1131)", () => {
+  it("shows a cantrip section alongside the leveled picker and records a cantrip pick", async () => {
+    const user = userEvent.setup();
+    render(<Harness step={newSpellsStep(1, { maxSpellLevel: 2, cantrips: 1 })} character={caster()} />);
+    expect(await screen.findByText(/Choose 1 cantrip/)).toBeInTheDocument();
+    // The cantrip (Firebolt) is offered in the cantrip section; the leveled picker still lists Shield.
+    await user.click(await screen.findByRole("button", { name: /Firebolt/ }));
+    await waitFor(() =>
+      expect(screen.getByTestId("cantrips")).toHaveTextContent(
+        JSON.stringify([{ type: "learnSpell", spellId: "Firebolt" }]),
+      ),
+    );
+    expect(screen.getByRole("button", { name: /Shield/ })).toBeInTheDocument();
+    // A leveled pick stays in spellsLearned, never in cantripsLearned.
+    await user.click(screen.getByRole("button", { name: /Shield/ }));
+    expect(screen.getByTestId("picks")).toHaveTextContent(
+      JSON.stringify([{ type: "learnSpell", spellId: "Shield" }]),
+    );
+  });
+
+  it("a cantrips-only level (count 0, no swap) hides the leveled picker", async () => {
+    render(<Harness step={newSpellsStep(0, { cantrips: 1 })} character={caster()} />);
+    expect(await screen.findByText(/Choose 1 cantrip/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Search spells")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Firebolt/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Shield/ })).not.toBeInTheDocument();
   });
 });
 
@@ -181,7 +224,7 @@ describe("NewSpellsStep — swap selection (#1101)", () => {
 
   it("a swap-only level (count 0) shows the optional copy", async () => {
     render(<Harness step={swapStep(0)} character={casterWithBook(BOOK)} />);
-    expect(await screen.findByText(/No new spells at this level, but you may swap one known spell/i)).toBeInTheDocument();
+    expect(await screen.findByText(/No new spells at this level, but you may swap one prepared spell/i)).toBeInTheDocument();
   });
 
   it("a staged swap on a count-0 level reads 'swap replacement', not '0 + 1 swap'", async () => {

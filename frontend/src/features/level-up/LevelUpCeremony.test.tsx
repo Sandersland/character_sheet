@@ -27,6 +27,7 @@ function plan(steps: LevelUpStep[], target?: Partial<LevelUpPlanResponse["target
   return {
     target: { className: "fighter", subclass: "Champion", newLevel: 8, isPrimary: true, ...target },
     steps,
+    grantedSpells: [],
   };
 }
 

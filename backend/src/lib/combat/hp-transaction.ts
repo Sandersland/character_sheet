@@ -113,6 +113,14 @@ function liftLongRestSnapshot(snaps: HpOpSnapshots, data: Record<string, unknown
     delete data.consumableChargesBefore;
     delete data.consumableChargesAfter;
   }
+  // Exhaustion −1 recovery (#1136): lift into before/after so undo re-applies the
+  // cleared level (only present when the character had exhaustion to recover).
+  if (data.beforeConditionsState !== undefined) {
+    snaps.beforeState.conditions = data.beforeConditionsState;
+    snaps.afterState.conditions = data.afterConditionsState ?? data.beforeConditionsState;
+    delete data.beforeConditionsState;
+    delete data.afterConditionsState;
+  }
 }
 
 /**

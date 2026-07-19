@@ -202,32 +202,41 @@ describe("derived armorClass", () => {
     ]);
   });
 
-  it("includes a Defense fighting-style entry in the breakdown while armored", async () => {
-    // Fighter L1 so the stored style survives the read-clamp.
+  it("applies the Defense Fighting Style feat's armorClassWhileArmored only while armored (#1137)", async () => {
+    // Fighter L1 so the fs feat survives the read-clamp; the feat carries the
+    // armorClassWhileArmored improvement the former Defense scalar applied.
     await prisma.character.update({
       where: { id: FIXTURE_ID },
       data: {
-        classEntries: { create: [{ name: "fighter", position: 0 }] },
+        classEntries: { create: [{ name: "Fighter", position: 0, level: 1 }] },
         resources: {
           used: {},
           maneuversKnown: [],
           toolProficienciesKnown: [],
-          fightingStyle: "defense",
-          advancements: [],
+          fightingStyle: null,
+          advancements: [
+            {
+              id: "fs-defense", level: 1, kind: "feat", slot: "fightingStyle",
+              abilityDeltas: {}, hpDelta: 0, initDelta: 0,
+              featName: "Defense", featDescription: "test",
+              improvements: [{ target: "armorClassWhileArmored", amount: 1 }],
+            },
+          ],
         },
       },
     });
-    const res = await acquire(chainMail);
-    expect(res.body.armorClass).toBe(17); // 16 + 1 Defense
-    expect(res.body.armorClassBreakdown).toEqual([
-      { label: "Test Chain Mail", value: 16 },
-      { label: "Defense fighting style", value: 1 },
-    ]);
-    const sum = res.body.armorClassBreakdown.reduce(
+    // Unarmored first: the Defense feat contributes nothing (10 + Dex 3 = 13).
+    const unarmored = await get();
+    expect(unarmored.body.armorClass).toBe(13);
+    // Armored: +1 from the Defense feat, labeled with the feat name.
+    const armored = await acquire(chainMail);
+    expect(armored.body.armorClass).toBe(17); // 16 + 1 Defense
+    expect(armored.body.armorClassBreakdown).toContainEqual({ label: "Defense", value: 1 });
+    const sum = armored.body.armorClassBreakdown.reduce(
       (t: number, p: { value: number }) => t + p.value,
       0,
     );
-    expect(sum).toBe(res.body.armorClass);
+    expect(sum).toBe(armored.body.armorClass);
   });
 
   it("returns an armorClassBreakdown that sums to armorClass", async () => {

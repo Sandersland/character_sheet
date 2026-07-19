@@ -17,6 +17,10 @@ vi.mock("@/api/client", () => ({
   ]),
   fetchDisciplines: vi.fn(async () => []),
   fetchReference: vi.fn(async () => ({ artisanTools: [] })),
+  fetchFeats: vi.fn(async () => [
+    { id: "archery", name: "Archery", description: "arch", category: "fighting_style" },
+    { id: "defense", name: "Defense", description: "def", category: "fighting_style" },
+  ]),
 }));
 
 const planMock = vi.mocked(fetchLevelUpPlan);
@@ -28,6 +32,7 @@ const character = {
   pendingLevelUps: 1,
   classes: [{ id: "entry-1", name: "fighter", level: 2, subclass: "Battle Master" }],
   resources: {},
+  advancements: [],
   abilityScores: { strength: 16, dexterity: 12, constitution: 14, intelligence: 10, wisdom: 10, charisma: 8 },
   hitPoints: { current: 20, max: 20 },
   hitDice: { die: "d10", total: 2 },
@@ -37,6 +42,7 @@ function plan(steps: LevelUpStep[]): LevelUpPlanResponse {
   return {
     target: { className: "fighter", subclass: "Battle Master", newLevel: 3, isPrimary: true },
     steps,
+    grantedSpells: [],
   };
 }
 
@@ -92,8 +98,8 @@ describe("ChoiceStep in the ceremony", () => {
     );
   });
 
-  it("submits a fighting-style pick as a scalar", async () => {
-    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "fightingStyle" }, { kind: "review" }]));
+  it("submits a fighting-style pick as a takeFeat op", async () => {
+    planMock.mockResolvedValue(plan([{ kind: "hitPoints" }, { kind: "fightingStyleFeat" }, { kind: "review" }]));
     const user = userEvent.setup();
     renderCeremony();
 
@@ -111,7 +117,7 @@ describe("ChoiceStep in the ceremony", () => {
       expect(submitMock).toHaveBeenCalledWith("c1", {
         target: { kind: "existing", classEntryId: "entry-1" },
         hp: { method: "average" },
-        fightingStyle: "archery",
+        fightingStyleFeat: { type: "takeFeat", featId: "archery", slot: "fightingStyle" },
       }),
     );
   });

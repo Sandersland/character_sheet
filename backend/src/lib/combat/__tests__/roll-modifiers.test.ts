@@ -96,43 +96,83 @@ describe("buildRollModifiers (#486)", () => {
       { mode: "disadvantage", kind: "check", source: "Frightened" },
     ]);
   });
+
+  it("emits Grappled's disadvantage on attacks (vs targets other than the grappler)", () => {
+    expect(buildRollModifiers(condition("grappled"), noEffects)).toEqual([
+      { mode: "disadvantage", kind: "attack", source: "Grappled" },
+    ]);
+  });
+
+  it("emits Invisible's advantage on initiative + attack rolls (2024)", () => {
+    expect(buildRollModifiers(condition("invisible"), noEffects)).toEqual([
+      { mode: "advantage", kind: "initiative", source: "Invisible" },
+      { mode: "advantage", kind: "attack", source: "Invisible" },
+    ]);
+  });
+
+  it("emits Incapacitated's disadvantage on initiative (2024 Surprised)", () => {
+    expect(buildRollModifiers(condition("incapacitated"), noEffects)).toEqual([
+      { mode: "disadvantage", kind: "initiative", source: "Incapacitated" },
+    ]);
+  });
+
+  it("flattens Incapacitated's initiative disadvantage onto Paralyzed", () => {
+    expect(buildRollModifiers(condition("paralyzed"), noEffects)).toEqual([
+      { mode: "disadvantage", kind: "initiative", source: "Paralyzed" },
+    ]);
+  });
+
+  it("flattens Incapacitated's initiative disadvantage onto Stunned", () => {
+    expect(buildRollModifiers(condition("stunned"), noEffects)).toEqual([
+      { mode: "disadvantage", kind: "initiative", source: "Stunned" },
+    ]);
+  });
+
+  it("flattens Incapacitated's initiative disadvantage onto Petrified", () => {
+    expect(buildRollModifiers(condition("petrified"), noEffects)).toEqual([
+      { mode: "disadvantage", kind: "initiative", source: "Petrified" },
+    ]);
+  });
+
+  it("flattens Incapacitated + Prone effects onto Unconscious", () => {
+    expect(buildRollModifiers(condition("unconscious"), noEffects)).toEqual([
+      { mode: "disadvantage", kind: "initiative", source: "Unconscious" },
+      { mode: "disadvantage", kind: "attack", source: "Unconscious" },
+    ]);
+  });
 });
 
-describe("buildRollModifiers exhaustion thresholds (#846)", () => {
+describe("buildRollModifiers exhaustion flat penalty (#1136)", () => {
   function exhaustion(level: number): ConditionsMutableState {
     return { active: [], exhaustion: level };
+  }
+
+  // 2024 (SRD 5.2): each exhaustion level is a flat −2 to every d20 Test —
+  // attack rolls, ability checks, saving throws, and Initiative (a Dex check).
+  function flatAtLevel(level: number) {
+    const modifier = -2 * level;
+    return (["attack", "check", "save", "initiative"] as const).map((kind) => ({
+      mode: "flat",
+      modifier,
+      kind,
+      source: "Exhaustion",
+    }));
   }
 
   it("level 0 grants no roll effects", () => {
     expect(buildRollModifiers(exhaustion(0), noEffects)).toEqual([]);
   });
 
-  it("level 1 grants disadvantage on ability checks only", () => {
-    expect(buildRollModifiers(exhaustion(1), noEffects)).toEqual([
-      { mode: "disadvantage", kind: "check", source: "Exhaustion" },
-    ]);
+  it("level 1 grants a flat −2 on every d20 Test (attack/check/save/initiative)", () => {
+    expect(buildRollModifiers(exhaustion(1), noEffects)).toEqual(flatAtLevel(1));
   });
 
-  it("level 2 still only grants disadvantage on ability checks (speed halved isn't a roll effect)", () => {
-    expect(buildRollModifiers(exhaustion(2), noEffects)).toEqual([
-      { mode: "disadvantage", kind: "check", source: "Exhaustion" },
-    ]);
+  it("level 3 grants a flat −6 on every d20 Test", () => {
+    expect(buildRollModifiers(exhaustion(3), noEffects)).toEqual(flatAtLevel(3));
   });
 
-  it("level 3 adds disadvantage on attack rolls + saving throws, cumulative with checks", () => {
-    expect(buildRollModifiers(exhaustion(3), noEffects)).toEqual([
-      { mode: "disadvantage", kind: "check", source: "Exhaustion" },
-      { mode: "disadvantage", kind: "attack", source: "Exhaustion" },
-      { mode: "disadvantage", kind: "save", source: "Exhaustion" },
-    ]);
-  });
-
-  it("level 6 (death) still carries the level-3 roll effects", () => {
-    expect(buildRollModifiers(exhaustion(6), noEffects)).toEqual([
-      { mode: "disadvantage", kind: "check", source: "Exhaustion" },
-      { mode: "disadvantage", kind: "attack", source: "Exhaustion" },
-      { mode: "disadvantage", kind: "save", source: "Exhaustion" },
-    ]);
+  it("level 6 (death) grants a flat −12 on every d20 Test", () => {
+    expect(buildRollModifiers(exhaustion(6), noEffects)).toEqual(flatAtLevel(6));
   });
 
   it("merges exhaustion effects with an active condition's effects", () => {
@@ -141,7 +181,14 @@ describe("buildRollModifiers exhaustion thresholds (#846)", () => {
       exhaustion: 1,
     };
     const mods = buildRollModifiers(state, noEffects);
-    expect(mods.map((m) => m.source)).toEqual(["Poisoned", "Poisoned", "Exhaustion"]);
+    expect(mods.map((m) => m.source)).toEqual([
+      "Poisoned",
+      "Poisoned",
+      "Exhaustion",
+      "Exhaustion",
+      "Exhaustion",
+      "Exhaustion",
+    ]);
   });
 });
 

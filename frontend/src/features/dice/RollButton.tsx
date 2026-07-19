@@ -12,10 +12,11 @@
 import { useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 import { formatRollSpec, type RollMode, type RollSpec } from "@/lib/dice";
-import { resolveRollMode, rollModeChip } from "@/lib/rollMode";
+import { resolveRollMode, rollModeChip, type ResolvedRollMode } from "@/lib/rollMode";
 import { useLongPress } from "@/hooks/useLongPress";
 import { useRoll, type RollLog } from "@/features/dice/RollContext";
 import RollModeMenu from "@/features/dice/RollModeMenu";
+import type { RollModifier } from "@/types/character";
 
 // The tap/hold gesture owns the pointer + click + context-menu handlers, so a
 // caller can't pass them through (they'd silently clobber the long-press wiring).
@@ -26,6 +27,28 @@ type OwnedHandlers =
   | "onPointerLeave"
   | "onPointerCancel"
   | "onContextMenu";
+
+// Fold a resolved flat d20 modifier (#1136) into a spec's modifier; identity when 0.
+function withFlatModifier(spec: RollSpec, flat: number): RollSpec {
+  return flat !== 0 ? { ...spec, modifier: (spec.modifier ?? 0) + flat } : spec;
+}
+
+// Resolve a button's state grants (#486/#1136) for its log category, or null when
+// the roll isn't categorized (nothing to apply).
+function resolveForLog(
+  rollModifiers: RollModifier[],
+  log: RollLog | undefined,
+  manualMode: RollMode,
+): ResolvedRollMode | null {
+  return log ? resolveRollMode(rollModifiers, { kind: log.kind, ability: log.ability }, manualMode) : null;
+}
+
+// The spec actually rolled/previewed: fold in the flat penalty and pick the mode
+// (a caller-pinned spec.mode wins; else the resolved mode, else the fallback).
+function effectiveSpec(spec: RollSpec, resolved: ResolvedRollMode | null, fallbackMode: RollMode): RollSpec {
+  const withMod = withFlatModifier(spec, resolved?.modifier ?? 0);
+  return spec.mode !== undefined ? withMod : { ...withMod, mode: resolved?.mode ?? fallbackMode };
+}
 
 interface RollButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, OwnedHandlers> {
   spec: RollSpec;
@@ -47,16 +70,13 @@ export default function RollButton({
   const [menuOpen, setMenuOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
 
-  // State-driven advantage/disadvantage (#486): resolve from the log's category
-  // (check/save/initiative + governing ability) merged with the picked manual
-  // mode. A caller-pinned spec.mode still wins. Only categorized rolls resolve.
+  // State-driven advantage/disadvantage (#486) + flat modifiers (#1136, e.g.
+  // exhaustion −2×level): resolve from the log's category merged with the picked
+  // manual mode. A caller-pinned spec.mode wins the die-count axis, but the flat
+  // penalty is folded in regardless (pinning must not strip the bonus).
   function rollWith(manualMode: RollMode) {
-    const resolved = log
-      ? resolveRollMode(rollModifiers, { kind: log.kind, ability: log.ability }, manualMode)
-      : null;
-    const effectiveSpec =
-      spec.mode !== undefined ? spec : { ...spec, mode: resolved?.mode ?? manualMode };
-    rollAnimated(effectiveSpec, label, log);
+    const resolved = resolveForLog(rollModifiers, log, manualMode);
+    rollAnimated(effectiveSpec(spec, resolved, manualMode), label, log);
   }
 
   // Tap → Normal roll; press-and-hold → open the ADV/DIS menu.
@@ -70,15 +90,12 @@ export default function RollButton({
   // longer stamped under every row — it lives ONCE in the ConditionRollBanner
   // above the rails. Here an affected affordance gets only a subtle amber dot,
   // and the full reason (`chip`) stays available on the button's title tooltip.
-  const chipResolved = log
-    ? resolveRollMode(rollModifiers, { kind: log.kind, ability: log.ability }, "normal")
-    : null;
+  const chipResolved = resolveForLog(rollModifiers, log, "normal");
   // `chip` is non-empty exactly when a state modifier applied (rollModeChip
   // returns "" for no sources), so it doubles as the "row is affected" flag.
   const chip = chipResolved ? rollModeChip(chipResolved) : "";
-  const chipMode = chipResolved?.mode ?? "normal";
   const affected = chip !== "";
-  const previewSpec = spec.mode !== undefined ? spec : { ...spec, mode: chipMode };
+  const previewSpec = effectiveSpec(spec, chipResolved, "normal");
 
   return (
     <>

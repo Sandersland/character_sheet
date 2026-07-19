@@ -41,9 +41,16 @@ export interface CharacterDraft {
   abilityPool: number[] | null;
   abilityAssignments: Record<AbilityName, number | null>;
   abilityScores: AbilityScores;
+  /** PHB'24 background ability spread (#1130): ability→bump map over the
+   *  background's three abilityChoices. Empty until assigned / for spec-less backgrounds. */
+  backgroundAbilities: Partial<Record<AbilityName, number>>;
   skillProficiencies: SkillName[];
   /** Tool proficiency names chosen by the player at character creation. */
   toolChoices: string[];
+  /** #1131: chosen level-1 cantrip catalog ids (casters only). */
+  cantripIds: string[];
+  /** #1131: chosen level-1 prepared-spell catalog ids (casters only). */
+  spellIds: string[];
   equipmentDraft: EquipmentDraft | null;
 }
 
@@ -62,8 +69,11 @@ const EMPTY_DRAFT: CharacterDraft = {
   abilityPool: null,
   abilityAssignments: EMPTY_ASSIGNMENTS,
   abilityScores: DEFAULT_ABILITY_SCORES,
+  backgroundAbilities: {},
   skillProficiencies: [],
   toolChoices: [],
+  cantripIds: [],
+  spellIds: [],
   equipmentDraft: null,
 };
 

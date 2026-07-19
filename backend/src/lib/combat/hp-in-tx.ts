@@ -2,7 +2,7 @@ import { Prisma } from "@/generated/prisma/client.js";
 import { logEvent } from "@/lib/activity/events.js";
 import { levelForExperience } from "@/lib/leveling/experience.js";
 import { advancementSlotsForLevel, deriveFeatBonuses } from "@/lib/srd/srd.js";
-import { normalizeResourcesMutable } from "@/lib/classes/resources.js";
+import { normalizeResourcesMutable, splitAdvancementsBySlotCap } from "@/lib/classes/resources.js";
 import {
   InvalidHitPointOperationError,
   normalizeHitPoints,
@@ -59,7 +59,9 @@ export async function applyHealInTx(
     row.classEntries[0]?.name ?? "",
     levelForExperience(row.experiencePoints),
   );
-  const featBonus = deriveFeatBonuses(advState.advancements.slice(0, featSlotCap), hd.total);
+  // Origin feats are kept regardless of the slot cap (#1130).
+  const { kept: inCapAdvancements } = splitAdvancementsBySlotCap(advState.advancements, featSlotCap);
+  const featBonus = deriveFeatBonuses(inCapAdvancements, hd.total);
   const effMax = hp.max + featBonus.maxHp;
 
   const beforeHp = { ...hp };

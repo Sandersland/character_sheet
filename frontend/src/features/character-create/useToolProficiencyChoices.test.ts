@@ -35,8 +35,11 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
       wisdom: 10,
       charisma: 10,
     },
+    backgroundAbilities: {},
     skillProficiencies: [],
     toolChoices: [],
+    cantripIds: [],
+    spellIds: [],
     equipmentDraft: null,
     ...overrides,
   };
@@ -58,6 +61,7 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
     toolProficiencies: [],
     toolChoices: [],
     toolChoiceCount: 0,
+    level1SpellPicks: null,
     ...overrides,
   };
 }
@@ -68,6 +72,8 @@ const background: BackgroundOption = {
   name: "Sage",
   skillProficiencies: [],
   toolProficiencies: [],
+  abilityChoices: [],
+  originFeat: null,
 };
 
 function run(args: {

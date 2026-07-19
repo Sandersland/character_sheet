@@ -14,6 +14,8 @@ interface Props {
   currentScores: Record<string, number>;
   slotsRemaining: number;
   busy: boolean;
+  /** Character level — gates which feats the picker offers (General 4+, Epic Boon 19+). */
+  characterLevel: number;
   /** Ordered list of skill names from the character (avoids duplicating SRD skill list). */
   skillNames: string[];
   onSubmit: (op: AdvancementOperation) => void;
@@ -23,6 +25,7 @@ export default function AdvancementPanel({
   currentScores,
   slotsRemaining,
   busy,
+  characterLevel,
   skillNames,
   onSubmit,
 }: Props) {
@@ -31,7 +34,7 @@ export default function AdvancementPanel({
 
   const asi = useAsiDraft();
 
-  const feats = useFeatCatalog(open && tab === "feat");
+  const feats = useFeatCatalog(open && tab === "feat", characterLevel);
   const [view, dispatchView] = useReducer(featViewReducer, FEAT_VIEW_INITIAL);
   const { selectedFeat, abilityChoice, customMode } = view;
 

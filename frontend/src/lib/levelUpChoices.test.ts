@@ -18,6 +18,11 @@ vi.mock("@/api/client", () => ({
     { id: "d1", name: "Fangs of the Fire Snake", description: "fire" },
   ]),
   fetchReference: vi.fn(async () => ({ artisanTools: [{ name: "Smith's Tools", category: "artisan" }] })),
+  fetchFeats: vi.fn(async () => [
+    { id: "archery", name: "Archery", description: "arch", category: "fighting_style" },
+    { id: "defense", name: "Defense", description: "def", category: "fighting_style" },
+    { id: "sentinel", name: "Sentinel", description: "sent", category: "general" },
+  ]),
 }));
 
 function characterWith(resources: Partial<Character["resources"]>): Character {
@@ -56,30 +61,40 @@ describe("CHOICE_KIND_CONFIGS", () => {
     });
   });
 
-  describe("fightingStyle", () => {
-    const cfg = CHOICE_KIND_CONFIGS.fightingStyle!;
+  describe("fightingStyleFeat", () => {
+    const cfg = CHOICE_KIND_CONFIGS.fightingStyleFeat!;
 
     it("is single-select", () => {
       expect(cfg.single).toBe(true);
     });
 
-    it("loads static options with resolved labels", async () => {
+    it("loads only the catalog's fighting_style feats", async () => {
       const opts = await cfg.loadOptions();
-      const archery = opts.find((o) => o.id === "archery");
-      expect(archery?.name).toBe("Archery");
-      expect(opts).toHaveLength(6);
+      expect(opts).toEqual([
+        { id: "archery", name: "Archery", description: "arch" },
+        { id: "defense", name: "Defense", description: "def" },
+      ]);
     });
 
-    it("writes a scalar key and replaces on re-pick", () => {
+    it("writes a slot:fightingStyle takeFeat op and replaces on re-pick", () => {
       const first = cfg.select(baseDraft, ["archery"]);
-      expect(first).toEqual({ fightingStyle: "archery" });
+      expect(first).toEqual({
+        fightingStyleFeat: { type: "takeFeat", featId: "archery", slot: "fightingStyle" },
+      });
       const second = cfg.select(first as LevelUpDraft, ["defense"]);
-      expect(second).toEqual({ fightingStyle: "defense" });
+      expect(second).toEqual({
+        fightingStyleFeat: { type: "takeFeat", featId: "defense", slot: "fightingStyle" },
+      });
       expect(cfg.selected(second as LevelUpDraft)).toEqual(["defense"]);
     });
 
-    it("extracts the known style", () => {
-      const character = characterWith({ fightingStyle: "dueling" } as Character["resources"]);
+    it("extracts already-taken fs feat ids from advancements (non-fs slots excluded)", () => {
+      const character = {
+        advancements: [
+          { id: "a1", slot: "fightingStyle", featId: "dueling" },
+          { id: "a2", featId: "sentinel" },
+        ],
+      } as unknown as Character;
       expect([...cfg.fromCharacter(character)]).toEqual(["dueling"]);
     });
   });

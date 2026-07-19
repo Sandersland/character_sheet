@@ -3,7 +3,6 @@
 // injects catalog id→name lookups as `resolvers` so this never fetches.
 
 import { abilityLabel, abilityModifier, formatModifier } from "@/lib/abilities";
-import { fightingStyleLabel } from "@/lib/fightingStyles";
 import { averageHitPointGain, dieFaces } from "@/lib/hitDice";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
 import type {
@@ -157,8 +156,20 @@ export function buildLevelUpLedger(
     advancement.affected.length ? { label: "Recalculated", note: advancement.affected.join(", "), variant: "note" } : null,
     { label: "Hit Dice", before: `${total}${die}`, after: `${total + 1}${die}`, variant: "delta" },
     draft.subclassId ? { label: "Subclass", after: plan.target.subclass ?? "New subclass", variant: "delta" } : null,
-    draft.fightingStyle ? { label: "Fighting Style", after: fightingStyleLabel(draft.fightingStyle), variant: "delta" } : null,
+    draft.fightingStyleFeat
+      ? {
+          label: "Fighting Style",
+          after: resolvedName(draft.fightingStyleFeat.featId, draft.fightingStyleFeat.custom, resolvers.feat),
+          variant: "delta",
+        }
+      : null,
     ...learnedListRows(draft, plan, resolvers, character),
+    // Auto-granted subclass spells are derived on the plan, not the draft — surface
+    // them so Review's "applied together" claim covers them too (#1139).
+    listRow(
+      plan.target.subclass ? `Granted by ${plan.target.subclass}` : "Granted Spells",
+      plan.grantedSpells.map((g) => g.name),
+    ),
   ];
   return rows.filter((row): row is LedgerRow => row !== null);
 }

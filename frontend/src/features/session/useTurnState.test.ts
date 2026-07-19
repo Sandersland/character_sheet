@@ -24,6 +24,7 @@ function makeCharacter(
   return {
     attacksPerAction: 1,
     inventory: [],
+    advancements: [],
     ...overrides,
   } as unknown as Character;
 }
@@ -145,11 +146,13 @@ describe("combat lifecycle", () => {
     expect(result.current.twfAvailable).toBe(true); // derived → updates without startTurn
   });
 
-  it("twfAvailable is true for a non-light pair WITH the Two-Weapon Fighting style (#732)", () => {
+  it("twfAvailable is true for a non-light pair WITH the Two-Weapon Fighting feat (#1137)", () => {
     const heavyPair = makeCharacter({ inventory: [heavyWeapon("h1"), heavyWeapon("h2")] });
     const withStyle = {
       ...heavyPair,
-      resources: { pools: [], fightingStyle: "twoWeaponFighting" },
+      advancements: [
+        { id: "fs1", slot: "fightingStyle", improvements: [{ target: "offhandAbilityDamage", amount: 1 }] },
+      ],
     } as unknown as Character;
     const { result } = renderHook(() => useTurnState(withStyle, SESSION_ID));
 
@@ -1110,7 +1113,7 @@ describe("localStorage persistence", () => {
 
 /** Character with a current-HP value, for the damage watcher. */
 function withHp(current: number): Character {
-  return { attacksPerAction: 1, inventory: [], hitPoints: { current, max: 20, temp: 0 } } as unknown as Character;
+  return { attacksPerAction: 1, inventory: [], advancements: [], hitPoints: { current, max: 20, temp: 0 } } as unknown as Character;
 }
 
 describe("turn-hook activity window (#457)", () => {

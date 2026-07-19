@@ -251,6 +251,12 @@ function catalogSpellToEntry(catalogSpell: Spell): SpellEntry {
   };
 }
 
+// #1131: a creation-time pick — the same catalog snapshot, but prepared (a fresh
+// caster's chosen cantrips + level-1 spells are all prepared from the start).
+export function creationSpellEntry(catalogSpell: Spell): SpellEntry {
+  return { ...catalogSpellToEntry(catalogSpell), prepared: true };
+}
+
 // Build a learned SpellEntry from custom DM-authored input.
 function customSpellToEntry(custom: CustomSpellInput): SpellEntry {
   return {
@@ -360,7 +366,7 @@ function applyPrepareSpellOp(
     const count = state.spells.filter((s) => s.prepared && s.level > 0 && s.source == null).length;
     if (count >= ctx.preparedSpellLimit) {
       throw new InvalidSpellcastingOperationError(
-        `You can prepare at most ${ctx.preparedSpellLimit} spells (spellcasting modifier + level).`,
+        `You can prepare at most ${ctx.preparedSpellLimit} spells.`,
       );
     }
   }
@@ -934,7 +940,7 @@ function buildSpellcastingOp(
   const limitEntries = row.classEntries.length === 1
     ? [{ name: className, level, subclass: row.classEntries[0]?.subclass ?? null }]
     : row.classEntries.map((e) => ({ name: e.name, level: e.level, subclass: e.subclass }));
-  const preparedSpellLimit = derivePreparedSpellLimit(limitEntries, abilityScores);
+  const preparedSpellLimit = derivePreparedSpellLimit(limitEntries);
 
   const { slotTotals, arcanaTotals } = computeSlotTables(row.spellcasting, derived);
 

@@ -206,6 +206,42 @@ describe("POST /api/characters/:id/hp", () => {
     expect(res.body.hitDice.spent).toBe(0);
   });
 
+  it("longRest: removes exactly 1 exhaustion level (#1136)", async () => {
+    await prisma.character.update({
+      where: { id: FIXTURE.id },
+      data: { conditions: { active: [], exhaustion: 3 } },
+    });
+    const res = await post(FIXTURE.id, { operations: [{ type: "longRest" }] });
+    expect(res.status).toBe(200);
+    expect(res.body.conditions.exhaustion).toBe(2);
+  });
+
+  it("longRest: leaves exhaustion 0 untouched (no decrement below 0) (#1136)", async () => {
+    const res = await post(FIXTURE.id, { operations: [{ type: "longRest" }] });
+    expect(res.status).toBe(200);
+    expect(res.body.conditions.exhaustion).toBe(0);
+    // No exhaustion part in the long-rest summary.
+    const activity = await supertest(app).get(`/api/characters/${FIXTURE.id}/activity`).set("Cookie", COOKIE);
+    const ev = (activity.body as Array<{ type: string; summary: string }>).find((e) => e.type === "longRest")!;
+    expect(ev.summary).not.toMatch(/[Ee]xhaustion/);
+  });
+
+  it("longRest → undo restores the exhaustion level cleared by the rest (#1136)", async () => {
+    await prisma.character.update({
+      where: { id: FIXTURE.id },
+      data: { conditions: { active: [], exhaustion: 3 } },
+    });
+    await post(FIXTURE.id, { operations: [{ type: "longRest" }] });
+    const activity = await supertest(app).get(`/api/characters/${FIXTURE.id}/activity`).set("Cookie", COOKIE);
+    const ev = (activity.body as Array<{ type: string; reverted: boolean; batchId?: string; summary: string }>)
+      .find((e) => e.type === "longRest" && !e.reverted)!;
+    expect(ev.summary).toMatch(/Exhaustion −1 \(now 2\)/);
+
+    const undo = await supertest(app).post(`/api/characters/${FIXTURE.id}/events/${ev.batchId}/revert`).set("Cookie", COOKIE);
+    expect(undo.status).toBe(200);
+    expect(undo.body.conditions.exhaustion).toBe(3);
+  });
+
   // ── levelUp ──────────────────────────────────────────────────────────────
 
   it("levelUp (average): increments total, bumps max+current by fixed average+conMod", async () => {
@@ -375,15 +411,17 @@ const FS_OWNER_ID = "owner-hitpoints-rest-undo";
 const BM_FIXTURE_ID = "test-hp-rest-undo-fighter";
 const BM_CATALOG_NAME = "HP Rest Undo Battle Master";
 
-// Level-4 Battle Master Fighter: fighting style (L1), 1 ASI (L4), 3 maneuvers
+// Level-4 Battle Master Fighter: Fighting Style feat (L1), 1 ASI (L4), 3 maneuvers
 // (L3), Student-of-War tool (L3) and a 4×d8 superiority pool all entitled, so
 // serializeCharacter's clamp-on-read keeps every stored sub-field.
 const BM_RESOURCES = {
   used: { superiorityDice: 3 },
   maneuversKnown: [{ id: "mv-1", name: "Trip Attack" }],
   toolProficienciesKnown: [{ id: "tp-1", name: "Smith's Tools" }],
-  advancements: [{ id: "adv-1", level: 4, kind: "asi", abilityDeltas: { strength: 2 }, hpDelta: 0, initDelta: 0 }],
-  fightingStyle: "defense",
+  advancements: [
+    { id: "adv-1", level: 4, kind: "asi", abilityDeltas: { strength: 2 }, hpDelta: 0, initDelta: 0 },
+    { id: "adv-fs", level: 1, kind: "feat", slot: "fightingStyle", abilityDeltas: {}, hpDelta: 0, initDelta: 0, featName: "Defense", featDescription: "d", improvements: [{ target: "armorClassWhileArmored", amount: 1 }] },
+  ],
 };
 
 const BM_FIXTURE = {
@@ -457,15 +495,16 @@ describe("POST /api/characters/:id/hp — rest undo preserves resource sub-field
     await prisma.character.deleteMany({ where: { id: BM_FIXTURE_ID } });
   });
 
-  function assertSubFieldsIntact(body: { resources: { fightingStyle: string | null; maneuversKnown: Array<{ name: string }>; toolProficienciesKnown: Array<{ name: string }> }; advancements: Array<{ abilityDeltas: Record<string, number> }> }) {
-    expect(body.resources.fightingStyle).toBe("defense");
+  function assertSubFieldsIntact(body: { resources: { maneuversKnown: Array<{ name: string }>; toolProficienciesKnown: Array<{ name: string }> }; advancements: Array<{ slot?: string; featName?: string; abilityDeltas: Record<string, number> }> }) {
     expect(body.resources.maneuversKnown.map((m) => m.name)).toContain("Trip Attack");
     expect(body.resources.toolProficienciesKnown.map((t) => t.name)).toContain("Smith's Tools");
-    expect(body.advancements).toHaveLength(1);
-    expect(body.advancements[0].abilityDeltas).toEqual({ strength: 2 });
+    // Both the ASI and the Fighting Style feat survive the rest-undo snapshot (#818/#1137).
+    expect(body.advancements).toHaveLength(2);
+    expect(body.advancements.find((a) => a.slot !== "fightingStyle")?.abilityDeltas).toEqual({ strength: 2 });
+    expect(body.advancements.some((a) => a.slot === "fightingStyle" && a.featName === "Defense")).toBe(true);
   }
 
-  it("short rest → undo retains fightingStyle, advancements and toolProficienciesKnown", async () => {
+  it("short rest → undo retains the fs feat, advancements and toolProficienciesKnown", async () => {
     const rest = await bmPost({ operations: [{ type: "shortRest", rolls: [4] }] });
     expect(rest.status).toBe(200);
 
@@ -477,7 +516,7 @@ describe("POST /api/characters/:id/hp — rest undo preserves resource sub-field
     expect(undo.body.resources.pools.find((p: { key: string }) => p.key === "superiorityDice").used).toBe(3);
   });
 
-  it("long rest → undo retains fightingStyle, advancements and toolProficienciesKnown", async () => {
+  it("long rest → undo retains the fs feat, advancements and toolProficienciesKnown", async () => {
     const rest = await bmPost({ operations: [{ type: "longRest" }] });
     expect(rest.status).toBe(200);
 

@@ -33,6 +33,10 @@ export interface AdvancementEntry {
   id: string;
   level: number;
   kind: "asi" | "feat";
+  /** PHB'24 Origin feat from a background (#1130): slot-exempt, not removable. */
+  origin?: true;
+  /** Fighting Style feat (#1137): occupies a fightingStyle slot, not an ASI slot. */
+  slot?: "fightingStyle";
   /** Score bumps applied: e.g. { strength: 2 } or { dexterity: 1, constitution: 1 } */
   abilityDeltas: Record<string, number>;
   /** HP delta added to max/current at time of choice. */
@@ -52,11 +56,18 @@ export interface AdvancementSlots {
   used: number;
 }
 
+/** PHB'24 feat categories — mirror of the backend FeatCategory. */
+export type FeatCategory = "origin" | "general" | "fighting_style" | "epic_boon";
+
 /** Catalog feat served by GET /api/feats. */
 export interface CatalogFeat {
   id: string;
   name: string;
   description: string;
+  category: FeatCategory;
+  /** General ⇒ 4, Epic Boon ⇒ 19 (PHB'24). */
+  levelPrerequisite?: number;
+  repeatable?: boolean;
   prerequisite?: string;
   /** Ability names the player may choose to bump by abilityIncrease. Empty = not a half-feat. */
   abilityOptions: string[];
@@ -89,6 +100,8 @@ export interface TakeFeatOperation {
   };
   /** Required when taking a half-feat (catalog or custom) with abilityOptions. */
   abilityChoice?: string;
+  /** #1137: routes a Fighting Style feat through its own slot partition. */
+  slot?: "fightingStyle";
 }
 
 export interface RemoveAdvancementOperation {
@@ -120,7 +133,7 @@ export type LevelUpStepKind =
   | "advancement"
   | "subclass"
   | "maneuvers"
-  | "fightingStyle"
+  | "fightingStyleFeat"
   | "disciplines"
   | "toolProficiency"
   | "subclassChoice"
@@ -145,6 +158,8 @@ export interface LevelUpPlanResponse {
     isPrimary: boolean;
   };
   steps: LevelUpStep[];
+  /** Subclass spells this level newly grants — always present ([] when none); shown in Review (#1139). */
+  grantedSpells: { name: string; level: number }[];
 }
 
 /**
@@ -157,12 +172,15 @@ export interface LevelUpSubmission {
   hp: { method: "average" | "roll"; roll?: number };
   advancement?: TakeAsiOperation | TakeFeatOperation;
   subclassId?: string;
-  fightingStyle?: string;
+  /** #1137: a Fighting Style feat pick — a takeFeat op (server forces the fs slot). */
+  fightingStyleFeat?: TakeFeatOperation;
   maneuvers?: LearnManeuverOperation[];
   disciplines?: LearnDisciplineOperation[];
   toolProficiencies?: LearnToolProficiencyOperation[];
   subclassChoices?: LearnSubclassChoiceOperation[];
   spellsLearned?: LearnSpellOperation[];
+  /** #1131: new cantrips this level — counted against the newSpells step's meta.cantrips. */
+  cantripsLearned?: LearnSpellOperation[];
   /** #1101: the one optional known-spell swap forget, offset by an extra learn. */
   spellsForgotten?: ForgetSpellOperation[];
 }

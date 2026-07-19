@@ -19,8 +19,9 @@ function wildShapeDescription(subclass: string | undefined, level: number): stri
 }
 
 describe("druid Wild Shape CR cap derivation (#906)", () => {
-  it("Circle of the Moon caps CR at 1 from level 2", () => {
-    expect(wildShapeDescription("circle of the moon", 2)).toContain("max CR 1 (no flying or swimming speed)");
+  it("Circle of the Moon caps CR at 1 from level 3 (subclass grants at 3, #1128)", () => {
+    expect(wildShapeDescription("circle of the moon", 2)).toContain("max CR 1/4 (no flying or swimming speed)");
+    expect(wildShapeDescription("circle of the moon", 3)).toContain("max CR 1 (no flying or swimming speed)");
     expect(wildShapeDescription("circle of the moon", 4)).toContain("max CR 1 (no flying speed)");
     expect(wildShapeDescription("circle of the moon", 5)).toContain("max CR 1 (no flying speed)");
   });

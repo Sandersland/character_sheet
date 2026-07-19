@@ -30,8 +30,9 @@ test("session conditions strip (mobile): tap, apply a condition, see it reflect 
   await expect(sheet.getByRole("heading", { name: /conditions/i })).toBeVisible();
 
   await sheet.getByRole("button", { name: /add condition/i }).click();
-  const poisonedRow = sheet.getByRole("listitem").filter({ hasText: "Poisoned" });
-  await poisonedRow.getByRole("button", { name: "Apply" }).click();
+  // Target the Apply button by its unique title — Petrified's 2024 blurb also
+  // contains "Poisoned" ("immunity to the Poisoned condition"), so a row hasText matches two rows.
+  await sheet.locator('button[title="Apply Poisoned"]').click();
 
   // The strip reflects the applied chip.
   await expect(strip.getByText("Poisoned")).toBeVisible();

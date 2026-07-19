@@ -6,7 +6,6 @@ import {
 import {
   deriveWeaponAttackBonus,
   deriveWeaponDamage,
-  type FightingStyleKey,
 } from "@/lib/srd/srd.js";
 import {
   activatedMaxUses,
@@ -33,8 +32,8 @@ interface InventoryItemContext {
   weaponGrants: ReadonlyArray<{ name: string }>;
   /** Shield equipped or ≥2 weapons equipped — picks the versatile-weapon die (2H when off-hand free). */
   offHandBusy: boolean;
-  /** Chosen Fighting Style, pre-clamped to null when unentitled; Archery adds +2 ranged attack. */
-  fightingStyle: FightingStyleKey | null;
+  /** Archery Fighting Style feat bonus (#1137) — +2 to ranged weapon attack rolls. */
+  rangedAttackRollBonus: number;
   /** Sum of active "meleeDamage" buffs (#455); added to melee weapon damage. */
   meleeDamageBonus: number;
   /** Sum of active "attackRoll" buffs (#419, e.g. Sacred Weapon); added to weapon attack bonus. */
@@ -99,7 +98,7 @@ function buildInventoryWeaponView(
       context.effectiveScores,
       context.proficiencyBonus,
       context.weaponGrants,
-      context.fightingStyle,
+      context.rangedAttackRollBonus,
       context.attackRollBonus,
     ),
     damage: deriveWeaponDamage(
@@ -200,7 +199,7 @@ export function buildInventoryContext(
   effectiveScores: Record<string, number>,
   proficiencyBonus: number,
   weaponGrants: ReturnType<typeof buildMergedWeaponProficiencies>,
-  fightingStyle: FightingStyleKey | null,
+  rangedAttackRollBonus: number,
   buffTargets: TargetModifierMap,
 ): InventoryItemContext {
   const equippedItems = row.inventoryItems.filter((i) => i.equippedSlot != null);
@@ -220,7 +219,7 @@ export function buildInventoryContext(
   // Active-item buff keys — an activatedEffect item is "active" when its item:<id> buff is present.
   const activeItemBuffKeys = new Set(normalizeActiveEffectsMutable(row.activeEffects).buffs.map((b) => b.key));
 
-  return { effectiveScores, proficiencyBonus, weaponGrants, offHandBusy, fightingStyle, meleeDamageBonus, attackRollBonus, activeItemBuffKeys };
+  return { effectiveScores, proficiencyBonus, weaponGrants, offHandBusy, rangedAttackRollBonus, meleeDamageBonus, attackRollBonus, activeItemBuffKeys };
 }
 
 // Item-granted traits (#529): resistances/immunities/conditionImmunities/

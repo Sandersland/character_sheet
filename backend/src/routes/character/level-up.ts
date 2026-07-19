@@ -9,6 +9,7 @@ import { z } from "zod";
 import { assertCharacterAccess } from "@/lib/auth/access.js";
 import { prisma } from "@/lib/core/prisma.js";
 import { applyLevelUpTransaction, resolveLevelUpContext } from "@/lib/leveling/level-up-transaction.js";
+import { grantedSpellsGained, type GrantedSpellSource } from "@/lib/spellcasting/granted-spells.js";
 import { InvalidLevelUpError, resolveLevelUpPlan } from "@/lib/leveling/level-up-submission.js";
 import type { LevelUpTarget } from "@/lib/combat/hp-operations.js";
 import { InvalidHitPointOperationError } from "@/lib/combat/hitpoints.js";
@@ -26,7 +27,6 @@ import {
   learnSubclassChoiceOpSchema,
 } from "@/routes/character/resources.js";
 import { forgetSpellOpSchema, learnSpellOpSchema } from "@/routes/character/spellcasting.js";
-import { fightingStyleKeySchema } from "@/routes/character/class.js";
 
 export const levelUpRouter = Router({ mergeParams: true });
 
@@ -39,6 +39,25 @@ const planQuerySchema = z
   .refine((q) => !(q.classEntryId && q.classId), {
     message: "classEntryId and classId are mutually exclusive",
   });
+
+// #1139: the granted-spell diff needs the target's committed grant source and any
+// not-yet-committed ?subclassId= pick. Loaded ONLY on the read-only plan route so
+// the shared level-up commit query never fetches (and discards) these catalog rows.
+const GRANT_SOURCE_INCLUDE = { grantedSpells: { orderBy: { gateLevel: "asc" as const }, include: { spell: true } } };
+
+async function persistedGrantSource(target: LevelUpTarget): Promise<GrantedSpellSource | null> {
+  if (target.kind !== "existing") return null;
+  const entry = await prisma.characterClassEntry.findUnique({
+    where: { id: target.classEntryId },
+    select: { subclassRef: { include: GRANT_SOURCE_INCLUDE } },
+  });
+  return entry?.subclassRef ?? null;
+}
+
+async function pickedGrantSource(subclassId: string | undefined): Promise<GrantedSpellSource | null> {
+  if (!subclassId) return null;
+  return prisma.subclass.findUnique({ where: { id: subclassId }, select: { name: true, ...GRANT_SOURCE_INCLUDE } });
+}
 
 // Neither classEntryId nor classId given → plan the primary (position-0) entry.
 async function resolvePlanTarget(
@@ -77,6 +96,14 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
     const target = await resolvePlanTarget(req.params.id, parsed.data);
     const context = await resolveLevelUpContext(req.params.id, target, parsed.data.subclassId);
     const steps = resolveLevelUpPlan(context.planCharacter, context.targetEntry, context.chosenSubclassName);
+    const persisted = await persistedGrantSource(target);
+    const picked = await pickedGrantSource(parsed.data.subclassId);
+    const gained = grantedSpellsGained(
+      persisted,
+      context.targetEntry.newLevel - 1,
+      picked ?? persisted,
+      context.targetEntry.newLevel,
+    );
     res.json({
       target: {
         className: context.targetEntry.name,
@@ -85,6 +112,7 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
         isPrimary: context.targetIsPrimary,
       },
       steps,
+      grantedSpells: gained.map((s) => ({ name: s.name, level: s.level })),
     });
   } catch (error) {
     if (error instanceof InvalidLevelUpError) {
@@ -97,18 +125,19 @@ levelUpRouter.get<{ id: string }>("/plan", async (req, res) => {
 
 // z.infer of this schema must satisfy LevelUpSubmission — each field reuses the
 // exact op schema its domain already validates, so the parsed body is the domain
-// op shape verbatim (only `target`/hp/subclassId/fightingStyle are level-up-local).
+// op shape verbatim (only `target`/hp/subclassId are level-up-local; fightingStyleFeat reuses takeFeat).
 const levelUpSubmissionSchema = z.object({
   target: levelUpTargetSchema,
   hp: z.object({ method: z.enum(["average", "roll"]), roll: z.number().int().min(1).optional() }),
   advancement: z.discriminatedUnion("type", [takeAsiOpSchema, takeFeatOpSchema]).optional(),
   subclassId: z.string().min(1).optional(),
-  fightingStyle: fightingStyleKeySchema.optional(),
+  fightingStyleFeat: takeFeatOpSchema.optional(),
   maneuvers: z.array(learnManeuverOpSchema).optional(),
   disciplines: z.array(learnDisciplineOpSchema).optional(),
   toolProficiencies: z.array(learnToolProficiencyOpSchema).optional(),
   subclassChoices: z.array(learnSubclassChoiceOpSchema).optional(),
   spellsLearned: z.array(learnSpellOpSchema).optional(),
+  cantripsLearned: z.array(learnSpellOpSchema).optional(),
   spellsForgotten: z.array(forgetSpellOpSchema).optional(),
 });
 

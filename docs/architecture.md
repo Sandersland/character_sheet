@@ -56,7 +56,7 @@ Every mutable domain follows the same shape:
 
 `lib/inventory/inventory.ts` is the reference implementation for the lib layer. Do not add new mutable domains via `PATCH /characters/:id`. The campaign-side counterpart is DM award/revoke (`lib/campaign/campaign-item-award.ts`), which writes undoable events on the **target** character.
 
-The level-up ceremony endpoint (`/level-up/transactions`) is the **composition variant**: it validates a structured submission against `buildLevelUpPlan`, then drives ONE `runCharacterTransaction` whose applyOp dispatches to the per-domain `*InTx` seams (`applyLevelUpHpInTx`, `applyAdvancementOpInTx`, `setSubclassInTx`, `setFightingStyleInTx`, `applyResourceOpInTx`, `applySpellcastingOpInTx`) — never the outer `apply*Operations` wrappers, which each mint their own transaction + `batchId`. The shared `batchId` is what makes the whole ceremony one atomic unit and one `revertBatch` undo.
+The level-up ceremony endpoint (`/level-up/transactions`) is the **composition variant**: it validates a structured submission against `buildLevelUpPlan`, then drives ONE `runCharacterTransaction` whose applyOp dispatches to the per-domain `*InTx` seams (`applyLevelUpHpInTx`, `applyAdvancementOpInTx`, `setSubclassInTx`, `applyResourceOpInTx`, `applySpellcastingOpInTx`) — never the outer `apply*Operations` wrappers, which each mint their own transaction + `batchId`. The shared `batchId` is what makes the whole ceremony one atomic unit and one `revertBatch` undo.
 
 ### Cross-tier shared types
 

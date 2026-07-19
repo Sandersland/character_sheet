@@ -45,7 +45,7 @@ const LIFE_DOMAIN_FEATURES: DerivedFeature[] = [
     level: 1,
     source: "subclass",
     description:
-      "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L1); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
+      "Always-prepared domain spells (they don't count against your prepared total): Bless, Cure Wounds (L3); Lesser Restoration, Spiritual Weapon (L3); Beacon of Hope, Revivify (L5); Death Ward, Guardian of Faith (L7); Mass Cure Wounds, Raise Dead (L9).",
   },
   {
     name: "Bonus Proficiency",
@@ -96,7 +96,7 @@ const TRICKERY_DOMAIN_FEATURES: DerivedFeature[] = [
     level: 1,
     source: "subclass",
     description:
-      "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L1); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
+      "Always-prepared domain spells (they don't count against your prepared total): Charm Person, Disguise Self (L3); Mirror Image, Pass without Trace (L3); Blink, Dispel Magic (L5); Dimension Door, Polymorph (L7); Dominate Person, Modify Memory (L9).",
   },
   {
     name: "Blessing of the Trickster",
@@ -153,7 +153,7 @@ export const cleric: ClassDefinition = {
     ];
   },
   subclasses: {
-    "life domain": { grantLevel: 1, features: LIFE_DOMAIN_FEATURES },
-    "trickery domain": { grantLevel: 1, features: TRICKERY_DOMAIN_FEATURES },
+    "life domain": { grantLevel: 3, features: LIFE_DOMAIN_FEATURES },
+    "trickery domain": { grantLevel: 3, features: TRICKERY_DOMAIN_FEATURES },
   },
 };

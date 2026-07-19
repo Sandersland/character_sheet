@@ -45,8 +45,14 @@ export function deriveSpellList(character: Character): SpellListDerivation {
   };
 }
 
+// One-liner under a Pact Magic slot group (#1139): warlock slots all cast at their
+// single pact level and refresh on a short rest — clarifies "why only level N?".
+export function pactMagicNote(slotLevel: number): string {
+  return `All slots are cast at level ${slotLevel} and return on a short rest.`;
+}
+
 // Prepared-spell budget (#883): N prepared of the derived cap, plus atLimit gate.
-// limit === null for known casters (Sorcerer/Bard) — no prepare cap applies.
+// limit === null only for non-casters (2024: every caster has a prepared cap).
 export interface PreparedBudget {
   count: number;
   limit: number | null;
@@ -62,7 +68,7 @@ export function preparedBudget(sc: Spellcasting): PreparedBudget {
 
 // Whether toggling a spell's rune *to prepared* is allowed. Unpreparing (already
 // prepared) and always-prepared runes are never blocked; a new prepare is blocked
-// only at the cap. Known casters (limit null) are unbounded.
+// only at the cap. Only non-casters (limit null) are unbounded.
 export function canPrepare(spell: Spell, budget: PreparedBudget): boolean {
   if (spell.prepared || runeState(spell) === "locked") return true;
   return !budget.atLimit;

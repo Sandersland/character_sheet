@@ -113,8 +113,8 @@ describe("deriveResources — Druid Wild Shape", () => {
     expect(wsPools.length).toBe(1); // exactly one — no duplicate from subclass
   });
 
-  it("Circle of the Moon contributes features (Combat Wild Shape, Circle Forms)", () => {
-    const result = deriveResources("druid", "circle of the moon", 2, ABILITY_SCORES, PROF_2);
+  it("Circle of the Moon contributes features (Combat Wild Shape, Circle Forms) at its level-3 grant (#1128)", () => {
+    const result = deriveResources("druid", "circle of the moon", 3, ABILITY_SCORES, PROF_2);
     const featureNames = result!.features.map((f) => f.name);
     expect(featureNames).toContain("Combat Wild Shape");
     expect(featureNames).toContain("Circle Forms");
@@ -487,9 +487,9 @@ describe("deriveSpellcasting — full casters", () => {
 // ── deriveSpellcasting — half-casters (Paladin / Ranger) ──────────────────────
 
 describe("deriveSpellcasting — half-casters", () => {
-  it("returns null at level 1 (no spellcasting until level 2)", () => {
-    expect(deriveSpellcasting("paladin", 1, CASTER_SCORES, PROF_2)).toBeNull();
-    expect(deriveSpellcasting("ranger", 1, CASTER_SCORES, PROF_2)).toBeNull();
+  it("casts from level 1 with two 1st-level slots (SRD 5.2)", () => {
+    expect(slotMap(deriveSpellcasting("paladin", 1, CASTER_SCORES, PROF_2))).toEqual({ 1: 2 });
+    expect(slotMap(deriveSpellcasting("ranger", 1, CASTER_SCORES, PROF_2))).toEqual({ 1: 2 });
   });
 
   it("grants two 1st-level slots at level 2", () => {

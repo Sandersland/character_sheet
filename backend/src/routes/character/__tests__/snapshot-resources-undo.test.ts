@@ -2,13 +2,13 @@
  * Undo-correctness regression for the canonical snapshotResources() helper (#818).
  *
  * Before #818 the maneuvers/tool-prof reconcile snapshots were hand-built 4-key
- * objects that omitted advancements + fightingStyle. Because the resources undo
- * branch restores before.resources WHOLESALE, undoing a maneuvers-reconcile
- * event silently wiped a Fighter's chosen fightingStyle and any advancements.
+ * objects that omitted advancements. Because the resources undo branch restores
+ * before.resources WHOLESALE, undoing a maneuvers-reconcile event silently wiped
+ * a Fighter's advancements (incl. the #1137 Fighting Style feat).
  *
- * This pins the fix: a Battle Master with a chosen fightingStyle AND an
- * advancement, leveled 7→6 (maneuvers trimmed 5→3, style + advancement kept),
- * then undone — both survive the round-trip.
+ * This pins the fix: a Battle Master with an ASI AND a Fighting Style feat
+ * advancement, leveled 7→6 (maneuvers trimmed 5→3, advancements kept), then
+ * undone — both survive the round-trip.
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -51,9 +51,12 @@ function fiveManeuvers() {
   ];
 }
 
-// One ASI advancement earned at level 4 — kept at level 6 (fighter allows 2 slots).
-function oneAdvancement() {
-  return [{ id: "adv-str", level: 4, kind: "asi" as const, abilityDeltas: { strength: 2 }, hpDelta: 0, initDelta: 0 }];
+// One ASI (L4) + one Fighting Style feat (#1137) — both kept at level 6.
+function twoAdvancements() {
+  return [
+    { id: "adv-str", level: 4, kind: "asi" as const, abilityDeltas: { strength: 2 }, hpDelta: 0, initDelta: 0 },
+    { id: "adv-fs", level: 1, kind: "feat" as const, slot: "fightingStyle" as const, abilityDeltas: {}, hpDelta: 0, initDelta: 0, featName: "Defense", featDescription: "d", improvements: [{ target: "armorClassWhileArmored", amount: 1 }] },
+  ];
 }
 
 const FIXTURE_ID = "snapshot-undo-bm";
@@ -89,7 +92,7 @@ afterEach(async () => {
   await prisma.character.deleteMany({ where: { id: FIXTURE_ID } });
 });
 
-// Class entry name is exactly "fighter" so fightingStyleChoiceCount +
+// Class entry name is exactly "fighter" so the Fighting Style feat slot +
 // advancementSlotsForLevel recognize the Fighter schedule.
 async function createBattleMaster() {
   return prisma.character.create({
@@ -107,9 +110,8 @@ async function createBattleMaster() {
         maneuversKnown: fiveManeuvers(),
         disciplinesKnown: [],
         toolProficienciesKnown: [],
-        advancements: oneAdvancement(),
-        fightingStyle: "defense",
-      },
+        advancements: twoAdvancements(),
+      } as unknown as Prisma.InputJsonValue,
       classEntries: {
         create: [{ name: "fighter", classId: fighterClassId, position: 0, level: 7, subclassId: bmSubclassId, subclass: BM_SUBCLASS_NAME }],
       },
@@ -118,16 +120,17 @@ async function createBattleMaster() {
 }
 
 describe("snapshotResources undo-correctness (#818)", () => {
-  it("undoing a maneuvers-reconcile event preserves fightingStyle and advancements", async () => {
+  it("undoing a maneuvers-reconcile event preserves the fs feat and advancements", async () => {
     await createBattleMaster();
+    const hasFs = (advs: Array<{ slot?: string }>) => advs.some((a) => a.slot === "fightingStyle");
 
-    // Level 7 → 6: maneuvers trimmed 5→3; fightingStyle + advancement retained.
+    // Level 7 → 6: maneuvers trimmed 5→3; both advancements retained.
     const down = await supertest(app).post(`/api/characters/${FIXTURE_ID}/experience`).set("Cookie", COOKIE)
       .send({ operations: [{ type: "set", value: XP_LVL_6 }] });
     expect(down.status).toBe(200);
     expect(down.body.resources.maneuversKnown).toHaveLength(3);
-    expect(down.body.resources.fightingStyle).toBe("defense");
-    expect(down.body.advancements).toHaveLength(1);
+    expect(down.body.advancements).toHaveLength(2);
+    expect(hasFs(down.body.advancements)).toBe(true);
 
     // Find the maneuvers-reconcile event's batch.
     const activity = await supertest(app).get(`/api/characters/${FIXTURE_ID}/activity`).set("Cookie", COOKIE);
@@ -135,13 +138,13 @@ describe("snapshotResources undo-correctness (#818)", () => {
       .find((e) => e.type === "maneuversReconciled" && !e.reverted)!;
     expect(ev).toBeDefined();
 
-    // Undo restores before.resources wholesale — pre-#818 this wiped
-    // fightingStyle + advancements because they weren't in the snapshot.
+    // Undo restores before.resources wholesale — pre-#818 this wiped advancements
+    // (incl. the fs feat) because they weren't in the snapshot.
     const undo = await supertest(app).post(`/api/characters/${FIXTURE_ID}/events/${ev.batchId}/revert`).set("Cookie", COOKIE);
     expect(undo.status).toBe(200);
-    expect(undo.body.resources.fightingStyle).toBe("defense");
     expect(undo.body.resources.maneuversKnown).toHaveLength(5);
-    expect(undo.body.advancements).toHaveLength(1);
-    expect(undo.body.advancements[0].abilityDeltas).toEqual({ strength: 2 });
+    expect(undo.body.advancements).toHaveLength(2);
+    expect(hasFs(undo.body.advancements)).toBe(true);
+    expect(undo.body.advancements.find((a: { slot?: string }) => a.slot !== "fightingStyle").abilityDeltas).toEqual({ strength: 2 });
   });
 });

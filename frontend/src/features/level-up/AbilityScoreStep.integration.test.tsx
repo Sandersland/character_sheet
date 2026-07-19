@@ -20,7 +20,7 @@ const submitMock = vi.mocked(submitLevelUp);
 const featsMock = vi.mocked(fetchFeats);
 
 const CATALOG: CatalogFeat[] = [
-  { id: "alert", name: "Alert", description: "Always on guard.", abilityOptions: [], abilityIncrease: 0, improvements: [] },
+  { id: "alert", name: "Alert", description: "Always on guard.", category: "general", abilityOptions: [], abilityIncrease: 0, improvements: [] },
 ];
 
 // hitPoints/hitDice present because step 1 is the real HitPointsStep (#887).
@@ -36,6 +36,7 @@ const character = {
 const plan: LevelUpPlanResponse = {
   target: { className: "fighter", subclass: "Champion", newLevel: 8, isPrimary: true },
   steps: [{ kind: "hitPoints" }, { kind: "advancement", count: 1 }, { kind: "review" }],
+  grantedSpells: [],
 };
 
 function renderCeremony() {

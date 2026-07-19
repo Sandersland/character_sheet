@@ -128,8 +128,8 @@ const CIRCLE_OF_THE_MOON_FEATURES: DerivedFeature[] = [
   },
 ];
 
-// Circle of the Moon's Circle Forms raise the Wild Shape CR cap: CR 1 at L2,
-// then level÷3 (min 1) from L6. Other circles use the base druid table.
+// Circle of the Moon's Circle Forms raise the Wild Shape CR cap: CR 1 at its L3
+// grant, then level÷3 (min 1) from L6. Other circles use the base druid table.
 function wildShapeCrCap(level: number, subclassKey: string | undefined): string {
   if (subclassKey === "circle of the moon") {
     return String(level >= 6 ? Math.max(1, Math.floor(level / 3)) : 1);
@@ -158,7 +158,7 @@ export const druid: ClassDefinition = {
     ];
   },
   subclasses: {
-    "circle of the land": { grantLevel: 2, features: CIRCLE_OF_THE_LAND_FEATURES },
-    "circle of the moon": { grantLevel: 2, features: CIRCLE_OF_THE_MOON_FEATURES },
+    "circle of the land": { grantLevel: 3, features: CIRCLE_OF_THE_LAND_FEATURES },
+    "circle of the moon": { grantLevel: 3, features: CIRCLE_OF_THE_MOON_FEATURES },
   },
 };

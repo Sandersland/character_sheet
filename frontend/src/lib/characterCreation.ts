@@ -1,11 +1,14 @@
 import { abilityModifier } from "@/lib/abilities";
 import { draftToInput } from "@/lib/startingEquipment";
 import { missingRequirements } from "@/lib/characterCreationValidation";
+import { creationSpellCounts, creationSpellsMissing } from "@/lib/creationSpells";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
 import type {
+  AbilityName,
   BackgroundOption,
   ClassOption,
   CreateCharacterInput,
+  OriginFeatOption,
   RaceOption,
   ReferenceData,
   SkillName,
@@ -30,6 +33,60 @@ export interface CreationPreview {
   dexModifier: number;
   speed: number | undefined;
   maxHp: number | undefined;
+}
+
+export interface CreationBackgroundBonuses {
+  /** True when the selected (non-custom) background carries a 2024 ability spread. */
+  applicable: boolean;
+  /** The three abilities the spread draws from (empty when not applicable). */
+  abilities: AbilityName[];
+  /** The Origin feat the background grants, if any. */
+  originFeat: OriginFeatOption | null;
+  /** Current per-ability assignment restricted to the three choices. */
+  assignment: Partial<Record<AbilityName, number>>;
+  /** Whether the assignment is a legal +2/+1 or +1/+1/+1 spread. */
+  complete: boolean;
+}
+
+// A legal PHB'24 spread is +2/+1 (two abilities) or +1/+1/+1 (three) — sums to 3.
+function isValidSpread(values: number[]): boolean {
+  const sorted = [...values].sort((a, b) => a - b);
+  const isTwoOne = sorted.length === 2 && sorted[0] === 1 && sorted[1] === 2;
+  const isOneOneOne = sorted.length === 3 && sorted.every((v) => v === 1);
+  return isTwoOne || isOneOneOne;
+}
+
+// Restrict the draft's raw assignment to the three abilities with positive bumps.
+function pickAssignment(
+  raw: Partial<Record<AbilityName, number>>,
+  abilities: AbilityName[],
+): Partial<Record<AbilityName, number>> {
+  const assignment: Partial<Record<AbilityName, number>> = {};
+  for (const ability of abilities) {
+    const value = raw[ability];
+    if (value && value > 0) assignment[ability] = value;
+  }
+  return assignment;
+}
+
+// Derives the background ability-spread state for the form: which abilities are
+// in play, the origin feat, the current assignment, and whether it's complete.
+// Inert (applicable:false) for custom or spec-less (Folk Hero) backgrounds (#1130).
+export function deriveBackgroundBonuses(
+  draft: CharacterDraft,
+  selections: CreationSelections,
+): CreationBackgroundBonuses {
+  const background = draft.useCustomBackground ? undefined : selections.background;
+  const abilities = background?.abilityChoices ?? [];
+  const applicable = abilities.length > 0;
+  const assignment = pickAssignment(draft.backgroundAbilities, abilities);
+  return {
+    applicable,
+    abilities,
+    originFeat: background?.originFeat ?? null,
+    assignment,
+    complete: applicable && isValidSpread(Object.values(assignment)),
+  };
 }
 
 function hitDieFace(hitDie: string): number {
@@ -76,12 +133,27 @@ export function resolveEquipmentInput(
   return draftToInput(selectedClass.startingEquipment, draft.equipmentDraft) ?? undefined;
 }
 
+// Fold the background spread's current assignment into the base scores so the
+// preview (AC / init / HP) reflects the bonuses the backend will bake in (#1130).
+function effectiveCreationScores(
+  draft: CharacterDraft,
+  selections: CreationSelections
+): Record<AbilityName, number> {
+  const bonuses = deriveBackgroundBonuses(draft, selections);
+  const scores = { ...draft.abilityScores };
+  for (const [ability, amount] of Object.entries(bonuses.assignment)) {
+    scores[ability as AbilityName] += amount ?? 0;
+  }
+  return scores;
+}
+
 export function derivePreview(
   draft: CharacterDraft,
   selections: CreationSelections
 ): CreationPreview {
-  const dexModifier = abilityModifier(draft.abilityScores.dexterity);
-  const conModifier = abilityModifier(draft.abilityScores.constitution);
+  const scores = effectiveCreationScores(draft, selections);
+  const dexModifier = abilityModifier(scores.dexterity);
+  const conModifier = abilityModifier(scores.constitution);
   return {
     armorClass: 10 + dexModifier,
     dexModifier,
@@ -96,7 +168,7 @@ export function creationMissing(
   draft: CharacterDraft,
   selections: CreationSelections
 ): string[] {
-  return missingRequirements({
+  const missing = missingRequirements({
     name: draft.name,
     alignment: draft.alignment,
     race: draft.race,
@@ -105,6 +177,12 @@ export function creationMissing(
     startingEquipment: selections.class?.startingEquipment ?? null,
     equipmentDraft: draft.equipmentDraft,
   });
+  // #1131: a level-1 caster must finish its cantrip + spell picks.
+  missing.push(...creationSpellsMissing(creationSpellCounts(selections.class), draft.cantripIds, draft.spellIds));
+  // A specced background requires a complete ability spread before saving (#1130).
+  const bonuses = deriveBackgroundBonuses(draft, selections);
+  if (bonuses.applicable && !bonuses.complete) missing.push("Background ability scores");
+  return missing;
 }
 
 export function buildCreatePayload(
@@ -113,6 +191,7 @@ export function buildCreatePayload(
   skills: CreationSkillChoices,
   selectedToolChoices: string[]
 ): CreateCharacterInput {
+  const backgroundBonuses = deriveBackgroundBonuses(draft, selections);
   return {
     name: draft.name.trim(),
     alignment: draft.alignment,
@@ -124,9 +203,15 @@ export function buildCreatePayload(
       subclassId: draft.subclassId || undefined,
     }],
     abilityScores: draft.abilityScores,
+    // Only send a complete spread; the backend derives HP/init from it (#1130).
+    backgroundAbilities: backgroundBonuses.complete ? backgroundBonuses.assignment : undefined,
     skillProficiencies: [...skills.granted, ...skills.selected],
     toolChoices: selectedToolChoices.length > 0 ? selectedToolChoices : undefined,
     portraitUrl: draft.portraitUrl.trim() || null,
     startingEquipment: resolveEquipmentInput(draft, selections.class) ?? undefined,
+    // #1131: casters send their prepared picks; a non-caster omits the field.
+    ...(selections.class?.level1SpellPicks
+      ? { spells: { cantripIds: draft.cantripIds, spellIds: draft.spellIds } }
+      : {}),
   };
 }

@@ -27,7 +27,7 @@ const STEP_LABELS: Record<LevelUpStepKind, string> = {
   advancement: "Ability Score / Feat",
   subclass: "Subclass",
   maneuvers: "Maneuvers",
-  fightingStyle: "Fighting Style",
+  fightingStyleFeat: "Fighting Style",
   disciplines: "Disciplines",
   toolProficiency: "Tool Proficiency",
   subclassChoice: "Subclass Choice",
@@ -102,15 +102,17 @@ export function draftSatisfies(step: LevelUpStep, draft: LevelUpDraft): boolean 
       return draft.advancement != null;
     case "subclass":
       return draft.subclassId != null;
-    case "fightingStyle":
-      return draft.fightingStyle != null;
+    case "fightingStyleFeat":
+      return draft.fightingStyleFeat != null;
     case "review":
       return true;
     case "newSpells": {
       // #1101: each swap forget must be offset by an extra learn, so the net
       // learn count must reach count + forgotten (count 0 with no swap is trivially met).
       const required = (step.count ?? 0) + (draft.spellsForgotten?.length ?? 0);
-      return listCount(step, draft) >= required;
+      // #1131: cantrips are picked separately and gate Continue on their own count.
+      const cantrips = typeof step.meta?.cantrips === "number" ? step.meta.cantrips : 0;
+      return listCount(step, draft) >= required && (draft.cantripsLearned?.length ?? 0) >= cantrips;
     }
     default:
       return listCount(step, draft) >= (step.count ?? 1);

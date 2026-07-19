@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { StrictMode, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchDisciplines, fetchManeuvers, fetchReference } from "@/api/client";
+import { fetchDisciplines, fetchFeats, fetchManeuvers, fetchReference } from "@/api/client";
 import ChoiceStep from "@/features/level-up/ChoiceStep";
 import { LevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import type { LevelUpDraft } from "@/lib/levelUpSteps";
@@ -14,6 +14,7 @@ vi.mock("@/api/client", () => ({
   fetchManeuvers: vi.fn(),
   fetchDisciplines: vi.fn(),
   fetchReference: vi.fn(),
+  fetchFeats: vi.fn(),
 }));
 
 // Defaults restored per-test so a test's mockResolvedValue override can't leak.
@@ -27,18 +28,24 @@ beforeEach(() => {
   vi.mocked(fetchReference).mockResolvedValue({ artisanTools: [] } as unknown as Awaited<
     ReturnType<typeof fetchReference>
   >);
+  vi.mocked(fetchFeats).mockResolvedValue([
+    { id: "archery", name: "Archery", description: "arch", category: "fighting_style" },
+    { id: "defense", name: "Defense", description: "def", category: "fighting_style" },
+    { id: "sentinel", name: "Sentinel", description: "sent", category: "general" },
+  ] as unknown as Awaited<ReturnType<typeof fetchFeats>>);
 });
 
 const plan: LevelUpPlanResponse = {
   target: { className: "Fighter", subclass: "Battle Master", newLevel: 3, isPrimary: true },
   steps: [],
+  grantedSpells: [],
 };
 
 function Harness({ step, character }: { step: LevelUpStep; character?: Character }) {
   const [draft, setDraft] = useState<LevelUpDraft>({ hp: { method: "average" } });
   return (
     <LevelUpStepContext.Provider
-      value={{ character: character ?? ({ resources: {} } as Character), draft, setDraft, plan }}
+      value={{ character: character ?? ({ resources: {}, advancements: [] } as unknown as Character), draft, setDraft, plan }}
     >
       <ChoiceStep step={step} />
       <pre data-testid="draft">{JSON.stringify(draft)}</pre>
@@ -84,18 +91,26 @@ describe("ChoiceStep", () => {
     expect(draft.maneuvers).toHaveLength(2);
   });
 
-  it("single-selects a fighting style as a scalar and replaces on re-pick", async () => {
+  it("single-selects a fighting-style feat as a takeFeat op and replaces on re-pick", async () => {
     const user = userEvent.setup();
-    render(<Harness step={{ kind: "fightingStyle" }} />);
+    render(<Harness step={{ kind: "fightingStyleFeat" }} />);
 
     await user.click(await screen.findByText("Archery"));
     await waitFor(() => {
-      expect(JSON.parse(screen.getByTestId("draft").textContent!).fightingStyle).toBe("archery");
+      expect(JSON.parse(screen.getByTestId("draft").textContent!).fightingStyleFeat).toEqual({
+        type: "takeFeat",
+        featId: "archery",
+        slot: "fightingStyle",
+      });
     });
 
     await user.click(screen.getByText("Defense"));
     await waitFor(() => {
-      expect(JSON.parse(screen.getByTestId("draft").textContent!).fightingStyle).toBe("defense");
+      expect(JSON.parse(screen.getByTestId("draft").textContent!).fightingStyleFeat).toEqual({
+        type: "takeFeat",
+        featId: "defense",
+        slot: "fightingStyle",
+      });
     });
   });
 

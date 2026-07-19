@@ -38,7 +38,10 @@ export default function AdvancementSection({ character, onUpdate }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { advancements, advancementSlots } = character;
+  const { advancementSlots } = character;
+  // Fighting Style feats (#1137) occupy their own slot partition and render in the
+  // class-features section — exclude them from the ASI/feat list here.
+  const advancements = character.advancements.filter((a) => a.slot !== "fightingStyle");
   const slotsRemaining = advancementSlots.total - advancementSlots.used;
 
   async function send(ops: AdvancementOperation[]) {
@@ -107,10 +110,11 @@ export default function AdvancementSection({ character, onUpdate }: Props) {
                   </span>
                   <span
                     className={`text-[10px] font-semibold uppercase tracking-wide ${
-                      entry.kind === "feat" ? "text-arcane-700" : "text-gold-800"
+                      entry.origin ? "text-vitality-700" : entry.kind === "feat" ? "text-arcane-700" : "text-gold-800"
                     }`}
                   >
-                    {entry.kind === "feat" ? "Feat" : "ASI"}
+                    {/* Origin feats (background grants, #1130) are slot-exempt and not removable. */}
+                    {entry.origin ? "Origin" : entry.kind === "feat" ? "Feat" : "ASI"}
                   </span>
                 </div>
                 <p className="mt-0.5 text-sm font-semibold text-parchment-900">
@@ -122,16 +126,18 @@ export default function AdvancementSection({ character, onUpdate }: Props) {
                   </p>
                 )}
               </div>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => handleRemove(entry.id)}
-                title="Remove this advancement"
-                aria-label={`Remove: ${entryLabel(entry)}`}
-                className="shrink-0 rounded-control px-1.5 py-0.5 text-[10px] text-parchment-600 hover:text-garnet-600 disabled:opacity-40"
-              >
-                ✕
-              </button>
+              {!entry.origin && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => handleRemove(entry.id)}
+                  title="Remove this advancement"
+                  aria-label={`Remove: ${entryLabel(entry)}`}
+                  className="shrink-0 rounded-control px-1.5 py-0.5 text-[10px] text-parchment-600 hover:text-garnet-600 disabled:opacity-40"
+                >
+                  ✕
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -149,6 +155,7 @@ export default function AdvancementSection({ character, onUpdate }: Props) {
         currentScores={character.abilityScores as unknown as Record<string, number>}
         slotsRemaining={slotsRemaining}
         busy={busy}
+        characterLevel={character.level}
         skillNames={(character.skills as { name: string }[]).map((s) => s.name)}
         onSubmit={handleSubmit}
       />
