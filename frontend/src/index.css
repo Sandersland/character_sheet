@@ -333,6 +333,35 @@
   }
 }
 
+/* Mobile sheet-header collapse crossfade (#1083): incoming variant fades up into
+   place while the outgoing one fades/slides out as an inert overlay. */
+@keyframes header-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes header-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[header-in_200ms_ease-out\],
+  .animate-\[header-out_200ms_ease-out_forwards\] {
+    animation: none;
+  }
+}
+
 /* Mobile quick-capture (#866): the "Campfire" register. In dark mode a faint
    gold firelight warms the base of the feed — no new colours, just what dark
    mode should give. Dark-only, so it lives here rather than in a `dark:`

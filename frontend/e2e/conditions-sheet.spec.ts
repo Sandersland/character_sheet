@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
-import { findCharacterByName, removeCondition } from "./helpers/api";
+import { enterLiveCombat, findCharacterByName, removeCondition } from "./helpers/api";
 import { collectConsoleErrors } from "./helpers/console";
 
 // Compact conditions strip on mobile (#769): the slim session strip opens a
@@ -18,7 +18,7 @@ test("session conditions strip (mobile): tap, apply a condition, see it reflect 
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
   const strip = page.getByRole("button", { name: /manage conditions/i });
@@ -40,9 +40,9 @@ test("session conditions strip (mobile): tap, apply a condition, see it reflect 
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // The apply lands on the session log — reachable via the mobile log peek strip,
-  // which opens the log in a bottom sheet (#1028; the Turn/Log sub-nav is gone).
-  await page.getByRole("button", { name: /view session log/i }).click();
+  // The apply lands on the session log — opened on demand from the one-line log
+  // row, which is a bottom sheet on mobile (#1086; the pinned peek strip is gone).
+  await page.getByRole("button", { name: /open session log/i }).click();
   const logSheet = page.getByRole("dialog");
   await expect(logSheet.getByText(/Applied condition: Poisoned/i).first()).toBeVisible();
 

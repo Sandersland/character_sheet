@@ -98,7 +98,8 @@ export interface CampaignRecap {
 
 export interface Session {
   id: string;
-  campaignId: string;
+  /** null = a solo (campaign-less) session owned by one character (#1082). */
+  campaignId: string | null;
   status: SessionStatus;
   startedAt: string; // ISO 8601
   endedAt?: string;

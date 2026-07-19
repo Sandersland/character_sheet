@@ -87,4 +87,11 @@ describe("partyHealAllies", () => {
   it("returns an empty list when there are no participants", () => {
     expect(partyHealAllies({ id: "s", campaignId: "camp-1" } as unknown as Session, "me")).toEqual([]);
   });
+
+  it("returns [] for a solo (null-campaign) session — no party to heal (#1082)", () => {
+    // A solo session has campaignId null and no co-participants; the campaign-pref
+    // match can never fire, so the friendly-heal picker stays empty.
+    const solo = { id: "s", campaignId: null, status: "active", startedAt: "x", participants: [] } as unknown as Session;
+    expect(partyHealAllies(solo, "me")).toEqual([]);
+  });
 });

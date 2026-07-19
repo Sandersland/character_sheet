@@ -16,11 +16,11 @@ interface Props {
 /**
  * A tappable HP control (#982): renders `children` inside a button labelled
  * "Manage hit points" that opens the shared "Hit Points" `BottomSheet`
- * (`HpSheetBody` — the single damage/heal/temp editing surface). Reused by the
- * sheet header vitals (desktop banner + mobile mini-header) so the header HP
- * readout IS the entry point to the HP sheet (the live-Combat panel carries no
- * separate HP control). The sheet stays open after an apply, so a player can
- * chain damage/heal without re-opening it.
+ * (`HpSheetBody` — the single damage/heal/temp editing surface). The entry point
+ * differs by surface: the mobile mini-header vitals carry it, while on desktop
+ * the header dropped HP (#1085) so the live-Combat `CombatUtilityStrip` carries
+ * it during play. The sheet stays open after an apply, so a player can chain
+ * damage/heal without re-opening it.
  */
 export default function ManageHpButton({ character, onUpdate, className, children }: Props) {
   const [open, setOpen] = useState(false);

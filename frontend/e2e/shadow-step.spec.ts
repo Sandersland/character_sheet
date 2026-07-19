@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
+import { enterLiveCombat } from "./helpers/api";
 import { collectConsoleErrors } from "./helpers/console";
 
 // The Shadow Monk persona (seeded in global-setup) is Monk L6 / Way of Shadow,
@@ -12,7 +13,7 @@ test("session: a Way of Shadow monk uses Shadow Step as a bonus action", async (
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Shadow Monk/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();

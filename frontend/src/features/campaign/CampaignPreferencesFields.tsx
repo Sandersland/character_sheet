@@ -1,10 +1,9 @@
 import { useState } from "react";
 
 import { updateCampaignPreferences } from "@/api/client";
-import Card from "@/components/ui/Card";
 import type { CampaignPreferences, Character } from "@/types/character";
 
-interface CampaignPreferencesPanelProps {
+interface CampaignPreferencesFieldsProps {
   character: Character;
   onUpdate: (c: Character) => void;
 }
@@ -38,13 +37,14 @@ function ToggleRow({ label, hint, checked, disabled, onChange }: ToggleRowProps)
   );
 }
 
-// Campaign-scoped play preferences (#537). Rendered only when the character is
-// attached to a campaign (the caller gates on character.campaignId). Reads the
-// serialized prefs and writes each flag through the API client helper.
-export default function CampaignPreferencesPanel({
+// The two campaign-scoped play-preference toggles + their save/error wiring
+// (#537). Extracted from the Story tab into a standalone field block so the
+// header Campaign-settings sheet (#1087) owns the surface. Reads the serialized
+// prefs and writes each flag through the API client helper.
+export default function CampaignPreferencesFields({
   character,
   onUpdate,
-}: CampaignPreferencesPanelProps) {
+}: CampaignPreferencesFieldsProps) {
   const prefs: CampaignPreferences = character.campaignPreferences ?? {
     shareWithDm: false,
     autoFriendlyHealing: false,
@@ -66,7 +66,7 @@ export default function CampaignPreferencesPanel({
   }
 
   return (
-    <Card title="Campaign preferences" className="p-0">
+    <>
       <div className="divide-y divide-parchment-200">
         <ToggleRow
           label="Share sheet with DM"
@@ -84,6 +84,6 @@ export default function CampaignPreferencesPanel({
         />
       </div>
       {error && <p className="px-4 pb-3 text-xs text-garnet-700">{error}</p>}
-    </Card>
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { ChevronDown, Shield } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import MeterBar from "@/components/ui/MeterBar";
@@ -8,18 +8,32 @@ import Popover from "@/components/ui/Popover";
 import ArmorClassBreakdown from "@/features/character-meta/ArmorClassBreakdown";
 import CharacterSwitcherSheet from "@/features/character-meta/CharacterSwitcherSheet";
 import ManageHpButton from "@/features/hitpoints/ManageHpButton";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { classSummary, isMulticlass } from "@/lib/multiclass";
 import type { Character } from "@/types/character";
 
+type HeaderVariant = "expanded" | "collapsed";
+
 type SheetMenuItem = { label: string; onSelect: () => void; danger?: boolean; disabled?: boolean; separatorBefore?: boolean };
+
+// Shared shape for the two breakpoint sub-headers (CollapsedBar / ExpandedSheetHeader):
+// identity + HP readout + the live pill + the "Sheet actions" ⋯ menu.
+interface SubHeaderProps {
+  character: Character;
+  onUpdate?: (character: Character) => void;
+  pill: React.ReactNode;
+  menuItems: SheetMenuItem[];
+  onOpenSwitcher: () => void;
+}
 
 interface MobileSheetHeaderProps {
   character: Character;
   /** Opens the shared HP sheet from the HP readout; omit for a read-only row. */
   onUpdate?: (character: Character) => void;
   /** Live-session controls folded into the "Sheet actions" menu while joined
-   *  (#979). Non-null ⇒ a session is live and this character is in it. */
-  sessionActions?: { busy: boolean; onLeave: () => void; onEnd: () => void } | null;
+   *  (#979). Non-null ⇒ a session is live and this character is in it. onLeave is
+   *  omitted for a solo session (#1082) — Leave is campaign-only, End is not. */
+  sessionActions?: { busy: boolean; onLeave?: () => void; onEnd: () => void } | null;
   /** Active combat round for the live pill (null → "Live"). */
   liveRound?: number | null;
   /** Jump to the Combat tab — the live pill's tap target (#1026). */
@@ -31,6 +45,9 @@ interface MobileSheetHeaderProps {
   onOpenSessions: () => void;
   onOpenActivity: () => void;
   onOpenDelete: () => void;
+  /** Opens the Campaign settings sheet (#1087); the ⋮ item shows only when the
+   *  caller passes a handler (gated on campaign attachment upstream). */
+  onOpenCampaignSettings?: () => void;
 }
 
 /** Pulsing garnet live pill — the single live-state indicator (#1026), replacing
@@ -85,7 +102,7 @@ function HpNumbers({ current, max, temp }: { current: number; max: number; temp:
 // Activity/All characters (above Delete). "All characters" (#1027) is the ⋮
 // discoverability fallback for the identity-tap switcher.
 function buildMenuItems(
-  handlers: Pick<MobileSheetHeaderProps, "onOpenCapture" | "onOpenSessions" | "onOpenActivity" | "onOpenDelete">,
+  handlers: Pick<MobileSheetHeaderProps, "onOpenCapture" | "onOpenSessions" | "onOpenActivity" | "onOpenDelete" | "onOpenCampaignSettings">,
   onAllCharacters: () => void,
   sessionActions: MobileSheetHeaderProps["sessionActions"],
 ): SheetMenuItem[] {
@@ -93,12 +110,17 @@ function buildMenuItems(
     { label: "＋ Note", onSelect: handlers.onOpenCapture },
     { label: "Sessions", onSelect: handlers.onOpenSessions },
     { label: "Activity", onSelect: handlers.onOpenActivity },
+    ...(handlers.onOpenCampaignSettings
+      ? [{ label: "Campaign settings…", onSelect: handlers.onOpenCampaignSettings }]
+      : []),
     { label: "All characters", onSelect: onAllCharacters, separatorBefore: true },
+    // Leave is campaign-only (#1082): a solo session omits onLeave, so only End
+    // surfaces. The separator rides whichever item leads the session group.
+    ...(sessionActions?.onLeave
+      ? [{ label: "Leave Session", onSelect: sessionActions.onLeave, disabled: sessionActions.busy, separatorBefore: true }]
+      : []),
     ...(sessionActions
-      ? [
-          { label: "Leave Session", onSelect: sessionActions.onLeave, disabled: sessionActions.busy, separatorBefore: true },
-          { label: "End Session", onSelect: sessionActions.onEnd, disabled: sessionActions.busy },
-        ]
+      ? [{ label: "End Session", onSelect: sessionActions.onEnd, disabled: sessionActions.busy, separatorBefore: !sessionActions.onLeave }]
       : []),
     { label: "Delete", onSelect: handlers.onOpenDelete, danger: true, separatorBefore: true },
   ];
@@ -122,12 +144,14 @@ export default function MobileSheetHeader({
   onOpenSessions,
   onOpenActivity,
   onOpenDelete,
+  onOpenCampaignSettings,
 }: MobileSheetHeaderProps) {
   const navigate = useNavigate();
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const reducedMotion = usePrefersReducedMotion();
 
   const menuItems = buildMenuItems(
-    { onOpenCapture, onOpenSessions, onOpenActivity, onOpenDelete },
+    { onOpenCapture, onOpenSessions, onOpenActivity, onOpenDelete, onOpenCampaignSettings },
     () => navigate("/"),
     sessionActions,
   );
@@ -135,15 +159,113 @@ export default function MobileSheetHeader({
   const pill = live ? <LivePill round={liveRound} onGoToCombat={onGoToCombat} /> : null;
   const openSwitcher = () => setSwitcherOpen(true);
 
+  const renderVariant = (variant: HeaderVariant) => {
+    const shared = { character, onUpdate, pill, menuItems, onOpenSwitcher: openSwitcher };
+    return variant === "collapsed" ? <CollapsedBar {...shared} /> : <ExpandedSheetHeader {...shared} />;
+  };
+
   return (
     <>
-      {scrolled ? (
-        <CollapsedBar character={character} onUpdate={onUpdate} pill={pill} menuItems={menuItems} onOpenSwitcher={openSwitcher} />
-      ) : (
-        <ExpandedSheetHeader character={character} onUpdate={onUpdate} pill={pill} menuItems={menuItems} onOpenSwitcher={openSwitcher} />
-      )}
+      <CollapseAnimator
+        variant={scrolled ? "collapsed" : "expanded"}
+        render={renderVariant}
+        reducedMotion={reducedMotion}
+      />
       {switcherOpen && <CharacterSwitcherSheet currentId={character.id} onClose={() => setSwitcherOpen(false)} />}
     </>
+  );
+}
+
+/**
+ * Animates the expanded⇄collapsed swap (#1083): pins the wrapper to the outgoing
+ * height, eases it to the incoming height over 200ms, and crossfades the outgoing
+ * variant out as an inert overlay (kept in normal a11y-hidden until it unmounts).
+ * First mount and reduced-motion take the plain swap. transitionend finalizes,
+ * with a 250ms fallback because that event is swallowed when the md breakpoint is
+ * crossed or the tab is backgrounded (would otherwise leave height pinned).
+ */
+function CollapseAnimator({
+  variant,
+  render,
+  reducedMotion,
+}: {
+  variant: HeaderVariant;
+  render: (v: HeaderVariant) => React.ReactNode;
+  reducedMotion: boolean;
+}) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const incomingRef = useRef<HTMLDivElement>(null);
+  const [current, setCurrent] = useState<HeaderVariant>(variant);
+  const [outgoing, setOutgoing] = useState<HeaderVariant | null>(null);
+  const [height, setHeight] = useState<number | null>(null);
+
+  const finalize = useCallback(() => {
+    setOutgoing(null);
+    setHeight(null);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (variant === current) return;
+    if (reducedMotion) {
+      setCurrent(variant);
+      return;
+    }
+    // Capture the outgoing height BEFORE the swap so the wrapper can hold it,
+    // then (next effect) ease to the incoming height.
+    setHeight(wrapperRef.current?.offsetHeight ?? null);
+    setOutgoing(current);
+    setCurrent(variant);
+  }, [variant, current, reducedMotion]);
+
+  useLayoutEffect(() => {
+    if (outgoing === null) return;
+    const target = incomingRef.current?.offsetHeight ?? null;
+    const raf = requestAnimationFrame(() => {
+      if (target !== null) setHeight(target);
+    });
+    const fallback = setTimeout(finalize, 250);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(fallback);
+    };
+  }, [outgoing, current, finalize]);
+
+  const animating = outgoing !== null;
+  return (
+    <div
+      ref={wrapperRef}
+      className={
+        animating
+          ? "relative overflow-hidden transition-[height] duration-200 ease-out motion-reduce:transition-none"
+          : "relative"
+      }
+      style={height !== null ? { height } : undefined}
+      onTransitionEnd={(e) => {
+        if (e.propertyName === "height" && e.target === wrapperRef.current) finalize();
+      }}
+    >
+      <div
+        key={`in-${current}`}
+        ref={incomingRef}
+        className={animating ? "animate-[header-in_200ms_ease-out] motion-reduce:animate-none" : undefined}
+      >
+        {render(current)}
+      </div>
+      {outgoing !== null && (
+        <div
+          key={`out-${outgoing}`}
+          // React 18 has no typed `inert` prop; set it imperatively so the
+          // fading-out overlay is untabbable while it lingers.
+          ref={(el) => {
+            el?.setAttribute("inert", "");
+          }}
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 animate-[header-out_200ms_ease-out_forwards] motion-reduce:animate-none"
+        >
+          {render(outgoing)}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -152,19 +274,7 @@ export default function MobileSheetHeader({
  * · ⋯. The scroll-collapsed default — calm paper chrome so the panel below stays
  * the subject. Tapping the identity region opens the character switcher (#1027).
  */
-function CollapsedBar({
-  character,
-  onUpdate,
-  pill,
-  menuItems,
-  onOpenSwitcher,
-}: {
-  character: Character;
-  onUpdate?: (character: Character) => void;
-  pill: React.ReactNode;
-  menuItems: SheetMenuItem[];
-  onOpenSwitcher: () => void;
-}) {
+function CollapsedBar({ character, onUpdate, pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
   const { current, max, temp } = character.hitPoints;
   const hp = (
     <>
@@ -216,19 +326,7 @@ function CollapsedBar({
  * live pill + ⋯. Row 2: HP numbers + full-width meter + AC badge. The identity
  * (avatar + name + subtitle) is a button opening the character switcher (#1027).
  */
-function ExpandedSheetHeader({
-  character,
-  onUpdate,
-  pill,
-  menuItems,
-  onOpenSwitcher,
-}: {
-  character: Character;
-  onUpdate?: (character: Character) => void;
-  pill: React.ReactNode;
-  menuItems: SheetMenuItem[];
-  onOpenSwitcher: () => void;
-}) {
+function ExpandedSheetHeader({ character, onUpdate, pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
   const { current, max, temp } = character.hitPoints;
 
   // "Race · Class Level" — classSummary carries per-class levels for multiclass;
