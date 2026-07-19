@@ -203,6 +203,35 @@ describe("POST /api/characters/:id/sessions/:sessionId/end — solo end", () => 
   });
 });
 
+describe("campaign attach vs active solo session", () => {
+  async function makeEmptyCampaign(): Promise<string> {
+    const created = await agent().post("/api/campaigns").send({ name: "Late Joiners" });
+    return created.body.id as string;
+  }
+
+  it("409s attaching a character that has an active solo session", async () => {
+    await startSoloSession(CHAR_SOLO);
+    const campaignId = await makeEmptyCampaign();
+    const res = await agent()
+      .post(`/api/campaigns/${campaignId}/characters`)
+      .send({ characterId: CHAR_SOLO });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/solo session/i);
+  });
+
+  it("allows the attach once the solo session has ended", async () => {
+    const started = await startSoloSession(CHAR_SOLO);
+    const campaignId = await makeEmptyCampaign();
+    await agent().post(`/api/characters/${CHAR_SOLO}/sessions/${started.id}/end`).send({});
+
+    const res = await agent()
+      .post(`/api/campaigns/${campaignId}/characters`)
+      .send({ characterId: CHAR_SOLO });
+    expect(res.status).toBe(200);
+    expect(res.body.campaignId).toBe(campaignId);
+  });
+});
+
 describe("solo session event tagging", () => {
   it("tags an HP event with the active solo session", async () => {
     const session = await startSoloSession(CHAR_SOLO);
