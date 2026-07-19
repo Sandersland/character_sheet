@@ -153,7 +153,7 @@ export const cleric: ClassDefinition = {
     ];
   },
   subclasses: {
-    "life domain": { grantLevel: 1, features: LIFE_DOMAIN_FEATURES },
-    "trickery domain": { grantLevel: 1, features: TRICKERY_DOMAIN_FEATURES },
+    "life domain": { grantLevel: 3, features: LIFE_DOMAIN_FEATURES },
+    "trickery domain": { grantLevel: 3, features: TRICKERY_DOMAIN_FEATURES },
   },
 };

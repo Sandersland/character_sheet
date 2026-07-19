@@ -156,7 +156,7 @@ export const warlock: ClassDefinition = {
   features: WARLOCK_FEATURES,
   subclasses: {
     "the fiend": {
-      grantLevel: 1,
+      grantLevel: 3,
       features: THE_FIEND_FEATURES,
       resourceFn: (level) => {
         if (level < 6) return [];
@@ -182,7 +182,7 @@ export const warlock: ClassDefinition = {
       },
     },
     "the archfey": {
-      grantLevel: 1,
+      grantLevel: 3,
       features: THE_ARCHFEY_FEATURES,
       resourceFn: (level) => {
         const pools: DerivedResource[] = [
@@ -216,7 +216,7 @@ export const warlock: ClassDefinition = {
       },
     },
     "the great old one": {
-      grantLevel: 1,
+      grantLevel: 3,
       features: THE_GREAT_OLD_ONE_FEATURES,
       resourceFn: (level) => {
         if (level < 6) return [];

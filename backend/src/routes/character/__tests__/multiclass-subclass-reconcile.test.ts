@@ -2,7 +2,7 @@
  * Per-entry subclass reconciliation + clamp-on-read — issue #125.
  * Fixture: a Fighter 4 / Wizard 1 multiclass (XP 6500 → derived level 5). The
  * Wizard entry carries a subclass even though its per-class level (1) is below
- * Wizard's subclassLevel (2). This is an invalid state that both the read clamp
+ * Wizard's subclassLevel (3). This is an invalid state that both the read clamp
  * (serializeCharacter `classes`) and the write reconciler (reconcileSubclass)
  * must correct per-entry — the primary Fighter is well past its own grant level,
  * so only the secondary entry is affected.

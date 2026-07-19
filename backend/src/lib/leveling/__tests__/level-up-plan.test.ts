@@ -58,7 +58,12 @@ describe("buildLevelUpPlan — subclass", () => {
     expect(kinds(plan)).not.toContain("subclass");
   });
 
-  it("respects a passed-in subclassLevel (Cleric 0→1 with subclassLevel 1)", () => {
+  it("Cleric 2→3 (unset) prompts the subclass choice at the default level 3 (#1128)", () => {
+    const plan = buildLevelUpPlan(char("cleric", 2), target("cleric", 3, null));
+    expect(kinds(plan)).toEqual(["hitPoints", "subclass", "review"]);
+  });
+
+  it("respects a passed-in non-default subclassLevel (subclass step at level 1)", () => {
     const plan = buildLevelUpPlan(char("cleric", 0), target("cleric", 1, null, 1));
     expect(kinds(plan)).toContain("subclass");
   });
