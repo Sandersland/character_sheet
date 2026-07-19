@@ -419,6 +419,28 @@ export async function castManeuverTransaction(
   );
 }
 
+export interface SneakAttackRollResult {
+  roll: number;
+  dice: number;
+  faces: number;
+  summary: string;
+}
+
+// Rolls the rogue's level-derived Nd6 Sneak Attack server-side (enforcing the
+// once-per-turn + eligibility guard) and returns the updated Character plus the
+// roll so the caller folds it into the attack's damage total.
+export async function rollSneakAttackTransaction(
+  characterId: string,
+  eligible: boolean,
+  usedThisTurn: boolean,
+): Promise<{ character: Character; results: SneakAttackRollResult[] }> {
+  return request<{ character: Character; results: SneakAttackRollResult[] }>(
+    `/characters/${characterId}/sneak-attack/transactions`,
+    jsonBody({ operations: [{ type: "rollSneakAttack", eligible, usedThisTurn }] }),
+    "Failed to roll Sneak Attack",
+  );
+}
+
 // Applies a batch of resource operations atomically (spend/restore resource
 // pools, learn/forget maneuvers). Full updated Character returned on success.
 export async function applyResourceTransactions(

@@ -26,6 +26,7 @@ import AttackStepCard, { AttackKickerPips } from "@/features/session/AttackStepC
 import AttackTallyStrip from "@/features/session/AttackTallyStrip";
 import AttackSheetFooter from "@/features/session/AttackSheetFooter";
 import ManeuversDisclosure from "@/features/session/ManeuversDisclosure";
+import SneakAttackSection from "@/features/session/SneakAttackSection";
 import InlineSpellAttackSection from "@/features/session/InlineSpellAttackSection";
 import type { TurnState, TurnStateActions } from "@/features/session/useTurnState";
 import type { Character } from "@/types/character";
@@ -161,6 +162,14 @@ export default function InlineAttackPicker({
       onUpdate={onUpdate}
     />
   );
+  const sneakAttack = boundView && (
+    <SneakAttackSection
+      character={character}
+      turnState={turnState}
+      currentRow={currentRow}
+      onUpdate={onUpdate}
+    />
+  );
   const spellAttacks = (
     <InlineSpellAttackSection
       character={character}
@@ -221,6 +230,7 @@ export default function InlineAttackPicker({
         {weaponRow}
         {stepCard}
         {maneuversDisclosure}
+        {sneakAttack}
         {spellAttacks}
         {footer}
       </div>
@@ -238,6 +248,7 @@ export default function InlineAttackPicker({
         <AttackKickerPips attack={turnState.attack} />
         {tallyStrip}
         {maneuversDisclosure}
+        {sneakAttack}
         {spellAttacks}
       </div>
     </div>
