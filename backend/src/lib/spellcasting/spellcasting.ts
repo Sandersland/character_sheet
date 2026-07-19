@@ -699,7 +699,8 @@ async function applyConvertSorceryPointsOp(
     throw new InvalidSpellcastingOperationError(`No level-${level} spell slots remaining to convert`);
   }
   state.slotsUsed[key] = used + 1;
-  // Gain SP = slot level; restoreResource caps at max (never exceed the pool).
+  // Gain SP = slot level; restoreResource throws if this would exceed the max,
+  // rejecting the whole conversion (slot stays unspent) — it does not clamp.
   await applyResourceOpInTx(tx, characterId, { type: "restoreResource", key: "sorceryPoints", amount: level }, batchId, sessionId);
   return {
     eventType: "convertSorceryPoints",
