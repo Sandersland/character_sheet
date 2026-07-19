@@ -77,9 +77,9 @@ const D10_RING_Y =
 function orientedOutward(quad: readonly number[], vertices: readonly number[][]): number[] {
   const [a, b, c] = quad.map((i) => new THREE.Vector3(...(vertices[i] as [number, number, number])));
   const normal = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a));
-  const centroid = new THREE.Vector3();
-  for (const i of quad) centroid.add(new THREE.Vector3(...(vertices[i] as [number, number, number])));
-  return normal.dot(centroid) >= 0 ? [...quad] : [quad[0], quad[3], quad[2], quad[1]];
+  const centroidSum = new THREE.Vector3();
+  for (const i of quad) centroidSum.add(new THREE.Vector3(...(vertices[i] as [number, number, number])));
+  return normal.dot(centroidSum) >= 0 ? [...quad] : [quad[0], quad[3], quad[2], quad[1]];
 }
 
 /** Canonical d10 vertices + outward-wound kite faces, shared by the THREE
