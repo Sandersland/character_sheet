@@ -484,3 +484,8 @@ export function learnsNewSpellsOnLevelUp(className: string, subclass?: string | 
   if (!profile) return false;
   return profile.preparation === "known" || className.toLowerCase() === "wizard";
 }
+
+/** Whether a class knows a fixed spell set (may swap one on level-up, #1101); Wizard scribes, so is excluded. */
+export function isKnownCaster(className: string, subclass?: string | null): boolean {
+  return casterProfile(className, subclass)?.preparation === "known";
+}

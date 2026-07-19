@@ -106,6 +106,12 @@ export function draftSatisfies(step: LevelUpStep, draft: LevelUpDraft): boolean 
       return draft.fightingStyle != null;
     case "review":
       return true;
+    case "newSpells": {
+      // #1101: each swap forget must be offset by an extra learn, so the net
+      // learn count must reach count + forgotten (count 0 with no swap is trivially met).
+      const required = (step.count ?? 0) + (draft.spellsForgotten?.length ?? 0);
+      return listCount(step, draft) >= required;
+    }
     default:
       return listCount(step, draft) >= (step.count ?? 1);
   }

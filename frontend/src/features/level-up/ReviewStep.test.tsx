@@ -122,6 +122,23 @@ describe("ReviewStep", () => {
     expect(screen.queryByText("New Spells")).not.toBeInTheDocument();
   });
 
+  it("renders a Forgotten row for a swapped spell, resolved from the spellbook (#1101)", () => {
+    const swapCaster = {
+      ...character,
+      spellcasting: { slots: [], arcana: [], spells: [{ id: "k-old", name: "Charm Person", level: 1 }] },
+    } as unknown as Character;
+    renderReview(
+      {
+        hp: { method: "average" },
+        spellsForgotten: [{ type: "forgetSpell", entryId: "k-old" }],
+        spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
+      },
+      { character: swapCaster },
+    );
+    expect(screen.getByText("Forgotten")).toBeInTheDocument();
+    expect(screen.getByText("Charm Person")).toBeInTheDocument();
+  });
+
   it("has no axe violations", async () => {
     const { container } = renderReview({
       hp: { method: "average" },

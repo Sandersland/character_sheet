@@ -8,7 +8,7 @@ import type {
   LearnToolProficiencyOperation,
 } from "./classes";
 import type { LevelUpTarget } from "./combat";
-import type { LearnSpellOperation } from "./spells";
+import type { ForgetSpellOperation, LearnSpellOperation } from "./spells";
 
 /**
  * A structured mechanical effect defined on a catalog or custom feat.
@@ -163,4 +163,6 @@ export interface LevelUpSubmission {
   toolProficiencies?: LearnToolProficiencyOperation[];
   subclassChoices?: LearnSubclassChoiceOperation[];
   spellsLearned?: LearnSpellOperation[];
+  /** #1101: the one optional known-spell swap forget, offset by an extra learn. */
+  spellsForgotten?: ForgetSpellOperation[];
 }

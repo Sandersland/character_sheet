@@ -22,7 +22,7 @@ function spell(id: string, level: number): CatalogSpell {
   return {
     id, name: id, level, school: "evocation", castingTime: "1 action",
     range: "60 ft", duration: "Instant", description: "", concentration: false,
-    ritual: false, classes: ["wizard"], cantripScaling: false,
+    ritual: false, classes: ["wizard", "sorcerer"], cantripScaling: false,
   };
 }
 
@@ -38,15 +38,25 @@ const character = {
   spellcasting: { slots: [], arcana: [], spells: [] },
 } as unknown as Character;
 
-function plan(steps: LevelUpStep[]): LevelUpPlanResponse {
-  return { target: { className: "wizard", subclass: null, newLevel: 3, isPrimary: true }, steps };
+// A known caster (sorcerer) whose book carries one swap candidate (#1101).
+const swapCaster = {
+  ...character,
+  classes: [{ id: "entry-1", name: "sorcerer", level: 4 }],
+  spellcasting: {
+    slots: [], arcana: [],
+    spells: [{ id: "k-old", name: "OldKnown", level: 1, school: "evocation", castingTime: "1a", range: "self", duration: "1m", prepared: false }],
+  },
+} as unknown as Character;
+
+function plan(steps: LevelUpStep[], className = "wizard"): LevelUpPlanResponse {
+  return { target: { className, subclass: null, newLevel: 3, isPrimary: true }, steps };
 }
 
-function renderCeremony() {
+function renderCeremony(c: Character = character) {
   return render(
     <MemoryRouter initialEntries={["/characters/c1/level-up"]}>
       <Routes>
-        <Route path="/characters/:id/level-up" element={<LevelUpCeremony character={character} />} />
+        <Route path="/characters/:id/level-up" element={<LevelUpCeremony character={c} />} />
         <Route path="/characters/:id" element={<div>SHEET</div>} />
       </Routes>
     </MemoryRouter>,
@@ -88,6 +98,58 @@ describe("NewSpellsStep in the ceremony", () => {
       expect(submitMock).toHaveBeenCalledWith("c1", {
         target: { kind: "existing", classEntryId: "entry-1" },
         hp: { method: "average" },
+        spellsLearned: [
+          { type: "learnSpell", spellId: "Shield" },
+          { type: "learnSpell", spellId: "MistyStep" },
+        ],
+      }),
+    );
+  });
+
+  it("a swap-only level (count 0, canSwap) lets Continue through with no picks (#1101)", async () => {
+    planMock.mockResolvedValue(
+      plan([{ kind: "hitPoints" }, { kind: "newSpells", count: 0, meta: { maxSpellLevel: 2, canSwap: true } }, { kind: "review" }], "sorcerer"),
+    );
+    const user = userEvent.setup();
+    renderCeremony(swapCaster);
+
+    await waitFor(() => expect(screen.getByText("Step 1 of 3")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /take average/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    expect(await screen.findByText(/No new spells at this level, but you may swap one known spell/i)).toBeInTheDocument();
+    // Swap is optional — Continue is enabled with nothing chosen.
+    expect(screen.getByRole("button", { name: /continue/i })).toBeEnabled();
+  });
+
+  it("submits a swap: one forget + a replacement learn on a count-1 level (#1101)", async () => {
+    planMock.mockResolvedValue(
+      plan([{ kind: "hitPoints" }, { kind: "newSpells", count: 1, meta: { maxSpellLevel: 2, canSwap: true } }, { kind: "review" }], "sorcerer"),
+    );
+    const user = userEvent.setup();
+    renderCeremony(swapCaster);
+
+    await waitFor(() => expect(screen.getByText("Step 1 of 3")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /take average/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    // Before the swap: one learn satisfies the count-1 step.
+    await user.click(await screen.findByRole("button", { name: /swap a known spell/i }));
+    await user.click(await screen.findByRole("button", { name: /OldKnown/ }));
+    // Now the cap is 2 — pick both.
+    await user.click(screen.getByRole("button", { name: /Shield/ }));
+    await user.click(screen.getByRole("button", { name: /MistyStep/ }));
+
+    const cont = screen.getByRole("button", { name: /continue/i });
+    await waitFor(() => expect(cont).toBeEnabled());
+    await user.click(cont);
+    await user.click(await screen.findByRole("button", { name: /confirm level up/i }));
+
+    await waitFor(() =>
+      expect(submitMock).toHaveBeenCalledWith("c1", {
+        target: { kind: "existing", classEntryId: "entry-1" },
+        hp: { method: "average" },
+        spellsForgotten: [{ type: "forgetSpell", entryId: "k-old" }],
         spellsLearned: [
           { type: "learnSpell", spellId: "Shield" },
           { type: "learnSpell", spellId: "MistyStep" },

@@ -151,6 +151,30 @@ describe("buildLevelUpLedger", () => {
     expect(rowFor(rows, "New Spells")?.items).toEqual(["Fireball"]);
   });
 
+  it("renders a Forgotten row resolving the name from the character's spellbook (#1101)", () => {
+    const character = makeCharacter({
+      spellcasting: { slots: [], arcana: [], spells: [{ id: "k-old", name: "Charm Person", level: 1 }] },
+    } as unknown as Partial<Character>);
+    const draft: LevelUpDraft = {
+      hp: { method: "average" },
+      spellsForgotten: [{ type: "forgetSpell", entryId: "k-old" }],
+      spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
+    };
+    const rows = buildLevelUpLedger(character, draft, makePlan(), resolvers);
+    expect(rowFor(rows, "Forgotten")).toMatchObject({ items: ["Charm Person"], variant: "list" });
+  });
+
+  it("falls back to the raw entry id when a forgotten spell is not in the book (#1101)", () => {
+    const draft: LevelUpDraft = { hp: { method: "average" }, spellsForgotten: [{ type: "forgetSpell", entryId: "gone" }] };
+    const rows = buildLevelUpLedger(makeCharacter(), draft, makePlan(), resolvers);
+    expect(rowFor(rows, "Forgotten")?.items).toEqual(["gone"]);
+  });
+
+  it("renders no Forgotten row when nothing is swapped (#1101)", () => {
+    const rows = buildLevelUpLedger(makeCharacter(), { hp: { method: "average" } }, makePlan(), resolvers);
+    expect(rowFor(rows, "Forgotten")).toBeUndefined();
+  });
+
   it("names subclass-feature picks by custom name, else the step's meta label", () => {
     const steps: LevelUpStep[] = [
       { kind: "subclassChoice", meta: { key: "metamagic", label: "Metamagic" } },

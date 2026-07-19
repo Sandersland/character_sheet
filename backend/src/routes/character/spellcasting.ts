@@ -90,7 +90,7 @@ export const learnSpellOpSchema = z
     message: "Provide exactly one of spellId or custom",
   });
 
-const forgetSpellOpSchema = z.object({
+export const forgetSpellOpSchema = z.object({
   type: z.literal("forgetSpell"),
   entryId: z.string().min(1),
 });

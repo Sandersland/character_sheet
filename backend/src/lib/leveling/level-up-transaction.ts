@@ -19,6 +19,7 @@ import {
 import type { FightingStyleKey } from "@/lib/srd/fighting-styles.js";
 import { applyResourceOpInTx, type ResourceOperation } from "@/lib/classes/resources.js";
 import { applySpellcastingOpInTx, type SpellcastingOperation } from "@/lib/spellcasting/spellcasting.js";
+import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import {
   applyLevelUpHpInTx,
   normalizeHitDice,
@@ -93,6 +94,7 @@ export async function resolveLevelUpContext(
     select: {
       abilityScores: true,
       hitDice: true,
+      spellcasting: true,
       classEntries: { orderBy: { position: "asc" }, select: TARGET_ENTRY_SELECT },
     },
   });
@@ -141,6 +143,8 @@ export async function resolveLevelUpContext(
     planCharacter: {
       abilityScores: character.abilityScores as Record<string, number>,
       classEntries: character.classEntries.map((e) => ({ name: e.name, subclass: e.subclass, level: e.level })),
+      // #1101: the known-spell list the validator checks a swap forget against.
+      spellEntries: normalizeSpellcastingMutable(character.spellcasting).spells.map((s) => ({ id: s.id, level: s.level, source: s.source ?? null })),
     },
     targetEntry: { name: targetClassName, subclass: persistedSubclass, newLevel, subclassLevel },
     chosenSubclassName,
@@ -164,7 +168,10 @@ const STEP_OP_BUILDERS: Record<LevelUpStepKind, (submission: LevelUpSubmission, 
     (s.subclassChoices ?? [])
       .filter((c) => c.choiceKey === step.meta?.key)
       .map((op) => ({ domain: "resources", op })),
-  newSpells: (s) => (s.spellsLearned ?? []).map((op) => ({ domain: "spellcasting", op })),
+  // #1101: forgets apply BEFORE learns (ops run sequentially in tx order), so a
+  // swap can re-learn the just-forgotten spellId without tripping the dup guard.
+  newSpells: (s) =>
+    [...(s.spellsForgotten ?? []), ...(s.spellsLearned ?? [])].map((op) => ({ domain: "spellcasting", op })),
   review: () => [],
 };
 

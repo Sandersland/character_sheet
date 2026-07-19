@@ -37,6 +37,16 @@ function caster(learnedSpellId?: string): Character {
   } as unknown as Character;
 }
 
+// A known caster whose spellbook carries swap candidates (#1101).
+function casterWithBook(book: Array<{ id: string; name: string; level: number; source?: "subclass" | "item" }>): Character {
+  const spells = book.map((b) => ({ school: "evocation", castingTime: "1a", range: "self", duration: "1m", prepared: false, ...b }));
+  return {
+    id: "c1",
+    classes: [{ id: "e1", name: "wizard", level: 4 }],
+    spellcasting: { slots: [], arcana: [], spells },
+  } as unknown as Character;
+}
+
 function newSpellsStep(count = 2, meta: Record<string, unknown> = { maxSpellLevel: 2 }): LevelUpStep {
   return { kind: "newSpells", count, meta };
 }
@@ -51,6 +61,7 @@ function Harness({ step, character }: { step: LevelUpStep; character: Character 
     <LevelUpStepContext.Provider value={{ character, draft, setDraft, plan }}>
       <NewSpellsStep step={step} />
       <output data-testid="picks">{JSON.stringify(draft.spellsLearned ?? [])}</output>
+      <output data-testid="forgets">{JSON.stringify(draft.spellsForgotten ?? [])}</output>
     </LevelUpStepContext.Provider>
   );
 }
@@ -103,5 +114,83 @@ describe("NewSpellsStep", () => {
     render(<Harness step={newSpellsStep(2, { maxSpellLevel: 2, magicalSecrets: true })} character={caster()} />);
     expect(await screen.findByText("CureWounds")).toBeInTheDocument();
     expect(screen.getByText(/any class/i)).toBeInTheDocument();
+  });
+});
+
+const BOOK = [
+  { id: "k-old", name: "OldChant", level: 1 },
+  { id: "k-hex", name: "GrantedChant", level: 1, source: "subclass" as const }, // granted — excluded
+  { id: "k-light", name: "CantripChant", level: 0 },                            // cantrip — excluded
+];
+const swapStep = (count = 1): LevelUpStep => newSpellsStep(count, { maxSpellLevel: 2, canSwap: true });
+
+describe("NewSpellsStep — swap panel visibility (#1101)", () => {
+  it("hides the swap panel when the step cannot swap", async () => {
+    render(<Harness step={newSpellsStep(2)} character={casterWithBook(BOOK)} />);
+    await screen.findByText("Shield");
+    expect(screen.queryByRole("button", { name: /swap a known spell/i })).not.toBeInTheDocument();
+  });
+
+  it("shows a collapsed disclosure that lists only swappable spells once expanded", async () => {
+    const user = userEvent.setup();
+    render(<Harness step={swapStep()} character={casterWithBook(BOOK)} />);
+    const toggle = await screen.findByRole("button", { name: /swap a known spell/i });
+    // Collapsed: the swap candidates are not yet listed.
+    expect(screen.queryByRole("button", { name: /OldChant/ })).not.toBeInTheDocument();
+    await user.click(toggle);
+    expect(await screen.findByRole("button", { name: /OldChant/ })).toBeInTheDocument();
+    // Granted + cantrip entries are never swap candidates.
+    expect(screen.queryByRole("button", { name: /GrantedChant/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /CantripChant/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("NewSpellsStep — swap selection (#1101)", () => {
+  it("picking a swap marks 'Forgetting', bumps the budget header, and allows one extra learn", async () => {
+    const user = userEvent.setup();
+    render(<Harness step={swapStep(1)} character={casterWithBook(BOOK)} />);
+    await user.click(await screen.findByRole("button", { name: /swap a known spell/i }));
+    await user.click(await screen.findByRole("button", { name: /OldChant/ }));
+
+    expect(await screen.findByText(/Forgetting: OldChant/i)).toBeInTheDocument();
+    expect(screen.getByText(/Choose 2 \(1 \+ 1 swap\)/)).toBeInTheDocument();
+    expect(screen.getByTestId("forgets")).toHaveTextContent(JSON.stringify([{ type: "forgetSpell", entryId: "k-old" }]));
+
+    // The cap is now 2 — both catalog picks are allowed.
+    await user.click(screen.getByRole("button", { name: /Shield/ }));
+    await user.click(screen.getByRole("button", { name: /MistyStep/ }));
+    expect(screen.getByTestId("picks")).toHaveTextContent(
+      JSON.stringify([{ type: "learnSpell", spellId: "Shield" }, { type: "learnSpell", spellId: "MistyStep" }]),
+    );
+  });
+
+  it("deselecting the swap reverts the header and trims the over-cap learn", async () => {
+    const user = userEvent.setup();
+    render(<Harness step={swapStep(1)} character={casterWithBook(BOOK)} />);
+    const toggle = await screen.findByRole("button", { name: /swap a known spell/i });
+    await user.click(toggle);
+    await user.click(await screen.findByRole("button", { name: /OldChant/ }));
+    await user.click(screen.getByRole("button", { name: /Shield/ }));
+    await user.click(screen.getByRole("button", { name: /MistyStep/ }));
+    // Deselect the swap — cap drops to 1, so one learn is trimmed.
+    await user.click(screen.getByRole("button", { name: /OldChant/ }));
+
+    await waitFor(() => expect(screen.getByTestId("forgets")).toHaveTextContent("[]"));
+    expect(screen.getByTestId("picks")).toHaveTextContent(JSON.stringify([{ type: "learnSpell", spellId: "Shield" }]));
+  });
+
+  it("a swap-only level (count 0) shows the optional copy", async () => {
+    render(<Harness step={swapStep(0)} character={casterWithBook(BOOK)} />);
+    expect(await screen.findByText(/No new spells at this level, but you may swap one known spell/i)).toBeInTheDocument();
+  });
+
+  it("a staged swap on a count-0 level reads 'swap replacement', not '0 + 1 swap'", async () => {
+    const user = userEvent.setup();
+    render(<Harness step={swapStep(0)} character={casterWithBook(BOOK)} />);
+    await user.click(await screen.findByRole("button", { name: /swap a known spell/i }));
+    await user.click(await screen.findByRole("button", { name: /OldChant/ }));
+
+    expect(await screen.findByText(/Choose 1 \(swap replacement\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/0 \+ 1 swap/)).not.toBeInTheDocument();
   });
 });
