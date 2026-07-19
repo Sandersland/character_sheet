@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { joinSession, startCampaignSession } from "@/api/client";
+import { joinSession, startCampaignSession, startSoloSession } from "@/api/client";
 import { useLiveSession } from "@/features/session/LiveSessionProvider";
 import {
   summarizeSessionDoorway,
@@ -11,21 +11,27 @@ import type { Session, SessionDoorwayState } from "@/types/character";
 
 // The network side of a doorway tap. "resume" needs no call — the character is
 // already joined; join/start hit their existing endpoints before we navigate.
+// A null campaignId means a solo (campaign-less) character: start routes to
+// startSoloSession, while join is campaign-only and fails loud (#1082).
 // Exported for direct unit testing of the join/start dispatch + guard.
 export async function dispatchDoorwayAction(
   action: DoorwayAction,
-  campaignId: string,
+  campaignId: string | null,
   sessionId: string | undefined,
   characterId: string,
 ): Promise<void> {
   if (action === "join") {
+    // Joining is inherently campaign-only (a solo doorway never offers it), so a
+    // null campaignId here is a can't-happen — fail loud rather than reinterpret.
+    if (campaignId === null) throw new Error("Cannot join a session without a campaign");
     // A liveNotJoined/earlyJoin doorway always carries a session, so this is a
     // can't-happen guard — but fail loud rather than skip the join and still
     // navigate to an empty session page (the signature admits undefined).
     if (!sessionId) throw new Error("Cannot join a session without a session id");
     await joinSession(campaignId, sessionId, characterId);
   } else if (action === "start") {
-    await startCampaignSession(campaignId, characterId);
+    if (campaignId === null) await startSoloSession(characterId);
+    else await startCampaignSession(campaignId, characterId);
   }
 }
 
@@ -89,12 +95,13 @@ export function useSessionDoorway(
   const activeSession = session ?? (doorway ? toCaptureSession(doorway) : null);
 
   const onAction = async () => {
-    const campaignId = doorway?.campaignId;
-    if (!id || !campaignId || summary.action === null) return;
+    // A solo doorway carries campaignId === null (a legit start target), so the
+    // guard checks the character + a dispatchable action, not campaign presence.
+    if (!id || !doorway || summary.action === null) return;
     setPending(true);
     setError(null);
     try {
-      await dispatchDoorwayAction(summary.action, campaignId, activeSessionId, id);
+      await dispatchDoorwayAction(summary.action, doorway.campaignId, activeSessionId, id);
       // Re-resolve BEFORE switching so Combat renders the live tracker, not the
       // static panel off stale not-joined state (#963 addendum).
       await refresh();
