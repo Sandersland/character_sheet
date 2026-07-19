@@ -142,41 +142,37 @@ describe("buildRollModifiers (#486)", () => {
   });
 });
 
-describe("buildRollModifiers exhaustion thresholds (#846)", () => {
+describe("buildRollModifiers exhaustion flat penalty (#1136)", () => {
   function exhaustion(level: number): ConditionsMutableState {
     return { active: [], exhaustion: level };
+  }
+
+  // 2024 (SRD 5.2): each exhaustion level is a flat −2 to every d20 Test —
+  // attack rolls, ability checks, saving throws, and Initiative (a Dex check).
+  function flatAtLevel(level: number) {
+    const modifier = -2 * level;
+    return (["attack", "check", "save", "initiative"] as const).map((kind) => ({
+      mode: "flat",
+      modifier,
+      kind,
+      source: "Exhaustion",
+    }));
   }
 
   it("level 0 grants no roll effects", () => {
     expect(buildRollModifiers(exhaustion(0), noEffects)).toEqual([]);
   });
 
-  it("level 1 grants disadvantage on ability checks only", () => {
-    expect(buildRollModifiers(exhaustion(1), noEffects)).toEqual([
-      { mode: "disadvantage", kind: "check", source: "Exhaustion" },
-    ]);
+  it("level 1 grants a flat −2 on every d20 Test (attack/check/save/initiative)", () => {
+    expect(buildRollModifiers(exhaustion(1), noEffects)).toEqual(flatAtLevel(1));
   });
 
-  it("level 2 still only grants disadvantage on ability checks (speed halved isn't a roll effect)", () => {
-    expect(buildRollModifiers(exhaustion(2), noEffects)).toEqual([
-      { mode: "disadvantage", kind: "check", source: "Exhaustion" },
-    ]);
+  it("level 3 grants a flat −6 on every d20 Test", () => {
+    expect(buildRollModifiers(exhaustion(3), noEffects)).toEqual(flatAtLevel(3));
   });
 
-  it("level 3 adds disadvantage on attack rolls + saving throws, cumulative with checks", () => {
-    expect(buildRollModifiers(exhaustion(3), noEffects)).toEqual([
-      { mode: "disadvantage", kind: "check", source: "Exhaustion" },
-      { mode: "disadvantage", kind: "attack", source: "Exhaustion" },
-      { mode: "disadvantage", kind: "save", source: "Exhaustion" },
-    ]);
-  });
-
-  it("level 6 (death) still carries the level-3 roll effects", () => {
-    expect(buildRollModifiers(exhaustion(6), noEffects)).toEqual([
-      { mode: "disadvantage", kind: "check", source: "Exhaustion" },
-      { mode: "disadvantage", kind: "attack", source: "Exhaustion" },
-      { mode: "disadvantage", kind: "save", source: "Exhaustion" },
-    ]);
+  it("level 6 (death) grants a flat −12 on every d20 Test", () => {
+    expect(buildRollModifiers(exhaustion(6), noEffects)).toEqual(flatAtLevel(6));
   });
 
   it("merges exhaustion effects with an active condition's effects", () => {
@@ -185,7 +181,14 @@ describe("buildRollModifiers exhaustion thresholds (#846)", () => {
       exhaustion: 1,
     };
     const mods = buildRollModifiers(state, noEffects);
-    expect(mods.map((m) => m.source)).toEqual(["Poisoned", "Poisoned", "Exhaustion"]);
+    expect(mods.map((m) => m.source)).toEqual([
+      "Poisoned",
+      "Poisoned",
+      "Exhaustion",
+      "Exhaustion",
+      "Exhaustion",
+      "Exhaustion",
+    ]);
   });
 });
 

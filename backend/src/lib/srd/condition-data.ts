@@ -22,7 +22,7 @@ export type ConditionKey =
   | "stunned"
   | "unconscious";
 
-import type { RollEffect } from "./roll-effects.js";
+import type { RollEffect, RollModeKind } from "./roll-effects.js";
 
 export interface ConditionDefinition {
   key: ConditionKey;
@@ -153,23 +153,26 @@ export function isKnownCondition(key: string): key is ConditionKey {
   return CONDITIONS.some((c) => c.key === key);
 }
 
+// The four d20 Test categories a flat exhaustion penalty binds to. Initiative is
+// a Dex check, so it's an explicit entry (SRD 5.2 "d20 Tests" cover it).
+const EXHAUSTION_ROLL_KINDS: RollModeKind[] = ["attack", "check", "save", "initiative"];
+
 /**
- * Synthetic roll-effect grants for a given exhaustion level (#846), mirroring
+ * Synthetic roll-effect grants for a given exhaustion level (#1136), mirroring
  * the standard conditions' `rollEffects` shape without a `ConditionDefinition`
  * entry of its own (exhaustion is a numeric level, not a boolean condition —
- * see the module comment above). PHB Appendix A: level 1 grants disadvantage
- * on ability checks; level 3 additionally grants disadvantage on attack rolls
- * and saving throws (cumulative with level 1's effect). Levels 2/4/5/6 (speed
- * halved, hp max halved, speed 0, death) don't affect d20 rolls, so they have
- * no representation here — their text lives in the frontend's
- * exhaustionEffect().
+ * see the module comment above). SRD 5.2: each exhaustion level applies a flat
+ * −2 to every d20 Test (attack rolls, ability checks, saving throws, Initiative),
+ * so the penalty is −2×level. The Speed reduction (−5 ft×level, see
+ * exhaustionSpeedPenalty) and death at level 6 are handled elsewhere.
  */
 export function exhaustionRollEffects(level: number): RollEffect[] {
   if (level < 1) return [];
-  const effects: RollEffect[] = [{ mode: "disadvantage", kind: "check" }];
-  if (level >= 3) {
-    effects.push({ mode: "disadvantage", kind: "attack" });
-    effects.push({ mode: "disadvantage", kind: "save" });
-  }
-  return effects;
+  const modifier = -2 * level;
+  return EXHAUSTION_ROLL_KINDS.map((kind) => ({ mode: "flat", modifier, kind }));
+}
+
+/** Speed reduction (feet) from exhaustion: −5 ft per level (SRD 5.2). */
+export function exhaustionSpeedPenalty(level: number): number {
+  return 5 * Math.max(0, level);
 }

@@ -9,13 +9,22 @@ export type RollAdvantage = "advantage" | "disadvantage";
 export type RollModeKind = "attack" | "check" | "save" | "initiative";
 
 /** One advantage/disadvantage grant; `ability` (lowercase key) narrows it to a single ability. */
-export interface RollEffect {
+export interface AdvantageRollEffect {
   mode: RollAdvantage;
   kind: RollModeKind;
   ability?: string;
 }
 
-/** A RollEffect resolved with its provenance label (e.g. "Rage", "Poisoned"). */
-export interface RollModifier extends RollEffect {
-  source: string;
+/** A flat numeric d20 modifier, e.g. 2024 exhaustion's −2×level (SRD 5.2). */
+export interface FlatRollEffect {
+  mode: "flat";
+  modifier: number;
+  kind: RollModeKind;
+  ability?: string;
 }
+
+/** A state-driven grant on a class of d20 roll: adv/dis or a flat modifier. */
+export type RollEffect = AdvantageRollEffect | FlatRollEffect;
+
+/** A RollEffect resolved with its provenance label (e.g. "Rage", "Poisoned", "Exhaustion"). */
+export type RollModifier = RollEffect & { source: string };

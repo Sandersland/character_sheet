@@ -185,7 +185,7 @@ export function serializeCharacter(row: CharacterWithRelations) {
     featBonuses,
     buffTargets,
   );
-  const speed = buildSpeedView(row, bestArmor, hasShield, featBonuses, buffTargets);
+  const speed = buildSpeedView(row, bestArmor, hasShield, featBonuses, buffTargets, conditions.exhaustion);
   const { unarmedStrike, improvisedWeapon } = buildUnarmedAttacksView(
     row,
     effectiveScores,
