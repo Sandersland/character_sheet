@@ -59,7 +59,7 @@ vi.mock("@/features/abilities/ProficienciesCard", () => ({ default: () => null }
 vi.mock("@/features/character-meta/BannerVitals", () => ({ default: () => null }));
 // Stub the mobile mini-header (the desktop banner keeps the campaign-less link).
 vi.mock("@/features/character-meta/MobileSheetHeader", () => ({ default: () => null }));
-vi.mock("@/features/character-meta/MobileOverviewVitals", () => ({ default: () => null }));
+vi.mock("@/features/character-meta/MobileQuickBar", () => ({ default: () => null }));
 vi.mock("@/features/conditions/ConditionsStrip", () => ({ default: () => null }));
 
 const mockUseCharacter = vi.mocked(useCharacter);

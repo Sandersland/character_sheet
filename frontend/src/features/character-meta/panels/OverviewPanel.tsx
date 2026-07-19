@@ -1,7 +1,7 @@
 import AbilityScoresPanel from "@/features/abilities/AbilityScoresPanel";
 import AllSkillsCard from "@/features/abilities/AllSkillsCard";
 import ConditionRollBanner from "@/features/conditions/ConditionRollBanner";
-import MobileOverviewVitals from "@/features/character-meta/MobileOverviewVitals";
+import MobileQuickBar from "@/features/character-meta/MobileQuickBar";
 import ProficienciesCard from "@/features/abilities/ProficienciesCard";
 import ClassFeaturesSection from "@/features/class/ClassFeaturesSection";
 import AdvancementSection from "@/features/advancement/AdvancementSection";
@@ -21,9 +21,9 @@ import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
 export default function OverviewPanel({ character, reference, onUpdate }: SheetPanelProps) {
   return (
     <div className="flex flex-col gap-6">
-      {/* Init/Speed/Prof left the compact header (#1026); on phones they live
-          here at the top of Overview. Desktop keeps them in the banner. */}
-      <MobileOverviewVitals character={character} />
+      {/* Prof/Speed/Init left the compact header (#1026); on phones they sit
+          here as a slim quick-bar (#1084). Desktop keeps them in the banner. */}
+      <MobileQuickBar character={character} />
       {/* One home for active roll-modifying states (#984) — above the rails, so
           the fact is said once, not stamped under every box + skill row. */}
       <ConditionRollBanner modifiers={character.rollModifiers} />

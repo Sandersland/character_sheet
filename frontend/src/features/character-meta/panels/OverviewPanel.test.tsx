@@ -19,6 +19,8 @@ function makeCharacter(overrides: Partial<Character>): Character {
     name: "Mage",
     class: "Wizard",
     proficiencyBonus: 2,
+    speed: 30,
+    initiativeBonus: 1,
     abilityScores: { strength: 10, dexterity: 12, constitution: 12, intelligence: 16, wisdom: 10, charisma: 10 },
     skills: [{ name: "arcana", ability: "intelligence", proficient: true }],
     savingThrowProficiencies: [],
@@ -61,5 +63,13 @@ describe("OverviewPanel", () => {
     renderPanel(makeCharacter({ spellcasting: undefined }));
     expect(screen.getByText("Skills")).toBeInTheDocument();
     expect(screen.queryByText("Spell Slots")).not.toBeInTheDocument();
+  });
+
+  it("shows the mobile quick-bar labels and no 'vitals' copy", () => {
+    renderPanel(makeCharacter({ spellcasting: undefined }));
+    expect(screen.getByText("Prof Bonus")).toBeInTheDocument();
+    expect(screen.getByText("Speed")).toBeInTheDocument();
+    expect(screen.getByText("Initiative")).toBeInTheDocument();
+    expect(screen.queryByText(/vitals/i)).toBeNull();
   });
 });
