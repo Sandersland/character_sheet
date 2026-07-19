@@ -90,12 +90,15 @@ export const CONDITIONS: readonly ConditionDefinition[] = [
     label: "Paralyzed",
     description:
       "Has the Incapacitated condition, and its Speed is 0 and can't increase. Automatically fails Strength and Dexterity saving throws. Attack rolls against it have advantage, and any attack that hits it from within 5 feet is a critical hit.",
+    // Conditions that include Incapacitated inherit its initiative disadvantage; buildRollModifiers does no inheritance walk, so it's flattened per-condition (SRD 5.2).
+    rollEffects: [{ mode: "disadvantage", kind: "initiative" }],
   },
   {
     key: "petrified",
     label: "Petrified",
     description:
       "Transformed, along with any nonmagical object it is wearing or carrying, into a solid inanimate substance (usually stone); its weight increases tenfold and it ceases aging. Has the Incapacitated condition and its Speed is 0. Automatically fails Strength and Dexterity saving throws, and attack rolls against it have advantage. Has resistance to all damage and immunity to the Poisoned condition.",
+    rollEffects: [{ mode: "disadvantage", kind: "initiative" }],
   },
   {
     key: "poisoned",
@@ -128,12 +131,17 @@ export const CONDITIONS: readonly ConditionDefinition[] = [
     label: "Stunned",
     description:
       "Has the Incapacitated condition. Automatically fails Strength and Dexterity saving throws, and attack rolls against it have advantage.",
+    rollEffects: [{ mode: "disadvantage", kind: "initiative" }],
   },
   {
     key: "unconscious",
     label: "Unconscious",
     description:
       "Has the Incapacitated and Prone conditions and drops whatever it is holding; when the condition ends, it remains Prone. Its Speed is 0. Automatically fails Strength and Dexterity saving throws, and attack rolls against it have advantage; any attack that hits it from within 5 feet is a critical hit. Unaware of its surroundings.",
+    rollEffects: [
+      { mode: "disadvantage", kind: "initiative" },
+      { mode: "disadvantage", kind: "attack" },
+    ],
   },
 ];
 

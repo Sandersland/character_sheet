@@ -115,6 +115,31 @@ describe("buildRollModifiers (#486)", () => {
       { mode: "disadvantage", kind: "initiative", source: "Incapacitated" },
     ]);
   });
+
+  it("flattens Incapacitated's initiative disadvantage onto Paralyzed", () => {
+    expect(buildRollModifiers(condition("paralyzed"), noEffects)).toEqual([
+      { mode: "disadvantage", kind: "initiative", source: "Paralyzed" },
+    ]);
+  });
+
+  it("flattens Incapacitated's initiative disadvantage onto Stunned", () => {
+    expect(buildRollModifiers(condition("stunned"), noEffects)).toEqual([
+      { mode: "disadvantage", kind: "initiative", source: "Stunned" },
+    ]);
+  });
+
+  it("flattens Incapacitated's initiative disadvantage onto Petrified", () => {
+    expect(buildRollModifiers(condition("petrified"), noEffects)).toEqual([
+      { mode: "disadvantage", kind: "initiative", source: "Petrified" },
+    ]);
+  });
+
+  it("flattens Incapacitated + Prone effects onto Unconscious", () => {
+    expect(buildRollModifiers(condition("unconscious"), noEffects)).toEqual([
+      { mode: "disadvantage", kind: "initiative", source: "Unconscious" },
+      { mode: "disadvantage", kind: "attack", source: "Unconscious" },
+    ]);
+  });
 });
 
 describe("buildRollModifiers exhaustion thresholds (#846)", () => {
