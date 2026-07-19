@@ -168,8 +168,9 @@ export function applyAdvancementClamp(
 }
 
 // Feat improvement modifier layer: sum structured feat improvements over the
-// in-cap advancements. Because clampedAdvancements already excludes over-cap
-// feats, level-down behavior is automatic — no separate reversal code needed.
+// kept advancements (origin feats + slot-bounded entries). Because
+// clampedAdvancements already excludes over-cap feats, level-down behavior is
+// automatic — no separate reversal code needed.
 // perLevel bonuses (e.g. Tough) scale with hitDiceTotal (applied level).
 export function applyFeatLayer(
   clampedAdvancements: AdvancementEntry[],
