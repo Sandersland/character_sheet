@@ -101,6 +101,8 @@ export interface FeatImprovement {
   perLevel?: boolean;
   /** Required for keyed targets (skillProficiency, savingThrowProficiency). */
   key?: string;
+  /** PHB'24: "proficiencyBonus" multiplies amount by PB at read time (e.g. Alert). */
+  scaling?: "proficiencyBonus";
 }
 
 /**

@@ -19,6 +19,7 @@ let COOKIE: string;
 
 // XP thresholds
 const XP_LVL_4 = 2700; // level 4 — 1 ASI slot (first unlock)
+const XP_LVL_19 = 305000; // level 19 — Epic Boon unlock (sync with XP_THRESHOLDS)
 
 const app = createApp();
 
@@ -82,6 +83,9 @@ const FIXTURE = {
 let alertFeatId: string;
 let mobileFeatId: string;
 let toughFeatId: string;
+let originFeatId: string;
+let fightingStyleFeatId: string;
+let epicBoonFeatId: string;
 
 describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
   beforeAll(async () => {
@@ -138,12 +142,46 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
       },
     });
     toughFeatId = toughFeat.id;
+
+    // Category-gating fixtures (PHB'24): Origin/Fighting Style never offered as an
+    // ASI slot; Epic Boon only at level 19+ with a +1 cap of 30.
+    const originFeat = await prisma.feat.upsert({
+      where: { name: "Origin Test Feat (Advancement Suite)" },
+      create: { name: "Origin Test Feat (Advancement Suite)", description: "Origin.", category: "origin" },
+      update: { category: "origin" },
+    });
+    originFeatId = originFeat.id;
+
+    const fightingStyleFeat = await prisma.feat.upsert({
+      where: { name: "Fighting Style Test Feat (Advancement Suite)" },
+      create: { name: "Fighting Style Test Feat (Advancement Suite)", description: "FS.", category: "fighting_style", prerequisite: "Fighting Style feature" },
+      update: { category: "fighting_style" },
+    });
+    fightingStyleFeatId = fightingStyleFeat.id;
+
+    const epicBoonFeat = await prisma.feat.upsert({
+      where: { name: "Boon Test Feat (Advancement Suite)" },
+      create: {
+        name: "Boon Test Feat (Advancement Suite)",
+        description: "Epic Boon.",
+        category: "epic_boon",
+        levelPrerequisite: 19,
+        abilityOptions: ["strength"],
+        abilityIncrease: 1,
+      },
+      update: { category: "epic_boon", levelPrerequisite: 19, abilityOptions: ["strength"], abilityIncrease: 1 },
+    });
+    epicBoonFeatId = epicBoonFeat.id;
   });
 
   afterAll(async () => {
     // Clean up catalog rows created by this suite.
     await prisma.feat.deleteMany({
-      where: { name: { in: ["Alert (Advancement Suite)", "Mobile (Advancement Suite)", "Tough (Advancement Suite)"] } },
+      where: { name: { in: [
+        "Alert (Advancement Suite)", "Mobile (Advancement Suite)", "Tough (Advancement Suite)",
+        "Origin Test Feat (Advancement Suite)", "Fighting Style Test Feat (Advancement Suite)",
+        "Boon Test Feat (Advancement Suite)",
+      ] } },
     });
     await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
   });
@@ -410,6 +448,57 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
       // GET should only apply the in-cap feat (Alert +5), not the extra +10.
       const res = await getCharacter(FIXTURE_ID);
       expect(res.body.initiativeBonus).toBe(7); // base 2 + Alert 5 only
+    });
+  });
+
+  // ── Category / level gating (PHB'24 pp. 87-88) ────────────────────────────
+
+  describe("feat category gating", () => {
+    it("400s taking an Origin feat via an ASI slot", async () => {
+      const res = await postAdvancement(FIXTURE_ID, {
+        operations: [{ type: "takeFeat", featId: originFeatId }],
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("400s taking a Fighting Style feat via an ASI slot", async () => {
+      const res = await postAdvancement(FIXTURE_ID, {
+        operations: [{ type: "takeFeat", featId: fightingStyleFeatId }],
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("allows a General feat at level 4", async () => {
+      // Alert (Advancement Suite) defaults to category general.
+      const res = await postAdvancement(FIXTURE_ID, {
+        operations: [{ type: "takeFeat", featId: alertFeatId }],
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it("400s an Epic Boon at level 4", async () => {
+      const res = await postAdvancement(FIXTURE_ID, {
+        operations: [{ type: "takeFeat", featId: epicBoonFeatId, abilityChoice: "strength" }],
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("allows an Epic Boon at level 19 and raises the ability past 20 (cap 30)", async () => {
+      // Promote the fixture to level 19 with strength already at 20 — the boon's
+      // +1 must be allowed to 21 (Epic Boon cap 30), which a takeAsi would reject.
+      await prisma.character.update({
+        where: { id: FIXTURE_ID },
+        data: {
+          experiencePoints: XP_LVL_19,
+          abilityScores: { ...BASE_ABILITY_SCORES, strength: 20 } as unknown as Prisma.InputJsonValue,
+        },
+      });
+      const res = await postAdvancement(FIXTURE_ID, {
+        operations: [{ type: "takeFeat", featId: epicBoonFeatId, abilityChoice: "strength" }],
+      });
+      expect(res.status).toBe(200);
+      const char = await getCharacter(FIXTURE_ID);
+      expect(char.body.abilityScores.strength).toBe(21);
     });
   });
 
