@@ -170,30 +170,35 @@ function DesktopBanner({
   // Desktop tab bar mirrors the mobile nav pip: a gold dot on Combat while live.
   const bannerTabs = withCombatLivePip(tabs, isLive);
   return (
-    <header className="hidden bg-gradient-to-br from-garnet-800 via-garnet-700 to-garnet-900 text-parchment-50 md:block">
+    <header className="hidden border-b border-parchment-200 bg-parchment-50 text-parchment-900 md:block">
+      {/* Thin garnet top rule — the one saturated accent on the light surface. */}
+      <div
+        aria-hidden
+        className="h-[5px] bg-gradient-to-r from-garnet-800 via-garnet-600 to-garnet-800"
+      />
       <div className="mx-auto max-w-6xl px-6 pt-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-4">
             {/* Level crest */}
-            <div className="flex h-14 w-14 flex-none flex-col items-center justify-center rounded-full border-2 border-garnet-200 bg-garnet-900/50 shadow-raised">
-              <span className="text-[9px] font-semibold uppercase tracking-wide text-garnet-100">
+            <div className="flex h-14 w-14 flex-none flex-col items-center justify-center rounded-full border-2 border-garnet-600 bg-parchment-50 shadow-raised">
+              <span className="text-[9px] font-semibold uppercase tracking-wide text-garnet-700">
                 Lvl
               </span>
-              <span className="font-display text-2xl font-semibold leading-none text-parchment-50">
+              <span className="font-display text-2xl font-semibold leading-none text-garnet-700">
                 {character.level}
               </span>
             </div>
             <div>
               <Link
                 to="/"
-                className="text-xs font-semibold text-garnet-100 transition-colors hover:text-parchment-50"
+                className="text-xs font-semibold text-parchment-700 transition-colors hover:text-garnet-700"
               >
                 ← All characters
               </Link>
-              <h1 className="mt-1 font-display text-3xl font-semibold text-parchment-50">
+              <h1 className="mt-1 font-display text-3xl font-semibold text-parchment-900">
                 {character.name}
               </h1>
-              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-garnet-100">
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-parchment-700">
                 <span>
                   {character.race}{" "}
                   {classSummary(character.classes, {
@@ -227,35 +232,32 @@ function DesktopBanner({
           </div>
         </div>
 
-        {/* Always-on vitals */}
-        <div className="mt-4">
-          <BannerVitals character={character} />
-        </div>
-
-        {/* Workspace tab bar (desktop only; mobile uses the docked SheetBottomNav) */}
-        <div className="mt-4 hidden pb-4 md:block">
+        {/* Bottom row: workspace tabs (left) + always-on stat cards (right).
+            Mobile uses the docked SheetBottomNav for tabs. */}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-4 pb-4">
           <Tabs
             tabs={bannerTabs}
             active={activeTab}
             onChange={(id) => onTabChange(id as SheetTabId)}
             idBase="sheet"
           />
+          <BannerVitals character={character} />
         </div>
       </div>
     </header>
   );
 }
 
-// Shared banner-button styles: a bordered "chip", a solid End-session accent, a
-// plain garnet-text link, and a light kebab trigger for the garnet surface.
+// Shared banner-button styles for the light surface: a bordered "chip", a solid
+// garnet End-session accent, a garnet-text link, and a muted-ink kebab trigger.
 const BANNER_CHIP =
-  "rounded-control border border-parchment-50/60 px-3 py-1.5 text-xs font-semibold text-parchment-50 transition-colors hover:bg-white/10 disabled:opacity-50";
+  "rounded-control border border-parchment-300 px-3 py-1.5 text-xs font-semibold text-parchment-800 transition-colors hover:bg-parchment-100 disabled:opacity-50";
 const BANNER_CHIP_SOLID =
   "rounded-control bg-garnet-600 px-3 py-1.5 text-xs font-semibold text-parchment-50 transition-colors hover:bg-garnet-700 disabled:opacity-50";
 const BANNER_LINK =
-  "text-xs font-semibold text-garnet-100 transition-colors hover:text-parchment-50 disabled:opacity-50";
+  "text-xs font-semibold text-garnet-700 transition-colors hover:text-garnet-900 disabled:opacity-50";
 const BANNER_KEBAB =
-  "flex h-7 w-7 items-center justify-center rounded-control text-parchment-100 transition-colors hover:bg-white/10 hover:text-parchment-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-parchment-50/60";
+  "flex h-7 w-7 items-center justify-center rounded-control text-parchment-700 transition-colors hover:bg-parchment-100 hover:text-parchment-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-garnet-600";
 
 /** The desktop banner's right-hand action cluster (#985/#1085) — the sole live
  *  indicator now the under-tabs strip is gone: a `Live · Round N` pill + ＋ Note,
