@@ -60,6 +60,16 @@ function buildSessionActions(
   return { busy, onLeave, onEnd };
 }
 
+/** Gate the Campaign-settings ⋮ item once (#1087): only campaign-attached
+ *  characters with a wired handler get it. Extracted so both breakpoints agree
+ *  and the header component stays under the cognitive ceiling. */
+function campaignSettingsHandler(
+  campaignId: string | undefined,
+  onOpen?: () => void,
+): (() => void) | undefined {
+  return campaignId ? onOpen : undefined;
+}
+
 /** Annotate the Combat tab with a gold "session live" pip (#961/#964); every
  *  other tab passes through. Extracted so the header component stays under the
  *  cognitive-complexity ceiling. */
@@ -111,9 +121,7 @@ export default function CharacterSheetHeader({
   onOpenDelete,
   onOpenCampaignSettings,
 }: CharacterSheetHeaderProps) {
-  // Gate the ⋮ item once here so both breakpoints agree: campaign-attached +
-  // handler wired (#1087).
-  const campaignSettings = character.campaignId ? onOpenCampaignSettings : undefined;
+  const campaignSettings = campaignSettingsHandler(character.campaignId, onOpenCampaignSettings);
   return (
     <>
       {/* Mobile: compact sticky mini-header. Desktop: the garnet banner below. */}

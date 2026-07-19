@@ -13,6 +13,16 @@ import type { Character } from "@/types/character";
 
 type SheetMenuItem = { label: string; onSelect: () => void; danger?: boolean; disabled?: boolean; separatorBefore?: boolean };
 
+// Shared shape for the two breakpoint sub-headers (CollapsedBar / ExpandedSheetHeader):
+// identity + HP readout + the live pill + the "Sheet actions" ⋯ menu.
+interface SubHeaderProps {
+  character: Character;
+  onUpdate?: (character: Character) => void;
+  pill: React.ReactNode;
+  menuItems: SheetMenuItem[];
+  onOpenSwitcher: () => void;
+}
+
 interface MobileSheetHeaderProps {
   character: Character;
   /** Opens the shared HP sheet from the HP readout; omit for a read-only row. */
@@ -159,19 +169,7 @@ export default function MobileSheetHeader({
  * · ⋯. The scroll-collapsed default — calm paper chrome so the panel below stays
  * the subject. Tapping the identity region opens the character switcher (#1027).
  */
-function CollapsedBar({
-  character,
-  onUpdate,
-  pill,
-  menuItems,
-  onOpenSwitcher,
-}: {
-  character: Character;
-  onUpdate?: (character: Character) => void;
-  pill: React.ReactNode;
-  menuItems: SheetMenuItem[];
-  onOpenSwitcher: () => void;
-}) {
+function CollapsedBar({ character, onUpdate, pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
   const { current, max, temp } = character.hitPoints;
   const hp = (
     <>
@@ -223,19 +221,7 @@ function CollapsedBar({
  * live pill + ⋯. Row 2: HP numbers + full-width meter + AC badge. The identity
  * (avatar + name + subtitle) is a button opening the character switcher (#1027).
  */
-function ExpandedSheetHeader({
-  character,
-  onUpdate,
-  pill,
-  menuItems,
-  onOpenSwitcher,
-}: {
-  character: Character;
-  onUpdate?: (character: Character) => void;
-  pill: React.ReactNode;
-  menuItems: SheetMenuItem[];
-  onOpenSwitcher: () => void;
-}) {
+function ExpandedSheetHeader({ character, onUpdate, pill, menuItems, onOpenSwitcher }: SubHeaderProps) {
   const { current, max, temp } = character.hitPoints;
 
   // "Race · Class Level" — classSummary carries per-class levels for multiclass;
