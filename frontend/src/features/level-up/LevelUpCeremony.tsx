@@ -6,6 +6,7 @@ import Spinner from "@/components/ui/Spinner";
 import HitPointsStep from "@/features/level-up/HitPointsStep";
 import LevelUpStepPlaceholder from "@/features/level-up/LevelUpStepPlaceholder";
 import StepRail from "@/features/level-up/StepRail";
+import SubclassStep from "@/features/level-up/SubclassStep";
 import { useLevelUpCeremony, type LevelUpCeremony as Ceremony } from "@/features/level-up/useLevelUpCeremony";
 import { LevelUpStepContext } from "@/features/level-up/useLevelUpStepContext";
 import { useDelayedFlag } from "@/hooks/useDelayedFlag";
@@ -31,6 +32,7 @@ const PRIMARY_BTN =
 // unregistered renders the placeholder.
 const STEP_BODIES: Partial<Record<LevelUpStepKind, React.ComponentType<{ step: LevelUpStep }>>> = {
   hitPoints: HitPointsStep,
+  subclass: SubclassStep,
 };
 
 function StepBody({ step }: { step: LevelUpStep }) {
