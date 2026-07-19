@@ -33,6 +33,8 @@ function sneakAttackEffectRow(rogueLevel: number): EffectRow {
 export function sneakAttackSpec(rogueLevel: number): { count: number; faces: number; modifier: number } | null {
   if (sneakAttackDiceCount(rogueLevel) <= 0) return null;
   const spec = readEffectSpec(sneakAttackEffectRow(rogueLevel), resolveSneakAttackDie);
+  // characterLevel receives rogueLevel: die faces (d6) never scale with level —
+  // only the count does, already baked into effectDiceCount above.
   return resolveEffectSpec(spec, 0, { characterLevel: rogueLevel });
 }
 

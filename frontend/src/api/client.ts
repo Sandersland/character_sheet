@@ -42,6 +42,7 @@ import type {
   LevelUpTarget,
   ManeuverOperation,
   ManeuverCastResult,
+  SneakAttackRollResult,
   ReferenceData,
   ResourceOperation,
   Session,
@@ -417,13 +418,6 @@ export async function castManeuverTransaction(
     jsonBody({ operations }),
     "Failed to cast maneuver",
   );
-}
-
-export interface SneakAttackRollResult {
-  roll: number;
-  dice: number;
-  faces: number;
-  summary: string;
 }
 
 // Rolls the rogue's level-derived Nd6 Sneak Attack server-side (enforcing the

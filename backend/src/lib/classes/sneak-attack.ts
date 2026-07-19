@@ -12,7 +12,9 @@ import { canApplySneakAttack, sneakAttackSpec } from "./rogue.js";
 export class InvalidSneakAttackOperationError extends Error {}
 
 // Roll Sneak Attack. `eligible` is the player's manual advantage-or-adjacent-ally
-// assertion (never auto-detected); `usedThisTurn` is the turn tracker's guard state.
+// assertion (never auto-detected); `usedThisTurn` is the client-asserted turn
+// tracker's guard state — also never server-verified, since the server has no
+// session turn state to cross-check against.
 export interface RollSneakAttackOperation {
   type: "rollSneakAttack";
   eligible: boolean;
