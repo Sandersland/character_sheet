@@ -82,8 +82,8 @@ describe("maxSpellLevelForClass", () => {
     expect(maxSpellLevelForClass("Bard", 10)).toBe(5);
   });
 
-  it("returns 0 before a half-caster has spellcasting, then the half-caster ceiling", () => {
-    expect(maxSpellLevelForClass("ranger", 1)).toBe(0);
+  it("half-casters cast from level 1 (SRD 5.2), then climb the half-caster ceiling", () => {
+    expect(maxSpellLevelForClass("ranger", 1)).toBe(1);
     expect(maxSpellLevelForClass("ranger", 2)).toBe(1);
     expect(maxSpellLevelForClass("ranger", 5)).toBe(2);
   });

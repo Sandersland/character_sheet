@@ -1064,7 +1064,7 @@ describe("prepared-spell cap enforcement (#883)", () => {
       },
     });
 
-    // Sorcerer 8 / CHA 18 → known caster → no prepared limit. Seed 20 "prepared" leveled + 1 unprepared.
+    // Sorcerer 8 → prepared caster (SRD 5.2 table = 12). Seed 20 "prepared" leveled + 1 unprepared (over cap).
     await prisma.character.create({
       data: {
         id: PREPCAP_SORCERER_ID, name: "PrepCap Sorcerer", alignment: "Neutral", ownerId: PREPCAP_OWNER,
@@ -1093,7 +1093,7 @@ describe("prepared-spell cap enforcement (#883)", () => {
       },
     });
 
-    // Multiclass Wizard 3 (INT 16 → 6) + Cleric 2 (WIS 12 → 3) → combined prepared cap 9.
+    // Multiclass Wizard 3 (SRD 5.2 table = 6) + Cleric 2 (table = 5) → combined prepared cap 11.
     await prisma.character.create({
       data: {
         id: PREPCAP_MULTI_ID, name: "PrepCap Multi", alignment: "Neutral", ownerId: PREPCAP_OWNER,
@@ -1102,7 +1102,7 @@ describe("prepared-spell cap enforcement (#883)", () => {
         abilityScores: { strength: 8, dexterity: 12, constitution: 12, intelligence: 16, wisdom: 12, charisma: 10 },
         savingThrowProficiencies: ["intelligence", "wisdom"], skills: [], toolProficiencies: [],
         currency: { cp: 0, sp: 0, gp: 0, pp: 0 },
-        spellcasting: { slotsUsed: {}, spells: leveledSpells(9, 10) } as Prisma.InputJsonValue,
+        spellcasting: { slotsUsed: {}, spells: leveledSpells(11, 12) } as Prisma.InputJsonValue,
         classEntries: {
           create: [
             { name: "wizard", classId: wizardClassId, level: 3, position: 0 },
@@ -1148,12 +1148,14 @@ describe("prepared-spell cap enforcement (#883)", () => {
     expect(get.body.spellcasting.preparedSpellCount).toBe(12);
   });
 
-  it("known caster (sorcerer) reports a null limit and is not blocked", async () => {
+  it("sorcerer is now a prepared caster with a non-null cap (SRD 5.2) and is blocked over it", async () => {
     const url = `/api/characters/${PREPCAP_SORCERER_ID}/spellcasting/transactions`;
     const res = await supertest.agent(createApp()).set("Cookie", COOKIE).post(url)
       .send({ operations: [{ type: "prepareSpell", entryId: "prep-21" }] });
-    expect(res.status).toBe(200);
-    expect(res.body.spellcasting.preparedSpellLimit).toBeNull();
+    expect(res.status).toBe(400);
+    expect(res.body.error ?? JSON.stringify(res.body)).toMatch(/at most 12/);
+    const get = await supertest(createApp()).get(`/api/characters/${PREPCAP_SORCERER_ID}`).set("Cookie", COOKIE);
+    expect(get.body.spellcasting.preparedSpellLimit).toBe(12);
   });
 
   it("single-class enforcement uses the XP-derived level, not a stale classEntry.level", async () => {
@@ -1170,10 +1172,10 @@ describe("prepared-spell cap enforcement (#883)", () => {
   it("multiclass prepared caster is rejected at the combined cap", async () => {
     const url = `/api/characters/${PREPCAP_MULTI_ID}/spellcasting/transactions`;
     const res = await supertest.agent(createApp()).set("Cookie", COOKIE).post(url)
-      .send({ operations: [{ type: "prepareSpell", entryId: "prep-10" }] });
+      .send({ operations: [{ type: "prepareSpell", entryId: "prep-12" }] });
     expect(res.status).toBe(400);
-    expect(res.body.error ?? JSON.stringify(res.body)).toMatch(/at most 9/);
+    expect(res.body.error ?? JSON.stringify(res.body)).toMatch(/at most 11/);
     const get = await supertest(createApp()).get(`/api/characters/${PREPCAP_MULTI_ID}`).set("Cookie", COOKIE);
-    expect(get.body.spellcasting.preparedSpellLimit).toBe(9);
+    expect(get.body.spellcasting.preparedSpellLimit).toBe(11);
   });
 });

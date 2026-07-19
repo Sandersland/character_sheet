@@ -297,8 +297,8 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     ]);
     expect(b.spellcasting.arcana).toEqual([]);
     expect(b.spellcasting.concentratingOn).toBeNull();
-    // Prepared-spell cap (#883): INT mod 3 + level 5 = 8; empty spellbook → 0 prepared.
-    expect(b.spellcasting.preparedSpellLimit).toBe(8);
+    // Prepared-spell cap (SRD 5.2): Wizard L5 table column = 9; empty spellbook → 0 prepared.
+    expect(b.spellcasting.preparedSpellLimit).toBe(9);
     expect(b.spellcasting.preparedSpellCount).toBe(0);
 
     // Single class, no subclass.
@@ -324,8 +324,8 @@ describe("serializeCharacter derive/clamp characterization (#616)", () => {
     });
     expect(c.spellcasting.spells).toEqual([]);
     expect(c.spellcasting.concentratingOn).toBeNull();
-    // Known/pact caster only (warlock + non-caster fighter) → no prepared cap.
-    expect(c.spellcasting.preparedSpellLimit).toBeNull();
+    // SRD 5.2: Warlock is now a prepared caster (L11 table = 11); Fighter contributes 0.
+    expect(c.spellcasting.preparedSpellLimit).toBe(11);
     expect(c.spellcasting.preparedSpellCount).toBe(0);
     expect(c.classes).toHaveLength(2);
   });

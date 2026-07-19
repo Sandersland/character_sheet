@@ -166,7 +166,7 @@ export function buildSpellcastingView(
 ): object | undefined {
   const view = buildSpellcastingViewBase(row, primaryClass, level, abilityScores, proficiencyBonus);
   if (view === undefined) return undefined;
-  return { ...view, ...derivePreparedFields(view, preparedLimitEntries(row, primaryClass, level), abilityScores) };
+  return { ...view, ...derivePreparedFields(view, preparedLimitEntries(row, primaryClass, level)) };
 }
 
 // Class entries feeding the prepared-cap sum: single-class uses the XP-derived
@@ -191,12 +191,11 @@ function preparedLimitEntries(
 function derivePreparedFields(
   view: object,
   entries: Array<{ name: string; level: number; subclass: string | null }>,
-  abilityScores: Record<string, number>,
 ): { preparedSpellLimit: number | null; preparedSpellCount: number } {
   const raw = (view as { spells?: unknown }).spells;
   const spells: SpellEntry[] = Array.isArray(raw) ? raw : [];
   return {
-    preparedSpellLimit: derivePreparedSpellLimit(entries, abilityScores),
+    preparedSpellLimit: derivePreparedSpellLimit(entries),
     preparedSpellCount: spells.filter((s) => s.prepared && s.level > 0 && s.source == null).length,
   };
 }

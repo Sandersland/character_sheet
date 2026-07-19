@@ -66,10 +66,11 @@ export interface DerivedSpellcastingInfo {
   arcana: Array<{ level: number; total: number }>;
 }
 
-// Half-caster slot table (Paladin / Ranger). No spellcasting at level 1; slots
-// at level N match the full-caster table at ceil(N/2). PHB p. 84 / 91.
-// Outer key: character level 2–20.  Inner key: spell slot level.
+// Half-caster slot table (Paladin / Ranger). SRD 5.2: half-casters gain
+// spellcasting at level 1 (two 1st-level slots); higher levels match the
+// full-caster table at ceil(N/2). Outer key: character level 1–20.
 const HALF_CASTER_SLOTS: Readonly<Record<number, Readonly<Record<number, number>>>> = {
+   1: { 1: 2 },
    2: { 1: 2 },
    3: { 1: 3 },
    4: { 1: 3 },
@@ -178,38 +179,27 @@ export const CASTER_FRACTION_BY_CLASS: Readonly<Record<string, CasterFraction>> 
   warlock: "pact",
 };
 
-// Whether a caster class prepares spells from a list (Cleric/Druid/Paladin/Wizard)
-// or knows a fixed set (Bard/Sorcerer/Ranger/Warlock + third casters).
-const SPELL_PREPARATION_BY_CLASS: Readonly<Record<string, "known" | "prepared">> = {
-  bard: "known",
-  sorcerer: "known",
-  ranger: "known",
-  warlock: "known",
-  cleric: "prepared",
-  druid: "prepared",
-  paladin: "prepared",
-  wizard: "prepared",
-};
-
 /** Caster fraction for a class (third casters resolved via subclass). "none" for non-casters. */
 export function casterFractionFor(className: string, subclass?: string | null): CasterFraction {
   if (THIRD_CASTER_SUBCLASSES[(subclass ?? "").toLowerCase()]) return "third";
   return CASTER_FRACTION_BY_CLASS[className.toLowerCase()] ?? "none";
 }
 
-// Full spellcasting profile of one class entry, or null for a non-caster.
+// Spellcasting profile of one class entry, or null for a non-caster. SRD 5.2
+// collapsed the known/prepared split — every caster now prepares (see
+// PREPARED_SPELLS_BY_CLASS), so preparation is no longer part of the profile.
 function casterProfile(
   className: string,
   subclass?: string | null,
-): { fraction: CasterFraction; ability: string; preparation: "known" | "prepared" } | null {
+): { fraction: CasterFraction; ability: string } | null {
   const subKey = (subclass ?? "").toLowerCase();
   const thirdAbility = THIRD_CASTER_SUBCLASSES[subKey];
-  if (thirdAbility) return { fraction: "third", ability: thirdAbility, preparation: "known" };
+  if (thirdAbility) return { fraction: "third", ability: thirdAbility };
 
   const key = className.toLowerCase();
   const fraction = CASTER_FRACTION_BY_CLASS[key];
   if (!fraction) return null;
-  return { fraction, ability: SPELLCASTING_ABILITY[key], preparation: SPELL_PREPARATION_BY_CLASS[key] };
+  return { fraction, ability: SPELLCASTING_ABILITY[key] };
 }
 
 // Levels a class entry adds to the combined multiclass caster level.
@@ -220,27 +210,109 @@ function casterLevelContribution(fraction: CasterFraction, level: number): numbe
   return 0; // pact + none never contribute to the merged pool
 }
 
+// SRD 5.2 prepared-spell counts, indexed by (class level − 1). 2024 rules: every
+// caster prepares a fixed table count (no longer ability mod + level). Bard,
+// Cleric, and Druid share one column; Paladin and Ranger share the half-caster
+// column and prepare from level 1.
+const FULL_CASTER_PREPARED = [4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 16, 17, 17, 18, 18, 19, 20, 21, 22] as const;
+const HALF_CASTER_PREPARED = [2, 3, 4, 5, 6, 6, 7, 7, 9, 9, 10, 10, 11, 11, 12, 12, 14, 14, 15, 15] as const;
+
+export const PREPARED_SPELLS_BY_CLASS: Readonly<Record<string, readonly number[]>> = {
+  bard: FULL_CASTER_PREPARED,
+  cleric: FULL_CASTER_PREPARED,
+  druid: FULL_CASTER_PREPARED,
+  sorcerer: [2, 4, 6, 7, 9, 10, 11, 12, 14, 15, 16, 16, 17, 17, 18, 18, 19, 20, 21, 22],
+  wizard: [4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 16, 17, 18, 19, 21, 22, 23, 24, 25],
+  warlock: [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15],
+  paladin: HALF_CASTER_PREPARED,
+  ranger: HALF_CASTER_PREPARED,
+};
+
+// Third-caster (Eldritch Knight / Arcane Trickster) prepared counts, indexed by
+// (class level − 3) — spellcasting begins at level 3 (PHB'24 Fighter/Rogue tables).
+const THIRD_CASTER_PREPARED = [3, 4, 4, 4, 5, 6, 6, 7, 8, 8, 9, 10, 10, 11, 11, 11, 12, 13] as const;
+
 /**
- * Prepared-spell cap (PHB): a prepared caster may have `abilityMod + classLevel`
- * spells prepared (min 1). Summed across prepared-caster classes for multiclass.
- * Returns null when no class prepares (known/pact/third casters are unaffected).
- * Pure function — no DB access, safe to call in serializeCharacter.
+ * Prepared-spell count for one class entry at its level (SRD 5.2 tables), or null
+ * when the entry is not a caster at that level (non-caster, or a third caster
+ * below level 3). Third casters resolve via `subclass`.
+ */
+export function preparedSpellCountAt(className: string, level: number, subclass?: string | null): number | null {
+  const subKey = (subclass ?? "").toLowerCase();
+  if (THIRD_CASTER_SUBCLASSES[subKey]) {
+    if (level < 3) return null; // subclass (and its spellcasting) unlocked at level 3
+    return THIRD_CASTER_PREPARED[Math.min(20, level) - 3] ?? null;
+  }
+  const table = PREPARED_SPELLS_BY_CLASS[className.toLowerCase()];
+  if (!table) return null;
+  return table[Math.min(20, Math.max(1, level)) - 1] ?? null;
+}
+
+/**
+ * Prepared-spell cap (SRD 5.2): a fixed per-class table count, summed across
+ * every caster class entry for multiclass. Returns null only when no entry is a
+ * caster. Pure function — no DB access, safe to call in serializeCharacter.
  */
 export function derivePreparedSpellLimit(
   classEntries: ReadonlyArray<{ name: string; level: number; subclass?: string | null }>,
-  abilityScores: Record<string, number>,
 ): number | null {
   let total = 0;
-  let anyPrepared = false;
+  let anyCaster = false;
   for (const entry of classEntries) {
-    const profile = casterProfile(entry.name, entry.subclass);
-    if (!profile || profile.preparation !== "prepared") continue;
-    if (profile.fraction === "half" && entry.level < 2) continue; // Paladin has no spellcasting below level 2
-    anyPrepared = true;
-    const mod = abilityModifier(abilityScores[profile.ability] ?? 10);
-    total += Math.max(1, mod + casterLevelContribution(profile.fraction, entry.level));
+    const count = preparedSpellCountAt(entry.name, entry.level, entry.subclass);
+    if (count == null) continue;
+    anyCaster = true;
+    total += count;
   }
-  return anyPrepared ? total : null;
+  return anyCaster ? total : null;
+}
+
+// SRD 5.2 cantrips known, as [minLevel, count] breakpoints (highest applicable
+// wins). Paladin/Ranger prepare no cantrips. Data only for now — the level-up
+// cantrip step is wired in #1131.
+const CANTRIP_BREAKPOINTS: Readonly<Record<string, ReadonlyArray<readonly [number, number]>>> = {
+  bard: [[1, 2], [4, 3], [10, 4]],
+  cleric: [[1, 3], [4, 4], [10, 5]],
+  druid: [[1, 2], [4, 3], [10, 4]],
+  sorcerer: [[1, 4], [4, 5], [10, 6]],
+  wizard: [[1, 3], [4, 4], [10, 5]],
+  warlock: [[1, 2], [4, 3], [10, 4]],
+};
+const THIRD_CASTER_CANTRIPS: ReadonlyArray<readonly [number, number]> = [[3, 2], [10, 3]];
+
+/** Cantrips known at a class level (SRD 5.2); 0 for Paladin/Ranger and non-casters. */
+export function cantripsKnownAtLevel(className: string, level: number, subclass?: string | null): number {
+  const breakpoints = THIRD_CASTER_SUBCLASSES[(subclass ?? "").toLowerCase()]
+    ? THIRD_CASTER_CANTRIPS
+    : CANTRIP_BREAKPOINTS[className.toLowerCase()];
+  if (!breakpoints) return 0;
+  let count = 0;
+  for (const [min, c] of breakpoints) if (level >= min) count = c;
+  return count;
+}
+
+// How a caster changes its prepared spells (SRD 5.2): "onLevelUp" replaces one on
+// gaining a class level (Bard/Sorcerer/Warlock + EK/AT); "oneOnLongRest" swaps one
+// per long rest (Paladin/Ranger); "anyOnLongRest" re-prepares freely on a long
+// rest (Cleric/Druid/Wizard). Swap TIMING is not enforced (#1127 decision) — only
+// the cap is; this drives the level-up new-spell step and swap affordance.
+export type SwapCadence = "onLevelUp" | "oneOnLongRest" | "anyOnLongRest";
+
+const SWAP_CADENCE_BY_CLASS: Readonly<Record<string, SwapCadence>> = {
+  bard: "onLevelUp",
+  sorcerer: "onLevelUp",
+  warlock: "onLevelUp",
+  cleric: "anyOnLongRest",
+  druid: "anyOnLongRest",
+  wizard: "anyOnLongRest",
+  paladin: "oneOnLongRest",
+  ranger: "oneOnLongRest",
+};
+
+/** Swap cadence for a class (EK/AT resolve via subclass to onLevelUp); null for a non-caster. */
+export function swapCadenceFor(className: string, subclass?: string | null): SwapCadence | null {
+  if (THIRD_CASTER_SUBCLASSES[(subclass ?? "").toLowerCase()]) return "onLevelUp";
+  return SWAP_CADENCE_BY_CLASS[className.toLowerCase()] ?? null;
 }
 
 /** One caster class's derived per-class spellcasting stats in a multiclass character. */
@@ -250,7 +322,6 @@ export interface MulticlassCasterClass {
   ability: string;
   spellSaveDC: number;
   spellAttackBonus: number;
-  preparation: "known" | "prepared";
   casterFraction: CasterFraction;
 }
 
@@ -327,7 +398,6 @@ export function deriveMulticlassSpellcasting(
       ability: profile.ability,
       spellSaveDC,
       spellAttackBonus,
-      preparation: profile.preparation,
       casterFraction: profile.fraction,
     });
 
@@ -409,8 +479,8 @@ export function deriveSpellcasting(
   }
 
   if (HALF_CASTER_CLASSES.has(classKey)) {
-    if (characterLevel < 2) return null; // half-casters gain spellcasting at level 2
-    return fromSlotRow(ability, HALF_CASTER_SLOTS[Math.min(20, characterLevel)] ?? {});
+    // SRD 5.2: half-casters cast from level 1.
+    return fromSlotRow(ability, HALF_CASTER_SLOTS[Math.min(20, Math.max(1, characterLevel))] ?? {});
   }
 
   if (classKey === "warlock") {
@@ -480,12 +550,11 @@ export function maxSpellLevelForClass(className: string, level: number, subclass
 
 /** Whether a class learns new spells on level-up (known casters + Wizard's spellbook), per RAW. */
 export function learnsNewSpellsOnLevelUp(className: string, subclass?: string | null): boolean {
-  const profile = casterProfile(className, subclass);
-  if (!profile) return false;
-  return profile.preparation === "known" || className.toLowerCase() === "wizard";
+  return isKnownCaster(className, subclass) || className.toLowerCase() === "wizard";
 }
 
 /** Whether a class knows a fixed spell set (may swap one on level-up, #1101); Wizard scribes, so is excluded. */
 export function isKnownCaster(className: string, subclass?: string | null): boolean {
-  return casterProfile(className, subclass)?.preparation === "known";
+  if (THIRD_CASTER_SUBCLASSES[(subclass ?? "").toLowerCase()]) return true;
+  return SPELLS_KNOWN_BY_CLASS[className.toLowerCase()] !== undefined;
 }

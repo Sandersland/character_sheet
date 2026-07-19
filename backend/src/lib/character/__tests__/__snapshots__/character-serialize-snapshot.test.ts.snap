@@ -490,7 +490,6 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
         "ability": "intelligence",
         "casterFraction": "full",
         "className": "wizard",
-        "preparation": "prepared",
         "spellAttackBonus": 6,
         "spellSaveDC": 14,
         "subclass": null,
@@ -502,7 +501,7 @@ exports[`serializeCharacter snapshot lock (#1003) > multiclass caster with inven
     },
     "pact": null,
     "preparedSpellCount": 1,
-    "preparedSpellLimit": 8,
+    "preparedSpellLimit": 9,
     "slots": [
       {
         "level": 1,

@@ -487,9 +487,9 @@ describe("deriveSpellcasting — full casters", () => {
 // ── deriveSpellcasting — half-casters (Paladin / Ranger) ──────────────────────
 
 describe("deriveSpellcasting — half-casters", () => {
-  it("returns null at level 1 (no spellcasting until level 2)", () => {
-    expect(deriveSpellcasting("paladin", 1, CASTER_SCORES, PROF_2)).toBeNull();
-    expect(deriveSpellcasting("ranger", 1, CASTER_SCORES, PROF_2)).toBeNull();
+  it("casts from level 1 with two 1st-level slots (SRD 5.2)", () => {
+    expect(slotMap(deriveSpellcasting("paladin", 1, CASTER_SCORES, PROF_2))).toEqual({ 1: 2 });
+    expect(slotMap(deriveSpellcasting("ranger", 1, CASTER_SCORES, PROF_2))).toEqual({ 1: 2 });
   });
 
   it("grants two 1st-level slots at level 2", () => {
