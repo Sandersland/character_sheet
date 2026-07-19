@@ -39,4 +39,19 @@ describe("subclass grant level is 3 for all classes (#1128)", () => {
     expect(at(2)).toBe(false);
     expect(at(3)).toBe(true);
   });
+
+  // The lowest domain/patron spell tier now grants at level 3, so no cleric or
+  // warlock subclass feature description may still label it "(L1)" (#1128).
+  const L1_LABEL_SUBCLASSES: Array<[string, string]> = [
+    ["cleric", "life domain"],
+    ["cleric", "trickery domain"],
+    ["warlock", "the fiend"],
+    ["warlock", "the archfey"],
+    ["warlock", "the great old one"],
+  ];
+  it.each(L1_LABEL_SUBCLASSES)("%s / %s has no feature description labelling a tier (L1)", (className, subclass) => {
+    const info = deriveResources(className, subclass, 20, ABILITIES, proficiencyBonusForLevel(20));
+    const withL1 = (info?.features ?? []).filter((f) => f.description.includes("(L1)")).map((f) => f.name);
+    expect(withL1).toEqual([]);
+  });
 });
