@@ -465,6 +465,19 @@ export function spellsGainedAtLevel(className: string, level: number): number {
   return Math.max(0, known(level) - known(level - 1));
 }
 
+/**
+ * Highest spell level a class can cast/scribe at `level` — the ceiling on spells
+ * learnable at level-up. Derived from the slot table (max slot level) rather than
+ * re-encoding thresholds; 0 when the class has no spellcasting yet (non-casters,
+ * a Ranger below level 2). Third-caster subclasses resolve via `subclass`.
+ */
+export function maxSpellLevelForClass(className: string, level: number, subclass?: string | null): number {
+  // Ability scores / proficiency don't affect slot LEVELS, so pass neutral values.
+  const derived = deriveSpellcasting(className, level, {}, 2, subclass ?? undefined);
+  if (!derived) return 0;
+  return derived.slotTotals.reduce((max, slot) => Math.max(max, slot.level), 0);
+}
+
 /** Whether a class learns new spells on level-up (known casters + Wizard's spellbook), per RAW. */
 export function learnsNewSpellsOnLevelUp(className: string, subclass?: string | null): boolean {
   const profile = casterProfile(className, subclass);
