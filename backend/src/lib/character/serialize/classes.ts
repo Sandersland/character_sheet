@@ -2,10 +2,9 @@
 
 import {
   advancementSlotsForLevel,
-  characterFightingStyleChoiceCount,
+  characterFightingStyleFeatSlots,
   deriveFeatBonuses,
   deriveFeatProficiencies,
-  type FightingStyleKey,
 } from "@/lib/srd/srd.js";
 import { deriveResources } from "@/lib/classes/class-features.js";
 import { deriveActions, type AvailableAction } from "@/lib/classes/actions.js";
@@ -18,17 +17,16 @@ import type { CharacterWithRelations } from "@/lib/character/character-include.j
 export type PrimaryClass = CharacterWithRelations["classEntries"][number] | undefined;
 
 // Resources clamp-on-read: derive class/subclass pools + level-gated caps, then
-// layer stored `used` counts and known lists (clamped to caps). Also resolves
-// the Fighting Style clamp (null when the character isn't entitled). Returns the
-// resources view (undefined for classes with no pools) plus the clamped
-// fightingStyle + its choice count, both reused elsewhere in serializeCharacter.
+// layer stored `used` counts and known lists (clamped to caps). Returns the
+// resources view (undefined for classes with no pools). Fighting Style is a feat
+// now (#1137) — surfaced via top-level fightingStyleSlots + advancements, not here.
 export function buildResourcesView(
   row: CharacterWithRelations,
   primaryClass: PrimaryClass,
   level: number,
   abilityScores: Record<string, number>,
   proficiencyBonus: number,
-): { resources: object | undefined; fightingStyle: FightingStyleKey | null; fightingStyleChoiceCount: number } {
+): { resources: object | undefined } {
   const derivedRes = deriveResources(
     primaryClass?.name ?? "",
     primaryClass?.subclass ?? undefined,
@@ -37,36 +35,19 @@ export function buildResourcesView(
     proficiencyBonus,
   );
 
-  // Fighting Style clamp-on-read: the chosen style key is persisted in
-  // resources.fightingStyle. Clamp it to null when NO class entry entitles the
-  // character (#1065: a non-primary Fighter entry counts) — defense-in-depth
-  // mirroring reconcileFightingStyle on the write side.
-  const fightingStyleChoices = characterFightingStyleChoiceCount(row.classEntries, level);
-  const storedFightingStyle = normalizeResourcesMutable(row.resources).fightingStyle;
-  const fightingStyle: FightingStyleKey | null =
-    fightingStyleChoices > 0 ? storedFightingStyle : null;
-
   const resources = derivedRes
-    ? buildResourcesPayload(
-        derivedRes,
-        normalizeResourcesMutable(row.resources),
-        fightingStyle,
-        fightingStyleChoices,
-      )
+    ? buildResourcesPayload(derivedRes, normalizeResourcesMutable(row.resources))
     : undefined;
 
-  return { resources, fightingStyle, fightingStyleChoiceCount: fightingStyleChoices };
+  return { resources };
 }
 
 // Assemble the wire `resources` payload from the derived caps + stored mutable
 // state, clamping each level-gated list to its derived count (defense-in-depth
 // for characters who haven't had a reconciling XP op since their level dropped).
-// Byte-identical to the former inline construction (feeds the serialize oracle).
 function buildResourcesPayload(
   derivedRes: NonNullable<ReturnType<typeof deriveResources>>,
   stored: ReturnType<typeof normalizeResourcesMutable>,
-  fightingStyle: FightingStyleKey | null,
-  fightingStyleChoiceCount: number,
 ): object {
   const clampedManeuversKnown =
     derivedRes.maneuverChoiceCount !== undefined
@@ -113,11 +94,6 @@ function buildResourcesPayload(
     // choicesKnown holds the (clamped) selections.
     subclassChoices,
     choicesKnown: clampedChoicesKnown,
-    // Fighting Style choice surface for the frontend picker. Choice count is
-    // level-gated (Fighter L1 -> 1); fightingStyle is already clamped to null
-    // when the character isn't entitled.
-    fightingStyleChoiceCount,
-    fightingStyle,
   };
 }
 
@@ -138,16 +114,22 @@ export function applyAdvancementClamp(
   clampedAdvancements: AdvancementEntry[];
   advSlotTotal: number;
   usedSlots: number;
+  fightingStyleSlotTotal: number;
+  usedFightingStyleSlots: number;
 } {
   const storedForAdv = normalizeResourcesMutable(row.resources);
   const advSlotTotal = advancementSlotsForLevel(primaryClass?.name ?? "", level);
+  // Fighting Style feat cap across all class entries (#1137) — its own partition.
+  const fightingStyleSlotTotal = characterFightingStyleFeatSlots(row.classEntries, level);
   let effectiveScores = row.abilityScores as Record<string, number>;
   let effectiveInitBonus = row.initiativeBonus;
   let effectiveHitPoints = hitPoints;
-  // Origin feats are kept regardless of the slot cap (#1130) via the shared split.
-  const { kept: clampedAdvancements, excess, usedSlots } = splitAdvancementsBySlotCap(
+  // Origin feats are kept regardless of the slot cap (#1130); fs feats trim against
+  // their own cap (#1137) — both handled by the shared split.
+  const { kept: clampedAdvancements, excess, usedSlots, usedFightingStyleSlots } = splitAdvancementsBySlotCap(
     storedForAdv.advancements,
     advSlotTotal,
+    fightingStyleSlotTotal,
   );
 
   if (excess.length > 0) {
@@ -164,7 +146,7 @@ export function applyAdvancementClamp(
     effectiveInitBonus = reversed.initiativeBonus;
   }
 
-  return { effectiveScores, hitPoints: effectiveHitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal, usedSlots };
+  return { effectiveScores, hitPoints: effectiveHitPoints, effectiveInitBonus, clampedAdvancements, advSlotTotal, usedSlots, fightingStyleSlotTotal, usedFightingStyleSlots };
 }
 
 // Feat improvement modifier layer: sum structured feat improvements over the

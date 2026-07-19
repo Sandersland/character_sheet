@@ -2,14 +2,14 @@
 // Owns busy/error via useClassTransactions, derives its view via deriveClassFeatureView,
 // and composes per-feature subcomponents. Mirrors SpellsSection's orchestrator/row split.
 
-import { applyClassTransactions } from "@/api/client";
-import type { Character, ClassOption, FightingStyleKey } from "@/types/character";
+import { applyAdvancementTransactions, applyClassTransactions } from "@/api/client";
+import type { Character, ClassOption } from "@/types/character";
 import { deriveClassFeatureView } from "@/lib/classFeatures";
 import { useClassTransactions } from "@/features/class/useClassTransactions";
 import ClassFeaturesList from "@/features/class/ClassFeaturesList";
 import ClassResourceBlocks from "@/features/class/ClassResourceBlocks";
 import ClassRosterSection from "@/features/class/ClassRosterSection";
-import FightingStyleSection from "@/features/class/FightingStyleSection";
+import FightingStyleFeatSection from "@/features/class/FightingStyleFeatSection";
 import SubclassSection from "@/features/class/SubclassSection";
 
 interface Props {
@@ -48,10 +48,11 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
       <ClassResourceBlocks character={character} view={view} busy={busy} run={run} />
 
       {view.hasFightingStyle && (
-        <FightingStyleSection
-          fightingStyle={view.fightingStyle}
+        <FightingStyleFeatSection
+          character={character}
+          takenFeats={view.fightingStyleFeats}
           busy={busy}
-          onChoose={(key: FightingStyleKey) => run(() => applyClassTransactions(character.id, [{ type: "setFightingStyle", key }]))}
+          onTake={(op) => run(() => applyAdvancementTransactions(character.id, [op]))}
         />
       )}
 

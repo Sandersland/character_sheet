@@ -56,6 +56,7 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
       proficient: false,
     },
     resources: { pools: [] },
+    advancements: [],
     ...overrides,
   } as unknown as Character;
 }
@@ -395,9 +396,13 @@ describe("buildOffHandEntry (#732)", () => {
     expect(entry.damageLabel).toBe("1d6 piercing");
   });
 
-  it("keeps the ability modifier WITH the Two-Weapon Fighting style", () => {
+  it("keeps the ability modifier WITH the Two-Weapon Fighting feat improvement", () => {
     const entry = buildOffHandEntry(
-      twoWeaponChar({ resources: { pools: [], fightingStyle: "twoWeaponFighting" } } as unknown as Partial<Character>),
+      twoWeaponChar({
+        advancements: [
+          { id: "fs1", slot: "fightingStyle", improvements: [{ target: "offhandAbilityDamage", amount: 1 }] },
+        ] as unknown as Character["advancements"],
+      }),
     )!;
     expect(entry.damageSpec).toEqual({ count: 1, faces: 6, modifier: 3 });
     expect(entry.damageLabel).toBe("1d6 + 3 piercing");

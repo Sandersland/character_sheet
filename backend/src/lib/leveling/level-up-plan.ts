@@ -4,7 +4,7 @@
 // and validated against by the transaction endpoint (#885).
 import { deriveResources, type DerivedClassInfo } from "@/lib/classes/class-features.js";
 import { proficiencyBonusForLevel } from "@/lib/leveling/experience.js";
-import { advancementSlotsForLevel, fightingStyleChoiceCount } from "@/lib/srd/srd.js";
+import { advancementSlotsForLevel, fightingStyleFeatSlots } from "@/lib/srd/srd.js";
 import {
   bardMagicalSecretsAt,
   levelUpCantripPicks,
@@ -18,7 +18,7 @@ export type LevelUpStepKind =
   | "advancement"
   | "subclass"
   | "maneuvers"
-  | "fightingStyle"
+  | "fightingStyleFeat"
   | "disciplines"
   | "toolProficiency"
   | "subclassChoice"
@@ -74,9 +74,11 @@ function subclassStep({ target }: PlanContext): LevelUpStep | null {
   return target.newLevel === subclassLevel && !target.subclass ? { kind: "subclass" } : null;
 }
 
-function fightingStyleStep({ target }: PlanContext): LevelUpStep | null {
-  const delta = fightingStyleChoiceCount(target.name, target.newLevel) - fightingStyleChoiceCount(target.name, target.newLevel - 1);
-  return delta > 0 ? { kind: "fightingStyle", count: delta } : null;
+// A Fighting Style feat pick (#1137): Fighter's arrives with a new level-1 entry,
+// Paladin's and Ranger's at level 2. Derived from the fightingStyleFeatSlots delta.
+function fightingStyleFeatStep({ target }: PlanContext): LevelUpStep | null {
+  const delta = fightingStyleFeatSlots(target.name, target.newLevel) - fightingStyleFeatSlots(target.name, target.newLevel - 1);
+  return delta > 0 ? { kind: "fightingStyleFeat", count: delta } : null;
 }
 
 // Diff one bespoke choose-N count (maneuvers/disciplines/tools) across N vs N-1.
@@ -151,7 +153,7 @@ export function buildLevelUpPlan(character: LevelUpPlanCharacter, target: Target
     advancementStep(ctx),
     subclassStep(ctx),
     choiceCountStep(ctx, "maneuvers", "maneuverChoiceCount"),
-    fightingStyleStep(ctx),
+    fightingStyleFeatStep(ctx),
     choiceCountStep(ctx, "disciplines", "disciplineChoiceCount"),
     choiceCountStep(ctx, "toolProficiency", "toolProfChoiceCount"),
     ...subclassChoiceSteps(ctx),

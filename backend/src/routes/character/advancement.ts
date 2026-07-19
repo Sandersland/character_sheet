@@ -59,6 +59,8 @@ export const takeFeatOpSchema = z
       })
       .optional(),
     abilityChoice: z.string().optional(),
+    /** #1137: routes a Fighting Style feat through its own slot partition. */
+    slot: z.literal("fightingStyle").optional(),
   })
   .refine((op) => Boolean(op.featId) !== Boolean(op.custom), {
     message: "Provide exactly one of featId or custom",

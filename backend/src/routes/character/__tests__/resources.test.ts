@@ -419,27 +419,32 @@ describe("POST /api/characters/:id/resources/transactions", () => {
     expect(toolProfs(char).some((t) => t.name === "Smith's Tools")).toBe(true);
   });
 
-  // ── undo preserves fightingStyle (issue #319) ───────────────────────────────
+  // ── undo preserves a Fighting Style feat advancement (issue #319 / #1137) ────
 
-  it("a resource op → undo preserves a previously chosen fightingStyle", async () => {
-    // Store a fighting style directly, then spend a resource and undo it.
+  it("a resource op → undo preserves a previously taken Fighting Style feat", async () => {
+    const fsFeat = {
+      id: "adv-fs", level: 1, kind: "feat", slot: "fightingStyle",
+      abilityDeltas: {}, hpDelta: 0, initDelta: 0,
+      featName: "Defense", featDescription: "d", improvements: [{ target: "armorClassWhileArmored", amount: 1 }],
+    };
     await prisma.character.update({
       where: { id: FIXTURE_ID },
-      data: { resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], advancements: [], fightingStyle: "defense" } },
+      data: { resources: { used: {}, maneuversKnown: [], toolProficienciesKnown: [], advancements: [fsFeat] } as unknown as Prisma.InputJsonValue },
     });
 
     const spend = await post([{ type: "spendResource", key: "superiorityDice" }]);
     expect(spend.status).toBe(200);
-    expect(spend.body.resources.fightingStyle).toBe("defense");
+    const hasFs = (advs: Array<{ slot?: string }>) => advs.some((a) => a.slot === "fightingStyle");
+    expect(hasFs(spend.body.advancements)).toBe(true);
 
     const events = await activity();
     const ev = events.find((e) => e.type === "spendResource")!;
-    expect((ev.before!.resources as { fightingStyle: string | null }).fightingStyle).toBe("defense");
-    expect((ev.after!.resources as { fightingStyle: string | null }).fightingStyle).toBe("defense");
+    expect(hasFs((ev.before!.resources as { advancements: Array<{ slot?: string }> }).advancements)).toBe(true);
+    expect(hasFs((ev.after!.resources as { advancements: Array<{ slot?: string }> }).advancements)).toBe(true);
 
     const undo = await agent().post(`/api/characters/${FIXTURE_ID}/events/${ev.batchId}/revert`);
     expect(undo.status).toBe(200);
-    expect(undo.body.resources.fightingStyle).toBe("defense");
+    expect(hasFs(undo.body.advancements)).toBe(true);
     expect(pool(undo, "superiorityDice").used).toBe(0);
   });
 });

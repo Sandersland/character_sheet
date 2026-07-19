@@ -5,98 +5,96 @@ import userEvent from "@testing-library/user-event";
 import ClassFeaturesSection from "@/features/class/ClassFeaturesSection";
 import { RollProvider } from "@/features/dice/RollContext";
 import * as client from "@/api/client";
-import type { CatalogDiscipline, Character, CharacterResources } from "@/types/character";
+import type { AdvancementEntry, CatalogDiscipline, CatalogFeat, Character } from "@/types/character";
 
 vi.mock("@/api/client", () => ({
   applyClassTransactions: vi.fn(),
+  applyAdvancementTransactions: vi.fn(),
   applyResourceTransactions: vi.fn(),
   applyDisciplineTransactions: vi.fn(),
   applyConditionTransactions: vi.fn(),
   fetchDisciplines: vi.fn(),
+  fetchFeats: vi.fn(),
 }));
 
 // AddClassPanel (rendered via ClassRosterSection) navigates into the ceremony
 // (#1131); stub useNavigate so these Router-less renders don't throw.
 vi.mock("react-router-dom", () => ({ useNavigate: () => vi.fn() }));
 
-function makeCharacter(resources: Partial<CharacterResources>): Character {
-  return {
-    id: "char-1",
-    class: "Fighter",
-    level: 5,
-    resources: {
-      features: [],
-      pools: [],
-      maneuversKnown: [],
-      toolProficienciesKnown: [],
-      ...resources,
-    },
-  } as unknown as Character;
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
+const FS_CATALOG = [
+  { id: "archery", name: "Archery", description: "+2 bonus to attack rolls with ranged weapons.", category: "fighting_style" },
+  { id: "defense", name: "Defense", description: "+1 AC while wearing armor.", category: "fighting_style" },
+  { id: "sentinel", name: "Sentinel", description: "not a style", category: "general" },
+] as unknown as CatalogFeat[];
+
+// A fighter with a Fighting Style slot partition (#1137). `taken` are the
+// fightingStyle-slot advancements; `used` derives from their count by default.
+function makeFighter(opts: { total: number; taken?: AdvancementEntry[] }): Character {
+  const taken = opts.taken ?? [];
+  return {
+    id: "char-1",
+    class: "Fighter",
+    level: 5,
+    fightingStyleSlots: { total: opts.total, used: taken.length },
+    advancements: taken,
+    resources: { features: [], pools: [], maneuversKnown: [], toolProficienciesKnown: [] },
+  } as unknown as Character;
+}
+
 describe("ClassFeaturesSection — Fighting Style", () => {
-  it("renders the Fighting Style picker when fightingStyleChoiceCount > 0 and none chosen", () => {
+  it("renders the picker when a fighting-style slot is open and none taken", () => {
     render(
-      <ClassFeaturesSection
-        character={makeCharacter({ fightingStyleChoiceCount: 1, fightingStyle: null })}
-        referenceClasses={[]}
-        onUpdate={vi.fn()}
-      />,
+      <ClassFeaturesSection character={makeFighter({ total: 1 })} referenceClasses={[]} onUpdate={vi.fn()} />,
     );
     expect(screen.getByText("Fighting Style")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /choose a fighting style/i })).toBeInTheDocument();
   });
 
-  it("does NOT render the Fighting Style section when not entitled", () => {
+  it("does NOT render the Fighting Style section when total slots is 0", () => {
     render(
-      <ClassFeaturesSection
-        character={makeCharacter({ fightingStyleChoiceCount: 0 })}
-        referenceClasses={[]}
-        onUpdate={vi.fn()}
-      />,
+      <ClassFeaturesSection character={makeFighter({ total: 0 })} referenceClasses={[]} onUpdate={vi.fn()} />,
     );
     expect(screen.queryByText("Fighting Style")).not.toBeInTheDocument();
   });
 
-  it("shows the chosen style label + description (never the raw key) when set", () => {
+  it("shows a taken feat's name + description, and no picker once slots are full", () => {
+    const taken = [
+      { id: "fs1", level: 1, kind: "feat", slot: "fightingStyle", featId: "archery", featName: "Archery", featDescription: "+2 bonus to attack rolls with ranged weapons.", abilityDeltas: {}, hpDelta: 0, initDelta: 0 },
+    ] as unknown as AdvancementEntry[];
     render(
-      <ClassFeaturesSection
-        character={makeCharacter({ fightingStyleChoiceCount: 1, fightingStyle: "archery" })}
-        referenceClasses={[]}
-        onUpdate={vi.fn()}
-      />,
+      <ClassFeaturesSection character={makeFighter({ total: 1, taken })} referenceClasses={[]} onUpdate={vi.fn()} />,
     );
     expect(screen.getByText("Archery")).toBeInTheDocument();
-    expect(screen.queryByText("archery")).not.toBeInTheDocument();
-    // Description text present.
     expect(screen.getByText(/\+2 bonus to attack rolls/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /choose a fighting style/i })).not.toBeInTheDocument();
   });
 
-  it("choosing a style calls applyClassTransactions with a setFightingStyle op", async () => {
+  it("choosing a style takes a slot:fightingStyle feat via applyAdvancementTransactions, excluding non-styles", async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
-    const mockApply = vi.mocked(client.applyClassTransactions);
-    mockApply.mockResolvedValue(
-      makeCharacter({ fightingStyleChoiceCount: 1, fightingStyle: "archery" }),
-    );
+    vi.mocked(client.fetchFeats).mockResolvedValue(FS_CATALOG);
+    const mockApply = vi.mocked(client.applyAdvancementTransactions);
+    mockApply.mockResolvedValue(makeFighter({ total: 1 }));
 
     render(
-      <ClassFeaturesSection
-        character={makeCharacter({ fightingStyleChoiceCount: 1, fightingStyle: null })}
-        referenceClasses={[]}
-        onUpdate={onUpdate}
-      />,
+      <ClassFeaturesSection character={makeFighter({ total: 1 })} referenceClasses={[]} onUpdate={onUpdate} />,
     );
 
     await user.click(screen.getByRole("button", { name: /choose a fighting style/i }));
+    // A general-category feat must not leak into the fighting-style picker.
+    expect(await screen.findByText("Archery")).toBeInTheDocument();
+    expect(screen.queryByText("Sentinel")).not.toBeInTheDocument();
+
     const archeryRow = screen.getByText("Archery").closest("li")!;
     await user.click(within(archeryRow).getByRole("button", { name: "Choose" }));
 
-    expect(mockApply).toHaveBeenCalledWith("char-1", [{ type: "setFightingStyle", key: "archery" }]);
+    expect(mockApply).toHaveBeenCalledWith("char-1", [
+      { type: "takeFeat", featId: "archery", slot: "fightingStyle" },
+    ]);
   });
 });
 

@@ -7,7 +7,6 @@ import * as alignments from "@/lib/srd/alignments.js";
 import * as tools from "@/lib/srd/tools.js";
 import * as conditionData from "@/lib/srd/condition-data.js";
 import * as itemRarity from "@/lib/srd/item-rarity.js";
-import * as fightingStyles from "@/lib/srd/fighting-styles.js";
 import * as armorClass from "@/lib/srd/armor-class.js";
 import * as movement from "@/lib/srd/movement.js";
 import * as extraAttack from "@/lib/srd/extra-attack.js";
@@ -20,17 +19,16 @@ import * as characterDerive from "@/lib/srd/character-derive.js";
 import * as feats from "@/lib/srd/feats.js";
 import * as barrel from "@/lib/srd/srd.js";
 
-// Pins the #663 decomposition of srd.ts into 15 topical files, each importable
+// Pins the #663 decomposition of srd.ts into topical files, each importable
 // on its own, with srd.ts kept as a thin re-export barrel (byte-identical
-// public API — same object identities, not copies).
+// public API — same object identities, not copies). #1137 retired fighting-styles.
 
 describe("srd.ts topical decomposition (#663)", () => {
-  it("splits rules data into 15 independently-importable topical files", () => {
+  it("splits rules data into independently-importable topical files", () => {
     expect(alignments.ALIGNMENTS).toBeDefined();
     expect(tools.TOOLS).toBeDefined();
     expect(conditionData.CONDITIONS).toBeDefined();
     expect(itemRarity.ITEM_RARITIES).toBeDefined();
-    expect(fightingStyles.FIGHTING_STYLES).toBeDefined();
     expect(armorClass.deriveArmorClass).toBeInstanceOf(Function);
     expect(movement.deriveUnarmoredMovement).toBeInstanceOf(Function);
     expect(extraAttack.deriveAttacksPerAction).toBeInstanceOf(Function);
@@ -48,7 +46,6 @@ describe("srd.ts topical decomposition (#663)", () => {
     expect(barrel.TOOLS).toBe(tools.TOOLS);
     expect(barrel.CONDITIONS).toBe(conditionData.CONDITIONS);
     expect(barrel.ITEM_RARITIES).toBe(itemRarity.ITEM_RARITIES);
-    expect(barrel.FIGHTING_STYLES).toBe(fightingStyles.FIGHTING_STYLES);
     expect(barrel.deriveArmorClass).toBe(armorClass.deriveArmorClass);
     expect(barrel.deriveUnarmoredMovement).toBe(movement.deriveUnarmoredMovement);
     expect(barrel.deriveAttacksPerAction).toBe(extraAttack.deriveAttacksPerAction);

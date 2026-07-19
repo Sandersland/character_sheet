@@ -116,6 +116,20 @@ describe("FEATS — PHB'24 category invariants", () => {
     }
   });
 
+  // #1137: the mechanical Fighting Style feats carry the same derived effects the
+  // former scalar styles applied — Archery +2 ranged attack, Defense +1 AC while
+  // armored, Two-Weapon Fighting the off-hand ability-mod marker. Great Weapon
+  // Fighting stays descriptive (its reroll is not automated).
+  it("Fighting Style feats carry their derived improvements", () => {
+    const byName = new Map(FEATS.map((f) => [f.name, f]));
+    expect(byName.get("Archery")?.improvements).toEqual([{ target: "rangedAttackRoll", amount: 2 }]);
+    expect(byName.get("Defense")?.improvements).toEqual([{ target: "armorClassWhileArmored", amount: 1 }]);
+    expect(byName.get("Two-Weapon Fighting")?.improvements).toEqual([
+      { target: "offhandAbilityDamage", amount: 1 },
+    ]);
+    expect(byName.get("Great Weapon Fighting")?.improvements ?? []).toEqual([]);
+  });
+
   it("only Magic Initiate and Skilled are repeatable", () => {
     const repeatable = FEATS.filter((f) => f.repeatable).map((f) => f.name).sort();
     expect(repeatable).toEqual(["Magic Initiate", "Skilled"]);

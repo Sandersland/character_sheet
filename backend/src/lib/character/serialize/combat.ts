@@ -2,15 +2,14 @@ import {
   abilityModifier,
   deriveArmorClass,
   deriveArmorClassParts,
+  deriveArmoredArmorClassParts,
   deriveFastMovement,
   deriveFeatBonuses,
-  deriveFightingStyleBonuses,
   deriveImprovisedAttack,
   deriveUnarmedDamageDie,
   deriveUnarmedStrike,
   deriveUnarmoredMovement,
   type BodyArmorCategory,
-  type FightingStyleKey,
 } from "@/lib/srd/srd.js";
 import { exhaustionSpeedPenalty } from "@/lib/srd/condition-data.js";
 import type { AdvancementEntry } from "@/lib/classes/resources.js";
@@ -53,7 +52,7 @@ export function selectEquippedBodyArmor(
 
 // AC assembly: labeled addends whose exact sum is armorClass (single source of
 // the base formula in srd/srd.ts). Layered in order: base parts (armor/Dex/shield/
-// Unarmored Defense/Mage Armor best-of) → Defense fighting style → feat AC →
+// Unarmored Defense/Mage Armor best-of) → Defense Fighting Style feat → feat AC →
 // per-source "ac" buffs → the acFloor (Barkskin) reconciling part last.
 // The branchiness is inherent to the 5e AC layering (each optional source is a
 // conditional addend), not accidental complexity.
@@ -63,7 +62,7 @@ export function buildArmorClassView(
   effectiveScores: Record<string, number>,
   bestArmor: BestBodyArmor,
   hasShield: boolean,
-  fightingStyle: FightingStyleKey | null,
+  clampedAdvancements: AdvancementEntry[],
   featBonuses: ReturnType<typeof deriveFeatBonuses>,
   buffTargets: TargetModifierMap,
 ): { armorClass: number; armorClassBreakdown: ReturnType<typeof deriveArmorClassParts> } {
@@ -83,9 +82,10 @@ export function buildArmorClassView(
   );
   // Labeled AC addends; armorClass below is their exact sum (single source in srd/srd.ts).
   const acParts = deriveArmorClassParts(bestArmor, hasShield, dexMod, unarmoredDefense, mageArmor);
-  // Defense fighting style only applies while wearing body armor (5e).
-  const styleAc = bestArmor !== null ? deriveFightingStyleBonuses(fightingStyle).armorClass : 0;
-  if (styleAc !== 0) acParts.push({ label: "Defense fighting style", value: styleAc });
+  // Defense Fighting Style feat only applies while wearing body armor (SRD 5.2, #1137).
+  if (bestArmor !== null) {
+    for (const part of deriveArmoredArmorClassParts(clampedAdvancements)) acParts.push(part);
+  }
   if (featBonuses.armorClass !== 0) acParts.push({ label: "Feats", value: featBonuses.armorClass });
   // Active-item AC bonuses (#383) + flat AC spell buffs (Shield of Faith +2, #363):
   // each labeled per source. v1 applies only unconditional bonuses; a conditional

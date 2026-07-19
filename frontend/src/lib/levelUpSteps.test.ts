@@ -36,7 +36,7 @@ describe("stepLabel", () => {
   it("maps kinds to display names, never the raw key", () => {
     expect(stepLabel({ kind: "hitPoints" })).toBe("Hit Points");
     expect(stepLabel({ kind: "advancement" })).toBe("Ability Score / Feat");
-    expect(stepLabel({ kind: "fightingStyle" })).toBe("Fighting Style");
+    expect(stepLabel({ kind: "fightingStyleFeat" })).toBe("Fighting Style");
     expect(stepLabel({ kind: "toolProficiency" })).toBe("Tool Proficiency");
     expect(stepLabel({ kind: "newSpells" })).toBe("New Spells");
     expect(stepLabel({ kind: "review" })).toBe("Review");
@@ -86,7 +86,7 @@ describe("ceremonyBlocked", () => {
 
   it("does not block subclass/fightingStyle steps (entry-aware since #1065), primary plans, or a missing plan", () => {
     expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "subclass" }, { kind: "review" }], false))).toBe(false);
-    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "fightingStyle", count: 1 }], false))).toBe(false);
+    expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "fightingStyleFeat", count: 1 }], false))).toBe(false);
     expect(ceremonyBlocked(plan([{ kind: "hitPoints" }, { kind: "maneuvers", count: 2 }, { kind: "review" }], true))).toBe(false);
     expect(ceremonyBlocked(null)).toBe(false);
   });
@@ -101,7 +101,7 @@ describe("draftSatisfies", () => {
     expect(draftSatisfies({ kind: "hitPoints" }, { hp: { method: "roll", roll: 7 } })).toBe(true);
   });
 
-  it("advancement / subclass / fightingStyle need their single field", () => {
+  it("advancement / subclass / fightingStyleFeat need their single field", () => {
     expect(draftSatisfies({ kind: "advancement" }, empty)).toBe(false);
     expect(
       draftSatisfies(
@@ -111,8 +111,13 @@ describe("draftSatisfies", () => {
     ).toBe(true);
     expect(draftSatisfies({ kind: "subclass" }, empty)).toBe(false);
     expect(draftSatisfies({ kind: "subclass" }, { ...empty, subclassId: "sub-1" })).toBe(true);
-    expect(draftSatisfies({ kind: "fightingStyle" }, empty)).toBe(false);
-    expect(draftSatisfies({ kind: "fightingStyle" }, { ...empty, fightingStyle: "defense" })).toBe(true);
+    expect(draftSatisfies({ kind: "fightingStyleFeat" }, empty)).toBe(false);
+    expect(
+      draftSatisfies(
+        { kind: "fightingStyleFeat" },
+        { ...empty, fightingStyleFeat: { type: "takeFeat", featId: "defense", slot: "fightingStyle" } },
+      ),
+    ).toBe(true);
   });
 
   it("list steps need at least `count` entries", () => {

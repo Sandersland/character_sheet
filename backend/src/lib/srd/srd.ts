@@ -8,7 +8,7 @@
 //
 // This file is a barrel: the rules tables themselves live in topical files
 // alongside it (alignments, tools, condition-data, item-rarity,
-// fighting-styles, armor-class, movement, extra-attack, spellcasting-tables,
+// armor-class, movement, extra-attack, spellcasting-tables,
 // math, advancement-slots, proficiencies, weapon-damage, character-derive,
 // feats). Import from those files directly for new same-domain code; this
 // barrel exists so the ~30 existing importers keep working unchanged.
@@ -18,7 +18,6 @@ export * from "@/lib/srd/tools.js";
 export * from "@/lib/srd/condition-data.js";
 export * from "@/lib/srd/roll-effects.js";
 export * from "@/lib/srd/item-rarity.js";
-export * from "@/lib/srd/fighting-styles.js";
 export * from "@/lib/srd/armor-class.js";
 export * from "@/lib/srd/movement.js";
 export * from "@/lib/srd/extra-attack.js";

@@ -12,11 +12,8 @@ import {
 } from "@/lib/leveling/advancement.js";
 import {
   setSubclassInTx,
-  setFightingStyleInTx,
   type SetSubclassOperation,
-  type SetFightingStyleOperation,
 } from "@/lib/classes/class.js";
-import type { FightingStyleKey } from "@/lib/srd/fighting-styles.js";
 import { applyResourceOpInTx, type ResourceOperation } from "@/lib/classes/resources.js";
 import { applySpellcastingOpInTx, type LearnSpellOperation, type SpellcastingOperation } from "@/lib/spellcasting/spellcasting.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
@@ -43,7 +40,7 @@ import type {
 type LevelUpTxOp =
   | { domain: "hp"; op: LevelUpOperation }
   | { domain: "advancement"; op: AdvancementOperation }
-  | { domain: "class"; op: SetSubclassOperation | SetFightingStyleOperation }
+  | { domain: "class"; op: SetSubclassOperation }
   | { domain: "resources"; op: ResourceOperation }
   | { domain: "spellcasting"; op: SpellcastingOperation };
 
@@ -160,7 +157,8 @@ const STEP_OP_BUILDERS: Record<LevelUpStepKind, (submission: LevelUpSubmission, 
   hitPoints: (s) => [{ domain: "hp", op: { type: "levelUp", method: s.hp.method, roll: s.hp.roll, target: s.target } }],
   advancement: (s) => [{ domain: "advancement", op: s.advancement! }],
   subclass: (s) => [{ domain: "class", op: { type: "setSubclass", subclassId: s.subclassId! } }],
-  fightingStyle: (s) => [{ domain: "class", op: { type: "setFightingStyle", key: s.fightingStyle as FightingStyleKey } }],
+  // #1137: force the fs slot so the pick lands in the fightingStyle partition.
+  fightingStyleFeat: (s) => [{ domain: "advancement", op: { ...s.fightingStyleFeat!, slot: "fightingStyle" } }],
   maneuvers: (s) => (s.maneuvers ?? []).map((op) => ({ domain: "resources", op })),
   disciplines: (s) => (s.disciplines ?? []).map((op) => ({ domain: "resources", op })),
   toolProficiency: (s) => (s.toolProficiencies ?? []).map((op) => ({ domain: "resources", op })),
@@ -188,12 +186,7 @@ const LEVEL_UP_OP_APPLIERS: Record<
 > = {
   hp: (tx, id, op, batchId, sessionId) => applyLevelUpHpInTx(tx, id, op as LevelUpOperation, batchId, sessionId),
   advancement: (tx, id, op, batchId, sessionId) => applyAdvancementOpInTx(tx, id, op as AdvancementOperation, batchId, sessionId),
-  class: (tx, id, op, batchId, sessionId) => {
-    const classOp = op as SetSubclassOperation | SetFightingStyleOperation;
-    return classOp.type === "setSubclass"
-      ? setSubclassInTx(tx, id, classOp, batchId, sessionId)
-      : setFightingStyleInTx(tx, id, classOp, batchId, sessionId);
-  },
+  class: (tx, id, op, batchId, sessionId) => setSubclassInTx(tx, id, op as SetSubclassOperation, batchId, sessionId),
   resources: (tx, id, op, batchId, sessionId) => applyResourceOpInTx(tx, id, op as ResourceOperation, batchId, sessionId),
   spellcasting: (tx, id, op, batchId, sessionId, userId) =>
     applySpellcastingOpInTx(tx, id, op as SpellcastingOperation, batchId, sessionId, userId),

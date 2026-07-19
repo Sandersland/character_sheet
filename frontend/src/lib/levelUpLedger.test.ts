@@ -8,7 +8,7 @@ const resolvers: LedgerResolvers = {
   maneuver: (id) => ({ m1: "Riposte", m2: "Trip Attack" })[id],
   discipline: (id) => ({ d1: "Fangs of the Fire Snake" })[id],
   spell: (id) => ({ s1: "Fireball" })[id],
-  feat: (id) => ({ f1: "Sentinel" })[id],
+  feat: (id) => ({ f1: "Sentinel", "fs-archery": "Archery" })[id],
 };
 
 function makeCharacter(over?: Partial<Character>): Character {
@@ -114,10 +114,10 @@ describe("buildLevelUpLedger", () => {
     expect(rowFor(rows, "Subclass")).toMatchObject({ after: "Champion" });
   });
 
-  it("resolves the fighting-style label from its key", () => {
+  it("resolves the fighting-style feat name through the feat resolver", () => {
     const rows = buildLevelUpLedger(
       makeCharacter(),
-      { hp: { method: "average" }, fightingStyle: "archery" },
+      { hp: { method: "average" }, fightingStyleFeat: { type: "takeFeat", featId: "fs-archery", slot: "fightingStyle" } },
       makePlan(),
       resolvers,
     );

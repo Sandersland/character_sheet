@@ -38,7 +38,10 @@ export default function AdvancementSection({ character, onUpdate }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { advancements, advancementSlots } = character;
+  const { advancementSlots } = character;
+  // Fighting Style feats (#1137) occupy their own slot partition and render in the
+  // class-features section — exclude them from the ASI/feat list here.
+  const advancements = character.advancements.filter((a) => a.slot !== "fightingStyle");
   const slotsRemaining = advancementSlots.total - advancementSlots.used;
 
   async function send(ops: AdvancementOperation[]) {

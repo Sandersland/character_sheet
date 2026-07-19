@@ -1,5 +1,12 @@
 import { abilityAbbr, abilityLabel } from "@/lib/abilities";
-import type { CatalogFeat } from "@/types/character";
+import type { CatalogFeat, Character } from "@/types/character";
+
+// #1137: a feat's mechanical effects (e.g. Two-Weapon Fighting's
+// "offhandAbilityDamage") now live in advancement improvements, not a class
+// scalar. True when any taken advancement carries an improvement for `target`.
+export function hasFeatImprovement(character: Character, target: string): boolean {
+  return (character.advancements ?? []).some((a) => (a.improvements ?? []).some((imp) => imp.target === target));
+}
 
 // Mirror of the backend featOfferedForAsiSlot (lib/srd/feats.ts) — update both.
 // Filters the ASI-slot feat picker: Origin/Fighting Style never appear; General

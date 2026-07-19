@@ -131,7 +131,6 @@ const EMPTY_RESOURCES = {
   toolProficienciesKnown: [],
   choicesKnown: {},
   advancements: [],
-  fightingStyle: null,
 };
 
 describe("advancement transaction event-stream characterization (#682)", () => {

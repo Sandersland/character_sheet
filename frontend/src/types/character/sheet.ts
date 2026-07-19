@@ -165,6 +165,8 @@ export interface Character {
   advancements: AdvancementEntry[];
   /** How many advancement slots this character has earned at their level. */
   advancementSlots: AdvancementSlots;
+  /** Fighting Style feat slots (#1137): a partition separate from ASI slots. */
+  fightingStyleSlots: AdvancementSlots;
 
   classes?: ClassEntry[];
 
