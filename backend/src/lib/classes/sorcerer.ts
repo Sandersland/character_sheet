@@ -1,5 +1,16 @@
 import type { ClassDefinition, DerivedFeature } from "./types.js";
 
+// Font of Magic "Creating Spell Slots" cost table (PHB p.101): slot level → SP cost.
+// Sorcerers can create spell slots no higher than 5th level.
+const FONT_OF_MAGIC_SLOT_COSTS: Record<number, number> = { 1: 2, 2: 3, 3: 5, 4: 6, 5: 7 };
+
+export const FONT_OF_MAGIC_MAX_SLOT_LEVEL = 5;
+
+// SP cost to create a slot of the given level, or null if outside the 1-5 table.
+export function sorceryPointCostForSlot(slotLevel: number): number | null {
+  return FONT_OF_MAGIC_SLOT_COSTS[slotLevel] ?? null;
+}
+
 const SORCERER_FEATURES: DerivedFeature[] = [
   {
     name: "Spellcasting",
@@ -20,7 +31,7 @@ const SORCERER_FEATURES: DerivedFeature[] = [
     level: 2,
     source: "class",
     description:
-      "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Converting: 1 SP = 1st-level slot; 2 SP = 2nd; 3 SP = 3rd; 4 SP = 4th; 5 SP = 5th. You can also convert spell slots to SP (slot level = SP gained). Regain all SP on a long rest.",
+      "You have a pool of Sorcery Points equal to your sorcerer level. Spend them to create spell slots or fuel Metamagic options. Creating slots costs 2 SP (1st), 3 SP (2nd), 5 SP (3rd), 6 SP (4th), or 7 SP (5th). You can also expend a spell slot to gain SP equal to its level. Regain all SP on a long rest.",
   },
   {
     name: "Metamagic",

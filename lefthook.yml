@@ -6,7 +6,11 @@
 #
 # Jobs scope per workspace via `root:` — a backend-only push runs the backend
 # jobs and skips the frontend ones (push_files filtered to that root), and
-# vice-versa. The two workspaces share no types, so this is correct and faster.
+# vice-versa. Both tiers now consume packages/shared-types via `import type`
+# (#820), so a change THERE can only surface in a consumer's tsc — its own
+# typecheck-shared job catches the package in isolation, and CI's `build` job
+# (npm run build --workspaces) is the cross-tier authority that re-typechecks
+# both consumers against it.
 #
 # Backend vitest stays CI-only — it needs Postgres, and keeping pre-push
 # infra-free means it never blocks on a DB being up. The tsc gate is the
@@ -83,6 +87,9 @@ post-merge:
 pre-push:
   parallel: true
   commands:
+    typecheck-shared:
+      root: "packages/shared-types/"
+      run: npx tsc --noEmit
     typecheck-backend:
       root: "backend/"
       run: npx tsc --noEmit

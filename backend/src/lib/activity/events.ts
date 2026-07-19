@@ -49,6 +49,7 @@ export type EventType =
   | "prepareSpell"
   | "unprepareSpell"
   | "concentrationDropped"
+  | "convertSorceryPoints"
   // class
   | "classAdded"
   | "subclassChosen"
