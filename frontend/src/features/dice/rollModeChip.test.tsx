@@ -29,6 +29,13 @@ const rage: RollModifier[] = [
   { mode: "advantage", kind: "save", ability: "strength", source: "Rage" },
 ];
 const poisonedCheck: RollModifier[] = [{ mode: "disadvantage", kind: "check", source: "Poisoned" }];
+// 2024 exhaustion level 2: flat −4 on every d20 Test (#1136).
+const exhaustion2: RollModifier[] = [
+  { mode: "flat", modifier: -4, kind: "attack", source: "Exhaustion" },
+  { mode: "flat", modifier: -4, kind: "check", source: "Exhaustion" },
+  { mode: "flat", modifier: -4, kind: "save", source: "Exhaustion" },
+  { mode: "flat", modifier: -4, kind: "initiative", source: "Exhaustion" },
+];
 
 function renderStrengthBox(rollModifiers: RollModifier[]) {
   return render(
@@ -84,5 +91,19 @@ describe("state-driven roll mode + affected-row indicator (#486/#984)", () => {
     // Poisoned disadvantage is check-only: the Strength CHECK affordance is
     // marked; the Strength SAVE affordance is not.
     expect(screen.getAllByTestId("roll-mode-indicator")).toHaveLength(1);
+  });
+
+  it("folds an exhaustion flat penalty into the rolled check and still rolls normal (#1136)", async () => {
+    const user = userEvent.setup();
+    renderStrengthBox(exhaustion2);
+    // Both the check and save affordances are marked (the flat penalty hits every d20 Test).
+    expect(screen.getAllByTestId("roll-mode-indicator").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByTitle(/Roll Strength check/));
+    await waitFor(() => expect(mockLogRoll).toHaveBeenCalledTimes(1));
+    const log = mockLogRoll.mock.calls[0][2];
+    expect(log.rollMode).toBe("normal");
+    // Strength 16 → +3 check, minus exhaustion −4 → −1; d20 face 11 → total 10.
+    expect(log.total).toBe(10);
   });
 });
