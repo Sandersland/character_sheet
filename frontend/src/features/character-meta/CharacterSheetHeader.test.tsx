@@ -63,7 +63,7 @@ describe("CharacterSheetHeader live state (#964)", () => {
   it("shows the round badge + Combat tab pip when live and in combat", () => {
     renderHeader({ isLive: true, liveRound: 3 });
 
-    expect(screen.getByText("Round 3")).toBeInTheDocument();
+    expect(screen.getByText(/Round 3/)).toBeInTheDocument();
     const combatTab = screen.getByRole("tab", { name: /Combat/ });
     expect(within(combatTab).getByText(/session live/i)).toBeInTheDocument();
   });
@@ -136,13 +136,13 @@ describe("CharacterSheetHeader banner chrome (#985)", () => {
     expect(onOpenDelete).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the banner ＋ Note chip when not joined and moves it to the strip when joined", () => {
-    // Not joined: the banner carries the ＋ Note quick-capture chip.
+  it("keeps a single ＋ Note quick-capture chip in the banner cluster (joined or not)", () => {
     const { unmount } = renderHeader({ activeTab: "overview", isLive: false });
     expect(screen.getByRole("button", { name: /Note/ })).toBeInTheDocument();
     unmount();
 
-    // Joined: the strip owns Note alongside Leave/End, so the banner drops its chip.
+    // Joined: the live pill + Leave/End join the same cluster, but ＋ Note is not
+    // duplicated (the old separate live strip is gone, #1085).
     renderHeader({
       activeTab: "overview",
       isLive: true,
@@ -150,15 +150,41 @@ describe("CharacterSheetHeader banner chrome (#985)", () => {
       onLeaveSession: vi.fn(),
       onEndSession: vi.fn(),
     });
-    // Exactly one ＋ Note (the strip's), not a duplicate in the banner cluster.
     expect(screen.getAllByRole("button", { name: /Note/ })).toHaveLength(1);
   });
 
-  it("renders the live strip with the session name and one round indicator per breakpoint", () => {
-    renderHeader({ activeTab: "overview", isLive: true, liveRound: 2, sessionName: "Goblin Ambush", isLiveJoined: true, onLeaveSession: vi.fn(), onEndSession: vi.fn() });
-    expect(screen.getByText(/Goblin Ambush/)).toBeInTheDocument();
-    // Exactly two round indicators — the desktop banner strip and the mobile
-    // header pill (#1026); only one is visible at a time by breakpoint.
-    expect(screen.getAllByText("Round 2")).toHaveLength(2);
+  // #1085: the old under-tabs LiveSessionStrip is deleted — the banner's right
+  // cluster is now the ONLY desktop live indicator. jsdom also paints the mobile
+  // header pill, so scope the count to the desktop <header>.
+  it("shows the live pill exactly once in the desktop header (no duplicate live state)", () => {
+    renderHeader({
+      activeTab: "overview",
+      isLive: true,
+      liveRound: 3,
+      isLiveJoined: true,
+      onLeaveSession: vi.fn(),
+      onEndSession: vi.fn(),
+    });
+    const desktopHeader = screen
+      .getAllByRole("banner")
+      .find((h) => h.className.includes("md:block"))!;
+    expect(within(desktopHeader).getAllByText(/Round 3/)).toHaveLength(1);
+    expect(within(desktopHeader).getByText(/Live · Round 3/)).toBeInTheDocument();
+  });
+
+  it("reads 'Live' with no round when live but not in combat", () => {
+    renderHeader({
+      activeTab: "overview",
+      isLive: true,
+      liveRound: null,
+      isLiveJoined: true,
+      onLeaveSession: vi.fn(),
+      onEndSession: vi.fn(),
+    });
+    const desktopHeader = screen
+      .getAllByRole("banner")
+      .find((h) => h.className.includes("md:block"))!;
+    expect(within(desktopHeader).getByText("Live")).toBeInTheDocument();
+    expect(within(desktopHeader).queryByText(/Round/)).not.toBeInTheDocument();
   });
 });

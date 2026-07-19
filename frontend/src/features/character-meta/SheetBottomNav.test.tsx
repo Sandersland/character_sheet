@@ -43,4 +43,18 @@ describe("SheetBottomNav (#928)", () => {
     expect(screen.getAllByRole("button")).toHaveLength(4);
     expect(screen.queryByRole("button", { name: "Magic" })).not.toBeInTheDocument();
   });
+
+  // #961: the Combat tab gains a "session live" pip while a session is live.
+  it("marks the Combat tab with a live pip only when livePipTab is set", () => {
+    const tabs = getSheetTabs(nonCaster);
+    const { rerender } = render(
+      <SheetBottomNav tabs={tabs} activeTab="overview" onTabChange={() => {}} livePipTab={null} />,
+    );
+    expect(screen.queryByText(/session live/i)).not.toBeInTheDocument();
+
+    rerender(
+      <SheetBottomNav tabs={tabs} activeTab="overview" onTabChange={() => {}} livePipTab="combat" />,
+    );
+    expect(screen.getByRole("button", { name: /combat/i })).toHaveTextContent(/session live/i);
+  });
 });

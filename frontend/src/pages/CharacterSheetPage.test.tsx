@@ -164,7 +164,7 @@ describe("CharacterSheetPage session doorway (#942)", () => {
     expect(await findDoorwayButton(/start session/i)).toBeInTheDocument();
   });
 
-  it("shows the live-session 'Go to fight' strip when this character is an active participant (#961)", async () => {
+  it("renders no under-tabs live strip when this character is an active participant (#1085)", async () => {
     mockUseCharacter.mockReturnValue({
       character: makeCharacter({ campaignId: "camp1" }),
       error: null,
@@ -173,9 +173,11 @@ describe("CharacterSheetPage session doorway (#942)", () => {
     mockFetchDoorway.mockResolvedValue(doorwayState({ kind: "liveJoined", session: liveSession({ joined: true }) }));
 
     renderPage();
-    // Off Combat + live-joined → the "Go to fight" strip (in-workspace jump),
-    // superseding the old "Resume session" doorway (which navigated away).
-    expect(await findDoorwayButton(/go to fight/i)).toBeInTheDocument();
+    // Wait for the live-joined header controls (doorway resolved). Live state now
+    // lives only in the header cluster — the old "Go to fight" strip is gone, and
+    // there's no "Resume session" doorway either (#1085).
+    await screen.findByRole("button", { name: /end session/i });
+    expect(screen.queryByRole("button", { name: /go to fight/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /resume session/i })).not.toBeInTheDocument();
   });
 
