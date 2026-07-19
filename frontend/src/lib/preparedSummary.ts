@@ -1,5 +1,5 @@
-// Prepared X / Y summary for the spellcasting block — null only for non-casters
-// (2024: every caster has a prepared cap, so limit is null only when uncapped, #883).
+// Prepared X / Y summary for the spellcasting block (#883)
+// (2024: every caster has a prepared cap, so limit is null only for non-casters).
 import type { Character } from "@/types/character";
 
 type Spellcasting = NonNullable<Character["spellcasting"]>;

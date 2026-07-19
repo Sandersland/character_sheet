@@ -76,6 +76,14 @@ describe("preparedSpellCountAt — per-class SRD 5.2 tables", () => {
       for (let i = 1; i < 20; i++) expect(table[i]).toBeGreaterThanOrEqual(table[i - 1]);
     }
   });
+
+  it("third-caster column is monotonically non-decreasing over levels 3-20", () => {
+    for (let level = 4; level <= 20; level++) {
+      expect(preparedSpellCountAt("fighter", level, "Eldritch Knight")).toBeGreaterThanOrEqual(
+        preparedSpellCountAt("fighter", level - 1, "Eldritch Knight") ?? 0,
+      );
+    }
+  });
 });
 
 describe("cantripsKnownAtLevel — SRD 5.2 cantrip columns (data only, #1131 wires the step)", () => {
