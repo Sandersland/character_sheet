@@ -32,22 +32,14 @@ export interface SessionDoorwaySessionState {
 }
 
 export interface SessionDoorwayState {
-  /** null → solo character → the doorway renders nothing. */
+  /** null → character-scoped solo session; the client's signal for solo play (#1080). */
   campaignId: string | null;
   role: CampaignRole;
-  /** THIS ISSUE: true for every campaign member. #951 flips it owner-only. */
+  /** THIS ISSUE: true for every campaign member and every solo character. #951 flips it owner-only. */
   canStart: boolean;
   kind: SessionDoorwayKind;
   session: SessionDoorwaySessionState | null;
 }
-
-const SOLO_DOORWAY: SessionDoorwayState = {
-  campaignId: null,
-  role: "PLAYER",
-  canStart: false,
-  kind: "none",
-  session: null,
-};
 
 /** Latest combat round for a session, or null when combat never advanced a round. */
 async function latestCombatRound(sessionId: string): Promise<number | null> {
@@ -63,8 +55,11 @@ async function latestCombatRound(sessionId: string): Promise<number | null> {
 /**
  * Builds the doorway state for a character. `getActiveSession` runs
  * autoCloseIfStale, so a stale session settles before we resolve (settle-on-read).
- * Only the live kinds (`none`/`liveJoined`/`liveNotJoined`) are ever returned
- * here; scheduling (#951) adds the rest without changing this contract.
+ * A campaign-less character gets a solo doorway (campaignId null, PLAYER, may
+ * start): a solo session can legitimately surface `liveNotJoined` during the
+ * leave grace window before auto-close. Only the live kinds
+ * (`none`/`liveJoined`/`liveNotJoined`) are ever returned here; scheduling (#951)
+ * adds the rest without changing this contract.
  */
 export async function getSessionDoorway(
   characterId: string,
@@ -74,19 +69,22 @@ export async function getSessionDoorway(
     where: { id: characterId },
     select: { campaignId: true },
   });
-  if (!character?.campaignId) return SOLO_DOORWAY;
-  const { campaignId } = character;
+  const campaignId = character?.campaignId ?? null;
 
-  const membership = await prisma.campaignMembership.findUnique({
-    where: { campaignId_userId: { campaignId, userId } },
-    select: { role: true },
-  });
-  const role: CampaignRole = membership?.role ?? "PLAYER";
-  // #951 flips this owner-only; for now any member may start (mirrors today's
-  // startCampaignSession authorization).
+  // Solo characters have no campaign membership; every solo character may start.
+  const role: CampaignRole = campaignId
+    ? (await prisma.campaignMembership.findUnique({
+        where: { campaignId_userId: { campaignId, userId } },
+        select: { role: true },
+      }))?.role ?? "PLAYER"
+    : "PLAYER";
+  // #951 flips this owner-only; for now any member (and any solo character) may
+  // start (mirrors today's startCampaignSession/startSoloSession authorization).
   const canStart = true;
 
-  const active = await getActiveSession(characterId);
+  // character is always non-null here — the route layer's assertCharacterAccess
+  // 404s first; standalone callers of a nonexistent id get canStart:true anyway.
+  const active = character ? await getActiveSession(characterId) : null;
   if (!active) {
     return { campaignId, role, canStart, kind: "none", session: null };
   }

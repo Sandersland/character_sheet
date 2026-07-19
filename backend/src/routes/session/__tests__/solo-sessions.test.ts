@@ -1,0 +1,148 @@
+/**
+ * Solo (character-scoped) session lifecycle tests (#1080). A solo session is a
+ * first-class Session row with campaignId null, owned by exactly one character.
+ * Mirrors sessions.test.ts: real Postgres in beforeEach, supertest against
+ * createApp(), plus direct lib calls to startSoloSession.
+ */
+
+import { randomUUID } from "node:crypto";
+
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import supertest from "supertest";
+
+import { createApp } from "@/app.js";
+import { Prisma } from "@/generated/prisma/client.js";
+import { prisma } from "@/lib/core/prisma.js";
+import { SessionError, startSoloSession } from "@/lib/session/sessions.js";
+import { ensureTestOwner } from "@/test-support/owner.js";
+import { authCookie } from "@/test-support/auth.js";
+
+const OWNER = "owner-solo-owner";
+const CHAR_SOLO = "test-solo-char-wanderer";
+const CHAR_CAMPAIGN = "test-solo-char-campaigner";
+
+let cookie: string;
+
+const app = createApp();
+const agent = () => supertest.agent(app).set("Cookie", cookie);
+
+const BASE_CHAR = {
+  alignment: "True Neutral",
+  experiencePoints: 900,
+  initiativeBonus: 2,
+  speed: 30,
+  hitPoints: { current: 28, max: 28, temp: 0, deathSaves: { successes: 0, failures: 0 } },
+  hitDice: { total: 3, die: "d10", spent: 0 },
+  abilityScores: {
+    strength: 16, dexterity: 14, constitution: 14,
+    intelligence: 10, wisdom: 10, charisma: 8,
+  },
+  savingThrowProficiencies: ["strength", "constitution"],
+  skills: [],
+  toolProficiencies: [],
+  currency: { cp: 0, sp: 0, gp: 50, pp: 0 },
+};
+
+async function makeChar(id: string, name: string) {
+  await prisma.character.create({
+    data: { ...BASE_CHAR, id, name, ownerId: OWNER, spellcasting: Prisma.JsonNull },
+  });
+}
+
+async function attachToCampaign(characterId: string): Promise<string> {
+  const campaign = await prisma.campaign.create({
+    data: {
+      name: "Solo Test Campaign",
+      ownerId: OWNER,
+      inviteCode: randomUUID(),
+      members: { create: { userId: OWNER, role: "OWNER" } },
+    },
+  });
+  await prisma.character.update({
+    where: { id: characterId },
+    data: { campaignId: campaign.id },
+  });
+  return campaign.id;
+}
+
+beforeEach(async () => {
+  await ensureTestOwner(OWNER);
+  cookie = await authCookie(OWNER);
+  await makeChar(CHAR_SOLO, "Solo Wanderer");
+  await makeChar(CHAR_CAMPAIGN, "Party Fighter");
+});
+
+afterEach(async () => {
+  await prisma.character.deleteMany({ where: { id: { in: [CHAR_SOLO, CHAR_CAMPAIGN] } } });
+  await prisma.campaign.deleteMany({ where: { ownerId: OWNER } });
+});
+
+describe("startSoloSession", () => {
+  it("creates a campaignId-null active session with the character as sole participant", async () => {
+    const session = await startSoloSession(CHAR_SOLO, "Lone Road");
+
+    expect(session.campaignId).toBeNull();
+    expect(session.status).toBe("active");
+    expect(session.title).toBe("Lone Road");
+    expect(session.participants).toHaveLength(1);
+    expect(session.participants[0]?.characterId).toBe(CHAR_SOLO);
+    expect(session.participants[0]?.leftAt).toBeNull();
+
+    const event = await prisma.characterEvent.findFirst({
+      where: { characterId: CHAR_SOLO, type: "sessionStarted" },
+    });
+    expect(event?.sessionId).toBe(session.id);
+  });
+
+  it("rejects a second active solo session for the same character with 409", async () => {
+    await startSoloSession(CHAR_SOLO);
+    const err = await startSoloSession(CHAR_SOLO).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SessionError);
+    expect((err as SessionError).status).toBe(409);
+  });
+
+  it("rejects a character attached to a campaign with 409", async () => {
+    await attachToCampaign(CHAR_CAMPAIGN);
+    const err = await startSoloSession(CHAR_CAMPAIGN).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SessionError);
+    expect((err as SessionError).status).toBe(409);
+  });
+});
+
+describe("solo session event tagging", () => {
+  it("tags an HP event with the active solo session", async () => {
+    const session = await startSoloSession(CHAR_SOLO);
+
+    const hp = await agent()
+      .post(`/api/characters/${CHAR_SOLO}/hp`)
+      .send({ operations: [{ type: "damage", amount: 5 }] });
+    expect(hp.status).toBe(200);
+
+    const event = await prisma.characterEvent.findFirst({
+      where: { characterId: CHAR_SOLO, type: "damage" },
+    });
+    expect(event?.sessionId).toBe(session.id);
+  });
+
+  it("auto-attaches a journal NOTE to the active solo session", async () => {
+    const session = await startSoloSession(CHAR_SOLO);
+
+    const res = await agent()
+      .post(`/api/characters/${CHAR_SOLO}/journal`)
+      .send({ kind: "NOTE", body: "campfire jot" });
+    expect(res.status).toBe(201);
+    expect(res.body.journal[0].sessionId).toBe(session.id);
+  });
+});
+
+describe("solo session doorway", () => {
+  it("reports liveJoined with campaignId null after a solo start", async () => {
+    const session = await startSoloSession(CHAR_SOLO, "Lone Road");
+
+    const res = await agent().get(`/api/characters/${CHAR_SOLO}/sessions/doorway`);
+    expect(res.status).toBe(200);
+    expect(res.body.campaignId).toBeNull();
+    expect(res.body.kind).toBe("liveJoined");
+    expect(res.body.session).toMatchObject({ id: session.id, joined: true, title: "Lone Road" });
+  });
+});
