@@ -45,15 +45,18 @@ interface DicePhysics {
 function createDicePhysics(spec: DiceRollerProps["spec"], groups: FaceGroup[]): DicePhysics {
   const dieCount = usesAdvantage(spec) ? 2 : spec.count;
   const { world, diceMaterial } = createDiceWorld(dieCount);
+  // Single-layer rest height (face-to-center distance) of this die's solid;
+  // the d6 box's is exactly D6_SIZE/2, the d10's inradius is slightly larger.
+  const restY = groups.length > 0 ? groups[0].normal.dot(groups[0].centroid) : D6_SIZE / 2;
   const dice: PhysicsDie[] = Array.from({ length: dieCount }, (_, index) => {
     const laneX = (index - (dieCount - 1) / 2) * DIE_GAP;
-    const body = createDieBody(diceMaterial);
+    const body = createDieBody(diceMaterial, spec.faces);
     // Rest in its tidy lane from the very first paint, same as the scripted
     // roller's idle pose, rather than at the cannon body default of the world
     // origin until the first roll throws it somewhere real.
-    body.position.set(laneX, FLOOR_Y + D6_SIZE / 2, 0);
+    body.position.set(laneX, FLOOR_Y + restY, 0);
     world.addBody(body);
-    return { body, groups, laneX };
+    return { body, groups, laneX, restY };
   });
   return { world, dice, resolver: createRollResolver(world, dice) };
 }
