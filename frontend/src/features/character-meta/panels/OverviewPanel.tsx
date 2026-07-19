@@ -7,16 +7,15 @@ import ClassFeaturesSection from "@/features/class/ClassFeaturesSection";
 import AdvancementSection from "@/features/advancement/AdvancementSection";
 import ExperienceTracker from "@/features/experience/ExperienceTracker";
 import SpellSlotSummary from "@/features/spells/SpellSlotSummary";
-import EquippedItemsCard from "@/features/inventory/EquippedItemsCard";
 import Card from "@/components/ui/Card";
 import { hasAdvancements, hasProficiencies } from "@/lib/characterSections";
 import type { SheetPanelProps } from "@/features/character-meta/sheetTabs";
 
 /**
- * Overview tab — abilities + saves on top, then a calm 3-column grid: all-18
- * skills (inline roll rows), features, and the XP/slots/equipped rail (#923).
- * Saving throws stay
- * inside AbilityScoresPanel; full slot/spell management lives on the Magic tab.
+ * Overview tab — abilities + saves full-width on top, then a 3fr/2fr grid (#1086):
+ * left is the two-up all-18 skills + proficiencies; right is the XP · spell slots ·
+ * features · advancements stack. Equipped gear moved to the Inventory tab. Saving
+ * throws stay inside AbilityScoresPanel; full slot/spell management is on Magic.
  */
 export default function OverviewPanel({ character, reference, onUpdate }: SheetPanelProps) {
   return (
@@ -29,12 +28,13 @@ export default function OverviewPanel({ character, reference, onUpdate }: SheetP
       <ConditionRollBanner modifiers={character.rollModifiers} />
       <AbilityScoresPanel character={character} />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[3fr_2fr] lg:items-start">
         <div className="flex flex-col gap-6">
           <AllSkillsCard
             skills={character.skills}
             abilityScores={character.abilityScores}
             proficiencyBonus={character.proficiencyBonus}
+            twoColumn
           />
 
           {hasProficiencies(character) && (
@@ -49,6 +49,14 @@ export default function OverviewPanel({ character, reference, onUpdate }: SheetP
         </div>
 
         <div className="flex flex-col gap-6">
+          <ExperienceTracker character={character} onUpdate={onUpdate} />
+
+          {character.spellcasting && (
+            <Card title="Spell Slots" className="p-4">
+              <SpellSlotSummary slots={character.spellcasting.slots} />
+            </Card>
+          )}
+
           {character.class && (
             <Card title="Class Features" className="p-4">
               <ClassFeaturesSection
@@ -60,24 +68,13 @@ export default function OverviewPanel({ character, reference, onUpdate }: SheetP
           )}
 
           {hasAdvancements(character) && (
+            // #advancement-card anchor is load-bearing: HpNotices deep-links here.
             <div id="advancement-card">
               <Card title="Advancements" className="p-4">
                 <AdvancementSection character={character} onUpdate={onUpdate} />
               </Card>
             </div>
           )}
-        </div>
-
-        <div className="flex flex-col gap-6">
-          <ExperienceTracker character={character} onUpdate={onUpdate} />
-
-          {character.spellcasting && (
-            <Card title="Spell Slots" className="p-4">
-              <SpellSlotSummary slots={character.spellcasting.slots} />
-            </Card>
-          )}
-
-          <EquippedItemsCard inventory={character.inventory} />
         </div>
       </div>
     </div>

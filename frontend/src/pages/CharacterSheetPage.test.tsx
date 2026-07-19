@@ -22,6 +22,10 @@ vi.mock("@/api/client", () => ({
   fetchActiveSession: vi.fn().mockResolvedValue(null),
   joinSession: vi.fn(),
   startCampaignSession: vi.fn(),
+  // The idle Combat panel's CombatLogRow fetches the last session on mount once a
+  // start/join jumps to the Combat tab (#1086); stub it so the effect resolves.
+  fetchSessions: vi.fn().mockResolvedValue([]),
+  fetchSession: vi.fn().mockResolvedValue({ id: "s1", events: [] }),
 }));
 
 vi.mock("@/hooks/useCharacter", () => ({ useCharacter: vi.fn() }));
@@ -53,7 +57,6 @@ vi.mock("@/features/journal/CapturePalette", () => ({
 vi.mock("@/features/session/SessionsModal", () => ({ default: () => null }));
 vi.mock("@/features/abilities/AllSkillsCard", () => ({ default: () => null }));
 vi.mock("@/features/spells/SpellSlotSummary", () => ({ default: () => null }));
-vi.mock("@/features/inventory/EquippedItemsCard", () => ({ default: () => null }));
 vi.mock("@/features/spells/SpellsSection", () => ({ default: () => null }));
 vi.mock("@/features/abilities/ProficienciesCard", () => ({ default: () => null }));
 vi.mock("@/features/character-meta/BannerVitals", () => ({ default: () => null }));
