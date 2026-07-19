@@ -42,6 +42,9 @@ interface CharacterSheetHeaderProps {
   onOpenSessions: () => void;
   onOpenActivity: () => void;
   onOpenDelete: () => void;
+  /** Opens the Campaign settings sheet (#1087); the ⋮ item shows only when set
+   *  AND the character is campaign-attached. */
+  onOpenCampaignSettings?: () => void;
 }
 
 /** The mobile header's folded-in Leave/End controls (#979), present only while
@@ -106,7 +109,11 @@ export default function CharacterSheetHeader({
   onOpenSessions,
   onOpenActivity,
   onOpenDelete,
+  onOpenCampaignSettings,
 }: CharacterSheetHeaderProps) {
+  // Gate the ⋮ item once here so both breakpoints agree: campaign-attached +
+  // handler wired (#1087).
+  const campaignSettings = character.campaignId ? onOpenCampaignSettings : undefined;
   return (
     <>
       {/* Mobile: compact sticky mini-header. Desktop: the garnet banner below. */}
@@ -126,6 +133,7 @@ export default function CharacterSheetHeader({
         onOpenSessions={onOpenSessions}
         onOpenActivity={onOpenActivity}
         onOpenDelete={onOpenDelete}
+        onOpenCampaignSettings={campaignSettings}
       />
       <DesktopBanner
         character={character}
@@ -144,6 +152,7 @@ export default function CharacterSheetHeader({
         onOpenSessions={onOpenSessions}
         onOpenActivity={onOpenActivity}
         onOpenDelete={onOpenDelete}
+        onOpenCampaignSettings={campaignSettings}
       />
     </>
   );
@@ -172,6 +181,7 @@ function DesktopBanner({
   onOpenSessions,
   onOpenActivity,
   onOpenDelete,
+  onOpenCampaignSettings,
 }: Omit<CharacterSheetHeaderProps, "scrolled" | "onGoToCombat">) {
   // Desktop tab bar mirrors the mobile nav pip: a gold dot on Combat while live.
   const bannerTabs = withCombatLivePip(tabs, isLive);
@@ -224,6 +234,7 @@ function DesktopBanner({
               onOpenSessions={onOpenSessions}
               onOpenActivity={onOpenActivity}
               onOpenDelete={onOpenDelete}
+              onOpenCampaignSettings={onOpenCampaignSettings}
             />
           </div>
         </div>
@@ -283,6 +294,7 @@ function BannerActions({
   onOpenSessions,
   onOpenActivity,
   onOpenDelete,
+  onOpenCampaignSettings,
 }: {
   uncampaigned: boolean;
   isLiveJoined: boolean;
@@ -290,7 +302,17 @@ function BannerActions({
   onOpenSessions: () => void;
   onOpenActivity: () => void;
   onOpenDelete: () => void;
+  onOpenCampaignSettings?: () => void;
 }) {
+  // Caller already gates on campaign attachment (#1087). separatorBefore rides on
+  // the settings item so a lone Delete never grows a stray divider.
+  const showSettings = Boolean(onOpenCampaignSettings);
+  const menuItems = [
+    ...(showSettings
+      ? [{ label: "Campaign settings…", onSelect: onOpenCampaignSettings! }]
+      : []),
+    { label: "Delete", onSelect: onOpenDelete, danger: true, separatorBefore: showSettings },
+  ];
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
       {/* Campaign-less characters have no doorway, so keep the invite here (#942). */}
@@ -316,11 +338,7 @@ function BannerActions({
       <button type="button" onClick={onOpenActivity} className={BANNER_LINK}>
         Activity
       </button>
-      <OverflowMenu
-        label="Sheet actions"
-        triggerClassName={BANNER_KEBAB}
-        items={[{ label: "Delete", onSelect: onOpenDelete, danger: true }]}
-      />
+      <OverflowMenu label="Sheet actions" triggerClassName={BANNER_KEBAB} items={menuItems} />
     </div>
   );
 }

@@ -116,6 +116,28 @@ describe("CharacterSheetHeader desktop session controls (#979)", () => {
   });
 });
 
+describe("CharacterSheetHeader campaign settings (#1087)", () => {
+  // Both breakpoints render in jsdom; the desktop banner's kebab is the second
+  // "Sheet actions" menu (MobileSheetHeader renders first).
+  it("shows 'Campaign settings…' in the desktop ⋮ and fires its handler when campaign-attached", () => {
+    const onOpenCampaignSettings = vi.fn();
+    renderHeader({ activeTab: "overview", onOpenCampaignSettings });
+    fireEvent.click(screen.getAllByRole("button", { name: /sheet actions/i })[1]);
+    fireEvent.click(screen.getByRole("menuitem", { name: /campaign settings/i }));
+    expect(onOpenCampaignSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it("omits 'Campaign settings…' for a campaign-less character", () => {
+    renderHeader({
+      activeTab: "overview",
+      character: makeCharacter({ campaignId: undefined }),
+      onOpenCampaignSettings: vi.fn(),
+    });
+    fireEvent.click(screen.getAllByRole("button", { name: /sheet actions/i })[1]);
+    expect(screen.queryByRole("menuitem", { name: /campaign settings/i })).not.toBeInTheDocument();
+  });
+});
+
 describe("CharacterSheetHeader banner chrome (#985)", () => {
   it("puts Delete behind the ⋯ overflow, never as a bare banner button", () => {
     renderHeader({ activeTab: "overview" });
