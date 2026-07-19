@@ -31,8 +31,9 @@ const KIND_ORDER: Record<RollModifier["kind"], number> = {
 
 // The noun phrase for one grant. Ability-scoped grants (Rage → Strength checks,
 // Restrained → Dexterity saving throws) name the ability via abilityLabel so we
-// never render a raw lowercase key.
-function categoryPhrase(mod: RollModifier): string {
+// never render a raw lowercase key. Takes just the kind/ability (not a full
+// RollModifier) so flat entries can be phrased without a lossy cast.
+function categoryPhrase(mod: { kind: RollModifier["kind"]; ability?: string }): string {
   switch (mod.kind) {
     case "attack":
       return "attack rolls";
@@ -63,25 +64,30 @@ function formatSigned(n: number): string {
   return n >= 0 ? `+${n}` : `−${Math.abs(n)}`;
 }
 
-// Flat-modifier clause (#1136): a single value hitting attack + check + save
-// collapses to "−N on d20 Tests" (Initiative is a Dex check, so it's subsumed);
-// any narrower coverage lists the categories explicitly. Distinct values (rare)
-// each get their own "; "-joined clause.
+// Every d20-Test category — the collapse to "d20 Tests" (SRD 5.2) fires only
+// when all four are covered, so a future attack+check+save-only modifier lists
+// its categories rather than silently claiming Initiative too.
+const ALL_D20_KINDS: RollModifier["kind"][] = ["attack", "check", "save", "initiative"];
+
+// Flat-modifier clause (#1136): a single value hitting every d20 Test collapses
+// to "−N on d20 Tests"; any narrower coverage lists the categories explicitly.
+// Grouped as full entries (not bare kinds) so an ability-scoped flat modifier
+// still names its ability. Distinct values (rare) each get a "; "-joined clause.
 function flatClause(mods: FlatRollEffect[]): string {
-  const byValue = new Map<number, RollModifier["kind"][]>();
+  const byValue = new Map<number, FlatRollEffect[]>();
   for (const m of mods) {
-    const kinds = byValue.get(m.modifier) ?? [];
-    if (!kinds.includes(m.kind)) kinds.push(m.kind);
-    byValue.set(m.modifier, kinds);
+    const entries = byValue.get(m.modifier) ?? [];
+    entries.push(m);
+    byValue.set(m.modifier, entries);
   }
   return [...byValue.entries()]
-    .map(([value, kinds]) => {
-      const kindSet = new Set(kinds);
-      if (kindSet.has("attack") && kindSet.has("check") && kindSet.has("save")) {
+    .map(([value, entries]) => {
+      const kindSet = new Set(entries.map((e) => e.kind));
+      if (ALL_D20_KINDS.every((k) => kindSet.has(k))) {
         return `${formatSigned(value)} on d20 Tests`;
       }
-      const ordered = [...kinds].sort((a, b) => KIND_ORDER[a] - KIND_ORDER[b]);
-      const phrases = [...new Set(ordered.map((kind) => categoryPhrase({ kind } as RollModifier)))];
+      const ordered = [...entries].sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind]);
+      const phrases = [...new Set(ordered.map(categoryPhrase))];
       return `${formatSigned(value)} on ${joinPhrases(phrases)}`;
     })
     .join("; ");
