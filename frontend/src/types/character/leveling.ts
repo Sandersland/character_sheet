@@ -35,6 +35,8 @@ export interface AdvancementEntry {
   kind: "asi" | "feat";
   /** PHB'24 Origin feat from a background (#1130): slot-exempt, not removable. */
   origin?: true;
+  /** Fighting Style feat (#1137): occupies a fightingStyle slot, not an ASI slot. */
+  slot?: "fightingStyle";
   /** Score bumps applied: e.g. { strength: 2 } or { dexterity: 1, constitution: 1 } */
   abilityDeltas: Record<string, number>;
   /** HP delta added to max/current at time of choice. */
@@ -98,6 +100,8 @@ export interface TakeFeatOperation {
   };
   /** Required when taking a half-feat (catalog or custom) with abilityOptions. */
   abilityChoice?: string;
+  /** #1137: routes a Fighting Style feat through its own slot partition. */
+  slot?: "fightingStyle";
 }
 
 export interface RemoveAdvancementOperation {

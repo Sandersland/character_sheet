@@ -572,3 +572,141 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
     });
   });
 });
+
+// #1137: Fighting Style feats are taken via the advancement endpoint's `slot:
+// "fightingStyle"` channel — a partition separate from the ASI slot cap.
+describe("Advancement — Fighting Style feat slot (#1137)", () => {
+  const XP_LVL_3 = 900; // level 3
+  const FS_ID = "test-adv-fs-1";
+  let fsDefenseId: string;
+  let generalId: string;
+
+  beforeAll(async () => {
+    const defense = await prisma.feat.upsert({
+      where: { name: "Defense (FS Suite)" },
+      create: {
+        name: "Defense (FS Suite)",
+        description: "+1 AC while armored.",
+        category: "fighting_style",
+        prerequisite: "Fighting Style feature",
+        improvements: [{ target: "armorClassWhileArmored", amount: 1 }] as unknown as Prisma.InputJsonValue,
+      },
+      update: { category: "fighting_style", improvements: [{ target: "armorClassWhileArmored", amount: 1 }] as unknown as Prisma.InputJsonValue },
+    });
+    fsDefenseId = defense.id;
+    const general = await prisma.feat.upsert({
+      where: { name: "General (FS Suite)" },
+      create: { name: "General (FS Suite)", description: "General feat.", category: "general", levelPrerequisite: 4 },
+      update: { category: "general", levelPrerequisite: 4, abilityOptions: [], abilityIncrease: 0 },
+    });
+    generalId = general.id;
+  });
+
+  afterAll(async () => {
+    await prisma.feat.deleteMany({ where: { name: { in: ["Defense (FS Suite)", "General (FS Suite)"] } } });
+  });
+
+  beforeEach(async () => {
+    await ensureTestOwner(OWNER_ID);
+    COOKIE = await authCookie(OWNER_ID);
+  });
+
+  afterEach(async () => {
+    await prisma.character.deleteMany({ where: { id: { in: [FS_ID, "test-adv-fs-mc"] } } });
+  });
+
+  async function createFighter(level: number, xp: number) {
+    await prisma.character.create({
+      data: {
+        ...FIXTURE, id: FS_ID, ownerId: OWNER_ID, experiencePoints: xp,
+        hitDice: { total: level, die: "d10", spent: 0 },
+        spellcasting: Prisma.JsonNull,
+        classEntries: { create: [{ position: 0, name: "Fighter", level }] },
+      },
+    });
+  }
+
+  it("Fighter takes a Fighting Style feat via the fightingStyle slot", async () => {
+    await createFighter(4, XP_LVL_4);
+    const res = await postAdvancement(FS_ID, {
+      operations: [{ type: "takeFeat", featId: fsDefenseId, slot: "fightingStyle" }],
+    });
+    expect(res.status).toBe(200);
+    const char = (await getCharacter(FS_ID)).body;
+    const fsEntry = char.advancements.find((a: { featName?: string }) => a.featName === "Defense (FS Suite)");
+    expect(fsEntry).toBeDefined();
+    expect(fsEntry.slot).toBe("fightingStyle");
+    // The ASI slot is untouched — the fs feat consumed no ASI slot.
+    expect(char.advancementSlots.used).toBe(0);
+  });
+
+  it("a Wizard cannot take a Fighting Style feat slot", async () => {
+    await prisma.character.create({
+      data: {
+        ...FIXTURE, id: FS_ID, ownerId: OWNER_ID, experiencePoints: XP_LVL_4,
+        hitDice: { total: 4, die: "d6", spent: 0 },
+        spellcasting: Prisma.JsonNull,
+        classEntries: { create: [{ position: 0, name: "Wizard", level: 4 }] },
+      },
+    });
+    const res = await postAdvancement(FS_ID, {
+      operations: [{ type: "takeFeat", featId: fsDefenseId, slot: "fightingStyle" }],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("a General feat cannot be taken via the fightingStyle slot", async () => {
+    await createFighter(4, XP_LVL_4);
+    const res = await postAdvancement(FS_ID, {
+      operations: [{ type: "takeFeat", featId: generalId, slot: "fightingStyle" }],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("a Fighting Style feat cannot be taken via the ASI slot (no slot tag)", async () => {
+    await createFighter(4, XP_LVL_4);
+    const res = await postAdvancement(FS_ID, {
+      operations: [{ type: "takeFeat", featId: fsDefenseId }],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects a duplicate Fighting Style feat", async () => {
+    // Fighter 1 / Paladin 2 → two fs slots, so the 2nd Defense fails on dedup,
+    // not on slot exhaustion.
+    await prisma.character.create({
+      data: {
+        ...FIXTURE, id: "test-adv-fs-mc", ownerId: OWNER_ID, experiencePoints: XP_LVL_3,
+        hitDice: { total: 3, die: "d10", spent: 0 },
+        spellcasting: Prisma.JsonNull,
+        classEntries: { create: [
+          { position: 0, name: "Fighter", level: 1 },
+          { position: 1, name: "Paladin", level: 2 },
+        ] },
+      },
+    });
+    const first = await postAdvancement("test-adv-fs-mc", {
+      operations: [{ type: "takeFeat", featId: fsDefenseId, slot: "fightingStyle" }],
+    });
+    expect(first.status).toBe(200);
+    const dup = await postAdvancement("test-adv-fs-mc", {
+      operations: [{ type: "takeFeat", featId: fsDefenseId, slot: "fightingStyle" }],
+    });
+    expect(dup.status).toBe(400);
+  });
+
+  it("holds a Fighting Style feat AND an ASI-slot feat without either consuming the other's slot", async () => {
+    await createFighter(4, XP_LVL_4);
+    const res = await postAdvancement(FS_ID, {
+      operations: [
+        { type: "takeFeat", featId: fsDefenseId, slot: "fightingStyle" },
+        { type: "takeFeat", featId: generalId },
+      ],
+    });
+    expect(res.status).toBe(200);
+    const char = (await getCharacter(FS_ID)).body;
+    expect(char.advancementSlots.used).toBe(1); // ASI slot: the general feat only
+    const fsEntry = char.advancements.find((a: { slot?: string }) => a.slot === "fightingStyle");
+    expect(fsEntry.featName).toBe("Defense (FS Suite)");
+  });
+});

@@ -118,6 +118,9 @@ export interface AdvancementEntry {
   /** PHB'24 Origin feat granted by a background (#1130): exempt from the ASI
    *  slot cap and never reversed on level-down; can't be removed via the route. */
   origin?: true;
+  /** Fighting Style feat (#1137): consumes a `fightingStyle` slot, not an ASI
+   *  slot. Absent ⇒ ASI-slot feat/ASI. Both partitions live in this one array. */
+  slot?: "fightingStyle";
   /** The raw score increases applied: e.g. { strength: 2 } or { dexterity: 1, constitution: 1 } */
   abilityDeltas: Record<string, number>;
   /** HP added to hitPoints.max/current (CON-mod change × hitDice.total). */
@@ -184,22 +187,35 @@ export function clampChoicesToCaps(
   return { clamped, removedCount };
 }
 
-// Single source of the ASI-slot cap policy (#1130), shared by every clamp-on-read
-// and reconcile-on-write site. Origin feats (background grants) are always kept
-// and never consume a slot; non-origin ASIs/feats keep the earliest `slotTotal`
-// (LIFO — the tail beyond the cap becomes `excess`). `kept` preserves the
-// original order (origin entries stay interleaved); `usedSlots` counts only the
-// slot-consuming entries kept.
+// Single source of the ASI-slot cap policy (#1130/#1137), shared by every
+// clamp-on-read and reconcile-on-write site. Three partitions in one array:
+// Origin feats (background grants) are always kept and consume no slot; Fighting
+// Style feats (slot "fightingStyle", #1137) keep the earliest `fightingStyleSlotTotal`
+// against their OWN cap; every other ASI/feat keeps the earliest `slotTotal`. Each
+// partition trims LIFO (the tail beyond its cap becomes `excess`). `kept` preserves
+// the original order; `usedSlots`/`usedFightingStyleSlots` count the kept
+// slot-consuming entries of each partition. fightingStyleSlotTotal defaults to
+// Infinity so non-reconcile callers (HP/concentration feat-bonus reads) keep every
+// fs feat without trimming — only the serialize clamp + reconciler pass the real cap.
 export function splitAdvancementsBySlotCap(
   advancements: AdvancementEntry[],
   slotTotal: number,
-): { kept: AdvancementEntry[]; excess: AdvancementEntry[]; usedSlots: number } {
+  fightingStyleSlotTotal = Number.POSITIVE_INFINITY,
+): { kept: AdvancementEntry[]; excess: AdvancementEntry[]; usedSlots: number; usedFightingStyleSlots: number } {
   const kept: AdvancementEntry[] = [];
   const excess: AdvancementEntry[] = [];
   let usedSlots = 0;
+  let usedFightingStyleSlots = 0;
   for (const entry of advancements) {
     if (entry.origin) {
       kept.push(entry);
+    } else if (entry.slot === "fightingStyle") {
+      if (usedFightingStyleSlots < fightingStyleSlotTotal) {
+        kept.push(entry);
+        usedFightingStyleSlots++;
+      } else {
+        excess.push(entry);
+      }
     } else if (usedSlots < slotTotal) {
       kept.push(entry);
       usedSlots++;
@@ -207,7 +223,7 @@ export function splitAdvancementsBySlotCap(
       excess.push(entry);
     }
   }
-  return { kept, excess, usedSlots };
+  return { kept, excess, usedSlots, usedFightingStyleSlots };
 }
 
 // Normalizer: tolerant of null (character has never used any resources) and future schema
