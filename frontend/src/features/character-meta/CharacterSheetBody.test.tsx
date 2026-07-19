@@ -44,3 +44,13 @@ describe("CharacterSheetBody combat slot (#960)", () => {
     expect(screen.getByText("overview-panel")).toBeInTheDocument();
   });
 });
+
+// #1083: +16px mobile breathing room under the collapsed-flush header.
+describe("CharacterSheetBody mobile breathing room (#1083)", () => {
+  it("pads the main landmark's top on mobile (pt-4), flush at bottom", () => {
+    render(<CharacterSheetBody {...props} activeTab="overview" />);
+    const main = screen.getByRole("main");
+    expect(main.className).toContain("pt-4");
+    expect(main.className).toContain("pb-0");
+  });
+});
