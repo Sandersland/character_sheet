@@ -18,12 +18,18 @@ export interface NewSpellsSelection {
   atCap: boolean;
   toggle: (spellId: string) => void;
   toggleForget: (entryId: string) => void;
+  /** #1131: new cantrips picked this level, kept separate from leveled learns. */
+  cantrips: number;
+  cantripSelectedIds: string[];
+  cantripsAtCap: boolean;
+  toggleCantrip: (spellId: string) => void;
 }
 
 export function useNewSpellsSelection(step: LevelUpStep): NewSpellsSelection {
   const { draft, setDraft } = useLevelUpStepContext();
-  const { count, maxSpellLevel, magicalSecrets, canSwap } = readNewSpellsMeta(step);
+  const { count, maxSpellLevel, magicalSecrets, canSwap, cantrips } = readNewSpellsMeta(step);
   const selectedIds = selectedSpellIds(draft.spellsLearned);
+  const cantripSelectedIds = selectedSpellIds(draft.cantripsLearned);
   const forgottenEntryId = draft.spellsForgotten?.[0]?.entryId ?? null;
   // #1101: a staged swap raises the learn cap by one (the extra replacement pick).
   const cap = count + (draft.spellsForgotten?.length ?? 0);
@@ -35,6 +41,13 @@ export function useNewSpellsSelection(step: LevelUpStep): NewSpellsSelection {
     }));
   }
 
+  function toggleCantrip(spellId: string) {
+    setDraft((prev) => ({
+      ...prev,
+      cantripsLearned: toggleLearnSpell(prev.cantripsLearned ?? [], spellId, cantrips),
+    }));
+  }
+
   function toggleForget(entryId: string) {
     setDraft((prev) => ({ ...prev, ...toggleForgetSpell(prev, entryId, count) }));
   }
@@ -42,5 +55,6 @@ export function useNewSpellsSelection(step: LevelUpStep): NewSpellsSelection {
   return {
     count, maxSpellLevel, magicalSecrets, canSwap,
     selectedIds, forgottenEntryId, atCap: selectedIds.length >= cap, toggle, toggleForget,
+    cantrips, cantripSelectedIds, cantripsAtCap: cantripSelectedIds.length >= cantrips, toggleCantrip,
   };
 }

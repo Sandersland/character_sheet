@@ -11,16 +11,20 @@ export interface NewSpellsMeta {
   magicalSecrets: boolean;
   /** #1101/#1127: an onLevelUp-cadence caster may swap one prepared spell this level-up. */
   canSwap: boolean;
+  /** #1131: new cantrips to pick this level (0 when the cantrips-known column is flat). */
+  cantrips: number;
 }
 
-/** Safe reads of the newSpells step: count, the derived ceiling, secrets, and swap flags. */
+/** Safe reads of the newSpells step: count, the derived ceiling, secrets, swap, and cantrip count. */
 export function readNewSpellsMeta(step: LevelUpStep): NewSpellsMeta {
   const max = step.meta?.maxSpellLevel;
+  const cantrips = step.meta?.cantrips;
   return {
     count: step.count ?? 0,
     maxSpellLevel: typeof max === "number" ? max : 0,
     magicalSecrets: step.meta?.magicalSecrets === true,
     canSwap: step.meta?.canSwap === true,
+    cantrips: typeof cantrips === "number" ? cantrips : 0,
   };
 }
 
@@ -65,6 +69,12 @@ export function eligibleNewSpells(
   const onList = (s: CatalogSpell) =>
     opts.magicalSecrets ? s.classes.some((c) => MAGICAL_SECRETS_LISTS.includes(c)) : s.classes.includes(className);
   return (catalog ?? []).filter((s) => s.level >= 1 && s.level <= opts.maxSpellLevel && onList(s));
+}
+
+/** Catalog cantrips (level 0) on the class's list — the level-up cantrip picks (#1131). */
+export function eligibleNewCantrips(catalog: CatalogSpell[] | null, className: string): CatalogSpell[] {
+  const cls = className.toLowerCase();
+  return (catalog ?? []).filter((s) => s.level === 0 && s.classes.includes(cls));
 }
 
 /** Toggle a catalog spell in the draft's learnSpell ops; refuses to add past `cap`. */
