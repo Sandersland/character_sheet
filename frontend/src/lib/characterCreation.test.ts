@@ -29,6 +29,7 @@ function makeClass(overrides: Partial<ClassOption> = {}): ClassOption {
     toolProficiencies: [],
     toolChoices: [],
     toolChoiceCount: 0,
+    level1SpellPicks: null,
     ...overrides,
   };
 }
@@ -84,6 +85,8 @@ function makeDraft(overrides: Partial<CharacterDraft> = {}): CharacterDraft {
     backgroundAbilities: {},
     skillProficiencies: [],
     toolChoices: [],
+    cantripIds: [],
+    spellIds: [],
     equipmentDraft: null,
     ...overrides,
   };
@@ -325,5 +328,43 @@ describe("buildCreatePayload", () => {
     const skills = deriveSkillChoices(draft, selections);
     const payload = buildCreatePayload(draft, selections, skills, ["Thieves' Tools"]);
     expect(payload.toolChoices).toEqual(["Thieves' Tools"]);
+  });
+});
+
+describe("creation spells (#1131)", () => {
+  const caster = makeClass({ name: "Wizard", level1SpellPicks: { cantrips: 3, spells: 4 } });
+  const casterSelections = { race: undefined, class: caster, background: undefined };
+  const completeCaster = {
+    name: "Mo", alignment: "Neutral Good", race: "Elf", className: "Wizard", background: "Sage",
+  };
+
+  it("creationMissing blocks an incomplete caster's spell picks", () => {
+    const draft = makeDraft({ ...completeCaster, cantripIds: ["c1"], spellIds: [] });
+    expect(creationMissing(draft, casterSelections)).toEqual(["Cantrips: choose 3", "Spells: choose 4"]);
+  });
+
+  it("creationMissing passes a complete caster", () => {
+    const draft = makeDraft({ ...completeCaster, cantripIds: ["c1", "c2", "c3"], spellIds: ["s1", "s2", "s3", "s4"] });
+    expect(creationMissing(draft, casterSelections)).toEqual([]);
+  });
+
+  it("creationMissing never blocks a non-caster on spells", () => {
+    const draft = makeDraft({ name: "F", alignment: "Neutral Good", race: "Elf", className: "Rogue", background: "Sage" });
+    expect(creationMissing(draft, resolveSelections(reference, draft))).toEqual([]);
+  });
+
+  it("buildCreatePayload includes spells for a caster", () => {
+    const draft = makeDraft({ name: "Mo", className: "Wizard", cantripIds: ["c1"], spellIds: ["s1"] });
+    const skills = deriveSkillChoices(draft, casterSelections);
+    const payload = buildCreatePayload(draft, casterSelections, skills, []);
+    expect(payload.spells).toEqual({ cantripIds: ["c1"], spellIds: ["s1"] });
+  });
+
+  it("buildCreatePayload omits spells for a non-caster", () => {
+    const draft = makeDraft({ name: "F", className: "Rogue" });
+    const selections = resolveSelections(reference, draft);
+    const skills = deriveSkillChoices(draft, selections);
+    const payload = buildCreatePayload(draft, selections, skills, []);
+    expect(payload.spells).toBeUndefined();
   });
 });

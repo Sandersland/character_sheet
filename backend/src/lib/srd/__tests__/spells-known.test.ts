@@ -6,15 +6,29 @@ import { describe, it, expect } from "vitest";
 // re-prepare classes (Cleric/Druid/Paladin/Ranger). Filename kept per #1127 AC.
 import {
   levelUpSpellPicks,
+  levelUpCantripPicks,
+  cantripsKnownAtLevel,
+  preparedSpellCountAt,
   maxSpellLevelForClass,
 } from "@/lib/srd/spellcasting-tables.js";
 
 describe("levelUpSpellPicks — 2024 new-spell pick count on level-up", () => {
-  it("Wizard scribes a flat 2 per level from level 2 up, 0 at level 1", () => {
-    expect(levelUpSpellPicks("wizard", 1)).toBe(0);
+  it("Wizard scribes 4 at level 1 (its prepared count), then a flat 2 per level (#1131)", () => {
+    expect(levelUpSpellPicks("wizard", 1)).toBe(4);
     expect(levelUpSpellPicks("wizard", 2)).toBe(2);
     expect(levelUpSpellPicks("Wizard", 8)).toBe(2);
     expect(levelUpSpellPicks("wizard", 20)).toBe(2);
+  });
+
+  it("level-1 picks equal the class's prepared count for every caster; 0 for non-casters (#1131)", () => {
+    for (const cls of ["wizard", "cleric", "druid", "bard", "sorcerer", "warlock", "paladin", "ranger"]) {
+      expect(levelUpSpellPicks(cls, 1)).toBe(preparedSpellCountAt(cls, 1));
+    }
+    expect(levelUpSpellPicks("wizard", 1)).toBe(4);
+    expect(levelUpSpellPicks("cleric", 1)).toBe(4);
+    expect(levelUpSpellPicks("paladin", 1)).toBe(2);
+    expect(levelUpSpellPicks("fighter", 1)).toBe(0);
+    expect(levelUpSpellPicks("monk", 1)).toBe(0);
   });
 
   it("Sorcerer offers the prepared-count delta on each onLevelUp level", () => {
@@ -37,9 +51,10 @@ describe("levelUpSpellPicks — 2024 new-spell pick count on level-up", () => {
     expect(levelUpSpellPicks("warlock", 11)).toBe(1);
   });
 
-  it("re-prepare classes never offer a level-up pick (Cleric/Druid/Paladin/Ranger)", () => {
+  it("re-prepare classes offer only the level-1 initial picks, then 0 (Cleric/Druid/Paladin/Ranger) (#1131)", () => {
     for (const cls of ["cleric", "druid", "paladin", "ranger"]) {
-      for (let lvl = 1; lvl <= 20; lvl++) expect(levelUpSpellPicks(cls, lvl)).toBe(0);
+      expect(levelUpSpellPicks(cls, 1)).toBe(preparedSpellCountAt(cls, 1));
+      for (let lvl = 2; lvl <= 20; lvl++) expect(levelUpSpellPicks(cls, lvl)).toBe(0);
     }
   });
 
@@ -53,6 +68,35 @@ describe("levelUpSpellPicks — 2024 new-spell pick count on level-up", () => {
     expect(levelUpSpellPicks("fighter", 3, "Eldritch Knight")).toBe(3); // first prepared: 0 → 3
     expect(levelUpSpellPicks("fighter", 4, "Eldritch Knight")).toBe(1); // 3 → 4
     expect(levelUpSpellPicks("rogue", 12, "Arcane Trickster")).toBe(0); // 8 → 8
+  });
+});
+
+describe("levelUpCantripPicks — 2024 cantrip pick count on level-up (#1131)", () => {
+  it("offers the cantrips-known delta on a growth level", () => {
+    expect(levelUpCantripPicks("warlock", 4)).toBe(1); // 2 → 3
+    expect(levelUpCantripPicks("cleric", 4)).toBe(1); // 3 → 4
+    expect(levelUpCantripPicks("wizard", 10)).toBe(1); // 4 → 5
+  });
+
+  it("level-1 picks equal the full cantrips-known count for every caster", () => {
+    for (const cls of ["wizard", "cleric", "druid", "bard", "sorcerer", "warlock"]) {
+      expect(levelUpCantripPicks(cls, 1)).toBe(cantripsKnownAtLevel(cls, 1));
+    }
+  });
+
+  it("is 0 on a flat cantrip level and for Paladin/Ranger (no cantrips)", () => {
+    expect(levelUpCantripPicks("warlock", 5)).toBe(0); // 3 → 3
+    for (let lvl = 1; lvl <= 20; lvl++) expect(levelUpCantripPicks("paladin", lvl)).toBe(0);
+    for (let lvl = 1; lvl <= 20; lvl++) expect(levelUpCantripPicks("ranger", lvl)).toBe(0);
+  });
+
+  it("third casters (EK/AT) gain 2 at level 3 and 1 more at level 10", () => {
+    expect(levelUpCantripPicks("fighter", 3, "Eldritch Knight")).toBe(2); // 0 → 2
+    expect(levelUpCantripPicks("rogue", 10, "Arcane Trickster")).toBe(1); // 2 → 3
+  });
+
+  it("is 0 for a non-caster at every level", () => {
+    for (let lvl = 1; lvl <= 20; lvl++) expect(levelUpCantripPicks("fighter", lvl)).toBe(0);
   });
 });
 

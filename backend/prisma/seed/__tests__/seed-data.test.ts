@@ -33,6 +33,7 @@ import { SPELLS } from "../spells.js";
 import { PACKS } from "../packs.js";
 import { SUBCLASS_GRANTED_SPELLS } from "../subclass-granted-spells.js";
 import { FEAT_IMPROVEMENT_TARGETS } from "@/lib/srd/feats.js";
+import { cantripsKnownAtLevel, preparedSpellCountAt } from "@/lib/srd/srd.js";
 
 // The values that repeat when a list has a duplicate on `key`.
 const duplicates = <T>(values: T[]): T[] =>
@@ -137,6 +138,25 @@ describe("FEATS — PHB'24 category invariants", () => {
     ];
     const missing = srd.filter((n) => !names.has(n));
     expect(missing, "missing SRD 5.2.1 feats").toEqual([]);
+  });
+});
+
+// #1131: the creation spell picker needs real choice — strictly MORE spells on a
+// class's list than it takes at level 1, so a fresh caster is never forced.
+describe("SPELLS — creation picker coverage (#1131)", () => {
+  const onList = (cls: string, level: number) =>
+    SPELLS.filter((s) => s.level === level && s.classes.includes(cls)).length;
+
+  it("every cantrip-casting class has more cantrips than it knows at level 1", () => {
+    for (const cls of ["bard", "cleric", "druid", "sorcerer", "wizard", "warlock"]) {
+      expect(onList(cls, 0), `${cls} cantrips`).toBeGreaterThan(cantripsKnownAtLevel(cls, 1));
+    }
+  });
+
+  it("every level-1 caster has more first-level spells than it prepares at level 1", () => {
+    for (const cls of ["bard", "cleric", "druid", "sorcerer", "wizard", "warlock", "paladin", "ranger"]) {
+      expect(onList(cls, 1), `${cls} L1 spells`).toBeGreaterThan(preparedSpellCountAt(cls, 1) ?? 0);
+    }
   });
 });
 

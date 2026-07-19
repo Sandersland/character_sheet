@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { createCharacter, fetchItems } from "@/api/client";
@@ -63,6 +63,19 @@ export function useCharacterCreation(): CharacterCreation {
   useEffect(() => {
     fetchItems().then(setCatalog).catch(() => {});
   }, []);
+
+  // #1131: switching class invalidates the chosen spells (different list + counts),
+  // so clear them on an actual change — the ref guards against the initial mount
+  // (and a restored draft), which must keep the persisted picks.
+  const prevClassName = useRef(draft.className);
+  useEffect(() => {
+    if (prevClassName.current !== draft.className) {
+      prevClassName.current = draft.className;
+      if (draft.cantripIds.length > 0 || draft.spellIds.length > 0) {
+        update({ cantripIds: [], spellIds: [] });
+      }
+    }
+  }, [draft.className, draft.cantripIds.length, draft.spellIds.length, update]);
 
   const selections = resolveSelections(reference, draft);
   const skillChoices = deriveSkillChoices(draft, selections);

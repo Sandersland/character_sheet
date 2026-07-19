@@ -9,6 +9,7 @@ import IdentitySection from "@/features/character-create/IdentitySection";
 import PreviewSection from "@/features/character-create/PreviewSection";
 import SkillSection from "@/features/character-create/SkillSection";
 import Spinner from "@/components/ui/Spinner";
+import SpellSelectionSection from "@/features/character-create/SpellSelectionSection";
 import StartingEquipmentSection from "@/features/character-create/StartingEquipmentSection";
 import ToolProficiencySection from "@/features/character-create/ToolProficiencySection";
 import { useCharacterCreation } from "@/hooks/useCharacterCreation";
@@ -103,6 +104,16 @@ export default function CharacterCreatePage() {
               selectedToolChoices={toolChoices.selectedToolChoices}
               toggleToolChoice={toolChoices.toggleToolChoice}
             />
+
+            {selections.class?.level1SpellPicks && (
+              <SpellSelectionSection
+                className={draft.className}
+                counts={selections.class.level1SpellPicks}
+                cantripIds={draft.cantripIds}
+                spellIds={draft.spellIds}
+                onChange={update}
+              />
+            )}
 
             <StartingEquipmentSection
               startingEquipment={selections.class?.startingEquipment}

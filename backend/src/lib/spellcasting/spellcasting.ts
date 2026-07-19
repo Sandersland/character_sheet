@@ -251,6 +251,12 @@ function catalogSpellToEntry(catalogSpell: Spell): SpellEntry {
   };
 }
 
+// #1131: a creation-time pick — the same catalog snapshot, but prepared (a fresh
+// caster's chosen cantrips + level-1 spells are all prepared from the start).
+export function creationSpellEntry(catalogSpell: Spell): SpellEntry {
+  return { ...catalogSpellToEntry(catalogSpell), prepared: true };
+}
+
 // Build a learned SpellEntry from custom DM-authored input.
 function customSpellToEntry(custom: CustomSpellInput): SpellEntry {
   return {

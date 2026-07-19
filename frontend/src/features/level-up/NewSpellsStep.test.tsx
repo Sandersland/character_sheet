@@ -63,6 +63,7 @@ function Harness({ step, character }: { step: LevelUpStep; character: Character 
       <NewSpellsStep step={step} />
       <output data-testid="picks">{JSON.stringify(draft.spellsLearned ?? [])}</output>
       <output data-testid="forgets">{JSON.stringify(draft.spellsForgotten ?? [])}</output>
+      <output data-testid="cantrips">{JSON.stringify(draft.cantripsLearned ?? [])}</output>
     </LevelUpStepContext.Provider>
   );
 }
@@ -127,6 +128,35 @@ describe("NewSpellsStep", () => {
     render(<Harness step={newSpellsStep(2)} character={caster()} />);
     expect(await screen.findByText(/You learn 2 new spells\./i)).toBeInTheDocument();
     expect(screen.queryByText(/You may also swap one spell for another/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("NewSpellsStep — cantrip picks (#1131)", () => {
+  it("shows a cantrip section alongside the leveled picker and records a cantrip pick", async () => {
+    const user = userEvent.setup();
+    render(<Harness step={newSpellsStep(1, { maxSpellLevel: 2, cantrips: 1 })} character={caster()} />);
+    expect(await screen.findByText(/Choose 1 cantrip/)).toBeInTheDocument();
+    // The cantrip (Firebolt) is offered in the cantrip section; the leveled picker still lists Shield.
+    await user.click(await screen.findByRole("button", { name: /Firebolt/ }));
+    await waitFor(() =>
+      expect(screen.getByTestId("cantrips")).toHaveTextContent(
+        JSON.stringify([{ type: "learnSpell", spellId: "Firebolt" }]),
+      ),
+    );
+    expect(screen.getByRole("button", { name: /Shield/ })).toBeInTheDocument();
+    // A leveled pick stays in spellsLearned, never in cantripsLearned.
+    await user.click(screen.getByRole("button", { name: /Shield/ }));
+    expect(screen.getByTestId("picks")).toHaveTextContent(
+      JSON.stringify([{ type: "learnSpell", spellId: "Shield" }]),
+    );
+  });
+
+  it("a cantrips-only level (count 0, no swap) hides the leveled picker", async () => {
+    render(<Harness step={newSpellsStep(0, { cantrips: 1 })} character={caster()} />);
+    expect(await screen.findByText(/Choose 1 cantrip/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Search spells")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Firebolt/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Shield/ })).not.toBeInTheDocument();
   });
 });
 

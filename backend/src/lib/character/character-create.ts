@@ -8,7 +8,14 @@ import {
   catalogItemDetailInclude,
   selectAutoEquip,
 } from "@/lib/inventory/inventory.js";
-import { ALIGNMENTS, deriveCreatedCharacter, isKnownTool } from "@/lib/srd/srd.js";
+import {
+  ALIGNMENTS,
+  cantripsKnownAtLevel,
+  deriveCreatedCharacter,
+  isKnownTool,
+  maxSpellLevelForClass,
+  preparedSpellCountAt,
+} from "@/lib/srd/srd.js";
 import { ABILITY_CAP } from "@/lib/leveling/advancement.js";
 import {
   normalizeResourcesMutable,
@@ -17,6 +24,8 @@ import {
   type FeatImprovement,
 } from "@/lib/classes/resources.js";
 import { STARTING_EQUIPMENT } from "@/lib/inventory/starting-equipment.js";
+import { creationSpellEntry } from "@/lib/spellcasting/spellcasting.js";
+import type { SpellEntry } from "@/lib/spellcasting/spell-state.js";
 import type { CreateCharacterBody } from "./character-schemas.js";
 
 // Discriminated result: return just the new id so the route re-fetches by id
@@ -599,6 +608,109 @@ async function materializeStartingEquipment(
   return { ok: true, inventoryItemCreates, startingCurrency };
 }
 
+type CreationSpellRow = NonNullable<Awaited<ReturnType<typeof prisma.spell.findFirst>>>;
+
+// Validate one chosen catalog row against the class list and its expected level
+// band (cantrip = level 0; leveled = 1..maxLevel). Null when the pick is legal.
+function creationPickError(
+  row: CreationSpellRow | undefined,
+  id: string,
+  kind: "cantrip" | "spell",
+  className: string,
+  classDisplay: string,
+  maxLevel: number,
+): Fail | null {
+  if (!row) return { ok: false, status: 400, error: `Unknown spell id: ${id}` };
+  if (kind === "cantrip" && row.level !== 0) {
+    return { ok: false, status: 400, error: `${row.name} is not a cantrip` };
+  }
+  if (kind === "spell" && (row.level < 1 || row.level > maxLevel)) {
+    return { ok: false, status: 400, error: `${row.name} is not a spell ${classDisplay} can learn at level 1 (max spell level: ${maxLevel})` };
+  }
+  if (!row.classes.includes(className)) {
+    return { ok: false, status: 400, error: `${row.name} is not on the ${classDisplay} spell list` };
+  }
+  return null;
+}
+
+type CreationSpells = NonNullable<CreateCharacterBody["spells"]>;
+
+// Precondition + count checks for creation picks: the class must cast at level 1,
+// the two lists must match the SRD 5.2 level-1 counts, and no id may repeat.
+function creationSpellCountError(
+  spells: CreationSpells,
+  className: string,
+  classDisplay: string,
+  subclass: string | null,
+): Fail | null {
+  const spellCount = preparedSpellCountAt(className, 1, subclass);
+  if (spellCount == null) {
+    return { ok: false, status: 400, error: `${classDisplay} does not cast spells at level 1` };
+  }
+  const cantripCount = cantripsKnownAtLevel(className, 1, subclass);
+  if (spells.cantripIds.length !== cantripCount) {
+    return { ok: false, status: 400, error: `Expected ${cantripCount} cantrip(s), got ${spells.cantripIds.length}` };
+  }
+  if (spells.spellIds.length !== spellCount) {
+    return { ok: false, status: 400, error: `Expected ${spellCount} level-1 spell(s), got ${spells.spellIds.length}` };
+  }
+  const allIds = [...spells.cantripIds, ...spells.spellIds];
+  if (new Set(allIds).size !== allIds.length) {
+    return { ok: false, status: 400, error: "A spell can be chosen only once" };
+  }
+  return null;
+}
+
+// Phase 2b — creation spell picks (#1131). A level-1 caster's chosen cantrips +
+// prepared spells become prepared SpellEntry snapshots; every count/list/level is
+// validated against the SRD 5.2 tables via one catalog read. Omitting `spells`
+// yields a null book (back-compat); a non-caster sending `spells` is a 400.
+async function resolveCreationSpells(
+  input: CreateCharacterBody,
+  selections: ResolvedSelections,
+): Promise<PhaseResult<{ spellEntries: SpellEntry[] | null }>> {
+  const { spells } = input;
+  if (!spells) return { ok: true, spellEntries: null };
+
+  const classDisplay = selections.characterClass.name;
+  const className = classDisplay.toLowerCase();
+  const subclass = selections.subclassName;
+  const countError = creationSpellCountError(spells, className, classDisplay, subclass);
+  if (countError) return countError;
+
+  const allIds = [...spells.cantripIds, ...spells.spellIds];
+  const rows = allIds.length ? await prisma.spell.findMany({ where: { id: { in: allIds } } }) : [];
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const maxLevel = maxSpellLevelForClass(className, 1, subclass);
+
+  const entries: SpellEntry[] = [];
+  for (const [ids, kind] of [[spells.cantripIds, "cantrip"], [spells.spellIds, "spell"]] as const) {
+    for (const id of ids) {
+      const row = byId.get(id);
+      const error = creationPickError(row, id, kind, className, classDisplay, maxLevel);
+      if (error) return error;
+      entries.push(creationSpellEntry(row!));
+    }
+  }
+  return { ok: true, spellEntries: entries };
+}
+
+// The Origin feat rides resources.advancements as a slot-exempt entry (#1130);
+// undefined when the background grants none (the column is left at its default).
+function creationResources(originEntry: AdvancementEntry | null): Prisma.InputJsonValue | undefined {
+  if (!originEntry) return undefined;
+  const state = normalizeResourcesMutable(null);
+  state.advancements = [originEntry];
+  return serializeResourcesState(state);
+}
+
+// The mutable spellcasting blob for a caster's creation picks (all prepared),
+// or Prisma's JSON-null sentinel for a non-caster / no picks (#1131).
+function creationSpellcasting(spellEntries: SpellEntry[] | null): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  if (!spellEntries) return Prisma.JsonNull;
+  return { slotsUsed: {}, arcanumUsed: {}, spells: spellEntries, concentratingOn: null } as unknown as Prisma.InputJsonValue;
+}
+
 // Phase 3 — ability/HP seeding, spell/proficiency setup (deriveCreatedCharacter)
 // and persistence. Returns just the new id; the route re-fetches + serializes.
 async function persistCreatedCharacter(
@@ -606,7 +718,8 @@ async function persistCreatedCharacter(
   ownerId: string,
   selections: ResolvedSelections,
   equipment: MaterializedEquipment,
-  grants: BackgroundGrants
+  spellEntries: SpellEntry[] | null,
+  grants: BackgroundGrants,
 ): Promise<{ id: string }> {
   const { race, characterClass, background, primaryClassChoice } = selections;
   const { inventoryItemCreates, startingCurrency } = equipment;
@@ -623,13 +736,7 @@ async function persistCreatedCharacter(
     { race, characterClass }
   );
 
-  // Origin feat rides the resources.advancements array as a slot-exempt entry.
-  let resources: Prisma.InputJsonValue | undefined;
-  if (originEntry) {
-    const state = normalizeResourcesMutable(null);
-    state.advancements = [originEntry];
-    resources = serializeResourcesState(state);
-  }
+  const resources = creationResources(originEntry);
 
   const created = await prisma.character.create({
     data: {
@@ -646,10 +753,7 @@ async function persistCreatedCharacter(
       toolProficiencies: derived.toolProficiencies as unknown as Prisma.InputJsonValue,
       // Override derived currency with starting gold if the gold path was chosen.
       ...(startingCurrency ? { currency: startingCurrency } : {}),
-      // Prisma represents an explicit JSON null distinctly from "field
-      // omitted" — derived.spellcasting is the app-level `null`, swapped
-      // here for the sentinel Prisma's Json column type expects.
-      spellcasting: Prisma.JsonNull,
+      spellcasting: creationSpellcasting(spellEntries),
       raceSelection: { create: { name: input.race, raceId: race.id } },
       backgroundSelection: {
         create: { name: input.background, backgroundId: background?.id ?? null },
@@ -691,6 +795,9 @@ export async function createCharacter(
   const equipment = await materializeStartingEquipment(input, selections.primaryClassChoice.name);
   if (!equipment.ok) return equipment;
 
-  const { id } = await persistCreatedCharacter(input, ownerId, selections, equipment, grants);
+  const spells = await resolveCreationSpells(input, selections);
+  if (!spells.ok) return spells;
+
+  const { id } = await persistCreatedCharacter(input, ownerId, selections, equipment, spells.spellEntries, grants);
   return { ok: true, id };
 }

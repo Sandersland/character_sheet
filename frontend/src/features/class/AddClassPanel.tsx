@@ -1,28 +1,27 @@
 /**
  * AddClassPanel — inline "multiclass into a new class" affordance for the class
  * section. Surfaces the 5e ability prerequisites the backend serves (per
- * ClassOption.multiclassPrerequisite) and rejects ineligible picks locally; the
- * server re-validates and its error is surfaced on failure.
+ * ClassOption.multiclassPrerequisite) and rejects ineligible picks locally.
+ * #1131: picking a class routes into the shared level-up ceremony
+ * (?classId=<id>), which handles HP, spells/cantrips, and the atomic commit.
  */
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-import { rollDie } from "@/lib/dice";
-import { dieFaces } from "@/lib/hitDice";
 import { multiclassPrereqMet } from "@/lib/multiclass";
-import type { AddClassOperation, Character, ClassOption } from "@/types/character";
+import type { Character, ClassOption } from "@/types/character";
 
 interface Props {
   character: Character;
   referenceClasses: ClassOption[];
   busy: boolean;
-  onAddClass: (op: AddClassOperation) => void;
 }
 
-export default function AddClassPanel({ character, referenceClasses, busy, onAddClass }: Props) {
+export default function AddClassPanel({ character, referenceClasses, busy }: Props) {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [classId, setClassId] = useState("");
-  const [method, setMethod] = useState<"average" | "roll">("average");
 
   // Classes the character doesn't already have a level in.
   const ownedNames = new Set((character.classes ?? []).map((c) => c.name.toLowerCase()));
@@ -41,10 +40,7 @@ export default function AddClassPanel({ character, referenceClasses, busy, onAdd
 
   function handleAdd() {
     if (!selected || !selectedMet) return;
-    const roll = method === "roll" ? rollDie(dieFaces(selected.hitDie)) : undefined;
-    onAddClass({ type: "addClass", classId: selected.id, method, roll });
-    setOpen(false);
-    setClassId("");
+    navigate(`/characters/${character.id}/level-up?classId=${selected.id}`);
   }
 
   if (!canAddClass) {
@@ -103,34 +99,6 @@ export default function AddClassPanel({ character, referenceClasses, busy, onAdd
           {selected.name} requires {selected.multiclassPrerequisite.description}.
         </p>
       )}
-
-      <fieldset className="flex flex-col gap-1.5">
-        <legend className="text-[11px] font-semibold uppercase tracking-wide text-parchment-600">
-          Hit points for the new level
-        </legend>
-        <div className="flex gap-4 text-sm text-parchment-700">
-          <label className="flex items-center gap-1.5">
-            <input
-              type="radio"
-              name="add-class-hp"
-              checked={method === "average"}
-              onChange={() => setMethod("average")}
-              disabled={busy}
-            />
-            Average
-          </label>
-          <label className="flex items-center gap-1.5">
-            <input
-              type="radio"
-              name="add-class-hp"
-              checked={method === "roll"}
-              onChange={() => setMethod("roll")}
-              disabled={busy}
-            />
-            Roll {selected?.hitDie ?? ""}
-          </label>
-        </div>
-      </fieldset>
 
       <div className="flex gap-2">
         <button

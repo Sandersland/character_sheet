@@ -174,6 +174,8 @@ export interface LevelUpSubmission {
   toolProficiencies?: LearnToolProficiencyOperation[];
   subclassChoices?: LearnSubclassChoiceOperation[];
   spellsLearned?: LearnSpellOperation[];
+  /** #1131: new cantrips this level — counted against the newSpells step's meta.cantrips. */
+  cantripsLearned?: LearnSpellOperation[];
   /** #1101: the one optional known-spell swap forget, offset by an extra learn. */
   spellsForgotten?: ForgetSpellOperation[];
 }

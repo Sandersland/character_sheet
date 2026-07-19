@@ -162,6 +162,28 @@ describe("draftSatisfies", () => {
     expect(draftSatisfies({ kind: "review" }, empty)).toBe(true);
   });
 
+  it("newSpells also requires the meta.cantrips count of cantripsLearned (#1131)", () => {
+    // Cleric 3→4: count 0, cantrips 1 — needs one cantrip and nothing else.
+    const cantripOnly: LevelUpStep = { kind: "newSpells", count: 0, meta: { cantrips: 1 } };
+    expect(draftSatisfies(cantripOnly, empty)).toBe(false);
+    expect(
+      draftSatisfies(cantripOnly, { ...empty, cantripsLearned: [{ type: "learnSpell", spellId: "c1" }] }),
+    ).toBe(true);
+
+    // Warlock 3→4: 1 spell AND 1 cantrip — the spell alone is not enough.
+    const both: LevelUpStep = { kind: "newSpells", count: 1, meta: { cantrips: 1, canSwap: true } };
+    expect(
+      draftSatisfies(both, { ...empty, spellsLearned: [{ type: "learnSpell", spellId: "s1" }] }),
+    ).toBe(false);
+    expect(
+      draftSatisfies(both, {
+        ...empty,
+        spellsLearned: [{ type: "learnSpell", spellId: "s1" }],
+        cantripsLearned: [{ type: "learnSpell", spellId: "c1" }],
+      }),
+    ).toBe(true);
+  });
+
   it("newSpells swap: a count-0 step needs a replacement learn per forget (#1101)", () => {
     const swapStep: LevelUpStep = { kind: "newSpells", count: 0, meta: { canSwap: true } };
     // No swap taken → trivially satisfied.

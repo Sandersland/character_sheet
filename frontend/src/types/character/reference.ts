@@ -98,6 +98,8 @@ export interface ClassOption {
   toolChoices: string[];
   /** Number of tool choices the player may make. */
   toolChoiceCount: number;
+  /** #1131: level-1 creation pick counts (SRD 5.2); null for a non-caster. */
+  level1SpellPicks: { cantrips: number; spells: number } | null;
 }
 
 /** A background's Origin feat (PHB'24), served by GET /api/reference. */
@@ -165,4 +167,6 @@ export interface CreateCharacterInput {
   /** Tool names chosen by the player (from class toolChoices). */
   toolChoices?: string[];
   startingEquipment?: StartingEquipmentInput;
+  /** #1131: a level-1 caster's chosen cantrips + prepared spells (catalog ids). */
+  spells?: { cantripIds: string[]; spellIds: string[] };
 }

@@ -15,6 +15,10 @@ vi.mock("@/api/client", () => ({
   fetchDisciplines: vi.fn(),
 }));
 
+// AddClassPanel (rendered via ClassRosterSection) navigates into the ceremony
+// (#1131); stub useNavigate so these Router-less renders don't throw.
+vi.mock("react-router-dom", () => ({ useNavigate: () => vi.fn() }));
+
 function makeCharacter(resources: Partial<CharacterResources>): Character {
   return {
     id: "char-1",

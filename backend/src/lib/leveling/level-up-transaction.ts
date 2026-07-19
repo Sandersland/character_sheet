@@ -18,7 +18,7 @@ import {
 } from "@/lib/classes/class.js";
 import type { FightingStyleKey } from "@/lib/srd/fighting-styles.js";
 import { applyResourceOpInTx, type ResourceOperation } from "@/lib/classes/resources.js";
-import { applySpellcastingOpInTx, type SpellcastingOperation } from "@/lib/spellcasting/spellcasting.js";
+import { applySpellcastingOpInTx, type LearnSpellOperation, type SpellcastingOperation } from "@/lib/spellcasting/spellcasting.js";
 import { normalizeSpellcastingMutable } from "@/lib/spellcasting/spell-state.js";
 import {
   applyLevelUpHpInTx,
@@ -170,8 +170,9 @@ const STEP_OP_BUILDERS: Record<LevelUpStepKind, (submission: LevelUpSubmission, 
       .map((op) => ({ domain: "resources", op })),
   // #1101: forgets apply BEFORE learns (ops run sequentially in tx order), so a
   // swap can re-learn the just-forgotten spellId without tripping the dup guard.
+  // #1131: cantrips are ordinary learns applied first (disjoint from the swap).
   newSpells: (s) =>
-    [...(s.spellsForgotten ?? []), ...(s.spellsLearned ?? [])].map((op) => ({ domain: "spellcasting", op })),
+    [...(s.cantripsLearned ?? []), ...(s.spellsForgotten ?? []), ...(s.spellsLearned ?? [])].map((op) => ({ domain: "spellcasting", op })),
   review: () => [],
 };
 
@@ -206,6 +207,32 @@ const RESOURCE_BACKED: ReadonlySet<LevelUpStepKind> = new Set([
   "maneuvers", "disciplines", "toolProficiency", "subclassChoice",
 ]);
 
+// #1131: cantrip picks must reference level-0 spells and leveled picks level-1+.
+// One catalog read validates both id lists before the tx opens (the count check
+// in validateLevelUpSubmission can't see spell levels). Unknown ids fall through
+// to applyLearnSpellOp's own not-found error. Custom ops carry their own level.
+async function assertPickSpellLevels(submission: LevelUpSubmission): Promise<void> {
+  const cantripOps = submission.cantripsLearned ?? [];
+  const spellOps = submission.spellsLearned ?? [];
+  const ids = [...cantripOps, ...spellOps].map((o) => o.spellId).filter((id): id is string => Boolean(id));
+  const rows = ids.length
+    ? await prisma.spell.findMany({ where: { id: { in: ids } }, select: { id: true, level: true } })
+    : [];
+  const levelById = new Map(rows.map((r) => [r.id, r.level]));
+  const levelOf = (op: LearnSpellOperation): number | undefined =>
+    op.spellId ? levelById.get(op.spellId) : op.custom?.level;
+  for (const op of cantripOps) {
+    if (levelOf(op) !== undefined && levelOf(op) !== 0) {
+      throw new InvalidLevelUpError("Only cantrips (level 0) may be chosen as new cantrips.");
+    }
+  }
+  for (const op of spellOps) {
+    if (levelOf(op) === 0) {
+      throw new InvalidLevelUpError("A cantrip cannot be chosen as a leveled spell.");
+    }
+  }
+}
+
 /**
  * Validate `submission` against the character's derived level-up plan and apply
  * every resulting choice (hit points, advancement, subclass, subclass-derived
@@ -222,6 +249,7 @@ export async function applyLevelUpTransaction(
     await resolveLevelUpContext(characterId, submission.target, submission.subclassId);
 
   const steps = validateLevelUpSubmission(planCharacter, targetEntry, chosenSubclassName, submission);
+  await assertPickSpellLevels(submission);
 
   if (!targetIsPrimary && steps.some((s) => RESOURCE_BACKED.has(s.kind))) {
     throw new InvalidLevelUpError(

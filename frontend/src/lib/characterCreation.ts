@@ -1,6 +1,7 @@
 import { abilityModifier } from "@/lib/abilities";
 import { draftToInput } from "@/lib/startingEquipment";
 import { missingRequirements } from "@/lib/characterCreationValidation";
+import { creationSpellCounts, creationSpellsMissing } from "@/lib/creationSpells";
 import type { CharacterDraft } from "@/hooks/useCharacterDraft";
 import type {
   AbilityName,
@@ -176,6 +177,8 @@ export function creationMissing(
     startingEquipment: selections.class?.startingEquipment ?? null,
     equipmentDraft: draft.equipmentDraft,
   });
+  // #1131: a level-1 caster must finish its cantrip + spell picks.
+  missing.push(...creationSpellsMissing(creationSpellCounts(selections.class), draft.cantripIds, draft.spellIds));
   // A specced background requires a complete ability spread before saving (#1130).
   const bonuses = deriveBackgroundBonuses(draft, selections);
   if (bonuses.applicable && !bonuses.complete) missing.push("Background ability scores");
@@ -206,5 +209,9 @@ export function buildCreatePayload(
     toolChoices: selectedToolChoices.length > 0 ? selectedToolChoices : undefined,
     portraitUrl: draft.portraitUrl.trim() || null,
     startingEquipment: resolveEquipmentInput(draft, selections.class) ?? undefined,
+    // #1131: casters send their prepared picks; a non-caster omits the field.
+    ...(selections.class?.level1SpellPicks
+      ? { spells: { cantripIds: draft.cantripIds, spellIds: draft.spellIds } }
+      : {}),
   };
 }

@@ -3,7 +3,7 @@
 // and composes per-feature subcomponents. Mirrors SpellsSection's orchestrator/row split.
 
 import { applyClassTransactions } from "@/api/client";
-import type { AddClassOperation, Character, ClassOption, FightingStyleKey } from "@/types/character";
+import type { Character, ClassOption, FightingStyleKey } from "@/types/character";
 import { deriveClassFeatureView } from "@/lib/classFeatures";
 import { useClassTransactions } from "@/features/class/useClassTransactions";
 import ClassFeaturesList from "@/features/class/ClassFeaturesList";
@@ -35,7 +35,6 @@ export default function ClassFeaturesSection({ character, referenceClasses, onUp
         referenceClasses={referenceClasses}
         rosterEntries={view.rosterEntries}
         busy={busy}
-        onAddClass={(op: AddClassOperation) => run(() => applyClassTransactions(character.id, [op]))}
       />
 
       <SubclassSection

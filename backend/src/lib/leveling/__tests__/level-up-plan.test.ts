@@ -149,11 +149,49 @@ describe("buildLevelUpPlan — newSpells (2024 prepared model)", () => {
     expect(step?.meta?.canSwap).toBe(true);
   });
 
-  it("re-prepare classes (Cleric/Druid/Paladin/Ranger) never get a newSpells step", () => {
+  it("re-prepare classes get a cantrip-only newSpells step at cantrip levels, none otherwise (#1131)", () => {
+    // Cleric/Druid gain a cantrip at level 4 → a count-0 cantrips-only step, no swap.
+    const cleric = buildLevelUpPlan(char("cleric", 3), target("cleric", 4)).find((s) => s.kind === "newSpells");
+    expect(cleric?.count).toBe(0);
+    expect(cleric?.meta?.cantrips).toBe(1);
+    expect(cleric?.meta?.canSwap).toBeUndefined();
+    // Flat levels (no new spells, no new cantrips) still emit nothing.
     expect(kinds(buildLevelUpPlan(char("cleric", 4), target("cleric", 5)))).not.toContain("newSpells");
     expect(kinds(buildLevelUpPlan(char("druid", 4), target("druid", 5)))).not.toContain("newSpells");
-    expect(kinds(buildLevelUpPlan(char("paladin", 4), target("paladin", 5)))).not.toContain("newSpells");
-    expect(kinds(buildLevelUpPlan(char("ranger", 4), target("ranger", 5)))).not.toContain("newSpells");
+    // Paladin/Ranger prepare no cantrips → never a step from cantrips.
+    expect(kinds(buildLevelUpPlan(char("paladin", 3), target("paladin", 4)))).not.toContain("newSpells");
+    expect(kinds(buildLevelUpPlan(char("ranger", 3), target("ranger", 4)))).not.toContain("newSpells");
+  });
+
+  it("warlock 3→4 offers a spell and a cantrip (#1131)", () => {
+    const step = buildLevelUpPlan(char("warlock", 3), target("warlock", 4)).find((s) => s.kind === "newSpells");
+    expect(step?.count).toBe(1);
+    expect(step?.meta?.cantrips).toBe(1);
+  });
+
+  // A fresh level-1 entry offers its full initial picks with no swap (a new
+  // entry must not swap other classes' spells, #1131).
+  const freshL1 = (cls: string) => buildLevelUpPlan(char(cls, 0), target(cls, 1)).find((s) => s.kind === "newSpells");
+
+  it("a fresh level-1 Cleric offers 4 spells + 3 cantrips, no swap (#1131)", () => {
+    expect(freshL1("cleric")).toMatchObject({ count: 4, meta: { cantrips: 3 } });
+    expect(freshL1("cleric")?.meta?.canSwap).toBeUndefined();
+  });
+
+  it("a fresh level-1 Paladin offers 2 spells, no cantrips, no swap (#1131)", () => {
+    expect(freshL1("paladin")?.count).toBe(2);
+    expect(freshL1("paladin")?.meta?.cantrips).toBeUndefined();
+    expect(freshL1("paladin")?.meta?.canSwap).toBeUndefined();
+  });
+
+  it("a fresh level-1 Wizard offers 4 spells + 3 cantrips, no swap (#1131)", () => {
+    expect(freshL1("wizard")).toMatchObject({ count: 4, meta: { cantrips: 3 } });
+    expect(freshL1("wizard")?.meta?.canSwap).toBeUndefined();
+  });
+
+  it("a fresh onLevelUp caster (Sorcerer) gets no swap at level 1; a Fighter emits nothing (#1131)", () => {
+    expect(freshL1("sorcerer")?.meta?.canSwap).toBeUndefined();
+    expect(kinds(buildLevelUpPlan(char("fighter", 0), target("fighter", 1)))).not.toContain("newSpells");
   });
 
   it("emits a swap-only newSpells step on a flat onLevelUp level (Warlock 9→10, #1101)", () => {

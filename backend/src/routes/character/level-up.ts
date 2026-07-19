@@ -138,6 +138,7 @@ const levelUpSubmissionSchema = z.object({
   toolProficiencies: z.array(learnToolProficiencyOpSchema).optional(),
   subclassChoices: z.array(learnSubclassChoiceOpSchema).optional(),
   spellsLearned: z.array(learnSpellOpSchema).optional(),
+  cantripsLearned: z.array(learnSpellOpSchema).optional(),
   spellsForgotten: z.array(forgetSpellOpSchema).optional(),
 });
 
