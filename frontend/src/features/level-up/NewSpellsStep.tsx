@@ -86,11 +86,19 @@ export default function NewSpellsStep({ step }: { step: LevelUpStep }) {
   const filtered = filterCatalog(eligible, search, "");
   const swapCandidates = swappableKnownSpells(character.spellcasting?.spells ?? []);
 
+  // #1139: spell out that the N learns and the optional swap are separate rules.
+  const learnCopy = count > 0
+    ? `You learn ${count} new spell${count === 1 ? "" : "s"}.${canSwap ? " You may also swap one spell you know for another." : ""}`
+    : null;
+
   return (
     <div>
       <p className="text-center text-sm font-medium text-parchment-700">
         {budgetHeadline(count, selectedIds.length, forgottenEntryId != null)}
       </p>
+      {learnCopy && (
+        <p className="mt-1 text-center text-xs text-parchment-600">{learnCopy}</p>
+      )}
       {canSwap && (
         <SwapPanel candidates={swapCandidates} forgottenEntryId={forgottenEntryId} onToggle={toggleForget} />
       )}

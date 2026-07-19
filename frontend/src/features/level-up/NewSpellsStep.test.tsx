@@ -115,6 +115,18 @@ describe("NewSpellsStep", () => {
     expect(await screen.findByText("CureWounds")).toBeInTheDocument();
     expect(screen.getByText(/any class/i)).toBeInTheDocument();
   });
+
+  it("states the learn count and, when swaps are allowed, that the swap is separate (#1139)", async () => {
+    render(<Harness step={newSpellsStep(1, { maxSpellLevel: 2, canSwap: true })} character={casterWithBook(BOOK)} />);
+    expect(await screen.findByText(/You learn 1 new spell\./i)).toBeInTheDocument();
+    expect(screen.getByText(/You may also swap one spell you know for another\./i)).toBeInTheDocument();
+  });
+
+  it("omits the swap sentence when the step cannot swap (#1139)", async () => {
+    render(<Harness step={newSpellsStep(2)} character={caster()} />);
+    expect(await screen.findByText(/You learn 2 new spells\./i)).toBeInTheDocument();
+    expect(screen.queryByText(/You may also swap one spell you know for another/i)).not.toBeInTheDocument();
+  });
 });
 
 const BOOK = [
