@@ -15,7 +15,6 @@ import { TurnStateProvider, useTurnStateContext } from "@/features/session/TurnS
 import { useSessionDoorway } from "@/features/session/useSessionDoorway";
 import { useLiveRound } from "@/features/session/useLiveRound";
 import SessionDoorway from "@/features/session/SessionDoorway";
-import LiveSessionStrip from "@/features/session/LiveSessionStrip";
 import CombatLivePanel from "@/features/session/CombatLivePanel";
 import { useCombatLifecycle } from "@/features/session/useCombatLifecycle";
 import EndSessionPrompt from "@/features/session/EndSessionPrompt";
@@ -46,12 +45,6 @@ export default function CharacterSheetContent(props: CharacterSheetContentProps)
   );
 }
 
-/** The live session's title for the header strip/fight bar — hoisted to module
- *  scope so the workspace's JSX stays a plain call (no added branch complexity). */
-function sessionTitle(session: ReturnType<typeof useSessionDoorway>): string | null {
-  return session.activeSession?.title ?? null;
-}
-
 /**
  * The sheet body: banner + tab panels + the roll/modal chrome. Split from
  * CharacterSheetPage so the page holds only load/error/guard states and this
@@ -80,20 +73,16 @@ function CharacterSheetWorkspace({
   const collapse = useScrollCollapse();
   const goToCombat = () => onTabChange("combat");
 
-  // #961/#1026: while a session is live + joined, off-Combat tabs show a "Go to
-  // fight" strip (an in-workspace jump to Combat) instead of the doorway — but
-  // only on DESKTOP. On mobile the header live pill carries live state, so
-  // SessionCue returns null there (no strip). The Combat nav item carries a live
-  // pip. On the Combat tab, no strip (D4) — the panel is the context.
-  // Non-joined/starting states keep the existing doorway.
+  // #1085: while live + joined the header cluster is the sole live indicator —
+  // SessionCue renders nothing on either breakpoint (the Combat nav item still
+  // carries a live pip). Non-joined/starting states keep the existing doorway;
+  // on the Combat tab nothing renders (D4) — the panel is the context.
   const isLiveJoined = live.status === "liveJoined";
   const isLive = isLiveJoined || live.status === "liveNotJoined";
   const cueProps = {
     activeTab,
     isLiveJoined,
     session,
-    liveRound,
-    onGoToCombat: goToCombat,
   };
 
   // The End/Leave-session lifecycle lifts here (#979) so the persistent sheet
@@ -128,7 +117,6 @@ function CharacterSheetWorkspace({
           onTabChange={onTabChange}
           isLive={isLive}
           liveRound={liveRound}
-          sessionName={sessionTitle(session)}
           isLiveJoined={isLiveJoined}
           sessionActionBusy={life.sessionActionBusy}
           onLeaveSession={life.handleLeave}
@@ -141,8 +129,8 @@ function CharacterSheetWorkspace({
           onOpenDelete={modals.openDelete}
         />
 
-        {/* Desktop: the session cue (live-strip when joined, else doorway),
-            pinned under the garnet banner; absent on the Combat tab (#961). */}
+        {/* Desktop: session doorway for non-joined states, pinned under the
+            header; absent on the Combat tab and while joined (#1085). */}
         <SessionCue placement="desktop" {...cueProps} />
 
         <CharacterSheetModals
@@ -273,40 +261,24 @@ function renderLivePanel(
 }
 
 /**
- * The off-Combat session cue (#961): the live-joined "Go to fight" strip (an
- * in-workspace jump to Combat) when live+joined, else the existing doorway
- * (start / join / scheduled). Renders nothing on the Combat tab (D4), and
- * nothing when live+joined on mobile — the header pill carries live state there
- * (#1026), so only desktop shows the strip.
+ * The off-Combat session cue (#961): the existing doorway (start / join /
+ * scheduled) for characters not yet in the session. Live-joined state now lives
+ * only in the sheet header cluster (#1085), so a joined character sees no cue
+ * here on either breakpoint; also nothing on the Combat tab (D4).
  */
 function SessionCue({
   placement,
   activeTab,
   isLiveJoined,
   session,
-  liveRound,
-  onGoToCombat,
 }: {
   placement: "desktop" | "mobile";
   activeTab: SheetTabId;
   isLiveJoined: boolean;
   session: ReturnType<typeof useSessionDoorway>;
-  liveRound: number | null;
-  onGoToCombat: () => void;
 }) {
   if (activeTab === "combat") return null;
-  if (isLiveJoined) {
-    // Mobile carries live state via the header pill now (#1026); only desktop
-    // keeps the full-width live strip.
-    if (placement === "mobile") return null;
-    return (
-      <LiveSessionStrip
-        title={session.activeSession?.title ?? null}
-        round={liveRound}
-        onGoToCombat={onGoToCombat}
-      />
-    );
-  }
+  if (isLiveJoined) return null;
   return (
     <SessionDoorway
       placement={placement}

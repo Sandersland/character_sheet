@@ -4,6 +4,7 @@ import { login } from "./helpers/auth";
 import {
   createCharacter,
   createSessionCharacter,
+  enterLiveCombat,
   gotoSheet,
   learnSpells,
   uniqueName,
@@ -169,7 +170,7 @@ test("visual: session / turn view", async ({ page }) => {
 
   await setTheme(page, "light");
   await page.goto(`/characters/${id}`);
-  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
   await expect(page.getByRole("button", { name: /Start combat/i })).toBeVisible();
   await ready(page);

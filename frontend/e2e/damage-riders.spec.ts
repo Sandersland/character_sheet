@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { createCharacter, uniqueName } from "./helpers/api";
+import { enterLiveCombat, createCharacter, uniqueName } from "./helpers/api";
 
 // A Flame Tongue-style weapon (dice-valued passiveBonus damage cap, requires
 // attunement) adds a typed +2d6 fire rider to its damage roll in the attack
@@ -61,7 +61,7 @@ test("damage riders: attuned Flame Tongue adds a typed +2d6 fire term to its att
 
   const errors = collectConsoleErrors(page);
   await page.goto(`/characters/${characterId}`);
-  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();

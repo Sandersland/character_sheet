@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
-import { findCharacterByName, removeCondition } from "./helpers/api";
+import { enterLiveCombat, findCharacterByName, removeCondition } from "./helpers/api";
 import { collectConsoleErrors } from "./helpers/console";
 
 // Compact conditions strip on mobile (#769): the slim session strip opens a
@@ -18,7 +18,7 @@ test("session conditions strip (mobile): tap, apply a condition, see it reflect 
 
   const errors = collectConsoleErrors(page);
   await page.getByRole("link", { name: /Session Fighter/ }).click();
-  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
   const strip = page.getByRole("button", { name: /manage conditions/i });

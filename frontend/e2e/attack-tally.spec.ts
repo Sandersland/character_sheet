@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { login } from "./helpers/auth";
 import { collectConsoleErrors } from "./helpers/console";
-import { findCharacterByName } from "./helpers/api";
+import { enterLiveCombat, findCharacterByName } from "./helpers/api";
 
 // Shared setup: deterministic dice (face = 1 + floor(0.5 * faces) → d20 always
 // 11, never nat 20/1, so no auto-verdict steals the manual-call paths under
@@ -22,7 +22,7 @@ async function openAttackSheet(page: import("@playwright/test").Page) {
   // that button appearing confirms the sheet rendered.
   await expect(page.getByRole("button", { name: "Switch character" })).toBeVisible();
 
-  await page.getByRole("button", { name: /(Start|Resume|Join) session|Go to fight/i }).click();
+  await enterLiveCombat(page);
   await expect(page).toHaveURL(/[?&]tab=combat/);
 
   await page.getByRole("button", { name: /Start combat/i }).click();
