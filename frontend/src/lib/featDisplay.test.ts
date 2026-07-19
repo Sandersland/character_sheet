@@ -32,6 +32,10 @@ describe("featOfferedForAsiSlot", () => {
     expect(featOfferedForAsiSlot(feat({ category: "epic_boon" }), 18)).toBe(false);
     expect(featOfferedForAsiSlot(feat({ category: "epic_boon" }), 19)).toBe(true);
   });
+
+  it("fails safe-closed for an unknown future category", () => {
+    expect(featOfferedForAsiSlot(feat({ category: "mystery" as never }), 20)).toBe(false);
+  });
 });
 
 describe("featAbilityChipLabel", () => {

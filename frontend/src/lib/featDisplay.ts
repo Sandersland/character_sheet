@@ -1,9 +1,10 @@
 import { abilityAbbr, abilityLabel } from "@/lib/abilities";
 import type { CatalogFeat } from "@/types/character";
 
-// Mirror of the backend featOfferedForAsiSlot (lib/srd/feats.ts) — filters the
-// ASI-slot feat picker. Origin/Fighting Style never appear; General unlocks at
-// level 4 and Epic Boon at 19 unless levelPrerequisite overrides (PHB'24 pp. 87-88).
+// Mirror of the backend featOfferedForAsiSlot (lib/srd/feats.ts) — update both.
+// Filters the ASI-slot feat picker: Origin/Fighting Style never appear; General
+// unlocks at level 4 and Epic Boon at 19 unless levelPrerequisite overrides
+// (PHB'24 pp. 87-88). The server gate in resolveCatalogFeat is authoritative.
 export function featOfferedForAsiSlot(
   feat: Pick<CatalogFeat, "category" | "levelPrerequisite">,
   level: number,
@@ -16,6 +17,8 @@ export function featOfferedForAsiSlot(
       return level >= (feat.levelPrerequisite ?? 4);
     case "epic_boon":
       return level >= (feat.levelPrerequisite ?? 19);
+    default:
+      return false; // unknown future category — fail safe-closed, never leak feats
   }
 }
 

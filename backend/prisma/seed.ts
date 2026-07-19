@@ -281,6 +281,13 @@ async function seedFeats(prisma: PrismaClient) {
       },
     });
   }
+  // Log before the destructive drop so the operator sees what's removed (a future
+  // homebrew feat row not in FEATS would be dropped here — intentional for 2014 rows).
+  const stale = await prisma.feat.findMany({
+    where: { name: { notIn: FEATS.map((f) => f.name) } },
+    select: { name: true },
+  });
+  if (stale.length) console.log(`seedFeats: dropping stale catalog rows: ${stale.map((f) => f.name).join(", ")}`);
   await prisma.feat.deleteMany({ where: { name: { notIn: FEATS.map((f) => f.name) } } });
 }
 

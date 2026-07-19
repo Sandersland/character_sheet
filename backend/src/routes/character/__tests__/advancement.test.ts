@@ -172,6 +172,20 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
       update: { category: "epic_boon", levelPrerequisite: 19, abilityOptions: ["strength"], abilityIncrease: 1 },
     });
     epicBoonFeatId = epicBoonFeat.id;
+
+    // PHB'24 Alert models initiative as +PB via scaling: "proficiencyBonus" — assert
+    // the improvements JSON (incl. scaling) round-trips through GET /api/feats.
+    const scalingImprovements = [{ target: "initiative", amount: 1, scaling: "proficiencyBonus" }];
+    await prisma.feat.upsert({
+      where: { name: "Scaling Test Feat (Advancement Suite)" },
+      create: {
+        name: "Scaling Test Feat (Advancement Suite)",
+        description: "Initiative scales with PB.",
+        category: "origin",
+        improvements: scalingImprovements as unknown as Prisma.InputJsonValue,
+      },
+      update: { improvements: scalingImprovements as unknown as Prisma.InputJsonValue },
+    });
   });
 
   afterAll(async () => {
@@ -180,7 +194,7 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
       where: { name: { in: [
         "Alert (Advancement Suite)", "Mobile (Advancement Suite)", "Tough (Advancement Suite)",
         "Origin Test Feat (Advancement Suite)", "Fighting Style Test Feat (Advancement Suite)",
-        "Boon Test Feat (Advancement Suite)",
+        "Boon Test Feat (Advancement Suite)", "Scaling Test Feat (Advancement Suite)",
       ] } },
     });
     await prisma.characterClass.deleteMany({ where: { name: CLASS_NAME } });
@@ -549,6 +563,12 @@ describe("Advancement — feat improvements (Alert / Mobile / Tough)", () => {
       const origin = res.body.find((f: { name: string }) => f.name === "Origin Test Feat (Advancement Suite)");
       expect(origin.category).toBe("origin");
       expect(origin.levelPrerequisite).toBeUndefined();
+    });
+
+    it("round-trips a scaling improvement (proficiencyBonus) unchanged", async () => {
+      const res = await supertest.agent(app).set("Cookie", COOKIE).get("/api/feats");
+      const scaling = res.body.find((f: { name: string }) => f.name === "Scaling Test Feat (Advancement Suite)");
+      expect(scaling.improvements).toEqual([{ target: "initiative", amount: 1, scaling: "proficiencyBonus" }]);
     });
   });
 });

@@ -22,6 +22,8 @@ export function featOfferedForAsiSlot(
       return level >= (feat.levelPrerequisite ?? 4);
     case "epic_boon":
       return level >= (feat.levelPrerequisite ?? 19);
+    default:
+      return false; // unknown future category — fail safe-closed, never leak feats
   }
 }
 

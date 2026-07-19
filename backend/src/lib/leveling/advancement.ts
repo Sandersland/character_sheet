@@ -109,6 +109,7 @@ export function reverseAdvancementEffects(
   return { scores: newScores, hitPoints: newHp, initiativeBonus: newInit };
 }
 
+// fallow-ignore-next-line code-duplication -- advancement operation types intentionally mirror the frontend wire types (types/character/leveling.ts); cross-workspace clone, shared-types consolidation is #820
 export interface TakeAsiOperation {
   type: "takeAsi";
   /** One or two increases summing to exactly 2, each capped at 1 or 2. */

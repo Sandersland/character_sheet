@@ -5,7 +5,10 @@
 // Improvement is NOT seeded — it stays the takeAsi advancement branch.
 // Deeper per-feat mechanics are surfaced as description text, not automated.
 
-export type FeatCategory = "origin" | "general" | "fighting_style" | "epic_boon";
+// Local (unexported) mirror of the backend FeatCategory (lib/srd/feats.ts) and
+// frontend FeatCategory (types/character/leveling.ts) — three copies because the
+// seed can't import from @/lib/ (tsx alias) or the frontend; update all three together.
+type FeatCategory = "origin" | "general" | "fighting_style" | "epic_boon";
 
 export interface FeatImprovement {
   target: string;
@@ -178,7 +181,7 @@ export const FEATS: FeatSeed[] = [
       "Increase the chosen ability score, and you gain proficiency in saving throws using that ability.",
     category: "general",
     levelPrerequisite: 4,
-    abilityOptions: ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"],
+    abilityOptions: ALL_ABILITIES,
     abilityIncrease: 1,
   },
   {

@@ -29,6 +29,11 @@ describe("featOfferedForAsiSlot", () => {
     expect(featOfferedForAsiSlot({ category: "epic_boon", levelPrerequisite: null }, 18)).toBe(false);
     expect(featOfferedForAsiSlot({ category: "epic_boon", levelPrerequisite: null }, 19)).toBe(true);
   });
+
+  it("fails safe-closed for an unknown future category", () => {
+    // A category added to the DB enum but not to the switch must never leak feats.
+    expect(featOfferedForAsiSlot({ category: "mystery" as never, levelPrerequisite: null }, 20)).toBe(false);
+  });
 });
 
 // PHB'24: Alert's initiative bonus scales with Proficiency Bonus rather than a

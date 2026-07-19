@@ -110,6 +110,7 @@ export interface FeatImprovement {
  * Stores the deltas applied so reversal subtracts exactly what was added —
  * never recomputes from ability scores, which may have changed since.
  */
+// fallow-ignore-next-line code-duplication -- FeatImprovement/AdvancementEntry intentionally mirror the frontend wire types (types/character/leveling.ts); cross-workspace clone, shared-types consolidation is #820
 export interface AdvancementEntry {
   id: string;                            // per-character entry UUID (operation target)
   level: number;                         // character level when taken (informational)
