@@ -139,6 +139,7 @@ function CharacterSheetWorkspace({
           onOpenSessions={modals.openSessions}
           onOpenActivity={modals.openActivity}
           onOpenDelete={modals.openDelete}
+          onOpenCampaignSettings={modals.openCampaignSettings}
         />
 
         {/* Desktop: the session cue (live-strip when joined, else doorway),
@@ -153,10 +154,12 @@ function CharacterSheetWorkspace({
           deleteOpen={modals.deleteOpen}
           activityOpen={modals.activityOpen}
           sessionsOpen={modals.sessionsOpen}
+          campaignSettingsOpen={modals.campaignSettingsOpen}
           captureOpen={captureOpen}
           onCloseDelete={modals.closeDelete}
           onCloseActivity={modals.closeActivity}
           onCloseSessions={modals.closeSessions}
+          onCloseCampaignSettings={modals.closeCampaignSettings}
           onCloseCapture={closeCapture}
         />
 
@@ -319,21 +322,26 @@ function SessionCue({
   );
 }
 
-/** The sheet's modal open-state + toggles (delete / activity / sessions),
- *  factored out so the workspace body stays free of inline handler closures. */
+/** The sheet's modal open-state + toggles (delete / activity / sessions /
+ *  campaign settings), factored out so the workspace body stays free of inline
+ *  handler closures. */
 function useSheetModals() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [campaignSettingsOpen, setCampaignSettingsOpen] = useState(false);
   return {
     deleteOpen,
     activityOpen,
     sessionsOpen,
+    campaignSettingsOpen,
     openDelete: () => setDeleteOpen(true),
     closeDelete: () => setDeleteOpen(false),
     openActivity: () => setActivityOpen(true),
     closeActivity: () => setActivityOpen(false),
     openSessions: () => setSessionsOpen(true),
     closeSessions: () => setSessionsOpen(false),
+    openCampaignSettings: () => setCampaignSettingsOpen(true),
+    closeCampaignSettings: () => setCampaignSettingsOpen(false),
   };
 }
